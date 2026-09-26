@@ -168,10 +168,6 @@ fn claim_stmt(stmt: &Stmt, claimed: &mut HashSet<u32>) {
             claim_catch(fac.catch.as_ref(), claimed);
         }
         StmtKind::Incipit(incipit) => claim_if_body(&incipit.body, claimed),
-        StmtKind::Cura(cura) => {
-            claim_block(&cura.body, claimed);
-            claim_catch(cura.catch.as_ref(), claimed);
-        }
     }
 }
 

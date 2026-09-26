@@ -1,12 +1,12 @@
 +++
 term = "cape"
 kind = "reject"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "dum_stmt", "itera_stmt", "cura_stmt", "cape_clause", "si_stmt", "iace_stmt", "fac_stmt", "redde_stmt", "expression", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "dum_stmt", "itera_stmt", "cape_clause", "si_stmt", "iace_stmt", "fac_stmt", "redde_stmt", "expression", "literal", "nota_stmt"]
 category = "lane"
 canonical = false
-summary = "cape AIR decline rows: whole-loop dum/itera cape stays out under the loop-spectrum causes, a rethrow from a recovery arm declines (rethrow_in_recovery), and the cura construct keeps its independent deferred-init keep-out."
+summary = "cape AIR decline rows: whole-loop dum/itera cape stays out under the loop-spectrum causes, a rethrow from a recovery arm declines (rethrow_in_recovery)."
 syntax = "dum <cond> { … } cape <err> { … }"
-related = ["cape", "dum", "itera", "cura", "iace", "receptio-air"]
+related = ["cape", "dum", "itera", "iace", "receptio-air"]
 locale = "la"
 +++
 
@@ -25,9 +25,6 @@ locale = "la"
 #   3. rethrow — a throw from inside the catch arm is a rethrow; it
 #      declines to Tier 2 fail-closed and is never silently treated as a
 #      recovered value: SEM059 rethrow_in_recovery
-#   4. cura construct — the cape handler itself does not decline; the
-#      construct's independent deferred-init ruling keeps the function out
-#      of AIR: SEM059 deferred_local_init
 #
 # Common mistakes:
 #   • expecting the trailing loop `cape` to recover per iteration — the
@@ -36,10 +33,8 @@ locale = "la"
 #   • expecting a rethrow to admit because the region admitted — the
 #      recovery arm is checked as a catch region; throwing from it is the
 #      named Tier 2 decline
-#   • reading the cura row as a handler decline — the handler admits; the
-#      construct's own keep-out is what fails
 #
-# See also: cape, dum, itera, cura, iace, receptio-air
+# See also: cape, dum, itera, iace, receptio-air
 # =============================================================================
 
 # 1. whole-loop cape on dum — loop-spectrum keep-out
@@ -68,11 +63,4 @@ functio reicit(bivalens malum) → numerus ⇥ textus {
         iace "reicitur"
     }
     redde 2
-}
-
-# 4. cura construct — the handler admits; deferred-init keeps the function out
-@ radix lane "air"
-functio cura_recepta() → numerus {
-    cura "arena" fixum _ res { redde 1 } cape err { redde 0 }
-    redde 3
 }

@@ -264,7 +264,7 @@ fn hir_artifact_round_trip_all() {
 /// paths that move statements out of an authored block must preserve the
 /// block's `end` on the receiving block.
 ///
-/// Regression: the `fac … dum` loop wrap, `cura` scope lowering, and `proba`
+/// Regression: the `fac … dum` loop wrap and `proba`
 /// test-body splicing dropped `HirBlock::end` while `block_end_for` still
 /// recorded the end, leaving the sidecar with more entries than the tree.
 #[test]
@@ -287,19 +287,12 @@ fn structural_end_count_parity_across_splicing_paths() {
     let config = Config::default().with_dev_locale_root();
     let session = Session::new(config);
 
-    // Exercises the three splicing paths: fac…dum wrap, cura scope, proba body.
+    // Exercises the splicing paths: fac…dum wrap, proba body.
     let source = r#"
 functio fac_dum(numerus n) → numerus {
     fac {
         nota n
     } dum n > 0
-    redde n
-}
-
-functio cura_scope(numerus n) → numerus {
-    cura "arena" fixum numerus alloc {
-        redde n
-    }
     redde n
 }
 

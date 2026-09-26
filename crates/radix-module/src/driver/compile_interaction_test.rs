@@ -596,7 +596,6 @@ functio = "函数"
 fixum = "常量"
 usque = "到"
 redde = "返回"
-cura = "管护"
 
 [llm]
 system_prompt_snippet = "emit Chinese reader-locale Faber"
@@ -1142,22 +1141,6 @@ incipit {
 }
 
 #[test]
-fn rust_target_accepts_cura_cape_attachments() {
-    let session = test_session(Target::HirRust);
-    let source = r#"incipit {
-  cura "arena" fixum _ mem {
-    tacet
-  } cape err {
-    tacet
-  }
-}"#;
-    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
-
-    assert!(result.success(), "{:?}", result.diagnostics);
-    assert!(matches!(result.output, Some(crate::Output::Rust(_))));
-}
-
-#[test]
 fn rust_target_accepts_lege_expression() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
@@ -1205,39 +1188,6 @@ fn sed_expression_fails_with_generic_unknown_identifier() {
             .diagnostics
             .iter()
             .any(|diag| diag.code == Some("SEM001"))
-    );
-}
-
-#[test]
-fn rust_target_reports_cura_arena_noop_warning() {
-    let session = test_session(Target::HirRust);
-    let source = r#"incipit {
-  cura "arena" fixum _ mem {
-  }
-}"#;
-    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
-
-    result
-        .diagnostics
-        .iter()
-        .find(|d| !d.is_error() && d.code == Some("WARN007") && d.issue() == Some("rust_target_cura_arena_noop"))
-        .expect("Rust target cura arena warning");
-}
-
-#[test]
-fn typescript_target_skips_rust_specific_cura_arena_warning() {
-    let session = test_session(Target::HirTypeScript);
-    let source = r#"incipit {
-  cura "arena" fixum _ mem {
-  }
-}"#;
-    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
-
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .all(|d| d.issue() != Some("rust_target_cura_arena_noop"))
     );
 }
 

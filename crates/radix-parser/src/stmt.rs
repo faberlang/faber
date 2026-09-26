@@ -25,6 +25,11 @@ use radix_lexer::{Span, TokenKind};
 #[allow(clippy::wildcard_imports)]
 use radix_syntax::*;
 
+/// Retired allocator-scope statement keyword (DECISIONS D8.2).
+pub(super) const RETIRED_CURA: &str = "cura";
+/// Retired allocator-requirement function modifier (DECISIONS D8.2).
+pub(super) const RETIRED_CURATA: &str = "curata";
+
 // CONDITIONAL STATEMENTS
 
 impl Parser {
@@ -752,45 +757,33 @@ impl Parser {
         }))
     }
 
-    /// Parse `cura` allocator scope.
+    /// Whether the current word opens the retired `cura` allocator scope.
     ///
-    /// GRAMMAR:
-    ///   cura-stmt := `cura` STRING (`fixum`|`varia`) type ident block [`cape` ident block]
+    /// `cura` was removed (DECISIONS D8.2). The old statement shape was
+    /// `cura STRING …`; only that shape is diagnosed, so `cura` stays an
+    /// ordinary identifier everywhere else. Matching the canonical Latin
+    /// spelling is deliberate: the keyword no longer has pack rows.
+    pub(super) fn at_retired_cura_stmt(&self) -> bool {
+        self.current_ident_is(RETIRED_CURA) && matches!(self.peek_at(1).kind, TokenKind::String(_))
+    }
+
+    /// Whether the current word is the retired `curata` function modifier.
     ///
-    /// The allocator kind is a validated string so strategy names do not become
-    /// grammar words.
-    pub(super) fn parse_cura_stmt(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword_ident(TokenKind::Cura, "expected 'cura'")?;
+    /// The old shape was `curata IDENT [ut IDENT]` after the parameter list,
+    /// where no other identifier is legal.
+    pub(super) fn at_retired_curata_modifier(&self) -> bool {
+        self.current_ident_is(RETIRED_CURATA) && matches!(self.peek_at(1).kind, TokenKind::Ident(_))
+    }
 
-        let kind_span = self.current_span();
-        let kind_symbol = self.parse_string()?;
-        let kind_text = self.interner.resolve(kind_symbol);
-        let kind = match kind_text {
-            "arena" => CuraKind::Arena,
-            "page" => CuraKind::Page,
-            _ => {
-                return Err(
-                    Self::expected_statement_error_at("allocator_kind", kind_span)
-                        .with_arg("expected", "allocator kind \"arena\" or \"page\""),
-                );
-            }
-        };
+    fn current_ident_is(&self, text: &str) -> bool {
+        matches!(self.peek().kind, TokenKind::Ident(sym) if self.interner.resolve(sym) == text)
+    }
 
-        let mutability = self.parse_mutability()?;
-
-        let ty = self.parse_type()?;
-        let binding = self.parse_ident()?;
-        let body = self.parse_block()?;
-        let catch = self.try_parse_cape_stmt()?;
-
-        Ok(StmtKind::Cura(CuraStmt {
-            kind,
-            mutability,
-            ty,
-            binding,
-            body,
-            catch,
-        }))
+    /// Migration diagnostic for the removed allocator surface (`cura`/`curata`).
+    pub(super) fn allocator_surface_removed_error(&self, keyword: &'static str) -> ParseError {
+        ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
+            .with_arg("issue", "allocator_surface_removed")
+            .with_arg("keyword", keyword)
     }
 
     /// Statement-level `ad` is not a valid statement form; use expression-form `ad`.

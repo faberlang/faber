@@ -67,7 +67,6 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::WildcardAbsorbsNull,
     WarningKind::UnnecessaryVaria,
     WarningKind::FileInterfaceExportSkipped,
-    WarningKind::UnrecognizedCurataAllocator,
     WarningKind::MonomorphicHoleSolvedToUnion,
     WarningKind::UnionHoleSolvedMonomorphically,
     WarningKind::PreferStringTemplate,
@@ -1058,12 +1057,6 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
             code: "WARN014",
             help: Some(
                 "use a supported export from the module, or wait for fuller file-interface coverage of this signature",
-            ),
-        },
-        WarningKind::UnrecognizedCurataAllocator => DiagnosticSpec {
-            code: "WARN015",
-            help: Some(
-                "use a recognized allocator name (\"arena\", \"page\", \"alloc\", or \"allocator\")",
             ),
         },
         WarningKind::MonomorphicHoleSolvedToUnion => DiagnosticSpec {

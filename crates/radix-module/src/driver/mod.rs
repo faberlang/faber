@@ -3471,7 +3471,6 @@ fn collect_target_policy_diagnostics(
         Target::HirGo => diagnostics.extend(target_policy::collect_go_unsupported_errors(program, name, interner)),
         Target::HirRust => {
             diagnostics.extend(target_policy::collect_rust_unsupported_errors(program, name));
-            diagnostics.extend(target_policy::collect_rust_noop_warnings(program, name));
         }
         // Remaining targets have no syntax-level target-policy checks yet.
         // Listed explicitly so new Target variants force consideration here.

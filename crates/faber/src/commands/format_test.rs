@@ -155,20 +155,6 @@ fn normaliza(list<float> values) → list<float> {
 }
 
 #[test]
-fn format_canonical_pipeline_reparses_cura_fixture() {
-    let path = exempla("cura/cura.fab");
-    let formatted = canonical_cli_pipeline(&path);
-    assert!(
-        formatted.contains("print \"in arena\"") || formatted.contains("# cura"),
-        "cura exempla should keep the arena-scoped body on the en surface:\n{formatted}"
-    );
-    let body = radix::module::driver::split_frontmatter(&formatted)
-        .expect("split")
-        .body;
-    assert_canonical_reparses_with(body, "cura pipeline", Some(&english_pack())).expect("reparse");
-}
-
-#[test]
 fn format_canonical_pipeline_preserves_and_reparses_comment_fixture() {
     let dir = std::env::temp_dir().join("faber-format-canonical-comment");
     let _ = fs::remove_dir_all(&dir);

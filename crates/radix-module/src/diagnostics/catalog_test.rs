@@ -217,7 +217,6 @@ fn warning_codes_are_stable() {
         (WarningKind::WildcardAbsorbsNull, "WARN011"),
         (WarningKind::UnnecessaryVaria, "WARN013"),
         (WarningKind::FileInterfaceExportSkipped, "WARN014"),
-        (WarningKind::UnrecognizedCurataAllocator, "WARN015"),
         (WarningKind::MonomorphicHoleSolvedToUnion, "WARN016"),
         (WarningKind::UnionHoleSolvedMonomorphically, "WARN017"),
         (WarningKind::PreferStringTemplate, "WARN018"),

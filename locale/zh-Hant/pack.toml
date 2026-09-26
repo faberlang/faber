@@ -18,7 +18,6 @@ columna = "欄位"
 varia = "變值"
 abstractus = "抽象"
 ceteri = "其餘"
-curata = "管理"
 errata = "錯誤"
 exitus = "出口"
 generis = "靜態"
@@ -81,7 +80,6 @@ nota = "註記"
 scribe = "寫出"
 vide = "檢視"
 argumenta = "引數"
-cura = "資源"
 incipiet = "非同步入口"
 incipit = "入口"
 ad = "端點"
@@ -2918,14 +2916,6 @@ help = "請使用模組中受支援的匯出，或等待此簽章獲得更完整
 [diagnostics.WARN014.issues.file_interface_export_skipped]
 message = "檔案介面略過匯出 `{namespace}.{export}`（{reason}）；其他匯出仍可用"
 help = "請使用模組中受支援的匯出，或等待此簽章獲得更完整的檔案介面支援"
-
-[diagnostics.WARN015]
-message = "無法辨識的 curata 配置器名稱"
-help = "請使用可辨識的配置器名稱（\"arena\"、\"page\"、\"alloc\" 或 \"allocator\"）"
-
-[diagnostics.WARN015.issues.unrecognized_curata_allocator]
-message = "curata 配置器名稱 '{name}' 不是可辨識的配置器契約"
-help = "請使用可辨識的配置器名稱（\"arena\"、\"page\"、\"alloc\" 或 \"allocator\"）"
 
 [diagnostics.WARN016]
 message = "monomorphic hole 被求解為 multi-member union"
