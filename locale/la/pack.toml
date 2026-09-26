@@ -491,8 +491,12 @@ message = "'{keyword}' was removed; allocation is not a language surface"
 help = "delete the '{keyword}' wrapper or modifier; allocation is managed by the target runtime"
 
 [diagnostics.PARSE002.issues.nexum_removed]
-message = "'nexum' was removed; change notification is a library pattern over 'ad'"
+message = "'nexum' was removed; change notification is a library pattern over '{ad}'"
 help = "delete 'nexum' and declare an ordinary field: '<type> <name>'"
+
+[diagnostics.PARSE002.issues.construction_spread_removed]
+message = "'{sparge}' is not valid in a construction literal"
+help = "name each field; copy-with-changes is 'Genus { field = value } {ex} source'"
 
 [diagnostics.PARSE010]
 message = "invalid declaration"
@@ -2165,10 +2169,6 @@ help = "spread a {lista} value inside {lista} construction"
 [diagnostics.SEM011.issues.struct_computed_key_forbidden]
 message = "computed keys are not valid in struct construction"
 help = "use declared struct field names in struct construction"
-
-[diagnostics.SEM011.issues.struct_spread_forbidden]
-message = "spread fields are not valid in struct construction"
-help = "provide each required struct field explicitly"
 
 [diagnostics.SEM011.issues.vector_constructor_forbids_spread]
 message = "vector constructor does not accept spread arguments"

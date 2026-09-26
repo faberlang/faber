@@ -709,6 +709,9 @@ fn unexpected_message(args: &[DiagnosticArg]) -> Option<String> {
         "nexum_removed" => Some(
             "'nexum' was removed; change notification is a library pattern over 'ad'".to_owned(),
         ),
+        "construction_spread_removed" => {
+            Some("'sparge' is not valid in a construction literal".to_owned())
+        }
         _ => None,
     }
 }
@@ -739,6 +742,9 @@ fn unexpected_help(args: &[DiagnosticArg]) -> Option<String> {
         "nexum_removed" => {
             Some("delete 'nexum' and declare an ordinary field: '<type> <name>'".to_owned())
         }
+        "construction_spread_removed" => Some(
+            "name each field; copy-with-changes is 'Genus { field = value } ex source'".to_owned(),
+        ),
         _ => None,
     }
 }

@@ -1968,10 +1968,6 @@ help = "在 lista construction 内 spread 一个 lista value"
 message = "struct construction 中不支持 computed keys"
 help = "在 struct construction 中使用已声明的 struct field 名称"
 
-[diagnostics.SEM011.issues.struct_spread_forbidden]
-message = "struct construction 中不支持 spread fields"
-help = "显式提供每个必需 struct field"
-
 [diagnostics.SEM011.issues.vector_constructor_forbids_spread]
 message = "vector constructor 不接受 spread arguments"
 help = "显式提供 vector elements，而非 spread arguments"

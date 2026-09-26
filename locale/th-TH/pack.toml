@@ -1980,10 +1980,6 @@ help = "กระจายค่า lista ภายในการสร้า�
 message = "คีย์ที่คำนวณไม่ได้ใช้ในการสร้าง struct"
 help = "ใช้ชื่อฟิลด์ struct ที่ประกาศไว้ในการสร้าง struct"
 
-[diagnostics.SEM011.issues.struct_spread_forbidden]
-message = "ฟิลด์ที่กระจายไม่ได้ใช้ในการสร้าง struct"
-help = "ระบุฟิลด์ struct ที่จำเป็นแต่ละฟิลด์อย่างชัดเจน"
-
 [diagnostics.SEM011.issues.vector_constructor_forbids_spread]
 message = "ตัวสร้าง vector ไม่รับอาร์กิวเมนต์แบบกระจาย"
 help = "ระบุองค์ประกอบ vector อย่างชัดเจนแทนอาร์กิวเมนต์แบบกระจาย"

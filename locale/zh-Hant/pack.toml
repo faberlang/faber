@@ -1968,10 +1968,6 @@ help = "在 lista 建構中展開 lista 值"
 message = "結構建構中不允許計算鍵值"
 help = "在結構建構中使用已宣告的結構欄位名稱"
 
-[diagnostics.SEM011.issues.struct_spread_forbidden]
-message = "結構建構中不允許展開欄位"
-help = "明確提供每個必要的結構欄位"
-
 [diagnostics.SEM011.issues.vector_constructor_forbids_spread]
 message = "向量建構函式不接受展開引數"
 help = "提供明確的向量元素，而非展開引數"

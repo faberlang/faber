@@ -2361,14 +2361,11 @@ impl Parser {
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
             let start = self.current_span();
 
-            if self.eat_keyword_ident(TokenKind::Sparge) {
-                let expr = Box::new(self.parse_expression()?);
-                let span = start.merge(self.previous_span());
-                fields.push(ObjectField {
-                    key: ObjectKey::Spread(expr),
-                    value: None,
-                    span,
-                });
+            // `sparge` left construction literals (DECISIONS D15.4); copying
+            // a value with changes is `Genus { … } ex source` (D15.1).
+            if self.check_keyword_ident(TokenKind::Sparge) {
+                return Err(ParseError::structured(ParseErrorKind::Unexpected, start)
+                    .with_arg("issue", "construction_spread_removed"));
             } else if let TokenKind::String(s) = self.peek().kind {
                 self.advance();
                 self.expect_field_value_separator()?;
@@ -2589,7 +2586,10 @@ impl Parser {
     }
 
     fn looks_like_typed_constructor_fields(&self) -> bool {
+        // A leading `sparge` routes here so the removed construction spread
+        // (D15.4) gets its named diagnostic instead of a generic parse error.
         matches!(self.peek_at(1).kind, TokenKind::RBrace)
+            || self.keyword_ident_at(1) == Some(TokenKind::Sparge)
             || matches!(
                 self.peek_at(1).kind,
                 TokenKind::Ident(_) | TokenKind::String(_)
