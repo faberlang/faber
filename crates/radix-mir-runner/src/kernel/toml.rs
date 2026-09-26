@@ -242,7 +242,8 @@ fn value_to_toml(value: &Value, span: Span) -> Result<toml::Value, RunnerError> 
         | Value::Tuple(_)
         | Value::Vector(_)
         | Value::Matrix(_)
-        | Value::GradientHandle(_) => Err(RunnerError::internal(
+        | Value::GradientHandle(_)
+        | Value::Cursor(_) => Err(RunnerError::internal(
             span,
             "value variant is outside toml kernel",
         )),

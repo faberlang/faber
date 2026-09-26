@@ -2372,7 +2372,7 @@ impl FunctionBuilder<'_> {
             .unwrap_or(false)
         {
             return Some(self.runtime_call_value(
-                MirIntrinsic::CursorStream(crate::mir::MirCursorStream { callee: def_id }),
+                MirIntrinsic::CursorStream(crate::mir::MirCursorStream { callee: def_id, stepped: false }),
                 lowered_args,
                 ty,
                 expr.span,

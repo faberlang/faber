@@ -29,6 +29,7 @@
     reason = "semantic numeric conversions between host value kinds in the MIR runtime evaluator"
 )]
 
+use super::cursor::GeneratorCursor;
 use super::value::{
     GradientStorage, MapKey, SermoValue, TensorValue, Value, ascii1_from_scalar,
     float_to_numerus_width, format_template, modular_operand, modular_word_mask,
@@ -283,20 +284,21 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let value = self.eval_operand(arg, span)?;
         let is_generator = self.frames.last().is_some_and(|frame| frame.is_generator);
         if is_generator {
-            if let Some(buffer) = self.generator_yields.last_mut() {
-                buffer.push(value);
-            }
+            // The run loop parks this frame once the statement completes.
+            self.yielded = Some(value);
             Ok(Value::Unit)
         } else {
             Ok(value)
         }
     }
 
-    /// Materialize a `@ cursor` call into a `lista<T>` by running the generator
-    /// to completion and collecting its `cede` yields.
+    /// Start a `@ cursor` generator call (D6.6: cursors are lazy).
     ///
-    /// Mirrors `invoke_call` but marks the callee frame as a generator and drains
-    /// a dedicated yield buffer (the generator's own return value is discarded).
+    /// Mirrors `invoke_call` but builds the callee frame off the stack as a
+    /// suspended generator. A stepped call returns the cursor for its `itera
+    /// ex` walk to pull one `cede` per step; any other call materializes the
+    /// `lista<T>` by pulling until the generator returns (its own return value
+    /// is discarded).
     pub(crate) fn eval_cursor_stream(
         &mut self,
         stream: &radix_mir::MirCursorStream,
@@ -322,34 +324,17 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             ));
         }
 
-        let depth = self.frames.len();
-        self.return_value = None;
-        self.return_error = None;
-        self.generator_yields.push(Vec::new());
-        self.push_frame(func_id, MirBlockId(0));
-        if let Some(frame) = self.frames.last_mut() {
-            frame.is_generator = true;
-            for (local, arg) in param_locals.into_iter().zip(arg_values) {
-                frame.locals.insert(local, arg);
-            }
+        let mut frame = self.new_frame(func_id, MirBlockId(0));
+        frame.is_generator = true;
+        for (local, arg) in param_locals.into_iter().zip(arg_values) {
+            frame.locals.insert(local, arg);
         }
-        self.run_until_depth(depth);
-
-        // WHY: the generator frame was popped on `Return`, but the yield buffer
-        // lives on the runner — pop it as the materialized `lista<T>`.
-        let yields = self.generator_yields.pop().unwrap_or_default();
-        if let Some(error) = self.errors.pop() {
-            while self.frames.len() > depth {
-                self.pop_frame();
-            }
-            return Err(error);
+        let cursor = GeneratorCursor::new(frame);
+        if stream.stepped {
+            return Ok(Value::Cursor(cursor));
         }
-        while self.frames.len() > depth {
-            self.pop_frame();
-        }
-        self.return_value = None;
-        self.return_error = None;
-        Ok(Value::Array(Rc::new(RefCell::new(yields))))
+        let items = self.cursor_collect(&cursor, span)?;
+        Ok(Value::Array(Rc::new(RefCell::new(items))))
     }
 
     // GRADIENT HANDLES
@@ -1012,6 +997,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let value = self.eval_operand(receiver, span)?;
                 let len = match value {
                     Value::Array(cell) => cell.borrow().len(),
+                    Value::Cursor(cursor) => self.cursor_step_length(&cursor, span)?,
                     Value::Map(cell) => cell.borrow().len(),
                     Value::Set(cell) => cell.borrow().len(),
                     Value::Tensor(cell) => cell.borrow().shape.len(),
@@ -3159,6 +3145,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         span: Span,
     ) -> Result<Value, RunnerError> {
         match receiver {
+            Value::Cursor(cursor) => cursor.index(index.as_index(span)?, span),
             Value::Array(cell) => {
                 // A semantically octeti local can retain the array carrier
                 // after a lista<u8> assignment; normalize its window back to

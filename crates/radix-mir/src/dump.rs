@@ -432,6 +432,9 @@ fn intrinsic(value: &MirIntrinsic) -> String {
         MirIntrinsic::ReadLine => "read_line".to_owned(),
         MirIntrinsic::Cede => "cede".to_owned(),
         MirIntrinsic::GpuBuiltin(builtin) => format!("gpu_builtin {}", builtin.spelling()),
+        MirIntrinsic::CursorStream(cursor) if cursor.stepped => {
+            format!("cursor_stream stepped def#{}", cursor.callee.0)
+        }
         MirIntrinsic::CursorStream(cursor) => format!("cursor_stream def#{}", cursor.callee.0),
         MirIntrinsic::Gradient(op) => format!("gradient_{}_op", gradient_op(*op)),
         MirIntrinsic::TypeCheck(op) => format!(

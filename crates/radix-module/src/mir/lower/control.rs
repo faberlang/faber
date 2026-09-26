@@ -2084,6 +2084,52 @@ impl FunctionBuilder<'_> {
         Some(())
     }
 
+    /// Mark the `cursor_stream` call that produced `collection` as stepped
+    /// (D6.6) when it is the direct iterable of an `itera ex` walk.
+    ///
+    /// The call must be the last statement of the open block and write the
+    /// operand's temp, so a generator call nested in arguments or bound to a
+    /// name first keeps its materializing read. An async cursor is retyped to
+    /// the `lista<T>` read the walk indexes, which replaces the drain snapshot.
+    fn mark_stepped_cursor_stream(
+        &mut self,
+        collection: &MirOperand,
+        kind: &CollectionIteraKind,
+        mode: HirIteraMode,
+    ) -> bool {
+        let element = match kind {
+            CollectionIteraKind::Array(element)
+            | CollectionIteraKind::Cursor(element)
+            | CollectionIteraKind::AsyncCursor(element) => *element,
+            _ => return false,
+        };
+        let (HirIteraMode::Ex, MirOperand::Temp(temp), Some(current)) = (mode, collection, self.current) else {
+            return false;
+        };
+        let Some(array) = self.types.find_array(element) else {
+            return false;
+        };
+        let array_ty = MirType::semantic(array);
+        let Some(MirStatement {
+            kind:
+                MirStatementKind::RuntimeCall {
+                    destination: Some(destination),
+                    call: MirRuntimeCall { intrinsic: MirIntrinsic::CursorStream(stream), return_ty, .. },
+                },
+            ..
+        }) = self.block_mut(current).statements.last_mut()
+        else {
+            return false;
+        };
+        if *destination != MirPlace::temp(*temp) {
+            return false;
+        }
+        stream.stepped = true;
+        *return_ty = array_ty;
+        self.temps[temp.0 as usize].ty = array_ty;
+        true
+    }
+
     /// Pointee classification for a borrowed itera receiver: the same
     /// lista/tabula arms the by-value lanes already iterate, applied to the
     /// carrier under the `Ref` marker. Other pointees stay unsupported so the
@@ -2278,7 +2324,13 @@ impl FunctionBuilder<'_> {
             _ => iter_ty,
         };
         let collection = self.lower_expr_value(iter.iter)?;
+        // D6.6: a direct generator call feeding `itera ex` is walked stepwise,
+        // so a suspending backend resumes the producer once per step.
+        let stepped = self.mark_stepped_cursor_stream(&collection, &collection_kind, iter.mode);
         let (collection, collection_ty) = match &collection_kind {
+            CollectionIteraKind::Cursor(element) | CollectionIteraKind::AsyncCursor(element) if stepped => {
+                (collection, MirType::semantic(self.types.find_array(*element)?))
+            }
             CollectionIteraKind::Cursor(element) | CollectionIteraKind::AsyncCursor(element) => {
                 let array = self.types.find_array(*element)?;
                 let array_ty = MirType::semantic(array);
@@ -2355,15 +2407,19 @@ impl FunctionBuilder<'_> {
             iter.span,
         );
 
-        let length = if matches!(&collection_kind, CollectionIteraKind::Tensor(_)) {
-            MirOperand::Constant(MirConstant::Int(tensor_lanes))
+        // A stepped cursor re-reads its length at every condition check, so
+        // the bound is lowered inside the condition block instead of here.
+        let hoisted_length = if stepped {
+            None
+        } else if matches!(&collection_kind, CollectionIteraKind::Tensor(_)) {
+            Some(MirOperand::Constant(MirConstant::Int(tensor_lanes)))
         } else {
-            self.runtime_call_value(
+            Some(self.runtime_call_value(
                 MirIntrinsic::Collection(MirCollectionOp::Length),
                 vec![MirOperand::Place(iteration_place.clone())],
                 numerus,
                 iter.span,
-            )
+            ))
         };
         if !self.current_is_open() {
             return None;
@@ -2387,6 +2443,15 @@ impl FunctionBuilder<'_> {
         self.terminate_current(MirTerminatorKind::Goto(cond_id), iter.span);
 
         self.switch_to(cond_id);
+        let length = match hoisted_length {
+            Some(length) => length,
+            None => self.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::Length),
+                vec![MirOperand::Place(iteration_place.clone())],
+                numerus,
+                iter.span,
+            ),
+        };
         let condition = self.binary_temp(
             MirBinOp::Lt,
             MirOperand::Place(MirPlace::local(index)),
