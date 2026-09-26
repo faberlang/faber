@@ -47,7 +47,7 @@
 //!   body subtree, which conservatively treats a `rumpe` in a nested
 //!   breakable scope as escaping the outer loop.
 
-use crate::passes::exhaustive::{collect_enum_variants, discerne_definitely_covered};
+use crate::passes::exhaustive::discerne_definitely_covered;
 use crate::{SemanticError, SemanticErrorKind, TypeTable};
 use radix_hir::{
     HirBlock, HirExpression, HirExpressionKind, HirItem, HirItemKind, HirModule, HirStatement,
@@ -58,12 +58,18 @@ use rustc_hash::FxHashMap;
 
 /// Validate that every value-returning function body returns on all paths.
 ///
+/// `enum_variants` is the closed variant list of every enum in scope (see
+/// [`crate::passes::exhaustive::collect_all_enum_variants`]).
+///
 /// # Errors
 ///
 /// Returns missing-return and control-flow errors as a list of
 /// [`SemanticError`]s.
-pub fn analyze(hir: &HirModule, types: &TypeTable) -> Result<(), Vec<SemanticError>> {
-    let enum_variants = collect_enum_variants(hir);
+pub fn analyze(
+    hir: &HirModule,
+    types: &TypeTable,
+    enum_variants: &FxHashMap<radix_hir::DefId, Vec<radix_hir::DefId>>,
+) -> Result<(), Vec<SemanticError>> {
     let mut checker = ReturnPathChecker {
         types,
         enum_variants,
@@ -80,7 +86,7 @@ pub fn analyze(hir: &HirModule, types: &TypeTable) -> Result<(), Vec<SemanticErr
 
 struct ReturnPathChecker<'a> {
     types: &'a TypeTable,
-    enum_variants: FxHashMap<radix_hir::DefId, Vec<radix_hir::DefId>>,
+    enum_variants: &'a FxHashMap<radix_hir::DefId, Vec<radix_hir::DefId>>,
     errors: Vec<SemanticError>,
 }
 
@@ -92,7 +98,7 @@ impl ReturnPathChecker<'_> {
         walk_program(
             &mut ClosureReturnPathVisitor {
                 types: self.types,
-                enum_variants: &self.enum_variants,
+                enum_variants: self.enum_variants,
                 errors: &mut self.errors,
             },
             hir,
@@ -113,7 +119,7 @@ impl ReturnPathChecker<'_> {
                 return;
             }
             let Some(body) = &func.body else { return };
-            if !block_terminates(body, self.types, &self.enum_variants) {
+            if !block_terminates(body, self.types, self.enum_variants) {
                 push_missing_return(&mut self.errors, item.span);
             }
         }
@@ -232,7 +238,7 @@ fn expr_terminates(
                 && block_terminates(els, types, enum_variants)
         }),
         // A dispatch terminates iff coverage is total and every reachable arm
-        // body terminates. Arms after an unguarded catchall are unreachable.
+        // body terminates. Arms after a catchall are unreachable.
         HirExpressionKind::Discerne {
             scrutinees, arms, ..
         } => {
@@ -259,12 +265,9 @@ fn expr_terminates(
     }
 }
 
-/// Whether every arm up to and including the first unguarded catchall terminates.
+/// Whether every arm up to and including the first catchall terminates.
 ///
-/// Arms after an unguarded catchall are unreachable and ignored. Guarded arms
-/// are still required to terminate: when a guard fires and the body does not
-/// return, control falls out of the dispatch with the body's value, so the
-/// dispatch would not definitely return.
+/// Arms after a catchall are unreachable and ignored.
 fn reachable_arms_all_terminate(
     arms: &[radix_hir::HirCasuArm],
     types: &TypeTable,

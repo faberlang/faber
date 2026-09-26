@@ -741,6 +741,7 @@ functio pick() → numerus {
     discerne value {
         casu 1 { nota "a" }
         casu 2 { nota "b" }
+        ceterum { nota "c" }
     }
     redde value
 }

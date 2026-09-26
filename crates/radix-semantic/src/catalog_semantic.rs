@@ -79,6 +79,7 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::UnionNoCommonMembers,
     WarningKind::UnionMethodSignatureShadowed,
     WarningKind::ComplexityBudgetExceeded,
+    WarningKind::CoverageUnchecked,
 ];
 
 // STABLE CODES
@@ -1115,6 +1116,10 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::ComplexityBudgetExceeded => DiagnosticSpec {
             code: "WARN027",
             help: Some("split the function or raise the complexity budget for this check"),
+        },
+        WarningKind::CoverageUnchecked => DiagnosticSpec {
+            code: "WARN028",
+            help: Some("add a 'ceterum' arm, or split the match so each pattern kind is checkable"),
         },
     }
 }

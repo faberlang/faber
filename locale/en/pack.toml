@@ -2947,8 +2947,16 @@ message = "non-exhaustive match"
 help = "add missing cases or a '{ceterum}' arm"
 
 [diagnostics.SEM040.issues.missing_variants]
-message = "non-exhaustive match"
-help = "add missing cases or a '{ceterum}' arm"
+message = "non-exhaustive match: variant {missing} is not covered"
+help = "add a '{casu}' arm for {missing} or a '{ceterum}' arm"
+
+[diagnostics.SEM040.issues.missing_union_members]
+message = "non-exhaustive match: member {missing} is not covered"
+help = "add a '{casu}' arm for {missing} or a '{ceterum}' arm"
+
+[diagnostics.SEM040.issues.missing_cases]
+message = "non-exhaustive match: {missing} is not covered"
+help = "add a '{casu}' arm for {missing} or a '{ceterum}' arm"
 
 [diagnostics.SEM041]
 message = "unreachable pattern"
@@ -3445,3 +3453,11 @@ help = "align the constituent signatures or rename one method to keep it common"
 [diagnostics.WARN026.issues.union_method_signature_shadowed]
 message = "method `{method}` is not common in `{union}`: constituent signatures disagree"
 help = "align the constituent signatures or rename one method to keep it common"
+
+[diagnostics.WARN028]
+message = "match coverage not checked"
+help = "add a '{ceterum}' arm, or split the match so each pattern kind is checkable"
+
+[diagnostics.WARN028.issues.coverage_unchecked]
+message = "coverage of this match could not be computed for its pattern kinds; exhaustiveness was not checked"
+help = "add a '{ceterum}' arm, or split the match so each pattern kind is checkable"
