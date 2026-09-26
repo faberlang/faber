@@ -2193,12 +2193,9 @@ impl FunctionBuilder<'_> {
                 // Text value iteration: only `ex` admits it,
                 // mirroring the queue/stack value-surface rule. The loop-local
                 // binding carries the checker's element row for textus
-                // iteration (the `numerus` fallback in typecheck/expr.rs), so
-                // green bodies convert through `c ↦ textus` exactly as
-                // checked — the gradus `_numeric` shape. At runtime the
-                // projection yields the one-byte ascii carrier, and
-                // value-directed conversion/equality join it with one-char
-                // textus per the documented scalar-index contract.
+                // iteration (`ascii<1>`, the `s[i]` row — D19.4), and the
+                // projection yields the one-byte ascii carrier (non-ASCII
+                // scalars trap exactly as `s[i]` does).
                 Type::Primitive(Primitive::Textus) if matches!(iter.mode, HirIteraMode::Ex) => {
                     CollectionIteraKind::Textus
                 }
@@ -2318,10 +2315,13 @@ impl FunctionBuilder<'_> {
                 (collection, MirType::semantic(*elem), false)
             }
             CollectionIteraKind::BoundedArray(elem, _) => (collection, MirType::semantic(*elem), false),
-            // The textus loop-local binding mirrors the checker's element row
-            // (numerus fallback); the element operand itself is the scalar
-            // `s[i]` projection read below.
-            CollectionIteraKind::Textus => (collection, numerus, false),
+            // The textus loop-local binding is the checker's element row —
+            // the same `ascii<1>` row as the scalar `s[i]` projection read
+            // below (D19.4). The checker interned it for this loop.
+            CollectionIteraKind::Textus => {
+                let element = radix_mir::ty::find_bounded_ascii_one(self.types)?;
+                (collection, MirType::semantic(element), false)
+            }
             CollectionIteraKind::Shaped { .. } => {
                 unreachable!("shaped collection itera returns through nested lowering above")
             }

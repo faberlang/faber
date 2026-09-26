@@ -143,7 +143,7 @@ impl TypeChecker<'_> {
                     .with_arg("issue", ISSUE_UNBOUNDED_TEXTUS_INDEX),
                 );
             }
-            return self.ascii_one_type();
+            return self.text_element_type();
         }
         // WHY: octeti[i] is one byte (`numerus<u8>`), O(1). octeti[lo‥hi] is a
         // half-open window that stays `octeti`. Do not reuse the textus return
@@ -159,9 +159,7 @@ impl TypeChecker<'_> {
             if self.is_range_index(idx_ty) {
                 return self.types.primitive(Primitive::Octeti);
             }
-            return self
-                .types
-                .sized_numeric(Primitive::Numerus, NumericWidth::U8);
+            return self.byte_element_type();
         }
         if let Type::Tensor(elem, shape) = resolved_kind {
             return self.check_tensor_bracket_index(elem, shape, idx_ty, object_span, index_span);
