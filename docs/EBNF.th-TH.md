@@ -18,7 +18,7 @@ program ::= statement*
 # [004] statement
 statement ::= annotation* statement_core
 # [005] statement_core
-statement_core ::= importa_decl | binding_decl | functio_decl | genus_decl | implendum_decl | typus_decl | ordo_decl | discretio_decl | schema_decl | si_stmt | dum_stmt | itera_stmt | elige_stmt | discerne_stmt | custodi_stmt | cura_stmt | fac_stmt | redde_stmt | reddet_stmt | tacebit_stmt | cede_stmt | rumpe_stmt | perge_stmt | tacet_stmt | iace_stmt | adfirma_stmt | requirit_stmt | reice_stmt | nota_stmt | incipit_stmt | incipiet_stmt | ex_stmt | probandum_decl | proba_stmt | block_stmt | inc_dec_stmt | expr_stmt
+statement_core ::= importa_decl | binding_decl | functio_decl | genus_decl | implendum_decl | typus_decl | ordo_decl | discretio_decl | schema_decl | si_stmt | dum_stmt | itera_stmt | elige_stmt | discerne_stmt | custodi_stmt | fac_stmt | redde_stmt | reddet_stmt | tacebit_stmt | cede_stmt | rumpe_stmt | perge_stmt | tacet_stmt | iace_stmt | adfirma_stmt | requirit_stmt | reice_stmt | nota_stmt | incipit_stmt | incipiet_stmt | ex_stmt | probandum_decl | proba_stmt | block_stmt | inc_dec_stmt | expr_stmt
 # [006] binding_decl
 binding_decl ::= fixum_decl | sit_decl | array_destruct | object_destruct | figendum_decl
 # [007] expr_stmt
@@ -52,7 +52,7 @@ call_type_args ::= '<' type_annotation (',' type_annotation)* '>'
 # [021] parameter
 parameter ::= 'ที่เหลือ'? type_annotation IDENTIFIER 'สมัครใจ'? ('ในชื่อ' IDENTIFIER)? ('หรือว่าง' expression)?
 # [022] func_modifier
-func_modifier ::= 'อาร์กิวเมนต์' IDENTIFIER | 'จัดการ' IDENTIFIER ('ในชื่อ' IDENTIFIER)? | 'ข้อผิดพลาด' IDENTIFIER | 'ทางออก' (IDENTIFIER | NUMBER) | 'ไม่เปลี่ยนแปลง' | 'โยนผล' | 'ทางเลือก' IDENTIFIER
+func_modifier ::= 'อาร์กิวเมนต์' IDENTIFIER | 'ข้อผิดพลาด' IDENTIFIER | 'ทางออก' (IDENTIFIER | NUMBER) | 'ไม่เปลี่ยนแปลง' | 'โยนผล' | 'ทางเลือก' IDENTIFIER
 # [023] callable_posture
 callable_posture ::= 'อะซิงก์' | 'สตรีม' | 'สตรีมอะซิงก์'
 # [024] return_clause
@@ -230,19 +230,19 @@ casu_variant_clause ::= 'กรณี' patterns (block_stmt | ergo_joint stateme
 # [110] patterns
 patterns ::= pattern ((',' | 'และ') pattern)*
 # [111] pattern
-pattern ::= '_' | literal | type_pattern | (IDENTIFIER ut_pattern?)
-# [112] type_pattern
+pattern ::= '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_pattern?)
+# [112] negated_number
+negated_number ::= '-' NUMBER
+# [113] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
-# [113] ut_pattern
+# [114] ut_pattern
 ut_pattern ::= ('ในชื่อ' IDENTIFIER) | (('คงที่' | 'แปร') pattern_binding (',' pattern_binding)*)
-# [114] pattern_binding
+# [115] pattern_binding
 pattern_binding ::= IDENTIFIER ('ในชื่อ' IDENTIFIER)?
-# [115] custodi_stmt
+# [116] custodi_stmt
 custodi_stmt ::= 'คุ้มครอง' '{' si_guard_clause+ '}'
-# [116] si_guard_clause
+# [117] si_guard_clause
 si_guard_clause ::= 'ถ้า' expression (block_stmt | ergo_joint statement)
-# [117] cura_stmt
-cura_stmt ::= 'ดูแล' STRING ('คงที่' | 'แปร') type_annotation IDENTIFIER block_stmt cape_clause?
 # [118] ex_stmt
 ex_stmt ::= 'ออก' expression ('คงที่' | 'แปร') extract_fields
 # [119] extract_fields
@@ -612,12 +612,12 @@ NO_NEWLINE ::=
 | [`casu_variant_clause`](#casu-variant-clause) | `#กรณี-variant-clause` | live |
 | [`patterns`](#patterns) | `#patterns` | live |
 | [`pattern`](#pattern) | `#pattern` | live |
+| [`negated_number`](#negated-number) | `#negated-number` | live |
 | [`type_pattern`](#type-pattern) | `#type-pattern` | live |
 | [`ut_pattern`](#ut-pattern) | `#ในชื่อ-pattern` | live |
 | [`pattern_binding`](#pattern-binding) | `#pattern-binding` | live |
 | [`custodi_stmt`](#custodi-stmt) | `#คุ้มครอง-stmt` | live |
 | [`si_guard_clause`](#si-guard-clause) | `#ถ้า-guard-clause` | live |
-| [`cura_stmt`](#cura-stmt) | `#ดูแล-stmt` | live |
 | [`ex_stmt`](#ex-stmt) | `#ออก-stmt` | live |
 | [`extract_fields`](#extract-fields) | `#extract-fields` | live |
 | [`extract_field`](#extract-field) | `#extract-field` | live |
@@ -768,8 +768,6 @@ productions. It is not a second keyword authority.
 | Objects | `ปิดล้อม` | legacy closure |
 | Declarations | `คอลัมน์` | relational column (experimental; census-types) |
 | Type | `สำเนา` | copy ownership |
-| Objects | `ดูแล` | with-resource |
-| Params | `จัดการ` | curated options |
 | Control | `คุ้มครอง` | guard |
 | Type | `จาก` | borrow / for-in keys |
 | Control | `แยก` | pattern match |
@@ -975,6 +973,12 @@ Entries are trivia-delimited.
 
 ## Declarations
 
+Declarations are top-level. A `ฟังก์ชัน` and the type declarations (`ชนิด`,
+`สัญญา`, `ชนิดนามแฝง`, `ลำดับ`, `สหภาพแยก`, `สคีมา`) may not appear inside a
+block; the parser rejects them there (`declaration_not_top_level`). Methods
+live in `ชนิด` bodies. For a local function, bind a closure; for recursion,
+use a top-level function.
+
 ### Variables
 
 
@@ -1024,10 +1028,10 @@ fixum _ dup ← duplica(xs)
 
 - Return syntax: `→` declares the normal success type. A bodyful function with no `→` is effect-only (`vacuum`) and must not contain `คืน`. A statement-bodied closure (`ทำ { ... }` or legacy block body) must also spell `→ T` before it can use `คืน`; expression-bodied closures may infer their result from the expression.
 - Recoverable alternate-exit syntax: `⇥` declares the error-channel type. It can appear after `→ T` or alone on an effect-only failable function or closure. A closure body that uses an escaping `โยน` must declare its own `⇥ E`; it cannot inherit the enclosing function's error channel. A local `ทำ { ... } จับ err { ... }` may catch `โยน` without an enclosing `⇥`. A failable function call (`→ T ⇥ E`) inside a `⇥`-declaring function propagates to the function's alternate exit without a `ทำ`/`จับ` wrapper, mirroring how bare `↦` conversio and `โยน` throws already behave; the call lowers to Rust `?`. A closure must still declare its own `⇥` to propagate a failable call — the enclosing function's error channel does not cross the closure boundary.
+- In a signature, `⇥` only ever names an error type (`→ T ⇥ E`). It never carries a value.
 - Parameter access markers live in the type position: `จาก`/`ref` (read), `ใน`/`mut` (mutate), `เป็นเจ้าของ` (consume), and `สำเนา` (duplicate then own). The retired parameter-prefix slot is not part of the grammar; `ออก`/`from` remains the import/iteration/extraction token identity.
 - Post-name marker: `สมัครใจ` (voluntary/optional provision)
 - `ที่เหลือ` marks rest parameter
-- `จัดการ NAME ('ในชื่อ' LOCAL)?` declares an allocator requirement; `LOCAL` is the function-body alias.
 - Ordinary `ฟังก์ชัน` declarations and genus methods require bodies. Signature-only methods belong in `สัญญา`.
 - `ข้อผิดพลาด NAME` is a legacy runtime-injected `ignotum` local, and `โยนผล` is a legacy marker with no current semantic effect. Neither declares the typed alternate-exit contract. New failable APIs should use `⇥ E`; whether either legacy modifier should survive is unresolved.
 - `ดังนั้น` is the compact **statement-body** joint only (one-statement `ถ้า`/`ขณะ`/`กรณี`/… arms).
@@ -1036,6 +1040,22 @@ fixum _ dup ← duplica(xs)
 
 ### Classes
 
+A `ชนิด` is a struct with methods. It holds data, its methods act on that
+data, and it satisfies contracts through `เติมเต็ม`. It is not a self-contained
+object that owns its own construction and process: a value is built with a
+construction literal (`Genus { field = value }`).
+
+- **No static methods.** A `ชนิด` declares instance methods only. A function
+  about a type is a top-level function in the type's file, reached through the
+  import alias. `ของชนิด` marks a type-level field, never a method.
+- **A newtype is a one-field `ชนิด`.** There is no separate newtype
+  declaration. Units that need arithmetic wait on operator overloading.
+- **No macros and no user derive.** What you read is what runs. Code
+  generation, when a project needs it, is an external step before the build.
+- **No extension methods and no retroactive conformance, for now.** A type's
+  methods and its `เติมเต็ม` contracts are declared on the type itself. Code
+  elsewhere cannot add either. Allowing it would need coherence rules, and is
+  revisited together with the contract features that are deferred.
 
 ### Annotations
 
@@ -1065,7 +1085,15 @@ and resolve through local declarations or imported file-interface exports.
 Resolved applications lower to `HirAnnotation` with `contract_id: Some(DefId)`
 and constant field values. v1 attachment target is `ฟังก์ชัน` only; payload
 scalars are `textus`, `numerus`, `fractus`, and `bivalens` (optional via
-`สมัครใจ` or `T ∪ ว่าง`). No compiler-owned `@ web` / controller / route families.
+`สมัครใจ` or `T ∪ ว่าง`). Web, HTTP, controller, and framework route families
+are not compiler-owned; they are built as libraries, from annotation contracts
+or on top of `@ ถึง`. The one exception is `@ ถึง` itself: it is the
+compiler-owned serving half of `ถึง` (see Capability Calls).
+
+User annotations are metadata. Their consumers are tools, such as product
+packaging. They never change compilation, and Faber code never reads them at
+run time. An annotation that changes compilation is compiler-owned (`@ json`,
+`@ ถึง`, `@ radix`).
 
 **JSON genera:** `@ json` on a `ชนิด` is a compiler-owned data-model contract,
 not a generic annotation schema. Fields must be JSON-safe (`textus`, `ascii`,
@@ -1105,7 +1133,7 @@ wire operation such as `json.pange(value ↦ json)`.
 - `@ protecta` is reserved and rejected with a semantic diagnostic; it has no package, subclass, or sibling-file visibility meaning
 
 - `สืบทอด` = extends, `เติมเต็ม` = implements
-- `ของชนิด` = static, `ผูก` = bound/property
+- `ของชนิด` = static (type-level) field, `ผูก` = bound/property
 
 ### Interfaces
 
@@ -1113,6 +1141,12 @@ wire operation such as `json.pange(value ↦ json)`.
 `สัญญา` is the **contract** construct: signature-only methods for `เติมเต็ม`
 (gerundive of *implere* — that which must be fulfilled). Import namespaces are
 `.fab` file boundaries; exported declarations live at file top level.
+
+A contract has no default method bodies. Default bodies would make a contract
+an abstract base class without fields. Behaviour shared by every implementer
+is a top-level function that takes the contract type. Contract inheritance (a
+contract that requires another), associated types, and retroactive
+conformance are deferred.
 
 ### Type Aliases
 
@@ -1185,7 +1219,7 @@ importa ex "faber:*" faber
 importa ex "lodash" * ut _
 # Re-export.
 importa ex "./types" publica User
-# Selective value imports.
+# Selective imports (values and types).
 importa ex "norma:consolum" fixum dic ut output
 ```
 
@@ -1196,7 +1230,7 @@ last import path segment when it is a valid, non-conflicting identifier. If the
 inferred name is invalid or collides with an existing top-level binding, spell an
 explicit `ชื่อ` or `ในชื่อ` binding.
 
-**Selective value imports** create ordinary immutable value bindings: `นำเข้า ออก "norma:consolum" คงที่ dic ในชื่อ output, funde ในชื่อ output_bytes` imports one exported value member per `คงที่` local. The pre-`ในชื่อ` identifier names an exported value in the imported file; the post-`ในชื่อ` identifier is the caller-owned local binding; the imported file interface supplies the complete type. Functions and constants are values and may be imported; types are not. The bindings obey ordinary local-binding rules (duplicates, shadowing, lints), are locale-resolved through the imported module, and are never re-exports. Wildcard members cannot mix into the list. The current parser tolerates one trailing comma after the final member; the canonical spine keeps every comma required.
+**Selective imports** create ordinary immutable local bindings: `นำเข้า ออก "norma:consolum" คงที่ dic ในชื่อ output, funde ในชื่อ output_bytes` imports one exported member per `คงที่` local. The pre-`ในชื่อ` identifier names an exported member in the imported file; the post-`ในชื่อ` identifier is the caller-owned local binding; the imported file interface supplies the complete type. A member may be a value (a function or constant) or a type declaration; the syntax is the same for both. The bindings obey ordinary local-binding rules (duplicates, shadowing, lints), are locale-resolved through the imported module, and are never re-exports. Wildcard members cannot mix into the list. The current parser tolerates one trailing comma after the final member; the canonical spine keeps every comma required.
 
 `นำเข้า ออก "faber:*" faber` is kernel-specific sugar: the glob lives
 inside the import path string and expands the released binary's kernel manifest
@@ -1214,6 +1248,10 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 - Explicit generic call-site lists use the same `typeArguments` production: `id<_>(x)` is a type hole (equivalent to omitted `id(x)` for a one-param callee), and mixed lists such as `both<_, textus>(a, b)` are legal. Arity stays exact (`both<_>` is still one argument). `∪` in that list is rejected (`explicit_union_type_arg_unsupported`): a callee type param is a monomorphic witness slot.
 - `labeledTypeArgument` is the optional label prefix on `ทูเพิล` type arguments only (`ทูเพิล<gx: f32, T>`; mixed labeled/unlabeled legal). A label in a non-`ทูเพิล` list (`f<gx: T>(x)`, `lista<gx: T>`) is a parse error. Absence is the only unlabeled form; there is no `_: T` spelling. Keyword spellings are legal labels under the contextual law (`ทูเพิล<คงที่: A>`).
 - Labels are unique within one tuple type.
+- The tuple type is spelled `ทูเพิล<…>`, not `(K1, K2)`. Parentheses already
+  mean grouping, function types, parameters, and calls. Every other compound
+  type is `name<args>`, and tuple labels come from the same type-argument
+  machinery.
 - Labels are erased from type identity: `ทูเพิล<gx: A, B> ≡ ทูเพิล<A, B>` for assignment, `≡`/`↦`, unify, and every emitter.
 - Bracket index on a tuple requires a literal integer (`i[0]`); every element is reachable by position, labeled or not. Non-literal index expressions stay rejected. Positions are brackets only — no `.0`.
 - Member-by-label (`i.gx`) requires that label to be present on the receiver's `ทูเพิล` annotation.
@@ -1232,6 +1270,8 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 - Qualified type paths such as `terminus.Terminus` name a type through an
   imported namespace binding. The prefix must resolve to a namespace; the final
   segment must resolve to a type-bearing declaration.
+- There is no runtime reflection. Types are compile-time facts. Serialization
+  goes through conversion (`↦ json`, `↦ valor`).
 
 Function types enable higher-order function signatures:
 
@@ -1306,6 +1346,11 @@ it crosses numeric families. Integer `numerus<W>` arithmetic errors on
 overflow while float→integer conversion clamps; `modulus<W>` stays the only
 wrapping family (FORK-2, operator mail 2fb79900). Runner cast-path alignment
 is tracked as want 34821b73.
+
+Overflow policy lives in the type, read once at the declaration. There are no
+per-operation checked, wrapping, or saturating method families. To ask "does
+this fit?" of untrusted input, convert it to the narrow type with `↦` and
+handle the failure through the error channel.
 
 ### Generic Collections
 
@@ -1398,23 +1443,64 @@ prefer sugar. Choose per module or file.
 - `วน จาก...คงที่`/`วน จาก...แปร` = for-in (keys)
 - `วน ช่วง range คงที่/แปร i` = range iteration (e.g. `วน ช่วง 0‥10 ต่อ 2 คงที่ i { บันทึก i }`; `ต่อ` belongs to the range expression)
 
+**Iteration order.** A type whose order is part of its value iterates in that
+order. `lista` iterates by index. `textus` iterates its characters in order.
+`tensor`, `vector`, and `matrix` iterate by index, outer axis first
+(row-major). Two equal values always iterate identically.
+
+`copia` and `tabula` iterate in unspecified order. The order is not promised
+and not deliberately random; backends may differ. When order matters, sort
+explicitly. `≡` on these types stays structural and does not depend on order.
+A map or set that promises an order is a separate library type, not a mode of
+`tabula` or `copia`.
+
+There is no iteration interface. `วน ออก` works on the built-in iterable
+types and on cursors. A user type that should be iterable exposes an ordinary
+method that returns a cursor (`วน ออก arbor.nodi() คงที่ n`); nothing is
+called implicitly.
+
 ### Switch/Match
 
+`แยก` is a statement, not an expression. A value chosen by a match comes
+from a function whose arms each `คืน`. The compiler checks exhaustiveness
+and definite return, and the function can be tested on its own.
 
 ### Pattern Matching
 
+Patterns are flat. A `กรณี` arm names one variant and binds its fields, or names one literal
+value; it does not match inside those fields. Nested patterns are left out for
+simplicity, not because they cannot be checked: a `แยก` inside an arm is
+two flat exhaustive switches.
+
+A negative number pattern is written with a leading minus (`กรณี -1`,
+`กรณี -∞`). The lexer never signs a number, so the pattern claims the sign;
+`-` before anything else is not pattern syntax.
+
+There are no range patterns (`กรณี 1‥5`). Test the range with `ถ้า` inside the
+arm.
+
+A NaN pattern is rejected. NaN never equals itself, so it could never match;
+test for NaN with `ถ้า` instead.
 
 ### Guards
 
-
-### Resource Management
-
+Match arms have no guards. `แยก` is one arm per variant, and a guard
+would split one variant's logic across several arms. Nest a `ถ้า` in the arm
+instead.
 
 ### Destructuring Extraction
 
+Destructuring is flat. A nested pattern such as `[[a, b], c]` is rejected;
+destructure the outer value, then the inner one on another line.
+
+Parameters are not destructured. A pattern in a parameter slot would hide the
+parameter's type from a type-first signature. Destructure in the body.
 
 ### Control Transfer
 
+`หยุด` and `ไปต่อ` take no label. They apply to the nearest enclosing loop.
+A nested search that needs an early exit from an outer loop becomes a
+function that `คืน`s.
 
 - `รอคืน` awaits a compatible promise and returns its success value from a
   `อะซิงก์` function.
@@ -1428,7 +1514,7 @@ prefer sugar. Choose per module or file.
 ## Error Handling
 
 
-- `จับ` attaches to the structured forms whose productions name `catchClause`: conditional arms, `ขณะ`, `วน`, `เลือก`, `ดูแล`, and `ทำ`. It does not attach to arbitrary bare blocks.
+- `จับ` attaches to the structured forms whose productions name `catchClause`: conditional arms, `ขณะ`, `วน`, `เลือก`, and `ทำ`. It does not attach to arbitrary bare blocks.
 - Use the explicit do block when a standalone block needs a handler: `ทำ { ... } จับ err { ... }`.
 - `โยน` = throw (recoverable), `ตาย` = panic (fatal).
 - A same-line `ถ้า <expr>` guard on `โยน` and `ตาย` is line-sensitive parser sugar: `โยน val ถ้า cond` desugars to `ถ้า cond { โยน val }` at parse time. Its canonical, compression-safe spelling is the expanded `ถ้า` block. A source compressor must expand this sugar before removing line breaks; the guarded shorthand remains under language review.
@@ -1486,6 +1572,10 @@ Retired predicate keywords are not prefix unary syntax. Use `expr เป็น �
 `expr ≻ 0`.
 
 The legacy ASCII spellings `<` and `>` are not productions of this grammar — both remain generic delimiters — though the shipped parser still accepts them as comparisons during the glyph migration; prefer the canonical `≺` and `≻`.
+
+Ordering comparisons (`≺`, `≻`, `≤`, `≥`) between two `textus` values compare
+the whole strings in Unicode code-point order. They do not use locale
+collation.
 
 **Static type ascription (`∷` / verte):**
 
@@ -1869,6 +1959,23 @@ ordinary postfix `conversio` materializes the resulting conversation handle.
 
 See [`docs/design/frame-stream-types.md`](docs/design/frame-stream-types.md).
 
+**Concurrency is conversations.** Concurrent work is an `ถึง` conversation with
+a route. There is no separate spawn, thread, or lock primitive family.
+Handlers that share nothing and exchange only frames are free of data races by
+construction.
+
+Every `ถึง` pays the conversation cost. It goes through the router with frames,
+even when both ends are local; there is no hidden fast path. The light path is
+an ordinary function call, and a swappable light path is a contract passed as a
+parameter.
+
+`ถึง` is the effect boundary. Effects reach the outside world through `ถึง`
+conversations, which stay portable across backends.
+
+`@ ถึง` on a function is the compiler-owned serving half of `ถึง`: it lets
+Faber code answer a route. It is designed, not yet implemented. Web, HTTP,
+and framework routing stay libraries (see Annotations).
+
 ---
 
 ## Collection Operations
@@ -1924,6 +2031,23 @@ policy around it, see:
 
 - [`EBNF_MATRIX.md`](EBNF_MATRIX.md) — generated grammar×target lowerability matrix (the official rows).
 - [`docs/design/target-capability-matrix.md`](docs/design/target-capability-matrix.md) — runtime/contract policy (erase/warn/defer), pipeline routing, per-target contracts.
+
+**Conditional compilation is package-granular.** A package's `faber.toml`
+declares its target or targets (`[build] target = "ts"`, or
+`targets = ["rust", "ts"]`). There are no conditionals inside a package: no
+`#if`, no in-body `cfg`, and no per-file target selection.
+
+A multi-target package stays target-neutral. Its per-target parts live in the
+per-target manifest sections (`[target.ts]`). Code that needs a genuinely
+different implementation per target is split into separate packages, and the
+consumer chooses one.
+
+Feature flags (`@ feature`, `[features]`) belong to the visibility model and
+are unchanged. `@ nondum` stays the marker for "not implemented on this target
+yet".
+
+There is no `unsafe`. Faber code is always checked. Code that must step
+outside the checker is foreign code, written outside Faber.
 
 ---
 

@@ -18,7 +18,7 @@ program ::= statement*
 # [004] statement
 statement ::= annotation* statement_core
 # [005] statement_core
-statement_core ::= importa_decl | binding_decl | functio_decl | genus_decl | implendum_decl | typus_decl | ordo_decl | discretio_decl | schema_decl | si_stmt | dum_stmt | itera_stmt | elige_stmt | discerne_stmt | custodi_stmt | cura_stmt | fac_stmt | redde_stmt | reddet_stmt | tacebit_stmt | cede_stmt | rumpe_stmt | perge_stmt | tacet_stmt | iace_stmt | adfirma_stmt | requirit_stmt | reice_stmt | nota_stmt | incipit_stmt | incipiet_stmt | ex_stmt | probandum_decl | proba_stmt | block_stmt | inc_dec_stmt | expr_stmt
+statement_core ::= importa_decl | binding_decl | functio_decl | genus_decl | implendum_decl | typus_decl | ordo_decl | discretio_decl | schema_decl | si_stmt | dum_stmt | itera_stmt | elige_stmt | discerne_stmt | custodi_stmt | fac_stmt | redde_stmt | reddet_stmt | tacebit_stmt | cede_stmt | rumpe_stmt | perge_stmt | tacet_stmt | iace_stmt | adfirma_stmt | requirit_stmt | reice_stmt | nota_stmt | incipit_stmt | incipiet_stmt | ex_stmt | probandum_decl | proba_stmt | block_stmt | inc_dec_stmt | expr_stmt
 # [006] binding_decl
 binding_decl ::= fixum_decl | sit_decl | array_destruct | object_destruct | figendum_decl
 # [007] expr_stmt
@@ -52,7 +52,7 @@ call_type_args ::= '<' type_annotation (',' type_annotation)* '>'
 # [021] parameter
 parameter ::= '其余'? type_annotation IDENTIFIER '可选'? ('作为' IDENTIFIER)? ('兜底' expression)?
 # [022] func_modifier
-func_modifier ::= '参数' IDENTIFIER | '委派' IDENTIFIER ('作为' IDENTIFIER)? | '勘误' IDENTIFIER | '退出' (IDENTIFIER | NUMBER) | '不变' | '可抛' | '可选项' IDENTIFIER
+func_modifier ::= '参数' IDENTIFIER | '勘误' IDENTIFIER | '退出' (IDENTIFIER | NUMBER) | '不变' | '可抛' | '可选项' IDENTIFIER
 # [023] callable_posture
 callable_posture ::= '异步' | '流' | '异流'
 # [024] return_clause
@@ -230,19 +230,19 @@ casu_variant_clause ::= '情况' patterns (block_stmt | ergo_joint statement)
 # [110] patterns
 patterns ::= pattern ((',' | '且') pattern)*
 # [111] pattern
-pattern ::= '_' | literal | type_pattern | (IDENTIFIER ut_pattern?)
-# [112] type_pattern
+pattern ::= '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_pattern?)
+# [112] negated_number
+negated_number ::= '-' NUMBER
+# [113] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
-# [113] ut_pattern
+# [114] ut_pattern
 ut_pattern ::= ('作为' IDENTIFIER) | (('常量' | '变量') pattern_binding (',' pattern_binding)*)
-# [114] pattern_binding
+# [115] pattern_binding
 pattern_binding ::= IDENTIFIER ('作为' IDENTIFIER)?
-# [115] custodi_stmt
+# [116] custodi_stmt
 custodi_stmt ::= '守护' '{' si_guard_clause+ '}'
-# [116] si_guard_clause
+# [117] si_guard_clause
 si_guard_clause ::= '如果' expression (block_stmt | ergo_joint statement)
-# [117] cura_stmt
-cura_stmt ::= '管护' STRING ('常量' | '变量') type_annotation IDENTIFIER block_stmt cape_clause?
 # [118] ex_stmt
 ex_stmt ::= '取自' expression ('常量' | '变量') extract_fields
 # [119] extract_fields
@@ -612,12 +612,12 @@ NO_NEWLINE ::=
 | [`casu_variant_clause`](#casu-variant-clause) | `#情况-variant-clause` | live |
 | [`patterns`](#patterns) | `#patterns` | live |
 | [`pattern`](#pattern) | `#pattern` | live |
+| [`negated_number`](#negated-number) | `#negated-number` | live |
 | [`type_pattern`](#type-pattern) | `#type-pattern` | live |
 | [`ut_pattern`](#ut-pattern) | `#作为-pattern` | live |
 | [`pattern_binding`](#pattern-binding) | `#pattern-binding` | live |
 | [`custodi_stmt`](#custodi-stmt) | `#守护-stmt` | live |
 | [`si_guard_clause`](#si-guard-clause) | `#如果-guard-clause` | live |
-| [`cura_stmt`](#cura-stmt) | `#管护-stmt` | live |
 | [`ex_stmt`](#ex-stmt) | `#取自-stmt` | live |
 | [`extract_fields`](#extract-fields) | `#extract-fields` | live |
 | [`extract_field`](#extract-field) | `#extract-field` | live |
@@ -768,8 +768,6 @@ productions. It is not a second keyword authority.
 | Objects | `闭包` | legacy closure |
 | Declarations | `列` | relational column (experimental; census-types) |
 | Type | `拷贝` | copy ownership |
-| Objects | `管护` | with-resource |
-| Params | `委派` | curated options |
 | Control | `守护` | guard |
 | Type | `借自` | borrow / for-in keys |
 | Control | `匹配` | pattern match |
@@ -975,6 +973,12 @@ Entries are trivia-delimited.
 
 ## Declarations
 
+Declarations are top-level. A `函数` and the type declarations (`类`,
+`契约`, `类型`, `枚举`, `判别`, `架构`) may not appear inside a
+block; the parser rejects them there (`declaration_not_top_level`). Methods
+live in `类` bodies. For a local function, bind a closure; for recursion,
+use a top-level function.
+
 ### Variables
 
 
@@ -1024,10 +1028,10 @@ fixum _ dup ← duplica(xs)
 
 - Return syntax: `→` declares the normal success type. A bodyful function with no `→` is effect-only (`vacuum`) and must not contain `返回`. A statement-bodied closure (`执行 { ... }` or legacy block body) must also spell `→ T` before it can use `返回`; expression-bodied closures may infer their result from the expression.
 - Recoverable alternate-exit syntax: `⇥` declares the error-channel type. It can appear after `→ T` or alone on an effect-only failable function or closure. A closure body that uses an escaping `抛错` must declare its own `⇥ E`; it cannot inherit the enclosing function's error channel. A local `执行 { ... } 捕获 err { ... }` may catch `抛错` without an enclosing `⇥`. A failable function call (`→ T ⇥ E`) inside a `⇥`-declaring function propagates to the function's alternate exit without a `执行`/`捕获` wrapper, mirroring how bare `↦` conversio and `抛错` throws already behave; the call lowers to Rust `?`. A closure must still declare its own `⇥` to propagate a failable call — the enclosing function's error channel does not cross the closure boundary.
+- In a signature, `⇥` only ever names an error type (`→ T ⇥ E`). It never carries a value.
 - Parameter access markers live in the type position: `借自`/`ref` (read), `传入`/`mut` (mutate), `拥有` (consume), and `拷贝` (duplicate then own). The retired parameter-prefix slot is not part of the grammar; `取自`/`from` remains the import/iteration/extraction token identity.
 - Post-name marker: `可选` (voluntary/optional provision)
 - `其余` marks rest parameter
-- `委派 NAME ('作为' LOCAL)?` declares an allocator requirement; `LOCAL` is the function-body alias.
 - Ordinary `函数` declarations and genus methods require bodies. Signature-only methods belong in `契约`.
 - `勘误 NAME` is a legacy runtime-injected `ignotum` local, and `可抛` is a legacy marker with no current semantic effect. Neither declares the typed alternate-exit contract. New failable APIs should use `⇥ E`; whether either legacy modifier should survive is unresolved.
 - `则` is the compact **statement-body** joint only (one-statement `如果`/`当`/`情况`/… arms).
@@ -1036,6 +1040,22 @@ fixum _ dup ← duplica(xs)
 
 ### Classes
 
+A `类` is a struct with methods. It holds data, its methods act on that
+data, and it satisfies contracts through `实现`. It is not a self-contained
+object that owns its own construction and process: a value is built with a
+construction literal (`Genus { field = value }`).
+
+- **No static methods.** A `类` declares instance methods only. A function
+  about a type is a top-level function in the type's file, reached through the
+  import alias. `静态` marks a type-level field, never a method.
+- **A newtype is a one-field `类`.** There is no separate newtype
+  declaration. Units that need arithmetic wait on operator overloading.
+- **No macros and no user derive.** What you read is what runs. Code
+  generation, when a project needs it, is an external step before the build.
+- **No extension methods and no retroactive conformance, for now.** A type's
+  methods and its `实现` contracts are declared on the type itself. Code
+  elsewhere cannot add either. Allowing it would need coherence rules, and is
+  revisited together with the contract features that are deferred.
 
 ### Annotations
 
@@ -1065,7 +1085,15 @@ and resolve through local declarations or imported file-interface exports.
 Resolved applications lower to `HirAnnotation` with `contract_id: Some(DefId)`
 and constant field values. v1 attachment target is `函数` only; payload
 scalars are `textus`, `numerus`, `fractus`, and `bivalens` (optional via
-`可选` or `T ∪ 空`). No compiler-owned `@ web` / controller / route families.
+`可选` or `T ∪ 空`). Web, HTTP, controller, and framework route families
+are not compiler-owned; they are built as libraries, from annotation contracts
+or on top of `@ 调用`. The one exception is `@ 调用` itself: it is the
+compiler-owned serving half of `调用` (see Capability Calls).
+
+User annotations are metadata. Their consumers are tools, such as product
+packaging. They never change compilation, and Faber code never reads them at
+run time. An annotation that changes compilation is compiler-owned (`@ json`,
+`@ 调用`, `@ radix`).
 
 **JSON genera:** `@ json` on a `类` is a compiler-owned data-model contract,
 not a generic annotation schema. Fields must be JSON-safe (`textus`, `ascii`,
@@ -1105,7 +1133,7 @@ wire operation such as `json.pange(value ↦ json)`.
 - `@ protecta` is reserved and rejected with a semantic diagnostic; it has no package, subclass, or sibling-file visibility meaning
 
 - `继承` = extends, `实现` = implements
-- `静态` = static, `属性` = bound/property
+- `静态` = static (type-level) field, `属性` = bound/property
 
 ### Interfaces
 
@@ -1113,6 +1141,12 @@ wire operation such as `json.pange(value ↦ json)`.
 `契约` is the **contract** construct: signature-only methods for `实现`
 (gerundive of *implere* — that which must be fulfilled). Import namespaces are
 `.fab` file boundaries; exported declarations live at file top level.
+
+A contract has no default method bodies. Default bodies would make a contract
+an abstract base class without fields. Behaviour shared by every implementer
+is a top-level function that takes the contract type. Contract inheritance (a
+contract that requires another), associated types, and retroactive
+conformance are deferred.
 
 ### Type Aliases
 
@@ -1185,7 +1219,7 @@ importa ex "faber:*" faber
 importa ex "lodash" * ut _
 # Re-export.
 importa ex "./types" publica User
-# Selective value imports.
+# Selective imports (values and types).
 importa ex "norma:consolum" fixum dic ut output
 ```
 
@@ -1196,7 +1230,7 @@ last import path segment when it is a valid, non-conflicting identifier. If the
 inferred name is invalid or collides with an existing top-level binding, spell an
 explicit `名称` or `作为` binding.
 
-**Selective value imports** create ordinary immutable value bindings: `导入 取自 "norma:consolum" 常量 dic 作为 output, funde 作为 output_bytes` imports one exported value member per `常量` local. The pre-`作为` identifier names an exported value in the imported file; the post-`作为` identifier is the caller-owned local binding; the imported file interface supplies the complete type. Functions and constants are values and may be imported; types are not. The bindings obey ordinary local-binding rules (duplicates, shadowing, lints), are locale-resolved through the imported module, and are never re-exports. Wildcard members cannot mix into the list. The current parser tolerates one trailing comma after the final member; the canonical spine keeps every comma required.
+**Selective imports** create ordinary immutable local bindings: `导入 取自 "norma:consolum" 常量 dic 作为 output, funde 作为 output_bytes` imports one exported member per `常量` local. The pre-`作为` identifier names an exported member in the imported file; the post-`作为` identifier is the caller-owned local binding; the imported file interface supplies the complete type. A member may be a value (a function or constant) or a type declaration; the syntax is the same for both. The bindings obey ordinary local-binding rules (duplicates, shadowing, lints), are locale-resolved through the imported module, and are never re-exports. Wildcard members cannot mix into the list. The current parser tolerates one trailing comma after the final member; the canonical spine keeps every comma required.
 
 `导入 取自 "faber:*" faber` is kernel-specific sugar: the glob lives
 inside the import path string and expands the released binary's kernel manifest
@@ -1214,6 +1248,10 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 - Explicit generic call-site lists use the same `typeArguments` production: `id<_>(x)` is a type hole (equivalent to omitted `id(x)` for a one-param callee), and mixed lists such as `both<_, textus>(a, b)` are legal. Arity stays exact (`both<_>` is still one argument). `∪` in that list is rejected (`explicit_union_type_arg_unsupported`): a callee type param is a monomorphic witness slot.
 - `labeledTypeArgument` is the optional label prefix on `元组` type arguments only (`元组<gx: f32, T>`; mixed labeled/unlabeled legal). A label in a non-`元组` list (`f<gx: T>(x)`, `lista<gx: T>`) is a parse error. Absence is the only unlabeled form; there is no `_: T` spelling. Keyword spellings are legal labels under the contextual law (`元组<常量: A>`).
 - Labels are unique within one tuple type.
+- The tuple type is spelled `元组<…>`, not `(K1, K2)`. Parentheses already
+  mean grouping, function types, parameters, and calls. Every other compound
+  type is `name<args>`, and tuple labels come from the same type-argument
+  machinery.
 - Labels are erased from type identity: `元组<gx: A, B> ≡ 元组<A, B>` for assignment, `≡`/`↦`, unify, and every emitter.
 - Bracket index on a tuple requires a literal integer (`i[0]`); every element is reachable by position, labeled or not. Non-literal index expressions stay rejected. Positions are brackets only — no `.0`.
 - Member-by-label (`i.gx`) requires that label to be present on the receiver's `元组` annotation.
@@ -1232,6 +1270,8 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 - Qualified type paths such as `terminus.Terminus` name a type through an
   imported namespace binding. The prefix must resolve to a namespace; the final
   segment must resolve to a type-bearing declaration.
+- There is no runtime reflection. Types are compile-time facts. Serialization
+  goes through conversion (`↦ json`, `↦ valor`).
 
 Function types enable higher-order function signatures:
 
@@ -1306,6 +1346,11 @@ it crosses numeric families. Integer `numerus<W>` arithmetic errors on
 overflow while float→integer conversion clamps; `modulus<W>` stays the only
 wrapping family (FORK-2, operator mail 2fb79900). Runner cast-path alignment
 is tracked as want 34821b73.
+
+Overflow policy lives in the type, read once at the declaration. There are no
+per-operation checked, wrapping, or saturating method families. To ask "does
+this fit?" of untrusted input, convert it to the narrow type with `↦` and
+handle the failure through the error channel.
 
 ### Generic Collections
 
@@ -1398,23 +1443,64 @@ prefer sugar. Choose per module or file.
 - `遍历 借自...常量`/`遍历 借自...变量` = for-in (keys)
 - `遍历 范围 range 常量/变量 i` = range iteration (e.g. `遍历 范围 0‥10 步 2 常量 i { 显示 i }`; `步` belongs to the range expression)
 
+**Iteration order.** A type whose order is part of its value iterates in that
+order. `lista` iterates by index. `textus` iterates its characters in order.
+`tensor`, `vector`, and `matrix` iterate by index, outer axis first
+(row-major). Two equal values always iterate identically.
+
+`copia` and `tabula` iterate in unspecified order. The order is not promised
+and not deliberately random; backends may differ. When order matters, sort
+explicitly. `≡` on these types stays structural and does not depend on order.
+A map or set that promises an order is a separate library type, not a mode of
+`tabula` or `copia`.
+
+There is no iteration interface. `遍历 取自` works on the built-in iterable
+types and on cursors. A user type that should be iterable exposes an ordinary
+method that returns a cursor (`遍历 取自 arbor.nodi() 常量 n`); nothing is
+called implicitly.
+
 ### Switch/Match
 
+`匹配` is a statement, not an expression. A value chosen by a match comes
+from a function whose arms each `返回`. The compiler checks exhaustiveness
+and definite return, and the function can be tested on its own.
 
 ### Pattern Matching
 
+Patterns are flat. A `情况` arm names one variant and binds its fields, or names one literal
+value; it does not match inside those fields. Nested patterns are left out for
+simplicity, not because they cannot be checked: a `匹配` inside an arm is
+two flat exhaustive switches.
+
+A negative number pattern is written with a leading minus (`情况 -1`,
+`情况 -∞`). The lexer never signs a number, so the pattern claims the sign;
+`-` before anything else is not pattern syntax.
+
+There are no range patterns (`情况 1‥5`). Test the range with `如果` inside the
+arm.
+
+A NaN pattern is rejected. NaN never equals itself, so it could never match;
+test for NaN with `如果` instead.
 
 ### Guards
 
-
-### Resource Management
-
+Match arms have no guards. `匹配` is one arm per variant, and a guard
+would split one variant's logic across several arms. Nest a `如果` in the arm
+instead.
 
 ### Destructuring Extraction
 
+Destructuring is flat. A nested pattern such as `[[a, b], c]` is rejected;
+destructure the outer value, then the inner one on another line.
+
+Parameters are not destructured. A pattern in a parameter slot would hide the
+parameter's type from a type-first signature. Destructure in the body.
 
 ### Control Transfer
 
+`中断` and `继续` take no label. They apply to the nearest enclosing loop.
+A nested search that needs an early exit from an outer loop becomes a
+function that `返回`s.
 
 - `等返` awaits a compatible promise and returns its success value from a
   `异步` function.
@@ -1428,7 +1514,7 @@ prefer sugar. Choose per module or file.
 ## Error Handling
 
 
-- `捕获` attaches to the structured forms whose productions name `catchClause`: conditional arms, `当`, `遍历`, `选择`, `管护`, and `执行`. It does not attach to arbitrary bare blocks.
+- `捕获` attaches to the structured forms whose productions name `catchClause`: conditional arms, `当`, `遍历`, `选择`, and `执行`. It does not attach to arbitrary bare blocks.
 - Use the explicit do block when a standalone block needs a handler: `执行 { ... } 捕获 err { ... }`.
 - `抛错` = throw (recoverable), `崩溃` = panic (fatal).
 - A same-line `如果 <expr>` guard on `抛错` and `崩溃` is line-sensitive parser sugar: `抛错 val 如果 cond` desugars to `如果 cond { 抛错 val }` at parse time. Its canonical, compression-safe spelling is the expanded `如果` block. A source compressor must expand this sugar before removing line breaks; the guarded shorthand remains under language review.
@@ -1486,6 +1572,10 @@ Retired predicate keywords are not prefix unary syntax. Use `expr 是 真`,
 `expr ≻ 0`.
 
 The legacy ASCII spellings `<` and `>` are not productions of this grammar — both remain generic delimiters — though the shipped parser still accepts them as comparisons during the glyph migration; prefer the canonical `≺` and `≻`.
+
+Ordering comparisons (`≺`, `≻`, `≤`, `≥`) between two `textus` values compare
+the whole strings in Unicode code-point order. They do not use locale
+collation.
 
 **Static type ascription (`∷` / verte):**
 
@@ -1869,6 +1959,23 @@ ordinary postfix `conversio` materializes the resulting conversation handle.
 
 See [`docs/design/frame-stream-types.md`](docs/design/frame-stream-types.md).
 
+**Concurrency is conversations.** Concurrent work is an `调用` conversation with
+a route. There is no separate spawn, thread, or lock primitive family.
+Handlers that share nothing and exchange only frames are free of data races by
+construction.
+
+Every `调用` pays the conversation cost. It goes through the router with frames,
+even when both ends are local; there is no hidden fast path. The light path is
+an ordinary function call, and a swappable light path is a contract passed as a
+parameter.
+
+`调用` is the effect boundary. Effects reach the outside world through `调用`
+conversations, which stay portable across backends.
+
+`@ 调用` on a function is the compiler-owned serving half of `调用`: it lets
+Faber code answer a route. It is designed, not yet implemented. Web, HTTP,
+and framework routing stay libraries (see Annotations).
+
 ---
 
 ## Collection Operations
@@ -1924,6 +2031,23 @@ policy around it, see:
 
 - [`EBNF_MATRIX.md`](EBNF_MATRIX.md) — generated grammar×target lowerability matrix (the official rows).
 - [`docs/design/target-capability-matrix.md`](docs/design/target-capability-matrix.md) — runtime/contract policy (erase/warn/defer), pipeline routing, per-target contracts.
+
+**Conditional compilation is package-granular.** A package's `faber.toml`
+declares its target or targets (`[build] target = "ts"`, or
+`targets = ["rust", "ts"]`). There are no conditionals inside a package: no
+`#if`, no in-body `cfg`, and no per-file target selection.
+
+A multi-target package stays target-neutral. Its per-target parts live in the
+per-target manifest sections (`[target.ts]`). Code that needs a genuinely
+different implementation per target is split into separate packages, and the
+consumer chooses one.
+
+Feature flags (`@ feature`, `[features]`) belong to the visibility model and
+are unchanged. `@ nondum` stays the marker for "not implemented on this target
+yet".
+
+There is no `unsafe`. Faber code is always checked. Code that must step
+outside the checker is foreign code, written outside Faber.
 
 ---
 

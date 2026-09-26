@@ -683,7 +683,6 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙"]
 # | Boolean | `verum` | true |
 # | Objects | `clausura` | legacy closure |
 # | Objects | `libera` | capture-free closure modifier |
-# | Objects | `cura` | with-resource |
 # | Objects | `ego` | self |
 # | Objects | `finge` | construct variant |
 # | Objects | `iuncta` | tuple type/constructor |
@@ -704,7 +703,6 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙"]
 # | Iteration | `usque` | range until inclusive |
 # | Params | `argumenta` | CLI arguments modifier |
 # | Params | `ceteri` | rest |
-# | Params | `curata` | curated options |
 # | Params | `errata` | error channel |
 # | Params | `exitus` | exit code |
 # | Params | `immutata` | immutable modifier |
@@ -840,7 +838,7 @@ statement     := annotation* statement_core
 statement_core := importa_decl | binding_decl | functio_decl | genus_decl | implendum_decl
                | typus_decl | ordo_decl | discretio_decl | schema_decl
                | si_stmt | dum_stmt | itera_stmt
-               | elige_stmt | discerne_stmt | custodi_stmt | cura_stmt | fac_stmt
+               | elige_stmt | discerne_stmt | custodi_stmt | fac_stmt
                | redde_stmt | reddet_stmt | tacebit_stmt | cede_stmt
                | rumpe_stmt | perge_stmt | tacet_stmt | iace_stmt
                | adfirma_stmt | requirit_stmt | reice_stmt | nota_stmt | incipit_stmt | incipiet_stmt
@@ -865,7 +863,7 @@ generic_type_default := '=' type_annotation
 generic_size_default := '=' NATURAL
 call_type_args  := '<' type_annotation (',' type_annotation)* '>'
 parameter    := 'ceteri'? type_annotation IDENTIFIER 'sponte'? ('ut' IDENTIFIER)? ('vel' expression)?
-func_modifier := 'argumenta' IDENTIFIER | 'curata' IDENTIFIER ('ut' IDENTIFIER)? | 'errata' IDENTIFIER | 'exitus' (IDENTIFIER | NUMBER) | 'immutata' | 'iacit' | 'optiones' IDENTIFIER
+func_modifier := 'argumenta' IDENTIFIER | 'errata' IDENTIFIER | 'exitus' (IDENTIFIER | NUMBER) | 'immutata' | 'iacit' | 'optiones' IDENTIFIER
 callable_posture := 'fiet' | 'fiunt' | 'fient'
 return_clause := '→' type_annotation
 alternate_exit_clause := '⇥' type_annotation
@@ -938,8 +936,8 @@ importa_sugar    := 'importa' 'ex' STRING publica? (named_import | wildcard_impo
 publica    := 'publica'
 named_import   := IDENTIFIER ('ut' IDENTIFIER)?
 wildcard_import := '*' 'ut' IDENTIFIER
-# Selective value imports (EOT-2): one immutable local binding per exported
-# value member; the imported interface supplies the complete type. The parser
+# Selective imports (EOT-2): one immutable local binding per exported member,
+# value or type; the imported interface supplies the complete type. The parser
 # tolerates one trailing comma after the final member; the canonical spine
 # keeps every comma required (comma law).
 selective_import := 'fixum' import_value_binding (',' import_value_binding)*
@@ -989,7 +987,12 @@ casu_variant_clause  := 'casu' patterns (block_stmt | ergo_joint statement)
 patterns     := pattern ((',' | 'et') pattern)*
 # A one-segment type name in a `discerne` arm is classified as a type pattern
 # by the parser's type-name lookahead; qualified paths remain variant patterns.
-pattern      := '_' | literal | type_pattern | (IDENTIFIER ut_pattern?)
+pattern      := '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_pattern?)
+# The lexer never signs a number, so a pattern claims a leading `-` directly
+# before a number literal as its sign (`casu -1`). `∞` is a NUMBER, so `-∞` is
+# a negated number. `-` before anything else is not pattern syntax. A NaN
+# literal (`nonnumerus`) in a pattern slot is rejected: NaN never equals itself.
+negated_number := '-' NUMBER
 # Type arguments carry bounded widths and hole arguments into pattern lowering.
 type_pattern := IDENTIFIER type_arguments? ut_pattern?
 ut_pattern  := ('ut' IDENTIFIER) | (('fixum' | 'varia') pattern_binding (',' pattern_binding)*)
@@ -998,7 +1001,6 @@ pattern_binding := IDENTIFIER ('ut' IDENTIFIER)?
 custodi_stmt   := 'custodi' '{' si_guard_clause+ '}'
 si_guard_clause := 'si' expression (block_stmt | ergo_joint statement)
 
-cura_stmt    := 'cura' STRING ('fixum' | 'varia') type_annotation IDENTIFIER block_stmt cape_clause?
 
 ex_stmt   := 'ex' expression ('fixum' | 'varia') extract_fields
 extract_fields := extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
