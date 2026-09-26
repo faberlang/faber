@@ -584,6 +584,7 @@ fn collection_op(op: MirCollectionOp) -> &'static str {
         MirCollectionOp::Reverse => "reverse",
         MirCollectionOp::ReverseInPlace => "reverse_in_place",
         MirCollectionOp::Sort => "sort",
+        MirCollectionOp::SortByKeys => "sort_by_keys",
         MirCollectionOp::Union => "union",
         MirCollectionOp::Intersection => "intersection",
         MirCollectionOp::Difference => "difference",

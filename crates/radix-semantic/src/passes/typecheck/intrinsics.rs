@@ -16,10 +16,10 @@ use crate::{
 };
 use radix_hir::{HirCallArg, HirExpression, HirExpressionKind};
 use radix_intrinsics::{
-    CatalogGenericDefault, CatalogGenericParam, IntrinsicParamKind, IntrinsicReceiver,
-    IntrinsicReturnKind, MethodIntrinsic, is_mutating_receiver, is_numeric_bitwise_operator,
-    is_numeric_imperativus_operator, lookup_method, lookup_method_for_type, lookup_method_named,
-    receivers_for_type,
+    CatalogGenericDefault, CatalogGenericParam, IntrinsicMirKind, IntrinsicParamKind,
+    IntrinsicReceiver, IntrinsicReturnKind, MethodIntrinsic, is_mutating_receiver,
+    is_numeric_bitwise_operator, is_numeric_imperativus_operator, lookup_method,
+    lookup_method_for_type, lookup_method_named, receivers_for_type,
 };
 use radix_lexer::Symbol;
 
@@ -28,6 +28,7 @@ const ISSUE_BITWISE_METHOD_REQUIRES_NUMERUS_RECEIVER: &str =
 const ISSUE_DENSATA_REQUIRES_SPARSA_RECEIVER: &str = "densata_requires_sparsa_receiver";
 const ISSUE_ARGUMENT_TYPE_MISMATCH: &str = "argument_type_mismatch";
 const ISSUE_NUMERIC_LISTA_ELEMENTS_REQUIRED: &str = "numeric_lista_elements_required";
+const ISSUE_ORDINA_KEY_NOT_ORDERED: &str = "ordina_key_not_ordered";
 const ISSUE_TENSOR_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED: &str =
     "tensor_arithmetic_numeric_element_required";
 const ISSUE_MATRIX_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED: &str =
@@ -431,6 +432,10 @@ pub(super) fn check_intrinsic_method_call(
         return Some(check_matrix_transpone(checker, receiver_ty));
     }
 
+    if matches!(entry.mir_kind, IntrinsicMirKind::HigherOrderSortBy) {
+        return Some(check_sort_by_key(checker, entry, ctx.inner, args, span));
+    }
+
     match entry.return_kind {
         IntrinsicReturnKind::MapperArray | IntrinsicReturnKind::MapperSet => {
             let Some(inner) = ctx.inner else {
@@ -535,6 +540,37 @@ pub(super) fn check_intrinsic_method_call(
             }
             Some(result)
         }
+    }
+}
+
+/// `ordina(key)` / `ordinata(key)` (D1.7): the key selector maps an element
+/// to a value that is ordered today — a number or `textus`. The result is the
+/// receiver's own element type, never the key type.
+fn check_sort_by_key(
+    checker: &mut TypeChecker<'_>,
+    entry: &MethodIntrinsic,
+    inner: Option<TypeId>,
+    args: &mut [HirCallArg],
+    span: radix_lexer::Span,
+) -> TypeId {
+    let Some(inner) = inner else {
+        return checker.error_type;
+    };
+    let key = checker.fresh_infer();
+    let key_fn = checker.types.function(simple_sig(vec![inner], key));
+    let vacuum = checker.vacuum_type();
+    checker.check_call_args(&simple_sig(vec![key_fn], vacuum), args, span);
+    let key = checker.resolve_inferred_type(key);
+    if key != checker.error_type && !checker.is_numeric(key) && !checker.is_textus(key) {
+        checker.invalid_operand_types(ISSUE_ORDINA_KEY_NOT_ORDERED, span);
+        return checker.error_type;
+    }
+    // WHY: MIR lowering carries the keys as a `lista<key>` through a
+    // read-only type table; intern the carrier here where it is admitted.
+    checker.types.array(key);
+    match entry.return_kind {
+        IntrinsicReturnKind::Vacuum => vacuum,
+        _ => checker.types.array(inner),
     }
 }
 

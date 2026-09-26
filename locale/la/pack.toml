@@ -2144,6 +2144,10 @@ help = "remove the explicit type argument list"
 message = "numeric {lista} elements required"
 help = "use numeric elements for this {lista} intrinsic"
 
+[diagnostics.SEM011.issues.ordina_key_not_ordered]
+message = "clavis ordinis numerus aut {textus} esse debet"
+help = "redde numerum aut {textus} ex selectore clavis"
+
 [diagnostics.SEM011.issues.octeti_literal_invalid_character]
 message = "octeti literal contains invalid character '{character}'"
 help = "use only hexadecimal digits in octeti literals"

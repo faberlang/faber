@@ -906,6 +906,10 @@ mod octeti_lista_conversio_test;
 mod octeti_index_test;
 
 #[cfg(test)]
+#[path = "ordina_key_test.rs"]
+mod ordina_key_test;
+
+#[cfg(test)]
 #[path = "scalar_longitudo_test.rs"]
 mod scalar_longitudo_test;
 

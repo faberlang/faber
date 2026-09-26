@@ -554,6 +554,7 @@ impl Validator<'_, '_> {
             | MirCollectionOp::ArrayMul
             | MirCollectionOp::ArrayDiv
             | MirCollectionOp::Append
+            | MirCollectionOp::SortByKeys
             | MirCollectionOp::AppendImmutable
             | MirCollectionOp::Delete
             | MirCollectionOp::Index
@@ -848,6 +849,32 @@ impl Validator<'_, '_> {
                                 "collection reverse/sort result type mismatch",
                             );
                         }
+                    }
+                }
+            }
+            MirCollectionOp::SortByKeys => {
+                if let Some(collection_ty) = first_arg_ty {
+                    let keys_ty = call
+                        .args
+                        .get(1)
+                        .and_then(|arg| self.validate_operand(scope, arg, span));
+                    if keys_ty
+                        .and_then(|ty| self.collection_element_ty(ty))
+                        .is_none()
+                    {
+                        self.error(span, "collection sort_by_keys keys are not a lista");
+                    }
+                    match (
+                        self.collection_element_ty(call.return_ty),
+                        self.collection_element_ty(collection_ty),
+                    ) {
+                        (Some(result_elem), Some(receiver_elem)) => self.require_assignable(
+                            result_elem,
+                            receiver_elem,
+                            span,
+                            "collection sort_by_keys result type mismatch",
+                        ),
+                        _ => self.error(span, "collection sort_by_keys receiver is not a lista"),
                     }
                 }
             }

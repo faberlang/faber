@@ -186,6 +186,10 @@ pub enum MirCollectionOp {
     Reverse,
     ReverseInPlace,
     Sort,
+    /// Stable sort of a `lista` by a parallel `lista` of keys (D1.7
+    /// `ordina(key)`): args `[receiver, keys]`, same length; keys are
+    /// numbers or `textus`. Returns the reordered receiver elements.
+    SortByKeys,
     Union,
     Intersection,
     Difference,

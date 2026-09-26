@@ -1,5 +1,5 @@
 //! Higher-order collection method lowering (`omnia`, `quilibet`, `filtrata`,
-//! `mappata`, `reducta`, `cumulata`).
+//! `mappata`, `reducta`, `cumulata`, keyed `ordina`/`ordinata`).
 //!
 //! Collection transforms lower into explicit MIR loops over array receivers.
 //! Each callback is emitted as a synthetic closure function, then invoked once
@@ -303,11 +303,26 @@ impl FunctionBuilder<'_> {
         }
         let collection_ty = MirType::semantic(receiver_ty);
         let result_ty = self.expr_ty(expr)?;
+        let collection = self.lower_expr_value(receiver)?;
+        let collection = self.materialize_operand_place(collection, collection_ty, receiver.span);
+        self.lower_transform_over(collection, callback, kind, result_ty, expr.span)
+    }
+
+    /// Loop `callback` over an already-materialized array place, building a
+    /// `result_ty` array (filter keeps items, map appends callback results).
+    fn lower_transform_over(
+        &mut self,
+        collection: MirPlace,
+        callback: MirCallee,
+        kind: TransformKind,
+        result_ty: MirType,
+        span: Span,
+    ) -> Option<MirOperand> {
         let result_element_ty = if let Type::Array(item) = self.normalized_type(result_ty.semantic_id()) {
             MirType::semantic(*item)
         } else {
             self.errors.push(MirError::unsupported(
-                expr.span,
+                span,
                 "collection transform result before array MIR lowering",
             ));
             return None;
@@ -316,54 +331,42 @@ impl FunctionBuilder<'_> {
         let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         let vacuum = MirType::semantic(self.types.primitive(Primitive::Vacuum));
 
-        let collection = self.lower_expr_value(receiver)?;
-        let collection = self.materialize_operand_place(collection, collection_ty, receiver.span);
         let result = self.construct_temp(
             MirAggregateKind::Array,
             MirAggregateFields::Ordered(Vec::new()),
             result_ty,
-            expr.span,
+            span,
         );
-        let result = self.materialize_operand_place(result, result_ty, expr.span);
+        let result = self.materialize_operand_place(result, result_ty, span);
 
         let index = self.next_local_id();
         self.locals
-            .push(MirLocalDecl { id: index, name: None, ty: numerus, mutable: true, span: expr.span });
-        self.assign(
-            MirPlace::local(index),
-            MirOperand::Constant(MirConstant::Int(0)),
-            numerus,
-            expr.span,
-        );
+            .push(MirLocalDecl { id: index, name: None, ty: numerus, mutable: true, span: span });
+        self.assign(MirPlace::local(index), MirOperand::Constant(MirConstant::Int(0)), numerus, span);
 
         let length = self.runtime_call_value(
             MirIntrinsic::Collection(MirCollectionOp::Length),
             vec![MirOperand::Place(collection.clone())],
             numerus,
-            expr.span,
+            span,
         );
         if !self.current_is_open() {
             return None;
         }
 
-        let cond_id = self.fresh_block(expr.span);
-        let body_id = self.fresh_block(expr.span);
-        let append_id = self.fresh_block(expr.span);
-        let increment_id = self.fresh_block(expr.span);
-        let after_id = self.fresh_block(expr.span);
-        self.terminate_current(MirTerminatorKind::Goto(cond_id), expr.span);
+        let cond_id = self.fresh_block(span);
+        let body_id = self.fresh_block(span);
+        let append_id = self.fresh_block(span);
+        let increment_id = self.fresh_block(span);
+        let after_id = self.fresh_block(span);
+        self.terminate_current(MirTerminatorKind::Goto(cond_id), span);
 
         self.switch_to(cond_id);
-        let continues = self.binary_temp(
-            MirBinOp::Lt,
-            MirOperand::Place(MirPlace::local(index)),
-            length,
-            bivalens,
-            expr.span,
-        );
+        let continues =
+            self.binary_temp(MirBinOp::Lt, MirOperand::Place(MirPlace::local(index)), length, bivalens, span);
         self.terminate_current(
             MirTerminatorKind::Branch { condition: continues, then_block: body_id, else_block: after_id },
-            expr.span,
+            span,
         );
 
         self.switch_to(body_id);
@@ -379,7 +382,7 @@ impl FunctionBuilder<'_> {
                 unreachable!("predicate folds use lower_collection_predicate")
             }
         };
-        let mapped = self.call_callback_callee(callback, vec![item.clone()], callback_return, expr.span);
+        let mapped = self.call_callback_callee(callback, vec![item.clone()], callback_return, span);
         if !self.current_is_open() {
             return None;
         }
@@ -388,24 +391,24 @@ impl FunctionBuilder<'_> {
             TransformKind::Filter => {
                 self.terminate_current(
                     MirTerminatorKind::Branch { condition: mapped, then_block: append_id, else_block: increment_id },
-                    expr.span,
+                    span,
                 );
                 self.switch_to(append_id);
                 self.runtime_call_value(
                     MirIntrinsic::Collection(MirCollectionOp::Append),
                     vec![MirOperand::Place(result.clone()), item],
                     vacuum,
-                    expr.span,
+                    span,
                 );
             }
             TransformKind::Map => {
-                self.terminate_current(MirTerminatorKind::Goto(append_id), expr.span);
+                self.terminate_current(MirTerminatorKind::Goto(append_id), span);
                 self.switch_to(append_id);
                 self.runtime_call_value(
                     MirIntrinsic::Collection(MirCollectionOp::Append),
                     vec![MirOperand::Place(result.clone()), mapped],
                     vacuum,
-                    expr.span,
+                    span,
                 );
             }
             TransformKind::All | TransformKind::Any => {
@@ -415,7 +418,7 @@ impl FunctionBuilder<'_> {
         if !self.current_is_open() {
             return None;
         }
-        self.terminate_open_current(MirTerminatorKind::Goto(increment_id), expr.span);
+        self.terminate_open_current(MirTerminatorKind::Goto(increment_id), span);
 
         self.switch_to(increment_id);
         let next = self.binary_temp(
@@ -423,13 +426,73 @@ impl FunctionBuilder<'_> {
             MirOperand::Place(MirPlace::local(index)),
             MirOperand::Constant(MirConstant::Int(1)),
             numerus,
-            expr.span,
+            span,
         );
-        self.assign(MirPlace::local(index), next, numerus, expr.span);
-        self.terminate_current(MirTerminatorKind::Goto(cond_id), expr.span);
+        self.assign(MirPlace::local(index), next, numerus, span);
+        self.terminate_current(MirTerminatorKind::Goto(cond_id), span);
 
         self.switch_to(after_id);
         Some(MirOperand::Place(result))
+    }
+
+    /// `ordina(key)` / `ordinata(key)` (D1.7): map the receiver to a key
+    /// `lista` with the ordinary map loop, then `SortByKeys` reorders the
+    /// receiver stably by those keys. The receiver is evaluated once.
+    pub(super) fn lower_sort_by_key(
+        &mut self,
+        receiver: &HirExpression,
+        closure: &HirExpression,
+        in_place: bool,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let receiver_ty = receiver.ty?;
+        if !matches!(self.normalized_type(receiver_ty), Type::Array(_) | Type::BoundedArray { .. }) {
+            self.errors.push(MirError::unsupported(
+                receiver.span,
+                "ordina key receiver before array MIR lowering",
+            ));
+            return None;
+        }
+        let key_ty = match closure.ty.map(|ty| self.normalized_type(ty)) {
+            Some(Type::Func(sig)) => sig.ret,
+            _ => {
+                self.errors
+                    .push(MirError::missing_type(closure.span, "ordina key selector"));
+                return None;
+            }
+        };
+        // WHY: typecheck interns `lista<key>` when it admits the selector, so
+        // the key carrier exists in the read-only type table here.
+        let Some(keys_ty) = self.types.find_array(key_ty) else {
+            self.errors
+                .push(MirError::missing_type(closure.span, "ordina key lista"));
+            return None;
+        };
+        let keys_ty = MirType::semantic(keys_ty);
+        let key_fn = self.lower_closure_function(closure, MirType::semantic(key_ty))?;
+        let collection_ty = MirType::semantic(receiver_ty);
+        if in_place {
+            let (place, ty) = self.lower_assignment_place_with_fallback(receiver, collection_ty)?;
+            let keys = self.lower_transform_over(place.clone(), key_fn, TransformKind::Map, keys_ty, expr.span)?;
+            let sorted = self.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::SortByKeys),
+                vec![MirOperand::Place(place.clone()), keys],
+                ty,
+                expr.span,
+            );
+            self.assign(place, sorted, ty, expr.span);
+            return Some(MirOperand::Constant(MirConstant::Unit));
+        }
+        let result_ty = self.expr_ty(expr)?;
+        let collection = self.lower_expr_value(receiver)?;
+        let collection = self.materialize_operand_place(collection, collection_ty, receiver.span);
+        let keys = self.lower_transform_over(collection.clone(), key_fn, TransformKind::Map, keys_ty, expr.span)?;
+        Some(self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::SortByKeys),
+            vec![MirOperand::Place(collection), keys],
+            result_ty,
+            expr.span,
+        ))
     }
 
     /// Lower the dedicated `primus_quem` first-match head (AFM-3 base lane).
