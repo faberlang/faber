@@ -462,6 +462,7 @@ impl FunctionBuilder<'_> {
             diagnostic_separator: context.diagnostic_separator,
             diagnostic_nihil: context.diagnostic_nihil,
             diagnostic_lockstep_length_mismatch: context.diagnostic_lockstep_length_mismatch,
+            diagnostic_ordo_no_member: context.diagnostic_ordo_no_member,
             function_errors: Arc::clone(&context.function_errors),
             function_params: Arc::clone(&context.function_params),
             function_async: Arc::clone(&context.function_async),

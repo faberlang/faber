@@ -2006,11 +2006,21 @@ fn transplant_expr(
         // inline recovery all travel; cross-analysis definitions inside them
         // still fail closed through the recursive transplant below.
         HirExpressionKind::Conversio {
+            route,
             source,
             target,
             params,
             recovery,
         } => {
+            // A routed conversion (ordo row, registered `@ conversio`)
+            // names definitions of the source analysis; fail closed rather
+            // than transplant them unmapped.
+            if route.is_some() {
+                return Err(
+                    "package MIR cannot transplant a const data member initializer with an ordo or registered conversio row"
+                        .to_string(),
+                );
+            }
             let source = Box::new(transplant_expr(
                 source,
                 source_interner,
@@ -2062,6 +2072,7 @@ fn transplant_expr(
                 None => None,
             };
             HirExpressionKind::Conversio {
+                route: None,
                 source,
                 target,
                 params,

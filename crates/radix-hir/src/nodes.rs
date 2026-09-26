@@ -1383,6 +1383,13 @@ pub enum HirExpressionKind {
         /// Stored as raw symbols because these are target-specific hints, not Faber types.
         params: Vec<Symbol>,
         recovery: Option<Box<HirExpression>>,
+
+        /// Non-primitive conversion row selected by typecheck, when one
+        /// applies: a built-in `ordo` row (D9.4) or a registered
+        /// `@ conversio` function (D9.3). `None` means the backend's own
+        /// scalar/structural conversion rules decide the lowering.
+        #[serde(default)]
+        route: Option<HirConversioRoute>,
     },
 
     /// Expression-form stream `ad` (blockless, evaluates to `sermo`).
@@ -1514,6 +1521,84 @@ pub enum HirConversioTarget {
     Type(TypeId),
     /// Clamp constraint: inline range (`↦ 0‥10`) or stored `intervallum` operand (`↦ fines`).
     Intervallum(Box<HirExpression>),
+}
+
+/// Conversion row resolved by typecheck for one `↦` site.
+///
+/// Carried on the expression so every backend lowers the same decision; the
+/// Faber re-emitter ignores it and keeps the authored `↦`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum HirConversioRoute {
+    /// D9.4: built-in `ordo` row. `members` lists every member in declaration
+    /// order with its resolved discriminant.
+    Ordo {
+        row: HirOrdoRow,
+        members: Vec<HirOrdoRouteMember>,
+    },
+    /// D9.3: registered `@ conversio` function for the direct (source,
+    /// destination) pair. `failable` when the function declares `⇥ E`; its
+    /// failure then propagates, or yields the site's `⊥` default.
+    Function { def_id: DefId, failable: bool },
+}
+
+impl HirConversioRoute {
+    /// The call a [`HirConversioRoute::Function`] route stands for:
+    /// `function(source)`, carrying the conversion expression's identity and
+    /// result type. Backends emit it through their ordinary call path.
+    #[must_use]
+    pub fn function_call(
+        def_id: DefId,
+        source: &HirExpression,
+        conversio: &HirExpression,
+    ) -> HirExpression {
+        let span = conversio.span;
+        HirExpression {
+            id: conversio.id,
+            kind: HirExpressionKind::Call(
+                Box::new(HirExpression {
+                    id: conversio.id,
+                    kind: HirExpressionKind::Path(def_id),
+                    ty: None,
+                    span,
+                }),
+                Vec::new(),
+                vec![HirCallArg {
+                    name: None,
+                    spread: false,
+                    expr: source.clone(),
+                    span: source.span,
+                }],
+                None,
+            ),
+            ty: conversio.ty,
+            span,
+        }
+    }
+}
+
+/// Direction of a built-in `ordo` conversion row (D9.4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirOrdoRow {
+    /// `Ordo ↦ numerus`: the member's discriminant. Infallible.
+    ToNumerus,
+    /// `numerus ↦ Ordo`: the first member whose discriminant equals the
+    /// value. Failable when no member matches.
+    FromNumerus,
+    /// `Ordo ↦ textus`: the member name. Infallible.
+    ToTextus,
+}
+
+/// One `ordo` member as a conversion row sees it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirOrdoRouteMember {
+    pub variant: DefId,
+    pub name: Symbol,
+    /// Resolved integer discriminant: the authored number, or the previous
+    /// member's plus one (the first member defaults to 0). `None` on the
+    /// `ToTextus` row for a string-valued member, and on the `FromNumerus`
+    /// row for a member whose discriminant an earlier member already has
+    /// (the first match wins, so it is never selected).
+    pub value: Option<i64>,
 }
 
 /// Range endpoint inclusion policy.

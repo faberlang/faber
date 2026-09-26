@@ -1333,6 +1333,7 @@ impl Lowerer<'_> {
             .as_ref()
             .map(|fb| Box::new(lower_expr(self, fb)));
         HirExpressionKind::Conversio {
+            route: None,
             source: Box::new(source),
             target,
             params,

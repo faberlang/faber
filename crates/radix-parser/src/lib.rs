@@ -1485,3 +1485,7 @@ mod conditional_glyph_test;
 #[cfg(test)]
 #[path = "ternary_removed_test.rs"]
 mod ternary_removed_test;
+
+#[cfg(test)]
+#[path = "sum_type_data_only_test.rs"]
+mod sum_type_data_only_test;

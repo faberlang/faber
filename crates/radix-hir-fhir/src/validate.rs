@@ -2734,6 +2734,7 @@ pub(crate) fn validate_referential_integrity(
                 }
             }
             HirExpressionKind::Conversio {
+                route: _,
                 source,
                 target,
                 params,

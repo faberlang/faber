@@ -102,6 +102,7 @@ pub mod json_genus;
 pub mod lockstep;
 pub mod lookup;
 pub mod ops;
+pub mod ordo_conversio;
 pub mod pattern;
 pub mod range;
 #[cfg(test)]
@@ -282,6 +283,10 @@ pub(crate) struct TypeChecker<'a> {
     /// Parent enum for each variant constructor.
     pub variant_parent: FxHashMap<DefId, DefId>,
 
+    /// Local `ordo` members in declaration order, keyed by the enum def
+    /// (D9.4 built-in conversion rows).
+    pub ordo_members: FxHashMap<DefId, Vec<ordo_conversio::OrdoMemberFact>>,
+
     /// Generic type parameters keyed by their declaring struct/enum def, in
     /// declaration order. Absent or empty means the nominal is not generic.
     pub type_params_by_def: FxHashMap<DefId, Vec<Symbol>>,
@@ -453,6 +458,9 @@ pub(crate) fn typecheck_with_config(
         checker.register_companion_signatures(companions);
     }
     checker.collect_items(hir);
+    if let Some(presentation) = presentation.as_deref() {
+        checker.collect_ordo_members(hir, presentation);
+    }
     checker.check_program(hir);
     if let Some(presentation) = presentation {
         checker.finalize_authored_forms(presentation);
@@ -498,6 +506,7 @@ impl<'a> TypeChecker<'a> {
             variant_fields: FxHashMap::default(),
             variant_field_names: FxHashMap::default(),
             variant_parent: FxHashMap::default(),
+            ordo_members: FxHashMap::default(),
             type_params_by_def: FxHashMap::default(),
             current_generic_param_kinds: FxHashMap::default(),
             current_return: None,
@@ -826,6 +835,14 @@ mod bounded_string_conversio_test;
 #[cfg(test)]
 #[path = "bits_conversio_test.rs"]
 mod bits_conversio_test;
+
+#[cfg(test)]
+#[path = "ordo_conversio_test.rs"]
+mod ordo_conversio_test;
+
+#[cfg(test)]
+#[path = "conversio_function_route_test.rs"]
+mod conversio_function_route_test;
 
 #[cfg(test)]
 #[path = "bf16_conversio_test.rs"]

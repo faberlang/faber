@@ -467,11 +467,19 @@ impl TypeChecker<'_> {
                 entries,
             } => self.check_verte(source, *target, entries.as_mut(), expected, expr.span),
             HirExpressionKind::Conversio {
+                route,
                 source,
                 target,
                 params,
                 recovery,
-            } => self.check_conversio(source, target, params, recovery.as_deref_mut(), expr.span),
+            } => self.check_conversio(
+                source,
+                target,
+                params,
+                recovery.as_deref_mut(),
+                route,
+                expr.span,
+            ),
             HirExpressionKind::Tuple(items, type_args) => {
                 self.check_tuple(items, type_args.as_ref(), expected)
             }

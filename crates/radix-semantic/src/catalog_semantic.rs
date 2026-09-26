@@ -420,6 +420,15 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         "conversio_failure_channel_textus_required" => {
             Some("declare the alternate-exit channel as textus or provide inline recovery".to_owned())
         }
+        "ordo_conversio_string_member" => Some(
+            "only an ordo whose members are numbers converts to and from numerus; convert to textus for the member name".to_owned(),
+        ),
+        "ordo_conversio_recovery_unsupported" => {
+            Some("remove the `⊥` default; this ordo conversion cannot fail".to_owned())
+        }
+        "conversio_assign_route_unsupported" => {
+            Some("write `target ← source ↦ T` instead of `↤` for this conversion".to_owned())
+        }
         "bivalens_recovery_unsupported" => {
             Some("remove the recovery arm; use the truthiness result directly".to_owned())
         }

@@ -68,6 +68,7 @@ mod collection_higher_order;
 
 mod context;
 mod control;
+mod conversio_route;
 mod expr;
 #[cfg(test)]
 #[path = "lower/first_match_test.rs"]
@@ -357,6 +358,7 @@ pub fn lower_analyzed_unit(
         separator: interner.intern(" "),
         nihil: interner.intern("nihil"),
         lockstep_length_mismatch: interner.intern("itera lockstep sources must have equal length"),
+        ordo_no_member: interner.intern("no ordo member has this value"),
     };
     let mut lowerer = MirLowerer {
         unit,
@@ -830,6 +832,8 @@ struct DiagnosticSymbols {
     /// Lockstep `itera ex` runtime admission message: the
     /// fail-closed equal-length guard's panic textus.
     lockstep_length_mismatch: Symbol,
+    /// Failed `numerus ↦ Ordo` payload (D9.4): no member has the value.
+    ordo_no_member: Symbol,
 }
 
 struct MirLowerer<'a> {
@@ -1494,6 +1498,8 @@ struct FunctionBuilderContext<'a> {
     /// Lockstep `itera ex` runtime admission message: the
     /// fail-closed equal-length guard's panic textus.
     diagnostic_lockstep_length_mismatch: Symbol,
+    /// Failed `numerus ↦ Ordo` payload textus (D9.4).
+    diagnostic_ordo_no_member: Symbol,
     function_errors: Arc<FxHashMap<DefId, MirType>>,
     function_async: Arc<FxHashMap<DefId, bool>>,
     function_generator: Arc<FxHashMap<DefId, bool>>,
@@ -1566,6 +1572,7 @@ impl<'a> FunctionBuilderContext<'a> {
             diagnostic_separator: Symbol(0),
             diagnostic_nihil: Symbol(0),
             diagnostic_lockstep_length_mismatch: Symbol(0),
+            diagnostic_ordo_no_member: Symbol(0),
             function_errors: Arc::new(FxHashMap::default()),
             function_async: Arc::new(FxHashMap::default()),
             function_generator: Arc::new(FxHashMap::default()),

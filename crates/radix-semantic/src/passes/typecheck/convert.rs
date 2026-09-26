@@ -324,15 +324,18 @@ impl TypeChecker<'_> {
     /// The source is always visited for diagnostics. An inline `⊥` default
     /// expression must be a value of the declared target type `T`. This function
     /// returns the declared target type rather than inventing a common type
-    /// between source and recovery.
+    /// between source and recovery. A built-in `ordo` row or registered
+    /// `@ conversio` pair that serves the site is written to `route`.
     pub fn check_conversio(
         &mut self,
         source: &mut HirExpression,
         target: &mut HirConversioTarget,
         params: &[Symbol],
-        recovery: Option<&mut HirExpression>,
+        mut recovery: Option<&mut HirExpression>,
+        route: &mut Option<radix_hir::HirConversioRoute>,
         span: radix_lexer::Span,
     ) -> TypeId {
+        *route = None;
         let source_ty = self.check_expr(source);
         if let HirConversioTarget::Intervallum(operand) = target {
             if recovery.is_some() {
@@ -352,6 +355,15 @@ impl TypeChecker<'_> {
             self.invalid_conversion(issue, span);
             return self.error_type;
         }
+        // D9.4: built-in `ordo` rows. Pairs outside the three rows fall
+        // through to the ordinary rules (and their `unsupported_conversio`).
+        if let Some((result_ty, ordo_route)) =
+            self.check_ordo_conversio(source_ty, target_resolved, recovery.as_deref_mut(), span)
+        {
+            *route = ordo_route;
+            return result_ty;
+        }
+
         // S0-G2: `↦` dispatch is value-transparent through applied aliases —
         // the shape arms below (vector/matrix/tensor materialization) see the
         // substituted builtin carrier, while a successful conversion keeps
@@ -580,22 +592,35 @@ impl TypeChecker<'_> {
             return self.error_type;
         }
 
-        // CTR-02: a registered user row is the authority for its ordered pair
-        // (direct-only lookup — no transitive composition). A row whose
-        // conversion function declares `⇥ E` makes a bare `↦` failable with
-        // that declared channel; inline recovery stays target-typed.
+        // CTR-02 / D9.3: a registered user row is the authority for its
+        // ordered pair (direct-only lookup — no transitive composition), and
+        // the explicit `↦` calls its function. A row whose conversion function
+        // declares `⇥ E` makes a bare `↦` failable with that declared channel:
+        // it needs a `⊥` default or an active channel that accepts `E`;
+        // inline recovery stays target-typed.
         if let Some(row) = self
             .resolver
             .conversion_row_for(self.resolve_inferred_type(source_ty), target_resolved)
             && let Some(fn_id) = row.fn_def_id
         {
-            if let Some(channel) = self.functions.get(&fn_id).and_then(|sig| sig.err) {
+            let channel = self.functions.get(&fn_id).and_then(|sig| sig.err);
+            if let Some(channel) = channel {
                 if let Some(recovery) = recovery {
                     self.note_conversio_recovery_checked(recovery, target_resolved);
+                } else if self.current_error.is_none() {
+                    self.invalid_operand_types(
+                        super::call::ISSUE_FAILABLE_CALL_REQUIRES_HANDLER,
+                        span,
+                    );
+                    return self.error_type;
                 } else {
                     self.check_registered_row_channel(channel, span);
                 }
             }
+            *route = Some(radix_hir::HirConversioRoute::Function {
+                def_id: fn_id,
+                failable: channel.is_some(),
+            });
             return target_resolved;
         }
 
@@ -2214,7 +2239,7 @@ impl TypeChecker<'_> {
     /// Bare failable `↦` propagates through the active alternate-exit channel.
     /// The propagated payload is text in v1, so reject incompatible channels at
     /// typecheck instead of letting Rust codegen or the MIR runner rediscover it.
-    fn check_conversio_propagation_channel(
+    pub(super) fn check_conversio_propagation_channel(
         &mut self,
         source_ty: TypeId,
         target_resolved: TypeId,
@@ -2309,6 +2334,9 @@ impl TypeChecker<'_> {
     fn conversio_can_propagate_failure(&self, source_ty: TypeId, target_resolved: TypeId) -> bool {
         let source = self.resolve_inferred_type(source_ty);
         let target = self.resolve_inferred_type(target_resolved);
+        if self.is_ordo_from_numerus(source, target) {
+            return true;
+        }
         if matches!(self.types.get(source), Type::Primitive(Primitive::Valor))
             && !matches!(self.types.get(target), Type::Primitive(Primitive::Valor))
         {
@@ -2479,7 +2507,7 @@ impl TypeChecker<'_> {
     }
 
     /// Require inline `⊥` default to be a value of the conversio target type `T`.
-    fn note_conversio_recovery_checked(
+    pub(super) fn note_conversio_recovery_checked(
         &mut self,
         recovery: &mut HirExpression,
         target_resolved: TypeId,

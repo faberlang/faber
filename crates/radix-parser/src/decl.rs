@@ -1133,12 +1133,16 @@ impl Parser {
     fn parse_enum_decl(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Ordo, "expected 'ordo'")?;
         let name = self.parse_decl_name()?;
+        self.reject_sum_type_implet()?;
 
         self.expect(&TokenKind::LBrace, "expected '{'")?;
 
         let mut members = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
             let leading_trivia = self.parse_leading_trivia();
+            if self.skip_sum_type_function(None)? {
+                continue;
+            }
             let start = self.current_span();
             let member_name = self.parse_ident()?;
 
@@ -1212,7 +1216,11 @@ impl Parser {
                 span,
             });
 
-            if !self.consume_item_separator(&TokenKind::RBrace, "enum_members")? {
+            // A misplaced `functio` member reports its own D9.1 diagnostic
+            // rather than a missing separator before it.
+            if !self.check_keyword_ident(TokenKind::Functio)
+                && !self.consume_item_separator(&TokenKind::RBrace, "enum_members")?
+            {
                 break;
             }
         }
@@ -1233,6 +1241,7 @@ impl Parser {
         self.expect_keyword_ident(TokenKind::Discretio, "expected 'discretio'")?;
         let name = self.parse_decl_name()?;
         let type_params = self.parse_generic_params()?;
+        self.reject_sum_type_implet()?;
 
         self.expect(&TokenKind::LBrace, "expected '{'")?;
 
@@ -1242,12 +1251,18 @@ impl Parser {
         let mut parsing_variants = false;
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
             let leading_trivia = self.parse_leading_trivia();
+            if self.skip_sum_type_function(None)? {
+                continue;
+            }
 
             if !parsing_variants {
                 let start = self.current_span();
                 if self.check(&TokenKind::At) {
                     declaration_region_started = true;
                     let annotations = self.parse_annotations()?;
+                    if self.skip_sum_type_function(Some(start))? {
+                        continue;
+                    }
                     let field = self.parse_field_decl()?;
                     shared_fields.push(UnionField {
                         leading_trivia,
@@ -1312,7 +1327,11 @@ impl Parser {
                 span,
             });
 
-            if !self.consume_item_separator(&TokenKind::RBrace, "discretio_variants")? {
+            // A misplaced `functio` member reports its own D9.1 diagnostic
+            // rather than a missing separator before it.
+            if !self.check_keyword_ident(TokenKind::Functio)
+                && !self.consume_item_separator(&TokenKind::RBrace, "discretio_variants")?
+            {
                 break;
             }
         }
@@ -1325,6 +1344,40 @@ impl Parser {
             shared_fields,
             variants,
         }))
+    }
+
+    /// D9.1: `ordo` and `discretio` are data only, so an `implet` clause on
+    /// the header is rejected with a pointed diagnostic before the body.
+    fn reject_sum_type_implet(&self) -> Result<(), ParseError> {
+        if self.check_keyword_ident(TokenKind::Implet) {
+            return Err(ParseError::structured(
+                ParseErrorKind::DeclarationInvalid,
+                self.current_span(),
+            )
+            .with_arg("issue", "sum_type_implements"));
+        }
+        Ok(())
+    }
+
+    /// D9.1: a `functio` inside a sum-type body is parsed whole so recovery
+    /// resumes at the next member, then dropped with a pointed diagnostic.
+    /// Returns `true` when a function member was consumed.
+    /// `annotated_from` is the span where preceding member annotations began.
+    fn skip_sum_type_function(&mut self, annotated_from: Option<Span>) -> Result<bool, ParseError> {
+        if !self.check_keyword_ident(TokenKind::Functio) {
+            return Ok(false);
+        }
+        let start = annotated_from.unwrap_or_else(|| self.current_span());
+        self.parse_func_decl()?;
+        self.errors.push(
+            ParseError::structured(
+                ParseErrorKind::DeclarationInvalid,
+                start.merge(self.previous_span()),
+            )
+            .with_arg("issue", "sum_type_function"),
+        );
+        self.eat(&TokenKind::Comma);
+        Ok(true)
     }
 
     fn variant_redeclares_commune_field(

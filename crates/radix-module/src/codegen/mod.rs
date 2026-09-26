@@ -63,6 +63,26 @@ mod failable_facts_test;
 #[path = "haskell_emit_test.rs"]
 mod haskell_emit_test;
 
+#[cfg(all(
+    test,
+    feature = "hir-rust",
+    feature = "hir-go",
+    feature = "hir-ts",
+    feature = "hir-swift"
+))]
+#[path = "ordo_conversio_emit_test.rs"]
+mod ordo_conversio_emit_test;
+
+#[cfg(all(
+    test,
+    feature = "hir-rust",
+    feature = "hir-go",
+    feature = "hir-ts",
+    feature = "hir-swift"
+))]
+#[path = "conversio_function_emit_test.rs"]
+mod conversio_function_emit_test;
+
 #[cfg(feature = "hir-go")]
 pub use needs::{GoNeeds, collect_go_needs};
 #[cfg(feature = "hir-rust")]

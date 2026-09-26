@@ -216,6 +216,9 @@ mod capability_tests;
 #[path = "commune_stepper_test.rs"]
 mod commune_stepper_tests;
 #[cfg(test)]
+#[path = "conversio_function_test.rs"]
+mod conversio_function_tests;
+#[cfg(test)]
 #[path = "copy_duplicate_test.rs"]
 mod copy_duplicate_tests;
 #[cfg(test)]
@@ -242,6 +245,9 @@ mod numeric_unary_tests;
 #[cfg(test)]
 #[path = "ordina_key_test.rs"]
 mod ordina_key_tests;
+#[cfg(test)]
+#[path = "ordo_conversio_test.rs"]
+mod ordo_conversio_tests;
 #[cfg(test)]
 #[path = "potentia_test.rs"]
 mod potentia_tests;

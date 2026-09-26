@@ -510,6 +510,14 @@ help = "check declaration keywords and required parts"
 message = "declarations are top-level; {functio} and type declarations cannot appear inside a block"
 help = "use a closure, or a top-level function for recursion"
 
+[diagnostics.PARSE010.issues.sum_type_function]
+message = "sum types are data only; a {functio} cannot be declared inside an {ordo} or {discretio}"
+help = "write a top-level {functio} that uses {discerne} on the value, or use a {genus}"
+
+[diagnostics.PARSE010.issues.sum_type_implements]
+message = "sum types are data only; an {ordo} or {discretio} cannot {implet} a contract"
+help = "write top-level functions that use {discerne} on the value, or use a {genus} that {implet} the contract"
+
 [diagnostics.PARSE010.issues.schema_inheritance]
 message = "a schema cannot attach sub, implet, or an interface"
 help = "keep schemas as plain relational headings"
@@ -2585,6 +2593,18 @@ help = "convert textus or ascii values to regex"
 [diagnostics.SEM016.issues.record_conversion_requires_reconstruction]
 message = "record conversion requires reconstruction; write `Type { field = value, … }` instead of converting with `↦`"
 help = "reconstruct by writing `Type { field = value, … }` instead of converting with `↦`"
+
+[diagnostics.SEM016.issues.ordo_conversio_string_member]
+message = "this {ordo} has a string-valued member, so it has no numerus conversion"
+help = "only an {ordo} whose members are numbers converts to and from numerus; convert to textus for the member name"
+
+[diagnostics.SEM016.issues.ordo_conversio_recovery_unsupported]
+message = "this {ordo} conversion cannot fail, so it takes no `⊥` default"
+help = "remove the `⊥` default; this {ordo} conversion cannot fail"
+
+[diagnostics.SEM016.issues.conversio_assign_route_unsupported]
+message = "`↤` does not yet convert through an {ordo} row"
+help = "write `target ← source ↦ T` instead of `↤` for this conversion"
 
 [diagnostics.SEM016.issues.regex_recovery_unsupported]
 message = "regex conversion does not support a `⊥` default; regex has no literal form, so there is no target-typed value to substitute"

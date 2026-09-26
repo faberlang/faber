@@ -1667,6 +1667,7 @@ fn bare_arrow_through_registered_row_composes_declared_channel() {
         &mut target,
         &[],
         None,
+        &mut None,
         crate::test_support::test_span(),
     );
     assert_eq!(result, numerus);
@@ -1709,6 +1710,7 @@ fn bare_arrow_through_registered_row_accepts_assignable_declared_channel() {
         &mut target,
         &[],
         None,
+        &mut None,
         crate::test_support::test_span(),
     );
     assert_eq!(result, numerus);
@@ -1746,6 +1748,7 @@ fn inline_recovery_stays_target_typed() {
         &mut target,
         &[],
         Some(&mut recovery),
+        &mut None,
         crate::test_support::test_span(),
     );
     assert_eq!(result, numerus);
@@ -1765,6 +1768,7 @@ fn inline_recovery_stays_target_typed() {
         &mut target,
         &[],
         Some(&mut recovery),
+        &mut None,
         crate::test_support::test_span(),
     );
     assert!(has_issue(&checker, "conversio_recovery_type_mismatch"));

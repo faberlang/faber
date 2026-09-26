@@ -170,6 +170,7 @@ fn conversion_targets_follow_the_same_spacing_law() {
     let mut ctx = Ctx::new();
     let n = ctx.path("n");
     let tight = expr(HirExpressionKind::Conversio {
+        route: None,
         source: Box::new(lit(1)),
         target: radix_hir::HirConversioTarget::Intervallum(Box::new(range(
             lit(0),
@@ -181,6 +182,7 @@ fn conversion_targets_follow_the_same_spacing_law() {
     });
     assert_eq!(ctx.render(&tight), "1 ↦ 0‥10");
     let expanded = expr(HirExpressionKind::Conversio {
+        route: None,
         source: Box::new(lit(1)),
         target: radix_hir::HirConversioTarget::Intervallum(Box::new(range(
             lit(0),

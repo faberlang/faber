@@ -1,0 +1,62 @@
++++
+term = "ordo-conversio"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "ordo_decl", "enum_member", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "inline_default", "expression", "unary_expr", "literal", "member_suffix", "nota_stmt"]
+category = "conversion"
+canonical = true
+summary = "An ordo converts to its number and name, and a number converts back to a member."
+syntax = "<ordo-value> ↦ int | <ordo-value> ↦ string | <int-expression> ↦ <Ordo> [⊥ <default>]"
+related = ["ordo", "↦", "⊥"]
+locale = "en"
++++
+# =============================================================================
+# ordo-conversio — An ordo converts to its number and name, and back.
+# =============================================================================
+#
+# What this teaches:
+#   • `member ↦ int` gives the member's number. A member without `= n`
+#     takes the previous member's number plus one; the first defaults to 0.
+#   • `member ↦ string` gives the member's name. It cannot fail.
+#   • `n ↦ Ordo` finds the first member with that number. It can fail, so
+#     write a `⊥` default for values that match no member.
+#
+# Common mistakes:
+#   • Writing methods on the ordo to convert it — an ordo is data only;
+#     these three conversions are built in.
+#   • An ordo with a string-valued member has no number, so it converts
+#     only to string.
+#
+# See also: ordo, ↦, ⊥
+# =============================================================================
+
+enum Color {
+    red,
+    green,
+    blue
+}
+
+enum Status {
+    pending = 10,
+    active,
+    done = -3,
+    archived
+}
+
+main {
+    # ordo ↦ int: declared or implicit numbers
+    print Color.green ↦ int
+    print Status.active ↦ int
+    print Status.archived ↦ int
+
+    # ordo ↦ string: the member name
+    print Color.blue ↦ string
+    print Status.done ↦ string
+
+    # int ↦ ordo: the matching member, or the ⊥ default
+    const Color found ← 2 ↦ Color ⊥ Color.red
+    print found ↦ string
+    const Color missing ← 9 ↦ Color ⊥ Color.red
+    print missing ↦ string
+    const Status negative ← -2 ↦ Status ⊥ Status.pending
+    print negative ↦ string
+}

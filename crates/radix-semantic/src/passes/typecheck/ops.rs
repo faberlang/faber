@@ -26,6 +26,7 @@ use super::*;
 
 const INSTANS_ORDERING_OPERANDS_REQUIRED: &str = "instans_ordering_operands_required";
 const NUMERIC_VALUE_EQUALITY_OPERANDS_REQUIRED: &str = "numeric_value_equality_operands_required";
+const ISSUE_CONVERSIO_ASSIGN_ROUTE_UNSUPPORTED: &str = "conversio_assign_route_unsupported";
 const ISSUE_CONVERSIO_ASSIGN_INFERENCE_HOLE_DESTINATION: &str =
     "conversio_assign_inference_hole_destination";
 
@@ -847,7 +848,26 @@ impl TypeChecker<'_> {
             return self.error_type;
         }
         let mut conversion_target = HirConversioTarget::Type(target_ty);
-        self.check_conversio(source, &mut conversion_target, &[], recovery, span);
+        let mut route = None;
+        let result_ty = self.check_conversio(
+            source,
+            &mut conversion_target,
+            &[],
+            recovery,
+            &mut route,
+            span,
+        );
+        // `↤` carries no conversion row to its backends yet: an `ordo` row
+        // fails closed here instead of reaching emission unrouted. Write
+        // `target ← source ↦ T` instead.
+        // A registered `@ conversio` row keeps its pre-D9.3 `↤` typecheck
+        // admission (CTR-02 channel composition).
+        if matches!(route, Some(radix_hir::HirConversioRoute::Ordo { .. }))
+            && result_ty != self.error_type
+        {
+            self.invalid_conversion(ISSUE_CONVERSIO_ASSIGN_ROUTE_UNSUPPORTED, span);
+            return self.error_type;
+        }
         target_ty
     }
 
