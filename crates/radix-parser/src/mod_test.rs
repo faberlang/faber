@@ -4717,7 +4717,7 @@ fn parses_posture_in_implendum_method_signature() {
 
 #[test]
 fn conversio_assign_typed_fixum_and_varia_initializers_parse() {
-    let result = parse_ok("fixum numerus n ↤ \"42\"\nvaria numerus count ↤ raw ⇥ 0");
+    let result = parse_ok("fixum numerus n ↤ \"42\"\nvaria numerus count ↤ raw ⊥ 0");
     let program = result.program.as_ref().expect("program");
     assert_eq!(program.statements.len(), 2);
     for stmt in &program.statements {

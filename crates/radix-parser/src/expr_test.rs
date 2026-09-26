@@ -24,8 +24,9 @@ fn generic_arg_type(arg: &radix_syntax::GenericArgExpr) -> &radix_syntax::TypeEx
 }
 
 #[test]
-fn conversio_with_exit_arrow_recovery_parses() {
-    let result = parse_ok(r#"fixum _ n ← "bad" ↦ numerus ⇥ 0"#);
+fn conversio_with_up_tack_default_parses() {
+    // D17.7: `↦ T ⊥ value` populates the conversion's `recovery` slot.
+    let result = parse_ok(r#"fixum _ n ← "bad" ↦ numerus ⊥ 0"#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1211,7 +1212,7 @@ fn ascii_comparison_parses_as_lt_during_migration() {
 // CDA-U2 — ↤ (U+21A4) conversion-directed assignment: red parser tests
 // =============================================================================
 // These tests encode the `↤` grammar contract — assignment-level precedence,
-// right associativity, `⇥` recovery legal only on `↤` — before the parser
+// right associativity, `⊥` default legal only on `↤` — before the parser
 // implements it (U3). Every fixture FAILS today at the lexer with
 // `unexpected_character` for the U+21A4 glyph, the expected missing-feature
 // reason. A red test that passes at this stage is a defect and must be
@@ -1300,10 +1301,9 @@ fn conversio_assign_is_right_associative() {
 
 #[test]
 fn conversio_assign_recovery_attaches_to_nearest_conversio_assign_in_chain() {
-    // Contract (AC4/AC9): `a ↤ b ↤ c ⇥ d` must parse with `⇥ d` attached to
-    // the NEAREST `↤` in the right-associated chain (the `b ↤ (c ⇥ d)` step),
-    // and `⇥` stays illegal on ordinary `←`.
-    let result = parse_ok("a ↤ b ↤ c ⇥ d");
+    // Contract (AC4/AC9): `a ↤ b ↤ c ⊥ d` must parse with `⊥ d` attached to
+    // the NEAREST `↤` in the right-associated chain (the `b ↤ (c ⊥ d)` step).
+    let result = parse_ok("a ↤ b ↤ c ⊥ d");
     let program = result.program.as_ref().expect("program");
     let outer = assign_expr(&expr_stmt(program).expr);
     assert!(matches!(outer.target.kind, ExprKind::Ident(_)));
@@ -1313,7 +1313,7 @@ fn conversio_assign_recovery_attaches_to_nearest_conversio_assign_in_chain() {
     // the right-associated chain, and the outer `↤` does not claim it.
     assert!(
         inner.recovery.is_some(),
-        "⇥ d must attach to the nearest ↤ (the inner b ↤ (c ⇥ d) step)"
+        "⊥ d must attach to the nearest ↤ (the inner b ↤ (c ⊥ d) step)"
     );
     assert!(
         outer.recovery.is_none(),
@@ -1323,16 +1323,16 @@ fn conversio_assign_recovery_attaches_to_nearest_conversio_assign_in_chain() {
 
 #[test]
 fn conversio_assign_recovery_is_legal_on_conversio_assign() {
-    // `a ↤ b ⇥ c` ≡ `a ← (b ↦ T ⇥ c)`: recovery is an inline part of the ↤
-    // form and is carried through the syntax node.
-    let result = parse_ok("a ↤ b ⇥ c");
+    // `a ↤ b ⊥ c` ≡ `a ← (b ↦ T ⊥ c)`: the default is an inline part of the
+    // ↤ form and is carried through the syntax node's `recovery` slot.
+    let result = parse_ok("a ↤ b ⊥ c");
     let program = result.program.as_ref().expect("program");
     let outer = assign_expr(&expr_stmt(program).expr);
     assert!(
         !matches!(outer.op, AssignOp::Assign),
         "the ↤ operator must be preserved as a distinct assign op"
     );
-    assert!(outer.recovery.is_some(), "⇥ c must attach to the ↤ form");
+    assert!(outer.recovery.is_some(), "⊥ c must attach to the ↤ form");
     assert!(matches!(
         outer.recovery.as_deref().expect("recovery").kind,
         ExprKind::Ident(_)
@@ -1340,11 +1340,65 @@ fn conversio_assign_recovery_is_legal_on_conversio_assign() {
 }
 
 #[test]
-fn conversio_recovery_is_rejected_on_ordinary_assign() {
-    // `⇥` inline recovery is legal only on `↤` (and after `↦ type`); on an
-    // ordinary `←` assignment it is a structured rejection, not a silent
-    // leftover-token error.
-    crate::test_support::assert_parse_error_issue("a ← b ⇥ c", "conversio_recovery_on_assign");
+fn exit_arrow_value_is_rejected_on_ordinary_assign() {
+    // D17.1: `⇥` never takes a value; on an ordinary `←` it is the same
+    // structured migration diagnostic, not a silent leftover-token error.
+    crate::test_support::assert_parse_error_issue("a ← b ⇥ c", "recovery_uses_exit_arrow");
+}
+
+#[test]
+fn exit_arrow_value_after_conversion_is_a_migration_diagnostic() {
+    // D17.2: `↦ T ⇥ value` is retired; `⇥` names an error type only.
+    crate::test_support::assert_parse_error_issue(
+        r#"fixum _ n ← "bad" ↦ numerus ⇥ 0"#,
+        "recovery_uses_exit_arrow",
+    );
+}
+
+#[test]
+fn exit_arrow_value_after_conversio_assign_is_a_migration_diagnostic() {
+    // D17.2: `↤ … ⇥ value` is retired alongside `↦ T ⇥ value`.
+    crate::test_support::assert_parse_error_issue("a ↤ b ⇥ c", "recovery_uses_exit_arrow");
+}
+
+#[test]
+fn up_tack_default_binds_looser_than_conversion_target() {
+    // D17.7 precedence: `x ↦ numerus<i32> ⊥ 0` is `(x ↦ numerus<i32>) ⊥ 0`;
+    // the type arguments stay on the target, the default is the literal.
+    let result = parse_ok(r"fixum _ n ← x ↦ numerus<i32> ⊥ 0");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let ExprKind::Conversio(conversio) = &var.init.as_deref().expect("init").kind else {
+        panic!("expected conversio expression");
+    };
+    assert!(matches!(conversio.expr.kind, ExprKind::Ident(_)));
+    assert!(matches!(
+        conversio.recovery.as_deref().expect("default").kind,
+        ExprKind::Literal(Literal::Int(0))
+    ));
+}
+
+#[test]
+fn up_tack_default_with_propagation_is_rejected() {
+    // D17.7: one expression either propagates (`⇥ E`) or defaults (`⊥ v`).
+    crate::test_support::assert_parse_error_issue(
+        r#"fixum _ n ← "bad" ↦ numerus ⊥ 0 ⇥ textus"#,
+        "default_with_propagation",
+    );
+}
+
+#[test]
+fn up_tack_default_on_non_conversion_is_not_yet_supported() {
+    // D17.7 on failable calls lands in a later stage (X3); until then `⊥`
+    // after a non-conversion expression is a clear structured diagnostic.
+    crate::test_support::assert_parse_error_issue(
+        "fixum _ n ← f() ⊥ 0",
+        "default_requires_conversion",
+    );
+    crate::test_support::assert_parse_error_issue("f() ⊥ 0", "default_requires_conversion");
+    crate::test_support::assert_parse_error_issue("a ← b ⊥ c", "default_requires_conversion");
 }
 
 #[test]

@@ -201,7 +201,7 @@ impl Parser {
     ///
     /// The binding pattern becomes the assignment target; the operator is
     /// preserved as `AssignOp::ConversioAssign` through the syntax tree (no
-    /// erasure into `←`). `⇥` recovery is parsed through the shared assignment
+    /// erasure into `←`). The `⊥` default is parsed through the shared assignment
     /// tail so it attaches exactly as it does in expression position.
     ///
     /// Rejects every binding form without a concrete conversion destination:

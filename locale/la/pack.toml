@@ -481,10 +481,6 @@ help = "put a number after '-' in JSON"
 message = "conversion-directed assignment '↤' requires a concrete destination type"
 help = "write a concrete type for the binding, e.g. 'fixum numerus x ↤ value'"
 
-[diagnostics.PARSE002.issues.conversio_recovery_on_assign]
-message = "'⇥' inline recovery is legal only on conversion-directed assignment '↤'"
-help = "use '↤' for the assignment, or move the recovery expression"
-
 [diagnostics.PARSE002.issues.conversio_assign_await_unsupported]
 message = "'↤' is not supported on awaited bindings"
 help = "keep '←' for 'figendum'/'variandum' awaited bindings"
@@ -634,8 +630,20 @@ message = "invalid expression"
 help = "check expression syntax"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
-message = "use ⇥ for conversio recovery"
-help = "use ⇥; vel is nullish coalescing only"
+message = "use ⊥ for a conversion default"
+help = "use ⊥; vel is nullish coalescing only"
+
+[diagnostics.PARSE030.issues.recovery_uses_exit_arrow]
+message = "'⇥' names an error type; use '⊥' for a default"
+help = "write '↦ T ⊥ value' (or '↤ … ⊥ value'); '⇥' never takes a value"
+
+[diagnostics.PARSE030.issues.default_with_propagation]
+message = "an expression either propagates with '⇥' or defaults with '⊥', never both"
+help = "keep the '⊥' default, or drop it and let the error propagate"
+
+[diagnostics.PARSE030.issues.default_requires_conversion]
+message = "'⊥' default is supported only after a conversion '↦ T' or '↤'"
+help = "defaults on failable calls are not yet supported; use 'capta' or 'fac … cape'"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "expected expression"
@@ -2379,10 +2387,10 @@ help = "cast to a compatible type"
 
 [diagnostics.SEM016]
 message = "invalid conversion"
-help = "use a valid conversion or provide inline recovery with `⇥`"
+help = "use a valid conversion or provide an inline default with `⊥`"
 
 [diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
-message = "intervallum clamp conversio does not support `⇥` recovery"
+message = "intervallum clamp conversio does not support a `⊥` default"
 help = "remove the recovery arm from this range clamp"
 
 [diagnostics.SEM016.issues.intervallum_target_not_range]
@@ -2407,15 +2415,15 @@ help = "make the source and target bound element types match"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_required]
 message = "vector materialization requires a {lista} literal source"
-help = "use a valid conversion or provide inline recovery with `⇥`"
+help = "use a valid conversion or provide an inline default with `⊥`"
 
 [diagnostics.SEM016.issues.lista_to_vector_element_mismatch]
 message = "{lista} to vector conversio requires matching element types"
-help = "use a valid conversion or provide inline recovery with `⇥`"
+help = "use a valid conversion or provide an inline default with `⊥`"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_width]
 message = "{lista} to vector conversio requires a literal vector width"
-help = "use a valid conversion or provide inline recovery with `⇥`"
+help = "use a valid conversion or provide an inline default with `⊥`"
 
 [diagnostics.SEM016.issues.matrix_materialize_unsupported]
 message = "matrix materialization requires a lista source with matching element type"
@@ -2526,12 +2534,12 @@ message = "record conversion requires reconstruction; write `Type { field = valu
 help = "reconstruct by writing `Type { field = value, … }` instead of converting with `↦`"
 
 [diagnostics.SEM016.issues.regex_recovery_unsupported]
-message = "regex conversion does not support `⇥` recovery; regex has no literal form, so there is no target-typed value to substitute"
+message = "regex conversion does not support a `⊥` default; regex has no literal form, so there is no target-typed value to substitute"
 help = "remove the recovery arm from this regex conversion"
 
 [diagnostics.SEM016.issues.valor_verte_unsupported]
-message = "{valor} ∷ T is not supported — a dynamic value's shape cannot be asserted at compile time. Use `↦ T` for runtime extraction (with `⇥` for recovery)."
-help = "use runtime `↦ T` conversion with `⇥` recovery instead"
+message = "{valor} ∷ T is not supported — a dynamic value's shape cannot be asserted at compile time. Use `↦ T` for runtime extraction (with `⊥` for a default)."
+help = "use runtime `↦ T` conversion with a `⊥` default instead"
 
 [diagnostics.SEM016.issues.json_genus_conversion_requires_json_annotation]
 message = "json/genus conversion requires the genus to be marked `@ json`"

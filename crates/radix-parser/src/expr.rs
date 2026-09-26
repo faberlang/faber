@@ -103,14 +103,30 @@ impl Parser {
     /// Parse assignment expression (lowest precedence).
     ///
     /// GRAMMAR:
-    ///   assignment := ternary ('←' assignment | '↤' assignment inlineRecovery?)?
-    ///   inlineRecovery := '⇥' unary
+    ///   assignment := ternary ('←' assignment | '↤' assignment inlineDefault?)?
+    ///   inlineDefault := '⊥' unary
     ///
     /// WHY: Right-associative via recursion on `RHS`. Allows `a ← b ← c` and
     /// `a ↤ b ↤ c`. `↤` is conversion-directed assignment (U+21A4) and sits at
-    /// the same precedence level as `←`; `⇥` inline recovery is legal only on
-    /// `↤` and attaches to the nearest `↤` in a right-associated chain.
+    /// the same precedence level as `←`; the `⊥` default (D17.7) is legal only
+    /// on `↤` (and after `↦ T`) and attaches to the nearest `↤` in a
+    /// right-associated chain.
+    ///
+    /// A `⊥` left over after a complete assignment follows a non-conversion
+    /// expression. Defaults on failable calls are a later stage, so that
+    /// position is a structured "not yet supported" rejection rather than a
+    /// leftover-token error.
     fn parse_assignment(&mut self) -> Result<Expr, ParseError> {
+        let expr = self.parse_assignment_open()?;
+        if self.check(&TokenKind::UpTack) {
+            return Err(self.invalid_expression_error("default_requires_conversion"));
+        }
+        Ok(expr)
+    }
+
+    /// Parse an assignment without the trailing-`⊥` rejection, so a `↤` tail
+    /// can claim the `⊥` default that follows its value.
+    fn parse_assignment_open(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         let expr = self.parse_ternary()?;
         let expr = self.parse_transfer_chain(expr, start)?;
@@ -161,7 +177,9 @@ impl Parser {
     ///
     /// Shared by the expression grammar (ternary LHS) and typed declaration
     /// initializers (binding LHS) so the `↤` contract — same precedence as
-    /// `←`, right-associative, `⇥` recovery on `↤` only — lives in one place.
+    /// `←`, right-associative, `⊥` default on `↤` only — lives in one place.
+    /// `⇥` never takes a value (D17.1): a `⇥` here is the retired inline
+    /// recovery spelling and gets the migration diagnostic.
     pub(super) fn parse_assignment_tail(
         &mut self,
         target: Expr,
@@ -174,26 +192,24 @@ impl Parser {
         };
 
         self.advance();
+        let is_conversio = matches!(op, AssignOp::ConversioAssign);
+        let parse_value: fn(&mut Self) -> Result<Expr, ParseError> = if is_conversio {
+            Self::parse_assignment_open
+        } else {
+            Self::parse_assignment
+        };
         let value = Box::new(self.nested(
             ParseErrorKind::ExpressionInvalid,
             self.current_span(),
-            Self::parse_assignment,
+            parse_value,
         )?);
 
-        let recovery = if matches!(op, AssignOp::ConversioAssign) {
-            if self.eat(&TokenKind::ExitArrow) {
-                Some(Box::new(self.parse_unary()?))
-            } else {
-                None
-            }
+        if self.check(&TokenKind::ExitArrow) {
+            return Err(self.invalid_expression_error("recovery_uses_exit_arrow"));
+        }
+        let recovery = if is_conversio {
+            self.parse_inline_default()?
         } else {
-            if self.check(&TokenKind::ExitArrow) {
-                return Err(ParseError::structured(
-                    ParseErrorKind::Unexpected,
-                    self.current_span(),
-                )
-                .with_arg("issue", "conversio_recovery_on_assign"));
-            }
             None
         };
 
@@ -863,7 +879,7 @@ impl Parser {
     ///   gradient := ∇ [ [ place (, place)* ] ]
     ///   cast := `∷` type
     ///   optional-chain := '?.' ident | '?[' expr `]` | '?(' args `)`
-    ///   conversion := '↦' type [type-params] ['⇥' recovery]
+    ///   conversion := '↦' type [type-params] ['⊥' default]
     ///
     /// Keeping every postfix form in one loop preserves left-to-right chaining
     /// (`a.b(c)[`d`]`) and prevents casts/conversions from accidentally binding at
@@ -1145,7 +1161,10 @@ impl Parser {
         ))
     }
 
-    /// Parse `↦ type [<params>] [⇥ recovery]` bound to an already-parsed operand.
+    /// Parse `↦ type [<params>] [⊥ default]` bound to an already-parsed operand.
+    ///
+    /// The `⊥` default (D17.7) binds looser than `↦ T`: the target type and its
+    /// parameters finish first, then the default fills the `recovery` slot.
     fn parse_conversio_postfix(
         &mut self,
         operand: Expr,
@@ -1158,11 +1177,10 @@ impl Parser {
         } else {
             Vec::new()
         };
-        let recovery = if self.eat(&TokenKind::ExitArrow) {
-            Some(Box::new(self.parse_unary()?))
-        } else {
-            None
-        };
+        if self.check(&TokenKind::ExitArrow) {
+            return Err(self.invalid_expression_error("recovery_uses_exit_arrow"));
+        }
+        let recovery = self.parse_inline_default()?;
         if self.check_keyword_ident(TokenKind::Vel) {
             return Err(self.invalid_expression_error("conversio_recovery_uses_vel"));
         }
@@ -1178,6 +1196,21 @@ impl Parser {
             }),
             span,
         })
+    }
+
+    /// Parse an optional `⊥ default` (D17.7) into the `recovery` slot.
+    ///
+    /// One expression either propagates or defaults, never both: a `⇥` after
+    /// the default is rejected with `default_with_propagation`.
+    fn parse_inline_default(&mut self) -> Result<Option<Box<Expr>>, ParseError> {
+        if !self.eat(&TokenKind::UpTack) {
+            return Ok(None);
+        }
+        let default = self.parse_unary()?;
+        if self.check(&TokenKind::ExitArrow) {
+            return Err(self.invalid_expression_error("default_with_propagation"));
+        }
+        Ok(Some(Box::new(default)))
     }
 
     /// Parse the target of `↦`: declared type or `intervallum` clamp operand.
