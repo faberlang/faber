@@ -1669,6 +1669,13 @@ pub enum HirPattern {
 
     /// Literal pattern.
     Literal(HirLiteral),
+
+    /// Negated number literal pattern (`casu -1`, `casu -2.5`, `casu -∞`).
+    ///
+    /// WHY: `HirLiteral::Int` carries an unsigned magnitude, so the sign lives
+    /// on the pattern. The payload is always `Int`, `Float`, or `FloatText`
+    /// holding the non-negative magnitude (DECISIONS D22.2).
+    NegatedLiteral(HirLiteral),
 }
 
 // ---------------------------------------------------------------------------

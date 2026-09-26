@@ -750,9 +750,14 @@ impl FunctionBuilder<'_> {
         for arm in arms {
             let pattern = self.discerne_switch_arm_pattern(arm)?;
             match pattern {
-                HirPattern::Literal(literal) => {
+                HirPattern::Literal(literal) | HirPattern::NegatedLiteral(literal) => {
                     let scrutinee_ty = self.expr_ty(scrutinee).map(|ty| ty.semantic_id());
                     let constant = self.literal_switch_constant(literal, scrutinee_ty, arm.span)?;
+                    let constant = if matches!(pattern, HirPattern::NegatedLiteral(_)) {
+                        self.negated_switch_constant(constant, arm.span)?
+                    } else {
+                        constant
+                    };
                     let target = self.fresh_block(arm.span);
                     cases.push(MirSwitchCase { value: constant, target });
                     bodies.push((target, &arm.body, arm.span));
@@ -1352,6 +1357,26 @@ impl FunctionBuilder<'_> {
                 None
             }
         }
+    }
+
+    /// Negate a number switch constant for a `casu -N` pattern (D22.2).
+    ///
+    /// Integer magnitudes negate from their unsigned carrier so `i64::MIN`
+    /// (whose magnitude arrives as `UInt`) stays representable.
+    fn negated_switch_constant(&mut self, constant: MirConstant, span: Span) -> Option<MirConstant> {
+        let negated = match constant {
+            MirConstant::Int(value) => value.checked_neg().map(MirConstant::Int),
+            MirConstant::UInt(magnitude) => 0i64.checked_sub_unsigned(magnitude).map(MirConstant::Int),
+            MirConstant::Float(value) => Some(MirConstant::Float(-value)),
+            _ => None,
+        };
+        if negated.is_none() {
+            self.errors.push(MirError::unsupported(
+                span,
+                "negated literal pattern outside the signed carrier",
+            ));
+        }
+        negated
     }
 
     /// Lower a block into a destination place, preserving early terminators.

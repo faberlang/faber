@@ -46,6 +46,7 @@ pub fn lower_pattern(lowerer: &mut Lowerer, pattern: &Pattern) -> HirPattern {
         Pattern::Ident(ident, bind) => lower_ident_pattern(lowerer, ident, bind.as_ref()),
         Pattern::Type(ty, bind) => lower_type_pattern(lowerer, ty, bind.as_ref()),
         Pattern::Literal(lit, span) => lower_literal(lowerer, lit, *span),
+        Pattern::NegatedLiteral(lit, span) => lower_negated_literal(lowerer, lit, *span),
         Pattern::Path(path) => lower_path_pattern(lowerer, path),
     }
 }
@@ -361,6 +362,11 @@ pub fn lower_literal(lowerer: &mut Lowerer, lit: &Literal, span: Span) -> HirPat
             lowerer.error("forma_literal_pattern");
             HirLiteral::Nil
         }
+        // D22.3: NaN never equals itself, so a NaN pattern could never match.
+        Literal::Float(value) if value.is_nan() => {
+            lowerer.error("nan_pattern");
+            HirLiteral::Nil
+        }
         _ => match super::literal::literal_to_hir(lit) {
             Ok(literal) => literal,
             Err(message) => {
@@ -371,4 +377,23 @@ pub fn lower_literal(lowerer: &mut Lowerer, lit: &Literal, span: Span) -> HirPat
     };
 
     HirPattern::Literal(literal)
+}
+
+/// Lower a negated number literal pattern (`casu -1`) over its magnitude.
+///
+/// The sign stays on the pattern because `HirLiteral::Int` is an unsigned
+/// magnitude. A NaN magnitude (`-nonnumerus` in `elige`) is rejected exactly
+/// like a bare NaN pattern; any non-number payload is not a case value.
+pub fn lower_negated_literal(lowerer: &mut Lowerer, lit: &Literal, span: Span) -> HirPattern {
+    match lower_literal(lowerer, lit, span) {
+        HirPattern::Literal(
+            literal @ (HirLiteral::Int(_) | HirLiteral::Float(_) | HirLiteral::FloatText { .. }),
+        ) => HirPattern::NegatedLiteral(literal),
+        HirPattern::Literal(HirLiteral::Nil) => HirPattern::Literal(HirLiteral::Nil),
+        _ => {
+            lowerer.current_span = span;
+            lowerer.error("elige_case_value_shape");
+            HirPattern::Wildcard
+        }
+    }
 }

@@ -146,6 +146,10 @@ impl super::FaberCodegen<'_> {
             HirPattern::Literal(lit) => {
                 self.write_literal(lit, surface, writer);
             }
+            HirPattern::NegatedLiteral(lit) => {
+                writer.write("-");
+                self.write_literal(lit, surface, writer);
+            }
         }
     }
 

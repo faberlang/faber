@@ -833,6 +833,10 @@ pub enum Pattern {
     /// intended as a new binding or a type predicate.
     Type(TypeExpr, Option<PatternBind>),
     Literal(Literal, Span),
+    /// A leading minus over a number literal (`casu -1`, `casu -2.5`,
+    /// `casu -∞`). The lexer never produces signed numbers, so the literal
+    /// keeps its unsigned magnitude and the pattern owns the sign (D22.2).
+    NegatedLiteral(Literal, Span),
     Path(PathPattern),
 }
 
