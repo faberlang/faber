@@ -35,6 +35,7 @@ role_table = [
   "literal",
   "range",
   "return_type",
+  "separator",
   "shift",
   "string_delimiter",
   "template_hole",
@@ -91,8 +92,8 @@ claiming_slots = ["multiplicative_expr"]
 glyph = ":"
 codepoint = "U+003A"
 unicode_name = "COLON"
-role = "conditional"
-claiming_slots = ["json_member", "clausura_legacy_expr", "ternary"]
+role = "separator"
+claiming_slots = ["json_member", "clausura_legacy_expr"]
 
 [[glyphs]]
 glyph = "<"
@@ -119,8 +120,8 @@ claiming_slots = ["call_type_args", "generic_params", "type_arguments"]
 glyph = "?"
 codepoint = "U+003F"
 unicode_name = "QUESTION MARK"
-role = "conditional"
-claiming_slots = ["optional_suffix", "ternary"]
+role = "access"
+claiming_slots = ["optional_suffix"]
 
 [[glyphs]]
 glyph = "@"
@@ -240,6 +241,20 @@ codepoint = "U+22A5"
 unicode_name = "UP TACK"
 role = "default"
 claiming_slots = ["inline_default"]
+
+[[glyphs]]
+glyph = "✓"
+codepoint = "U+2713"
+unicode_name = "CHECK MARK"
+role = "conditional"
+claiming_slots = ["ternary"]
+
+[[glyphs]]
+glyph = "✗"
+codepoint = "U+2717"
+unicode_name = "BALLOT X"
+role = "conditional"
+claiming_slots = ["ternary"]
 
 [[glyphs]]
 glyph = "↢"
@@ -659,7 +674,6 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Control | `rumpe` | break |
 # | Control | `secus` | else |
 # | Control | `si` | if |
-# | Control | `sic` | then (ternary) |
 # | Control | `sin` | else-if |
 # | Control | `tacet` | no-op |
 # | Error | `adfirma` | assert |
@@ -1038,7 +1052,9 @@ transfer   := ternary ('⇇' ternary)*
 assignment := transfer ('←' assignment | '↤' assignment inline_default?)?
 inc_dec_stmt := place ('↑' | '↓')
 place      := call_expr  (* semantic analysis requires an assignable target *)
-ternary    := aut_expr (('?' expression ':' | 'sic' expression 'secus') ternary)?
+# `c ✓ a ✗ b` is the one value conditional (D4.5), one level only (D4.6): a
+# `✓ ✗` inside the condition or either branch is rejected (`conditional_nested`).
+ternary    := aut_expr ('✓' expression '✗' aut_expr)?
 aut_expr         := et_expr (('aut') et_expr)*
 et_expr        := equality (('et') equality)*
 equality   := comparison equality_tail*

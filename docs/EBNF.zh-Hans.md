@@ -292,7 +292,7 @@ inc_dec_stmt ::= place ('↑' | '↓')
 # [141] place
 place ::= call_expr
 # [142] ternary
-ternary ::= aut_expr (('?' expression ':' | '乃' expression '否则') ternary)?
+ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
 # [143] aut_expr
 aut_expr ::= et_expr (('或') et_expr)*
 # [144] et_expr
@@ -857,7 +857,6 @@ productions. It is not a second keyword authority.
 | Builtin | `格式化` | write |
 | Control | `否则` | else |
 | Control | `如果` | if |
-| Control | `乃` | then (ternary) |
 | Control | `否则如果` | else-if |
 | Declarations | `设` | inferred immutable local |
 | Testing | `仅` | only |
@@ -1449,6 +1448,17 @@ prefer sugar. Choose per module or file.
 
 
 - `如果` = if, `否则如果` = else-if, `否则` = else
+- `c ✓ a ✗ b` is the one value conditional: `a` when `c` holds, else `b`.
+  `✓` (U+2713 CHECK MARK) and `✗` (U+2717 BALLOT X) are the same in every
+  locale and have no word twin. It is one level only: a `✓ ✗` inside the
+  condition or either branch is rejected (`conditional_nested`); choose among
+  more values with a function whose `如果` arms each `返回`. The branches narrow
+  exactly like `如果` branches (after `r 是 numerus`, `r` is `numerus` in the
+  `✓` branch).
+- `c ? a : b` and `c sic a 否则 b` (en `c yields a else b`) were removed and
+  are rejected with a migration diagnostic; write `c ✓ a ✗ b`. `sic` stays a
+  reserved word only to carry that diagnostic. The look-alikes `✔` and `✘` are
+  rejected with a "did you mean" hint.
 - `则` for one-statement bodies, including `则 返回`, `则 抛错`, `则 崩溃`, and `则 静默` (`∴` is not accepted here)
 - `静默` for explicit no-op (from musical notation: "it is silent")
 

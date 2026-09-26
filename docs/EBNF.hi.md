@@ -292,7 +292,7 @@ inc_dec_stmt ::= place ('↑' | '↓')
 # [141] place
 place ::= call_expr
 # [142] ternary
-ternary ::= aut_expr (('?' expression ':' | 'ऐसा' expression 'अन्यथा') ternary)?
+ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
 # [143] aut_expr
 aut_expr ::= et_expr (('या') et_expr)*
 # [144] et_expr
@@ -857,7 +857,6 @@ productions. It is not a second keyword authority.
 | Builtin | `लिखित` | write |
 | Control | `अन्यथा` | else |
 | Control | `यदि` | if |
-| Control | `ऐसा` | then (ternary) |
 | Control | `अन्यथायदि` | else-if |
 | Declarations | `बैठा` | inferred immutable local |
 | Testing | `केवल` | only |
@@ -1449,6 +1448,17 @@ prefer sugar. Choose per module or file.
 
 
 - `यदि` = if, `अन्यथायदि` = else-if, `अन्यथा` = else
+- `c ✓ a ✗ b` is the one value conditional: `a` when `c` holds, else `b`.
+  `✓` (U+2713 CHECK MARK) and `✗` (U+2717 BALLOT X) are the same in every
+  locale and have no word twin. It is one level only: a `✓ ✗` inside the
+  condition or either branch is rejected (`conditional_nested`); choose among
+  more values with a function whose `यदि` arms each `लौटाओ`. The branches narrow
+  exactly like `यदि` branches (after `r है numerus`, `r` is `numerus` in the
+  `✓` branch).
+- `c ? a : b` and `c sic a अन्यथा b` (en `c yields a else b`) were removed and
+  are rejected with a migration diagnostic; write `c ✓ a ✗ b`. `sic` stays a
+  reserved word only to carry that diagnostic. The look-alikes `✔` and `✘` are
+  rejected with a "did you mean" hint.
 - `अतः` for one-statement bodies, including `अतः लौटाओ`, `अतः इधरफेंको`, `अतः मरोजाओ`, and `अतः मौन` (`∴` is not accepted here)
 - `मौन` for explicit no-op (from musical notation: "it is silent")
 

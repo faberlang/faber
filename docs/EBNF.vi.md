@@ -292,7 +292,7 @@ inc_dec_stmt ::= place ('↑' | '↓')
 # [141] place
 place ::= call_expr
 # [142] ternary
-ternary ::= aut_expr (('?' expression ':' | 'thế' expression 'khác') ternary)?
+ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
 # [143] aut_expr
 aut_expr ::= et_expr (('hoặc') et_expr)*
 # [144] et_expr
@@ -857,7 +857,6 @@ productions. It is not a second keyword authority.
 | Builtin | `văn_bản_hóa` | write |
 | Control | `khác` | else |
 | Control | `nếu` | if |
-| Control | `thế` | then (ternary) |
 | Control | `nếukhôngthì` | else-if |
 | Declarations | `đặt` | inferred immutable local |
 | Testing | `chỉ` | only |
@@ -1449,6 +1448,17 @@ prefer sugar. Choose per module or file.
 
 
 - `nếu` = if, `nếukhôngthì` = else-if, `khác` = else
+- `c ✓ a ✗ b` is the one value conditional: `a` when `c` holds, else `b`.
+  `✓` (U+2713 CHECK MARK) and `✗` (U+2717 BALLOT X) are the same in every
+  locale and have no word twin. It is one level only: a `✓ ✗` inside the
+  condition or either branch is rejected (`conditional_nested`); choose among
+  more values with a function whose `nếu` arms each `trả`. The branches narrow
+  exactly like `nếu` branches (after `r là numerus`, `r` is `numerus` in the
+  `✓` branch).
+- `c ? a : b` and `c sic a khác b` (en `c yields a else b`) were removed and
+  are rejected with a migration diagnostic; write `c ✓ a ✗ b`. `sic` stays a
+  reserved word only to carry that diagnostic. The look-alikes `✔` and `✘` are
+  rejected with a "did you mean" hint.
 - `do_đó` for one-statement bodies, including `do_đó trả`, `do_đó ném`, `do_đó chết`, and `do_đó im_lặng` (`∴` is not accepted here)
 - `im_lặng` for explicit no-op (from musical notation: "it is silent")
 

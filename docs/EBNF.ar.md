@@ -292,7 +292,7 @@ inc_dec_stmt ::= place ('↑' | '↓')
 # [141] place
 place ::= call_expr
 # [142] ternary
-ternary ::= aut_expr (('?' expression ':' | 'فإذا' expression 'وإلا') ternary)?
+ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
 # [143] aut_expr
 aut_expr ::= et_expr (('أو') et_expr)*
 # [144] et_expr
@@ -857,7 +857,6 @@ productions. It is not a second keyword authority.
 | Builtin | `حرر` | write |
 | Control | `وإلا` | else |
 | Control | `إذا` | if |
-| Control | `فإذا` | then (ternary) |
 | Control | `وإلاإذا` | else-if |
 | Declarations | `ليكن` | inferred immutable local |
 | Testing | `فقط` | only |
@@ -1449,6 +1448,17 @@ prefer sugar. Choose per module or file.
 
 
 - `إذا` = if, `وإلاإذا` = else-if, `وإلا` = else
+- `c ✓ a ✗ b` is the one value conditional: `a` when `c` holds, else `b`.
+  `✓` (U+2713 CHECK MARK) and `✗` (U+2717 BALLOT X) are the same in every
+  locale and have no word twin. It is one level only: a `✓ ✗` inside the
+  condition or either branch is rejected (`conditional_nested`); choose among
+  more values with a function whose `إذا` arms each `أعد`. The branches narrow
+  exactly like `إذا` branches (after `r هو numerus`, `r` is `numerus` in the
+  `✓` branch).
+- `c ? a : b` and `c sic a وإلا b` (en `c yields a else b`) were removed and
+  are rejected with a migration diagnostic; write `c ✓ a ✗ b`. `sic` stays a
+  reserved word only to carry that diagnostic. The look-alikes `✔` and `✘` are
+  rejected with a "did you mean" hint.
 - `إذن` for one-statement bodies, including `إذن أعد`, `إذن ارم`, `إذن انهر`, and `إذن صمت` (`∴` is not accepted here)
 - `صمت` for explicit no-op (from musical notation: "it is silent")
 

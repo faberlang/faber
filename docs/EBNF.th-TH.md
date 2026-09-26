@@ -292,7 +292,7 @@ inc_dec_stmt ::= place ('↑' | '↓')
 # [141] place
 place ::= call_expr
 # [142] ternary
-ternary ::= aut_expr (('?' expression ':' | 'เช่นนั้น' expression 'มิฉะนั้น') ternary)?
+ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
 # [143] aut_expr
 aut_expr ::= et_expr (('หรือ') et_expr)*
 # [144] et_expr
@@ -857,7 +857,6 @@ productions. It is not a second keyword authority.
 | Builtin | `จารึก` | write |
 | Control | `มิฉะนั้น` | else |
 | Control | `ถ้า` | if |
-| Control | `เช่นนั้น` | then (ternary) |
 | Control | `ถ้าไม่ก็` | else-if |
 | Declarations | `อนุมานคงที่` | inferred immutable local |
 | Testing | `เฉพาะ` | only |
@@ -1449,6 +1448,17 @@ prefer sugar. Choose per module or file.
 
 
 - `ถ้า` = if, `ถ้าไม่ก็` = else-if, `มิฉะนั้น` = else
+- `c ✓ a ✗ b` is the one value conditional: `a` when `c` holds, else `b`.
+  `✓` (U+2713 CHECK MARK) and `✗` (U+2717 BALLOT X) are the same in every
+  locale and have no word twin. It is one level only: a `✓ ✗` inside the
+  condition or either branch is rejected (`conditional_nested`); choose among
+  more values with a function whose `ถ้า` arms each `คืน`. The branches narrow
+  exactly like `ถ้า` branches (after `r เป็น numerus`, `r` is `numerus` in the
+  `✓` branch).
+- `c ? a : b` and `c sic a มิฉะนั้น b` (en `c yields a else b`) were removed and
+  are rejected with a migration diagnostic; write `c ✓ a ✗ b`. `sic` stays a
+  reserved word only to carry that diagnostic. The look-alikes `✔` and `✘` are
+  rejected with a "did you mean" hint.
 - `ดังนั้น` for one-statement bodies, including `ดังนั้น คืน`, `ดังนั้น โยน`, `ดังนั้น ตาย`, and `ดังนั้น เงียบ` (`∴` is not accepted here)
 - `เงียบ` for explicit no-op (from musical notation: "it is silent")
 
