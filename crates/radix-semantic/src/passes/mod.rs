@@ -42,6 +42,7 @@
 //! well as errors, and the driver decides success from the final diagnostic
 //! severities rather than from pass execution alone.
 
+pub mod ad_routes;
 pub mod air_closure_lift;
 pub mod air_purity;
 pub mod air_specialize;

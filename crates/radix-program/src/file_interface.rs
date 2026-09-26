@@ -189,6 +189,17 @@ pub fn extract_file_interface_with_identity(
         });
     }
 
+    // `@ ad` routes are program-wide facts, not export-filtered: a private
+    // handler still serves its route (D6.10).
+    interface.routes = radix_module::semantic::passes::ad_routes::route_exports(
+        &analysis.hir,
+        &analysis.types,
+        &analysis.interner,
+        &analysis.resolver,
+        export_identity.map(identity_for).as_ref(),
+    )
+    .map_err(|err| interface_error(file_label, "@ ad route", err))?;
+
     Ok(interface)
 }
 
