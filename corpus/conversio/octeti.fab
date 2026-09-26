@@ -15,11 +15,11 @@ locale = "en"
 #
 # What this teaches:
 #   • Text↔byte bridges — `textus ↦ octeti` (UTF-8 encode), `ascii ↦ octeti` (ASCII encode), `octeti ↦ textus` (UTF-8 decode), `octeti ↦ ascii` (ASCII narrow).
-#   • Fallible decoding — byte-to-text conversions can fail on invalid bytes; recover with `⇥`.
+#   • Fallible decoding — byte-to-text conversions can fail on invalid bytes; recover with a `⊥` default.
 #   • Stdlib foundation — these language-level bridges are what stdlib's chorda mechanical trio (pange/solve/tempta) builds on.
 #
 # Common mistakes:
-#   • Assuming `octeti ↦ textus` always succeeds — invalid UTF-8 bytes require a `⇥` recovery value.
+#   • Assuming `octeti ↦ textus` always succeeds — invalid UTF-8 bytes require a `⊥` recovery value.
 #
 # See also: ↦, octeti, textus, chorda
 # =============================================================================
@@ -34,8 +34,8 @@ locale = "en"
 #
 # textus ↦ octeti: UTF-8 encode (lossless; String is already UTF-8 in Rust).
 # ascii  ↦ octeti: ASCII encode (lossless; ASCII is a strict subset of UTF-8).
-# octeti ↦ textus: UTF-8 decode (can fail on invalid bytes; use `⇥` to recover).
-# octeti ↦ ascii:  ASCII narrow (can fail on any byte ≥ 128; use `⇥`).
+# octeti ↦ textus: UTF-8 decode (can fail on invalid bytes; use `⊥` for a default).
+# octeti ↦ ascii:  ASCII narrow (can fail on any byte ≥ 128; use `⊥`).
 
 main {
     # textus → octeti (UTF-8 encode)
@@ -51,7 +51,7 @@ main {
 
     # octeti → textus with recovery (invalid UTF-8 → recovery value)
     const bytes badUtf8 ← |ff ff|
-    const string recovered ← badUtf8 ↦ string ⇥ "?"
+    const string recovered ← badUtf8 ↦ string ⊥ "?"
     print recovered
 
     # ascii → octeti
@@ -67,6 +67,6 @@ main {
     # A one-scalar ascii literal is ascii<1>, which does not assign to bare
     # ascii. Recovery for ↦ ascii must be bare ascii (a multi-char literal).
     const bytes nonAscii ← |ff|
-    const ascii arecovery ← nonAscii ↦ ascii ⇥ 'n/a'
+    const ascii arecovery ← nonAscii ↦ ascii ⊥ 'n/a'
     print arecovery
 }

@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "conversio"
 canonical = false
 summary = "ad sermo materialization can recover from a failed typed extraction with a fallback."
-syntax = "ad 'runtime:echo' (payload) ↦ numerus ⇥ fallback"
+syntax = "ad 'runtime:echo' (payload) ↦ numerus ⊥ fallback"
 related = ["ad", "conversio", "sermo"]
 locale = "en"
 +++
@@ -15,24 +15,24 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Fallback materialization — `↦ T ⇥ fallback` supplies a default value when
+#   • Fallback materialization — `↦ T ⊥ fallback` supplies a default value when
 #     the typed extraction from a sermo stream fails
 #   • Recovery on type mismatch — materializing textus frames as numerus triggers
 #     the fallback rather than a runtime error
 #
 # Common mistakes:
-#   • confusing ad route syntax — the fallback `⇥` applies to all materialization failures, not just nil frames
+#   • confusing ad route syntax — the `⊥` default applies to all materialization failures, not just nil frames
 #
 # See also: ad, conversio, sermo
 # =============================================================================
 
-# Exemplar: `sermo ↦ T ⇥ fallback` recovers materialization failure.
+# Exemplar: `sermo ↦ T ⊥ fallback` recovers materialization failure.
 #
 # runtime:echo returns the opener as textus. Materializing that stream as
 # `numerus` fails the one-frame scalar extractor, so inline recovery supplies
 # the target-typed fallback value.
 
 main {
-    const int n ← call 'runtime:echo' ("non-numeric") ↦ int ⇥ 0
+    const int n ← call 'runtime:echo' ("non-numeric") ↦ int ⊥ 0
     assert n ≡ 0
 }

@@ -50,6 +50,6 @@ main {
     const bool b4 ← "salve" ↦ bool
     print b3
     print b4
-    const bool habet ← ("123" ↦ int ⇥ 0) ↦ bool
+    const bool habet ← ("123" ↦ int ⊥ 0) ↦ bool
     print habet
 }

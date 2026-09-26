@@ -3493,7 +3493,7 @@ fn lowers_format_conversion_collection_and_provider_runtime_intrinsics() {
     assert!(!format_dump.contains("format!"));
 
     let conversion_dump =
-        dump_source(r"functio parse(textus raw) → numerus<i32> { redde raw ↦ numerus<i32, Hex> ⇥ 0 ∷ numerus<i32> }");
+        dump_source(r"functio parse(textus raw) → numerus<i32> { redde raw ↦ numerus<i32, Hex> ⊥ 0 ∷ numerus<i32> }");
     assert!(conversion_dump.contains("runtime convert runtime ty#"));
     assert!(conversion_dump.contains(" -> ty#"));
     assert!(conversion_dump.contains("hints [sym#"));
@@ -6388,26 +6388,26 @@ fn conversio_assign_typed_init_lowers_single_convert_then_store() {
 
 #[test]
 fn conversio_assign_recovery_lowers_through_conversion_recovery_slot() {
-    // `⇥` recovery travels through the same conversion intrinsic as `↦`.
-    let dump = dump_source("incipit {\n  varia numerus count ← 0\n  count ↤ \"x\" ⇥ 0\n}\n");
+    // `⊥` default travels through the same conversion intrinsic as `↦`.
+    let dump = dump_source("incipit {\n  varia numerus count ← 0\n  count ↤ \"x\" ⊥ 0\n}\n");
     assert!(
         dump.contains("runtime convert runtime"),
         "↤ with recovery must lower through the conversion owner:\n{dump}"
     );
     assert!(
         dump.contains("recovery"),
-        "⇥ recovery must be carried by the conversion:\n{dump}"
+        "⊥ recovery must be carried by the conversion:\n{dump}"
     );
 }
 
 #[test]
 fn conversio_assign_call_recovery_is_deferred_out_of_the_main_flow() {
-    // CTO-3: a side-effecting `⇥ fb()` recovery CALL is lowered into an
+    // CTO-3: a side-effecting `⊥ fb()` recovery CALL is lowered into an
     // orphan block — NOT into the main (bb0) flow — so it cannot run when the
     // conversion succeeds (fallback-not-run-on-success; the runner invokes it
     // lazily at the failure point).
     let dump = dump_source(
-        "functio fb() → numerus {\n  redde 0\n}\nincipit {\n  varia numerus count ← 0\n  count ↤ \"42\" ⇥ fb()\n}\n",
+        "functio fb() → numerus {\n  redde 0\n}\nincipit {\n  varia numerus count ← 0\n  count ↤ \"42\" ⊥ fb()\n}\n",
     );
     let body = first_block_body(&dump);
     assert!(

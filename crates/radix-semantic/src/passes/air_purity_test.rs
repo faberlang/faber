@@ -1185,7 +1185,7 @@ functio loss(tf32[2, 2] x) → numerus {
 
 // ---------------------------------------------------------------------------
 // ATH-3 (AIR Tier 0.5): recovery-arm Conversio slice. A conversion with an
-// inline `⇥` recovery resolves its failure inside its own expression —
+// inline `⊥` default resolves its failure inside its own expression —
 // self-resolved union dataflow, admitted like a locally-resolved handler. A
 // conversion without recovery is a boundary throw and keeps the
 // `runtime_conversion` decline everywhere in v1 — including inside admitted
@@ -1198,7 +1198,7 @@ fn air_lane_admits_inline_recovery_conversio() {
         r#"
 @ radix lane "air"
 functio parse_or_zero(textus s) → numerus {
-    fixum numerus v ← s ↦ numerus ⇥ 0
+    fixum numerus v ← s ↦ numerus ⊥ 0
     redde v
 }
 "#,
@@ -1215,7 +1215,7 @@ fn air_lane_admits_inline_recovery_conversio_inside_handler_region() {
 functio in_region(textus s, bivalens bad) → numerus {
     fac {
         si bad { iace "x" }
-        fixum numerus v ← s ↦ numerus ⇥ 0
+        fixum numerus v ← s ↦ numerus ⊥ 0
         redde v
     } cape err { redde 1 }
 }
@@ -1263,7 +1263,7 @@ functio in_region(textus s, bivalens bad) → numerus {
 
 #[test]
 fn air_lane_admits_non_literal_inline_recovery_expression() {
-    // The inline recovery grammar is `'⇥' unary_expr` (EBNF #153): a control
+    // The inline recovery grammar is `'⊥' unary_expr` (EBNF #153): a control
     // expression carrying `iace` cannot appear in the recovery operand, so
     // the rethrow-in-recovery case is unrepresentable at the v1 surface.
     // The gate still checks the recovery arm as a Catch region (defensive
@@ -1273,7 +1273,7 @@ fn air_lane_admits_non_literal_inline_recovery_expression() {
         r#"
 @ radix lane "air"
 functio parse_or_zero(textus s, numerus fallback) → numerus {
-    fixum numerus v ← s ↦ numerus ⇥ fallback
+    fixum numerus v ← s ↦ numerus ⊥ fallback
     redde v
 }
 "#,

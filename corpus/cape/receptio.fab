@@ -21,7 +21,7 @@ locale = "la"
 #     `elige … { … } cape err { … }` wrap the complete construct: any caught
 #     `iace` inside exits to the recovery arm, which resolves to the
 #     construct's outer type
-#   • recovery-arm conversion — `s ↦ numerus ⇥ 0` resolves a failed
+#   • recovery-arm conversion — `s ↦ numerus ⊥ 0` resolves a failed
 #     conversion in its own expression: the fallback rides the same
 #     recovery contract without a handler
 #
@@ -84,10 +84,10 @@ functio electio(bivalens malum) → numerus {
     } cape err { redde 0 }
 }
 
-# recovery-arm conversion — the inline ⇥ fallback resolves a failed
+# recovery-arm conversion — the inline ⊥ default resolves a failed
 # conversion inside its own expression (no handler needed)
 functio lectio(textus s) → numerus {
-    fixum numerus v ↤ s ⇥ 0
+    fixum numerus v ↤ s ⊥ 0
     redde v
 }
 

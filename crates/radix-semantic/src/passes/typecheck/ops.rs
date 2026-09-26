@@ -813,7 +813,7 @@ impl TypeChecker<'_> {
     /// right side is checked through the **same conversion registry** as an
     /// explicit `value ↦ TargetType` ([`Self::check_conversio`], the
     /// `convert.rs` deny-list + allow-list) using the place's resolved type as
-    /// the destination. Inline `⇥` recovery is typed before the store and must
+    /// the destination. Inline `⊥` default is typed before the store and must
     /// satisfy the same target-type rule as explicit `↦` recovery. The result
     /// type is the destination type (the stored value's type), matching
     /// ordinary assignment.

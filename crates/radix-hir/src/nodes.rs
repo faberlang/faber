@@ -1267,7 +1267,7 @@ pub enum HirExpressionKind {
     ///
     /// `target ↤ source` evaluates `source`, converts it to the statically
     /// known type of `target` through the `↦` conversion route, then stores
-    /// once. `recovery` is the optional `⇥ fallback`, legal only on this form;
+    /// once. `recovery` is the optional `⊥ fallback`, legal only on this form;
     /// the fallback satisfies the same target-type rule as explicit `↦`
     /// recovery. Lowering preserves the operator (never erasing it into
     /// [`HirExpressionKind::Assign`]); typecheck resolves the destination type
@@ -1367,7 +1367,7 @@ pub enum HirExpressionKind {
     /// Runtime value conversion (`↦ target`).
     ///
     /// Unlike Verte (compile-time cast), this performs actual parsing/conversion
-    /// and supports inline recovery values via `⇥`.
+    /// and supports inline recovery values via `⊥`.
     Conversio {
         source: Box<HirExpression>,
         target: HirConversioTarget,

@@ -1497,7 +1497,7 @@ fn verte_vel_no_longer_reports_invalid_cast() {
     let source = r#"incipit {
   fixum _ data ← 42
   fixum _ asText ← data ∷ textus
-  fixum _ parsed ← "invalid" ↦ numerus ⇥ 0
+  fixum _ parsed ← "invalid" ↦ numerus ⊥ 0
   fixum tabula<textus, numerus> cache ← { "alice": 95, "bob": 87 }
   fixum lista<textus> items ← vacua
   nota asText, parsed, cache, items

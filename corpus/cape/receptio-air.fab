@@ -21,7 +21,7 @@ locale = "la"
 #     rule is enforced at the AIR admission path (recovery_type_mismatch)
 #   • every arm position in the AR-2 map is admitted: the `si` then arm,
 #     each `secus`/`sin` arm, and the whole `fac`/`elige` construct
-#   • the inline-recovery conversion (`↦ T ⇥ <fallback>`) is the
+#   • the inline-recovery conversion (`↦ T ⊥ <fallback>`) is the
 #     self-resolved slice: it admits alone and inside a handler region
 #
 # Common mistakes:
@@ -30,7 +30,7 @@ locale = "la"
 #     (see receptio-decline.fab)
 #   • throwing from inside the catch arm — that is a rethrow, Tier 2, and
 #     declines with rethrow_in_recovery (see receptio-decline.fab)
-#   • a bare conversion (`s ↦ numerus` with no ⇥ fallback) inside a
+#   • a bare conversion (`s ↦ numerus` with no ⊥ fallback) inside a
 #     handler region — it keeps the runtime_conversion decline everywhere
 #     in v1, even inside an admitted region
 #
@@ -108,11 +108,11 @@ functio electio(bivalens malum) → numerus {
     }
 }
 
-# recovery-arm conversion — the inline ⇥ fallback resolves the conversion
+# recovery-arm conversion — the inline ⊥ default resolves the conversion
 # failure in its own expression
 @ radix { lane = "air" }
 functio lectio(textus s) → numerus {
-    fixum numerus v ← s ↦ numerus ⇥ 0
+    fixum numerus v ← s ↦ numerus ⊥ 0
     redde v
 }
 
@@ -123,7 +123,7 @@ functio lectio_in_regione(textus s, bivalens malum) → numerus {
         si malum {
             iace "x"
         }
-        fixum numerus v ← s ↦ numerus ⇥ 0
+        fixum numerus v ← s ↦ numerus ⊥ 0
         redde v
     }
     cape err {

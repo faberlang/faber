@@ -1224,7 +1224,7 @@ fn conversio_assign_fhir_artifact_round_trip_preserves_operator() {
     // artifact round-trip (serialize → load_fhir, which runs referential-
     // integrity validation) must carry the conversion-directed assignment
     // through unchanged, and every claimed HIR backend must re-emit it.
-    let source = "incipit {\n  varia numerus count ← 0\n  count ↤ \"42\" ⇥ 0\n  nota count\n}\n";
+    let source = "incipit {\n  varia numerus count ← 0\n  count ↤ \"42\" ⊥ 0\n  nota count\n}\n";
 
     let session = crate::driver::Session::new(crate::driver::Config::default());
     let unit = crate::driver::analyze_source(&session, "conversio-assign.faber", source, AnalyzeRequest::default())
@@ -1244,7 +1244,7 @@ fn conversio_assign_fhir_artifact_round_trip_preserves_operator() {
         panic!("expected faber output");
     };
     assert!(
-        faber.code.contains("count ↤ \"42\" ⇥ 0"),
+        faber.code.contains("count ↤ \"42\" ⊥ 0"),
         "↤ must survive the FHIR round-trip verbatim:\n{}",
         faber.code
     );

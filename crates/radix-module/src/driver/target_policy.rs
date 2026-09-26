@@ -342,7 +342,7 @@ fn scan_go_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
         ExprKind::Assign(assign) => {
             scan_go_expr(&assign.target, file, diagnostics);
             scan_go_expr(&assign.value, file, diagnostics);
-            // `↤` inline recovery (`⇥ fallback`) is part of the assignment's
+            // `↤` inline recovery (`⊥ fallback`) is part of the assignment's
             // expression surface; it must not escape the target-policy scan.
             if let Some(recovery) = &assign.recovery {
                 scan_go_expr(recovery, file, diagnostics);
@@ -721,7 +721,7 @@ fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
         ExprKind::Assign(assign) => {
             scan_rust_expr(&assign.target, file, diagnostics);
             scan_rust_expr(&assign.value, file, diagnostics);
-            // `↤` inline recovery (`⇥ fallback`) is part of the assignment's
+            // `↤` inline recovery (`⊥ fallback`) is part of the assignment's
             // expression surface; it must not escape the target-policy scan.
             if let Some(recovery) = &assign.recovery {
                 scan_rust_expr(recovery, file, diagnostics);

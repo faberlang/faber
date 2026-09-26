@@ -4,33 +4,33 @@ kind = "conversio"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "alternate_exit_clause", "redde_stmt", "fac_stmt", "cape_clause", "iace_stmt", "adfirma_stmt", "conversio_expr", "inline_recovery", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "equality", "equality_tail", "expression", "literal"]
 category = "conversion"
 canonical = true
-summary = "Three recovery postures for fallible conversio: inline ⇥, ⇥ propagation, and fac/cape."
+summary = "Three recovery postures for fallible conversio: inline ⊥ default, ⇥ propagation, and fac/cape."
 syntax = "<expression> ↦ <type> | functio … → T ⇥ E | fac { … } cape err { … }"
-related = ["↦", "⇥", "fac", "cape", "iace"]
+related = ["↦", "⇥", "⊥", "fac", "cape", "iace"]
 locale = "en"
 +++
 # =============================================================================
-# conversio-fallibilis — Three recovery postures for fallible conversio: inline ⇥, ⇥ propagation, and fac/cape.
+# conversio-fallibilis — Three recovery postures for fallible conversio: inline ⊥ default, ⇥ propagation, and fac/cape.
 # =============================================================================
 #
 # What this teaches:
-#   • Recovery postures — three strategies for handling conversion failure: inline `⇥` fallback, `⇥` propagation to callers, and `fac { … } cape err { … }` error absorption.
+#   • Recovery postures — three strategies for handling conversion failure: inline `⊥` default, `⇥` propagation to callers, and `fac { … } cape err { … }` error absorption.
 #   • Type signatures — how `→ T ⇥ textus` propagates conversion error as a typed channel.
 #
 # Common mistakes:
-#   • Mixing propagation and inline recovery — bare `↦` without `⇥` inside a `→ T ⇥ textus` function still propagates errors rather than handling them locally.
+#   • Mixing propagation and inline recovery — bare `↦` without `⊥` inside a `→ T ⇥ textus` function still propagates errors rather than handling them locally.
 #
-# See also: ↦, ⇥, fac, cape, iace
+# See also: ↦, ⇥, ⊥, fac, cape, iace
 # =============================================================================
 
-# conversio fallibilis — inline ⇥, propagation, and fac/cape recovery
+# conversio fallibilis — inline ⊥ default, ⇥ propagation, and fac/cape recovery
 #
-# Posture 1: `expr ↦ T ⇥ recovery` handles failure at the site.
+# Posture 1: `expr ↦ T ⊥ recovery` handles failure at the site.
 # Posture 2: bare `↦` inside `→ T ⇥ textus` propagates to callers.
 # Posture 3: `fac { … }` with `cape err { … }` absorbs propagated conversio failure.
 #
 # BACKEND:
-#   Rust lowers all three postures (inline `⇥`, propagation, `fac`/`cape`).
+#   Rust lowers all three postures (inline `⊥`, propagation, `fac`/`cape`).
 #   Go/TS remain diagnostic-only until their failable stacks mature.
 
 fn epochZero() → instant {
@@ -42,7 +42,7 @@ fn parseInstans(value v) → instant ⇥ string {
 }
 
 fn inlineRecovery(value v) → instant {
-    return v ↦ instant ⇥ epochZero()
+    return v ↦ instant ⊥ epochZero()
 }
 
 fn tutum(value v) → instant {

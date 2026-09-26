@@ -898,7 +898,7 @@ impl Lowerer<'_> {
             }
             // `↤` (U+21A4) is conversion-directed assignment: the operator is
             // preserved through HIR (never erased into `Assign`) until the
-            // destination type resolves in typecheck, and the `⇥` inline
+            // destination type resolves in typecheck, and the `⊥` inline
             // recovery travels with the node. The right side must go through
             // the same conversion registry as an explicit `↦ TargetType`.
             radix_syntax::AssignOp::ConversioAssign => {
@@ -1318,7 +1318,7 @@ impl Lowerer<'_> {
         );
         // Fold constant literal sources to `HirLiteral::Regex` so regex values
         // share one HIR shape with future slash literals (Part B). Guard on the
-        // absence of recovery: typecheck rejects `↦ regex ⇥ …`, but lowering
+        // absence of recovery: typecheck rejects `↦ regex ⊥ …`, but lowering
         // may still run after error recovery. Never silently drop recovery.
         let regex_ty = self.types.primitive(Primitive::Regex);
         if matches!(target, HirConversioTarget::Type(ty) if ty == regex_ty)

@@ -41,7 +41,7 @@ fn conversio_emits_parse_not_as_cast() {
 fn conversio_with_recovery_emits_unwrap_or() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
-  fixum _ n ← "bad" ↦ numerus ⇥ 0
+  fixum _ n ← "bad" ↦ numerus ⊥ 0
   nota n
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -105,7 +105,7 @@ fn octeti_to_textus_conversio_with_recovery_emits_unwrap_or() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
   fixum _ b ← |ff|
-  fixum _ s ← b ↦ textus ⇥ "?"
+  fixum _ s ← b ↦ textus ⊥ "?"
   nota s
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -364,14 +364,14 @@ fn valor_to_numerus_conversio_with_recovery_emits_unwrap_or() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
   fixum valor v ← "bad"
-  fixum numerus n ← v ↦ numerus ⇥ 0
+  fixum numerus n ← v ↦ numerus ⊥ 0
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
         code.contains("<i64 as faber::FromValor>::from_valor") && code.contains(".unwrap_or("),
-        "expected valor extraction with ⇥ recovery, got:\n{code}"
+        "expected valor extraction with ⊥ recovery, got:\n{code}"
     );
 }
 
@@ -668,7 +668,7 @@ fn conversio_glyph_form_roundtrips_through_faber_codegen() {
 #[cfg(feature = "hir-faber")]
 fn conversio_with_recovery_roundtrips_through_faber_codegen() {
     let source = r#"incipit {
-  fixum _ n ← "bad" ↦ numerus ⇥ 0
+  fixum _ n ← "bad" ↦ numerus ⊥ 0
   nota n
 }"#;
     let result = super::faber_emit("test.fab", source);
@@ -677,5 +677,5 @@ fn conversio_with_recovery_roundtrips_through_faber_codegen() {
     let Some(output) = result.output else {
         panic!("expected faber output");
     };
-    assert!(output.code.contains("↦ numerus ⇥ 0"));
+    assert!(output.code.contains("↦ numerus ⊥ 0"));
 }
