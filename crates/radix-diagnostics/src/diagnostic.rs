@@ -235,9 +235,6 @@ pub enum WarningKind {
     /// An `est M` type test names a member its operand union cannot hold —
     /// a statically dead test (U1R).
     TypeTestMemberAbsent,
-    /// A written `∪` annotation has two or more nominal members; it
-    /// guarantees only the common members (U1R guardrail 1).
-    UnionOfNominalMembers,
     /// An all-nominal `∪` whose constituents share no members is store-only
     /// until narrowed (U1R guardrail 3).
     UnionNoCommonMembers,

@@ -46,7 +46,7 @@ struct HandledConversio<'a> {
 }
 
 impl FunctionBuilder<'_> {
-    fn lower_hir_call_args(&mut self, args: &[HirCallArg]) -> Option<Vec<MirOperand>> {
+    pub(super) fn lower_hir_call_args(&mut self, args: &[HirCallArg]) -> Option<Vec<MirOperand>> {
         let mut lowered = Vec::with_capacity(args.len());
         for arg in args {
             lowered.push(self.lower_expr_value(&arg.expr)?);
@@ -73,6 +73,9 @@ impl FunctionBuilder<'_> {
             lowered_args.push(self.lower_expr_value(receiver)?);
             lowered_args.extend(self.lower_hir_call_args(args)?);
             return self.lower_definition_call(target.def_id, Vec::new(), lowered_args, conversion, expr);
+        }
+        if let Some(result) = self.lower_union_method_call(receiver, method, args, conversion, expr) {
+            return result;
         }
 
         let imported_method_target = receiver.ty.and_then(|receiver_ty| {
@@ -2357,7 +2360,7 @@ impl FunctionBuilder<'_> {
     }
 
     // consumes type_args and args into MIR statements
-    fn lower_definition_call(
+    pub(super) fn lower_definition_call(
         &mut self,
         def_id: DefId,
         explicit_type_args: Vec<MirType>,

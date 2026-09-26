@@ -39,6 +39,9 @@ mod bounded_itera_test;
 #[cfg(test)]
 #[path = "queue_stack_test.rs"]
 mod queue_stack_test;
+#[cfg(test)]
+#[path = "union_overlap_dispatch_test.rs"]
+mod union_overlap_dispatch_test;
 
 // --- Core from radix-mir (module paths for residual code) ---
 pub use radix_mir::{

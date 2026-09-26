@@ -1,0 +1,80 @@
++++
+term = "∪"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "param_list", "parameter", "return_clause", "typus_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "functio_decl", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "field_list", "field_init", "field_key", "assignment", "place", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "template_argument", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Union overlap access: a method or field every member shares is usable on the union."
+syntax = "typus <name> = <genus> ∪ <genus>; <union>.<shared member>"
+related = ["typus", "genus", "discerne"]
+locale = "en"
++++
+# =============================================================================
+# ∪ — Union overlap access
+# =============================================================================
+#
+# What this teaches:
+#   • A union of genus types exposes exactly what every member shares: a method
+#     with the same signature, or a field with the same type
+#   • Calling a shared method runs the method of whichever member the value is
+#   • A shared field can be read and written through the union
+#
+# Common mistakes:
+#   • reaching for a member only one type has (`radius`) — narrow first with
+#     `est` or `discerne`; outside the overlap the access is a compile error
+#   • sharing a name with a different type (`float area` vs `int area`) — the
+#     error names each member's type
+#
+# See also: typus, genus, discerne
+# =============================================================================
+
+class Circulus {
+    string nomen
+    int radius
+
+    fn area() → int {
+        return 3 * self.radius * self.radius
+    }
+
+    fn scala(int k) → int {
+        return k * self.radius
+    }
+}
+
+class Quadratum {
+    string nomen
+    int latus
+
+    fn area() → int {
+        return self.latus * self.latus
+    }
+
+    fn scala(int k) → int {
+        return k + self.latus
+    }
+}
+
+type Figura = Circulus ∪ Quadratum
+
+fn describe(Figura f) → string {
+    return "§: §"(f.nomen, f.area())
+}
+
+main {
+    const Figura c ← Circulus { nomen = "rota", radius = 2 }
+    const Figura q ← Quadratum { nomen = "tabula", latus = 3 }
+
+    # Shared method: each value runs its own member's `area`.
+    print describe(c)
+    print describe(q)
+
+    # Shared method with an argument.
+    print c.scala(10)
+    print q.scala(10)
+
+    # Shared field write through the union.
+    var Figura f ← Quadratum { nomen = "tessera", latus = 4 }
+    f.nomen ← "mensa"
+    print f.nomen
+    print f.area()
+}
