@@ -167,6 +167,7 @@ pub(crate) fn annotation_json(annotations: &[crate::syntax::Annotation]) -> Stri
                 crate::syntax::AnnotationKind::RadixLane(_) => "RadixLane",
                 crate::syntax::AnnotationKind::Nucleum(_) => "Nucleum",
                 crate::syntax::AnnotationKind::Conversio => "Conversio",
+                crate::syntax::AnnotationKind::Ad(_) => "Ad",
                 crate::syntax::AnnotationKind::Statement(_) => "Statement",
                 crate::syntax::AnnotationKind::Futura => "Futura",
                 crate::syntax::AnnotationKind::Cursor => "Cursor",

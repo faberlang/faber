@@ -26,6 +26,10 @@ mod cape_roundtrip_test;
 #[path = "frame_names_test.rs"]
 mod frame_names_test;
 
+#[cfg(test)]
+#[path = "ad_annotation_roundtrip_test.rs"]
+mod ad_annotation_roundtrip_test;
+
 use crate::lexer::TokenKind;
 use crate::locale::{self, TypeBindingKind};
 use radix_hir_faber::FrameFamily;

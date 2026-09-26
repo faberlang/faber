@@ -136,6 +136,22 @@ impl Lowerer<'_> {
             // Standalone `@ conversio` marker; the ordered pair is derived
             // and enrolled from the function signature by `lower_functio`.
             AnnotationKind::Conversio => self.unit_annotation("conversio", annotation.span),
+            // `@ ad '<route>'`: family `ad`, one `route` string field
+            // ([`radix_hir::HirAnnotation::ad_route`]); validation and route
+            // collection belong to `passes::ad_routes`.
+            AnnotationKind::Ad(ad) => {
+                let mut lowered = HirAnnotation::with_fields(
+                    self.intern_field_name("ad"),
+                    vec![HirAnnotationField {
+                        name: self.intern_field_name("route"),
+                        value: HirAnnotationValue::String(ad.route),
+                        span: ad.route_span,
+                    }],
+                    annotation.span,
+                );
+                lowered.brace_authored = false;
+                lowered
+            }
             AnnotationKind::Cli(cli) => self.lower_cli_annotation(cli, annotation.span),
             AnnotationKind::Imperium(imperium) => {
                 self.lower_imperium_annotation(imperium, annotation.span)

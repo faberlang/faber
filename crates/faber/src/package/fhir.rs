@@ -204,6 +204,14 @@ pub(crate) fn loaded_package_to_analyzed(
         .clone()
         .map_or_else(|| nodes.keys().cloned().collect(), |id| vec![id]);
 
+    // No library resolver exists on rehydration: the table holds the
+    // package's own handlers only.
+    let routes = radix::program::route_table::local_route_table(
+        nodes
+            .values()
+            .map(|node| (node.path.as_path(), &node.analysis)),
+        None,
+    )?;
     Ok(AnalyzedProgram {
         spec,
         entry,
@@ -213,6 +221,7 @@ pub(crate) fn loaded_package_to_analyzed(
         entry_frontmatter,
         diagnostics: Vec::new(),
         library_resolver: LibraryResolver::with_optional_home(None),
+        routes,
     })
 }
 

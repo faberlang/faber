@@ -267,6 +267,22 @@ impl HirAnnotation {
             span,
         }
     }
+
+    /// The route of a compiler-owned `@ ad '<route>'` handler annotation, or
+    /// `None` for every other family. Lowering records the route as the
+    /// family `ad` with one `route` string field.
+    #[must_use]
+    pub fn ad_route(&self, interner: &radix_lexer::Interner) -> Option<Symbol> {
+        if interner.resolve(self.family) != "ad" {
+            return None;
+        }
+        self.fields.iter().find_map(|field| match field.value {
+            HirAnnotationValue::String(route) if interner.resolve(field.name) == "route" => {
+                Some(route)
+            }
+            _ => None,
+        })
+    }
 }
 
 fn annotation_brace_authored_default() -> bool {

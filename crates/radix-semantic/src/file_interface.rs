@@ -24,6 +24,10 @@ pub struct FileInterface {
     /// missing identity keeps the historical canonical-name behavior.
     pub identity: Option<InterfaceLibraryIdentity>,
     pub exports: BTreeMap<String, FileExport>,
+    /// Routes this file serves with `@ ad '<route>'` handlers, keyed by the
+    /// exact route. Routes are program-wide facts independent of export
+    /// visibility: a private handler still serves its route (D6.10).
+    pub routes: BTreeMap<String, RouteExport>,
 }
 
 impl FileInterface {
@@ -42,6 +46,38 @@ impl FileInterface {
         self.identity = Some(identity);
         self
     }
+}
+
+/// Execution shape of one `@ ad` route handler (D6.11 table rows).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
+pub enum RouteHandlerKind {
+    /// `functio f(…) → T` — one `item`, then `done`.
+    Sync,
+    /// `… fiet T` — as `Sync`, produced by an async task.
+    Async,
+    /// `… fiunt T` — one `item` per yield, then `done`.
+    Cursor,
+    /// `… fient T` — as `Cursor`, produced by an async task.
+    AsyncCursor,
+}
+
+/// One route served by a `@ ad '<route>'` handler in an analyzed file.
+///
+/// `opener` is the caller-sent type `O` (`None` = `nihil`, a zero-parameter
+/// handler); `reply` is the per-item type `R` (`None` = `vacuum`, `done`
+/// only). Snapshots are portable, like every other interface fact.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RouteExport {
+    pub route: String,
+    /// Handler function name in its defining module (no export required).
+    pub handler: String,
+    pub opener: Option<InterfaceTypeSnapshot>,
+    pub reply: Option<InterfaceTypeSnapshot>,
+    pub kind: RouteHandlerKind,
+    /// Whether the handler declares a `⇥ E` failure channel.
+    pub failable: bool,
+    /// Span of the `@ ad` annotation in the defining file.
+    pub span: radix_lexer::Span,
 }
 
 /// Portable identity for one library module's public interface.

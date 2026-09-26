@@ -596,6 +596,18 @@ help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
 message = "@ nucleum lane value must be a string literal"
 help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
 
+[diagnostics.PARSE018.issues.ad_annotation_route]
+message = "`@ {ad}` viam ASCII inter apostrophos requirit"
+help = "scribe `@ {ad} 'praefixum:nomen'` ante {functio} tractatricem"
+
+[diagnostics.PARSE018.issues.ad_pattern_route_deferred]
+message = "viae per exemplar post `@ {ad}` differuntur"
+help = "unam viam exactam servi: `@ {ad} 'praefixum:nomen'`"
+
+[diagnostics.PARSE018.issues.ad_annotation_requires_functio]
+message = "`@ {ad}` declarationem {functio} notare debet"
+help = "pone `@ {ad} 'praefixum:nomen'` directe ante {functio} summi gradus"
+
 [diagnostics.PARSE018.issues.wrong_locale_annotation]
 message = "annotatio `@ {annotation}` non est declarata in hac superficie lectoris"
 help = "utere `@ {expected}` pro lingua lectoris huius fasciculi"
@@ -963,6 +975,10 @@ help = "narrow the receiver (`est M` branch, `discerne`) to recover per-member a
 [diagnostics.SEM005]
 message = "duplicate definition"
 help = "rename one of the definitions"
+
+[diagnostics.SEM005.issues.ad_route_duplicate]
+message = "via '{route}' et a {first} et a {second} servitur"
+help = "servi quamque viam ex una tantum tractatrice in programmate"
 
 [diagnostics.SEM005.issues.duplicate_definition]
 message = "duplicate definition"
@@ -2619,6 +2635,42 @@ help = "use an available declaration or change the target"
 [diagnostics.SEM018]
 message = "invalid annotation"
 help = "fix the annotation contract before semantic lowering"
+
+[diagnostics.SEM018.issues.ad_handler_not_top_level_functio]
+message = "`@ {ad}` licet tantum in {functio} summi gradus"
+help = "move tractatricem in {functio} summi gradus; methodi et aliae declarationes vias non serviunt"
+
+[diagnostics.SEM018.issues.ad_handler_multiple_routes]
+message = "tractatrix unam tantum viam servit"
+help = "remove `@ {ad}` superfluum; scribe unam {functio} pro quaque via"
+
+[diagnostics.SEM018.issues.ad_handler_generic]
+message = "tractatrix viae generica esse non potest"
+help = "da tractatrici typos parametri et reditus concretos"
+
+[diagnostics.SEM018.issues.ad_handler_kernel]
+message = "nucleus machinae viam servire non potest"
+help = "servi viam ex {functio} ordinaria quae nucleum mittit"
+
+[diagnostics.SEM018.issues.ad_handler_externa]
+message = "declaratio externa viam servire non potest"
+help = "servi viam ex {functio} cum corpore"
+
+[diagnostics.SEM018.issues.ad_handler_bodyless]
+message = "tractatrix viae corpus requirit"
+help = "da corpus {functio} tractatrici"
+
+[diagnostics.SEM018.issues.ad_handler_arity]
+message = "tractatrix viae nullum aut unum parametrum accipit, inventi {count}"
+help = "transmitte {genus} aut {iuncta} ut unicum parametrum aperiens"
+
+[diagnostics.SEM018.issues.ad_route_shape]
+message = "via '{route}' non est via exacta `praefixum:nomen` aut `praefixum/nomen`"
+help = "scribe viam ASCII non vacuam, ut `@ {ad} 'ordines:index'`"
+
+[diagnostics.SEM018.issues.ad_route_reserved]
+message = "via '{route}' linguae tempori cursus reservata est"
+help = "elige viam extra praefixum `runtime:` et vias internas"
 
 [diagnostics.SEM018.issues.protecta_reserved]
 message = "`{annotation}` is reserved and has no active visibility meaning"

@@ -1736,6 +1736,10 @@ pub enum AnnotationKind {
     /// concrete `(source, destination)` pair is derived from the function
     /// signature during semantic enrollment; the marker carries no payload.
     Conversio,
+    /// `@ ad '<route>'` — compiler-owned route handler registration on a
+    /// top-level `functio` (en `@ call '<route>'`). Legality (placement,
+    /// handler shape, reserved routes) is semantic policy, not syntax.
+    Ad(AdAnnotation),
     Cli(CliAnnotation),
     Imperium(ImperiumAnnotation),
     Optio(OptioAnnotation),
@@ -1793,6 +1797,16 @@ pub struct NucleumAnnotation {
     /// True when the braced record form (`@ nucleum { … }`) was authored;
     /// re-emission keeps the authored brace shape.
     pub braced: bool,
+}
+
+/// Structured `@ ad '<route>'` handler registration.
+///
+/// The route is the single-quoted ASCII literal, the same literal form as
+/// expression `ad`. Only exact routes exist; pattern routes are deferred.
+#[derive(Debug)]
+pub struct AdAnnotation {
+    pub route: Symbol,
+    pub route_span: Span,
 }
 
 #[derive(Debug)]

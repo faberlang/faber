@@ -53,7 +53,7 @@ pub mod program {
     pub use radix_program::{
         LibraryImportBinding, PackageFile, analyze, artifact_plan, discovery, emit, file_interface,
         frontmatter, import_graph, library, lockfile, manifest, member_path, modules, paths,
-        source_files, test_source_filter,
+        route_table, source_files, test_source_filter,
     };
     #[cfg(feature = "hir-rust")]
     pub use radix_program::{codegen, rust_target};

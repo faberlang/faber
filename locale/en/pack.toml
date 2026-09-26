@@ -805,6 +805,18 @@ help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
 message = "@ nucleum lane value must be a string literal"
 help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
 
+[diagnostics.PARSE018.issues.ad_annotation_route]
+message = "`@ {ad}` requires a single-quoted ASCII route"
+help = "write `@ {ad} 'prefix:name'` before the handler {functio}"
+
+[diagnostics.PARSE018.issues.ad_pattern_route_deferred]
+message = "pattern routes after `@ {ad}` are deferred"
+help = "serve one exact route: `@ {ad} 'prefix:name'`"
+
+[diagnostics.PARSE018.issues.ad_annotation_requires_functio]
+message = "`@ {ad}` must annotate a {functio} declaration"
+help = "place `@ {ad} 'prefix:name'` directly before a top-level {functio}"
+
 [diagnostics.PARSE018.issues.wrong_locale_annotation]
 message = "annotation `@ {annotation}` is not declared on this reader surface"
 help = "use `@ {expected}` for this file's reader locale"
@@ -1172,6 +1184,10 @@ help = "narrow the receiver (`est M` branch, `discerne`) to recover per-member a
 [diagnostics.SEM005]
 message = "duplicate definition"
 help = "rename one of the definitions"
+
+[diagnostics.SEM005.issues.ad_route_duplicate]
+message = "route '{route}' is served by both {first} and {second}"
+help = "serve each route from exactly one handler in the program"
 
 [diagnostics.SEM005.issues.duplicate_definition]
 message = "duplicate definition"
@@ -2828,6 +2844,42 @@ help = "use an available declaration or change the target"
 [diagnostics.SEM018]
 message = "invalid annotation"
 help = "fix the annotation contract before semantic lowering"
+
+[diagnostics.SEM018.issues.ad_handler_not_top_level_functio]
+message = "`@ {ad}` is legal only on a top-level {functio}"
+help = "move the handler to a top-level {functio}; methods and other declarations cannot serve routes"
+
+[diagnostics.SEM018.issues.ad_handler_multiple_routes]
+message = "a handler serves exactly one route"
+help = "remove the extra `@ {ad}`; write one {functio} per route"
+
+[diagnostics.SEM018.issues.ad_handler_generic]
+message = "a route handler cannot be generic"
+help = "give the handler concrete parameter and return types"
+
+[diagnostics.SEM018.issues.ad_handler_kernel]
+message = "a device kernel cannot serve a route"
+help = "serve the route from an ordinary {functio} that launches the kernel"
+
+[diagnostics.SEM018.issues.ad_handler_externa]
+message = "an external declaration cannot serve a route"
+help = "serve the route from a {functio} with a body"
+
+[diagnostics.SEM018.issues.ad_handler_bodyless]
+message = "a route handler needs a body"
+help = "give the handler {functio} a body"
+
+[diagnostics.SEM018.issues.ad_handler_arity]
+message = "a route handler takes zero or one parameter, found {count}"
+help = "pass a {genus} or {iuncta} as the single opener parameter"
+
+[diagnostics.SEM018.issues.ad_route_shape]
+message = "route '{route}' is not an exact `prefix:name` or `prefix/name` route"
+help = "write a non-empty ASCII route such as `@ {ad} 'orders:list'`"
+
+[diagnostics.SEM018.issues.ad_route_reserved]
+message = "route '{route}' is reserved for the language runtime"
+help = "choose a route outside the `runtime:` prefix and the builtin routes"
 
 [diagnostics.SEM018.issues.protecta_reserved]
 message = "`{annotation}` is reserved and has no active visibility meaning"

@@ -154,6 +154,12 @@ impl<'a> LintContext<'a> {
         for item in &hir.items {
             match &item.kind {
                 HirItemKind::Import(import) => self.collect_import(import),
+                // A `@ ad` handler is used by its route, not by name.
+                HirItemKind::Function(_)
+                    if item
+                        .annotations
+                        .iter()
+                        .any(|annotation| annotation.ad_route(self.interner).is_some()) => {}
                 HirItemKind::Function(func) if !item.def_id.is_hir_synthetic() => {
                     self.functions.push((
                         item.def_id,
