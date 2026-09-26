@@ -959,11 +959,13 @@ impl TypeChecker<'_> {
             return self.types.primitive(Primitive::Ignotum);
         }
 
-        self.error_issue(
-            SemanticErrorKind::VariableUndefined,
-            "unknown_identifier",
-            span,
-        );
+        // A selective import that binds a type (D22.5) names no value.
+        let issue = if self.resolver.selective_import_type(def_id).is_some() {
+            "name_not_value"
+        } else {
+            "unknown_identifier"
+        };
+        self.error_issue(SemanticErrorKind::VariableUndefined, issue, span);
         self.error_type
     }
 }

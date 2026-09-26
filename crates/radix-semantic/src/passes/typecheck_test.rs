@@ -2523,7 +2523,7 @@ incipit { output("salve") }"#,
     );
     assert!(
         result.is_ok(),
-        "EOT-2M red driver: imported callable aliases must typecheck as ordinary values; current diagnostics={:?}; expected later issues include `selective_import_missing_member`, `selective_import_type_not_value`, and `selective_import_duplicate_alias`",
+        "EOT-2M red driver: imported callable aliases must typecheck as ordinary values; current diagnostics={:?}; expected later issues include `selective_import_missing_member`, and `selective_import_duplicate_alias`",
         result.diagnostics
     );
 }
@@ -2748,18 +2748,19 @@ incipit { tacet }"#,
 }
 
 #[test]
-fn selective_import_type_export_rejected_as_value() {
+fn selective_import_type_export_binds_a_type() {
+    // D22.5: selective imports accept types as well as values.
     let result = eot_analyze_with_selective_interface(
-        r#"importa ex "norma:consolum" fixum Vector,
+        r#"importa ex "norma:consolum" fixum Vector
+functio f(Vector v) → Vector { redde v }
 incipit { tacet }"#,
     );
-    assert!(result.is_err());
     assert!(
-        result
+        !result
             .diagnostics
             .iter()
-            .any(|err| test_support::issue(err) == Some("selective_import_type_not_value")),
-        "expected selective_import_type_not_value, got: {:?}",
+            .any(crate::SemanticError::is_error),
+        "selective type import must bind the type: {:?}",
         result.diagnostics
     );
 }

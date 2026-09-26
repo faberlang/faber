@@ -4925,7 +4925,6 @@ fn stacked_closure_modifiers_are_structured_duplicates() {
 
 const EOT_SELECTIVE_IMPORT_ISSUES: &[&str] = &[
     "selective_import_binding_expected",
-    "selective_import_type_not_value",
     "selective_import_missing_member",
     "selective_import_duplicate_alias",
 ];

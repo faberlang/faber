@@ -8223,6 +8223,119 @@ fn label(string nomen) → string {
 }
 
 #[test]
+fn check_package_selective_type_import_binds_the_type() {
+    // D22.5: a selective import binds a type export; check must close the
+    // emit def table over the imported nominal (no DEFID001).
+    let dir = test_temp_dir("package-selective-type-import");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+import from "./auxilium" const Canis, Felis as Cattus
+
+fn nomen(Canis c) → string {
+    return c.nomen
+}
+
+fn felis(Cattus c) → string {
+    return c.nomen
+}
+
+main {
+    const Canis c ← Canis { nomen = "rex" }
+    print nomen(c)
+    print felis(Cattus { nomen = "tom" })
+}
+"#,
+    )
+    .expect("write entry");
+    fs::write(
+        dir.join("auxilium.fab"),
+        r#"
+@ public
+class Canis {
+    string nomen
+}
+
+@ public
+class Felis {
+    string nomen
+}
+"#,
+    )
+    .expect("write module");
+
+    let diagnostics = check_with_faber_seams(&Config::default(), &entry);
+    assert!(
+        !diagnostics.iter().any(radix::Diagnostic::is_error),
+        "expected selective type import to check, got {:?}",
+        diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn check_package_rejects_est_against_imported_type() {
+    // D18.1: `x is aux.Felis` / `x is Canis` on imported types is an error,
+    // never a value-equality fallback.
+    let dir = test_temp_dir("package-est-imported-type");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+import from "./auxilium" aux
+import from "./auxilium" const Canis
+
+fn qualified(aux.Felis ∪ aux.Canis x) → bool {
+    return x is aux.Felis
+}
+
+fn bare(aux.Felis ∪ Canis x) → bool {
+    return x is Canis
+}
+
+main {
+    print qualified(aux.Felis { nomen = "tom" })
+    print bare(Canis { nomen = "rex" })
+}
+"#,
+    )
+    .expect("write entry");
+    fs::write(
+        dir.join("auxilium.fab"),
+        r#"
+@ public
+class Canis {
+    string nomen
+}
+
+@ public
+class Felis {
+    string nomen
+}
+"#,
+    )
+    .expect("write module");
+
+    let diagnostics = check_with_faber_seams(&Config::default(), &entry);
+    let hits = diagnostics
+        .iter()
+        .filter(|diag| diagnostic_has_issue(diag, "est_imported_type"))
+        .count();
+    assert_eq!(
+        hits,
+        2,
+        "expected est_imported_type for both spellings, got {:?}",
+        diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn check_package_rejects_wrong_argument_type_for_file_namespace_alias() {
     let dir = test_temp_dir("package-file-namespace-function-arg-type");
     let entry = dir.join("main.fab");

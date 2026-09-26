@@ -99,7 +99,7 @@ incipit { output ⇇ "salve\\n" }"#,
     );
     assert!(
         result.is_ok(),
-        "EOT-1 driver red fixture must reach analyzable HIR; current diagnostics={:?}; later issue names are `selective_import_missing_member`, `selective_import_type_not_value`, `selective_import_duplicate_alias`, and transfer sink/payload issues",
+        "EOT-1 driver red fixture must reach analyzable HIR; current diagnostics={:?}; later issue names are `selective_import_missing_member`, `selective_import_duplicate_alias`, and transfer sink/payload issues",
         result.as_ref().err()
     );
 }

@@ -118,7 +118,6 @@ const ISSUE_NAME_NOT_VALUE: &str = "name_not_value";
 const ISSUE_NAMESPACE_MISSING_EXPORT: &str = "namespace_missing_export";
 const ISSUE_SCRIBE_CALLEE: &str = "scribe_callee";
 const ISSUE_SELECTIVE_IMPORT_MISSING_MEMBER: &str = "selective_import_missing_member";
-const ISSUE_SELECTIVE_IMPORT_TYPE_NOT_VALUE: &str = "selective_import_type_not_value";
 const ISSUE_UNKNOWN_IDENTIFIER: &str = "unknown_identifier";
 const ISSUE_UNKNOWN_NAMESPACE: &str = "unknown_namespace";
 const ISSUE_UNKNOWN_QUALIFIED_TYPE: &str = "unknown_qualified_type";
@@ -185,11 +184,12 @@ pub fn resolve(
     }
 
     seed_nucleum_lane_fallbacks(program, resolver, interner, types);
+    // Selective bindings resolve first: a binding that names an imported
+    // type (D22.5) must be visible to the type positions resolved below.
+    resolve_selective_imports(program, resolver, interner, types, &mut errors);
     for stmt in &program.statements {
         resolve_stmt(resolver, interner, stmt, &mut errors);
     }
-
-    resolve_selective_imports(program, resolver, interner, types, &mut errors);
 
     resolve_alias_types(&aliases, resolver, interner, types, &mut errors);
     register_named_generic_descriptors(program, resolver, interner, types, &mut errors);
@@ -747,12 +747,7 @@ fn resolve_selective_imports(
                     symbol.ty = Some(ty);
                 }
             } else if resolver.namespace_file_type(decl.path, exported).is_some() {
-                errors.push(
-                    SemanticError::structured(SemanticErrorKind::ImportAbsent, member.span)
-                        .with_arg("issue", ISSUE_SELECTIVE_IMPORT_TYPE_NOT_VALUE)
-                        .with_arg("member", interner.resolve(exported))
-                        .with_arg("path", interner.resolve(decl.path)),
-                );
+                resolver.bind_selective_type_import(def_id, decl.path, exported);
             } else {
                 errors.push(
                     SemanticError::structured(SemanticErrorKind::ImportAbsent, member.span)
@@ -2092,7 +2087,13 @@ fn resolve_type_ident(
     }
 
     let Some(def_id) = resolver.lookup_type(ident.name) else {
-        errors.push(undefined_type_error(ISSUE_UNKNOWN_TYPE, ident.span));
+        if resolver.lookup_selective_import_type(ident.name).is_some() {
+            // A selective type binding used in type position counts as a
+            // use of the import, like a namespace named by a qualified path.
+            resolver.mark_namespace_used(ident.name);
+        } else {
+            errors.push(undefined_type_error(ISSUE_UNKNOWN_TYPE, ident.span));
+        }
         return;
     };
 
@@ -3787,6 +3788,9 @@ fn lower_named_type(
     }
 
     let Some(def_id) = resolver.lookup_type(name.name) else {
+        if let Some(type_id) = resolver.lookup_selective_import_type(name.name) {
+            return lower_selective_import_type(type_id, params, resolver, interner, types);
+        }
         return Err(TypeLowerError::Issue(ISSUE_UNKNOWN_TYPE_NAME));
     };
 
@@ -3886,6 +3890,25 @@ fn lower_qualified_type(
         return Ok(types.intern(Type::Applied(type_id, args)));
     }
     Err(TypeLowerError::Issue(ISSUE_UNKNOWN_QUALIFIED_TYPE))
+}
+
+/// A selectively imported type (D22.5) lowers exactly like its qualified
+/// `module.Type` path: the imported `TypeId`, applied when arguments follow.
+fn lower_selective_import_type(
+    type_id: TypeId,
+    params: &[GenericArgExpr],
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<TypeId, TypeLowerError> {
+    if params.is_empty() {
+        return Ok(type_id);
+    }
+    let args = params
+        .iter()
+        .map(|param| lower_applied_arg(param, resolver, interner, types))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(types.intern(Type::Applied(type_id, args)))
 }
 
 fn define_generic_param(
