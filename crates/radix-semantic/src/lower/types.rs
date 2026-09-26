@@ -678,18 +678,8 @@ impl Lowerer<'_> {
             return self.lower_modular_word_type(params);
         }
 
-        // WHY: `octet` is the canonical byte scalar spelling — an alternative
-        // name for `numerus<u8>`, symmetric with `octeti` (the byte buffer,
-        // which unifies with `lista<numerus<u8>>`). It rejects width params
-        // because the width is fixed by definition. See DEFER-029.
-        if name_str == "octet" {
-            if !params.is_empty() {
-                self.error("octet_params");
-                return self.types.intern(Type::Error);
-            }
-            return self
-                .types
-                .sized_numeric(Primitive::Numerus, crate::NumericWidth::U8);
+        if name_str == "octetus" {
+            return self.lower_byte_word_type(params);
         }
 
         if crate::numeric_width::standalone_width_type(name_str).is_some() {
@@ -950,6 +940,7 @@ impl Lowerer<'_> {
             crate::locale::TypeBindingKind::ModularWord => {
                 Some(self.lower_modular_word_type(params))
             }
+            crate::locale::TypeBindingKind::ByteWord => Some(self.lower_byte_word_type(params)),
             // Census relational type names are reader-surface rows only in S2
             // (no HIR/MIR type yet; the real surface is S3/S4). Fall through to
             // the hardcoded name paths in `lower_named_type` (bare `series`
@@ -960,6 +951,18 @@ impl Lowerer<'_> {
             // structs by their canonical Latin name in `lower_named_type`.
             crate::locale::TypeBindingKind::Frame(_) => None,
         }
+    }
+
+    /// D10.4: `octetus` (en `byte`) is exactly `numerus<u8>` — the byte
+    /// scalar and the element of `octeti` (`≡ lista<octetus>`). The width is
+    /// fixed by definition, so parameters are rejected.
+    fn lower_byte_word_type(&mut self, params: &[GenericArgExpr]) -> TypeId {
+        if !params.is_empty() {
+            self.error("octet_params");
+            return self.types.intern(Type::Error);
+        }
+        self.types
+            .sized_numeric(Primitive::Numerus, crate::NumericWidth::U8)
     }
 
     fn lower_primitive_type(&mut self, prim: Primitive, params: &[GenericArgExpr]) -> TypeId {

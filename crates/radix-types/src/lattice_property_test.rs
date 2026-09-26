@@ -497,6 +497,7 @@ impl TypeName for Type {
                 Primitive::Json => "json",
                 Primitive::Valor => "valor",
                 Primitive::Instans => "instans",
+                Primitive::Littera => "littera",
             },
             Type::SizedNumeric(p, w) => {
                 // Leak for diagnostic brevity

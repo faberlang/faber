@@ -965,13 +965,10 @@ fn is_numerus_u8(types: &crate::TypeTable, ty: crate::TypeId) -> bool {
     )
 }
 
-fn is_ascii_one(types: &crate::TypeTable, ty: crate::TypeId) -> bool {
-    let crate::Type::BoundedAscii { capacity } = types.get(ty) else {
-        return false;
-    };
+fn is_littera(types: &crate::TypeTable, ty: crate::TypeId) -> bool {
     matches!(
-        types.get_index(*capacity),
-        radix_types::IndexExpr::Literal(1)
+        types.get(ty),
+        crate::Type::Primitive(radix_types::Primitive::Littera)
     )
 }
 
@@ -1027,8 +1024,8 @@ functio ascii_full() → vacuum {
         "one gather must be emitted per full slot"
     );
     assert!(
-        gathers.0.iter().all(|ty| is_ascii_one(&result.types, *ty)),
-        "every ascii<N> lane gathers ascii<1>: {:?}",
+        gathers.0.iter().all(|ty| is_littera(&result.types, *ty)),
+        "every ascii<N> lane gathers littera (D10.1): {:?}",
         gathers.0
     );
 }
@@ -1055,12 +1052,11 @@ functio textus_full() → vacuum {
         8,
         "one gather must be emitted per full slot"
     );
-    // Trap audit (D14/D17): each lane binds ascii<1> — the non-ASCII trap
-    // row exists, but a full literal is pure ASCII and the loop reads only
-    // the literal's own slots, so no lane can trap.
+    // D10.1: each lane binds one Unicode scalar (`littera`); there is no
+    // non-ASCII trap row on text iteration.
     assert!(
-        gathers.0.iter().all(|ty| is_ascii_one(&result.types, *ty)),
-        "every textus<N> lane gathers ascii<1>: {:?}",
+        gathers.0.iter().all(|ty| is_littera(&result.types, *ty)),
+        "every textus<N> lane gathers littera: {:?}",
         gathers.0
     );
 }

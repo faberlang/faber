@@ -294,6 +294,18 @@ impl TypeChecker<'_> {
         self.types.primitive(Primitive::Json)
     }
 
+    /// D10.2 `littera`: one Unicode scalar.
+    pub fn littera_type(&mut self) -> TypeId {
+        self.types.primitive(Primitive::Littera)
+    }
+
+    pub fn is_littera(&self, ty: TypeId) -> bool {
+        matches!(
+            self.types.get(self.resolve_inferred_type(ty)),
+            Type::Primitive(Primitive::Littera)
+        )
+    }
+
     pub fn is_ascii(&self, ty: TypeId) -> bool {
         matches!(
             self.types.get(self.resolve_inferred_type(ty)),
@@ -692,6 +704,15 @@ impl TypeChecker<'_> {
                     }
                 }
 
+                // D10.5: a one-letter literal where a `littera` is expected
+                // is that scalar (`ascii<1> → littera`), so backends emit a
+                // character literal rather than a one-letter string.
+                if decoded.len() == 1
+                    && let Some(expected) = expected
+                    && self.is_littera(expected)
+                {
+                    return self.littera_type();
+                }
                 // Bare ascii is unbounded: `ascii_literal_too_long` is reserved
                 // for `ascii<N>`. One-byte payloads stay `ascii<1>`.
                 if decoded.len() == 1 {

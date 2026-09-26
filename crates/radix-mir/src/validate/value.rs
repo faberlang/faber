@@ -628,6 +628,7 @@ fn spell_type_id(types: &TypeTable, id: TypeId, depth: u8) -> String {
     match types.get(id) {
         Type::Primitive(prim) => match prim {
             Primitive::Ascii => "ascii",
+            Primitive::Littera => "littera",
             Primitive::Textus => "textus",
             Primitive::Numerus => "numerus",
             Primitive::Fractus => "fractus",

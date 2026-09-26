@@ -1,0 +1,55 @@
++++
+term = "ex"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "assignment", "place", "additive_expr", "itera_stmt", "si_stmt", "comparison", "equality", "equality_tail", "conversio_expr", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "Value iteration over textus binds each Unicode scalar as a char (littera), including non-ASCII."
+syntax = "for from <textus> const <c> { }"
+related = ["itera", "textus", "ascii", "littera"]
+locale = "en"
++++
+# =============================================================================
+# ex over textus — iterate the characters of a string.
+# =============================================================================
+#
+# What this teaches:
+#   • `itera ex` over a textus binds each Unicode scalar as a `char`
+#     (`littera`): one character, four bytes, never a heap string
+#   • non-ASCII text iterates the same way on every backend — no trap
+#   • a loop character compares directly with a one-letter literal ('o')
+#     and converts to string with `↦`
+#
+# Common mistakes:
+#   • Treating the loop character as a number: it is a character, not a
+#     code point.
+#   • Expecting grapheme clusters: 👍🏽 is two scalars, so it iterates twice.
+#
+# See also: ex, de, textus, char
+# =============================================================================
+
+main {
+    const string verbum ← "roma"
+    for from verbum const c {
+        print c ↦ string
+    }
+
+    var int vocales ← 0
+    for from verbum const c {
+        if c ≡ 'o' {
+            vocales ← vocales + 1
+        }
+        if c ≡ 'a' {
+            vocales ← vocales + 1
+        }
+    }
+    print vocales
+
+    const string salutatio ← "Grüße👍"
+    var int litterae ← 0
+    for from salutatio const c {
+        print c
+        litterae ← litterae + 1
+    }
+    print litterae
+}

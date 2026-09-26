@@ -1779,6 +1779,7 @@ impl Validator<'_, '_> {
                         self.type_kind(receiver_ty),
                         Type::Primitive(Primitive::Ascii | Primitive::Textus)
                             | Type::BoundedAscii { .. }
+                            | Type::BoundedTextus { .. }
                     )
                 {
                     self.error(span, "cord cursor receiver is not ascii or textus");

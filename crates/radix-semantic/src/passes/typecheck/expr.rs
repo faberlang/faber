@@ -33,7 +33,7 @@ const ISSUE_ASSERT_CONDITION_TYPE_MISMATCH: &str = "assert_condition_type_mismat
 const ISSUE_STREAM_AD_OPENER_TYPE_MISMATCH: &str = "stream_ad_opener_type_mismatch";
 const ISSUE_EXPRESSION_TYPE_MISMATCH: &str = "expression_type_mismatch";
 const ISSUE_ITERA_AB_SOURCE_REQUIRES_RANGE: &str = "itera_ab_source_requires_range";
-const ISSUE_CURSOR_ITERATION_REQUIRES_EX: &str = "cursor_iteration_requires_ex";
+pub(super) const ISSUE_CURSOR_ITERATION_REQUIRES_EX: &str = "cursor_iteration_requires_ex";
 const ISSUE_ITERA_APUD_REQUIRES_EX: &str = "itera_apud_requires_ex";
 pub(super) const ISSUE_ITERA_APUD_ARITY_MISMATCH: &str = "itera_apud_arity_mismatch";
 pub(super) const ISSUE_ITERA_APUD_REQUIRES_SHAPED_ITERABLE: &str =
@@ -255,130 +255,7 @@ impl TypeChecker<'_> {
                         self.numerus_type()
                     }
                 } else {
-                    match self.types.get(dispatch_ty) {
-                        Type::Array(inner) => match mode {
-                            radix_hir::HirIteraMode::De => self.numerus_type(),
-                            radix_hir::HirIteraMode::Ex => *inner,
-                            radix_hir::HirIteraMode::Ab => {
-                                self.error_issue(
-                                    SemanticErrorKind::TypeMismatch,
-                                    ISSUE_ITERA_AB_SOURCE_REQUIRES_RANGE,
-                                    iter.span,
-                                );
-                                self.error_type
-                            }
-                        },
-                        // Queue/stack expose only value iteration (`ex`). Their
-                        // access orders are distinct MIR laws: queue FIFO and
-                        // stack top-first LIFO. `de` is not an index surface for
-                        // either kind, so it remains fail-closed in MIR.
-                        Type::Queue(inner)
-                        | Type::BoundedQueue { element: inner, .. }
-                        | Type::Stack(inner)
-                        | Type::BoundedStack { element: inner, .. }
-                            if matches!(mode, radix_hir::HirIteraMode::Ex) =>
-                        {
-                            *inner
-                        }
-                        Type::Map(key, value) => match mode {
-                            radix_hir::HirIteraMode::Ex => *value,
-                            radix_hir::HirIteraMode::De => *key,
-                            radix_hir::HirIteraMode::Ab => {
-                                self.error_issue(
-                                    SemanticErrorKind::TypeMismatch,
-                                    ISSUE_ITERA_AB_SOURCE_REQUIRES_RANGE,
-                                    iter.span,
-                                );
-                                self.error_type
-                            }
-                        },
-                        Type::Cursor(inner) => match mode {
-                            radix_hir::HirIteraMode::Ex => *inner,
-                            radix_hir::HirIteraMode::De | radix_hir::HirIteraMode::Ab => {
-                                self.error_issue(
-                                    SemanticErrorKind::TypeMismatch,
-                                    ISSUE_CURSOR_ITERATION_REQUIRES_EX,
-                                    iter.span,
-                                );
-                                self.error_type
-                            }
-                        },
-                        Type::AsyncCursor(inner, _) => match mode {
-                            radix_hir::HirIteraMode::Ex => *inner,
-                            radix_hir::HirIteraMode::De | radix_hir::HirIteraMode::Ab => {
-                                self.error_issue(
-                                    SemanticErrorKind::TypeMismatch,
-                                    ISSUE_CURSOR_ITERATION_REQUIRES_EX,
-                                    iter.span,
-                                );
-                                self.error_type
-                            }
-                        },
-                        // `apud` coordinates with arity == rank bind the
-                        // element type; coordinate-free rank-1 literal tensors
-                        // (Route T) keep their existing element binding. Rank
-                        // > 1 coordinate-free and symbolic shapes keep the
-                        // numerus fallback so MIR's Unsupported diagnostic
-                        // stays the decline site. `[N]` parses as a
-                        // one-element Tuple.
-                        Type::Tensor(elem, shape)
-                            if matches!(mode, radix_hir::HirIteraMode::Ex) =>
-                        {
-                            let rank = tensor_shape_rank(self.types, *shape);
-                            let route_t = !has_coordinates
-                                && match self.types.get_index(*shape) {
-                                    IndexExpr::Literal(_) => true,
-                                    IndexExpr::Tuple(dims) => {
-                                        dims.len() == 1
-                                            && matches!(
-                                                self.types.get_index(dims[0]),
-                                                IndexExpr::Literal(_)
-                                            )
-                                    }
-                                    _ => false,
-                                };
-                            if rank == Some(coordinate_bindings.len() as u64) || route_t {
-                                *elem
-                            } else {
-                                self.numerus_type()
-                            }
-                        }
-                        // Matrix is rank-2 by the width-sugar rule; the arity
-                        // gate rejects coordinate counts other than 2 (and no
-                        // clause on a matrix, arity 0 != 2).
-                        Type::Matrix(elem, _)
-                            if matches!(mode, radix_hir::HirIteraMode::Ex)
-                                && coordinate_bindings.len() == 2 =>
-                        {
-                            *elem
-                        }
-                        // Route B (AEU-4): `lista<T, N>` binds the element type;
-                        // mir/lower/control.rs owns the matching static-split
-                        // arm and the N <= 10 / literal-capacity decline site.
-                        Type::BoundedArray { element, .. }
-                            if matches!(mode, radix_hir::HirIteraMode::Ex) =>
-                        {
-                            *element
-                        }
-                        // AEU-7 scalar buffer forms: the lane binding is the
-                        // scalar index element row — `octeti<N>[i]` reads
-                        // `numerus<u8>`, `ascii<N>[i]` / `textus<N>[i]` read
-                        // `ascii<1>` (D14 / D17). Unrolls read only `0..len`,
-                        // so the non-ASCII trap row can never fire from a
-                        // dead slot.
-                        Type::BoundedOcteti { .. }
-                            if matches!(mode, radix_hir::HirIteraMode::Ex) =>
-                        {
-                            self.types
-                                .sized_numeric(Primitive::Numerus, NumericWidth::U8)
-                        }
-                        Type::BoundedAscii { .. } | Type::BoundedTextus { .. }
-                            if matches!(mode, radix_hir::HirIteraMode::Ex) =>
-                        {
-                            self.ascii_one_type()
-                        }
-                        _ => self.numerus_type(),
-                    }
+                    self.itera_element_type(dispatch_ty, *mode, iter.span)
                 };
                 self.push_scope();
                 let numerus = self.numerus_type();

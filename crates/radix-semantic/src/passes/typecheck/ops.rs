@@ -1211,8 +1211,7 @@ impl TypeChecker<'_> {
                     );
                     return self.bool_type();
                 }
-                let lhs_ty = self.check_expr(lhs);
-                let rhs_ty = self.check_expr(rhs);
+                let (lhs_ty, rhs_ty) = self.check_littera_operands(lhs, rhs);
                 let lhs_is_nil = matches!(
                     self.types.get(self.resolve_inferred_type(lhs_ty)),
                     Type::Primitive(Primitive::Nihil)
@@ -1227,8 +1226,7 @@ impl TypeChecker<'_> {
                 self.bool_type()
             }
             HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq => {
-                let lhs_ty = self.check_expr(lhs);
-                let rhs_ty = self.check_expr(rhs);
+                let (lhs_ty, rhs_ty) = self.check_littera_operands(lhs, rhs);
                 if self.is_instans(lhs_ty) && self.is_instans(rhs_ty) {
                     self.instans_join(lhs_ty, rhs_ty, lhs.span);
                 } else if self.is_textus(lhs_ty) && self.is_textus(rhs_ty) {

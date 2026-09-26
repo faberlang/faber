@@ -611,6 +611,7 @@ fn layout_kind_for_type(
         Type::Tuple(_) => LayoutResolution::Resolved(physical_aggregate(MirAggregateFamily::Tuple)),
         Type::Primitive(
             Primitive::Ascii
+            | Primitive::Littera
             | Primitive::Textus
             | Primitive::Nihil
             | Primitive::Ignotum

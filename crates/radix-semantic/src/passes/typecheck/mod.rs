@@ -98,6 +98,7 @@ pub mod infer;
 pub mod intervallum;
 pub mod intrinsics;
 pub mod item;
+pub mod itera_element;
 pub mod json_genus;
 pub mod lockstep;
 pub mod lookup;
@@ -674,6 +675,10 @@ mod ascii_cursor_test;
 mod ascii_index_test;
 
 #[cfg(test)]
+#[path = "littera_test.rs"]
+mod littera_test;
+
+#[cfg(test)]
 #[path = "ascii_format_pack_conversio_test.rs"]
 mod ascii_format_pack_conversio_test;
 
@@ -772,6 +777,10 @@ mod infer_test;
 #[cfg(test)]
 #[path = "itera_apud_test.rs"]
 mod itera_apud_test;
+
+#[cfg(test)]
+#[path = "itera_element_test.rs"]
+mod itera_element_test;
 
 #[cfg(test)]
 #[path = "summa_test.rs"]

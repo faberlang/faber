@@ -136,15 +136,16 @@ incipit {
             expect: EqualityExpect::RejectsIssue(EXACT_EQ_ISSUE),
         },
         EqualityCase {
-            name: "octeti_lista_eq_rejects",
+            // D10.4: `octeti` is exactly `lista<octetus>` — one type.
+            name: "octeti_lista_eq_accepts",
             source: r#"
 incipit {
     fixum octeti raw ← |41|
     fixum lista<numerus<u8>> bytes ← [0x41 ∷ numerus<u8>]
-    si raw ≡ bytes { nota "bad" }
+    si raw ≡ bytes { nota "same" }
 }
 "#,
-            expect: EqualityExpect::RejectsIssue(EXACT_EQ_ISSUE),
+            expect: EqualityExpect::Accepts,
         },
         EqualityCase {
             name: "ascii_index_numerus_eq_rejects",

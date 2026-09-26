@@ -85,6 +85,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         Ok(Value::Str(match value {
             Value::Str(text) => text,
             Value::Ascii(b) => char::from(b).to_string(),
+            Value::Char(ch) => ch.to_string(),
             Value::Int(v) => v.to_string(),
             Value::UInt(v) => v.to_string(),
             Value::Float(v) => v.to_string(),
@@ -846,6 +847,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             | Value::UInt(_)
             | Value::Str(_)
             | Value::Ascii(_)
+            | Value::Char(_)
             | Value::Instans(_)
             | Value::Octeti(_) => Ok(true),
             Value::Float(n) => Ok(n.is_finite()),
@@ -902,6 +904,10 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Value::Str(v) => render_json_string(v),
             Value::Ascii(b) => {
                 let ch = char::from(*b);
+                let mut buf = [0u8; 4];
+                render_json_string(ch.encode_utf8(&mut buf))
+            }
+            Value::Char(ch) => {
                 let mut buf = [0u8; 4];
                 render_json_string(ch.encode_utf8(&mut buf))
             }

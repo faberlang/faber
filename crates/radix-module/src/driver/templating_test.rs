@@ -257,18 +257,18 @@ fn octeti_literal_matches_in_discerne_pattern() {
     assert!(result.success(), "expected octeti pattern match, got: {:?}", result.diagnostics);
 }
 
-// ── octet builtin ──
+// ── octetus builtin (D10.4: `octetus ≡ numerus<u8>`) ──
 
 #[test]
-fn octet_builtin_resolves_to_numerus_u8_and_lowers_to_u8() {
+fn octetus_builtin_resolves_to_numerus_u8_and_lowers_to_u8() {
     let session = test_session(Target::HirRust);
-    let source = "functio firstByte(octeti buf) → octet {\n    fixum octet b ← buf.accipe(0)\n    redde b\n}\n\nincipit {\n    fixum octeti sig ← |de ad be ef|\n    fixum octet a ← firstByte(sig)\n    fixum numerus<u8> raw ← a\n    sig.appende(raw)\n    nota a\n}\n";
+    let source = "functio firstByte(octeti buf) → octetus {\n    fixum octetus b ← buf.accipe(0)\n    redde b\n}\n\nincipit {\n    fixum octeti sig ← |de ad be ef|\n    fixum octetus a ← firstByte(sig)\n    fixum numerus<u8> raw ← a\n    sig.appende(raw)\n    nota a\n}\n";
     let result = compile(&session, "octet_builtin.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "expected success, got: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
         code.contains("fn firstByte(buf: Vec<u8>) -> u8"),
-        "expected octet param/ret to lower to u8, got:\n{code}"
+        "expected octetus param/ret to lower to u8, got:\n{code}"
     );
     assert!(code.contains("buf.get(0"), "expected accipe to lower to buf.get, got:\n{code}");
     assert!(
@@ -278,11 +278,11 @@ fn octet_builtin_resolves_to_numerus_u8_and_lowers_to_u8() {
 }
 
 #[test]
-fn octet_builtin_rejects_width_parameters() {
+fn octetus_builtin_rejects_width_parameters() {
     let session = test_session(Target::HirRust);
-    let source = "incipit { fixum octet<i32> x ← 1 }";
+    let source = "incipit { fixum octetus<i32> x ← 1 }";
     let result = compile(&session, "octet_params.fab", source, ModuleCompileRequest::default());
-    assert!(!result.success(), "expected octet<i32> to be rejected, got success");
+    assert!(!result.success(), "expected octetus<i32> to be rejected, got success");
 }
 
 // ── valor unification ──

@@ -31,10 +31,10 @@
 
 use super::cursor::GeneratorCursor;
 use super::value::{
-    GradientStorage, MapKey, SermoValue, TensorValue, Value, ascii1_from_scalar,
-    float_to_numerus_width, format_template, modular_operand, modular_word_mask,
-    modular_word_result, uint_width_checked_add, uint_width_checked_mul, values_equal,
-    width_checked_add, width_checked_mul,
+    GradientStorage, MapKey, SermoValue, TensorValue, Value, float_to_numerus_width,
+    format_template, modular_operand, modular_word_mask, modular_word_result,
+    uint_width_checked_add, uint_width_checked_mul, values_equal, width_checked_add,
+    width_checked_mul,
 };
 use super::{Runner, RunnerError, gelu_f64, host::provider_identity};
 use radix_hir::DefId;
@@ -3405,14 +3405,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
         let value = self.eval_operand(receiver, span)?;
         let elems = match value {
-            Value::Str(text) => {
-                let mut elems = Vec::with_capacity(text.len());
-                for ch in text.chars() {
-                    elems.push(ascii1_from_scalar(ch, span)?);
-                }
-                elems
-            }
-            Value::Ascii(byte) => vec![Value::Ascii(byte)],
+            // D10.1: one `littera` per Unicode scalar; no non-ASCII trap.
+            Value::Str(text) => text.chars().map(Value::Char).collect(),
+            Value::Ascii(byte) => vec![Value::Char(char::from(byte))],
             _ => {
                 return Err(RunnerError::internal(
                     span,

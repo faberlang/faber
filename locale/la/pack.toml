@@ -169,6 +169,8 @@ vacuum = "vacuum"
 numquam = "numquam"
 ignotum = "ignotum"
 octeti = "octeti"
+octetus = "octetus"
+littera = "littera"
 regex = "regex"
 json = "json"
 valor = "valor"
@@ -1343,7 +1345,7 @@ message = "object destructuring should be expanded before statement lowering"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.octet_params]
-message = "octet is fixed-width and cannot accept parameters"
+message = "octetus is fixed-width (exactly numerus<u8>) and cannot accept parameters"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.precision_marker_shape]
@@ -1793,6 +1795,10 @@ help = "make the expression type match the expected type"
 [diagnostics.SEM010.issues.itera_apud_requires_shaped_iterable]
 message = "{apud} requires a tensor or matrix iterable"
 help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.itera_source_not_iterable]
+message = "{itera} source is not iterable"
+help = "expose a method that returns a cursor and iterate that"
 
 [diagnostics.SEM010.issues.json_map_key_must_be_textus]
 message = "JSON map key must be textus"

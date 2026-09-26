@@ -216,13 +216,15 @@ pub fn index_projection_result_ty(
             .map(MirType::semantic)
             .ok_or_else(|| MirTypeError::unsupported("octeti element type")),
         // AEU-7: the bounded scalar buffer element rows — `octeti<N>[i]` is
-        // `numerus<u8>`, `ascii<N>[i]` / `textus<N>[i]` are `ascii<1>`
-        // (D14 / D17), matching the semantic index row exactly.
+        // `numerus<u8>`, `ascii<N>[i]` is `littera` (D10.3) and
+        // `textus<N>[i]` is `ascii<1>` (D14 / D17; F5 held), matching the
+        // semantic index row exactly.
         Type::BoundedOcteti { .. } => types
             .find_sized_numeric(Primitive::Numerus, NumericWidth::U8)
             .map(MirType::semantic)
             .ok_or_else(|| MirTypeError::unsupported("bounded octeti element type")),
-        Type::BoundedAscii { .. } | Type::BoundedTextus { .. } => find_bounded_ascii_one(types)
+        Type::BoundedAscii { .. } => Ok(MirType::semantic(types.primitive(Primitive::Littera))),
+        Type::BoundedTextus { .. } => find_bounded_ascii_one(types)
             .map(MirType::semantic)
             .ok_or_else(|| MirTypeError::unsupported("ascii<1> element type")),
         Type::Tuple(_) => Err(MirTypeError::unsupported(

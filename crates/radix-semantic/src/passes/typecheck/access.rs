@@ -116,9 +116,8 @@ impl TypeChecker<'_> {
             .1;
         let resolved = self.resolve_inferred_type(object_ty);
         let resolved_kind = self.types.get(resolved).clone();
-        // WHY: textus and ascii scalar index returns `ascii<1>` (D14 / D17),
-        // the type of `'x'`. Emit stays `Ascii::from_byte` (zero-alloc).
-        // Range indices (e.g. textus[0‥5]) still return a textus substring.
+        // WHY: `ascii[i]` returns `littera` (D10.3); `textus[i]` returns
+        // `ascii<1>` (D14 / D17) until operator fork F5 rules. Range indices (e.g. textus[0‥5]) still return a textus substring.
         if matches!(
             resolved_kind,
             Type::Primitive(Primitive::Textus | Primitive::Ascii)
@@ -143,6 +142,14 @@ impl TypeChecker<'_> {
                     .with_arg("issue", ISSUE_UNBOUNDED_TEXTUS_INDEX),
                 );
             }
+            // D10.3: `ascii[i]` is one scalar (`littera`, O(1)). F5 held:
+            // `textus[i]` keeps its `ascii<1>` row (and non-ASCII trap).
+            if matches!(
+                resolved_kind,
+                Type::Primitive(Primitive::Ascii) | Type::BoundedAscii { .. }
+            ) {
+                return self.text_element_type();
+            }
             return self.ascii_one_type();
         }
         // WHY: octeti[i] is one byte (`numerus<u8>`), O(1). octeti[lo‥hi] is a
@@ -159,9 +166,7 @@ impl TypeChecker<'_> {
             if self.is_range_index(idx_ty) {
                 return self.types.primitive(Primitive::Octeti);
             }
-            return self
-                .types
-                .sized_numeric(Primitive::Numerus, NumericWidth::U8);
+            return self.byte_element_type();
         }
         if let Type::Tensor(elem, shape) = resolved_kind {
             return self.check_tensor_bracket_index(elem, shape, idx_ty, object_span, index_span);

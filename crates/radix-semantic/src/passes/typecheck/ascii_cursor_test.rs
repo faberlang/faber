@@ -1,17 +1,17 @@
-//! Typecheck pins for `ascii.cursor()` → `cursor<ascii<1>>` (CC-1).
+//! Typecheck pins for `ascii.cursor()` → `cursor<littera>` (CC-1).
 
 use super::TypeChecker;
 use crate::test_support;
-use crate::{IndexExpr, Primitive, Resolver, Type, TypeTable};
+use crate::{Primitive, Resolver, Type, TypeTable};
 use radix_intrinsics::{
     IntrinsicReceiver, IntrinsicReturnKind, lookup_method_for_type, receivers_for_type,
 };
 use radix_lexer::Interner;
 use radix_target::Target;
 
-/// Direct table pin: `ascii.cursor()` is `Type::Cursor` of `BoundedAscii { 1 }`.
+/// Direct table pin: `ascii.cursor()` is `Type::Cursor` of `littera` (D10.1).
 #[test]
-fn ascii_cursor_type_is_cursor_of_bounded_ascii_one() {
+fn ascii_cursor_type_is_cursor_of_littera() {
     let mut types = TypeTable::new();
     let resolver = Resolver::new();
     let interner = Interner::new();
@@ -20,10 +20,9 @@ fn ascii_cursor_type_is_cursor_of_bounded_ascii_one() {
     let ascii_ty = checker.types.get(ascii).clone();
     assert_eq!(receivers_for_type(&ascii_ty), &[IntrinsicReceiver::Ascii]);
     let entry = lookup_method_for_type(&ascii_ty, "cursor", 0).expect("ascii.cursor");
-    assert_eq!(entry.return_kind, IntrinsicReturnKind::CursorAsciiOne);
-    let one = checker.ascii_one_type();
-    let cursor_ty = checker.types.cursor(one);
-    let n1 = checker.types.intern_index(IndexExpr::Literal(1));
+    assert_eq!(entry.return_kind, IntrinsicReturnKind::CursorLittera);
+    let element = checker.text_element_type();
+    let cursor_ty = checker.types.cursor(element);
     let Type::Cursor(inner) = checker.types.get(cursor_ty).clone() else {
         panic!(
             "ascii.cursor() is Type::Cursor, got {:?}",
@@ -33,36 +32,29 @@ fn ascii_cursor_type_is_cursor_of_bounded_ascii_one() {
     assert!(
         matches!(
             checker.types.get(inner),
-            Type::BoundedAscii { capacity } if checker.types.index_equals(*capacity, n1)
+            Type::Primitive(Primitive::Littera)
         ),
-        "ascii.cursor() element is BoundedAscii {{ 1 }}, got {:?}",
+        "ascii.cursor() element is littera (D10.1), got {:?}",
         checker.types.get(inner)
-    );
-    assert!(
-        !matches!(
-            checker.types.get(inner),
-            Type::Primitive(Primitive::Ascii | Primitive::Textus | Primitive::Numerus)
-        ),
-        "cursor element must not be bare ascii / textus / numerus"
     );
 }
 
 #[test]
-fn ascii_cursor_accepts_as_cursor_ascii_one() {
+fn ascii_cursor_accepts_as_cursor_littera() {
     test_support::assert_accepts(
-        r"functio walk(ascii s) → cursor<ascii<1>> {
+        r"functio walk(ascii s) → cursor<littera> {
     redde s.cursor()
 }",
     );
 }
 
 #[test]
-fn itera_ex_ascii_cursor_binds_ascii_one() {
+fn itera_ex_ascii_cursor_binds_littera() {
     test_support::assert_accepts(
         r"incipit {
     fixum ascii s ← 'ab'
     itera ex s.cursor() fixum c {
-        fixum ascii<1> x ← c
+        fixum littera x ← c
         nota x
     }
 }",
@@ -70,11 +62,11 @@ fn itera_ex_ascii_cursor_binds_ascii_one() {
 }
 
 #[test]
-fn ascii_cursor_collects_to_lista_ascii_one() {
+fn ascii_cursor_collects_to_lista_littera() {
     test_support::assert_accepts(
         r"incipit {
     fixum ascii s ← 'ab'
-    fixum lista<ascii<1>> xs ← s.cursor() ↦ lista<ascii<1>>
+    fixum lista<littera> xs ← s.cursor() ↦ lista<littera>
     nota xs
 }",
     );
