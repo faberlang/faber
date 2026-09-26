@@ -336,9 +336,6 @@ impl<'a> DefiniteAssignmentChecker<'a> {
 
     fn check_casu_arm(&mut self, arm: &HirCasuArm) {
         self.assign_pattern_bindings(&arm.patterns);
-        if let Some(guard) = &arm.guard {
-            self.check_expr(guard);
-        }
         self.check_expr(&arm.body);
     }
 

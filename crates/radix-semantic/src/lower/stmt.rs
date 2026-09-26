@@ -1289,7 +1289,6 @@ impl Lowerer<'_> {
             let body = self.expr_from_block(block, case.span);
             arms.push(HirCasuArm {
                 patterns: vec![pattern],
-                guard: None,
                 body,
                 span: case.span,
             });
@@ -1300,7 +1299,6 @@ impl Lowerer<'_> {
             let body = self.expr_from_block(block, default.span);
             arms.push(HirCasuArm {
                 patterns: vec![HirPattern::Wildcard],
-                guard: None,
                 body,
                 span: default.span,
             });
@@ -1477,7 +1475,6 @@ impl Lowerer<'_> {
             let body = self.expr_from_block(block, arm.span);
             arms.push(HirCasuArm {
                 patterns,
-                guard: None,
                 body,
                 span: arm.span,
             });
@@ -1491,7 +1488,6 @@ impl Lowerer<'_> {
                 patterns: (0..scrutinees.len().max(1))
                     .map(|_| HirPattern::Wildcard)
                     .collect(),
-                guard: None,
                 body,
                 span: default.span,
             });

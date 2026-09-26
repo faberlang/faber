@@ -912,7 +912,6 @@ fn pattern_positions_pin_between_only_and_no_trailing() {
 
     let arm = HirCasuArm {
         patterns,
-        guard: None,
         body: int(&interner, 1),
         span: span(),
     };

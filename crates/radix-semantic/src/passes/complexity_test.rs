@@ -196,7 +196,6 @@ fn row_conditional_si_counts_one_each() {
 fn row_discerne_counts_one_per_match_not_per_arm() {
     let arm = || HirCasuArm {
         patterns: vec![HirPattern::Wildcard],
-        guard: None,
         body: lit(),
         span: test_span(),
     };

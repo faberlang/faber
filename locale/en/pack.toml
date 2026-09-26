@@ -2978,8 +2978,16 @@ message = "non-exhaustive match"
 help = "add missing cases or a '{ceterum}' arm"
 
 [diagnostics.SEM040.issues.missing_variants]
-message = "non-exhaustive match"
-help = "add missing cases or a '{ceterum}' arm"
+message = "non-exhaustive match: variant {missing} is not covered"
+help = "add a '{casu}' arm for {missing} or a '{ceterum}' arm"
+
+[diagnostics.SEM040.issues.missing_union_members]
+message = "non-exhaustive match: member {missing} is not covered"
+help = "add a '{casu}' arm for {missing} or a '{ceterum}' arm"
+
+[diagnostics.SEM040.issues.missing_cases]
+message = "non-exhaustive match: {missing} is not covered"
+help = "add a '{casu}' arm for {missing} or a '{ceterum}' arm"
 
 [diagnostics.SEM041]
 message = "unreachable pattern"
@@ -3476,3 +3484,11 @@ help = "remove the annotation; members are public by default"
 [diagnostics.WARN028.issues.redundant_member_publica]
 message = "`{annotation}` on a member is redundant; members are public by default"
 help = "remove the annotation; members are public by default"
+
+[diagnostics.WARN029]
+message = "match coverage not checked"
+help = "add a '{ceterum}' arm, or split the match so each pattern kind is checkable"
+
+[diagnostics.WARN029.issues.coverage_unchecked]
+message = "coverage of this match could not be computed for its pattern kinds; exhaustiveness was not checked"
+help = "add a '{ceterum}' arm, or split the match so each pattern kind is checkable"

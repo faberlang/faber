@@ -8,7 +8,7 @@
 //! `omnia` alignment through the enum-shaped HIR they lower to — see the probe
 //! note in the union section below.
 
-use super::exhaustive::{check, discerne_definitely_covered};
+use super::exhaustive::{check, collect_enum_variants, discerne_definitely_covered};
 use crate::SemanticError;
 use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::test_span;
@@ -17,7 +17,7 @@ use radix_hir::{
     HirBlock, HirCasuArm, HirExpression, HirExpressionKind, HirItem, HirItemKind, HirLiteral,
     HirModule, HirPattern, HirStatement, HirStatementKind, HirVariant, HirVariantField,
 };
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 fn expect_structured_error<'a>(
     errors: &'a [SemanticError],
@@ -71,7 +71,6 @@ fn match_expr_with_exhaustive(
         .into_iter()
         .map(|pattern| HirCasuArm {
             patterns: vec![pattern],
-            guard: None,
             body: lit_expr(2),
             span: test_span(),
         })
@@ -99,7 +98,6 @@ fn match_expr_with_arms(scrutinee_ty: TypeId, arm_patterns: Vec<Vec<HirPattern>>
         .into_iter()
         .map(|patterns| HirCasuArm {
             patterns,
-            guard: None,
             body: lit_expr(2),
             span: test_span(),
         })
@@ -167,7 +165,13 @@ fn reports_non_exhaustive_match() {
     let match_expr = match_expr(enum_ty, vec![HirPattern::Variant(DefId(2), Vec::new())]);
     let program = program_with_match(enum_def, match_expr);
 
-    let result = check(&program, &types);
+    let result = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    );
     assert!(result.is_err());
     let errors = result.unwrap_err();
     expect_structured_error(
@@ -191,7 +195,13 @@ fn reports_duplicate_variant_pattern() {
     );
     let program = program_with_match(enum_def, match_expr);
 
-    let result = check(&program, &types);
+    let result = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    );
     assert!(result.is_err());
     let errors = result.unwrap_err();
     expect_structured_error(
@@ -215,7 +225,13 @@ fn counts_all_alternative_patterns_in_single_scrutinee_arm() {
     );
     let program = program_with_match(enum_def, match_expr);
 
-    let result = check(&program, &types);
+    let result = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    );
     assert!(result.is_ok());
 }
 
@@ -233,7 +249,13 @@ fn reports_unreachable_after_wildcard() {
     );
     let program = program_with_match(enum_def, match_expr);
 
-    let result = check(&program, &types);
+    let result = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    );
     assert!(result.is_err());
     let errors = result.unwrap_err();
     expect_structured_error(
@@ -277,7 +299,13 @@ fn warns_when_wildcard_absorbs_nullable_constituent() {
     let match_expr = match_expr(nullable, vec![HirPattern::Wildcard]);
     let program = program_with_bare_match(match_expr);
 
-    let result = check(&program, &types);
+    let result = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    );
     // WHY: warnings ride the same error stream, so the pass returns Err but the
     // result stays a successful `check` (`is_error()` is false for warnings).
     let errors = result.unwrap_err();
@@ -303,7 +331,14 @@ fn warns_when_binding_absorbs_option_constituent() {
     );
     let program = program_with_bare_match(match_expr);
 
-    let errors = check(&program, &types).unwrap_err();
+    let errors = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    )
+    .unwrap_err();
     assert!(
         errors
             .iter()
@@ -327,7 +362,15 @@ fn suppresses_warning_when_explicit_null_arm_present() {
     let program = program_with_bare_match(match_expr);
 
     // No hard errors, and no wildcard-absorb warning once null is handled.
-    let errors = check(&program, &types).err().unwrap_or_default();
+    let errors = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    )
+    .err()
+    .unwrap_or_default();
     assert!(
         !errors
             .iter()
@@ -342,7 +385,15 @@ fn no_warning_when_scrutinee_is_not_nullable() {
     let match_expr = match_expr(numerus, vec![HirPattern::Wildcard]);
     let program = program_with_bare_match(match_expr);
 
-    let errors = check(&program, &types).err().unwrap_or_default();
+    let errors = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    )
+    .err()
+    .unwrap_or_default();
     assert!(errors.is_empty());
 }
 
@@ -391,7 +442,15 @@ fn omnia_accepts_all_variants_named() {
     );
     let program = program_with_match(enum_def, match_expr);
 
-    let errors = check(&program, &types).err().unwrap_or_default();
+    let errors = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    )
+    .err()
+    .unwrap_or_default();
     assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
 }
 
@@ -409,7 +468,14 @@ fn omnia_rejects_wildcard_catchall() {
     );
     let program = program_with_match(enum_def, match_expr);
 
-    let errors = check(&program, &types).unwrap_err();
+    let errors = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    )
+    .unwrap_err();
     expect_structured_error(
         &errors,
         SemanticErrorKind::OmniaForbidsCatchall,
@@ -431,7 +497,14 @@ fn omnia_rejects_binding_catchall() {
     );
     let program = program_with_match(enum_def, match_expr);
 
-    let errors = check(&program, &types).unwrap_err();
+    let errors = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    )
+    .unwrap_err();
     expect_structured_error(
         &errors,
         SemanticErrorKind::OmniaForbidsCatchall,
@@ -447,7 +520,14 @@ fn omnia_rejects_non_enum_scrutinee() {
     // Non-enum scrutinee — use a bare match (no enum definition needed).
     let program = program_with_bare_match(match_expr);
 
-    let errors = check(&program, &types).unwrap_err();
+    let errors = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    )
+    .unwrap_err();
     expect_structured_error(
         &errors,
         SemanticErrorKind::OmniaRequiresEnum,
@@ -462,7 +542,14 @@ fn omnia_rejects_multi_scrutinee() {
     let match_expr = omnia_multi_scrutinee_match_expr(numerus);
     let program = program_with_bare_match(match_expr);
 
-    let errors = check(&program, &types).unwrap_err();
+    let errors = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    )
+    .unwrap_err();
     expect_structured_error(
         &errors,
         SemanticErrorKind::OmniaRequiresEnum,
@@ -480,7 +567,14 @@ fn omnia_still_reports_missing_variants() {
     let match_expr = omnia_match_expr(enum_ty, vec![HirPattern::Variant(DefId(2), Vec::new())]);
     let program = program_with_match(enum_def, match_expr);
 
-    let errors = check(&program, &types).unwrap_err();
+    let errors = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    )
+    .unwrap_err();
     expect_structured_error(
         &errors,
         SemanticErrorKind::NonExhaustiveMatch,
@@ -507,7 +601,14 @@ fn omnia_rejects_mixed_variant_wildcard_arm() {
     );
     let program = program_with_match(enum_def, match_expr);
 
-    let errors = check(&program, &types).unwrap_err();
+    let errors = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    )
+    .unwrap_err();
     expect_structured_error(
         &errors,
         SemanticErrorKind::OmniaForbidsCatchall,
@@ -573,7 +674,15 @@ fn empty_enum_omnia_accepts_zero_arms() {
         span: test_span(),
     };
     let program = program_with_variants(enum_def, match_expr, Vec::new());
-    let errors = check(&program, &types).err().unwrap_or_default();
+    let errors = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    )
+    .err()
+    .unwrap_or_default();
     assert!(
         errors.is_empty(),
         "expected no errors for empty enum omnia, got: {errors:?}"
@@ -593,7 +702,15 @@ fn single_variant_enum_accepts_exact_match() {
         span: test_span(),
     }];
     let program = program_with_variants(enum_def, match_expr, variants);
-    let errors = check(&program, &types).err().unwrap_or_default();
+    let errors = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    )
+    .err()
+    .unwrap_or_default();
     assert!(
         errors.is_empty(),
         "expected no errors for single-variant enum match, got: {errors:?}"
@@ -617,350 +734,28 @@ fn single_variant_omnia_accepts_exact_match() {
         span: test_span(),
     }];
     let program = program_with_variants(enum_def, match_expr, variants);
-    let errors = check(&program, &types).err().unwrap_or_default();
+    let errors = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    )
+    .err()
+    .unwrap_or_default();
     assert!(
         errors.is_empty(),
         "expected no errors for single-variant omnia, got: {errors:?}"
     );
 }
 
-// ── F-022: omnia + guarded arms ──────────────────────────────────────────────
-
-fn guarded_match_expr_with_exhaustive(
-    enum_ty: TypeId,
-    variant_def_ids: Vec<DefId>,
-    exhaustive: bool,
-    guard_text: &HirExpression,
-    body_text: &HirExpression,
-) -> HirExpression {
-    let scrutinee = HirExpression {
-        id: radix_hir::HirId(1),
-        kind: HirExpressionKind::Path(DefId(100)),
-        ty: Some(enum_ty),
-        span: test_span(),
-    };
-    let arms: Vec<HirCasuArm> = variant_def_ids
-        .into_iter()
-        .map(|def_id| HirCasuArm {
-            patterns: vec![HirPattern::Variant(def_id, Vec::new())],
-            guard: Some(guard_text.clone()),
-            body: body_text.clone(),
-            span: test_span(),
-        })
-        .collect();
-    HirExpression {
-        id: radix_hir::HirId(3),
-        kind: HirExpressionKind::Discerne {
-            scrutinees: vec![scrutinee],
-            arms,
-            exhaustive,
-        },
-        ty: None,
-        span: test_span(),
-    }
-}
-
 #[test]
-fn omnia_rejects_all_guarded_variants() {
-    let mut types = TypeTable::new();
-    let enum_def = DefId(1);
-    let enum_ty = types.intern(Type::Enum(enum_def));
-
-    let guard_body = HirExpression {
-        id: radix_hir::HirId(90),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-    let arm_body = HirExpression {
-        id: radix_hir::HirId(91),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-
-    let match_expr = guarded_match_expr_with_exhaustive(
-        enum_ty,
-        vec![DefId(2), DefId(3)],
-        true, // omnia
-        &guard_body,
-        &arm_body,
-    );
-    let program = program_with_match(enum_def, match_expr);
-
-    let result = check(&program, &types);
-    // F-022: all-guarded arms under omnia MUST be non-exhaustive
-    assert!(
-        result.is_err(),
-        "F-022: expected NonExhaustiveMatch, got Ok"
-    );
-    let errors = result.unwrap_err();
-    let has_non_exhaustive = errors
-        .iter()
-        .any(|e| matches!(e.kind, SemanticErrorKind::NonExhaustiveMatch));
-    assert!(
-        has_non_exhaustive,
-        "F-022: expected NonExhaustiveMatch in errors: {errors:?}"
-    );
-}
-
-#[test]
-fn omnia_rejects_partially_guarded_variants() {
-    // F-022: when some variants are covered by guarded arms and others by
-    // unguarded arms, the guarded-only variants must still be reported as
-    // missing under omnia.
-    let mut types = TypeTable::new();
-    let enum_def = DefId(1);
-    let enum_ty = types.intern(Type::Enum(enum_def));
-
-    let guard_body = HirExpression {
-        id: radix_hir::HirId(90),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-    let arm_body = HirExpression {
-        id: radix_hir::HirId(91),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-
-    let scrutinee = HirExpression {
-        id: radix_hir::HirId(1),
-        kind: HirExpressionKind::Path(DefId(100)),
-        ty: Some(enum_ty),
-        span: test_span(),
-    };
-
-    // DefId(2) = guarded, DefId(3) = unguarded
-    let arms = vec![
-        HirCasuArm {
-            patterns: vec![HirPattern::Variant(DefId(2), Vec::new())],
-            guard: Some(guard_body.clone()),
-            body: arm_body.clone(),
-            span: test_span(),
-        },
-        HirCasuArm {
-            patterns: vec![HirPattern::Variant(DefId(3), Vec::new())],
-            guard: None, // unguarded — covers variant 3
-            body: arm_body.clone(),
-            span: test_span(),
-        },
-    ];
-
-    let match_expr = HirExpression {
-        id: radix_hir::HirId(3),
-        kind: HirExpressionKind::Discerne {
-            scrutinees: vec![scrutinee],
-            arms,
-            exhaustive: true,
-        },
-        ty: None,
-        span: test_span(),
-    };
-    let program = program_with_match(enum_def, match_expr);
-
-    let result = check(&program, &types);
-    assert!(
-        result.is_err(),
-        "F-022: expected NonExhaustiveMatch for guarded variant, got Ok"
-    );
-    let errors = result.unwrap_err();
-    let has_non_exhaustive = errors
-        .iter()
-        .any(|e| matches!(e.kind, SemanticErrorKind::NonExhaustiveMatch));
-    assert!(
-        has_non_exhaustive,
-        "F-022: expected NonExhaustiveMatch in errors: {errors:?}"
-    );
-}
-
-#[test]
-fn omnia_accepts_all_unguarded_variants_even_with_extra_guarded_arms() {
-    // F-022: when every variant has at least one unguarded arm AND there are
-    // additional guarded arms for the same variants, omnia should still accept
-    // (the unguarded arms prove exhaustiveness; the guards are extras).
-    let mut types = TypeTable::new();
-    let enum_def = DefId(1);
-    let enum_ty = types.intern(Type::Enum(enum_def));
-
-    let guard_body = HirExpression {
-        id: radix_hir::HirId(90),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-    let arm_body = HirExpression {
-        id: radix_hir::HirId(91),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-
-    let scrutinee = HirExpression {
-        id: radix_hir::HirId(1),
-        kind: HirExpressionKind::Path(DefId(100)),
-        ty: Some(enum_ty),
-        span: test_span(),
-    };
-
-    // Both variants have unguarded arms + an extra guarded arm for variant 2
-    let arms = vec![
-        HirCasuArm {
-            patterns: vec![HirPattern::Variant(DefId(2), Vec::new())],
-            guard: None, // unguarded for variant 2
-            body: arm_body.clone(),
-            span: test_span(),
-        },
-        HirCasuArm {
-            patterns: vec![HirPattern::Variant(DefId(3), Vec::new())],
-            guard: None, // unguarded for variant 3
-            body: arm_body.clone(),
-            span: test_span(),
-        },
-        HirCasuArm {
-            patterns: vec![HirPattern::Variant(DefId(2), Vec::new())],
-            guard: Some(guard_body.clone()), // guarded duplicate of variant 2
-            body: arm_body.clone(),
-            span: test_span(),
-        },
-    ];
-
-    let match_expr = HirExpression {
-        id: radix_hir::HirId(3),
-        kind: HirExpressionKind::Discerne {
-            scrutinees: vec![scrutinee],
-            arms,
-            exhaustive: true,
-        },
-        ty: None,
-        span: test_span(),
-    };
-    let program = program_with_match(enum_def, match_expr);
-
-    let errors = check(&program, &types).err().unwrap_or_default();
-    // The guarded duplicate should NOT trigger a DuplicatePattern error
-    // (guarded arms are never counted for coverage or duplicate checks).
-    let has_duplicate = errors
-        .iter()
-        .any(|e| matches!(e.kind, SemanticErrorKind::PatternDuplicate));
-    assert!(
-        !has_duplicate,
-        "F-022: guarded duplicate must not trigger DuplicatePattern: {errors:?}"
-    );
-    // The omnia match should still be accepted because ALL variants have
-    // unguarded coverage.
-    let has_non_exhaustive = errors
-        .iter()
-        .any(|e| matches!(e.kind, SemanticErrorKind::NonExhaustiveMatch));
-    assert!(
-        !has_non_exhaustive,
-        "F-022: omnia with full unguarded coverage must pass: {errors:?}"
-    );
-}
-
-#[test]
-fn non_omnia_does_not_reject_all_guarded_variants() {
-    // Regression: non-omnia matches must still accept guarded-only variant
-    // arms — the author is not promising exhaustiveness without a catchall.
-    let mut types = TypeTable::new();
-    let enum_def = DefId(1);
-    let enum_ty = types.intern(Type::Enum(enum_def));
-
-    let guard_body = HirExpression {
-        id: radix_hir::HirId(90),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-    let arm_body = HirExpression {
-        id: radix_hir::HirId(91),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-
-    let match_expr = guarded_match_expr_with_exhaustive(
-        enum_ty,
-        vec![DefId(2), DefId(3)],
-        false, // NOT omnia
-        &guard_body,
-        &arm_body,
-    );
-    let program = program_with_match(enum_def, match_expr);
-
-    let result = check(&program, &types);
-    // Non-omnia without catchall is non-exhaustive regardless of guards — the
-    // NonExhaustiveMatch is expected here because there is no catchall arm.
-    assert!(result.is_err());
-    let errors = result.unwrap_err();
-    let has_non_exhaustive = errors
-        .iter()
-        .any(|e| matches!(e.kind, SemanticErrorKind::NonExhaustiveMatch));
-    assert!(
-        has_non_exhaustive,
-        "non-omnia without catchall must still be non-exhaustive"
-    );
-}
-
-// ── F-022: discerne_definitely_covered guards ────────────────────────────────
-
-#[test]
-fn definitely_covered_rejects_all_guarded_variant_arms() {
-    // F-022: `discerne_definitely_covered` must not treat guarded-only variant
-    // arms as proof of exhaustiveness, even when every variant is named.
-    let mut types = TypeTable::new();
-    let enum_def = DefId(1);
-    let enum_ty = types.intern(Type::Enum(enum_def));
-
-    let guard_body = HirExpression {
-        id: radix_hir::HirId(90),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-    let arm_body = HirExpression {
-        id: radix_hir::HirId(91),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-
-    let mut enum_variants: FxHashMap<DefId, Vec<DefId>> = FxHashMap::default();
-    enum_variants.insert(enum_def, vec![DefId(2), DefId(3)]);
-
-    let scrutinees = vec![HirExpression {
-        id: radix_hir::HirId(1),
-        kind: HirExpressionKind::Path(DefId(100)),
-        ty: Some(enum_ty),
-        span: test_span(),
-    }];
-    let guarded_arms = vec![
-        HirCasuArm {
-            patterns: vec![HirPattern::Variant(DefId(2), Vec::new())],
-            guard: Some(guard_body.clone()),
-            body: arm_body.clone(),
-            span: test_span(),
-        },
-        HirCasuArm {
-            patterns: vec![HirPattern::Variant(DefId(3), Vec::new())],
-            guard: Some(guard_body),
-            body: arm_body,
-            span: test_span(),
-        },
-    ];
-    assert!(
-        !discerne_definitely_covered(&scrutinees, &guarded_arms, &types, &enum_variants),
-        "F-022: definitely_covered must reject all-guarded variant arms"
-    );
-}
-
-#[test]
-fn discerne_definitely_covered_imported_enum_via_derived_variants() {
-    // F-077: When the variant list is missing (imported enum), derive the
-    // expected set from the arm patterns. All unguarded variant arms with no
-    // catchall should be treated as definitely covered.
+fn definitely_covered_enum_without_variant_list_needs_catchall() {
+    // D4.8 (supersedes F-077's arm-derived variant set): an enum whose
+    // variant list is not visible is not a closed set, so variant arms alone
+    // never prove coverage — the driver supplies imported and builtin enum
+    // lists (`collect_all_enum_variants`), and a list that is still missing
+    // leaves only a catchall as proof.
     let mut types = TypeTable::new();
     let imported_enum_def = DefId(99);
     let enum_ty = types.intern(Type::Enum(imported_enum_def));
@@ -979,69 +774,55 @@ fn discerne_definitely_covered_imported_enum_via_derived_variants() {
     // No entry for imported enum — simulates collect_enum_variants only knowing local enums.
     let enum_variants: FxHashMap<DefId, Vec<DefId>> = FxHashMap::default();
 
-    // All variant arms → definitely covered (derived from arms).
+    // All variant arms → not provably covered without the variant list.
     let all_variant_body = arm_body.clone();
     let arms = vec![
         HirCasuArm {
             patterns: vec![HirPattern::Variant(DefId(2), Vec::new())],
-            guard: None,
             body: all_variant_body.clone(),
             span: test_span(),
         },
         HirCasuArm {
             patterns: vec![HirPattern::Variant(DefId(3), Vec::new())],
-            guard: None,
             body: all_variant_body,
             span: test_span(),
         },
     ];
     assert!(
-        discerne_definitely_covered(&scrutinees, &arms, &types, &enum_variants),
-        "F-077: imported enum with pure variant arms should be definitely covered"
+        !discerne_definitely_covered(&scrutinees, &arms, &types, &enum_variants),
+        "enum without a variant list must not be covered by variant arms alone"
     );
 
-    // Guarded arm breaks coverage.
-    let guard_body = HirExpression {
-        id: radix_hir::HirId(92),
-        kind: HirExpressionKind::Literal(HirLiteral::Bool(true)),
-        ty: Some(types.primitive(crate::Primitive::Bivalens)),
-        span: test_span(),
-    };
-    let guarded_arms = vec![HirCasuArm {
-        patterns: vec![HirPattern::Variant(DefId(2), Vec::new())],
-        guard: Some(guard_body),
-        body: arm_body.clone(),
-        span: test_span(),
-    }];
+    // With the variant list supplied, the same arms are covered.
+    let mut listed = FxHashMap::default();
+    listed.insert(imported_enum_def, vec![DefId(2), DefId(3)]);
     assert!(
-        !discerne_definitely_covered(&scrutinees, &guarded_arms, &types, &enum_variants),
-        "F-077: imported enum with guarded arm must not be definitely covered"
+        discerne_definitely_covered(&scrutinees, &arms, &types, &listed),
+        "enum with a supplied variant list is covered by all its variant arms"
     );
 
-    // Catchall arm breaks coverage.
+    // A catchall arm closes coverage regardless.
     let catchall_arms = vec![
         HirCasuArm {
             patterns: vec![HirPattern::Variant(DefId(2), Vec::new())],
-            guard: None,
             body: arm_body.clone(),
             span: test_span(),
         },
         HirCasuArm {
             patterns: vec![HirPattern::Wildcard],
-            guard: None,
             body: arm_body,
             span: test_span(),
         },
     ];
     assert!(
         discerne_definitely_covered(&scrutinees, &catchall_arms, &types, &enum_variants),
-        "F-077: imported enum with catchall should be definitely covered (catchall path)"
+        "enum without a variant list is covered by a catchall"
     );
 
     // Empty arms.
     assert!(
         !discerne_definitely_covered(&scrutinees, &[], &types, &enum_variants),
-        "F-077: imported enum with no arms must not be definitely covered"
+        "enum with no arms must not be definitely covered"
     );
 }
 
@@ -1188,5 +969,73 @@ incipit {{
     assert!(
         issues.iter().any(|i| i == "missing_variants"),
         "expected missing_variants under omnia over a union, got issues: {issues:?}"
+    );
+}
+
+// ── D4.8: uncomputable coverage warns, never silent ─────────────────────────
+
+fn coverage_unchecked(errors: &[SemanticError]) -> bool {
+    errors.iter().any(|e| {
+        e.kind == SemanticErrorKind::Warning(WarningKind::CoverageUnchecked)
+            && e.issue() == Some("coverage_unchecked")
+    })
+}
+
+#[test]
+fn enum_without_variant_list_warns_coverage_unchecked() {
+    let mut types = TypeTable::new();
+    let unknown_enum_ty = types.intern(Type::Enum(DefId(99)));
+    let match_expr = match_expr(
+        unknown_enum_ty,
+        vec![
+            HirPattern::Variant(DefId(2), Vec::new()),
+            HirPattern::Variant(DefId(3), Vec::new()),
+        ],
+    );
+    let program = program_with_match(DefId(1), match_expr);
+    let errors = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    )
+    .err()
+    .unwrap_or_default();
+    assert!(
+        coverage_unchecked(&errors),
+        "expected CoverageUnchecked, got {errors:?}"
+    );
+    assert!(
+        !errors.iter().any(SemanticError::is_error),
+        "unchecked coverage is a warning, not an error: {errors:?}"
+    );
+}
+
+#[test]
+fn non_binding_payload_subpattern_warns_coverage_unchecked() {
+    let mut types = TypeTable::new();
+    let enum_def = DefId(1);
+    let enum_ty = types.intern(Type::Enum(enum_def));
+    let match_expr = match_expr(
+        enum_ty,
+        vec![
+            HirPattern::Variant(DefId(2), vec![HirPattern::Literal(HirLiteral::Int(1))]),
+            HirPattern::Variant(DefId(3), Vec::new()),
+        ],
+    );
+    let program = program_with_match(enum_def, match_expr);
+    let errors = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    )
+    .err()
+    .unwrap_or_default();
+    assert!(
+        coverage_unchecked(&errors),
+        "expected CoverageUnchecked, got {errors:?}"
     );
 }

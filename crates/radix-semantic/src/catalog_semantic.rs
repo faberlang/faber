@@ -79,6 +79,7 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::UnionMethodSignatureShadowed,
     WarningKind::ComplexityBudgetExceeded,
     WarningKind::RedundantMemberVisibility,
+    WarningKind::CoverageUnchecked,
 ];
 
 // STABLE CODES
@@ -1118,6 +1119,10 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::RedundantMemberVisibility => DiagnosticSpec {
             code: "WARN028",
             help: Some("remove the annotation; members are public by default"),
+        },
+        WarningKind::CoverageUnchecked => DiagnosticSpec {
+            code: "WARN029",
+            help: Some("add a 'ceterum' arm, or split the match so each pattern kind is checkable"),
         },
     }
 }

@@ -3,55 +3,80 @@
 //! This pass runs after typechecking has annotated HIR expressions and after
 //! the optional Rust borrow pass in the default Rust pipeline. It is target
 //! configurable through `PassConfig`, but its contract is target-neutral:
-//! single-scrutinee enum matches should either cover every known variant or
-//! provide an unguarded catchall arm.
+//! every match — any number of scrutinees — covers every value of the
+//! scrutinee product or provides a catchall arm (D4.8).
 //!
 //! The pass depends on two earlier semantic products. Lowering provides HIR
 //! pattern structure with variant `DefId`s, while the `TypeTable` identifies
 //! the scrutinee's enum definition even through aliases, references, and
-//! applied generic types. No name resolution happens here.
+//! applied generic types. Enum variant lists come from local HIR items plus
+//! the resolver's imported and builtin enums. Coverage itself is the
+//! pattern-matrix computation in [`super::coverage`].
 //!
 //! ERROR STRATEGY
 //! ==============
-//! - Missing enum coverage is emitted as `NonExhaustiveMatch`.
+//! - Missing coverage is emitted as `NonExhaustiveMatch` with a `missing`
+//!   argument naming one uncovered value or combination.
 //! - Duplicate variant arms and arms after a catchall are emitted as semantic
-//!   diagnostics using their dedicated pattern kinds.
-//! - Multi-scrutinee matches, untyped scrutinees, and non-enum scrutinees are
-//!   skipped instead of guessed; missing type information is owned by an
-//!   earlier pass, not recovered here.
+//!   diagnostics using their dedicated pattern kinds (single scrutinee).
+//! - A match whose pattern kinds coverage cannot be computed for gets the
+//!   `CoverageUnchecked` warning — never silence.
+//! - Untyped scrutinees and pattern-arity mismatches are owned by earlier
+//!   passes and skipped here.
 //!
 //! INVARIANTS
 //! ==========
-//! - Guarded arms never contribute to exhaustiveness because their guard may
-//!   evaluate to false at runtime.
-//! - Catchall detection is structural and unguarded: wildcard and binding
-//!   patterns close coverage for the current single-scrutinee match.
+//! - Arms carry no guards (D4.1): every arm's patterns contribute coverage.
+//! - `bivalens` is the closed set `{verum, falsum}`.
 //! - Variant coverage is collected by enum definition `DefId`, not by textual
 //!   variant name, so later codegen can rely on resolved identity.
 
-use crate::{Primitive, SemanticError, SemanticErrorKind, Type, TypeId, TypeTable, WarningKind};
+use super::coverage::{Coverage, Ctor, Space, Witness, coverage, space_for};
+use crate::locale::LocalePack;
+use crate::{
+    Primitive, Resolver, SemanticError, SemanticErrorKind, Type, TypeId, TypeTable, WarningKind,
+};
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
-    DefId, HirCasuArm, HirExpression, HirExpressionKind, HirItemKind, HirModule, HirPattern,
+    DefId, HirCasuArm, HirExpression, HirExpressionKind, HirId, HirItemKind, HirModule, HirPattern,
 };
+use radix_lexer::Interner;
 use rustc_hash::{FxHashMap, FxHashSet};
+
+/// Name sources for rendering a coverage witness in the reader's locale.
+pub struct CoverageNames<'a> {
+    pub interner: &'a Interner,
+    pub resolver: &'a Resolver,
+    pub locale_pack: Option<&'a LocalePack>,
+}
 
 /// Check target-enabled `discerne` coverage and pattern reachability.
 ///
-/// The current findings are hard semantic diagnostics: missing enum coverage,
-/// duplicate variant arms, and arms made unreachable by a previous catchall.
-/// The semantic driver appends them to the shared result stream and decides
-/// success by `SemanticError::is_error`.
+/// Findings are hard semantic diagnostics (missing coverage, duplicate variant
+/// arms, arms made unreachable by a previous catchall) plus warnings (null
+/// absorbed by a catchall, coverage not computable). The semantic driver
+/// appends them to the shared result stream and decides success by
+/// `SemanticError::is_error`. `enum_variants` is the closed variant list of
+/// every enum in scope; `elige_ids` marks the matches authored as `elige`
+/// (see [`check_coverage`]); `names`, when present, spells witnesses for
+/// readers.
 ///
 /// # Errors
 ///
 /// Returns non-exhaustive match and unreachable pattern errors as a list of
 /// [`SemanticError`]s.
-pub fn check(hir: &HirModule, types: &TypeTable) -> Result<(), Vec<SemanticError>> {
-    let enum_variants = collect_enum_variants(hir);
+pub fn check(
+    hir: &HirModule,
+    types: &TypeTable,
+    enum_variants: &FxHashMap<DefId, Vec<DefId>>,
+    elige_ids: &FxHashSet<HirId>,
+    names: Option<&CoverageNames<'_>>,
+) -> Result<(), Vec<SemanticError>> {
     let mut checker = ExhaustiveChecker {
         types,
         enum_variants,
+        elige_ids,
+        names,
         errors: Vec::new(),
     };
     checker.visit_program(hir);
@@ -63,6 +88,21 @@ pub fn check(hir: &HirModule, types: &TypeTable) -> Result<(), Vec<SemanticError
     }
 }
 
+/// Variant lists of every enum in scope: local HIR items plus the resolver's
+/// imported and builtin enums.
+#[must_use]
+pub fn collect_all_enum_variants(
+    hir: &HirModule,
+    resolver: &Resolver,
+) -> FxHashMap<DefId, Vec<DefId>> {
+    let mut map = collect_enum_variants(hir);
+    for (enum_def, variants) in resolver.non_local_enum_variants() {
+        map.entry(enum_def).or_insert(variants);
+    }
+    map
+}
+
+/// Variant lists of the enums this unit's HIR declares.
 #[must_use]
 pub fn collect_enum_variants(hir: &HirModule) -> FxHashMap<DefId, Vec<DefId>> {
     let mut map = FxHashMap::default();
@@ -82,7 +122,9 @@ pub fn collect_enum_variants(hir: &HirModule) -> FxHashMap<DefId, Vec<DefId>> {
 /// table, then compare arm patterns with the known variant set.
 struct ExhaustiveChecker<'a> {
     types: &'a TypeTable,
-    enum_variants: FxHashMap<DefId, Vec<DefId>>,
+    enum_variants: &'a FxHashMap<DefId, Vec<DefId>>,
+    elige_ids: &'a FxHashSet<HirId>,
+    names: Option<&'a CoverageNames<'a>>,
     errors: Vec<SemanticError>,
 }
 
@@ -94,12 +136,14 @@ impl HirVisitor for ExhaustiveChecker<'_> {
             exhaustive,
         } = &expr.kind
         {
-            check_match(
+            check_match(scrutinees, arms, *exhaustive, self.types, &mut self.errors);
+            check_coverage(
                 scrutinees,
                 arms,
-                *exhaustive,
+                self.elige_ids.contains(&expr.id),
                 self.types,
-                &self.enum_variants,
+                self.enum_variants,
+                self.names,
                 &mut self.errors,
             );
         }
@@ -112,7 +156,6 @@ fn check_match(
     arms: &[HirCasuArm],
     exhaustive: bool,
     types: &TypeTable,
-    enum_variants: &FxHashMap<DefId, Vec<DefId>>,
     errors: &mut Vec<SemanticError>,
 ) {
     // `omnia` enforcement: the keyword is only valid over a single enum
@@ -154,7 +197,7 @@ fn check_match(
         // arm like `casu A, _` whose wildcard silently absorbs the remaining
         // variants. `any` (not `all`) catches a catchall hiding alongside named
         // variants in the same arm; `all` would let `casu A, _` slip through and
-        // defeat the omnia invariant. Guards do not exempt a catchall.
+        // defeat the omnia invariant.
         for arm in arms {
             if !arm.patterns.is_empty() && arm.patterns.iter().any(is_catchall_pattern) {
                 errors.push(
@@ -173,10 +216,6 @@ fn check_match(
     let Some(scrutinee_ty) = scrutinees[0].ty else {
         return;
     };
-
-    let enum_def = enum_def_from_type(scrutinee_ty, types);
-    let expected_variants = enum_def.and_then(|def_id| enum_variants.get(&def_id));
-    let expected_members = union_members_from_type(scrutinee_ty, types);
 
     let mut covered = FxHashSet::default();
     let mut covered_members = Vec::new();
@@ -201,14 +240,8 @@ fn check_match(
             continue;
         }
 
-        let is_guarded = arm.guard.is_some();
         for pattern in &arm.patterns {
             if let Some(def_id) = pattern_variant_id(pattern) {
-                // F-022: guarded arms never contribute to exhaustiveness
-                // because their guard may evaluate to false at runtime.
-                if is_guarded {
-                    continue;
-                }
                 if !covered.insert(def_id) {
                     errors.push(
                         SemanticError::structured(SemanticErrorKind::PatternDuplicate, arm.span)
@@ -216,9 +249,6 @@ fn check_match(
                     );
                 }
             } else if let Some(member) = pattern_type_id(pattern) {
-                if is_guarded {
-                    continue;
-                }
                 if covered_width_patterns
                     .iter()
                     .copied()
@@ -255,7 +285,7 @@ fn check_match(
                 }
             } else if is_null_literal_pattern(pattern) {
                 explicit_null_arm = true;
-            } else if is_catchall_pattern(pattern) && !is_guarded {
+            } else if is_catchall_pattern(pattern) {
                 has_catchall = true;
                 catchall_span = Some(arm.span);
             }
@@ -263,7 +293,7 @@ fn check_match(
     }
 
     // WHY: Faber's canonical nullable form is `T ∪ nihil` (AGENTS.md rule 5).
-    // An unguarded catchall silently swallows the null case with no signal,
+    // A catchall silently swallows the null case with no signal,
     // so flag it and steer authors toward an explicit `casu nihil` arm. This
     // is a warning, not an error: existing catchalls keep compiling. Once an
     // explicit null arm exists, a trailing catchall legitimately covers only
@@ -283,44 +313,9 @@ fn check_match(
             .with_arg("nil", "nihil"),
         );
     }
-
-    if !has_catchall {
-        if let Some(expected) = expected_variants {
-            let missing = expected.iter().any(|def_id| !covered.contains(def_id));
-            if missing {
-                errors.push(
-                    SemanticError::structured(
-                        SemanticErrorKind::NonExhaustiveMatch,
-                        scrutinees[0].span,
-                    )
-                    .with_arg("issue", "missing_variants"),
-                );
-            }
-        } else if let Some(expected) = expected_members {
-            let missing = expected.iter().any(|member| {
-                !covered_members
-                    .iter()
-                    .copied()
-                    .any(|covered| types.equals(covered, *member))
-                    && !covered_width_patterns
-                        .iter()
-                        .copied()
-                        .any(|covered| radix_types::width_pattern_covers(types, covered, *member))
-            });
-            if missing {
-                errors.push(
-                    SemanticError::structured(
-                        SemanticErrorKind::NonExhaustiveMatch,
-                        scrutinees[0].span,
-                    )
-                    .with_arg("issue", "missing_union_members"),
-                );
-            }
-        }
-    }
 }
 
-fn union_members_from_type(ty: TypeId, types: &TypeTable) -> Option<Vec<TypeId>> {
+pub(crate) fn union_members_from_type(ty: TypeId, types: &TypeTable) -> Option<Vec<TypeId>> {
     match types.get(ty) {
         Type::Union(members) => Some(members.clone()),
         Type::Option(inner) => {
@@ -366,116 +361,115 @@ pub fn enum_def_from_type(ty: TypeId, types: &TypeTable) -> Option<DefId> {
 ///
 /// This is the coverage input consumed by the return-path pass: a `discerne`
 /// can only "definitely return" when control cannot fall out the bottom for
-/// an uncovered value. Coverage is provable in two cases, mirroring the
-/// exhaustiveness pass's coverage logic without depending on its diagnostics:
-///
-/// - an unguarded catchall arm (Wildcard or Binding) is present, closing the
-///   match for any scrutinee type; or
-/// - a single enum scrutinee where every variant is covered by an unguarded
-///   variant arm.
-///
-/// Multi-scrutinee matches, non-enum scrutinees without a catchall, and
-/// guarded-only coverage are reported as not-covered. This is sound for the
-/// return-path consumer: "not covered" means the match may fall through, so
-/// the enclosing function is treated as not definitely returning. The
-/// exhaustiveness pass remains the authority on whether missing coverage is a
-/// hard error; this helper only answers the yes/no reachability question.
+/// an uncovered value. It is the same pattern-matrix computation the
+/// exhaustiveness pass reports from, so an exhaustive `bivalens` or
+/// multi-scrutinee match definitely returns exactly when it is exhaustive.
+/// Uncomputable or upstream-owned shapes answer "not covered", which is sound
+/// for the consumer: the enclosing function is treated as not definitely
+/// returning.
 pub fn discerne_definitely_covered(
     scrutinees: &[HirExpression],
     arms: &[HirCasuArm],
     types: &TypeTable,
     enum_variants: &FxHashMap<DefId, Vec<DefId>>,
 ) -> bool {
-    // An unguarded catchall closes coverage for any scrutinee type.
-    let has_unguarded_catchall = arms
-        .iter()
-        .any(|arm| arm.guard.is_none() && arm.patterns.iter().any(is_catchall_pattern));
-    if has_unguarded_catchall {
-        return true;
-    }
-
-    // Otherwise coverage is only provable for a single enum scrutinee whose
-    // variants are all covered by unguarded variant arms.
-    if scrutinees.len() != 1 {
-        return false;
-    }
-    let Some(scrutinee_ty) = scrutinees[0].ty else {
-        return false;
-    };
-    let covered: Vec<TypeId> = arms
-        .iter()
-        .filter(|arm| arm.guard.is_none())
-        .flat_map(|arm| arm.patterns.iter())
-        .filter_map(pattern_type_id)
-        .collect();
-    if let Some(expected) = union_members_from_type(scrutinee_ty, types) {
-        return expected.iter().all(|member| {
-            covered.iter().copied().any(|candidate| {
-                types.equals(candidate, *member)
-                    || radix_types::width_pattern_covers(types, candidate, *member)
-            })
-        });
-    }
-    if covered
-        .iter()
-        .copied()
-        .any(|candidate| radix_types::width_pattern_covers(types, candidate, scrutinee_ty))
-    {
-        return true;
-    }
-
-    let Some(enum_def) = enum_def_from_type(scrutinee_ty, types) else {
-        return false;
-    };
-    let Some(expected) = enum_variants.get(&enum_def) else {
-        // F-077: imported enum — variant list is not available from local HIR.
-        // Derive the expected set from the arm patterns: every arm must be
-        // unguarded and contain at least one variant pattern with no catchall
-        // or binding patterns. If all arms are pure variant arms, the discerne
-        // is "definitely covered" with respect to the subset of variants the
-        // author explicitly listed.
-        return imported_enum_arms_all_variant(arms);
-    };
-
-    let mut covered: FxHashSet<DefId> = FxHashSet::default();
-    for arm in arms {
-        if arm.guard.is_some() {
-            continue;
-        }
-        for pattern in &arm.patterns {
-            if let Some(def_id) = pattern_variant_id(pattern) {
-                covered.insert(def_id);
-            }
-        }
-    }
-    expected.iter().all(|def_id| covered.contains(def_id))
+    matches!(
+        coverage(scrutinees, arms, types, enum_variants),
+        Coverage::Covered
+    )
 }
 
-/// F-077: for imported enums where we lack the full variant list, derive the
-/// "expected" set from the arm patterns. Every arm must be unguarded and carry
-/// at least one variant pattern without any catchall or binding patterns.
-/// Guarded arms and catchalls prevent definitive coverage because they leave
-/// paths untested at runtime.
-fn imported_enum_arms_all_variant(arms: &[radix_hir::HirCasuArm]) -> bool {
-    use radix_hir::HirPattern;
-    if arms.is_empty() {
-        return false;
-    }
-    for arm in arms {
-        if arm.guard.is_some() {
-            return false;
+/// Report missing or uncomputable coverage for one match.
+///
+/// `elige` is a value switch: without `ceterum`, a value outside its cases
+/// runs no arm (targets emit an empty default arm). Over an open space —
+/// numbers, text — that implicit default is the construct's meaning, not a
+/// gap, so an `elige` whose only witness is "any other value" is accepted.
+/// Closed spaces (enum variants, `verum`/`falsum`, union members) are checked
+/// for `elige` exactly as for `discerne`.
+#[allow(clippy::too_many_arguments)]
+fn check_coverage(
+    scrutinees: &[HirExpression],
+    arms: &[HirCasuArm],
+    is_elige: bool,
+    types: &TypeTable,
+    enum_variants: &FxHashMap<DefId, Vec<DefId>>,
+    names: Option<&CoverageNames<'_>>,
+    errors: &mut Vec<SemanticError>,
+) {
+    let Some(first) = scrutinees.first() else {
+        return;
+    };
+    match coverage(scrutinees, arms, types, enum_variants) {
+        Coverage::Covered | Coverage::Skipped => {}
+        Coverage::Unchecked => errors.push(
+            SemanticError::structured(
+                SemanticErrorKind::Warning(WarningKind::CoverageUnchecked),
+                first.span,
+            )
+            .with_arg("issue", "coverage_unchecked"),
+        ),
+        Coverage::Missing(witness) if is_elige && witness.iter().all(Option::is_none) => {}
+        Coverage::Missing(witness) => {
+            let issue = match (scrutinees, witness.first()) {
+                ([only], _) => match only.ty.map(|ty| space_for(ty, types, enum_variants)) {
+                    Some(Space::Enum(_)) => "missing_variants",
+                    Some(Space::Union(_)) => "missing_union_members",
+                    _ => "missing_cases",
+                },
+                _ => "missing_cases",
+            };
+            errors.push(
+                SemanticError::structured(SemanticErrorKind::NonExhaustiveMatch, first.span)
+                    .with_arg("issue", issue)
+                    .with_arg("missing", render_witness(&witness, types, names)),
+            );
         }
-        let has_variant = arm
-            .patterns
-            .iter()
-            .any(|p| matches!(p, HirPattern::Variant(_, _)));
-        let has_catchall = arm.patterns.iter().any(is_catchall_pattern);
-        // Every arm must have at least one variant pattern and no catchall.
-        if !has_variant || has_catchall {
-            return false;
-        }
     }
-    true
+}
+
+/// Spell a witness: one value for a single scrutinee, `(a, b)` for several.
+fn render_witness(
+    witness: &Witness,
+    types: &TypeTable,
+    names: Option<&CoverageNames<'_>>,
+) -> String {
+    let parts: Vec<String> = witness
+        .iter()
+        .map(|ctor| render_ctor(*ctor, types, names))
+        .collect();
+    match parts.as_slice() {
+        [only] => only.clone(),
+        _ => format!("({})", parts.join(", ")),
+    }
+}
+
+fn render_ctor(ctor: Option<Ctor>, types: &TypeTable, names: Option<&CoverageNames<'_>>) -> String {
+    let keyword = |latin: &'static str| -> String {
+        names
+            .and_then(|names| names.locale_pack)
+            .map_or(latin, |pack| pack.contextual_keyword_surface(latin))
+            .to_owned()
+    };
+    let def_name = |def_id: DefId| -> String {
+        names
+            .and_then(|names| {
+                let symbol = names.resolver.get_symbol(def_id)?;
+                Some(names.interner.resolve(symbol.name).to_owned())
+            })
+            .unwrap_or_else(|| format!("Def{}", def_id.0))
+    };
+    match ctor {
+        None => "_".to_owned(),
+        Some(Ctor::Bool(true)) => keyword("verum"),
+        Some(Ctor::Bool(false)) => keyword("falsum"),
+        Some(Ctor::Variant(def_id)) => def_name(def_id),
+        Some(Ctor::Member(member)) if type_is_nil(member, types) => keyword("nihil"),
+        Some(Ctor::Member(member)) => match names {
+            Some(names) => crate::format_faber_type(member, types, names.interner, &def_name),
+            None => format!("Type{}", member.0),
+        },
+    }
 }
 
 /// Extract the enum variant a pattern targets, descending through aliases.
@@ -492,9 +486,8 @@ pub fn pattern_variant_id(pattern: &HirPattern) -> Option<DefId> {
     }
 }
 
-/// Whether a pattern is an unguarded catchall (`_`, a bare binding, or an
-/// alias wrapping either). Guards are checked by callers; this only answers
-/// the pattern-shape question.
+/// Whether a pattern is a catchall (`_`, a bare binding, or an alias wrapping
+/// either).
 fn is_catchall_pattern(pattern: &HirPattern) -> bool {
     match pattern {
         HirPattern::Wildcard | HirPattern::Binding(_, _) => true,
@@ -506,7 +499,7 @@ fn is_catchall_pattern(pattern: &HirPattern) -> bool {
     }
 }
 
-/// `casu nihil` lowers to a literal-nil pattern; an unguarded occurrence
+/// `casu nihil` lowers to a literal-nil pattern; an occurrence
 /// counts as an explicit null arm and suppresses the wildcard-absorb warning.
 fn is_null_literal_pattern(pattern: &HirPattern) -> bool {
     match pattern {
@@ -516,7 +509,7 @@ fn is_null_literal_pattern(pattern: &HirPattern) -> bool {
     }
 }
 
-/// Whether a scrutinee type carries a null possibility that an unguarded
+/// Whether a scrutinee type carries a null possibility that a
 /// catchall would silently absorb. Nullable is written `T ∪ nihil` in Faber
 /// and modeled as `Option(_)` or any `Union` containing `nihil`, possibly
 /// wrapped in aliases, references, or applied generic arguments.

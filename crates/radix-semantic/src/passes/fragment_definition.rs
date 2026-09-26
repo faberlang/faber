@@ -270,9 +270,6 @@ impl FragmentDefinitionChecker<'_> {
                     self.check_expr(scrutinee);
                 }
                 for arm in arms {
-                    if let Some(guard) = &arm.guard {
-                        self.check_expr(guard);
-                    }
                     self.check_expr(&arm.body);
                 }
             }

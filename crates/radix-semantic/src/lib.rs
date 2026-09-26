@@ -705,13 +705,27 @@ pub fn analyze_with_cli(
         diagnostics.extend(e);
     }
 
-    if config.exhaustiveness
-        && let Err(e) = passes::exhaustive::check(&hir, &types)
-    {
-        diagnostics.extend(e);
+    let enum_variants = passes::exhaustive::collect_all_enum_variants(&hir, &resolver);
+    if config.exhaustiveness {
+        let names = passes::exhaustive::CoverageNames {
+            interner,
+            resolver: &resolver,
+            locale_pack: config.locale_pack.as_ref(),
+        };
+        let elige_ids = lowered
+            .presentation
+            .elige_expr_ids
+            .iter()
+            .copied()
+            .collect();
+        if let Err(e) =
+            passes::exhaustive::check(&hir, &types, &enum_variants, &elige_ids, Some(&names))
+        {
+            diagnostics.extend(e);
+        }
     }
 
-    if let Err(e) = passes::return_path::analyze(&hir, &types) {
+    if let Err(e) = passes::return_path::analyze(&hir, &types, &enum_variants) {
         diagnostics.extend(e);
     }
 

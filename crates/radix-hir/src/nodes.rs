@@ -1638,7 +1638,6 @@ pub enum HirRefKind {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirCasuArm {
     pub patterns: Vec<HirPattern>,
-    pub guard: Option<HirExpression>,
     pub body: HirExpression,
     pub span: Span,
 }

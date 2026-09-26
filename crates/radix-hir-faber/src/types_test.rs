@@ -548,7 +548,6 @@ fn discerne_omnia_preserves_exhaustiveness() {
                     DefId(2),
                     vec![HirPattern::Binding(DefId(3), name_x)],
                 )],
-                guard: None,
                 body: HirExpression {
                     id: HirId(12),
                     kind: HirExpressionKind::Block(HirBlock {
