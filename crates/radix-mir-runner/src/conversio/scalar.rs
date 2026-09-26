@@ -667,7 +667,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    /// Map scalar truthiness to `bivalens`, honoring `⇥` recovery on falsy inputs.
+    /// Map scalar truthiness to `bivalens`, honoring `⊥` default on falsy inputs.
     fn bivalens_from_scalar_truthiness(
         &mut self,
         truthy: bool,
@@ -1122,7 +1122,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         let precision = instans_precision(target);
         match value {
             Value::Instans(value) => Ok(Value::Instans(value.ad_praecisionem(precision))),
-            // String sources parse as RFC3339 wire text; recovery honors `⇥`.
+            // String sources parse as RFC3339 wire text; recovery honors `⊥`.
             Value::Str(text) => match Instans::from_rfc3339(&text, precision) {
                 Some(value) => Ok(Value::Instans(value)),
                 None => self.recover_or_fail(recovery, span, "textus to instans conversion failed"),

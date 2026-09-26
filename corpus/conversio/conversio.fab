@@ -5,9 +5,9 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "conversion"
 canonical = true
 summary = "Converts a value with explicit runtime parsing or coercion semantics."
-syntax = "<expression> ↦ <type> [⇥ <recovery>]"
+syntax = "<expression> ↦ <type> [⊥ <recovery>]"
 aliases = ["convert", "conversio"]
-related = ["∷", "⇥"]
+related = ["∷", "⊥"]
 locale = "en"
 +++
 # =============================================================================
@@ -16,13 +16,13 @@ locale = "en"
 #
 # What this teaches:
 #   • Core conversion — the `↦` operator converts between types with explicit parsing (textus→numerus) and coercion (numerus→textus).
-#   • Recovery with `⇥` — the `⇥` operator supplies a fallback value when conversion fails at runtime.
+#   • Default with `⊥` — the `⊥` operator supplies a default value when conversion fails at runtime (`⇥` only names error types).
 #   • Chaining — `↦` composes left-to-right for roundtrip conversions.
 #
 # Common mistakes:
-#   • Confusing `∷` (compile-time type ascription) with `↦` (runtime conversion) and using `vel` instead of `⇥` for conversio recovery.
+#   • Confusing `∷` (compile-time type ascription) with `↦` (runtime conversion) and using `vel` instead of `⊥` for conversio recovery.
 #
-# See also: ∷, ⇥
+# See also: ∷, ⊥
 # =============================================================================
 
 # conversio — type conversion operator (↦)
@@ -42,11 +42,11 @@ locale = "en"
 main {
     # ↦ converts textus → numerus
     const int n1 ← "42" ↦ int
-    # ⇥ supplies recovery on failure
-    const int n2 ← "invalid" ↦ int ⇥ 0
+    # ⊥ supplies a default on failure
+    const int n2 ← "invalid" ↦ int ⊥ 0
     const int<i32> n3 ← "255" ↦ int<i32>
     const float f1 ← "3.14159" ↦ float
-    const float f2 ← "invalid" ↦ float ⇥ 0.0
+    const float f2 ← "invalid" ↦ float ⊥ 0.0
     const string s1 ← 42 ↦ string
     const string s2 ← 3.14 ↦ string
     const string s3 ← true ↦ string

@@ -5,9 +5,9 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "assignment"
 canonical = true
 summary = "Conversion-directed assignment: evaluate the right side, convert it to the statically known type of the left place through the ↦ route, then assign."
-syntax = "<place> ↤ <expression> [⇥ <recovery>]"
+syntax = "<place> ↤ <expression> [⊥ <recovery>]"
 aliases = ["conversion-directed-assignment", "conversio assign"]
-related = ["←", "↦", "⇥", "fixum", "varia"]
+related = ["←", "↦", "⊥", "fixum", "varia"]
 # The body is canonical Latin; the reader-pack resolution treats the
 # frontmatter locale as the SOURCE reader locale, so a Latin body declares
 # `la` (la identity surface) — not `en`, whose pack owns English surfaces.
@@ -22,7 +22,7 @@ locale = "la"
 #     type through the existing `↦` route, then stores it exactly once.
 #   • Typed initialization — `fixum numerus n ↤ "42"` converts to the written
 #     type, then initializes the binding.
-#   • Inline recovery — `place ↤ value ⇥ fallback` stores the fallback only
+#   • Inline recovery — `place ↤ value ⊥ fallback` stores the fallback only
 #     when the conversion fails.
 #   • Right-associated chains — `a ↤ b ↤ "42"` converts inner-to-outer and
 #     stores each link.
@@ -30,9 +30,9 @@ locale = "la"
 # Common mistakes:
 #   • using `↤` when the destination type is inferred — `fixum _ x ↤ …` is
 #     rejected (no concrete conversion target).
-#   • `⇥` recovery on ordinary `←` — legal only on `↤`.
+#   • `⊥` default on ordinary `←` — legal only on `↤`; `⇥` never takes a value.
 #
-# See also: ←, ↦, ⇥, fixum, varia
+# See also: ←, ↦, ⊥, fixum, varia
 # =============================================================================
 
 incipit {
@@ -45,9 +45,9 @@ incipit {
     fixum numerus typed ↤ "7"
     nota typed
 
-    # Inline recovery: "x" cannot parse as numerus, so ⇥ 0 is stored.
+    # Inline recovery: "x" cannot parse as numerus, so ⊥ 0 is stored.
     varia numerus recovered ← 0
-    recovered ↤ "x" ⇥ 0
+    recovered ↤ "x" ⊥ 0
     nota recovered
 
     # Right-associated chain: inner b converts first, then the inner result

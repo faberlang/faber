@@ -190,13 +190,13 @@ abi_string_family! {
         SYMBOL_INSTANS_FROM_VALOR = "__faber_rt_v1_instans_from_valor",
         SYMBOL_INSTANS_RETAG = "__faber_rt_v1_instans_retag",
         SYMBOL_INSTANS_GET_TEXT = "__faber_rt_v1_instans_get_text",
-        // `⇥` recovery for aggregate/opaque payload extraction.
-        // `expr ↦ T ⇥ recovery` lowers to a fixed-signature
+        // `⊥` default for aggregate/opaque payload extraction.
+        // `expr ↦ T ⊥ recovery` lowers to a fixed-signature
         // `(payload + fallback → payload)` row per closed-set conversion, so
         // the host substitutes the fallback on a missing or wrong-typed
         // payload instead of aborting. Parse `_or` rows and `option_get_or`
         // are the same closed-set mechanism; `valor_cape` is the fac/cape
-        // channel, not this inline `⇥` fallback.
+        // channel, not this inline `⊥` fallback.
         SYMBOL_VALOR_GET_I64_OR = "__faber_rt_v1_valor_get_i64_or",
         SYMBOL_VALOR_GET_F64_OR = "__faber_rt_v1_valor_get_f64_or",
         SYMBOL_VALOR_GET_I1_OR = "__faber_rt_v1_valor_get_i1_or",
@@ -358,7 +358,7 @@ abi_string_family! {
         // Shared sermo materialization. `ad 'route'(payload)` opens a stream
         // (route + valor → opaque handle); `SermoSetOpener` replaces the
         // first request frame's payload before consume; `↦ textus` /
-        // `↦ valor` materialize inbound frames; the `_or` row is the `⇥`
+        // `↦ valor` materialize inbound frames; the `_or` row is the `⊥`
         // recovery for stream extraction.
         SYMBOL_SERMO_OPEN = "__faber_rt_v1_sermo_open",
         SYMBOL_SERMO_SET_OPENER = "__faber_rt_v1_sermo_set_opener",
@@ -375,7 +375,7 @@ abi_string_family! {
 // codes, these policy flags, and pre-seeded typed output slots.
 // `GENUS_FIELD_POLICY_MANDATORY` (`0`): the key must be present in the
 // `Valor::Tabula` payload — a missing key fails the whole extraction
-// (non-OK status, latched for `⇥` recovery).
+// (non-OK status, latched for `⊥` default).
 // `GENUS_FIELD_POLICY_DEFAULTABLE` (`1`): the host retains the pre-seeded
 // slot when the key is missing. The seed is the emitter-supplied
 // construction default (declared default, or the sponte zero/nihil seed

@@ -18,7 +18,7 @@ locale = "en"
 #   • Declaration-only — currently a declaration-only modifier; the error channel is whitelisted for syntax validation and future codegen.
 #
 # Common mistakes:
-#   • Confusing errata with ⇥ recovery — `errata` declares a typed error parameter on a function; `⇥` provides inline fallback recovery on conversion.
+#   • Confusing errata with a ⊥ default — `errata` declares a typed error parameter on a function; `⊥` provides an inline default on conversion.
 #
 # See also: ⇥, cape, iace
 # =============================================================================

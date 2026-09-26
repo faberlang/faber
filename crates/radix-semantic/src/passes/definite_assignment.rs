@@ -446,7 +446,7 @@ impl HirVisitor for DefiniteAssignmentChecker<'_> {
                 self.check_expr(value);
                 self.assign_binding(target);
             }
-            // `↤` stores exactly like ordinary `←`: the source (and its `⇥`
+            // `↤` stores exactly like ordinary `←`: the source (and its `⊥`
             // recovery) are reads, then the target binding is assigned.
             HirExpressionKind::ConversioAssign {
                 target,

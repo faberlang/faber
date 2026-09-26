@@ -2185,7 +2185,7 @@ impl<'a> FunctionBuilder<'a> {
     ///   1. destination place evaluated once (receiver/index once),
     ///   2. source evaluated once,
     ///   3. converted once through the shared `↦` conversion owner
-    ///      (`lower_conversio`) — `⇥` recovery runs only on conversion failure,
+    ///      (`lower_conversio`) — `⊥` default runs only on conversion failure,
     ///   4. stored exactly once.
     ///
     /// The result value denotes the stored value (the destination place), the

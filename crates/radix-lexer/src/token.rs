@@ -275,6 +275,7 @@ pub enum TokenKind {
     Dot,       // .
     Arrow,     // →
     ExitArrow, // ⇥
+    UpTack,    // ⊥ default channel (D17.7)
     Cup,       // ∪ inline union
     Cap,       // ∩ inline intersection
     At,        // @

@@ -565,15 +565,15 @@ impl super::FaberCodegen<'_> {
                 recovery,
             } => {
                 // Conversion-directed assignment: re-emit the exact `↤`
-                // spelling (never `←` or `↦`). `⇥ recovery` is
-                // `inlineRecovery := '⇥' unary`, so the recovery operand is
+                // spelling (never `←` or `↦`). The `⊥` default is
+                // `inlineDefault := '⊥' unary`, so the default operand is
                 // written at unary precedence to keep parens that let it
                 // reparse attached to this `↤` (the nearest in a chain).
                 self.write_expr_prec(target, 1, names, surface, writer);
                 writer.write(" ↤ ");
                 self.write_expr_prec(source, 1, names, surface, writer);
                 if let Some(recovery) = recovery {
-                    writer.write(" ⇥ ");
+                    writer.write(" ⊥ ");
                     self.write_expr_prec(recovery, 12, names, surface, writer);
                 }
             }
@@ -866,7 +866,7 @@ impl super::FaberCodegen<'_> {
                 // looser than additive. Writing the operand at additive
                 // strength regroups shift-or-looser children (`n ⇒ 24 ↦ T`
                 // reparses as `n ⇒ (24 ↦ T)` without the parens), and the
-                // `⇥` recovery is a unary-level operand.
+                // `⊥` default is a unary-level operand.
                 self.write_expr_prec(source, 10, names, surface, writer);
                 writer.write(" ↦ ");
                 match target {
@@ -914,7 +914,7 @@ impl super::FaberCodegen<'_> {
                     }
                 }
                 if let Some(recovery) = recovery {
-                    writer.write(" ⇥ ");
+                    writer.write(" ⊥ ");
                     self.write_expr_prec(recovery, 12, names, surface, writer);
                 }
             }

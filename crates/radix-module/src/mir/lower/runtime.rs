@@ -27,7 +27,7 @@ use crate::semantic::lista_tensor_conversio::{
     resolve_lista_to_tensor_shape, validate_lista_to_tensor_source,
 };
 
-/// Whether a `⇥` recovery expression is side-effecting: a call or method call
+/// Whether a `⊥` default expression is side-effecting: a call or method call
 /// whose execution has observable effects. Pure recovery expressions (literals,
 /// paths, compound values) need no deferral — evaluating them eagerly is
 /// side-effect-free (CTO-3 recovery-eval fix).
@@ -2967,8 +2967,8 @@ impl FunctionBuilder<'_> {
         }
         // Route C (AEU-5): bounded numeric lista snapshots into a padded
         // tensor. The trailing `TensorFromFlat` fill operand is a real value —
-        // the caller's `⇥` fill or the numeric zero — never a `MaybeUninit`
-        // read; a `⇥` on the flat path below stays a failure recovery, so the
+        // the caller's `⊥` fill or the numeric zero — never a `MaybeUninit`
+        // read; a `⊥` on the flat path below stays a failure recovery, so the
         // padded arm runs first and even with a recovery present.
         if resolve_bounded_lista_padded_shape(source_type_id, target, self.types).is_some() {
             return self.lower_bounded_lista_to_padded_tensor_conversio(
@@ -3056,7 +3056,7 @@ impl FunctionBuilder<'_> {
         self.lower_expr_value(source)
     }
 
-    /// CTO-3 — defer a SIDE-EFFECTING `⇥` recovery call. A `⇥ fb()` fallback's
+    /// CTO-3 — defer a SIDE-EFFECTING `⊥` default call. A `⊥ fb()` fallback's
     /// CALL must run ONLY when the conversion fails (fallback-not-run-on-
     /// success): the eager `%0 = call fb()` statement previously executed even
     /// when the conversion succeeded (an eval/dup-work hazard, AC4 deviation).
@@ -3209,7 +3209,7 @@ impl FunctionBuilder<'_> {
     }
 
     /// Route C padded snapshot: `lista<T, N> ↦ tensor<T, [N]>` with the
-    /// caller's fill (a `⇥` value, element-typed) or the numeric zero. The
+    /// caller's fill (a `⊥` value, element-typed) or the numeric zero. The
     /// runtime `TensorFromFlat` pads slots `len..N` with that real value; the
     /// bounded carrier's dead slots are never read.
     fn lower_bounded_lista_to_padded_tensor_conversio(

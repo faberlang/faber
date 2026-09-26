@@ -2552,3 +2552,18 @@ fn latin_surface_records_only_latin_modifier_identities() {
         "tokenless `libera` is parser-claimed, never key-recorded"
     );
 }
+
+#[test]
+fn lexes_up_tack_default_glyph() {
+    // D17.7: `⊥` (U+22A5) is the default channel; one glyph in every locale.
+    let result = lex("⊥");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    assert_eq!(result.tokens[0].kind, TokenKind::UpTack);
+    assert!(result.reader_keyword_latin_keys.is_empty());
+}
+
+#[test]
+fn perpendicular_lookalike_suggests_up_tack() {
+    // D17.7: `⟂` (U+27C2 PERPENDICULAR) is rejected with "did you mean `⊥`?".
+    assert_homoglyph_did_you_mean("⟂", "⟂", "⊥");
+}

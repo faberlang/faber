@@ -599,8 +599,8 @@ message = "無效運算式"
 help = "檢查運算式語法"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
-message = "使用 ⇥ 進行 conversio 復原"
-help = "使用 ⇥；vel 僅用於 nullish 合併"
+message = "使用 ⊥ 進行 conversio 復原"
+help = "使用 ⊥；vel 僅用於 nullish 合併"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "需要運算式"
@@ -2188,10 +2188,10 @@ help = "轉型為相容的型別"
 
 [diagnostics.SEM016]
 message = "無效轉換"
-help = "使用有效的轉換，或使用 `⇥` 提供內嵌復原"
+help = "使用有效的轉換，或使用 `⊥` 提供內嵌復原"
 
 [diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
-message = "intervallum clamp 轉換不支援 `⇥` 復原"
+message = "intervallum clamp 轉換不支援 `⊥` 復原"
 help = "從此 range clamp 移除復原 arm"
 
 [diagnostics.SEM016.issues.intervallum_target_not_range]
@@ -2216,15 +2216,15 @@ help = "使來源與目標的界限元素型別相符"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_required]
 message = "vector 具現化需要 lista 字面值來源"
-help = "使用有效的轉換，或使用 `⇥` 提供內嵌復原"
+help = "使用有效的轉換，或使用 `⊥` 提供內嵌復原"
 
 [diagnostics.SEM016.issues.lista_to_vector_element_mismatch]
 message = "lista 至 vector 轉換需要相符的元素型別"
-help = "使用有效的轉換，或使用 `⇥` 提供內嵌復原"
+help = "使用有效的轉換，或使用 `⊥` 提供內嵌復原"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_width]
 message = "lista 至 vector 轉換需要字面值 vector 寬度"
-help = "使用有效的轉換，或使用 `⇥` 提供內嵌復原"
+help = "使用有效的轉換，或使用 `⊥` 提供內嵌復原"
 
 [diagnostics.SEM016.issues.matrix_materialize_unsupported]
 message = "目前尚不支援 matrix 具現化"
@@ -2315,12 +2315,12 @@ message = "regex 轉換需要 textus 或 ascii 運算元"
 help = "將 textus 或 ascii 值轉換為 regex"
 
 [diagnostics.SEM016.issues.regex_recovery_unsupported]
-message = "regex 轉換不支援 `⇥` 復原；regex 沒有字面形式，因此沒有可替代的目標型別值"
+message = "regex 轉換不支援 `⊥` 復原；regex 沒有字面形式，因此沒有可替代的目標型別值"
 help = "從此 regex 轉換移除復原 arm"
 
 [diagnostics.SEM016.issues.valor_verte_unsupported]
-message = "不支援 valor ∷ T — 動態值的形狀無法在編譯時期斷言。請使用 `↦ T` 進行執行時期擷取（使用 `⇥` 復原）。"
-help = "改用執行時期 `↦ T` 轉換與 `⇥` 復原"
+message = "不支援 valor ∷ T — 動態值的形狀無法在編譯時期斷言。請使用 `↦ T` 進行執行時期擷取（使用 `⊥` 復原）。"
+help = "改用執行時期 `↦ T` 轉換與 `⊥` 復原"
 
 [diagnostics.SEM016.issues.json_genus_conversion_requires_json_annotation]
 message = "json/genus 轉換需要將 genus 標記為 `@ json`"

@@ -6,7 +6,7 @@ category = "conversion"
 canonical = true
 summary = "Conversio arms for instans precision family and textus datetime provenance."
 syntax = "<expression> ↦ instans | instans<ms> | instans<us> | instans<ns>"
-related = ["↦", "⇥", "textus"]
+related = ["↦", "⊥", "textus"]
 locale = "en"
 +++
 # =============================================================================
@@ -21,7 +21,7 @@ locale = "en"
 # Common mistakes:
 #   • Converting `instans<ns>` to `instans` and expecting sub-second precision in the text output — fine→coarse narrowing truncates sub-second bits.
 #
-# See also: ↦, ⇥, textus
+# See also: ↦, ⊥, textus
 # =============================================================================
 
 # conversio — instans precision family and valor provenance
@@ -34,7 +34,7 @@ locale = "en"
 # instans ↦ instans<ms>  — coarse→fine widening (lossless at storage)
 # instans<ns> ↦ instans    — fine→coarse narrowing (truncates sub-second bits)
 # instans ↦ textus        — precision-honoring RFC3339 `Z` emit
-# textus ↦ instans ⇥ …     — explicit recovery when wire is not a datetime
+# textus ↦ instans ⊥ …     — explicit recovery when wire is not a datetime
 
 main {
     const string utc ← "1979-05-27T07:32:00.123456Z"
@@ -51,7 +51,7 @@ main {
     const instant narrowed ← fine ↦ instant
     assert (narrowed ↦ string) ≡ "1979-05-27T07:32:00Z"
     const string bad ← "not-a-datetime"
-    const instant recovered ← bad ↦ instant ⇥ seconds
+    const instant recovered ← bad ↦ instant ⊥ seconds
     assert recovered ≡ seconds
     print seconds ↦ string
     print millis ↦ string

@@ -167,7 +167,7 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
         },
         SemanticErrorKind::ConversionInvalid => DiagnosticSpec {
             code: "SEM016",
-            help: Some("use a valid conversion or provide inline recovery with `⇥`"),
+            help: Some("use a valid conversion or provide an inline default with `⊥`"),
         },
         SemanticErrorKind::UnavailableDeclaration => DiagnosticSpec {
             code: "SEM017",
@@ -431,7 +431,7 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         "matrix_materialize_unsupported" => {
             Some("keep matrix values as typed parameters until matrix construction lowering is implemented".to_owned())
         }
-        "valor_verte_unsupported" => Some("use runtime `↦ T` conversion with `⇥` recovery instead".to_owned()),
+        "valor_verte_unsupported" => Some("use runtime `↦ T` conversion with a `⊥` default instead".to_owned()),
         "lista_to_tabula_unsupported" => Some("construct the tabula with explicit key/value selection".to_owned()),
         "cross_collection_unsupported" => Some("use an explicit stdlib conversion verb".to_owned()),
         "lista_to_tensor_nested" => Some("flatten the nested lista before converting to tensor".to_owned()),
