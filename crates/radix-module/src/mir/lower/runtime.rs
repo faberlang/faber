@@ -188,6 +188,10 @@ impl FunctionBuilder<'_> {
                         let initial = &args[1].expr;
                         self.lower_cumulata(receiver, closure, initial, expr)
                     }
+                    crate::intrinsics::IntrinsicMirKind::HigherOrderSortBy => {
+                        let in_place = matches!(entry.return_kind, crate::intrinsics::IntrinsicReturnKind::Vacuum);
+                        self.lower_sort_by_key(receiver, closure, in_place, expr)
+                    }
                     _ => None,
                 };
             }

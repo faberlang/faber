@@ -2379,6 +2379,10 @@ help = "remove the explicit type argument list"
 message = "numeric {lista} elements required"
 help = "use numeric elements for this {lista} intrinsic"
 
+[diagnostics.SEM011.issues.ordina_key_not_ordered]
+message = "sort key must be a number or {textus}"
+help = "return a number or {textus} from the key selector"
+
 [diagnostics.SEM011.issues.octeti_literal_invalid_character]
 message = "bytes literal contains invalid character '{character}'"
 help = "use only hexadecimal digits in bytes literals"

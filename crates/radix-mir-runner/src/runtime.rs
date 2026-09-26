@@ -1294,6 +1294,33 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     _ => Err(RunnerError::internal(span, "sort receiver type mismatch")),
                 }
             }
+            MirCollectionOp::SortByKeys => {
+                let [receiver, keys] = args else {
+                    return Err(RunnerError::internal(span, "collection sort_by_keys arity"));
+                };
+                let (Value::Array(items), Value::Array(keys)) = (
+                    self.eval_operand(receiver, span)?,
+                    self.eval_operand(keys, span)?,
+                ) else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "sort_by_keys operand type mismatch",
+                    ));
+                };
+                let items = items.borrow();
+                let keys = keys.borrow();
+                if items.len() != keys.len() {
+                    return Err(RunnerError::internal(span, "sort_by_keys length mismatch"));
+                }
+                // WHY: `sort_by` is stable, so equal keys keep source order (D1.7).
+                let mut order: Vec<usize> = (0..items.len()).collect();
+                order.sort_by(|&a, &b| super::value::compare_sort_values(&keys[a], &keys[b]));
+                let sorted = order
+                    .into_iter()
+                    .map(|index| items[index].clone())
+                    .collect();
+                Ok(Value::Array(Rc::new(RefCell::new(sorted))))
+            }
             MirCollectionOp::Uppercase => self.map_str_arg(args, span, |text| text.to_uppercase()),
             MirCollectionOp::Lowercase => self.map_str_arg(args, span, |text| text.to_lowercase()),
             MirCollectionOp::Trim => self.map_str_arg(args, span, |text| text.trim().to_owned()),

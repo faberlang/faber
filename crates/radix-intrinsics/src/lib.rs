@@ -363,6 +363,7 @@ pub fn mir_collection_op(entry: &MethodIntrinsic) -> Option<MirCollectionOp> {
         | IntrinsicMirKind::HigherOrderFiltrata
         | IntrinsicMirKind::HigherOrderMap
         | IntrinsicMirKind::HigherOrderReduce
+        | IntrinsicMirKind::HigherOrderSortBy
         | IntrinsicMirKind::HigherOrderCumulata
         | IntrinsicMirKind::CodegenOnly => None,
     }
@@ -379,6 +380,7 @@ pub fn mir_atomic_op(entry: &MethodIntrinsic) -> Option<MirAtomicOp> {
         | IntrinsicMirKind::HigherOrderFiltrata
         | IntrinsicMirKind::HigherOrderMap
         | IntrinsicMirKind::HigherOrderReduce
+        | IntrinsicMirKind::HigherOrderSortBy
         | IntrinsicMirKind::HigherOrderCumulata
         | IntrinsicMirKind::CodegenOnly => None,
     }
@@ -394,6 +396,7 @@ pub fn mir_is_higher_order_lista(entry: &MethodIntrinsic) -> bool {
             | IntrinsicMirKind::HigherOrderFiltrata
             | IntrinsicMirKind::HigherOrderMap
             | IntrinsicMirKind::HigherOrderReduce
+            | IntrinsicMirKind::HigherOrderSortBy
             | IntrinsicMirKind::HigherOrderCumulata
     )
 }

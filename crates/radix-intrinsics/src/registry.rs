@@ -129,6 +129,9 @@ pub enum IntrinsicMirKind {
     HigherOrderFiltrata,
     HigherOrderMap,
     HigherOrderReduce,
+    /// Stable sort by a key selector (D1.7): `ordina(key)` in place,
+    /// `ordinata(key)` as a new `lista`. Keys are numbers or `textus`.
+    HigherOrderSortBy,
     /// Base-lane target-codegen scan; MIR has no lista scan op yet.
     HigherOrderCumulata,
     /// Lowered directly in target codegen without a MIR collection op.
@@ -322,7 +325,23 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         HigherOrderAll
     ),
     intrinsic!(Lista, "ordina", 0, &[], Vacuum, CodegenOnly),
+    intrinsic!(
+        Lista,
+        "ordina",
+        1,
+        &[IntrinsicParamKind::Mapper],
+        Vacuum,
+        HigherOrderSortBy
+    ),
     intrinsic!(Lista, "ordinata", 0, &[], ArrayInner, collection Sort),
+    intrinsic!(
+        Lista,
+        "ordinata",
+        1,
+        &[IntrinsicParamKind::Mapper],
+        ArrayInner,
+        HigherOrderSortBy
+    ),
     intrinsic!(Lista, "prima", 1, &[IntrinsicParamKind::NumerusIndex], ArrayInner, collection Take),
     intrinsic!(Lista, "primus", 0, &[], OptionInner, collection First),
     intrinsic!(

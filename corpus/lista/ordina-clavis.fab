@@ -1,0 +1,76 @@
++++
+term = "ordina"
+kind = "existing-home"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "incipit_stmt", "fixum_decl", "expr_stmt", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "typed_constructor", "field_list", "field_init", "field_key", "argument_list", "argument", "compact_clausura_expr", "clausura_signature", "clausura_joint", "clausura_params", "clausura_param", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Sort a list by a key selector; equal keys keep their order."
+syntax = "<lista>.sort(<T x ∴ key>) | <lista>.sorted(<T x ∴ key>)"
+related = ["lista", "ordinata", "mappata"]
+locale = "en"
++++
+# =============================================================================
+# lista — sort by a key selector
+# =============================================================================
+#
+# What this teaches:
+#   • `sorted(key)` returns a new list ordered by the key each element maps to
+#   • `sort(key)` reorders a `var` list in place
+#   • keys are numbers or text; text orders by Unicode code point
+#   • the sort is stable: elements with equal keys keep their source order
+#
+# EXPECTED OUTPUT:
+#   Aulus Cornelia Livia Marcus Titus Émilia
+#   Livia Marcus Aulus Cornelia Titus Émilia
+#   Titus Livia Marcus Émilia Aulus Cornelia
+#   Aulus Cornelia Livia Marcus Émilia Titus
+#   [1, 2, 3]
+
+class Persona {
+    string nomen
+    int aetas
+}
+
+fn nomina(list<Persona> ps) → string {
+    var string out ← ""
+    for from ps const p {
+        if out ≡ "" {
+            out ← p.nomen
+        } else {
+            out ← out + " " + p.nomen
+        }
+    }
+    return out
+}
+
+main {
+    const list<Persona> personae ← [
+        Persona { nomen = "Livia", aetas = 30 },
+        Persona { nomen = "Marcus", aetas = 30 },
+        Persona { nomen = "Aulus", aetas = 25 },
+        Persona { nomen = "Cornelia", aetas = 25 },
+        Persona { nomen = "Titus", aetas = 40 },
+        Persona { nomen = "Émilia", aetas = 30 }
+    ]
+
+    # Text key: code-point order puts "É" (U+00C9) after every ASCII letter.
+    const list<Persona> per_nomen ← personae.sorted(Persona p ∴ p.nomen)
+    print nomina(per_nomen)
+
+    # The source list is unchanged.
+    print nomina(personae)
+
+    # A computed key: descending age via negation, still stable.
+    const list<Persona> senes ← personae.sorted(Persona p ∴ 0 - p.aetas)
+    print nomina(senes)
+
+    # Numeric key, stable: 25s keep Aulus before Cornelia; 30s keep
+    # Livia, Marcus, Émilia in source order.
+    var list<Persona> per_aetatem ← personae
+    per_aetatem.sort(Persona p ∴ p.aetas)
+    print nomina(per_aetatem)
+
+    # Without a key, sorting is unchanged.
+    const list<int> numeri ← [3, 1, 2]
+    print numeri.sorted()
+}
