@@ -37,23 +37,23 @@ locale = "en"
 
 main {
     # Labeled type args, labeled construction, and by-label member access.
-    const tuple<string, int> pair ← tuple<string, int> ["salve", 42]
-    print pair[0]
-    print pair[1]
+    const tuple<gx: string, gw: int> pair ← tuple<gx: string, gw: int> ["salve", 42]
+    print pair.gx
+    print pair.gw
     print pair[0]
 
     # Mixed labeled/unlabeled type args; unlabeled slots stay positional.
-    const tuple<string, int> mixed ← tuple<string, int> ["mundus", 7]
-    print mixed[0]
+    const tuple<gx: string, int> mixed ← tuple<gx: string, int> ["mundus", 7]
+    print mixed.gx
     print mixed[1]
 
     # Element hole solved from the construction witness.
-    const tuple<f32, int> hole ← tuple<f32, int> [1.0, 2]
+    const tuple<f32, _> hole ← tuple<f32, int> [1.0, 2]
     print hole[1]
 
     # Labels compose with holes.
-    const tuple<float, int> labeled_hole ← tuple<f32, int> [1.0, 3]
-    print labeled_hole[0]
+    const tuple<loss: _, int> labeled_hole ← tuple<f32, int> [1.0, 3]
+    print labeled_hole.loss
     print labeled_hole[1]
 
     # A wanted union element is a binary cup, not ∪ in the slot.
@@ -61,15 +61,13 @@ main {
     print cup[1]
 
     # objectPattern binds by label.
-    const string gx ← pair[0]
-    const int gw ← pair[1]
+    const {gx, gw} ← pair
     print gx
     print gw
 
     # Partial by-label binding; rest is the unbound sub-tuple.
-    const tuple<f32, int> metrics ← tuple<f32, int> [1.0, 4]
-    const f32 loss ← metrics[0]
-    const tuple<int> leftover ← tuple<int> [metrics[1]]
+    const tuple<loss: f32, steps: int> metrics ← tuple<loss: f32, steps: int> [1.0, 4]
+    const {loss, rest leftover} ← metrics
     print loss
     print leftover[0]
 

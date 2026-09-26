@@ -58,44 +58,36 @@ class Punctum {
 main {
     # --- Records: object_pattern over lista of genus elements ---
 
-    const list<Punctum, 2> puncta ← [Punctum { x = 1, y = 2 }, Punctum { x = 3, y = 4 }]
-    for from puncta const __itera_element_0 {
-        const int x ← __itera_element_0.x
-        const int y ← __itera_element_0.y
+    const _ puncta ← [Punctum { x = 1, y = 2 }, Punctum { x = 3, y = 4 }]
+    for from puncta const {x, y} {
         print x + y
     }
 
     # --- Labeled tuples: object_pattern binds by label ---
 
-    const list<tuple<int, int>> paria ← [tuple<int, int> [50, 60], tuple<int, int> [70, 80]]
-    for from paria const __itera_element_0 {
-        const int gx ← __itera_element_0[0]
+    const list<tuple<gx: int, int>> paria ← [tuple<int, int> [50, 60], tuple<int, int> [70, 80]]
+    for from paria const {gx} {
         print gx
     }
 
     # --- Positional tuples: array_pattern over fixed-width rows ---
 
     const list<tuple<int, int>> ordines ← [tuple<int, int> [10, 20], tuple<int, int> [30, 40]]
-    for from ordines const __itera_element_0 {
-        const int a ← __itera_element_0[0]
-        const int b ← __itera_element_0[1]
+    for from ordines const [a, b] {
         print a + b
     }
 
     # --- Rest patterns: first element plus the remaining lista ---
 
-    const list<list<int, 3>, 2> matricula ← [[1, 2, 3], [4, 5, 6]]
-    for from matricula const __itera_element_0 {
-        const int caput ← __itera_element_0[0]
-        const list<int, 3> cauda ← __itera_element_0
+    const _ matricula ← [[1, 2, 3], [4, 5, 6]]
+    for from matricula const [caput, rest cauda] {
         print caput
         print cauda[1]
     }
 
     # --- Holes: `_` skips a slot ---
 
-    for from ordines const __itera_element_0 {
-        const int secundus ← __itera_element_0[1]
+    for from ordines const [_, secundus] {
         print secundus
     }
 }

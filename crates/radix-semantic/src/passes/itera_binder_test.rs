@@ -86,6 +86,18 @@ fn expression_shape(expr: &HirExpression, unit: &AnalyzedFixture) -> String {
                 unit.interner.resolve(*name)
             )
         }
+        HirExpressionKind::MethodCall(receiver, name, _, args, _) => {
+            let args = args
+                .iter()
+                .map(|arg| expression_shape(&arg.expr, unit))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!(
+                "call({}.{}, {args})",
+                expression_shape(receiver, unit),
+                unit.interner.resolve(*name)
+            )
+        }
         HirExpressionKind::Tuple(elements, _) => {
             let elements = elements
                 .iter()
@@ -267,7 +279,8 @@ functio loopum(lista<lista<numerus>> pairs) → vacuum {
         local_shapes(loop_body(&looping), &looping),
         vec![
             (true, "index(path, literal:Int(1))".to_owned()),
-            (true, "path".to_owned()),
+            // D14.1: the rest binds the tail after both authored positions.
+            (true, "call(path.omissa, literal:Int(2))".to_owned()),
         ],
         "array holes and rest must retain binding-form mutability",
     );

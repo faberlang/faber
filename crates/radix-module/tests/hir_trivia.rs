@@ -401,10 +401,10 @@ fn expanded_statement_attaches_once_to_first_rendered_node() {
     assert!(errors.is_empty(), "lower failed: {errors:?}");
     let presentation = &lowered.presentation;
 
-    // The array destructure renders two local statements; the block also
-    // holds the trailing `tacet`.
+    // The array destructure renders the once-evaluated subject local and two
+    // element locals (D14.2); the block also holds the trailing `tacet`.
     let body = function_body(&lowered.hir);
-    assert_eq!(body.statements.len(), 3, "two destructure locals + tacet");
+    assert_eq!(body.statements.len(), 4, "subject local + two destructure locals + tacet");
     let first_id = body.statements[0].id;
     let second_id = body.statements[1].id;
 

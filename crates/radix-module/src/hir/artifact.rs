@@ -402,6 +402,7 @@ fn provider_units_live(
         let carried = match entry {
             radix_hir_fhir::ProviderCarriageEntryWire::Failed { message } => CarriedProviderUnit::Failed { message },
             radix_hir_fhir::ProviderCarriageEntryWire::Unit(fragment) => {
+                let fragment = *fragment;
                 let mut types = TypeTable::from_snapshot(fragment.types)
                     .map_err(|msg| HirArtifactError::MalformedSnapshot { kind: "types", detail: msg })?;
                 types.resolved_generic_calls = fragment.resolved_generic_calls;
