@@ -451,6 +451,7 @@ impl<'a> Lowerer<'a> {
             self.resolver,
             self.types,
             self.interner,
+            self.locale_pack,
         );
 
         HirModule {

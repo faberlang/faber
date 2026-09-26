@@ -198,6 +198,12 @@ filtrum = "篩選器"
 series = "序列"
 census = "普查"
 ratio = "ratio"
+# Conversation family (DECISIONS D6.16). The meus/tuus rows also spell
+# the sermo view methods `s.meus<T>()` / `s.tuus<T>()`.
+sermo = "通道"
+scrinium = "幀"
+meus = "發送"
+tuus = "接收"
 
 [diagnostics.UNRES001]
 message = "關鍵字 '{keyword}' 未在讀者語言包 '{pack}' 中宣告"

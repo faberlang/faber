@@ -429,7 +429,13 @@ pub fn analyze_with_cli(
     // rows (CTR-04) seed before user declaration collection so enrollment can
     // never shadow them.
     crate::builtins::register(&mut resolver, &mut types, interner);
-    crate::builtins::register_frame_types_if_needed(program, &mut resolver, &mut types, interner);
+    crate::builtins::register_frame_types_if_needed(
+        program,
+        &mut resolver,
+        &mut types,
+        interner,
+        config.locale_pack.as_ref(),
+    );
     intern_catalog_generic_names(interner);
     if let Some(pack) = config.locale_pack.as_ref() {
         register_locale_pack_type_spellings(pack, &mut resolver, &mut types, interner);
@@ -940,6 +946,13 @@ fn register_locale_pack_type_spellings(
         interner.intern(canonical);
     }
     for binding in pack.types.values() {
+        // Conversation-family spellings (`channel`, `frame`, `send`, `recv`)
+        // resolve only through the parser's canonical type ident. They are
+        // never symbols: the words stay ordinary identifiers (a user `fn send`
+        // must not collide with a type alias).
+        if matches!(binding.kind, TypeBindingKind::Frame(_)) {
+            continue;
+        }
         let spellings = std::iter::once(binding.canonical.as_str())
             .chain(binding.aliases.iter().map(String::as_str));
         for spelling in spellings {
@@ -958,7 +971,7 @@ fn register_locale_pack_type_spellings(
                 // Census relational names are reader-surface rows only in S2;
                 // no bare `TypeId` until the S3/S4 type surface lands.
                 TypeBindingKind::Relational(_) => None,
-                TypeBindingKind::Ratio => None,
+                TypeBindingKind::Ratio | TypeBindingKind::Frame(_) => None,
             };
             let symbol = scope::Symbol {
                 def_id: resolver.fresh_builtin_def_id(),

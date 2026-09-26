@@ -198,6 +198,12 @@ filtrum = "ตัวกรอง"
 series = "ซีรีส์"
 census = "สำมะโน"
 ratio = "ratio"
+# Conversation family (DECISIONS D6.16). The meus/tuus rows also spell
+# the sermo view methods `s.meus<T>()` / `s.tuus<T>()`.
+sermo = "ช่องทาง"
+scrinium = "เฟรม"
+meus = "ส่ง"
+tuus = "รับ"
 
 [diagnostics.UNRES001]
 message = "คีย์เวิร์ด '{keyword}' ไม่ได้ประกาศไว้สำหรับชุดภาษา '{pack}'"

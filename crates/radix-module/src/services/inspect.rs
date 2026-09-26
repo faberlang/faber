@@ -418,7 +418,7 @@ fn prepare_hir_prerequisites(
     let mut resolver = crate::semantic::Resolver::new();
     let mut types = crate::semantic::TypeTable::new();
     crate::builtins::register(&mut resolver, &mut types, interner);
-    crate::builtins::register_frame_types_if_needed(program, &mut resolver, &mut types, interner);
+    crate::builtins::register_frame_types_if_needed(program, &mut resolver, &mut types, interner, None);
 
     if let Err(errors) = crate::semantic::passes::collect::collect(program, &mut resolver, &mut types) {
         let mut lines = vec!["collection errors:".to_owned()];

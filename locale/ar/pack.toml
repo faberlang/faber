@@ -198,6 +198,12 @@ filtrum = "مرشح"
 series = "سلسلة"
 census = "تعداد"
 ratio = "ratio"
+# Conversation family (DECISIONS D6.16). The meus/tuus rows also spell
+# the sermo view methods `s.meus<T>()` / `s.tuus<T>()`.
+sermo = "قناة"
+scrinium = "إطار"
+meus = "إرسال"
+tuus = "استقبال"
 
 [diagnostics.UNRES001]
 message = "الكلمة '{keyword}' غير معلنة لحزمة القارئ '{pack}'"
