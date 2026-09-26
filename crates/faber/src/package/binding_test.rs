@@ -49,11 +49,13 @@ fn has_issue(diagnostics: &[radix::module::diagnostics::Diagnostic], issue: &str
 fn compiler_analysis_handles_annotations_multiline_signatures_and_next_line_bodies() {
     let root = test_package(
         "analyzed-layout",
-        r"@ future
+        r"@ public
+@ future
 fn delegata(
     string value
 ) → string
 
+@ public
 fn localis(
     string value
 ) → string
@@ -105,7 +107,7 @@ path = "rust/shim.rs"
 fn rust_probe_rejects_a_missing_symbol() {
     let root = test_package(
         "missing-symbol",
-        "fn delegata(string value) → string\n",
+        "@ public\nfn delegata(string value) → string\n",
         r#"[functions."fixture:api.delegata"]
 symbol = "crate::shim::delegata"
 
@@ -125,7 +127,7 @@ path = "rust/shim.rs"
 fn rust_probe_rejects_a_signature_mismatch() {
     let root = test_package(
         "wrong-signature",
-        "fn delegata(string value) → string\n",
+        "@ public\nfn delegata(string value) → string\n",
         r#"[functions."fixture:api.delegata"]
 symbol = "crate::shim::delegata"
 
@@ -145,7 +147,7 @@ path = "rust/shim.rs"
 fn rust_probe_rejects_a_sync_symbol_for_an_async_contract() {
     let root = test_package(
         "wrong-async-signature",
-        "@ future\nfn delegata(string value) → string\n",
+        "@ public\n@ future\nfn delegata(string value) → string\n",
         r#"[functions."fixture:api.delegata"]
 symbol = "crate::shim::delegata"
 
@@ -165,7 +167,7 @@ path = "rust/shim.rs"
 fn rust_probe_rejects_a_missing_error_channel() {
     let root = test_package(
         "wrong-error-signature",
-        "fn delegata(string value) → string ⇥ string\n",
+        "@ public\nfn delegata(string value) → string ⇥ string\n",
         r#"[functions."fixture:api.delegata"]
 symbol = "crate::shim::delegata"
 
@@ -184,7 +186,7 @@ path = "rust/shim.rs"
 fn duplicate_binding_rows_are_rejected_by_manifest_parsing() {
     let root = test_package(
         "duplicate-row",
-        "fn delegata(string value) → string\n",
+        "@ public\nfn delegata(string value) → string\n",
         r#"[functions."fixture:api.delegata"]
 symbol = "crate::shim::delegata"
 
@@ -232,7 +234,7 @@ fn dot_source_library_with_bindings_verifies() {
     // with package_member_empty on the bare `.` member path.
     let root = test_package(
         "dot-source",
-        "fn localis() → string { return \"ok\" }\n",
+        "@ public\nfn localis() → string { return \"ok\" }\n",
         r#"[functions."fixture:api.localis"]
 symbol = "crate::shim::localis"
 
@@ -250,7 +252,7 @@ path = "rust/shim.rs"
     // `.`-source keeps sources at the package root, not under `src/`.
     fs::write(
         root.path().join("api.fab"),
-        "fn localis() → string { return \"ok\" }\n",
+        "@ public\nfn localis() → string { return \"ok\" }\n",
     )
     .expect("write package-root source");
     fs::remove_dir_all(root.path().join("src")).expect("remove default src dir");
@@ -267,7 +269,7 @@ fn src_source_library_with_bindings_still_verifies() {
     // source-root resolution was aligned with discovery's supported set.
     let root = test_package(
         "src-source",
-        "fn localis() → string { return \"ok\" }\n",
+        "@ public\nfn localis() → string { return \"ok\" }\n",
         r#"[functions."fixture:api.localis"]
 symbol = "crate::shim::localis"
 
@@ -314,7 +316,7 @@ fn symlinked_shim_escape_is_rejected() {
 
     let root = test_package(
         "shim-symlink",
-        "fn delegata(string value) → string\n",
+        "@ public\nfn delegata(string value) → string\n",
         r#"[functions."fixture:api.delegata"]
 symbol = "crate::shim::delegata"
 
@@ -405,7 +407,7 @@ fn empty_source_has_no_declarations() {
 fn all_local_functions_without_bindings() {
     let root = test_package(
         "local-only",
-        "fn localis() → string { return \"ok\" }\n",
+        "@ public\nfn localis() → string { return \"ok\" }\n",
         "",
         "",
     );
@@ -413,4 +415,42 @@ fn all_local_functions_without_bindings() {
         verify_library_bindings(root.path(), "rust").expect("local functions without bindings");
     assert_eq!(result.declarations, 1);
     assert_eq!(result.bindings, 0);
+}
+
+// DECISIONS D5.1 for bodyless binding declarations: they follow the one
+// export-visibility rule. A marked declaration is a binding contract; an
+// unmarked one is module-private, so a manifest row naming it matches nothing.
+
+const LIGATA_BINDINGS: &str = r#"[functions."fixture:api.ligata"]
+symbol = "crate::shim::ligata"
+
+[shim]
+path = "rust/shim.rs"
+"#;
+const LIGATA_SHIM: &str = "pub fn ligata(via: String) -> Result<String, String> { Ok(via) }\n";
+
+#[test]
+fn marked_bodyless_binding_declaration_is_a_binding_contract() {
+    let root = test_package(
+        "marked-bodyless",
+        "@ public\nfn ligata(string via) → string ⇥ string\n",
+        LIGATA_BINDINGS,
+        LIGATA_SHIM,
+    );
+    let report = verify_library_binding_shapes(root.path(), "rust")
+        .expect("a marked bodyless declaration binds");
+    assert_eq!(report.bindings, 1);
+}
+
+#[test]
+fn unmarked_bodyless_binding_declaration_is_module_private() {
+    let root = test_package(
+        "unmarked-bodyless",
+        "fn ligata(string via) → string ⇥ string\n",
+        LIGATA_BINDINGS,
+        LIGATA_SHIM,
+    );
+    let diagnostics = verify_library_binding_shapes(root.path(), "rust")
+        .expect_err("an unmarked bodyless declaration is not a binding contract");
+    assert!(has_issue(&diagnostics, "binding_unknown_declaration"));
 }

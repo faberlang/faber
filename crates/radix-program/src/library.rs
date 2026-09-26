@@ -536,12 +536,11 @@ use radix_module::hir::{
 };
 use radix_module::lexer::Interner;
 use radix_module::parser;
+use radix_module::program::program_export_surface;
 use radix_module::semantic::passes::visibility_annotation::{
-    VisibilityTier, has_private_visibility_annotation, statement_export_tier,
+    VisibilityTier, has_private_visibility_annotation,
 };
-use radix_module::syntax::{
-    AnnotationKind, Expr, ExprKind, Program, StmtKind, Visibility, Visitor, walk_expr,
-};
+use radix_module::syntax::{Expr, ExprKind, Program, StmtKind, Visibility, Visitor, walk_expr};
 
 use crate::import_graph::{
     inner_library_import_unresolved_diagnostic, library_import_binding,
@@ -1145,7 +1144,7 @@ pub fn library_generates_rust_module(
 ) -> Result<bool, Diagnostic> {
     let cached = load_cached_library_interface(&import.module, library_cache)?;
     Ok(cached.program.statements.iter().any(|stmt| {
-        !has_private_visibility(&stmt.annotations, &cached.interner)
+        !has_private_visibility_annotation(stmt, &cached.interner)
             && matches!(
                 stmt.kind,
                 StmtKind::Func(_)
@@ -1669,7 +1668,7 @@ fn library_interface_items(
 
     let mut items = Vec::new();
     for stmt in &cached.program.statements {
-        if has_private_visibility(&stmt.annotations, &cached.interner) {
+        if has_private_visibility_annotation(stmt, &cached.interner) {
             continue;
         }
         if let Some(mut item) = library_interface_item(stmt, &cached.interner)? {
@@ -1687,127 +1686,6 @@ fn library_interface_items(
         }
     }
     Ok(items)
-}
-
-#[must_use]
-pub fn program_declaration_surface(
-    program: &Program,
-    interner: &Interner,
-) -> BTreeMap<String, VisibilityTier> {
-    let mut surface = BTreeMap::new();
-    for stmt in &program.statements {
-        // Package-path declaration surface: unmarked stays exported (the
-        // module-private default is radix-scoped in VM-U2; the package-path
-        // flip is a follow-on). Explicit `@ privata` remains module-private
-        // so same-package consumers get SEM006 instead of a missing-export.
-        let tier = if has_private_visibility_annotation(stmt, interner) {
-            VisibilityTier::Privata
-        } else {
-            statement_export_tier(stmt, interner).unwrap_or(VisibilityTier::Publica)
-        };
-        if let Some(name) = stmt_export_name(stmt, interner) {
-            surface.insert(name, tier);
-        }
-        for companion in backward_companion_export_names(stmt, interner) {
-            surface.insert(companion, VisibilityTier::Publica);
-        }
-    }
-    surface
-}
-
-#[must_use]
-pub fn program_export_surface(
-    program: &Program,
-    interner: &Interner,
-) -> BTreeMap<String, VisibilityTier> {
-    let mut surface = BTreeMap::new();
-    for stmt in &program.statements {
-        if has_private_visibility(&stmt.annotations, interner) {
-            continue;
-        }
-        // Package-path legacy surface: unmarked declarations remain exported
-        // (the flip to module-private defaults is radix-scoped in VM-U2; the
-        // package-path flip is a follow-on). The tier is preserved so
-        // `@ interna` fails closed cross-package through the driver.
-        let tier = statement_export_tier(stmt, interner).unwrap_or(VisibilityTier::Publica);
-        if let Some(name) = stmt_export_name(stmt, interner) {
-            surface.insert(name, tier);
-        }
-        // `@ radix backward` companions are compiler-generated and have no
-        // source statement of their own; their export names are derived from
-        // the annotation so consumers can call them across import boundaries
-        // (SEM004).
-        for companion in backward_companion_export_names(stmt, interner) {
-            surface.insert(companion, VisibilityTier::Publica);
-        }
-    }
-    surface
-}
-
-/// Companion export names from `@ radix backward "name"` annotations on a
-/// function statement.
-fn backward_companion_export_names(
-    stmt: &radix_module::syntax::Stmt,
-    interner: &Interner,
-) -> Vec<String> {
-    let StmtKind::Func(decl) = &stmt.kind else {
-        return Vec::new();
-    };
-    let mut names = Vec::new();
-    for annotation in stmt.annotations.iter().chain(decl.annotations.iter()) {
-        let AnnotationKind::Statement(annotation_stmt) = &annotation.kind else {
-            continue;
-        };
-        if interner.resolve(annotation_stmt.name.name) != "radix" {
-            continue;
-        }
-        let mut args = annotation_stmt.args.iter();
-        let Some(radix_module::lexer::TokenKind::Ident(directive)) =
-            args.next().map(|arg| &arg.kind)
-        else {
-            continue;
-        };
-        if interner.resolve(*directive) != "backward" {
-            continue;
-        }
-        let Some(radix_module::lexer::TokenKind::String(name)) = args.next().map(|arg| &arg.kind)
-        else {
-            continue;
-        };
-        names.push(interner.resolve(*name).to_owned());
-    }
-    names
-}
-
-#[must_use]
-pub fn has_private_visibility(
-    annotations: &[radix_module::syntax::Annotation],
-    interner: &Interner,
-) -> bool {
-    annotations.iter().any(|annotation| match &annotation.kind {
-        AnnotationKind::Privata => true,
-        AnnotationKind::Statement(stmt) => interner.resolve(stmt.name.name) == "privata",
-        _ => false,
-    })
-}
-
-fn stmt_export_name(stmt: &radix_module::syntax::Stmt, interner: &Interner) -> Option<String> {
-    let name = match &stmt.kind {
-        StmtKind::Interface(interface) => interner.resolve(interface.name.name),
-        StmtKind::Func(func) => interner.resolve(func.name.name),
-        StmtKind::TypeAlias(alias) => interner.resolve(alias.name.name),
-        StmtKind::Class(class) => interner.resolve(class.name.name),
-        StmtKind::Enum(enm) => interner.resolve(enm.name.name),
-        StmtKind::Union(union) => interner.resolve(union.name.name),
-        StmtKind::Var(var) => {
-            let radix_module::syntax::BindingPattern::Ident(ident) = &var.binding else {
-                return None;
-            };
-            interner.resolve(ident.name)
-        }
-        _ => return None,
-    };
-    Some(name.to_owned())
 }
 
 /// True when a function body opens a host stream (`ad`) so package codegen can

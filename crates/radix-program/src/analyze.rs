@@ -45,8 +45,7 @@ use crate::library::{
     LibraryInterfaceCache, LibraryResolver, LocaleLoader, analysis_source_for_file,
     attach_library_provenance_with_links, expand_library_imports, library_cached_file_interface,
     library_interface_declaration_surface, library_interface_export_surface,
-    library_interface_has_module, library_interface_source, program_declaration_surface,
-    program_export_surface,
+    library_interface_has_module, library_interface_source,
 };
 use crate::manifest::read_manifest;
 use crate::modules::module_segments_for_file;
@@ -54,6 +53,7 @@ use crate::paths::normalize_path;
 use crate::source_files::{is_proba_source_path, load_package_source, package_source_files};
 use crate::test_source_filter::TestSourceFilter;
 use crate::{LibraryImportBinding, PackageFile};
+use radix_module::program::{program_declaration_surface, program_export_surface};
 
 /// Reused [`artifact_plan::ModuleId`] — the one module identity in this crate.
 pub use crate::artifact_plan::ModuleId;

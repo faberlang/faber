@@ -737,6 +737,10 @@ mod const_member_lane_tests;
 mod closure_env_link_tests;
 
 #[cfg(test)]
+#[path = "private_helper_link_test.rs"]
+mod private_helper_link_tests;
+
+#[cfg(test)]
 #[path = "stats_route_test.rs"]
 mod stats_route_tests;
 

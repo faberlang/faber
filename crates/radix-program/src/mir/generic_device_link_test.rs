@@ -52,6 +52,19 @@ main {
     const _ r22 ← devicemath.kadd(a, b)
     const _ again22 ← devicemath.kadd(a, b)
     const _ r88 ← devicemath.kadd(c, c)
+    print "ok"
+}
+"#;
+
+/// DECISIONS D5.1: the unmarked `khelper` kernel is module-private, so a
+/// cross-package consumer that names it is rejected at the import seam.
+const DEVICE_MAIN_PRIVATE_HELPER: &str = r#"+++
+locale = "en"
++++
+import from "optlib:devicemath" devicemath
+
+main {
+    const tensor<f32, []> seed ← empty
     const tensor<f32, [4]> v ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [4])
     const tensor<f32, [4]> w ← seed.from_flat([4.0, 3.0, 2.0, 1.0], [4])
     const _ rh ← devicemath.khelper(v, w)
@@ -60,6 +73,10 @@ main {
 "#;
 
 fn write_device_package(dir: &std::path::Path) -> std::path::PathBuf {
+    write_device_package_with_main(dir, DEVICE_MAIN)
+}
+
+fn write_device_package_with_main(dir: &std::path::Path, main: &str) -> std::path::PathBuf {
     let src = dir.join("src");
     let libhome = dir.join("libhome");
     let library = libhome.join("optlib");
@@ -91,7 +108,7 @@ optlib = "1.0.0"
     );
     fs::write(dir.join("faber.lock"), lock).expect("write faber.lock");
     fs::write(library.join("src/devicemath.fab"), DEVICE_MATH_LIB).expect("write library module");
-    fs::write(src.join("main.fab"), DEVICE_MAIN).expect("write main.fab");
+    fs::write(src.join("main.fab"), main).expect("write main.fab");
     src.join("main.fab")
 }
 
@@ -104,8 +121,12 @@ fn literal_shape(types: &radix_types::TypeTable, index: radix_types::IndexId) ->
 
 /// done_when (a), (d): one concrete `MirMonomorphizationKey` per requested
 /// type/shape binding, with the route's provider identity and v2 device
-/// contract carried into the returned package lowering metadata — public
-/// Kernel and unmarked private-helper cases both register.
+/// contract carried into the returned package lowering metadata. Under
+/// DECISIONS D5.1 only the `@ public` Kernel crosses the package boundary:
+/// the unmarked `khelper` is module-private and never becomes an imported
+/// device route (its private launch tier is proven through a same-package
+/// `@ internal` sibling in
+/// `package_mir_internal_sibling_device_helper_registers_private`).
 #[test]
 fn package_mir_registers_imported_device_instances() {
     let dir = crate::test_support::test_temp_dir("generic-device-link");
@@ -186,25 +207,15 @@ fn package_mir_registers_imported_device_instances() {
                 "registration key must join the merged synthetic template source"
             );
 
-            // Unmarked `@ kernel` helper: private launch visibility, still an
-            // importable export that registers its concrete instance.
-            let khelper = registration_of("khelper");
-            assert_eq!(
-                khelper.route.contract.role,
-                radix_module::file_interface::InterfaceDeviceRole::Kernel
+            // Unmarked `@ kernel` helper: module-private under D5.1, so it is
+            // never an importable device route of the library.
+            assert!(
+                lowered
+                    .imported_device_registrations
+                    .iter()
+                    .all(|registration| registration.route.identity.name != "khelper"),
+                "the module-private khelper must not register as an imported route"
             );
-            assert_eq!(
-                khelper.route.contract.visibility,
-                radix_module::file_interface::InterfaceDeviceVisibility::Private
-            );
-            assert!(khelper.route.contract.is_composable());
-            let helper_shapes = khelper
-                .key
-                .shape_args
-                .iter()
-                .filter_map(|index| literal_shape(types, *index))
-                .collect::<Vec<_>>();
-            assert_eq!(helper_shapes, vec![4], "khelper instance must bind [4]");
         },
     )
     .unwrap_or_else(|errors| panic!("device package MIR must link, got {:?}", errors));
@@ -338,4 +349,134 @@ optlib = "1.0.0"
             .map(|error| (error.code, error.issue()))
             .collect::<Vec<_>>()
     );
+}
+
+/// DECISIONS D5.1 converse of the old "unmarked helper stays importable"
+/// shape: a cross-package consumer naming the unmarked (module-private)
+/// `khelper` kernel is rejected at the library import seam with the named
+/// `namespace_missing_export` issue.
+#[test]
+fn package_mir_module_private_device_helper_is_not_importable_cross_package() {
+    let dir = crate::test_support::test_temp_dir("generic-device-private-helper");
+    write_device_package_with_main(dir.as_ref(), DEVICE_MAIN_PRIVATE_HELPER);
+    let config = Config::default().with_library_home(dir.join("libhome"));
+
+    let diagnostics = crate::analyze::check_package(
+        &config,
+        &dir.join("faber.toml"),
+        &crate::test_support::test_analysis_seams(),
+    );
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.issue() == Some("namespace_missing_export")),
+        "the module-private helper must not be importable cross-package, got {:?}",
+        diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
+            .collect::<Vec<_>>()
+    );
+}
+
+const INTERNAL_SIBLING_HELPERS: &str = r#"+++
+locale = "en"
++++
+@ kernel
+@ internal
+fn khelper<size M>(tensor<f32, [M]> a, tensor<f32, [M]> b) → tensor<f32, [M]> {
+    return a + b
+}
+
+# Same-unit caller keeps the generic entry non-orphaned (ADM001), mirroring
+# the library fixture's `helper_4`.
+@ internal
+fn helper_4(tensor<f32, [4]> a, tensor<f32, [4]> b) → tensor<f32, [4]> {
+    return khelper(a, b)
+}
+"#;
+
+const INTERNAL_SIBLING_MAIN: &str = r#"+++
+locale = "en"
++++
+import from "./helpers" helpers
+
+main {
+    const tensor<f32, []> seed ← empty
+    const tensor<f32, [4]> v ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [4])
+    const tensor<f32, [4]> w ← seed.from_flat([4.0, 3.0, 2.0, 1.0], [4])
+    const _ rh ← helpers.khelper(v, w)
+    print "ok"
+}
+"#;
+
+/// The private launch tier that the unmarked cross-package helper used to
+/// carry, expressed through what D5.1 still admits: an `@ internal` kernel
+/// imported by a same-package sibling registers its concrete instance with
+/// `Private` launch visibility (only `@ public` is a Public launch fact).
+#[test]
+fn package_mir_internal_sibling_device_helper_registers_private() {
+    let dir = crate::test_support::test_temp_dir("generic-device-internal-sibling");
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "generic-device-internal-sibling"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(src.join("helpers.fab"), INTERNAL_SIBLING_HELPERS).expect("write helpers.fab");
+    fs::write(src.join("main.fab"), INTERNAL_SIBLING_MAIN).expect("write main.fab");
+    let entry = src.join("main.fab");
+    let config = Config::default().with_library_home(dir.join("libhome"));
+
+    with_interpreted_lowered_package_mir(
+        &config,
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        |lowered| {
+            let khelper = lowered
+                .imported_device_registrations
+                .iter()
+                .find(|registration| registration.route.identity.name == "khelper")
+                .unwrap_or_else(|| {
+                    panic!(
+                        "the internal sibling helper must register; got {:?}",
+                        lowered
+                            .imported_device_registrations
+                            .iter()
+                            .map(|registration| registration.route.identity.name.clone())
+                            .collect::<Vec<_>>()
+                    )
+                });
+            assert_eq!(
+                khelper.route.contract.role,
+                radix_module::file_interface::InterfaceDeviceRole::Kernel
+            );
+            assert_eq!(
+                khelper.route.contract.visibility,
+                radix_module::file_interface::InterfaceDeviceVisibility::Private
+            );
+            assert!(khelper.route.contract.is_composable());
+            let types = lowered.validated.validation().types.as_table();
+            let helper_shapes = khelper
+                .key
+                .shape_args
+                .iter()
+                .filter_map(|index| literal_shape(types, *index))
+                .collect::<Vec<_>>();
+            assert_eq!(helper_shapes, vec![4], "khelper instance must bind [4]");
+        },
+    )
+    .unwrap_or_else(|errors| panic!("internal sibling device helper must link, got {:?}", errors));
 }

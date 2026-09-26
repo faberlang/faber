@@ -74,11 +74,11 @@ const LOCAL_MAIN: &str = "import from \"./util\" * as utilModule\n\nfn run() →
 const LOCAL_UTIL: &str = "@ public\nfn salutare() → string {\n    return \"salve\"\n}\n";
 
 const CONST_MEMBER_MAIN: &str = "import from \"./util\" * as utilModule\n\nfn run() → string {\n    return utilModule.VALUE\n}\n\nmain {\n    print utilModule.VALUE\n}\n";
-const CONST_MEMBER_UTIL: &str = "const string VALUE ← \"salve\"\n";
+const CONST_MEMBER_UTIL: &str = "@ public\nconst string VALUE ← \"salve\"\n";
 
 const LIBRARY_CONST_MAIN: &str = "import from \"constlib:vals\" vals\n\nfn run() → string {\n    return vals.LIBRARY_VALUE\n}\n\nmain {\n    print vals.LIBRARY_VALUE\n}\n";
 const LIBRARY_CONST_VALS: &str =
-    "+++\nlocale = \"en\"\n+++\nconst string LIBRARY_VALUE ← \"salve\"\n";
+    "+++\nlocale = \"en\"\n+++\n@ public\nconst string LIBRARY_VALUE ← \"salve\"\n";
 
 /// Entry that CALLS a const data member — an unsupported shape that must
 /// keep the non-function fail-closed diagnostic (U1 `done_when` 4).
@@ -408,7 +408,10 @@ fn build_load_round_trip_with_local_import() {
     assert_eq!(main.local_links.len(), 1);
     assert_eq!(main.local_links[0].binding, "utilModule");
     assert_eq!(main.local_links[0].target, "src/util.fab");
-    assert_eq!(main.export_names, vec!["run".to_owned()]);
+    // D5.1: the entry's unmarked `fn run()` is module-private, so the entry
+    // exports nothing; the imported module's `@ public fn salutare()` is the
+    // export surface the round trip must preserve.
+    assert!(main.export_names.is_empty());
 
     let util = loaded
         .modules
@@ -417,6 +420,7 @@ fn build_load_round_trip_with_local_import() {
         .expect("util module");
     assert!(!util.is_entry);
     assert!(util.local_links.is_empty());
+    assert_eq!(util.export_names, vec!["salutare".to_owned()]);
 }
 
 #[test]

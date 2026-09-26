@@ -834,6 +834,7 @@ rustc = ""
     fs::write(
         locked_interfaces.join("fs/path.fab"),
         r#"
+@ publica
 functio locked_label() → textus {
   redde "locked"
 }
@@ -843,6 +844,7 @@ functio locked_label() → textus {
     fs::write(
         library_home.join("norma/src/fs/path.fab"),
         r#"
+@ publica
 functio fallback_label() → textus {
   redde "fallback"
 }
@@ -4186,6 +4188,56 @@ fn label() → int {
 }
 
 #[test]
+fn package_mir_linking_reports_unmarked_namespace_member_as_module_private() {
+    // D5.1: an unmarked top-level declaration is module-private on the
+    // package path too — one export-visibility resolver for both paths.
+    let dir = test_temp_dir("package-mir-unmarked-namespace");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+import from "./auxilium" Aux
+
+main {
+  print Aux.occultum()
+}
+"#,
+    )
+    .expect("write entry");
+    fs::write(
+        dir.join("auxilium.fab"),
+        r"
+fn occultum() → int {
+  return 1
+}
+
+@ public
+fn publicum() → int {
+  return 2
+}
+",
+    )
+    .expect("write auxilium");
+
+    let mut host = BufferHost::default();
+    let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
+        .expect_err("unmarked namespace member access should fail package analysis");
+
+    assert!(host.stdout_lines.is_empty());
+    assert!(
+        diagnostics.iter().any(|diag| {
+            diagnostic_has_issue(diag, "import_module_private")
+                && diagnostic_has_arg(diag, "name", "occultum")
+        }),
+        "expected module-private diagnostic for unmarked member, got {:?}",
+        diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn package_mir_linking_reports_private_namespace_diagnostic() {
     let dir = test_temp_dir("package-mir-private-namespace");
     let entry = dir.join("main.fab");
@@ -4862,6 +4914,7 @@ fn compile_package_preserves_file_stem_named_type_under_import_alias() {
         library_home.path(),
         "Thing",
         r"
+@ publica
 genus Thing {
     textus name
 }
@@ -6967,7 +7020,7 @@ rusqlite = "0.32"
     .expect("write manifest");
     fs::write(
         dir.join("src/sqlite.fab"),
-        "fn exec(string via) → string\nfn local() → string { return \"ok\" }\n",
+        "@ public\nfn exec(string via) → string\n@ public\nfn local() → string { return \"ok\" }\n",
     )
     .expect("write source");
     fs::write(
@@ -7017,7 +7070,11 @@ bindings = "bindings/rust.toml"
 "#,
     )
     .expect("write manifest");
-    fs::write(dir.join("src/sqlite.fab"), "fn exec(string via) → string\n").expect("write source");
+    fs::write(
+        dir.join("src/sqlite.fab"),
+        "@ public\nfn exec(string via) → string\n",
+    )
+    .expect("write source");
     fs::write(dir.join("bindings/rust.toml"), "").expect("write bindings");
 
     let diagnostics = verify_library_bindings(&dir, "rust").expect_err("missing binding");
@@ -7753,6 +7810,7 @@ targets = ["ts"]
         lib_root.join("lalib/src/math.fab"),
         r#"# Public import: importa ex "lalib:math" math
 
+@ publica
 genus Vector3 {
     lista<numerus> elementa
 
@@ -7761,6 +7819,7 @@ genus Vector3 {
     }
 }
 
+@ publica
 functio make_vector() → Vector3 {
     redde Vector3 { elementa = [1, 2, 3] }
 }
@@ -8409,6 +8468,7 @@ fn check_package_types_top_level_json_solve_namespace_call() {
         library_home.path(),
         "json/solve",
         r"
+@ publica
 functio solve(textus json) → valor {
     redde json ↦ valor
 }
@@ -10051,6 +10111,7 @@ fn transitive_nested_lista_lista_textus_typechecks() {
         library_home.path(),
         "nested_lista_probe",
         r"
+@ publica
 functio vacua_tabula() → lista<lista<textus>> {
     redde vacua
 }
@@ -10222,6 +10283,7 @@ fn transitive_library_diamond_dedupes_shared_dependency() {
         library_home.path(),
         "shared_d",
         r#"
+@ publica
 functio tag() → textus {
     redde "d"
 }
@@ -10233,6 +10295,7 @@ functio tag() → textus {
         r#"
 importa ex "norma:shared_d" shared_d
 
+@ publica
 functio via_b() → textus {
     redde shared_d.tag()
 }
@@ -10244,6 +10307,7 @@ functio via_b() → textus {
         r#"
 importa ex "norma:shared_d" shared_d
 
+@ publica
 functio via_c() → textus {
     redde shared_d.tag()
 }
@@ -10256,6 +10320,7 @@ functio via_c() → textus {
 importa ex "norma:dep_b" dep_b
 importa ex "norma:dep_c" dep_c
 
+@ publica
 functio both() → textus {
     redde dep_b.via_b() + dep_c.via_c()
 }
@@ -10711,7 +10776,10 @@ entry = "main.fab"
 }
 
 fn examples_sqlite_lib() -> Option<PathBuf> {
-    let lib = PathBuf::from("~/work/faberlang/examples/sqlite");
+    // Resolve the sibling `examples/` checkout of this radix tree (main
+    // container or lane packet), never a hardcoded main-checkout path, so the
+    // shipped library is verified at the same revision as the compiler.
+    let lib = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/sqlite");
     if lib.exists() { Some(lib) } else { None }
 }
 
@@ -11028,7 +11096,11 @@ bindings = "bindings/rust.toml"
 "#,
     )
     .expect("lib manifest");
-    fs::write(lib.join("src/math.fab"), "fn double(int n) → int\n").expect("lib source");
+    fs::write(
+        lib.join("src/math.fab"),
+        "@ public\nfn double(int n) → int\n",
+    )
+    .expect("lib source");
     fs::write(
         lib.join("rust/shim.rs"),
         "pub fn double(n: i64) -> i64 { n * 2 }\n",
@@ -11190,7 +11262,11 @@ bindings = "bindings/rust.toml"
 "#,
     )
     .expect("lib manifest");
-    fs::write(lib.join("src/math.fab"), "fn double(int n) → int\n").expect("lib source");
+    fs::write(
+        lib.join("src/math.fab"),
+        "@ public\nfn double(int n) → int\n",
+    )
+    .expect("lib source");
     fs::write(
         lib.join("rust/shim.rs"),
         "pub fn double(n: i64) -> i64 { n * 2 }\n",
@@ -13846,7 +13922,8 @@ main {
 
 #[test]
 fn library_interface_exports_backward_companion() {
-    // SEM004: `@ radix backward` companions must appear in the library file
+    // SEM004: `@ radix backward` companions of a `@ public` function share
+    // its export tier (D5.1), so they must appear in the library file
     // interface so consumers can call them across `importa` boundaries
     // without a mirrored annotation. Covers both the parse-level export-name
     // collection (program_export_names via package analysis) and the
@@ -13879,6 +13956,7 @@ targets = ["fmir"]
     pass
 }
 
+@ public
 @ radix lane "air"
 @ radix backward "loss_backward"
 fn simple_loss(
@@ -13987,10 +14065,12 @@ targets = ["fmir"]
     .expect("write library manifest");
     fs::write(
         lib_root.join("testgrad/src/gradient.fab"),
-        r#"functio nil() → vacuum {
+        r#"@ publica
+functio nil() → vacuum {
     tacet
 }
 
+@ publica
 @ radix lane "air"
 @ radix backward "loss_backward"
 functio simple_loss(
@@ -14082,10 +14162,12 @@ targets = ["fmir"]
     .expect("write library manifest");
     fs::write(
         lib_root.join("testgrad/src/gradient.fab"),
-        r#"functio nil() → vacuum {
+        r#"@ publica
+functio nil() → vacuum {
     tacet
 }
 
+@ publica
 @ radix lane "air"
 @ radix backward "ghost"
 functio simple_add(numerus a, numerus b) → numerus {
@@ -14158,7 +14240,8 @@ targets = ["fmir"]
     .expect("write library manifest");
     fs::write(
         lib_root.join("testlib/src/inner.fab"),
-        r"functio dupla(numerus value) → numerus {
+        r"@ interna
+functio dupla(numerus value) → numerus {
     redde value * 2
 }
 ",
@@ -14168,6 +14251,7 @@ targets = ["fmir"]
         lib_root.join("testlib/src/outer.fab"),
         r#"importa ex "testlib:inner" inner
 
+@ publica
 functio computa(numerus value) → numerus {
     redde inner.dupla(value) + 1
 }
@@ -14243,10 +14327,12 @@ functio inner(tensor<f32, [2,2]> a, tensor<f32, [2,2]> b) → tensor<f32, [2,2]>
     redde a.addita(b)
 }
 
+@ publica
 functio nil() → vacuum {
     tacet
 }
 
+@ publica
 @ radix lane "air"
 @ radix backward "loss_backward"
 functio simple_loss(
@@ -14335,10 +14421,12 @@ targets = ["fmir"]
         lib_root.join("testgrad/src/gradient.fab"),
         r#"importa ex "testgrad:tensor" tensor
 
+@ publica
 functio nil() → vacuum {
     tacet
 }
 
+@ publica
 @ radix lane "air"
 @ radix backward "loss_backward"
 functio simple_loss(

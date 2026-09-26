@@ -27,8 +27,9 @@ use radix_module::codegen::Target;
 
 /// The gradus `math.fab` twin shape: an exported public size-generic
 /// `@ kernel` template with ordered symbolic shape witnesses and **no
-/// same-unit caller** — a package API, not an orphan — plus an unmarked
-/// helper twin that stays importable with private launch visibility.
+/// same-unit caller** — a package API, not an orphan. (DECISIONS D5.1: an
+/// unmarked helper twin is module-private and no longer importable across
+/// the package boundary; see [`UNMARKED_TWIN_HELPER`].)
 const TWIN_LIB: &str = r#"+++
 locale = "en"
 +++
@@ -37,10 +38,20 @@ locale = "en"
 fn twin_add<size M, size N>(tensor<f32, [M, N]> a, tensor<f32, [M, N]> b) → tensor<f32, [M, N]> {
     return a + b
 }
+"#;
 
+/// The helper twin the pre-D5.1 matrix imported with private launch
+/// visibility: unmarked, so under DECISIONS D5.1 it is module-private. A
+/// same-unit caller keeps it non-orphaned (ADM001) at the library's own
+/// analysis, so the proof isolates the consumer's import seam.
+const UNMARKED_TWIN_HELPER: &str = r#"
 @ kernel
 fn twin_hidden<size M>(tensor<f32, [M]> a, tensor<f32, [M]> b) → tensor<f32, [M]> {
     return a + b
+}
+
+fn hidden_4(tensor<f32, [4]> a, tensor<f32, [4]> b) → tensor<f32, [4]> {
+    return twin_hidden(a, b)
 }
 "#;
 
@@ -57,9 +68,7 @@ main {
     const tensor<f32, [2, 2]> a ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [2, 2])
     const tensor<f32, [2, 2]> b ← seed.from_flat([10.0, 20.0, 30.0, 40.0], [2, 2])
     const tensor<f32, [4]> v ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [4])
-    const tensor<f32, [4]> w ← seed.from_flat([4.0, 3.0, 2.0, 1.0], [4])
     const _ r ← twins.twin_add(a, b)
-    const _ h ← twins.twin_hidden(v, w)
     print "ok"
 }
 "#;
@@ -181,7 +190,12 @@ fn exported_generic_twin_template_is_admitted_and_representable_in_package_mode(
 /// one `MirMonomorphizationKey` bound to the requested shape witnesses, the
 /// registration's route carries the provider identity and v2 contract, the
 /// key joins the merged synthetic template source, and the visibility tier
-/// separates the public entry fact from the unmarked private helper.
+/// records the public entry fact. (Pre-D5.1 this also registered an unmarked
+/// cross-package helper with private launch visibility; that helper is now
+/// module-private and rejected at import — see
+/// `unmarked_twin_helper_is_module_private_and_not_importable` — and the
+/// private launch tier is proven through a same-package `@ internal` sibling
+/// in `generic_device_link_test.rs`.)
 #[test]
 fn imported_twin_instance_records_key_route_registration_and_visibility() {
     let dir = matrix_dir("device-matrix-registration");
@@ -260,20 +274,43 @@ fn imported_twin_instance_records_key_route_registration_and_visibility() {
                     .any(|template| template.source == Some(twin_add.key.source)),
                 "the registration key must join the merged synthetic template source"
             );
-
-            let twin_hidden = registration_of(lowered, "twin_hidden");
-            assert_eq!(
-                twin_hidden.route.contract.visibility,
-                radix_module::file_interface::InterfaceDeviceVisibility::Private,
-                "the unmarked helper twin registers with private launch visibility"
-            );
-            assert!(
-                twin_hidden.route.contract.is_composable(),
-                "the helper stays available to composition"
-            );
         },
     )
     .unwrap_or_else(|errors| panic!("matrix package MIR must link, got {:?}", errors));
+}
+
+/// DECISIONS D5.1 converse of the pre-D5.1 "unmarked helper twin stays
+/// importable" fact: an unmarked size-generic helper twin is module-private,
+/// so the consumer's cross-package call is rejected at the library import
+/// seam with `namespace_missing_export` — it never reaches the link as a
+/// private-visibility route.
+#[test]
+fn unmarked_twin_helper_is_module_private_and_not_importable() {
+    let library = format!("{TWIN_LIB}{UNMARKED_TWIN_HELPER}");
+    let main = TWIN_MAIN.replacen(
+        "    print \"ok\"",
+        "    const tensor<f32, [4]> w ← seed.from_flat([4.0, 3.0, 2.0, 1.0], [4])\n    const _ h ← twins.twin_hidden(v, w)\n    print \"ok\"",
+        1,
+    );
+    let dir = matrix_dir("device-matrix-unmarked-helper");
+    write_twins_package(dir.as_ref(), &library, &main);
+    let config = twins_config(dir.as_ref());
+
+    let diagnostics = crate::analyze::check_package(
+        &config,
+        &dir.join("faber.toml"),
+        &crate::test_support::test_analysis_seams(),
+    );
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.issue() == Some("namespace_missing_export")),
+        "the unmarked helper twin must not be importable cross-package, got {:?}",
+        diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code.clone(), diagnostic.issue()))
+            .collect::<Vec<_>>()
+    );
 }
 
 /// Unadmitted-generic fail-closed (integrated PKG-ADM converse): an
