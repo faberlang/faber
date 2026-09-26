@@ -392,6 +392,7 @@ fn row_conversio_assign_recovery_counts_when_present() {
 fn row_conversio_expression_recovery_counts_when_present() {
     let conv = |recovery: Option<Box<HirExpression>>| {
         expr(HirExpressionKind::Conversio {
+            route: None,
             source: boxed(HirExpressionKind::Literal(HirLiteral::Int(1))),
             target: HirConversioTarget::Type(radix_types::TypeId(1)),
             params: Vec::new(),

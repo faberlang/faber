@@ -240,6 +240,9 @@ mod nodes_tests;
 #[path = "numeric_unary_test.rs"]
 mod numeric_unary_tests;
 #[cfg(test)]
+#[path = "ordo_conversio_test.rs"]
+mod ordo_conversio_tests;
+#[cfg(test)]
 #[path = "potentia_test.rs"]
 mod potentia_tests;
 #[cfg(test)]

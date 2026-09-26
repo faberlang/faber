@@ -2564,6 +2564,18 @@ help = "convert textus or ascii values to regex"
 message = "record conversion requires reconstruction; write `Type { field = value, … }` instead of converting with `↦`"
 help = "reconstruct by writing `Type { field = value, … }` instead of converting with `↦`"
 
+[diagnostics.SEM016.issues.ordo_conversio_string_member]
+message = "this {ordo} has a string-valued member, so it has no numerus conversion"
+help = "only an {ordo} whose members are numbers converts to and from numerus; convert to textus for the member name"
+
+[diagnostics.SEM016.issues.ordo_conversio_recovery_unsupported]
+message = "this {ordo} conversion cannot fail, so it takes no `⊥` default"
+help = "remove the `⊥` default; this {ordo} conversion cannot fail"
+
+[diagnostics.SEM016.issues.conversio_assign_route_unsupported]
+message = "`↤` does not yet convert through an {ordo} row or a registered conversion function"
+help = "write `target ← source ↦ T` instead of `↤` for this conversion"
+
 [diagnostics.SEM016.issues.regex_recovery_unsupported]
 message = "regex conversion does not support a `⊥` default; regex has no literal form, so there is no target-typed value to substitute"
 help = "remove the recovery arm from this regex conversion"

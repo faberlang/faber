@@ -66,7 +66,10 @@ pub(super) trait HirExpressionLoweringVisitor {
             HirExpressionKind::Intervallum { start, end, step, kind } => {
                 self.visit_interval_expr(start, end, step.as_deref(), *kind, expr)
             }
-            HirExpressionKind::Conversio { source, target, params, recovery } => {
+            HirExpressionKind::Conversio { source, target, params, recovery, route } => {
+                if let Some(route) = route {
+                    return self.visit_conversio_route_expr(source, route, recovery.as_deref(), expr);
+                }
                 let target_ty = match target {
                     HirConversioTarget::Type(ty) => *ty,
                     HirConversioTarget::Intervallum(target) => {
@@ -245,6 +248,13 @@ pub(super) trait HirExpressionLoweringVisitor {
         source: &HirExpression,
         target: TypeId,
         params: &[Symbol],
+        recovery: Option<&HirExpression>,
+        expr: &HirExpression,
+    ) -> Option<MirOperand>;
+    fn visit_conversio_route_expr(
+        &mut self,
+        source: &HirExpression,
+        route: &crate::hir::HirConversioRoute,
         recovery: Option<&HirExpression>,
         expr: &HirExpression,
     ) -> Option<MirOperand>;
@@ -563,6 +573,16 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         self.lower_conversio(source, target, params, recovery, expr)
+    }
+
+    fn visit_conversio_route_expr(
+        &mut self,
+        source: &HirExpression,
+        route: &crate::hir::HirConversioRoute,
+        recovery: Option<&HirExpression>,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        self.lower_conversio_route(source, route, recovery, expr)
     }
 
     fn visit_block_expr(&mut self, block: &HirBlock, expr: &HirExpression) -> Option<MirOperand> {
