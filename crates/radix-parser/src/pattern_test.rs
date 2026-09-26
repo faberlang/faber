@@ -149,3 +149,51 @@ discerne sig {
     };
     assert_eq!(result.interner.resolve(*sym), "deadbeef");
 }
+
+/// Arm-head patterns of the first `discerne` statement in `source`.
+fn discerne_patterns(result: &crate::ParseResult) -> &[Pattern] {
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Discerne(stmt) = &program.statements[0].kind else {
+        panic!("expected discerne statement");
+    };
+    &stmt.arms[0].patterns
+}
+
+#[test]
+fn leading_minus_before_a_number_is_a_negated_literal_pattern() {
+    // D22.2: the lexer never produces a signed number, so the pattern parser
+    // owns the sign for integer, decimal, and infinity literals.
+    let result = parse_ok("discerne n {\n    casu -1, -2.5, -∞ { tacet }\n}");
+    let patterns = discerne_patterns(&result);
+    assert_eq!(patterns.len(), 3);
+    assert!(matches!(
+        patterns[0],
+        Pattern::NegatedLiteral(radix_syntax::Literal::Int(1), _)
+    ));
+    assert!(matches!(
+        &patterns[1],
+        Pattern::NegatedLiteral(radix_syntax::Literal::FloatText { value, .. }, _) if *value == 2.5
+    ));
+    assert!(matches!(
+        &patterns[2],
+        Pattern::NegatedLiteral(radix_syntax::Literal::Float(value), _) if value.is_infinite() && *value > 0.0
+    ));
+}
+
+#[test]
+fn minus_before_a_non_number_is_not_a_pattern() {
+    let result = parse(lex("discerne n {\n    casu -x { tacet }\n}"));
+    assert!(!result.success(), "`-x` must not parse as a pattern");
+}
+
+#[test]
+fn nonnumerus_in_pattern_position_is_a_nan_literal_not_a_binding() {
+    // D22.3: the NaN keyword claims the literal slot so lowering can reject
+    // it, instead of silently binding a catch-all name.
+    let result = parse_ok("discerne x {\n    casu nonnumerus { tacet }\n}");
+    let patterns = discerne_patterns(&result);
+    assert!(matches!(
+        &patterns[0],
+        Pattern::Literal(radix_syntax::Literal::Float(value), _) if value.is_nan()
+    ));
+}

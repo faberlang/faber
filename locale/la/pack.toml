@@ -493,6 +493,10 @@ help = "keep '←' for 'figendum'/'variandum' awaited bindings"
 message = "invalid declaration"
 help = "check declaration keywords and required parts"
 
+[diagnostics.PARSE010.issues.declaration_not_top_level]
+message = "declarations are top-level; {functio} and type declarations cannot appear inside a block"
+help = "use a closure, or a top-level function for recursion"
+
 [diagnostics.PARSE010.issues.schema_inheritance]
 message = "a schema cannot attach sub, implet, or an interface"
 help = "keep schemas as plain relational headings"
@@ -1188,6 +1192,10 @@ help = "fix the AST construct for lowering"
 [diagnostics.SEM008.issues.invalid_width_marker]
 message = "unknown width marker for this family"
 help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.nan_pattern]
+message = "a NaN pattern can never match: NaN is not equal to itself"
+help = "test for NaN with a {si} statement instead of a {casu} pattern"
 
 [diagnostics.SEM008.issues.json_valor_pattern]
 message = "JSON document literals are not valid in patterns"

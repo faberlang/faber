@@ -1453,3 +1453,7 @@ mod non_trivia_index_test;
 #[cfg(test)]
 #[path = "nesting_budget_test.rs"]
 mod nesting_budget_test;
+
+#[cfg(test)]
+#[path = "nested_declaration_test.rs"]
+mod nested_declaration_test;

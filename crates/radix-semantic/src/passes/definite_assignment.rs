@@ -324,7 +324,7 @@ impl<'a> DefiniteAssignmentChecker<'a> {
                     self.mark_assigned(*def_id);
                 }
             }
-            HirPattern::Wildcard | HirPattern::Literal(_) => {}
+            HirPattern::Wildcard | HirPattern::Literal(_) | HirPattern::NegatedLiteral(_) => {}
         }
     }
 

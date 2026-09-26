@@ -29,6 +29,22 @@ use radix_lexer::{
 #[allow(clippy::wildcard_imports)]
 use radix_syntax::*;
 
+/// Whether a parsed statement is a declaration that may appear only at top
+/// level (DECISIONS D22.1): a `functio` or a type declaration. Methods live in
+/// `genus` bodies, which parse through their own member loop, not a block.
+fn is_top_level_only_declaration(kind: &StmtKind) -> bool {
+    matches!(
+        kind,
+        StmtKind::Func(_)
+            | StmtKind::Class(_)
+            | StmtKind::Interface(_)
+            | StmtKind::TypeAlias(_)
+            | StmtKind::Schema(_)
+            | StmtKind::Enum(_)
+            | StmtKind::Union(_)
+    )
+}
+
 // STATEMENT DISPATCH
 
 impl Parser {
@@ -2714,6 +2730,15 @@ impl Parser {
         let mut stmts = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() && !self.budget_exhausted {
             match self.parse_stmt() {
+                // D22.1: declarations are top-level. The declaration is parsed
+                // whole so recovery resumes after it, then dropped with a
+                // named diagnostic instead of reaching lowering.
+                Ok(stmt) if is_top_level_only_declaration(&stmt.kind) => {
+                    self.errors.push(
+                        ParseError::structured(ParseErrorKind::DeclarationInvalid, stmt.span)
+                            .with_arg("issue", "declaration_not_top_level"),
+                    );
+                }
                 Ok(stmt) => stmts.push(stmt),
                 Err(e) => {
                     self.errors.push(e);

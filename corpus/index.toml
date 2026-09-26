@@ -2355,6 +2355,12 @@ kind = "keyword"
 category = "control-flow"
 
 [[files]]
+path = "discerne/negative-patterns.fab"
+term = "discerne negative patterns"
+kind = "feature"
+category = "control-flow"
+
+[[files]]
 path = "discerne/type-patterns.fab"
 term = "discerne type patterns"
 kind = "feature"

@@ -978,7 +978,7 @@ fn resolve_pattern(
 ) {
     match pattern {
         Pattern::Wildcard(_) => {}
-        Pattern::Literal(_, _) => {}
+        Pattern::Literal(_, _) | Pattern::NegatedLiteral(_, _) => {}
         Pattern::Type(_ty, bind) => {
             // The type pattern is classified before resolution. Only its
             // optional value binding enters the arm scope; the type name and

@@ -150,7 +150,9 @@ impl TypeChecker<'_> {
                 }
                 self.check_pattern(pattern, expected, span);
             }
-            HirPattern::Literal(lit) => {
+            // A negated pattern types as the literal it negates; the parser
+            // admits only number literals under the sign (D22.2).
+            HirPattern::Literal(lit) | HirPattern::NegatedLiteral(lit) => {
                 let lit_ty = self.literal_type(lit, span, Some(expected));
                 self.unify_assign_issue(lit_ty, expected, span, ISSUE_PATTERN_TYPE_MISMATCH);
             }
