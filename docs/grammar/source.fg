@@ -31,12 +31,14 @@ role_table = [
   "generic",
   "gradient",
   "increment",
+  "literal",
   "range",
   "return_type",
   "shift",
   "string_delimiter",
   "template_hole",
   "tensor_product",
+  "transpose",
   "type_ascription",
   "type_union",
   "unary",
@@ -124,7 +126,7 @@ glyph = "@"
 codepoint = "U+0040"
 unicode_name = "COMMERCIAL AT"
 role = "annotation"
-claiming_slots = ["annotation_sugar", "braced_annotation", "nucleum_braced", "nucleum_sugar"]
+claiming_slots = ["annotation_sugar", "braced_annotation", "nucleum_braced", "nucleum_sugar", "radix_annotation"]
 
 [[glyphs]]
 glyph = "¬"
@@ -146,6 +148,13 @@ codepoint = "U+00D7"
 unicode_name = "MULTIPLICATION SIGN"
 role = "tensor_product"
 claiming_slots = ["multiplicative_expr"]
+
+[[glyphs]]
+glyph = "ᵀ"
+codepoint = "U+1D40"
+unicode_name = "MODIFIER LETTER CAPITAL T"
+role = "transpose"
+claiming_slots = ["transpose_suffix"]
 
 [[glyphs]]
 glyph = "‥"
@@ -237,6 +246,13 @@ codepoint = "U+2207"
 unicode_name = "NABLA"
 role = "gradient"
 claiming_slots = ["gradient_expr"]
+
+[[glyphs]]
+glyph = "∞"
+codepoint = "U+221E"
+unicode_name = "INFINITY"
+role = "literal"
+claiming_slots = ["literal"]
 
 [[glyphs]]
 glyph = "∧"
@@ -358,6 +374,13 @@ role = "tensor_product"
 claiming_slots = ["multiplicative_expr"]
 
 [[glyphs]]
+glyph = "⊘"
+codepoint = "U+2298"
+unicode_name = "CIRCLED DIVISION SLASH"
+role = "tensor_product"
+claiming_slots = ["multiplicative_expr"]
+
+[[glyphs]]
 glyph = "⊙"
 codepoint = "U+2299"
 unicode_name = "CIRCLED DOT OPERATOR"
@@ -370,6 +393,20 @@ codepoint = "U+22BB"
 unicode_name = "XOR"
 role = "bitwise"
 claiming_slots = ["bitwise_xor_expr"]
+
+[[glyphs]]
+glyph = "⤒"
+codepoint = "U+2912"
+unicode_name = "UPWARDS ARROW TO BAR"
+role = "arithmetic"
+claiming_slots = ["additive_expr"]
+
+[[glyphs]]
+glyph = "⤓"
+codepoint = "U+2913"
+unicode_name = "DOWNWARDS ARROW TO BAR"
+role = "arithmetic"
+claiming_slots = ["additive_expr"]
 
 [[glyphs]]
 glyph = "§"
@@ -592,6 +629,8 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙"]
 # | Declarations | `nomen` | import binding name |
 # | Declarations | `ordo` | enum |
 # | Declarations | `publica` | public visibility |
+# | Declarations | `schema` | relational heading (experimental; census-types) |
+# | Declarations | `columna` | relational column (experimental; census-types) |
 # | Declarations | `sit` | inferred immutable local |
 # | Declarations | `sponte` | optional declaration slot |
 # | Declarations | `typus` | type alias |
@@ -620,6 +659,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙"]
 # | Control | `tacet` | no-op |
 # | Error | `adfirma` | assert |
 # | Error | `cape` | local handler |
+# | Error | `capta` | capture boundary (error channel reified as a value) |
 # | Error | `iace` | throw |
 # | Error | `iacit` | throws marker |
 # | Error | `mori` | panic |
@@ -677,6 +717,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙"]
 # | Diagnostics | `scribe` | diagnostic channel |
 # | Diagnostics | `vide` | debug |
 # | Literals | `nihil` | none |
+# | Literals | `nonnumerus` | named NaN literal (`nan` outside the Latin pack) |
 # | JSON | `false` | JSON false |
 # | JSON | `null` | JSON null |
 # | JSON | `true` | JSON true |
@@ -685,6 +726,10 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙"]
 # | Builtin | `scriptum` | write |
 # | Annotation | `fragment` | nucleum fragment |
 # | Annotation | `nucleum` | kernel annotation; kernel closure modifier |
+# | Annotation | `radix` | compiler-reserved annotation family |
+# | Annotation | `lane` | `@ radix` compiler-lane directive |
+# | Annotation | `backward` | `@ radix` gradient-companion directive |
+# | Testing | `erratur` | expect failure |
 # | Testing | `fragilis` | flaky |
 # | Testing | `futurum` | future |
 # | Testing | `metior` | benchmark |
@@ -711,7 +756,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙"]
 @status capture-pending
 IDENTIFIER ::=
 
-# scan.rs scan_number; decimal/hex/bin/oct integers and floats with '_' separators; TokenKind::Integer(u64) or Float(f64)
+# scan.rs scan_number; decimal/hex/bin/oct integers and floats with '_' separators; TokenKind::Integer(u64) or Float(f64); scan.rs also lexes the glyph '∞' as Float(+inf)
 @status capture-pending
 NUMBER ::=
 
@@ -739,7 +784,7 @@ OCTETI_STRING ::=
 @status capture-pending
 NEWLINE ::=
 
-# parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64/f16/f32/f64; not a lexer token
+# parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64 and decimal d32/d64 (numerus only), f16/bf16/f32/f64 (fractus only); not a lexer token
 @status capture-pending
 WIDTH_MARKER ::=
 
@@ -793,7 +838,7 @@ frontmatter   := FRONTMATTER_DELIMITER NEWLINE TOML_LINES FRONTMATTER_DELIMITER 
 program       := statement*
 statement     := annotation* statement_core
 statement_core := importa_decl | binding_decl | functio_decl | genus_decl | implendum_decl
-               | typus_decl | ordo_decl | discretio_decl
+               | typus_decl | ordo_decl | discretio_decl | schema_decl
                | si_stmt | dum_stmt | itera_stmt
                | elige_stmt | discerne_stmt | custodi_stmt | cura_stmt | fac_stmt
                | redde_stmt | reddet_stmt | tacebit_stmt | cede_stmt
@@ -840,7 +885,7 @@ genus_member  := annotation* (field_decl | functio_method_decl)
 field_decl    := 'generis'? 'nexum'? type_annotation IDENTIFIER 'sponte'? ('=' expression)?
 functio_method_decl   := 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 
-annotation            := nucleum_annotation | braced_annotation | annotation_sugar
+annotation            := nucleum_annotation | radix_annotation | braced_annotation | annotation_sugar
 annotation_name        := ANNOTATION_NAME
 braced_annotation      := '@' annotation_name '{' annotation_field_list? '}'
 annotation_field_list   := annotation_field (',' annotation_field)*
@@ -852,6 +897,12 @@ nucleum_braced         := '@' 'nucleum' '{' nucleum_field_list? '}'
 nucleum_modifier       := 'fragment'
 nucleum_field_list      := nucleum_field (',' nucleum_field)*
 nucleum_field          := 'fragment' '=' ('verum' | 'falsum')
+# `@ radix` is reserved for compiler-owned metadata; applications must not
+# define or rely on it. Directive words `lane` and `backward` are claimed by
+# exact spelling after `@ radix`. The braced records `@ radix { lane = STRING }`
+# and `@ radix { param = IDENT, allowed = TYPE, ... }` use braced_annotation.
+radix_annotation       := '@' 'radix' radix_directive NEWLINE
+radix_directive        := 'lane' STRING | 'backward' STRING | 'typus' IDENTIFIER 'in' type_annotation+
 
 implendum_decl   := 'implendum' IDENTIFIER generic_params? '{' implendum_method_decl* '}'
 implendum_method_decl := annotation* 'functio' IDENTIFIER '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
@@ -865,6 +916,12 @@ discretio_decl := 'discretio' IDENTIFIER generic_params? '{' union_member* varia
 union_member  := annotation* field_decl
 variant       := IDENTIFIER ('{' variant_fields '}')?
 variant_fields := (type_annotation IDENTIFIER)*
+
+# Experimental (owned by the census-types goal): a relational heading naming
+# only the columns the application reads. Columns take no separator; the
+# optional `: source` row maps the public column name to a source column.
+schema_decl   := 'schema' IDENTIFIER '{' schema_column* '}'
+schema_column := 'columna' type_annotation IDENTIFIER (':' IDENTIFIER)?
 
 importa_decl     := importa_record | importa_sugar
 importa_record   := 'importa' '{' import_field_list? '}'
@@ -986,10 +1043,13 @@ bitwise_and_expr := shift_expr ('∧' shift_expr)*
 shift_expr      := range_expr (('⇐' | '⇒') range_expr)*
 range_expr      := additive_expr range_tail?
 range_tail  := ('‥' | '…' | 'ante' | 'usque') additive_expr ('per' additive_expr)?
-additive_expr   := multiplicative_expr (('+' | '-') multiplicative_expr)*
-# Glyph products (`·` `×` `⊗` `⊙`) bind at the multiplicative level with `*`,
-# left-associative. `·` inner product dispatches dot/matvec/matmul by rank.
-multiplicative_expr := vel_expr (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙') vel_expr)*
+# `⤒` (maximum) and `⤓` (minimum) are arithmetic extrema at the additive tier,
+# left-associative: `a ⤒ b ⤓ c` is `(a ⤒ b) ⤓ c`.
+additive_expr   := multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
+# Glyph products (`·` `×` `⊗` `⊙`) and Hadamard divide `⊘` bind at the
+# multiplicative level with `*`, left-associative. `·` inner product
+# dispatches dot/matvec/matmul by rank.
+multiplicative_expr := vel_expr (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
 # `vel` is local nullable elimination (`T ∪ nihil vel T → T`), not logical `aut`.
 # It binds tighter than arithmetic so `prefix + item vel ""` is `prefix + (item vel "")`.
 # `velRhs` greedily consumes a following range tail, so `a vel b‥c` is `a vel (b‥c)`.
@@ -1010,22 +1070,27 @@ cast_expr       := gradient_expr ('∷' type_annotation | conversio_expr)*
 conversio_expr        := '↦' type_annotation inline_recovery?
 inline_recovery   := '⇥' unary_expr
 
-call_expr          := primary (call_suffix | member_suffix | optional_suffix | non_null_suffix)*
+call_expr          := primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
 call_suffix    := call_type_args? '(' argument_list ')'
 member_suffix  := '.' IDENTIFIER | '[' expression ']'
+# Postfix rank-2 tensor transpose (U+1D40); sugar for the `transpone` intrinsic.
+transpose_suffix := 'ᵀ'
 optional_suffix := '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
 non_null_suffix := '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
 argument_list  := (argument (',' argument)*)?
 argument      := template_argument | 'sparge'? expression
 template_argument := 'sparge'? IDENTIFIER ':' expression
 
+# `∞` and `nonnumerus` are non-finite floating-point literals; `nonnumerus`
+# is claimed only in the literal slot (a following `(` keeps it a call).
 literal := NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING
-         | 'verum' | 'falsum' | 'nihil'
+         | 'verum' | 'falsum' | 'nihil' | '∞' | 'nonnumerus'
 primary := IDENTIFIER | literal | 'ego'
          | array_literal | json_literal | typed_constructor | iuncta_expr
          | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr
          | first_match_expr
          | summa_expr
+         | capta_expr
          | '(' expression ')'
 ad_expr    := 'ad' ASCII_STRING ad_opener?
 ad_opener  := '(' expression ')'
@@ -1063,6 +1128,10 @@ first_match_expr := 'primus_quem' '(' expression apud_clause? ',' 'ubi' IDENTIFI
 # `filum` is claimed by exact spelling only inside this production.
 summa_expr  := 'summa' 'ex' expression apud_clause? filum_clause? ('fixum' | 'varia') IDENTIFIER block_stmt
 filum_clause := 'filum' IDENTIFIER
+# Capture boundary: `capta` claims its spelling only in expression-primary
+# position directly followed by `{`; the block's trailing expression is the
+# success value and the error channel is reified into a value union.
+capta_expr := 'capta' block_stmt
 
 object_pattern  := '{' pattern_property (',' pattern_property)* '}'
 pattern_property := 'ceteri'? IDENTIFIER ('ut' IDENTIFIER)?
@@ -1078,7 +1147,7 @@ incipiet_stmt := 'incipiet' entry_header block_stmt
 probandum_decl := 'probandum' STRING proba_modifier* '{' probandum_body '}'
 probandum_body := (praepara_block | probandum_decl | proba_stmt)*
 proba_stmt     := 'proba' STRING proba_modifier* block_stmt
-proba_modifier := 'omitte' STRING | 'futurum' STRING | 'solum' | 'tag' STRING
+proba_modifier := 'erratur' | 'omitte' STRING | 'futurum' STRING | 'solum' | 'tag' STRING
               | 'temporis' NUMBER | 'metior' | 'repete' NUMBER | 'fragilis' NUMBER
               | 'solum_in' STRING
 praepara_block := ('praepara' | 'praeparabit' | 'postpara' | 'postparabit') 'omnia'? block_stmt
