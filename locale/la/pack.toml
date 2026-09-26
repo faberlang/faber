@@ -2613,6 +2613,10 @@ help = "fix the annotation contract before semantic lowering"
 message = "`{annotation}` is reserved and has no active visibility meaning"
 help = "use `{publica}` for explicit export intent or `{privata}` for file-private intent"
 
+[diagnostics.SEM018.issues.member_privacy_unenforced]
+message = "member privacy is not enforced yet; remove the annotation"
+help = "remove `{annotation}` from the member; members are public until member privacy is enforced"
+
 [diagnostics.SEM018.issues.conflicting_lane]
 message = "conflicting @ radix lane annotations: '{existing}' and '{parsed}'"
 help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
@@ -3252,6 +3256,14 @@ help = "split the function or raise the complexity budget for this check"
 [diagnostics.WARN027.issues.complexity_budget_exceeded]
 message = "function `{function}` has cyclomatic complexity {score}, over the budget {budget}"
 help = "split the function or raise the complexity budget for this check"
+
+[diagnostics.WARN028]
+message = "member visibility annotation is redundant"
+help = "remove the annotation; members are public by default"
+
+[diagnostics.WARN028.issues.redundant_member_publica]
+message = "`{annotation}` on a member is redundant; members are public by default"
+help = "remove the annotation; members are public by default"
 
 [llm]
 system_prompt_snippet = "Emit canonical Latin Faber source using the registered Latin keywords, canonical type spellings, and invariant glyph syntax."

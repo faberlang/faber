@@ -2822,6 +2822,10 @@ help = "fix the annotation contract before semantic lowering"
 message = "`{annotation}` is reserved and has no active visibility meaning"
 help = "use `{publica}` for explicit export intent or `{privata}` for file-private intent"
 
+[diagnostics.SEM018.issues.member_privacy_unenforced]
+message = "member privacy is not enforced yet; remove the annotation"
+help = "remove `{annotation}` from the member; members are public until member privacy is enforced"
+
 [diagnostics.SEM018.issues.conflicting_lane]
 message = "conflicting @ radix lane annotations: '{existing}' and '{parsed}'"
 help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
@@ -3453,3 +3457,11 @@ help = "align the constituent signatures or rename one method to keep it common"
 [diagnostics.WARN026.issues.union_method_signature_shadowed]
 message = "method `{method}` is not common in `{union}`: constituent signatures disagree"
 help = "align the constituent signatures or rename one method to keep it common"
+
+[diagnostics.WARN028]
+message = "member visibility annotation is redundant"
+help = "remove the annotation; members are public by default"
+
+[diagnostics.WARN028.issues.redundant_member_publica]
+message = "`{annotation}` on a member is redundant; members are public by default"
+help = "remove the annotation; members are public by default"
