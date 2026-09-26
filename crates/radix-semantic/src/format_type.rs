@@ -258,6 +258,7 @@ fn flatten_option(mut type_id: TypeId, types: &TypeTable) -> TypeId {
 fn primitive_to_faber(prim: Primitive) -> String {
     match prim {
         Primitive::Ascii => "ascii",
+        Primitive::Littera => "littera",
         Primitive::Textus => "textus",
         Primitive::Numerus => "numerus",
         Primitive::Fractus => "fractus",

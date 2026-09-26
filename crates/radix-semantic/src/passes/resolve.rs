@@ -2018,6 +2018,7 @@ fn primitive_name(prim: Primitive) -> &'static str {
         Primitive::Fractus => "fractus",
         Primitive::Instans => "instans",
         Primitive::Ascii => "ascii",
+        Primitive::Littera => "littera",
         Primitive::Textus => "textus",
         Primitive::Bivalens => "bivalens",
         Primitive::Nihil => "nihil",
@@ -2532,7 +2533,8 @@ fn is_builtin_type(name: &str) -> bool {
             | "numquam"
             | "ignotum"
             | "octeti"
-            | "octet"
+            | "octetus"
+            | "littera"
             | "regex"
             | "objectum"
             | "quidlibet"
@@ -3638,10 +3640,9 @@ fn lower_named_type(
         return Ok(types.primitive(prim));
     }
 
-    // WHY: `octet` is the canonical byte scalar spelling — an alternative
-    // name for `numerus<u8>`, symmetric with `octeti` (the byte buffer, which
-    // unifies with `lista<numerus<u8>>`). Fixed-width; rejects parameters.
-    if name_str == "octet" {
+    // D10.4: `octetus` (en `byte`) is exactly `numerus<u8>`, the element of
+    // `octeti` (`≡ lista<octetus>`). Fixed-width; rejects parameters.
+    if name_str == "octetus" {
         if !params.is_empty() {
             return Err(TypeLowerError::Issue(ISSUE_OCTET_PARAMS));
         }

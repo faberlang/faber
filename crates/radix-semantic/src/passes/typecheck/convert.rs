@@ -2124,6 +2124,13 @@ impl TypeChecker<'_> {
             return true;
         }
 
+        // D10.5: `littera` converts only along its widening chain
+        // (`ascii<1> ↦ littera ↦ textus`) here. The remaining text and code
+        // point conversions are D10.6 rows, not scalar fallthrough.
+        if self.is_littera(source) || self.is_littera(target) {
+            return self.types.is_assignable(source, target);
+        }
+
         if self.is_record_type(source) || self.is_record_type(target) {
             return false;
         }

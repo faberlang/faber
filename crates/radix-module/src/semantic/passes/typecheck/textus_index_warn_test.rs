@@ -51,7 +51,7 @@ incipit {
 #[test]
 fn does_not_warn_on_unbounded_ascii_scalar_index() {
     assert_no_warning(
-        r"functio probe(ascii xs) → ascii<1> {
+        r"functio probe(ascii xs) → littera {
     redde xs[0]
 }
 

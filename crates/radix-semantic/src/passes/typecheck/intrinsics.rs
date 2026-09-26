@@ -815,9 +815,9 @@ fn resolve_return_type(
             let textus = checker.textus_type();
             checker.types.array(textus)
         }
-        IntrinsicReturnKind::CursorAsciiOne => {
-            let one = checker.ascii_one_type();
-            checker.types.cursor(one)
+        IntrinsicReturnKind::CursorLittera => {
+            let element = checker.text_element_type();
+            checker.types.cursor(element)
         }
         IntrinsicReturnKind::Inner => {
             let Some(inner) = ctx.inner else {

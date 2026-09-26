@@ -188,6 +188,7 @@ impl TypeTable {
             Primitive::Json,
             Primitive::Valor,
             Primitive::Ascii,
+            Primitive::Littera,
             Primitive::Instans,
         ] {
             let id = table.intern(Type::Primitive(prim));
@@ -269,9 +270,16 @@ impl TypeTable {
         if let Some(&cached) = self.find_equal_memo.borrow().get(candidate) {
             return Some(cached);
         }
+        // D10.4 `octeti ≡ lista<octetus>` is type identity, but the two keep
+        // distinct carriers: the scan never answers a `lista` probe with the
+        // byte buffer row, or the reverse.
         let found = self.types.iter().enumerate().find_map(|(index, existing)| {
-            self.type_equal(existing, candidate)
-                .then_some(TypeId(index as u32))
+            let carrier_split = matches!(
+                (existing, candidate),
+                (Type::Primitive(Primitive::Octeti), Type::Array(_))
+                    | (Type::Array(_), Type::Primitive(Primitive::Octeti))
+            );
+            (!carrier_split && self.type_equal(existing, candidate)).then_some(TypeId(index as u32))
         });
         if let Some(id) = found {
             self.find_equal_memo
@@ -330,6 +338,7 @@ impl TypeTable {
             Primitive::Json,
             Primitive::Valor,
             Primitive::Ascii,
+            Primitive::Littera,
             Primitive::Instans,
         ] {
             if !primitives.contains_key(&prim) {
@@ -894,6 +903,14 @@ impl TypeTable {
         }
         match (a, b) {
             (Type::Primitive(pa), Type::Primitive(pb)) => pa == pb,
+            // D10.4: `octeti` is exactly `lista<octetus>` (`octetus ≡
+            // numerus<u8>`) for type identity — one type with a byte-buffer
+            // runtime representation, not two mutually assignable ones (L2-10).
+            (Type::Primitive(Primitive::Octeti), Type::Array(inner))
+            | (Type::Array(inner), Type::Primitive(Primitive::Octeti)) => matches!(
+                self.get(*inner),
+                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U8)
+            ),
             (Type::SizedNumeric(pa, aw), Type::SizedNumeric(pb, bw)) => pa == pb && aw == bw,
             (Type::ModularWord(aw), Type::ModularWord(bw)) => aw == bw,
             (Type::SizedInstans(ap), Type::SizedInstans(bp)) => ap == bp,
@@ -1301,18 +1318,14 @@ impl TypeTable {
                 true
             }
 
-            // WHY: `octeti` is semantic sugar for `lista<numerus<u8>>`. The two
-            // are representation-identical (`Vec<u8>` in Rust) once sized numerics
-            // shipped; both directions are implicit so octeti carries every
-            // `lista` method and either slot accepts the other. See
-            // `docs/factory/octeti-unify-lista/goal.md`.
-            (Type::Primitive(Primitive::Octeti), Type::Array(inner))
-            | (Type::Array(inner), Type::Primitive(Primitive::Octeti)) => {
-                matches!(
-                    self.get(*inner),
-                    Type::SizedNumeric(Primitive::Numerus, NumericWidth::U8)
-                )
+            // D10.5 widening chain `ascii<1> → littera → textus`: a one-letter
+            // ASCII string is a scalar, and a scalar is a one-letter string, so
+            // `s[i] ≡ '\n'` and `textus t ← c` keep working. Bare / multi-char
+            // `ascii` never widens to `littera` (it is not one scalar).
+            (Type::BoundedAscii { capacity }, Type::Primitive(Primitive::Littera)) => {
+                matches!(self.get_index(*capacity), IndexExpr::Literal(1))
             }
+            (Type::Primitive(Primitive::Littera), Type::Primitive(Primitive::Textus)) => true,
 
             // Scalar Faber values widen into dynamic `valor` for captured template params.
             (
@@ -1761,6 +1774,11 @@ pub enum Primitive {
 
     /// Absolute point-in-time (bare spelling = Unix seconds).
     Instans,
+
+    /// One Unicode scalar value (D10.2): Rust `char`, Go `rune`. Four bytes,
+    /// never allocates. Element of `textus` / `ascii` iteration and of
+    /// `ascii[i]`; `ascii<1> → littera → textus` widen implicitly (D10.5).
+    Littera,
 }
 
 impl Primitive {
@@ -1797,6 +1815,11 @@ pub static PRIMITIVE_TYPE_SPECS: &[PrimitiveTypeSpec] = &[
     PrimitiveTypeSpec {
         text: "textus",
         primitive: Primitive::Textus,
+        canonical: true,
+    },
+    PrimitiveTypeSpec {
+        text: "littera",
+        primitive: Primitive::Littera,
         canonical: true,
     },
     PrimitiveTypeSpec {

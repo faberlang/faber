@@ -169,7 +169,29 @@ impl TypeChecker<'_> {
     /// code-point order for those pairs; multi-char ascii literals stay
     /// rejected by [`Self::char_order_operand_ok`].
     pub fn is_char_order_type(&self, ty: TypeId) -> bool {
-        self.is_bounded_ascii_one(ty) || self.is_ascii(ty)
+        self.is_bounded_ascii_one(ty) || self.is_ascii(ty) || self.is_littera(ty)
+    }
+
+    /// Check a comparison's operands so a one-letter literal facing a
+    /// `littera` types as that scalar (D10.5 `ascii<1> → littera`): `c ≡ 'o'`
+    /// and `'a' ≤ c` compare two `littera`s, and backends emit a character
+    /// literal. Any other operand pair is checked unchanged.
+    pub fn check_littera_operands(
+        &mut self,
+        lhs: &mut HirExpression,
+        rhs: &mut HirExpression,
+    ) -> (TypeId, TypeId) {
+        let lhs_ty = self.check_expr(lhs);
+        let rhs_ty = if self.is_littera(lhs_ty) && is_ascii_literal(rhs) {
+            self.check_expr_with_expected(rhs, Some(lhs_ty))
+        } else {
+            self.check_expr(rhs)
+        };
+        if self.is_littera(rhs_ty) && is_ascii_literal(lhs) && self.is_bounded_ascii_one(lhs_ty) {
+            let lhs_ty = self.check_expr_with_expected(lhs, Some(rhs_ty));
+            return (lhs_ty, rhs_ty);
+        }
+        (lhs_ty, rhs_ty)
     }
 
     fn is_bounded_ascii_one(&self, ty: TypeId) -> bool {
@@ -182,7 +204,7 @@ impl TypeChecker<'_> {
     }
 
     fn char_order_operand_ok(&mut self, expr: &HirExpression, ty: TypeId) -> bool {
-        if self.is_bounded_ascii_one(ty) {
+        if self.is_bounded_ascii_one(ty) || self.is_littera(ty) {
             return true;
         }
         if self.is_ascii(ty) {
@@ -239,4 +261,8 @@ impl TypeChecker<'_> {
         }
         true
     }
+}
+
+fn is_ascii_literal(expr: &HirExpression) -> bool {
+    matches!(expr.kind, HirExpressionKind::Literal(HirLiteral::Ascii(_)))
 }

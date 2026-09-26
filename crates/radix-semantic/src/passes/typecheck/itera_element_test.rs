@@ -1,7 +1,7 @@
 //! D19.4: `itera` element typing has no silent `numerus` fallback.
 //!
 //! Every iterable binds its real element type (`copia<T>` binds `T`,
-//! `textus` binds the `textus[i]` row, tensors bind their element), and a
+//! `textus` binds `littera` (D10.1), tensors bind their element), and a
 //! non-iterable source is `itera_source_not_iterable`. Assertions are
 //! structured (issue identity), never rendered prose.
 
@@ -73,11 +73,11 @@ fn itera_ex_bivalens_rejects_as_not_iterable() {
 }
 
 #[test]
-fn itera_ex_textus_binds_index_element_type() {
+fn itera_ex_textus_binds_littera() {
     test_support::assert_accepts(
         "functio f(textus s) → vacuum {
     itera ex s fixum c {
-        fixum ascii<1> x ← c
+        fixum littera x ← c
         nota x
     }
 }",

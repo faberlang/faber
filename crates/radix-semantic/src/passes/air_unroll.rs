@@ -862,11 +862,12 @@ fn bounded_capacity(ty: TypeId, types: &TypeTable) -> Option<usize> {
     usize::try_from(*value).ok()
 }
 
-/// AEU-7: the scalar buffer element row — `octeti<N>[i]` reads `numerus<u8>`,
-/// `ascii<N>[i]` / `textus<N>[i]` read `ascii<1>` (D14 / D17). The typecheck
-/// `itera` arm interns both rows for the very loop being classified, so the
-/// shared table already holds them when this AIR pass runs; a miss fails
-/// closed into the caller's `not_concrete` decline.
+/// AEU-7: the scalar buffer element row — `octeti<N>` lanes bind
+/// `octetus` (`numerus<u8>`), `ascii<N>` / `textus<N>` lanes bind `littera`
+/// (D10.1: text iteration yields one Unicode scalar). The typecheck `itera`
+/// arm interns the byte row for the very loop being classified, so the
+/// shared table already holds it when this AIR pass runs; a miss fails closed
+/// into the caller's `not_concrete` decline.
 fn scalar_bounded_element(ty: TypeId, types: &TypeTable) -> Option<TypeId> {
     match types.get(ty) {
         Type::BoundedOcteti { .. } => types.find_sized_numeric(
@@ -874,14 +875,7 @@ fn scalar_bounded_element(ty: TypeId, types: &TypeTable) -> Option<TypeId> {
             radix_types::NumericWidth::U8,
         ),
         Type::BoundedAscii { .. } | Type::BoundedTextus { .. } => {
-            (0..u32::try_from(types.type_count()).ok()?)
-                .map(TypeId)
-                .find(|&id| match types.get(id) {
-                    Type::BoundedAscii { capacity } => {
-                        matches!(types.get_index(*capacity), IndexExpr::Literal(1))
-                    }
-                    _ => false,
-                })
+            Some(types.primitive(radix_types::Primitive::Littera))
         }
         _ => None,
     }

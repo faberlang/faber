@@ -113,8 +113,8 @@ pub enum IntrinsicReturnKind {
     /// `lista` of prefix results for a serial higher-order scan.
     ReducerArray,
     TextusArray,
-    /// `cursor<ascii<1>>` — the `ascii.cursor()` / later `textus.cursor()` walk.
-    CursorAsciiOne,
+    /// `cursor<littera>` — the `ascii.cursor()` / `textus.cursor()` scalar walk (D10.1).
+    CursorLittera,
     /// The bound type of the first Typus generic (`formata`).
     GenericTypus,
 }
@@ -399,11 +399,11 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Copia, "unio", 1, &[IntrinsicParamKind::SetInner], SetInner, collection Union),
     intrinsic!(Copia, "vacua", 0, &[], Bool, collection IsEmpty),
     // ascii
-    intrinsic!(Ascii, "cursor", 0, &[], CursorAsciiOne, collection CordCursor),
+    intrinsic!(Ascii, "cursor", 0, &[], CursorLittera, collection CordCursor),
     // textus
     intrinsic!(Textus, "accipe", 1, &[IntrinsicParamKind::NumerusIndex], Textus, collection Index),
     intrinsic!(Textus, "continet", 1, &[IntrinsicParamKind::Textus], Bool, collection Contains),
-    intrinsic!(Textus, "cursor", 0, &[], CursorAsciiOne, collection CordCursor),
+    intrinsic!(Textus, "cursor", 0, &[], CursorLittera, collection CordCursor),
     intrinsic!(Textus, "divide", 1, &[IntrinsicParamKind::Textus], TextusArray, collection Split),
     intrinsic!(Textus, "finis", 1, &[IntrinsicParamKind::Textus], Bool, collection EndsWith),
     intrinsic!(Textus, "initium", 1, &[IntrinsicParamKind::Textus], Bool, collection StartsWith),

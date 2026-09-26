@@ -114,6 +114,7 @@ fn intended_bucket(ty: &Type) -> Bucket {
         ) => Bucket::Physical,
         Type::Primitive(
             Primitive::Ascii
+            | Primitive::Littera
             | Primitive::Textus
             | Primitive::Nihil
             | Primitive::Ignotum

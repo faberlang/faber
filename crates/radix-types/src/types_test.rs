@@ -687,6 +687,46 @@ fn octeti_unifies_bidirectionally_with_lista_numerus_u8() {
     );
 }
 
+/// D10.4 (L2-10): `octeti` is exactly `lista<octetus>` — type identity, not
+/// mutual assignability — while interning keeps the two carriers distinct.
+#[test]
+fn octeti_is_identical_to_lista_octetus() {
+    let mut types = TypeTable::new();
+    let octeti = types.primitive(Primitive::Octeti);
+    let u8 = types.sized_numeric(Primitive::Numerus, NumericWidth::U8);
+    let lista_u8 = types.array(u8);
+
+    assert!(types.equals(octeti, lista_u8));
+    assert!(types.equals(lista_u8, octeti));
+    assert_ne!(octeti, lista_u8, "interning keeps the byte-buffer carrier");
+    assert_eq!(
+        types.find_equal(&Type::Array(u8)),
+        Some(lista_u8),
+        "find_equal never answers a lista probe with the byte buffer row"
+    );
+}
+
+/// D10.5: `ascii<1> → littera → textus`; nothing widens the other way.
+#[test]
+fn littera_widening_chain() {
+    let mut types = TypeTable::new();
+    let littera = types.primitive(Primitive::Littera);
+    let textus = types.primitive(Primitive::Textus);
+    let ascii = types.primitive(Primitive::Ascii);
+    let one = types.intern_index(IndexExpr::Literal(1));
+    let two = types.intern_index(IndexExpr::Literal(2));
+    let ascii_one = types.bounded_ascii(one);
+    let ascii_two = types.bounded_ascii(two);
+
+    assert!(types.is_assignable(ascii_one, littera));
+    assert!(types.is_assignable(littera, textus));
+    assert!(!types.is_assignable(textus, littera));
+    assert!(!types.is_assignable(littera, ascii_one));
+    assert!(!types.is_assignable(ascii, littera));
+    assert!(!types.is_assignable(ascii_two, littera));
+    assert!(!types.equals(littera, ascii_one));
+}
+
 #[test]
 fn octeti_does_not_unify_with_non_u8_lista() {
     // WHY: octeti is specifically `lista<numerus<u8>>`, not any lista. Other

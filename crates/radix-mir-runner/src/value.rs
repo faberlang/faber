@@ -45,6 +45,11 @@ pub enum Value {
     Str(String),
     /// One-byte `ascii<1>` (`'x'`, `s[i]`). Not a heap `String`.
     Ascii(u8),
+    /// One Unicode scalar, `littera` (D10.2): text iteration and cursors. An
+    /// ASCII scalar may also arrive as [`Value::Ascii`] (a `'x'` literal or
+    /// `ascii[i]`); equality, order, display, and keys join the two by
+    /// scalar value.
+    Char(char),
     Nil,
     Unit,
     Octeti(Vec<u8>),
@@ -307,6 +312,10 @@ impl Value {
                 let mut buf = [0u8; 4];
                 display_text_payload(ch.encode_utf8(&mut buf)).to_owned()
             }
+            Value::Char(ch) => {
+                let mut buf = [0u8; 4];
+                display_text_payload(ch.encode_utf8(&mut buf)).to_owned()
+            }
             Value::Nil => "nihil".to_owned(),
             Value::Unit => String::new(),
             Value::Octeti(bytes) => String::from_utf8_lossy(bytes).into_owned(),
@@ -348,6 +357,7 @@ impl Value {
             Value::Bool(v) => Ok(MapKey::Bool(*v)),
             Value::Str(v) => Ok(MapKey::Str(v.clone())),
             Value::Ascii(b) => Ok(MapKey::Str(char::from(*b).to_string())),
+            Value::Char(ch) => Ok(MapKey::Str(ch.to_string())),
             Value::Unit => Ok(MapKey::Unit),
             _ => Err(RunnerError::internal(
                 span,
@@ -1158,6 +1168,9 @@ pub fn compare_values(
         (Value::Float(a), Value::UInt(b)) => a.partial_cmp(&(*b as f64)),
         (Value::Str(a), Value::Str(b)) => Some(a.cmp(b)),
         (Value::Ascii(a), Value::Ascii(b)) => Some(a.cmp(b)),
+        (Value::Char(a), Value::Char(b)) => Some(a.cmp(b)),
+        (Value::Char(a), Value::Ascii(b)) => Some(a.cmp(&char::from(*b))),
+        (Value::Ascii(a), Value::Char(b)) => Some(char::from(*a).cmp(b)),
         (Value::Bool(a), Value::Bool(b)) => Some(a.cmp(b)),
         (Value::Instans(a), Value::Instans(b)) => Some(
             a.partial_cmp_at_coarser(*b)
@@ -1210,6 +1223,14 @@ pub fn values_equal(left: &Value, right: &Value) -> bool {
         // ASCII byte). Multi-byte textus never equals an `ascii<1>`.
         (Value::Ascii(a), Value::Str(b)) => b.as_bytes() == [*a],
         (Value::Str(a), Value::Ascii(b)) => a.as_bytes() == [*b],
+        // `littera` joins the ascii scalar and a one-letter textus by value.
+        (Value::Char(a), Value::Ascii(b)) | (Value::Ascii(b), Value::Char(a)) => {
+            *a == char::from(*b)
+        }
+        (Value::Char(a), Value::Str(b)) | (Value::Str(b), Value::Char(a)) => {
+            let mut chars = b.chars();
+            chars.next() == Some(*a) && chars.next().is_none()
+        }
         _ => left == right,
     }
 }

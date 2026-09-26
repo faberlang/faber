@@ -736,6 +736,10 @@ mod ascii_cursor_test;
 mod ascii_index_test;
 
 #[cfg(test)]
+#[path = "littera_test.rs"]
+mod littera_test;
+
+#[cfg(test)]
 #[path = "ascii_format_pack_conversio_test.rs"]
 mod ascii_format_pack_conversio_test;
 

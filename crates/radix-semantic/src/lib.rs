@@ -968,7 +968,7 @@ fn register_locale_pack_type_spellings(
                 // aliases and lower through dedicated type syntax.
                 TypeBindingKind::Collection(_) => None,
                 TypeBindingKind::TensorFamily(_) => None,
-                TypeBindingKind::ModularWord => None,
+                TypeBindingKind::ModularWord | TypeBindingKind::ByteWord => None,
                 // Census relational names are reader-surface rows only in S2;
                 // no bare `TypeId` until the S3/S4 type surface lands.
                 TypeBindingKind::Relational(_) => None,

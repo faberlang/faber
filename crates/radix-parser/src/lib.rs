@@ -913,6 +913,7 @@ impl Parser {
                 | "regex"
                 | "octeti"
                 | "ascii"
+                | "littera"
                 | "vacuum"
                 | "tensor"
                 | "sparsa"

@@ -184,6 +184,8 @@ vacuum = "void"
 numquam = "never"
 ignotum = "unknown"
 octeti = "bytes"
+octetus = "byte"
+littera = "char"
 regex = "regex"
 json = "json"
 valor = "value"
@@ -1514,7 +1516,7 @@ message = "object destructuring should be expanded before statement lowering"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.octet_params]
-message = "octet is fixed-width and cannot accept parameters"
+message = "byte is fixed-width (exactly int<u8>) and cannot accept parameters"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.precision_marker_shape]

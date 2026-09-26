@@ -2,10 +2,9 @@
 //!
 //! Every iterable source binds its real element type; there is no silent
 //! `numerus` fallback. `copia<T>` binds `T` (unspecified order, D19.2).
-//! Text binds the same row as `textus[i]` ([`TypeChecker::text_element_type`])
-//! and bytes the same row as `octeti[i]`
-//! ([`TypeChecker::byte_element_type`]), so indexing and iteration can never
-//! disagree. A source with no iteration surface — a user `genus`, a scalar, a
+//! Text binds `littera`, one Unicode scalar, on every backend (D10.1/D10.2 —
+//! [`TypeChecker::text_element_type`]); bytes bind `octetus` (`numerus<u8>`),
+//! the same row as `octeti[i]` ([`TypeChecker::byte_element_type`]). A source with no iteration surface — a user `genus`, a scalar, a
 //! generic parameter — is `itera_source_not_iterable`: per D19.5 a user type
 //! that should be iterable exposes a method returning a cursor.
 //!
@@ -23,13 +22,15 @@ use super::expr::ISSUE_CURSOR_ITERATION_REQUIRES_EX;
 pub(super) const ISSUE_ITERA_SOURCE_NOT_ITERABLE: &str = "itera_source_not_iterable";
 
 impl TypeChecker<'_> {
-    /// Element row of a `textus` / `ascii` scalar index and of text
-    /// iteration. Single seam: D10 retypes both through this helper.
+    /// Element row of text iteration and text cursors (D10.1): `littera`.
+    /// `ascii[i]` binds the same row (D10.3); `textus[i]` keeps its
+    /// `ascii<1>` row until operator fork F5 rules on its index unit.
     pub fn text_element_type(&mut self) -> TypeId {
-        self.ascii_one_type()
+        self.littera_type()
     }
 
-    /// Element row of an `octeti` scalar index and of byte iteration.
+    /// Element row of an `octeti` scalar index and of byte iteration:
+    /// `octetus ≡ numerus<u8>` (D10.4).
     pub fn byte_element_type(&mut self) -> TypeId {
         self.types
             .sized_numeric(Primitive::Numerus, NumericWidth::U8)
@@ -87,7 +88,12 @@ impl TypeChecker<'_> {
             | Type::BoundedAscii { .. }
                 if ex =>
             {
-                self.text_element_type()
+                let element = self.text_element_type();
+                // MIR walks unbounded text through the cord cursor drained to
+                // a list; intern both rows for that lowering.
+                self.types.cursor(element);
+                self.types.array(element);
+                element
             }
             // `de` over any other iterable binds its index; MIR admits only
             // the lista/tabula index surfaces and declines the rest.

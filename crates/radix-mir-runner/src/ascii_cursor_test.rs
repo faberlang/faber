@@ -1,4 +1,4 @@
-//! CC-1: `ascii.cursor()` walks bytes into one-byte `Value::Ascii` cells.
+//! CC-1 / D10.1: text cursors walk into one `Value::Char` (`littera`) per scalar.
 
 use super::*;
 use radix_lexer::{Interner, Span};
@@ -47,17 +47,13 @@ fn eval_cord_cursor(receiver: Value) -> Result<Value, RunnerError> {
 }
 
 #[test]
-fn ascii_cursor_two_bytes_are_ascii1_not_heap_strings() {
+fn ascii_cursor_two_bytes_are_littera_not_heap_strings() {
     let value = eval_cord_cursor(Value::Str("ab".to_owned())).expect("ascii cursor");
     let Value::Array(cell) = value else {
         panic!("cursor must materialize as an array, got {value:?}");
     };
     let elems = cell.borrow().clone();
-    assert_eq!(elems, vec![Value::Ascii(b'a'), Value::Ascii(b'b')]);
-    assert!(
-        elems.iter().all(|elem| !matches!(elem, Value::Str(_))),
-        "cord cursor must not allocate a heap String per step, got {elems:?}"
-    );
+    assert_eq!(elems, vec![Value::Char('a'), Value::Char('b')]);
 }
 
 #[test]
@@ -66,27 +62,19 @@ fn ascii_cursor_one_byte_ascii_value_is_singleton() {
     let Value::Array(cell) = value else {
         panic!("cursor must materialize as an array, got {value:?}");
     };
-    assert_eq!(cell.borrow().as_slice(), &[Value::Ascii(b'x')]);
+    assert_eq!(cell.borrow().as_slice(), &[Value::Char('x')]);
 }
 
+/// D10.1: text cursors yield one `littera` per Unicode scalar, with no
+/// non-ASCII trap.
 #[test]
-fn textus_cursor_two_scalars_are_ascii1_not_heap_strings() {
-    let value = eval_cord_cursor(Value::Str("ab".to_owned())).expect("textus cursor");
+fn textus_cursor_non_ascii_scalars_are_littera() {
+    let value = eval_cord_cursor(Value::Str("é👍".to_owned())).expect("non-ASCII cursor");
     let Value::Array(cell) = value else {
         panic!("cursor must materialize as an array, got {value:?}");
     };
-    let elems = cell.borrow().clone();
-    assert_eq!(elems, vec![Value::Ascii(b'a'), Value::Ascii(b'b')]);
-    assert!(
-        elems.iter().all(|elem| !matches!(elem, Value::Str(_))),
-        "cord cursor must not allocate a heap String per step, got {elems:?}"
+    assert_eq!(
+        cell.borrow().as_slice(),
+        &[Value::Char('é'), Value::Char('👍')]
     );
-}
-
-#[test]
-fn textus_cursor_non_ascii_scalar_traps() {
-    let err = eval_cord_cursor(Value::Str("é".to_owned())).expect_err("non-ASCII");
-    assert_eq!(err.issue, "runner_textus_index_trap");
-    let err = eval_cord_cursor(Value::Str("ξ".to_owned())).expect_err("non-ASCII greek");
-    assert_eq!(err.issue, "runner_textus_index_trap");
 }

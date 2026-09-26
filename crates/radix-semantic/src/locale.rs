@@ -808,6 +808,7 @@ fn build_type_fallbacks(type_surfaces: &HashMap<TypeBindingKind, String>) -> Vec
                 .map(|spec| TypeBindingKind::TensorFamily(spec.kind)),
         )
         .chain(std::iter::once(TypeBindingKind::ModularWord))
+        .chain(std::iter::once(TypeBindingKind::ByteWord))
         .filter(|kind| !type_surfaces.contains_key(kind))
         .collect()
 }
@@ -833,6 +834,7 @@ fn latin_type_surface(kind: TypeBindingKind) -> &'static str {
             .find(|spec| spec.canonical && spec.kind == family)
             .map_or("ignotum", |spec| spec.text),
         TypeBindingKind::ModularWord => "modulus",
+        TypeBindingKind::ByteWord => "octetus",
         // Relational type names keep the canonical Latin spelling as the
         // Latin fallback (identity surface; all 8 packs own rows today).
         TypeBindingKind::Relational(kind) => match kind {
@@ -989,6 +991,9 @@ pub enum TypeBindingKind {
     Collection(CollectionKind),
     TensorFamily(TensorFamilyKind),
     ModularWord,
+    /// `octetus` (en `byte`): the byte scalar, an exact alias of
+    /// `numerus<u8>` (D10.4) and the element of `octeti`.
+    ByteWord,
     /// Census relational type names (`relational-views.md` §7): the inert
     /// plan type, the admitted row type, and the finite result type.
     Relational(RelationalTypeKind),
@@ -1303,6 +1308,15 @@ pub fn latin_locale_pack() -> LocalePack {
             canonical: "modulus_t".to_owned(),
             aliases: Vec::new(),
             kind: TypeBindingKind::ModularWord,
+        },
+    );
+    types.insert(
+        "octetus".to_owned(),
+        TypeBinding {
+            key: "octetus".to_owned(),
+            canonical: "octetus".to_owned(),
+            aliases: Vec::new(),
+            kind: TypeBindingKind::ByteWord,
         },
     );
     // Identity rows so the la scaffold carries the same `[types]` keys every
@@ -2334,6 +2348,9 @@ fn canonical_and_aliases(
 fn type_binding_kind_for_key(key: &str) -> Option<TypeBindingKind> {
     if key == "modulus" {
         return Some(TypeBindingKind::ModularWord);
+    }
+    if key == "octetus" {
+        return Some(TypeBindingKind::ByteWord);
     }
     // Census relational-view type names (`relational-views.md` §7). The keys
     // must be known identities so pack `[types]` rows loader-validate

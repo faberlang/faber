@@ -119,6 +119,7 @@ fn value_to_json(value: &Value, span: Span) -> Result<serde_json::Value, RunnerE
         }
         Value::Str(value) => Ok(serde_json::Value::String(value.clone())),
         Value::Ascii(b) => Ok(serde_json::Value::String(char::from(*b).to_string())),
+        Value::Char(ch) => Ok(serde_json::Value::String(ch.to_string())),
         Value::Instans(value) => Ok(serde_json::Value::String(value.to_rfc3339())),
         Value::Octeti(bytes) => {
             let items = bytes

@@ -171,6 +171,8 @@ vacuum = "vacuum"
 numquam = "numquam"
 ignotum = "ignotum"
 octeti = "octeti"
+octetus = "octetus"
+littera = "littera"
 regex = "regex"
 json = "json"
 valor = "valor"
@@ -1305,7 +1307,7 @@ message = "object destructuring should be expanded before statement lowering"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.octet_params]
-message = "octet is fixed-width and cannot accept parameters"
+message = "octetus is fixed-width (exactly numerus<u8>) and cannot accept parameters"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.precision_marker_shape]

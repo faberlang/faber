@@ -61,21 +61,22 @@ fn scalar_textus_index_infers_ascii() {
     );
 }
 
-/// A scalar index on an `ascii` value is also `ascii<1>`.
+/// A scalar index on an `ascii` value is one scalar: `littera` (D10.3).
 #[test]
-fn scalar_ascii_index_infers_ascii() {
+fn scalar_ascii_index_infers_littera() {
     accepts(
         r"incipit {
     fixum ascii s ← 'ab'
-    fixum ascii<1> c ← s[1]
+    fixum littera c ← s[1]
     nota c
 }",
     );
 }
 
-/// Direct type pin: `s[i]` on bare `textus` / `ascii` is `BoundedAscii { 1 }`.
+/// Direct type pin: `s[i]` on bare `textus` is `BoundedAscii { 1 }` (F5
+/// held); on bare `ascii` it is `littera` (D10.3).
 #[test]
-fn scalar_index_type_is_bounded_ascii_one() {
+fn scalar_index_type_is_ascii_one_for_textus_littera_for_ascii() {
     let mut types = TypeTable::new();
     let resolver = Resolver::new();
     let interner = Interner::new();
@@ -98,9 +99,9 @@ fn scalar_index_type_is_bounded_ascii_one() {
     assert!(
         matches!(
             checker.types.get(from_ascii),
-            Type::BoundedAscii { capacity } if checker.types.index_equals(*capacity, n1)
+            Type::Primitive(Primitive::Littera)
         ),
-        "ascii[i] is BoundedAscii {{ 1 }}, got {:?}",
+        "ascii[i] is littera, got {:?}",
         checker.types.get(from_ascii)
     );
     assert!(
@@ -199,11 +200,11 @@ fn bounded_ascii_literal_rejects_payload_over_capacity() {
 }
 
 #[test]
-fn bounded_ascii_scalar_index_returns_ascii_one() {
+fn bounded_ascii_scalar_index_returns_littera() {
     accepts(
         r"incipit {
     fixum ascii<8> source ← 'abc'
-    fixum ascii<1> c ← source[1]
+    fixum littera c ← source[1]
     nota c
 }",
     );

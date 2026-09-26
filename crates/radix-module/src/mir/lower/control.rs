@@ -86,11 +86,12 @@ enum CollectionIteraKind {
     // into N+1 guard-free unrolled arms; the literal capacity is carried so
     // the split stays base-lane MIR (never AIR).
     BoundedArray(TypeId, i64),
-    // Text iteration: `for from s const c` over `textus` rides
-    // the generic index loop — the bound is `Collection(Length)` (characters)
-    // and the element read is the scalar `s[i]` projection, whose runner
-    // carrier is the one-byte ascii lane.
-    Textus,
+    // Text iteration (need, D10.1): `for from s const c` over
+    // `textus` / `ascii` walks one `littera` per Unicode scalar. The text is
+    // snapshot once through the cord cursor (`s.cursor()`), drained into a
+    // `lista<littera>`, and read by the generic index loop — never the
+    // `s[i]` projection, whose `textus` row still traps on non-ASCII (F5).
+    Text(TypeId),
     Unsupported,
 }
 
@@ -2216,13 +2217,10 @@ impl FunctionBuilder<'_> {
                 }
                 Type::Array(item) => CollectionIteraKind::Array(*item),
                 // Text value iteration: only `ex` admits it,
-                // mirroring the queue/stack value-surface rule. The loop-local
-                // binding carries the checker's element row for textus
-                // iteration (`ascii<1>`, the `s[i]` row — D19.4), and the
-                // projection yields the one-byte ascii carrier (non-ASCII
-                // scalars trap exactly as `s[i]` does).
-                Type::Primitive(Primitive::Textus) if matches!(iter.mode, HirIteraMode::Ex) => {
-                    CollectionIteraKind::Textus
+                // mirroring the queue/stack value-surface rule. The binding
+                // is `littera` (D10.1), one Unicode scalar, with no trap.
+                Type::Primitive(Primitive::Textus | Primitive::Ascii) if matches!(iter.mode, HirIteraMode::Ex) => {
+                    CollectionIteraKind::Text(self.types.primitive(Primitive::Littera))
                 }
                 // Queue and stack share the array-backed carrier but not its
                 // access order. Only `ex` admits the value iteration surface;
@@ -2290,6 +2288,11 @@ impl FunctionBuilder<'_> {
         };
         let collection = self.lower_expr_value(iter.iter)?;
         let (collection, collection_ty) = match &collection_kind {
+            CollectionIteraKind::Text(element) => {
+                let snapshot = self.text_scalar_snapshot(collection, *element, iter.iter.span)?;
+                let array_ty = MirType::semantic(self.types.find_array(*element)?);
+                (MirOperand::Place(snapshot), array_ty)
+            }
             CollectionIteraKind::Cursor(element) | CollectionIteraKind::AsyncCursor(element) => {
                 let array = self.types.find_array(*element)?;
                 let array_ty = MirType::semantic(array);
@@ -2340,13 +2343,7 @@ impl FunctionBuilder<'_> {
                 (collection, MirType::semantic(*elem), false)
             }
             CollectionIteraKind::BoundedArray(elem, _) => (collection, MirType::semantic(*elem), false),
-            // The textus loop-local binding is the checker's element row —
-            // the same `ascii<1>` row as the scalar `s[i]` projection read
-            // below (D19.4). The checker interned it for this loop.
-            CollectionIteraKind::Textus => {
-                let element = radix_mir::ty::find_bounded_ascii_one(self.types)?;
-                (collection, MirType::semantic(element), false)
-            }
+            CollectionIteraKind::Text(element) => (collection, MirType::semantic(*element), false),
             CollectionIteraKind::Shaped { .. } => {
                 unreachable!("shaped collection itera returns through nested lowering above")
             }
@@ -2356,7 +2353,11 @@ impl FunctionBuilder<'_> {
         };
 
         if let CollectionIteraKind::BoundedArray(_, capacity) = &collection_kind {
-            return self.lower_bounded_array_itera_split(&iter, iteration_place, binding_ty, *capacity);
+            let text = matches!(
+                self.normalized_type(collection_semantic),
+                Type::BoundedAscii { .. } | Type::BoundedTextus { .. }
+            );
+            return self.lower_bounded_array_itera_split(&iter, iteration_place, binding_ty, *capacity, text);
         }
 
         let index = self.next_local_id();
@@ -2941,17 +2942,39 @@ impl FunctionBuilder<'_> {
     /// loop (`air_unroll` declines runtime-len values `not_concrete`), so
     /// reverse AD never sees a non-literal scrutinee.
     /// AEU-7: the scalar buffer lane element — `octeti<N>` binds
-    /// `numerus<u8>`, `ascii<N>` / `textus<N>` bind `ascii<1>` (D14 / D17).
-    /// The typecheck `itera` arm interns both rows for the loop being
-    /// lowered; a miss fails closed into Unsupported.
+    /// `octetus` (`numerus<u8>`), `ascii<N>` / `textus<N>` bind `littera`
+    /// (D10.1). The typecheck `itera` arm interns the byte row for the loop
+    /// being lowered; a miss fails closed into Unsupported.
     fn scalar_buffer_element(&self, ty: &Type) -> Option<TypeId> {
         match ty {
             Type::BoundedOcteti { .. } => self
                 .types
                 .find_sized_numeric(Primitive::Numerus, NumericWidth::U8),
-            Type::BoundedAscii { .. } | Type::BoundedTextus { .. } => radix_mir::ty::find_bounded_ascii_one(self.types),
+            Type::BoundedAscii { .. } | Type::BoundedTextus { .. } => Some(self.types.primitive(Primitive::Littera)),
             _ => None,
         }
+    }
+
+    /// D10.1 text walk: snapshot `text` once through the cord cursor into a
+    /// `lista<littera>` (one Unicode scalar per cell, no non-ASCII trap). The
+    /// checker interned `cursor<littera>` / `lista<littera>` for the loop
+    /// (`itera_element`).
+    fn text_scalar_snapshot(&mut self, text: MirOperand, element: TypeId, span: Span) -> Option<MirPlace> {
+        let cursor_ty = MirType::semantic(self.types.find_equal(&Type::Cursor(element))?);
+        let array_ty = MirType::semantic(self.types.find_array(element)?);
+        let cursor = self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::CordCursor),
+            vec![text],
+            cursor_ty,
+            span,
+        );
+        let snapshot = self.runtime_call_value(
+            MirIntrinsic::Sermo(crate::mir::MirSermoOp::DrainCursor),
+            vec![cursor],
+            array_ty,
+            span,
+        );
+        Some(self.materialize_operand_place(snapshot, array_ty, span))
     }
 
     fn lower_bounded_array_itera_split(
@@ -2960,6 +2983,7 @@ impl FunctionBuilder<'_> {
         collection: MirPlace,
         binding_ty: MirType,
         capacity: i64,
+        text: bool,
     ) -> Option<()> {
         let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
         // Runtime `len` read from the ListaN carrier — the split scrutinee.
@@ -2972,6 +2996,15 @@ impl FunctionBuilder<'_> {
         if !self.current_is_open() {
             return None;
         }
+        // D10.1: `ascii<N>` / `textus<N>` lanes bind `littera`. The live
+        // prefix is snapshot once through the cord cursor into a
+        // `lista<littera>`, so a lane reads one Unicode scalar with no
+        // non-ASCII trap (the `textus<N>[i]` row keeps its trap under F5).
+        let reads = if text {
+            self.text_scalar_snapshot(MirOperand::Place(collection), binding_ty.semantic_id(), iter.iter.span)?
+        } else {
+            collection
+        };
 
         let binding = self.next_local_id();
         self.locals.push(MirLocalDecl {
@@ -3000,7 +3033,7 @@ impl FunctionBuilder<'_> {
             self.switch_to(arm_id);
             for lane in 0..k as i64 {
                 // Arm k reads only lanes 0..k ⊆ 0..len — never a dead slot.
-                let mut indexed = collection.clone();
+                let mut indexed = reads.clone();
                 indexed
                     .projections
                     .push(MirProjection::Index(MirOperand::Constant(MirConstant::Int(lane))));

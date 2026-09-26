@@ -243,6 +243,7 @@ impl<'a> DeviceSafeClassifier<'a> {
             Type::Primitive(
                 Primitive::Textus
                 | Primitive::Ascii
+                | Primitive::Littera
                 | Primitive::Octeti
                 | Primitive::Regex
                 | Primitive::Json
