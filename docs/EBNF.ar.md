@@ -26,7 +26,7 @@ expr_stmt ::= expression
 # [008] block_stmt
 block_stmt ::= '{' statement* '}'
 # [009] fixum_decl
-fixum_decl ::= ('ثابت' | 'متغير') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_recovery?) | ('↢' expression))?
+fixum_decl ::= ('ثابت' | 'متغير') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_default?) | ('↢' expression))?
 # [010] figendum_decl
 figendum_decl ::= ('انتظر_ثابت' | 'انتظر_متغير') type_annotation IDENTIFIER '←' expression
 # [011] sit_decl
@@ -80,15 +80,15 @@ clausura_params ::= clausura_param (',' clausura_param)*
 # [035] clausura_param
 clausura_param ::= type_annotation IDENTIFIER
 # [036] genus_decl
-genus_decl ::= 'مجرد'? 'صنف' IDENTIFIER generic_params? ('امتد' IDENTIFIER)? ('حقق' IDENTIFIER ((',' | '∩') IDENTIFIER)*)? '{' genus_member* '}'
+genus_decl ::= 'صنف' IDENTIFIER generic_params? ('حقق' IDENTIFIER ((',' | '∩') IDENTIFIER)*)? '{' genus_member* '}'
 # [037] genus_member
 genus_member ::= annotation* (field_decl | functio_method_decl)
 # [038] field_decl
-field_decl ::= 'سكوني'? 'مرتبط'? type_annotation IDENTIFIER 'اختياري'? ('=' expression)?
+field_decl ::= 'سكوني'? type_annotation IDENTIFIER 'اختياري'? ('=' expression)?
 # [039] functio_method_decl
 functio_method_decl ::= 'دالة' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 # [040] annotation
-annotation ::= nucleum_annotation | radix_annotation | braced_annotation | annotation_sugar
+annotation ::= nucleum_annotation | radix_annotation | ad_annotation | braced_annotation | annotation_sugar
 # [041] annotation_name
 annotation_name ::= ANNOTATION_NAME
 # [042] braced_annotation
@@ -115,365 +115,367 @@ nucleum_field ::= 'جزء' '=' ('صواب' | 'خطأ')
 radix_annotation ::= '@' 'radix' radix_directive NEWLINE
 # [053] radix_directive
 radix_directive ::= 'مسار' STRING | 'backward' STRING | 'نمط' IDENTIFIER 'في' type_annotation+
-# [054] implendum_decl
+# [054] ad_annotation
+ad_annotation ::= '@' 'اتصل' ASCII_STRING NEWLINE
+# [055] implendum_decl
 implendum_decl ::= 'عقد' IDENTIFIER generic_params? '{' implendum_method_decl* '}'
-# [055] implendum_method_decl
+# [056] implendum_method_decl
 implendum_method_decl ::= annotation* 'دالة' IDENTIFIER '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
-# [056] typus_decl
+# [057] typus_decl
 typus_decl ::= 'نمط' IDENTIFIER generic_params? '=' type_annotation
-# [057] ordo_decl
+# [058] ordo_decl
 ordo_decl ::= 'ترتيب' IDENTIFIER '{' enum_member (',' enum_member)* '}'
-# [058] enum_member
+# [059] enum_member
 enum_member ::= IDENTIFIER ('=' ('-'? NUMBER | STRING))?
-# [059] discretio_decl
+# [060] discretio_decl
 discretio_decl ::= 'تمايز' IDENTIFIER generic_params? '{' union_member* variant (',' variant)* '}'
-# [060] union_member
+# [061] union_member
 union_member ::= annotation* field_decl
-# [061] variant
+# [062] variant
 variant ::= IDENTIFIER ('{' variant_fields '}')?
-# [062] variant_fields
+# [063] variant_fields
 variant_fields ::= (type_annotation IDENTIFIER)*
-# [063] schema_decl
+# [064] schema_decl
 schema_decl ::= 'مخطط' IDENTIFIER '{' schema_column* '}'
-# [064] schema_column
+# [065] schema_column
 schema_column ::= 'عمود' type_annotation IDENTIFIER (':' IDENTIFIER)?
-# [065] importa_decl
+# [066] importa_decl
 importa_decl ::= importa_record | importa_sugar
-# [066] importa_record
+# [067] importa_record
 importa_record ::= 'استورد' '{' import_field_list? '}'
-# [067] import_field_list
+# [068] import_field_list
 import_field_list ::= import_field (',' import_field)*
-# [068] import_field
+# [069] import_field
 import_field ::= ex_field | visibilitas_field | nomen_field | ut_field | omnia_field
-# [069] ex_field
+# [070] ex_field
 ex_field ::= 'من' '=' STRING
-# [070] visibilitas_field
+# [071] visibilitas_field
 visibilitas_field ::= 'visibilitas' '=' publica
-# [071] nomen_field
+# [072] nomen_field
 nomen_field ::= 'اسم' '=' IDENTIFIER
-# [072] ut_field
+# [073] ut_field
 ut_field ::= 'كـ' '=' IDENTIFIER
-# [073] omnia_field
+# [074] omnia_field
 omnia_field ::= 'جميع' '=' IDENTIFIER
-# [074] importa_sugar
+# [075] importa_sugar
 importa_sugar ::= 'استورد' 'من' STRING publica? (named_import | wildcard_import | selective_import)?
-# [075] publica
+# [076] publica
 publica ::= 'عام'
-# [076] named_import
+# [077] named_import
 named_import ::= IDENTIFIER ('كـ' IDENTIFIER)?
-# [077] wildcard_import
+# [078] wildcard_import
 wildcard_import ::= '*' 'كـ' IDENTIFIER
-# [078] selective_import
+# [079] selective_import
 selective_import ::= 'ثابت' import_value_binding (',' import_value_binding)*
-# [079] import_value_binding
+# [080] import_value_binding
 import_value_binding ::= IDENTIFIER ('كـ' IDENTIFIER)?
-# [080] type_annotation
+# [081] type_annotation
 type_annotation ::= intersection_type ('∪' intersection_type)*
-# [081] intersection_type
+# [082] intersection_type
 intersection_type ::= owned_type ('∩' owned_type)*
-# [082] owned_type
+# [083] owned_type
 owned_type ::= ('عن' | 'في' | 'ملك' | 'نسخة')? base_type
-# [083] base_type
+# [084] base_type
 base_type ::= hole_type | function_type | width_type_sugar | ratio_type | qualified_type type_arguments? | '(' type_annotation ')'
-# [084] ratio_type
+# [085] ratio_type
 ratio_type ::= 'ratio' '<' labeled_type_argument (',' labeled_type_argument)* '>'
-# [085] hole_type
+# [086] hole_type
 hole_type ::= '_' | '∪'
-# [086] qualified_type
+# [087] qualified_type
 qualified_type ::= IDENTIFIER ('.' IDENTIFIER)*
-# [087] type_arguments
+# [088] type_arguments
 type_arguments ::= '<' type_argument (',' type_argument)* '>'
-# [088] type_argument
+# [089] type_argument
 type_argument ::= labeled_type_argument | type_annotation | NATURAL | '[' figura_list? ']'
-# [089] labeled_type_argument
+# [090] labeled_type_argument
 labeled_type_argument ::= IDENTIFIER ':' type_annotation
-# [090] width_type_sugar
+# [091] width_type_sugar
 width_type_sugar ::= WIDTH_MARKER | LISTA_WIDTH_SUGAR | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix? | MATRIX_WIDTH_SUGAR shape_suffix
-# [091] shape_suffix
+# [092] shape_suffix
 shape_suffix ::= '[' figura_list? ']'
-# [092] figura
+# [093] figura
 figura ::= '_' | NATURAL | IDENTIFIER | '[' figura_list? ']'
-# [093] figura_list
+# [094] figura_list
 figura_list ::= figura (',' figura)*
-# [094] function_type
+# [095] function_type
 function_type ::= '(' type_list? ')' '→' type_annotation alternate_exit_clause?
-# [095] type_list
+# [096] type_list
 type_list ::= type_annotation (',' type_annotation)*
-# [096] si_stmt
+# [097] si_stmt
 si_stmt ::= 'إذا' expression arm ('وإلاإذا' si_stmt | secus_clause)?
-# [097] secus_clause
+# [098] secus_clause
 secus_clause ::= 'وإلا' else_arm
-# [098] arm
+# [099] arm
 arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [099] else_arm
+# [100] else_arm
 else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [100] dum_stmt
+# [101] dum_stmt
 dum_stmt ::= 'طالما' expression (block_stmt | ergo_joint statement) cape_clause?
-# [101] itera_stmt
+# [102] itera_stmt
 itera_stmt ::= 'كرر' ('من' expression (',' expression)* | 'عن' expression | 'نطاق' expression (',' expression)*) apud_clause? ('ثابت' | 'متغير') itera_binding (block_stmt | ergo_joint statement) cape_clause?
-# [102] itera_binding
+# [103] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
-# [103] apud_clause
+# [104] apud_clause
 apud_clause ::= 'عند' '[' IDENTIFIER (',' IDENTIFIER)* ']'
-# [104] elige_stmt
+# [105] elige_stmt
 elige_stmt ::= 'اختر' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
-# [105] casu_elige_clause
+# [106] casu_elige_clause
 casu_elige_clause ::= 'حالة' expression (block_stmt | ergo_joint statement)
-# [106] ceterum_clause
+# [107] ceterum_clause
 ceterum_clause ::= 'افتراضي' (block_stmt | ergo_joint statement)
-# [107] discerne_stmt
+# [108] discerne_stmt
 discerne_stmt ::= 'طابق' 'جميع'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
-# [108] discriminants
+# [109] discriminants
 discriminants ::= expression (',' expression)*
-# [109] casu_variant_clause
+# [110] casu_variant_clause
 casu_variant_clause ::= 'حالة' patterns (block_stmt | ergo_joint statement)
-# [110] patterns
+# [111] patterns
 patterns ::= pattern ((',' | 'و') pattern)*
-# [111] pattern
+# [112] pattern
 pattern ::= '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_pattern?)
-# [112] negated_number
+# [113] negated_number
 negated_number ::= '-' NUMBER
-# [113] type_pattern
+# [114] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
-# [114] ut_pattern
+# [115] ut_pattern
 ut_pattern ::= ('كـ' IDENTIFIER) | (('ثابت' | 'متغير') pattern_binding (',' pattern_binding)*)
-# [115] pattern_binding
+# [116] pattern_binding
 pattern_binding ::= IDENTIFIER ('كـ' IDENTIFIER)?
-# [116] custodi_stmt
+# [117] custodi_stmt
 custodi_stmt ::= 'احرس' '{' si_guard_clause+ '}'
-# [117] si_guard_clause
+# [118] si_guard_clause
 si_guard_clause ::= 'إذا' expression (block_stmt | ergo_joint statement)
-# [118] ex_stmt
+# [119] ex_stmt
 ex_stmt ::= 'من' expression ('ثابت' | 'متغير') extract_fields
-# [119] extract_fields
+# [120] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
-# [120] extract_field
+# [121] extract_field
 extract_field ::= IDENTIFIER ('كـ' IDENTIFIER)?
-# [121] ceteri_field
+# [122] ceteri_field
 ceteri_field ::= 'باقي' IDENTIFIER
-# [122] redde_stmt
+# [123] redde_stmt
 redde_stmt ::= 'أعد' expression?
-# [123] reddet_stmt
+# [124] reddet_stmt
 reddet_stmt ::= 'أعد_منتظرا' expression
-# [124] tacebit_stmt
+# [125] tacebit_stmt
 tacebit_stmt ::= 'انتظر' expression
-# [125] cede_stmt
+# [126] cede_stmt
 cede_stmt ::= 'سلم' expression
-# [126] rumpe_stmt
+# [127] rumpe_stmt
 rumpe_stmt ::= 'اكسر'
-# [127] perge_stmt
+# [128] perge_stmt
 perge_stmt ::= 'تابع'
-# [128] tacet_stmt
+# [129] tacet_stmt
 tacet_stmt ::= 'صمت'
-# [129] iace_stmt
+# [130] iace_stmt
 iace_stmt ::= iace_expr | iace_guarded_expr
-# [130] iace_expr
+# [131] iace_expr
 iace_expr ::= ('ارم' | 'انهر') expression
-# [131] iace_guarded_expr
+# [132] iace_guarded_expr
 iace_guarded_expr ::= ('ارم' | 'انهر') expression NO_NEWLINE 'إذا' expression
-# [132] cape_clause
+# [133] cape_clause
 cape_clause ::= 'التقط' IDENTIFIER block_stmt
-# [133] adfirma_stmt
+# [134] adfirma_stmt
 adfirma_stmt ::= 'أكد' expression ('انهر' expression)?
-# [134] requirit_stmt
+# [135] requirit_stmt
 requirit_stmt ::= 'يتطلب' expression 'ارم' expression
-# [135] reice_stmt
+# [136] reice_stmt
 reice_stmt ::= 'ارفض' expression 'ارم' expression
-# [136] expression
+# [137] expression
 expression ::= assignment
-# [137] transfer
+# [138] transfer
 transfer ::= ternary ('⇇' ternary)*
-# [138] assignment
-assignment ::= transfer ('←' assignment | '↤' assignment inline_recovery?)?
-# [139] inc_dec_stmt
+# [139] assignment
+assignment ::= transfer ('←' assignment | '↤' assignment inline_default?)?
+# [140] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
-# [140] place
+# [141] place
 place ::= call_expr
-# [141] ternary
-ternary ::= aut_expr (('?' expression ':' | 'فإذا' expression 'وإلا') ternary)?
-# [142] aut_expr
+# [142] ternary
+ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
+# [143] aut_expr
 aut_expr ::= et_expr (('أو') et_expr)*
-# [143] et_expr
+# [144] et_expr
 et_expr ::= equality (('و') equality)*
-# [144] equality
+# [145] equality
 equality ::= comparison equality_tail*
-# [145] equality_tail
+# [146] equality_tail
 equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉' | 'هو' | 'ليس' 'هو') comparison
-# [146] comparison
+# [147] comparison
 comparison ::= bitwise_or_expr (('≺' | '≻' | '≤' | '≥' | 'ضمن' | 'بين') bitwise_or_expr)*
-# [147] bitwise_or_expr
+# [148] bitwise_or_expr
 bitwise_or_expr ::= bitwise_xor_expr ('∨' bitwise_xor_expr)*
-# [148] bitwise_xor_expr
+# [149] bitwise_xor_expr
 bitwise_xor_expr ::= bitwise_and_expr ('⊻' bitwise_and_expr)*
-# [149] bitwise_and_expr
+# [150] bitwise_and_expr
 bitwise_and_expr ::= shift_expr ('∧' shift_expr)*
-# [150] shift_expr
+# [151] shift_expr
 shift_expr ::= range_expr (('⇐' | '⇒') range_expr)*
-# [151] range_expr
+# [152] range_expr
 range_expr ::= additive_expr range_tail?
-# [152] range_tail
+# [153] range_tail
 range_tail ::= ('‥' | '…' | 'قبل' | 'حتى') additive_expr ('كل' additive_expr)?
-# [153] additive_expr
+# [154] additive_expr
 additive_expr ::= multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
-# [154] multiplicative_expr
+# [155] multiplicative_expr
 multiplicative_expr ::= vel_expr (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
-# [155] vel_expr
+# [156] vel_expr
 vel_expr ::= unary_expr ('عوض' vel_rhs)*
-# [156] vel_rhs
+# [157] vel_rhs
 vel_rhs ::= unary_expr vel_range_tail?
-# [157] vel_range_tail
+# [158] vel_range_tail
 vel_range_tail ::= ('‥' | '…' | 'قبل' | 'حتى') unary_expr ('كل' unary_expr)?
-# [158] unary_expr
+# [159] unary_expr
 unary_expr ::= ('-' | '¬' | 'ليس') unary_expr | finge_expr | cast_expr
-# [159] gradient_expr
+# [160] gradient_expr
 gradient_expr ::= call_expr ('∇' gradient_selection?)?
-# [160] gradient_selection
+# [161] gradient_selection
 gradient_selection ::= '[' gradient_place (',' gradient_place)* ']'
-# [161] gradient_place
+# [162] gradient_place
 gradient_place ::= expression
-# [162] cast_expr
+# [163] cast_expr
 cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)*
-# [163] conversio_expr
-conversio_expr ::= '↦' type_annotation inline_recovery?
-# [164] inline_recovery
-inline_recovery ::= '⇥' unary_expr
-# [165] call_expr
+# [164] conversio_expr
+conversio_expr ::= '↦' type_annotation inline_default?
+# [165] inline_default
+inline_default ::= '⊥' unary_expr
+# [166] call_expr
 call_expr ::= primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
-# [166] call_suffix
+# [167] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
-# [167] member_suffix
+# [168] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
-# [168] transpose_suffix
+# [169] transpose_suffix
 transpose_suffix ::= 'ᵀ'
-# [169] optional_suffix
+# [170] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
-# [170] non_null_suffix
+# [171] non_null_suffix
 non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
-# [171] argument_list
+# [172] argument_list
 argument_list ::= (argument (',' argument)*)?
-# [172] argument
+# [173] argument
 argument ::= template_argument | 'انشر'? expression
-# [173] template_argument
+# [174] template_argument
 template_argument ::= 'انشر'? IDENTIFIER ':' expression
-# [174] literal
+# [175] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'صواب' | 'خطأ' | 'لاشيء' | '∞' | 'nan'
-# [175] primary
+# [176] primary
 primary ::= IDENTIFIER | literal | 'ذات' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | summa_expr | capta_expr | '(' expression ')'
-# [176] ad_expr
+# [177] ad_expr
 ad_expr ::= 'اتصل' ASCII_STRING ad_opener?
-# [177] ad_opener
+# [178] ad_opener
 ad_opener ::= '(' expression ')'
-# [178] array_literal
+# [179] array_literal
 array_literal ::= '[' argument_list? ']'
-# [179] iuncta_expr
+# [180] iuncta_expr
 iuncta_expr ::= 'توبل' type_arguments '[' argument_list? ']'
-# [180] json_literal
+# [181] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
-# [181] json_member
+# [182] json_member
 json_member ::= STRING ':' json_value
-# [182] typed_constructor
+# [183] typed_constructor
 typed_constructor ::= type_annotation '{' field_list? '}'
-# [183] field_list
+# [184] field_list
 field_list ::= field_init (',' field_init)*
-# [184] field_init
-field_init ::= ('انشر' expression) | (field_key '=' expression) | IDENTIFIER
-# [185] field_key
+# [185] field_init
+field_init ::= (field_key '=' expression) | IDENTIFIER
+# [186] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
-# [186] json_value
+# [187] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
-# [187] json_object
+# [188] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
-# [188] json_array
+# [189] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
-# [189] json_string
+# [190] json_string
 json_string ::= STRING
-# [190] json_number
+# [191] json_number
 json_number ::= NUMBER
-# [191] finge_expr
+# [192] finge_expr
 finge_expr ::= 'أنشئ' qualified_ident ('{' field_list '}')? ('∷' type_annotation)?
-# [192] qualified_ident
+# [193] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
-# [193] praefixum_expr
+# [194] praefixum_expr
 praefixum_expr ::= 'بادئة' (block_stmt | '(' expression ')')
-# [194] scriptum_expr
+# [195] scriptum_expr
 scriptum_expr ::= 'حرر' '(' STRING (',' expression)* ')'
-# [195] lege_expr
+# [196] lege_expr
 lege_expr ::= 'اقرأ' 'سطرا'?
-# [196] first_match_expr
+# [197] first_match_expr
 first_match_expr ::= 'أول_مطابقة' '(' expression apud_clause? ',' 'حيث' IDENTIFIER block_stmt ')'
-# [197] summa_expr
+# [198] summa_expr
 summa_expr ::= 'مجموع' 'من' expression apud_clause? filum_clause? ('ثابت' | 'متغير') IDENTIFIER block_stmt
-# [198] filum_clause
+# [199] filum_clause
 filum_clause ::= 'خيط' IDENTIFIER
-# [199] capta_expr
+# [200] capta_expr
 capta_expr ::= 'فخ' block_stmt
-# [200] object_pattern
+# [201] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [201] pattern_property
+# [202] pattern_property
 pattern_property ::= 'باقي'? IDENTIFIER ('كـ' IDENTIFIER)?
-# [202] array_pattern
+# [203] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [203] array_pattern_element
+# [204] array_pattern_element
 array_pattern_element ::= '_' | 'باقي'? IDENTIFIER
-# [204] nota_stmt
+# [205] nota_stmt
 nota_stmt ::= ('اعرض' | 'شاهد' | 'نبه' | 'اكتب') expression (',' expression)*
-# [205] entry_header
+# [206] entry_header
 entry_header ::= ('وسائط' IDENTIFIER)? ('مخرج' expression)?
-# [206] incipit_stmt
+# [207] incipit_stmt
 incipit_stmt ::= 'بداية' entry_header block_stmt
-# [207] incipiet_stmt
+# [208] incipiet_stmt
 incipiet_stmt ::= 'استهلال' entry_header block_stmt
-# [208] probandum_decl
+# [209] probandum_decl
 probandum_decl ::= 'مختبر' STRING proba_modifier* '{' probandum_body '}'
-# [209] probandum_body
+# [210] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [210] proba_stmt
+# [211] proba_stmt
 proba_stmt ::= 'اختبر' STRING proba_modifier* block_stmt
-# [211] proba_modifier
+# [212] proba_modifier
 proba_modifier ::= 'توقع_الفشل' | 'أهمل' STRING | 'مستقبلي' STRING | 'فقط' | 'وسم' STRING | 'زمني' NUMBER | 'قس' | 'معاد' NUMBER | 'هش' NUMBER | 'حصري' STRING
-# [212] praepara_block
+# [213] praepara_block
 praepara_block ::= ('جهز' | 'سيهيئ' | 'لاحق' | 'سيلحق') 'جميع'? block_stmt
-# [213] fac_stmt
+# [214] fac_stmt
 fac_stmt ::= 'افعل' block_stmt cape_clause? ('طالما' expression)?
-# [214] IDENTIFIER
+# [215] IDENTIFIER
 IDENTIFIER ::=
-# [215] NUMBER
+# [216] NUMBER
 NUMBER ::=
-# [216] NATURAL
+# [217] NATURAL
 NATURAL ::=
-# [217] STRING
+# [218] STRING
 STRING ::=
-# [218] ASCII_STRING
+# [219] ASCII_STRING
 ASCII_STRING ::=
-# [219] BACKTICK_STRING
+# [220] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [220] OCTETI_STRING
+# [221] OCTETI_STRING
 OCTETI_STRING ::=
-# [221] NEWLINE
+# [222] NEWLINE
 NEWLINE ::=
-# [222] WIDTH_MARKER
+# [223] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [223] LISTA_WIDTH_SUGAR
+# [224] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [224] TENSOR_WIDTH_SUGAR
+# [225] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [225] SPARSA_WIDTH_SUGAR
+# [226] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [226] VECTOR_WIDTH_SUGAR
+# [227] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [227] MATRIX_WIDTH_SUGAR
+# [228] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [228] FRONTMATTER_DELIMITER
+# [229] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [229] TOML_LINES
+# [230] TOML_LINES
 TOML_LINES ::=
-# [230] ANNOTATION_NAME
+# [231] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [231] ANNOTATION_FIELD_NAME
+# [232] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [232] NON_NEWLINE_TOKEN
+# [233] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [233] NO_NEWLINE
+# [234] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -554,6 +556,7 @@ NO_NEWLINE ::=
 | [`nucleum_field`](#nucleum-field) | `#نواة-field` | live |
 | [`radix_annotation`](#radix-annotation) | `#radix-annotation` | live |
 | [`radix_directive`](#radix-directive) | `#radix-directive` | live |
+| [`ad_annotation`](#ad-annotation) | `#اتصل-annotation` | live |
 | [`implendum_decl`](#implendum-decl) | `#عقد-decl` | live |
 | [`implendum_method_decl`](#implendum-method-decl) | `#عقد-method-decl` | live |
 | [`typus_decl`](#typus-decl) | `#نمط-decl` | live |
@@ -664,7 +667,7 @@ NO_NEWLINE ::=
 | [`gradient_place`](#gradient-place) | `#gradient-place` | live |
 | [`cast_expr`](#cast-expr) | `#cast-expr` | live |
 | [`conversio_expr`](#conversio-expr) | `#conversio-expr` | live |
-| [`inline_recovery`](#inline-recovery) | `#inline-recovery` | live |
+| [`inline_default`](#inline-default) | `#inline-default` | live |
 | [`call_expr`](#call-expr) | `#call-expr` | live |
 | [`call_suffix`](#call-suffix) | `#call-suffix` | live |
 | [`member_suffix`](#member-suffix) | `#member-suffix` | live |
@@ -751,7 +754,6 @@ productions. It is not a second keyword authority.
 | Category | Faber | Meaning |
 |---|---|---|
 | Iteration | `نطاق` | range iteration |
-| Declarations | `مجرد` | abstract genus modifier |
 | Endpoints | `اتصل` | capability call |
 | Error | `أكد` | assert |
 | Iteration | `قبل` | range until exclusive |
@@ -819,7 +821,6 @@ productions. It is not a second keyword authority.
 | Testing | `قس` | benchmark |
 | Diagnostics | `نبه` | warn |
 | Error | `انهر` | panic |
-| Genus | `مرتبط` | link field |
 | Literals | `لاشيء` | none |
 | Declarations | `اسم` | import binding name |
 | Boolean | `ليس` | not |
@@ -856,14 +857,12 @@ productions. It is not a second keyword authority.
 | Builtin | `حرر` | write |
 | Control | `وإلا` | else |
 | Control | `إذا` | if |
-| Control | `فإذا` | then (ternary) |
 | Control | `وإلاإذا` | else-if |
 | Declarations | `ليكن` | inferred immutable local |
 | Testing | `فقط` | only |
 | Testing | `حصري` | only-in |
 | Params | `انشر` | spread |
 | Declarations | `اختياري` | optional declaration slot |
-| Genus | `امتد` | extends |
 | Grammar | `مجموع` | keyword literal derived from the production |
 | Async | `انتظر` | await-discard |
 | Control | `صمت` | no-op |
@@ -1045,6 +1044,11 @@ data, and it satisfies contracts through `حقق`. It is not a self-contained
 object that owns its own construction and process: a value is built with a
 construction literal (`Genus { field = value }`).
 
+- **No class inheritance.** Inheritance was removed: there is no `sub`
+  (extends) clause and no `abstractus` genus. Shared behaviour comes from
+  contracts (`عقد` + `حقق`) and from composition — a field holding
+  another value. The old spellings are rejected with a migration diagnostic.
+
 - **No static methods.** A `صنف` declares instance methods only. A function
   about a type is a top-level function in the type's file, reached through the
   import alias. `سكوني` marks a type-level field, never a method.
@@ -1131,9 +1135,21 @@ wire operation such as `json.pange(value ↦ json)`.
   slot after modifiers and before `→`/`⇥`/body; bare means synchronous finite
 - `@ عام` marks a declaration for the file's importable (export) surface; `@ interna` marks it package-internal (same-package importable only); `@ privata` is an explicit module-private marker. Unmarked top-level declarations are module-private by default; a declaration mixing distinct visibility tiers is rejected with `SEM019` (`conflicting_visibility`)
 - `@ protecta` is reserved and rejected with a semantic diagnostic; it has no package, subclass, or sibling-file visibility meaning
+- `@ doc` is not an annotation. Comments are the documentation: a line comment attaches forward to the declaration it precedes, and there is no doc marker.
 
-- `امتد` = extends, `حقق` = implements
-- `سكوني` = static (type-level) field, `مرتبط` = bound/property
+- `حقق` = implements (conformance to an `عقد` contract)
+- `سكوني` = static (type-level) field. A field has no other modifier; the
+  former `nexum` field modifier is removed and rejected with a migration
+  diagnostic.
+- Members are public by default. Until member privacy is enforced,
+  `@ privata` or `@ interna` on a `صنف` member is an error
+  (`member_privacy_unenforced`), because it promises privacy nothing checks;
+  `@ عام` on a member is a redundant-annotation warning
+  (`redundant_member_publica`), an error when warnings are denied.
+- A type may refer to itself: `تمايز Expr { Adde { Expr sinister, Expr dexter } }`
+  and `صنف Nodus { Nodus ∪ لاشيء next }` need no keyword and no box type.
+  Values have reference semantics, so the indirection is implied; a backend
+  that stores fields inline inserts it on the fields that close a type cycle.
 
 ### Interfaces
 
@@ -1170,7 +1186,7 @@ extra source columns stay invisible. Each `عمود` row takes a type (use
 `T ∪ لاشيء` for a nullable column) and a name, with an optional
 `: sourceName` alias mapping the public column to a source column (absent means
 identity). Column rows are a declaration block (no commas). A schema has no
-methods (`schema_method`), no `امتد`/`حقق` inheritance
+methods (`schema_method`), no `حقق`
 (`schema_inheritance`), and no nested columns (`schema_nested_column`); each is
 rejected at parse time.
 
@@ -1432,6 +1448,17 @@ prefer sugar. Choose per module or file.
 
 
 - `إذا` = if, `وإلاإذا` = else-if, `وإلا` = else
+- `c ✓ a ✗ b` is the one value conditional: `a` when `c` holds, else `b`.
+  `✓` (U+2713 CHECK MARK) and `✗` (U+2717 BALLOT X) are the same in every
+  locale and have no word twin. It is one level only: a `✓ ✗` inside the
+  condition or either branch is rejected (`conditional_nested`); choose among
+  more values with a function whose `إذا` arms each `أعد`. The branches narrow
+  exactly like `إذا` branches (after `r هو numerus`, `r` is `numerus` in the
+  `✓` branch).
+- `c ? a : b` and `c sic a وإلا b` (en `c yields a else b`) were removed and
+  are rejected with a migration diagnostic; write `c ✓ a ✗ b`. `sic` stays a
+  reserved word only to carry that diagnostic. The look-alikes `✔` and `✘` are
+  rejected with a "did you mean" hint.
 - `إذن` for one-statement bodies, including `إذن أعد`, `إذن ارم`, `إذن انهر`, and `إذن صمت` (`∴` is not accepted here)
 - `صمت` for explicit no-op (from musical notation: "it is silent")
 
@@ -1464,6 +1491,17 @@ called implicitly.
 `طابق` is a statement, not an expression. A value chosen by a match comes
 from a function whose arms each `أعد`. The compiler checks exhaustiveness
 and definite return, and the function can be tested on its own.
+
+Coverage is checked as a pattern matrix. Each scrutinee has a space: the
+variants of an `ترتيب` or `تمايز`, the members of a union, and `bivalens`
+as the closed set `{صواب, خطأ}`. A match over several scrutinees is
+checked over their product, so `طابق a, b` over two `bivalens` values
+needs all four combinations or a `افتراضي`. A missing variant or combination is
+an error that names one uncovered case. Open types (`numerus`, `textus`, …)
+are complete only with a catch-all arm. When coverage cannot be computed for a
+pattern kind, the compiler warns that it was not checked; it is never silent.
+`اختر` keeps its switch meaning: over an open domain, a missing `افتراضي` is
+an implicit no-op default, while a closed domain is checked.
 
 ### Pattern Matching
 
@@ -1552,9 +1590,9 @@ and `-`, left-associative: `a ⤒ b ⤓ c` is `(a ⤒ b) ⤓ c`.
 **Conversion-directed assignment (`↤` / conversio-assign):** `place ↤ value`
 evaluates the right side, converts it to the statically known type of the left
 place through the existing `↦` route, then assigns. It binds at the same
-precedence as `←` and is right-associative; `⇥ inlineRecovery` is **legal only
-on `↤`** — a `⇥` recovery after ordinary `←` is rejected, and in a
-right-associated `↤` chain the recovery attaches to the nearest `↤`. The
+precedence as `←` and is right-associative; the `⊥` default (`inline_default`)
+is **legal only on `↤`** — a `⊥` after ordinary `←` is rejected, and in a
+right-associated `↤` chain the default attaches to the nearest `↤`. The
 operator is preserved verbatim through syntax and emission; it is never
 rewritten to `←` or `↦`. Typed `ثابت`/`متغير` initializers accept `↤`
 (convert to the written type, then initialize); `ثابت _`, `ليكن`, and untyped
@@ -1599,7 +1637,7 @@ Only the `∷` glyph is accepted as the postfix static type-ascription operator.
 The `↦` glyph (U+21A6, "rightwards arrow from bar") is the runtime value conversion operator. Unlike `∷` (compile-time cast), this performs actual parsing/conversion that can fail:
 
 - `"22" ↦ numerus` → Rust: `"22".parse::<i64>().unwrap()`
-- `"bad" ↦ numerus ⇥ 0` → Rust: `"bad".parse::<i64>().unwrap_or(0)`
+- `"bad" ↦ numerus ⊥ 0` → Rust: `"bad".parse::<i64>().unwrap_or(0)`
 - `42 ↦ textus` → Rust: `42.to_string()`
 - `n ↦ ascii<N, Hex|Bin|Oct>` — shipped; fixed-width lowercase digits, zero-padded to `N`, with overflow and negative sources rejected.
 - `n ↦ ascii<_, Hex|Bin|Oct>` — shipped for const-foldable numerus sources; the hole is solved to the source digit count. Runtime sources leave the hole unsolved and require explicit `N`.
@@ -1612,9 +1650,37 @@ The second type argument of a `↦` target is the convert-hint slot. `Hex` / `Bi
 - `n ↦ numerus<u32, Bits>` / `n ↦ numerus<u64, Bits>` / `n ↦ fractus<f32, Bits>` / `n ↦ fractus<f64, Bits>` / `n ↦ fractus<f16, Bits>` — shipped; the `Bits` hint reinterprets between exact-width integer/float pairs (u32↔f32, u64↔f64, u16↔f16, u16↔bf16) bit-identically. It is reinterpretation, not value conversion; wrong-pair rows reject with the structured issue, and `Bits` is never a base or an ascii format hint. `Bits` is a convert-slot hint in the same Hex slot, not a keyword and not a `baseType` production.
 - `n ↦ octeti<N, Be>` / `… ↦ octeti<N, Le>` — proposed (not shipped); write convert after `octeti<N>` (`N` ∈ {2, 4, 8}). `Be`/`Le` stay Hex-slot hints, not a second capacity.
 
-Inline failure recovery uses `⇥` immediately after the conversio target (`↦ T ⇥ recovery-expr`). The unparenthesized recovery operand is a unary-precedence expression; parenthesize arithmetic, coalescing, ternary, or assignment recovery expressions. The recovery value must have type `T`.
+Explicit integer narrowing is magnitude-checked on every backend:
+`n ↦ numerus<u8>` converts a value that fits unchanged, and a value out of the
+target's range fails — it never wraps and never relabels. The failure takes the
+error channel, or the `⊥` default when one is written. Use `modulus<W>` for
+wrapping arithmetic.
 
-Using `عوض` as conversio recovery is rejected with a migration diagnostic. `عوض` is local nullable elimination only (`x عوض y`, parameter defaults) — not logical `أو`. A parenthesized conversio result may still combine with `عوض` as ordinary defaulting.
+**Default channel (`⊥`):** `⊥` (U+22A5 UP TACK) supplies a value when a
+conversion fails: `ثابت numerus n ← "abc" ↦ numerus ⊥ 0`. It is written
+immediately after the conversio target (`↦ T ⊥ default`) or after the value of
+a `↤` assignment.
+
+- `⊥` catches only the `⇥` error channel. It never catches `انهر` or traps
+  (for example integer overflow).
+- The default is evaluated only on failure.
+- The default must type-check as the success type `T`.
+- One expression either propagates (`⇥ E`) or defaults (`⊥ v`), never both;
+  `⊥ v ⇥ …` is rejected.
+- `⊥` binds looser than `↦ T`: `x ↦ numerus ⊥ 0` is `(x ↦ numerus) ⊥ 0`. The
+  unparenthesized default is a unary-precedence expression; parenthesize
+  arithmetic, coalescing, ternary, or assignment defaults.
+- Today `⊥` is legal only on a conversion (`↦ T`, `↤`); after any other
+  expression it is rejected.
+- `⊥` is an operator between a failable expression and a value. It is not the
+  type-theory "never" type (that is `numquam`).
+- The glyph is the same in every locale. The look-alike `⟂` (U+27C2) is
+  rejected with a "did you mean `⊥`?" hint.
+
+`⇥` only ever names an error type. The retired inline recovery `↦ T ⇥ value`
+(and `↤ … ⇥ value`) is rejected with a migration diagnostic pointing at `⊥`.
+
+Using `عوض` as a conversio default is rejected with a migration diagnostic. `عوض` is local nullable elimination only (`x عوض y`, parameter defaults) — not logical `أو`. A parenthesized conversio result may still combine with `عوض` as ordinary defaulting.
 
 ### Call and Member Access
 
@@ -1815,6 +1881,9 @@ separated by `:`; values are JSON constants only. Duplicate keys are an error
 (second occurrence). Ascribing to `tabula<K,V>` lowers a real constant map.
 Use `↦ valor` for explicit widening to the broad dynamic carrier. Genus/variant
 construction `Type { field = expr }` uses the Faber `=` grammar unchanged.
+Construction literals do not spread: `انشر` is not a field initializer
+(`Genus { انشر other }` is rejected). `انشر` stays for list literals and
+call arguments. Copy-with-changes is planned as `Genus { … } من source`.
 
 - Ratio construction uses `ratioType '{' fieldInit (',' fieldInit)* '}'` through `typedConstructor`; every field initializer is named, and the resulting fields remain accessible only by label.
 
@@ -1954,6 +2023,9 @@ ordinary postfix `conversio` materializes the resulting conversation handle.
   `s.tuus<T>().cursor()`, not direct `كرر من s.tuus<T>()`.
 - **Removed (parse error):** legacy typed `اتصل "route"` and block `meus`/`tuus` arms.
 - Types: compiler-owned `scrinium`, `status`; opaque `sermo` conversation handle.
+- English reader spellings: `sermo` is `channel`, `scrinium` is `frame`, and
+  the views `meus<T>` / `tuus<T>` are `send<T>` / `recv<T>` (`s.send<T>()`,
+  `s.recv<T>()`). The Latin spellings are unchanged.
 - `sermo ↦ T` materializes inbound frames into one value of type `T` using
   the type-directed collector for `T`.
 
@@ -1973,8 +2045,21 @@ parameter.
 conversations, which stay portable across backends.
 
 `@ اتصل` on a function is the compiler-owned serving half of `اتصل`: it lets
-Faber code answer a route. It is designed, not yet implemented. Web, HTTP,
-and framework routing stay libraries (see Annotations).
+Faber code answer a route. `@ اتصل 'prefix:name'` (en `@ call`) on a top-level,
+non-generic, bodied `دالة` serves that route.
+
+- Routes are exact: `prefix:name` or `prefix/name`. Pattern routes are deferred.
+- The handler takes zero or one parameter; the one parameter is the opener
+  value of the calling `اتصل`.
+- A handler serves one route. Reserved prefixes (such as `runtime:`) and
+  builtin routes cannot be served.
+- Routes form one program-wide static table built from every module in the
+  program, including imported libraries. Two definitions of the same route are
+  a compile error.
+- Parsing, checking, and the route table exist today; backend serving is in
+  progress.
+
+Web, HTTP, and framework routing stay libraries (see Annotations).
 
 ---
 
