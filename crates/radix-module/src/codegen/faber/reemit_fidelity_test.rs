@@ -719,3 +719,27 @@ fn ordo_enum_round_trips_discriminants() {
     assert!(code.contains("One = 1,"), "en discriminant must survive:\n{code}");
     assert!(!code.contains("union Level"), "enum must not become union:\n{code}");
 }
+
+#[test]
+fn array_destructuring_reemits_as_pattern() {
+    let source = "incipit {\n    fixum _ xs ← [1, 2, 3, 4]\n    fixum [a, _, ceteri r] ← xs\n    varia [c, d] ← [5, 6]\n    nota a\n    nota r\n    nota c + d\n}\n";
+    let emitted = assert_idempotent(source);
+    assert!(emitted.contains("fixum [a, _, ceteri r] ← xs\n"), "{emitted}");
+    assert!(emitted.contains("varia [c, d] ← [5, 6]\n"), "{emitted}");
+    assert!(!emitted.contains("__destructura"), "{emitted}");
+}
+
+#[test]
+fn object_destructuring_reemits_as_pattern() {
+    let source = "genus Punctum {\n    numerus x\n    numerus y\n}\nfunctio fac() → Punctum {\n    redde Punctum { x = 1, y = 2 }\n}\nincipit {\n    fixum {x, y ut z} ← fac()\n    nota x + z\n}\n";
+    let emitted = assert_idempotent(source);
+    assert!(emitted.contains("fixum {x, y ut z} ← fac()\n"), "{emitted}");
+}
+
+#[test]
+fn itera_destructuring_binder_reemits_as_pattern() {
+    let source = "incipit {\n    fixum _ m ← [[1, 2, 3], [4, 5, 6]]\n    itera ex m fixum [caput, ceteri cauda] {\n        nota caput\n        nota cauda\n    }\n}\n";
+    let emitted = assert_idempotent(source);
+    assert!(emitted.contains("itera ex m fixum [caput, ceteri cauda] {\n"), "{emitted}");
+    assert!(!emitted.contains("__itera_element"), "{emitted}");
+}

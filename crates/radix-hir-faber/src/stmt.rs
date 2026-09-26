@@ -434,13 +434,12 @@ impl super::FaberCodegen<'_> {
             writer.write(&self.symbol_to_string(name));
             writer.writeln(" {");
             writer.indented(|writer| {
-                for stmt in block
-                    .statements
-                    .iter()
-                    .skip(usize::from(skip_binding_local))
-                {
-                    self.write_stmt(stmt, names, surface, writer);
-                }
+                self.write_stmts(
+                    &block.statements[usize::from(skip_binding_local)..],
+                    names,
+                    surface,
+                    writer,
+                );
                 if let Some(expr) = &block.expr {
                     self.write_expr(expr, names, surface, writer);
                     writer.newline();
@@ -470,7 +469,50 @@ impl super::FaberCodegen<'_> {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        for stmt in &block.statements {
+        self.write_block_from(block, 0, names, surface, writer);
+    }
+
+    /// Emit a block starting at statement `start` (a loop binder may already
+    /// own the leading destructuring run), followed by its tail expression.
+    pub(super) fn write_block_from(
+        &self,
+        block: &HirBlock,
+        start: usize,
+        names: &FxHashMap<DefId, Symbol>,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        self.write_stmts(&block.statements[start..], names, surface, writer);
+        if let Some(expr) = &block.expr {
+            self.write_expr(expr, names, surface, writer);
+            writer.newline();
+        }
+    }
+
+    /// Emit a statement run, re-sugaring authored destructuring expansions
+    /// back to their pattern declaration.
+    pub(super) fn write_stmts(
+        &self,
+        stmts: &[HirStatement],
+        names: &FxHashMap<DefId, Symbol>,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        let mut index = 0;
+        while index < stmts.len() {
+            let stmt = &stmts[index];
+            if let Some((binding, subject)) = self.destructure_run(&stmts[index..]) {
+                self.write_statement_trivia(stmt, writer);
+                writer.write(destructure_keyword(binding, surface));
+                writer.write(" ");
+                self.write_destructure_pattern(&binding.pattern, surface, writer);
+                writer.write(" ← ");
+                self.write_expr(subject, names, surface, writer);
+                writer.newline();
+                index += binding.stmt_ids.len();
+                continue;
+            }
+            index += 1;
             // Omit compiler-synthesized locals (shader implicit IO, CLI args);
             // they are runtime-provided, not authored source.
             if let HirStatementKind::Local(local) = &stmt.kind
@@ -480,10 +522,81 @@ impl super::FaberCodegen<'_> {
             }
             self.write_stmt(stmt, names, surface, writer);
         }
-        if let Some(expr) = &block.expr {
-            self.write_expr(expr, names, surface, writer);
-            writer.newline();
+    }
+
+    /// The authored destructuring binding whose lowered run starts `stmts`,
+    /// with the subject expression the pattern reads. `None` when the run is
+    /// not intact (emission then falls back to the expanded locals).
+    pub(super) fn destructure_run<'s>(
+        &'s self,
+        stmts: &'s [HirStatement],
+    ) -> Option<(&'s radix_hir::HirDestructureBinding, &'s HirExpression)> {
+        let first = stmts.first()?;
+        let binding = self.destructure_bindings.get(&first.id)?;
+        let run = stmts.get(..binding.stmt_ids.len())?;
+        if !run
+            .iter()
+            .zip(&binding.stmt_ids)
+            .all(|(stmt, id)| stmt.id == *id)
+        {
+            return None;
         }
+        let subject = match &first.kind {
+            HirStatementKind::Local(local) if binding.hoisted => local.init.as_ref()?,
+            HirStatementKind::Local(local) => destructure_place(local.init.as_ref()?)?,
+            HirStatementKind::Expr(expr) if !binding.hoisted => expr,
+            _ => return None,
+        };
+        Some((binding, subject))
+    }
+
+    /// Write `[a, _, rest r]` or `{x, y ut z, rest r}`.
+    pub(super) fn write_destructure_pattern(
+        &self,
+        pattern: &radix_hir::HirDestructurePattern,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        let (open, close, mut items, rest) = match pattern {
+            radix_hir::HirDestructurePattern::Array { elements, rest } => (
+                "[",
+                "]",
+                elements
+                    .iter()
+                    .map(|element| {
+                        element.map_or_else(|| "_".to_owned(), |name| self.symbol_to_string(name))
+                    })
+                    .collect::<Vec<_>>(),
+                rest,
+            ),
+            radix_hir::HirDestructurePattern::Object { fields, rest } => (
+                "{",
+                "}",
+                fields
+                    .iter()
+                    .map(|(name, alias)| match alias {
+                        Some(alias) => format!(
+                            "{} {} {}",
+                            self.symbol_to_string(*name),
+                            surface.keyword(TokenKind::Ut),
+                            self.symbol_to_string(*alias)
+                        ),
+                        None => self.symbol_to_string(*name),
+                    })
+                    .collect::<Vec<_>>(),
+                rest,
+            ),
+        };
+        if let Some(rest) = rest {
+            items.push(format!(
+                "{} {}",
+                surface.keyword(TokenKind::Ceteri),
+                self.symbol_to_string(*rest)
+            ));
+        }
+        writer.write(open);
+        writer.write(&items.join(", "));
+        writer.write(close);
     }
 
     pub(super) fn write_stmt(
@@ -654,5 +767,34 @@ impl super::FaberCodegen<'_> {
             }
         }
         writer.newline();
+    }
+}
+
+/// Declaration keyword for an authored destructuring binding.
+pub(super) fn destructure_keyword<'s>(
+    binding: &radix_hir::HirDestructureBinding,
+    surface: &'s impl KeywordSurface,
+) -> &'s str {
+    match (binding.is_await, binding.mutable) {
+        (false, false) => surface.contextual_keyword("fixum"),
+        (false, true) => surface.contextual_keyword("varia"),
+        (true, false) => surface.contextual_keyword("figendum"),
+        (true, true) => surface.contextual_keyword("variandum"),
+    }
+}
+
+/// Recover the place subject from the first expanded local of an un-hoisted
+/// destructuring run: the receiver of its index, field, or `omissa` read, or
+/// the whole initializer for a whole-value rest.
+fn destructure_place(init: &HirExpression) -> Option<&HirExpression> {
+    match &init.kind {
+        HirExpressionKind::Index(subject, _)
+        | HirExpressionKind::Field(subject, _)
+        | HirExpressionKind::MethodCall(subject, ..) => Some(subject),
+        HirExpressionKind::Tuple(elements, _) => match &elements.first()?.kind {
+            HirExpressionKind::Index(subject, _) => Some(subject),
+            _ => None,
+        },
+        _ => Some(init),
     }
 }

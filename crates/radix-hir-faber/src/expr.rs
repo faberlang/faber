@@ -365,9 +365,7 @@ impl super::FaberCodegen<'_> {
                     writer.write(surface.contextual_keyword("fac"));
                     writer.writeln(" {");
                     writer.indented(|writer| {
-                        for stmt in body_stmts {
-                            self.write_stmt(stmt, names, surface, writer);
-                        }
+                        self.write_stmts(body_stmts, names, surface, writer);
                         self.write_block_end_trivia(block, writer);
                     });
                     writer.write("} ");
@@ -426,12 +424,25 @@ impl super::FaberCodegen<'_> {
                     writer.write("]");
                 }
                 writer.write(" ");
-                writer.write(surface.contextual_keyword("fixum"));
-                writer.write(" ");
-                writer.write(&self.symbol_to_string(*binding_name));
+                // A destructuring binder lowers to a synthetic element local
+                // plus a leading run of pattern locals; re-sugar that run.
+                let pattern = self.destructure_run(&block.statements);
+                let start = pattern.map_or(0, |(binding, _)| binding.stmt_ids.len());
+                match pattern {
+                    Some((binding, _)) => {
+                        writer.write(super::stmt::destructure_keyword(binding, surface));
+                        writer.write(" ");
+                        self.write_destructure_pattern(&binding.pattern, surface, writer);
+                    }
+                    None => {
+                        writer.write(surface.contextual_keyword("fixum"));
+                        writer.write(" ");
+                        writer.write(&self.symbol_to_string(*binding_name));
+                    }
+                }
                 writer.writeln(" {");
                 writer.indented(|writer| {
-                    self.write_block(block, names, surface, writer);
+                    self.write_block_from(block, start, names, surface, writer);
                     self.write_block_end_trivia(block, writer);
                 });
                 writer.write("}");
@@ -1281,9 +1292,7 @@ impl super::FaberCodegen<'_> {
             writer.write(surface.contextual_keyword("fac"));
             writer.writeln(" {");
             writer.indented(|writer| {
-                for stmt in body_stmts {
-                    self.write_stmt(stmt, names, surface, writer);
-                }
+                self.write_stmts(body_stmts, names, surface, writer);
                 self.write_block_end_trivia(loop_block, writer);
             });
             // Grammar order is `fac block cape_clause? (dum expression)?`:
