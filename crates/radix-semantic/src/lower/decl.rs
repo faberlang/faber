@@ -1302,9 +1302,6 @@ fn modifier_bindings(modifiers: &[radix_syntax::FuncModifier]) -> Vec<&radix_syn
     let mut out = Vec::new();
     for modifier in modifiers {
         match modifier {
-            radix_syntax::FuncModifier::Curata { required, alias } => {
-                out.push(alias.as_ref().unwrap_or(required));
-            }
             radix_syntax::FuncModifier::Errata(ident)
             | radix_syntax::FuncModifier::Optiones(ident) => {
                 out.push(ident);

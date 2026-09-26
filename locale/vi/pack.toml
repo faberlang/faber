@@ -18,7 +18,6 @@ columna = "cột"
 varia = "biến"
 abstractus = "trừu_tượng"
 ceteri = "còn_lại"
-curata = "được_sửa"
 errata = "lỗi"
 exitus = "thoát"
 generis = "tĩnh"
@@ -26,7 +25,6 @@ iacit = "ném_lỗi"
 immutata = "bất_biến"
 interna = "nội_bộ"
 magnitudo = "kích_thước"
-nexum = "ràng_buộc"
 iuncta = "bộ"
 optiones = "lựa_chọn"
 prae = "tiền"
@@ -81,7 +79,6 @@ nota = "ghi_chú"
 scribe = "viết"
 vide = "xem"
 argumenta = "đối_số"
-cura = "chăm_sóc"
 incipiet = "bắt_đầu_bất_đồng_bộ"
 incipit = "bắt_đầu"
 ad = "gọi"
@@ -198,6 +195,12 @@ filtrum = "bộ_lọc"
 series = "chuỗi"
 census = "điều_tra"
 ratio = "ratio"
+# Conversation family (DECISIONS D6.16). The meus/tuus rows also spell
+# the sermo view methods `s.meus<T>()` / `s.tuus<T>()`.
+sermo = "kênh"
+scrinium = "khung"
+meus = "gửi"
+tuus = "nhận"
 
 [diagnostics.UNRES001]
 message = "từ khóa '{keyword}' không được khai báo cho gói đọc '{pack}'"
@@ -596,8 +599,8 @@ message = "biểu thức không hợp lệ"
 help = "kiểm tra cú pháp biểu thức"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
-message = "dùng ⇥ cho phục hồi conversio"
-help = "dùng ⇥; vel chỉ dùng cho phép hợp nhất nullish"
+message = "dùng ⊥ cho phục hồi conversio"
+help = "dùng ⊥; vel chỉ dùng cho phép hợp nhất nullish"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "cần biểu thức"
@@ -1971,10 +1974,6 @@ help = "spread một giá trị lista bên trong phần tạo lista"
 message = "khóa được tính không hợp lệ trong phần tạo struct"
 help = "dùng tên trường struct đã khai báo trong phần tạo struct"
 
-[diagnostics.SEM011.issues.struct_spread_forbidden]
-message = "các trường spread không hợp lệ trong phần tạo struct"
-help = "cung cấp rõ ràng từng trường struct bắt buộc"
-
 [diagnostics.SEM011.issues.vector_constructor_forbids_spread]
 message = "constructor vector không nhận đối số spread"
 help = "cung cấp rõ ràng các phần tử vector thay vì đối số spread"
@@ -2189,10 +2188,10 @@ help = "ép sang một kiểu tương thích"
 
 [diagnostics.SEM016]
 message = "chuyển đổi không hợp lệ"
-help = "sử dụng chuyển đổi hợp lệ hoặc cung cấp khôi phục nội tuyến bằng `⇥`"
+help = "sử dụng chuyển đổi hợp lệ hoặc cung cấp khôi phục nội tuyến bằng `⊥`"
 
 [diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
-message = "chuyển đổi clamp intervallum không hỗ trợ khôi phục bằng `⇥`"
+message = "chuyển đổi clamp intervallum không hỗ trợ khôi phục bằng `⊥`"
 help = "xóa nhánh khôi phục khỏi clamp miền giá trị này"
 
 [diagnostics.SEM016.issues.intervallum_target_not_range]
@@ -2217,15 +2216,15 @@ help = "làm cho các kiểu phần tử cận nguồn và đích khớp nhau"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_required]
 message = "vật chất hóa vector yêu cầu nguồn là literal lista"
-help = "sử dụng chuyển đổi hợp lệ hoặc cung cấp khôi phục nội tuyến bằng `⇥`"
+help = "sử dụng chuyển đổi hợp lệ hoặc cung cấp khôi phục nội tuyến bằng `⊥`"
 
 [diagnostics.SEM016.issues.lista_to_vector_element_mismatch]
 message = "chuyển đổi lista sang vector yêu cầu các kiểu phần tử khớp nhau"
-help = "sử dụng chuyển đổi hợp lệ hoặc cung cấp khôi phục nội tuyến bằng `⇥`"
+help = "sử dụng chuyển đổi hợp lệ hoặc cung cấp khôi phục nội tuyến bằng `⊥`"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_width]
 message = "chuyển đổi lista sang vector yêu cầu độ rộng vector dạng literal"
-help = "sử dụng chuyển đổi hợp lệ hoặc cung cấp khôi phục nội tuyến bằng `⇥`"
+help = "sử dụng chuyển đổi hợp lệ hoặc cung cấp khôi phục nội tuyến bằng `⊥`"
 
 [diagnostics.SEM016.issues.matrix_materialize_unsupported]
 message = "vật chất hóa matrix chưa được hỗ trợ"
@@ -2316,12 +2315,12 @@ message = "chuyển đổi regex yêu cầu toán hạng textus hoặc ascii"
 help = "chuyển đổi giá trị textus hoặc ascii sang regex"
 
 [diagnostics.SEM016.issues.regex_recovery_unsupported]
-message = "chuyển đổi regex không hỗ trợ khôi phục bằng `⇥`; regex không có dạng literal, nên không có giá trị theo kiểu đích để thay thế"
+message = "chuyển đổi regex không hỗ trợ khôi phục bằng `⊥`; regex không có dạng literal, nên không có giá trị theo kiểu đích để thay thế"
 help = "xóa nhánh khôi phục khỏi chuyển đổi regex này"
 
 [diagnostics.SEM016.issues.valor_verte_unsupported]
-message = "valor ∷ T không được hỗ trợ — không thể khẳng định hình dạng của giá trị động tại thời điểm biên dịch. Sử dụng `↦ T` để trích xuất lúc chạy (với `⇥` để khôi phục)."
-help = "thay vào đó sử dụng chuyển đổi lúc chạy `↦ T` với khôi phục `⇥`"
+message = "valor ∷ T không được hỗ trợ — không thể khẳng định hình dạng của giá trị động tại thời điểm biên dịch. Sử dụng `↦ T` để trích xuất lúc chạy (với `⊥` để khôi phục)."
+help = "thay vào đó sử dụng chuyển đổi lúc chạy `↦ T` với khôi phục `⊥`"
 
 [diagnostics.SEM016.issues.json_genus_conversion_requires_json_annotation]
 message = "chuyển đổi json/genus yêu cầu genus được đánh dấu `@ json`"
@@ -2918,14 +2917,6 @@ help = "dùng export được hỗ trợ từ module, hoặc chờ file interfac
 [diagnostics.WARN014.issues.file_interface_export_skipped]
 message = "file interface đã bỏ qua export `{namespace}.{export}` ({reason}); các export khác vẫn khả dụng"
 help = "dùng export được hỗ trợ từ module, hoặc chờ file interface hỗ trợ đầy đủ chữ ký này"
-
-[diagnostics.WARN015]
-message = "tên allocator curata không được nhận diện"
-help = "dùng tên allocator được nhận diện (\"arena\", \"page\", \"alloc\" hoặc \"allocator\")"
-
-[diagnostics.WARN015.issues.unrecognized_curata_allocator]
-message = "tên allocator curata '{name}' không khớp với hợp đồng allocator được nhận diện"
-help = "dùng tên allocator được nhận diện (\"arena\", \"page\", \"alloc\" hoặc \"allocator\")"
 
 [diagnostics.WARN016]
 message = "monomorphic hole đã giải thành multi-member union"

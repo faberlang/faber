@@ -1576,7 +1576,9 @@ fn collect_pattern_defs(pat: &radix_hir::HirPattern, registry: &mut FxHashSet<ra
                 registry.insert(*def_id);
             }
         }
-        radix_hir::HirPattern::Literal(_) | radix_hir::HirPattern::Wildcard => {}
+        radix_hir::HirPattern::Literal(_)
+        | radix_hir::HirPattern::NegatedLiteral(_)
+        | radix_hir::HirPattern::Wildcard => {}
     }
     if let radix_hir::HirPattern::Alias(_, _, inner) = pat {
         collect_pattern_defs(inner, registry);
@@ -2798,17 +2800,19 @@ pub(crate) fn validate_referential_integrity(
                     validate_pattern(sp, check_symbol, check_def)?;
                 }
             }
-            radix_hir::HirPattern::Literal(lit) => match lit {
-                radix_hir::HirLiteral::String(s)
-                | radix_hir::HirLiteral::Ascii(s)
-                | radix_hir::HirLiteral::Octeti(s) => check_symbol(*s)?,
-                radix_hir::HirLiteral::Regex(s, Some(f)) => {
-                    check_symbol(*s)?;
-                    check_symbol(*f)?;
+            radix_hir::HirPattern::Literal(lit) | radix_hir::HirPattern::NegatedLiteral(lit) => {
+                match lit {
+                    radix_hir::HirLiteral::String(s)
+                    | radix_hir::HirLiteral::Ascii(s)
+                    | radix_hir::HirLiteral::Octeti(s) => check_symbol(*s)?,
+                    radix_hir::HirLiteral::Regex(s, Some(f)) => {
+                        check_symbol(*s)?;
+                        check_symbol(*f)?;
+                    }
+                    radix_hir::HirLiteral::Regex(s, None) => check_symbol(*s)?,
+                    _ => {}
                 }
-                radix_hir::HirLiteral::Regex(s, None) => check_symbol(*s)?,
-                _ => {}
-            },
+            }
             radix_hir::HirPattern::TypeTest { binding, .. } => {
                 if let Some((def_id, sym)) = binding {
                     check_def(*def_id)?;

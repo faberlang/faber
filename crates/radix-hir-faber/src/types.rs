@@ -180,6 +180,11 @@ impl super::FaberCodegen<'_> {
                 format!("{} {}", prefix, self.type_to_faber(*inner, names, surface))
             }
 
+            Type::Struct(def_id) if let Some(frame) = self.builtin_frame_family(*def_id, names) => {
+                surface
+                    .type_surface(TypeBindingKind::Frame(frame))
+                    .to_owned()
+            }
             Type::Struct(def_id) | Type::Enum(def_id) | Type::Interface(def_id) => self
                 .imported_type_spellings
                 .get(&type_id)
@@ -397,11 +402,16 @@ impl super::FaberCodegen<'_> {
             }
             _ => {}
         }
-        let head = path
-            .iter()
-            .map(|segment| self.interner.resolve(*segment))
-            .collect::<Vec<_>>()
-            .join(".");
+        let head = match self.builtin_frame_family(def_id, names) {
+            Some(frame) => surface
+                .type_surface(TypeBindingKind::Frame(frame))
+                .to_owned(),
+            None => path
+                .iter()
+                .map(|segment| self.interner.resolve(*segment))
+                .collect::<Vec<_>>()
+                .join("."),
+        };
         if form.args.is_empty() {
             return Ok(head);
         }

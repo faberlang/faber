@@ -11,9 +11,9 @@ use crate::{ParseErrorKind, ParseResult, parse};
 use radix_lexer::{KeywordPack, lex_with_locale_pack};
 use radix_syntax::{
     AnnotationKind, AstMutability, AstParamMode, AwaitBindingForm, BindingPattern, CallablePosture,
-    ClassMemberKind, ClausuraBody, ClosureModifier, CuraKind, ExprKind, IfBody, ImportKind,
-    IteraMode, JsonValue, Literal, Pattern, PatternBind, PraeparaKind, ProbaModifier, ScribeKind,
-    SecusClause, StmtKind, TypeExprKind,
+    ClassMemberKind, ClausuraBody, ClosureModifier, ExprKind, IfBody, ImportKind, IteraMode,
+    JsonValue, Literal, Pattern, PatternBind, PraeparaKind, ProbaModifier, ScribeKind, SecusClause,
+    StmtKind, TypeExprKind,
 };
 
 fn generic_arg_type(arg: &radix_syntax::GenericArgExpr) -> &radix_syntax::TypeExpr {
@@ -743,17 +743,6 @@ fn secus_si_else_if_rejected() {
 }
 
 #[test]
-fn cura_unknown_allocator_kind_rejected() {
-    assert_parse_error_matches(
-        r#"cura "general" fixum _ alloc {}"#,
-        ParseExpectation::Args(&[
-            ("issue", "allocator_kind"),
-            ("expected", "allocator kind \"arena\" or \"page\""),
-        ]),
-    );
-}
-
-#[test]
 fn ex_without_mutability_marker_rejected() {
     assert_parse_error_matches(
         r"ex data name",
@@ -1434,7 +1423,7 @@ fn parses_object_destructuring() {
 #[test]
 fn parses_functio_with_all_modifiers() {
     let result = parse_ok(
-        "@ futura\nfunctio mitte<T>(de textus nomen sponte ut alias vel \"anon\", own numerus item, ceteri T reliqua) curata allocator errata Error exitus 7 immutata iacit optiones Opts → textus {}",
+        "@ futura\nfunctio mitte<T>(de textus nomen sponte ut alias vel \"anon\", own numerus item, ceteri T reliqua) errata Error exitus 7 immutata iacit optiones Opts → textus {}",
     );
     let program = result
         .program
@@ -1464,7 +1453,7 @@ fn parses_functio_with_all_modifiers() {
     assert!(matches!(func.params[1].mode, AstParamMode::Owned));
     assert_eq!(func.params[1].ty.mode, Some(radix_syntax::TypeMode::Own));
     assert!(func.params[2].is_rest);
-    assert_eq!(func.modifiers.len(), 6);
+    assert_eq!(func.modifiers.len(), 5);
 }
 
 #[test]
@@ -1896,14 +1885,6 @@ fn object_destructuring_rejects_colon_rename() {
 }
 
 #[test]
-fn cura_rejects_unknown_allocator_kind() {
-    assert_parse_error_matches(
-        r#"cura "general" fixum _ alloc {}"#,
-        ParseExpectation::Issue("allocator_kind"),
-    );
-}
-
-#[test]
 fn parses_abstract_genus_with_extends_implements() {
     let result = parse_ok(
         r#"
@@ -1911,7 +1892,6 @@ abstractus genus Animal<T> sub Vivens implet Canens, Currens {
     @ futura
     functio canta(textus vox) → vacuum {}
     generis textus nomen = "leo"
-    nexum numerus aetas = 3
 }
 "#,
     );
@@ -1922,21 +1902,15 @@ abstractus genus Animal<T> sub Vivens implet Canens, Currens {
     assert!(class.is_abstract);
     assert!(class.extends.is_some());
     assert_eq!(class.implements.len(), 2);
-    assert_eq!(class.members.len(), 3);
+    assert_eq!(class.members.len(), 2);
     assert!(matches!(class.members[0].kind, ClassMemberKind::Method(_)));
     assert!(matches!(class.members[1].kind, ClassMemberKind::Field(_)));
-    assert!(matches!(class.members[2].kind, ClassMemberKind::Field(_)));
     assert_eq!(class.members[0].annotations.len(), 1);
 
     let ClassMemberKind::Field(static_field) = &class.members[1].kind else {
         panic!("expected static field");
     };
     assert!(static_field.is_static);
-
-    let ClassMemberKind::Field(bound_field) = &class.members[2].kind else {
-        panic!("expected bound field");
-    };
-    assert!(bound_field.is_bound);
 }
 
 #[test]
@@ -3424,7 +3398,6 @@ fn migrated_keywords_usable_as_contextual_identifiers() {
         "finge",
         "sub",
         "implet",
-        "cura",
         "ad",
         "omnia",
         "inter",
@@ -3490,7 +3463,6 @@ fn migrated_keywords_usable_as_contextual_identifiers() {
         "redde",
         "sub",
         "implet",
-        "cura",
         "omnia",
         "inter",
         "intra",
@@ -3634,13 +3606,11 @@ fn incipit_tacet_expected_block() {
 }
 
 #[test]
-fn parses_entry_resource_endpoint_and_extract_keywords() {
+fn parses_entry_endpoint_and_extract_keywords() {
     let result = parse_ok(
         r#"
 incipit argumenta args exitus 1 {}
 incipiet argumenta argv {}
-cura "arena" fixum _ alloc {}
-cura "page" fixum _ page {}
 ex source varia nomen ut name, ceteri reliqua
 "#,
     );
@@ -3649,7 +3619,7 @@ ex source varia nomen ut name, ceteri reliqua
         .program
         .as_ref()
         .expect("parser should produce a program");
-    assert_eq!(program.statements.len(), 5);
+    assert_eq!(program.statements.len(), 3);
 
     let StmtKind::Incipit(main_stmt) = &program.statements[0].kind else {
         panic!("expected incipit statement");
@@ -3665,18 +3635,7 @@ ex source varia nomen ut name, ceteri reliqua
     assert!(async_main.is_async);
     assert!(matches!(async_main.body, IfBody::Block(_)));
 
-    let StmtKind::Cura(arena_stmt) = &program.statements[2].kind else {
-        panic!("expected arena cura");
-    };
-    assert!(matches!(arena_stmt.kind, CuraKind::Arena));
-
-    let StmtKind::Cura(page_stmt) = &program.statements[3].kind else {
-        panic!("expected bound page cura");
-    };
-    assert!(matches!(page_stmt.kind, CuraKind::Page));
-    assert!(matches!(page_stmt.mutability, AstMutability::Immutable));
-
-    let StmtKind::Ex(extract) = &program.statements[4].kind else {
+    let StmtKind::Ex(extract) = &program.statements[2].kind else {
         panic!("expected ex destructuring statement");
     };
     assert!(matches!(extract.mutability, AstMutability::Mutable));
@@ -3695,24 +3654,6 @@ ex source varia nomen ut name, ceteri reliqua
         ),
         "reliqua"
     );
-}
-
-#[test]
-fn parses_curata_allocator_alias() {
-    let result = parse_ok(r"functio greet(textus name) curata alloc ut a → textus { redde name }");
-    let program = result.program.as_ref().expect("program");
-    let StmtKind::Func(func) = &program.statements[0].kind else {
-        panic!("expected function declaration");
-    };
-    let radix_syntax::FuncModifier::Curata {
-        required,
-        alias: Some(alias),
-    } = &func.modifiers[0]
-    else {
-        panic!("expected curata alias modifier");
-    };
-    assert_eq!(symbol_name(&result, required.name), "alloc");
-    assert_eq!(symbol_name(&result, alias.name), "a");
 }
 
 #[test]
@@ -4717,7 +4658,7 @@ fn parses_posture_in_implendum_method_signature() {
 
 #[test]
 fn conversio_assign_typed_fixum_and_varia_initializers_parse() {
-    let result = parse_ok("fixum numerus n ↤ \"42\"\nvaria numerus count ↤ raw ⇥ 0");
+    let result = parse_ok("fixum numerus n ↤ \"42\"\nvaria numerus count ↤ raw ⊥ 0");
     let program = result.program.as_ref().expect("program");
     assert_eq!(program.statements.len(), 2);
     for stmt in &program.statements {

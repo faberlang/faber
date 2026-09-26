@@ -65,7 +65,7 @@ impl Parser {
     /// Parse one pattern atom plus its optional binding suffix.
     ///
     /// GRAMMAR:
-    ///   pattern := `_` | literal | type-pattern [`bind`] | ident [`bind`] | path bind
+    ///   pattern := `_` | `-` number | literal | type-pattern [`bind`] | ident [`bind`] | path bind
     ///   type-pattern := type-name [type-arguments]
     ///   bind := `ut` ident | (`fixum`|`varia`) binding-list
     ///   binding-list := ident [`ut` ident] (',' ident [`ut` ident])*
@@ -203,6 +203,22 @@ impl Parser {
     /// This intentionally stops at constants. Operators, calls, and object/array
     /// expressions are not pattern syntax.
     fn try_parse_pattern_literal(&mut self) -> Option<Pattern> {
+        // D22.2: the lexer never produces a signed number, so a leading minus
+        // directly before a number literal is claimed here as the pattern's
+        // sign. `-` before anything else is not pattern syntax.
+        if self.check(&TokenKind::Minus) {
+            let literal = match self.peek_at(1).kind {
+                TokenKind::Integer(n) => Literal::Int(n),
+                TokenKind::Float(n) => Literal::Float(n),
+                TokenKind::FloatText { value, text } => Literal::FloatText { value, text },
+                _ => return None,
+            };
+            let start = self.peek().span;
+            self.advance();
+            let span = start.merge(self.peek().span);
+            self.advance();
+            return Some(Pattern::NegatedLiteral(literal, span));
+        }
         match self.peek().kind {
             TokenKind::Integer(n) => {
                 let span = self.peek().span;
@@ -242,6 +258,11 @@ impl Parser {
                     Some(Literal::Bool(true))
                 } else if self.check_keyword_ident(TokenKind::Falsum) {
                     Some(Literal::Bool(false))
+                } else if self.is_nan_literal_claim() {
+                    // D22.3: NaN claims the literal slot exactly as in
+                    // expressions, so lowering can reject it by name rather
+                    // than binding a catch-all local called `nonnumerus`.
+                    Some(Literal::Float(f64::NAN))
                 } else {
                     None
                 };
@@ -253,6 +274,16 @@ impl Parser {
             }
             _ => None,
         }
+    }
+
+    /// Whether the current identifier is the locale's NaN spelling in a
+    /// literal slot (not a call head), mirroring the expression-primary claim.
+    fn is_nan_literal_claim(&self) -> bool {
+        let TokenKind::Ident(sym) = self.peek().kind else {
+            return false;
+        };
+        self.keyword_claim_key(sym) == Some("nonnumerus")
+            && self.peek_at(1).kind != TokenKind::LParen
     }
 }
 

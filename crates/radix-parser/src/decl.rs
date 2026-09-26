@@ -29,6 +29,22 @@ use radix_lexer::{
 #[allow(clippy::wildcard_imports)]
 use radix_syntax::*;
 
+/// Whether a parsed statement is a declaration that may appear only at top
+/// level (DECISIONS D22.1): a `functio` or a type declaration. Methods live in
+/// `genus` bodies, which parse through their own member loop, not a block.
+fn is_top_level_only_declaration(kind: &StmtKind) -> bool {
+    matches!(
+        kind,
+        StmtKind::Func(_)
+            | StmtKind::Class(_)
+            | StmtKind::Interface(_)
+            | StmtKind::TypeAlias(_)
+            | StmtKind::Schema(_)
+            | StmtKind::Enum(_)
+            | StmtKind::Union(_)
+    )
+}
+
 // STATEMENT DISPATCH
 
 impl Parser {
@@ -91,7 +107,6 @@ impl Parser {
                 Some(TokenKind::Perge) => self.parse_perge_stmt()?,
                 Some(TokenKind::Redde) => self.parse_redde_stmt()?,
                 Some(TokenKind::Rumpe) => self.parse_rumpe_stmt()?,
-                Some(TokenKind::Cura) => self.parse_cura_stmt()?,
                 Some(TokenKind::Tacet) => self.parse_tacet_stmt()?,
                 Some(TokenKind::Ad) => self.parse_ad_stmt()?,
                 Some(TokenKind::Figendum | TokenKind::Variandum) => {
@@ -104,6 +119,9 @@ impl Parser {
                 }
                 Some(TokenKind::Reddet) => self.parse_reddet_stmt(start)?,
                 Some(TokenKind::Tacebit) => self.parse_tacebit_stmt(start)?,
+                None if self.at_retired_cura_stmt() => {
+                    return Err(self.allocator_surface_removed_error(super::stmt::RETIRED_CURA));
+                }
                 _ => self.parse_expr_stmt()?,
             },
 
@@ -201,7 +219,7 @@ impl Parser {
     ///
     /// The binding pattern becomes the assignment target; the operator is
     /// preserved as `AssignOp::ConversioAssign` through the syntax tree (no
-    /// erasure into `←`). `⇥` recovery is parsed through the shared assignment
+    /// erasure into `←`). The `⊥` default is parsed through the shared assignment
     /// tail so it attaches exactly as it does in expression position.
     ///
     /// Rejects every binding form without a concrete conversion destination:
@@ -659,14 +677,8 @@ impl Parser {
             if self.eat_keyword_ident(TokenKind::Argumenta) {
                 let name = self.parse_ident()?;
                 modifiers.push(FuncModifier::Argumenta(name));
-            } else if self.eat_keyword_ident(TokenKind::Curata) {
-                let required = self.parse_ident()?;
-                let alias = if self.eat_keyword_ident(TokenKind::Ut) {
-                    Some(self.parse_ident()?)
-                } else {
-                    None
-                };
-                modifiers.push(FuncModifier::Curata { required, alias });
+            } else if self.at_retired_curata_modifier() {
+                return Err(self.allocator_surface_removed_error(super::stmt::RETIRED_CURATA));
             } else if self.eat_keyword_ident(TokenKind::Errata) {
                 let name = self.parse_ident()?;
                 modifiers.push(FuncModifier::Errata(name));
@@ -808,7 +820,12 @@ impl Parser {
     /// Parse the field portion shared by genus and union declaration members.
     fn parse_field_decl(&mut self) -> Result<FieldDecl, ParseError> {
         let is_static = self.eat_keyword_ident(TokenKind::Generis);
-        let is_bound = self.eat_keyword_ident(TokenKind::Nexum);
+        if self.at_removed_nexum_modifier() {
+            return Err(
+                ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
+                    .with_arg("issue", "nexum_removed"),
+            );
+        }
         let ty = self.parse_type()?;
         let name = self.parse_param_name()?;
         let sponte = self.parse_post_name_marker();
@@ -820,12 +837,46 @@ impl Parser {
 
         Ok(FieldDecl {
             is_static,
-            is_bound,
             sponte,
             ty,
             name,
             init,
         })
+    }
+
+    /// Whether the current word is the removed `nexum` field modifier.
+    ///
+    /// `nexum` was removed (DECISIONS D16.2). The old shape was
+    /// `nexum <type> <name>`: two further words on the same line, or a
+    /// generic type head. A field of a user type spelled `nexum`
+    /// (`nexum name`) stays legal. Matching the canonical Latin spelling is
+    /// deliberate: the keyword no longer has pack rows.
+    fn at_removed_nexum_modifier(&self) -> bool {
+        let TokenKind::Ident(sym) = self.peek().kind else {
+            return false;
+        };
+        if self.interner.resolve(sym) != "nexum"
+            || !matches!(self.peek_at(1).kind, TokenKind::Ident(_))
+        {
+            return false;
+        }
+        match self.peek_at(2).kind {
+            TokenKind::LtAscii => true,
+            TokenKind::Ident(_) => {
+                let slot = self.non_trivia_indices.partition_point(|&i| i < self.pos);
+                let (Some(&ty_idx), Some(&name_idx)) = (
+                    self.non_trivia_indices.get(slot + 1),
+                    self.non_trivia_indices.get(slot + 2),
+                ) else {
+                    return false;
+                };
+                self.keyword_ident_at(2) != Some(TokenKind::Sponte)
+                    && !self.tokens[ty_idx + 1..name_idx]
+                        .iter()
+                        .any(|token| token.kind == TokenKind::Newline)
+            }
+            _ => false,
+        }
     }
 
     /// Parse a class member, preserving annotations at the member boundary.
@@ -2714,6 +2765,15 @@ impl Parser {
         let mut stmts = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() && !self.budget_exhausted {
             match self.parse_stmt() {
+                // D22.1: declarations are top-level. The declaration is parsed
+                // whole so recovery resumes after it, then dropped with a
+                // named diagnostic instead of reaching lowering.
+                Ok(stmt) if is_top_level_only_declaration(&stmt.kind) => {
+                    self.errors.push(
+                        ParseError::structured(ParseErrorKind::DeclarationInvalid, stmt.span)
+                            .with_arg("issue", "declaration_not_top_level"),
+                    );
+                }
                 Ok(stmt) => stmts.push(stmt),
                 Err(e) => {
                     self.errors.push(e);

@@ -9,8 +9,6 @@ use crate::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase};
 // syntax is a pure re-export barrel from radix-syntax
 use crate::syntax::*;
 
-const RUST_TARGET_CURA_ARENA_NOOP_MESSAGE: &str = "cura \"arena\" has no effect for Rust targets";
-
 /// Go async-stream posture policy (`go_target_async_stream_unsupported`).
 ///
 /// DEFINED POLICY (U3, codex-gap Stage 3): `fient` async streams are
@@ -208,12 +206,6 @@ fn scan_go_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             }
             scan_go_if_body(&entry.body, file, diagnostics);
         }
-        StmtKind::Cura(resource) => {
-            scan_go_block(&resource.body, file, diagnostics);
-            if let Some(catch) = &resource.catch {
-                scan_go_block(&catch.body, file, diagnostics);
-            }
-        }
         StmtKind::Expr(expr) => scan_go_expr(&expr.expr, file, diagnostics),
         StmtKind::IncDec(stmt) => {
             scan_go_expr(&stmt.target, file, diagnostics);
@@ -342,7 +334,7 @@ fn scan_go_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
         ExprKind::Assign(assign) => {
             scan_go_expr(&assign.target, file, diagnostics);
             scan_go_expr(&assign.value, file, diagnostics);
-            // `↤` inline recovery (`⇥ fallback`) is part of the assignment's
+            // `↤` inline recovery (`⊥ fallback`) is part of the assignment's
             // expression surface; it must not escape the target-policy scan.
             if let Some(recovery) = &assign.recovery {
                 scan_go_expr(recovery, file, diagnostics);
@@ -591,12 +583,6 @@ fn scan_rust_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             }
             scan_rust_if_body(&entry.body, file, diagnostics);
         }
-        StmtKind::Cura(resource) => {
-            scan_rust_block(&resource.body, file, diagnostics);
-            if let Some(catch) = &resource.catch {
-                scan_rust_block(&catch.body, file, diagnostics);
-            }
-        }
         StmtKind::Expr(expr) => scan_rust_expr(&expr.expr, file, diagnostics),
         StmtKind::IncDec(stmt) => scan_rust_expr(&stmt.target, file, diagnostics),
         StmtKind::Var(decl) => {
@@ -721,7 +707,7 @@ fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
         ExprKind::Assign(assign) => {
             scan_rust_expr(&assign.target, file, diagnostics);
             scan_rust_expr(&assign.value, file, diagnostics);
-            // `↤` inline recovery (`⇥ fallback`) is part of the assignment's
+            // `↤` inline recovery (`⊥ fallback`) is part of the assignment's
             // expression surface; it must not escape the target-policy scan.
             if let Some(recovery) = &assign.recovery {
                 scan_rust_expr(recovery, file, diagnostics);
@@ -846,166 +832,6 @@ fn target_exception_diagnostic(file: &str, span: crate::lexer::Span, message: &s
         .with_file(file)
         .with_span(span)
         .with_args(vec![DiagnosticArg::new("issue", issue)])
-}
-
-/// Collect warnings for Rust-specific no-ops.
-///
-/// WHY: Allocator scopes are no-ops in Rust. We warn users to avoid
-/// confusion about why allocator scoping has no effect.
-#[must_use]
-pub(super) fn collect_rust_noop_warnings(program: &Program, file: &str) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
-    for stmt in &program.statements {
-        scan_rust_warning_stmt(stmt, file, &mut diagnostics);
-    }
-    diagnostics
-}
-
-/// Recursively scan statements for Rust no-op warnings.
-fn scan_rust_warning_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
-    match &stmt.kind {
-        StmtKind::Block(block) => scan_rust_warning_block(block, file, diagnostics),
-        StmtKind::Func(func) => {
-            if let Some(body) = &func.body {
-                scan_rust_warning_block(body, file, diagnostics);
-            }
-        }
-        StmtKind::Class(class) => {
-            for member in &class.members {
-                if let ClassMemberKind::Method(method) = &member.kind
-                    && let Some(body) = &method.body
-                {
-                    scan_rust_warning_block(body, file, diagnostics);
-                }
-            }
-        }
-        StmtKind::Probandum(test) => scan_rust_warning_test(test, file, diagnostics),
-        StmtKind::Proba(test) => scan_rust_warning_block(&test.body, file, diagnostics),
-        StmtKind::Si(if_stmt) => {
-            scan_rust_warning_if_body(&if_stmt.then, file, diagnostics);
-            if let Some(catch) = &if_stmt.catch {
-                scan_rust_warning_block(&catch.body, file, diagnostics);
-            }
-            if let Some(else_) = &if_stmt.else_ {
-                scan_rust_warning_else(else_, file, diagnostics);
-            }
-        }
-        StmtKind::Dum(while_stmt) => {
-            scan_rust_warning_if_body(&while_stmt.body, file, diagnostics);
-            if let Some(catch) = &while_stmt.catch {
-                scan_rust_warning_block(&catch.body, file, diagnostics);
-            }
-        }
-        StmtKind::Itera(iter_stmt) => {
-            scan_rust_warning_if_body(&iter_stmt.body, file, diagnostics);
-            if let Some(catch) = &iter_stmt.catch {
-                scan_rust_warning_block(&catch.body, file, diagnostics);
-            }
-        }
-        StmtKind::Elige(switch_stmt) => {
-            for case in &switch_stmt.cases {
-                scan_rust_warning_if_body(&case.body, file, diagnostics);
-            }
-            if let Some(default) = &switch_stmt.default {
-                scan_rust_warning_if_body(&default.body, file, diagnostics);
-            }
-            if let Some(catch) = &switch_stmt.catch {
-                scan_rust_warning_block(&catch.body, file, diagnostics);
-            }
-        }
-        StmtKind::Discerne(match_stmt) => {
-            for arm in &match_stmt.arms {
-                scan_rust_warning_if_body(&arm.body, file, diagnostics);
-            }
-            if let Some(default) = &match_stmt.default {
-                scan_rust_warning_if_body(&default.body, file, diagnostics);
-            }
-        }
-        StmtKind::Custodi(guard_stmt) => {
-            for clause in &guard_stmt.clauses {
-                scan_rust_warning_if_body(&clause.body, file, diagnostics);
-            }
-        }
-        StmtKind::Fac(fac_stmt) => {
-            scan_rust_warning_block(&fac_stmt.body, file, diagnostics);
-            if let Some(catch) = &fac_stmt.catch {
-                scan_rust_warning_block(&catch.body, file, diagnostics);
-            }
-        }
-        StmtKind::Incipit(entry) => {
-            scan_rust_warning_if_body(&entry.body, file, diagnostics);
-        }
-        StmtKind::Cura(resource) => {
-            if matches!(resource.kind, CuraKind::Arena) {
-                let spec = crate::diagnostics::semantic_spec(crate::semantic::SemanticErrorKind::Warning(
-                    crate::semantic::WarningKind::TargetNoop,
-                ));
-                let diag = Diagnostic::warning(RUST_TARGET_CURA_ARENA_NOOP_MESSAGE)
-                    .with_phase(DiagnosticPhase::Analysis)
-                    .with_code(spec.code)
-                    .with_file(file)
-                    .with_args(vec![DiagnosticArg::new("issue", "rust_target_cura_arena_noop")])
-                    .with_span(stmt.span);
-                diagnostics.push(diag);
-            }
-            scan_rust_warning_block(&resource.body, file, diagnostics);
-            if let Some(catch) = &resource.catch {
-                scan_rust_warning_block(&catch.body, file, diagnostics);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn scan_rust_warning_block(block: &BlockStmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
-    for stmt in &block.statements {
-        scan_rust_warning_stmt(stmt, file, diagnostics);
-    }
-}
-
-fn scan_rust_warning_if_body(body: &IfBody, file: &str, diagnostics: &mut Vec<Diagnostic>) {
-    match body {
-        IfBody::Block(block) => scan_rust_warning_block(block, file, diagnostics),
-        IfBody::Ergo(stmt) => scan_rust_warning_stmt(stmt, file, diagnostics),
-    }
-}
-
-fn scan_rust_warning_else(else_: &SecusClause, file: &str, diagnostics: &mut Vec<Diagnostic>) {
-    match else_ {
-        SecusClause::Sin { stmt, .. } => {
-            scan_rust_warning_if_body(&stmt.then, file, diagnostics);
-            if let Some(catch) = &stmt.catch {
-                scan_rust_warning_block(&catch.body, file, diagnostics);
-            }
-            if let Some(else_clause) = &stmt.else_ {
-                scan_rust_warning_else(else_clause, file, diagnostics);
-            }
-        }
-        SecusClause::Block { body, catch, .. } => {
-            scan_rust_warning_block(body, file, diagnostics);
-            if let Some(catch) = catch {
-                scan_rust_warning_block(&catch.body, file, diagnostics);
-            }
-        }
-        SecusClause::Stmt { stmt, catch, .. } => {
-            scan_rust_warning_stmt(stmt, file, diagnostics);
-            if let Some(catch) = catch {
-                scan_rust_warning_block(&catch.body, file, diagnostics);
-            }
-        }
-    }
-}
-
-fn scan_rust_warning_test(test: &ProbandumDecl, file: &str, diagnostics: &mut Vec<Diagnostic>) {
-    for setup in &test.body.setup {
-        scan_rust_warning_block(&setup.body, file, diagnostics);
-    }
-    for case in &test.body.tests {
-        scan_rust_warning_block(&case.body, file, diagnostics);
-    }
-    for nested in &test.body.nested {
-        scan_rust_warning_test(nested, file, diagnostics);
-    }
 }
 
 #[cfg(test)]

@@ -1194,7 +1194,6 @@ impl Parser {
                         | TokenKind::Perge
                         | TokenKind::Redde
                         | TokenKind::Rumpe
-                        | TokenKind::Cura
                         | TokenKind::Tacet
                         | TokenKind::Ad
                         | TokenKind::Abstractus
@@ -1387,6 +1386,18 @@ mod est_type_classification_test;
 mod slot_helpers_test;
 
 #[cfg(test)]
+#[path = "allocator_surface_removed_test.rs"]
+mod allocator_surface_removed_test;
+
+#[cfg(test)]
+#[path = "nexum_removed_test.rs"]
+mod nexum_removed_test;
+
+#[cfg(test)]
+#[path = "construction_spread_removed_test.rs"]
+mod construction_spread_removed_test;
+
+#[cfg(test)]
 #[path = "mod_test.rs"]
 mod tests;
 
@@ -1453,3 +1464,7 @@ mod non_trivia_index_test;
 #[cfg(test)]
 #[path = "nesting_budget_test.rs"]
 mod nesting_budget_test;
+
+#[cfg(test)]
+#[path = "nested_declaration_test.rs"]
+mod nested_declaration_test;

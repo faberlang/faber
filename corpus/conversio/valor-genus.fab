@@ -4,30 +4,30 @@ kind = "conversio"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "genus_decl", "genus_member", "field_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "typed_constructor", "field_list", "field_init", "field_key", "type_arguments", "type_argument", "json_literal", "json_object", "json_member", "json_value", "json_string", "json_number", "conversio_expr", "inline_recovery", "equality", "equality_tail", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal"]
 category = "conversion"
 canonical = true
-summary = "valor ↦ genus extraction with missing-field defaults and mandatory-field failure via ⇥ recovery."
-syntax = "<valor-expression> ↦ <genus-type> [⇥ <recovery>]"
-related = ["↦", "⇥"]
+summary = "valor ↦ genus extraction with missing-field defaults and mandatory-field failure via ⊥ recovery."
+syntax = "<valor-expression> ↦ <genus-type> [⊥ <recovery>]"
+related = ["↦", "⊥"]
 locale = "en"
 +++
 # =============================================================================
-# valor — valor ↦ genus extraction with missing-field defaults and mandatory-field failure via ⇥ recovery.
+# valor — valor ↦ genus extraction with missing-field defaults and mandatory-field failure via ⊥ recovery.
 # =============================================================================
 #
 # What this teaches:
 #   • JSON-to-struct deserialization — `valor ↦ genus` deserializes JSON objects into typed genus records.
-#   • Field policies — missing `sponte` fields zero-initialize; missing mandatory fields fail at runtime (recoverable via `⇥`); extra JSON keys are ignored.
+#   • Field policies — missing `sponte` fields zero-initialize; missing mandatory fields fail at runtime (recoverable via a `⊥` default); extra JSON keys are ignored.
 #
 # Common mistakes:
 #   • Omitting a mandatory field from the JSON and expecting a default value — only `sponte` or default-valued fields are optional; missing mandatory fields fail at runtime.
 #
-# See also: ↦, ⇥
+# See also: ↦, ⊥
 # =============================================================================
 
 # conversio — valor to genus extraction
 #
 # WHY: `valor ↦ genus` deserializes JSON objects into typed records. Missing
 # defaultable fields zero-initialize; missing mandatory fields fail at runtime
-# (recoverable via `⇥`). Extra JSON keys are ignored.
+# (recoverable via a `⊥` default). Extra JSON keys are ignored.
 
 class Persona {
     string nomen
@@ -43,7 +43,7 @@ main {
     assert good.aetas ≡ null
     assert good.regio ≡ "Roma"
     const value stale ← { "nomen": "Livia" } ↦ value
-    const Persona recovered ← stale ↦ Persona ⇥ good
+    const Persona recovered ← stale ↦ Persona ⊥ good
     assert recovered.nomen ≡ "Marcus"
     const value boxed ← recovered ↦ value
     const Persona roundtrip ← boxed ↦ Persona

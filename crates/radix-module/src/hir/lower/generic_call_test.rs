@@ -15,7 +15,7 @@ fn prepare_lower_pipeline(source: &str) -> (crate::syntax::Program, Resolver, Ty
     let mut types = TypeTable::new();
 
     crate::builtins::register(&mut resolver, &mut types, &mut interner);
-    crate::builtins::register_frame_types_if_needed(&program, &mut resolver, &mut types, &mut interner);
+    crate::builtins::register_frame_types_if_needed(&program, &mut resolver, &mut types, &mut interner, None);
 
     assert!(passes::collect::collect(&program, &mut resolver, &mut types).is_ok());
     if let Err(errors) = passes::resolve::resolve(&program, &mut resolver, &interner, &mut types) {

@@ -1816,10 +1816,10 @@ fn canonical_round_trips_conversio_assign() {
 
 #[test]
 fn canonical_round_trips_conversio_assign_recovery() {
-    let source = "incipit {\n  fixum numerus n\n  n ↤ \"x\" ⇥ 0\n}\n";
+    let source = "incipit {\n  fixum numerus n\n  n ↤ \"x\" ⊥ 0\n}\n";
     let (code, _) = canonical_round_trip(source);
     assert!(code.contains(" ↤ "), "↤ must survive canonical emit:\n{code}");
-    assert!(code.contains(" ⇥ 0"), "⇥ recovery must survive canonical emit:\n{code}");
+    assert!(code.contains(" ⊥ 0"), "⊥ recovery must survive canonical emit:\n{code}");
     assert!(!code.contains(" ← "), "must never rewrite ↤ to ←:\n{code}");
     assert!(!code.contains(" ↦ "), "must never rewrite ↤ to ↦:\n{code}");
 }

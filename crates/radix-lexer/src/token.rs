@@ -121,14 +121,12 @@ pub enum TokenKind {
     // === Keywords: Modifiers ===
     Abstractus,
     Ceteri,
-    Curata,
     Errata,
     Exitus,
     Generis,
     Iacit,
     Immutata,
     Interna,
-    Nexum,
     Optiones,
     Prae,
     Privata,
@@ -216,7 +214,6 @@ pub enum TokenKind {
     // === Keywords: Entry points ===
     Ad,
     Argumenta,
-    Cura,
     Incipiet,
     Incipit,
     Meus, // `ad` outgoing arm (caller → gateway)
@@ -278,6 +275,7 @@ pub enum TokenKind {
     Dot,       // .
     Arrow,     // →
     ExitArrow, // ⇥
+    UpTack,    // ⊥ default channel (D17.7)
     Cup,       // ∪ inline union
     Cap,       // ∩ inline intersection
     At,        // @
@@ -395,14 +393,12 @@ impl TokenKind {
                 | Varia
                 | Abstractus
                 | Ceteri
-                | Curata
                 | Errata
                 | Exitus
                 | Generis
                 | Iacit
                 | Immutata
                 | Interna
-                | Nexum
                 | Optiones
                 | Prae
                 | Privata
@@ -457,7 +453,6 @@ impl TokenKind {
                 | Vide
                 | Ad
                 | Argumenta
-                | Cura
                 | Incipiet
                 | Incipit
                 | Meus

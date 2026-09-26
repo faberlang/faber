@@ -13,6 +13,32 @@ pub enum TypeBindingKind {
     Collection(CollectionKind),
     TensorFamily(TensorFamilyKind),
     ModularWord,
+    /// Compiler-owned conversation family (DECISIONS D6.16).
+    Frame(FrameFamily),
+}
+
+/// Compiler-owned conversation-family types whose spelling projects through
+/// the target pack (`sermo`, `scrinium`, and the `meus`/`tuus` views).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FrameFamily {
+    Sermo,
+    Scrinium,
+    Meus,
+    Tuus,
+}
+
+impl FrameFamily {
+    /// Identity for a builtin struct's canonical Latin name.
+    #[must_use]
+    pub fn from_latin(text: &str) -> Option<Self> {
+        match text {
+            "sermo" => Some(Self::Sermo),
+            "scrinium" => Some(Self::Scrinium),
+            "meus" => Some(Self::Meus),
+            "tuus" => Some(Self::Tuus),
+            _ => None,
+        }
+    }
 }
 
 /// Borrowed keyword/type surface for canonical Faber emission.

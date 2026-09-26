@@ -5,8 +5,8 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "conversion"
 canonical = false
 summary = "Valor datetime carriers to instans through runtime extraction."
-syntax = "valor ↦ instans | instans<ms> [⇥ fallback]"
-related = ["↦", "⇥", "valor"]
+syntax = "valor ↦ instans | instans<ms> [⊥ fallback]"
+related = ["↦", "⊥", "valor"]
 locale = "en"
 +++
 # =============================================================================
@@ -20,7 +20,7 @@ locale = "en"
 # Common mistakes:
 #   • Assuming all text values in valor are valid RFC3339 strings — invalid carriers require `⇥` recovery.
 #
-# See also: ↦, ⇥, valor
+# See also: ↦, ⊥, valor
 # =============================================================================
 
 
@@ -37,7 +37,7 @@ main {
     const instant<ms> millis ← utc ↦ instant<ms>
     const instant normalized ← offset ↦ instant
     const value bad ← "not-a-datetime"
-    const instant recovered ← bad ↦ instant ⇥ seconds
+    const instant recovered ← bad ↦ instant ⊥ seconds
     print seconds ↦ string
     print millis ↦ string
     print normalized ↦ string

@@ -19,7 +19,6 @@ columna = "column"
 varia = "var"
 abstractus = "abstract"
 ceteri = "rest"
-curata = "allocator"
 errata = "errors"
 exitus = "exit"
 generis = "static"
@@ -27,7 +26,6 @@ iacit = "throws"
 immutata = "readonly"
 interna = "internal"
 magnitudo = "size"
-nexum = "nexum"
 iuncta = "tuple"
 optiones = "options"
 prae = "prae"
@@ -88,7 +86,6 @@ scribe = "write"
 vide = "debug"
 # Entry and async
 argumenta = "args"
-cura = "with"
 incipiet = "async_main"
 incipit = "main"
 ad = "call"
@@ -216,6 +213,12 @@ filtrum = "filter"
 series = "series"
 census = "census"
 ratio = "record"
+# Conversation family (DECISIONS D6.16). The meus/tuus rows also spell
+# the sermo view methods `s.meus<T>()` / `s.tuus<T>()`.
+sermo = "channel"
+scrinium = "frame"
+meus = "send"
+tuus = "recv"
 
 [llm]
 system_prompt_snippet = "Write Faber code using LLM-optimized English keywords (fn, let, const, if, else, match, return, etc.) with invariant structural glyphs (←, →, ∴). Type-first declarations: fn greet(string msg) → string { return msg }"
@@ -690,17 +693,29 @@ help = "put a number after '-' in JSON"
 message = "conversion-directed assignment '↤' requires a concrete destination type"
 help = "write a concrete type for the binding, e.g. 'const int x ↤ value'"
 
-[diagnostics.PARSE002.issues.conversio_recovery_on_assign]
-message = "'⇥' inline recovery is legal only on conversion-directed assignment '↤'"
-help = "use '↤' for the assignment, or move the recovery expression"
-
 [diagnostics.PARSE002.issues.conversio_assign_await_unsupported]
 message = "'↤' is not supported on awaited bindings"
 help = "keep '←' for 'figendum'/'variandum' awaited bindings"
 
+[diagnostics.PARSE002.issues.allocator_surface_removed]
+message = "'{keyword}' was removed; allocation is not a language surface"
+help = "delete the '{keyword}' wrapper or modifier; allocation is managed by the target runtime"
+
+[diagnostics.PARSE002.issues.nexum_removed]
+message = "'nexum' was removed; change notification is a library pattern over '{ad}'"
+help = "delete 'nexum' and declare an ordinary field: '<type> <name>'"
+
+[diagnostics.PARSE002.issues.construction_spread_removed]
+message = "'{sparge}' is not valid in a construction literal"
+help = "name each field; copy-with-changes is 'Genus { field = value } {ex} source'"
+
 [diagnostics.PARSE010]
 message = "invalid declaration"
 help = "check declaration keywords and required parts"
+
+[diagnostics.PARSE010.issues.declaration_not_top_level]
+message = "declarations are top-level; {functio} and type declarations cannot appear inside a block"
+help = "use a closure, or a top-level function for recursion"
 
 [diagnostics.PARSE010.issues.schema_inheritance]
 message = "a schema cannot attach sub, implet, or an interface"
@@ -843,8 +858,20 @@ message = "invalid expression"
 help = "check expression syntax"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
-message = "use ⇥ for conversio recovery"
-help = "use ⇥; vel is nullish coalescing only"
+message = "use ⊥ for a conversion default"
+help = "use ⊥; vel is nullish coalescing only"
+
+[diagnostics.PARSE030.issues.recovery_uses_exit_arrow]
+message = "'⇥' names an error type; use '⊥' for a default"
+help = "write '↦ T ⊥ value' (or '↤ … ⊥ value'); '⇥' never takes a value"
+
+[diagnostics.PARSE030.issues.default_with_propagation]
+message = "an expression either propagates with '⇥' or defaults with '⊥', never both"
+help = "keep the '⊥' default, or drop it and let the error propagate"
+
+[diagnostics.PARSE030.issues.default_requires_conversion]
+message = "'⊥' default is supported only after a conversion '↦ T' or '↤'"
+help = "defaults on failable calls are not yet supported; use 'capta' or 'fac … cape'"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "expected expression"
@@ -1397,6 +1424,10 @@ help = "fix the AST construct for lowering"
 [diagnostics.SEM008.issues.invalid_width_marker]
 message = "unknown width marker for this family"
 help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.nan_pattern]
+message = "a NaN pattern can never match: NaN is not equal to itself"
+help = "test for NaN with a {si} statement instead of a {casu} pattern"
 
 [diagnostics.SEM008.issues.json_valor_pattern]
 message = "JSON document literals are not valid in patterns"
@@ -2362,10 +2393,6 @@ help = "spread a {lista} value inside {lista} construction"
 message = "computed keys are not valid in struct construction"
 help = "use declared struct field names in struct construction"
 
-[diagnostics.SEM011.issues.struct_spread_forbidden]
-message = "spread fields are not valid in struct construction"
-help = "provide each required struct field explicitly"
-
 [diagnostics.SEM011.issues.vector_constructor_forbids_spread]
 message = "vector constructor does not accept spread arguments"
 help = "provide explicit vector elements instead of spread arguments"
@@ -2592,10 +2619,10 @@ help = "cast to a compatible type"
 
 [diagnostics.SEM016]
 message = "invalid conversion"
-help = "use a valid conversion or provide inline recovery with `⇥`"
+help = "use a valid conversion or provide an inline default with `⊥`"
 
 [diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
-message = "intervallum clamp conversio does not support `⇥` recovery"
+message = "intervallum clamp conversio does not support a `⊥` default"
 help = "remove the recovery arm from this range clamp"
 
 [diagnostics.SEM016.issues.intervallum_target_not_range]
@@ -2620,15 +2647,15 @@ help = "make the source and target bound element types match"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_required]
 message = "vector materialization requires a {lista} literal source"
-help = "use a valid conversion or provide inline recovery with `⇥`"
+help = "use a valid conversion or provide an inline default with `⊥`"
 
 [diagnostics.SEM016.issues.lista_to_vector_element_mismatch]
 message = "{lista} to vector conversio requires matching element types"
-help = "use a valid conversion or provide inline recovery with `⇥`"
+help = "use a valid conversion or provide an inline default with `⊥`"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_width]
 message = "{lista} to vector conversio requires a literal vector width"
-help = "use a valid conversion or provide inline recovery with `⇥`"
+help = "use a valid conversion or provide an inline default with `⊥`"
 
 [diagnostics.SEM016.issues.matrix_materialize_unsupported]
 message = "matrix materialization requires a lista source with matching element type"
@@ -2739,12 +2766,12 @@ message = "record conversion requires reconstruction; write `Type { field = valu
 help = "reconstruct by writing `Type { field = value, … }` instead of converting with `↦`"
 
 [diagnostics.SEM016.issues.regex_recovery_unsupported]
-message = "regex conversion does not support `⇥` recovery; regex has no literal form, so there is no target-typed value to substitute"
+message = "regex conversion does not support a `⊥` default; regex has no literal form, so there is no target-typed value to substitute"
 help = "remove the recovery arm from this regex conversion"
 
 [diagnostics.SEM016.issues.valor_verte_unsupported]
-message = "{valor} ∷ T is not supported — a dynamic value's shape cannot be asserted at compile time. Use `↦ T` for runtime extraction (with `⇥` for recovery)."
-help = "use runtime `↦ T` conversion with `⇥` recovery instead"
+message = "{valor} ∷ T is not supported — a dynamic value's shape cannot be asserted at compile time. Use `↦ T` for runtime extraction (with `⊥` for a default)."
+help = "use runtime `↦ T` conversion with a `⊥` default instead"
 
 [diagnostics.SEM016.issues.json_genus_conversion_requires_json_annotation]
 message = "json/class conversion requires the class to be marked `@ json`"
@@ -2805,6 +2832,10 @@ help = "fix the annotation contract before semantic lowering"
 [diagnostics.SEM018.issues.protecta_reserved]
 message = "`{annotation}` is reserved and has no active visibility meaning"
 help = "use `{publica}` for explicit export intent or `{privata}` for file-private intent"
+
+[diagnostics.SEM018.issues.member_privacy_unenforced]
+message = "member privacy is not enforced yet; remove the annotation"
+help = "remove `{annotation}` from the member; members are public until member privacy is enforced"
 
 [diagnostics.SEM018.issues.conflicting_lane]
 message = "conflicting @ radix lane annotations: '{existing}' and '{parsed}'"
@@ -3366,14 +3397,6 @@ help = "use a supported export from the module, or wait for fuller file-interfac
 message = "file interface skipped export `{namespace}.{export}` ({reason}); other exports still available"
 help = "use a supported export from the module, or wait for fuller file-interface coverage of this signature"
 
-[diagnostics.WARN015]
-message = "unrecognized curata allocator name"
-help = "use a recognized allocator name (\"arena\", \"page\", \"alloc\", or \"allocator\")"
-
-[diagnostics.WARN015.issues.unrecognized_curata_allocator]
-message = "curata allocator name '{name}' is not a recognized allocator contract"
-help = "use a recognized allocator name (\"arena\", \"page\", \"alloc\", or \"allocator\")"
-
 [diagnostics.WARN016]
 message = "monomorphic hole solved to multi-member union"
 help = "use an explicit union type or a `∪` hole if a sum was intended"
@@ -3455,9 +3478,17 @@ message = "method `{method}` is not common in `{union}`: constituent signatures 
 help = "align the constituent signatures or rename one method to keep it common"
 
 [diagnostics.WARN028]
+message = "member visibility annotation is redundant"
+help = "remove the annotation; members are public by default"
+
+[diagnostics.WARN028.issues.redundant_member_publica]
+message = "`{annotation}` on a member is redundant; members are public by default"
+help = "remove the annotation; members are public by default"
+
+[diagnostics.WARN029]
 message = "match coverage not checked"
 help = "add a '{ceterum}' arm, or split the match so each pattern kind is checkable"
 
-[diagnostics.WARN028.issues.coverage_unchecked]
+[diagnostics.WARN029.issues.coverage_unchecked]
 message = "coverage of this match could not be computed for its pattern kinds; exhaustiveness was not checked"
 help = "add a '{ceterum}' arm, or split the match so each pattern kind is checkable"

@@ -374,7 +374,7 @@ fn row_conversio_assign_recovery_counts_when_present() {
             recovery: None,
         })]),
         1,
-        "no ⇥ fallback: 0"
+        "no ⊥ fallback: 0"
     );
     assert_eq!(
         score(vec![expr(HirExpressionKind::ConversioAssign {
@@ -383,7 +383,7 @@ fn row_conversio_assign_recovery_counts_when_present() {
             recovery: Some(source()),
         })]),
         2,
-        "⇥ fallback present: +1"
+        "⊥ fallback present: +1"
     );
 }
 
@@ -397,13 +397,13 @@ fn row_conversio_expression_recovery_counts_when_present() {
             recovery,
         })
     };
-    assert_eq!(score(vec![conv(None)]), 1, "no ⇥ fallback: 0");
+    assert_eq!(score(vec![conv(None)]), 1, "no ⊥ fallback: 0");
     assert_eq!(
         score(vec![conv(Some(boxed(HirExpressionKind::Literal(
             HirLiteral::Int(0)
         ))))]),
         2,
-        "⇥ fallback present: +1"
+        "⊥ fallback present: +1"
     );
 }
 

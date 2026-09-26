@@ -99,19 +99,6 @@ fn rust_elige_with_cape_has_no_unsupported_error() {
 }
 
 #[test]
-fn rust_cura_with_cape_has_no_unsupported_error() {
-    let (program, _) =
-        parse_program("functio f() → vacuum { cura \"arena\" fixum _ alloc { tacet } cape err { tacet } }\n");
-    let errors = collect_rust_unsupported_errors(&program, "test.fab");
-    assert!(
-        errors
-            .iter()
-            .all(|e| e.issue() != Some("rust_target_cape_unsupported")),
-        "cura cape should emit; got: {errors:?}"
-    );
-}
-
-#[test]
 fn rust_mixed_cape_forms_have_no_unsupported_error() {
     let (program, _) =
         parse_program("functio f() → vacuum { si verum { tacet } elige 1 { casu 1 { tacet } } cape err { tacet } }\n");
@@ -196,29 +183,6 @@ fn go_fient_class_and_interface_methods_fail_closed() {
     );
 }
 
-// ── Rust no-op warnings ─────────────────────────────────────────────────────
-
-#[test]
-fn rust_empty_program_has_no_noop_warnings() {
-    let (program, _) = parse_program("");
-    let warnings = collect_rust_noop_warnings(&program, "test.fab");
-    assert!(warnings.is_empty(), "empty program should have no Rust no-op warnings");
-}
-
-#[test]
-fn rust_simple_function_has_no_noop_warnings() {
-    let (program, _) = parse_program("functio f() → vacuum { tacet }\n");
-    let warnings = collect_rust_noop_warnings(&program, "test.fab");
-    assert!(warnings.is_empty(), "simple function should have no Rust no-op warnings");
-}
-
-#[test]
-fn rust_loop_without_cape_has_no_noop_warnings() {
-    let (program, _) = parse_program("functio f() → vacuum { dum verum { perge } }\n");
-    let warnings = collect_rust_noop_warnings(&program, "test.fab");
-    assert!(warnings.is_empty(), "loop without cape should have no Rust no-op warnings");
-}
-
 #[test]
 fn rust_incipit_only_has_no_unsupported_errors() {
     let (program, _) = parse_program("incipit { tacet }\n");
@@ -235,15 +199,13 @@ fn rust_unsupported_errors_are_empty_on_empty_entry_program() {
 
 #[test]
 fn rust_multiple_cape_constructs_are_not_reported() {
-    let (program, _) = parse_program(
-        "functio f() → vacuum { elige 1 { casu 1 { tacet } } cape err { tacet } cura \"arena\" fixum _ alloc { tacet } cape err { tacet } }\n",
-    );
+    let (program, _) = parse_program("functio f() → vacuum { elige 1 { casu 1 { tacet } } cape err { tacet } }\n");
     let errors = collect_rust_unsupported_errors(&program, "test.fab");
     let cape_count = errors
         .iter()
         .filter(|e| e.issue() == Some("rust_target_cape_unsupported"))
         .count();
-    assert_eq!(cape_count, 0, "elige+cura cape should emit; got {cape_count}: {errors:?}");
+    assert_eq!(cape_count, 0, "elige cape should emit; got {cape_count}: {errors:?}");
 }
 
 #[test]

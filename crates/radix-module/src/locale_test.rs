@@ -1644,7 +1644,7 @@ fn installed_packs_resolve_batch_f_keyword_surfaces() {
 
 #[test]
 fn installed_packs_resolve_batch_g_keyword_surfaces() {
-    // Batch G (the long tail: ego/finge/sub/implet/cura/ad/omnia/inter/intra/
+    // Batch G (the long tail: ego/finge/sub/implet/ad/omnia/inter/intra/
     // per/usque/ante/praefixum/clausura/sponte/tacet) are tokenless; their
     // `[keywords]` rows must still resolve to Latin registry identities and
     // localized emit surfaces. The en pack localizes the statement/expression
@@ -1652,7 +1652,6 @@ fn installed_packs_resolve_batch_g_keyword_surfaces() {
     let llm = installed_pack("en");
     for (surface, latin_key) in [
         ("self", "ego"),
-        ("with", "cura"),
         ("call", "ad"),
         ("all", "omnia"),
         ("within", "intra"),

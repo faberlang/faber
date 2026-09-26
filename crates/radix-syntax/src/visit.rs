@@ -417,15 +417,6 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
                 visitor.visit_expr(exitus);
             }
         }
-        StmtKind::Cura(stmt) => {
-            visitor.visit_type_expr(&stmt.ty);
-            visitor.visit_ident(&stmt.binding);
-            visitor.visit_block(&stmt.body);
-            if let Some(catch) = &stmt.catch {
-                visitor.visit_ident(&catch.binding);
-                visitor.visit_block(&catch.body);
-            }
-        }
         StmtKind::Reddet(stmt) => {
             visitor.visit_expr(&stmt.future);
         }
@@ -812,7 +803,7 @@ fn walk_pattern<V: Visitor>(visitor: &mut V, pattern: &Pattern) {
         return;
     };
     match pattern {
-        Pattern::Wildcard(_) | Pattern::Literal(_, _) => {}
+        Pattern::Wildcard(_) | Pattern::Literal(_, _) | Pattern::NegatedLiteral(_, _) => {}
         Pattern::Ident(ident, bind) => {
             visitor.visit_ident(ident);
             if let Some(bind) = bind {

@@ -141,8 +141,6 @@ pub enum StmtKind {
     Scribe(ScribeStmt),
     /// `incipit` / `incipiet` entry point.
     Incipit(IncipitStmt),
-    /// `cura` resource management.
-    Cura(CuraStmt),
     /// `reddet future` await-return (`fiet` only).
     Reddet(ReddetStmt),
     /// `tacebit future` await-discard.
@@ -371,10 +369,6 @@ pub enum AstParamMode {
 #[derive(Debug)]
 pub enum FuncModifier {
     Argumenta(Ident),
-    Curata {
-        required: Ident,
-        alias: Option<Ident>,
-    },
     Errata(Ident),
     Exitus(ExitusValue),
     Iacit,
@@ -426,7 +420,6 @@ pub enum ClassMemberKind {
 #[derive(Debug)]
 pub struct FieldDecl {
     pub is_static: bool, // generis
-    pub is_bound: bool,  // nexum
     pub sponte: bool,    // sponte — voluntary field
     pub ty: TypeExpr,
     pub name: Ident,
@@ -833,6 +826,10 @@ pub enum Pattern {
     /// intended as a new binding or a type predicate.
     Type(TypeExpr, Option<PatternBind>),
     Literal(Literal, Span),
+    /// A leading minus over a number literal (`casu -1`, `casu -2.5`,
+    /// `casu -∞`). The lexer never produces signed numbers, so the literal
+    /// keeps its unsigned magnitude and the pattern owns the sign (D22.2).
+    NegatedLiteral(Literal, Span),
     Path(PathPattern),
 }
 
@@ -997,22 +994,6 @@ pub struct ExStmt {
 pub struct ExField {
     pub name: Ident,
     pub alias: Option<Ident>,
-}
-
-#[derive(Debug)]
-pub struct CuraStmt {
-    pub kind: CuraKind,
-    pub mutability: AstMutability,
-    pub ty: TypeExpr,
-    pub binding: Ident,
-    pub body: BlockStmt,
-    pub catch: Option<CapeClause>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum CuraKind {
-    Arena,
-    Page,
 }
 
 // =============================================================================
@@ -1397,7 +1378,7 @@ pub struct AssignExpr {
     pub op: AssignOp,
     pub target: Box<Expr>,
     pub value: Box<Expr>,
-    /// `⇥ fallback` inline recovery, legal only on `↤` (conversion-directed
+    /// `⊥ fallback` inline recovery, legal only on `↤` (conversion-directed
     /// assignment). The parser attaches the recovery to the nearest `↤` in a
     /// right-associated chain; the operator and recovery travel through the
     /// syntax tree so no erasure happens before the destination type is known.

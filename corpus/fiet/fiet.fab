@@ -32,10 +32,8 @@ locale = "la"
 #   callablePosture :← 'fiet'
 #
 # EXPECTED OUTPUT:
-#   none — async runtime compile smoke (whitelist with futura if needed).
+#   42
 
-``
-`fab
 functio responde() fiet → numerus {
     redde 42
 }
@@ -44,5 +42,3 @@ incipiet {
     figendum _ responsum ← responde()
     nota responsum
 }
-`
-``

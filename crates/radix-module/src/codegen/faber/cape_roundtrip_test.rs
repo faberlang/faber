@@ -1,7 +1,7 @@
 //! Reader-locale round trips for every `cape` attachment form.
 //!
 //! `cape` attaches to `fac` (with or without `dum`), conditional arms (`si`,
-//! `sin`, `secus`), `dum`, `itera`, `elige`, and `cura`. Each source converts
+//! `sin`, `secus`), `dum`, `itera`, and `elige`. Each source converts
 //! en→la and back la→en through [`reemit_faber`] (which re-validates every
 //! emitted body), and en→en format must agree with the round-tripped en so the
 //! handler attachment is preserved rather than moved to a stray statement.
@@ -97,11 +97,4 @@ fn loop_and_switch_catches_round_trip() {
     assert_round_trips(&format!(
         "{RISKY}main {{\n    var int n ← 0\n    while n < 3 {{\n        print risky(n)\n        n ↑\n    }} catch err {{\n        print \"while\"\n    }}\n    for range 0‥3 const i {{\n        print risky(i)\n    }} catch err {{\n        print \"range\"\n    }}\n    const list<int> xs ← [0, 1, 2]\n    for from xs const x {{\n        print risky(x)\n    }} catch err {{\n        print \"from\"\n    }}\n    switch n {{\n        case 1 {{ print risky(1) }}\n        default {{ print \"other\" }}\n    }} catch err {{\n        print \"switch\"\n    }}\n}}\n"
     ));
-}
-
-#[test]
-fn with_catch_round_trips() {
-    assert_round_trips(
-        "main {\n    with \"arena\" const any alloc {\n        print \"in arena\"\n    } catch err {\n        print \"caught\"\n    }\n}\n",
-    );
 }

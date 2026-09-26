@@ -162,7 +162,10 @@ fn is_catchall(pattern: &HirPattern) -> bool {
     match pattern {
         HirPattern::Wildcard | HirPattern::Binding(_, _) => true,
         HirPattern::Alias(_, _, inner) => is_catchall(inner),
-        HirPattern::Variant(_, _) | HirPattern::TypeTest { .. } | HirPattern::Literal(_) => false,
+        HirPattern::Variant(_, _)
+        | HirPattern::TypeTest { .. }
+        | HirPattern::Literal(_)
+        | HirPattern::NegatedLiteral(_) => false,
     }
 }
 
@@ -195,7 +198,8 @@ fn normalize(
         },
         HirPattern::Literal(HirLiteral::Bool(value)) => Head::Bool(*value),
         HirPattern::Literal(HirLiteral::Nil) => Head::Nil,
-        HirPattern::Literal(_) => Head::Value,
+        // A signed number literal is one value of an open space.
+        HirPattern::Literal(_) | HirPattern::NegatedLiteral(_) => Head::Value,
     })
 }
 

@@ -18,7 +18,6 @@ columna = "列"
 varia = "变量"
 abstractus = "抽象"
 ceteri = "其余"
-curata = "委派"
 errata = "勘误"
 exitus = "退出"
 generis = "静态"
@@ -26,7 +25,6 @@ iacit = "可抛"
 immutata = "不变"
 interna = "内部"
 magnitudo = "维度"
-nexum = "属性"
 iuncta = "元组"
 optiones = "可选项"
 prae = "前"
@@ -81,7 +79,6 @@ nota = "显示"
 scribe = "写入"
 vide = "查看"
 argumenta = "参数"
-cura = "管护"
 incipiet = "异步入口"
 incipit = "入口"
 ad = "调用"
@@ -198,6 +195,12 @@ filtrum = "过滤器"
 series = "序列"
 census = "普查"
 ratio = "ratio"
+# Conversation family (DECISIONS D6.16). The meus/tuus rows also spell
+# the sermo view methods `s.meus<T>()` / `s.tuus<T>()`.
+sermo = "通道"
+scrinium = "帧"
+meus = "发送"
+tuus = "接收"
 
 [diagnostics.UNRES001]
 message = "关键字 '{keyword}' 未在读者语言包 '{pack}' 中声明"
@@ -596,8 +599,8 @@ message = "无效表达式"
 help = "检查表达式语法"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
-message = "使用 ⇥ 进行 conversio recovery"
-help = "使用 ⇥；vel 仅用于 nullish coalescing"
+message = "使用 ⊥ 进行 conversio recovery"
+help = "使用 ⊥；vel 仅用于 nullish coalescing"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "需要表达式"
@@ -1971,10 +1974,6 @@ help = "在 lista construction 内 spread 一个 lista value"
 message = "struct construction 中不支持 computed keys"
 help = "在 struct construction 中使用已声明的 struct field 名称"
 
-[diagnostics.SEM011.issues.struct_spread_forbidden]
-message = "struct construction 中不支持 spread fields"
-help = "显式提供每个必需 struct field"
-
 [diagnostics.SEM011.issues.vector_constructor_forbids_spread]
 message = "vector constructor 不接受 spread arguments"
 help = "显式提供 vector elements，而非 spread arguments"
@@ -2189,10 +2188,10 @@ help = "cast 到 compatible type"
 
 [diagnostics.SEM016]
 message = "conversion 无效"
-help = "使用有效 conversion，或用 `⇥` 提供 inline recovery"
+help = "使用有效 conversion，或用 `⊥` 提供 inline recovery"
 
 [diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
-message = "intervallum clamp conversio 不支持 `⇥` recovery"
+message = "intervallum clamp conversio 不支持 a `⊥` default"
 help = "从这个 range clamp 中移除 recovery arm"
 
 [diagnostics.SEM016.issues.intervallum_target_not_range]
@@ -2217,15 +2216,15 @@ help = "使 source 和 target bound element types 匹配"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_required]
 message = "vector materialization 需要 lista literal source"
-help = "使用有效 conversion，或用 `⇥` 提供 inline recovery"
+help = "使用有效 conversion，或用 `⊥` 提供 inline recovery"
 
 [diagnostics.SEM016.issues.lista_to_vector_element_mismatch]
 message = "lista 到 vector conversio 需要匹配的 element types"
-help = "使用有效 conversion，或用 `⇥` 提供 inline recovery"
+help = "使用有效 conversion，或用 `⊥` 提供 inline recovery"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_width]
 message = "lista 到 vector conversio 需要 literal vector width"
-help = "使用有效 conversion，或用 `⇥` 提供 inline recovery"
+help = "使用有效 conversion，或用 `⊥` 提供 inline recovery"
 
 [diagnostics.SEM016.issues.matrix_materialize_unsupported]
 message = "尚不支持 matrix materialization"
@@ -2316,12 +2315,12 @@ message = "regex conversion 需要 textus 或 ascii operand"
 help = "把 textus 或 ascii values convert 到 regex"
 
 [diagnostics.SEM016.issues.regex_recovery_unsupported]
-message = "regex conversion 不支持 `⇥` recovery"
+message = "regex conversion 不支持 a `⊥` default"
 help = "从这个 regex conversion 中移除 recovery arm"
 
 [diagnostics.SEM016.issues.valor_verte_unsupported]
 message = "不支持 valor ∷ T；dynamic shape 不能在 compile time 断言"
-help = "改用 runtime `↦ T` conversion，并用 `⇥` recovery"
+help = "改用 runtime `↦ T` conversion，并用 a `⊥` default"
 
 [diagnostics.SEM016.issues.json_genus_conversion_requires_json_annotation]
 message = "json/genus conversion 要求该 genus 标记为 `@ json`"
@@ -2918,14 +2917,6 @@ help = "使用该模块中受支持的 export，或等待该 signature 的更完
 [diagnostics.WARN014.issues.file_interface_export_skipped]
 message = "file interface 跳过了 export `{namespace}.{export}` ({reason})；其他 exports 仍可用"
 help = "使用该模块中受支持的 export，或等待该 signature 的更完整 file-interface 覆盖"
-
-[diagnostics.WARN015]
-message = "无法识别的 curata allocator 名称"
-help = "使用受认可的 allocator 名称（\"arena\"、\"page\"、\"alloc\" 或 \"allocator\"）"
-
-[diagnostics.WARN015.issues.unrecognized_curata_allocator]
-message = "curata allocator 名称 '{name}' 不是受认可的 allocator contract"
-help = "使用受认可的 allocator 名称（\"arena\"、\"page\"、\"alloc\" 或 \"allocator\"）"
 
 [diagnostics.WARN016]
 message = "monomorphic hole 被求解为 multi-member union"

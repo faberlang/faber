@@ -389,6 +389,7 @@ impl TypeChecker<'_> {
         {
             *name = canonical_name;
         }
+        self.canonicalize_sermo_view_method(receiver_ty, name);
         let method_name = self.method_display_name(*name);
         let method_name = if method_name == super::tensor_index::GLYPH_TRANSPOSE_METHOD {
             if !explicit_type_args.is_empty() || !args.is_empty() {
@@ -879,6 +880,29 @@ impl TypeChecker<'_> {
             return Some((DirectionalViewKind::Tuus, payload));
         }
         None
+    }
+
+    /// Rewrite a pack spelling of a sermo view method (`s.recv<T>()` under
+    /// en) to its canonical Latin symbol (`tuus`) so lint, MIR lowering and
+    /// every backend keep matching canonical names. The view methods share
+    /// the directional view type rows (DECISIONS D6.16). The canonical Latin
+    /// spelling stays accepted, as Latin type names are under every pack.
+    fn canonicalize_sermo_view_method(&self, receiver_ty: TypeId, name: &mut Symbol) {
+        let (Some(pack), Some(interner)) = (self.locale_pack, self.interner) else {
+            return;
+        };
+        let Some(crate::locale::TypeBindingKind::Frame(
+            view @ (crate::locale::FrameTypeKind::Meus | crate::locale::FrameTypeKind::Tuus),
+        )) = pack.type_binding_kind(interner.resolve(*name))
+        else {
+            return;
+        };
+        if !self.is_sermo_receiver(receiver_ty) {
+            return;
+        }
+        if let Some(canonical) = interner.lookup(view.latin()) {
+            *name = canonical;
+        }
     }
 
     fn is_sermo_receiver(&self, receiver_ty: TypeId) -> bool {

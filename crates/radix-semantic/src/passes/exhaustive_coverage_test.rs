@@ -250,3 +250,18 @@ fn elige_over_bivalens_missing_falsum_is_rejected() {
         "falsum",
     );
 }
+
+#[test]
+fn negated_literal_rows_are_open_space_values() {
+    assert_missing(
+        "functio s(numerus n) → numerus {
+            discerne n {
+                casu -1 { redde 1 }
+                casu 0 { redde 0 }
+            }
+            redde 2
+        }",
+        "missing_cases",
+        "_",
+    );
+}

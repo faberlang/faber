@@ -6,7 +6,7 @@ category = "type"
 canonical = true
 summary = "Absolute point-in-time primitive with precision contract."
 syntax = "instans | instans<ms> | instans<us> | instans<ns>"
-related = ["↦", "⇥", "textus"]
+related = ["↦", "⊥", "textus"]
 locale = "en"
 +++
 # =============================================================================
@@ -15,12 +15,12 @@ locale = "en"
 #
 # What this teaches:
 #   • Absolute point-in-time primitive with precision contract.
-#   • Related keywords: ↦, ⇥, textus
+#   • Related keywords: ↦, ⊥, textus
 #
 # Common mistakes:
 #   • Using `instans ∷ T` (static ascription) instead of `instans ↦ T` (runtime conversion) — use `↦` for runtime datetime parsing and extraction (SEM016).
 #
-# See also: ↦, ⇥, textus
+# See also: ↦, ⊥, textus
 # =============================================================================
 
 # instans — wall clock, precision contract, offset ingest, TOML provenance

@@ -452,6 +452,7 @@ impl<'a> Lowerer<'a> {
             self.resolver,
             self.types,
             self.interner,
+            self.locale_pack,
         );
 
         HirModule {
@@ -1097,3 +1098,7 @@ mod template_holes_test;
 #[cfg(test)]
 #[path = "type_algebra_test.rs"]
 mod type_algebra_test;
+
+#[cfg(test)]
+#[path = "signed_pattern_test.rs"]
+mod signed_pattern_test;

@@ -77,7 +77,7 @@ impl HirVisitor for DecisionPointCounter {
             HirExpressionKind::Summa { .. } | HirExpressionKind::FirstMatch { .. } => self.0 += 1,
             // No-body fold (`Extremum`): 0; only its `vel` coalesce tail decides.
             HirExpressionKind::Extremum { coalesce, .. } => self.0 += u32::from(coalesce.is_some()),
-            // Conversion recovery tails: +1 only when the `⇥` fallback is present.
+            // Conversion recovery tails: +1 only when the `⊥` fallback is present.
             HirExpressionKind::ConversioAssign { recovery, .. } => {
                 self.0 += u32::from(recovery.is_some());
             }

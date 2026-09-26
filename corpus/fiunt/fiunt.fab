@@ -34,8 +34,6 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   [1, 2]
 
-``
-`fab
 functio stream() fiunt → numerus {
     cede 1
     cede 2
@@ -44,5 +42,3 @@ functio stream() fiunt → numerus {
 incipit {
     nota stream()
 }
-`
-``

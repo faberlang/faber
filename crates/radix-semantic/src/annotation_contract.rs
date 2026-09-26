@@ -973,13 +973,12 @@ fn is_compiler_owned_family(name: &str) -> bool {
             | "imperia"
             | "json"
             | "versio"
-            // Shader and doc families. External-binding spellings are absent
-            // from this allowlist, so active references are rejected.
+            // Shader families. External-binding spellings are absent from
+            // this allowlist, so active references are rejected.
             | "vertex"
             | "fragment"
             | "shader_contract"
             | "pure"
-            | "doc"
             // Declaration/fixture metadata families (grammatica-nova fixture).
             | "nomen"
             | "tabulae"

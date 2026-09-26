@@ -214,7 +214,7 @@ main {
     # GT-3: a negative value into an unsigned target fails closed at runtime
     # (conversion never wraps — DEFER-116 boundary contract); the inline
     # recovery supplies the target-typed fallback.
-    print signed ↦ int<u32> ⇥ 0 ∷ int<u32>
+    print signed ↦ int<u32> ⊥ 0 ∷ int<u32>
     print a ↦ f32
     print single ↦ int
     print a ↦ float

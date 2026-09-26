@@ -10,13 +10,13 @@
 //! ## `↦` (conversio)
 //!
 //! Operand checking is intentionally light: backends own parse/truthiness/narrowing
-//! lowering. Regex targets are the exception — no literal form, so `⇥` recovery
+//! lowering. Regex targets are the exception — no literal form, so `⊥` default
 //! is rejected here.
 //!
 //! ## `∷` (verte)
 //!
 //! Target shape drives validation. `valor ∷ T` is rejected for every `T` —
-//! dynamic JSON shape is not assertable at compile time; use `↦ T` (with `⇥`
+//! dynamic JSON shape is not assertable at compile time; use `↦ T` (with `⊥`
 //! for recovery) instead.
 //!
 //! ERROR AND ESCAPE POLICY
@@ -321,7 +321,7 @@ impl TypeChecker<'_> {
 
     /// Checks a runtime value conversion (`↦` / `conversio`).
     ///
-    /// The source is always visited for diagnostics. An inline `⇥` recovery
+    /// The source is always visited for diagnostics. An inline `⊥` default
     /// expression must be a value of the declared target type `T`. This function
     /// returns the declared target type rather than inventing a common type
     /// between source and recovery.
@@ -454,7 +454,7 @@ impl TypeChecker<'_> {
         }
 
         // Route C (AEU-5): numeric `lista<T, N> ↦ tensor<T, [N]>` is a padded
-        // snapshot. The inline `⇥` value names the dead-slot fill (element
+        // snapshot. The inline `⊥` value names the dead-slot fill (element
         // type `T`), not a target-typed failure recovery — padding always
         // succeeds structurally, and the fill must be a real value, never a
         // read of the carrier's uninitialized slots.
@@ -1300,7 +1300,7 @@ impl TypeChecker<'_> {
     /// `n ↦ ascii<N, Hex|Bin|Oct>`: N is digit width; Hex/Bin/Oct are slot-2
     /// format hints peeled into conversio params. Float sources reject; a
     /// const-foldable negative or overflowing source fail-closes at typecheck
-    /// unless `⇥` recovery is present (runtime still fail-closes).
+    /// unless `⊥` default is present (runtime still fail-closes).
     fn check_ascii_format_pack_conversio(
         &mut self,
         source: &HirExpression,
@@ -2478,7 +2478,7 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// Require inline `⇥` recovery to be a value of the conversio target type `T`.
+    /// Require inline `⊥` default to be a value of the conversio target type `T`.
     fn note_conversio_recovery_checked(
         &mut self,
         recovery: &mut HirExpression,
@@ -2496,7 +2496,7 @@ impl TypeChecker<'_> {
         );
     }
 
-    /// Validates `↦ regex` operand shapes and rejects structurally empty `⇥` recovery.
+    /// Validates `↦ regex` operand shapes and rejects structurally empty `⊥` default.
     ///
     /// Returns `Some(error_type)` when the operand type is invalid; `None` when
     /// checking should continue toward the declared regex target.
@@ -2521,9 +2521,9 @@ impl TypeChecker<'_> {
             return Some(self.error_type);
         }
 
-        // WHY: the `⇥` recovery slot is structurally empty for `↦ regex`.
-        // Every coherent `↦ T ⇥ <value>` form requires a recovery of type T
-        // (e.g. `"bad" ↦ numerus ⇥ 0`). `regex` has no literal form; its
+        // WHY: the `⊥` default slot is structurally empty for `↦ regex`.
+        // Every coherent `↦ T ⊥ <value>` form requires a recovery of type T
+        // (e.g. `"bad" ↦ numerus ⊥ 0`). `regex` has no literal form; its
         // only constructor is the fallible conversion itself, so a recovery
         // would have to be another `pat ↦ regex` — recursion with no base.
         // Pattern validity is a downstream target-engine concern, not a

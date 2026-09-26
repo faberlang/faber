@@ -212,10 +212,6 @@ pub enum WarningKind {
     /// A provider/file-interface export could not be remapped and was skipped;
     /// sibling exports in the same namespace may still be usable.
     FileInterfaceExportSkipped,
-    /// A postfix `curata <ident>` names an allocator contract the compiler
-    /// does not recognize. Accepted at warning level until allocator
-    /// threading ships.
-    UnrecognizedCurataAllocator,
     /// A monomorphic `_` hole solved to a multi-member union. The source
     /// still looks monomorphic while the inferred type is a sum of
     /// alternatives; the warning makes that cross-shape explicit.
@@ -251,6 +247,9 @@ pub enum WarningKind {
     /// A declared function's cyclomatic complexity exceeded the applicable
     /// budget. Warn-only; promotion is the caller's deny policy.
     ComplexityBudgetExceeded,
+    /// A `genus` member carries `@ publica`, which is redundant because members
+    /// are public by default (D5.5 interim).
+    RedundantMemberVisibility,
     /// A `discerne` whose coverage could not be computed for its pattern
     /// kinds (D4.8): the match is compiled, but exhaustiveness was not
     /// checked, so the author is told rather than left in silence.

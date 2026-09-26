@@ -375,6 +375,8 @@ impl<'a> Lexer<'a> {
             '≥' => TokenKind::GtEq,
             '→' => TokenKind::Arrow,
             '⇥' => TokenKind::ExitArrow,
+            // D17.7 default channel: `↦ T ⊥ value`. Same glyph in every locale.
+            '⊥' => TokenKind::UpTack,
             '?' => {
                 if self.cursor.eat('.') {
                     TokenKind::QuestionDot
@@ -1098,6 +1100,8 @@ fn homoglyph_suggestion(c: char) -> Option<&'static str> {
         // are intentionally absent because they are already live tokens.
         '⤈' | '⤋' | '⇣' | '⇓' | '↧' => Some("⤓"),
         '⤉' | '⤊' | '⇡' | '⇑' | '↥' => Some("⤒"),
+        // U+27C2 PERPENDICULAR looks like the `⊥` (U+22A5) default glyph.
+        '⟂' => Some("⊥"),
         _ => None,
     }
 }

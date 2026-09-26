@@ -808,8 +808,8 @@ functio f(bivalens bad) → numerus {
 }
 
 #[test]
-fn ar2_fac_elige_cura_cape_lower_to_handled_whole_construct() {
-    // Whole-construct attachment: `fac`/`elige`/`cura` cape wraps the
+fn ar2_fac_elige_cape_lower_to_handled_whole_construct() {
+    // Whole-construct attachment: `fac`/`elige` cape wraps the
     // complete containing construct as one `Handled` node.
     let facts = ar2_facts(
         r#"
@@ -824,18 +824,14 @@ functio g(bivalens bad) → numerus {
         ceterum { redde 2 }
     } cape err { redde 0 }
 
-    cura "arena" fixum _ res { redde 1 } cape err { redde 0 }
     redde 3
 }
 "#,
     );
 
+    assert_eq!(facts.handled, 2, "fac/elige cape each lower to one Handled");
     assert_eq!(
-        facts.handled, 3,
-        "fac/elige/cura cape each lower to one Handled"
-    );
-    assert_eq!(
-        facts.handled_wrapping_block, 3,
+        facts.handled_wrapping_block, 2,
         "whole-construct handlers wrap non-loop bodies"
     );
     assert_eq!(
@@ -970,30 +966,6 @@ functio b(bivalens bad) → numerus {
 "#,
     );
     assert!(elige.is_empty(), "unexpected AIR errors: {elige:?}");
-}
-
-#[test]
-fn air_lane_cura_cape_handler_admits_construct_keepout_stands() {
-    // The cura handler itself admits (no handler decline); the construct's
-    // independent deferred-init ruling still keeps the function out of AIR.
-    let errors = air_errors(
-        r#"
-@ radix lane "air"
-functio c() → numerus {
-    cura "arena" fixum _ res { redde 1 } cape err { redde 0 }
-    redde 1
-}
-"#,
-    );
-
-    assert!(
-        !errors.iter().any(|err| err
-            .args
-            .iter()
-            .any(|arg| arg.name == "issue" && arg.value == "recoverable_handler")),
-        "cura handler must not decline under the handler cause: {errors:?}"
-    );
-    expect_air_issue(&errors, "deferred_local_init");
 }
 
 #[test]
@@ -1185,7 +1157,7 @@ functio loss(tf32[2, 2] x) → numerus {
 
 // ---------------------------------------------------------------------------
 // ATH-3 (AIR Tier 0.5): recovery-arm Conversio slice. A conversion with an
-// inline `⇥` recovery resolves its failure inside its own expression —
+// inline `⊥` default resolves its failure inside its own expression —
 // self-resolved union dataflow, admitted like a locally-resolved handler. A
 // conversion without recovery is a boundary throw and keeps the
 // `runtime_conversion` decline everywhere in v1 — including inside admitted
@@ -1198,7 +1170,7 @@ fn air_lane_admits_inline_recovery_conversio() {
         r#"
 @ radix lane "air"
 functio parse_or_zero(textus s) → numerus {
-    fixum numerus v ← s ↦ numerus ⇥ 0
+    fixum numerus v ← s ↦ numerus ⊥ 0
     redde v
 }
 "#,
@@ -1215,7 +1187,7 @@ fn air_lane_admits_inline_recovery_conversio_inside_handler_region() {
 functio in_region(textus s, bivalens bad) → numerus {
     fac {
         si bad { iace "x" }
-        fixum numerus v ← s ↦ numerus ⇥ 0
+        fixum numerus v ← s ↦ numerus ⊥ 0
         redde v
     } cape err { redde 1 }
 }
@@ -1263,7 +1235,7 @@ functio in_region(textus s, bivalens bad) → numerus {
 
 #[test]
 fn air_lane_admits_non_literal_inline_recovery_expression() {
-    // The inline recovery grammar is `'⇥' unary_expr` (EBNF #153): a control
+    // The inline recovery grammar is `'⊥' unary_expr` (EBNF #153): a control
     // expression carrying `iace` cannot appear in the recovery operand, so
     // the rethrow-in-recovery case is unrepresentable at the v1 surface.
     // The gate still checks the recovery arm as a Catch region (defensive
@@ -1273,7 +1245,7 @@ fn air_lane_admits_non_literal_inline_recovery_expression() {
         r#"
 @ radix lane "air"
 functio parse_or_zero(textus s, numerus fallback) → numerus {
-    fixum numerus v ← s ↦ numerus ⇥ fallback
+    fixum numerus v ← s ↦ numerus ⊥ fallback
     redde v
 }
 "#,

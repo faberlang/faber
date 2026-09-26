@@ -244,7 +244,7 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     textus_literals: RefCell<FxHashMap<Symbol, String>>,
     /// Owned ASCII literals, keyed by interned source symbol.
     ascii_literals: RefCell<FxHashMap<Symbol, String>>,
-    /// Side-effecting `⇥` recovery calls parked in unreachable orphan blocks.
+    /// Side-effecting `⊥` default calls parked in unreachable orphan blocks.
     /// Looked up by `(function, dest temp)` so conversion failure is O(1).
     recovery_calls: FxHashMap<(MirFunctionId, MirTempId), (MirCallee, Vec<MirOperand>)>,
     /// Value-id static types per function (`MirStatementKind::Assign`), for
@@ -1380,7 +1380,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     }
 
     /// CTO-3 — the fallback runs ONLY on conversion failure. A side-effecting
-    /// `⇥` recovery CALL is lowered by the materializer into an ORPHAN block
+    /// `⊥` default CALL is lowered by the materializer into an ORPHAN block
     /// (dead code to the main flow); at the conversion-failure recovery point
     /// this invokes it LAZILY, so its side effects run only here — never on a
     /// successful conversion (fallback-not-run-on-success). Pure recovery
@@ -2204,6 +2204,10 @@ mod value_test;
 #[cfg(test)]
 #[path = "decimal_test.rs"]
 mod decimal_test;
+
+#[cfg(test)]
+#[path = "narrowing_conversio_test.rs"]
+mod narrowing_conversio_test;
 
 #[cfg(test)]
 #[path = "decimal_shared_agreement_test.rs"]

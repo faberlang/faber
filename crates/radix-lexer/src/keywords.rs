@@ -172,7 +172,7 @@ pub enum KeywordOwner {
     /// (`intra` / `inter` / `per` / `usque` / `ante`).
     RangeOperator,
 
-    /// Statement-initial resource or transfer keyword (`cura` / `tacet`).
+    /// Statement-initial transfer keyword (`tacet`).
     StatementIntroducer,
 
     /// Marker inside a declaration or dispatch
@@ -221,9 +221,6 @@ pub enum KeywordKind {
 
     /// Program entrypoint surface.
     EntryPoint,
-
-    /// Resource-management syntax.
-    Resource,
 
     /// Endpoint binding syntax.
     Endpoint,
@@ -495,12 +492,6 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         category: KeywordKind::Modifier,
     },
     KeywordSpec {
-        text: "curata",
-        token_kind: Some(TokenKind::Curata),
-        scope: KeywordScope::Contextual(FUNCTION_MODIFIER),
-        category: KeywordKind::Modifier,
-    },
-    KeywordSpec {
         text: "errata",
         token_kind: Some(TokenKind::Errata),
         scope: KeywordScope::Contextual(FUNCTION_MODIFIER),
@@ -540,12 +531,6 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         text: "magnitudo",
         token_kind: Some(TokenKind::Magnitudo),
         scope: KeywordScope::Contextual(TYPE_PARAMETER),
-        category: KeywordKind::Modifier,
-    },
-    KeywordSpec {
-        text: "nexum",
-        token_kind: Some(TokenKind::Nexum),
-        scope: KeywordScope::Contextual(GENUS_MEMBER),
         category: KeywordKind::Modifier,
     },
     KeywordSpec {
@@ -993,13 +978,6 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         token_kind: Some(TokenKind::Incipit),
         scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
         category: KeywordKind::EntryPoint,
-    },
-    // === Keywords: Resource management ===
-    KeywordSpec {
-        text: "cura",
-        token_kind: Some(TokenKind::Cura),
-        scope: KeywordScope::Contextual(STATEMENT_INTRODUCER),
-        category: KeywordKind::Resource,
     },
     // === Keywords: Endpoint ===
     KeywordSpec {
