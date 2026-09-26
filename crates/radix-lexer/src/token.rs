@@ -276,6 +276,7 @@ pub enum TokenKind {
     UpTack,    // ⊥ default channel (D17.7)
     Check,     // ✓ value conditional then-marker (D4.5)
     Ballot,    // ✗ value conditional else-marker (D4.5)
+    Pilcrow,   // ¶ format operator (D2.1)
     Cup,       // ∪ inline union
     Cap,       // ∩ inline intersection
     At,        // @

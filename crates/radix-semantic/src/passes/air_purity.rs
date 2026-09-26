@@ -503,7 +503,10 @@ impl AirPurityChecker<'_> {
                 self.reject(expr.span, "runtime_variant_check");
                 self.check_expr(inner);
             }
-            HirExpressionKind::Praefixum(inner) => self.check_expr(inner),
+            HirExpressionKind::Praefixum(inner)
+            | HirExpressionKind::Format { value: inner, .. } => {
+                self.check_expr(inner);
+            }
             HirExpressionKind::Error => {}
         }
     }

@@ -1508,7 +1508,8 @@ pub(super) fn rewrite_expr(
         | HirExpressionKind::Yield(inner)
         | HirExpressionKind::Panic(inner)
         | HirExpressionKind::Throw(inner)
-        | HirExpressionKind::Praefixum(inner) => rewrite_expr(
+        | HirExpressionKind::Praefixum(inner)
+        | HirExpressionKind::Format { value: inner, .. } => rewrite_expr(
             unit_path,
             inner,
             interner,

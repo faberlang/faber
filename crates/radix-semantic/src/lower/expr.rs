@@ -103,6 +103,12 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Transfer(transfer) => lowerer.lower_transfer(transfer),
         ExprKind::FirstMatch(first_match) => lower_first_match(lowerer, first_match),
         ExprKind::Trap(trap) => lower_trap(lowerer, trap),
+        // D2.1: `value ¶ "spec"` keeps the spec literal's text; typecheck
+        // parses and validates it against the value's type (D2.2).
+        ExprKind::Format(format) => HirExpressionKind::Format {
+            value: Box::new(lower_expr(lowerer, &format.value)),
+            spec: format.spec,
+        },
     };
 
     HirExpression {

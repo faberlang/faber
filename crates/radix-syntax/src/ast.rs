@@ -1103,6 +1103,8 @@ pub enum ExprKind {
     /// trailing expression statement of the body is the success value; there
     /// is no early-success exit form this campaign.
     Trap(Box<TrapExpr>),
+    /// Format operator: `value ¶ "spec"` (D2.1) → `textus`.
+    Format(FormatExpr),
 }
 
 #[derive(Debug)]
@@ -1122,6 +1124,20 @@ pub struct FirstMatchExpr {
     pub binding: Ident,
     /// Predicate body evaluated for every candidate lane.
     pub body: BlockStmt,
+}
+
+/// Source shape for the `¶` format operator (D2.1, D2.2).
+///
+/// The spec is a string literal by construction: pass 1 rejects anything
+/// else. Pass 2 parses and validates it against the value's type.
+#[derive(Debug)]
+pub struct FormatExpr {
+    /// Value being formatted.
+    pub value: Box<Expr>,
+    /// Spec literal text, without quotes.
+    pub spec: Symbol,
+    /// Span of the spec literal.
+    pub spec_span: Span,
 }
 
 /// Source shape for the `⇇` exact-output transfer chain.

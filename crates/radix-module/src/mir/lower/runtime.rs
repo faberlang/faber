@@ -2931,6 +2931,21 @@ impl FunctionBuilder<'_> {
         Some(self.runtime_call_value(MirIntrinsic::FormatString { template }, lowered_args, ty, expr.span))
     }
 
+    /// Lower `value ¶ "spec"` (D2.1) to the one-argument format runtime call.
+    ///
+    /// Typecheck validated the spec against the value's type; the executor
+    /// re-parses the same literal text with the shared spec parser.
+    pub(super) fn lower_format(
+        &mut self,
+        value: &HirExpression,
+        spec: Symbol,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let value = self.lower_expr_value(value)?;
+        let ty = self.expr_ty(expr)?;
+        Some(self.runtime_call_value(MirIntrinsic::FormatValue { spec }, vec![value], ty, expr.span))
+    }
+
     /// Lower runtime conversions, including optional inline recovery expressions.
     ///
     /// Aggregate `verte` construction is handled in `aggregate.rs`; this path

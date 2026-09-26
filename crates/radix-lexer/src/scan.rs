@@ -380,6 +380,8 @@ impl<'a> Lexer<'a> {
             // D4.5 value conditional `c ✓ a ✗ b`. Same glyphs in every locale.
             '✓' => TokenKind::Check,
             '✗' => TokenKind::Ballot,
+            // D2.1 format operator `value ¶ "spec"`. Same glyph in every locale.
+            '¶' => TokenKind::Pilcrow,
             '?' => {
                 if self.cursor.eat('.') {
                     TokenKind::QuestionDot

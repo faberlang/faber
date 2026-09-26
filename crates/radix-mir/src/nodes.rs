@@ -899,6 +899,13 @@ pub enum MirIntrinsic {
     FormatString {
         template: Symbol,
     },
+    /// `value ¶ "spec"` (D2.1): render one built-in value as `textus`.
+    ///
+    /// `spec` is the validated spec literal's text; executors parse it with
+    /// `radix_types::format_spec`. One argument; returns `textus`.
+    FormatValue {
+        spec: Symbol,
+    },
     Convert(MirConversion),
     Collection(MirCollectionOp),
     Atomic(MirAtomicOp),

@@ -420,6 +420,7 @@ fn intrinsic(value: &MirIntrinsic) -> String {
         MirIntrinsic::FormatString { template } => {
             format!("format_string template sym#{}", template.0)
         }
+        MirIntrinsic::FormatValue { spec } => format!("format_value spec sym#{}", spec.0),
         MirIntrinsic::Convert(conversion) => conversion_intrinsic(conversion),
         MirIntrinsic::Collection(op) => format!("collection {}", collection_op(*op)),
         MirIntrinsic::Atomic(op) => format!("atomic {}", op.spelling()),

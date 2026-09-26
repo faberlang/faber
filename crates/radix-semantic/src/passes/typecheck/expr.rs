@@ -149,6 +149,9 @@ impl TypeChecker<'_> {
             HirExpressionKind::Transfer { sink, payloads } => {
                 self.check_transfer(sink, payloads, expr.span)
             }
+            HirExpressionKind::Format { value, spec } => {
+                super::format::check_format_expr(self, value, *spec, expr.span)
+            }
             HirExpressionKind::MethodCall(receiver, name, type_args, args, conversion) => {
                 let ty = self.check_method_call(receiver, name, type_args, args, expected);
                 *conversion = self.pending_conversion.take();

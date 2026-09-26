@@ -112,7 +112,7 @@ impl MirRuntimeAbi {
                 MirRuntimeAbiKind::CoreSemantics,
                 true,
             ),
-            MirIntrinsic::FormatString { .. } => (
+            MirIntrinsic::FormatString { .. } | MirIntrinsic::FormatValue { .. } => (
                 MirRuntimeAbiFamily::RuntimeFormat,
                 MirRuntimeAbiKind::CoreSemantics,
                 false,

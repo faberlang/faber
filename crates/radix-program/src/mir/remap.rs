@@ -245,7 +245,7 @@ pub(super) fn remap_runtime_call_text_symbols(
             }
             provider.name = remap_symbol(provider.name, source, target);
         }
-        MirIntrinsic::FormatString { template } => {
+        MirIntrinsic::FormatString { template } | MirIntrinsic::FormatValue { spec: template } => {
             *template = remap_symbol(*template, source, target);
         }
         MirIntrinsic::Convert(conversion) => {

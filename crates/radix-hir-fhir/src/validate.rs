@@ -1295,7 +1295,7 @@ fn collect_expr_defs(
             registry.insert(binding.0);
             collect_block_defs(body, registry);
         }
-        HirExpressionKind::Praefixum(inner) => {
+        HirExpressionKind::Praefixum(inner) | HirExpressionKind::Format { value: inner, .. } => {
             collect_expr_defs(inner, registry);
         }
         HirExpressionKind::Transfer { sink, payloads } => {
@@ -1869,7 +1869,10 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                 }
             }
             HirExpressionKind::TypeCheck { expr, .. } => collect_expr(expr, registry),
-            HirExpressionKind::Praefixum(inner) => collect_expr(inner, registry),
+            HirExpressionKind::Praefixum(inner)
+            | HirExpressionKind::Format { value: inner, .. } => {
+                collect_expr(inner, registry);
+            }
             HirExpressionKind::Intervallum {
                 start, end, step, ..
             } => {
@@ -2769,6 +2772,10 @@ pub(crate) fn validate_referential_integrity(
             }
             HirExpressionKind::Praefixum(inner) => {
                 validate_expr(inner, check_symbol, check_def, check_hir, check_type)?;
+            }
+            HirExpressionKind::Format { value, spec } => {
+                check_symbol(*spec)?;
+                validate_expr(value, check_symbol, check_def, check_hir, check_type)?;
             }
             HirExpressionKind::Vacua
             | HirExpressionKind::ReadLine(_)

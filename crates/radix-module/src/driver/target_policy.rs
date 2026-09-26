@@ -445,6 +445,7 @@ fn scan_go_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             }
         }
         ExprKind::Paren(expr) => scan_go_expr(expr, file, diagnostics),
+        ExprKind::Format(format) => scan_go_expr(&format.value, file, diagnostics),
         ExprKind::Literal(_)
         | ExprKind::Vacua(_)
         | ExprKind::Ident(_)
@@ -816,6 +817,7 @@ fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             }
         }
         ExprKind::Paren(expr) => scan_rust_expr(expr, file, diagnostics),
+        ExprKind::Format(format) => scan_rust_expr(&format.value, file, diagnostics),
         ExprKind::Literal(_)
         | ExprKind::Vacua(_)
         | ExprKind::Ident(_)

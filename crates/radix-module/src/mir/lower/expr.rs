@@ -61,6 +61,7 @@ pub(super) trait HirExpressionLoweringVisitor {
             }
             HirExpressionKind::Scribe(kind, args) => self.visit_scribe_expr(*kind, args, expr),
             HirExpressionKind::Scriptum(template, args) => self.visit_scriptum_expr(*template, args, expr),
+            HirExpressionKind::Format { value, spec } => self.visit_format_expr(value, *spec, expr),
             HirExpressionKind::Adfirma(cond, message) => self.visit_adfirma_expr(cond, message.as_deref(), expr),
             HirExpressionKind::Ad { route, opener } => self.visit_ad_expr(*route, opener.as_deref(), expr),
             HirExpressionKind::Intervallum { start, end, step, kind } => {
@@ -216,6 +217,7 @@ pub(super) trait HirExpressionLoweringVisitor {
         args: &[HirExpression],
         expr: &HirExpression,
     ) -> Option<MirOperand>;
+    fn visit_format_expr(&mut self, value: &HirExpression, spec: Symbol, expr: &HirExpression) -> Option<MirOperand>;
     fn visit_adfirma_expr(
         &mut self,
         cond: &HirExpression,
@@ -523,6 +525,10 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         self.lower_scriptum(template, args, expr)
+    }
+
+    fn visit_format_expr(&mut self, value: &HirExpression, spec: Symbol, expr: &HirExpression) -> Option<MirOperand> {
+        self.lower_format(value, spec, expr)
     }
 
     fn visit_adfirma_expr(

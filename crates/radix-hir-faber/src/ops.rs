@@ -36,6 +36,11 @@ impl super::FaberCodegen<'_> {
             // TypeCheck (`expr est <type>`) behaves like Is (precedence 4):
             // both are relational-style checks spelled with `est`.
             HirExpressionKind::TypeCheck { .. } => 4,
+            // `¶` sits between comparison and `|` (D2.5). Sharing the
+            // comparison level only adds parentheses where a comparison
+            // operand is a format — still the same parse — and keeps a
+            // nested format parenthesized (no chaining).
+            HirExpressionKind::Format { .. } => 5,
             HirExpressionKind::Unary(_, _)
             | HirExpressionKind::Ref(_, _)
             | HirExpressionKind::Deref(_) => 12,

@@ -436,6 +436,11 @@ impl SummaBodyState {
             }
             HirExpressionKind::ReadLine(_) => effect(checker, expr.span, "host_io"),
             HirExpressionKind::Praefixum(inner) => self.walk_expr(checker, inner),
+            // `¶` builds text, like `scriptum`.
+            HirExpressionKind::Format { value, .. } => {
+                effect(checker, expr.span, "host_io");
+                self.walk_expr(checker, value);
+            }
             HirExpressionKind::Adfirma(cond, message) => {
                 effect(checker, expr.span, "unapproved_effect");
                 self.walk_expr(checker, cond);

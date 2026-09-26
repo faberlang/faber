@@ -101,6 +101,7 @@ pub(super) fn collect_runtime_call_requirement(
         }
         MirIntrinsic::Assert
         | MirIntrinsic::FormatString { .. }
+        | MirIntrinsic::FormatValue { .. }
         | MirIntrinsic::Convert(_)
         | MirIntrinsic::Collection(_)
         | MirIntrinsic::Atomic(_)

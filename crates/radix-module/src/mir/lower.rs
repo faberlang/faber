@@ -3444,6 +3444,7 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::Tuple(..) => "tuple literals before aggregate MIR lowering",
         HirExpressionKind::Scribe(kind, _) => scribe_kind_name(*kind),
         HirExpressionKind::Scriptum(_, _) => "scriptum templates before format intrinsic MIR lowering",
+        HirExpressionKind::Format { .. } => "¶ format before format intrinsic MIR lowering",
         HirExpressionKind::ReadLine(_) => "lege before input MIR lowering",
         HirExpressionKind::Praefixum(_) => "praefixum before compile-time MIR lowering",
         HirExpressionKind::Adfirma(_, _) => "adfirma before assert intrinsic MIR lowering",

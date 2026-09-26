@@ -1495,3 +1495,7 @@ mod ternary_removed_test;
 #[cfg(test)]
 #[path = "sum_type_data_only_test.rs"]
 mod sum_type_data_only_test;
+
+#[cfg(test)]
+#[path = "format_operator_test.rs"]
+mod format_operator_test;

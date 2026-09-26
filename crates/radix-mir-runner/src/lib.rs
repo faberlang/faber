@@ -2260,3 +2260,7 @@ mod queue_stack_test;
 #[cfg(test)]
 #[path = "stats_test.rs"]
 mod stats_test;
+
+#[cfg(test)]
+#[path = "format_value_test.rs"]
+mod format_value_test;
