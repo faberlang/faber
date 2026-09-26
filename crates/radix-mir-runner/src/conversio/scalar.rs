@@ -878,7 +878,8 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             | Value::Tuple(_)
             | Value::Vector(_)
             | Value::Matrix(_)
-            | Value::GradientHandle(_) => Err(RunnerError::internal(
+            | Value::GradientHandle(_)
+            | Value::Cursor(_) => Err(RunnerError::internal(
                 span,
                 "value variant is outside kernel valor bridge",
             )),
@@ -991,7 +992,8 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             | Value::Tuple(_)
             | Value::Vector(_)
             | Value::Matrix(_)
-            | Value::GradientHandle(_) => {
+            | Value::GradientHandle(_)
+            | Value::Cursor(_) => {
                 return Err(RunnerError::internal(
                     span,
                     "value variant is outside kernel valor bridge",

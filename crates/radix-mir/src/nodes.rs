@@ -1034,10 +1034,17 @@ impl MirSermoOp {
     }
 }
 
-/// `@ cursor` call collected into a `lista<T>` before indexed iteration.
+/// `@ cursor` call: the generator's `cede` yields read as a `lista<T>`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MirCursorStream {
     pub callee: DefId,
+    /// `true` when the only consumer is a stepped `itera ex` walk that
+    /// re-reads `length` before each index read (D6.6: cursors are lazy).
+    /// A suspending backend may then resume the generator one `cede` per
+    /// step and abandon it on `rumpe`; the result is typed `lista<T>`, so an
+    /// eager backend may ignore the flag and materialize.
+    #[serde(default)]
+    pub stepped: bool,
 }
 
 /// Diagnostic runtime channels surfaced by Faber source constructs.

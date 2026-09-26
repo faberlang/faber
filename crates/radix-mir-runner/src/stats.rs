@@ -77,8 +77,12 @@ impl FunctionAccumulator {
         }
     }
 
-    fn record(&mut self, duration_ns: u64, self_ns: u64) {
-        self.calls = self.calls.saturating_add(1);
+    /// Record one activation segment. A resumed generator segment adds time
+    /// and a duration sample but not another call.
+    fn record(&mut self, duration_ns: u64, self_ns: u64, counts_call: bool) {
+        if counts_call {
+            self.calls = self.calls.saturating_add(1);
+        }
         self.total_ns = self.total_ns.saturating_add(duration_ns);
         self.self_ns = self.self_ns.saturating_add(self_ns);
         self.durations.push(duration_ns);
@@ -198,6 +202,7 @@ fn splitmix64(mut value: u64) -> u64 {
 
 struct ActiveCall {
     function: MirFunctionId,
+    counts_call: bool,
     started: Instant,
     child_ns: u64,
 }
@@ -233,9 +238,12 @@ impl StatsCollector {
         }
     }
 
-    pub(crate) fn enter_function(&mut self, function: MirFunctionId) {
+    /// Open an activation segment; `counts_call` is `false` when a parked
+    /// generator frame resumes (D6.6), so one generator call counts once.
+    pub(crate) fn enter_function(&mut self, function: MirFunctionId, counts_call: bool) {
         self.active_calls.push(ActiveCall {
             function,
+            counts_call,
             started: Instant::now(),
             child_ns: 0,
         });
@@ -259,7 +267,7 @@ impl StatsCollector {
         self.functions
             .entry(key)
             .or_insert_with(FunctionAccumulator::new)
-            .record(elapsed_ns, self_ns);
+            .record(elapsed_ns, self_ns, active.counts_call);
         if let Some(parent) = self.active_calls.last_mut() {
             parent.child_ns = parent.child_ns.saturating_add(elapsed_ns);
         }
@@ -297,7 +305,7 @@ impl StatsCollector {
         self.functions
             .entry(key)
             .or_insert_with(FunctionAccumulator::new)
-            .record(duration_ns, self_ns);
+            .record(duration_ns, self_ns, true);
     }
 
     #[cfg(test)]

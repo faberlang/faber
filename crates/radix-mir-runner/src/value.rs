@@ -77,6 +77,9 @@ pub enum Value {
     /// (`MirIntrinsic::Gradient`). Carries the handle-key into the gradient
     /// storage map on the runner; never a numeric value.
     GradientHandle(u64),
+    /// Suspended `fiunt`/`fient` generator read by a stepped `itera ex` walk
+    /// (D6.6); never observed outside that walk's `length`/index reads.
+    Cursor(crate::cursor::GeneratorCursor),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -333,6 +336,7 @@ impl Value {
                 format!("{self:?}")
             }
             Value::GradientHandle(id) => format!("gradient-handle#{id}"),
+            Value::Cursor(_) => "cursor".to_owned(),
         })
     }
 

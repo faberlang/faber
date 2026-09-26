@@ -14,6 +14,10 @@ pub use radix_mir_runner::{
 #[path = "kernel_ban_test.rs"]
 mod kernel_ban_tests;
 
+#[cfg(test)]
+#[path = "lazy_cursor_test.rs"]
+mod lazy_cursor_tests;
+
 use crate::diagnostics::Diagnostic;
 use crate::driver::{AnalyzedModule, Session};
 use crate::mir::lower_analyzed_unit;

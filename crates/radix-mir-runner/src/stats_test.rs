@@ -186,8 +186,8 @@ fn active_call_stack_subtracts_inclusive_child_duration() {
     ));
 
     let mut collector = StatsCollector::new(&program, &context, &interner);
-    collector.enter_function(MirFunctionId(0));
-    collector.enter_function(MirFunctionId(1));
+    collector.enter_function(MirFunctionId(0), true);
+    collector.enter_function(MirFunctionId(1), true);
     collector.leave_function(MirFunctionId(1));
     collector.leave_function(MirFunctionId(0));
     let stats = collector.finish();
@@ -329,7 +329,14 @@ fn direct_cursor_stream_path_records_generator_frame_and_attribution() {
     runner.stats = Some(StatsCollector::new(&program, &context, &interner));
     runner.push_frame(MirFunctionId(0), MirBlockId(0));
     let value = runner
-        .eval_cursor_stream(&MirCursorStream { callee: DefId(77) }, &[], Span::default())
+        .eval_cursor_stream(
+            &MirCursorStream {
+                callee: DefId(77),
+                stepped: false,
+            },
+            &[],
+            Span::default(),
+        )
         .expect("cursor stream");
     assert!(matches!(value, Value::Array(_)));
     runner.pop_frame();

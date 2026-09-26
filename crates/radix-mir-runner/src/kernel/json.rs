@@ -185,7 +185,8 @@ fn value_to_json(value: &Value, span: Span) -> Result<serde_json::Value, RunnerE
         | Value::Tuple(_)
         | Value::Vector(_)
         | Value::Matrix(_)
-        | Value::GradientHandle(_) => Err(RunnerError::internal(
+        | Value::GradientHandle(_)
+        | Value::Cursor(_) => Err(RunnerError::internal(
             span,
             "value variant is outside json kernel",
         )),

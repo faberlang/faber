@@ -8,6 +8,7 @@
 
 pub mod capability;
 mod conversio;
+mod cursor;
 mod host;
 pub mod kernel;
 mod runtime;
@@ -177,8 +178,14 @@ struct Frame {
     temps: FxHashMap<MirTempId, Value>,
     values: FxHashMap<MirValueId, Value>,
     block: MirBlockId,
-    /// `true` while this frame runs a `@ cursor` generator whose `cede` yields
-    /// collect into [`Runner::generator_yields`] rather than awaiting.
+    /// First statement of `block` to run: nonzero only for a generator frame
+    /// resumed after the yielding statement it was parked on.
+    resume_at: usize,
+    /// `true` once this generator frame has been parked at a `cede`, so its
+    /// next push resumes the same call rather than starting a new one.
+    resumed: bool,
+    /// `true` while this frame runs a `@ cursor` generator whose `cede` parks
+    /// the frame and hands the item to [`Runner::yielded`] rather than awaiting.
     is_generator: bool,
 }
 
@@ -226,10 +233,10 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     deadline: Option<Instant>,
     return_value: Option<Value>,
     return_error: Option<Value>,
-    /// Stack of yield buffers, one per active `CursorStream` materialization.
-    /// `cede` inside a generator frame (`Frame::is_generator`) appends here; the
-    /// matching `eval_cursor_stream` pops the buffer as the materialized `lista<T>`.
-    generator_yields: Vec<Vec<Value>>,
+    /// Item handed over by `cede` in a generator frame (`Frame::is_generator`).
+    /// While set, `run_until_depth` parks the generator frame after the
+    /// yielding statement and stops; the pulling cursor takes the item.
+    yielded: Option<Value>,
     /// `DefId` → `MirFunctionId` index built once at construction (BO-M-6).
     def_to_function: FxHashMap<DefId, MirFunctionId>,
     /// Per-step block share: one clone at construct, `Rc` bump in the loop (BO-M-1).
@@ -286,7 +293,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             deadline: None,
             return_value: None,
             return_error: None,
-            generator_yields: Vec::new(),
+            yielded: None,
             def_to_function,
             block_cache,
             gradient_handles: FxHashMap::default(),
@@ -713,6 +720,19 @@ fn half_to_f32(bits: u16) -> f32 {
 
 impl<H: Host + ?Sized> Runner<'_, H> {
     fn push_frame(&mut self, function_id: MirFunctionId, entry_block: MirBlockId) {
+        let frame = self.new_frame(function_id, entry_block);
+        self.resume_frame(frame);
+    }
+
+    /// Push a built (or parked generator) frame onto the runner stack.
+    fn resume_frame(&mut self, frame: Frame) {
+        if let Some(stats) = self.stats.as_mut() {
+            stats.enter_function(frame.function, !frame.resumed);
+        }
+        self.frames.push(frame);
+    }
+
+    fn new_frame(&self, function_id: MirFunctionId, entry_block: MirBlockId) -> Frame {
         let locals = match self
             .program
             .indexed_function(&self.function_index, function_id)
@@ -726,17 +746,16 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             }
             None => FxHashMap::default(),
         };
-        self.frames.push(Frame {
+        Frame {
             function: function_id,
             locals,
             aliases: FxHashMap::default(),
             temps: FxHashMap::default(),
             values: FxHashMap::default(),
             block: entry_block,
+            resume_at: 0,
+            resumed: false,
             is_generator: false,
-        });
-        if let Some(stats) = self.stats.as_mut() {
-            stats.enter_function(function_id);
         }
     }
 
@@ -834,10 +853,11 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             if !self.consume_step(Span::default()) {
                 break;
             }
-            let Some(frame) = self.frames.last() else {
+            let Some(frame) = self.frames.last_mut() else {
                 break;
             };
             let (function_id, block_id) = (frame.function, frame.block);
+            let resume_at = std::mem::take(&mut frame.resume_at);
             let block_data = match self.block_snapshot(function_id, block_id) {
                 Ok(data) => data,
                 Err(error) => {
@@ -847,9 +867,20 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             };
 
             let mut frame_returned = false;
-            for statement in &block_data.statements {
+            let mut suspended = false;
+            for (index, statement) in block_data.statements.iter().enumerate().skip(resume_at) {
                 match self.execute_statement(statement) {
-                    Ok(StatementOutcome::Continue) => {}
+                    Ok(StatementOutcome::Continue) => {
+                        if self.yielded.is_some() {
+                            // D6.6: park the generator after its `cede`.
+                            if let Some(frame) = self.frames.last_mut() {
+                                frame.resume_at = index + 1;
+                                frame.resumed = true;
+                            }
+                            suspended = true;
+                            break;
+                        }
+                    }
                     Ok(StatementOutcome::FrameReturned) => {
                         frame_returned = true;
                         break;
@@ -860,7 +891,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     }
                 }
             }
-            if !self.errors.is_empty() {
+            if !self.errors.is_empty() || suspended {
                 break;
             }
             if frame_returned {

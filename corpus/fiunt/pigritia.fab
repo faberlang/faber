@@ -1,0 +1,49 @@
++++
+term = "fiunt"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "callable_posture", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "cede_stmt", "incipit_stmt", "itera_stmt", "nota_stmt", "expression", "literal"]
+category = "async"
+canonical = false
+summary = "Stream functions are lazy: each step resumes the producer once."
+syntax = "functio name(…) fiunt → T"
+related = ["cede", "itera", "rumpe"]
+locale = "la"
++++
+# =============================================================================
+# fiunt — Streams are lazy
+# =============================================================================
+#
+# What this teaches:
+#   • A `fiunt` stream is lazy: each `itera ex` step resumes the producer
+#     until its next `cede`, so producer and consumer prints interleave.
+#   • An endless producer is fine when the consumer stops early: `rumpe`
+#     abandons the suspended stream.
+#
+# Common mistakes:
+#   • Expecting the whole stream to run before the loop body starts.
+#
+# See also: cede, itera, rumpe
+# =============================================================================
+
+# BACKEND:
+#   Lazy on the MIR runner and TypeScript. Rust and Go still collect the
+#   stream eagerly (the D6.6 stopgap), so the endless doubling overflows there.
+
+functio potentiae() fiunt → numerus {
+    varia numerus n ← 1
+    dum verum {
+        nota "produco §"(n)
+        cede n
+        n ← n * 2
+    }
+}
+
+incipit {
+    itera ex potentiae() fixum n {
+        nota "consumo §"(n)
+        si n ≥ 4 {
+            rumpe
+        }
+    }
+    nota "finis"
+}
