@@ -556,7 +556,6 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "postfix_inc_dec_numerus_operand" => Some("apply postfix increment/decrement to numerus values".to_owned()),
         "array_spread_requires_lista" => Some("spread a lista value inside lista construction".to_owned()),
         "struct_computed_key_forbidden" => Some("use declared struct field names in struct construction".to_owned()),
-        "struct_spread_forbidden" => Some("provide each required struct field explicitly".to_owned()),
         "vector_constructor_forbids_spread" => {
             Some("provide explicit vector elements instead of spread arguments".to_owned())
         }

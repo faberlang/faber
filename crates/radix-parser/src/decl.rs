@@ -820,7 +820,12 @@ impl Parser {
     /// Parse the field portion shared by genus and union declaration members.
     fn parse_field_decl(&mut self) -> Result<FieldDecl, ParseError> {
         let is_static = self.eat_keyword_ident(TokenKind::Generis);
-        let is_bound = self.eat_keyword_ident(TokenKind::Nexum);
+        if self.at_removed_nexum_modifier() {
+            return Err(
+                ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
+                    .with_arg("issue", "nexum_removed"),
+            );
+        }
         let ty = self.parse_type()?;
         let name = self.parse_param_name()?;
         let sponte = self.parse_post_name_marker();
@@ -832,12 +837,46 @@ impl Parser {
 
         Ok(FieldDecl {
             is_static,
-            is_bound,
             sponte,
             ty,
             name,
             init,
         })
+    }
+
+    /// Whether the current word is the removed `nexum` field modifier.
+    ///
+    /// `nexum` was removed (DECISIONS D16.2). The old shape was
+    /// `nexum <type> <name>`: two further words on the same line, or a
+    /// generic type head. A field of a user type spelled `nexum`
+    /// (`nexum name`) stays legal. Matching the canonical Latin spelling is
+    /// deliberate: the keyword no longer has pack rows.
+    fn at_removed_nexum_modifier(&self) -> bool {
+        let TokenKind::Ident(sym) = self.peek().kind else {
+            return false;
+        };
+        if self.interner.resolve(sym) != "nexum"
+            || !matches!(self.peek_at(1).kind, TokenKind::Ident(_))
+        {
+            return false;
+        }
+        match self.peek_at(2).kind {
+            TokenKind::LtAscii => true,
+            TokenKind::Ident(_) => {
+                let slot = self.non_trivia_indices.partition_point(|&i| i < self.pos);
+                let (Some(&ty_idx), Some(&name_idx)) = (
+                    self.non_trivia_indices.get(slot + 1),
+                    self.non_trivia_indices.get(slot + 2),
+                ) else {
+                    return false;
+                };
+                self.keyword_ident_at(2) != Some(TokenKind::Sponte)
+                    && !self.tokens[ty_idx + 1..name_idx]
+                        .iter()
+                        .any(|token| token.kind == TokenKind::Newline)
+            }
+            _ => false,
+        }
     }
 
     /// Parse a class member, preserving annotations at the member boundary.

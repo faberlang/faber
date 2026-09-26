@@ -25,7 +25,6 @@ iacit = "ném_lỗi"
 immutata = "bất_biến"
 interna = "nội_bộ"
 magnitudo = "kích_thước"
-nexum = "ràng_buộc"
 iuncta = "bộ"
 optiones = "lựa_chọn"
 prae = "tiền"
@@ -1974,10 +1973,6 @@ help = "spread một giá trị lista bên trong phần tạo lista"
 [diagnostics.SEM011.issues.struct_computed_key_forbidden]
 message = "khóa được tính không hợp lệ trong phần tạo struct"
 help = "dùng tên trường struct đã khai báo trong phần tạo struct"
-
-[diagnostics.SEM011.issues.struct_spread_forbidden]
-message = "các trường spread không hợp lệ trong phần tạo struct"
-help = "cung cấp rõ ràng từng trường struct bắt buộc"
 
 [diagnostics.SEM011.issues.vector_constructor_forbids_spread]
 message = "constructor vector không nhận đối số spread"

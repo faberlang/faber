@@ -25,7 +25,6 @@ iacit = "يرمي"
 immutata = "ثابتة"
 interna = "داخلي"
 magnitudo = "حجم"
-nexum = "مرتبط"
 iuncta = "توبل"
 optiones = "خيارات"
 prae = "سابق"
@@ -1974,10 +1973,6 @@ help = "انشر قيمة {lista} داخل {lista} construction"
 [diagnostics.SEM011.issues.struct_computed_key_forbidden]
 message = "computed keys غير صالحة في struct construction"
 help = "استخدم declared struct field names في struct construction"
-
-[diagnostics.SEM011.issues.struct_spread_forbidden]
-message = "spread fields غير صالحة في struct construction"
-help = "قدم كل required struct field صراحة"
 
 [diagnostics.SEM011.issues.vector_constructor_forbids_spread]
 message = "vector constructor لا يقبل spread arguments"

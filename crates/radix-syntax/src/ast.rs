@@ -420,7 +420,6 @@ pub enum ClassMemberKind {
 #[derive(Debug)]
 pub struct FieldDecl {
     pub is_static: bool, // generis
-    pub is_bound: bool,  // nexum
     pub sponte: bool,    // sponte — voluntary field
     pub ty: TypeExpr,
     pub name: Ident,

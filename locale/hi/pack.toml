@@ -25,7 +25,6 @@ iacit = "फेंकता"
 immutata = "अपरिवर्तित"
 interna = "आंतरिक"
 magnitudo = "आकार"
-nexum = "संबद्ध"
 iuncta = "टपल"
 optiones = "चयन"
 prae = "पूर्व"
@@ -1986,10 +1985,6 @@ help = "lista construction के भीतर lista value को spread कर�
 [diagnostics.SEM011.issues.struct_computed_key_forbidden]
 message = "struct construction में computed keys मान्य नहीं हैं"
 help = "struct construction में घोषित struct field names का उपयोग करें"
-
-[diagnostics.SEM011.issues.struct_spread_forbidden]
-message = "struct construction में spread fields मान्य नहीं हैं"
-help = "हर आवश्यक struct field स्पष्ट रूप से दें"
 
 [diagnostics.SEM011.issues.vector_constructor_forbids_spread]
 message = "vector constructor spread arguments स्वीकार नहीं करता"
