@@ -1287,18 +1287,12 @@ pub enum UnOp {
     BitNot, // ¬
 }
 
+/// The value conditional `cond ✓ then ✗ else_` (D4.5), one level only.
 #[derive(Debug)]
 pub struct TernaryExpr {
     pub cond: Box<Expr>,
     pub then: Box<Expr>,
     pub else_: Box<Expr>,
-    pub style: TernaryStyle,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum TernaryStyle {
-    QuestionColon, // ? :
-    SicSecus,      // sic secus
 }
 
 #[derive(Debug)]

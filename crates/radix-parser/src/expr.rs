@@ -227,65 +227,77 @@ impl Parser {
         })
     }
 
-    /// Parse ternary conditional expression.
+    /// Parse the conditional tier.
     ///
     /// GRAMMAR:
-    ///   ternary := or ['?' expr ':' ternary | `sic` expr `secus` ternary]
+    ///   ternary := or ['✓' expr '✗' ternary]
     ///
-    /// WHY: Faber supports both C-style (? :) and keyword-style (sic secus) ternary.
-    /// Right-associative via recursion on else branch, so the else recursion is
-    /// where the depth budget is charged for `? :` chains.
+    /// WHY: `c ✓ a ✗ b` (D4.5) is the one value conditional, the same glyphs
+    /// in every locale. It is one level only (D4.6): a `✓ ✗` anywhere inside
+    /// another is rejected with `conditional_nested`. The else branch still
+    /// recurses through this tier so a chained `✗ d ✓ …` reaches that named
+    /// diagnostic instead of a leftover-token error. The removed spellings
+    /// `? :` and `sic … secus` (D4.7) get migration diagnostics here; `sic`
+    /// stays a reserved word that carries it.
     fn parse_ternary(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
+        let first_inner_id = self.next_node_id;
         let cond = self.parse_or()?;
 
-        if self.eat(&TokenKind::Question) {
-            let then = Box::new(self.parse_expression()?);
-            self.expect(&TokenKind::Colon, "expected ':' in ternary")?;
-            let else_span = self.current_span();
-            let else_ = Box::new(self.nested(
-                ParseErrorKind::ExpressionInvalid,
-                else_span,
-                Self::parse_ternary,
-            )?);
-            let span = start.merge(self.previous_span());
-            let id = self.next_id();
-            return Ok(Expr {
-                id,
-                kind: ExprKind::Ternary(TernaryExpr {
-                    cond: Box::new(cond),
-                    then,
-                    else_,
-                    style: TernaryStyle::QuestionColon,
-                }),
-                span,
-            });
+        if self.eat(&TokenKind::Check) {
+            return self.parse_check_ballot_tail(cond, start, first_inner_id);
         }
-
-        if self.eat_keyword_ident(TokenKind::Sic) {
-            let then = Box::new(self.parse_expression()?);
-            self.expect_keyword_ident(TokenKind::Secus, "expected 'secus' after 'sic'")?;
-            let else_span = self.current_span();
-            let else_ = Box::new(self.nested(
-                ParseErrorKind::ExpressionInvalid,
-                else_span,
-                Self::parse_ternary,
-            )?);
-            let span = start.merge(self.previous_span());
-            let id = self.next_id();
-            return Ok(Expr {
-                id,
-                kind: ExprKind::Ternary(TernaryExpr {
-                    cond: Box::new(cond),
-                    then,
-                    else_,
-                    style: TernaryStyle::SicSecus,
-                }),
-                span,
-            });
+        if self.check(&TokenKind::Question) {
+            return Err(self.invalid_expression_error("conditional_question_colon_removed"));
+        }
+        if self.check_keyword_ident(TokenKind::Sic) {
+            return Err(self.invalid_expression_error("conditional_sic_removed"));
         }
 
         Ok(cond)
+    }
+
+    /// Finish `cond ✓ then ✗ else` after the `✓` (D4.5, D4.6).
+    ///
+    /// Kept out of line so the deeply recursive conditional tier keeps a
+    /// small stack frame.
+    #[inline(never)]
+    fn parse_check_ballot_tail(
+        &mut self,
+        cond: Expr,
+        start: Span,
+        first_inner_id: NodeId,
+    ) -> Result<Expr, ParseError> {
+        let then = Box::new(self.parse_expression()?);
+        self.expect(&TokenKind::Ballot, "expected '✗' in conditional")?;
+        let else_span = self.current_span();
+        let else_ = Box::new(self.nested(
+            ParseErrorKind::ExpressionInvalid,
+            else_span,
+            Self::parse_ternary,
+        )?);
+        if let Some(&(_, inner)) = self
+            .conditionals
+            .iter()
+            .find(|&&(id, _)| id >= first_inner_id)
+        {
+            return Err(
+                ParseError::structured(ParseErrorKind::ExpressionInvalid, inner)
+                    .with_arg("issue", "conditional_nested"),
+            );
+        }
+        let span = start.merge(self.previous_span());
+        let id = self.next_id();
+        self.conditionals.push((id, span));
+        Ok(Expr {
+            id,
+            kind: ExprKind::Ternary(TernaryExpr {
+                cond: Box::new(cond),
+                then,
+                else_,
+            }),
+            span,
+        })
     }
 
     /// Logical OR (`aut` only). Nullable defaulting `vel` is a tighter tier.

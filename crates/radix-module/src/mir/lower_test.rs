@@ -1338,7 +1338,7 @@ function f0 -> ty#1 {
 
 #[test]
 fn lowers_expression_valued_si_into_shared_destination() {
-    let dump = dump_source("functio positum(numerus n) → numerus { fixum numerus x ← n > 0 sic 1 secus 0 redde x }");
+    let dump = dump_source("functio positum(numerus n) → numerus { fixum numerus x ← n > 0 ✓ 1 ✗ 0 redde x }");
 
     assert_eq!(
         dump,

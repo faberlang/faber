@@ -194,7 +194,7 @@ fn shared_branch_into_own_rejects_with_copy_suggestion() {
 incipit {
     fixum lista<numerus> a ← [1]
     fixum lista<numerus> b ← [2]
-    fixum own lista<numerus> c ← verum sic a secus b
+    fixum own lista<numerus> c ← verum ✓ a ✗ b
 }
 ",
         ISSUE_SHARED_INTO_OWN,

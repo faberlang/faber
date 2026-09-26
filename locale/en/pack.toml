@@ -875,6 +875,18 @@ help = "check expression syntax"
 message = "use ⊥ for a conversion default"
 help = "use ⊥; vel is nullish coalescing only"
 
+[diagnostics.PARSE030.issues.conditional_nested]
+message = "a '✓ ✗' conditional cannot appear inside another '✓ ✗'"
+help = "use '{si}'/'{sin}', '{discerne}', or a function that '{redde}'s each case"
+
+[diagnostics.PARSE030.issues.conditional_question_colon_removed]
+message = "'c ? a : b' was removed; write 'c ✓ a ✗ b'"
+help = "the value conditional is 'c ✓ a ✗ b' (U+2713, U+2717) in every locale"
+
+[diagnostics.PARSE030.issues.conditional_sic_removed]
+message = "'c {sic} a {secus} b' was removed; write 'c ✓ a ✗ b'"
+help = "the value conditional is 'c ✓ a ✗ b' (U+2713, U+2717) in every locale"
+
 [diagnostics.PARSE030.issues.recovery_uses_exit_arrow]
 message = "'⇥' names an error type; use '⊥' for a default"
 help = "write '↦ T ⊥ value' (or '↤ … ⊥ value'); '⇥' never takes a value"

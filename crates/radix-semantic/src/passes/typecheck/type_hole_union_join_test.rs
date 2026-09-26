@@ -162,7 +162,7 @@ fn source_branch_join_accumulates_into_union_hole() {
         r#"
 incipit {
     fixum numerus x ← 1
-    fixum ∪ either ← x > 0 sic 1 secus "x"
+    fixum ∪ either ← x > 0 ✓ 1 ✗ "x"
     nota either
 }
 "#,
@@ -175,7 +175,7 @@ fn source_branch_join_homogeneous_under_concrete_expectation_unchanged() {
         r"
 incipit {
     fixum numerus x ← 1
-    fixum numerus y ← x > 0 sic 1 secus 2
+    fixum numerus y ← x > 0 ✓ 1 ✗ 2
     nota y
 }
 ",
@@ -251,7 +251,7 @@ fn source_branch_join_heterogeneous_without_hole_still_mismatches() {
         r#"
 incipit {
     fixum numerus x ← 1
-    fixum _ y ← x > 0 sic 1 secus "x"
+    fixum _ y ← x > 0 ✓ 1 ✗ "x"
     nota y
 }
 "#,

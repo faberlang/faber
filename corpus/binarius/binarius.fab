@@ -102,12 +102,12 @@ main {
     const string inventum ← (primum coalesce secundum) coalesce tertium
     print inventum
 
-    # sic/secus — ternary conditional (sic = "thus", secus = "otherwise")
+    # ✓ ✗ — value conditional, one level only
     const int aetas ← 25
-    const string condicio ← aetas ≥ 18 yields "adultus" else "minor"
+    const string condicio ← aetas ≥ 18 ✓ "adultus" ✗ "minor"
     print condicio
     const int puncta ← 85
-    const string gradus ← puncta ≥ 90 yields "A" else puncta ≥ 80 yields "B" else puncta ≥ 70 yields "C" else "F"
+    const string gradus ← puncta ≥ 80 ✓ "B" ✗ "F"
     print gradus
 
     # Bit per bit

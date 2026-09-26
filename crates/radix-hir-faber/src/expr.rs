@@ -281,7 +281,7 @@ impl super::FaberCodegen<'_> {
                     }
                     return;
                 }
-                if self.write_sic_secus_chain(
+                if self.write_check_ballot(
                     cond,
                     then_block,
                     else_block.as_ref(),

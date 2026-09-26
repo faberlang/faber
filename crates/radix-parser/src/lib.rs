@@ -169,6 +169,13 @@ pub struct Parser {
     /// the budget: a speculative sub-parse may discard the crossing error and
     /// continue, and a synthetic "budget spent" report would hide the cause.
     budget_diagnostic: Option<ParseError>,
+    /// `✓ ✗` conditionals built so far, as `(node id, span)` in build order.
+    ///
+    /// Node ids grow monotonically, so a conditional whose id is at least the
+    /// id counter at the start of an enclosing conditional's condition lies
+    /// inside it (D4.6 one-level rule). [`Parser::restore`] drops entries a
+    /// discarded speculative parse built.
+    conditionals: Vec<(NodeId, Span)>,
 }
 
 /// Contextual parser policy supplied by compiler frontends.
@@ -315,6 +322,7 @@ impl Parser {
             expression_contexts: 0,
             budget_exhausted: false,
             budget_diagnostic: None,
+            conditionals: Vec::new(),
         };
         parser.declared_type_names = parser.scan_declared_type_names();
         parser
@@ -445,6 +453,7 @@ impl Parser {
     fn restore(&mut self, checkpoint: (usize, NodeId)) {
         self.pos = checkpoint.0;
         self.next_node_id = checkpoint.1;
+        self.conditionals.retain(|&(id, _)| id < checkpoint.1);
         // pos may have moved backward; re-sync the non-trivia cursor.
         self.sync_non_trivia_cursor();
     }
@@ -1468,3 +1477,11 @@ mod nesting_budget_test;
 #[cfg(test)]
 #[path = "nested_declaration_test.rs"]
 mod nested_declaration_test;
+
+#[cfg(test)]
+#[path = "conditional_glyph_test.rs"]
+mod conditional_glyph_test;
+
+#[cfg(test)]
+#[path = "ternary_removed_test.rs"]
+mod ternary_removed_test;

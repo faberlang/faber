@@ -16,5 +16,5 @@ locale = "en"
 main {
     const list<int> a ← [1]
     const list<int> b ← [2]
-    const own list<int> c ← true ? a : b
+    const own list<int> c ← true ✓ a ✗ b
 }

@@ -36,10 +36,6 @@ fn nested_parens(depth: usize) -> String {
     )
 }
 
-fn ternary_chain(depth: usize) -> String {
-    format!("fixum _ value ← {}1", "1 ? 2 : ".repeat(depth))
-}
-
 fn assignment_chain(depth: usize) -> String {
     format!("fixum _ value ← {}1", "a ← ".repeat(depth))
 }
@@ -153,14 +149,6 @@ fn deepest_admitted_within(
 fn parenthesized_nesting_past_the_budget_reports_a_nesting_diagnostic() {
     assert_parse_error_matches(
         &nested_parens(OVER_BUDGET_DEPTH),
-        ParseExpectation::Issue("nesting_too_deep"),
-    );
-}
-
-#[test]
-fn ternary_chain_past_the_budget_reports_a_nesting_diagnostic() {
-    assert_parse_error_matches(
-        &ternary_chain(OVER_BUDGET_DEPTH),
         ParseExpectation::Issue("nesting_too_deep"),
     );
 }
@@ -283,7 +271,6 @@ fn fold_operators_accumulate_across_sub_expressions_of_one_root() {
 #[test]
 fn nesting_and_folding_within_the_budgets_parse_clean() {
     let _ = parse_ok(&nested_parens(MAX_PARSE_DEPTH as usize / 4));
-    let _ = parse_ok(&ternary_chain(MAX_PARSE_DEPTH as usize / 4));
     let _ = parse_ok(&assignment_chain(MAX_PARSE_DEPTH as usize / 4));
     let _ = parse_ok(&nested_blocks(MAX_PARSE_DEPTH as usize / 4));
     let _ = parse_ok(&nested_types(MAX_PARSE_DEPTH as usize / 4));
@@ -297,9 +284,8 @@ fn nesting_and_folding_within_the_budgets_parse_clean() {
 /// every nesting shape is walked without reporting the depth limit.
 #[test]
 fn deepest_admitted_nesting_stays_inside_the_walker_budget() {
-    let shapes: [NestingShape; 8] = [
+    let shapes: [NestingShape; 7] = [
         ("parens", nested_parens),
-        ("ternary", ternary_chain),
         ("assignment", assignment_chain),
         ("blocks", nested_blocks),
         ("types", nested_types),
