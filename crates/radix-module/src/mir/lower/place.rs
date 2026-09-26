@@ -24,12 +24,12 @@ impl FunctionBuilder<'_> {
         &mut self,
         object: &HirExpression,
         name: crate::lexer::Symbol,
-        _expr: &HirExpression,
+        expr: &HirExpression,
     ) -> Option<MirOperand> {
         if self.is_handler_error_nuntius_projection(object, name) {
             return self.lower_expr_value(object);
         }
-        if let Some(result) = self.lower_union_field_read(object, name, _expr) {
+        if let Some(result) = self.lower_union_field_read(object, name, expr) {
             return result;
         }
         let mut place = self.lower_projectable_place(object)?;

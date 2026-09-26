@@ -81,15 +81,10 @@ impl FunctionBuilder<'_> {
             } else {
                 None
             };
-            let narrowed = self.assign_temp(
-                MirValueKind::Operand(MirOperand::Place(receiver_place.clone())),
-                MirType::semantic(member.ty),
-                span,
-            );
-            let MirOperand::Temp(narrowed) = narrowed else {
-                unreachable!("assign_temp always returns a temp operand");
-            };
-            let value = arm(self, MirPlace::temp(narrowed), member)?;
+            let member_ty = MirType::semantic(member.ty);
+            let narrowed = MirPlace::temp(self.push_temp(member_ty, span));
+            self.assign(narrowed.clone(), MirOperand::Place(receiver_place.clone()), member_ty, span);
+            let value = arm(self, narrowed, member)?;
             if let Some(destination) = destination.clone() {
                 self.assign(destination, value, result_ty, span);
             }
