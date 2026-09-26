@@ -408,6 +408,8 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
     let rel = display_relative(root, path);
     rel == "crates/hygiene-ratchet/tests/hygiene.rs"
         || rel == "crates/radix/src/diagnostics/render_test.rs"
+        // The renderer tests followed the crate split into radix-module.
+        || rel == "crates/radix-module/src/diagnostics/render_test.rs"
         // Renderer-contract: pack template interpolation, issue-vs-code
         // fallback, and localized row resolution. Followed the crate split
         // from crates/radix/src/locale_test.rs.

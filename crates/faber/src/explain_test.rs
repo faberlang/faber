@@ -67,8 +67,9 @@ fn index_manifest_matches_registry() {
 #[test]
 fn all_entries_validate() {
     let registry = disk_registry();
-    // 216 since D17.7 (`⊥` default-channel term, primary conversio/conversio.fab).
-    assert_eq!(registry.entries().len(), 216);
+    // 216 → 210: the registry follows the canonical term count (202 → 196;
+    // see reference_test for the seven retired terms and the one arrival).
+    assert_eq!(registry.entries().len(), 210);
 
     for entry in registry.entries() {
         assert!(!entry.term.is_empty());
@@ -143,8 +144,9 @@ fn load_aliases_disk_registry_entry_point() {
     }
 
     let registry = Registry::load().expect("load via disk entry point");
-    // 216 since D17.7 (`⊥` default-channel term, primary conversio/conversio.fab).
-    assert_eq!(registry.entries().len(), 216);
+    // 216 → 210: the registry follows the canonical term count (202 → 196;
+    // see reference_test for the seven retired terms and the one arrival).
+    assert_eq!(registry.entries().len(), 210);
 
     if let Some(value) = previous {
         // SAFETY: serialized by env_lock(); edition 2024 marks env mutation unsafe.

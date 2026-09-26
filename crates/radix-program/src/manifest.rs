@@ -260,7 +260,8 @@ pub fn manifest_build_target(target: Option<&str>, path: &Path) -> Result<Target
             ))
             .with_file(path.display().to_string())
             .with_arg("issue", "package_build_target_unsupported")
-            .with_arg("target", raw.to_owned()),
+            .with_arg("target", raw.to_owned())
+            .with_arg("accepted", manifest_build_target_spellings()),
         )),
         Some(target) if is_manifest_build_target(target) => Ok(target),
         // Only `MirStepper` / `MirAmd` reach this arm (the guard above takes
@@ -273,7 +274,8 @@ pub fn manifest_build_target(target: Option<&str>, path: &Path) -> Result<Target
             ))
             .with_file(path.display().to_string())
             .with_arg("issue", "package_build_target_internal")
-            .with_arg("target", internal.to_string()),
+            .with_arg("target", internal.to_string())
+            .with_arg("accepted", manifest_build_target_spellings()),
         )),
     }
 }

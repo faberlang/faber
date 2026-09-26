@@ -364,11 +364,24 @@ fn go_and_typescript_frame_protocols_follow_runtime_status_semantics() {
         .nth(1)
         .and_then(|body| body.split("func radixSermoAccipe").next())
         .expect("Go cursor helper");
+    // Since A4/U8 (a412c062d) `nextInbound` and `nextInboundAsync` share one
+    // frame-admission switch, `admit<T>`; terminal statuses finish the inbound
+    // half there, so the terminal cases are checked in that helper and
+    // `nextInbound` must delegate to it.
     let ts_next_inbound = typescript
-        .split("nextInbound<T>()")
+        .split("nextInbound<T>(): ")
         .nth(1)
-        .and_then(|body| body.split("finishInbound()").next())
+        .and_then(|body| body.split("nextInboundAsync<T>()").next())
         .expect("TypeScript nextInbound helper");
+    assert!(
+        ts_next_inbound.contains("this.admit<T>(frame)"),
+        "TypeScript nextInbound does not route frames through admit"
+    );
+    let ts_admit = typescript
+        .split("private admit<T>(frame: scrinium<any>)")
+        .nth(1)
+        .and_then(|body| body.split("private finish(").next())
+        .expect("TypeScript admit helper");
 
     for tag in &terminal {
         assert!(
@@ -376,7 +389,7 @@ fn go_and_typescript_frame_protocols_follow_runtime_status_semantics() {
             "Go cursor omits terminal {tag}"
         );
         assert!(
-            ts_next_inbound.contains(&format!("case \"{tag}\":")),
+            ts_admit.contains(&format!("case \"{tag}\":")),
             "TypeScript nextInbound omits terminal {tag}"
         );
     }

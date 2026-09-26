@@ -240,9 +240,17 @@ fn build_target_rejects_unsupported_spelling() {
     );
     // The diagnostic names the accepted vocabulary (S09-7): a rejected
     // spelling must tell the declarer what the manifest does accept.
-    assert!(err.message.contains("is not a build target; use one of:"));
-    assert!(err.message.contains("go"));
-    assert!(err.message.contains("fmir-bin"));
+    let accepted = accepted_arg(&err);
+    assert!(accepted.split(", ").any(|spelling| spelling == "go"));
+    assert!(accepted.split(", ").any(|spelling| spelling == "fmir-bin"));
+}
+
+fn accepted_arg(err: &radix_module::diagnostics::Diagnostic) -> &str {
+    err.args
+        .iter()
+        .find(|arg| arg.name == "accepted")
+        .map(|arg| arg.value.as_str())
+        .expect("build-target rejection carries the accepted vocabulary")
 }
 
 #[test]
@@ -285,10 +293,12 @@ fn build_target_rejects_internal_targets_with_the_rule_named() {
                 .map(|arg| arg.value.as_str()),
             Some(internal)
         );
+        // The exclusion rule is the issue identity above; the declarer is
+        // still told what the manifest accepts.
         assert!(
-            err.message.contains("internal compiler target"),
-            "diagnostic must name the exclusion rule: {}",
-            err.message
+            accepted_arg(&err)
+                .split(", ")
+                .any(|spelling| spelling == "go")
         );
     }
 }
