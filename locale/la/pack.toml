@@ -1969,6 +1969,10 @@ help = "use compatible operand types"
 message = "fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"
 help = "keep caller and fragment lane bindings distinct"
 
+[diagnostics.SEM011.issues.est_imported_type]
+message = "`{est}` cannot test against imported type '{type}' yet; it would compare values, not types"
+help = "test against a type declared in this file, or restructure the check without `{est}`"
+
 [diagnostics.SEM011.issues.range_step_must_be_numeric]
 message = "range step must be numeric"
 help = "use a numeric range step"
