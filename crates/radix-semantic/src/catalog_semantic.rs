@@ -1052,7 +1052,7 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         },
         WarningKind::UnnecessaryVaria => DiagnosticSpec {
             code: "WARN013",
-            help: Some("use `fixum` when the binding is never reassigned or mutated"),
+            help: Some("use `fixum` when the binding is never reassigned"),
         },
         WarningKind::FileInterfaceExportSkipped => DiagnosticSpec {
             code: "WARN014",

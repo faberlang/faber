@@ -2917,11 +2917,11 @@ help = "เพิ่มแขนง `casu nihil` อย่างชัดแจ�
 
 [diagnostics.WARN013]
 message = "varia ไม่จำเป็น"
-help = "ใช้ `fixum` เมื่อ binding ไม่เคยถูกกำหนดค่าหรือแก้ไขใหม่"
+help = "ใช้ `fixum` เมื่อ binding ไม่เคยถูกกำหนดค่าใหม่"
 
 [diagnostics.WARN013.issues.unnecessary_varia]
-message = "varia ไม่จำเป็น: binding ไม่เคยถูกกำหนดค่าหรือแก้ไขใหม่"
-help = "ใช้ `fixum` เมื่อ binding ไม่เคยถูกกำหนดค่าหรือแก้ไขใหม่"
+message = "varia ไม่จำเป็น: binding ไม่เคยถูกกำหนดค่าใหม่"
+help = "ใช้ `fixum` เมื่อ binding ไม่เคยถูกกำหนดค่าใหม่"
 
 [diagnostics.WARN014]
 message = "อินเทอร์เฟซไฟล์ข้าม export ที่ไม่รองรับ"

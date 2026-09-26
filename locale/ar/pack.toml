@@ -2905,11 +2905,11 @@ help = "أضف ذراع `{casu} {nihil}` صريحة لتتم معالجة حال
 
 [diagnostics.WARN013]
 message = "{varia} غير ضروري"
-help = "استخدم `{fixum}` عندما لا يعاد إسناد binding أو تعديله أبدا"
+help = "استخدم `{fixum}` عندما لا يعاد إسناد binding أبدا"
 
 [diagnostics.WARN013.issues.unnecessary_varia]
-message = "{varia} غير ضروري: binding لا يعاد إسناده أو تعديله أبدا"
-help = "استخدم `{fixum}` عندما لا يعاد إسناد binding أو تعديله أبدا"
+message = "{varia} غير ضروري: binding لا يعاد إسناده أبدا"
+help = "استخدم `{fixum}` عندما لا يعاد إسناد binding أبدا"
 
 [diagnostics.WARN014]
 message = "file interface تخطى export غير مدعوم"

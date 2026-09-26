@@ -3340,11 +3340,11 @@ help = "add an explicit `{casu} {nihil}` arm so the null case is handled deliber
 
 [diagnostics.WARN013]
 message = "unnecessary var"
-help = "use `const` when the binding is never reassigned or mutated"
+help = "use `const` when the binding is never reassigned"
 
 [diagnostics.WARN013.issues.unnecessary_varia]
-message = "unnecessary var: binding is never reassigned or mutated"
-help = "use `const` when the binding is never reassigned or mutated"
+message = "unnecessary var: binding is never reassigned"
+help = "use `const` when the binding is never reassigned"
 
 [diagnostics.WARN014]
 message = "file interface skipped unsupported export"
