@@ -417,15 +417,6 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
                 visitor.visit_expr(exitus);
             }
         }
-        StmtKind::Cura(stmt) => {
-            visitor.visit_type_expr(&stmt.ty);
-            visitor.visit_ident(&stmt.binding);
-            visitor.visit_block(&stmt.body);
-            if let Some(catch) = &stmt.catch {
-                visitor.visit_ident(&catch.binding);
-                visitor.visit_block(&catch.body);
-            }
-        }
         StmtKind::Reddet(stmt) => {
             visitor.visit_expr(&stmt.future);
         }

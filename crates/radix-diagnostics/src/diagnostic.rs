@@ -212,10 +212,6 @@ pub enum WarningKind {
     /// A provider/file-interface export could not be remapped and was skipped;
     /// sibling exports in the same namespace may still be usable.
     FileInterfaceExportSkipped,
-    /// A postfix `curata <ident>` names an allocator contract the compiler
-    /// does not recognize. Accepted at warning level until allocator
-    /// threading ships.
-    UnrecognizedCurataAllocator,
     /// A monomorphic `_` hole solved to a multi-member union. The source
     /// still looks monomorphic while the inferred type is a sum of
     /// alternatives; the warning makes that cross-shape explicit.

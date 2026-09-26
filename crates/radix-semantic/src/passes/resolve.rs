@@ -40,11 +40,9 @@
 //! ERROR STRATEGY
 //! ==============
 //! Resolution accumulates hard semantic errors and lets the driver stop before
-//! HIR lowering. The only warning produced here is the `curata` allocator-name
-//! lint (`WARN015`); broader warning/error policy for target-sensitive analysis
-//! is handled by the later HIR passes and driver.
+//! HIR lowering. Warning/error policy for target-sensitive analysis is handled
+//! by the later HIR passes and driver.
 
-use crate::error::WarningKind;
 use crate::instans_precision::InstansPrecisionError;
 use crate::numeric_width::{WidthError, WidthLowerIssue};
 use crate::{
@@ -113,7 +111,6 @@ const ISSUE_TYPE_NAME_NOT_TYPE: &str = "type_name_not_type";
 const ISSUE_VARIANT_AMBIGUOUS: &str = "variant_ambiguous";
 const ISSUE_UNION_ONLY_NIHIL: &str = "union_only_nihil";
 const ISSUE_UNKNOWN_TYPE_LOWERING: &str = "unknown_type_lowering_error";
-const ISSUE_UNRECOGNIZED_CURATA_ALLOCATOR: &str = "unrecognized_curata_allocator";
 const ISSUE_NAME_NOT_VALUE: &str = "name_not_value";
 const ISSUE_NAMESPACE_MISSING_EXPORT: &str = "namespace_missing_export";
 const ISSUE_SCRIBE_CALLEE: &str = "scribe_callee";
@@ -344,7 +341,6 @@ fn resolve_stmt(
                 stmt_span,
                 errors,
             );
-            check_curata_allocator_names(&decl.modifiers, interner, errors);
             if let Some(ret) = &decl.ret {
                 resolve_type_expr(resolver, interner, ret, errors);
             }
@@ -415,7 +411,6 @@ fn resolve_stmt(
                             &member.annotations,
                             errors,
                         );
-                        check_curata_allocator_names(&method.modifiers, interner, errors);
                         if let Some(ret) = &method.ret {
                             resolve_type_expr(resolver, interner, ret, errors);
                         }
@@ -632,23 +627,6 @@ fn resolve_stmt(
             }
             resolve_if_body(resolver, interner, &stmt.body, errors);
             resolver.exit_scope();
-        }
-        StmtKind::Cura(stmt) => {
-            resolve_type_expr(resolver, interner, &stmt.ty, errors);
-            resolver.enter_scope(ScopeKind::Block);
-            define_symbol(
-                resolver,
-                stmt.binding.name,
-                stmt.binding.span,
-                SymbolKind::Local,
-                stmt.mutability == radix_syntax::AstMutability::Mutable,
-                errors,
-            );
-            resolve_block(resolver, interner, &stmt.body, errors);
-            resolver.exit_scope();
-            if let Some(catch) = &stmt.catch {
-                resolve_catch_binding(resolver, interner, catch, errors);
-            }
         }
         StmtKind::Probandum(test) => resolve_probandum(resolver, interner, test, errors),
         StmtKind::Proba(case) => {
@@ -3907,38 +3885,6 @@ fn define_generic_param(
     );
 }
 
-/// Recognized `curata` allocator contract names.
-///
-/// `"arena"`/`"page"` match the statement-form `cura` kinds validated in the
-/// parser; `"alloc"`/`"allocator"` cover existing corpus and test usage
-/// (corpus/curata/curata.fab, parser/driver tests). Anything else
-/// earns a warning until allocator threading ships and this becomes a hard
-/// contract (docs/factory/deferred/defer-017.md).
-const CURATA_KNOWN_ALLOCATORS: &[&str] = &["alloc", "allocator", "arena", "page"];
-
-/// Warn when a postfix `curata <ident>` names an unknown allocator contract.
-fn check_curata_allocator_names(
-    modifiers: &[radix_syntax::FuncModifier],
-    interner: &Interner,
-    errors: &mut Vec<SemanticError>,
-) {
-    for modifier in modifiers {
-        if let radix_syntax::FuncModifier::Curata { required, .. } = modifier {
-            let name = interner.resolve(required.name);
-            if !CURATA_KNOWN_ALLOCATORS.contains(&name) {
-                errors.push(
-                    SemanticError::structured(
-                        SemanticErrorKind::Warning(WarningKind::UnrecognizedCurataAllocator),
-                        required.span,
-                    )
-                    .with_arg("issue", ISSUE_UNRECOGNIZED_CURATA_ALLOCATOR)
-                    .with_arg("name", name),
-                );
-            }
-        }
-    }
-}
-
 fn modifier_bindings(modifiers: &[radix_syntax::FuncModifier]) -> Vec<&radix_syntax::Ident> {
     let mut out = Vec::new();
     for modifier in modifiers {
@@ -3946,9 +3892,6 @@ fn modifier_bindings(modifiers: &[radix_syntax::FuncModifier]) -> Vec<&radix_syn
             radix_syntax::FuncModifier::Argumenta(ident)
             | radix_syntax::FuncModifier::Errata(ident)
             | radix_syntax::FuncModifier::Optiones(ident) => out.push(ident),
-            radix_syntax::FuncModifier::Curata { required, alias } => {
-                out.push(alias.as_ref().unwrap_or(required))
-            }
             radix_syntax::FuncModifier::Exitus(radix_syntax::ExitusValue::Name(ident)) => {
                 out.push(ident)
             }

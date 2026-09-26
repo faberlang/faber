@@ -19,7 +19,6 @@ columna = "column"
 varia = "var"
 abstractus = "abstract"
 ceteri = "rest"
-curata = "allocator"
 errata = "errors"
 exitus = "exit"
 generis = "static"
@@ -88,7 +87,6 @@ scribe = "write"
 vide = "debug"
 # Entry and async
 argumenta = "args"
-cura = "with"
 incipiet = "async_main"
 incipit = "main"
 ad = "call"
@@ -697,6 +695,10 @@ help = "use '↤' for the assignment, or move the recovery expression"
 [diagnostics.PARSE002.issues.conversio_assign_await_unsupported]
 message = "'↤' is not supported on awaited bindings"
 help = "keep '←' for 'figendum'/'variandum' awaited bindings"
+
+[diagnostics.PARSE002.issues.allocator_surface_removed]
+message = "'{keyword}' was removed; allocation is not a language surface"
+help = "delete the '{keyword}' wrapper or modifier; allocation is managed by the target runtime"
 
 [diagnostics.PARSE010]
 message = "invalid declaration"
@@ -3353,14 +3355,6 @@ help = "use a supported export from the module, or wait for fuller file-interfac
 [diagnostics.WARN014.issues.file_interface_export_skipped]
 message = "file interface skipped export `{namespace}.{export}` ({reason}); other exports still available"
 help = "use a supported export from the module, or wait for fuller file-interface coverage of this signature"
-
-[diagnostics.WARN015]
-message = "unrecognized curata allocator name"
-help = "use a recognized allocator name (\"arena\", \"page\", \"alloc\", or \"allocator\")"
-
-[diagnostics.WARN015.issues.unrecognized_curata_allocator]
-message = "curata allocator name '{name}' is not a recognized allocator contract"
-help = "use a recognized allocator name (\"arena\", \"page\", \"alloc\", or \"allocator\")"
 
 [diagnostics.WARN016]
 message = "monomorphic hole solved to multi-member union"

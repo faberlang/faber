@@ -97,22 +97,6 @@ fn format_cmd_stdout_is_idempotent_for_salve_munde() {
     );
 }
 
-#[test]
-fn format_cmd_stdout_reparses_cura() {
-    let path = exempla("cura/cura.fab");
-    let formatted = run_faber_format_stdout(&path);
-    assert!(
-        formatted.contains("print \"in arena\"") || formatted.contains("# cura"),
-        "cura exempla should keep the arena-scoped body on the en surface:\n{formatted}"
-    );
-    assert_canonical_reparses_with(
-        body_for_parse(&formatted),
-        "cura CLI --stdout",
-        Some(&english_pack()),
-    )
-    .expect("reparse");
-}
-
 /// Need: CLI `format --stdout` keeps English types on an en source.
 #[test]
 fn format_cmd_en_source_keeps_english_types() {

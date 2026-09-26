@@ -1911,35 +1911,6 @@ fn resolve_source(source: &str) -> Vec<crate::SemanticError> {
 }
 
 #[test]
-fn warns_on_unrecognized_curata_allocator() {
-    let errors = resolve_source("functio f() curata evil → numerus { redde 0 }");
-
-    let err = expect_structured_error(
-        &errors,
-        SemanticErrorKind::Warning(crate::error::WarningKind::UnrecognizedCurataAllocator),
-        "unrecognized_curata_allocator",
-    );
-    assert!(
-        err.args
-            .iter()
-            .any(|arg| arg.name == "name" && arg.value == "evil")
-    );
-    assert!(!err.is_error(), "curata lint must stay warning-level");
-}
-
-#[test]
-fn allows_recognized_curata_allocators() {
-    for name in ["arena", "page", "alloc", "allocator"] {
-        let source = format!("functio f() curata {name} → numerus {{ redde 0 }}");
-        let errors = resolve_source(&source);
-        assert!(
-            errors.is_empty(),
-            "recognized allocator '{name}' should not warn: {errors:?}"
-        );
-    }
-}
-
-#[test]
 fn resolves_empty_program() {
     let result = compile_ok("");
     assert!(

@@ -808,8 +808,8 @@ functio f(bivalens bad) → numerus {
 }
 
 #[test]
-fn ar2_fac_elige_cura_cape_lower_to_handled_whole_construct() {
-    // Whole-construct attachment: `fac`/`elige`/`cura` cape wraps the
+fn ar2_fac_elige_cape_lower_to_handled_whole_construct() {
+    // Whole-construct attachment: `fac`/`elige` cape wraps the
     // complete containing construct as one `Handled` node.
     let facts = ar2_facts(
         r#"
@@ -824,18 +824,14 @@ functio g(bivalens bad) → numerus {
         ceterum { redde 2 }
     } cape err { redde 0 }
 
-    cura "arena" fixum _ res { redde 1 } cape err { redde 0 }
     redde 3
 }
 "#,
     );
 
+    assert_eq!(facts.handled, 2, "fac/elige cape each lower to one Handled");
     assert_eq!(
-        facts.handled, 3,
-        "fac/elige/cura cape each lower to one Handled"
-    );
-    assert_eq!(
-        facts.handled_wrapping_block, 3,
+        facts.handled_wrapping_block, 2,
         "whole-construct handlers wrap non-loop bodies"
     );
     assert_eq!(
@@ -970,30 +966,6 @@ functio b(bivalens bad) → numerus {
 "#,
     );
     assert!(elige.is_empty(), "unexpected AIR errors: {elige:?}");
-}
-
-#[test]
-fn air_lane_cura_cape_handler_admits_construct_keepout_stands() {
-    // The cura handler itself admits (no handler decline); the construct's
-    // independent deferred-init ruling still keeps the function out of AIR.
-    let errors = air_errors(
-        r#"
-@ radix lane "air"
-functio c() → numerus {
-    cura "arena" fixum _ res { redde 1 } cape err { redde 0 }
-    redde 1
-}
-"#,
-    );
-
-    assert!(
-        !errors.iter().any(|err| err
-            .args
-            .iter()
-            .any(|arg| arg.name == "issue" && arg.value == "recoverable_handler")),
-        "cura handler must not decline under the handler cause: {errors:?}"
-    );
-    expect_air_issue(&errors, "deferred_local_init");
 }
 
 #[test]

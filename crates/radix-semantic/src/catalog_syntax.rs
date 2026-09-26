@@ -704,6 +704,8 @@ fn unexpected_message(args: &[DiagnosticArg]) -> Option<String> {
         "conversio_assign_await_unsupported" => {
             Some("'↤' is not supported on awaited bindings".to_owned())
         }
+        "allocator_surface_removed" => quote_arg(args, "keyword")
+            .map(|keyword| format!("{keyword} was removed; allocation is not a language surface")),
         _ => None,
     }
 }
@@ -726,6 +728,11 @@ fn unexpected_help(args: &[DiagnosticArg]) -> Option<String> {
         "conversio_assign_await_unsupported" => {
             Some("keep '←' for 'figendum'/'variandum' awaited bindings".to_owned())
         }
+        "allocator_surface_removed" => quote_arg(args, "keyword").map(|keyword| {
+            format!(
+                "delete the {keyword} wrapper or modifier; allocation is managed by the target runtime"
+            )
+        }),
         _ => None,
     }
 }

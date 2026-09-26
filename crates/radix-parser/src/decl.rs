@@ -91,7 +91,6 @@ impl Parser {
                 Some(TokenKind::Perge) => self.parse_perge_stmt()?,
                 Some(TokenKind::Redde) => self.parse_redde_stmt()?,
                 Some(TokenKind::Rumpe) => self.parse_rumpe_stmt()?,
-                Some(TokenKind::Cura) => self.parse_cura_stmt()?,
                 Some(TokenKind::Tacet) => self.parse_tacet_stmt()?,
                 Some(TokenKind::Ad) => self.parse_ad_stmt()?,
                 Some(TokenKind::Figendum | TokenKind::Variandum) => {
@@ -104,6 +103,9 @@ impl Parser {
                 }
                 Some(TokenKind::Reddet) => self.parse_reddet_stmt(start)?,
                 Some(TokenKind::Tacebit) => self.parse_tacebit_stmt(start)?,
+                None if self.at_retired_cura_stmt() => {
+                    return Err(self.allocator_surface_removed_error(super::stmt::RETIRED_CURA));
+                }
                 _ => self.parse_expr_stmt()?,
             },
 
@@ -659,14 +661,8 @@ impl Parser {
             if self.eat_keyword_ident(TokenKind::Argumenta) {
                 let name = self.parse_ident()?;
                 modifiers.push(FuncModifier::Argumenta(name));
-            } else if self.eat_keyword_ident(TokenKind::Curata) {
-                let required = self.parse_ident()?;
-                let alias = if self.eat_keyword_ident(TokenKind::Ut) {
-                    Some(self.parse_ident()?)
-                } else {
-                    None
-                };
-                modifiers.push(FuncModifier::Curata { required, alias });
+            } else if self.at_retired_curata_modifier() {
+                return Err(self.allocator_surface_removed_error(super::stmt::RETIRED_CURATA));
             } else if self.eat_keyword_ident(TokenKind::Errata) {
                 let name = self.parse_ident()?;
                 modifiers.push(FuncModifier::Errata(name));

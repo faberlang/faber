@@ -121,7 +121,6 @@ pub enum TokenKind {
     // === Keywords: Modifiers ===
     Abstractus,
     Ceteri,
-    Curata,
     Errata,
     Exitus,
     Generis,
@@ -216,7 +215,6 @@ pub enum TokenKind {
     // === Keywords: Entry points ===
     Ad,
     Argumenta,
-    Cura,
     Incipiet,
     Incipit,
     Meus, // `ad` outgoing arm (caller → gateway)
@@ -395,7 +393,6 @@ impl TokenKind {
                 | Varia
                 | Abstractus
                 | Ceteri
-                | Curata
                 | Errata
                 | Exitus
                 | Generis
@@ -457,7 +454,6 @@ impl TokenKind {
                 | Vide
                 | Ad
                 | Argumenta
-                | Cura
                 | Incipiet
                 | Incipit
                 | Meus

@@ -510,46 +510,6 @@ fn deferred_local_assignment_can_drive_inference() {
 }
 
 #[test]
-fn cura_allocator_scope_no_longer_reports_infer_variable_error() {
-    let session = test_session(Target::HirRust);
-    let source = r#"incipit {
-  cura "arena" fixum _ alloc {
-    nota "ok"
-  }
-}"#;
-    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
-
-    assert!(result.success());
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .all(|d| d.issue() != Some("cannot_infer_variable_type"))
-    );
-}
-
-#[test]
-fn curata_alias_binding_is_visible_in_function_body() {
-    let session = test_session(Target::HirRust);
-    let source = r"functio useAllocator() curata alloc ut a {
-  nota a
-}
-
-incipit {
-  useAllocator()
-}";
-    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
-
-    assert!(result.success());
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .all(|d| d.issue() != Some("unknown_identifier"))
-    );
-}
-
-#[test]
 fn compile_supports_extended_binary_operators() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
@@ -1433,27 +1393,7 @@ incipit {
     );
 }
 
-// ── misc: curator, quidlibet, conversio type params, verte_vel ──
-
-#[test]
-fn curator_param_type_is_not_the_allocator_contract() {
-    let session = test_session(Target::HirRust);
-    let source = r#"functio createUser(textus name, curator alloc) → textus {
-  redde name
-}
-
-incipit {
-  nota "ok"
-}"#;
-    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
-
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|d| d.is_error() && d.code == Some("SEM002") && d.issue() == Some("unknown_type"))
-    );
-}
+// ── misc: quidlibet, conversio type params, verte_vel ──
 
 #[test]
 fn quidlibet_container_annotation_no_longer_reports_unknown_type() {

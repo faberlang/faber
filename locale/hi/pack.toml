@@ -18,7 +18,6 @@ columna = "कॉलम"
 varia = "चर"
 abstractus = "अमूर्त"
 ceteri = "बाकी"
-curata = "आवंटक"
 errata = "त्रुटि"
 exitus = "निर्गम"
 generis = "स्थैतिक"
@@ -81,7 +80,6 @@ nota = "दिखाओ"
 scribe = "लिखो"
 vide = "देखो"
 argumenta = "तर्क"
-cura = "देखभाल"
 incipiet = "आरंभasync"
 incipit = "आरंभ"
 ad = "सेवा"
@@ -2930,14 +2928,6 @@ help = "मॉड्यूल से समर्थित export का उप�
 [diagnostics.WARN014.issues.file_interface_export_skipped]
 message = "फ़ाइल इंटरफ़ेस ने export `{namespace}.{export}` ({reason}) छोड़ दिया; अन्य export अभी भी उपलब्ध हैं"
 help = "मॉड्यूल से समर्थित export का उपयोग करें, या इस हस्ताक्षर के फ़ाइल-इंटरफ़ेस कवरेज के पूर्ण होने की प्रतीक्षा करें"
-
-[diagnostics.WARN015]
-message = "अपरिचित curata आवंटक नाम"
-help = "पहचाने गए आवंटक नाम (\"arena\", \"page\", \"alloc\", या \"allocator\") का उपयोग करें"
-
-[diagnostics.WARN015.issues.unrecognized_curata_allocator]
-message = "curata आवंटक नाम '{name}' किसी पहचाने गए आवंटक अनुबंध से मेल नहीं खाता"
-help = "पहचाने गए आवंटक नाम (\"arena\", \"page\", \"alloc\", या \"allocator\") का उपयोग करें"
 
 [diagnostics.WARN016]
 message = "monomorphic hole multi-member union में हल हुआ"

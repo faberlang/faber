@@ -141,8 +141,6 @@ pub enum StmtKind {
     Scribe(ScribeStmt),
     /// `incipit` / `incipiet` entry point.
     Incipit(IncipitStmt),
-    /// `cura` resource management.
-    Cura(CuraStmt),
     /// `reddet future` await-return (`fiet` only).
     Reddet(ReddetStmt),
     /// `tacebit future` await-discard.
@@ -371,10 +369,6 @@ pub enum AstParamMode {
 #[derive(Debug)]
 pub enum FuncModifier {
     Argumenta(Ident),
-    Curata {
-        required: Ident,
-        alias: Option<Ident>,
-    },
     Errata(Ident),
     Exitus(ExitusValue),
     Iacit,
@@ -997,22 +991,6 @@ pub struct ExStmt {
 pub struct ExField {
     pub name: Ident,
     pub alias: Option<Ident>,
-}
-
-#[derive(Debug)]
-pub struct CuraStmt {
-    pub kind: CuraKind,
-    pub mutability: AstMutability,
-    pub ty: TypeExpr,
-    pub binding: Ident,
-    pub body: BlockStmt,
-    pub catch: Option<CapeClause>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum CuraKind {
-    Arena,
-    Page,
 }
 
 // =============================================================================

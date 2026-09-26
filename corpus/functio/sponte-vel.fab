@@ -7,7 +7,7 @@ canonical = true
 summary = "Declares a named function or method."
 syntax = "functio <name>(<params>) [modifiers] [→ <type>] [⇥ <error-type>] <block>"
 aliases = ["function"]
-related = ["→", "⇥", "redde", "sponte", "ceteri", "prae", "curata", "futura", "cursor"]
+related = ["→", "⇥", "redde", "sponte", "ceteri", "prae", "futura", "cursor"]
 locale = "en"
 +++
 # =============================================================================
@@ -16,12 +16,12 @@ locale = "en"
 #
 # What this teaches:
 #   • Declares a named function or method.
-#   • Related keywords: →, ⇥, redde, sponte, ceteri, prae, curata, futura, cursor
+#   • Related keywords: →, ⇥, redde, sponte, ceteri, prae, futura, cursor
 #
 # Common mistakes:
 #   • Forgetting that `sponte` parameters produce `T ∪ nihil` — accessing a `sponte` value without checking `est nihil` first may fail.
 #
-# See also: →, ⇥, redde, sponte, ceteri, prae, curata, futura, cursor
+# See also: →, ⇥, redde, sponte, ceteri, prae, futura, cursor
 # =============================================================================
 
 # Parameters with sponte and vel

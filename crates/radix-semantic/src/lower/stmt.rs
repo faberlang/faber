@@ -146,7 +146,6 @@ pub fn lower_stmt(lowerer: &mut Lowerer, stmt: &Stmt) -> HirStatement {
         StmtKind::Reject(reject_stmt) => lowerer.lower_reject(reject_stmt),
         StmtKind::Scribe(scribe_stmt) => lowerer.lower_scribe(scribe_stmt),
         StmtKind::Incipit(incipit_stmt) => lowerer.lower_incipit_stmt(incipit_stmt),
-        StmtKind::Cura(cura_stmt) => lowerer.lower_cura(cura_stmt),
         StmtKind::Ex(ex_stmt) => lowerer.lower_ex(ex_stmt),
         StmtKind::Elige(elige_stmt) => lowerer.lower_elige(elige_stmt),
         StmtKind::Discerne(discerne_stmt) => lowerer.lower_discerne(discerne_stmt),
@@ -1117,61 +1116,6 @@ impl Lowerer<'_> {
             block.expr = Some(Box::new(exitus_expr));
         }
         self.pop_scope();
-        HirStatementKind::Expr(HirExpression {
-            id: self.next_hir_id(),
-            kind: HirExpressionKind::Block(block),
-            ty: None,
-            span: self.current_span,
-        })
-    }
-
-    /// Lower allocator `cura` scopes into a synthetic local plus scoped body block.
-    fn lower_cura(&mut self, stmt: &radix_syntax::CuraStmt) -> HirStatementKind {
-        let mut stmts = Vec::new();
-        let local_def = self.next_def_id();
-        let ty = if matches!(stmt.ty.kind, radix_syntax::TypeExprKind::Infer) {
-            self.types.primitive(crate::Primitive::Ignotum)
-        } else {
-            self.lower_type(&stmt.ty)
-        };
-        stmts.push(HirStatement {
-            id: self.next_hir_id(),
-            kind: HirStatementKind::Local(radix_hir::HirLocal {
-                def_id: local_def,
-                name: stmt.binding.name,
-                ty: Some(ty),
-                init: None,
-                mutable: stmt.mutability == radix_syntax::AstMutability::Mutable,
-                is_await: false,
-                runtime_provided: false,
-            }),
-            span: self.current_span,
-        });
-
-        self.push_scope();
-        self.bind_local(stmt.binding.name, local_def);
-        // The authored `cura` body boundary owns one structural end already
-        // recorded by `block_end_for`; carry it onto the wrapping scope block
-        // so the end-count parity with `presentation.block_ends` holds.
-        let body_block = self.lower_block(&stmt.body);
-        let body_end = body_block.end.clone();
-        if let Some(catch) = &stmt.catch {
-            // Catch stays inside the resource scope so the handler can name
-            // the open binding; cleanup is the outer block end after Handled.
-            let cape = self.lower_cape_clause(catch);
-            let handled = self.handled_block_expr(body_block, cape, self.current_span);
-            stmts.push(HirStatement {
-                id: self.next_hir_id(),
-                kind: HirStatementKind::Expr(handled),
-                span: self.current_span,
-            });
-        } else {
-            stmts.extend(body_block.statements);
-        }
-        self.pop_scope();
-
-        let mut block = HirBlock::simple(stmts, None, self.current_span);
-        block.end = body_end;
         HirStatementKind::Expr(HirExpression {
             id: self.next_hir_id(),
             kind: HirExpressionKind::Block(block),
