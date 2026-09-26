@@ -1299,6 +1299,7 @@ pub struct TernaryExpr {
 
 #[derive(Debug, Clone, Copy)]
 pub enum TernaryStyle {
+    CheckBallot,   // ✓ ✗ (D4.5)
     QuestionColon, // ? :
     SicSecus,      // sic secus
 }

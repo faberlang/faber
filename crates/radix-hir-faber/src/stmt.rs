@@ -39,11 +39,11 @@ impl super::FaberCodegen<'_> {
 
     /// Return the expression represented by a single-expression return block.
     ///
-    /// This is the gate for compact `ergo redde` and `sic ... secus ...`
+    /// This is the gate for compact `ergo redde` and `c ✓ a ✗ b`
     /// output. Blocks with additional statements or mixed tail forms stay in
     /// brace form to avoid changing control-flow meaning. The shape check is
     /// trivia-free; [`FaberCodegen::ergo_return_expr`] and
-    /// [`FaberCodegen::can_write_sic_secus_chain`] additionally require that
+    /// [`FaberCodegen::check_ballot_branches`] additionally require that
     /// the candidate blocks carry no attached trivia.
     pub(super) fn return_expr<'a>(&self, block: &'a HirBlock) -> Option<&'a HirExpression> {
         if block.statements.is_empty() {
@@ -61,7 +61,7 @@ impl super::FaberCodegen<'_> {
     /// Return the bare tail expression of a block, if any.
     ///
     /// Unlike [`FaberCodegen::return_expr`], a `redde` statement is not
-    /// eligible. The compact `sic ... secus ...` expression form has no
+    /// eligible. The compact `c ✓ a ✗ b` expression form has no
     /// statement slot, so a branch whose value is an explicit `redde` must stay
     /// in the statement chain (`ergo redde`): compressing it into a bare
     /// expression drops the return and the re-emitted function no longer
@@ -211,7 +211,7 @@ impl super::FaberCodegen<'_> {
     /// Detect an else-block that is a `sin` arm, with or without its own
     /// arm-attached `cape` handler.
     ///
-    /// Unlike [`FaberCodegen::as_sin_branch`] (the compact `sic … secus …`
+    /// Unlike [`FaberCodegen::as_sin_branch`] (the compact `c ✓ a ✗ b`
     /// gate, which has no handler slot), the statement chain can carry a
     /// per-arm `cape`, so a nested conditional with `then_catch` still
     /// flattens to `sin cond { … } cape err { … }`.
@@ -308,12 +308,15 @@ impl super::FaberCodegen<'_> {
         true
     }
 
-    /// Try to write a conditional expression as compact `sic ... secus ...`.
+    /// Try to write a conditional expression as the value conditional
+    /// `c ✓ a ✗ b` (D4.5). The glyphs are the same in every reader locale.
     ///
-    /// Returns `false` when either branch needs block syntax. Callers then fall
-    /// back to the ordinary conditional form, which preserves grammar validity
-    /// without pretending arbitrary blocks are expressions.
-    pub(super) fn write_sic_secus_chain(
+    /// Returns `false` when either branch needs block syntax or the else
+    /// branch continues an `si`/`sin` chain. The conditional is one level only
+    /// (D4.6), so a chain stays in the ordinary conditional form, which
+    /// preserves grammar validity without pretending arbitrary blocks are
+    /// expressions.
+    pub(super) fn write_check_ballot(
         &self,
         cond: &HirExpression,
         then_block: &HirBlock,
@@ -322,63 +325,42 @@ impl super::FaberCodegen<'_> {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) -> bool {
-        if !self.can_write_sic_secus_chain(then_block, else_block) {
-            return false;
-        }
-
-        let Some(then_expr) = self.tail_expression(then_block) else {
-            return false;
-        };
-        let Some(else_block) = else_block else {
+        let Some((then_expr, else_expr)) = self.check_ballot_branches(then_block, else_block)
+        else {
             return false;
         };
 
         self.write_expr_prec(cond, 2, names, surface, writer);
-        writer.write(" ");
-        writer.write(surface.keyword(TokenKind::Sic));
-        writer.write(" ");
+        writer.write(" ✓ ");
         self.write_expr_prec(then_expr, 2, names, surface, writer);
-        writer.write(" ");
-        writer.write(surface.contextual_keyword("secus"));
-        writer.write(" ");
-
-        if let Some((sin_cond, sin_then, sin_else)) = self.as_sin_branch(else_block) {
-            return self
-                .write_sic_secus_chain(sin_cond, sin_then, sin_else, names, surface, writer);
-        }
-
-        let Some(else_expr) = self.tail_expression(else_block) else {
-            return false;
-        };
+        writer.write(" ✗ ");
         self.write_expr_prec(else_expr, 2, names, surface, writer);
         true
     }
 
-    /// Validate that a whole conditional chain can be rendered compactly.
+    /// Return both branch values when a conditional fits `c ✓ a ✗ b`.
     ///
-    /// Every candidate branch must be a single-return shape with no attached
-    /// trivia on its statements or structural end; comment-bearing branches
-    /// stay braced. Only bare tail expressions are eligible — a branch whose
-    /// value is an explicit `redde` statement would lose its return in the
-    /// expression form (see [`FaberCodegen::tail_expression`]).
-    pub(super) fn can_write_sic_secus_chain(
+    /// Each branch must be a bare tail expression with no attached trivia on
+    /// its statements or structural end; comment-bearing branches stay braced.
+    /// A branch whose value is an explicit `redde` statement would lose its
+    /// return in the expression form (see [`FaberCodegen::tail_expression`]),
+    /// and an else branch that is itself a `sin` conditional would nest.
+    pub(super) fn check_ballot_branches<'a>(
         &self,
-        then_block: &HirBlock,
-        else_block: Option<&HirBlock>,
-    ) -> bool {
-        if self.tail_expression(then_block).is_none() || self.trivia.block_has_trivia(then_block) {
-            return false;
+        then_block: &'a HirBlock,
+        else_block: Option<&'a HirBlock>,
+    ) -> Option<(&'a HirExpression, &'a HirExpression)> {
+        let else_block = else_block?;
+        if self.trivia.block_has_trivia(then_block)
+            || self.trivia.block_has_trivia(else_block)
+            || self.as_sin_branch(else_block).is_some()
+        {
+            return None;
         }
-
-        let Some(else_block) = else_block else {
-            return false;
-        };
-
-        if let Some((_, sin_then, sin_else)) = self.as_sin_branch(else_block) {
-            return self.can_write_sic_secus_chain(sin_then, sin_else);
-        }
-
-        self.tail_expression(else_block).is_some() && !self.trivia.block_has_trivia(else_block)
+        Some((
+            self.tail_expression(then_block)?,
+            self.tail_expression(else_block)?,
+        ))
     }
 
     pub(super) fn write_si_branch_body(

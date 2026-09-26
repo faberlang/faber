@@ -860,6 +860,9 @@ fn invalid_expression_message(args: &[DiagnosticArg]) -> Option<String> {
     let issue = arg_value(args, "issue")?;
     match issue {
         "conversio_recovery_uses_vel" => Some("use ⊥ for a conversion default".to_owned()),
+        "conditional_nested" => {
+            Some("a '✓ ✗' conditional cannot appear inside another '✓ ✗'".to_owned())
+        }
         "recovery_uses_exit_arrow" => {
             Some("'⇥' names an error type; use '⊥' for a default".to_owned())
         }
@@ -881,6 +884,9 @@ fn invalid_expression_help(args: &[DiagnosticArg]) -> Option<String> {
     let issue = arg_value(args, "issue")?;
     match issue {
         "conversio_recovery_uses_vel" => Some("use ⊥; vel is nullish coalescing only".to_owned()),
+        "conditional_nested" => {
+            Some("use 'si'/'sin', 'discerne', or a function that 'redde's each case".to_owned())
+        }
         "recovery_uses_exit_arrow" => {
             Some("write '↦ T ⊥ value' (or '↤ … ⊥ value'); '⇥' never takes a value".to_owned())
         }

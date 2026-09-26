@@ -22,6 +22,10 @@ mod canonical_test;
 mod cape_roundtrip_test;
 
 #[cfg(test)]
+#[path = "conditional_roundtrip_test.rs"]
+mod conditional_roundtrip_test;
+
+#[cfg(test)]
 #[path = "frame_names_test.rs"]
 mod frame_names_test;
 

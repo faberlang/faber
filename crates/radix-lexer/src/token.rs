@@ -276,6 +276,8 @@ pub enum TokenKind {
     Arrow,     // →
     ExitArrow, // ⇥
     UpTack,    // ⊥ default channel (D17.7)
+    Check,     // ✓ value conditional then-marker (D4.5)
+    Ballot,    // ✗ value conditional else-marker (D4.5)
     Cup,       // ∪ inline union
     Cap,       // ∩ inline intersection
     At,        // @

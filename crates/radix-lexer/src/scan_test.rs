@@ -2567,3 +2567,26 @@ fn perpendicular_lookalike_suggests_up_tack() {
     // D17.7: `⟂` (U+27C2 PERPENDICULAR) is rejected with "did you mean `⊥`?".
     assert_homoglyph_did_you_mean("⟂", "⟂", "⊥");
 }
+
+#[test]
+fn lexes_check_and_ballot_conditional_glyphs() {
+    // D4.5: `c ✓ a ✗ b` uses U+2713 CHECK MARK and U+2717 BALLOT X; one
+    // spelling in every locale, no word twin.
+    let result = lex("✓ ✗");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    assert_eq!(result.tokens[0].kind, TokenKind::Check);
+    assert_eq!(result.tokens[1].kind, TokenKind::Ballot);
+    assert!(result.reader_keyword_latin_keys.is_empty());
+}
+
+#[test]
+fn heavy_check_lookalike_suggests_check_mark() {
+    // D4.7: `✔` (U+2714 HEAVY CHECK MARK) gets "did you mean `✓`?".
+    assert_homoglyph_did_you_mean("✔", "✔", "✓");
+}
+
+#[test]
+fn heavy_ballot_lookalike_suggests_ballot_x() {
+    // D4.7: `✘` (U+2718 HEAVY BALLOT X) gets "did you mean `✗`?".
+    assert_homoglyph_did_you_mean("✘", "✘", "✗");
+}

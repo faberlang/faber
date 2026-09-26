@@ -871,6 +871,10 @@ mod matrix_intrinsic_test;
 mod namespace_shadow_test;
 
 #[cfg(test)]
+#[path = "conditional_narrowing_test.rs"]
+mod conditional_narrowing_test;
+
+#[cfg(test)]
 #[path = "null_narrowing_test.rs"]
 mod null_narrowing_test;
 

@@ -652,6 +652,10 @@ help = "check expression syntax"
 message = "use ⊥ for a conversion default"
 help = "use ⊥; vel is nullish coalescing only"
 
+[diagnostics.PARSE030.issues.conditional_nested]
+message = "a '✓ ✗' conditional cannot appear inside another '✓ ✗'"
+help = "use '{si}'/'{sin}', '{discerne}', or a function that '{redde}'s each case"
+
 [diagnostics.PARSE030.issues.recovery_uses_exit_arrow]
 message = "'⇥' names an error type; use '⊥' for a default"
 help = "write '↦ T ⊥ value' (or '↤ … ⊥ value'); '⇥' never takes a value"
