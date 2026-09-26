@@ -1969,6 +1969,10 @@ help = "make the expression type match the expected type"
 message = "{apud} requires a tensor or matrix iterable"
 help = "make the expression type match the expected type"
 
+[diagnostics.SEM010.issues.itera_source_not_iterable]
+message = "{itera} source is not iterable"
+help = "expose a method that returns a cursor and iterate that"
+
 [diagnostics.SEM010.issues.json_map_key_must_be_textus]
 message = "JSON map key must be string"
 help = "make the expression type match the expected type"

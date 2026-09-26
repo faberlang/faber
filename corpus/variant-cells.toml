@@ -35,7 +35,7 @@
 ratchet_baseline = 0
 
 # =============================================================================
-# itera (32 cells: 29 direct / 3 unit-proven / 0 bare)
+# itera (33 cells: 30 direct / 3 unit-proven / 0 bare)
 # =============================================================================
 
 [[cells]]
@@ -63,6 +63,15 @@ status = "direct"
 exemplum = "itera/ex-tabula.fab"
 expected = true
 note = "batch 3: value iteration over tabula; .expected pinned from runner stdout (map order + order-independent sum)"
+
+[[cells]]
+id = "itera.ex.textus"
+family = "itera"
+cell = "ex × textus (character iteration)"
+status = "direct"
+exemplum = "itera/ex-textus.fab"
+expected = true
+note = "D19.4: binds the textus[i] element row (ascii<1>); wasm/sexp decline ascii<1> fail-closed"
 
 [[cells]]
 id = "itera.ex.bounded-lista"

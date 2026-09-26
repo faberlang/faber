@@ -99,6 +99,7 @@ pub mod infer;
 pub mod intervallum;
 pub mod intrinsics;
 pub mod item;
+pub mod itera_element;
 pub mod json_genus;
 pub mod lockstep;
 pub mod lookup;
@@ -833,6 +834,10 @@ mod infer_test;
 #[cfg(test)]
 #[path = "itera_apud_test.rs"]
 mod itera_apud_test;
+
+#[cfg(test)]
+#[path = "itera_element_test.rs"]
+mod itera_element_test;
 
 #[cfg(test)]
 #[path = "summa_test.rs"]

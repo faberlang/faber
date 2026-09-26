@@ -1,0 +1,48 @@
++++
+term = "ex"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "assignment", "place", "additive_expr", "itera_stmt", "si_stmt", "comparison", "equality", "equality_tail", "conversio_expr", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "Value iteration over textus binds the same element type as textus[i]."
+syntax = "for from <textus> const <c> { }"
+related = ["itera", "textus", "ascii"]
+locale = "en"
++++
+# =============================================================================
+# ex over textus — iterate the characters of a string.
+# =============================================================================
+#
+# What this teaches:
+#   • `itera ex` over a textus binds each character with the same type that
+#     `textus[i]` returns (today `ascii<1>`, the type of a 'x' literal)
+#   • so a loop character compares directly with a character literal and
+#     converts to textus with `↦`
+#
+# Common mistakes:
+#   • Treating the loop character as a number: it is a one-character text
+#     value, not a code point.
+#   • Iterating non-ASCII text: not yet uniform across backends (the runner
+#     and Rust trap like `textus[i]`; Go, TS and Swift pass the character
+#     through) until the `littera` element type lands. Keep this ASCII.
+#
+# See also: ex, de, textus
+# =============================================================================
+
+main {
+    const string verbum ← "roma"
+    for from verbum const c {
+        print c ↦ string
+    }
+
+    var int vocales ← 0
+    for from verbum const c {
+        if c ≡ 'o' {
+            vocales ← vocales + 1
+        }
+        if c ≡ 'a' {
+            vocales ← vocales + 1
+        }
+    }
+    print vocales
+}
