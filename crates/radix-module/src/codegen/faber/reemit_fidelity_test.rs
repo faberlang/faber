@@ -743,3 +743,132 @@ fn itera_destructuring_binder_reemits_as_pattern() {
     assert!(emitted.contains("itera ex m fixum [caput, ceteri cauda] {\n"), "{emitted}");
     assert!(!emitted.contains("__itera_element"), "{emitted}");
 }
+
+#[test]
+fn ordo_members_keep_their_authored_qualification() {
+    let source = "ordo Color {\n    rubrum,\n    viridis\n}\n\nincipit {\n    fixum Color color ← Color.rubrum\n    fixum Color bare ← viridis\n    elige color {\n        casu Color.rubrum {\n            nota \"rubrum\"\n        }\n        casu viridis {\n            nota \"viridis\"\n        }\n    }\n    nota bare\n}\n";
+    let emitted = assert_idempotent(source);
+    assert!(emitted.contains("ordo Color {"), "{emitted}");
+    assert!(emitted.contains("fixum Color color ← Color.rubrum"), "{emitted}");
+    assert!(emitted.contains("casu Color.rubrum {"), "{emitted}");
+}
+
+#[test]
+fn canonical_revalidation_refuses_an_emitter_that_changes_meaning() {
+    let source = "functio duplex(numerus x) → numerus {\n    redde x + x\n}\n";
+    let latin = crate::locale::latin_locale_pack();
+    let session = Session::new(Config::default().with_locale_pack(latin.clone()));
+    let prepared = prepare_program_module_for_name("meaning.fab", source, &session).expect("prepare meaning source");
+    let analysis = analyze_source(
+        &prepared.session,
+        "meaning.fab",
+        source,
+        AnalyzeRequest { cli_program: None, contract: prepared.contract },
+    )
+    .expect("analyze meaning source");
+    let output = reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
+        "meaning.fab",
+        source,
+    );
+    assert!(output.success(), "faithful source must pass: {:?}", output.diagnostics);
+    let emitted = output.output.expect("faithful output").code;
+    assert!(emitted.contains("x + x"), "{emitted}");
+
+    // A deliberately broken emitter: same shape, same types, other meaning.
+    let broken = emitted.replace("x + x", "x * x");
+    let diagnostic = super::compile::revalidate_emitted_output(&session, "meaning.fab", &broken, &analysis, &latin)
+        .expect_err("an emitter that changes meaning must be refused");
+    assert_eq!(diagnostic.code, Some("CODEGEN006"));
+    assert_eq!(diagnostic.issue(), Some("hir_meaning_diverged"));
+    assert_eq!(
+        diagnostic
+            .args
+            .iter()
+            .find(|arg| arg.name == "segment")
+            .map(|arg| arg.value.as_str()),
+        Some("item 0 (duplex)")
+    );
+}
+
+#[test]
+fn canonical_revalidation_accepts_layout_only_changes() {
+    let source = "functio duplex(numerus x) → numerus {\n    redde x + x\n}\n";
+    let latin = crate::locale::latin_locale_pack();
+    let session = Session::new(Config::default().with_locale_pack(latin.clone()));
+    let prepared = prepare_program_module_for_name("layout.fab", source, &session).expect("prepare layout source");
+    let analysis = analyze_source(
+        &prepared.session,
+        "layout.fab",
+        source,
+        AnalyzeRequest { cli_program: None, contract: prepared.contract },
+    )
+    .expect("analyze layout source");
+    let relaid = "# comment\n\nfunctio duplex(numerus x) → numerus { redde (x + x) }\n";
+    super::compile::revalidate_emitted_output(&session, "layout.fab", relaid, &analysis, &latin)
+        .expect("layout, trivia, and redundant parentheses do not change meaning");
+}
+
+#[test]
+fn plain_fac_block_keeps_its_breakable_scope() {
+    let source = "incipit {\n    varia numerus m ← 0\n    fac {\n        fac {\n            m ↑\n            si m ≥ 2 {\n                rumpe\n            }\n        }\n    } dum m < 6\n    nota m\n}\n";
+    let emitted = assert_idempotent(source);
+    assert_eq!(emitted.matches("fac {").count(), 2, "{emitted}");
+}
+
+#[test]
+fn elige_attached_cape_stays_attached() {
+    let source = "functio electio(bivalens malum) → numerus {\n    elige malum {\n        casu verum {\n            iace \"x\"\n        }\n        ceterum {\n            redde 2\n        }\n    } cape err {\n        redde 0\n    }\n}\n\nincipit {\n    nota electio(verum)\n}\n";
+    let emitted = assert_idempotent(source);
+    assert!(emitted.contains("} cape err {"), "{emitted}");
+    assert!(!emitted.contains("fac {"), "{emitted}");
+}
+
+#[test]
+fn float_literals_keep_their_authored_digits() {
+    let source =
+        "incipit {\n    fixum fractus parvus ← 1e-5\n    fixum fractus magnus ← 1.0e15\n    nota parvus, magnus\n}\n";
+    let emitted = assert_idempotent(source);
+    assert!(emitted.contains("← 1e-5"), "{emitted}");
+    assert!(emitted.contains("← 1.0e15"), "{emitted}");
+}
+
+#[test]
+fn record_field_order_is_not_a_meaning_change() {
+    // The CLI args record is a field set keyed by analysis-local symbols; a
+    // conversion that interns `verbose` before `nomen` must still prove the
+    // same program.
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/cli/cli.fab");
+    let source = &fs::read_to_string(&path).expect("read corpus/cli/cli.fab");
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirFaber)
+            .with_dev_locale_root(),
+    );
+    let la = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
+        .expect("installed la pack");
+    let result = reemit_faber(&session, &la, "record-order.fab", source);
+    assert!(
+        result.success(),
+        "{:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn mixed_bare_and_qualified_variant_references_stay_provable() {
+    // `casu Fons.Mala` is qualified while `finge Mala` is bare. The spelling
+    // sidecar is keyed by variant, so the re-emitter falls back to bare for
+    // both; the variant is the same, so the program is unchanged.
+    let source = "discretio Fons {\n    Mala {\n        textus detail\n    }\n}\n\nfunctio fac_malam() → Fons {\n    redde finge Mala { detail = \"x\" }\n}\n\nfunctio lege(Fons fons) → textus {\n    discerne fons {\n        casu Fons.Mala fixum detail {\n            redde detail\n        }\n    }\n}\n";
+    assert_idempotent(source);
+}

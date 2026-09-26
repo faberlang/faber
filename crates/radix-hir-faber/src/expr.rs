@@ -249,6 +249,13 @@ impl super::FaberCodegen<'_> {
                 );
             }
             HirExpressionKind::Block(block) => {
+                // A plain `fac { }` body is a breakable scope: `rumpe` exits
+                // the block, not the enclosing loop. Dropping the keyword
+                // would change what `rumpe`/`perge` target (D8.9).
+                if block.breakable == Some(radix_hir::HirBreakableKind::Fac) {
+                    writer.write(surface.contextual_keyword("fac"));
+                    writer.write(" ");
+                }
                 writer.writeln("{");
                 writer.indented(|writer| {
                     self.write_block(block, names, surface, writer);
@@ -801,7 +808,10 @@ impl super::FaberCodegen<'_> {
                     writer.write(&rendered);
                 }
                 writer.write(" ∴ ");
-                if matches!(body.kind, HirExpressionKind::Block(_)) {
+                // A `fac`-breakable body block writes its own keyword.
+                if matches!(&body.kind, HirExpressionKind::Block(block)
+                    if block.breakable != Some(radix_hir::HirBreakableKind::Fac))
+                {
                     writer.write(surface.contextual_keyword("fac"));
                     writer.write(" ");
                 }
@@ -1316,6 +1326,27 @@ impl super::FaberCodegen<'_> {
             return;
         }
 
+        // Attached handlers (`elige … cape`, `dum … cape`, `itera … cape`):
+        // the handled body's tail is the construct itself. Re-emitting it as
+        // `fac { … } cape` would demote that tail to a statement.
+        if body.statements.is_empty()
+            && let Some(expr) = &body.expr
+            && self.accepts_attached_cape(expr)
+        {
+            self.write_expr(expr, names, surface, writer);
+            writer.write(" ");
+            writer.write(surface.keyword(TokenKind::Cape));
+            writer.write(" ");
+            self.write_cape_block_named(
+                &catch.body,
+                Some(catch.binding_name),
+                names,
+                surface,
+                writer,
+            );
+            return;
+        }
+
         writer.write(surface.contextual_keyword("fac"));
         writer.writeln(" {");
         writer.indented(|writer| {
@@ -1333,6 +1364,18 @@ impl super::FaberCodegen<'_> {
             surface,
             writer,
         );
+    }
+
+    /// Constructs whose grammar takes a trailing `cape` clause directly.
+    fn accepts_attached_cape(&self, expr: &HirExpression) -> bool {
+        match &expr.kind {
+            HirExpressionKind::Discerne { .. } => self.elige_expr_ids.contains(&expr.id),
+            HirExpressionKind::Dum(..)
+            | HirExpressionKind::Itera(..)
+            | HirExpressionKind::IteraRange { .. }
+            | HirExpressionKind::IteraLockstep { .. } => true,
+            _ => false,
+        }
     }
 
     /// Unwrap the synthetic `Block` tail produced when `fac` lowers to `Handled`.
