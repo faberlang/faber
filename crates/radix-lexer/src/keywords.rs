@@ -210,7 +210,7 @@ pub enum KeywordKind {
     /// Word operator.
     Operator,
 
-    /// Object, self, inheritance, or construction syntax.
+    /// Object, self, contract, or construction syntax.
     Object,
 
     /// Type conversion or construction syntax.
@@ -483,12 +483,6 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         category: KeywordKind::Declaration,
     },
     // === Keywords: Modifiers ===
-    KeywordSpec {
-        text: "abstractus",
-        token_kind: Some(TokenKind::Abstractus),
-        scope: KeywordScope::Contextual(GENUS_HEADER),
-        category: KeywordKind::Modifier,
-    },
     KeywordSpec {
         text: "ceteri",
         token_kind: Some(TokenKind::Ceteri),
@@ -930,12 +924,6 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "implet",
         token_kind: Some(TokenKind::Implet),
-        scope: KeywordScope::Contextual(GENUS_HEADER),
-        category: KeywordKind::Object,
-    },
-    KeywordSpec {
-        text: "sub",
-        token_kind: Some(TokenKind::Sub),
         scope: KeywordScope::Contextual(GENUS_HEADER),
         category: KeywordKind::Object,
     },

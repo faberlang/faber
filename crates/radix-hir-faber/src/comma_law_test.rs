@@ -691,9 +691,7 @@ fn declaration_and_annotation_lists_emit_between_only() {
             },
         ],
         methods: Vec::new(),
-        extends: None,
         implements: vec![DefId(100), DefId(101), DefId(102)],
-        is_abstract: false,
     };
     let enm = HirEnum {
         name: interner.intern("E"),

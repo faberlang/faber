@@ -1885,10 +1885,10 @@ fn object_destructuring_rejects_colon_rename() {
 }
 
 #[test]
-fn parses_abstract_genus_with_extends_implements() {
+fn parses_generic_genus_with_implements_and_members() {
     let result = parse_ok(
         r#"
-abstractus genus Animal<T> sub Vivens implet Canens, Currens {
+genus Animal<T> implet Canens, Currens {
     @ futura
     functio canta(textus vox) → vacuum {}
     generis textus nomen = "leo"
@@ -1899,8 +1899,6 @@ abstractus genus Animal<T> sub Vivens implet Canens, Currens {
     let StmtKind::Class(class) = &program.statements[0].kind else {
         panic!("expected class declaration");
     };
-    assert!(class.is_abstract);
-    assert!(class.extends.is_some());
     assert_eq!(class.implements.len(), 2);
     assert_eq!(class.members.len(), 2);
     assert!(matches!(class.members[0].kind, ClassMemberKind::Method(_)));
@@ -3396,7 +3394,6 @@ fn migrated_keywords_usable_as_contextual_identifiers() {
         "redde",
         "ego",
         "finge",
-        "sub",
         "implet",
         "ad",
         "omnia",
@@ -3461,7 +3458,6 @@ fn migrated_keywords_usable_as_contextual_identifiers() {
         "rumpe",
         "perge",
         "redde",
-        "sub",
         "implet",
         "omnia",
         "inter",

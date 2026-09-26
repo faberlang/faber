@@ -136,12 +136,6 @@ pub struct Parser {
     reader_keyword_surfaces: HashMap<String, String>,
     reader_type_latin_keys: HashMap<String, String>,
     has_latin_fallback: bool,
-    /// Depth of `abstractus genus` member parsing (type-algebra U1).
-    ///
-    /// Bodyless `functio_method_decl`s parse only while this is non-zero, so
-    /// signature-only methods exist under an `abstractus` header and nowhere
-    /// else; top-level bodyless functions remain governed by `options`.
-    abstract_class_depth: u32,
     /// Source spellings that declare a nominal type in this file (U1R).
     ///
     /// Populated by one pre-parse token scan so `est <name>` classification is
@@ -315,7 +309,6 @@ impl Parser {
             reader_keyword_surfaces,
             reader_type_latin_keys,
             has_latin_fallback,
-            abstract_class_depth: 0,
             declared_type_names: HashSet::new(),
             nesting_depth: 0,
             folded_operators: 0,
@@ -1196,7 +1189,6 @@ impl Parser {
                         | TokenKind::Rumpe
                         | TokenKind::Tacet
                         | TokenKind::Ad
-                        | TokenKind::Abstractus
                         | TokenKind::Ex
                         | TokenKind::Importa
                         | TokenKind::Proba
@@ -1388,6 +1380,10 @@ mod slot_helpers_test;
 #[cfg(test)]
 #[path = "allocator_surface_removed_test.rs"]
 mod allocator_surface_removed_test;
+
+#[cfg(test)]
+#[path = "inheritance_removed_test.rs"]
+mod inheritance_removed_test;
 
 #[cfg(test)]
 #[path = "nexum_removed_test.rs"]

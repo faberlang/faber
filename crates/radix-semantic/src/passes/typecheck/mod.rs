@@ -62,8 +62,7 @@ use crate::{
     FuncSig, GenericBindingSource, GenericParamSort, GenericWitness, IndexExpr, IndexInferState,
     MarkerFamily, NumericWidth, ParamType, Primitive, ResolvedGenericBinding, ResolvedGenericCall,
     Resolver, SemanticError, SemanticErrorKind, SemanticGenericParamDefault, SemanticParamMode,
-    StructHeritageFieldRow, Type, TypeId, TypeParamConstraint, TypeTable, WarningKind,
-    types::InferVar,
+    Type, TypeId, TypeParamConstraint, TypeTable, WarningKind, types::InferVar,
 };
 use radix_hir::{
     DefId, HirArrayElement, HirAvailability, HirBinOp, HirBlock, HirCape, HirCasuArm,
@@ -142,45 +141,11 @@ pub(crate) struct BindingInfo {
 /// Struct member information collected before expression checking begins.
 pub(crate) struct StructInfo {
     /// Field contracts keyed by lowered field symbol.
-    ///
-    /// After heritage resolution this is the merged view: inherited fields are
-    /// present alongside own fields so literals, access, and lookup see the
-    /// full genus contract with zero call-site changes (ruling (a)).
     fields: FxHashMap<Symbol, StructFieldInfo>,
 
     /// Method signatures keyed by method name; receiver handling is performed
     /// by lookup/call checking rather than encoded in the signature table.
-    ///
-    /// Merged view after heritage resolution; own declarations win over
-    /// inherited ones (legal override).
     methods: FxHashMap<Symbol, FuncSig>,
-
-    /// Declaration spans keyed by method name for override diagnostics.
-    method_spans: FxHashMap<Symbol, radix_lexer::Span>,
-
-    /// Whether the genus itself was declared `abstractus`.
-    is_abstract: bool,
-
-    /// Method names declared without a body in this genus's own source.
-    own_bodyless: FxHashSet<Symbol>,
-
-    /// Method names with a body in this genus's own source.
-    own_bodied: FxHashSet<Symbol>,
-
-    /// Bodyless method names still unsatisfied anywhere in the merged view
-    /// (own bodyless plus inherited bodyless minus implemented names). A
-    /// concrete genus with any entry here fails concrete-completeness.
-    bodyless_methods: FxHashSet<Symbol>,
-}
-
-/// Direct heritage of one local genus declaration (type-algebra U1).
-#[derive(Clone)]
-pub(crate) struct StructHeritage {
-    /// Resolved `extends` target, if declared.
-    pub extends: Option<DefId>,
-
-    /// Resolved `implements` targets, in declaration order.
-    pub implements: Vec<DefId>,
 }
 
 /// Interface method contract plus availability metadata.
@@ -287,30 +252,13 @@ pub(crate) struct TypeChecker<'a> {
     /// Interface method contracts available to method lookup.
     pub interfaces: FxHashMap<DefId, FxHashMap<Symbol, InterfaceMethodInfo>>,
 
-    /// Direct heritage of local genus declarations, keyed by struct def.
-    pub struct_heritage: FxHashMap<DefId, StructHeritage>,
+    /// Declared `implet` contracts of local genus declarations in item order,
+    /// with their spans, so contract resolution reports deterministically.
+    pub struct_implements: Vec<(DefId, radix_lexer::Span, Vec<DefId>)>,
 
-    /// Local genus declarations in item order, with their spans, so heritage
-    /// resolution walks and reports in a deterministic sequence.
-    pub struct_order: Vec<(DefId, radix_lexer::Span)>,
-
-    /// Own instance-field declaration order per genus (statics excluded).
-    /// The order seed for the canonical merged field view.
-    pub own_instance_fields: FxHashMap<DefId, Vec<Symbol>>,
-
-    /// Canonical merged instance-field rows per genus, built by the heritage
-    /// merge (ancestors first, own fields last, nearest declaration wins) and
-    /// published to the resolver after checking so MIR aggregate
-    /// lowering/validation reuse the view the checker admitted against.
-    pub merged_heritage_fields: FxHashMap<DefId, Vec<StructHeritageFieldRow>>,
-
-    /// Transitive `extends` chain (nearest ancestor first), keyed by struct
-    /// def. Cycle-cut and kind-checked during heritage resolution.
-    pub ancestor_structs: FxHashMap<DefId, Vec<DefId>>,
-
-    /// Transitive `implements` closure (own plus every ancestor's), keyed by
-    /// struct def. Interface-to-interface heritage is not in the grammar and
-    /// never contributes here.
+    /// Kind-checked `implet` contracts keyed by struct def. There is no class
+    /// inheritance (DECISIONS D8.1), so this is exactly the genus's own
+    /// declaration, and interface-to-interface heritage is not in the grammar.
     pub implemented_interfaces: FxHashMap<DefId, FxHashSet<DefId>>,
 
     /// Type-alias declaration parameter names keyed by alias def-id, in
@@ -479,13 +427,10 @@ pub(crate) fn typecheck_with_interner(
     interner: Option<&Interner>,
 ) -> Result<(), Vec<SemanticError>> {
     let config = crate::PassConfig::for_target(Target::HirRust);
-    typecheck_with_config(hir, resolver, types, interner, &config, None, None).map(|_| ())
+    typecheck_with_config(hir, resolver, types, interner, &config, None, None)
 }
 
 /// Typecheck HIR with a caller-supplied [`PassConfig`].
-///
-/// On success returns the canonical merged heritage field view per local
-/// genus, for publication onto the resolver.
 ///
 /// # Errors
 ///
@@ -498,7 +443,7 @@ pub(crate) fn typecheck_with_config(
     config: &crate::PassConfig,
     companion_signatures: Option<&crate::passes::companion_signature::CompanionSignatures>,
     presentation: Option<&mut HirPresentation>,
-) -> Result<FxHashMap<DefId, Vec<StructHeritageFieldRow>>, Vec<SemanticError>> {
+) -> Result<(), Vec<SemanticError>> {
     let mut checker = TypeChecker::new(resolver, types, interner, config.target);
     checker.locale_pack = config.locale_pack.as_ref();
     checker.collect_imported_file_structs();
@@ -514,7 +459,7 @@ pub(crate) fn typecheck_with_config(
     }
 
     if checker.errors.is_empty() {
-        Ok(std::mem::take(&mut checker.merged_heritage_fields))
+        Ok(())
     } else {
         Err(checker.errors)
     }
@@ -545,11 +490,7 @@ impl<'a> TypeChecker<'a> {
             structs: FxHashMap::default(),
             json_structs: FxHashSet::default(),
             interfaces: FxHashMap::default(),
-            struct_heritage: FxHashMap::default(),
-            struct_order: Vec::new(),
-            own_instance_fields: FxHashMap::default(),
-            merged_heritage_fields: FxHashMap::default(),
-            ancestor_structs: FxHashMap::default(),
+            struct_implements: Vec::new(),
             implemented_interfaces: FxHashMap::default(),
             alias_type_params: FxHashMap::default(),
             import_receivers: FxHashSet::default(),
@@ -632,18 +573,7 @@ impl<'a> TypeChecker<'a> {
                 .into_iter()
                 .map(|method| (method.name, method.sig))
                 .collect();
-            self.structs.insert(
-                def_id,
-                StructInfo {
-                    fields,
-                    methods,
-                    method_spans: FxHashMap::default(),
-                    is_abstract: false,
-                    own_bodyless: FxHashSet::default(),
-                    own_bodied: FxHashSet::default(),
-                    bodyless_methods: FxHashSet::default(),
-                },
-            );
+            self.structs.insert(def_id, StructInfo { fields, methods });
         }
     }
 

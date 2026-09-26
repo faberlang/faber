@@ -16,7 +16,6 @@ typus = "类型"
 schema = "架构"
 columna = "列"
 varia = "变量"
-abstractus = "抽象"
 ceteri = "其余"
 errata = "勘误"
 exitus = "退出"
@@ -73,7 +72,6 @@ vel = "兜底"
 ego = "自身"
 finge = "构造"
 implet = "实现"
-sub = "继承"
 mone = "警告"
 nota = "显示"
 scribe = "写入"
@@ -1264,10 +1262,6 @@ help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.unhandled_statement_kind]
 message = "lowering 中出现未处理的 statement kind"
-help = "修正用于 lowering 的 AST construct"
-
-[diagnostics.SEM008.issues.unknown_base_class]
-message = "gens 声明中出现未知 base class"
 help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.unknown_finge_cast_type]

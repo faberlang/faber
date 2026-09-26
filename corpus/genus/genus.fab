@@ -7,7 +7,7 @@ canonical = true
 summary = "Declares a concrete type with fields and methods."
 syntax = "genus <name> [<type-params>] <block>"
 aliases = ["class", "struct"]
-related = ["implendum", "abstractus", "implet", "sub"]
+related = ["implendum", "implet"]
 locale = "en"
 +++
 # =============================================================================
@@ -16,12 +16,12 @@ locale = "en"
 #
 # What this teaches:
 #   • Declares a concrete type with fields and methods.
-#   • Related keywords: implendum, abstractus, implet, sub
+#   • Related keywords: implendum, implet
 #
 # Common mistakes:
 #   • Using retired bare object literals (`{ key = expr }`) — use `GenusName { field = expr }` instead; bare `{ }` is now a JSON valor literal.
 #
-# See also: implendum, abstractus, implet, sub
+# See also: implendum, implet
 # =============================================================================
 
 # Basic genus (record type) with fields

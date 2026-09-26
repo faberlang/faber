@@ -1266,7 +1266,7 @@ impl TypeChecker<'_> {
     ///
     /// Guardrail 1 teaches the member rule whenever a written union has two
     /// or more nominal members. Guardrails 3 and 4 compute over the
-    /// heritage-merged member views and stay confined to all-nominal unions
+    /// declared member views and stay confined to all-nominal unions
     /// — a mixed or primitive union has no honest declared-member view.
     pub fn warn_union_annotation_guardrails(
         &mut self,

@@ -507,8 +507,10 @@ pub struct FunctionProvenanceTableWire {
 /// serialized HIR presentation additions, so schema-v14 artifacts fail closed
 /// at the schema gate as usual. Version 16 drops the dead `HirCasuArm::guard`
 /// field (D4.1: `discerne` arms carry no guards), a serialized HIR removal,
-/// so schema-v15 artifacts fail closed at the schema gate.
-pub const SCHEMA_VERSION: u32 = 16;
+/// so schema-v15 artifacts fail closed at the schema gate. Version 17 drops `HirStruct.extends` and `HirStruct.is_abstract` (class
+/// inheritance removed, DECISIONS D8.1); the serialized struct shape changed,
+/// so schema-v16 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 17;
 
 /// Serializable snapshot of one analyzed provider unit carried for HIR
 /// emission (ARCH-U4 carriage).

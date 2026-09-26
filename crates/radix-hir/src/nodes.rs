@@ -563,10 +563,12 @@ pub enum HirParamMode {
     Ex,
 }
 
-/// Product type declaration with fields, methods, and declared relationships.
+/// Product type declaration with fields, methods, and declared contracts.
 ///
-/// HIR stores inheritance/interface references as `DefId` values so later
-/// checks can reason about relationships without reopening lexical scopes.
+/// HIR stores interface references as `DefId` values so later checks can
+/// reason about conformance without reopening lexical scopes. Class
+/// inheritance does not exist (DECISIONS D8.1): shared behaviour is a contract
+/// (`implet`), shared data is composition.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirStruct {
     pub name: Symbol,
@@ -576,19 +578,8 @@ pub struct HirStruct {
     pub fields: Vec<HirField>,
     pub methods: Vec<HirMethod>,
 
-    /// Resolved base type, if the source declares extension.
-    pub extends: Option<DefId>,
-
     /// Resolved interfaces this type claims to implement.
     pub implements: Vec<DefId>,
-
-    /// Whether the source declared this genus `abstractus`.
-    ///
-    /// Abstract genera cannot be constructed and may declare bodyless methods;
-    /// concrete genera must complete every bodyless method in their heritage
-    /// closure (type-algebra U1).
-    #[serde(default)]
-    pub is_abstract: bool,
 }
 
 /// Field declaration inside a product type.

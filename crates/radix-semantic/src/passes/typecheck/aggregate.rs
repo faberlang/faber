@@ -22,7 +22,6 @@ use super::*;
 use radix_syntax::ClosureModifier;
 
 const ISSUE_ARRAY_SPREAD_REQUIRES_LISTA: &str = "array_spread_requires_lista";
-const ISSUE_ABSTRACT_CONSTRUCTION: &str = "abstract_construction";
 const ISSUE_CLOSURE_PARAMETER_TYPE_MISMATCH: &str = "closure_parameter_type_mismatch";
 const ISSUE_CLOSURE_RETURN_TYPE_MISMATCH: &str = "closure_return_type_mismatch";
 const ISSUE_FIELD_INITIALIZER_TYPE_MISMATCH: &str = "field_initializer_type_mismatch";
@@ -48,8 +47,8 @@ impl TypeChecker<'_> {
         args: &[radix_types::AppliedArg],
         span: radix_lexer::Span,
     ) {
-        let (field_types, is_abstract) = if let Some(info) = self.structs.get(&def_id) {
-            (info.fields.clone(), info.is_abstract)
+        let field_types = if let Some(info) = self.structs.get(&def_id) {
+            info.fields.clone()
         } else {
             self.error_issue(
                 SemanticErrorKind::TypeUndefined,
@@ -61,15 +60,6 @@ impl TypeChecker<'_> {
             );
             return;
         };
-        // (c): an abstract genus is a contract, not a constructor; concrete
-        // genera extending it are the constructible shapes.
-        if is_abstract {
-            self.error_issue(
-                SemanticErrorKind::TypeMismatch,
-                ISSUE_ABSTRACT_CONSTRUCTION,
-                span,
-            );
-        }
         let field_types: FxHashMap<Symbol, StructFieldInfo> = {
             let mut vars = FxHashMap::default();
             let mut shape_vars = FxHashMap::default();
@@ -445,10 +435,9 @@ impl TypeChecker<'_> {
         &mut self,
         def_id: DefId,
         fields: &mut Vec<(Symbol, HirExpression)>,
-        literal_span: radix_lexer::Span,
     ) -> TypeId {
-        let (field_types, is_abstract) = if let Some(info) = self.structs.get(&def_id) {
-            (info.fields.clone(), info.is_abstract)
+        let field_types = if let Some(info) = self.structs.get(&def_id) {
+            info.fields.clone()
         } else {
             self.error_issue(
                 SemanticErrorKind::TypeUndefined,
@@ -460,15 +449,6 @@ impl TypeChecker<'_> {
             );
             return self.error_type;
         };
-        // (c): an abstract genus is a contract, not a constructor; concrete
-        // genera extending it are the constructible shapes.
-        if is_abstract {
-            self.error_issue(
-                SemanticErrorKind::TypeMismatch,
-                ISSUE_ABSTRACT_CONSTRUCTION,
-                literal_span,
-            );
-        }
         let witnesses = self.constructor_witnesses(def_id, &[], None, radix_lexer::Span::default());
         let applied_args: Vec<radix_types::AppliedArg> = witnesses
             .iter()

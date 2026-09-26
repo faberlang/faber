@@ -776,10 +776,6 @@ fn semantic_duplicate_definition_help(args: &[DiagnosticArg]) -> Option<String> 
         "duplicate_commune_field" => {
             Some("declare each commune field once in the union region".to_owned())
         }
-        "field_redeclaration" => Some(
-            "remove the redeclared field; inherited fields are already part of the child genus"
-                .to_owned(),
-        ),
         "union_variant_redeclares_shared_field" => {
             Some("omit the commune field from the variant payload".to_owned())
         }

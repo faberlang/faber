@@ -16,7 +16,6 @@ typus = "نمط"
 schema = "مخطط"
 columna = "عمود"
 varia = "متغير"
-abstractus = "مجرد"
 ceteri = "باقي"
 errata = "مخطئ"
 exitus = "مخرج"
@@ -73,7 +72,6 @@ vel = "عوض"
 ego = "ذات"
 finge = "أنشئ"
 implet = "حقق"
-sub = "امتد"
 mone = "نبه"
 nota = "اعرض"
 scribe = "اكتب"
@@ -1264,10 +1262,6 @@ help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.unhandled_statement_kind]
 message = "unhandled statement kind في التخفيض"
-help = "أصلح تركيب AST للتخفيض"
-
-[diagnostics.SEM008.issues.unknown_base_class]
-message = "base class غير معروف في gens declaration"
 help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.unknown_finge_cast_type]

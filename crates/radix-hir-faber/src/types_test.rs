@@ -85,7 +85,6 @@ impl KeywordSurface for LatinSurface {
             TokenKind::Discretio => "discretio",
             TokenKind::Implendum => "implendum",
             TokenKind::Typus => "typus",
-            TokenKind::Sub => "sub",
             TokenKind::Implet => "implet",
             TokenKind::Generis => "generis",
             TokenKind::Ordo => "ordo",
@@ -1566,9 +1565,7 @@ fn struct_publica_annotation_reemits() {
             type_params: Vec::new(),
             fields: Vec::new(),
             methods: Vec::new(),
-            extends: None,
             implements: Vec::new(),
-            is_abstract: false,
         }),
         span: span(),
     };

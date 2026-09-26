@@ -775,7 +775,7 @@ impl Parser {
         self.current_ident_is(RETIRED_CURATA) && matches!(self.peek_at(1).kind, TokenKind::Ident(_))
     }
 
-    fn current_ident_is(&self, text: &str) -> bool {
+    pub(super) fn current_ident_is(&self, text: &str) -> bool {
         matches!(self.peek().kind, TokenKind::Ident(sym) if self.interner.resolve(sym) == text)
     }
 

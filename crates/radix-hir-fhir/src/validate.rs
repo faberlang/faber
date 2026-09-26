@@ -2170,9 +2170,6 @@ pub(crate) fn validate_referential_integrity(
                         check_type,
                     )?;
                 }
-                if let Some(d) = s.extends {
-                    check_def(d)?;
-                }
                 for d in &s.implements {
                     check_def(*d)?;
                 }

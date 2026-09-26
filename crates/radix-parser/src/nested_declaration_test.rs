@@ -1,10 +1,10 @@
 //! Parser tests for the top-level declaration rule (DECISIONS D22.1).
 //!
-//! Contract: a `functio` or a type declaration (`genus`, `abstractus genus`,
-//! `implendum`, `ordo`, `discretio`, `typus`, `schema`) inside a statement
-//! block fails at parse time with PARSE010 `declaration_not_top_level`. The
-//! same declaration at top level parses, and a `functio` inside a `genus` body
-//! is a method and stays legal.
+//! Contract: a `functio` or a type declaration (`genus`, `implendum`,
+//! `ordo`, `discretio`, `typus`, `schema`) inside a statement block fails at
+//! parse time with PARSE010 `declaration_not_top_level`. The same declaration
+//! at top level parses, and a `functio` inside a `genus` body is a method and
+//! stays legal.
 
 use crate::ParseErrorKind;
 use crate::test_support::{has_arg, parse_ok, parse_program};
@@ -13,7 +13,6 @@ use crate::test_support::{has_arg, parse_ok, parse_program};
 const DECLARATIONS: &[&str] = &[
     "functio g() → numerus { redde 1 }",
     "genus Punctum { numerus x }",
-    "abstractus genus Figura { numerus latera }",
     "implendum Mensura { functio area() → fractus }",
     "ordo Color { Ruber, Viridis }",
     "discretio Signum { Unus, Duo }",

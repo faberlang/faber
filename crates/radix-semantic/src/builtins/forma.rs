@@ -197,9 +197,7 @@ pub fn inject_hir_item(
             },
         ],
         methods: Vec::new(),
-        extends: None,
         implements: Vec::new(),
-        is_abstract: false,
     };
 
     items.push(HirItem {

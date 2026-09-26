@@ -1,9 +1,7 @@
-//! U1 (type-algebra-error-lifecycle): semantic relations — the first real
-//! consumer of `HirStruct.extends`/`implements`.
-//!
-//! Probes p1–p14 (green flips + regression floor) and the declared negatives
-//! live as durable fixtures under `test-fixtures/oop-relations/`; the sources
-//! here are the inline equivalents asserted issue-by-issue.
+//! Semantic relations over `HirStruct.implements`: contract (`implet`)
+//! subsumption at the assignment funnel and its declared negatives. Class
+//! inheritance (`extends`/`abstractus`) was removed (DECISIONS D8.1), so a
+//! genus relates to other types only through the contracts it declares.
 //!
 //! E1 (equality-tier-respelling) also pins the scalar equality relation
 //! ladder on this configured (en) surface: relaxed `≅`/`≈` admit mixed-width
@@ -56,49 +54,6 @@ fn assert_en_rejects_with_issue(source: &str, expected: &str) {
 }
 
 #[test]
-fn p1_field_inheritance_flips_green() {
-    assert_en_accepts(
-        "class Base {
-    string message
-}
-
-class Child extends Base { }
-
-fn probe() → string {
-    const Child c ← Child {message = \"hi\"}
-    return c.message
-}
-
-main {
-    probe()
-}
-",
-    );
-}
-
-#[test]
-fn p2_method_inheritance_flips_green() {
-    assert_en_accepts(
-        "class Base {
-    string message
-    fn message() → string { return self.message }
-}
-
-class Child extends Base { }
-
-fn probe() → string {
-    const Child c ← Child {message = \"hi\"}
-    return c.message()
-}
-
-main {
-    probe()
-}
-",
-    );
-}
-
-#[test]
 fn p5_implements_subsumption_at_arguments_flips_green() {
     assert_en_accepts(
         "interface Greets {
@@ -145,27 +100,6 @@ main {
 }
 
 #[test]
-fn p7_extends_subsumption_at_arguments_flips_green() {
-    assert_en_accepts(
-        "class Base {
-    string message
-}
-
-class Child extends Base { }
-
-fn probe(Base b) → string {
-    return b.message
-}
-
-main {
-    const Child c ← Child {message = \"hi\"}
-    probe(c)
-}
-",
-    );
-}
-
-#[test]
 fn p8_subsumption_at_returns_flips_green() {
     assert_en_accepts(
         "interface Greets {
@@ -182,26 +116,6 @@ fn make() → Greets {
 
 main {
     make()
-}
-",
-    );
-}
-
-#[test]
-fn p13c_bodyless_method_under_abstractus_flips_green() {
-    assert_en_accepts(
-        "abstract class Shape {
-    fn area() → float
-}
-
-class Square extends Shape {
-    float side
-    fn area() → float { return self.side * self.side }
-}
-
-main {
-    const Square s ← Square {side = 2.0}
-    print s.area()
 }
 ",
     );
@@ -241,44 +155,6 @@ main {
 // NEGATIVES — the declared red set.
 
 #[test]
-fn heritage_cycle_is_rejected() {
-    assert_en_rejects_with_issue(
-        "class A extends B {
-    string x
-}
-
-class B extends A {
-    string y
-}
-
-main {
-    print \"cycle\"
-}
-",
-        "heritage_cycle",
-    );
-}
-
-#[test]
-fn extends_naming_non_genus_is_rejected() {
-    assert_en_rejects_with_issue(
-        "interface Greets {
-    fn greet() → string
-}
-
-class Weird extends Greets {
-    fn greet() → string { return \"weird\" }
-}
-
-main {
-    print \"kind\"
-}
-",
-        "extends_requires_genus",
-    );
-}
-
-#[test]
 fn implet_naming_non_implendum_is_rejected() {
     assert_en_rejects_with_issue(
         "class Base {
@@ -298,100 +174,48 @@ main {
 }
 
 #[test]
-fn missing_impl_body_in_chain_is_rejected() {
+fn invariant_generics_reject_lista_concrete_into_lista_contract() {
     assert_en_rejects_with_issue(
-        "abstract class Shape {
-    fn area() → float
+        "interface Greets {
+    fn greet() → string
 }
 
-class Circle extends Shape {
-    float radius
+class Hello implements Greets {
+    fn greet() → string { return \"hello\" }
 }
 
-main {
-    print \"missing\"
-}
-",
-        "abstract_method_unimplemented",
-    );
-}
-
-#[test]
-fn abstract_construction_is_rejected() {
-    assert_en_rejects_with_issue(
-        "abstract class Shape {
-    fn area() → float { return 0.0 }
-}
-
-main {
-    const Shape s ← Shape {}
-    print s.area()
-}
-",
-        "abstract_construction",
-    );
-}
-
-#[test]
-fn p11_field_redeclaration_flips_red() {
-    assert_en_rejects_with_issue(
-        "class Base {
-    string message
-}
-
-class Child extends Base {
-    string message
-}
-
-fn probe() → string {
-    const Child c ← Child {message = \"hi\"}
-    return c.message
-}
-
-main {
-    probe()
-}
-",
-        "field_redeclaration",
-    );
-}
-
-#[test]
-fn incompatible_override_is_rejected() {
-    assert_en_rejects_with_issue(
-        "class Base {
-    fn name() → string { return \"base\" }
-}
-
-class Child extends Base {
-    fn name() → float { return 1.5 }
-}
-
-main {
-    print \"override\"
-}
-",
-        "override_signature_incompatible",
-    );
-}
-
-#[test]
-fn invariant_generics_reject_lista_child_into_lista_base() {
-    assert_en_rejects_with_issue(
-        "class Base {
-    string message
-}
-
-class Child extends Base { }
-
-fn probe(lista<Base> xs) → void {
+fn probe(lista<Greets> xs) → void {
     print \"probe\"
 }
 
 main {
-    const Child c ← Child {message = \"hi\"}
-    const lista<Child> cs ← [c]
-    probe(cs)
+    const Hello h ← Hello {}
+    const lista<Hello> hs ← [h]
+    probe(hs)
+}
+",
+        "argument_type_mismatch",
+    );
+}
+
+#[test]
+fn genus_does_not_flow_into_an_unrelated_genus() {
+    assert_en_rejects_with_issue(
+        "class Base {
+    string message
+}
+
+class Other {
+    string message
+}
+
+fn probe(Base b) → string {
+    return b.message
+}
+
+main {
+    const Other o ← Other {message = \"hi\"}
+    probe(o)
 }
 ",
         "argument_type_mismatch",
@@ -458,33 +282,8 @@ main {
 }
 
 #[test]
-fn inherited_interface_conformance_flows_through_extends() {
-    assert_en_accepts(
-        "interface Greets {
-    fn greet() → string
-}
-
-class Base implements Greets {
-    fn greet() → string { return \"base\" }
-}
-
-class Child extends Base { }
-
-fn probe(Greets g) → string {
-    return g.greet()
-}
-
-main {
-    const Child c ← Child {}
-    print probe(c)
-}
-",
-    );
-}
-
-#[test]
-fn bodyless_relaxation_is_abstractus_only() {
-    // A bodyless method under a CONCRETE genus stays a parse error.
+fn bodyless_genus_method_is_rejected() {
+    // Bodyless methods belong to contracts; a genus method needs a body.
     let result = analyze_en(
         "class Concrete {
     fn bodyless() → string
@@ -497,7 +296,7 @@ main {
     );
     assert!(
         !result.is_ok(),
-        "bodyless method outside abstractus must not parse, got: {:?}",
+        "bodyless genus method must not parse, got: {:?}",
         result.diagnostics
     );
 }

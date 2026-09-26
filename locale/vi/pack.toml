@@ -16,7 +16,6 @@ typus = "kiểu_tên"
 schema = "lược_đồ"
 columna = "cột"
 varia = "biến"
-abstractus = "trừu_tượng"
 ceteri = "còn_lại"
 errata = "lỗi"
 exitus = "thoát"
@@ -73,7 +72,6 @@ vel = "hoặc_nếu_rỗng"
 ego = "tôi"
 finge = "tạo"
 implet = "thực_thi"
-sub = "dưới"
 mone = "cảnh_báo"
 nota = "ghi_chú"
 scribe = "viết"
@@ -1264,10 +1262,6 @@ help = "sửa cấu trúc AST để hạ cấp"
 
 [diagnostics.SEM008.issues.unhandled_statement_kind]
 message = "loại câu lệnh chưa được xử lý khi hạ cấp"
-help = "sửa cấu trúc AST để hạ cấp"
-
-[diagnostics.SEM008.issues.unknown_base_class]
-message = "không biết lớp cơ sở trong khai báo gens"
 help = "sửa cấu trúc AST để hạ cấp"
 
 [diagnostics.SEM008.issues.unknown_finge_cast_type]

@@ -16,7 +16,6 @@ typus = "型別"
 schema = "結構"
 columna = "欄位"
 varia = "變值"
-abstractus = "抽象"
 ceteri = "其餘"
 errata = "錯誤"
 exitus = "出口"
@@ -73,7 +72,6 @@ vel = "或取"
 ego = "自身"
 finge = "虛構"
 implet = "實作"
-sub = "子"
 mone = "警告"
 nota = "註記"
 scribe = "寫出"
@@ -1264,10 +1262,6 @@ help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.unhandled_statement_kind]
 message = "降階中有未處理的陳述式種類"
-help = "修正用於降階的 AST 結構"
-
-[diagnostics.SEM008.issues.unknown_base_class]
-message = "gens 宣告中的基底類別未知"
 help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.unknown_finge_cast_type]

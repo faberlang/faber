@@ -29,6 +29,11 @@ use radix_lexer::{
 #[allow(clippy::wildcard_imports)]
 use radix_syntax::*;
 
+/// Retired abstract-genus modifier (DECISIONS D8.1).
+pub(super) const RETIRED_ABSTRACTUS: &str = "abstractus";
+/// Retired genus `extends` clause keyword (DECISIONS D8.1).
+const RETIRED_SUB: &str = "sub";
+
 /// Whether a parsed statement is a declaration that may appear only at top
 /// level (DECISIONS D22.1): a `functio` or a type declaration. Methods live in
 /// `genus` bodies, which parse through their own member loop, not a block.
@@ -77,7 +82,6 @@ impl Parser {
                 Some(TokenKind::Sit) => self.parse_sit_decl()?,
                 Some(TokenKind::Typus) => self.parse_type_alias_decl()?,
                 Some(TokenKind::Schema) => self.parse_schema_decl()?,
-                Some(TokenKind::Abstractus) => self.parse_abstract_class_decl()?,
                 Some(TokenKind::Importa) => self.parse_import_decl()?,
                 Some(TokenKind::Proba) => StmtKind::Proba(self.parse_proba_case()?),
                 Some(TokenKind::Probandum) => self.parse_probandum_decl()?,
@@ -119,6 +123,9 @@ impl Parser {
                 }
                 Some(TokenKind::Reddet) => self.parse_reddet_stmt(start)?,
                 Some(TokenKind::Tacebit) => self.parse_tacebit_stmt(start)?,
+                None if self.at_retired_abstractus_decl() => {
+                    return Err(self.inheritance_removed_error(RETIRED_ABSTRACTUS));
+                }
                 None if self.at_retired_cura_stmt() => {
                     return Err(self.allocator_surface_removed_error(super::stmt::RETIRED_CURA));
                 }
@@ -577,7 +584,7 @@ impl Parser {
 
         let body = if self.check(&TokenKind::LBrace) {
             Some(self.parse_block()?)
-        } else if self.options.allow_bodyless_functions || self.abstract_class_depth > 0 {
+        } else if self.options.allow_bodyless_functions {
             None
         } else {
             return Err(ParseError::structured(
@@ -721,36 +728,25 @@ impl Parser {
 
     // CLASS DECLARATIONS
 
-    /// Parse a concrete class declaration.
+    /// Parse a class declaration.
     ///
     /// GRAMMAR:
-    ///   class-decl := genus ident [type-params] [sub ident] [implet ident-list] { member* }
+    ///   class-decl := genus ident [type-params] [implet ident-list] { member* }
     ///
-    /// Class headers are intentionally narrow: one optional `sub` parent and a
-    /// comma-separated `implet` list. Field and method parsing stays inside this
-    /// module because member syntax shares declaration markers with top-level
-    /// bindings and functions.
+    /// Class headers are intentionally narrow: a comma-separated `implet` list
+    /// and nothing else. Class inheritance (`sub`, `abstractus`) was removed
+    /// (DECISIONS D8.1); its old shapes report `inheritance_removed`. Field and
+    /// method parsing stays inside this module because member syntax shares
+    /// declaration markers with top-level bindings and functions.
     fn parse_class_decl(&mut self) -> Result<StmtKind, ParseError> {
-        self.parse_class_decl_inner(false)
-    }
-
-    /// Parse `abstractus genus ...` without introducing a second class grammar.
-    fn parse_abstract_class_decl(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword_ident(TokenKind::Abstractus, "expected 'abstractus'")?;
-        self.parse_class_decl_inner(true)
-    }
-
-    fn parse_class_decl_inner(&mut self, is_abstract: bool) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Genus, "expected 'genus'")?;
 
         let name = self.parse_class_name()?;
         let type_params = self.parse_generic_params()?;
 
-        let extends = if self.eat_keyword_ident(TokenKind::Sub) {
-            Some(self.parse_decl_name()?)
-        } else {
-            None
-        };
+        if self.at_retired_sub_clause() {
+            return Err(self.inheritance_removed_error(RETIRED_SUB));
+        }
 
         let mut implements = Vec::new();
         if self.eat_keyword_ident(TokenKind::Implet) {
@@ -786,17 +782,10 @@ impl Parser {
         }
         self.advance();
 
-        // Bodyless methods parse only while an `abstractus` header is open.
-        if is_abstract {
-            self.abstract_class_depth += 1;
-        }
         let mut members = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
             let member = self.parse_class_member()?;
             members.push(member);
-        }
-        if is_abstract {
-            self.abstract_class_depth -= 1;
         }
 
         // Trivia immediately before the consuming `}` has no following member
@@ -807,14 +796,38 @@ impl Parser {
         self.expect(&TokenKind::RBrace, "expected '}' after class body")?;
 
         Ok(StmtKind::Class(ClassDecl {
-            is_abstract,
             name,
             type_params,
-            extends,
             implements,
             members,
             end_trivia,
         }))
+    }
+
+    /// Whether the current word opens a retired `abstractus genus` header.
+    ///
+    /// `abstractus` was removed (DECISIONS D8.1). Only the old declaration
+    /// shape `abstractus genus …` is diagnosed, so `abstractus` stays an
+    /// ordinary identifier everywhere else. Matching the canonical Latin
+    /// spelling is deliberate: the keyword no longer has pack rows.
+    pub(super) fn at_retired_abstractus_decl(&self) -> bool {
+        self.current_ident_is(RETIRED_ABSTRACTUS)
+            && self.keyword_ident_at(1) == Some(TokenKind::Genus)
+    }
+
+    /// Whether the current word is the retired `sub Parent` genus clause.
+    ///
+    /// The old shape was `sub IDENT` directly after the genus name and type
+    /// parameters, where no other identifier is legal.
+    fn at_retired_sub_clause(&self) -> bool {
+        self.current_ident_is(RETIRED_SUB) && matches!(self.peek_at(1).kind, TokenKind::Ident(_))
+    }
+
+    /// Migration diagnostic for removed class inheritance (`abstractus`/`sub`).
+    pub(super) fn inheritance_removed_error(&self, keyword: &'static str) -> ParseError {
+        ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
+            .with_arg("issue", "inheritance_removed")
+            .with_arg("keyword", keyword)
     }
 
     /// Parse the field portion shared by genus and union declaration members.
@@ -1015,7 +1028,7 @@ impl Parser {
 
         // Grammar-level rejection: `sub`/`implet` inheritance syntax on a
         // schema is not a header surface (schemas have no inheritance).
-        if self.check_keyword_ident(TokenKind::Sub) || self.check_keyword_ident(TokenKind::Implet) {
+        if self.current_ident_is(RETIRED_SUB) || self.check_keyword_ident(TokenKind::Implet) {
             return Err(ParseError::structured(
                 ParseErrorKind::DeclarationInvalid,
                 self.current_span(),
@@ -1040,9 +1053,7 @@ impl Parser {
                 )
                 .with_arg("issue", "schema_method"));
             }
-            if self.check_keyword_ident(TokenKind::Sub)
-                || self.check_keyword_ident(TokenKind::Implet)
-            {
+            if self.current_ident_is(RETIRED_SUB) || self.check_keyword_ident(TokenKind::Implet) {
                 return Err(ParseError::structured(
                     ParseErrorKind::DeclarationInvalid,
                     self.current_span(),
@@ -2690,7 +2701,6 @@ impl Parser {
         // `parse_optio_annotation`'s own loop, which extends the generic
         // argument guard with the keyword.
         matches!(self.peek().kind, TokenKind::LBrace)
-            || self.check_keyword_ident(TokenKind::Abstractus)
             || self.check_keyword_ident(TokenKind::Importa)
             || self.check_keyword_ident(TokenKind::Incipit)
             || self.check_keyword_ident(TokenKind::Proba)

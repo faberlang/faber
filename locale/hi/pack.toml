@@ -16,7 +16,6 @@ typus = "प्रकार"
 schema = "स्कीमा"
 columna = "कॉलम"
 varia = "चर"
-abstractus = "अमूर्त"
 ceteri = "बाकी"
 errata = "त्रुटि"
 exitus = "निर्गम"
@@ -73,7 +72,6 @@ vel = "डिफ़ॉल्ट"
 ego = "मैं"
 finge = "गढ़ो"
 implet = "लागूकरता"
-sub = "अधीन"
 mone = "चेताओ"
 nota = "दिखाओ"
 scribe = "लिखो"
@@ -1276,10 +1274,6 @@ help = "लोअरिंग के लिए AST संरचना ठीक 
 
 [diagnostics.SEM008.issues.unhandled_statement_kind]
 message = "लोअरिंग में स्टेटमेंट का प्रकार संभाला नहीं गया"
-help = "लोअरिंग के लिए AST संरचना ठीक करें"
-
-[diagnostics.SEM008.issues.unknown_base_class]
-message = "gens घोषणा में अज्ञात आधार क्लास"
 help = "लोअरिंग के लिए AST संरचना ठीक करें"
 
 [diagnostics.SEM008.issues.unknown_finge_cast_type]

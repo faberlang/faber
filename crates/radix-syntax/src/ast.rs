@@ -384,10 +384,8 @@ pub enum ExitusValue {
 
 #[derive(Debug)]
 pub struct ClassDecl {
-    pub is_abstract: bool,
     pub name: Ident,
     pub type_params: Vec<TypeParam>,
-    pub extends: Option<Ident>,
     pub implements: Vec<Ident>,
     pub members: Vec<ClassMember>,
 

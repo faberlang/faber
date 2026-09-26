@@ -23,11 +23,6 @@ fn empty_struct_info() -> StructInfo {
     StructInfo {
         fields: FxHashMap::default(),
         methods: FxHashMap::default(),
-        method_spans: FxHashMap::default(),
-        is_abstract: false,
-        own_bodyless: FxHashSet::default(),
-        own_bodied: FxHashSet::default(),
-        bodyless_methods: FxHashSet::default(),
     }
 }
 
@@ -94,8 +89,6 @@ impl TypeChecker<'_> {
     ///
     /// Methods are stored as signatures rather than checked here so recursive
     /// and forward calls see the same declaration table as ordinary functions.
-    /// Inherited members are merged later by [`Self::resolve_struct_heritage`]
-    /// so parent views are complete regardless of declaration order.
     pub fn collect_struct(
         &mut self,
         def_id: DefId,
@@ -105,18 +98,11 @@ impl TypeChecker<'_> {
     ) {
         let mut fields = FxHashMap::default();
         let mut methods = FxHashMap::default();
-        let mut method_spans = FxHashMap::default();
-        let mut own_bodyless = FxHashSet::default();
-        let mut own_bodied = FxHashSet::default();
 
         if self.annotations_contain_json(annotations) {
             self.json_structs.insert(def_id);
         }
 
-        // Declaration order is the merged-view order seed: the MIR aggregate
-        // view keeps ancestors-first, own-fields-last ordering, which the
-        // hash-map field table loses.
-        let mut own_instance_fields = Vec::new();
         for field in &struct_item.fields {
             fields.insert(
                 field.name,
@@ -127,21 +113,11 @@ impl TypeChecker<'_> {
                     span: field.span,
                 },
             );
-            if !field.is_static {
-                own_instance_fields.push(field.name);
-            }
         }
-        self.own_instance_fields.insert(def_id, own_instance_fields);
 
         for method in &struct_item.methods {
             let sig = self.function_signature(&method.func);
             methods.insert(method.func.name, sig);
-            method_spans.insert(method.func.name, method.span);
-            if method.func.body.is_some() {
-                own_bodied.insert(method.func.name);
-            } else {
-                own_bodyless.insert(method.func.name);
-            }
             if let Some(role) = method.func.nucleum_role() {
                 self.nucleum_roles.insert(method.def_id, role);
                 self.method_nucleum_roles
@@ -158,27 +134,10 @@ impl TypeChecker<'_> {
                 .collect(),
         );
 
-        self.struct_heritage.insert(
-            def_id,
-            StructHeritage {
-                extends: struct_item.extends,
-                implements: struct_item.implements.clone(),
-            },
-        );
-        self.struct_order.push((def_id, span));
+        self.struct_implements
+            .push((def_id, span, struct_item.implements.clone()));
 
-        self.structs.insert(
-            def_id,
-            StructInfo {
-                fields,
-                methods,
-                method_spans,
-                is_abstract: struct_item.is_abstract,
-                own_bodyless,
-                own_bodied,
-                bodyless_methods: FxHashSet::default(),
-            },
-        );
+        self.structs.insert(def_id, StructInfo { fields, methods });
     }
 
     fn collect_interface(&mut self, def_id: DefId, interface_item: &radix_hir::HirInterface) {
@@ -272,11 +231,6 @@ impl TypeChecker<'_> {
             StructInfo {
                 fields,
                 methods: FxHashMap::default(),
-                method_spans: FxHashMap::default(),
-                is_abstract: false,
-                own_bodyless: FxHashSet::default(),
-                own_bodied: FxHashSet::default(),
-                bodyless_methods: FxHashSet::default(),
             },
         );
     }
@@ -348,11 +302,6 @@ impl TypeChecker<'_> {
                 StructInfo {
                     fields,
                     methods: FxHashMap::default(),
-                    method_spans: FxHashMap::default(),
-                    is_abstract: false,
-                    own_bodyless: FxHashSet::default(),
-                    own_bodied: FxHashSet::default(),
-                    bodyless_methods: FxHashSet::default(),
                 },
             );
         }
@@ -441,276 +390,36 @@ impl TypeChecker<'_> {
             }
         }
 
-        // U1: heritage resolution runs after every local genus and implendum
-        // is collected so kind checks, the transitive walk, and the merged
-        // views are declaration-order independent.
-        self.resolve_struct_heritage();
+        // Contract kind checks run after every local genus and implendum is
+        // collected so they are declaration-order independent.
+        self.resolve_struct_implements();
     }
 
-    /// Check and consume `HirStruct` heritage: kind checks, cycle detection,
-    /// merged member views, override/field-redeclaration diagnostics, and
-    /// concrete-completeness.
+    /// Kind-check each genus's `implet` clause and record its contracts.
     ///
-    /// Merging is compositional: each genus merges its parent's already-merged
-    /// view, so a parent's own ancestors arrive transitively and nearest
-    /// declarations win. Kind-invalid edges are dropped before the walk so a
-    /// bad clause does not cascade into member-merge noise.
-    fn resolve_struct_heritage(&mut self) {
-        let order = self.struct_order.clone();
-
-        // KIND: `extends` names a genus; `implet` names an implendum.
-        for (def_id, span) in &order {
-            let Some(mut heritage) = self.struct_heritage.get(def_id).cloned() else {
-                continue;
-            };
-            if let Some(parent) = heritage.extends
-                && !self.structs.contains_key(&parent)
-            {
-                self.error_issue(
-                    SemanticErrorKind::TypeMismatch,
-                    ISSUE_EXTENDS_REQUIRES_GENUS,
-                    *span,
-                );
-                heritage.extends = None;
-            }
-            let mut implements = heritage.implements.clone();
-            implements.retain(|iface| self.interfaces.contains_key(iface));
-            let dropped = heritage.implements.len() - implements.len();
-            heritage.implements = implements;
-            if dropped > 0 {
+    /// `implet` must name an implendum; other targets are dropped with one
+    /// diagnostic per genus. There is no class inheritance (DECISIONS D8.1), so
+    /// a genus conforms to exactly the contracts it declares.
+    fn resolve_struct_implements(&mut self) {
+        let declared = std::mem::take(&mut self.struct_implements);
+        for (def_id, span, implements) in &declared {
+            let interfaces: Vec<DefId> = implements
+                .iter()
+                .copied()
+                .filter(|iface| self.interfaces.contains_key(iface))
+                .collect();
+            if interfaces.len() < implements.len() {
                 self.error_issue(
                     SemanticErrorKind::TypeMismatch,
                     ISSUE_IMPLET_REQUIRES_IMPLENDUM,
                     *span,
                 );
             }
-            self.struct_heritage.insert(*def_id, heritage);
+            self.implemented_interfaces
+                .insert(*def_id, interfaces.into_iter().collect());
         }
-
-        // CYCLE: transitive extends chain per genus, cut at the closing edge.
-        for (def_id, span) in &order {
-            let mut chain: Vec<DefId> = Vec::new();
-            let mut seen: FxHashSet<DefId> = FxHashSet::default();
-            let mut cursor = *def_id;
-            while let Some(parent) = self
-                .struct_heritage
-                .get(&cursor)
-                .and_then(|heritage| heritage.extends)
-            {
-                if parent == *def_id || seen.contains(&parent) {
-                    self.error_issue(SemanticErrorKind::TypeMismatch, ISSUE_HERITAGE_CYCLE, *span);
-                    // Cut the walk at the closing edge; the cycle members
-                    // already carry the diagnostic.
-                    if let Some(heritage) = self.struct_heritage.get_mut(&cursor) {
-                        heritage.extends = None;
-                    }
-                    break;
-                }
-                seen.insert(parent);
-                chain.push(parent);
-                cursor = parent;
-            }
-            self.ancestor_structs.insert(*def_id, chain);
-        }
-
-        // MERGE: parent-first compositional views (own members win).
-        let mut merged: FxHashSet<DefId> = FxHashSet::default();
-        for (def_id, _) in &order {
-            self.merge_heritage_into(*def_id, &mut merged);
-        }
-
-        // IMPLEMENTS closure: own plus every ancestor's declaration.
-        for (def_id, _) in &order {
-            let mut interfaces: FxHashSet<DefId> = FxHashSet::default();
-            if let Some(heritage) = self.struct_heritage.get(def_id) {
-                interfaces.extend(heritage.implements.iter().copied());
-            }
-            if let Some(ancestors) = self.ancestor_structs.get(def_id) {
-                for ancestor in ancestors {
-                    if let Some(heritage) = self.struct_heritage.get(ancestor) {
-                        interfaces.extend(heritage.implements.iter().copied());
-                    }
-                }
-            }
-            self.implemented_interfaces.insert(*def_id, interfaces);
-        }
-
-        // COMPLETENESS: a concrete genus implements every bodyless method in
-        // its full heritage closure.
-        for (def_id, span) in &order {
-            let Some(info) = self.structs.get(def_id) else {
-                continue;
-            };
-            if info.is_abstract || info.bodyless_methods.is_empty() {
-                continue;
-            }
-            let unsatisfied: Vec<Symbol> = info.bodyless_methods.iter().copied().collect();
-            for name in unsatisfied {
-                let name_text = self
-                    .interner
-                    .map(|interner| interner.resolve(name).to_owned())
-                    .unwrap_or_default();
-                self.errors.push(
-                    SemanticError::structured(SemanticErrorKind::TypeMismatch, *span)
-                        .with_arg("issue", ISSUE_ABSTRACT_METHOD_UNIMPLEMENTED)
-                        .with_arg("method", name_text),
-                );
-            }
-        }
-    }
-
-    /// Merge the parent's (already-merged) view into one genus's view.
-    ///
-    /// Own field redeclarations and incompatible method overrides are
-    /// diagnosed here; own declarations always win the merged slot. The
-    /// child's view is taken out of the table while merging so diagnostics can
-    /// be emitted mid-merge without aliasing the member maps.
-    fn merge_heritage_into(&mut self, def_id: DefId, merged: &mut FxHashSet<DefId>) {
-        if merged.contains(&def_id) {
-            return;
-        }
-        merged.insert(def_id);
-        let parent = self
-            .struct_heritage
-            .get(&def_id)
-            .and_then(|heritage| heritage.extends)
-            .filter(|parent| self.structs.contains_key(parent));
-        if let Some(parent) = parent {
-            self.merge_heritage_into(parent, merged);
-        }
-
-        let mut info = self
-            .structs
-            .remove(&def_id)
-            .expect("collected struct present during heritage merge");
-
-        let own_instance_names: Vec<Symbol> = self
-            .own_instance_fields
-            .get(&def_id)
-            .cloned()
-            .unwrap_or_default();
-
-        let mut diagnostics: Vec<SemanticError> = Vec::new();
-        // The canonical merged field view: the parent's already-merged rows
-        // minus names this genus redeclares, then own instance fields in
-        // declaration order. Published to the resolver so MIR aggregate
-        // lowering/validation reuse it instead of re-deriving flattening.
-        let mut heritage_rows: Vec<StructHeritageFieldRow> = Vec::new();
-        if let Some(parent) = parent {
-            let parent_info = self.structs.get(&parent).expect("parent collected");
-            let parent_fields = parent_info.fields.clone();
-            let parent_methods = parent_info.methods.clone();
-            let parent_method_spans = parent_info.method_spans.clone();
-            let parent_bodyless = parent_info.bodyless_methods.clone();
-            for (name, field) in parent_fields {
-                if let std::collections::hash_map::Entry::Vacant(e) = info.fields.entry(name) {
-                    e.insert(field);
-                } else {
-                    // (a): no field shadowing under `sub` — the child's own
-                    // declaration is the diagnostic site.
-                    let span = info
-                        .fields
-                        .get(&name)
-                        .map(|own| own.span)
-                        .unwrap_or_default();
-                    diagnostics.push(
-                        SemanticError::structured(SemanticErrorKind::DefinitionDuplicate, span)
-                            .with_arg("issue", ISSUE_FIELD_REDECLARATION),
-                    );
-                }
-            }
-            for row in self
-                .merged_heritage_fields
-                .get(&parent)
-                .into_iter()
-                .flatten()
-                .copied()
-                .collect::<Vec<_>>()
-            {
-                // Nearest declaration wins: a name this genus redeclares is
-                // dropped here and supplied by the own-field rows below.
-                if !own_instance_names.contains(&row.name) {
-                    heritage_rows.push(row);
-                }
-            }
-            for (name, sig) in parent_methods {
-                if let Some(own_sig) = info.methods.get(&name).cloned() {
-                    if !self.override_compatible(&own_sig, &sig) {
-                        let span = info.method_spans.get(&name).copied().unwrap_or_default();
-                        diagnostics.push(
-                            SemanticError::structured(SemanticErrorKind::TypeMismatch, span)
-                                .with_arg("issue", ISSUE_OVERRIDE_SIGNATURE_INCOMPATIBLE),
-                        );
-                    }
-                } else {
-                    info.method_spans.entry(name).or_insert_with(|| {
-                        parent_method_spans.get(&name).copied().unwrap_or_default()
-                    });
-                    info.methods.insert(name, sig);
-                }
-            }
-            // Bodyless propagation: inherited unsatisfied names minus the ones
-            // this genus provides bodies for.
-            let mut bodyless = info.own_bodyless.clone();
-            bodyless.extend(parent_bodyless.iter().copied());
-            for name in &info.own_bodied {
-                bodyless.remove(name);
-            }
-            info.bodyless_methods = bodyless;
-        } else {
-            info.bodyless_methods.clone_from(&info.own_bodyless);
-        }
-
-        for name in own_instance_names {
-            let field = info
-                .fields
-                .get(&name)
-                .copied()
-                .expect("own instance field present in merged table");
-            heritage_rows.push(StructHeritageFieldRow {
-                name,
-                ty: field.ty,
-                optional: field.optional,
-                required: field.required,
-                owner: def_id,
-            });
-        }
-        self.merged_heritage_fields.insert(def_id, heritage_rows);
-
-        self.structs.insert(def_id, info);
-        self.errors.extend(diagnostics);
-    }
-
-    /// (a): override compatibility — same parameter count and modes, and
-    /// assignable return/error channels. Parameter types follow the ruling's
-    /// explicit list and are not compared.
-    fn override_compatible(&self, child: &FuncSig, parent: &FuncSig) -> bool {
-        if child.params.len() != parent.params.len() {
-            return false;
-        }
-        for (child_param, parent_param) in child.params.iter().zip(parent.params.iter()) {
-            if child_param.mode != parent_param.mode
-                || child_param.optional != parent_param.optional
-            {
-                return false;
-            }
-        }
-        if !self.assignable_with_heritage(child.ret, parent.ret) {
-            return false;
-        }
-        match (child.err, parent.err) {
-            (None, _) => true,
-            (Some(_), None) => false,
-            (Some(child_err), Some(parent_err)) => {
-                self.assignable_with_heritage(child_err, parent_err)
-            }
-        }
+        self.struct_implements = declared;
     }
 }
 
-const ISSUE_EXTENDS_REQUIRES_GENUS: &str = "extends_requires_genus";
 const ISSUE_IMPLET_REQUIRES_IMPLENDUM: &str = "implet_requires_implendum";
-const ISSUE_HERITAGE_CYCLE: &str = "heritage_cycle";
-const ISSUE_FIELD_REDECLARATION: &str = "field_redeclaration";
-const ISSUE_OVERRIDE_SIGNATURE_INCOMPATIBLE: &str = "override_signature_incompatible";
-const ISSUE_ABSTRACT_METHOD_UNIMPLEMENTED: &str = "abstract_method_unimplemented";
