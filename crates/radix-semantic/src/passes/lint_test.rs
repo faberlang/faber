@@ -1197,3 +1197,82 @@ incipit { output("salve") }"#,
         "the aliased call must record a Call use on the binding DefId"
     );
 }
+
+// ── Ruling R3: `perge` in `fac … dum` reaches the condition test ───────────
+
+fn unreachable_count(source: &str) -> usize {
+    crate::test_support::analyze_source(source)
+        .result
+        .diagnostics
+        .iter()
+        .filter(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnreachableCode))
+        .count()
+}
+
+#[test]
+fn fac_dum_condition_reached_by_perge_is_not_unreachable() {
+    let source = r"
+incipit {
+    varia numerus n ← 0
+    fac {
+        n ← n + 1
+        si n < 3 {
+            perge
+        }
+        rumpe
+    } dum n < 10
+}
+";
+    assert_eq!(unreachable_count(source), 0);
+}
+
+#[test]
+fn fac_dum_condition_reached_by_perge_through_bare_fac_is_not_unreachable() {
+    let source = r"
+incipit {
+    varia numerus n ← 0
+    fac {
+        n ← n + 1
+        fac {
+            si n < 3 {
+                perge
+            }
+        }
+        rumpe
+    } dum n < 10
+}
+";
+    assert_eq!(unreachable_count(source), 0);
+}
+
+#[test]
+fn fac_dum_condition_after_rumpe_without_perge_is_unreachable() {
+    let source = r"
+incipit {
+    varia numerus n ← 0
+    fac {
+        n ← n + 1
+        rumpe
+    } dum n < 10
+}
+";
+    assert_eq!(unreachable_count(source), 1);
+}
+
+#[test]
+fn fac_dum_perge_in_nested_loop_does_not_reach_outer_condition() {
+    let source = r"
+incipit {
+    varia numerus n ← 0
+    fac {
+        n ← n + 1
+        dum n < 3 {
+            n ← n + 1
+            perge
+        }
+        rumpe
+    } dum n < 10
+}
+";
+    assert_eq!(unreachable_count(source), 1);
+}

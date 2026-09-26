@@ -263,9 +263,19 @@ impl<'a> LintContext<'a> {
 
     fn check_block(&mut self, block: &HirBlock, in_loop: bool) {
         self.push_scope();
-        let mut terminated = false;
-        for stmt in &block.statements {
-            if terminated {
+        self.check_statements(&block.statements, in_loop);
+        if let Some(expr) = &block.expr {
+            self.check_expr(expr, in_loop);
+        }
+        self.pop_scope();
+    }
+
+    /// Check a statement run, warning on every statement after the first
+    /// terminator. Returns the terminator's index, if any.
+    fn check_statements(&mut self, statements: &[HirStatement], in_loop: bool) -> Option<usize> {
+        let mut terminator = None;
+        for (index, stmt) in statements.iter().enumerate() {
+            if terminator.is_some() {
                 self.warnings.push((
                     WarningKind::UnreachableCode,
                     ISSUE_UNREACHABLE_CODE,
@@ -279,11 +289,34 @@ impl<'a> LintContext<'a> {
                 || (in_loop
                     && matches!(stmt.kind, HirStatementKind::Rumpe | HirStatementKind::Perge))
             {
-                terminated = true;
+                terminator = Some(index);
             }
         }
-        if let Some(expr) = &block.expr {
-            self.check_expr(expr, in_loop);
+        terminator
+    }
+
+    /// Ruling R3: `perge` in a `fac … dum` body lands on the synthesized
+    /// `si non c { rumpe }` test. A terminated body leaves the test reachable
+    /// when any `perge` before the terminator targets this loop.
+    fn check_fac_dum(&mut self, body: &[HirStatement], test: &HirStatement) {
+        self.push_scope();
+        let terminator = self.check_statements(body, true);
+        let test_reachable = terminator.is_none_or(|index| {
+            let mut perge = PergeFinder::default();
+            body[..=index]
+                .iter()
+                .for_each(|stmt| perge.visit_stmt(stmt));
+            perge.found
+        });
+        if test_reachable {
+            self.check_stmt(test, true);
+        } else {
+            self.warnings.push((
+                WarningKind::UnreachableCode,
+                ISSUE_UNREACHABLE_CODE,
+                test.span,
+                None,
+            ));
         }
         self.pop_scope();
     }
@@ -549,7 +582,10 @@ impl HirVisitor for LintContext<'_> {
             HirExpressionKind::Path(def_id) => {
                 self.used.insert(*def_id);
             }
-            HirExpressionKind::Loop(block) => self.check_block(block, true),
+            HirExpressionKind::Loop(block) => match block.fac_dum_parts() {
+                Some((body, test, _)) => self.check_fac_dum(body, test),
+                None => self.check_block(block, true),
+            },
             HirExpressionKind::Dum(cond, block) => {
                 self.visit_expr(cond);
                 self.check_block(block, true);
@@ -621,6 +657,36 @@ impl HirVisitor for LintContext<'_> {
                 }
             }
             _ => walk_expr(self, expr),
+        }
+    }
+}
+
+/// Finds a `perge` that continues the enclosing loop: nested loops and
+/// closures own their own `perge`, so the search stops at them.
+#[derive(Default)]
+struct PergeFinder {
+    found: bool,
+}
+
+impl HirVisitor for PergeFinder {
+    fn visit_stmt(&mut self, stmt: &HirStatement) {
+        if matches!(stmt.kind, HirStatementKind::Perge) {
+            self.found = true;
+        }
+        radix_hir::visit::walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        if !matches!(
+            expr.kind,
+            HirExpressionKind::Loop(_)
+                | HirExpressionKind::Dum(..)
+                | HirExpressionKind::Itera(..)
+                | HirExpressionKind::IteraLockstep { .. }
+                | HirExpressionKind::IteraRange { .. }
+                | HirExpressionKind::Clausura(..)
+        ) {
+            walk_expr(self, expr);
         }
     }
 }
