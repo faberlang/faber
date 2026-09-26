@@ -1,0 +1,126 @@
++++
+term = "recursive types"
+kind = "feature"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "discretio_decl", "variant", "variant_fields", "genus_decl", "genus_member", "field_decl", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "functio_decl", "param_list", "parameter", "return_clause", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "pattern_binding", "si_stmt", "redde_stmt", "expression", "assignment", "place", "equality", "additive_expr", "multiplicative_expr", "unary_expr", "call_expr", "call_suffix", "member_suffix", "optional_suffix", "argument_list", "argument", "finge_expr", "typed_constructor", "field_list", "field_init", "field_key", "literal", "nota_stmt", "incipit_stmt"]
+category = "type"
+canonical = true
+summary = "A discretio or genus may name itself in its own fields; every backend gives it a finite carrier."
+syntax = "discretio <name> { <Variant> { <name> <field> } } · genus <name> { <name> ∪ nihil <field> }"
+related = ["discretio", "genus", "discerne", "finge", "nihil"]
+locale = "en"
++++
+# =============================================================================
+# recursive types — a type may refer to itself in its own fields.
+# =============================================================================
+#
+# What this teaches:
+#   • Recursive discretio — `Expr` variants hold `Expr` operands, so a value
+#     is a whole expression tree. `discerne` walks it recursively.
+#   • Recursive genus — `Nodus` holds a nullable `Nodus` link, so a value is a
+#     linked list ending in `nihil`.
+#   • No keyword, no box type — Faber values alias by reference, so the
+#     indirection is implied. Backends that store fields inline (Rust) insert
+#     the pointer themselves on the fields that close the cycle.
+#
+# Common mistakes:
+#   • A non-nullable self field on a genus (`Nodus next`) — no value can ever
+#     be built, because every node needs another node. End the chain with
+#     `∪ nihil`, or recurse through a discretio with a leaf variant.
+#
+# See also: discretio, genus, discerne, finge, nihil
+# =============================================================================
+#
+# EXPECTED OUTPUT:
+#   14
+#   (2 + (3 * 4))
+#   -9
+#   6
+#   3
+#   2
+#   15
+
+union Expr {
+    Numerus {
+        int valor
+    },
+    Nega {
+        Expr interior
+    },
+    Adde {
+        Expr sinister
+        Expr dexter
+    },
+    Multiplica {
+        Expr sinister
+        Expr dexter
+    }
+}
+
+fn evalua(Expr e) → int {
+    match e {
+        case Numerus const valor {
+            return valor
+        }
+        case Nega const interior {
+            return 0 - evalua(interior)
+        }
+        case Adde const sinister, dexter {
+            return evalua(sinister) + evalua(dexter)
+        }
+        case Multiplica const sinister, dexter {
+            return evalua(sinister) * evalua(dexter)
+        }
+    }
+}
+
+fn depinge(Expr e) → string {
+    match e {
+        case Numerus const valor {
+            return "§"(valor)
+        }
+        case Nega const interior {
+            return "-§"(depinge(interior))
+        }
+        case Adde const sinister, dexter {
+            return "(§ + §)"(depinge(sinister), depinge(dexter))
+        }
+        case Multiplica const sinister, dexter {
+            return "(§ * §)"(depinge(sinister), depinge(dexter))
+        }
+    }
+}
+
+class Nodus {
+    int valor
+    Nodus ∪ null sequens
+}
+
+fn summa(Nodus ∪ null n) → int {
+    if n is null {
+        return 0
+    }
+    return n.valor + summa(n.sequens)
+}
+
+fn longitudo(Nodus ∪ null n) → int {
+    if n is null {
+        return 0
+    }
+    return 1 + longitudo(n.sequens)
+}
+
+main {
+    const Expr tres ← variant Numerus { valor = 3 }
+    const Expr productum ← variant Multiplica { sinister = tres, dexter = variant Numerus { valor = 4 } }
+    const Expr arbor ← variant Adde { sinister = variant Numerus { valor = 2 }, dexter = productum }
+    print evalua(arbor)
+    print depinge(arbor)
+    print evalua(variant Nega { interior = variant Adde { sinister = tres, dexter = variant Numerus { valor = 6 } } })
+
+    var Nodus caput ← Nodus { valor = 1, sequens = Nodus { valor = 2, sequens = Nodus { valor = 3, sequens = null } } }
+    print summa(caput)
+    print longitudo(caput)
+    print caput?.sequens?.valor
+    caput.sequens ← Nodus { valor = 14, sequens = null }
+    print summa(caput)
+}
