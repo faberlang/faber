@@ -1277,6 +1277,7 @@ fn failed_top_level_const_initializer_does_not_bind_const() {
         ty: Some(numerus),
         value: unsupported_range_expr(numerus, span, 0),
         is_await: false,
+        statica: None,
         mutable: false,
     };
 

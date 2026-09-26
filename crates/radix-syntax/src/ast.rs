@@ -163,6 +163,11 @@ pub struct VarDecl {
     pub ty: Option<TypeExpr>,
     pub binding: BindingPattern,
     pub init: Option<Box<Expr>>,
+
+    /// Top-level static (`generis T NAME = expr`, DECISIONS D5.8/D5.9): an
+    /// immutable, compile-time-evaluated value. Always `Immutable`, never
+    /// awaited, and initialized with `=`.
+    pub is_static: bool,
 }
 
 impl VarDecl {

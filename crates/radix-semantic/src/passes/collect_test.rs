@@ -79,6 +79,7 @@ fn reports_duplicate_definitions() {
         ty: None,
         binding: radix_syntax::BindingPattern::Ident(ident_sym(sym)),
         init: None,
+        is_static: false,
     };
     let var2 = VarDecl {
         mutability: AstMutability::Immutable,
@@ -86,6 +87,7 @@ fn reports_duplicate_definitions() {
         ty: None,
         binding: radix_syntax::BindingPattern::Ident(ident_sym(sym)),
         init: None,
+        is_static: false,
     };
     let program = program(vec![stmt(StmtKind::Var(var)), stmt(StmtKind::Var(var2))]);
 
@@ -111,6 +113,7 @@ fn inferred_import_name_collision_requests_explicit_alias() {
         ty: None,
         binding: radix_syntax::BindingPattern::Ident(ident_sym(sym)),
         init: None,
+        is_static: false,
     };
     let import = ImportDecl {
         path: interner.intern("norma:chorda"),
@@ -147,6 +150,7 @@ fn top_level_var_requires_identifier_binding() {
         ty: None,
         binding: radix_syntax::BindingPattern::Wildcard(Span::default()),
         init: None,
+        is_static: false,
     }))]);
 
     let mut resolver = Resolver::new();

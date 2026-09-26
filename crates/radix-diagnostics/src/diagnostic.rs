@@ -247,6 +247,10 @@ pub enum WarningKind {
     /// A `genus` member carries `@ publica`, which is redundant because members
     /// are public by default (D5.5 interim).
     RedundantMemberVisibility,
+    /// A legacy top-level `fixum`/`varia` binding. Module-level mutable
+    /// state does not exist; the migration target is a `generis` static
+    /// (D5.7). A warning until the library sweep lands.
+    TopLevelBinding,
     /// A `discerne` whose coverage could not be computed for its pattern
     /// kinds (D4.8): the match is compiled, but exhaustiveness was not
     /// checked, so the author is told rather than left in silence.
@@ -288,6 +292,9 @@ pub enum SemanticErrorKind {
     ConversionInvalid,
     UnavailableDeclaration,
     AirPurityViolation,
+    /// A top-level static initializer that is not a compile-time constant,
+    /// or whose evaluation overflows or divides by zero (D5.9).
+    StaticInitializerInvalid,
 
     // Assignment
     ImmutableAssignment,

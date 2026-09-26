@@ -33,6 +33,7 @@ pub(crate) const SEMANTIC_ERROR_KINDS: &[SemanticErrorKind] = &[
     SemanticErrorKind::ConversionInvalid,
     SemanticErrorKind::UnavailableDeclaration,
     SemanticErrorKind::AirPurityViolation,
+    SemanticErrorKind::StaticInitializerInvalid,
     SemanticErrorKind::ImmutableAssignment,
     SemanticErrorKind::AssignmentTargetInvalid,
     SemanticErrorKind::UseBeforeInit,
@@ -79,6 +80,7 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::ComplexityBudgetExceeded,
     WarningKind::RedundantMemberVisibility,
     WarningKind::CoverageUnchecked,
+    WarningKind::TopLevelBinding,
 ];
 
 // STABLE CODES
@@ -172,6 +174,10 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
         SemanticErrorKind::UnavailableDeclaration => DiagnosticSpec {
             code: "SEM017",
             help: Some("use an available declaration or implement the marked surface"),
+        },
+        SemanticErrorKind::StaticInitializerInvalid => DiagnosticSpec {
+            code: "SEM060",
+            help: Some("move the computation into a function, or use `praefixum` (planned)"),
         },
         SemanticErrorKind::AirPurityViolation => DiagnosticSpec {
             code: "SEM059",
@@ -1119,6 +1125,12 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::CoverageUnchecked => DiagnosticSpec {
             code: "WARN029",
             help: Some("add a 'ceterum' arm, or split the match so each pattern kind is checkable"),
+        },
+        WarningKind::TopLevelBinding => DiagnosticSpec {
+            code: "WARN030",
+            help: Some(
+                "use `generis T X = …` for a compile-time constant, or move the binding into a function",
+            ),
         },
     }
 }

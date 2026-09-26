@@ -1,0 +1,545 @@
+//! Top-level statics: compile-time evaluation and the legacy-binding warning
+//! (DECISIONS D5.7, D5.8, D5.9, D8.4).
+//!
+//! A top-level static (`generis T NAME = expr`) is immutable and has no
+//! runtime initialization: its initializer must be evaluable at compile time.
+//! This pass evaluates every static after typecheck and rewrites each
+//! foldable scalar subexpression to the literal it evaluates to, so every
+//! backend receives the constant through the ordinary top-level-constant
+//! path and initialization order can never differ between targets.
+//!
+//! The evaluable surface is small and closed:
+//! - literals;
+//! - arithmetic, comparison, bit, and logical operators on `numerus`,
+//!   `fractus`, and `bivalens` scalars, plus `textus` concatenation;
+//! - references to other statics, evaluated in dependency order (a cycle is
+//!   SEM007 `static_cycle`);
+//! - collection literals (`lista`, tuples, map construction) whose elements
+//!   are constants. These stay structural; only their scalar leaves fold.
+//!
+//! Anything else is SEM060 `static_initializer_not_constant`. Integer
+//! arithmetic is checked (overflow and division by zero are compile errors),
+//! matching the runner's checked integer semantics; `/` and `%` truncate.
+//! Decimal widths and modular words are not folded, so arithmetic on them
+//! is not constant.
+//!
+//! Folding replaces `HirConst::value`; the authored initializer is kept on
+//! [`HirStatic::authored`] so Faber re-emission prints the source, not the
+//! folded value.
+//!
+//! D5.7: a legacy top-level `fixum`/`varia` is WARN030 `top_level_binding`
+//! until the library sweep lands, when it becomes an error.
+
+use crate::{SemanticError, SemanticErrorKind, Type, TypeTable, WarningKind};
+use radix_hir::visit::{HirVisitor, walk_expr, walk_program};
+use radix_hir::{
+    DefId, HirArrayElement, HirBinOp, HirExpression, HirExpressionKind, HirId, HirItemKind,
+    HirLiteral, HirModule, HirObjectKey, HirUnOp,
+};
+use radix_lexer::{Interner, Span, Symbol};
+use radix_types::{Primitive, TypeId};
+use rustc_hash::FxHashMap;
+
+const ISSUE_TOP_LEVEL_BINDING: &str = "top_level_binding";
+const ISSUE_NOT_CONSTANT: &str = "static_initializer_not_constant";
+const ISSUE_CYCLE: &str = "static_cycle";
+const ISSUE_OVERFLOW: &str = "static_arithmetic_overflow";
+const ISSUE_DIVISION_BY_ZERO: &str = "static_division_by_zero";
+
+/// Warn on every legacy top-level `fixum`/`varia` binding (D5.7 migration).
+#[must_use]
+pub fn warn_top_level_bindings(hir: &HirModule, interner: &Interner) -> Vec<SemanticError> {
+    hir.items
+        .iter()
+        .filter_map(|item| match &item.kind {
+            HirItemKind::Constant(konst) if konst.statica.is_none() => Some(
+                SemanticError::structured(
+                    SemanticErrorKind::Warning(WarningKind::TopLevelBinding),
+                    item.span,
+                )
+                .with_arg("issue", ISSUE_TOP_LEVEL_BINDING)
+                .with_arg("name", interner.resolve(konst.name)),
+            ),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Evaluate every static, report non-constant initializers and cycles, and
+/// rewrite foldable initializers to literals.
+pub fn fold(hir: &mut HirModule, types: &TypeTable, interner: &mut Interner) -> Vec<SemanticError> {
+    let mut inits = FxHashMap::default();
+    let mut order = Vec::new();
+    for item in &hir.items {
+        if let HirItemKind::Constant(konst) = &item.kind
+            && konst.statica.is_some()
+        {
+            inits.insert(item.def_id, (konst.name, konst.value.clone()));
+            order.push(item.def_id);
+        }
+    }
+    if order.is_empty() {
+        return Vec::new();
+    }
+
+    let mut evaluator = Evaluator {
+        types,
+        inits,
+        state: FxHashMap::default(),
+    };
+    let mut errors = Vec::new();
+    for def_id in &order {
+        if let Err(fault) = evaluator.eval_static(*def_id, interner)
+            && fault.issue != ISSUE_DEPENDENCY
+        {
+            let name = evaluator.inits[def_id].0;
+            let kind = if fault.issue == ISSUE_CYCLE {
+                SemanticErrorKind::CircularDependency
+            } else {
+                SemanticErrorKind::StaticInitializerInvalid
+            };
+            errors.push(
+                SemanticError::structured(kind, fault.span)
+                    .with_arg("issue", fault.issue)
+                    .with_arg("name", interner.resolve(name)),
+            );
+        }
+    }
+    if !errors.is_empty() {
+        return errors;
+    }
+
+    let state = std::mem::take(&mut evaluator.state);
+    let mut rewriter = Rewriter {
+        evaluator: Evaluator {
+            types,
+            inits: FxHashMap::default(),
+            state,
+        },
+        next_id: max_hir_id(hir) + 1,
+    };
+    for item in &mut hir.items {
+        let HirItemKind::Constant(konst) = &mut item.kind else {
+            continue;
+        };
+        let Some(statica) = konst.statica.as_mut() else {
+            continue;
+        };
+        let authored = konst.value.clone();
+        if rewriter.rewrite(&mut konst.value, interner) {
+            statica.authored = Some(Box::new(authored));
+        }
+    }
+    Vec::new()
+}
+
+// EVALUATION
+
+/// Marker issue: a static failed because a static it references failed.
+/// The referenced static carries the diagnostic; this one stays quiet.
+const ISSUE_DEPENDENCY: &str = "static_dependency";
+
+#[derive(Debug, Clone, PartialEq)]
+enum Value {
+    Int(i128),
+    Float(f64),
+    Bool(bool),
+    Text(String),
+    /// A constant with no scalar fold: a collection literal of constants,
+    /// `nihil`, a JSON/regex/ascii/octeti literal, or a decimal-width value.
+    Opaque,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Fault {
+    issue: &'static str,
+    span: Span,
+}
+
+impl Fault {
+    fn at(issue: &'static str, span: Span) -> Self {
+        Self { issue, span }
+    }
+}
+
+enum State {
+    InProgress,
+    /// Evaluated; a failure keeps the static's own fault so it is reported
+    /// even when a dependent evaluated it first.
+    Done(Result<Value, Fault>),
+}
+
+/// The scalar class a node's type folds as, if any.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Class {
+    Int(i128, i128),
+    Float,
+    Bool,
+    Text,
+}
+
+struct Evaluator<'a> {
+    types: &'a TypeTable,
+    inits: FxHashMap<DefId, (Symbol, HirExpression)>,
+    state: FxHashMap<DefId, State>,
+}
+
+impl Evaluator<'_> {
+    fn eval_static(&mut self, def_id: DefId, interner: &Interner) -> Result<Value, Fault> {
+        let init = match self.state.get(&def_id) {
+            Some(State::Done(Ok(value))) => return Ok(value.clone()),
+            Some(State::Done(Err(fault))) => return Err(*fault),
+            Some(State::InProgress) => return Err(Fault::at(ISSUE_CYCLE, Span::new(0, 0))),
+            None => self.inits[&def_id].1.clone(),
+        };
+        self.state.insert(def_id, State::InProgress);
+        let result = self.eval(&init, interner);
+        self.state.insert(def_id, State::Done(result.clone()));
+        result
+    }
+
+    fn class(&self, ty: Option<TypeId>) -> Option<Class> {
+        let mut ty = ty?;
+        loop {
+            match self.types.get(ty) {
+                Type::Alias(_, inner) => ty = *inner,
+                Type::Primitive(Primitive::Numerus) => {
+                    return Some(Class::Int(i128::from(i64::MIN), i128::from(i64::MAX)));
+                }
+                Type::SizedNumeric(Primitive::Numerus, width) => {
+                    let (lo, hi) = width.integer_range()?;
+                    return Some(Class::Int(lo, hi));
+                }
+                Type::Primitive(Primitive::Fractus) => return Some(Class::Float),
+                Type::SizedNumeric(Primitive::Fractus, width) if width.is_float() => {
+                    return Some(Class::Float);
+                }
+                Type::Primitive(Primitive::Bivalens) => return Some(Class::Bool),
+                Type::Primitive(Primitive::Textus) => return Some(Class::Text),
+                _ => return None,
+            }
+        }
+    }
+
+    fn eval(&mut self, expr: &HirExpression, interner: &Interner) -> Result<Value, Fault> {
+        let value = match &expr.kind {
+            HirExpressionKind::Literal(literal) => self.eval_literal(expr, literal, interner),
+            HirExpressionKind::Path(def_id) => {
+                if !self.state.contains_key(def_id) && !self.inits.contains_key(def_id) {
+                    return Err(Fault::at(ISSUE_NOT_CONSTANT, expr.span));
+                }
+                self.eval_static(*def_id, interner)
+                    .map_err(|fault| match fault.issue {
+                        ISSUE_CYCLE => Fault::at(ISSUE_CYCLE, expr.span),
+                        _ => Fault::at(ISSUE_DEPENDENCY, expr.span),
+                    })?
+            }
+            HirExpressionKind::Unary(op, operand) => {
+                let operand = self.eval(operand, interner)?;
+                unary(*op, operand).ok_or(Fault::at(ISSUE_NOT_CONSTANT, expr.span))?
+            }
+            HirExpressionKind::Binary(op, lhs, rhs) => {
+                let lhs = self.eval(lhs, interner)?;
+                let rhs = self.eval(rhs, interner)?;
+                binary(*op, lhs, rhs, expr.span)?
+            }
+            HirExpressionKind::Array(elements) => {
+                for element in elements {
+                    match element {
+                        HirArrayElement::Expr(inner) => {
+                            self.eval(inner, interner)?;
+                        }
+                        HirArrayElement::Spread(inner) => {
+                            return Err(Fault::at(ISSUE_NOT_CONSTANT, inner.span));
+                        }
+                    }
+                }
+                Value::Opaque
+            }
+            HirExpressionKind::Tuple(elements, ..) => {
+                for inner in elements {
+                    self.eval(inner, interner)?;
+                }
+                Value::Opaque
+            }
+            HirExpressionKind::Verte {
+                source, entries, ..
+            } => {
+                self.eval(source, interner)?;
+                for field in entries.iter().flatten() {
+                    match (&field.key, &field.value) {
+                        (HirObjectKey::Ident(_) | HirObjectKey::String(_), Some(value)) => {
+                            self.eval(value, interner)?;
+                        }
+                        _ => return Err(Fault::at(ISSUE_NOT_CONSTANT, expr.span)),
+                    }
+                }
+                Value::Opaque
+            }
+            _ => return Err(Fault::at(ISSUE_NOT_CONSTANT, expr.span)),
+        };
+        self.fit(value, expr)
+    }
+
+    fn eval_literal(
+        &self,
+        expr: &HirExpression,
+        literal: &HirLiteral,
+        interner: &Interner,
+    ) -> Value {
+        let class = self.class(expr.ty);
+        match literal {
+            HirLiteral::Int(v) => match class {
+                Some(Class::Float) => Value::Float(*v as f64),
+                Some(Class::Int(..)) => Value::Int(i128::from(*v)),
+                _ => Value::Opaque,
+            },
+            HirLiteral::Float(v) | HirLiteral::FloatText { value: v, .. } => match class {
+                Some(Class::Float) => Value::Float(*v),
+                _ => Value::Opaque,
+            },
+            HirLiteral::Bool(b) => Value::Bool(*b),
+            HirLiteral::String(sym) => Value::Text(interner.resolve(*sym).to_owned()),
+            _ => Value::Opaque,
+        }
+    }
+
+    /// Conform a computed value to the node's own type: widen integers
+    /// to floats where the node is `fractus`, and range-check integers.
+    fn fit(&self, value: Value, expr: &HirExpression) -> Result<Value, Fault> {
+        match (value, self.class(expr.ty)) {
+            (Value::Int(v), Some(Class::Int(lo, hi))) => {
+                if v < lo || v > hi {
+                    Err(Fault::at(ISSUE_OVERFLOW, expr.span))
+                } else {
+                    Ok(Value::Int(v))
+                }
+            }
+            (Value::Int(v), Some(Class::Float)) => Ok(Value::Float(v as f64)),
+            (Value::Float(v), Some(Class::Float)) if !v.is_finite() => {
+                Err(Fault::at(ISSUE_OVERFLOW, expr.span))
+            }
+            // A numeric value on a node whose type does not fold (a decimal
+            // width, a modular word) is not evaluated further.
+            (Value::Int(_) | Value::Float(_), None) => Ok(Value::Opaque),
+            (value, _) => Ok(value),
+        }
+    }
+}
+
+fn unary(op: HirUnOp, value: Value) -> Option<Value> {
+    match (op, value) {
+        (HirUnOp::Neg, Value::Int(v)) => Some(Value::Int(-v)),
+        (HirUnOp::Neg, Value::Float(v)) => Some(Value::Float(-v)),
+        (HirUnOp::Not, Value::Bool(b)) => Some(Value::Bool(!b)),
+        (HirUnOp::BitNot, Value::Int(v)) => Some(Value::Int(!v)),
+        _ => None,
+    }
+}
+
+fn binary(op: HirBinOp, lhs: Value, rhs: Value, span: Span) -> Result<Value, Fault> {
+    let not_constant = Fault::at(ISSUE_NOT_CONSTANT, span);
+    match (lhs, rhs) {
+        (Value::Int(a), Value::Int(b)) => int_binary(op, a, b, span),
+        (Value::Float(a), Value::Float(b)) => float_binary(op, a, b).ok_or(not_constant),
+        (Value::Int(a), Value::Float(b)) => float_binary(op, a as f64, b).ok_or(not_constant),
+        (Value::Float(a), Value::Int(b)) => float_binary(op, a, b as f64).ok_or(not_constant),
+        (Value::Bool(a), Value::Bool(b)) => match op {
+            HirBinOp::And => Ok(Value::Bool(a && b)),
+            HirBinOp::Or => Ok(Value::Bool(a || b)),
+            HirBinOp::Eq | HirBinOp::StrictEq => Ok(Value::Bool(a == b)),
+            HirBinOp::NotEq | HirBinOp::StrictNotEq => Ok(Value::Bool(a != b)),
+            _ => Err(not_constant),
+        },
+        (Value::Text(a), Value::Text(b)) => match op {
+            HirBinOp::Add => Ok(Value::Text(a + &b)),
+            HirBinOp::Eq | HirBinOp::StrictEq => Ok(Value::Bool(a == b)),
+            HirBinOp::NotEq | HirBinOp::StrictNotEq => Ok(Value::Bool(a != b)),
+            _ => Err(not_constant),
+        },
+        _ => Err(not_constant),
+    }
+}
+
+fn int_binary(op: HirBinOp, a: i128, b: i128, span: Span) -> Result<Value, Fault> {
+    let overflow = Fault::at(ISSUE_OVERFLOW, span);
+    let divide = |f: fn(i128, i128) -> Option<i128>| {
+        if b == 0 {
+            Err(Fault::at(ISSUE_DIVISION_BY_ZERO, span))
+        } else {
+            f(a, b).map(Value::Int).ok_or(overflow)
+        }
+    };
+    let shift = |f: fn(i128, u32) -> Option<i128>| {
+        u32::try_from(b)
+            .ok()
+            .filter(|s| *s < 64)
+            .and_then(|s| f(a, s))
+            .map(Value::Int)
+            .ok_or(overflow)
+    };
+    match op {
+        HirBinOp::Add => a.checked_add(b).map(Value::Int).ok_or(overflow),
+        HirBinOp::Sub => a.checked_sub(b).map(Value::Int).ok_or(overflow),
+        HirBinOp::Mul => a.checked_mul(b).map(Value::Int).ok_or(overflow),
+        HirBinOp::Div => divide(i128::checked_div),
+        HirBinOp::Mod => divide(i128::checked_rem),
+        HirBinOp::BitAnd => Ok(Value::Int(a & b)),
+        HirBinOp::BitOr => Ok(Value::Int(a | b)),
+        HirBinOp::BitXor => Ok(Value::Int(a ^ b)),
+        HirBinOp::Shl => shift(i128::checked_shl),
+        HirBinOp::Shr => shift(i128::checked_shr),
+        HirBinOp::Eq | HirBinOp::StrictEq => Ok(Value::Bool(a == b)),
+        HirBinOp::NotEq | HirBinOp::StrictNotEq => Ok(Value::Bool(a != b)),
+        HirBinOp::Lt => Ok(Value::Bool(a < b)),
+        HirBinOp::Gt => Ok(Value::Bool(a > b)),
+        HirBinOp::LtEq => Ok(Value::Bool(a <= b)),
+        HirBinOp::GtEq => Ok(Value::Bool(a >= b)),
+        _ => Err(Fault::at(ISSUE_NOT_CONSTANT, span)),
+    }
+}
+
+fn float_binary(op: HirBinOp, a: f64, b: f64) -> Option<Value> {
+    Some(match op {
+        HirBinOp::Add => Value::Float(a + b),
+        HirBinOp::Sub => Value::Float(a - b),
+        HirBinOp::Mul => Value::Float(a * b),
+        HirBinOp::Div => Value::Float(a / b),
+        HirBinOp::Lt => Value::Bool(a < b),
+        HirBinOp::Gt => Value::Bool(a > b),
+        HirBinOp::LtEq => Value::Bool(a <= b),
+        HirBinOp::GtEq => Value::Bool(a >= b),
+        _ => return None,
+    })
+}
+
+// REWRITE
+
+struct Rewriter<'a> {
+    evaluator: Evaluator<'a>,
+    next_id: u32,
+}
+
+impl Rewriter<'_> {
+    /// Rewrite `expr` in place; returns whether anything changed.
+    fn rewrite(&mut self, expr: &mut HirExpression, interner: &mut Interner) -> bool {
+        let Ok(value) = self.evaluator.eval(expr, interner) else {
+            return false;
+        };
+        if value != Value::Opaque {
+            if is_literal_form(expr) {
+                return false;
+            }
+            *expr = self.materialize(value, expr, interner);
+            return true;
+        }
+        let mut changed = false;
+        match &mut expr.kind {
+            HirExpressionKind::Array(elements) => {
+                for element in elements {
+                    if let HirArrayElement::Expr(inner) = element {
+                        changed |= self.rewrite(inner, interner);
+                    }
+                }
+            }
+            HirExpressionKind::Tuple(elements, ..) => {
+                for inner in elements {
+                    changed |= self.rewrite(inner, interner);
+                }
+            }
+            HirExpressionKind::Verte {
+                source, entries, ..
+            } => {
+                changed |= self.rewrite(source, interner);
+                for field in entries.iter_mut().flatten() {
+                    if let Some(value) = &mut field.value {
+                        changed |= self.rewrite(value, interner);
+                    }
+                }
+            }
+            _ => {}
+        }
+        changed
+    }
+
+    fn fresh_id(&mut self) -> HirId {
+        let id = HirId(self.next_id);
+        self.next_id += 1;
+        id
+    }
+
+    fn materialize(
+        &mut self,
+        value: Value,
+        original: &HirExpression,
+        interner: &mut Interner,
+    ) -> HirExpression {
+        let literal = |kind: HirLiteral, id: HirId| HirExpression {
+            id,
+            kind: HirExpressionKind::Literal(kind),
+            ty: original.ty,
+            span: original.span,
+        };
+        let negated = |inner: HirExpression| HirExpression {
+            id: original.id,
+            kind: HirExpressionKind::Unary(HirUnOp::Neg, Box::new(inner)),
+            ty: original.ty,
+            span: original.span,
+        };
+        match value {
+            Value::Int(v) => {
+                let magnitude = u64::try_from(v.unsigned_abs()).unwrap_or(u64::MAX);
+                if v < 0 {
+                    let inner = literal(HirLiteral::Int(magnitude), self.fresh_id());
+                    negated(inner)
+                } else {
+                    literal(HirLiteral::Int(magnitude), original.id)
+                }
+            }
+            Value::Float(v) => {
+                if v.is_sign_negative() {
+                    let inner = literal(HirLiteral::Float(-v), self.fresh_id());
+                    negated(inner)
+                } else {
+                    literal(HirLiteral::Float(v), original.id)
+                }
+            }
+            Value::Bool(b) => literal(HirLiteral::Bool(b), original.id),
+            Value::Text(text) => literal(HirLiteral::String(interner.intern(&text)), original.id),
+            Value::Opaque => original.clone(),
+        }
+    }
+}
+
+/// Whether `expr` is already the literal form a fold would produce.
+fn is_literal_form(expr: &HirExpression) -> bool {
+    match &expr.kind {
+        HirExpressionKind::Literal(_) => true,
+        HirExpressionKind::Unary(HirUnOp::Neg, inner) => matches!(
+            inner.kind,
+            HirExpressionKind::Literal(HirLiteral::Int(_) | HirLiteral::Float(_))
+        ),
+        _ => false,
+    }
+}
+
+fn max_hir_id(hir: &HirModule) -> u32 {
+    struct MaxId(u32);
+    impl HirVisitor for MaxId {
+        fn visit_item(&mut self, item: &radix_hir::HirItem) {
+            self.0 = self.0.max(item.id.0);
+            radix_hir::visit::walk_item(self, item);
+        }
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            self.0 = self.0.max(expr.id.0);
+            walk_expr(self, expr);
+        }
+        fn visit_stmt(&mut self, stmt: &radix_hir::HirStatement) {
+            self.0 = self.0.max(stmt.id.0);
+            radix_hir::visit::walk_stmt(self, stmt);
+        }
+    }
+    let mut max = MaxId(0);
+    walk_program(&mut max, hir);
+    max.0
+}

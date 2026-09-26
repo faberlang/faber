@@ -1,7 +1,7 @@
 +++
 term = "intra"
 kind = "keyword"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "hole_type", "si_stmt", "arm", "comparison", "range_expr", "range_tail", "incipit_stmt", "expression", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "field_decl", "hole_type", "si_stmt", "arm", "comparison", "range_expr", "range_tail", "incipit_stmt", "expression", "literal", "nota_stmt"]
 category = "range"
 canonical = true
 summary = "Checks whether a value lies within a range."
@@ -35,7 +35,7 @@ locale = "en"
 # EXPECTED OUTPUT:
 #   none — stdout not pinned for this exemplum.
 
-const int aetas ← 25
+static int aetas = 25
 
 main {
     print "exempla intra"

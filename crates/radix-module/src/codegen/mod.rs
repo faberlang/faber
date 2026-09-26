@@ -45,6 +45,10 @@ pub mod ts;
 #[cfg(test)]
 mod coherence_test;
 
+#[cfg(test)]
+#[path = "statica_emit_test.rs"]
+mod statica_emit_test;
+
 // The failable-facts conversion under test is gated to the non-rust backends
 // that call it, so its tests carry the same feature gate.
 #[cfg(all(

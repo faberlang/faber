@@ -784,6 +784,22 @@ pub struct HirConst {
 
     /// Whether the initializer should be awaited.
     pub is_await: bool,
+
+    /// Present for a top-level static (`generis T X = …`, DECISIONS
+    /// D5.8/D5.9); absent for a legacy top-level `fixum`/`varia`. After
+    /// semantic analysis a static's `value` is its compile-time folded
+    /// constant.
+    #[serde(default)]
+    pub statica: Option<HirStatic>,
+}
+
+/// Static-declaration facts for a top-level [`HirConst`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HirStatic {
+    /// The authored initializer, kept only when constant folding replaced
+    /// `value`. Faber re-emission prints it so formatting never rewrites the
+    /// source; every other consumer reads the folded `value`.
+    pub authored: Option<Box<HirExpression>>,
 }
 
 /// Import declaration retained after package/library resolution.

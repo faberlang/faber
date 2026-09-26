@@ -75,6 +75,9 @@ impl Parser {
             TokenKind::Ident(_) => match self.current_keyword_ident() {
                 Some(TokenKind::Discretio) => self.parse_union_decl()?,
                 Some(TokenKind::Fixum | TokenKind::Varia) => self.parse_var_decl()?,
+                // `generis` is a genus-member modifier; at statement start it
+                // introduces a top-level static only when a type follows.
+                Some(TokenKind::Generis) if self.at_static_decl() => self.parse_static_decl()?,
                 Some(TokenKind::Functio) => self.parse_func_decl()?,
                 Some(TokenKind::Genus) => self.parse_class_decl()?,
                 Some(TokenKind::Implendum) => self.parse_interface_decl()?,
@@ -218,6 +221,59 @@ impl Parser {
             ty,
             binding,
             init,
+            is_static: false,
+        }))
+    }
+
+    /// Whether the current `generis` word starts a static declaration: the
+    /// next token must begin a type (an identifier or a parenthesized type).
+    fn at_static_decl(&self) -> bool {
+        matches!(
+            self.peek_at(1).kind,
+            TokenKind::Ident(_) | TokenKind::LParen
+        )
+    }
+
+    /// Parse a top-level static declaration (DECISIONS D5.8, D5.9).
+    ///
+    /// GRAMMAR:
+    ///   static-decl := `generis` type ident '=' expr
+    ///
+    /// This is the genus static-field production used at top level. The
+    /// initializer is a compile-time fact, so it is spelled with `=`; `←` and
+    /// a missing initializer are named errors. The result is an immutable
+    /// `VarDecl` with `is_static`, so it reuses the top-level constant path.
+    fn parse_static_decl(&mut self) -> Result<StmtKind, ParseError> {
+        let field = self.parse_field_decl()?;
+        if field.sponte {
+            return Err(ParseError::structured(
+                ParseErrorKind::DeclarationInvalid,
+                field.name.span,
+            )
+            .with_arg("issue", "static_sponte"));
+        }
+        let init = if let Some(init) = field.init {
+            init
+        } else if self.check(&TokenKind::Assign) {
+            return Err(ParseError::structured(
+                ParseErrorKind::DeclarationInvalid,
+                self.current_span(),
+            )
+            .with_arg("issue", "static_initializer_eq"));
+        } else {
+            return Err(ParseError::structured(
+                ParseErrorKind::DeclarationInvalid,
+                field.name.span,
+            )
+            .with_arg("issue", "static_initializer_required"));
+        };
+        Ok(StmtKind::Var(VarDecl {
+            mutability: AstMutability::Immutable,
+            await_form: None,
+            ty: Some(field.ty),
+            binding: BindingPattern::Ident(field.name),
+            init: Some(init),
+            is_static: true,
         }))
     }
 
@@ -304,6 +360,7 @@ impl Parser {
             ty,
             binding,
             init,
+            is_static: false,
         }))
     }
 
@@ -398,6 +455,7 @@ impl Parser {
             ty,
             binding,
             init,
+            is_static: false,
         }))
     }
 
@@ -2767,6 +2825,7 @@ impl Parser {
             || self.check_keyword_ident(TokenKind::Sit)
             || self.check_keyword_ident(TokenKind::Typus)
             || self.check_keyword_ident(TokenKind::Varia)
+            || (self.check_keyword_ident(TokenKind::Generis) && self.at_static_decl())
     }
 
     fn is_annotation_arg(&self) -> bool {
@@ -2863,6 +2922,19 @@ impl Parser {
                 // D22.1: declarations are top-level. The declaration is parsed
                 // whole so recovery resumes after it, then dropped with a
                 // named diagnostic instead of reaching lowering.
+                Ok(Stmt {
+                    kind:
+                        StmtKind::Var(VarDecl {
+                            is_static: true, ..
+                        }),
+                    span,
+                    ..
+                }) => {
+                    self.errors.push(
+                        ParseError::structured(ParseErrorKind::DeclarationInvalid, span)
+                            .with_arg("issue", "static_not_top_level"),
+                    );
+                }
                 Ok(stmt) if is_top_level_only_declaration(&stmt.kind) => {
                     self.errors.push(
                         ParseError::structured(ParseErrorKind::DeclarationInvalid, stmt.span)

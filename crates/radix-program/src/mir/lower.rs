@@ -1725,6 +1725,12 @@ fn transplant_data_member(
         )?,
         mutable: member.konst.mutable,
         is_await: member.konst.is_await,
+        // The authored form belongs to the source module's re-emission only.
+        statica: member
+            .konst
+            .statica
+            .as_ref()
+            .map(|_| radix_module::hir::HirStatic { authored: None }),
     };
     Ok(HirItem {
         annotations: Vec::new(),

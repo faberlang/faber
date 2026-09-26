@@ -49,10 +49,10 @@ pub use nodes::{
     HirIteraMode, HirLiteral, HirLocal, HirMethod, HirModule, HirModuleEnd, HirNonNullKind, HirObjectField,
     HirObjectKey, HirOptionalChainKind, HirOrdoRouteMember, HirOrdoRow, HirOwnerRef, HirParam, HirParamMode,
     HirPattern, HirPresentation, HirRangeKind, HirReceiver, HirRefKind, HirSchema, HirSchemaColumn, HirScribeKind,
-    HirSourceAnchorId, HirStatement, HirStatementKind, HirStruct, HirTestMetadata, HirTestModifier, HirTrivia,
-    HirTriviaAttachment, HirTriviaOwner, HirTriviaOwnerKind, HirTypeAlias, HirTypeParam, HirTypeParamConstraint,
-    HirUnOp, HirVariant, HirVariantField, LibraryBinding, LibraryIdentity, LibraryItem, LibraryItemKind,
-    LibraryProvider, LibraryRegistry, NucleumRole,
+    HirSourceAnchorId, HirStatement, HirStatementKind, HirStatic, HirStruct, HirTestMetadata, HirTestModifier,
+    HirTrivia, HirTriviaAttachment, HirTriviaOwner, HirTriviaOwnerKind, HirTypeAlias, HirTypeParam,
+    HirTypeParamConstraint, HirUnOp, HirVariant, HirVariantField, LibraryBinding, LibraryIdentity, LibraryItem,
+    LibraryItemKind, LibraryProvider, LibraryRegistry, NucleumRole,
 };
 
 pub use radix_semantic::LoweredProgram;
