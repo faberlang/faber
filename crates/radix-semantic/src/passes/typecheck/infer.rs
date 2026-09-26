@@ -264,31 +264,32 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
         issue: &'static str,
     ) -> TypeId {
-        // U1 ruling (b): subsumption enters at one insertion point, Assign
-        // only, before the `types.is_assignable` delegation. Implemented as a
+        // Contract subsumption enters at one insertion point, Assign only,
+        // before the `types.is_assignable` delegation. Implemented as a
         // pre-check at this public funnel entry rather than an arm inside
         // `unify_with_policy`'s fallthrough: every funnel site (argument,
         // initializer, return, `⇥` channel) calls here, while the structural
-        // arms recurse through `unify_with_policy` directly — so heritage
+        // arms recurse through `unify_with_policy` directly — so conformance
         // never leaks into type-argument positions and parameterized types
-        // stay invariant (`lista<Child>` is not `lista<Base>`).
-        if let Some(destination) = self.heritage_destination(a, b) {
+        // stay invariant (`lista<Concrete>` is not `lista<Contract>`).
+        if let Some(destination) = self.conformance_destination(a, b) {
             return destination;
         }
         self.unify_with_policy(a, b, span, issue, UnifyPolicy::Assign)
     }
 
-    /// The heritage-accepted destination type for `a → b`, if any.
+    /// The contract-accepted destination type for `a → b`, if any.
     ///
-    /// Covers bare nominal subsumption (Child→Base genus, Concrete→Interface
-    /// through `implements`), the `(_, Intersection)` slot decomposition (every
-    /// constituent holds), and union destinations member-by-member so a
-    /// concrete value flows into a `⇥` interface-channel union. Joins and
-    /// inference binding never consult this.
-    fn heritage_destination(&self, a: TypeId, b: TypeId) -> Option<TypeId> {
+    /// Covers bare nominal subsumption (Concrete→Interface through `implet`),
+    /// the `(_, Intersection)` slot decomposition (every constituent holds),
+    /// and union destinations member-by-member so a concrete value flows into
+    /// a `⇥` interface-channel union. Joins and inference binding never
+    /// consult this. There is no genus-to-genus subsumption: class
+    /// inheritance was removed (DECISIONS D8.1).
+    fn conformance_destination(&self, a: TypeId, b: TypeId) -> Option<TypeId> {
         let from = self.peel_nominal_aliases(a);
         let to = self.peel_nominal_aliases(b);
-        if self.accepts_via_heritage(from, to) {
+        if self.accepts_via_conformance(from, to) {
             return Some(to);
         }
         None
@@ -306,22 +307,24 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// Whether `from` flows into `to` through nominal heritage alone.
-    fn accepts_via_heritage(&self, from: TypeId, to: TypeId) -> bool {
+    /// Whether `from` flows into `to` through declared `implet` contracts.
+    fn accepts_via_conformance(&self, from: TypeId, to: TypeId) -> bool {
         match self.types.get(to) {
             // Slot law: a union destination accepts when any member accepts.
-            // `types.is_assignable` already covers non-heritage members; this
-            // arm adds heritage acceptance per member (the `⇥` channel case).
+            // `types.is_assignable` already covers non-contract members; this
+            // arm adds contract acceptance per member (the `⇥` channel case).
             Type::Union(members) => members.iter().any(|member| {
-                self.accepts_via_heritage(from, *member) || self.types.is_assignable(from, *member)
+                self.accepts_via_conformance(from, *member)
+                    || self.types.is_assignable(from, *member)
             }),
             // `(_, Intersection(to))` under Assign: every constituent holds.
             Type::Intersection(members) => members.iter().all(|member| {
-                self.accepts_via_heritage(from, *member) || self.types.is_assignable(from, *member)
+                self.accepts_via_conformance(from, *member)
+                    || self.types.is_assignable(from, *member)
             }),
-            Type::Struct(base) => self.struct_def_from_type(from).is_some_and(|from_def| {
-                from_def == *base || self.heritage_chain_contains(from_def, *base)
-            }),
+            Type::Struct(base) => self
+                .struct_def_from_type(from)
+                .is_some_and(|from_def| from_def == *base),
             Type::Interface(iface) => self
                 .struct_def_from_type(from)
                 .is_some_and(|from_def| self.struct_implements(from_def, *iface)),
@@ -329,29 +332,11 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// Whether `base` appears in `from`'s transitive `extends` chain.
-    fn heritage_chain_contains(&self, from: DefId, base: DefId) -> bool {
-        self.ancestor_structs
-            .get(&from)
-            .is_some_and(|ancestors| ancestors.contains(&base))
-    }
-
-    /// Whether `from`'s transitive implements closure contains `iface`.
+    /// Whether `from` declares `iface` in its `implet` clause.
     fn struct_implements(&self, from: DefId, iface: DefId) -> bool {
         self.implemented_interfaces
             .get(&from)
             .is_some_and(|interfaces| interfaces.contains(&iface))
-    }
-
-    /// Quiet assignability including nominal heritage; used where a boolean
-    /// answer is needed without diagnostics (override compatibility).
-    pub(crate) fn assignable_with_heritage(&self, from: TypeId, to: TypeId) -> bool {
-        self.types.equals(from, to)
-            || self.types.is_assignable(from, to)
-            || self.accepts_via_heritage(
-                self.peel_nominal_aliases(from),
-                self.peel_nominal_aliases(to),
-            )
     }
 
     /// Unify assignment on carrier payloads, ignoring access-marker wrappers.

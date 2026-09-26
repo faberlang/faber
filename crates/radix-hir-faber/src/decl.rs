@@ -314,13 +314,6 @@ impl super::FaberCodegen<'_> {
 
         self.write_generic_params(&s.type_params, names, surface, writer);
 
-        if let Some(parent) = s.extends {
-            writer.write(" ");
-            writer.write(surface.contextual_keyword("sub"));
-            writer.write(" ");
-            writer.write(&self.name_for_def(parent, names));
-        }
-
         if !s.implements.is_empty() {
             writer.write(" ");
             writer.write(surface.contextual_keyword("implet"));

@@ -381,9 +381,7 @@ fn inject_scrinium(
             }],
             fields,
             methods: Vec::new(),
-            extends: None,
             implements: Vec::new(),
-            is_abstract: false,
         }),
         span: Span::default(),
     });
@@ -458,9 +456,7 @@ fn inject_directional_view(
             }],
             fields: Vec::new(),
             methods: Vec::new(),
-            extends: None,
             implements: Vec::new(),
-            is_abstract: false,
         }),
         span: Span::default(),
     });
@@ -488,9 +484,7 @@ fn inject_sermo(
             type_params: Vec::new(),
             fields: Vec::new(),
             methods: Vec::new(),
-            extends: None,
             implements: Vec::new(),
-            is_abstract: false,
         }),
         span: Span::default(),
     });

@@ -505,8 +505,10 @@ pub struct FunctionProvenanceTableWire {
 /// element label on `HirTypeForm` and `HirPresentation::tuple_label_accesses`
 /// (by-label `p.gw` reads lowered to constant-index nodes): both are
 /// serialized HIR presentation additions, so schema-v14 artifacts fail closed
-/// at the schema gate as usual.
-pub const SCHEMA_VERSION: u32 = 15;
+/// at the schema gate as usual. Version 16 drops `HirStruct.extends` and
+/// `HirStruct.is_abstract` (class inheritance removed, DECISIONS D8.1); the
+/// serialized struct shape changed, so schema-v15 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 16;
 
 /// Serializable snapshot of one analyzed provider unit carried for HIR
 /// emission (ARCH-U4 carriage).

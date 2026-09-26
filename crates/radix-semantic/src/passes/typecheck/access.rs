@@ -392,8 +392,8 @@ impl TypeChecker<'_> {
 
     /// Common-member field access on a `∪` receiver (U1R).
     ///
-    /// Every constituent must expose the field (through the same merged
-    /// heritage views single-receiver access uses) with one agreeing type;
+    /// Every constituent must expose the field (through the same declared
+    /// member views single-receiver access uses) with one agreeing type;
     /// otherwise the member is not common and the diagnostic names the
     /// constituents that lack it, teaching the narrowing recovery (`est M`).
     fn check_union_field_from_type(

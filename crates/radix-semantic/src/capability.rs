@@ -539,10 +539,11 @@ impl<'a> DerivedCapabilityQueries<'a> {
         memo.nominal.as_ref()?.get(&def_id).copied()
     }
 
-    /// Field types of one nominal declaration, flattening `extends` chains.
+    /// Field types of one nominal declaration.
     ///
     /// A missing declaration (imported nominal) is [`CapabilityReason::MissingFact`];
-    /// a heritage cycle is [`CapabilityReason::UnsupportedRecursion`].
+    /// re-entering a declaration already on the walk is
+    /// [`CapabilityReason::UnsupportedRecursion`].
     fn nominal_field_types(
         &self,
         ty: TypeId,
@@ -565,20 +566,7 @@ impl<'a> DerivedCapabilityQueries<'a> {
         }
         visited_defs.push(def);
         let result = match self.nominal_decl(def) {
-            Some(NominalDecl::Struct(strukt)) => {
-                let mut fields: Vec<TypeId> = strukt.fields.iter().map(|f| f.ty).collect();
-                if let Some(base) = strukt.extends {
-                    match self.nominal_decl(base) {
-                        Some(NominalDecl::Struct(_)) => {
-                            fields.extend(self.decl_field_types(base, visited_defs)?);
-                        }
-                        // An extends target that is not a local struct cannot
-                        // be walked; the heritage closure is unknown.
-                        _ => return Err(CapabilityReason::MissingFact),
-                    }
-                }
-                Ok(fields)
-            }
+            Some(NominalDecl::Struct(strukt)) => Ok(strukt.fields.iter().map(|f| f.ty).collect()),
             Some(NominalDecl::Enum(enumeratio)) => {
                 let mut fields: Vec<TypeId> =
                     enumeratio.commune_fields.iter().map(|f| f.ty).collect();

@@ -354,9 +354,6 @@ fn resolve_stmt(
             for param in &decl.type_params {
                 define_generic_param(resolver, param, errors);
             }
-            if let Some(base) = &decl.extends {
-                resolve_type_ident(resolver, interner, base, errors);
-            }
             for iface in &decl.implements {
                 resolve_type_ident(resolver, interner, iface, errors);
             }

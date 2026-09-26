@@ -4233,10 +4233,6 @@ mod rope_norm_intrinsic_tests;
 mod type_hole_union_deny_tests;
 
 #[cfg(test)]
-#[path = "heritage_field_test.rs"]
-mod heritage_field_tests;
-
-#[cfg(test)]
 #[path = "amd_target_test.rs"]
 mod amd_target_tests;
 

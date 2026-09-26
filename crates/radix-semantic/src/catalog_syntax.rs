@@ -706,6 +706,9 @@ fn unexpected_message(args: &[DiagnosticArg]) -> Option<String> {
         }
         "allocator_surface_removed" => quote_arg(args, "keyword")
             .map(|keyword| format!("{keyword} was removed; allocation is not a language surface")),
+        "inheritance_removed" => quote_arg(args, "keyword").map(|keyword| {
+            format!("{keyword} was removed; class inheritance is not a language surface")
+        }),
         _ => None,
     }
 }
@@ -733,6 +736,9 @@ fn unexpected_help(args: &[DiagnosticArg]) -> Option<String> {
                 "delete the {keyword} wrapper or modifier; allocation is managed by the target runtime"
             )
         }),
+        "inheritance_removed" => Some(
+            "inheritance was removed; use a contract (`implet`) or composition".to_owned(),
+        ),
         _ => None,
     }
 }

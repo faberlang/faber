@@ -17,7 +17,6 @@ typus = "type"
 schema = "schema"
 columna = "column"
 varia = "var"
-abstractus = "abstract"
 ceteri = "rest"
 errata = "errors"
 exitus = "exit"
@@ -79,7 +78,6 @@ ego = "self"
 # OOP
 finge = "variant"
 implet = "implements"
-sub = "extends"
 # IO and diagnostics
 mone = "warn"
 nota = "print"
@@ -699,6 +697,10 @@ help = "keep '←' for 'figendum'/'variandum' awaited bindings"
 [diagnostics.PARSE002.issues.allocator_surface_removed]
 message = "'{keyword}' was removed; allocation is not a language surface"
 help = "delete the '{keyword}' wrapper or modifier; allocation is managed by the target runtime"
+
+[diagnostics.PARSE002.issues.inheritance_removed]
+message = "'{keyword}' was removed; class inheritance is not a language surface"
+help = "inheritance was removed; use a contract (`implements`) or composition"
 
 [diagnostics.PARSE010]
 message = "invalid declaration"
@@ -1606,10 +1608,6 @@ help = "provide a labeled actual for each named hole, or call the template by po
 
 [diagnostics.SEM008.issues.unhandled_statement_kind]
 message = "unhandled statement kind in lowering"
-help = "fix the AST construct for lowering"
-
-[diagnostics.SEM008.issues.unknown_base_class]
-message = "unknown base class in gens declaration"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.unknown_finge_cast_type]

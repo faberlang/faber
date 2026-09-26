@@ -16,7 +16,6 @@ typus = "ชนิดนามแฝง"
 schema = "สคีมา"
 columna = "คอลัมน์"
 varia = "แปร"
-abstractus = "นามธรรม"
 ceteri = "ที่เหลือ"
 errata = "ข้อผิดพลาด"
 exitus = "ทางออก"
@@ -74,7 +73,6 @@ vel = "หรือว่าง"
 ego = "ตัวฉัน"
 finge = "สร้าง"
 implet = "เติมเต็ม"
-sub = "สืบทอด"
 mone = "เตือน"
 nota = "บันทึก"
 scribe = "เขียน"
@@ -1271,10 +1269,6 @@ help = "แก้ไขโครงสร้าง AST สำหรับกา�
 
 [diagnostics.SEM008.issues.unhandled_statement_kind]
 message = "ไม่รองรับชนิดของ statement นี้ในการลดรูป"
-help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
-
-[diagnostics.SEM008.issues.unknown_base_class]
-message = "ไม่รู้จักคลาสฐานในการประกาศ gens"
 help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
 
 [diagnostics.SEM008.issues.unknown_finge_cast_type]

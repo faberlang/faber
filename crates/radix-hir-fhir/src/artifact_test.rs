@@ -109,7 +109,7 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // `HirTypeForm` and `HirPresentation::tuple_label_accesses` so authored
     // named-tuple labels and by-label reads survive re-emission — both are
     // serialized presentation additions, so schema-v14 artifacts fail closed.
-    assert_eq!(SCHEMA_VERSION, 15);
+    assert_eq!(SCHEMA_VERSION, 16);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────

@@ -840,15 +840,6 @@ impl Lowerer<'_> {
 
         self.pop_type_params();
 
-        let extends = decl
-            .extends
-            .as_ref()
-            .and_then(|ident| self.resolver.lookup(ident.name));
-
-        if decl.extends.is_some() && extends.is_none() {
-            self.error("unknown_base_class");
-        }
-
         let implements = decl
             .implements
             .iter()
@@ -866,9 +857,7 @@ impl Lowerer<'_> {
             type_params,
             fields,
             methods,
-            extends,
             implements,
-            is_abstract: decl.is_abstract,
         };
 
         Some(HirItem {

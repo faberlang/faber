@@ -119,7 +119,6 @@ pub enum TokenKind {
     Typus,
     Varia,
     // === Keywords: Modifiers ===
-    Abstractus,
     Ceteri,
     Errata,
     Exitus,
@@ -203,7 +202,6 @@ pub enum TokenKind {
     Ego,
     Finge,
     Implet,
-    Sub,
     // === Keywords: Type operations ===
     Conversio, // ↦
     Verte,     // ∷ postfix ascription
@@ -391,7 +389,6 @@ impl TokenKind {
                 | Schema
                 | Typus
                 | Varia
-                | Abstractus
                 | Ceteri
                 | Errata
                 | Exitus
@@ -445,7 +442,6 @@ impl TokenKind {
                 | Ego
                 | Finge
                 | Implet
-                | Sub
                 | Conversio
                 | Verte
                 | Mone
