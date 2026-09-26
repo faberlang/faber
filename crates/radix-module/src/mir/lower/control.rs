@@ -1319,10 +1319,7 @@ impl FunctionBuilder<'_> {
             // decimal-widths D1 successor: a decimal-typed
             // text pattern carries the exact scaled carrier, so the case
             // compares against the same Int carrier the scrutinee stores.
-            HirLiteral::FloatText { text, .. } if self.decimal_literal_width(scrutinee_ty).is_some() => {
-                let width = self
-                    .decimal_literal_width(scrutinee_ty)
-                    .expect("guarded above");
+            HirLiteral::FloatText { text, .. } if let Some(width) = self.decimal_literal_width(scrutinee_ty) => {
                 let carrier = self.context.interner.and_then(|interner| {
                     radix_codegen_shared::decimal::decimal_text_to_carrier(interner.resolve(*text), width)
                 });
