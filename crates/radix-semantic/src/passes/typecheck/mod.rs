@@ -92,6 +92,7 @@ pub mod expr;
 pub mod extremum;
 pub mod finalize;
 pub mod first_match;
+pub mod format;
 pub mod generic;
 pub mod index_infer;
 pub mod infer;
@@ -926,3 +927,7 @@ mod generic_defaults_test;
 #[cfg(test)]
 #[path = "named_type_defaults_test.rs"]
 mod named_type_defaults_test;
+
+#[cfg(test)]
+#[path = "format_test.rs"]
+mod format_test;

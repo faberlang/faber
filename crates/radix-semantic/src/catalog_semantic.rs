@@ -579,6 +579,18 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             Some("give vacua a lista, queue, stack, tabula, copia, tensor, or sparsa context".to_owned())
         }
         "textus_index_must_be_numerus_or_range" => Some("index textus with numerus or an integer range".to_owned()),
+        "format_spec_malformed" => {
+            Some("write the spec as [fill][align][sign][0][width][.precision][kind], e.g. \"08.2\"".to_owned())
+        }
+        "format_spec_part_invalid" => Some("drop the spec part this type does not accept".to_owned()),
+        "format_spec_preset_required" => Some("format instans with \"iso\", \"date\", or \"time\"".to_owned()),
+        "format_spec_preset_not_allowed" => Some("the named presets format instans only".to_owned()),
+        "format_type_unsupported" => {
+            Some("¶ formats numbers, textus, and instans; write a function that returns textus".to_owned())
+        }
+        "format_decimal_unsupported" => {
+            Some("convert the decimal with ↦ fractus or ↦ textus until decimal display is settled".to_owned())
+        }
         "octeti_index_must_be_numerus_or_range" => Some("index octeti with numerus or an integer range".to_owned()),
         "array_index_must_be_numerus" => Some("index lista values with numerus".to_owned()),
         "indexing_requires_array_or_map" => {

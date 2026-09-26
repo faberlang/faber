@@ -670,6 +670,14 @@ help = "use ⊥; vel is nullish coalescing only"
 message = "a '✓ ✗' conditional cannot appear inside another '✓ ✗'"
 help = "use '{si}'/'{sin}', '{discerne}', or a function that '{redde}'s each case"
 
+[diagnostics.PARSE030.issues.format_spec_not_literal]
+message = "the '¶' format spec must be a string literal"
+help = "write the spec in quotes, like 'x ¶ \".2\"'; a computed spec is not allowed"
+
+[diagnostics.PARSE030.issues.format_chained]
+message = "'¶' does not chain"
+help = "format once; parenthesize to format a formatted text"
+
 [diagnostics.PARSE030.issues.conditional_question_colon_removed]
 message = "'c ? a : b' was removed; write 'c ✓ a ✗ b'"
 help = "the value conditional is 'c ✓ a ✗ b' (U+2713, U+2717) in every locale"
@@ -2265,6 +2273,30 @@ help = "give vacua a {lista}, tabula, copia, tensor, or sparsa context"
 [diagnostics.SEM011.issues.textus_index_must_be_numerus_or_range]
 message = "textus index must be numerus or range"
 help = "index textus with numerus or an integer range"
+
+[diagnostics.SEM011.issues.format_spec_malformed]
+message = "malformed '¶' format spec"
+help = "write the spec as [fill][align][sign][0][width][.precision][kind], e.g. \"08.2\""
+
+[diagnostics.SEM011.issues.format_spec_part_invalid]
+message = "the '¶' spec part '{part}' does not apply to this type"
+help = "drop the spec part this type does not accept"
+
+[diagnostics.SEM011.issues.format_spec_preset_required]
+message = "'¶' on {instans} takes a named preset"
+help = "format {instans} with \"iso\", \"date\", or \"time\""
+
+[diagnostics.SEM011.issues.format_spec_preset_not_allowed]
+message = "'¶' presets apply only to {instans}"
+help = "the named presets format {instans} only"
+
+[diagnostics.SEM011.issues.format_type_unsupported]
+message = "'¶' does not format this type"
+help = "'¶' formats numbers, {textus}, and {instans}; write a function that returns {textus}"
+
+[diagnostics.SEM011.issues.format_decimal_unsupported]
+message = "'¶' on decimal numbers is not yet supported"
+help = "convert the decimal with ↦ {fractus} or ↦ {textus} until decimal display is settled"
 
 [diagnostics.SEM011.issues.octeti_index_must_be_numerus_or_range]
 message = "octeti index requirit numerus vel intervallum"

@@ -1415,6 +1415,16 @@ pub enum HirExpressionKind {
         payloads: Vec<HirExpression>,
     },
 
+    /// Format operator `value ¶ "spec"` (D2.1) → `textus`.
+    ///
+    /// `spec` is the literal's text. Typecheck parses and validates it against
+    /// the value's type through `radix_types::format_spec`; backends re-parse
+    /// the same text with the same parser.
+    Format {
+        value: Box<HirExpression>,
+        spec: Symbol,
+    },
+
     /// Error placeholder that keeps the tree traversable after a diagnostic.
     Error,
 }

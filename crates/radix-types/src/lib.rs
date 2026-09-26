@@ -11,6 +11,7 @@
 mod capability;
 mod def_id;
 mod filtrum;
+pub mod format_spec;
 mod index;
 pub mod instans_precision;
 pub mod numeric_width;

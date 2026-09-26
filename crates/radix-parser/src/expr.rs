@@ -387,7 +387,7 @@ impl Parser {
 
     fn parse_comparison(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        let mut left = self.parse_bitwise_or()?;
+        let mut left = self.parse_format()?;
 
         loop {
             let op = match self.peek().kind {
@@ -403,11 +403,54 @@ impl Parser {
                 _ => break,
             };
             self.advance();
-            let right = self.parse_bitwise_or()?;
+            let right = self.parse_format()?;
             left = self.binary_expr(start, left, op, right)?;
         }
 
         Ok(left)
+    }
+
+    /// Parse the format tier.
+    ///
+    /// GRAMMAR:
+    ///   format := bitwise_or ['¶' STRING]
+    ///
+    /// WHY: `¶` (D2.1) is looser than arithmetic and tighter than comparison,
+    /// so `a + b ¶ ".2"` is `(a + b) ¶ ".2"` (D2.5). The spec must be a string
+    /// literal (D2.2): pass 1 checks only that one is present. `¶` does not
+    /// chain; a second `¶` is `format_chained`.
+    fn parse_format(&mut self) -> Result<Expr, ParseError> {
+        let start = self.current_span();
+        let value = self.parse_bitwise_or()?;
+        if !self.eat(&TokenKind::Pilcrow) {
+            return Ok(value);
+        }
+        let spec_span = self.current_span();
+        let TokenKind::String(spec) = self.peek().kind else {
+            return Err(
+                ParseError::structured(ParseErrorKind::ExpressionInvalid, spec_span)
+                    .with_arg("issue", "format_spec_not_literal"),
+            );
+        };
+        self.advance();
+        if self.check(&TokenKind::Pilcrow) {
+            return Err(ParseError::structured(
+                ParseErrorKind::ExpressionInvalid,
+                self.current_span(),
+            )
+            .with_arg("issue", "format_chained"));
+        }
+        let span = start.merge(self.previous_span());
+        let id = self.next_id();
+        Ok(Expr {
+            id,
+            kind: ExprKind::Format(FormatExpr {
+                value: Box::new(value),
+                spec,
+                spec_span,
+            }),
+            span,
+        })
     }
 
     fn parse_bitwise_or(&mut self) -> Result<Expr, ParseError> {

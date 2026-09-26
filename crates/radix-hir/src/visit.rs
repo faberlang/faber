@@ -296,6 +296,7 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
         | HirExpressionKind::ReadLine(_)
         | HirExpressionKind::Error => {}
         HirExpressionKind::Praefixum(inner) => visitor.visit_expr(inner),
+        HirExpressionKind::Format { value, .. } => visitor.visit_expr(value),
         HirExpressionKind::Transfer { sink, payloads } => {
             visitor.visit_expr(sink);
             for payload in payloads {
@@ -879,6 +880,7 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
         | HirExpressionKind::ReadLine(_)
         | HirExpressionKind::Error => {}
         HirExpressionKind::Praefixum(inner) => visitor.visit_expr_mut(inner),
+        HirExpressionKind::Format { value, .. } => visitor.visit_expr_mut(value),
         HirExpressionKind::Transfer { sink, payloads } => {
             visitor.visit_expr_mut(sink);
             for payload in payloads {

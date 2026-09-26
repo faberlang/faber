@@ -460,6 +460,11 @@ impl FragmentDefinitionChecker<'_> {
                 self.check_expr(inner);
             }
             HirExpressionKind::Praefixum(inner) => self.check_expr(inner),
+            // `¶` builds text, like `scriptum`: not a device-lane value.
+            HirExpressionKind::Format { value, .. } => {
+                self.effect(expr.span, "host_io");
+                self.check_expr(value);
+            }
         }
     }
 

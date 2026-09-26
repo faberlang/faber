@@ -1487,6 +1487,7 @@ fn resolve_expr(
         // EOT-3S repair (fail-closed): `⇇` transfer typing is owned by EOT-3M.
         // Name resolution still walks sink and payloads so ordinary
         // binding-wins lookup applies to every subexpression.
+        ExprKind::Format(format) => resolve_expr(resolver, interner, &format.value, errors),
         ExprKind::Transfer(expr) => {
             resolve_expr(resolver, interner, &expr.sink, errors);
             for payload in &expr.payloads {

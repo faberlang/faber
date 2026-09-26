@@ -2590,3 +2590,13 @@ fn heavy_ballot_lookalike_suggests_ballot_x() {
     // D4.7: `✘` (U+2718 HEAVY BALLOT X) gets "did you mean `✗`?".
     assert_homoglyph_did_you_mean("✘", "✘", "✗");
 }
+
+#[test]
+fn lexes_pilcrow_format_operator() {
+    // D2.1: `value ¶ "spec"` uses U+00B6 PILCROW SIGN; one spelling in every
+    // locale, no word twin.
+    let result = lex("x ¶ \".2\"");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    assert_eq!(result.tokens[1].kind, TokenKind::Pilcrow);
+    assert!(result.reader_keyword_latin_keys.is_empty());
+}

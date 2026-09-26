@@ -869,6 +869,10 @@ fn invalid_expression_message(args: &[DiagnosticArg]) -> Option<String> {
         "conditional_nested" => {
             Some("a '✓ ✗' conditional cannot appear inside another '✓ ✗'".to_owned())
         }
+        "format_spec_not_literal" => {
+            Some("the '¶' format spec must be a string literal".to_owned())
+        }
+        "format_chained" => Some("'¶' does not chain".to_owned()),
         "conditional_question_colon_removed" => {
             Some("'c ? a : b' was removed; write 'c ✓ a ✗ b'".to_owned())
         }
@@ -899,6 +903,11 @@ fn invalid_expression_help(args: &[DiagnosticArg]) -> Option<String> {
         "conditional_nested" => {
             Some("use 'si'/'sin', 'discerne', or a function that 'redde's each case".to_owned())
         }
+        "format_spec_not_literal" => Some(
+            "write the spec in quotes, like 'x ¶ \".2\"'; a computed spec is not allowed"
+                .to_owned(),
+        ),
+        "format_chained" => Some("format once; parenthesize to format a formatted text".to_owned()),
         "recovery_uses_exit_arrow" => {
             Some("write '↦ T ⊥ value' (or '↤ … ⊥ value'); '⇥' never takes a value".to_owned())
         }

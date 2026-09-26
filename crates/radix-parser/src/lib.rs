@@ -1485,3 +1485,7 @@ mod conditional_glyph_test;
 #[cfg(test)]
 #[path = "ternary_removed_test.rs"]
 mod ternary_removed_test;
+
+#[cfg(test)]
+#[path = "format_operator_test.rs"]
+mod format_operator_test;

@@ -377,6 +377,7 @@ pub(crate) fn intrinsic_name(intrinsic: &MirIntrinsic) -> String {
         MirIntrinsic::Diagnostic(kind) => format!("diagnostic.{}", diagnostic_name(*kind)),
         MirIntrinsic::Assert => "assert".to_owned(),
         MirIntrinsic::FormatString { .. } => "format_string".to_owned(),
+        MirIntrinsic::FormatValue { .. } => "format_value".to_owned(),
         MirIntrinsic::Convert(_) => "convert".to_owned(),
         MirIntrinsic::Collection(op) => format!("collection.{}", debug_snake(op)),
         MirIntrinsic::Atomic(op) => format!("atomic.{}", op.spelling()),

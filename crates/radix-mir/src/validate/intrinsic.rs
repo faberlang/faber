@@ -112,6 +112,17 @@ impl Validator<'_, '_> {
                     "format_string runtime call does not return textus",
                 );
             }
+            MirIntrinsic::FormatValue { .. } => {
+                if call.args.len() != 1 {
+                    self.error(span, "format_value runtime call takes one argument");
+                }
+                self.require_exact(
+                    call.return_ty,
+                    self.primitive(Primitive::Textus),
+                    span,
+                    "format_value runtime call does not return textus",
+                );
+            }
             MirIntrinsic::Convert(conversion) => {
                 self.require_arg_count(call.args.len(), 1, span, "conversion runtime call");
                 self.validate_mir_type(conversion.source_ty, span);

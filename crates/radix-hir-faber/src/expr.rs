@@ -1086,6 +1086,13 @@ impl super::FaberCodegen<'_> {
                     self.write_expr_prec(payload, 3, names, surface, writer);
                 }
             }
+            HirExpressionKind::Format { value, spec } => {
+                // `value ¶ "spec"` (D2.1): the glyph is the same in every
+                // locale; the value binds tighter than the format tier.
+                self.write_expr_prec(value, 5, names, surface, writer);
+                writer.write(" ¶ ");
+                self.write_textus_literal(*spec, writer);
+            }
             HirExpressionKind::Error => writer.write(surface.contextual_keyword("nihil")),
         }
 

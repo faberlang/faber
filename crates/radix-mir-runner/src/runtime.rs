@@ -129,6 +129,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     span,
                 )?))
             }
+            MirIntrinsic::FormatValue { spec } => {
+                let [arg] = call.args.as_slice() else {
+                    return Err(RunnerError::internal(span, "format_value runtime arity"));
+                };
+                let value = self.eval_operand(arg, span)?;
+                let float_width = self.operand_float_width(arg);
+                let spec = self.interner.resolve(*spec);
+                format_value(&value, spec, float_width, self.interner, span).map(Value::Str)
+            }
             MirIntrinsic::Convert(conversion) => self.eval_convert(conversion, &call.args, span),
             MirIntrinsic::Collection(op) => {
                 self.eval_collection(*op, &call.args, call.return_ty, span)
@@ -4588,4 +4597,50 @@ fn numeric_max(
         |a, b, _, _| Ok(a.max(b)),
         super::value::ieee_maximum,
     )
+}
+
+/// Render one value for `value ¶ "spec"` (D2.1) through the shared reference
+/// renderer. Typecheck already validated the spec against the value's type,
+/// so a spec that does not parse here, or a value family `¶` does not
+/// admit, is an internal error, never a user-facing failure (D2.4).
+fn format_value(
+    value: &Value,
+    spec: &str,
+    float_width: Option<radix_types::NumericWidth>,
+    interner: &radix_lexer::Interner,
+    span: Span,
+) -> Result<String, RunnerError> {
+    use radix_types::format_spec::{
+        FormatSpec, parse_format_spec, render_float, render_instans_preset, render_integer,
+        render_text,
+    };
+    let parsed = parse_format_spec(spec)
+        .map_err(|_| RunnerError::internal(span, "format_value spec did not parse"))?;
+    match (value, parsed) {
+        (Value::Int(v), FormatSpec::Layout(layout)) => Ok(render_integer(i128::from(*v), &layout)),
+        (Value::UInt(v), FormatSpec::Layout(layout)) => Ok(render_integer(i128::from(*v), &layout)),
+        (Value::Float(v), FormatSpec::Layout(layout)) => {
+            let mut display_error = None;
+            let text = render_float(*v, &layout, |magnitude| {
+                Value::Float(magnitude)
+                    .display_typed(interner, span, float_width)
+                    .unwrap_or_else(|err| {
+                        display_error = Some(err);
+                        String::new()
+                    })
+            });
+            match display_error {
+                Some(err) => Err(err),
+                None => Ok(text),
+            }
+        }
+        (Value::Str(v), FormatSpec::Layout(layout)) => Ok(render_text(v, &layout)),
+        (Value::Instans(v), FormatSpec::Preset(preset)) => {
+            Ok(render_instans_preset(&v.to_rfc3339(), preset))
+        }
+        _ => Err(RunnerError::internal(
+            span,
+            "format_value operand not admitted by ¶",
+        )),
+    }
 }
