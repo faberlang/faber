@@ -845,11 +845,6 @@ impl FunctionBuilder<'_> {
                 ));
                 return None;
             };
-            if arm.guard.is_some() {
-                self.errors
-                    .push(MirError::unsupported(arm.span, "guarded type-test discerne arm"));
-                return None;
-            }
             let HirPattern::TypeTest { ty, binding, .. } = pattern else {
                 if matches!(pattern, HirPattern::Wildcard | HirPattern::Binding(_, _)) {
                     has_default = true;
@@ -1072,15 +1067,9 @@ impl FunctionBuilder<'_> {
         }
     }
 
-    /// Shared prelude for the discerne switch loops: reject guarded arms and
-    /// multi-pattern arms with their standing diagnostics, or yield the arm's
-    /// single pattern.
+    /// Shared prelude for the discerne switch loops: reject multi-pattern arms
+    /// with their standing diagnostic, or yield the arm's single pattern.
     fn discerne_switch_arm_pattern<'a>(&mut self, arm: &'a HirCasuArm) -> Option<&'a HirPattern> {
-        if arm.guard.is_some() {
-            self.errors
-                .push(MirError::unsupported(arm.span, "guarded discerne before switch MIR lowering"));
-            return None;
-        }
         let [pattern] = arm.patterns.as_slice() else {
             self.errors.push(MirError::unsupported(
                 arm.span,

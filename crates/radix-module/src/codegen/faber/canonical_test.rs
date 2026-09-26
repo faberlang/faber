@@ -1036,7 +1036,6 @@ fn discerne_cases_do_not_emit_nested_blocks() {
             }],
             arms: vec![HirCasuArm {
                 patterns: vec![HirPattern::Literal(HirLiteral::Int(200))],
-                guard: None,
                 body: arm_body,
                 span: span(),
             }],
@@ -1069,7 +1068,7 @@ fn discerne_cases_do_not_emit_nested_blocks() {
 }
 
 #[test]
-fn discerne_patterns_preserve_bindings_aliases_variants_and_guards() {
+fn discerne_patterns_preserve_bindings_aliases_and_variants() {
     let mut interner = Interner::new();
     let event = interner.intern("Event");
     let click = interner.intern("Click");
@@ -1079,7 +1078,6 @@ fn discerne_patterns_preserve_bindings_aliases_variants_and_guards() {
 
     let types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);
-    let bivalens = types.primitive(Primitive::Bivalens);
     let textus = types.primitive(Primitive::Textus);
 
     let enum_item = HirItem {
@@ -1115,12 +1113,6 @@ fn discerne_patterns_preserve_bindings_aliases_variants_and_guards() {
                     alias,
                     Box::new(HirPattern::Variant(DefId(2), vec![HirPattern::Binding(DefId(3), payload)])),
                 )],
-                guard: Some(HirExpression {
-                    id: crate::hir::HirId(5),
-                    kind: HirExpressionKind::Literal(HirLiteral::Bool(true)),
-                    ty: Some(bivalens),
-                    span: span(),
-                }),
                 body: HirExpression {
                     id: crate::hir::HirId(6),
                     kind: HirExpressionKind::Literal(HirLiteral::String(ok)),
@@ -1153,7 +1145,7 @@ fn discerne_patterns_preserve_bindings_aliases_variants_and_guards() {
     };
 
     let code = generate_faber(&program, &types, &interner);
-    assert!(code.contains("casu Click fixum payload ut matched si verum {"));
+    assert!(code.contains("casu Click fixum payload ut matched {"));
     assert!(code.contains("\"ok\""));
 }
 

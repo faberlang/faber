@@ -1194,9 +1194,6 @@ impl HirVisitor for BorrowChecker<'_> {
                 }
                 for arm in arms {
                     self.push_scope();
-                    if let Some(guard) = &arm.guard {
-                        self.visit_expr(guard);
-                    }
                     self.visit_expr(&arm.body);
                     self.pop_scope();
                 }

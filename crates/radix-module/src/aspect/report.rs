@@ -567,9 +567,7 @@ fn explicit_variant_coverage(arms: &[HirCasuArm]) -> ExplicitVariantCoverage {
     for arm in arms {
         for pattern in &arm.patterns {
             if let Some(variant) = pattern_variant_id(pattern) {
-                if arm.guard.is_none() {
-                    covered_variants.insert(variant);
-                }
+                covered_variants.insert(variant);
             } else {
                 has_non_variant_pattern = true;
             }

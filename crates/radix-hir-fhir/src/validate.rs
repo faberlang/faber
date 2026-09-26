@@ -1392,9 +1392,6 @@ fn collect_expr_defs(
                 for pat in &arm.patterns {
                     collect_pattern_defs(pat, registry);
                 }
-                if let Some(ref guard) = arm.guard {
-                    collect_expr_defs(guard, registry);
-                }
                 collect_expr_defs(&arm.body, registry);
             }
         }
@@ -1738,9 +1735,6 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                     collect_expr(s, registry);
                 }
                 for arm in arms {
-                    if let Some(ref guard) = arm.guard {
-                        collect_expr(guard, registry);
-                    }
                     collect_expr(&arm.body, registry);
                 }
             }
@@ -2554,9 +2548,6 @@ pub(crate) fn validate_referential_integrity(
                 for arm in arms {
                     for pat in &arm.patterns {
                         validate_pattern(pat, check_symbol, check_def)?;
-                    }
-                    if let Some(ref guard) = arm.guard {
-                        validate_expr(guard, check_symbol, check_def, check_hir, check_type)?;
                     }
                     validate_expr(&arm.body, check_symbol, check_def, check_hir, check_type)?;
                 }

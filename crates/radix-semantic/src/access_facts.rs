@@ -709,9 +709,6 @@ impl HirVisitor for DeadSourceAnalyzer<'_> {
                     self.bindings = bindings.clone();
                     self.used = used.clone();
                     self.branch_depth += 1;
-                    if let Some(guard) = &arm.guard {
-                        self.visit_expr(guard);
-                    }
                     self.visit_expr(&arm.body);
                     self.branch_depth = self.branch_depth.saturating_sub(1);
                     branch_states.push(self.states.clone());

@@ -43,7 +43,6 @@ impl super::FaberCodegen<'_> {
             // instead of `casu _`.
             let elige_default = authored_elige
                 && idx + 1 == arms.len()
-                && arm.guard.is_none()
                 && arm.patterns.len() == 1
                 && matches!(arm.patterns[0], HirPattern::Wildcard);
             if elige_default {
@@ -52,12 +51,6 @@ impl super::FaberCodegen<'_> {
                 writer.write(surface.contextual_keyword("casu"));
                 writer.write(" ");
                 self.write_pattern_list(&arm.patterns, names, surface, writer);
-                if let Some(guard) = &arm.guard {
-                    writer.write(" ");
-                    writer.write(surface.contextual_keyword("si"));
-                    writer.write(" ");
-                    self.write_expr(guard, names, surface, writer);
-                }
             }
             writer.writeln(" {");
             writer.indented(|writer| {

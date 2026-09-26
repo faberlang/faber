@@ -529,22 +529,6 @@ fn rewrite_nested_expr(
                 );
             }
             for arm in arms {
-                if let Some(guard) = &mut arm.guard {
-                    rewrite_nested_expr(
-                        presentation,
-                        guard,
-                        root_locals,
-                        lanes,
-                        interner,
-                        ids,
-                        errors,
-                        mask,
-                        types,
-                        fullness,
-                        emitted_lanes,
-                        multiplicity,
-                    );
-                }
                 rewrite_nested_expr(
                     presentation,
                     &mut arm.body,

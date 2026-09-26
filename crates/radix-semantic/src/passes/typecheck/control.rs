@@ -244,9 +244,6 @@ impl TypeChecker<'_> {
             for (def_id, narrowed) in refinements {
                 self.override_binding(def_id, narrowed);
             }
-            if let Some(guard) = &mut arm.guard {
-                self.check_condition(guard);
-            }
             let body_ty = self.check_expr_with_expected(&mut arm.body, expected);
             result_ty = Some(match result_ty {
                 None => body_ty,

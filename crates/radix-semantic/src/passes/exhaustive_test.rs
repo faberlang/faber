@@ -71,7 +71,6 @@ fn match_expr_with_exhaustive(
         .into_iter()
         .map(|pattern| HirCasuArm {
             patterns: vec![pattern],
-            guard: None,
             body: lit_expr(2),
             span: test_span(),
         })
@@ -99,7 +98,6 @@ fn match_expr_with_arms(scrutinee_ty: TypeId, arm_patterns: Vec<Vec<HirPattern>>
         .into_iter()
         .map(|patterns| HirCasuArm {
             patterns,
-            guard: None,
             body: lit_expr(2),
             span: test_span(),
         })
@@ -624,342 +622,10 @@ fn single_variant_omnia_accepts_exact_match() {
     );
 }
 
-// ── F-022: omnia + guarded arms ──────────────────────────────────────────────
-
-fn guarded_match_expr_with_exhaustive(
-    enum_ty: TypeId,
-    variant_def_ids: Vec<DefId>,
-    exhaustive: bool,
-    guard_text: &HirExpression,
-    body_text: &HirExpression,
-) -> HirExpression {
-    let scrutinee = HirExpression {
-        id: radix_hir::HirId(1),
-        kind: HirExpressionKind::Path(DefId(100)),
-        ty: Some(enum_ty),
-        span: test_span(),
-    };
-    let arms: Vec<HirCasuArm> = variant_def_ids
-        .into_iter()
-        .map(|def_id| HirCasuArm {
-            patterns: vec![HirPattern::Variant(def_id, Vec::new())],
-            guard: Some(guard_text.clone()),
-            body: body_text.clone(),
-            span: test_span(),
-        })
-        .collect();
-    HirExpression {
-        id: radix_hir::HirId(3),
-        kind: HirExpressionKind::Discerne {
-            scrutinees: vec![scrutinee],
-            arms,
-            exhaustive,
-        },
-        ty: None,
-        span: test_span(),
-    }
-}
-
-#[test]
-fn omnia_rejects_all_guarded_variants() {
-    let mut types = TypeTable::new();
-    let enum_def = DefId(1);
-    let enum_ty = types.intern(Type::Enum(enum_def));
-
-    let guard_body = HirExpression {
-        id: radix_hir::HirId(90),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-    let arm_body = HirExpression {
-        id: radix_hir::HirId(91),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-
-    let match_expr = guarded_match_expr_with_exhaustive(
-        enum_ty,
-        vec![DefId(2), DefId(3)],
-        true, // omnia
-        &guard_body,
-        &arm_body,
-    );
-    let program = program_with_match(enum_def, match_expr);
-
-    let result = check(&program, &types);
-    // F-022: all-guarded arms under omnia MUST be non-exhaustive
-    assert!(
-        result.is_err(),
-        "F-022: expected NonExhaustiveMatch, got Ok"
-    );
-    let errors = result.unwrap_err();
-    let has_non_exhaustive = errors
-        .iter()
-        .any(|e| matches!(e.kind, SemanticErrorKind::NonExhaustiveMatch));
-    assert!(
-        has_non_exhaustive,
-        "F-022: expected NonExhaustiveMatch in errors: {errors:?}"
-    );
-}
-
-#[test]
-fn omnia_rejects_partially_guarded_variants() {
-    // F-022: when some variants are covered by guarded arms and others by
-    // unguarded arms, the guarded-only variants must still be reported as
-    // missing under omnia.
-    let mut types = TypeTable::new();
-    let enum_def = DefId(1);
-    let enum_ty = types.intern(Type::Enum(enum_def));
-
-    let guard_body = HirExpression {
-        id: radix_hir::HirId(90),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-    let arm_body = HirExpression {
-        id: radix_hir::HirId(91),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-
-    let scrutinee = HirExpression {
-        id: radix_hir::HirId(1),
-        kind: HirExpressionKind::Path(DefId(100)),
-        ty: Some(enum_ty),
-        span: test_span(),
-    };
-
-    // DefId(2) = guarded, DefId(3) = unguarded
-    let arms = vec![
-        HirCasuArm {
-            patterns: vec![HirPattern::Variant(DefId(2), Vec::new())],
-            guard: Some(guard_body.clone()),
-            body: arm_body.clone(),
-            span: test_span(),
-        },
-        HirCasuArm {
-            patterns: vec![HirPattern::Variant(DefId(3), Vec::new())],
-            guard: None, // unguarded — covers variant 3
-            body: arm_body.clone(),
-            span: test_span(),
-        },
-    ];
-
-    let match_expr = HirExpression {
-        id: radix_hir::HirId(3),
-        kind: HirExpressionKind::Discerne {
-            scrutinees: vec![scrutinee],
-            arms,
-            exhaustive: true,
-        },
-        ty: None,
-        span: test_span(),
-    };
-    let program = program_with_match(enum_def, match_expr);
-
-    let result = check(&program, &types);
-    assert!(
-        result.is_err(),
-        "F-022: expected NonExhaustiveMatch for guarded variant, got Ok"
-    );
-    let errors = result.unwrap_err();
-    let has_non_exhaustive = errors
-        .iter()
-        .any(|e| matches!(e.kind, SemanticErrorKind::NonExhaustiveMatch));
-    assert!(
-        has_non_exhaustive,
-        "F-022: expected NonExhaustiveMatch in errors: {errors:?}"
-    );
-}
-
-#[test]
-fn omnia_accepts_all_unguarded_variants_even_with_extra_guarded_arms() {
-    // F-022: when every variant has at least one unguarded arm AND there are
-    // additional guarded arms for the same variants, omnia should still accept
-    // (the unguarded arms prove exhaustiveness; the guards are extras).
-    let mut types = TypeTable::new();
-    let enum_def = DefId(1);
-    let enum_ty = types.intern(Type::Enum(enum_def));
-
-    let guard_body = HirExpression {
-        id: radix_hir::HirId(90),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-    let arm_body = HirExpression {
-        id: radix_hir::HirId(91),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-
-    let scrutinee = HirExpression {
-        id: radix_hir::HirId(1),
-        kind: HirExpressionKind::Path(DefId(100)),
-        ty: Some(enum_ty),
-        span: test_span(),
-    };
-
-    // Both variants have unguarded arms + an extra guarded arm for variant 2
-    let arms = vec![
-        HirCasuArm {
-            patterns: vec![HirPattern::Variant(DefId(2), Vec::new())],
-            guard: None, // unguarded for variant 2
-            body: arm_body.clone(),
-            span: test_span(),
-        },
-        HirCasuArm {
-            patterns: vec![HirPattern::Variant(DefId(3), Vec::new())],
-            guard: None, // unguarded for variant 3
-            body: arm_body.clone(),
-            span: test_span(),
-        },
-        HirCasuArm {
-            patterns: vec![HirPattern::Variant(DefId(2), Vec::new())],
-            guard: Some(guard_body.clone()), // guarded duplicate of variant 2
-            body: arm_body.clone(),
-            span: test_span(),
-        },
-    ];
-
-    let match_expr = HirExpression {
-        id: radix_hir::HirId(3),
-        kind: HirExpressionKind::Discerne {
-            scrutinees: vec![scrutinee],
-            arms,
-            exhaustive: true,
-        },
-        ty: None,
-        span: test_span(),
-    };
-    let program = program_with_match(enum_def, match_expr);
-
-    let errors = check(&program, &types).err().unwrap_or_default();
-    // The guarded duplicate should NOT trigger a DuplicatePattern error
-    // (guarded arms are never counted for coverage or duplicate checks).
-    let has_duplicate = errors
-        .iter()
-        .any(|e| matches!(e.kind, SemanticErrorKind::PatternDuplicate));
-    assert!(
-        !has_duplicate,
-        "F-022: guarded duplicate must not trigger DuplicatePattern: {errors:?}"
-    );
-    // The omnia match should still be accepted because ALL variants have
-    // unguarded coverage.
-    let has_non_exhaustive = errors
-        .iter()
-        .any(|e| matches!(e.kind, SemanticErrorKind::NonExhaustiveMatch));
-    assert!(
-        !has_non_exhaustive,
-        "F-022: omnia with full unguarded coverage must pass: {errors:?}"
-    );
-}
-
-#[test]
-fn non_omnia_does_not_reject_all_guarded_variants() {
-    // Regression: non-omnia matches must still accept guarded-only variant
-    // arms — the author is not promising exhaustiveness without a catchall.
-    let mut types = TypeTable::new();
-    let enum_def = DefId(1);
-    let enum_ty = types.intern(Type::Enum(enum_def));
-
-    let guard_body = HirExpression {
-        id: radix_hir::HirId(90),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-    let arm_body = HirExpression {
-        id: radix_hir::HirId(91),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-
-    let match_expr = guarded_match_expr_with_exhaustive(
-        enum_ty,
-        vec![DefId(2), DefId(3)],
-        false, // NOT omnia
-        &guard_body,
-        &arm_body,
-    );
-    let program = program_with_match(enum_def, match_expr);
-
-    let result = check(&program, &types);
-    // Non-omnia without catchall is non-exhaustive regardless of guards — the
-    // NonExhaustiveMatch is expected here because there is no catchall arm.
-    assert!(result.is_err());
-    let errors = result.unwrap_err();
-    let has_non_exhaustive = errors
-        .iter()
-        .any(|e| matches!(e.kind, SemanticErrorKind::NonExhaustiveMatch));
-    assert!(
-        has_non_exhaustive,
-        "non-omnia without catchall must still be non-exhaustive"
-    );
-}
-
-// ── F-022: discerne_definitely_covered guards ────────────────────────────────
-
-#[test]
-fn definitely_covered_rejects_all_guarded_variant_arms() {
-    // F-022: `discerne_definitely_covered` must not treat guarded-only variant
-    // arms as proof of exhaustiveness, even when every variant is named.
-    let mut types = TypeTable::new();
-    let enum_def = DefId(1);
-    let enum_ty = types.intern(Type::Enum(enum_def));
-
-    let guard_body = HirExpression {
-        id: radix_hir::HirId(90),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-    let arm_body = HirExpression {
-        id: radix_hir::HirId(91),
-        kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-        ty: Some(types.primitive(crate::Primitive::Numerus)),
-        span: test_span(),
-    };
-
-    let mut enum_variants: FxHashMap<DefId, Vec<DefId>> = FxHashMap::default();
-    enum_variants.insert(enum_def, vec![DefId(2), DefId(3)]);
-
-    let scrutinees = vec![HirExpression {
-        id: radix_hir::HirId(1),
-        kind: HirExpressionKind::Path(DefId(100)),
-        ty: Some(enum_ty),
-        span: test_span(),
-    }];
-    let guarded_arms = vec![
-        HirCasuArm {
-            patterns: vec![HirPattern::Variant(DefId(2), Vec::new())],
-            guard: Some(guard_body.clone()),
-            body: arm_body.clone(),
-            span: test_span(),
-        },
-        HirCasuArm {
-            patterns: vec![HirPattern::Variant(DefId(3), Vec::new())],
-            guard: Some(guard_body),
-            body: arm_body,
-            span: test_span(),
-        },
-    ];
-    assert!(
-        !discerne_definitely_covered(&scrutinees, &guarded_arms, &types, &enum_variants),
-        "F-022: definitely_covered must reject all-guarded variant arms"
-    );
-}
-
 #[test]
 fn discerne_definitely_covered_imported_enum_via_derived_variants() {
     // F-077: When the variant list is missing (imported enum), derive the
-    // expected set from the arm patterns. All unguarded variant arms with no
+    // expected set from the arm patterns. All variant arms with no
     // catchall should be treated as definitely covered.
     let mut types = TypeTable::new();
     let imported_enum_def = DefId(99);
@@ -984,13 +650,11 @@ fn discerne_definitely_covered_imported_enum_via_derived_variants() {
     let arms = vec![
         HirCasuArm {
             patterns: vec![HirPattern::Variant(DefId(2), Vec::new())],
-            guard: None,
             body: all_variant_body.clone(),
             span: test_span(),
         },
         HirCasuArm {
             patterns: vec![HirPattern::Variant(DefId(3), Vec::new())],
-            guard: None,
             body: all_variant_body,
             span: test_span(),
         },
@@ -1000,35 +664,15 @@ fn discerne_definitely_covered_imported_enum_via_derived_variants() {
         "F-077: imported enum with pure variant arms should be definitely covered"
     );
 
-    // Guarded arm breaks coverage.
-    let guard_body = HirExpression {
-        id: radix_hir::HirId(92),
-        kind: HirExpressionKind::Literal(HirLiteral::Bool(true)),
-        ty: Some(types.primitive(crate::Primitive::Bivalens)),
-        span: test_span(),
-    };
-    let guarded_arms = vec![HirCasuArm {
-        patterns: vec![HirPattern::Variant(DefId(2), Vec::new())],
-        guard: Some(guard_body),
-        body: arm_body.clone(),
-        span: test_span(),
-    }];
-    assert!(
-        !discerne_definitely_covered(&scrutinees, &guarded_arms, &types, &enum_variants),
-        "F-077: imported enum with guarded arm must not be definitely covered"
-    );
-
     // Catchall arm breaks coverage.
     let catchall_arms = vec![
         HirCasuArm {
             patterns: vec![HirPattern::Variant(DefId(2), Vec::new())],
-            guard: None,
             body: arm_body.clone(),
             span: test_span(),
         },
         HirCasuArm {
             patterns: vec![HirPattern::Wildcard],
-            guard: None,
             body: arm_body,
             span: test_span(),
         },

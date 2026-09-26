@@ -30,7 +30,7 @@ fn discerne_omnia_expr(id: u32, span: Span, scrutinee_ty: TypeId, patterns: Vec<
                 ty: Some(scrutinee_ty),
                 span,
             }],
-            arms: vec![HirCasuArm { patterns, guard: None, body: lit_expr(id + 20, span), span }],
+            arms: vec![HirCasuArm { patterns, body: lit_expr(id + 20, span), span }],
             exhaustive: true,
         },
         ty: None,

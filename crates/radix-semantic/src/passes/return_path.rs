@@ -274,8 +274,8 @@ fn reachable_arms_all_terminate(
         if !expr_terminates(&arm.body, types, enum_variants) {
             return false;
         }
-        // An unguarded catchall shadows the arms after it; stop once reached.
-        if arm.guard.is_none() && arm.patterns.iter().any(is_catchall_pattern) {
+        // A catchall shadows the arms after it; stop once reached.
+        if arm.patterns.iter().any(is_catchall_pattern) {
             break;
         }
     }
