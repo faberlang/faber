@@ -69,10 +69,10 @@ mod collection_higher_order;
 mod context;
 mod control;
 mod expr;
-mod fractus_potentia;
 #[cfg(test)]
 #[path = "lower/first_match_test.rs"]
 mod first_match_tests;
+mod fractus_potentia;
 mod item;
 mod monomorphize;
 mod package_instantiate;
