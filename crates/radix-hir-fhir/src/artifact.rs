@@ -550,8 +550,8 @@ pub struct ProviderUnitWire {
 /// to a missing-carriage error.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ProviderCarriageEntryWire {
-    /// Analyzed provider unit.
-    Unit(ProviderUnitWire),
+    /// Analyzed provider unit (boxed: it dwarfs the failure marker).
+    Unit(Box<ProviderUnitWire>),
     /// Contract discovery or analysis failed for this target; `message` is
     /// the fail-closed emission error's tail clause.
     Failed {

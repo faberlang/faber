@@ -104,14 +104,14 @@ fn provider_units_wire(
                 }
                 crate::driver::CarriedProviderUnit::Unit(unit) => {
                     let provider = unit.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-                    radix_hir_fhir::ProviderCarriageEntryWire::Unit(radix_hir_fhir::ProviderUnitWire {
+                    radix_hir_fhir::ProviderCarriageEntryWire::Unit(Box::new(radix_hir_fhir::ProviderUnitWire {
                         hir: provider.hir.clone(),
                         types: provider.types.snapshot(),
                         resolved_generic_calls: provider.types.resolved_generic_calls.clone(),
                         interner: provider.interner.to_string_table(),
                         resolver: provider.resolver.to_snapshot(),
                         nested: provider_units_wire(&provider.nested),
-                    })
+                    }))
                 }
             };
             (import_path.clone(), entry)

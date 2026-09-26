@@ -1813,6 +1813,13 @@ pub struct HirPresentation {
     #[serde(default)]
     pub discard_binding_stmts: Vec<HirDiscardBinding>,
 
+    /// Authored destructuring declarations (`fixum [a, rest r] ← xs`,
+    /// `fixum {x, y} ← p`, and destructuring `itera` binders), which lower to
+    /// a run of ordinary locals. Emission re-sugars exactly these runs back to
+    /// the authored pattern.
+    #[serde(default)]
+    pub destructure_bindings: Vec<HirDestructureBinding>,
+
     /// Definitions whose awaited initializer was authored with `↢` rather
     /// than the `figendum` or `variandum` morphology.
     #[serde(default)]
@@ -2031,6 +2038,41 @@ pub struct HirDiscardBinding {
 
     pub mutable: bool,
     pub is_await: bool,
+}
+
+/// Authored facts for one destructuring declaration.
+///
+/// Lowering expands the pattern into consecutive statements: an optional
+/// hidden subject local (the initializer evaluated once), then one local per
+/// bound element or field, then the rest local. `stmt_ids` lists exactly that
+/// run, so emission can replace it with the authored pattern.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirDestructureBinding {
+    /// Lowered statement ids of the expansion, in order. Never empty.
+    pub stmt_ids: Vec<HirId>,
+
+    /// Whether `stmt_ids[0]` is the hidden subject local. Otherwise the
+    /// subject is a side-effect-free place read by every expanded local.
+    pub hoisted: bool,
+
+    pub pattern: HirDestructurePattern,
+    pub mutable: bool,
+    pub is_await: bool,
+}
+
+/// Authored shape of a flat destructuring pattern.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirDestructurePattern {
+    /// `[a, _, b, rest r]`; `None` is a `_` hole.
+    Array {
+        elements: Vec<Option<Symbol>>,
+        rest: Option<Symbol>,
+    },
+    /// `{x, y ut z, rest r}` as `(field, alias)` pairs.
+    Object {
+        fields: Vec<(Symbol, Option<Symbol>)>,
+        rest: Option<Symbol>,
+    },
 }
 
 /// Structural end of one authored executable block.

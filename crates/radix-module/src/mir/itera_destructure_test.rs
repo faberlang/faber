@@ -240,9 +240,8 @@ incipit {
 }
 ";
     assert_lowered_and_valid(source);
-    // Rest inherits the binding-position carrier semantics: `tail` is the
-    // source list path, so this is 2 * (1 + 4), not a sliced-tail sum.
-    assert_eq!(run(source), ["10"]);
+    // D14.1: `tail` is the tail after `head`, so this is (1 + 2) + (4 + 5).
+    assert_eq!(run(source), ["12"]);
 }
 
 #[test]

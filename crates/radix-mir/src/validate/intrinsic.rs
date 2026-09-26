@@ -848,16 +848,31 @@ impl Validator<'_, '_> {
             }
             MirCollectionOp::Take | MirCollectionOp::TakeLast | MirCollectionOp::DropFirst => {
                 if let Some(collection_ty) = first_arg_ty {
-                    let Type::Array(_) = self.type_kind(collection_ty) else {
+                    // A fixed-width receiver (BoundedArray) yields an
+                    // ArrayInner copy/view: only the element type carries.
+                    let (Type::Array(_) | Type::BoundedArray { .. }) =
+                        self.type_kind(collection_ty)
+                    else {
                         self.error(span, "list copy/view receiver is not a lista");
                         return;
                     };
-                    self.require_assignable(
-                        call.return_ty,
-                        collection_ty,
-                        span,
-                        "list copy/view result type mismatch",
-                    );
+                    match (
+                        self.collection_element_ty(call.return_ty),
+                        self.collection_element_ty(collection_ty),
+                    ) {
+                        (Some(result_elem), Some(receiver_elem)) => self.require_assignable(
+                            result_elem,
+                            receiver_elem,
+                            span,
+                            "list copy/view result type mismatch",
+                        ),
+                        _ => self.require_assignable(
+                            call.return_ty,
+                            collection_ty,
+                            span,
+                            "list copy/view result type mismatch",
+                        ),
+                    }
                 }
                 if let Some(count) = call.args.get(1)
                     && let Some(count_ty) = self.validate_operand(scope, count, span)

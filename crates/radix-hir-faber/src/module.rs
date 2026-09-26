@@ -77,6 +77,9 @@ pub struct FaberCodegen<'a> {
     /// Initializer-expression ids of authored discard bindings (`fixum T _ ← e`)
     /// with their declaration facts, for re-emitting the binding.
     pub(crate) discard_bindings: FxHashMap<radix_hir::HirId, radix_hir::HirDiscardBinding>,
+    /// Authored destructuring declarations keyed by the first statement id
+    /// of their lowered run; emission re-sugars the run to the pattern.
+    pub(crate) destructure_bindings: FxHashMap<radix_hir::HirId, radix_hir::HirDestructureBinding>,
     /// Definitions whose awaited initializer used the `↢` spelling.
     pub(crate) await_assignment_bindings: FxHashSet<DefId>,
     /// Authored `ordo` enumerations by enum def id: emission re-sugars these
@@ -133,6 +136,7 @@ impl<'a> FaberCodegen<'a> {
             guard_si_ids: FxHashSet::default(),
             elige_expr_ids: FxHashSet::default(),
             discard_bindings: FxHashMap::default(),
+            destructure_bindings: FxHashMap::default(),
             await_assignment_bindings: FxHashSet::default(),
             ordo_enums: FxHashMap::default(),
             authored_type_forms: FxHashMap::default(),
@@ -192,6 +196,7 @@ pub fn empty_presentation() -> HirPresentation {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
+        destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
@@ -227,6 +232,11 @@ impl FaberCodegen<'_> {
             .discard_binding_stmts
             .iter()
             .map(|binding| (binding.expr_id, binding.clone()))
+            .collect();
+        self.destructure_bindings = presentation
+            .destructure_bindings
+            .iter()
+            .filter_map(|binding| Some((*binding.stmt_ids.first()?, binding.clone())))
             .collect();
         self.await_assignment_bindings = presentation
             .await_assignment_bindings

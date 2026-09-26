@@ -231,8 +231,6 @@ impl Lowerer<'_> {
         mutability: radix_syntax::AstMutability,
         is_await: bool,
     ) -> Vec<HirStatement> {
-        let mut out = Vec::new();
-        let mutable = mutability == radix_syntax::AstMutability::Mutable;
         let (elements, rest, span) = match pattern {
             radix_syntax::BindingPattern::Array {
                 elements,
@@ -241,10 +239,26 @@ impl Lowerer<'_> {
             } => (elements, rest, *span),
             _ => return Vec::new(),
         };
+        let mutable = mutability == radix_syntax::AstMutability::Mutable;
+        // A pattern of holes only binds nothing; its initializer lowers to one
+        // expression statement below, which already evaluates it once.
+        let binds = rest.is_some()
+            || elements
+                .iter()
+                .any(|element| !matches!(element, radix_syntax::BindingPattern::Wildcard(_)));
+        let (mut out, hoisted_subject) = if binds {
+            self.destructure_subject(init, is_await, span)
+        } else {
+            (Vec::new(), None)
+        };
+        let hoisted = hoisted_subject.is_some();
+        let subject = hoisted_subject.as_ref().unwrap_or(init);
+        let mut authored = Vec::with_capacity(elements.len());
 
         for (idx, pattern) in elements.iter().enumerate() {
             match pattern {
                 radix_syntax::BindingPattern::Ident(ident) => {
+                    authored.push(Some(ident.name));
                     let def_id = self.next_def_id();
                     self.bind_local(ident.name, def_id);
                     let index_expr = HirExpression {
@@ -256,27 +270,15 @@ impl Lowerer<'_> {
                     let init_expr = HirExpression {
                         id: self.next_hir_id(),
                         kind: HirExpressionKind::Index(
-                            Box::new(self.lower_expr(init)),
+                            Box::new(self.lower_expr(subject)),
                             Box::new(index_expr),
                         ),
                         ty: None,
                         span: ident.span,
                     };
-                    out.push(HirStatement {
-                        id: self.next_hir_id(),
-                        kind: HirStatementKind::Local(radix_hir::HirLocal {
-                            def_id,
-                            name: ident.name,
-                            ty: None,
-                            init: Some(init_expr),
-                            mutable,
-                            is_await,
-                            runtime_provided: false,
-                        }),
-                        span: ident.span,
-                    });
+                    out.push(self.destructured_local(def_id, ident.name, init_expr, mutable));
                 }
-                radix_syntax::BindingPattern::Wildcard(_) => {}
+                radix_syntax::BindingPattern::Wildcard(_) => authored.push(None),
                 radix_syntax::BindingPattern::Array { .. } => {
                     self.error("nested_array_destructuring");
                 }
@@ -286,22 +288,35 @@ impl Lowerer<'_> {
             }
         }
 
+        // The rest binding is the tail after every authored position (holes
+        // included), not the whole subject: `omissa(n)` drops the first `n`.
         if let Some(rest_ident) = rest {
             let def_id = self.next_def_id();
             self.bind_local(rest_ident.name, def_id);
-            out.push(HirStatement {
+            let count = HirExpression {
                 id: self.next_hir_id(),
-                kind: HirStatementKind::Local(radix_hir::HirLocal {
-                    def_id,
-                    name: rest_ident.name,
-                    ty: None,
-                    init: Some(self.lower_expr(init)),
-                    mutable,
-                    is_await,
-                    runtime_provided: false,
-                }),
+                kind: HirExpressionKind::Literal(HirLiteral::Int(elements.len() as u64)),
+                ty: None,
                 span: rest_ident.span,
-            });
+            };
+            let tail = HirExpression {
+                id: self.next_hir_id(),
+                kind: HirExpressionKind::MethodCall(
+                    Box::new(self.lower_expr(subject)),
+                    self.intrinsic_surface_symbol("omissa"),
+                    Vec::new(),
+                    vec![radix_hir::HirCallArg {
+                        name: None,
+                        spread: false,
+                        expr: count,
+                        span: rest_ident.span,
+                    }],
+                    None,
+                ),
+                ty: None,
+                span: rest_ident.span,
+            };
+            out.push(self.destructured_local(def_id, rest_ident.name, tail, mutable));
         }
 
         if out.is_empty() {
@@ -312,7 +327,120 @@ impl Lowerer<'_> {
             });
         }
 
+        self.record_destructure(
+            &out,
+            hoisted,
+            radix_hir::HirDestructurePattern::Array {
+                elements: authored,
+                rest: rest.as_ref().map(|ident| ident.name),
+            },
+            mutable,
+            is_await,
+        );
         out
+    }
+
+    /// Evaluate a destructuring initializer once.
+    ///
+    /// A side-effect-free place (`xs`, `(xs)`, `ego.xs`) is re-read by each
+    /// expanded local, which keeps target ownership unchanged. Anything else
+    /// (a call, a literal, an awaited value) is bound to a hidden immutable
+    /// local first, so `fixum [a, b] ← f()` calls `f` once and awaits once.
+    /// Returns the hoisted statement (if any) and the subject expression the
+    /// expanded locals must read instead of `init`.
+    fn destructure_subject(
+        &mut self,
+        init: &radix_syntax::Expr,
+        is_await: bool,
+        span: Span,
+    ) -> (Vec<HirStatement>, Option<radix_syntax::Expr>) {
+        if !is_await && is_pure_place(init) {
+            return (Vec::new(), None);
+        }
+        let def_id = self.next_def_id();
+        let name = self.interner.intern(&format!("__destructura_{}", def_id.0));
+        let init_expr = self.lower_expr(init);
+        self.bind_local(name, def_id);
+        let local = HirStatement {
+            id: self.next_hir_id(),
+            kind: HirStatementKind::Local(radix_hir::HirLocal {
+                def_id,
+                name,
+                ty: None,
+                init: Some(init_expr),
+                mutable: false,
+                is_await,
+                runtime_provided: false,
+            }),
+            span,
+        };
+        let subject = radix_syntax::Expr {
+            id: u32::MAX,
+            kind: radix_syntax::ExprKind::Ident(radix_syntax::Ident { name, span }),
+            span,
+        };
+        (vec![local], Some(subject))
+    }
+
+    /// Reader-pack spelling of a canonical intrinsic for a synthesized call.
+    ///
+    /// Type checking resolves intrinsic method names through the active pack
+    /// (non-`la` packs reject the canonical Latin spelling), so synthesized
+    /// calls use the same surface an author would write.
+    fn intrinsic_surface_symbol(&mut self, canonical: &str) -> radix_lexer::Symbol {
+        let surface = self
+            .locale_pack
+            .map_or(canonical, |pack| pack.intrinsic_surface(canonical))
+            .to_owned();
+        self.interner.intern(&surface)
+    }
+
+    /// One expanded destructuring local; the subject was already awaited.
+    fn destructured_local(
+        &mut self,
+        def_id: radix_hir::DefId,
+        name: radix_lexer::Symbol,
+        init: HirExpression,
+        mutable: bool,
+    ) -> HirStatement {
+        let span = init.span;
+        HirStatement {
+            id: self.next_hir_id(),
+            kind: HirStatementKind::Local(radix_hir::HirLocal {
+                def_id,
+                name,
+                ty: None,
+                init: Some(init),
+                mutable,
+                is_await: false,
+                runtime_provided: false,
+            }),
+            span,
+        }
+    }
+
+    /// Record the authored pattern over its expanded statement run so Faber
+    /// re-emission restores the destructuring form.
+    fn record_destructure(
+        &mut self,
+        out: &[HirStatement],
+        hoisted: bool,
+        pattern: radix_hir::HirDestructurePattern,
+        mutable: bool,
+        is_await: bool,
+    ) {
+        if out.is_empty() {
+            return;
+        }
+        self.presentation
+            .destructure_bindings
+            .push(radix_hir::HirDestructureBinding {
+                stmt_ids: out.iter().map(|stmt| stmt.id).collect(),
+                hoisted,
+                pattern,
+                mutable,
+                is_await,
+            });
     }
 
     fn lower_object_destructure_stmt(&mut self, decl: &radix_syntax::VarDecl) -> Vec<HirStatement> {
@@ -334,7 +462,7 @@ impl Lowerer<'_> {
         let radix_syntax::BindingPattern::Object {
             fields,
             is_rest: rest,
-            ..
+            span,
         } = pattern
         else {
             return Vec::new();
@@ -347,8 +475,10 @@ impl Lowerer<'_> {
         let mut bound_positions = tuple_labels
             .as_ref()
             .map(|labels| vec![false; labels.len()]);
-        let mut out = Vec::new();
         let mutable = mutability == radix_syntax::AstMutability::Mutable;
+        let (mut out, hoisted_subject) = self.destructure_subject(init, is_await, *span);
+        let hoisted = hoisted_subject.is_some();
+        let subject = hoisted_subject.as_ref().unwrap_or(init);
 
         for field in fields {
             let name = field
@@ -363,7 +493,7 @@ impl Lowerer<'_> {
                         if let Some(bound) = bound_positions.as_mut() {
                             bound[position] = true;
                         }
-                        self.lower_tuple_destructure_index(init, position, field.name.span)
+                        self.lower_tuple_destructure_index(subject, position, field.name.span)
                     }
                     None => {
                         self.current_span = field.name.span;
@@ -375,26 +505,14 @@ impl Lowerer<'_> {
                 HirExpression {
                     id: self.next_hir_id(),
                     kind: HirExpressionKind::Field(
-                        Box::new(self.lower_expr(init)),
+                        Box::new(self.lower_expr(subject)),
                         field.name.name,
                     ),
                     ty: None,
                     span: field.name.span,
                 }
             };
-            out.push(HirStatement {
-                id: self.next_hir_id(),
-                kind: HirStatementKind::Local(radix_hir::HirLocal {
-                    def_id,
-                    name,
-                    ty: None,
-                    init: Some(init_expr),
-                    mutable,
-                    is_await,
-                    runtime_provided: false,
-                }),
-                span: field.name.span,
-            });
+            out.push(self.destructured_local(def_id, name, init_expr, mutable));
         }
 
         if let Some(rest_ident) = rest {
@@ -408,7 +526,7 @@ impl Lowerer<'_> {
                             .is_none_or(|bound| !bound[*position])
                     })
                     .map(|(position, _)| {
-                        self.lower_tuple_destructure_index(init, position, rest_ident.span)
+                        self.lower_tuple_destructure_index(subject, position, rest_ident.span)
                     })
                     .collect();
                 HirExpression {
@@ -418,25 +536,31 @@ impl Lowerer<'_> {
                     span: rest_ident.span,
                 }
             } else {
-                self.lower_expr(init)
+                self.lower_expr(subject)
             };
             let def_id = self.next_def_id();
             self.bind_local(rest_ident.name, def_id);
-            out.push(HirStatement {
-                id: self.next_hir_id(),
-                kind: HirStatementKind::Local(radix_hir::HirLocal {
-                    def_id,
-                    name: rest_ident.name,
-                    ty: None,
-                    init: Some(init_expr),
-                    mutable,
-                    is_await,
-                    runtime_provided: false,
-                }),
-                span: rest_ident.span,
-            });
+            out.push(self.destructured_local(def_id, rest_ident.name, init_expr, mutable));
         }
 
+        self.record_destructure(
+            &out,
+            hoisted,
+            radix_hir::HirDestructurePattern::Object {
+                fields: fields
+                    .iter()
+                    .map(|field| {
+                        (
+                            field.name.name,
+                            field.alias.as_ref().map(|alias| alias.name),
+                        )
+                    })
+                    .collect(),
+                rest: rest.as_ref().map(|ident| ident.name),
+            },
+            mutable,
+            is_await,
+        );
         out
     }
 
@@ -1609,5 +1733,17 @@ impl Lowerer<'_> {
         } else {
             expr
         }
+    }
+}
+
+/// Whether a destructuring subject is a side-effect-free place that each
+/// expanded local may re-read (identifiers, parenthesized places, and member
+/// reads rooted at one). Faber members are plain fields, never getters.
+fn is_pure_place(expr: &radix_syntax::Expr) -> bool {
+    match &expr.kind {
+        radix_syntax::ExprKind::Ident(_) | radix_syntax::ExprKind::Ego(_) => true,
+        radix_syntax::ExprKind::Paren(inner) => is_pure_place(inner),
+        radix_syntax::ExprKind::Member(member) => is_pure_place(&member.object),
+        _ => false,
     }
 }

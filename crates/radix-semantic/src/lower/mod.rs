@@ -248,6 +248,7 @@ impl<'a> Lowerer<'a> {
                 guard_si_ids: Vec::new(),
                 elige_expr_ids: Vec::new(),
                 discard_binding_stmts: Vec::new(),
+                destructure_bindings: Vec::new(),
                 await_assignment_bindings: Vec::new(),
                 ordo_enums: Vec::new(),
                 variant_paths: Vec::new(),
@@ -1087,6 +1088,9 @@ fn issue_args(issue: &'static str) -> Vec<DiagnosticArg> {
 #[cfg(test)]
 #[path = "authored_form_test.rs"]
 mod authored_form_test;
+#[cfg(test)]
+#[path = "destructure_test.rs"]
+mod destructure_test;
 #[cfg(test)]
 #[path = "template_holes_test.rs"]
 mod template_holes_test;
