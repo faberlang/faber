@@ -90,9 +90,9 @@ fn runtime_echo_builtin_covers_hostless_dispatch() {
 }
 
 #[test]
-fn runtime_echo_falls_back_to_builtin_when_host_rejects() {
-    // An installed host that does not manifest `runtime:echo` must not shadow
-    // the builtin route (native-host fallback ordering, dual-backend contract).
+fn runtime_echo_builtin_answers_before_rejecting_host() {
+    // Router order (D6.9): builtins are tier 2, ahead of the installed host,
+    // so a host that does not manifest `runtime:echo` is never consulted.
     let mut sermo = frame::sermo_open_with_dispatch("runtime:echo", Arc::new(RejectingDispatch));
     frame::sermo_set_opener(&mut sermo, Valor::Textus("salve".into()));
 
@@ -108,8 +108,8 @@ fn runtime_echo_falls_back_to_builtin_when_host_rejects() {
 
 #[test]
 fn non_builtin_route_rejected_by_host_does_not_fall_back() {
-    // The builtin fallback covers only builtin-classified routes; an unrelated
-    // route rejected by the installed host still surfaces the host error.
+    // Only builtin-classified routes skip the host; an unrelated route
+    // rejected by the installed host still surfaces the host error.
     let mut sermo = frame::sermo_open_with_dispatch("solum:lege", Arc::new(RejectingDispatch));
     frame::sermo_set_opener(&mut sermo, Valor::Textus("data.txt".into()));
 

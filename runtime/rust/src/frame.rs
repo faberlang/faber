@@ -49,8 +49,43 @@ struct SermoInner {
     incoming_waiters: Vec<Waker>,
     runtime_cancellation: Option<Cancellation>,
     host_dispatch: Option<DispatchOverride>,
+    /// Per-conversation tier-1 table (embedder/test seam); `None` reads the
+    /// process-global table installed by [`install_static_routes`].
+    static_routes: Option<&'static [StaticRoute]>,
+    /// Conversation record (§2.7): the tier that answered, once dispatch ran.
+    answering_tier: Option<AnsweringTier>,
+    /// Conversation record (§2.7): the tier-1 handler task, held until the
+    /// release point.
+    handler_task: Option<thread::JoinHandle<()>>,
     detached: bool,
     meus_closed: bool,
+}
+
+/// The router tier that answered one conversation (conversation record).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnsweringTier {
+    /// Tier 1: a Faber `@ ad` handler from the static table.
+    Static,
+    /// Tier 2: an in-process runtime builtin (`runtime:echo`, `processus:exi`).
+    Builtin,
+    /// Tier 3: the installed (or per-conversation) host dispatch.
+    Host,
+    /// No tier answered; the conversation failed closed.
+    None,
+}
+
+/// One tier-1 route: a Faber `@ ad` handler registered by generated code.
+///
+/// `start` runs synchronously on the conversation's own handler task (a
+/// thread the router spawns), converts the opener, runs the handler, and
+/// answers through `responses`. `takes_opener` is false for a zero-parameter
+/// handler, which then starts when the conversation opens instead of when its
+/// opener is set.
+#[derive(Debug, Clone, Copy)]
+pub struct StaticRoute {
+    pub route: &'static str,
+    pub takes_opener: bool,
+    pub start: fn(SermoRequest, ResponseSender, Cancellation),
 }
 
 #[derive(Clone)]
@@ -194,6 +229,25 @@ pub trait HostDispatch: Send + Sync {
 }
 
 static HOST_DISPATCH: OnceLock<Arc<dyn HostDispatch>> = OnceLock::new();
+
+static STATIC_ROUTES: OnceLock<&'static [StaticRoute]> = OnceLock::new();
+
+/// Install the program's tier-1 route table (generated entry prologue).
+///
+/// Independent of [`install_host_dispatch`]; the two may be installed in
+/// either order.
+///
+/// # Errors
+///
+/// Returns `Err` if a static route table is already installed.
+pub fn install_static_routes(routes: &'static [StaticRoute]) -> Result<(), DispatchError> {
+    STATIC_ROUTES.set(routes).map_err(|_| {
+        DispatchError::new(
+            "frame_static_routes_already_installed",
+            "static route table is already installed",
+        )
+    })
+}
 
 /// Install a global host dispatch handler.
 ///
@@ -453,6 +507,19 @@ impl Sermo {
         lock_sermo(&self.inner).incoming_drained
     }
 
+    /// The router tier that answered, or `None` before dispatch started.
+    #[must_use]
+    pub fn answering_tier(&self) -> Option<AnsweringTier> {
+        lock_sermo(&self.inner).answering_tier
+    }
+
+    /// Whether the conversation still holds its tier-1 handler task (it is
+    /// dropped at the release point).
+    #[must_use]
+    pub fn handler_task_held(&self) -> bool {
+        lock_sermo(&self.inner).handler_task.is_some()
+    }
+
     pub fn push_incoming(&mut self, frame: Scrinium) {
         let mut inner = lock_sermo(&self.inner);
         inner.runtime_response_state = RuntimeResponseState::Generated;
@@ -467,16 +534,37 @@ impl Sermo {
     }
 }
 
+/// Set the opener on the request frame. A tier-1 route starts its handler
+/// task here: the opener is final once set.
 pub fn sermo_set_opener(sermo: &mut Sermo, data: Valor) {
-    if let Some(request) = lock_sermo(&sermo.inner).outgoing.first_mut()
+    let mut inner = lock_sermo(&sermo.inner);
+    if let Some(request) = inner.outgoing.first_mut()
         && request.status == FrameStatus::Request
     {
         request.data = data;
+    }
+    if static_route(&inner).is_some() {
+        start_runtime_response(&sermo.inner, &mut inner, None);
     }
 }
 
 #[must_use]
 pub fn sermo_open(route: &str) -> Sermo {
+    let sermo = new_sermo(route);
+    start_zero_opener_static_route(&sermo);
+    sermo
+}
+
+/// A zero-parameter tier-1 handler has no opener to wait for: it starts when
+/// the conversation opens.
+fn start_zero_opener_static_route(sermo: &Sermo) {
+    let mut inner = lock_sermo(&sermo.inner);
+    if static_route(&inner).is_some_and(|route| !route.takes_opener) {
+        start_runtime_response(&sermo.inner, &mut inner, None);
+    }
+}
+
+fn new_sermo(route: &str) -> Sermo {
     let conversation_id = next_frame_id();
     Sermo {
         inner: Arc::new(SermoShared::new(SermoInner {
@@ -500,10 +588,33 @@ pub fn sermo_open(route: &str) -> Sermo {
             incoming_waiters: Vec::new(),
             runtime_cancellation: None,
             host_dispatch: None,
+            static_routes: None,
+            answering_tier: None,
+            handler_task: None,
             detached: false,
             meus_closed: false,
         })),
     }
+}
+
+/// Open a conversation against an explicit tier-1 table and optional host,
+/// without touching the process-global installations (embedder/test seam).
+#[cfg(any(test, feature = "test-support"))]
+#[doc(hidden)]
+#[must_use]
+pub fn sermo_open_with_static_routes(
+    route: &str,
+    routes: &'static [StaticRoute],
+    dispatch: Option<Arc<dyn HostDispatch>>,
+) -> Sermo {
+    let sermo = new_sermo(route);
+    {
+        let mut inner = lock_sermo(&sermo.inner);
+        inner.static_routes = Some(routes);
+        inner.host_dispatch = dispatch.map(DispatchOverride);
+    }
+    start_zero_opener_static_route(&sermo);
+    sermo
 }
 
 /// Open a conversation with an explicit host dispatcher.
@@ -512,8 +623,9 @@ pub fn sermo_open(route: &str) -> Sermo {
 /// hosts in one process. It does not mutate the process-global installation and
 /// therefore avoids test races and cross-embedder coupling.
 pub fn sermo_open_with_dispatch(route: &str, dispatch: Arc<dyn HostDispatch>) -> Sermo {
-    let sermo = sermo_open(route);
+    let sermo = new_sermo(route);
     lock_sermo(&sermo.inner).host_dispatch = Some(DispatchOverride(dispatch));
+    start_zero_opener_static_route(&sermo);
     sermo
 }
 
@@ -653,7 +765,17 @@ pub fn tuus_as_sermo<T>(tuus: &Tuus<T>) -> Sermo {
 fn record_incoming_terminal(inner: &mut SermoInner, status: FrameStatus) {
     inner.incoming_terminal = Some(status);
     inner.incoming_drained = true;
+    release_conversation(inner);
+}
+
+/// The conversation's single release point (§2.7): runs once the inbound
+/// direction has terminated, which is also when the handler task has sent
+/// its terminal. It drops the handler task handle (detaching the finished
+/// thread) and the dispatch cancellation lease. A7 hangs completion-close
+/// here.
+fn release_conversation(inner: &mut SermoInner) {
     inner.runtime_cancellation = None;
+    inner.handler_task = None;
 }
 
 fn wake_incoming(inner: &mut SermoInner) {
@@ -810,27 +932,7 @@ fn cancel_runtime_response(shared: &Arc<SermoShared>) {
 }
 
 fn ensure_runtime_response_started(shared: &Arc<SermoShared>, inner: &mut SermoInner) {
-    if inner.runtime_response_state == RuntimeResponseState::Generated {
-        return;
-    }
-    inner.runtime_response_state = RuntimeResponseState::Generated;
-    let request = sermo_request(inner, None);
-    let cancellation = Cancellation {
-        cancelled: Arc::new(AtomicBool::new(false)),
-    };
-    inner.runtime_cancellation = Some(cancellation.clone());
-    let responses = ResponseSender::new(Arc::clone(shared), cancellation.clone());
-    let dispatch = inner
-        .host_dispatch
-        .as_ref()
-        .map(|override_dispatch| &override_dispatch.0);
-    if let Err(error) = start_host_dispatch(request, responses.clone(), cancellation, dispatch) {
-        // The caller holds the sermo lock while starting dispatch, and
-        // `reject_start_error` enqueues through that same (non-reentrant)
-        // lock — deliver the terminal rejection from a separate thread, once
-        // the lock is released, instead of deadlocking.
-        thread::spawn(move || responses.reject_start_error(error));
-    }
+    start_runtime_response(shared, inner, None);
 }
 
 fn ensure_runtime_response_started_for_type<T>(sermo: &mut Sermo)
@@ -842,21 +944,27 @@ where
 
 fn ensure_runtime_response_started_for_target(sermo: &mut Sermo, target: &'static str) {
     let mut inner = lock_sermo(&sermo.inner);
+    start_runtime_response(&sermo.inner, &mut inner, Some(target));
+}
+
+/// Start dispatch once per conversation. Tier 1 starts eagerly (at open or
+/// when the opener is set); tiers 2 and 3 start lazily on the first receive.
+fn start_runtime_response(
+    shared: &Arc<SermoShared>,
+    inner: &mut SermoInner,
+    target: Option<&'static str>,
+) {
     if inner.runtime_response_state == RuntimeResponseState::Generated {
         return;
     }
     inner.runtime_response_state = RuntimeResponseState::Generated;
-    let request = sermo_request(&inner, Some(target));
+    let request = sermo_request(inner, target);
     let cancellation = Cancellation {
         cancelled: Arc::new(AtomicBool::new(false)),
     };
     inner.runtime_cancellation = Some(cancellation.clone());
-    let responses = ResponseSender::new(Arc::clone(&sermo.inner), cancellation.clone());
-    let dispatch = inner
-        .host_dispatch
-        .as_ref()
-        .map(|override_dispatch| &override_dispatch.0);
-    if let Err(error) = start_host_dispatch(request, responses.clone(), cancellation, dispatch) {
+    let responses = ResponseSender::new(Arc::clone(shared), cancellation.clone());
+    if let Err(error) = route_conversation(inner, request, responses.clone(), cancellation) {
         // The caller holds the sermo lock while starting dispatch, and
         // `reject_start_error` enqueues through that same (non-reentrant)
         // lock — deliver the terminal rejection from a separate thread, once
@@ -865,52 +973,75 @@ fn ensure_runtime_response_started_for_target(sermo: &mut Sermo, target: &'stati
     }
 }
 
-fn start_host_dispatch(
+/// The tier-1 entry for this conversation's route, if the static table
+/// (per-conversation seam first, then the installed table) serves it.
+fn static_route(inner: &SermoInner) -> Option<StaticRoute> {
+    let routes = inner
+        .static_routes
+        .or_else(|| STATIC_ROUTES.get().copied())?;
+    routes
+        .iter()
+        .find(|entry| entry.route == inner.route)
+        .copied()
+}
+
+/// The three-tier router (D6.9): static Faber table → builtin routes →
+/// installed host → fail closed. Records the answering tier on the
+/// conversation. A host may no longer answer a builtin route itself.
+fn route_conversation(
+    inner: &mut SermoInner,
     request: SermoRequest,
     responses: ResponseSender,
     cancellation: Cancellation,
-    override_dispatch: Option<&Arc<dyn HostDispatch>>,
 ) -> Result<(), DispatchError> {
-    // S1-U3 split, stabilized: the faber runtime package owns the
-    // HostDispatch contract plus builtin routes (`runtime:echo`,
-    // `processus:exi`) that stay in-process. An installed host is consulted
-    // first; when it rejects a builtin-classified route, the builtin fallback
-    // covers it.
-    // Unrelated routes stay fail-closed against the host error (no host is
-    // installed → `host_dispatch_unavailable`).
-    if let Some(dispatch) = override_dispatch {
-        return dispatch_or_builtin_fallback(dispatch, request, responses, cancellation);
-    }
-    if let Some(dispatch) = HOST_DISPATCH.get() {
-        return dispatch_or_builtin_fallback(dispatch, request, responses, cancellation);
+    if let Some(route) = static_route(inner) {
+        inner.answering_tier = Some(AnsweringTier::Static);
+        inner.handler_task = Some(spawn_static_handler(
+            route,
+            request,
+            responses,
+            cancellation,
+        ));
+        return Ok(());
     }
     if is_builtin_route(&request.route) {
+        inner.answering_tier = Some(AnsweringTier::Builtin);
         return BuiltinRuntimeDispatch.start(request, responses, cancellation);
     }
+    let host = inner
+        .host_dispatch
+        .as_ref()
+        .map(|override_dispatch| Arc::clone(&override_dispatch.0))
+        .or_else(|| HOST_DISPATCH.get().cloned());
+    if let Some(dispatch) = host {
+        inner.answering_tier = Some(AnsweringTier::Host);
+        return dispatch.start(request, responses, cancellation);
+    }
+    inner.answering_tier = Some(AnsweringTier::None);
     Err(DispatchError::new(
         "host_dispatch_unavailable",
         format!("no host dispatch installed for route `{}`", request.route),
     ))
 }
 
-/// When an installed host rejects a route that the builtin runtime covers
-/// (plan-time `is_builtin_ad_route` classification), fall back to the builtin
-/// dispatch instead of surfacing the host error. The dual-backend contract:
-/// builtin-covered routes (e.g. `runtime:echo`) must work without any host,
-/// so an installed host that does not manifest them must not shadow delivery.
-fn dispatch_or_builtin_fallback(
-    dispatch: &Arc<dyn HostDispatch>,
+/// Run one tier-1 handler as its own task (D6.13). A panicking handler
+/// becomes an `error` terminal naming the route; a handler that returns
+/// without a terminal gets the `ResponseSender` drop net.
+fn spawn_static_handler(
+    route: StaticRoute,
     request: SermoRequest,
     responses: ResponseSender,
     cancellation: Cancellation,
-) -> Result<(), DispatchError> {
-    if let Err(error) = dispatch.start(request.clone(), responses.clone(), cancellation.clone()) {
-        if is_builtin_route(&request.route) {
-            return BuiltinRuntimeDispatch.start(request, responses, cancellation);
+) -> thread::JoinHandle<()> {
+    thread::spawn(move || {
+        let handler_responses = responses.clone();
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            (route.start)(request, handler_responses, cancellation);
+        }));
+        if outcome.is_err() {
+            let _ = responses.error(format!("route handler `{}` panicked", route.route));
         }
-        return Err(error);
-    }
-    Ok(())
+    })
 }
 
 /// Minimal S1-U3-stabilized builtin dispatch. `runtime:echo` is restored

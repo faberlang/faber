@@ -35,9 +35,9 @@ pub use display::{
     display_option_fractus, display_option_vacuum, display_text_payload, display_valor,
 };
 pub use frame::{
-    Cancellation, DispatchError, FrameStatus, HostDispatch, IntoFrameStatus, IntoScrinium, Meus,
-    ResponseSender, Scrinium, Sermo, SermoRequest, Tuus, install_host_dispatch,
-    sermo_open_with_dispatch,
+    AnsweringTier, Cancellation, DispatchError, FrameStatus, HostDispatch, IntoFrameStatus,
+    IntoScrinium, Meus, ResponseSender, Scrinium, Sermo, SermoRequest, StaticRoute, Tuus,
+    install_host_dispatch, install_static_routes, sermo_open_with_dispatch,
 };
 pub use instans::{Instans, InstansPraecisio};
 pub use intervallum::{Intervallum, IntervallumKind, IntervallumNumeric, IntervallumWalk};
@@ -96,3 +96,7 @@ mod frame_test;
 #[cfg(test)]
 #[path = "frame_live_test.rs"]
 mod frame_live_test;
+
+#[cfg(test)]
+#[path = "frame_router_test.rs"]
+mod frame_router_test;
