@@ -555,6 +555,36 @@ pub fn effective_width(types: &TypeTable, ty: TypeId) -> Option<NumericWidth> {
     }
 }
 
+/// Integer width of a `numerus` type (bare `numerus` is `i64`); `None` for
+/// fractus, decimal, modular, and non-numeric types.
+#[must_use]
+pub fn numerus_integer_width(types: &TypeTable, ty: TypeId) -> Option<NumericWidth> {
+    match types.get(ty) {
+        Type::Primitive(Primitive::Numerus) => Some(NumericWidth::I64),
+        Type::SizedNumeric(Primitive::Numerus, width) if width.integer_range().is_some() => {
+            Some(*width)
+        }
+        Type::Alias(_, inner) => numerus_integer_width(types, *inner),
+        _ => None,
+    }
+}
+
+/// D1.11: the `(source, target)` integer widths of a `numerus ↦ numerus<W>`
+/// conversion that must magnitude-check its value, or `None` when the pair is
+/// not integer numerus on both sides or the target range holds every source
+/// value. Every backend's `↦` narrowing arm keys off this one predicate.
+#[must_use]
+pub fn checked_integer_conversio(
+    types: &TypeTable,
+    from: TypeId,
+    to: TypeId,
+) -> Option<(NumericWidth, NumericWidth)> {
+    let from_width = numerus_integer_width(types, from)?;
+    let to_width = numerus_integer_width(types, to)?;
+    NumericWidth::is_checked_integer_conversio(from_width, to_width)
+        .then_some((from_width, to_width))
+}
+
 pub const TENSOR_ELEMENT_NUMERIC_MSG: &str = "tensor arithmetic requires numeric element type";
 
 /// DEFER-064: tensor `accipe` / `ponde` (and other `NumerusArray` slots) accept
@@ -748,6 +778,51 @@ impl NumericWidth {
             return a > b;
         }
         false
+    }
+
+    /// Inclusive value range of an integer width; `None` for float and
+    /// decimal widths.
+    #[must_use]
+    pub fn integer_range(self) -> Option<(i128, i128)> {
+        let range = match self {
+            Self::I8 => (i128::from(i8::MIN), i128::from(i8::MAX)),
+            Self::I16 => (i128::from(i16::MIN), i128::from(i16::MAX)),
+            Self::I32 => (i128::from(i32::MIN), i128::from(i32::MAX)),
+            Self::I64 => (i128::from(i64::MIN), i128::from(i64::MAX)),
+            Self::U8 => (0, i128::from(u8::MAX)),
+            Self::U16 => (0, i128::from(u16::MAX)),
+            Self::U32 => (0, i128::from(u32::MAX)),
+            Self::U64 => (0, i128::from(u64::MAX)),
+            _ => return None,
+        };
+        Some(range)
+    }
+
+    /// D1.11: whether an explicit integer `↦` from `from` into `to` must
+    /// magnitude-check the value — the target range does not contain the
+    /// source range, so some source values do not fit and the conversion
+    /// fails (or yields its `⇥` recovery) instead of wrapping or relabeling.
+    #[must_use]
+    pub fn is_checked_integer_conversio(from: Self, to: Self) -> bool {
+        match (from.integer_range(), to.integer_range()) {
+            (Some((from_lo, from_hi)), Some((to_lo, to_hi))) => from_lo < to_lo || from_hi > to_hi,
+            _ => false,
+        }
+    }
+
+    /// The target bounds a checked integer `↦` must test: `(lower, upper)`,
+    /// each `Some` only when that target bound lies strictly inside the source
+    /// range. A guard constant is therefore always representable in the
+    /// source carrier, and an unreachable bound (`u16 < 0`) is never emitted.
+    #[must_use]
+    pub fn checked_integer_guards(from: Self, to: Self) -> (Option<i128>, Option<i128>) {
+        match (from.integer_range(), to.integer_range()) {
+            (Some((from_lo, from_hi)), Some((to_lo, to_hi))) => (
+                (to_lo > from_lo).then_some(to_lo),
+                (to_hi < from_hi).then_some(to_hi),
+            ),
+            _ => (None, None),
+        }
     }
 
     /// decimal-widths D3: the decimal conversio matrix admits exactly the

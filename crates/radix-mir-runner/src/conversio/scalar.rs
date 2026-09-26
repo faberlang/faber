@@ -197,11 +197,12 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Value::Float(v) => Ok(float_to_numerus_width(v, width)),
             Value::Bool(v) => Ok(Value::Int(if v { 1 } else { 0 })),
             Value::Int(v) => {
-                // GT-3: conversion never wraps (DEFER-116 boundary contract).
-                // A negative signed value has no unsigned carrier, so it fails
-                // closed here instead of leaving a negative carrier in an
-                // unsigned slot (which made print/≡/≅/ordering disagree).
-                if width.is_unsigned_int() && v < 0 {
+                // GT-3 / D1.11: conversion never wraps (DEFER-116 boundary
+                // contract). The value is magnitude-checked against `W` — a
+                // negative into an unsigned target and a magnitude past either
+                // bound both fail closed, instead of leaving an out-of-range
+                // carrier in a narrow slot (`300 ↦ numerus<u8>` printed 300).
+                if !numerus_fits_width(v, width) {
                     return self.recover_or_fail(
                         recovery,
                         span,
@@ -223,8 +224,8 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 }
             }
             Value::UInt(v) => match i64::try_from(v) {
-                Ok(v) => Ok(Value::Int(v)),
-                Err(_) => self.recover_or_fail(
+                Ok(v) if numerus_fits_width(v, width) => Ok(Value::Int(v)),
+                _ => self.recover_or_fail(
                     recovery,
                     span,
                     "numerus to numerus conversion out of range",

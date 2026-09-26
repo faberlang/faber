@@ -135,10 +135,15 @@ impl Validator<'_, '_> {
                     );
                     self.validate_runtime_conversion_route(source_ty, conversion.target_ty, span);
                 }
+                // p17b (D1.11): a `⇥` literal recovery was range-checked
+                // against the target by semantic analysis, but MIR integer
+                // constants carry plain `numerus` / `numerus<u64>` types — a
+                // fitting constant is the target-typed value, not a mismatch.
                 if let Some(recovery) = &conversion.recovery
                     && let Some(recovery_ty) = self.validate_operand(scope, recovery, span)
                 {
-                    self.require_assignable(
+                    self.require_assignable_or_fitting_constant(
+                        recovery,
                         recovery_ty,
                         conversion.target_ty,
                         span,
