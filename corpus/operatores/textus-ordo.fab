@@ -1,0 +1,42 @@
++++
+term = "≺"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "comparison", "expression", "literal", "nota_stmt"]
+category = "comparison"
+canonical = false
+summary = "Whole-string ordering on text compares Unicode code points."
+syntax = "<string> ≺ <string> | <string> ≻ <string> | <string> ≤ <string> | <string> ≥ <string>"
+related = ["≡", "≤", "≥"]
+locale = "en"
++++
+test "whole-string order is code-point order" {
+    assert "abc" ≺ "abd"
+    assert "ab" ≺ "abc"
+    assert "b" ≻ "abc"
+    assert "～" ≺ "😀"
+}
+
+# operatores/textus-ordo — ≺ ≻ ≤ ≥ on whole strings
+#
+# EXPECTED OUTPUT:
+#   verum, verum, verum, falsum, verum, verum, verum, falsum, verum
+#
+# BACKEND:
+#   Order is by Unicode code point, one scalar at a time; a proper prefix
+#   sorts first. "～" is U+FF5E and "😀" is U+1F600, so "～" ≺ "😀" even on
+#   targets whose native string order is UTF-16 code units (where the
+#   surrogate pair of "😀" would sort first).
+
+main {
+    const string a ← "abc"
+    const string b ← "abd"
+    print a ≺ b
+    print "ab" ≺ a
+    print "b" ≻ a
+    print "Zeta" ≻ "alpha"
+    print a ≤ "abc"
+    print a ≥ "abc"
+    print "～" ≺ "😀"
+    print "😀" ≺ "～"
+    print "é" ≻ "z"
+}

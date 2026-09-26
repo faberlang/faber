@@ -1196,6 +1196,8 @@ impl TypeChecker<'_> {
                 let rhs_ty = self.check_expr(rhs);
                 if self.is_instans(lhs_ty) && self.is_instans(rhs_ty) {
                     self.instans_join(lhs_ty, rhs_ty, lhs.span);
+                } else if self.is_textus(lhs_ty) && self.is_textus(rhs_ty) {
+                    // D1.6: whole-string `textus` order is Unicode code-point order.
                 } else if self.scalar_ordered_text_bin(lhs, rhs, lhs_ty, rhs_ty, lhs.span) {
                     // Single-scalar Unicode order (Seam B); not lexicographic cord compare.
                 } else {

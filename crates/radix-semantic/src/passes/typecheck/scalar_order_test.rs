@@ -31,10 +31,28 @@ fn scalar_ascii_literals_order_typechecks() {
     accepts(&compile("incipit { si 'a' ≤ 'z' { nota \"ok\" } }"));
 }
 
+// D1.6: whole-string order on `textus` is code-point order.
+
 #[test]
-fn full_cord_text_order_rejects() {
+fn full_cord_text_order_typechecks() {
+    accepts(&compile("incipit { si \"ab\" < \"ac\" { nota \"ok\" } }"));
+}
+
+#[test]
+fn textus_bindings_whole_string_order_typechecks() {
+    accepts(&compile(
+        r#"
+functio prior(textus left, textus right) → bivalens {
+    redde left ≺ right
+}
+"#,
+    ));
+}
+
+#[test]
+fn textus_to_numerus_relational_rejects() {
     rejects_with_issue(
-        &compile("incipit { si \"ab\" < \"ac\" { nota \"bad\" } }"),
+        &compile("incipit { si \"abc\" ≥ 1 { nota \"bad\" } }"),
         "numeric_operands_required",
     );
 }

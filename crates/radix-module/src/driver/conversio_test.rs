@@ -403,15 +403,29 @@ fn instans_fine_to_coarse_assignment_rejects_without_conversio() {
 }
 
 #[test]
-fn scalar_text_order_emits_unicode_scalar_value_compare() {
+fn scalar_text_order_emits_str_compare() {
     let session = test_session(Target::HirRust);
     let source = "incipit { si 'a' ≤ 'z' { nota \"ok\" } }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
-        code.contains("faber::unicode_scalar_value("),
-        "expected scalar text compare emit, got:\n{code}"
+        code.contains("AsRef::<str>::as_ref("),
+        "expected str text compare emit, got:\n{code}"
+    );
+}
+
+#[test]
+fn whole_string_text_order_emits_str_compare() {
+    // D1.6: UTF-8 byte order is code-point order, so `&str` compare is exact.
+    let session = test_session(Target::HirRust);
+    let source = "functio prior(textus a, textus b) → bivalens { redde a ≺ b }";
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
+    assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
+    let code = super::rust_output(result).code;
+    assert!(
+        code.contains("AsRef::<str>::as_ref(") && !code.contains("unicode_scalar_value"),
+        "expected str text compare emit, got:\n{code}"
     );
 }
 
