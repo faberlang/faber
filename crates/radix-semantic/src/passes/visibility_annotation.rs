@@ -3,15 +3,21 @@
 //! Top-level `@ publica` / `@ interna` / `@ privata` participate in package/file
 //! namespace export filtering (see `tool::commands::compile`). Unmarked
 //! declarations are module-private; `@ privata` on a declaration is an explicit
-//! module-private marker (accepted, no warning). Member-level visibility is
-//! tier-aware but not import-relevant in phase 1, so member annotations carry
-//! no diagnostic. `@ protecta` is not part of the file-namespace visibility
-//! model, so it is rejected as reserved instead of being treated as
-//! documentation.
+//! module-private marker (accepted, no warning).
+//!
+//! Member privacy is not enforced yet (D5.5 interim, until D5.3/D5.4 land):
+//! `@ privata` / `@ interna` on a `genus` member is an error because it
+//! promises privacy nothing checks, and `@ publica` on a member is a
+//! redundancy warning (WARN028) because members are public by default.
+//! `@ protecta` is not part of the file-namespace visibility model, so it is
+//! rejected as reserved instead of being treated as documentation.
 
-use crate::{SemanticError, SemanticErrorKind};
+use crate::{SemanticError, SemanticErrorKind, WarningKind};
 use radix_lexer::{Interner, Span};
 use radix_syntax::{Annotation, AnnotationKind, ClassMemberKind, Program, Stmt, StmtKind};
+
+const ISSUE_MEMBER_PRIVACY_UNENFORCED: &str = "member_privacy_unenforced";
+const ISSUE_REDUNDANT_MEMBER_PUBLICA: &str = "redundant_member_publica";
 
 /// Effective visibility tier for the file-namespace model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -138,9 +144,34 @@ fn check_member_annotations(
     interner: &Interner,
     errors: &mut Vec<SemanticError>,
 ) {
-    // Member visibility is tier-aware but not import-relevant in phase 1;
-    // only the reserved `@ protecta` is rejected here.
     push_protecta_diagnostics(annotations, interner, errors);
+}
+
+/// D5.5 interim: reject unenforced member privacy and warn on redundant
+/// member `@ publica` on `genus` members.
+fn check_genus_member_annotations(
+    annotations: &[Annotation],
+    interner: &Interner,
+    errors: &mut Vec<SemanticError>,
+) {
+    check_member_annotations(annotations, interner, errors);
+    for annotation in annotations {
+        let Some(tier) = visibility_tier(annotation, interner) else {
+            continue;
+        };
+        let diagnostic = match tier {
+            VisibilityTier::Publica => SemanticError::structured(
+                SemanticErrorKind::Warning(WarningKind::RedundantMemberVisibility),
+                annotation.span,
+            )
+            .with_arg("issue", ISSUE_REDUNDANT_MEMBER_PUBLICA),
+            VisibilityTier::Interna | VisibilityTier::Privata => {
+                SemanticError::structured(SemanticErrorKind::AnnotationInvalid, annotation.span)
+                    .with_arg("issue", ISSUE_MEMBER_PRIVACY_UNENFORCED)
+            }
+        };
+        errors.push(diagnostic.with_arg("annotation", tier_spelling(tier)));
+    }
 }
 
 fn check_stmt(stmt: &Stmt, interner: &Interner, errors: &mut Vec<SemanticError>) {
@@ -149,9 +180,9 @@ fn check_stmt(stmt: &Stmt, interner: &Interner, errors: &mut Vec<SemanticError>)
         StmtKind::Func(func) => check_declaration_visibility(&func.annotations, interner, errors),
         StmtKind::Class(class) => {
             for member in &class.members {
-                check_member_annotations(&member.annotations, interner, errors);
+                check_genus_member_annotations(&member.annotations, interner, errors);
                 if let ClassMemberKind::Method(method) = &member.kind {
-                    check_member_annotations(&method.annotations, interner, errors);
+                    check_genus_member_annotations(&method.annotations, interner, errors);
                 }
             }
         }
@@ -168,8 +199,9 @@ fn check_stmt(stmt: &Stmt, interner: &Interner, errors: &mut Vec<SemanticError>)
 ///
 /// # Errors
 ///
-/// Returns a list of [`SemanticError`]s for reserved `@ protecta` annotations
-/// and conflicting visibility tiers on one declaration.
+/// Returns a list of [`SemanticError`]s for reserved `@ protecta` annotations,
+/// conflicting visibility tiers on one declaration, unenforced `genus` member
+/// privacy, and redundant member `@ publica` (a warning).
 pub fn check(program: &Program, interner: &Interner) -> Result<(), Vec<SemanticError>> {
     let mut errors = Vec::new();
     for stmt in &program.statements {

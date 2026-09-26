@@ -434,3 +434,29 @@ genus Meta {
     let meta = analyze(&program, &resolver, &parsed.interner).expect("contracts");
     assert_eq!(meta.registry.iter().count(), 1);
 }
+
+#[test]
+fn rejects_retired_doc_family_bare() {
+    // D7.5: `doc` was a dead compiler-owned family (no parser, lowering or
+    // consumer); it now fails closed like any unregistered contract.
+    expect_issue(
+        r"
+@ doc
+functio documented() → vacuum {
+}
+",
+        "annotatio_unknown_contract",
+    );
+}
+
+#[test]
+fn rejects_retired_doc_family_braced() {
+    expect_issue(
+        r#"
+@ doc { textus = "prose" }
+functio documented() → vacuum {
+}
+"#,
+        "annotatio_unknown_contract",
+    );
+}

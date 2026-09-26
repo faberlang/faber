@@ -4233,6 +4233,10 @@ mod rope_norm_intrinsic_tests;
 mod type_hole_union_deny_tests;
 
 #[cfg(test)]
+#[path = "member_visibility_deny_test.rs"]
+mod member_visibility_deny_tests;
+
+#[cfg(test)]
 #[path = "heritage_field_test.rs"]
 mod heritage_field_tests;
 

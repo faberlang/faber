@@ -79,6 +79,7 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::UnionNoCommonMembers,
     WarningKind::UnionMethodSignatureShadowed,
     WarningKind::ComplexityBudgetExceeded,
+    WarningKind::RedundantMemberVisibility,
 ];
 
 // STABLE CODES
@@ -956,6 +957,12 @@ fn semantic_invalid_annotation_help(args: &[DiagnosticArg]) -> Option<String> {
                 "use `{publica}` for explicit export intent or `{privata}` for file-private intent"
             ))
         }
+        "member_privacy_unenforced" => {
+            let annotation = arg_value(args, "annotation")?;
+            Some(format!(
+                "remove `{annotation}` from the member; members are public until member privacy is enforced"
+            ))
+        }
         "empty_radix_typus_domain" | "missing_type_param" | "non_identifier_type_param" | "non_type_allowed" => {
             Some("use `@ radix typus T in textus octeti` or braced `@ radix { param = T, allowed = textus }` with at least one allowed type".to_owned())
         }
@@ -1115,6 +1122,10 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::ComplexityBudgetExceeded => DiagnosticSpec {
             code: "WARN027",
             help: Some("split the function or raise the complexity budget for this check"),
+        },
+        WarningKind::RedundantMemberVisibility => DiagnosticSpec {
+            code: "WARN028",
+            help: Some("remove the annotation; members are public by default"),
         },
     }
 }
