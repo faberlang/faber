@@ -1,7 +1,7 @@
 +++
 term = "↦"
 kind = "operator-group"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "functio_decl", "param_list", "parameter", "return_clause", "type_arguments", "type_argument", "shape_suffix", "figendum_decl", "redde_stmt", "si_stmt", "arm", "else_arm", "assignment", "place", "dum_stmt", "comparison", "equality", "equality_tail", "additive_expr", "multiplicative_expr", "bitwise_and_expr", "shift_expr", "optional_suffix", "cast_expr", "inline_recovery", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "functio_decl", "param_list", "parameter", "return_clause", "type_arguments", "type_argument", "shape_suffix", "figendum_decl", "redde_stmt", "si_stmt", "arm", "else_arm", "assignment", "place", "dum_stmt", "comparison", "equality", "equality_tail", "additive_expr", "multiplicative_expr", "bitwise_and_expr", "shift_expr", "optional_suffix", "cast_expr", "inline_default", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal"]
 category = "conversion"
 canonical = false
 summary = "GGUF/safetensors-style data edge: octeti fixture → LE dims + flat lista<f32> → ↦ tensor<f32, [2, 8]>."

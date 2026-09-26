@@ -1,7 +1,7 @@
 +++
 term = "conversio-fallibilis"
 kind = "conversio"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "alternate_exit_clause", "redde_stmt", "fac_stmt", "cape_clause", "iace_stmt", "adfirma_stmt", "conversio_expr", "inline_recovery", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "equality", "equality_tail", "expression", "literal"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "alternate_exit_clause", "redde_stmt", "fac_stmt", "cape_clause", "iace_stmt", "adfirma_stmt", "conversio_expr", "inline_default", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "equality", "equality_tail", "expression", "literal"]
 category = "conversion"
 canonical = true
 summary = "Three recovery postures for fallible conversio: inline ⊥ default, ⇥ propagation, and fac/cape."
