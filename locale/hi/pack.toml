@@ -196,6 +196,12 @@ filtrum = "फ़िल्टर"
 series = "शृंखला"
 census = "गणना"
 ratio = "ratio"
+# Conversation family (DECISIONS D6.16). The meus/tuus rows also spell
+# the sermo view methods `s.meus<T>()` / `s.tuus<T>()`.
+sermo = "चैनल"
+scrinium = "फ़्रेम"
+meus = "भेजना"
+tuus = "पाना"
 
 [diagnostics.UNRES001]
 message = "कीवर्ड '{keyword}' reader locale '{pack}' के लिए घोषित नहीं है"

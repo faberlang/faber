@@ -198,6 +198,12 @@ filtrum = "filtrum"
 series = "series"
 census = "census"
 ratio = "ratio"
+# Conversation family (DECISIONS D6.16). The meus/tuus rows also spell
+# the sermo view methods `s.meus<T>()` / `s.tuus<T>()`.
+sermo = "sermo"
+scrinium = "scrinium"
+meus = "meus"
+tuus = "tuus"
 
 [diagnostics.UNRES001]
 message = "keyword '{keyword}' is not declared for reader locale '{pack}'"

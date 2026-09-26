@@ -196,6 +196,12 @@ filtrum = "bộ_lọc"
 series = "chuỗi"
 census = "điều_tra"
 ratio = "ratio"
+# Conversation family (DECISIONS D6.16). The meus/tuus rows also spell
+# the sermo view methods `s.meus<T>()` / `s.tuus<T>()`.
+sermo = "kênh"
+scrinium = "khung"
+meus = "gửi"
+tuus = "nhận"
 
 [diagnostics.UNRES001]
 message = "từ khóa '{keyword}' không được khai báo cho gói đọc '{pack}'"

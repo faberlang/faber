@@ -83,8 +83,9 @@ pub fn register_frame_types_if_needed(
     resolver: &mut Resolver,
     types: &mut TypeTable,
     interner: &mut Interner,
+    locale_pack: Option<&crate::locale::LocalePack>,
 ) {
-    if frame_types::program_needs_frame_types(program, interner) {
+    if frame_types::program_needs_frame_types(program, interner, locale_pack) {
         frame_types::register(resolver, types, interner);
     }
 }
@@ -96,11 +97,12 @@ pub fn inject_hir_items(
     resolver: &mut Resolver,
     types: &mut TypeTable,
     interner: &mut Interner,
+    locale_pack: Option<&crate::locale::LocalePack>,
 ) {
     if forma::program_uses_forma(program, resolver) {
         forma::inject_hir_item(items, resolver, types, interner);
     }
-    if frame_types::program_needs_frame_types(program, interner) {
+    if frame_types::program_needs_frame_types(program, interner, locale_pack) {
         frame_types::inject_hir_items(items, resolver, types, interner);
     }
 }

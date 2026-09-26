@@ -214,6 +214,12 @@ filtrum = "filter"
 series = "series"
 census = "census"
 ratio = "record"
+# Conversation family (DECISIONS D6.16). The meus/tuus rows also spell
+# the sermo view methods `s.meus<T>()` / `s.tuus<T>()`.
+sermo = "channel"
+scrinium = "frame"
+meus = "send"
+tuus = "recv"
 
 [llm]
 system_prompt_snippet = "Write Faber code using LLM-optimized English keywords (fn, let, const, if, else, match, return, etc.) with invariant structural glyphs (←, →, ∴). Type-first declarations: fn greet(string msg) → string { return msg }"

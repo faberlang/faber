@@ -16,6 +16,24 @@ use radix_lexer::Symbol;
 use rustc_hash::FxHashMap;
 
 impl super::FaberCodegen<'_> {
+    /// Conversation-family identity of a compiler-owned frame struct.
+    ///
+    /// WHY: `sermo`/`scrinium`/`meus`/`tuus` are builtin structs, not user
+    /// nominals, so their spelling projects through the target pack
+    /// (DECISIONS D6.16). A user definition never matches: only builtin
+    /// `DefId`s qualify.
+    pub(super) fn builtin_frame_family(
+        &self,
+        def_id: DefId,
+        names: &FxHashMap<DefId, Symbol>,
+    ) -> Option<crate::surface::FrameFamily> {
+        if !def_id.is_builtin() {
+            return None;
+        }
+        let sym = names.get(&def_id)?;
+        crate::surface::FrameFamily::from_latin(self.interner.resolve(*sym))
+    }
+
     /// Return the printable spelling for an already-resolved definition.
     ///
     /// The fallback is for robustness at the output boundary, not a resolver.
