@@ -1468,3 +1468,7 @@ mod nesting_budget_test;
 #[cfg(test)]
 #[path = "nested_declaration_test.rs"]
 mod nested_declaration_test;
+
+#[cfg(test)]
+#[path = "sum_type_data_only_test.rs"]
+mod sum_type_data_only_test;
