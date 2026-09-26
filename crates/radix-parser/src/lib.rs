@@ -1481,3 +1481,7 @@ mod nested_declaration_test;
 #[cfg(test)]
 #[path = "conditional_glyph_test.rs"]
 mod conditional_glyph_test;
+
+#[cfg(test)]
+#[path = "ternary_removed_test.rs"]
+mod ternary_removed_test;

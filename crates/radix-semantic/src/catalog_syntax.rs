@@ -863,6 +863,12 @@ fn invalid_expression_message(args: &[DiagnosticArg]) -> Option<String> {
         "conditional_nested" => {
             Some("a '✓ ✗' conditional cannot appear inside another '✓ ✗'".to_owned())
         }
+        "conditional_question_colon_removed" => {
+            Some("'c ? a : b' was removed; write 'c ✓ a ✗ b'".to_owned())
+        }
+        "conditional_sic_removed" => {
+            Some("'c sic a secus b' was removed; write 'c ✓ a ✗ b'".to_owned())
+        }
         "recovery_uses_exit_arrow" => {
             Some("'⇥' names an error type; use '⊥' for a default".to_owned())
         }

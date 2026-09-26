@@ -45,3 +45,32 @@ fn conditional_reemits_check_ballot_in_every_locale() {
     assert!(!back.contains("yields"), "{back}");
     assert_eq!(back, reemit(EN, "en"));
 }
+
+fn reemit_issues(source: &str) -> Vec<String> {
+    let pack = LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+        .expect("installed en pack should load");
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirFaber)
+            .with_dev_locale_root(),
+    );
+    let result = reemit_faber(&session, &pack, "test.fab", source);
+    result
+        .diagnostics
+        .iter()
+        .filter_map(|d| d.issue().map(str::to_owned))
+        .collect()
+}
+
+#[test]
+fn en_yields_else_reports_migration_to_check_ballot() {
+    let issues = reemit_issues(
+        "+++\nlocale = \"en\"\n+++\nfn f(int n) → string {\n    return n ≥ 18 yields \"adult\" else \"minor\"\n}\n",
+    );
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue == "conditional_sic_removed"),
+        "{issues:?}"
+    );
+}

@@ -105,8 +105,8 @@ fn comment_between_condition_and_ergo_is_invalid() {
 }
 
 #[test]
-fn comment_inside_sic_secus_ternary_is_invalid() {
-    let source = "fixum numerus x ← verum sic\n# mid\n1 secus 2\n";
+fn comment_inside_check_ballot_conditional_is_invalid() {
+    let source = "fixum numerus x ← verum ✓\n# mid\n1 ✗ 2\n";
     let result = parse_source(source);
     assert_invalid_comment_placement(&result, " mid");
 }

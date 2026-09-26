@@ -1,66 +1,77 @@
 +++
-term = "sic"
-kind = "keyword"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "hole_type", "type_annotation", "owned_type", "base_type", "qualified_type", "ternary", "comparison", "equality", "equality_tail", "cast_expr", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+term = "✓"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "hole_type", "type_annotation", "owned_type", "base_type", "qualified_type", "ternary", "comparison", "equality", "equality_tail", "cast_expr", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt", "functio_decl", "param_list", "parameter", "return_clause", "si_stmt", "secus_clause", "redde_stmt", "unary_expr"]
 category = "control-flow"
-canonical = false
-summary = "Ternary conditional expressions with sic and secus."
-syntax = "<condition> sic <then-expr> secus <else-expr>"
-related = ["sic", "secus", "si"]
+canonical = true
+summary = "The value conditional: c ✓ a ✗ b, one level only."
+syntax = "<condition> ✓ <then-expr> ✗ <else-expr>"
+aliases = ["✗"]
+related = ["si", "sin", "discerne"]
 locale = "en"
 +++
 # =============================================================================
-# sic — Ternary conditional expressions with sic and secus.
+# ✓ ✗ — The value conditional: `c ✓ a ✗ b`, one level only.
 # =============================================================================
 #
 # What this teaches:
-#   • Ternary expressions — `sic`/`secus` as Latin-inspired conditional syntax
-#   • Nesting — `sic`/`secus` chains read more clearly than nested if-else
+#   • The value conditional — `c ✓ a ✗ b` yields `a` when `c` holds, else `b`.
+#     The glyphs are U+2713 CHECK MARK and U+2717 BALLOT X, the same in every
+#     locale; there is no word spelling.
+#   • Narrowing — the branches narrow like `if` branches: after `x not is null`
+#     the `✓` branch sees `x` as non-null.
+#   • One level only — a `✓ ✗` inside another `✓ ✗` (in the condition or in
+#     either branch) is rejected. More than two outcomes read better as
+#     `if`/`elif`/`else`, a `match`, or a small function that `return`s each
+#     case (shown below with early returns).
 #
 # Common mistakes:
-#   • confusing ternarius (sic/secus ternary) with si/ergo (statement conditional) — ternarius is an expression, si is a statement
+#   • Writing `c ? a : b` or `c yields a else b` — both were removed; the
+#     compiler points to `c ✓ a ✗ b`.
+#   • Using the heavy emoji `✔` / `✘` — the lexer suggests `✓` / `✗`.
+#   • Chaining `c ✓ a ✗ d ✓ b ✗ e` — nesting is rejected; use a function.
 #
-# See also: sic, secus, si
+# See also: si, sin, discerne
 # =============================================================================
 
-
-
-
-# sic — ternary conditional expressions (sic/secus)
+# ✓ ✗ — value conditional
 #
-# <conditio> sic <tunc> secus <aliter>
-#
-# GRAMMAR:
-#   ternaryExpr :← expr 'sic' expr 'secus' expr
+# "fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "hole_type", "type_annotation", "owned_type", "base_type", "qualified_type", "ternary", "comparison", "equality", "equality_tail", "cast_expr", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt", "functio_decl", "param_list", "parameter", "return_clause", "si_stmt", "secus_clause", "redde_stmt", "unary_expr":
+#   ternary := or ['✓' expression '✗' ternary]   (one level only)
 #
 # EXPECTED OUTPUT:
-#   ternarius.expected — nested and flat ternary results.
+#   ternarius.expected — one-level conditionals and the function alternative.
+
+# More than two outcomes: a function that returns each case, not a chain.
+fn gradus(int puncta) → string {
+    if puncta ≥ 90 { return "A" }
+    if puncta ≥ 80 { return "B" }
+    if puncta ≥ 70 { return "C" }
+    return "F"
+}
 
 main {
     const int aetas ← 25
 
-    # Latin ternary
-    const string gradusaetatis ← aetas ≥ 18 yields "adultus" else "minor"
+    # One level: two outcomes
+    const string gradusaetatis ← aetas ≥ 18 ✓ "adultus" ✗ "minor"
     # "adultus"
     print gradusaetatis
 
-    # Latin nested (reads more clearly)
-    const int puncta ← 85
-    const string gradus ← puncta ≥ 90 yields "A" else puncta ≥ 80 yields "B" else puncta ≥ 70 yields "C" else "F"
+    # Several outcomes go through a function
     # "B"
-    print gradus
+    print gradus(85)
 
     # In expressions
-    const int maximum ← aetas ≻ 30 yields aetas else 30
+    const int maximum ← aetas ≻ 30 ✓ aetas ✗ 30
     print "maximum: §"(maximum)
 
-    # With nullish values
+    # Narrowing: the ✓ branch sees a non-null string
     var string ∪ null forsitan ← null ∷ string ∪ null
-    const string solutum ← forsitan not is null yields forsitan else "defectum"
+    const string solutum ← forsitan not is null ✓ forsitan ✗ "defectum"
     # "defectum"
     print solutum
 
-    # Prefer sic/secus for clarity
-    const string licentia ← aetas ≥ 21 yields "licet bibere" else "bibere non licet"
+    const string licentia ← aetas ≥ 21 ✓ "licet bibere" ✗ "bibere non licet"
     print licentia
 }
