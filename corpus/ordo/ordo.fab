@@ -37,45 +37,45 @@ locale = "en"
 #   rubrum
 #   actum
 
-union Color {
+enum Color {
     rubrum,
     viridis,
     caeruleum
 }
 
-union Condicio {
-    pendens,
-    actum,
-    finitum
+enum Condicio {
+    pendens = 0,
+    actum = 1,
+    finitum = 2
 }
 
 main {
-    # Using ordo values
-    const Color color ← rubrum
-    const Condicio condicio ← actum
+    # Using ordo values: members are qualified by their ordo name
+    const Color color ← Color.rubrum
+    const Condicio condicio ← Condicio.actum
 
     # Select by ordo
-    match color {
-        case rubrum {
+    switch color {
+        case Color.rubrum {
             print "rubrum"
         }
-        case viridis {
+        case Color.viridis {
             print "viridis"
         }
-        case caeruleum {
+        case Color.caeruleum {
             print "caeruleum"
         }
     }
 
     # Select by ordo with numeric values
-    match condicio {
-        case pendens {
+    switch condicio {
+        case Condicio.pendens {
             print "pendens"
         }
-        case actum {
+        case Condicio.actum {
             print "actum"
         }
-        case finitum {
+        case Condicio.finitum {
             print "finitum"
         }
     }

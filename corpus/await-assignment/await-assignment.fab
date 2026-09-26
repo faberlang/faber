@@ -21,17 +21,17 @@ locale = "la"
 # See also: figendum, variandum, fiet, promissum
 # =============================================================================
 
-``
-`fab
-functio responde(numerus value) fiet → numerus {
-    redde value
+functio responde(numerus valor) fiet → numerus {
+    redde valor
 }
 
 incipiet {
-    fixum promissum<numerus> pending ← responde(7)
-    fixum numerus immutable ↢ pending
-    varia numerus mutable ↢ responde(8)
-    sit inferred ↢ responde(9)
+    fixum promissum<numerus> futurum ← responde(7)
+    fixum numerus immotum ↢ futurum
+    varia numerus mutabile ↢ responde(8)
+    sit illatum ↢ responde(9)
+    mutabile ← mutabile + 1
+    nota immotum
+    nota mutabile
+    nota illatum
 }
-`
-``

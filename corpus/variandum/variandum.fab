@@ -23,8 +23,6 @@ locale = "la"
 # See also: figendum, tacebit, fiet, promissum
 # =============================================================================
 
-``
-`fab
 functio responde() fiet → numerus {
     redde 3
 }
@@ -34,5 +32,3 @@ incipiet {
     responsum ← responsum + 1
     nota responsum
 }
-`
-``

@@ -1,7 +1,7 @@
 +++
 term = "fient"
 kind = "keyword"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "callable_posture", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "cede_stmt", "incipit_stmt", "nota_stmt", "call_expr", "call_suffix", "argument_list", "expression", "literal"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "callable_posture", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "cede_stmt", "incipiet_stmt", "itera_stmt", "itera_binding", "nota_stmt", "call_expr", "call_suffix", "argument_list", "expression", "literal"]
 category = "async"
 canonical = true
 summary = "Callable posture for asynchronous stream functions."
@@ -19,7 +19,7 @@ locale = "la"
 #
 # What this teaches:
 #   • Async stream posture: `fient → T` yields promised pulls of `T`.
-#   • Yield with `cede`; await other work with await morphology.
+#   • Yield with `cede`; consume the stream with `itera ex` inside an async body.
 #
 # Common mistakes:
 #   • Expecting every backend to lower `fient` — some fail closed until a
@@ -34,15 +34,13 @@ locale = "la"
 # BACKEND:
 #   Product path is Rust async-cursor; other backends may fail closed.
 
-``
-`fab
 functio stream() fient → numerus {
     cede 1
     cede 2
 }
 
 incipiet {
-    nota stream()
+    itera ex stream() fixum n {
+        nota n
+    }
 }
-`
-``
