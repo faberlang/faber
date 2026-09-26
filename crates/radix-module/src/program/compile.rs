@@ -5,6 +5,7 @@
 //! [`crate::Compiler`] / [`crate::driver::Session`]. Package inputs are rejected
 //! with a message pointing at the `faber` CLI.
 
+use super::export_surface::{import_binding, program_declaration_surface, program_export_surface};
 use crate::file_interface::{
     FileExport, FileExportKind, FileInterface, InterfaceAliasExport, InterfaceAnnotationContract,
     InterfaceAnnotationContractField, InterfaceBodyChannel, InterfaceCallable, InterfaceCallableParam,
@@ -17,7 +18,7 @@ use crate::semantic::passes::visibility_annotation::VisibilityTier;
 use crate::semantic::{ContractFieldType, InstansPrecision, NumericWidth, Primitive, SemanticParamMode};
 use crate::syntax::{
     Annotation, AnnotationFieldValue, AnnotationKind, AstParamMode, ClassDecl, ClassMemberKind, ExprKind, FiguraExpr,
-    ImportKind, Literal, Program, Stmt, StmtKind, TypeExpr, TypeExprKind,
+    Literal, Program, Stmt, StmtKind, TypeExpr, TypeExprKind,
 };
 use rustc_hash::FxHashMap;
 use std::collections::{BTreeMap, BTreeSet};
@@ -656,8 +657,8 @@ fn cached_import_target(
         }
         return ImportTargetLookup::Unparsable(target_path);
     };
-    let exports = sorted_export_surface(&target_program, &target_interner);
-    let declarations = sorted_declaration_surface(&target_program, &target_interner);
+    let exports = program_export_surface(&target_program, &target_interner);
+    let declarations = program_declaration_surface(&target_program, &target_interner);
     let module_identity = import_target_identity(import_path, None);
     let interface = file_interface_for_program(&target_program, &target_interner, module_identity.as_ref());
     let cached =
@@ -2201,79 +2202,7 @@ fn parse_program_for_namespace_exports(
     Some((program?, interner))
 }
 
-fn import_binding(interner: &crate::lexer::Interner, kind: &ImportKind) -> Option<String> {
-    match kind {
-        ImportKind::Named { name, alias, .. } => Some(
-            interner
-                .resolve(alias.as_ref().unwrap_or(name).name)
-                .to_owned(),
-        ),
-        ImportKind::Wildcard { alias } => Some(interner.resolve(alias.name).to_owned()),
-        // EOT-2M: selective members are caller-owned value locals, never a
-        // re-exported namespace surface.
-        ImportKind::Selective { .. } => None,
-    }
-}
-
 pub(crate) use crate::import_resolve::resolve_namespace_import;
-
-/// The export surface of one file: every importable name with its tier.
-///
-/// `@ publica` and `@ interna` declarations (plus `publica` re-export imports)
-/// join the surface with their tier preserved; unmarked and `@ privata`
-/// declarations are module-private and absent. The import-seam policy decides
-/// whether an `@ interna` name is actually importable.
-fn sorted_export_surface(program: &Program, interner: &crate::lexer::Interner) -> BTreeMap<String, VisibilityTier> {
-    let mut surface = BTreeMap::new();
-    for stmt in &program.statements {
-        let tier = if let StmtKind::Import(decl) = &stmt.kind {
-            if decl.visibility == crate::syntax::Visibility::Publica {
-                Some(VisibilityTier::Publica)
-            } else {
-                None
-            }
-        } else {
-            crate::semantic::passes::visibility_annotation::statement_export_tier(stmt, interner)
-        };
-        if let Some(tier) = tier
-            && let Some(name) = export_name(stmt, interner)
-        {
-            surface.insert(name, tier);
-        }
-    }
-    surface
-}
-
-/// Every named top-level declaration, including module-private names.
-///
-/// Used by the import-seam validator to distinguish "does not exist" from
-/// "exists but is not importable".
-fn sorted_declaration_surface(
-    program: &Program,
-    interner: &crate::lexer::Interner,
-) -> BTreeMap<String, VisibilityTier> {
-    let mut surface = BTreeMap::new();
-    for stmt in &program.statements {
-        let tier = if let StmtKind::Import(decl) = &stmt.kind {
-            if decl.visibility == crate::syntax::Visibility::Publica {
-                Some(VisibilityTier::Publica)
-            } else {
-                None
-            }
-        } else {
-            Some(
-                crate::semantic::passes::visibility_annotation::statement_export_tier(stmt, interner)
-                    .unwrap_or(VisibilityTier::Privata),
-            )
-        };
-        if let Some(tier) = tier
-            && let Some(name) = export_name(stmt, interner)
-        {
-            surface.insert(name, tier);
-        }
-    }
-    surface
-}
 
 fn annotations_include_callable_family(
     annotations: &[Annotation],
@@ -2430,22 +2359,6 @@ fn contract_field_type_spelling(ty: &TypeExpr, interner: &crate::lexer::Interner
         }
         _ => None,
     }
-}
-
-fn export_name(stmt: &Stmt, interner: &crate::lexer::Interner) -> Option<String> {
-    let name = match &stmt.kind {
-        StmtKind::Func(decl) => decl.name.name,
-        StmtKind::Class(decl) => decl.name.name,
-        StmtKind::Interface(decl) => decl.name.name,
-        StmtKind::TypeAlias(decl) => decl.name.name,
-        StmtKind::Enum(decl) => decl.name.name,
-        StmtKind::Union(decl) => decl.name.name,
-        StmtKind::Import(decl) if decl.visibility == crate::syntax::Visibility::Publica => {
-            return import_binding(interner, &decl.kind);
-        }
-        _ => return None,
-    };
-    Some(interner.resolve(name).to_owned())
 }
 
 /// Pre-check: reject import specifiers that validate_import_paths would later

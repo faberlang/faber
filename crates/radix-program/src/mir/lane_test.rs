@@ -22,12 +22,12 @@ use radix_module::mir::{MirConversion, MirConversionFlavor};
 use radix_module::semantic::Resolver;
 use std::path::PathBuf;
 
-const METHOD_LIB: &str = "genus Punctum {\n    numerus x\n\n    functio dupla() → numerus {\n        redde ego.x * 2\n    }\n}\n\nfunctio structa(numerus x) → Punctum {\n    redde Punctum { x = x }\n}\n";
+const METHOD_LIB: &str = "@ publica\ngenus Punctum {\n    numerus x\n\n    functio dupla() → numerus {\n        redde ego.x * 2\n    }\n}\n\n@ publica\nfunctio structa(numerus x) → Punctum {\n    redde Punctum { x = x }\n}\n";
 const METHOD_MAIN: &str = "import from \"methlib:lib\" lib\n\nmain {\n    const lib.Punctum p ← lib.structa(21)\n    print p.dupla()\n}\n";
 const LOCAL_METHOD_LIB: &str = "@ public {}\nclass Punctum {\n    int x\n\n    fn dupla() → int {\n        return self.x * 2\n    }\n}\n\n@ public {}\nfn structa(int x) → Punctum {\n    return Punctum { x = x }\n}\n";
 const LOCAL_METHOD_MAIN: &str = "import from \"./math\" math\n\nmain {\n    const math.Punctum p ← math.structa(21)\n    print p.dupla()\n}\n";
 
-const CALLBACK_LIB: &str = "genus Lectio {\n    bivalens successus\n    numerus valor\n    textus causa\n}\n\nfunctio applica((numerus, numerus) → Lectio f, numerus x) → numerus {\n    fixum Lectio lectio ← f(x, 2)\n    si non lectio.successus ergo redde 0\n    redde lectio.valor\n}\n";
+const CALLBACK_LIB: &str = "@ publica\ngenus Lectio {\n    bivalens successus\n    numerus valor\n    textus causa\n}\n\n@ publica\nfunctio applica((numerus, numerus) → Lectio f, numerus x) → numerus {\n    fixum Lectio lectio ← f(x, 2)\n    si non lectio.successus ergo redde 0\n    redde lectio.valor\n}\n";
 const CALLBACK_MAIN: &str = "importa ex \"callbacklib:lib\" lib\n\nincipit {\n    fixum numerus factor ← 1\n    nota lib.applica((numerus x, numerus y) → lib.Lectio ∴ lib.Lectio { successus = verum, valor = x * y * factor, causa = \"\" }, 21)\n}\n";
 
 // The forma-shadowing guard (fd0c939) false-positive exclusion: a local
@@ -36,7 +36,7 @@ const CALLBACK_MAIN: &str = "importa ex \"callbacklib:lib\" lib\n\nincipit {\n  
 // unit imports a module that exports `gelu`. Pre-guard, the method-name sweep
 // rewrote ANY HIR-generated receiver def (>= 1_000_000), so `h1b.gelu()` was
 // rewritten to `nn.gelu(h1b)` — an arity-corrupting synthetic-path call.
-const GELU_LIB: &str = "functio gelu() → numerus {\n    redde 7\n}\n";
+const GELU_LIB: &str = "@ publica\nfunctio gelu() → numerus {\n    redde 7\n}\n";
 const GELU_MAIN: &str = "import from \"gelulib:lib\" nn\n\nclass H1B {\n    int x\n\n    fn gelu() → int {\n        return self.x * 2\n    }\n}\n\nfn structa(int x) → H1B {\n    return H1B { x = x }\n}\n\nmain {\n    const int nn_value ← nn.gelu()\n    const H1B h1b ← structa(21)\n    print h1b.gelu()\n    print nn_value\n}\n";
 
 #[test]
@@ -106,7 +106,7 @@ fn package_mir_shadowed_alias_rewrite_skips_plain_local_method_calls() {
 }
 
 const VERTE_CONST_LIB: &str =
-    "+++\nlocale = \"en\"\n+++\nconst f32 GELU_ALPHA ← (0.7978845608028654 ∷ f32)\n";
+    "+++\nlocale = \"en\"\n+++\n@ public\nconst f32 GELU_ALPHA ← (0.7978845608028654 ∷ f32)\n";
 const VERTE_CONST_MAIN: &str =
     "import from \"verteclib:lib\" vals\n\nmain {\n    print vals.GELU_ALPHA\n}\n";
 
@@ -433,7 +433,7 @@ fn package_mir_passes_captured_entry_closure_to_linked_library_function() {
 // MIR lowerer lowered it as a plain call and the cape handler's blocks
 // orphaned ("block bbN is not reachable from entry", PKG001). The success
 // path (`4`) and the error path (`caught`) both prove handler reachability.
-const FAILABLE_METHOD_LIB: &str = "genus Divisor {\n    numerus x\n\n    functio reciproca() → numerus ⇥ textus {\n        si ego.x ≡ 0 {\n            iace \"division by zero\"\n        }\n        redde 100 / ego.x\n    }\n}\n\nfunctio structa(numerus x) → Divisor {\n    redde Divisor { x = x }\n}\n";
+const FAILABLE_METHOD_LIB: &str = "@ publica\ngenus Divisor {\n    numerus x\n\n    functio reciproca() → numerus ⇥ textus {\n        si ego.x ≡ 0 {\n            iace \"division by zero\"\n        }\n        redde 100 / ego.x\n    }\n}\n\n@ publica\nfunctio structa(numerus x) → Divisor {\n    redde Divisor { x = x }\n}\n";
 const FAILABLE_METHOD_MAIN: &str = "import from \"failib:lib\" lib\n\nmain {\n    const lib.Divisor ok ← lib.structa(25)\n    do {\n        const int r ← ok.reciproca()\n        print r\n    }\n    catch err {\n        print \"caught\"\n    }\n    const lib.Divisor bad ← lib.structa(0)\n    do {\n        const int r2 ← bad.reciproca()\n        print r2\n    }\n    catch err {\n        print \"caught\"\n    }\n}\n";
 
 #[test]
@@ -493,18 +493,20 @@ fn package_mir_const_data_member_verte_initializer_transplants() {
 
 // MC6 (7df48a51): const-to-const initializers (`ELEMENTS ← N * K`, the
 // gradus kernel.fab GEMV shape) transplant by rewriting the inner `Path`
-// to the referenced const's synthetic def id.
+// to the referenced const's synthetic def id. Under DECISIONS D5.1 the
+// referenced N and K stay unmarked (module-private): every top-level const is
+// linked for transplant, and only exports become member-reference targets.
 const PATH_CONST_SIBLING_MATH: &str =
-    "const int N ← 320\n\nconst int K ← 960\n\nconst int ELEMENTS ← N * K\n";
+    "const int N ← 320\n\nconst int K ← 960\n\n@ internal\nconst int ELEMENTS ← N * K\n";
 const PATH_CONST_SIBLING_MAIN: &str =
     "import from \"./math\" math\n\nmain {\n    print math.ELEMENTS\n}\n";
-const PATH_CONST_LIB: &str = "+++\nlocale = \"en\"\n+++\nconst int N ← 320\n\nconst int K ← 960\n\nconst int ELEMENTS ← N * K\n";
+const PATH_CONST_LIB: &str = "+++\nlocale = \"en\"\n+++\nconst int N ← 320\n\nconst int K ← 960\n\n@ public\nconst int ELEMENTS ← N * K\n";
 const PATH_CONST_LIB_MAIN: &str =
     "import from \"pathclib:lib\" vals\n\nmain {\n    print vals.ELEMENTS\n}\n";
-// The rejection boundary: a `Path` to a const that is NOT a linked data
-// member (`@ private` never reaches the export surface) fails closed.
+// D5.1: a `Path` to an `@ private` const of the same source unit links — the
+// const is transplanted without becoming a member-reference target.
 const PATH_CONST_PRIVATA_MATH: &str =
-    "@ private\nconst int PRIVATE_N ← 320\n\nconst int ELEMENTS ← PRIVATE_N * 3\n";
+    "@ private\nconst int PRIVATE_N ← 320\n\n@ internal\nconst int ELEMENTS ← PRIVATE_N * 3\n";
 const PATH_CONST_PRIVATA_MAIN: &str =
     "import from \"./math\" math\n\nmain {\n    print math.ELEMENTS\n}\n";
 
@@ -607,12 +609,13 @@ fn package_mir_const_data_member_path_initializer_transplants_library() {
 }
 
 #[test]
-fn package_mir_const_data_member_path_initializer_unlinked_target_fails_closed() {
-    // MC6 rejection boundary: `ELEMENTS ← PRIVATE_N * 3` references an
-    // `@ privata` const that never enters the export surface, so it is not a
-    // linked data member and has no synthetic def id. The transplant fails
-    // closed with the data-member diagnostic instead of silently carrying a
-    // dangling cross-analysis Path.
+fn package_mir_const_data_member_path_initializer_module_private_target_transplants() {
+    // Pre-D5.1 this pinned a fail-closed boundary: `@ privata` consts were
+    // never linked, so `ELEMENTS ← PRIVATE_N * 3` had no synthetic target.
+    // D5.1 makes unmarked top-level declarations module-private, which would
+    // turn every same-module const reference (`ELEMENTS ← N * K`) into that
+    // failure; module-private consts are therefore linked for transplant and
+    // only withheld as member-reference targets.
     let dir = crate::test_support::test_temp_dir("mc6-path-privata");
     let entry = write_sibling_namespace_package(
         dir.path(),
@@ -623,22 +626,17 @@ fn package_mir_const_data_member_path_initializer_unlinked_target_fails_closed()
     let config = Config::default().with_library_home(dir.join("libhome"));
 
     let mut host = BufferHost::default();
-    let diagnostics = run_package_mir(
+    run_package_mir(
         &config,
         &entry,
         &crate::test_support::test_mir_seams(),
         &mut host,
     )
-    .expect_err("an unlinked Path target must fail the package MIR link");
-    assert!(
-        diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.issue() == Some("package_mir_data_member_unsupported")),
-        "expected the fail-closed Path diagnostic, got {:?}",
-        diagnostics
-            .iter()
-            .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
-            .collect::<Vec<_>>()
+    .expect("a module-private const referenced by an exported initializer must link");
+    assert_eq!(
+        host.stdout_lines,
+        vec!["960".to_owned()],
+        "PRIVATE_N * 3 must evaluate through the transplanted private const"
     );
 }
 
@@ -740,8 +738,8 @@ fn package_mir_training_loop_mlp_runs_on_fmir_lane() {
 // never a name sweep across the unit's imports (which bails when more than
 // one import exports the method: BOTH `forma` and `typo` export `causa` here,
 // mirroring gradus shape.fab + dtype.fab).
-const FORMA_LIB: &str = "functio quantitas(lista<numerus> forma) → numerus {\n    redde forma.longitudo()\n}\n\nfunctio causa(numerus n) → numerus {\n    redde n + 1\n}\n";
-const TYPO_LIB: &str = "functio causa(numerus n) → numerus {\n    redde n + 2\n}\n";
+const FORMA_LIB: &str = "@ publica\nfunctio quantitas(lista<numerus> forma) → numerus {\n    redde forma.longitudo()\n}\n\n@ publica\nfunctio causa(numerus n) → numerus {\n    redde n + 1\n}\n";
+const TYPO_LIB: &str = "@ publica\nfunctio causa(numerus n) → numerus {\n    redde n + 2\n}\n";
 const FORMA_MAIN: &str = "import from \"forma:lib\" forma\nimport from \"typo:lib\" typo\n\n# The local param `forma` shadows the import binding `forma` — the shadowed\n# namespace-reference shape of gradus tensor.fab `_quantitas_forma`.\nfn dubbia(list<int> forma) → int {\n    const int n ← forma.quantitas(forma)\n    return forma.causa(n)\n}\n\nmain {\n    print dubbia([2, 3, 4])\n    print typo.causa(7)\n}\n";
 
 /// The shadowed-alias rewrite fires for synthetic HIR receiver defs: a local
@@ -1154,6 +1152,7 @@ fn write_return_conversion_package(dir: &std::path::Path, mlp_lib: &str) -> std:
     let nn_lib = r#"+++
 locale = "en"
 +++
+@ public
 union NnError {
     @ shared
     string message
@@ -1219,6 +1218,7 @@ locale = "en"
 +++
 import from "convlib:nn" nn
 
+@ public
 union GradusError {
     @ shared
     string message
@@ -1243,6 +1243,7 @@ locale = "en"
 +++
 import from "convlib:nn" nn
 
+@ public
 union GradusError {
     @ shared
     string message

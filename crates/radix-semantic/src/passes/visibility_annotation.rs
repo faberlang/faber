@@ -1,7 +1,7 @@
 //! Validate visibility annotations for the file-namespace model.
 //!
 //! Top-level `@ publica` / `@ interna` / `@ privata` participate in package/file
-//! namespace export filtering (see `tool::commands::compile`). Unmarked
+//! namespace export filtering (see `radix_module::program::export_surface`). Unmarked
 //! declarations are module-private; `@ privata` on a declaration is an explicit
 //! module-private marker (accepted, no warning).
 //!
@@ -67,10 +67,10 @@ fn tier_spelling(tier: VisibilityTier) -> &'static str {
 }
 
 /// The export tier (`@ publica` / `@ interna`) of a top-level statement, if
-/// any. Unmarked and `@ privata` declarations have no export tier. Shared with
-/// the export-surface builders in `tool::commands::compile` and the faber
-/// package machinery; a declaration mixing distinct tiers is separately
-/// diagnosed by this pass.
+/// any. Unmarked and `@ privata` declarations have no export tier. The input
+/// of the one export-visibility resolver
+/// (`radix_module::program::export_surface`); a declaration mixing distinct
+/// tiers is separately diagnosed by this pass.
 #[must_use]
 pub fn statement_export_tier(stmt: &Stmt, interner: &Interner) -> Option<VisibilityTier> {
     stmt.annotations.iter().find_map(|annotation| {
@@ -81,10 +81,12 @@ pub fn statement_export_tier(stmt: &Stmt, interner: &Interner) -> Option<Visibil
 
 /// Whether a top-level statement carries an explicit `@ privata` marker.
 ///
-/// Distinct from [`statement_export_tier`]: unmarked declarations also have no
-/// export tier, but only explicitly private declarations must be excluded from
-/// export surfaces that keep the legacy unmarked-exported default (the package
-/// machinery's surface and the import-contract file interfaces it drives).
+/// Not an importability test: importable names come only from the one
+/// export-visibility resolver (`radix_module::program::export_surface`), where
+/// unmarked and `@ privata` are both module-private. This predicate serves the
+/// type-snapshot carriers (file interfaces, library interface items), which
+/// keep unmarked nominals so a public signature that names a same-module
+/// unmarked type still resolves in consumers.
 #[must_use]
 pub fn has_private_visibility_annotation(stmt: &Stmt, interner: &Interner) -> bool {
     stmt.annotations

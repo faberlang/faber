@@ -1,4 +1,5 @@
 use super::*;
+use radix_module::program::program_declaration_surface;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
@@ -302,4 +303,97 @@ fn norma_http_generates_ordinary_rust_module() {
         "norma:http must generate a rust module after the special-case deletion"
     );
     let _ = fs::remove_dir_all(&root);
+}
+
+// ── export-visibility resolver (D5.1) ──────────────────────────────────────
+
+fn library_surfaces_for(
+    label: &str,
+    source: &str,
+) -> (
+    BTreeMap<String, VisibilityTier>,
+    BTreeMap<String, VisibilityTier>,
+) {
+    let root = temp_root(label);
+    fs::create_dir_all(root.join("norma/src")).expect("mkdir norma");
+    fs::write(root.join("norma/src/visibilis.fab"), source).expect("write visibilis.fab");
+    let resolver = LibraryResolver::new(&root);
+    let module = resolver
+        .resolve("norma:visibilis")
+        .expect("resolve")
+        .expect("norma:visibilis must resolve");
+    let import = crate::LibraryImportBinding {
+        binding: "visibilis".to_owned(),
+        visibility: radix_module::syntax::Visibility::Publica,
+        import_span: radix_module::lexer::Span::new(0, 0),
+        module,
+    };
+    let mut cache =
+        LibraryInterfaceCache::default().with_locale_loader(crate::test_support::test_locale_pack);
+    let exports =
+        library_interface_export_surface(&import, &resolver, &mut cache).expect("export surface");
+    let cached = load_cached_library_interface(&import.module, &mut cache).expect("cached");
+    let declarations = program_declaration_surface(&cached.program, &cached.interner);
+    let _ = fs::remove_dir_all(&root);
+    (exports, declarations)
+}
+
+const VISIBILITY_TIERS_SOURCE: &str = "
+@ publica
+functio aperta() → vacuum { }
+
+@ interna
+functio clausa() → vacuum { }
+
+@ privata
+functio secretum() → vacuum { }
+
+functio occultum() → vacuum { }
+";
+
+#[test]
+fn unmarked_library_declaration_is_module_private_in_export_surface() {
+    let (exports, _) = library_surfaces_for("unmarked-export", VISIBILITY_TIERS_SOURCE);
+    assert_eq!(
+        exports,
+        BTreeMap::from([
+            ("aperta".to_owned(), VisibilityTier::Publica),
+            ("clausa".to_owned(), VisibilityTier::Interna),
+        ]),
+        "unmarked and `@ privata` declarations must be absent from the export surface"
+    );
+}
+
+#[test]
+fn unmarked_library_declaration_is_module_private_in_declaration_surface() {
+    let (_, declarations) = library_surfaces_for("unmarked-declaration", VISIBILITY_TIERS_SOURCE);
+    assert_eq!(
+        declarations.get("occultum"),
+        Some(&VisibilityTier::Privata),
+        "an unmarked declaration exists but is module-private"
+    );
+    assert_eq!(declarations.get("secretum"), Some(&VisibilityTier::Privata));
+    assert_eq!(declarations.get("aperta"), Some(&VisibilityTier::Publica));
+    assert_eq!(declarations.get("clausa"), Some(&VisibilityTier::Interna));
+}
+
+/// Bodyless binding declarations (bound by a target binding manifest) follow
+/// the same D5.1 rule as bodied ones: `@ publica` exports them, unmarked keeps
+/// them module-private. There is no by-construction export exception.
+const BODYLESS_BINDING_SOURCE: &str = "
+@ publica
+functio ligata(textus via) → textus ⇥ textus
+
+functio adiutrix(textus via) → textus
+";
+
+#[test]
+fn bodyless_binding_declaration_exports_only_when_marked() {
+    let (exports, declarations) = library_surfaces_for("bodyless-binding", BODYLESS_BINDING_SOURCE);
+    assert_eq!(
+        exports,
+        BTreeMap::from([("ligata".to_owned(), VisibilityTier::Publica)]),
+        "a marked bodyless binding declaration is exported; an unmarked one is not"
+    );
+    assert_eq!(declarations.get("adiutrix"), Some(&VisibilityTier::Privata));
 }

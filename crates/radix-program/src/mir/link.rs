@@ -322,7 +322,10 @@ pub(super) fn local_namespace_call_targets(
                     links
                         .namespaces
                         .insert((unit.path.clone(), import_item.def_id), exports.clone());
-                    for function in exported_top_level_functions(sibling, &exports) {
+                    // D5.1: allocate every function source; module-private
+                    // helpers are reached from exported functions of the
+                    // same module. Only exports become call targets.
+                    for function in top_level_functions(sibling) {
                         let synthetic = *links
                             .source_rewrites
                             .entry((sibling.path.clone(), function.def_id))
@@ -331,18 +334,22 @@ pub(super) fn local_namespace_call_targets(
                                 links.next_synthetic += 1;
                                 def_id
                             });
-                        links.targets.insert(
-                            (unit.path.clone(), import_item.def_id, function.name),
-                            synthetic,
-                        );
+                        if exports.contains(&function.name) {
+                            links.targets.insert(
+                                (unit.path.clone(), import_item.def_id, function.name),
+                                synthetic,
+                            );
+                        }
                     }
-                    for member in exported_top_level_consts(sibling, &exports) {
+                    for member in top_level_consts(sibling) {
+                        let exported = exports.contains(&member.name);
                         link_const_member(
                             &mut links,
                             &unit.path,
                             import_item.def_id,
                             &sibling.path,
                             &member,
+                            exported,
                         );
                     }
                 }
@@ -513,7 +520,9 @@ fn link_sibling_import_item(
     // route is composable by construction; without the route the consumer's
     // generic instantiation registers no device entry (the spike-3 gap) and
     // the target seam sees a zero-kernel package.
-    for function in exported_top_level_functions(sibling, exports) {
+    // D5.1: allocate every function source, not only exports — module-private
+    // helpers are reached from exported functions of the same module.
+    for function in top_level_functions(sibling) {
         let synthetic = *links
             .source_rewrites
             .entry((sibling.path.clone(), function.def_id))
@@ -546,13 +555,23 @@ fn link_sibling_import_item(
                 },
             ));
         }
-        links.targets.insert(
-            (caller_path.to_path_buf(), import_def_id, function.name),
-            synthetic,
-        );
+        if exports.contains(&function.name) {
+            links.targets.insert(
+                (caller_path.to_path_buf(), import_def_id, function.name),
+                synthetic,
+            );
+        }
     }
-    for member in exported_top_level_consts(sibling, exports) {
-        link_const_member(links, caller_path, import_def_id, &sibling.path, &member);
+    for member in top_level_consts(sibling) {
+        let exported = exports.contains(&member.name);
+        link_const_member(
+            links,
+            caller_path,
+            import_def_id,
+            &sibling.path,
+            &member,
+            exported,
+        );
     }
 }
 
@@ -601,7 +620,7 @@ fn link_library_import_site(
             let HirItemKind::Function(function) = &item.kind else {
                 return None;
             };
-            Some(ExportedFunction {
+            Some(TopLevelFunction {
                 name: analysis.interner.resolve(function.name).to_owned(),
                 def_id: item.def_id,
             })
@@ -628,7 +647,7 @@ fn link_library_import_site(
             );
             continue;
         }
-        functions.push(ExportedFunction {
+        functions.push(TopLevelFunction {
             name,
             def_id: backward.companion_def_id,
         });
@@ -641,7 +660,7 @@ fn link_library_import_site(
             let HirItemKind::Constant(konst) = &item.kind else {
                 return None;
             };
-            Some(ExportedConst {
+            Some(TopLevelConst {
                 name: analysis.interner.resolve(konst.name).to_owned(),
                 def_id: item.def_id,
                 konst: konst.clone(),
@@ -702,10 +721,19 @@ fn link_library_import_site(
                 );
             }
         }
+        // D5.1: module-private consts are linked too — an exported const
+        // initializer or function body may reference them — but only exports
+        // become member-reference targets.
         for member in &consts {
-            if exports.contains(&member.name) {
-                link_const_member(links, &site.caller_path, item.def_id, &library_path, member);
-            }
+            let exported = exports.contains(&member.name);
+            link_const_member(
+                links,
+                &site.caller_path,
+                item.def_id,
+                &library_path,
+                member,
+                exported,
+            );
         }
     }
 
@@ -1040,15 +1068,12 @@ pub(super) fn push_companion_unresolved(
     );
 }
 
-pub(super) struct ExportedFunction {
+pub(super) struct TopLevelFunction {
     name: String,
     def_id: DefId,
 }
 
-pub(super) fn exported_top_level_functions(
-    unit: &AnalyzedProgramNode,
-    exports: &BTreeSet<String>,
-) -> Vec<ExportedFunction> {
+pub(super) fn top_level_functions(unit: &AnalyzedProgramNode) -> Vec<TopLevelFunction> {
     unit.analysis
         .hir
         .items
@@ -1058,7 +1083,7 @@ pub(super) fn exported_top_level_functions(
                 return None;
             };
             let name = unit.analysis.interner.resolve(function.name).to_owned();
-            exports.contains(&name).then_some(ExportedFunction {
+            Some(TopLevelFunction {
                 name,
                 def_id: item.def_id,
             })
@@ -1066,19 +1091,17 @@ pub(super) fn exported_top_level_functions(
         .collect()
 }
 
-pub(super) struct ExportedConst {
+pub(super) struct TopLevelConst {
     name: String,
     def_id: DefId,
     konst: HirConst,
 }
 
-/// Top-level const data members a sibling/library unit exports. Like
-/// [`exported_top_level_functions`], this walks the analysis HIR so the
-/// synthetic def id and the const's value travel together.
-pub(super) fn exported_top_level_consts(
-    unit: &AnalyzedProgramNode,
-    exports: &BTreeSet<String>,
-) -> Vec<ExportedConst> {
+/// Every top-level const data member of a sibling unit, exported or
+/// module-private (D5.1: exported initializers and bodies may reference
+/// private consts). Like [`top_level_functions`], this walks the analysis HIR
+/// so the synthetic def id and the const's value travel together.
+pub(super) fn top_level_consts(unit: &AnalyzedProgramNode) -> Vec<TopLevelConst> {
     unit.analysis
         .hir
         .items
@@ -1088,7 +1111,7 @@ pub(super) fn exported_top_level_consts(
                 return None;
             };
             let name = unit.analysis.interner.resolve(konst.name).to_owned();
-            exports.contains(&name).then(|| ExportedConst {
+            Some(TopLevelConst {
                 name,
                 def_id: item.def_id,
                 konst: konst.clone(),
@@ -1097,16 +1120,17 @@ pub(super) fn exported_top_level_consts(
         .collect()
 }
 
-/// Link one exported const data member: allocate a synthetic def id in the
+/// Link one const data member: allocate a synthetic def id in the
 /// package-MIR range (same discipline as function sources), register the
-/// member reference target, and carry the const declaration for the entry
-/// lowering's transplant.
+/// member reference target when the member is exported, and carry the const
+/// declaration for the entry lowering's transplant.
 fn link_const_member(
     links: &mut PackageMirLinkAccumulator,
     caller_path: &Path,
     import_def_id: DefId,
     source_path: &Path,
-    member: &ExportedConst,
+    member: &TopLevelConst,
+    exported: bool,
 ) {
     let synthetic = *links
         .source_rewrites
@@ -1116,14 +1140,16 @@ fn link_const_member(
             links.next_synthetic += 1;
             def_id
         });
-    links.data_member_targets.insert(
-        (
-            caller_path.to_path_buf(),
-            import_def_id,
-            member.name.clone(),
-        ),
-        synthetic,
-    );
+    if exported {
+        links.data_member_targets.insert(
+            (
+                caller_path.to_path_buf(),
+                import_def_id,
+                member.name.clone(),
+            ),
+            synthetic,
+        );
+    }
     links.data_members.push(DataMemberLink {
         synthetic,
         source_path: source_path.to_path_buf(),
