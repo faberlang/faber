@@ -29,6 +29,9 @@ impl FunctionBuilder<'_> {
         if self.is_handler_error_nuntius_projection(object, name) {
             return self.lower_expr_value(object);
         }
+        if let Some(result) = self.lower_union_field_read(object, name, _expr) {
+            return result;
+        }
         let mut place = self.lower_projectable_place(object)?;
         place.projections.push(MirProjection::Field(name));
         Some(MirOperand::Place(place))
@@ -164,6 +167,11 @@ impl FunctionBuilder<'_> {
                 self.adapt_narrowed_place(MirPlace::local(binding.local), Some(binding.ty), expr)
             }
             HirExpressionKind::Field(object, name) => {
+                if let Some(result) = self.lower_union_field_read(object, *name, expr) {
+                    let ty = self.expr_ty(expr)?;
+                    let operand = result?;
+                    return Some(self.materialize_operand_place(operand, ty, expr.span));
+                }
                 let mut place = self.lower_projectable_place(object)?;
                 place.projections.push(MirProjection::Field(*name));
                 Some(place)

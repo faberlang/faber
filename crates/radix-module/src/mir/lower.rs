@@ -79,6 +79,7 @@ mod package_instantiate;
 mod place;
 mod runtime;
 mod stmt;
+mod union_dispatch;
 
 use context::{LoweringContextMaps, function_param_map, struct_field_map};
 use expr::HirExpressionLoweringVisitor;
@@ -2170,6 +2171,9 @@ impl<'a> FunctionBuilder<'a> {
 
         if let Some(result) = self.lower_tensor_bracket_set(lhs, rhs, expr.span) {
             return Some(result);
+        }
+        if let Some(result) = self.lower_union_field_assign(lhs, rhs, expr.span) {
+            return result;
         }
 
         let fallback_ty = self.expr_ty(rhs)?;
