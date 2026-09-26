@@ -857,10 +857,14 @@ impl TypeChecker<'_> {
             &mut route,
             span,
         );
-        // `↤` carries no conversion row to its backends yet: an `ordo` row or
-        // registered `@ conversio` pair fails closed here instead of reaching
-        // emission unrouted. Write `target ← source ↦ T` instead.
-        if route.is_some() && result_ty != self.error_type {
+        // `↤` carries no conversion row to its backends yet: an `ordo` row
+        // fails closed here instead of reaching emission unrouted. Write
+        // `target ← source ↦ T` instead.
+        // A registered `@ conversio` row keeps its pre-D9.3 `↤` typecheck
+        // admission (CTR-02 channel composition).
+        if matches!(route, Some(radix_hir::HirConversioRoute::Ordo { .. }))
+            && result_ty != self.error_type
+        {
             self.invalid_conversion(ISSUE_CONVERSIO_ASSIGN_ROUTE_UNSUPPORTED, span);
             return self.error_type;
         }

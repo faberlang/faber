@@ -431,9 +431,13 @@ impl HirVisitor for UseVisitor<'_> {
                 self.record_type(*target);
                 walk_expr(self, expr);
             }
-            HirExpressionKind::Conversio { target, .. } => {
+            HirExpressionKind::Conversio { target, route, .. } => {
                 if let radix_hir::HirConversioTarget::Type(target) = target {
                     self.record_type(*target);
+                }
+                // D9.3: the registered `@ conversio` function is called.
+                if let Some(radix_hir::HirConversioRoute::Function { def_id, .. }) = route {
+                    self.record_local(*def_id, ResolvedUseKind::Call);
                 }
                 walk_expr(self, expr);
             }

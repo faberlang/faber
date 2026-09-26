@@ -592,22 +592,35 @@ impl TypeChecker<'_> {
             return self.error_type;
         }
 
-        // CTR-02: a registered user row is the authority for its ordered pair
-        // (direct-only lookup — no transitive composition). A row whose
-        // conversion function declares `⇥ E` makes a bare `↦` failable with
-        // that declared channel; inline recovery stays target-typed.
+        // CTR-02 / D9.3: a registered user row is the authority for its
+        // ordered pair (direct-only lookup — no transitive composition), and
+        // the explicit `↦` calls its function. A row whose conversion function
+        // declares `⇥ E` makes a bare `↦` failable with that declared channel:
+        // it needs a `⊥` default or an active channel that accepts `E`;
+        // inline recovery stays target-typed.
         if let Some(row) = self
             .resolver
             .conversion_row_for(self.resolve_inferred_type(source_ty), target_resolved)
             && let Some(fn_id) = row.fn_def_id
         {
-            if let Some(channel) = self.functions.get(&fn_id).and_then(|sig| sig.err) {
+            let channel = self.functions.get(&fn_id).and_then(|sig| sig.err);
+            if let Some(channel) = channel {
                 if let Some(recovery) = recovery {
                     self.note_conversio_recovery_checked(recovery, target_resolved);
+                } else if self.current_error.is_none() {
+                    self.invalid_operand_types(
+                        super::call::ISSUE_FAILABLE_CALL_REQUIRES_HANDLER,
+                        span,
+                    );
+                    return self.error_type;
                 } else {
                     self.check_registered_row_channel(channel, span);
                 }
             }
+            *route = Some(radix_hir::HirConversioRoute::Function {
+                def_id: fn_id,
+                failable: channel.is_some(),
+            });
             return target_resolved;
         }
 

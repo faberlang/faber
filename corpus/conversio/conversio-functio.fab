@@ -1,0 +1,70 @@
++++
+term = "conversio-functio"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "annotation", "annotation_sugar", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "si_stmt", "iace_stmt", "comparison", "additive_expr", "multiplicative_expr", "typed_constructor", "incipit_stmt", "fixum_decl", "conversio_expr", "inline_recovery", "expression", "unary_expr", "literal", "member_suffix", "nota_stmt"]
+category = "conversion"
+canonical = true
+summary = "A registered @ conversion function also serves an explicit ↦ between its two types."
+syntax = "@ conversion fn f(A a) → B [⇥ E] { … } … a ↦ B [⊥ <default>]"
+related = ["↦", "⊥", "⇥"]
+locale = "en"
++++
+# =============================================================================
+# conversio-functio — A registered conversion function serves an explicit ↦.
+# =============================================================================
+#
+# What this teaches:
+#   • `@ conversion` on a top-level function registers its (parameter type,
+#     return type) pair. `a ↦ B` between those two types calls it.
+#   • Only direct pairs convert: A ↦ B and B ↦ C never compose into A ↦ C.
+#   • A function that declares `⇥ E` makes `↦` failable: write a `⊥`
+#     default, or let the failure propagate from a function with a channel.
+#
+# Common mistakes:
+#   • Writing the conversion inside the type — conversions are top-level
+#     `@ conversion` functions, never members of a class or union.
+#
+# See also: ↦, ⊥, ⇥
+# =============================================================================
+
+class Celsius {
+    float degrees
+}
+
+class Fahrenheit {
+    float degrees
+}
+
+class Reading {
+    int value
+}
+
+class Gauged {
+    int value
+}
+
+@ conversion
+fn toFahrenheit(Celsius c) → Fahrenheit {
+    return Fahrenheit { degrees = c.degrees * 9.0 / 5.0 + 32.0 }
+}
+
+# A failable conversion: a negative reading has no gauge value.
+@ conversion
+fn toGauged(Reading r) → Gauged ⇥ string {
+    if r.value ≺ 0 {
+        throw "negative reading"
+    }
+    return Gauged { value = r.value }
+}
+
+main {
+    # infallible: ↦ calls toFahrenheit
+    const Fahrenheit boiling ← Celsius { degrees = 100.0 } ↦ Fahrenheit
+    print boiling.degrees
+
+    # failable: the ⊥ default applies only when toGauged fails
+    const Gauged kept ← Reading { value = 7 } ↦ Gauged ⊥ Gauged { value = 0 }
+    print kept.value
+    const Gauged fallback ← Reading { value = -4 } ↦ Gauged ⊥ Gauged { value = 0 }
+    print fallback.value
+}

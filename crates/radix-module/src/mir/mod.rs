@@ -216,6 +216,9 @@ mod capability_tests;
 #[path = "commune_stepper_test.rs"]
 mod commune_stepper_tests;
 #[cfg(test)]
+#[path = "conversio_function_test.rs"]
+mod conversio_function_tests;
+#[cfg(test)]
 #[path = "copy_duplicate_test.rs"]
 mod copy_duplicate_tests;
 #[cfg(test)]

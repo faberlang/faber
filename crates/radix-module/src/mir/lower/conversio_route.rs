@@ -14,6 +14,11 @@
 //!   the function's `⇥` channel) with a `textus` payload, or panics when no
 //!   alternate exit is active — the same postures as a failable runtime
 //!   conversion.
+//!
+//! A registered `@ conversio` pair (D9.3) lowers as a call to its function.
+//! A failable function propagates through the call's own alternate exit; a
+//! `⊥` default installs a local handler around the call whose block writes
+//! the default instead.
 
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for lowering
@@ -32,12 +37,14 @@ impl FunctionBuilder<'_> {
             HirConversioRoute::Ordo { row, members } => {
                 self.lower_ordo_conversio(source, *row, members, recovery, expr)
             }
-            HirConversioRoute::Function { .. } => {
-                self.errors.push(MirError::unsupported(
-                    expr.span,
-                    "registered conversio function route before MIR lowering",
-                ));
-                None
+            HirConversioRoute::Function { def_id, failable } => {
+                let call = HirConversioRoute::function_call(*def_id, source, expr);
+                match (failable, recovery) {
+                    (true, Some(recovery)) => self.lower_recovered_conversio_call(*def_id, &call, recovery, expr),
+                    // Infallible, or failable propagating through the call's
+                    // own alternate exit (trap, handler, or `⇥` channel).
+                    _ => self.lower_expr_value(&call),
+                }
             }
         }
     }
@@ -104,6 +111,59 @@ impl FunctionBuilder<'_> {
                 self.terminate_current(MirTerminatorKind::Unreachable, span);
             }
         }
+
+        if reaches_join {
+            self.switch_to(join_id);
+        } else {
+            self.seal_unreachable(join_id, span);
+        }
+        Some(MirOperand::Place(result))
+    }
+
+    /// `source ↦ B ⊥ default` through a failable `@ conversio` function: the
+    /// call runs under a local handler whose block yields the default.
+    fn lower_recovered_conversio_call(
+        &mut self,
+        function: DefId,
+        call: &HirExpression,
+        recovery: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let span = expr.span;
+        let result_ty = self.expr_ty(expr)?;
+        let Some(error_ty) = self.context.function_errors.get(&function).cloned() else {
+            self.errors
+                .push(MirError::unsupported(span, "failable conversio function without an error type"));
+            return None;
+        };
+        let result = MirPlace::temp(self.push_temp(result_ty, span));
+        let handler_id = self.fresh_block(span);
+        let join_id = self.fresh_block(span);
+        let handler_local = self.next_local_id();
+        self.locals
+            .push(MirLocalDecl { id: handler_local, name: None, ty: error_ty, mutable: false, span });
+
+        self.capture_depth += 1;
+        self.handlers.push(HandlerContext {
+            error_place: MirPlace::local(handler_local),
+            error_ty,
+            error_block: handler_id,
+            depth: self.capture_depth,
+        });
+        let value = self.lower_expr_value(call);
+        self.handlers.pop();
+        let mut reaches_join = false;
+        if let Some(value) = value
+            && self.current_is_open()
+        {
+            self.assign(result.clone(), value, result_ty, span);
+            reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), span);
+        }
+
+        self.switch_to(handler_id);
+        let fallback = self.lower_expr_value(recovery)?;
+        self.assign(result.clone(), fallback, result_ty, span);
+        reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), span);
 
         if reaches_join {
             self.switch_to(join_id);

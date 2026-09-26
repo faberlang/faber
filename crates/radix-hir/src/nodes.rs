@@ -1534,6 +1534,41 @@ pub enum HirConversioRoute {
     Function { def_id: DefId, failable: bool },
 }
 
+impl HirConversioRoute {
+    /// The call a [`HirConversioRoute::Function`] route stands for:
+    /// `function(source)`, carrying the conversion expression's identity and
+    /// result type. Backends emit it through their ordinary call path.
+    #[must_use]
+    pub fn function_call(
+        def_id: DefId,
+        source: &HirExpression,
+        conversio: &HirExpression,
+    ) -> HirExpression {
+        let span = conversio.span;
+        HirExpression {
+            id: conversio.id,
+            kind: HirExpressionKind::Call(
+                Box::new(HirExpression {
+                    id: conversio.id,
+                    kind: HirExpressionKind::Path(def_id),
+                    ty: None,
+                    span,
+                }),
+                Vec::new(),
+                vec![HirCallArg {
+                    name: None,
+                    spread: false,
+                    expr: source.clone(),
+                    span: source.span,
+                }],
+                None,
+            ),
+            ty: conversio.ty,
+            span,
+        }
+    }
+}
+
 /// Direction of a built-in `ordo` conversion row (D9.4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HirOrdoRow {

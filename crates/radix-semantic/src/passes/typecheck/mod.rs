@@ -907,6 +907,10 @@ mod bits_conversio_test;
 mod ordo_conversio_test;
 
 #[cfg(test)]
+#[path = "conversio_function_route_test.rs"]
+mod conversio_function_route_test;
+
+#[cfg(test)]
 #[path = "bf16_conversio_test.rs"]
 mod bf16_conversio_test;
 

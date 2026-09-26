@@ -2573,7 +2573,7 @@ message = "this {ordo} conversion cannot fail, so it takes no `⊥` default"
 help = "remove the `⊥` default; this {ordo} conversion cannot fail"
 
 [diagnostics.SEM016.issues.conversio_assign_route_unsupported]
-message = "`↤` does not yet convert through an {ordo} row or a registered conversion function"
+message = "`↤` does not yet convert through an {ordo} row"
 help = "write `target ← source ↦ T` instead of `↤` for this conversion"
 
 [diagnostics.SEM016.issues.regex_recovery_unsupported]

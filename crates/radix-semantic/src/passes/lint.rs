@@ -585,6 +585,15 @@ impl HirVisitor for LintContext<'_> {
             HirExpressionKind::Path(def_id) => {
                 self.used.insert(*def_id);
             }
+            // D9.3: an explicit `↦` through a registered `@ conversio` pair
+            // calls that function.
+            HirExpressionKind::Conversio {
+                route: Some(radix_hir::HirConversioRoute::Function { def_id, .. }),
+                ..
+            } => {
+                self.used.insert(*def_id);
+                walk_expr(self, expr);
+            }
             HirExpressionKind::Loop(block) => match block.fac_dum_parts() {
                 Some((body, test, _)) => self.check_fac_dum(body, test),
                 None => self.check_block(block, true),
