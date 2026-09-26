@@ -341,7 +341,7 @@ impl FunctionBuilder<'_> {
 
         let index = self.next_local_id();
         self.locals
-            .push(MirLocalDecl { id: index, name: None, ty: numerus, mutable: true, span: span });
+            .push(MirLocalDecl { id: index, name: None, ty: numerus, mutable: true, span });
         self.assign(MirPlace::local(index), MirOperand::Constant(MirConstant::Int(0)), numerus, span);
 
         let length = self.runtime_call_value(
