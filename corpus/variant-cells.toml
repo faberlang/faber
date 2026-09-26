@@ -1199,7 +1199,7 @@ status = "direct"
 exemplum = "await-assignment/await-assignment.fab"
 expected = true
 required = true
-note = "exemplum runs three awaited declarations; empty stdout is intentional"
+note = "exemplum runs three awaited declarations and prints each resolved value"
 
 [[cells]]
 id = "await-assignment.varia"
@@ -1209,7 +1209,7 @@ status = "direct"
 exemplum = "await-assignment/await-assignment.fab"
 expected = true
 required = true
-note = "exemplum runs three awaited declarations; empty stdout is intentional"
+note = "exemplum runs three awaited declarations and prints each resolved value"
 
 [[cells]]
 id = "await-assignment.sit"
@@ -1219,4 +1219,4 @@ status = "direct"
 exemplum = "await-assignment/await-assignment.fab"
 expected = true
 required = true
-note = "exemplum runs three awaited declarations; empty stdout is intentional"
+note = "exemplum runs three awaited declarations and prints each resolved value"

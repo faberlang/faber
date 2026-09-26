@@ -27,8 +27,6 @@ locale = "la"
 # GRAMMAR:
 #   awaitDiscard :← 'tacebit' expr
 
-``
-`fab
 functio responde() fiet → numerus {
     redde 1
 }
@@ -37,5 +35,3 @@ incipiet {
     tacebit responde()
     nota "done"
 }
-`
-``

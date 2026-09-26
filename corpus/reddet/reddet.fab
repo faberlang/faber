@@ -23,19 +23,15 @@ locale = "la"
 # See also: figendum, tacebit, fiet, redde
 # =============================================================================
 
-``
-`fab
-functio inner() fiet → numerus {
+functio interior() fiet → numerus {
     redde 9
 }
 
-functio outer() fiet → numerus {
-    reddet inner()
+functio exterior() fiet → numerus {
+    reddet interior()
 }
 
 incipiet {
-    figendum numerus v ← outer()
+    figendum numerus v ← exterior()
     nota v
 }
-`
-``

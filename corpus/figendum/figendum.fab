@@ -27,8 +27,6 @@ locale = "la"
 # GRAMMAR:
 #   awaitBind :← 'figendum' type? IDENT '←' expr
 
-``
-`fab
 functio responde() fiet → numerus {
     redde 7
 }
@@ -37,5 +35,3 @@ incipiet {
     figendum numerus responsum ← responde()
     nota responsum
 }
-`
-``
