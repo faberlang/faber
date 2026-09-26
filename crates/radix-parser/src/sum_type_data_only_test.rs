@@ -88,8 +88,8 @@ fn recovery_resumes_after_the_rejected_member() {
 
 #[test]
 fn plain_sum_types_still_parse() {
-    parse_ok("ordo Color { rubrum, viridis }\n");
-    parse_ok(
+    let _ = parse_ok("ordo Color { rubrum, viridis }\n");
+    let _ = parse_ok(
         "discretio Figura {\n    Circulus { fractus r },\n    Quadratum { fractus latus }\n}\n",
     );
 }
