@@ -57,8 +57,18 @@ pub fn lex_inspection_for_source(name: &str, source: &str) -> SourceInspection {
         Ok(file) => file,
         Err(error) => return SourceInspection { text: String::new(), success: false, errors: vec![error] },
     };
-    let result = crate::lexer::lex(source_file.content.as_str());
+    let result = lex_reader_surface(&source_file);
     SourceInspection { text: lex_json(&source_file, &result), success: result.success(), errors: Vec::new() }
+}
+
+/// Lex the peeled body under the file's own frontmatter reader locale, as check
+/// and compile do; no frontmatter locale keeps the canonical Latin surface.
+fn lex_reader_surface(source_file: &crate::driver::SourceFile) -> crate::lexer::LexResult {
+    let pack = crate::program::compile::frontmatter_locale_pack_from_frontmatter(source_file.frontmatter.as_ref());
+    match pack.as_ref() {
+        Some(pack) => crate::lexer::lex_with_locale_pack(source_file.content.as_str(), pack),
+        None => crate::lexer::lex(source_file.content.as_str()),
+    }
 }
 
 fn lex_json(source_file: &crate::driver::SourceFile, result: &crate::lexer::LexResult) -> String {
@@ -71,16 +81,18 @@ fn lex_json(source_file: &crate::driver::SourceFile, result: &crate::lexer::LexR
         frontmatter_json(source_file.frontmatter.as_ref())
     )
     .ok();
+    writeln!(out, "  \"body_byte_offset\": {},", source_file.body_byte_offset).ok();
     writeln!(out, "  \"success\": {},", result.success()).ok();
     writeln!(out, "  \"tokens\": [").ok();
     for (i, token) in result.tokens.iter().enumerate() {
         let comma = if i + 1 < result.tokens.len() { "," } else { "" };
         writeln!(
             out,
-            "    {{ \"kind\": \"{}\", \"span\": [{}, {}] }}{}",
+            "    {{ \"kind\": \"{}\", \"span\": [{}, {}]{} }}{}",
             escape_json(&token_kind_display(&token.kind)),
             token.span.start,
             token.span.end,
+            ident_fields_json(result, &token.kind),
             comma
         )
         .ok();
@@ -104,6 +116,21 @@ fn lex_json(source_file: &crate::driver::SourceFile, result: &crate::lexer::LexR
     out
 }
 
+/// Identifier spelling and, when the parser may claim it as a keyword, its
+/// Latin registry identity. Keywords lex as identifiers on every surface, so
+/// this is the locale-normalized view of the token stream.
+fn ident_fields_json(result: &crate::lexer::LexResult, kind: &crate::lexer::TokenKind) -> String {
+    let crate::lexer::TokenKind::Ident(symbol) = kind else {
+        return String::new();
+    };
+    let text = result.interner.resolve(*symbol);
+    let mut fields = format!(", \"text\": \"{}\"", escape_json(text));
+    if let Some(latin) = result.reader_keyword_latin_keys.get(text) {
+        write!(fields, ", \"keyword\": \"{}\"", escape_json(latin)).ok();
+    }
+    fields
+}
+
 fn token_kind_display(kind: &crate::lexer::TokenKind) -> String {
     let kind = format!("{kind:?}");
     if kind.len() > 60 {
@@ -120,7 +147,7 @@ pub fn parse_inspection_for_source(name: &str, source: &str) -> SourceInspection
         Ok(file) => file,
         Err(error) => return SourceInspection { text: String::new(), success: false, errors: vec![error] },
     };
-    let lex_result = crate::lexer::lex(source_file.content.as_str());
+    let lex_result = lex_reader_surface(&source_file);
     if !lex_result.success() {
         return SourceInspection {
             text: String::new(),
@@ -436,3 +463,7 @@ fn prepare_hir_prerequisites(
     }
     Ok((resolver, types))
 }
+
+#[cfg(test)]
+#[path = "inspect_test.rs"]
+mod tests;
