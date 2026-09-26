@@ -33,7 +33,7 @@ fn lower_source_result(source: &str) -> (crate::hir::LoweredProgram, Vec<crate::
     let mut types = TypeTable::new();
 
     crate::builtins::register(&mut resolver, &mut types, &mut interner);
-    crate::builtins::register_frame_types_if_needed(&program, &mut resolver, &mut types, &mut interner);
+    crate::builtins::register_frame_types_if_needed(&program, &mut resolver, &mut types, &mut interner, None);
 
     if let Err(errors) = passes::collect::collect(&program, &mut resolver, &mut types) {
         panic!("collect failed: {errors:?}");
@@ -82,7 +82,7 @@ fn lower_source_with_locale_pack(
     let mut types = TypeTable::new();
 
     crate::builtins::register(&mut resolver, &mut types, &mut interner);
-    crate::builtins::register_frame_types_if_needed(&program, &mut resolver, &mut types, &mut interner);
+    crate::builtins::register_frame_types_if_needed(&program, &mut resolver, &mut types, &mut interner, None);
 
     if let Err(errors) = passes::collect::collect(&program, &mut resolver, &mut types) {
         panic!("collect failed: {errors:?}");

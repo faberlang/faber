@@ -559,13 +559,10 @@ pub fn walk_cape<V: HirVisitor>(visitor: &mut V, cape: &HirCape) {
     visitor.visit_block(&cape.body);
 }
 
-/// Walk one pattern arm: patterns first, then guard, then body.
+/// Walk one pattern arm: patterns first, then body.
 pub fn walk_casu_arm<V: HirVisitor>(visitor: &mut V, arm: &HirCasuArm) {
     for pattern in &arm.patterns {
         visitor.visit_pattern(pattern);
-    }
-    if let Some(guard) = &arm.guard {
-        visitor.visit_expr(guard);
     }
     visitor.visit_expr(&arm.body);
 }
@@ -1145,13 +1142,10 @@ pub fn walk_cape_mut<V: HirVisitorMut>(visitor: &mut V, cape: &mut HirCape) {
     visitor.visit_block_mut(&mut cape.body);
 }
 
-/// Mutably walk one pattern arm: patterns first, then guard, then body.
+/// Mutably walk one pattern arm: patterns first, then body.
 pub fn walk_casu_arm_mut<V: HirVisitorMut>(visitor: &mut V, arm: &mut HirCasuArm) {
     for pattern in &mut arm.patterns {
         visitor.visit_pattern_mut(pattern);
-    }
-    if let Some(guard) = &mut arm.guard {
-        visitor.visit_expr_mut(guard);
     }
     visitor.visit_expr_mut(&mut arm.body);
 }

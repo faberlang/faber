@@ -126,7 +126,6 @@ pub enum TokenKind {
     Iacit,
     Immutata,
     Interna,
-    Nexum,
     Optiones,
     Prae,
     Privata,
@@ -274,6 +273,7 @@ pub enum TokenKind {
     Dot,       // .
     Arrow,     // →
     ExitArrow, // ⇥
+    UpTack,    // ⊥ default channel (D17.7)
     Cup,       // ∪ inline union
     Cap,       // ∩ inline intersection
     At,        // @
@@ -396,7 +396,6 @@ impl TokenKind {
                 | Iacit
                 | Immutata
                 | Interna
-                | Nexum
                 | Optiones
                 | Prae
                 | Privata

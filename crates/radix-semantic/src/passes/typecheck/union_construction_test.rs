@@ -391,6 +391,7 @@ functio match_alpha(alpha.A value) → textus {
 functio match_beta(beta.B value) → textus {
     discerne value {
         casu beta.B.X { redde "x" }
+        ceterum { redde "missing" }
     }
 }
 

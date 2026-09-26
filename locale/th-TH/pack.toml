@@ -24,7 +24,6 @@ iacit = "โยนผล"
 immutata = "ไม่เปลี่ยนแปลง"
 interna = "ภายในองค์กร"
 magnitudo = "ขนาด"
-nexum = "ผูก"
 iuncta = "ทูเพิล"
 optiones = "ทางเลือก"
 prae = "ก่อนหน้า"
@@ -194,6 +193,12 @@ filtrum = "ตัวกรอง"
 series = "ซีรีส์"
 census = "สำมะโน"
 ratio = "ratio"
+# Conversation family (DECISIONS D6.16). The meus/tuus rows also spell
+# the sermo view methods `s.meus<T>()` / `s.tuus<T>()`.
+sermo = "ช่องทาง"
+scrinium = "เฟรม"
+meus = "ส่ง"
+tuus = "รับ"
 
 [diagnostics.UNRES001]
 message = "คีย์เวิร์ด '{keyword}' ไม่ได้ประกาศไว้สำหรับชุดภาษา '{pack}'"
@@ -592,8 +597,8 @@ message = "นิพจน์ไม่ถูกต้อง"
 help = "ตรวจไวยากรณ์นิพจน์"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
-message = "ใช้ ⇥ สำหรับการกู้คืน conversio"
-help = "ใช้ ⇥; vel ใช้สำหรับการรวมค่า nullish เท่านั้น"
+message = "ใช้ ⊥ สำหรับการกู้คืน conversio"
+help = "ใช้ ⊥; vel ใช้สำหรับการรวมค่า nullish เท่านั้น"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "ต้องมีนิพจน์"
@@ -1975,10 +1980,6 @@ help = "กระจายค่า lista ภายในการสร้า�
 message = "คีย์ที่คำนวณไม่ได้ใช้ในการสร้าง struct"
 help = "ใช้ชื่อฟิลด์ struct ที่ประกาศไว้ในการสร้าง struct"
 
-[diagnostics.SEM011.issues.struct_spread_forbidden]
-message = "ฟิลด์ที่กระจายไม่ได้ใช้ในการสร้าง struct"
-help = "ระบุฟิลด์ struct ที่จำเป็นแต่ละฟิลด์อย่างชัดเจน"
-
 [diagnostics.SEM011.issues.vector_constructor_forbids_spread]
 message = "ตัวสร้าง vector ไม่รับอาร์กิวเมนต์แบบกระจาย"
 help = "ระบุองค์ประกอบ vector อย่างชัดเจนแทนอาร์กิวเมนต์แบบกระจาย"
@@ -2193,10 +2194,10 @@ help = "แปลงเป็นชนิดที่เข้ากันได
 
 [diagnostics.SEM016]
 message = "การแปลงไม่ถูกต้อง"
-help = "ใช้การแปลงที่ถูกต้องหรือระบุการกู้คืนแบบอินไลน์ด้วย `⇥`"
+help = "ใช้การแปลงที่ถูกต้องหรือระบุการกู้คืนแบบอินไลน์ด้วย `⊥`"
 
 [diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
-message = "การแปลง intervallum clamp ไม่รองรับการกู้คืนด้วย `⇥`"
+message = "การแปลง intervallum clamp ไม่รองรับการกู้คืนด้วย `⊥`"
 help = "นำ arm การกู้คืนออกจาก range clamp นี้"
 
 [diagnostics.SEM016.issues.intervallum_target_not_range]
@@ -2221,15 +2222,15 @@ help = "ทำให้ชนิดองค์ประกอบ bound ขอ�
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_required]
 message = "การ materialize เป็น vector ต้องมีแหล่งที่มาเป็น lista literal"
-help = "ใช้การแปลงที่ถูกต้องหรือระบุการกู้คืนแบบอินไลน์ด้วย `⇥`"
+help = "ใช้การแปลงที่ถูกต้องหรือระบุการกู้คืนแบบอินไลน์ด้วย `⊥`"
 
 [diagnostics.SEM016.issues.lista_to_vector_element_mismatch]
 message = "การแปลง lista เป็น vector ต้องการชนิดองค์ประกอบที่ตรงกัน"
-help = "ใช้การแปลงที่ถูกต้องหรือระบุการกู้คืนแบบอินไลน์ด้วย `⇥`"
+help = "ใช้การแปลงที่ถูกต้องหรือระบุการกู้คืนแบบอินไลน์ด้วย `⊥`"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_width]
 message = "การแปลง lista เป็น vector ต้องมีความกว้าง vector แบบ literal"
-help = "ใช้การแปลงที่ถูกต้องหรือระบุการกู้คืนแบบอินไลน์ด้วย `⇥`"
+help = "ใช้การแปลงที่ถูกต้องหรือระบุการกู้คืนแบบอินไลน์ด้วย `⊥`"
 
 [diagnostics.SEM016.issues.matrix_materialize_unsupported]
 message = "ยังไม่รองรับการ materialize matrix"
@@ -2320,12 +2321,12 @@ message = "การแปลง regex ต้องการ operand เป็�
 help = "แปลงค่า textus หรือ ascii เป็น regex"
 
 [diagnostics.SEM016.issues.regex_recovery_unsupported]
-message = "การแปลง regex ไม่รองรับการกู้คืนด้วย `⇥`; regex ไม่มีรูปแบบ literal จึงไม่มีค่าที่มีชนิดตามเป้าหมายให้แทนที่"
+message = "การแปลง regex ไม่รองรับการกู้คืนด้วย `⊥`; regex ไม่มีรูปแบบ literal จึงไม่มีค่าที่มีชนิดตามเป้าหมายให้แทนที่"
 help = "นำ arm การกู้คืนออกจากการแปลง regex นี้"
 
 [diagnostics.SEM016.issues.valor_verte_unsupported]
-message = "ไม่รองรับ valor ∷ T — ไม่สามารถยืนยัน shape ของค่า dynamic ณ เวลาคอมไพล์ได้ ใช้ `↦ T` สำหรับการดึงค่า ณ runtime (พร้อม `⇥` สำหรับการกู้คืน)"
-help = "ใช้การแปลง runtime `↦ T` พร้อมการกู้คืนด้วย `⇥` แทน"
+message = "ไม่รองรับ valor ∷ T — ไม่สามารถยืนยัน shape ของค่า dynamic ณ เวลาคอมไพล์ได้ ใช้ `↦ T` สำหรับการดึงค่า ณ runtime (พร้อม `⊥` สำหรับการกู้คืน)"
+help = "ใช้การแปลง runtime `↦ T` พร้อมการกู้คืนด้วย `⊥` แทน"
 
 [diagnostics.SEM016.issues.json_genus_conversion_requires_json_annotation]
 message = "การแปลง json/genus ต้องทำเครื่องหมาย genus ด้วย `@ json`"

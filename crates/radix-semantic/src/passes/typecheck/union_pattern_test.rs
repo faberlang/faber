@@ -321,6 +321,7 @@ discretio TokenKind {
 functio kind_name(token.TokenKind k) → textus {
     discerne k {
         casu token.TokenKind.Numerus fixum code { redde code ↦ textus }
+        ceterum { redde "palabra" }
     }
 }"#;
     let mut unit = analyze_consumer(source);

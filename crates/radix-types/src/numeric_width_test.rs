@@ -465,3 +465,44 @@ fn modular_word_lowering_reports_typed_issues() {
     assert_eq!(reported, vec![WidthLowerIssue::ModularWordShape]);
     assert_eq!(reported[0].issue(), "modular_word_width_shape");
 }
+
+#[test]
+fn checked_integer_conversio_covers_every_range_losing_pair() {
+    use NumericWidth::{F64, I8, I16, I64, U8, U16, U64};
+    assert!(NumericWidth::is_checked_integer_conversio(I64, U8));
+    assert!(NumericWidth::is_checked_integer_conversio(I64, I8));
+    assert!(NumericWidth::is_checked_integer_conversio(U16, U8));
+    assert!(NumericWidth::is_checked_integer_conversio(U16, I8));
+    assert!(NumericWidth::is_checked_integer_conversio(I8, U64));
+    assert!(NumericWidth::is_checked_integer_conversio(U64, I64));
+    assert!(!NumericWidth::is_checked_integer_conversio(U8, I16));
+    assert!(!NumericWidth::is_checked_integer_conversio(U8, U8));
+    assert!(!NumericWidth::is_checked_integer_conversio(I8, I64));
+    assert!(!NumericWidth::is_checked_integer_conversio(I64, F64));
+}
+
+#[test]
+fn checked_integer_guards_name_only_reachable_bounds() {
+    use NumericWidth::{I8, I64, U8, U16, U64};
+    assert_eq!(
+        NumericWidth::checked_integer_guards(I64, U8),
+        (Some(0), Some(255))
+    );
+    assert_eq!(
+        NumericWidth::checked_integer_guards(I64, I8),
+        (Some(-128), Some(127))
+    );
+    assert_eq!(
+        NumericWidth::checked_integer_guards(U16, U8),
+        (None, Some(255))
+    );
+    assert_eq!(
+        NumericWidth::checked_integer_guards(I8, U64),
+        (Some(0), None)
+    );
+    assert_eq!(
+        NumericWidth::checked_integer_guards(U64, I64),
+        (None, Some(i128::from(i64::MAX)))
+    );
+    assert_eq!(NumericWidth::checked_integer_guards(U8, U16), (None, None));
+}

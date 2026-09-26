@@ -418,7 +418,6 @@ pub enum ClassMemberKind {
 #[derive(Debug)]
 pub struct FieldDecl {
     pub is_static: bool, // generis
-    pub is_bound: bool,  // nexum
     pub sponte: bool,    // sponte — voluntary field
     pub ty: TypeExpr,
     pub name: Ident,
@@ -1377,7 +1376,7 @@ pub struct AssignExpr {
     pub op: AssignOp,
     pub target: Box<Expr>,
     pub value: Box<Expr>,
-    /// `⇥ fallback` inline recovery, legal only on `↤` (conversion-directed
+    /// `⊥ fallback` inline recovery, legal only on `↤` (conversion-directed
     /// assignment). The parser attaches the recovery to the nearest `↤` in a
     /// right-associated chain; the operator and recovery travel through the
     /// syntax tree so no erasure happens before the destination type is known.

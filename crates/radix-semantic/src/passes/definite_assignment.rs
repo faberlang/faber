@@ -336,9 +336,6 @@ impl<'a> DefiniteAssignmentChecker<'a> {
 
     fn check_casu_arm(&mut self, arm: &HirCasuArm) {
         self.assign_pattern_bindings(&arm.patterns);
-        if let Some(guard) = &arm.guard {
-            self.check_expr(guard);
-        }
         self.check_expr(&arm.body);
     }
 
@@ -446,7 +443,7 @@ impl HirVisitor for DefiniteAssignmentChecker<'_> {
                 self.check_expr(value);
                 self.assign_binding(target);
             }
-            // `↤` stores exactly like ordinary `←`: the source (and its `⇥`
+            // `↤` stores exactly like ordinary `←`: the source (and its `⊥`
             // recovery) are reads, then the target binding is assigned.
             HirExpressionKind::ConversioAssign {
                 target,

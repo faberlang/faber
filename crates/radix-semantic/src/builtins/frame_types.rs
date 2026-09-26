@@ -244,11 +244,20 @@ pub fn directional_view_payload_type_id(
 /// "not used" for a subtree that was never read. The refused depth is recorded
 /// on the visitor for callers that can report it.
 #[must_use]
-pub fn program_needs_frame_types(program: &radix_syntax::Program, interner: &Interner) -> bool {
+///
+/// `locale_pack` supplies reader spellings of the sermo view methods
+/// (`s.recv<T>()` under en is `s.tuus<T>()`, DECISIONS D6.16); member names
+/// are not canonicalized before semantic analysis.
+pub fn program_needs_frame_types(
+    program: &radix_syntax::Program,
+    interner: &Interner,
+    locale_pack: Option<&crate::locale::LocalePack>,
+) -> bool {
     use radix_syntax::{DepthExceeded, ExprKind, Program, StmtKind, Visitor, walk_stmt};
 
     struct FrameUsageVisitor<'a> {
         interner: &'a Interner,
+        locale_pack: Option<&'a crate::locale::LocalePack>,
         found: bool,
         /// Depth the walker refused to enter, if it stopped short.
         depth_exceeded: Option<DepthExceeded>,
@@ -297,7 +306,17 @@ pub fn program_needs_frame_types(program: &radix_syntax::Program, interner: &Int
             }
             if let ExprKind::Member(member) = &expr.kind {
                 let name = self.interner.resolve(member.member.name);
-                if matches!(name, "meus" | "tuus") {
+                let pack_view = self
+                    .locale_pack
+                    .and_then(|pack| pack.type_binding_kind(name));
+                if matches!(name, "meus" | "tuus")
+                    || matches!(
+                        pack_view,
+                        Some(crate::locale::TypeBindingKind::Frame(
+                            crate::locale::FrameTypeKind::Meus | crate::locale::FrameTypeKind::Tuus
+                        ))
+                    )
+                {
                     self.found = true;
                     return;
                 }
@@ -308,6 +327,7 @@ pub fn program_needs_frame_types(program: &radix_syntax::Program, interner: &Int
 
     let mut visitor = FrameUsageVisitor {
         interner,
+        locale_pack,
         found: false,
         depth_exceeded: None,
     };
@@ -550,7 +570,7 @@ mod frame_usage_budget_test {
             kind: ExprKind::Literal(Literal::Int(1)),
             span: Span::default(),
         });
-        assert!(!program_needs_frame_types(&program, &interner));
+        assert!(!program_needs_frame_types(&program, &interner, None));
     }
 
     #[test]
@@ -558,7 +578,7 @@ mod frame_usage_budget_test {
         let interner = Interner::new();
         let program = program_with(deep_spine(MAX_VISIT_DEPTH + 8));
         assert!(
-            program_needs_frame_types(&program, &interner),
+            program_needs_frame_types(&program, &interner, None),
             "an incomplete scan must register the builtins rather than report no frame use"
         );
     }

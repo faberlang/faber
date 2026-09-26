@@ -29,7 +29,7 @@
 //! (`panic`). Leftover Secus is PARSE001 `adfirma_else_rejected` (`7805f8e1a`);
 //! hardcoded `secus` (`e0fbae339`) is not a valid particle.
 
-use crate::surface::{KeywordSurface, TypeBindingKind};
+use crate::surface::{FrameFamily, KeywordSurface, TypeBindingKind};
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     DefId, HirArrayElement, HirBlock, HirCallArg, HirCape, HirConversioTarget, HirExpression,
@@ -183,7 +183,7 @@ impl super::FaberCodegen<'_> {
             HirExpressionKind::MethodCall(receiver, name, type_args, args, _) => {
                 self.write_expr_prec(receiver, 13, names, surface, writer);
                 writer.write(".");
-                let method_name = self.method_spelling(receiver, *name, surface);
+                let method_name = self.method_spelling(receiver, *name, names, surface);
                 writer.write(&method_name);
                 self.write_call_type_args(type_args, names, surface, writer);
                 writer.write("(");
@@ -249,6 +249,13 @@ impl super::FaberCodegen<'_> {
                 );
             }
             HirExpressionKind::Block(block) => {
+                // A plain `fac { }` body is a breakable scope: `rumpe` exits
+                // the block, not the enclosing loop. Dropping the keyword
+                // would change what `rumpe`/`perge` target (D8.9).
+                if block.breakable == Some(radix_hir::HirBreakableKind::Fac) {
+                    writer.write(surface.contextual_keyword("fac"));
+                    writer.write(" ");
+                }
                 writer.writeln("{");
                 writer.indented(|writer| {
                     self.write_block(block, names, surface, writer);
@@ -565,15 +572,15 @@ impl super::FaberCodegen<'_> {
                 recovery,
             } => {
                 // Conversion-directed assignment: re-emit the exact `↤`
-                // spelling (never `←` or `↦`). `⇥ recovery` is
-                // `inlineRecovery := '⇥' unary`, so the recovery operand is
+                // spelling (never `←` or `↦`). The `⊥` default is
+                // `inlineDefault := '⊥' unary`, so the default operand is
                 // written at unary precedence to keep parens that let it
                 // reparse attached to this `↤` (the nearest in a chain).
                 self.write_expr_prec(target, 1, names, surface, writer);
                 writer.write(" ↤ ");
                 self.write_expr_prec(source, 1, names, surface, writer);
                 if let Some(recovery) = recovery {
-                    writer.write(" ⇥ ");
+                    writer.write(" ⊥ ");
                     self.write_expr_prec(recovery, 12, names, surface, writer);
                 }
             }
@@ -801,7 +808,10 @@ impl super::FaberCodegen<'_> {
                     writer.write(&rendered);
                 }
                 writer.write(" ∴ ");
-                if matches!(body.kind, HirExpressionKind::Block(_)) {
+                // A `fac`-breakable body block writes its own keyword.
+                if matches!(&body.kind, HirExpressionKind::Block(block)
+                    if block.breakable != Some(radix_hir::HirBreakableKind::Fac))
+                {
                     writer.write(surface.contextual_keyword("fac"));
                     writer.write(" ");
                 }
@@ -866,7 +876,7 @@ impl super::FaberCodegen<'_> {
                 // looser than additive. Writing the operand at additive
                 // strength regroups shift-or-looser children (`n ⇒ 24 ↦ T`
                 // reparses as `n ⇒ (24 ↦ T)` without the parens), and the
-                // `⇥` recovery is a unary-level operand.
+                // `⊥` default is a unary-level operand.
                 self.write_expr_prec(source, 10, names, surface, writer);
                 writer.write(" ↦ ");
                 match target {
@@ -914,7 +924,7 @@ impl super::FaberCodegen<'_> {
                     }
                 }
                 if let Some(recovery) = recovery {
-                    writer.write(" ⇥ ");
+                    writer.write(" ⊥ ");
                     self.write_expr_prec(recovery, 12, names, surface, writer);
                 }
             }
@@ -1316,6 +1326,27 @@ impl super::FaberCodegen<'_> {
             return;
         }
 
+        // Attached handlers (`elige … cape`, `dum … cape`, `itera … cape`):
+        // the handled body's tail is the construct itself. Re-emitting it as
+        // `fac { … } cape` would demote that tail to a statement.
+        if body.statements.is_empty()
+            && let Some(expr) = &body.expr
+            && self.accepts_attached_cape(expr)
+        {
+            self.write_expr(expr, names, surface, writer);
+            writer.write(" ");
+            writer.write(surface.keyword(TokenKind::Cape));
+            writer.write(" ");
+            self.write_cape_block_named(
+                &catch.body,
+                Some(catch.binding_name),
+                names,
+                surface,
+                writer,
+            );
+            return;
+        }
+
         writer.write(surface.contextual_keyword("fac"));
         writer.writeln(" {");
         writer.indented(|writer| {
@@ -1333,6 +1364,18 @@ impl super::FaberCodegen<'_> {
             surface,
             writer,
         );
+    }
+
+    /// Constructs whose grammar takes a trailing `cape` clause directly.
+    fn accepts_attached_cape(&self, expr: &HirExpression) -> bool {
+        match &expr.kind {
+            HirExpressionKind::Discerne { .. } => self.elige_expr_ids.contains(&expr.id),
+            HirExpressionKind::Dum(..)
+            | HirExpressionKind::Itera(..)
+            | HirExpressionKind::IteraRange { .. }
+            | HirExpressionKind::IteraLockstep { .. } => true,
+            _ => false,
+        }
     }
 
     /// Unwrap the synthetic `Block` tail produced when `fac` lowers to `Handled`.
@@ -1512,12 +1555,45 @@ impl super::FaberCodegen<'_> {
         &self,
         receiver: &HirExpression,
         name: Symbol,
+        names: &FxHashMap<DefId, Symbol>,
         surface: &impl KeywordSurface,
     ) -> String {
         if self.receiver_projects_intrinsic(receiver) {
             self.method_name_to_surface(name, surface)
+        } else if let Some(view) = self.sermo_view_method(receiver, name, names) {
+            // `s.meus<T>()` / `s.tuus<T>()` share the view type's pack row
+            // (DECISIONS D6.16): en re-emits `s.send<T>()` / `s.recv<T>()`.
+            surface
+                .type_surface(TypeBindingKind::Frame(view))
+                .to_owned()
         } else {
             self.symbol_to_string(name)
+        }
+    }
+
+    /// The directional view a `meus`/`tuus` method call on a builtin `sermo`
+    /// receiver constructs, if this is one.
+    fn sermo_view_method(
+        &self,
+        receiver: &HirExpression,
+        name: Symbol,
+        names: &FxHashMap<DefId, Symbol>,
+    ) -> Option<FrameFamily> {
+        let view = match FrameFamily::from_latin(self.interner.resolve(name))? {
+            view @ (FrameFamily::Meus | FrameFamily::Tuus) => view,
+            FrameFamily::Sermo | FrameFamily::Scrinium => return None,
+        };
+        let mut ty = receiver.ty?;
+        loop {
+            match self.types.get(ty) {
+                Type::Ref(_, inner) | Type::Option(inner) | Type::Alias(_, inner) => ty = *inner,
+                Type::Struct(def_id)
+                    if self.builtin_frame_family(*def_id, names) == Some(FrameFamily::Sermo) =>
+                {
+                    return Some(view);
+                }
+                _ => return None,
+            }
         }
     }
 

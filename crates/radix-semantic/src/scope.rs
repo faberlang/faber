@@ -3125,6 +3125,40 @@ impl Resolver {
         }
     }
 
+    /// Variant lists, in declaration order, for enums that have no local HIR
+    /// item: imported enums and the builtin status enum. Exhaustiveness needs
+    /// the closed variant set of every enum a `discerne` can scrutinize, and
+    /// local HIR only carries the enums this unit declares.
+    ///
+    /// An imported variant whose payload failed consumer-side remap is left
+    /// out, matching [`Self::variant_child`]: the consumer cannot name it in a
+    /// pattern, so coverage is proven over the partial remap and codegen
+    /// synthesizes the fallback arm.
+    #[must_use]
+    pub fn non_local_enum_variants(&self) -> Vec<(DefId, Vec<DefId>)> {
+        let mut lists: Vec<(DefId, Vec<DefId>)> = self
+            .imported_enum_variants
+            .iter()
+            .map(|(&enum_def, variants)| {
+                let nameable = variants
+                    .iter()
+                    .filter(|variant| !variant.payload_unresolved)
+                    .map(|variant| variant.def_id);
+                (enum_def, nameable.collect())
+            })
+            .collect();
+        if let Some(status) = self.builtin_status_def_id {
+            lists.push((
+                status,
+                self.builtin_status_variants
+                    .iter()
+                    .map(|(def_id, _)| *def_id)
+                    .collect(),
+            ));
+        }
+        lists
+    }
+
     /// Every variant → parent-enum definition pair known to this resolver
     /// (local enums and imported enum variants). Used by the package-MIR
     /// merge to remap a source unit's variant definitions to the consumer

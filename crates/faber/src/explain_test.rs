@@ -67,8 +67,8 @@ fn index_manifest_matches_registry() {
 #[test]
 fn all_entries_validate() {
     let registry = disk_registry();
-    // 215 since b07cc8c3e (LSR-W2 reice/reject keyword + meta/reice.fab exemplum).
-    assert_eq!(registry.entries().len(), 215);
+    // 216 since D17.7 (`⊥` default-channel term, primary conversio/conversio.fab).
+    assert_eq!(registry.entries().len(), 216);
 
     for entry in registry.entries() {
         assert!(!entry.term.is_empty());
@@ -143,8 +143,8 @@ fn load_aliases_disk_registry_entry_point() {
     }
 
     let registry = Registry::load().expect("load via disk entry point");
-    // 215 since b07cc8c3e (LSR-W2 reice/reject keyword + meta/reice.fab exemplum).
-    assert_eq!(registry.entries().len(), 215);
+    // 216 since D17.7 (`⊥` default-channel term, primary conversio/conversio.fab).
+    assert_eq!(registry.entries().len(), 216);
 
     if let Some(value) = previous {
         // SAFETY: serialized by env_lock(); edition 2024 marks env mutation unsafe.

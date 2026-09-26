@@ -2,12 +2,13 @@
 //!
 //! These tests prove that the pass rejects the reserved `@ protecta`
 //! annotation, accepts `@ publica`/`@ privata`/`@ interna`, errors on
-//! conflicting visibility tiers on one declaration, and no longer warns on
-//! member visibility annotations (WARN012 retired for the enforced kinds).
+//! conflicting visibility tiers on one declaration, rejects `@ privata` /
+//! `@ interna` on `genus` members (privacy is not enforced yet, D5.5), and
+//! warns on redundant member `@ publica` (WARN028).
 
 use super::visibility_annotation::check;
 use crate::test_support::args_have_no_legacy_message;
-use crate::{SemanticError, SemanticErrorKind};
+use crate::{SemanticError, SemanticErrorKind, WarningKind};
 use radix_diagnostics::DiagnosticArg;
 
 fn expect_structured_error<'a>(
@@ -75,45 +76,86 @@ functio hidden() → vacuum {
     );
 }
 
-#[test]
-fn member_visibility_annotations_are_accepted_without_diagnostic() {
-    for annotation in ["@ publica", "@ interna", "@ privata"] {
-        let source = format!(
-            r"
+fn member_source(annotation: &str) -> String {
+    format!(
+        r"
 genus Demo {{
+    {annotation}
+    textus nomen
     {annotation}
     functio open() → vacuum {{
     }}
 }}
 "
+    )
+}
+
+fn member_diagnostics(annotation: &str) -> Vec<SemanticError> {
+    let source = member_source(annotation);
+    let lex_result = radix_lexer::lex(&source);
+    let parse_result = radix_parser::parse(lex_result);
+    let program = parse_result.program.expect("parse");
+    check(&program, &parse_result.interner)
+        .err()
+        .unwrap_or_default()
+}
+
+#[test]
+fn member_privata_and_interna_are_errors_until_privacy_is_enforced() {
+    for (annotation, spelling) in [("@ privata", "@ privata"), ("@ interna", "@ interna")] {
+        let errors = member_diagnostics(annotation);
+        let unenforced: Vec<_> = errors
+            .iter()
+            .filter(|err| err.issue() == Some("member_privacy_unenforced"))
+            .collect();
+        assert_eq!(
+            unenforced.len(),
+            2,
+            "field and method each diagnosed: {errors:?}"
         );
-        let lex_result = radix_lexer::lex(&source);
-        let parse_result = radix_parser::parse(lex_result);
-        let program = parse_result.program.expect("parse");
-        let interner = &parse_result.interner;
-        let result = check(&program, interner);
-        assert!(
-            result.is_ok(),
-            "member {annotation} should not error or warn (WARN012 retired)"
-        );
+        for err in unenforced {
+            assert_eq!(err.kind, SemanticErrorKind::AnnotationInvalid);
+            assert!(err.is_error());
+            assert!(
+                err.args
+                    .iter()
+                    .any(|arg| arg.name == "annotation" && arg.value == spelling)
+            );
+        }
     }
 }
 
 #[test]
-fn member_interna_is_accepted_without_diagnostic() {
-    let source = r"
-genus Demo {
-    @ interna
-    functio internal() → vacuum {
+fn member_publica_is_a_redundancy_warning() {
+    let errors = member_diagnostics("@ publica");
+    assert_eq!(errors.len(), 2, "field and method each warned: {errors:?}");
+    for err in &errors {
+        assert_eq!(
+            err.kind,
+            SemanticErrorKind::Warning(WarningKind::RedundantMemberVisibility)
+        );
+        assert!(!err.is_error());
+        assert_eq!(err.issue(), Some("redundant_member_publica"));
+        assert_eq!(crate::semantic_spec(err.kind).code, "WARN028");
     }
 }
-";
-    let lex_result = radix_lexer::lex(source);
-    let parse_result = radix_parser::parse(lex_result);
-    let program = parse_result.program.expect("parse");
-    let interner = &parse_result.interner;
-    let result = check(&program, interner);
-    assert!(result.is_ok(), "member @ interna should not error or warn");
+
+#[test]
+fn member_publica_warning_survives_full_analysis_as_non_fatal() {
+    let result = crate::test_support::analyze_source(&member_source("@ publica"));
+    assert!(result.is_ok(), "{:?}", result.diagnostics);
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| !diag.is_error() && diag.issue() == Some("redundant_member_publica"))
+    );
+}
+
+#[test]
+fn member_privata_fails_full_analysis() {
+    let result = crate::test_support::analyze_source(&member_source("@ privata"));
+    assert!(!result.is_ok(), "{:?}", result.diagnostics);
 }
 
 #[test]

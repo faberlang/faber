@@ -841,6 +841,7 @@ fn latin_type_surface(kind: TypeBindingKind) -> &'static str {
             RelationalTypeKind::Census => "census",
         },
         TypeBindingKind::Ratio => "ratio",
+        TypeBindingKind::Frame(kind) => kind.latin(),
     }
 }
 
@@ -993,6 +994,42 @@ pub enum TypeBindingKind {
     Relational(RelationalTypeKind),
     /// Labeled ad-hoc aggregate (`ratio<label: T, …>` → `Type::Record`).
     Ratio,
+    /// Compiler-owned conversation family (`sermo`, `scrinium`, and the
+    /// `meus`/`tuus` directional views). The view rows also spell the sermo
+    /// view methods `s.meus<T>()` / `s.tuus<T>()` (DECISIONS D6.16).
+    Frame(FrameTypeKind),
+}
+
+/// The four conversation-family type identities behind
+/// [`TypeBindingKind::Frame`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FrameTypeKind {
+    Sermo,
+    Scrinium,
+    Meus,
+    Tuus,
+}
+
+impl FrameTypeKind {
+    /// Every conversation-family identity, in registry order.
+    pub const ALL: [Self; 4] = [Self::Sermo, Self::Scrinium, Self::Meus, Self::Tuus];
+
+    /// Canonical Latin spelling (the builtin struct name).
+    #[must_use]
+    pub const fn latin(self) -> &'static str {
+        match self {
+            Self::Sermo => "sermo",
+            Self::Scrinium => "scrinium",
+            Self::Meus => "meus",
+            Self::Tuus => "tuus",
+        }
+    }
+
+    /// Identity for a canonical Latin spelling.
+    #[must_use]
+    pub fn from_latin(text: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|kind| kind.latin() == text)
+    }
 }
 
 /// The three census relational type identities behind
@@ -1285,6 +1322,10 @@ pub fn latin_locale_pack() -> LocalePack {
             TypeBindingKind::Relational(RelationalTypeKind::Census),
         ),
         ("ratio", TypeBindingKind::Ratio),
+        ("sermo", TypeBindingKind::Frame(FrameTypeKind::Sermo)),
+        ("scrinium", TypeBindingKind::Frame(FrameTypeKind::Scrinium)),
+        ("meus", TypeBindingKind::Frame(FrameTypeKind::Meus)),
+        ("tuus", TypeBindingKind::Frame(FrameTypeKind::Tuus)),
     ] {
         types.insert(
             key.to_owned(),
@@ -2302,6 +2343,10 @@ fn type_binding_kind_for_key(key: &str) -> Option<TypeBindingKind> {
         "series" => return Some(TypeBindingKind::Relational(RelationalTypeKind::Series)),
         "census" => return Some(TypeBindingKind::Relational(RelationalTypeKind::Census)),
         "ratio" => return Some(TypeBindingKind::Ratio),
+        "sermo" => return Some(TypeBindingKind::Frame(FrameTypeKind::Sermo)),
+        "scrinium" => return Some(TypeBindingKind::Frame(FrameTypeKind::Scrinium)),
+        "meus" => return Some(TypeBindingKind::Frame(FrameTypeKind::Meus)),
+        "tuus" => return Some(TypeBindingKind::Frame(FrameTypeKind::Tuus)),
         _ => {}
     }
     primitive_type_specs()

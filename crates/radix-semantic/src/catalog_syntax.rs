@@ -698,9 +698,6 @@ fn unexpected_message(args: &[DiagnosticArg]) -> Option<String> {
         "conversio_assign_requires_concrete_type" => Some(
             "conversion-directed assignment '↤' requires a concrete destination type".to_owned(),
         ),
-        "conversio_recovery_on_assign" => Some(
-            "'⇥' inline recovery is legal only on conversion-directed assignment '↤'".to_owned(),
-        ),
         "conversio_assign_await_unsupported" => {
             Some("'↤' is not supported on awaited bindings".to_owned())
         }
@@ -709,6 +706,12 @@ fn unexpected_message(args: &[DiagnosticArg]) -> Option<String> {
         "inheritance_removed" => quote_arg(args, "keyword").map(|keyword| {
             format!("{keyword} was removed; class inheritance is not a language surface")
         }),
+        "nexum_removed" => Some(
+            "'nexum' was removed; change notification is a library pattern over 'ad'".to_owned(),
+        ),
+        "construction_spread_removed" => {
+            Some("'sparge' is not valid in a construction literal".to_owned())
+        }
         _ => None,
     }
 }
@@ -725,9 +728,6 @@ fn unexpected_help(args: &[DiagnosticArg]) -> Option<String> {
         "conversio_assign_requires_concrete_type" => {
             Some("write a concrete type for the binding, e.g. 'fixum numerus x ↤ value'".to_owned())
         }
-        "conversio_recovery_on_assign" => {
-            Some("use '↤' for the assignment, or move the recovery expression".to_owned())
-        }
         "conversio_assign_await_unsupported" => {
             Some("keep '←' for 'figendum'/'variandum' awaited bindings".to_owned())
         }
@@ -738,6 +738,12 @@ fn unexpected_help(args: &[DiagnosticArg]) -> Option<String> {
         }),
         "inheritance_removed" => Some(
             "inheritance was removed; use a contract (`implet`) or composition".to_owned(),
+        ),
+        "nexum_removed" => {
+            Some("delete 'nexum' and declare an ordinary field: '<type> <name>'".to_owned())
+        }
+        "construction_spread_removed" => Some(
+            "name each field; copy-with-changes is 'Genus { field = value } ex source'".to_owned(),
         ),
         _ => None,
     }
@@ -859,7 +865,16 @@ fn invalid_type_help(args: &[DiagnosticArg]) -> Option<String> {
 fn invalid_expression_message(args: &[DiagnosticArg]) -> Option<String> {
     let issue = arg_value(args, "issue")?;
     match issue {
-        "conversio_recovery_uses_vel" => Some("use ⇥ for conversio recovery".to_owned()),
+        "conversio_recovery_uses_vel" => Some("use ⊥ for a conversion default".to_owned()),
+        "recovery_uses_exit_arrow" => {
+            Some("'⇥' names an error type; use '⊥' for a default".to_owned())
+        }
+        "default_with_propagation" => Some(
+            "an expression either propagates with '⇥' or defaults with '⊥', never both".to_owned(),
+        ),
+        "default_requires_conversion" => {
+            Some("'⊥' default is supported only after a conversion '↦ T' or '↤'".to_owned())
+        }
         "expected_expression" => Some("expected expression".to_owned()),
         "expression_ad_block" => Some("expression-form ad must not have a block".to_owned()),
         "closure_block_body" => Some("closure block body must use 'fac'".to_owned()),
@@ -871,7 +886,17 @@ fn invalid_expression_message(args: &[DiagnosticArg]) -> Option<String> {
 fn invalid_expression_help(args: &[DiagnosticArg]) -> Option<String> {
     let issue = arg_value(args, "issue")?;
     match issue {
-        "conversio_recovery_uses_vel" => Some("use ⇥; vel is nullish coalescing only".to_owned()),
+        "conversio_recovery_uses_vel" => Some("use ⊥; vel is nullish coalescing only".to_owned()),
+        "recovery_uses_exit_arrow" => {
+            Some("write '↦ T ⊥ value' (or '↤ … ⊥ value'); '⇥' never takes a value".to_owned())
+        }
+        "default_with_propagation" => {
+            Some("keep the '⊥' default, or drop it and let the error propagate".to_owned())
+        }
+        "default_requires_conversion" => Some(
+            "defaults on failable calls are not yet supported; use 'capta' or 'fac … cape'"
+                .to_owned(),
+        ),
         "expected_expression" => Some("provide a valid expression in this position".to_owned()),
         "expression_ad_block" => Some("use ad 'route' (opener) ↦ T without a block".to_owned()),
         "closure_block_body" => {

@@ -26,7 +26,6 @@ const ISSUE_CLOSURE_PARAMETER_TYPE_MISMATCH: &str = "closure_parameter_type_mism
 const ISSUE_CLOSURE_RETURN_TYPE_MISMATCH: &str = "closure_return_type_mismatch";
 const ISSUE_FIELD_INITIALIZER_TYPE_MISMATCH: &str = "field_initializer_type_mismatch";
 const ISSUE_STRUCT_COMPUTED_KEY_FORBIDDEN: &str = "struct_computed_key_forbidden";
-const ISSUE_STRUCT_SPREAD_FORBIDDEN: &str = "struct_spread_forbidden";
 const ISSUE_UNKNOWN_STRUCT: &str = "unknown_struct";
 const ISSUE_NUCLEUM_CLOSURE_EFFECT: &str = "nucleum_closure_effect";
 const ISSUE_NUCLEUM_CLOSURE_TYPE: &str = "nucleum_closure_type";
@@ -112,9 +111,10 @@ impl TypeChecker<'_> {
                     self.check_expr(expr);
                     self.invalid_operand_types(ISSUE_STRUCT_COMPUTED_KEY_FORBIDDEN, expr.span);
                 }
+                // The parser rejects `sparge` in construction literals
+                // (D15.4, `construction_spread_removed`); no source reaches here.
                 HirObjectKey::Spread(expr) => {
                     self.check_expr(expr);
-                    self.invalid_operand_types(ISSUE_STRUCT_SPREAD_FORBIDDEN, expr.span);
                 }
             }
         }

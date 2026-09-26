@@ -7,7 +7,7 @@
 //!     backend-native cast of the raw source, never constructor syntax),
 //!   - an effectful destination/source subexpression is evaluated exactly
 //!     once (AC7),
-//!   - `⇥` recovery rides the conversion.
+//!   - `⊥` default rides the conversion.
 //!
 //! Right-associated chains are covered per backend where the backend supports
 //! assignment-result expressions; pre-existing disagreements are recorded in
@@ -244,7 +244,7 @@ fn effectful_destination_index_referenced_once_on_each_backend() {
     }
 }
 
-// ── `⇥` recovery rides the conversion on each backend ─────────────────────
+// ── `⊥` default rides the conversion on each backend ─────────────────────
 
 #[cfg(all(
     feature = "hir-rust",
@@ -255,7 +255,7 @@ fn effectful_destination_index_referenced_once_on_each_backend() {
 ))]
 #[test]
 fn recovery_rides_conversion_on_each_backend() {
-    let source = "incipit {\n  varia numerus count ← 0\n  count ↤ \"x\" ⇥ 0\n  nota count\n}";
+    let source = "incipit {\n  varia numerus count ← 0\n  count ↤ \"x\" ⊥ 0\n  nota count\n}";
     let mut codes = vec![
         ("rust", emit_rust(source), false),
         ("ts", emit_ts(source), false),
@@ -264,11 +264,11 @@ fn recovery_rides_conversion_on_each_backend() {
         ("faber", emit_faber(source), true),
     ];
     for (label, code, is_faber) in codes.drain(..) {
-        assert!(code.contains('0'), "{label} must carry the ⇥ recovery value:\n{code}");
+        assert!(code.contains('0'), "{label} must carry the ⊥ recovery value:\n{code}");
         if is_faber {
             assert!(
-                code.contains(" ↤ ") && code.contains(" ⇥ 0"),
-                "{label} must re-emit ↤ with its ⇥ recovery verbatim:\n{code}"
+                code.contains(" ↤ ") && code.contains(" ⊥ 0"),
+                "{label} must re-emit ↤ with its ⊥ recovery verbatim:\n{code}"
             );
         } else {
             assert!(!code.contains(" ↤ "), "{label} must not leak raw ↤:\n{code}");

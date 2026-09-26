@@ -36,7 +36,7 @@ fn lower_source(source: &str) -> (LoweredProgram, Vec<LowerError>, Interner) {
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
     radix_module::builtins::register(&mut resolver, &mut types, &mut interner);
-    radix_module::builtins::register_frame_types_if_needed(&program, &mut resolver, &mut types, &mut interner);
+    radix_module::builtins::register_frame_types_if_needed(&program, &mut resolver, &mut types, &mut interner, None);
     if let Err(errors) = passes::collect::collect(&program, &mut resolver, &mut types) {
         panic!("collect failed: {errors:?}");
     }

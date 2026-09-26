@@ -41,7 +41,7 @@ genus Circle implet Drawable {
 #[test]
 #[cfg(feature = "hir-faber")]
 fn annotation_strings_with_quotes_and_newlines_roundtrip_through_faber_codegen() {
-    let source = r#"@ doc "a \"hello\" world"
+    let source = r#"@ verte "a \"hello\" world"
 incipit {}"#;
     let result = super::faber_emit("test.fab", source);
 
@@ -1437,7 +1437,7 @@ fn verte_vel_no_longer_reports_invalid_cast() {
     let source = r#"incipit {
   fixum _ data ← 42
   fixum _ asText ← data ∷ textus
-  fixum _ parsed ← "invalid" ↦ numerus ⇥ 0
+  fixum _ parsed ← "invalid" ↦ numerus ⊥ 0
   fixum tabula<textus, numerus> cache ← { "alice": 95, "bob": 87 }
   fixum lista<textus> items ← vacua
   nota asText, parsed, cache, items

@@ -4,6 +4,7 @@
 pub use radix_hir_faber::{FaberCodegen, FaberOutput, empty_presentation};
 
 pub mod compile;
+mod meaning;
 pub use compile::{FaberReemitResult, emit_from_analyzed, reemit_faber};
 
 #[doc(hidden)]
@@ -21,8 +22,13 @@ mod canonical_test;
 #[path = "cape_roundtrip_test.rs"]
 mod cape_roundtrip_test;
 
+#[cfg(test)]
+#[path = "frame_names_test.rs"]
+mod frame_names_test;
+
 use crate::lexer::TokenKind;
 use crate::locale::{self, TypeBindingKind};
+use radix_hir_faber::FrameFamily;
 use radix_hir_faber::KeywordSurface as LeafKeywordSurface;
 use radix_hir_faber::TypeBindingKind as LeafTypeBindingKind;
 
@@ -56,6 +62,12 @@ impl LeafKeywordSurface for LocaleKeywordBridge<'_> {
             LeafTypeBindingKind::Collection(collection) => TypeBindingKind::Collection(collection),
             LeafTypeBindingKind::TensorFamily(family) => TypeBindingKind::TensorFamily(family),
             LeafTypeBindingKind::ModularWord => TypeBindingKind::ModularWord,
+            LeafTypeBindingKind::Frame(frame) => TypeBindingKind::Frame(match frame {
+                FrameFamily::Sermo => locale::FrameTypeKind::Sermo,
+                FrameFamily::Scrinium => locale::FrameTypeKind::Scrinium,
+                FrameFamily::Meus => locale::FrameTypeKind::Meus,
+                FrameFamily::Tuus => locale::FrameTypeKind::Tuus,
+            }),
         };
         locale::KeywordSurface::type_surface(&self.0, pack_kind)
     }

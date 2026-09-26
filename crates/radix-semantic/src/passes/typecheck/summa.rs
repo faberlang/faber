@@ -348,9 +348,6 @@ impl SummaBodyState {
                     self.walk_expr(checker, scrutinee);
                 }
                 for arm in arms {
-                    if let Some(guard) = &arm.guard {
-                        self.walk_expr(checker, guard);
-                    }
                     self.walk_expr(checker, &arm.body);
                 }
             }

@@ -282,9 +282,6 @@ impl AirPurityChecker<'_> {
                     self.check_expr(scrutinee);
                 }
                 for arm in arms {
-                    if let Some(guard) = &arm.guard {
-                        self.check_expr(guard);
-                    }
                     self.check_expr(&arm.body);
                 }
             }
@@ -469,7 +466,7 @@ impl AirPurityChecker<'_> {
                 recovery,
                 ..
             } => {
-                // ATH-3 (AIR Tier 0.5): an inline `⇥` recovery resolves the
+                // ATH-3 (AIR Tier 0.5): an inline `⊥` default resolves the
                 // conversion failure inside its own expression — self-resolved
                 // union dataflow, admitted like a locally-resolved handler. A
                 // bare conversion (`recovery: None`) is a boundary throw and

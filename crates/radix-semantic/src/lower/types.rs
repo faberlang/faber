@@ -956,6 +956,9 @@ impl Lowerer<'_> {
             // keeps its dynamic row-map special case).
             crate::locale::TypeBindingKind::Relational(_) => None,
             crate::locale::TypeBindingKind::Ratio => Some(self.lower_ratio_type(params)),
+            // Conversation-family names lower through the builtin frame
+            // structs by their canonical Latin name in `lower_named_type`.
+            crate::locale::TypeBindingKind::Frame(_) => None,
         }
     }
 

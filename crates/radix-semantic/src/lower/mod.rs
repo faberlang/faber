@@ -147,6 +147,12 @@ pub struct Lowerer<'a> {
     /// entry-start anchor. Drained into `LoweredProgram` at the end of the run.
     presentation: HirPresentation,
 
+    /// Indices into `presentation.variant_paths` of local parent-qualified
+    /// spellings (`Color.rubrum`). Pruned per variant at the end of lowering
+    /// when the same variant is also referenced bare (see
+    /// [`prune_mixed_local_variant_paths`]).
+    local_variant_path_indices: Vec<usize>,
+
     /// Owner context for authored-type capture inside annotation lowering.
     /// Set while lowering a carrying item's annotations; `None` leaves
     /// annotation type fields presentation-free.
@@ -255,6 +261,7 @@ impl<'a> Lowerer<'a> {
                 authored_types: Vec::new(),
                 tuple_label_accesses: Vec::new(),
             },
+            local_variant_path_indices: Vec::new(),
             form_frames: Vec::new(),
             annotation_capture: None,
             annotation_ordinal: None,
@@ -276,7 +283,9 @@ impl<'a> Lowerer<'a> {
     }
 
     /// Preserve a qualified variant spelling that would otherwise disappear
-    /// when lowering the reference to its resolved `DefId`.
+    /// when lowering the reference to its resolved `DefId`: a module-qualified
+    /// path (`ns.Variant`, `ns.Type.Variant`) or a local parent-qualified one
+    /// (`Color.rubrum`). The formatter must re-emit what was written (D8.9).
     pub(super) fn record_variant_path(&mut self, def_id: radix_hir::DefId, path: &[Symbol]) {
         if path.len() < 2 {
             return;
@@ -284,13 +293,17 @@ impl<'a> Lowerer<'a> {
         let Some(namespace_def) = self.lookup_name(path[0]) else {
             return;
         };
-        if !matches!(
-            self.resolver
-                .get_symbol(namespace_def)
-                .map(|symbol| symbol.kind),
-            Some(crate::SymbolKind::Module)
-        ) {
-            return;
+        let namespace_kind = self
+            .resolver
+            .get_symbol(namespace_def)
+            .map(|symbol| symbol.kind);
+        match namespace_kind {
+            Some(crate::SymbolKind::Module) => {}
+            Some(crate::SymbolKind::Enum) if path.len() == 2 => {
+                self.local_variant_path_indices
+                    .push(self.presentation.variant_paths.len());
+            }
+            _ => return,
         }
         self.presentation.variant_paths.push(HirVariantPath {
             def_id,
@@ -452,6 +465,7 @@ impl<'a> Lowerer<'a> {
             self.resolver,
             self.types,
             self.interner,
+            self.locale_pack,
         );
 
         HirModule {
@@ -1046,8 +1060,84 @@ pub fn lower(request: LowerRequest<'_>) -> (LoweredProgram, Vec<LowerError>) {
     );
     let hir = lowerer.lower_program(program);
     let errors = lowerer.take_errors();
-    let presentation = lowerer.presentation;
+    let mut presentation = lowerer.presentation;
+    prune_mixed_local_variant_paths(&hir, &mut presentation, &lowerer.local_variant_path_indices);
     (LoweredProgram { hir, presentation }, errors)
+}
+
+/// Keep a local parent-qualified variant spelling only when every HIR
+/// reference to that variant was authored qualified.
+///
+/// The spelling sidecar is keyed by variant `DefId`, not by site, so the
+/// re-emitter writes one spelling for all of a variant's references. When a
+/// source mixes `Color.rubrum` and bare `rubrum`, dropping the qualified
+/// records re-emits every site bare — the same variant, so the same program
+/// (D8.9) — instead of qualifying sites that were written bare.
+fn prune_mixed_local_variant_paths(
+    hir: &radix_hir::HirModule,
+    presentation: &mut HirPresentation,
+    local_indices: &[usize],
+) {
+    use radix_hir::visit::{HirVisitor, walk_expr, walk_pattern};
+    use radix_hir::{HirExpressionKind, HirPattern};
+
+    struct VariantReferenceCounter<'a> {
+        tracked: &'a FxHashSet<radix_hir::DefId>,
+        counts: FxHashMap<radix_hir::DefId, usize>,
+    }
+
+    impl VariantReferenceCounter<'_> {
+        fn count(&mut self, def_id: radix_hir::DefId) {
+            if self.tracked.contains(&def_id) {
+                *self.counts.entry(def_id).or_default() += 1;
+            }
+        }
+    }
+
+    impl HirVisitor for VariantReferenceCounter<'_> {
+        fn visit_expr(&mut self, expr: &radix_hir::HirExpression) {
+            if let HirExpressionKind::Path(def_id) = &expr.kind {
+                self.count(*def_id);
+            }
+            walk_expr(self, expr);
+        }
+
+        fn visit_pattern(&mut self, pattern: &HirPattern) {
+            match pattern {
+                HirPattern::Variant(def_id, _) => self.count(*def_id),
+                HirPattern::TypeTest {
+                    candidate: Some(def_id),
+                    ..
+                } => self.count(*def_id),
+                _ => {}
+            }
+            walk_pattern(self, pattern);
+        }
+    }
+
+    if local_indices.is_empty() {
+        return;
+    }
+    let mut qualified: FxHashMap<radix_hir::DefId, usize> = FxHashMap::default();
+    for &index in local_indices {
+        *qualified
+            .entry(presentation.variant_paths[index].def_id)
+            .or_default() += 1;
+    }
+    let tracked: FxHashSet<radix_hir::DefId> = qualified.keys().copied().collect();
+    let mut counter = VariantReferenceCounter {
+        tracked: &tracked,
+        counts: FxHashMap::default(),
+    };
+    counter.visit_program(hir);
+    let local: FxHashSet<usize> = local_indices.iter().copied().collect();
+    let mut index = 0;
+    presentation.variant_paths.retain(|path| {
+        let keep = !local.contains(&index)
+            || counter.counts.get(&path.def_id).copied().unwrap_or(0) == qualified[&path.def_id];
+        index += 1;
+        keep
+    });
 }
 
 /// Convert residual shared-helper messages to stable lowering issue facts.

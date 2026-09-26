@@ -6,7 +6,7 @@ category = "conversion"
 canonical = true
 summary = "Scalar valor ↦ T extraction via FromValor (variant match, fractus widen, textus|instans wire)."
 syntax = "<valor-expression> ↦ numerus | fractus | bivalens | textus | ascii | nihil"
-related = ["↦", "⇥", "instans", "textus"]
+related = ["↦", "⊥", "instans", "textus"]
 locale = "en"
 +++
 # =============================================================================
@@ -20,9 +20,9 @@ locale = "en"
 #   • Recovery — `⇥` provides a fallback on variant mismatch.
 #
 # Common mistakes:
-#   • Assuming `valor ↦ textus` works for non-text valor variants — only Textus and Instans wire strings are accepted; other variants fail without `⇥` recovery.
+#   • Assuming `valor ↦ textus` works for non-text valor variants — only Textus and Instans wire strings are accepted; other variants fail without a `⊥` default.
 #
-# See also: ↦, ⇥, instans, textus
+# See also: ↦, ⊥, instans, textus
 # =============================================================================
 
 # conversio — scalar valor extraction
@@ -30,7 +30,7 @@ locale = "en"
 # WHY: `valor ↦ T` is the default runtime extraction for dynamic JSON carriers.
 # Scalar arms match `Valor` variants; `valor ↦ fractus` widens `Numerus` losslessly;
 # `valor ↦ textus` accepts `Textus` and `Instans` wire strings. Typed datetime
-# provenance stays on `valor ↦ instans` (see conversio/instans.fab). `⇥`
+# provenance stays on `valor ↦ instans` (see conversio/instans.fab). `⊥`
 # recovers on variant mismatch.
 
 main {
@@ -56,7 +56,7 @@ main {
     const ascii token ← asAscii ↦ ascii
     assert token ≡ 'yes'
     const value bad ← "not-a-number"
-    const int recovered ← bad ↦ int ⇥ 0
+    const int recovered ← bad ↦ int ⊥ 0
     assert recovered ≡ 0
     print count
     print ratio

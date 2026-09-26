@@ -32,7 +32,7 @@ fn ascii_to_regex_conversio_typechecks_via_textus_widening() {
 #[test]
 fn regex_conversio_rejects_recovery_slot() {
     test_support::assert_rejects_with_issue(
-        r#"incipit { fixum _ r ← "\d[" ↦ regex ⇥ "\d+" }"#,
+        r#"incipit { fixum _ r ← "\d[" ↦ regex ⊥ "\d+" }"#,
         "regex_recovery_unsupported",
     );
 }
@@ -62,7 +62,7 @@ fn regex_conversio_dynamic_source_unaffected_by_cap() {
 #[test]
 fn conversio_recovery_type_mismatch_rejects() {
     test_support::assert_rejects_with_issue(
-        r#"incipit { fixum _ n ← "x" ↦ numerus ⇥ "string" }"#,
+        r#"incipit { fixum _ n ← "x" ↦ numerus ⊥ "string" }"#,
         "conversio_recovery_type_mismatch",
     );
 }
@@ -92,7 +92,7 @@ fn inline_conversio_recovery_allows_non_textus_alternate_exit() {
     test_support::assert_accepts(
         r"
 functio parse(valor v, instans epoch) → instans ⇥ numerus {
-    redde v ↦ instans ⇥ epoch
+    redde v ↦ instans ⊥ epoch
 }
 ",
     );
@@ -176,10 +176,10 @@ functio truthy(textus s) → bivalens ⇥ numerus {
 #[test]
 fn truthiness_conversio_rejects_recovery_slot() {
     for source in [
-        "0 ↦ bivalens ⇥ verum",
-        "0.0 ↦ bivalens ⇥ verum",
-        "\"\" ↦ bivalens ⇥ verum",
-        "'no' ↦ bivalens ⇥ verum",
+        "0 ↦ bivalens ⊥ verum",
+        "0.0 ↦ bivalens ⊥ verum",
+        "\"\" ↦ bivalens ⊥ verum",
+        "'no' ↦ bivalens ⊥ verum",
     ] {
         test_support::assert_rejects_with_issue(
             &format!("incipit {{ fixum _ b ← {source} }}"),
@@ -207,7 +207,7 @@ fn ascii_octeti_conversio_roundtrip_typechecks() {
 
 #[test]
 fn octeti_textus_recovery_typechecks() {
-    test_support::assert_accepts(r#"incipit { fixum _ s ← |ff| ↦ textus ⇥ "?" }"#);
+    test_support::assert_accepts(r#"incipit { fixum _ s ← |ff| ↦ textus ⊥ "?" }"#);
 }
 
 #[test]
@@ -389,7 +389,7 @@ fn primitive_conversio_matrix_cases() -> &'static [ConversioMatrixCase] {
         },
         ConversioMatrixCase {
             name: "valor_to_numerus_recovery",
-            source: r#"incipit { fixum valor v ← "x" fixum numerus n ← v ↦ numerus ⇥ 0 }"#,
+            source: r#"incipit { fixum valor v ← "x" fixum numerus n ← v ↦ numerus ⊥ 0 }"#,
             expect: MatrixExpect::Accepts,
         },
         ConversioMatrixCase {
@@ -1144,9 +1144,9 @@ fn conversio_assign_rejects_unsupported_route() {
 
 #[test]
 fn conversio_assign_accepts_recovery_before_storage() {
-    // `⇥ fallback` types before storage: the fallback satisfies the same
+    // `⊥ fallback` types before storage: the fallback satisfies the same
     // target-type rule as explicit `↦` recovery.
-    test_support::assert_accepts("incipit {\n  varia numerus count ← 0\n  count ↤ \"x\" ⇥ 0\n}");
+    test_support::assert_accepts("incipit {\n  varia numerus count ← 0\n  count ↤ \"x\" ⊥ 0\n}");
 }
 
 #[test]
@@ -1245,14 +1245,14 @@ fn conversio_assign_awaited_binding_initializer_rejects() {
 
 #[test]
 fn conversio_assign_recovery_typed_before_storage() {
-    // `⇥ fallback` is typed against the resolved destination type through the
+    // `⊥ fallback` is typed against the resolved destination type through the
     // same target-type rule as explicit `↦` recovery — a wrong-typed fallback
     // rejects before any store.
     test_support::assert_rejects_with_issue(
-        "incipit {\n  varia numerus count ← 0\n  count ↤ \"x\" ⇥ \"fallback\"\n}",
+        "incipit {\n  varia numerus count ← 0\n  count ↤ \"x\" ⊥ \"fallback\"\n}",
         "conversio_recovery_type_mismatch",
     );
-    test_support::assert_accepts("incipit {\n  varia numerus count ← 0\n  count ↤ \"x\" ⇥ 0\n}");
+    test_support::assert_accepts("incipit {\n  varia numerus count ← 0\n  count ↤ \"x\" ⊥ 0\n}");
 }
 
 #[test]
@@ -1321,7 +1321,7 @@ fn conversion_registry_builtin_shadow_conflict_reports_dual_spans() {
 // - a row whose conversion function declares `⇥ E` composes that declared
 //   channel through the function/use-site channel for explicit `↦` and
 //   failable-call propagation;
-// - inline `⇥` recovery stays target-typed, never channel-typed;
+// - inline `⊥` default stays target-typed, never channel-typed;
 // - lookup is direct only: rows `A → B` and `B → C` never admit `A → C`;
 // - local `fac/cape`, `iace` (hence `requirit`, which lowers to
 //   `si non (cond) { iace err }`), and `↤` never consult the failable-call
@@ -1721,7 +1721,7 @@ fn bare_arrow_through_registered_row_accepts_assignable_declared_channel() {
 
 #[test]
 fn inline_recovery_stays_target_typed() {
-    // Inline `⇥` recovery is typed against the conversion target, not the
+    // Inline `⊥` default is typed against the conversion target, not the
     // row's declared channel: a `numerus` recovery is accepted even though
     // the row declares `⇥ bivalens`, and a `bivalens` recovery rejects with
     // `conversio_recovery_type_mismatch`.
@@ -1737,7 +1737,7 @@ fn inline_recovery_stays_target_typed() {
     checker.functions.insert(row_fn, row_sig);
     checker.current_error = Some(super::ErrorSink::Function(numerus));
 
-    // Target-typed recovery: `⇥ 0` (numerus) admits, despite the declared channel.
+    // Target-typed recovery: `⊥ 0` (numerus) admits, despite the declared channel.
     let mut source = textus_literal_expr(1);
     let mut target = HirConversioTarget::Type(numerus);
     let mut recovery = int_literal_expr(2, 0);
@@ -1755,7 +1755,7 @@ fn inline_recovery_stays_target_typed() {
         checker.errors
     );
 
-    // Channel-typed recovery would be the wrong seam: `⇥ verum` (bivalens) is
+    // Channel-typed recovery would be the wrong seam: `⊥ verum` (bivalens) is
     // rejected against the numerus target.
     let mut source = textus_literal_expr(3);
     let mut target = HirConversioTarget::Type(numerus);

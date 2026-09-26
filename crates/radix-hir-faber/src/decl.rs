@@ -132,11 +132,11 @@ impl super::FaberCodegen<'_> {
                 {
                     // Typed `↤` constant initializer: lowering stores the
                     // binding as the assignment target, so re-emit as
-                    // `fixum T name ↤ source [⇥ recovery]`.
+                    // `fixum T name ↤ source [⊥ default]`.
                     writer.write(" ↤ ");
                     self.write_expr_prec(source, 1, names, surface, writer);
                     if let Some(recovery) = recovery {
-                        writer.write(" ⇥ ");
+                        writer.write(" ⊥ ");
                         self.write_expr_prec(recovery, 12, names, surface, writer);
                     }
                 } else {

@@ -1892,7 +1892,6 @@ genus Animal<T> implet Canens, Currens {
     @ futura
     functio canta(textus vox) → vacuum {}
     generis textus nomen = "leo"
-    nexum numerus aetas = 3
 }
 "#,
     );
@@ -1901,21 +1900,15 @@ genus Animal<T> implet Canens, Currens {
         panic!("expected class declaration");
     };
     assert_eq!(class.implements.len(), 2);
-    assert_eq!(class.members.len(), 3);
+    assert_eq!(class.members.len(), 2);
     assert!(matches!(class.members[0].kind, ClassMemberKind::Method(_)));
     assert!(matches!(class.members[1].kind, ClassMemberKind::Field(_)));
-    assert!(matches!(class.members[2].kind, ClassMemberKind::Field(_)));
     assert_eq!(class.members[0].annotations.len(), 1);
 
     let ClassMemberKind::Field(static_field) = &class.members[1].kind else {
         panic!("expected static field");
     };
     assert!(static_field.is_static);
-
-    let ClassMemberKind::Field(bound_field) = &class.members[2].kind else {
-        panic!("expected bound field");
-    };
-    assert!(bound_field.is_bound);
 }
 
 #[test]
@@ -4661,7 +4654,7 @@ fn parses_posture_in_implendum_method_signature() {
 
 #[test]
 fn conversio_assign_typed_fixum_and_varia_initializers_parse() {
-    let result = parse_ok("fixum numerus n ↤ \"42\"\nvaria numerus count ↤ raw ⇥ 0");
+    let result = parse_ok("fixum numerus n ↤ \"42\"\nvaria numerus count ↤ raw ⊥ 0");
     let program = result.program.as_ref().expect("program");
     assert_eq!(program.statements.len(), 2);
     for stmt in &program.statements {

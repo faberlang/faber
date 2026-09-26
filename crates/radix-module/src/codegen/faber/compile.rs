@@ -214,7 +214,32 @@ pub(crate) fn revalidate_emitted_output(
             Some(actual_types.total()),
         )));
     }
+
+    // D8.9: the formatter never changes meaning. The narrower checks above
+    // name the known emitter-debt families; this one proves the whole
+    // analyzed program is unchanged.
+    let expected_meaning = super::meaning::meaning_fingerprint(input);
+    let actual_meaning = super::meaning::meaning_fingerprint(&reanalysis);
+    if let Some(difference) = super::meaning::first_meaning_difference(&expected_meaning, &actual_meaning) {
+        return Err(Box::new(meaning_divergence(name, &difference)));
+    }
     Ok(())
+}
+
+/// `CODEGEN006` / `hir_meaning_diverged`: the emitted program analyzes to a
+/// different HIR than the input, so the formatter refuses to write it.
+fn meaning_divergence(name: &str, difference: &super::meaning::MeaningDifference) -> Diagnostic {
+    Diagnostic::error(format!(
+        "canonical Faber output failed re-validation: the emitted program means something else; first difference in {}: expected `{}`, emitted `{}`",
+        difference.segment, difference.expected, difference.actual
+    ))
+    .with_phase(crate::diagnostics::DiagnosticPhase::Codegen)
+    .with_code("CODEGEN006")
+    .with_file(name.to_owned())
+    .with_arg("issue", "hir_meaning_diverged")
+    .with_arg("segment", difference.segment.clone())
+    .with_arg("expected", difference.expected.clone())
+    .with_arg("actual", difference.actual.clone())
 }
 
 /// Occurrence-aware authored type facts used by output revalidation.

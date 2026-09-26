@@ -850,11 +850,6 @@ impl FunctionBuilder<'_> {
                 ));
                 return None;
             };
-            if arm.guard.is_some() {
-                self.errors
-                    .push(MirError::unsupported(arm.span, "guarded type-test discerne arm"));
-                return None;
-            }
             let HirPattern::TypeTest { ty, binding, .. } = pattern else {
                 if matches!(pattern, HirPattern::Wildcard | HirPattern::Binding(_, _)) {
                     has_default = true;
@@ -1077,15 +1072,9 @@ impl FunctionBuilder<'_> {
         }
     }
 
-    /// Shared prelude for the discerne switch loops: reject guarded arms and
-    /// multi-pattern arms with their standing diagnostics, or yield the arm's
-    /// single pattern.
+    /// Shared prelude for the discerne switch loops: reject multi-pattern arms
+    /// with their standing diagnostic, or yield the arm's single pattern.
     fn discerne_switch_arm_pattern<'a>(&mut self, arm: &'a HirCasuArm) -> Option<&'a HirPattern> {
-        if arm.guard.is_some() {
-            self.errors
-                .push(MirError::unsupported(arm.span, "guarded discerne before switch MIR lowering"));
-            return None;
-        }
         let [pattern] = arm.patterns.as_slice() else {
             self.errors.push(MirError::unsupported(
                 arm.span,
@@ -1330,10 +1319,7 @@ impl FunctionBuilder<'_> {
             // decimal-widths D1 successor: a decimal-typed
             // text pattern carries the exact scaled carrier, so the case
             // compares against the same Int carrier the scrutinee stores.
-            HirLiteral::FloatText { text, .. } if self.decimal_literal_width(scrutinee_ty).is_some() => {
-                let width = self
-                    .decimal_literal_width(scrutinee_ty)
-                    .expect("guarded above");
+            HirLiteral::FloatText { text, .. } if let Some(width) = self.decimal_literal_width(scrutinee_ty) => {
                 let carrier = self.context.interner.and_then(|interner| {
                     radix_codegen_shared::decimal::decimal_text_to_carrier(interner.resolve(*text), width)
                 });

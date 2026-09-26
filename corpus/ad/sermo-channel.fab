@@ -1,0 +1,47 @@
++++
+term = "sermo"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "incipit_stmt", "fixum_decl", "ad_expr", "ad_opener", "itera_stmt", "assignment", "place", "additive_expr", "redde_stmt", "call_expr", "call_suffix", "call_type_args", "member_suffix", "optional_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "endpoint"
+canonical = true
+summary = "English reader names for the conversation family: channel, frame, send<T>, recv<T>"
+related = ["ad", "sermo", "scrinium", "meus", "tuus", "cursor"]
+locale = "en"
++++
+# =============================================================================
+# channel — the conversation family under the English reader surface.
+# =============================================================================
+#
+# What this teaches:
+#   • `channel` is the en spelling of `sermo`, the handle `call` returns
+#   • `frame<T>` is the en spelling of `scrinium<T>`, one typed frame
+#   • `s.send<T>()` / `s.recv<T>()` are the en spellings of the outbound
+#     `meus<T>` and inbound `tuus<T>` views
+#
+# Common mistakes:
+#   • treating the words as reserved: `channel`, `frame`, `send` and `recv`
+#     are type names only, and stay ordinary identifiers elsewhere
+#
+# See also: ad, sermo, scrinium, meus, tuus, cursor
+# =============================================================================
+
+fn count_items(channel s) → int {
+    var int n ← 0
+    for from s.recv<string>().cursor() const item {
+        print item.data
+        n ← n + 1
+    }
+    return n
+}
+
+main {
+    const channel s ← call 'runtime:echo' ("salve")
+    const send<value> outbound ← s.send<value>()
+    outbound.da("ping")
+    outbound.fini()
+    print count_items(s)
+
+    const channel second ← call 'runtime:echo' ("vale")
+    const frame<string> ∪ null first ← second.recv<string>().accipe()
+    print first?.data
+}

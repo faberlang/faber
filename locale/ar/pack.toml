@@ -24,7 +24,6 @@ iacit = "يرمي"
 immutata = "ثابتة"
 interna = "داخلي"
 magnitudo = "حجم"
-nexum = "مرتبط"
 iuncta = "توبل"
 optiones = "خيارات"
 prae = "سابق"
@@ -194,6 +193,12 @@ filtrum = "مرشح"
 series = "سلسلة"
 census = "تعداد"
 ratio = "ratio"
+# Conversation family (DECISIONS D6.16). The meus/tuus rows also spell
+# the sermo view methods `s.meus<T>()` / `s.tuus<T>()`.
+sermo = "قناة"
+scrinium = "إطار"
+meus = "إرسال"
+tuus = "استقبال"
 
 [diagnostics.UNRES001]
 message = "الكلمة '{keyword}' غير معلنة لحزمة القارئ '{pack}'"
@@ -592,8 +597,8 @@ message = "تعبير غير صالح"
 help = "تحقق من صياغة التعبير"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
-message = "استخدم ⇥ لاسترداد conversio"
-help = "استخدم ⇥؛ {vel} للـ nullish coalescing فقط"
+message = "استخدم ⊥ لاسترداد conversio"
+help = "استخدم ⊥؛ {vel} للـ nullish coalescing فقط"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "تعبير مطلوب"
@@ -1963,10 +1968,6 @@ help = "انشر قيمة {lista} داخل {lista} construction"
 message = "computed keys غير صالحة في struct construction"
 help = "استخدم declared struct field names في struct construction"
 
-[diagnostics.SEM011.issues.struct_spread_forbidden]
-message = "spread fields غير صالحة في struct construction"
-help = "قدم كل required struct field صراحة"
-
 [diagnostics.SEM011.issues.vector_constructor_forbids_spread]
 message = "vector constructor لا يقبل spread arguments"
 help = "قدم explicit vector elements بدلا من spread arguments"
@@ -2181,10 +2182,10 @@ help = "cast إلى type متوافق"
 
 [diagnostics.SEM016]
 message = "conversion غير صالح"
-help = "استخدم conversion صالحا أو قدم inline recovery باستخدام `⇥`"
+help = "استخدم conversion صالحا أو قدم inline recovery باستخدام `⊥`"
 
 [diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
-message = "intervallum clamp conversio لا يدعم recovery `⇥`"
+message = "intervallum clamp conversio لا يدعم recovery `⊥`"
 help = "احذف recovery arm من range clamp هذا"
 
 [diagnostics.SEM016.issues.intervallum_target_not_range]
@@ -2209,15 +2210,15 @@ help = "طابق source و target bound element types"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_required]
 message = "vector materialization يتطلب {lista} literal source"
-help = "استخدم conversion صالحا أو قدم inline recovery باستخدام `⇥`"
+help = "استخدم conversion صالحا أو قدم inline recovery باستخدام `⊥`"
 
 [diagnostics.SEM016.issues.lista_to_vector_element_mismatch]
 message = "{lista} إلى vector conversio يتطلب element types متطابقة"
-help = "استخدم conversion صالحا أو قدم inline recovery باستخدام `⇥`"
+help = "استخدم conversion صالحا أو قدم inline recovery باستخدام `⊥`"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_width]
 message = "{lista} إلى vector conversio يتطلب literal vector width"
-help = "استخدم conversion صالحا أو قدم inline recovery باستخدام `⇥`"
+help = "استخدم conversion صالحا أو قدم inline recovery باستخدام `⊥`"
 
 [diagnostics.SEM016.issues.matrix_materialize_unsupported]
 message = "matrix materialization غير مدعوم بعد"
@@ -2308,12 +2309,12 @@ message = "{regex} conversion يتطلب {textus} أو {ascii} operand"
 help = "حول {textus} أو {ascii} values إلى {regex}"
 
 [diagnostics.SEM016.issues.regex_recovery_unsupported]
-message = "{regex} conversion لا يدعم recovery `⇥`؛ {regex} ليس له literal form، لذا لا توجد target-typed value للاستبدال"
+message = "{regex} conversion لا يدعم recovery `⊥`؛ {regex} ليس له literal form، لذا لا توجد target-typed value للاستبدال"
 help = "احذف recovery arm من {regex} conversion هذا"
 
 [diagnostics.SEM016.issues.valor_verte_unsupported]
-message = "{valor} ∷ T غير مدعوم — لا يمكن تأكيد dynamic value's shape في compile time. استخدم `↦ T` للـ runtime extraction (مع `⇥` للـ recovery)."
-help = "استخدم runtime `↦ T` conversion مع recovery `⇥` بدلا من ذلك"
+message = "{valor} ∷ T غير مدعوم — لا يمكن تأكيد dynamic value's shape في compile time. استخدم `↦ T` للـ runtime extraction (مع `⊥` للـ recovery)."
+help = "استخدم runtime `↦ T` conversion مع recovery `⊥` بدلا من ذلك"
 
 [diagnostics.SEM016.issues.json_genus_conversion_requires_json_annotation]
 message = "{json}/{genus} conversion يتطلب أن يكون {genus} معلمًا `@ {json}`"

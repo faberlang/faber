@@ -47,7 +47,7 @@ fn discerne_expr(
                     span,
                 })
                 .collect(),
-            arms: vec![HirCasuArm { patterns, guard: None, body: lit_expr(id + 20, span, None), span }],
+            arms: vec![HirCasuArm { patterns, body: lit_expr(id + 20, span, None), span }],
             exhaustive,
         },
         ty: None,

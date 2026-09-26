@@ -24,7 +24,6 @@ iacit = "फेंकता"
 immutata = "अपरिवर्तित"
 interna = "आंतरिक"
 magnitudo = "आकार"
-nexum = "संबद्ध"
 iuncta = "टपल"
 optiones = "चयन"
 prae = "पूर्व"
@@ -194,6 +193,12 @@ filtrum = "फ़िल्टर"
 series = "शृंखला"
 census = "गणना"
 ratio = "ratio"
+# Conversation family (DECISIONS D6.16). The meus/tuus rows also spell
+# the sermo view methods `s.meus<T>()` / `s.tuus<T>()`.
+sermo = "चैनल"
+scrinium = "फ़्रेम"
+meus = "भेजना"
+tuus = "पाना"
 
 [diagnostics.UNRES001]
 message = "कीवर्ड '{keyword}' reader locale '{pack}' के लिए घोषित नहीं है"
@@ -592,8 +597,8 @@ message = "अमान्य अभिव्यक्ति"
 help = "अभिव्यक्ति syntax जांचें"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
-message = "conversio recovery के लिए ⇥ उपयोग करें"
-help = "⇥ उपयोग करें; vel केवल nullish coalescing के लिए है"
+message = "conversio recovery के लिए ⊥ उपयोग करें"
+help = "⊥ उपयोग करें; vel केवल nullish coalescing के लिए है"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "अभिव्यक्ति अपेक्षित है"
@@ -1975,10 +1980,6 @@ help = "lista construction के भीतर lista value को spread कर�
 message = "struct construction में computed keys मान्य नहीं हैं"
 help = "struct construction में घोषित struct field names का उपयोग करें"
 
-[diagnostics.SEM011.issues.struct_spread_forbidden]
-message = "struct construction में spread fields मान्य नहीं हैं"
-help = "हर आवश्यक struct field स्पष्ट रूप से दें"
-
 [diagnostics.SEM011.issues.vector_constructor_forbids_spread]
 message = "vector constructor spread arguments स्वीकार नहीं करता"
 help = "spread arguments के बजाय vector elements स्पष्ट रूप से दें"
@@ -2193,10 +2194,10 @@ help = "compatible type में cast करें"
 
 [diagnostics.SEM016]
 message = "अमान्य रूपांतरण"
-help = "मान्य रूपांतरण का उपयोग करें या `⇥` के साथ इनलाइन पुनर्प्राप्ति दें"
+help = "मान्य रूपांतरण का उपयोग करें या `⊥` के साथ इनलाइन पुनर्प्राप्ति दें"
 
 [diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
-message = "intervallum clamp रूपांतरण `⇥` पुनर्प्राप्ति का समर्थन नहीं करता"
+message = "intervallum clamp रूपांतरण `⊥` पुनर्प्राप्ति का समर्थन नहीं करता"
 help = "इस range clamp से पुनर्प्राप्ति arm हटाएँ"
 
 [diagnostics.SEM016.issues.intervallum_target_not_range]
@@ -2221,15 +2222,15 @@ help = "source और target bound element प्रकारों को स�
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_required]
 message = "vector materialization के लिए lista literal source आवश्यक है"
-help = "मान्य रूपांतरण का उपयोग करें या `⇥` के साथ इनलाइन पुनर्प्राप्ति दें"
+help = "मान्य रूपांतरण का उपयोग करें या `⊥` के साथ इनलाइन पुनर्प्राप्ति दें"
 
 [diagnostics.SEM016.issues.lista_to_vector_element_mismatch]
 message = "lista से vector रूपांतरण के लिए समान element प्रकार आवश्यक हैं"
-help = "मान्य रूपांतरण का उपयोग करें या `⇥` के साथ इनलाइन पुनर्प्राप्ति दें"
+help = "मान्य रूपांतरण का उपयोग करें या `⊥` के साथ इनलाइन पुनर्प्राप्ति दें"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_width]
 message = "lista से vector रूपांतरण के लिए literal vector width आवश्यक है"
-help = "मान्य रूपांतरण का उपयोग करें या `⇥` के साथ इनलाइन पुनर्प्राप्ति दें"
+help = "मान्य रूपांतरण का उपयोग करें या `⊥` के साथ इनलाइन पुनर्प्राप्ति दें"
 
 [diagnostics.SEM016.issues.matrix_materialize_unsupported]
 message = "matrix materialization अभी समर्थित नहीं है"
@@ -2320,11 +2321,11 @@ message = "regex रूपांतरण के लिए textus या ascii o
 help = "textus या ascii मानों को regex में रूपांतरित करें"
 
 [diagnostics.SEM016.issues.regex_recovery_unsupported]
-message = "regex रूपांतरण `⇥` recovery का समर्थन नहीं करता; regex का कोई literal form नहीं है, इसलिए प्रतिस्थापित करने के लिए target-typed value नहीं है"
+message = "regex रूपांतरण a `⊥` default का समर्थन नहीं करता; regex का कोई literal form नहीं है, इसलिए प्रतिस्थापित करने के लिए target-typed value नहीं है"
 help = "इस regex रूपांतरण से recovery arm हटाएँ"
 
 [diagnostics.SEM016.issues.valor_verte_unsupported]
-message = "valor ∷ T समर्थित नहीं है — dynamic value के shape को compile time पर assert नहीं किया जा सकता। runtime extraction के लिए `↦ T` का उपयोग करें (`⇥` से recovery के साथ)।"
+message = "valor ∷ T समर्थित नहीं है — dynamic value के shape को compile time पर assert नहीं किया जा सकता। runtime extraction के लिए `↦ T` का उपयोग करें (`⊥` से recovery के साथ)।"
 help = "इसके बजाय recovery के साथ runtime `↦ T` रूपांतरण का उपयोग करें"
 
 [diagnostics.SEM016.issues.json_genus_conversion_requires_json_annotation]

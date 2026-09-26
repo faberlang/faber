@@ -24,7 +24,6 @@ iacit = "可拋"
 immutata = "不變"
 interna = "內部"
 magnitudo = "尺寸"
-nexum = "綁定"
 iuncta = "元組"
 optiones = "可選項"
 prae = "前置"
@@ -194,6 +193,12 @@ filtrum = "篩選器"
 series = "序列"
 census = "普查"
 ratio = "ratio"
+# Conversation family (DECISIONS D6.16). The meus/tuus rows also spell
+# the sermo view methods `s.meus<T>()` / `s.tuus<T>()`.
+sermo = "通道"
+scrinium = "幀"
+meus = "發送"
+tuus = "接收"
 
 [diagnostics.UNRES001]
 message = "關鍵字 '{keyword}' 未在讀者語言包 '{pack}' 中宣告"
@@ -592,8 +597,8 @@ message = "無效運算式"
 help = "檢查運算式語法"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
-message = "使用 ⇥ 進行 conversio 復原"
-help = "使用 ⇥；vel 僅用於 nullish 合併"
+message = "使用 ⊥ 進行 conversio 復原"
+help = "使用 ⊥；vel 僅用於 nullish 合併"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "需要運算式"
@@ -1963,10 +1968,6 @@ help = "在 lista 建構中展開 lista 值"
 message = "結構建構中不允許計算鍵值"
 help = "在結構建構中使用已宣告的結構欄位名稱"
 
-[diagnostics.SEM011.issues.struct_spread_forbidden]
-message = "結構建構中不允許展開欄位"
-help = "明確提供每個必要的結構欄位"
-
 [diagnostics.SEM011.issues.vector_constructor_forbids_spread]
 message = "向量建構函式不接受展開引數"
 help = "提供明確的向量元素，而非展開引數"
@@ -2181,10 +2182,10 @@ help = "轉型為相容的型別"
 
 [diagnostics.SEM016]
 message = "無效轉換"
-help = "使用有效的轉換，或使用 `⇥` 提供內嵌復原"
+help = "使用有效的轉換，或使用 `⊥` 提供內嵌復原"
 
 [diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
-message = "intervallum clamp 轉換不支援 `⇥` 復原"
+message = "intervallum clamp 轉換不支援 `⊥` 復原"
 help = "從此 range clamp 移除復原 arm"
 
 [diagnostics.SEM016.issues.intervallum_target_not_range]
@@ -2209,15 +2210,15 @@ help = "使來源與目標的界限元素型別相符"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_required]
 message = "vector 具現化需要 lista 字面值來源"
-help = "使用有效的轉換，或使用 `⇥` 提供內嵌復原"
+help = "使用有效的轉換，或使用 `⊥` 提供內嵌復原"
 
 [diagnostics.SEM016.issues.lista_to_vector_element_mismatch]
 message = "lista 至 vector 轉換需要相符的元素型別"
-help = "使用有效的轉換，或使用 `⇥` 提供內嵌復原"
+help = "使用有效的轉換，或使用 `⊥` 提供內嵌復原"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_width]
 message = "lista 至 vector 轉換需要字面值 vector 寬度"
-help = "使用有效的轉換，或使用 `⇥` 提供內嵌復原"
+help = "使用有效的轉換，或使用 `⊥` 提供內嵌復原"
 
 [diagnostics.SEM016.issues.matrix_materialize_unsupported]
 message = "目前尚不支援 matrix 具現化"
@@ -2308,12 +2309,12 @@ message = "regex 轉換需要 textus 或 ascii 運算元"
 help = "將 textus 或 ascii 值轉換為 regex"
 
 [diagnostics.SEM016.issues.regex_recovery_unsupported]
-message = "regex 轉換不支援 `⇥` 復原；regex 沒有字面形式，因此沒有可替代的目標型別值"
+message = "regex 轉換不支援 `⊥` 復原；regex 沒有字面形式，因此沒有可替代的目標型別值"
 help = "從此 regex 轉換移除復原 arm"
 
 [diagnostics.SEM016.issues.valor_verte_unsupported]
-message = "不支援 valor ∷ T — 動態值的形狀無法在編譯時期斷言。請使用 `↦ T` 進行執行時期擷取（使用 `⇥` 復原）。"
-help = "改用執行時期 `↦ T` 轉換與 `⇥` 復原"
+message = "不支援 valor ∷ T — 動態值的形狀無法在編譯時期斷言。請使用 `↦ T` 進行執行時期擷取（使用 `⊥` 復原）。"
+help = "改用執行時期 `↦ T` 轉換與 `⊥` 復原"
 
 [diagnostics.SEM016.issues.json_genus_conversion_requires_json_annotation]
 message = "json/genus 轉換需要將 genus 標記為 `@ json`"

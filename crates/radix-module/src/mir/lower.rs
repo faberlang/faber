@@ -2185,7 +2185,7 @@ impl<'a> FunctionBuilder<'a> {
     ///   1. destination place evaluated once (receiver/index once),
     ///   2. source evaluated once,
     ///   3. converted once through the shared `↦` conversion owner
-    ///      (`lower_conversio`) — `⇥` recovery runs only on conversion failure,
+    ///      (`lower_conversio`) — `⊥` default runs only on conversion failure,
     ///   4. stored exactly once.
     ///
     /// The result value denotes the stored value (the destination place), the
@@ -2408,8 +2408,7 @@ impl<'a> FunctionBuilder<'a> {
             // decimal-widths D1 successor: a decimal-typed
             // text literal lowers to its exact scaled carrier through the one
             // shared text→carrier conversion; the f64 field never intermediates.
-            HirLiteral::FloatText { value, text } if self.decimal_literal_width(ty).is_some() => {
-                let width = self.decimal_literal_width(ty).expect("guarded above");
+            HirLiteral::FloatText { value, text } if let Some(width) = self.decimal_literal_width(ty) => {
                 let Some(interner) = self.context.interner else {
                     // Without the interner the digit text is unreadable; keep
                     // the historical float constant instead of guessing.

@@ -38,7 +38,7 @@ locale = "en"
 #   Greetings and status strings for known and unknown inputs.
 
 fn saluta(string lingua) → string {
-    match lingua {
+    switch lingua {
         case "latina" {
             return "Salve"
         }
@@ -58,7 +58,7 @@ fn saluta(string lingua) → string {
 }
 
 fn nuntius(int codex) → string {
-    match codex {
+    switch codex {
         case 1 {
             return "paratum"
         }

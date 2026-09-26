@@ -505,10 +505,12 @@ pub struct FunctionProvenanceTableWire {
 /// element label on `HirTypeForm` and `HirPresentation::tuple_label_accesses`
 /// (by-label `p.gw` reads lowered to constant-index nodes): both are
 /// serialized HIR presentation additions, so schema-v14 artifacts fail closed
-/// at the schema gate as usual. Version 16 drops `HirStruct.extends` and
-/// `HirStruct.is_abstract` (class inheritance removed, DECISIONS D8.1); the
-/// serialized struct shape changed, so schema-v15 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 16;
+/// at the schema gate as usual. Version 16 drops the dead `HirCasuArm::guard`
+/// field (D4.1: `discerne` arms carry no guards), a serialized HIR removal,
+/// so schema-v15 artifacts fail closed at the schema gate. Version 17 drops `HirStruct.extends` and `HirStruct.is_abstract` (class
+/// inheritance removed, DECISIONS D8.1); the serialized struct shape changed,
+/// so schema-v16 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 17;
 
 /// Serializable snapshot of one analyzed provider unit carried for HIR
 /// emission (ARCH-U4 carriage).
@@ -552,7 +554,8 @@ pub struct ProviderUnitWire {
 /// to a missing-carriage error.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ProviderCarriageEntryWire {
-    /// Analyzed provider unit (boxed: it dwarfs the failure marker).
+    /// Analyzed provider unit (boxed: far larger than the `Failed` marker;
+    /// serde encodes `Box<T>` exactly as `T`, so the wire shape is unchanged).
     Unit(Box<ProviderUnitWire>),
     /// Contract discovery or analysis failed for this target; `message` is
     /// the fail-closed emission error's tail clause.

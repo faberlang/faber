@@ -1386,6 +1386,14 @@ mod allocator_surface_removed_test;
 mod inheritance_removed_test;
 
 #[cfg(test)]
+#[path = "nexum_removed_test.rs"]
+mod nexum_removed_test;
+
+#[cfg(test)]
+#[path = "construction_spread_removed_test.rs"]
+mod construction_spread_removed_test;
+
+#[cfg(test)]
 #[path = "mod_test.rs"]
 mod tests;
 

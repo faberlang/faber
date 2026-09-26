@@ -78,6 +78,8 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::UnionNoCommonMembers,
     WarningKind::UnionMethodSignatureShadowed,
     WarningKind::ComplexityBudgetExceeded,
+    WarningKind::RedundantMemberVisibility,
+    WarningKind::CoverageUnchecked,
 ];
 
 // STABLE CODES
@@ -166,7 +168,7 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
         },
         SemanticErrorKind::ConversionInvalid => DiagnosticSpec {
             code: "SEM016",
-            help: Some("use a valid conversion or provide inline recovery with `⇥`"),
+            help: Some("use a valid conversion or provide an inline default with `⊥`"),
         },
         SemanticErrorKind::UnavailableDeclaration => DiagnosticSpec {
             code: "SEM017",
@@ -430,7 +432,7 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         "matrix_materialize_unsupported" => {
             Some("keep matrix values as typed parameters until matrix construction lowering is implemented".to_owned())
         }
-        "valor_verte_unsupported" => Some("use runtime `↦ T` conversion with `⇥` recovery instead".to_owned()),
+        "valor_verte_unsupported" => Some("use runtime `↦ T` conversion with a `⊥` default instead".to_owned()),
         "lista_to_tabula_unsupported" => Some("construct the tabula with explicit key/value selection".to_owned()),
         "cross_collection_unsupported" => Some("use an explicit stdlib conversion verb".to_owned()),
         "lista_to_tensor_nested" => Some("flatten the nested lista before converting to tensor".to_owned()),
@@ -555,7 +557,6 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "postfix_inc_dec_numerus_operand" => Some("apply postfix increment/decrement to numerus values".to_owned()),
         "array_spread_requires_lista" => Some("spread a lista value inside lista construction".to_owned()),
         "struct_computed_key_forbidden" => Some("use declared struct field names in struct construction".to_owned()),
-        "struct_spread_forbidden" => Some("provide each required struct field explicitly".to_owned()),
         "vector_constructor_forbids_spread" => {
             Some("provide explicit vector elements instead of spread arguments".to_owned())
         }
@@ -951,6 +952,12 @@ fn semantic_invalid_annotation_help(args: &[DiagnosticArg]) -> Option<String> {
                 "use `{publica}` for explicit export intent or `{privata}` for file-private intent"
             ))
         }
+        "member_privacy_unenforced" => {
+            let annotation = arg_value(args, "annotation")?;
+            Some(format!(
+                "remove `{annotation}` from the member; members are public until member privacy is enforced"
+            ))
+        }
         "empty_radix_typus_domain" | "missing_type_param" | "non_identifier_type_param" | "non_type_allowed" => {
             Some("use `@ radix typus T in textus octeti` or braced `@ radix { param = T, allowed = textus }` with at least one allowed type".to_owned())
         }
@@ -1104,6 +1111,14 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::ComplexityBudgetExceeded => DiagnosticSpec {
             code: "WARN027",
             help: Some("split the function or raise the complexity budget for this check"),
+        },
+        WarningKind::RedundantMemberVisibility => DiagnosticSpec {
+            code: "WARN028",
+            help: Some("remove the annotation; members are public by default"),
+        },
+        WarningKind::CoverageUnchecked => DiagnosticSpec {
+            code: "WARN029",
+            help: Some("add a 'ceterum' arm, or split the match so each pattern kind is checkable"),
         },
     }
 }

@@ -2822,17 +2822,6 @@ pub(super) fn rewrite_casu_arm(
     namespaces: &NamespaceExports,
     diagnostics: &mut Vec<String>,
 ) {
-    if let Some(guard) = &mut arm.guard {
-        rewrite_expr(
-            unit_path,
-            guard,
-            interner,
-            targets,
-            data_member_targets,
-            namespaces,
-            diagnostics,
-        );
-    }
     rewrite_expr(
         unit_path,
         &mut arm.body,

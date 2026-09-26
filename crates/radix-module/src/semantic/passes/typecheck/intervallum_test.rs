@@ -295,7 +295,7 @@ fn intervallum_continet_method_codegen() {
 #[test]
 fn intervallum_clamp_recovery_rejects() {
     let source = r"incipit {
-  fixum _ clamped ← 15 ↦ 0‥10 ⇥ 0
+  fixum _ clamped ← 15 ↦ 0‥10 ⊥ 0
 }";
     rejects_with_issue(&compile(source), "intervallum_clamp_recovery_unsupported");
 }

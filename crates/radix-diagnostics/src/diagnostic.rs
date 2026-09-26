@@ -247,6 +247,13 @@ pub enum WarningKind {
     /// A declared function's cyclomatic complexity exceeded the applicable
     /// budget. Warn-only; promotion is the caller's deny policy.
     ComplexityBudgetExceeded,
+    /// A `genus` member carries `@ publica`, which is redundant because members
+    /// are public by default (D5.5 interim).
+    RedundantMemberVisibility,
+    /// A `discerne` whose coverage could not be computed for its pattern
+    /// kinds (D4.8): the match is compiled, but exhaustiveness was not
+    /// checked, so the author is told rather than left in silence.
+    CoverageUnchecked,
 }
 
 /// Semantic diagnostic categories used by passes and command policy.
