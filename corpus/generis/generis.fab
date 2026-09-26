@@ -6,7 +6,7 @@ category = "type"
 canonical = true
 summary = "Marks a class member as belonging to the type itself."
 syntax = "generis <type> <name> [= <expression>]"
-related = ["genus", "nexum"]
+related = ["genus", "ego"]
 locale = "en"
 +++
 # =============================================================================
@@ -15,12 +15,12 @@ locale = "en"
 #
 # What this teaches:
 #   • Marks a class member as belonging to the type itself.
-#   • Related keywords: genus, nexum
+#   • Related keywords: genus, ego
 #
 # Common mistakes:
 #   • Accessing a `generis` field on an instance instead of the type — `generis` fields are static members accessed via the genus name, not via `ego`.
 #
-# See also: genus, nexum
+# See also: genus, ego
 # =============================================================================
 
 # generis marks a static genus field (shared across instances)

@@ -706,6 +706,9 @@ fn unexpected_message(args: &[DiagnosticArg]) -> Option<String> {
         }
         "allocator_surface_removed" => quote_arg(args, "keyword")
             .map(|keyword| format!("{keyword} was removed; allocation is not a language surface")),
+        "nexum_removed" => Some(
+            "'nexum' was removed; change notification is a library pattern over 'ad'".to_owned(),
+        ),
         _ => None,
     }
 }
@@ -733,6 +736,9 @@ fn unexpected_help(args: &[DiagnosticArg]) -> Option<String> {
                 "delete the {keyword} wrapper or modifier; allocation is managed by the target runtime"
             )
         }),
+        "nexum_removed" => {
+            Some("delete 'nexum' and declare an ordinary field: '<type> <name>'".to_owned())
+        }
         _ => None,
     }
 }

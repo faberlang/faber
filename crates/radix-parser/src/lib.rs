@@ -1390,6 +1390,10 @@ mod slot_helpers_test;
 mod allocator_surface_removed_test;
 
 #[cfg(test)]
+#[path = "nexum_removed_test.rs"]
+mod nexum_removed_test;
+
+#[cfg(test)]
 #[path = "mod_test.rs"]
 mod tests;
 

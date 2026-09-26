@@ -1892,7 +1892,6 @@ abstractus genus Animal<T> sub Vivens implet Canens, Currens {
     @ futura
     functio canta(textus vox) → vacuum {}
     generis textus nomen = "leo"
-    nexum numerus aetas = 3
 }
 "#,
     );
@@ -1903,21 +1902,15 @@ abstractus genus Animal<T> sub Vivens implet Canens, Currens {
     assert!(class.is_abstract);
     assert!(class.extends.is_some());
     assert_eq!(class.implements.len(), 2);
-    assert_eq!(class.members.len(), 3);
+    assert_eq!(class.members.len(), 2);
     assert!(matches!(class.members[0].kind, ClassMemberKind::Method(_)));
     assert!(matches!(class.members[1].kind, ClassMemberKind::Field(_)));
-    assert!(matches!(class.members[2].kind, ClassMemberKind::Field(_)));
     assert_eq!(class.members[0].annotations.len(), 1);
 
     let ClassMemberKind::Field(static_field) = &class.members[1].kind else {
         panic!("expected static field");
     };
     assert!(static_field.is_static);
-
-    let ClassMemberKind::Field(bound_field) = &class.members[2].kind else {
-        panic!("expected bound field");
-    };
-    assert!(bound_field.is_bound);
 }
 
 #[test]

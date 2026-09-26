@@ -534,12 +534,6 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         category: KeywordKind::Modifier,
     },
     KeywordSpec {
-        text: "nexum",
-        token_kind: Some(TokenKind::Nexum),
-        scope: KeywordScope::Contextual(GENUS_MEMBER),
-        category: KeywordKind::Modifier,
-    },
-    KeywordSpec {
         text: "optiones",
         token_kind: Some(TokenKind::Optiones),
         scope: KeywordScope::Contextual(FUNCTION_MODIFIER),

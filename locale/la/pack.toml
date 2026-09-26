@@ -26,7 +26,6 @@ iacit = "iacit"
 immutata = "immutata"
 interna = "interna"
 magnitudo = "magnitudo"
-nexum = "nexum"
 optiones = "optiones"
 prae = "prae"
 privata = "privata"
@@ -490,6 +489,10 @@ help = "keep '←' for 'figendum'/'variandum' awaited bindings"
 [diagnostics.PARSE002.issues.allocator_surface_removed]
 message = "'{keyword}' was removed; allocation is not a language surface"
 help = "delete the '{keyword}' wrapper or modifier; allocation is managed by the target runtime"
+
+[diagnostics.PARSE002.issues.nexum_removed]
+message = "'nexum' was removed; change notification is a library pattern over 'ad'"
+help = "delete 'nexum' and declare an ordinary field: '<type> <name>'"
 
 [diagnostics.PARSE010]
 message = "invalid declaration"
