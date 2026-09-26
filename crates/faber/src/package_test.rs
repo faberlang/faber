@@ -9187,6 +9187,41 @@ entry = "main.fab"
 }
 
 #[test]
+fn package_runtime_plan_served_route_needs_no_host() {
+    // A3/U4: a route served by a Faber `@ ad` handler is tier 1, so it is
+    // never host-required — the D8.1 test seam serves `solum:lege` itself.
+    let pkg = test_temp_dir("runtime-plan-served-route");
+    fs::create_dir_all(pkg.join("src")).expect("src");
+    fs::write(
+        pkg.join("faber.toml"),
+        r#"
+[package]
+name = "runtime-plan-served-route"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        pkg.join("src/main.fab"),
+        "@ call 'solum:lege'\nfn lege(string via) → string {\n    return via\n}\n\nmain { const string body ← call 'solum:lege' (\"data.txt\") ↦ string print body }\n",
+    )
+    .expect("entry");
+
+    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
+
+    assert!(
+        plan.non_runtime_routes.is_empty(),
+        "served route must not be host-required: {:?}",
+        plan.non_runtime_routes
+    );
+    assert!(plan.selected_providers.is_empty());
+    assert!(package_host_selection_diagnostic(&plan, &pkg.join("faber.toml")).is_none());
+}
+
+#[test]
 fn package_runtime_plan_requires_host_for_host_only_routes() {
     // Host-only (not builtin) routes still require [target.rust] host.
     let pkg = test_temp_dir("runtime-plan-host-required");

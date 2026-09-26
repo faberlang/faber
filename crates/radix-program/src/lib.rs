@@ -79,6 +79,7 @@ pub mod modules;
 #[cfg(feature = "hir-fhir")]
 pub mod nucleum;
 pub mod paths;
+pub mod route_table;
 #[cfg(feature = "hir-rust")]
 pub mod rust_target;
 pub mod source_files;

@@ -145,6 +145,8 @@ pub struct AnalyzedProgram {
     /// Analysis-prepared library resolver (lock + home). Threaded into MIR
     /// linking; not reconstructed from config after analyze.
     pub library_resolver: LibraryResolver,
+    /// Program-wide `@ ad` handler table (tier 1 of the router).
+    pub routes: crate::route_table::RouteTable,
 }
 
 impl AnalyzedProgram {
@@ -160,6 +162,7 @@ impl AnalyzedProgram {
             entry_frontmatter: None,
             diagnostics: Vec::new(),
             library_resolver: LibraryResolver::with_optional_home(None),
+            routes: crate::route_table::RouteTable::default(),
         }
     }
 
@@ -692,6 +695,18 @@ fn analyze_package_spec_with_deadline(
     if let Some(diagnostic) = analysis_deadline_diagnostic(&spec, deadline, None, "package") {
         diagnostics.push(diagnostic);
     }
+    let routes = match program_route_table(
+        &nodes,
+        package_name.as_ref(),
+        library_resolver,
+        &mut library_cache,
+    ) {
+        Ok(routes) => routes,
+        Err(route_diagnostics) => {
+            diagnostics.extend(route_diagnostics);
+            crate::route_table::RouteTable::default()
+        }
+    };
     if diagnostics.iter().any(radix_module::Diagnostic::is_error) {
         return Err(diagnostics);
     }
@@ -711,6 +726,7 @@ fn analyze_package_spec_with_deadline(
         entry_frontmatter,
         diagnostics,
         library_resolver: library_resolver.clone(),
+        routes,
     };
 
     #[cfg(feature = "hir-rust")]
@@ -739,6 +755,70 @@ fn analyze_package_spec_with_deadline(
     }
 
     Ok(program)
+}
+
+/// Merge the `@ ad` routes of every analyzed package module and every
+/// library module in their expanded import closure (F11 default; Q6 module
+/// granularity). Library modules that fail to analyze were already
+/// diagnosed by the import walk and contribute nothing here.
+fn program_route_table(
+    nodes: &BTreeMap<ModuleId, AnalyzedProgramNode>,
+    package_name: Option<&String>,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+) -> Result<crate::route_table::RouteTable, Vec<Diagnostic>> {
+    use crate::route_table::{RouteOrigin, RouteTableBuilder};
+    let mut builder = RouteTableBuilder::default();
+    for node in nodes.values() {
+        let origin = RouteOrigin {
+            package: package_name.cloned(),
+            path: node.path.clone(),
+        };
+        builder.merge_module(&origin, &node.file_interface.routes);
+    }
+    let mut interface_errors = Vec::new();
+    for import in nodes
+        .values()
+        .flat_map(|node| node.expanded_library_imports.iter())
+    {
+        let Ok(analysis) =
+            crate::library::library_cached_analysis(import, library_resolver, library_cache)
+        else {
+            continue;
+        };
+        let routes = match radix_module::semantic::passes::ad_routes::route_exports(
+            &analysis.hir,
+            &analysis.types,
+            &analysis.interner,
+            &analysis.resolver,
+            None,
+        ) {
+            Ok(routes) => routes,
+            Err(err) => {
+                interface_errors.push(
+                    crate::package_diagnostic_error(format!(
+                        "library `@ ad` route handler cannot be snapshotted: {err:?}"
+                    ))
+                    .with_file(import.module.interface_path.display().to_string())
+                    .with_arg("issue", "ad_route_snapshot_failed"),
+                );
+                continue;
+            }
+        };
+        let origin = RouteOrigin {
+            package: Some(import.module.package.clone()),
+            path: normalize_path(&import.module.interface_path),
+        };
+        builder.merge_module(&origin, &routes);
+    }
+    match builder.finish() {
+        Ok(table) if interface_errors.is_empty() => Ok(table),
+        Ok(_) => Err(interface_errors),
+        Err(mut duplicates) => {
+            duplicates.extend(interface_errors);
+            Err(duplicates)
+        }
+    }
 }
 
 fn analysis_deadline_diagnostic(
