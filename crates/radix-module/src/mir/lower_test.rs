@@ -2372,17 +2372,21 @@ fn textus_itera_de_and_scalar_receivers_keep_fail_closed_decline() {
     nota x
   }
 }";
-    let mut unit = analyze(scalar_case);
-    let errors = lower_analyzed_unit(&mut unit, MirLoweringOptions::default())
-        .expect_err("scalar itera ex keeps the fail-closed decline")
-        .into_iter()
-        .map(|error| error.message)
-        .collect::<Vec<_>>();
+    // D19.4: a non-iterable source is now rejected at typecheck, before MIR.
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let Err(errors) = crate::driver::analyze_source(&session, "test.fab", scalar_case, AnalyzeRequest::default())
+    else {
+        panic!("scalar itera ex must fail closed at analysis")
+    };
     assert!(
         errors
             .iter()
-            .any(|message| message.contains("itera collection before iterator MIR lowering")),
-        "non-iterable scalar must keep the decline: {errors:?}"
+            .any(|error| error.issue() == Some("itera_source_not_iterable")),
+        "non-iterable scalar must be rejected: {:?}",
+        errors
+            .iter()
+            .map(|e| (e.code, e.issue()))
+            .collect::<Vec<_>>()
     );
 }
 
