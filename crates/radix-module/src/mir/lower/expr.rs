@@ -106,6 +106,9 @@ pub(super) trait HirExpressionLoweringVisitor {
             }
             HirExpressionKind::Handled { body, catch } => self.visit_handled_expr(body, catch, expr),
             HirExpressionKind::Trap(body) => self.visit_trap_expr(body, expr),
+            HirExpressionKind::CallDefault { body, default, err_ty } => {
+                self.visit_call_default_expr(body, default, *err_ty, expr)
+            }
             HirExpressionKind::Assign(_, _) => self.visit_assignment_expr(expr),
             HirExpressionKind::ConversioAssign { .. } => self.visit_conversio_assign_expr(expr),
             HirExpressionKind::Ref(_, inner) => self.visit_ref_expr(inner, expr),
@@ -328,6 +331,13 @@ pub(super) trait HirExpressionLoweringVisitor {
     ) -> Option<MirOperand>;
     fn visit_handled_expr(&mut self, body: &HirBlock, catch: &HirCape, expr: &HirExpression) -> Option<MirOperand>;
     fn visit_trap_expr(&mut self, body: &HirBlock, expr: &HirExpression) -> Option<MirOperand>;
+    fn visit_call_default_expr(
+        &mut self,
+        body: &HirBlock,
+        default: &HirExpression,
+        err_ty: Option<crate::semantic::TypeId>,
+        expr: &HirExpression,
+    ) -> Option<MirOperand>;
     fn visit_ref_expr(&mut self, inner: &HirExpression, expr: &HirExpression) -> Option<MirOperand>;
     fn visit_deref_expr(&mut self, inner: &HirExpression, expr: &HirExpression) -> Option<MirOperand>;
     fn visit_read_line_expr(&mut self, expr: &HirExpression) -> Option<MirOperand>;
@@ -663,6 +673,16 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
 
     fn visit_trap_expr(&mut self, body: &HirBlock, expr: &HirExpression) -> Option<MirOperand> {
         self.lower_trap_expr(body, expr)
+    }
+
+    fn visit_call_default_expr(
+        &mut self,
+        body: &HirBlock,
+        default: &HirExpression,
+        err_ty: Option<crate::semantic::TypeId>,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        self.lower_call_default_expr(body, default, err_ty, expr)
     }
 
     fn visit_ref_expr(&mut self, inner: &HirExpression, expr: &HirExpression) -> Option<MirOperand> {

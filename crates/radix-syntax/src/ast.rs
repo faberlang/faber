@@ -1139,8 +1139,23 @@ pub enum ExprKind {
     /// trailing expression statement of the body is the success value; there
     /// is no early-success exit form this campaign.
     Trap(Box<TrapExpr>),
+    /// Call default: `call ⊥ default` (D17.7).
+    ///
+    /// Supplies `default` when the failable `call` fails through its `⇥`
+    /// error channel. The parser admits only a call operand; semantic analysis
+    /// requires the call to be failable.
+    CallDefault(CallDefaultExpr),
     /// Format operator: `value ¶ "spec"` (D2.1) → `textus`.
     Format(FormatExpr),
+}
+
+/// `call ⊥ default` (D17.7): the call-site default channel.
+#[derive(Debug)]
+pub struct CallDefaultExpr {
+    /// The failable call whose `⇥` failure is replaced.
+    pub call: Box<Expr>,
+    /// Value evaluated only when `call` fails.
+    pub default: Box<Expr>,
 }
 
 #[derive(Debug)]

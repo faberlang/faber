@@ -12,8 +12,8 @@ use crate::test_support::{assert_parse_error_issue, parse_ok, parse_program, spa
 use radix_diagnostics::Span;
 use radix_lexer::lex;
 use radix_syntax::{
-    AssignOp, BinOp, ConversioTarget, ExprKind, FiguraExpr, JsonValue, Literal, NonNullKind,
-    OptionalChainKind, StmtKind, TypeExprKind,
+    AssignOp, BinOp, CallDefaultExpr, ConversioTarget, Expr, ExprKind, FiguraExpr, JsonValue,
+    Literal, NonNullKind, OptionalChainKind, StmtKind, TypeExprKind,
 };
 
 fn generic_arg_type(arg: &radix_syntax::GenericArgExpr) -> &radix_syntax::TypeExpr {
@@ -1390,15 +1390,58 @@ fn up_tack_default_with_propagation_is_rejected() {
 }
 
 #[test]
-fn up_tack_default_on_non_conversion_is_not_yet_supported() {
-    // D17.7 on failable calls lands in a later stage (X3); until then `⊥`
-    // after a non-conversion expression is a clear structured diagnostic.
+fn up_tack_default_on_non_call_non_conversion_is_rejected() {
+    // D17.7: `⊥` follows a failable call or a conversion; anything else is a
+    // structured parse diagnostic.
+    crate::test_support::assert_parse_error_issue("fixum _ n ← a ⊥ 0", "default_requires_failable");
+    crate::test_support::assert_parse_error_issue("a ← b ⊥ c", "default_requires_failable");
+    crate::test_support::assert_parse_error_issue("f() ⊥ 0 ⊥ 1", "default_requires_failable");
+}
+
+fn call_default_expr(expr: &Expr) -> &CallDefaultExpr {
+    let ExprKind::CallDefault(call_default) = &expr.kind else {
+        panic!("expected call default, got {:?}", expr.kind);
+    };
+    call_default
+}
+
+#[test]
+fn up_tack_default_after_call_parses_call_default() {
+    // D17.7: `f(x) ⊥ v` wraps the call; the default is a unary operand.
+    let result = parse_ok("fixum _ n ← f(1) ⊥ 0");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let call_default = call_default_expr(var.init.as_deref().expect("init"));
+    assert!(matches!(call_default.call.kind, ExprKind::Call(_)));
+    assert!(matches!(
+        call_default.default.kind,
+        ExprKind::Literal(Literal::Int(0))
+    ));
+}
+
+#[test]
+fn up_tack_default_after_method_call_binds_the_whole_postfix_chain() {
+    let result = parse_ok("fixum _ n ← a.b(1).c() ⊥ 0 + 1");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    // `⊥` binds at the postfix tier, so `+ 1` applies to the defaulted call.
+    let ExprKind::Binary(binary) = &var.init.as_deref().expect("init").kind else {
+        panic!("expected binary");
+    };
+    let call_default = call_default_expr(&binary.lhs);
+    assert!(matches!(call_default.call.kind, ExprKind::Call(_)));
+}
+
+#[test]
+fn up_tack_call_default_with_propagation_is_rejected() {
     crate::test_support::assert_parse_error_issue(
-        "fixum _ n ← f() ⊥ 0",
-        "default_requires_conversion",
+        "fixum _ n ← f() ⊥ 0 ⇥ textus",
+        "default_with_propagation",
     );
-    crate::test_support::assert_parse_error_issue("f() ⊥ 0", "default_requires_conversion");
-    crate::test_support::assert_parse_error_issue("a ← b ⊥ c", "default_requires_conversion");
 }
 
 #[test]

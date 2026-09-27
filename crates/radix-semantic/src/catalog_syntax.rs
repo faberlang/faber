@@ -885,8 +885,8 @@ fn invalid_expression_message(args: &[DiagnosticArg]) -> Option<String> {
         "default_with_propagation" => Some(
             "an expression either propagates with '⇥' or defaults with '⊥', never both".to_owned(),
         ),
-        "default_requires_conversion" => {
-            Some("'⊥' default is supported only after a conversion '↦ T' or '↤'".to_owned())
+        "default_requires_failable" => {
+            Some("'⊥' default follows a failable call or a conversion '↦ T' or '↤'".to_owned())
         }
         "expected_expression" => Some("expected expression".to_owned()),
         "expression_ad_block" => Some("expression-form ad must not have a block".to_owned()),
@@ -914,8 +914,8 @@ fn invalid_expression_help(args: &[DiagnosticArg]) -> Option<String> {
         "default_with_propagation" => {
             Some("keep the '⊥' default, or drop it and let the error propagate".to_owned())
         }
-        "default_requires_conversion" => Some(
-            "defaults on failable calls are not yet supported; use 'capta' or 'fac … cape'"
+        "default_requires_failable" => Some(
+            "put '⊥' right after the call or conversion it defaults; use 'capta' to inspect the error"
                 .to_owned(),
         ),
         "expected_expression" => Some("provide a valid expression in this position".to_owned()),

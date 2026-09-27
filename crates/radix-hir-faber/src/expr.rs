@@ -371,6 +371,16 @@ impl super::FaberCodegen<'_> {
                 });
                 writer.write("}");
             }
+            // D17.7: `call ⊥ default`. The trap body holds only the call as
+            // its tail; the default is a unary-level operand like the
+            // conversion default.
+            HirExpressionKind::CallDefault { body, default, .. } => {
+                if let Some(call) = body.expr.as_deref() {
+                    self.write_expr_prec(call, 13, names, surface, writer);
+                }
+                writer.write(" ⊥ ");
+                self.write_expr_prec(default, 12, names, surface, writer);
+            }
             HirExpressionKind::Discerne {
                 scrutinees,
                 arms,

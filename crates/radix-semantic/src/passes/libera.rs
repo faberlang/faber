@@ -450,6 +450,7 @@ impl HirVisitor for KernelBodyProbe {
             HirExpressionKind::Throw(_) => self.effect(expr.span, "throw", "iace"),
             HirExpressionKind::Handled { .. } => self.effect(expr.span, "cape", "cape"),
             HirExpressionKind::Trap(_) => self.effect(expr.span, "recovery", "capta"),
+            HirExpressionKind::CallDefault { .. } => self.effect(expr.span, "recovery", "⊥"),
             HirExpressionKind::Scribe(..) => self.effect(expr.span, "host_effect", "scribe"),
             HirExpressionKind::Scriptum(..) => self.effect(expr.span, "host_effect", "scriptum"),
             HirExpressionKind::ReadLine(_) => self.effect(expr.span, "host_effect", "read_line"),

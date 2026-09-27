@@ -1,0 +1,91 @@
++++
+term = "defectus"
+kind = "operator"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "alternate_exit_clause", "redde_stmt", "si_stmt", "iace_stmt", "inline_default", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal"]
+category = "errors"
+canonical = true
+summary = "Supplies a default value when a failable call fails: f(x) ⊥ v."
+syntax = "<failable call> ⊥ <default>"
+related = ["⊥", "⇥", "iace", "capta", "mori"]
+locale = "en"
++++
+# =============================================================================
+# defectus — Supplies a default value when a failable call fails: f(x) ⊥ v.
+# =============================================================================
+#
+# What this teaches:
+#   • Call default — `f(x) ⊥ v` gives `v` when `f` fails through its `⇥` channel, and the call's value otherwise.
+#   • Lazy default — `v` is evaluated only when the call fails.
+#   • Propagation versus default — inside a `⇥` function a bare failable call propagates; `⊥` handles the failure at the call site instead.
+#   • Traps are not caught — `⊥` catches only the `⇥` channel, never `mori` or runtime traps.
+#
+# Common mistakes:
+#   • Using `⊥` on a call that cannot fail — only a call whose signature has `⇥` takes a default.
+#   • Writing both — `f(x) ⊥ 0 ⇥ E` is rejected: one expression propagates or defaults, never both.
+#
+# See also: ⊥, ⇥, iace, capta, mori
+# =============================================================================
+
+# defectus — the call-site default channel (D17.7)
+#
+# GRAMMAR:
+#   callDefault :← call '⊥' unary
+#
+# EXPECTED OUTPUT:
+#   4 -1
+#   fallback
+#   2 -1
+#   2 -1
+#   2 -1
+#
+# BACKEND:
+#   Desugars through the `capta` trap machinery; Go and TypeScript fail
+#   closed until they emit `capta`.
+
+fn half(int n) → int ⇥ string {
+    if n % 2 ≠ 0 {
+        throw "odd"
+    }
+    return n / 2
+}
+
+fn fallback() → int {
+    print "fallback"
+    return -1
+}
+
+# Propagation: a bare failable call inside a `⇥` function sends the failure
+# on to this function's caller.
+fn quarter(int n) → int ⇥ string {
+    return half(half(n))
+}
+
+# `⊥` also handles a propagated failure at the outer call site.
+fn safeQuarter(int n) → int {
+    return quarter(n) ⊥ -1
+}
+
+fn fatal(int n) → int ⇥ string {
+    if n ≡ 0 {
+        panic "fatal"
+    }
+    return n
+}
+
+main {
+    # The call's value on success, the default on failure.
+    const int a ← half(8) ⊥ 0
+    const int b ← half(7) ⊥ -1
+    print a, b
+
+    # The default runs only when the call fails: `fallback` prints once.
+    const int c ← half(4) ⊥ fallback()
+    const int d ← half(5) ⊥ fallback()
+    print c, d
+
+    print safeQuarter(8), safeQuarter(6)
+
+    # `⊥` never catches `panic`; this would still abort:
+    # const int e ← fatal(0) ⊥ 1
+    print fatal(2) ⊥ 0, half(1) ⊥ -1
+}

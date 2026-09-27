@@ -80,6 +80,9 @@ pub mod access;
 pub mod aggregate;
 pub mod call;
 #[cfg(test)]
+#[path = "call_default_test.rs"]
+mod call_default_test;
+#[cfg(test)]
 #[path = "cfa_join_test.rs"]
 mod cfa_join_test;
 pub mod collect;

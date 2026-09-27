@@ -724,9 +724,9 @@ help = "write '↦ T ⊥ value' (or '↤ … ⊥ value'); '⇥' never takes a va
 message = "an expression either propagates with '⇥' or defaults with '⊥', never both"
 help = "keep the '⊥' default, or drop it and let the error propagate"
 
-[diagnostics.PARSE030.issues.default_requires_conversion]
-message = "'⊥' default is supported only after a conversion '↦ T' or '↤'"
-help = "defaults on failable calls are not yet supported; use 'capta' or 'fac … cape'"
+[diagnostics.PARSE030.issues.default_requires_failable]
+message = "'⊥' default follows a failable call or a conversion '↦ T' or '↤'"
+help = "put '⊥' right after the call or conversion it defaults; use {capta} to inspect the error"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "expected expression"
@@ -2243,6 +2243,14 @@ help = "remove the explicit type argument list"
 [diagnostics.SEM011.issues.failable_call_requires_handler]
 message = "failable call requires a ⇥ declaring context, a local handler, or a {capta} trap"
 help = "handle the call with {fac}/cape, capture it with {capta}, or declare a function ⇥"
+
+[diagnostics.SEM010.issues.call_default_type_mismatch]
+message = "'⊥' default does not match the call's success type"
+help = "give a default of the type the call returns on success"
+
+[diagnostics.SEM011.issues.call_default_on_infallible_call]
+message = "'⊥' default on a call that cannot fail"
+help = "remove the '⊥' default; only a call whose signature has '⇥' can fail"
 
 [diagnostics.SEM010.issues.trap_member_type_mismatch]
 message = "trap member type mismatch"

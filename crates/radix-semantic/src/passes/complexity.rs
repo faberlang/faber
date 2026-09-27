@@ -72,7 +72,7 @@ impl HirVisitor for DecisionPointCounter {
                 self.0 += 1
             }
             HirExpressionKind::Handled { .. } => self.0 += 1,
-            HirExpressionKind::Trap(_) => self.0 += 1,
+            HirExpressionKind::Trap(_) | HirExpressionKind::CallDefault { .. } => self.0 += 1,
             // Body-carrying folds/selections: +1 each.
             HirExpressionKind::Summa { .. } | HirExpressionKind::FirstMatch { .. } => self.0 += 1,
             // No-body fold (`Extremum`): 0; only its `vel` coalesce tail decides.

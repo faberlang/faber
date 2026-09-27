@@ -31,6 +31,7 @@ impl super::FaberCodegen<'_> {
             // assignment), so the chain shares the Si/Conversio level.
             HirExpressionKind::Si { .. }
             | HirExpressionKind::Conversio { .. }
+            | HirExpressionKind::CallDefault { .. }
             | HirExpressionKind::Transfer { .. } => 2,
             HirExpressionKind::Binary(op, _, _) => self.binop_precedence(*op),
             // TypeCheck (`expr est <type>`) behaves like Is (precedence 4):

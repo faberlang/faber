@@ -516,6 +516,10 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
         HirExpressionKind::Trap(body) => {
             visitor.visit_block(body);
         }
+        HirExpressionKind::CallDefault { body, default, .. } => {
+            visitor.visit_block(body);
+            visitor.visit_expr(default);
+        }
         HirExpressionKind::Clausura(params, _, _, body, _) => {
             for param in params {
                 visitor.visit_param(param);
@@ -1099,6 +1103,10 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
         }
         HirExpressionKind::Trap(body) => {
             visitor.visit_block_mut(body);
+        }
+        HirExpressionKind::CallDefault { body, default, .. } => {
+            visitor.visit_block_mut(body);
+            visitor.visit_expr_mut(default);
         }
         HirExpressionKind::Clausura(params, _, _, body, _) => {
             for param in params {

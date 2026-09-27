@@ -103,6 +103,7 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Transfer(transfer) => lowerer.lower_transfer(transfer),
         ExprKind::FirstMatch(first_match) => lower_first_match(lowerer, first_match),
         ExprKind::Trap(trap) => lower_trap(lowerer, trap),
+        ExprKind::CallDefault(call_default) => lower_call_default(lowerer, call_default),
         // D2.1: `value ¶ "spec"` keeps the spec literal's text; typecheck
         // parses and validates it against the value's type (D2.2).
         ExprKind::Format(format) => HirExpressionKind::Format {
@@ -229,6 +230,23 @@ fn lower_trap(lowerer: &mut Lowerer, trap: &radix_syntax::TrapExpr) -> HirExpres
     let mut body = lowerer.lower_block(&trap.body);
     lift_trailing_expression_stmt(&mut body);
     HirExpressionKind::Trap(Box::new(body))
+}
+
+/// Lower `call ⊥ default` (D17.7) through the trap machinery: the call
+/// becomes the trailing expression of a trap body, and the default stays a
+/// separate operand evaluated only on failure.
+fn lower_call_default(
+    lowerer: &mut Lowerer,
+    call_default: &radix_syntax::CallDefaultExpr,
+) -> HirExpressionKind {
+    let call = lower_expr(lowerer, &call_default.call);
+    let span = call.span;
+    let body = radix_hir::HirBlock::simple(Vec::new(), Some(Box::new(call)), span);
+    HirExpressionKind::CallDefault {
+        body: Box::new(body),
+        default: Box::new(lower_expr(lowerer, &call_default.default)),
+        err_ty: None,
+    }
 }
 
 /// Lower a literal

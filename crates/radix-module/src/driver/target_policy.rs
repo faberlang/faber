@@ -419,6 +419,10 @@ fn scan_go_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
         },
         // UT: the capture boundary's body is ordinary scanned source.
         ExprKind::Trap(trap) => scan_go_block(&trap.body, file, diagnostics),
+        ExprKind::CallDefault(call_default) => {
+            scan_go_expr(&call_default.call, file, diagnostics);
+            scan_go_expr(&call_default.default, file, diagnostics);
+        }
         ExprKind::Summa(summa) => {
             scan_go_expr(&summa.source, file, diagnostics);
             scan_go_block(&summa.body, file, diagnostics);
@@ -793,6 +797,10 @@ fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
         },
         // UT: the capture boundary's body is ordinary scanned source.
         ExprKind::Trap(trap) => scan_rust_block(&trap.body, file, diagnostics),
+        ExprKind::CallDefault(call_default) => {
+            scan_rust_expr(&call_default.call, file, diagnostics);
+            scan_rust_expr(&call_default.default, file, diagnostics);
+        }
         ExprKind::Summa(summa) => {
             scan_rust_expr(&summa.source, file, diagnostics);
             scan_rust_block(&summa.body, file, diagnostics);

@@ -431,6 +431,14 @@ impl AirPurityChecker<'_> {
                 self.check_block(body);
                 self.handler_regions.pop();
             }
+            // D17.7: the call default is a trap whose recovery arm is the
+            // default value, evaluated outside the handler region.
+            HirExpressionKind::CallDefault { body, default, .. } => {
+                self.handler_regions.push(HandlerRegion::Try);
+                self.check_block(body);
+                self.handler_regions.pop();
+                self.check_expr(default);
+            }
             HirExpressionKind::Clausura(params, _, _, body, _) => {
                 // ARC-4 rewrites higher-order capture-free combines before this
                 // walker. A closure that remains here is outside that callback
@@ -692,5 +700,6 @@ fn is_control_expr_statement(expr: &HirExpression) -> bool {
             | HirExpressionKind::Block(_)
             | HirExpressionKind::Handled { .. }
             | HirExpressionKind::Trap(_)
+            | HirExpressionKind::CallDefault { .. }
     )
 }

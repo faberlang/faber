@@ -1511,6 +1511,10 @@ fn collect_expr_defs(
         HirExpressionKind::Trap(body) => {
             collect_block_defs(body, registry);
         }
+        HirExpressionKind::CallDefault { body, default, .. } => {
+            collect_block_defs(body, registry);
+            collect_expr_defs(default, registry);
+        }
         HirExpressionKind::Clausura(params, _, _, body, _) => {
             for param in params {
                 collect_param_defs(param, registry);
@@ -1823,6 +1827,10 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
             }
             HirExpressionKind::Trap(body) => {
                 collect_block(body, registry);
+            }
+            HirExpressionKind::CallDefault { body, default, .. } => {
+                collect_block(body, registry);
+                collect_expr(default, registry);
             }
             HirExpressionKind::Clausura(params, _, _, body, _) => {
                 for param in params {
@@ -2747,6 +2755,17 @@ pub(crate) fn validate_referential_integrity(
             }
             HirExpressionKind::Trap(body) => {
                 validate_block(body, check_symbol, check_def, check_hir, check_type)?;
+            }
+            HirExpressionKind::CallDefault {
+                body,
+                default,
+                err_ty,
+            } => {
+                validate_block(body, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(default, check_symbol, check_def, check_hir, check_type)?;
+                if let Some(ty) = err_ty {
+                    check_type(*ty)?;
+                }
             }
             HirExpressionKind::Clausura(params, ret_ty, err_ty, body, _) => {
                 for param in params {

@@ -2088,6 +2088,26 @@ pub(super) fn rewrite_expr(
             namespaces,
             diagnostics,
         ),
+        HirExpressionKind::CallDefault { body, default, .. } => {
+            rewrite_block(
+                unit_path,
+                body,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
+            rewrite_expr(
+                unit_path,
+                default,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
+        }
         HirExpressionKind::Clausura(_, _, _, body, _) => rewrite_expr(
             unit_path,
             body,
