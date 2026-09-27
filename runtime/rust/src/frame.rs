@@ -1,4 +1,16 @@
 //! In-process frame conversation types for expression `ad` and directional views.
+//!
+//! # Lifecycle (D8.3)
+//!
+//! A conversation completes when its producer sends a terminal (the handler
+//! returned, failed, or observed a cancel) or the consumer ends it. At that
+//! moment the single release point drops the handler task handle, the
+//! cancellation lease and any host dispatch, and gives the router slot back;
+//! the handle lives on as a finished record whose unread frames still read as
+//! its result. [`sermo_close`] closes early and reports an `error` terminal.
+//! The last caller-side handle ([`Sermo`], [`Meus`], [`Tuus`], a cursor) is
+//! the safety net: `Drop` cancels and releases an abandoned conversation, and
+//! any error it carried is lost.
 
 use crate::{Instans, InstansPraecisio, Valor};
 use std::collections::VecDeque;
@@ -59,6 +71,21 @@ struct SermoInner {
     handler_task: Option<thread::JoinHandle<()>>,
     detached: bool,
     meus_closed: bool,
+    /// The producer's terminal once it sent one (D8.3 completion), with the
+    /// text of an `error` terminal, which `close()` reports.
+    producer_terminal: Option<(FrameStatus, Option<String>)>,
+    lifecycle: Lifecycle,
+}
+
+/// Where a conversation is in its D8.3 lifecycle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Lifecycle {
+    /// Holding its router slot.
+    Open,
+    /// Released: the task handle, lease and slot are gone.
+    Released,
+    /// Released by `close()`; a second `close()` reports `false`.
+    Closed,
 }
 
 /// The router tier that answered one conversation (conversation record).
@@ -116,17 +143,45 @@ impl SermoShared {
 #[derive(Clone, Debug)]
 pub struct Sermo {
     inner: Arc<SermoShared>,
+    caller: Arc<CallerHandle>,
+}
+
+/// The caller's side of a conversation, shared by every caller handle
+/// ([`Sermo`] clones, views, cursors). The producer holds the conversation
+/// through its `ResponseSender`, not through this, so dropping the last
+/// caller handle is the conversation's last reference (D8.3 safety net).
+#[derive(Debug)]
+struct CallerHandle {
+    shared: Arc<SermoShared>,
+}
+
+impl Drop for CallerHandle {
+    fn drop(&mut self) {
+        let mut inner = lock_sermo(&self.shared);
+        if !inner.incoming_drained {
+            if inner.producer_terminal.is_some() {
+                inner.incoming_terminal = Some(FrameStatus::Done);
+                inner.incoming_drained = true;
+            } else {
+                record_incoming_terminal(&mut inner, FrameStatus::Cancel);
+            }
+        }
+        inner.incoming.clear();
+        release_conversation(&mut inner);
+    }
 }
 
 /// Caller-to-gateway live outbound half-stream view.
 pub struct Meus<T> {
     inner: Arc<SermoShared>,
+    _caller: Arc<CallerHandle>,
     _marker: PhantomData<T>,
 }
 
 /// Gateway-to-caller live inbound half-stream view.
 pub struct Tuus<T> {
     inner: Arc<SermoShared>,
+    caller: Arc<CallerHandle>,
     _marker: PhantomData<T>,
 }
 
@@ -520,9 +575,18 @@ impl Sermo {
         lock_sermo(&self.inner).handler_task.is_some()
     }
 
+    /// Whether the conversation's release point has run (D8.3).
+    #[must_use]
+    pub fn released(&self) -> bool {
+        lock_sermo(&self.inner).lifecycle != Lifecycle::Open
+    }
+
     pub fn push_incoming(&mut self, frame: Scrinium) {
         let mut inner = lock_sermo(&self.inner);
         inner.runtime_response_state = RuntimeResponseState::Generated;
+        if frame.status.is_terminal() {
+            note_producer_terminal(&mut inner, frame.status, &frame.data);
+        }
         inner.incoming.push_back(frame);
         wake_incoming(&mut inner);
         self.inner.incoming_changed.notify_all();
@@ -566,35 +630,52 @@ fn start_zero_opener_static_route(sermo: &Sermo) {
 
 fn new_sermo(route: &str) -> Sermo {
     let conversation_id = next_frame_id();
+    LIVE_CONVERSATIONS.fetch_add(1, Ordering::SeqCst);
+    let shared = Arc::new(SermoShared::new(SermoInner {
+        conversation_id: conversation_id.clone(),
+        route: route.to_owned(),
+        outgoing: vec![Scrinium {
+            id: conversation_id,
+            parent_id: None,
+            call: route.to_owned(),
+            status: FrameStatus::Request,
+            data: Valor::Nihil,
+            created_ms: now_millis(),
+            from: None,
+            trace: None,
+        }],
+        incoming: VecDeque::new(),
+        runtime_response_state: RuntimeResponseState::Pending,
+        incoming_drained: false,
+        incoming_terminal: None,
+        incoming_wake_epoch: 0,
+        incoming_waiters: Vec::new(),
+        runtime_cancellation: None,
+        host_dispatch: None,
+        static_routes: None,
+        answering_tier: None,
+        handler_task: None,
+        detached: false,
+        meus_closed: false,
+        producer_terminal: None,
+        lifecycle: Lifecycle::Open,
+    }));
     Sermo {
-        inner: Arc::new(SermoShared::new(SermoInner {
-            conversation_id: conversation_id.clone(),
-            route: route.to_owned(),
-            outgoing: vec![Scrinium {
-                id: conversation_id,
-                parent_id: None,
-                call: route.to_owned(),
-                status: FrameStatus::Request,
-                data: Valor::Nihil,
-                created_ms: now_millis(),
-                from: None,
-                trace: None,
-            }],
-            incoming: VecDeque::new(),
-            runtime_response_state: RuntimeResponseState::Pending,
-            incoming_drained: false,
-            incoming_terminal: None,
-            incoming_wake_epoch: 0,
-            incoming_waiters: Vec::new(),
-            runtime_cancellation: None,
-            host_dispatch: None,
-            static_routes: None,
-            answering_tier: None,
-            handler_task: None,
-            detached: false,
-            meus_closed: false,
-        })),
+        caller: Arc::new(CallerHandle {
+            shared: Arc::clone(&shared),
+        }),
+        inner: shared,
     }
+}
+
+/// Router slots held by conversations in this process that have not been
+/// released (D8.3). Process-wide, so concurrent conversations all count.
+static LIVE_CONVERSATIONS: AtomicUsize = AtomicUsize::new(0);
+
+/// Conversations opened in this process and not yet released.
+#[must_use]
+pub fn live_conversations() -> usize {
+    LIVE_CONVERSATIONS.load(Ordering::SeqCst)
 }
 
 /// Open a conversation against an explicit tier-1 table and optional host,
@@ -649,6 +730,7 @@ pub fn test_response_sender(route: &str) -> (Sermo, ResponseSender, Cancellation
 pub fn sermo_meus<T>(sermo: &Sermo) -> Meus<T> {
     Meus {
         inner: sermo.inner.clone(),
+        _caller: Arc::clone(&sermo.caller),
         _marker: PhantomData,
     }
 }
@@ -657,6 +739,7 @@ pub fn sermo_meus<T>(sermo: &Sermo) -> Meus<T> {
 pub fn sermo_tuus<T>(sermo: &Sermo) -> Tuus<T> {
     Tuus {
         inner: sermo.inner.clone(),
+        caller: Arc::clone(&sermo.caller),
         _marker: PhantomData,
     }
 }
@@ -719,6 +802,7 @@ pub fn tuus_accipe<T>(tuus: &Tuus<T>) -> Option<Scrinium> {
 /// Lazy inbound content-frame iterator; shares the queue with `tuus_accipe`.
 pub struct TuusCursor<T> {
     inner: Arc<SermoShared>,
+    _caller: Arc<CallerHandle>,
     _marker: PhantomData<T>,
 }
 
@@ -734,6 +818,7 @@ impl<T> Iterator for TuusCursor<T> {
 pub fn tuus_cursor<T>(tuus: &Tuus<T>) -> TuusCursor<T> {
     TuusCursor {
         inner: tuus.inner.clone(),
+        _caller: Arc::clone(&tuus.caller),
         _marker: PhantomData,
     }
 }
@@ -745,6 +830,14 @@ pub fn tuus_fini<T>(tuus: &Tuus<T>) -> FrameStatus {
         return inner.incoming_terminal.unwrap_or(FrameStatus::Done);
     }
     ensure_runtime_response_started(&tuus.inner, &mut inner);
+    // WHY: an unread stream whose Faber handler is still producing is
+    // cancelled, not drained (the Go/runner choice): the handler may never
+    // finish on its own.
+    if inner.producer_terminal.is_none() && inner.answering_tier == Some(AnsweringTier::Static) {
+        record_incoming_terminal(&mut inner, FrameStatus::Cancel);
+        inner.incoming.clear();
+        return FrameStatus::Cancel;
+    }
     while let Some(frame) = inner.incoming.pop_front() {
         if frame.status.is_terminal() {
             record_incoming_terminal(&mut inner, frame.status);
@@ -759,6 +852,7 @@ pub fn tuus_fini<T>(tuus: &Tuus<T>) -> FrameStatus {
 pub fn tuus_as_sermo<T>(tuus: &Tuus<T>) -> Sermo {
     Sermo {
         inner: tuus.inner.clone(),
+        caller: Arc::clone(&tuus.caller),
     }
 }
 
@@ -768,14 +862,75 @@ fn record_incoming_terminal(inner: &mut SermoInner, status: FrameStatus) {
     release_conversation(inner);
 }
 
-/// The conversation's single release point (§2.7): runs once the inbound
-/// direction has terminated, which is also when the handler task has sent
-/// its terminal. It drops the handler task handle (detaching the finished
-/// thread) and the dispatch cancellation lease. A7 hangs completion-close
-/// here.
+/// The conversation's single release point (§2.7, D8.3). It runs when the
+/// conversation completes: the producer sent its terminal, the consumer
+/// reached or cancelled to a terminal, `close()` ran, or the last caller
+/// handle dropped. A producer still running is cancelled first. Release
+/// drops the handler task handle (detaching the thread), the cancellation
+/// lease and any host dispatch, and gives the router slot back. Idempotent.
 fn release_conversation(inner: &mut SermoInner) {
-    inner.runtime_cancellation = None;
+    if inner.lifecycle != Lifecycle::Open {
+        return;
+    }
+    inner.lifecycle = Lifecycle::Released;
+    if let Some(cancellation) = inner.runtime_cancellation.take()
+        && inner.producer_terminal.is_none()
+    {
+        cancellation.cancel();
+    }
     inner.handler_task = None;
+    inner.host_dispatch = None;
+    LIVE_CONVERSATIONS.fetch_sub(1, Ordering::SeqCst);
+}
+
+/// Record the producer's terminal: the conversation is complete.
+fn note_producer_terminal(inner: &mut SermoInner, status: FrameStatus, data: &Valor) {
+    if inner.producer_terminal.is_none() {
+        let error = (status == FrameStatus::Error).then(|| error_text(data));
+        inner.producer_terminal = Some((status, error));
+    }
+}
+
+/// Text of an `error` terminal's data, as `close()` reports it.
+fn error_text(data: &Valor) -> String {
+    match data {
+        Valor::Textus(text) => text.clone(),
+        other => format!("{other:?}"),
+    }
+}
+
+/// Close a conversation early (D8.3 `close()`). A live handler is cancelled,
+/// unread frames are dropped, and the conversation is released. Returns
+/// whether this call closed it (`false` when it was already closed).
+///
+/// # Errors
+///
+/// Returns the text of the conversation's `error` terminal.
+pub fn sermo_close(sermo: &Sermo) -> Result<bool, String> {
+    let mut inner = lock_sermo(&sermo.inner);
+    if inner.lifecycle == Lifecycle::Closed {
+        return Ok(false);
+    }
+    if !inner.incoming_drained {
+        let terminal = inner
+            .producer_terminal
+            .as_ref()
+            .map_or(FrameStatus::Cancel, |(status, _)| *status);
+        inner.runtime_response_state = RuntimeResponseState::Generated;
+        record_incoming_terminal(&mut inner, terminal);
+    }
+    inner.incoming.clear();
+    release_conversation(&mut inner);
+    inner.lifecycle = Lifecycle::Closed;
+    sermo.inner.incoming_changed.notify_all();
+    if inner.incoming_terminal == Some(FrameStatus::Error) {
+        let error = inner
+            .producer_terminal
+            .as_ref()
+            .and_then(|(_, error)| error.clone());
+        return Err(error.unwrap_or_default());
+    }
+    Ok(true)
 }
 
 fn wake_incoming(inner: &mut SermoInner) {
@@ -1106,6 +1261,12 @@ fn sermo_request(inner: &SermoInner, target: Option<&'static str>) -> SermoReque
 }
 
 fn push_runtime_frame(inner: &mut SermoInner, status: FrameStatus, data: Valor) {
+    if status.is_terminal() {
+        note_producer_terminal(inner, status, &data);
+        // Completion (D8.3): the producer is done, so the conversation
+        // releases now, even while its handle and unread frames live on.
+        release_conversation(inner);
+    }
     inner.incoming.push_back(Scrinium {
         id: next_frame_id(),
         parent_id: Some(inner.conversation_id.clone()),
