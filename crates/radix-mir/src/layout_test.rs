@@ -171,8 +171,8 @@ fn intended_bucket(ty: &Type) -> Bucket {
     }
 }
 
-/// One representative `Type` per census row (49 rows: 14 Primitive-expanded
-/// variants + 35 other variants; `Alias` excluded). Nested ids are interned
+/// One representative `Type` per census row (50 rows: 14 Primitive-expanded
+/// variants + 36 other variants; `Alias` excluded). Nested ids are interned
 /// into `types` so the rows are resolvable.
 fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     let int64_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
@@ -185,7 +185,7 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     let two = types.intern_index(IndexExpr::Literal(2));
     let matrix_shape = types.intern_index(IndexExpr::Tuple(vec![two, two]));
 
-    let mut rows = Vec::with_capacity(49);
+    let mut rows = Vec::with_capacity(50);
     // Physical (14): the five physical primitives, the sized/word numerics,
     // the device-class rows, and the physical aggregates.
     for prim in [
@@ -281,14 +281,14 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     rows.push(Type::Error);
     assert_eq!(
         rows.len(),
-        49,
-        "the census must stay 49 Primitive-expanded rows"
+        50,
+        "the census must stay 50 Primitive-expanded rows"
     );
     rows
 }
 
 #[test]
-fn pin_table_census_is_49_rows_across_the_four_buckets() {
+fn pin_table_census_is_50_rows_across_the_four_buckets() {
     let mut types = TypeTable::new();
     let rows = census_rows(&mut types);
 
@@ -304,7 +304,10 @@ fn pin_table_census_is_49_rows_across_the_four_buckets() {
             Bucket::Internal => internal += 1,
         }
     }
-    assert_eq!(physical, 18, "physical census rows (MLC-4: +1 sparsa)");
+    assert_eq!(
+        physical, 19,
+        "physical census rows (MLC-4: +1 sparsa; D11.1: +1 saturatus)"
+    );
     assert_eq!(aggregate, 6, "opaque-aggregate census rows");
     assert_eq!(
         opaque, 20,
