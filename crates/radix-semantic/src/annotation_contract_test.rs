@@ -345,6 +345,7 @@ functio apply() → vacuum {
                 required: true,
                 default: None,
                 modifier: None,
+                visibility: radix_syntax::MemberVisibility::Publica,
             }],
             methods: Vec::new(),
             annotation_contract: Some(InterfaceAnnotationContract {

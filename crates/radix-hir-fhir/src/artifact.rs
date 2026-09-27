@@ -108,6 +108,8 @@ pub struct StructFieldSnapshot {
     pub required: bool,
     /// Authored genus field modifier (D16.1).
     pub modifier: Option<radix_syntax::FieldModifier>,
+    /// Genus member visibility (D5.3).
+    pub visibility: radix_syntax::MemberVisibility,
 }
 
 // ---------------------------------------------------------------------------
@@ -524,8 +526,10 @@ pub struct FunctionProvenanceTableWire {
 /// (`HirPresentation::region`, D7.7) and the `HirTriviaOwnerKind::Region`
 /// owner that carries the module doc; schema-v20 artifacts fail closed.
 /// Version 22 adds `HirPresentation::insere_exprs` (authored build-time
-/// embed paths, D8.10); schema-v21 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 22;
+/// embed paths, D8.10); schema-v21 artifacts fail closed. Version 23 carries
+/// genus member visibility on `StructFieldSnapshot` (D5.3); schema-v22
+/// artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 23;
 
 /// Serializable snapshot of one analyzed provider unit carried for HIR
 /// emission (ARCH-U4 carriage).

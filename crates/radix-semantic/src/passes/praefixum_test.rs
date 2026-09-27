@@ -2,10 +2,10 @@
 //!
 //! Contract:
 //! - `praefixum` is legal only as a `generis` initializer; elsewhere it is
-//!   SEM062 `praefixum_outside_static`;
+//!   SEM064 `praefixum_outside_static`;
 //! - its body type-checks like a function body returning the declared type;
 //! - a body that reaches `ad`, await, async, `externa`, input, or output —
-//!   directly or through Faber callees — is SEM062 `praefixum_forbidden`,
+//!   directly or through Faber callees — is SEM064 `praefixum_forbidden`,
 //!   naming the effect and the call chain;
 //! - a static that reads itself through a `praefixum` body is SEM007
 //!   `static_cycle`;

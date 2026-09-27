@@ -11,7 +11,7 @@
 //!
 //! FAILURES
 //! ========
-//! Every failure is a build error on the static (SEM062):
+//! Every failure is a build error on the static (SEM064):
 //! - `mori` or a propagated `⇥`: `praefixum_failed`, carrying the message;
 //! - the step budget: `praefixum_step_limit`;
 //! - no `redde` value: `praefixum_no_result`;

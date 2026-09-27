@@ -2886,10 +2886,6 @@ help = "elige viam extra praefixum `runtime:` et vias internas"
 message = "`{annotation}` is reserved and has no active visibility meaning"
 help = "use `{publica}` for explicit export intent or `{privata}` for file-private intent"
 
-[diagnostics.SEM018.issues.member_privacy_unenforced]
-message = "member privacy is not enforced yet; remove the annotation"
-help = "remove `{annotation}` from the member; members are public until member privacy is enforced"
-
 [diagnostics.SEM018.issues.conflicting_lane]
 message = "conflicting @ radix lane annotations: '{existing}' and '{parsed}'"
 help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
@@ -3431,34 +3427,74 @@ message = "an `{insere}` initializer must declare `textus` or `octeti`"
 help = "declare `textus` for UTF-8 text or `octeti` for raw bytes"
 
 [diagnostics.SEM062]
+message = "top-level binding"
+help = "use `{generis} T X = …` for a compile-time constant, or move the binding into a function"
+
+[diagnostics.SEM062.issues.top_level_binding]
+message = "top-level `{name}`: module-level mutable state does not exist"
+help = "use `{generis} T X = …` for a compile-time constant, or move the binding into a function"
+
+[diagnostics.SEM063]
+message = "member is not accessible here"
+help = "reach the member through the type's own methods, or change its visibility"
+
+[diagnostics.SEM063.issues.member_private_read]
+message = "`{member}` is private to `{owner}`; only its own methods can read it"
+help = "read it through a method of `{owner}`"
+
+[diagnostics.SEM063.issues.member_private_write]
+message = "`{member}` is private to `{owner}`; only its own methods can write it"
+help = "set it in a construction literal, or through a method of `{owner}`"
+
+[diagnostics.SEM063.issues.member_private_call]
+message = "`{member}` is private to `{owner}`; only its own methods can call it"
+help = "call a public method of `{owner}` instead"
+
+[diagnostics.SEM063.issues.member_interna_read]
+message = "`{member}` of `{owner}` is internal to its package and cannot be read from another package"
+help = "use a public member of `{owner}`"
+
+[diagnostics.SEM063.issues.member_interna_write]
+message = "`{member}` of `{owner}` is internal to its package and cannot be written from another package"
+help = "set it in a construction literal, or use a public member of `{owner}`"
+
+[diagnostics.SEM063.issues.member_interna_call]
+message = "`{member}` of `{owner}` is internal to its package and cannot be called from another package"
+help = "call a public method of `{owner}` instead"
+
+[diagnostics.SEM063.issues.union_member_visibility_differs]
+message = "`{member}` is written through a union whose members declare different visibility: {detail}"
+help = "declare `{member}` with the same visibility on every member of the union"
+
+[diagnostics.SEM064]
 message = "invalid `{praefixum}` initializer"
 help = "keep a `{praefixum}` body to pure computation that yields a literal value"
 
-[diagnostics.SEM062.issues.praefixum_outside_static]
+[diagnostics.SEM064.issues.praefixum_outside_static]
 message = "`{praefixum}` is allowed only as a `{generis}` initializer"
 help = "move the computation into a `{generis}` initializer: `{generis} T NAME = {praefixum}` followed by a block"
 
-[diagnostics.SEM062.issues.praefixum_forbidden]
+[diagnostics.SEM064.issues.praefixum_forbidden]
 message = "`{praefixum}` initializer of `{name}` reaches `{effect}` through {chain}"
 help = "a build-time body may compute, loop, and call pure Faber functions; it may not use `{ad}`, await, async code, external code, input, or output"
 
-[diagnostics.SEM062.issues.praefixum_failed]
+[diagnostics.SEM064.issues.praefixum_failed]
 message = "`{praefixum}` initializer of `{name}` failed at build time: {message}"
 help = "fix the computation or the condition it asserts"
 
-[diagnostics.SEM062.issues.praefixum_step_limit]
+[diagnostics.SEM064.issues.praefixum_step_limit]
 message = "`{praefixum}` initializer of `{name}` did not finish within {limit} steps"
 help = "check for an endless loop or runaway recursion"
 
-[diagnostics.SEM062.issues.praefixum_no_result]
+[diagnostics.SEM064.issues.praefixum_no_result]
 message = "`{praefixum}` initializer of `{name}` finished without a value"
 help = "end every path of the body with `{redde}` and the value"
 
-[diagnostics.SEM062.issues.praefixum_result_not_literal]
+[diagnostics.SEM064.issues.praefixum_result_not_literal]
 message = "the value of `{praefixum}` initializer `{name}` has no literal form"
 help = "return scalars, text, bytes, collections of those, tuples, or a non-generic genus; never closures or handles"
 
-[diagnostics.SEM062.issues.praefixum_unsupported]
+[diagnostics.SEM064.issues.praefixum_unsupported]
 message = "`{praefixum}` initializer of `{name}` cannot run at build time: {detail}"
 help = "use only constructs the build-time runner supports"
 
@@ -3653,14 +3689,6 @@ help = "add a '{ceterum}' arm, or split the match so each pattern kind is checka
 [diagnostics.WARN029.issues.coverage_unchecked]
 message = "coverage of this match could not be computed for its pattern kinds; exhaustiveness was not checked"
 help = "add a '{ceterum}' arm, or split the match so each pattern kind is checkable"
-
-[diagnostics.WARN030]
-message = "top-level binding"
-help = "use `{generis} T X = …` for a compile-time constant, or move the binding into a function"
-
-[diagnostics.WARN030.issues.top_level_binding]
-message = "top-level `{name}`: module-level mutable state does not exist"
-help = "use `{generis} T X = …` for a compile-time constant, or move the binding into a function"
 
 [llm]
 system_prompt_snippet = "Emit canonical Latin Faber source using the registered Latin keywords, canonical type spellings, and invariant glyph syntax."

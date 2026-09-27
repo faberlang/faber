@@ -48,9 +48,9 @@ fn rejection(source: &str, issue: &str) -> Diagnostic {
     };
     diagnostics
         .iter()
-        .find(|d| d.code == Some("SEM062") && d.issue() == Some(issue))
+        .find(|d| d.code == Some("SEM064") && d.issue() == Some(issue))
         .cloned()
-        .unwrap_or_else(|| panic!("expected SEM062 {issue}, got {diagnostics:?}"))
+        .unwrap_or_else(|| panic!("expected SEM064 {issue}, got {diagnostics:?}"))
 }
 
 fn arg<'a>(diagnostic: &'a Diagnostic, name: &str) -> Option<&'a str> {

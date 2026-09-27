@@ -35,6 +35,7 @@ pub(crate) const SEMANTIC_ERROR_KINDS: &[SemanticErrorKind] = &[
     SemanticErrorKind::AirPurityViolation,
     SemanticErrorKind::StaticInitializerInvalid,
     SemanticErrorKind::InsereInvalid,
+    SemanticErrorKind::MemberInaccessible,
     SemanticErrorKind::PraefixumInvalid,
     SemanticErrorKind::ImmutableAssignment,
     SemanticErrorKind::AssignmentTargetInvalid,
@@ -55,6 +56,7 @@ pub(crate) const SEMANTIC_ERROR_KINDS: &[SemanticErrorKind] = &[
     SemanticErrorKind::LifetimeMismatch,
     SemanticErrorKind::AssignToImmutableBorrow,
     SemanticErrorKind::ModeMismatch,
+    SemanticErrorKind::TopLevelBindingForbidden,
 ];
 
 pub(crate) const WARNING_KINDS: &[WarningKind] = &[
@@ -82,7 +84,6 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::ComplexityBudgetExceeded,
     WarningKind::RedundantMemberVisibility,
     WarningKind::CoverageUnchecked,
-    WarningKind::TopLevelBinding,
 ];
 
 // STABLE CODES
@@ -187,8 +188,12 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
                 "embed a package-relative file that exists, as `textus` (UTF-8) or `octeti`",
             ),
         },
+        SemanticErrorKind::MemberInaccessible => DiagnosticSpec {
+            code: "SEM063",
+            help: Some("reach the member through the type's own methods, or change its visibility"),
+        },
         SemanticErrorKind::PraefixumInvalid => DiagnosticSpec {
-            code: "SEM062",
+            code: "SEM064",
             help: Some("keep a `praefixum` body to pure computation that yields a literal value"),
         },
         SemanticErrorKind::AirPurityViolation => DiagnosticSpec {
@@ -272,6 +277,12 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
         SemanticErrorKind::ModeMismatch => DiagnosticSpec {
             code: "SEM057",
             help: Some("align parameter modes between caller and callee"),
+        },
+        SemanticErrorKind::TopLevelBindingForbidden => DiagnosticSpec {
+            code: "SEM062",
+            help: Some(
+                "use `generis T X = …` for a compile-time constant, or move the binding into a function",
+            ),
         },
         SemanticErrorKind::Warning(kind) => warning_spec(kind),
     }
@@ -997,12 +1008,6 @@ fn semantic_invalid_annotation_help(args: &[DiagnosticArg]) -> Option<String> {
                 "use `{publica}` for explicit export intent or `{privata}` for file-private intent"
             ))
         }
-        "member_privacy_unenforced" => {
-            let annotation = arg_value(args, "annotation")?;
-            Some(format!(
-                "remove `{annotation}` from the member; members are public until member privacy is enforced"
-            ))
-        }
         "empty_radix_typus_domain" | "missing_type_param" | "non_identifier_type_param" | "non_type_allowed" => {
             Some("use `@ radix typus T in textus octeti` or braced `@ radix { param = T, allowed = textus }` with at least one allowed type".to_owned())
         }
@@ -1158,12 +1163,6 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::CoverageUnchecked => DiagnosticSpec {
             code: "WARN029",
             help: Some("add a 'ceterum' arm, or split the match so each pattern kind is checkable"),
-        },
-        WarningKind::TopLevelBinding => DiagnosticSpec {
-            code: "WARN030",
-            help: Some(
-                "use `generis T X = …` for a compile-time constant, or move the binding into a function",
-            ),
         },
     }
 }

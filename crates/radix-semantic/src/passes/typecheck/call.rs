@@ -17,6 +17,7 @@
 //! - Backend method translation and stdlib target names are not decided here;
 //!   this pass only establishes the semantic result type and diagnostics.
 
+use super::member_privacy::MemberAccess;
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
@@ -464,6 +465,7 @@ impl TypeChecker<'_> {
             return ret;
         }
         if let Some(sig) = self.lookup_method_signature(receiver_ty, *name) {
+            self.check_method_visibility(receiver_ty, *name, receiver.span);
             if let Some(method) = self.lookup_interface_method_info(receiver_ty, *name) {
                 let availability = method.availability.clone();
                 let span = method.span;
@@ -489,6 +491,7 @@ impl TypeChecker<'_> {
         if let Some(field_ty) = self.lookup_field_type(receiver_ty, *name)
             && let Some(sig) = self.signature_from_type(field_ty)
         {
+            self.check_field_visibility(receiver_ty, *name, MemberAccess::Read, receiver.span);
             return self.check_instantiated_call(
                 &sig,
                 explicit_type_args,
@@ -504,6 +507,7 @@ impl TypeChecker<'_> {
         // to. A miss names the constituents that lack the method.
         if let Some(members) = self.union_members_of(receiver_ty) {
             if let Some(sig) = self.union_common_method_signature(&members, *name) {
+                self.check_method_visibility(receiver_ty, *name, receiver.span);
                 self.set_chorda_scalar_closure_context(*name);
                 let ret = self.check_instantiated_call(
                     &sig,

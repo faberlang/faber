@@ -85,6 +85,7 @@ fn token_union_interface() -> FileInterface {
                         required: true,
                         default: None,
                         modifier: None,
+                        visibility: radix_syntax::MemberVisibility::Publica,
                     }],
                 },
             ],

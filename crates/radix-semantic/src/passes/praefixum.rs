@@ -11,7 +11,7 @@
 //! - call `externa` (bodyless) code, which cannot run on the runner;
 //! - read input (`lege`) or write output (`scribe`/`nota`).
 //!
-//! A violation is SEM062 `praefixum_forbidden` naming the effect and the call
+//! A violation is SEM064 `praefixum_forbidden` naming the effect and the call
 //! chain from the static to the function that performs it.
 //!
 //! The same walk records which statics each initializer reads, directly or

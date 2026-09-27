@@ -343,7 +343,14 @@ impl super::FaberCodegen<'_> {
         writer.writeln(" {");
         writer.indented(|writer| {
             for (ordinal, field) in s.fields.iter().enumerate() {
-                self.write_member_trivia(field.def_id, false, writer);
+                self.write_member_trivia(field.def_id, !field.annotations.is_empty(), writer);
+                self.write_hir_annotations(
+                    &field.annotations,
+                    names,
+                    surface,
+                    Some(field.def_id),
+                    writer,
+                );
                 if let Some(modifier) = field.modifier {
                     writer.write(surface.keyword(match modifier {
                         radix_syntax::FieldModifier::Fixum => TokenKind::Fixum,

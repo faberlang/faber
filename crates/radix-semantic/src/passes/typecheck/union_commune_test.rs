@@ -46,6 +46,7 @@ fn shape_error_interface() -> FileInterface {
         required: true,
         default: None,
         modifier: None,
+        visibility: radix_syntax::MemberVisibility::Publica,
     };
     interface.insert(FileExport {
         name: "ShapeError".to_owned(),
@@ -70,6 +71,7 @@ fn shape_error_interface() -> FileInterface {
                             required: true,
                             default: None,
                             modifier: None,
+                            visibility: radix_syntax::MemberVisibility::Publica,
                         },
                         InterfaceStructField {
                             name: "actual".to_owned(),
@@ -78,6 +80,7 @@ fn shape_error_interface() -> FileInterface {
                             required: true,
                             default: None,
                             modifier: None,
+                            visibility: radix_syntax::MemberVisibility::Publica,
                         },
                     ],
                 },

@@ -228,6 +228,9 @@ impl TypeChecker<'_> {
             }
             HirItemKind::Constant(const_item) => self.check_const(item.def_id, const_item),
             HirItemKind::Struct(struct_item) => {
+                // Field defaults and methods are the type's own code: its
+                // `@ privata` members are reachable here (D5.3).
+                let outer_owner = self.current_member_owner.replace(item.def_id);
                 self.check_json_struct_contract(item.def_id, struct_item);
                 for field in &mut struct_item.fields {
                     self.check_hashable_keys(field.ty, item.span);
@@ -244,6 +247,7 @@ impl TypeChecker<'_> {
                 for method in &mut struct_item.methods {
                     self.check_function(method.def_id, &method.annotations, &mut method.func);
                 }
+                self.current_member_owner = outer_owner;
             }
             _ => {}
         }

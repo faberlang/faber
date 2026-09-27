@@ -309,6 +309,8 @@ pub struct ImportedFileInterfaceMethod {
     /// Consumer-locale spelling accepted at the source boundary.
     pub surface_name: LexSymbol,
     pub sig: FuncSig,
+    /// Member visibility for `genus` methods (D5.3); public elsewhere.
+    pub visibility: radix_syntax::MemberVisibility,
 }
 
 #[derive(Debug, Clone)]
@@ -332,6 +334,8 @@ pub struct ImportedFileStructField {
     pub required: bool,
     /// Authored genus field modifier (D16.1), carried across the interface.
     pub modifier: Option<radix_syntax::FieldModifier>,
+    /// Member visibility (D5.3), carried across the interface.
+    pub visibility: radix_syntax::MemberVisibility,
     pub init: Option<HirExpression>,
 }
 
@@ -1601,6 +1605,7 @@ impl Resolver {
                                 optional: field.optional,
                                 required: field.required,
                                 modifier: field.modifier,
+                                visibility: field.visibility,
                                 init: field.default.clone(),
                             }),
                             Err(_) => {
@@ -1706,6 +1711,7 @@ impl Resolver {
                 name,
                 surface_name,
                 sig,
+                visibility: method.visibility,
             });
         }
         (imported, skipped)
@@ -1828,6 +1834,7 @@ impl Resolver {
                 optional: field.optional,
                 required: field.required,
                 modifier: field.modifier,
+                visibility: field.visibility,
                 init: field.default.clone(),
             });
         }
@@ -2483,6 +2490,21 @@ impl Resolver {
                     strukt.methods.clone(),
                     strukt.type_params.clone(),
                 )),
+                ImportedFileExport::Function(_) | ImportedFileExport::Type(_) => None,
+            })
+            .collect()
+    }
+
+    /// Imported `genus` declarations reached through a cross-package
+    /// namespace binding: their `@ interna` members are unreachable (D5.3).
+    #[must_use]
+    pub fn imported_cross_package_structs(&self) -> Vec<DefId> {
+        self.file_interfaces
+            .iter()
+            .filter(|(namespace, _)| !self.namespace_same_package(**namespace))
+            .flat_map(|(_, interface)| interface.exports.values())
+            .filter_map(|export| match export {
+                ImportedFileExport::Struct(strukt) => Some(strukt.def_id),
                 ImportedFileExport::Function(_) | ImportedFileExport::Type(_) => None,
             })
             .collect()
@@ -3696,6 +3718,7 @@ impl Resolver {
                                         optional: field.optional,
                                         required: field.required,
                                         modifier: field.modifier,
+                                        visibility: field.visibility,
                                         init: None,
                                     })
                                     .collect();
@@ -3844,6 +3867,7 @@ impl Resolver {
                                         optional: field.optional,
                                         required: field.required,
                                         modifier: field.modifier,
+                                        visibility: field.visibility,
                                     })
                                     .collect(),
                             },

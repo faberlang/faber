@@ -32,6 +32,7 @@ fn genus(name: &str) -> FileExport {
                 required: true,
                 default: None,
                 modifier: None,
+                visibility: radix_syntax::MemberVisibility::Publica,
             }],
             methods: Vec::new(),
             annotation_contract: None,

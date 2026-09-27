@@ -908,7 +908,6 @@ pub(super) fn lower_package_units<'a>(
 
     for unit in others.values_mut() {
         let unit_path = unit.path.clone();
-        let source_interner = unit.analysis.interner.clone();
         let source_exports = exported_nominal_names(&unit.file_interface);
         // S1 U2 nominal identity: build the canonical nominal remap while the
         // source analysis is freely borrowable (lowering mutates it below).
@@ -966,6 +965,11 @@ pub(super) fn lower_package_units<'a>(
             &mut consumer_launch_entries,
         );
         let mut lowered = lower_unit(unit, &cli_plan.entry_records, no_fuse)?;
+        // Remap from the post-lowering table: lowering appends runtime and
+        // diagnostic text (format templates, the lockstep length-mismatch
+        // message, …) that the pre-lowering analysis interner never held
+        // (B11).
+        let source_interner = lowered.interner.clone();
         let lowered_source_types = TypeTable::from_snapshot(
             lowered.validated.validation().types.snapshot(),
         )
