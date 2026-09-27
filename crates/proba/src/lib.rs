@@ -14,7 +14,8 @@ use radix::hir::{DefId, HirItemKind, HirModule, HirTestMetadata, HirTestModifier
 use radix::lexer::Interner;
 use radix::mir::{
     BufferHost, MirFunctionId, RunSourceError, RunnerError, RunnerStats, ValidatedMir,
-    lower_analyzed_unit, run_function_with_limits, run_function_with_stats_and_limits,
+    lower_analyzed_unit, reset_execution_state, run_function_with_limits,
+    run_function_with_stats_and_limits,
 };
 use radix::module::{AnalyzedModule, Session};
 use radix::program::analyze_prepared_program_name;
@@ -766,6 +767,9 @@ fn execute_case(
     erratur: bool,
     collect_stats: bool,
 ) -> CaseExecution {
+    // A seed belongs to one program execution. Clear the runner's process-wide
+    // kernel state before this case can observe an earlier program's seed.
+    reset_execution_state();
     let mut host = BufferHost::default();
     // Wall-clock deadline from the resolved timeout (per-test temporis, else
     // the CLI default). The runner's default step budget still applies as a
