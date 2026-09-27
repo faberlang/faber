@@ -757,7 +757,7 @@ driver. `capture-pending` rows intentionally carry no invented token shape.
 | `BACKTICK_STRING` | `capture-pending` | scan.rs scan_backtick_string; backtick forma template; TokenKind::BacktickString |
 | `OCTETI_STRING` | `capture-pending` | scan.rs scan_octeti_string; pipe-delimited hex; TokenKind::OctetiString |
 | `NEWLINE` | `capture-pending` | scan.rs scan_line_break; LF or CRLF; TokenKind::Newline |
-| `WIDTH_MARKER` | `capture-pending` | parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64 and decimal d32/d64 (numerus only), f16/bf16/f32/f64 (fractus only); not a lexer token |
+| `WIDTH_MARKER` | `capture-pending` | parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64 and decimal d32/d64 (numerus only), f16/bf16/f32/f64 (fractus only); u8/u16/u32/u64 (modulus), i8/i16/i32/i64/u8/u16/u32/u64 (saturatus); not a lexer token |
 | `LISTA_WIDTH_SUGAR` | `capture-pending` | parser type-position l + WIDTH_MARKER; not a lexer token |
 | `TENSOR_WIDTH_SUGAR` | `capture-pending` | parser type-position t + WIDTH_MARKER; not a lexer token |
 | `SPARSA_WIDTH_SUGAR` | `capture-pending` | parser type-position s + WIDTH_MARKER; not a lexer token |
@@ -1052,7 +1052,7 @@ and `bivalens` scalars, plus `textus` concatenation; references to other
 statics (evaluated in dependency order — a cycle is `static_cycle`); and
 collection literals (`lista`, tuples, map construction) whose elements are
 constants (only their scalar leaves fold). Anything else is
-`static_initializer_not_constant`. Decimal widths and `modulus<W>` values are
+`static_initializer_not_constant`. Decimal widths and `modulus<W>`/`saturatus<W>` values are
 not folded, so arithmetic on them is not a compile-time constant today.
 Compile-time integer arithmetic is checked (overflow and division by zero are
 compile errors), matching the runner's checked runtime semantics.
@@ -1428,7 +1428,8 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | `littera`  | en `char`; one Unicode scalar value (D10.1–10.2): a 4-byte value that never allocates (Rust `char`, Go `rune`). Element of `textus` / `ascii` iteration and of `textus[i]` / `ascii[i]` indexing. Grapheme clusters are norma library work, not this type. |
 | `forma`    | captured template + params |
 | `numerus`  | integer (default `i64`) |
-| `modulus<W>` | unsigned modular word; arithmetic wraps modulo 2^W |
+| `modulus<W>` | en `wrapping<W>`; unsigned modular word; arithmetic wraps modulo 2^W |
+| `saturatus<W>` | en `saturating<W>`; saturating integer; arithmetic clamps at both ends of W |
 | `fractus`  | float (default `f64`) |
 | `bivalens` | boolean |
 | `rỗng`    | null |
@@ -1462,6 +1463,7 @@ Sized primitives accept one optional **width marker** (not a user type parameter
 | `numerus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `d32`, `d64` | `numerus<f32>` → use `fractus<f32>` |
 | `fractus<W>` | `f16`, `bf16`, `f32`, `f64` | `fractus<i32>` → use `numerus<i32>` |
 | `modulus<W>` | `u8`, `u16`, `u32`, `u64` | `modulus<i32>` → signed widths are not modular words |
+| `saturatus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64` | `saturatus<f32>` → use `fractus<f32>` |
 
 Bare `numerus` / `fractus` remain shorthand for `numerus<i64>` / `fractus<f64>`.
 
@@ -1472,7 +1474,7 @@ with round-half-even reductions, so `4.2 + 0.1` is exactly `4.3`. The `d`
 markers are valid only on `numerus` (`fractus<d32>` is rejected). Integer
 literals in a decimal context are rejected (`decimal_integer_literal_rejected`);
 write `1.0` or convert explicitly with `↦`.
-`numerus<_>`, `fractus<_>`, `modulus<_>`, and `instans<_>` are marker holes:
+`numerus<_>`, `fractus<_>`, `modulus<_>`, `saturatus<_>`, and `instans<_>` are marker holes:
 the family stays identity and only the width/precision is inferred from a
 same-family witness (exact marker, no lattice widening). Unsolved `_` is an
 error, never the bare default. Convert-hint holes (`numerus<u32, _>`) are
@@ -1497,6 +1499,12 @@ Overflow policy lives in the type, read once at the declaration. There are no
 per-operation checked, wrapping, or saturating method families. To ask "does
 this fit?" of untrusted input, convert it to the narrow type with `↦` and
 handle the failure through the error channel.
+
+`saturatus<W>` clamps: `+ - * / %` saturate at `W`'s bounds (`-MIN` and
+`MIN / -1` give MAX); division by zero traps. Literals adapt and must fit
+`W`. It never mixes with `numerus`/`modulus` without `↦`, and `↦` into or
+out of it is a range-checked narrowing between integer families only. Bitwise, shift, `¬`, unsigned negation, and
+`↑`/`↓` are rejected.
 
 ### Generic Collections
 
@@ -1564,7 +1572,8 @@ For non-width element types (e.g. `tensor<textus, [3]>`), use the full form.
 Sugar is reserved in type syntax only — value identifiers named `tf32`, `lf32`,
 etc. are unchanged.
 
-`modulus<W>` has no sugar; write `modulus<u32>` in full.
+`modulus<W>` and `saturatus<W>` have no sugar; write `modulus<u32>` /
+`saturatus<i16>` in full.
 
 **Spelling preference (author convention, not grammar):** general Faber code
 tends toward long form for readability; numeric/tensor-primary modules may
