@@ -46,10 +46,8 @@ mod frame_names_test;
 mod ad_annotation_roundtrip_test;
 
 use crate::lexer::TokenKind;
-use crate::locale::{self, TypeBindingKind};
-use radix_hir_faber::FrameFamily;
+use crate::locale;
 use radix_hir_faber::KeywordSurface as LeafKeywordSurface;
-use radix_hir_faber::TypeBindingKind as LeafTypeBindingKind;
 
 /// Bridge package reader-locale surfaces into the leaf keyword trait.
 ///
@@ -75,21 +73,8 @@ impl LeafKeywordSurface for LocaleKeywordBridge<'_> {
         locale::KeywordSurface::intrinsic_surface(&self.0, canonical).map(str::to_owned)
     }
 
-    fn type_surface(&self, kind: LeafTypeBindingKind) -> &str {
-        let pack_kind = match kind {
-            LeafTypeBindingKind::Primitive(prim) => TypeBindingKind::Primitive(prim),
-            LeafTypeBindingKind::Collection(collection) => TypeBindingKind::Collection(collection),
-            LeafTypeBindingKind::TensorFamily(family) => TypeBindingKind::TensorFamily(family),
-            LeafTypeBindingKind::ModularWord => TypeBindingKind::ModularWord,
-            LeafTypeBindingKind::SaturatingWord => TypeBindingKind::SaturatingWord,
-            LeafTypeBindingKind::Frame(frame) => TypeBindingKind::Frame(match frame {
-                FrameFamily::Sermo => locale::FrameTypeKind::Sermo,
-                FrameFamily::Scrinium => locale::FrameTypeKind::Scrinium,
-                FrameFamily::Meus => locale::FrameTypeKind::Meus,
-                FrameFamily::Tuus => locale::FrameTypeKind::Tuus,
-            }),
-        };
-        locale::KeywordSurface::type_surface(&self.0, pack_kind)
+    fn type_surface(&self, kind: radix_semantic::locale::TypeBindingKind) -> &str {
+        locale::KeywordSurface::type_surface(&self.0, kind)
     }
 }
 

@@ -4,44 +4,8 @@
 //! The leaf does not depend on the full reader-pack machinery.
 
 use radix_lexer::TokenKind;
-use radix_types::{CollectionKind, Primitive, TensorFamilyKind};
 
-/// Identity used when looking up localized type spellings.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum TypeBindingKind {
-    Primitive(Primitive),
-    Collection(CollectionKind),
-    TensorFamily(TensorFamilyKind),
-    ModularWord,
-    /// `saturatus<W>` (en `saturating<W>`, D11.1).
-    SaturatingWord,
-    /// Compiler-owned conversation family (DECISIONS D6.16).
-    Frame(FrameFamily),
-}
-
-/// Compiler-owned conversation-family types whose spelling projects through
-/// the target pack (`sermo`, `scrinium`, and the `meus`/`tuus` views).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum FrameFamily {
-    Sermo,
-    Scrinium,
-    Meus,
-    Tuus,
-}
-
-impl FrameFamily {
-    /// Identity for a builtin struct's canonical Latin name.
-    #[must_use]
-    pub fn from_latin(text: &str) -> Option<Self> {
-        match text {
-            "sermo" => Some(Self::Sermo),
-            "scrinium" => Some(Self::Scrinium),
-            "meus" => Some(Self::Meus),
-            "tuus" => Some(Self::Tuus),
-            _ => None,
-        }
-    }
-}
+pub use radix_semantic::locale::{FrameTypeKind as FrameFamily, TypeBindingKind};
 
 /// Borrowed keyword/type surface for canonical Faber emission.
 pub trait KeywordSurface {

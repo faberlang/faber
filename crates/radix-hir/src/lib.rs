@@ -20,4 +20,20 @@ mod presentation_test;
 pub mod visit;
 
 pub use nodes::*;
-pub use radix_types::DefId;
+pub use radix_types::{DefId, TypeId};
+use rustc_hash::{FxHashMap, FxHashSet};
+
+/// Function facts installed by analyzed HIR consumers at the codegen boundary.
+///
+/// Every non-Rust HIR backend consumes the same semantic fact surface. Keeping
+/// this carrier in the neutral HIR crate prevents each backend from inventing a
+/// nominally different wrapper for the same analyzed table.
+#[derive(Default, Clone)]
+pub struct FailableFacts {
+    /// Definitions whose return value carries an alternate exit.
+    pub failable: FxHashSet<DefId>,
+    /// Per-definition error type overrides.
+    pub err_tys: FxHashMap<DefId, TypeId>,
+    /// Definitions whose body is asynchronous or generator-shaped.
+    pub async_defs: FxHashSet<DefId>,
+}

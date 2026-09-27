@@ -705,6 +705,7 @@ dependencies = [
  "radix-diagnostics",
  "radix-hir",
  "radix-lexer",
+ "radix-target",
  "radix-types",
  "rustc-hash",
 ]
@@ -739,6 +740,7 @@ dependencies = [
  "radix-hir",
  "radix-lexer",
  "radix-parser",
+ "radix-semantic",
  "radix-syntax",
  "radix-types",
  "rustc-hash",

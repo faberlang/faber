@@ -12,6 +12,7 @@ radix-diagnostics = { path = "../radix-diagnostics" }
 radix-hir = { path = "../radix-hir" }
 radix-lexer = { path = "../radix-lexer" }
 radix-syntax = { path = "../radix-syntax" }
+radix-semantic = { path = "../radix-semantic" }
 radix-types = { path = "../radix-types" }
 rustc-hash = "2"
 

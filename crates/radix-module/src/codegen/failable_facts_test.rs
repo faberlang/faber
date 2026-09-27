@@ -5,7 +5,7 @@
 //! compiles under the same feature gate (see the module declaration in
 //! `codegen/mod.rs`).
 
-use super::failable_facts_parts;
+use super::failable_facts;
 use crate::hir::DefId;
 use crate::semantic::{FunctionFact, FunctionFactTable, TypeId};
 use rustc_hash::FxHashMap;
@@ -28,16 +28,16 @@ fn conversion_preserves_failable_set_and_err_tys() {
     by_def.insert(DefId(3), FunctionFact::default());
     let facts = FunctionFactTable::from_raw(by_def, None);
 
-    let (failable, err_tys) = failable_facts_parts(&facts);
+    let converted = failable_facts(&facts);
 
-    assert_eq!(failable.len(), 2, "may_fail defs only");
-    assert!(failable.contains(&DefId(1)));
-    assert!(failable.contains(&DefId(2)));
+    assert_eq!(converted.failable.len(), 2, "may_fail defs only");
+    assert!(converted.failable.contains(&DefId(1)));
+    assert!(converted.failable.contains(&DefId(2)));
 
-    assert_eq!(err_tys.len(), 1, "only defs with a declared error type");
-    assert_eq!(err_tys.get(&DefId(1)), Some(&err_ty));
-    assert!(!err_tys.contains_key(&DefId(2)));
-    assert!(!err_tys.contains_key(&DefId(3)));
+    assert_eq!(converted.err_tys.len(), 1, "only defs with a declared error type");
+    assert_eq!(converted.err_tys.get(&DefId(1)), Some(&err_ty));
+    assert!(!converted.err_tys.contains_key(&DefId(2)));
+    assert!(!converted.err_tys.contains_key(&DefId(3)));
 }
 
 /// Synthetic entry facts never map to a `DefId`, so they must not leak into the
@@ -49,8 +49,8 @@ fn synthetic_entry_fact_stays_out_of_parts() {
         Some(FunctionFact { may_fail: true, err_ty: Some(TypeId(9)), ..FunctionFact::default() }),
     );
 
-    let (failable, err_tys) = failable_facts_parts(&facts);
+    let converted = failable_facts(&facts);
 
-    assert!(failable.is_empty(), "entry fact is not a def-keyed failable row");
-    assert!(err_tys.is_empty(), "entry fact is not a def-keyed err_ty row");
+    assert!(converted.failable.is_empty(), "entry fact is not a def-keyed failable row");
+    assert!(converted.err_tys.is_empty(), "entry fact is not a def-keyed err_ty row");
 }
