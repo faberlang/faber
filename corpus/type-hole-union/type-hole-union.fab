@@ -65,7 +65,7 @@ fn consume(string ∪ int value) → int {
 # `T ∪ null` is one optional inhabitant, so a `null` arm is the null case.
 fn maybe_len(string ∪ none value) → int {
     match value {
-        case null_ty {
+        case none {
             return 0
         }
         case _ {

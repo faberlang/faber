@@ -32,6 +32,6 @@ locale = "en"
 #
 
 main {
-    const null_ty nothing ← null
+    const none nothing ← null
     print nothing
 }

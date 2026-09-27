@@ -107,6 +107,6 @@ main {
     print forsitan?.adest?.valor
 
     # Accessus optionalis on nihil binding
-    const null_ty void ← null
+    const none void ← null
     print void?.absens
 }
