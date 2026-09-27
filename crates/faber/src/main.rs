@@ -18,6 +18,10 @@ mod cli_test;
 #[path = "script_test.rs"]
 mod script_test;
 
+#[cfg(test)]
+#[path = "construction_source_run_test.rs"]
+mod construction_source_run_test;
+
 fn main() {
     commands::run();
 }

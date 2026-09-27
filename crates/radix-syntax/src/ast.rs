@@ -1543,6 +1543,9 @@ pub enum ObjectKey {
     Ident(Ident),
     String(Symbol),
     Computed(Box<Expr>),
+    /// Copy-with-changes source (`Genus { … } ex source`, DECISIONS D15.1):
+    /// every field the braces omit is copied from this value. Only the
+    /// construction-literal `ex` suffix produces it, as the last field.
     Spread(Box<Expr>),
 }
 

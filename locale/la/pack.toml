@@ -504,6 +504,10 @@ help = "delete 'nexum' and declare an ordinary field: '<type> <name>'"
 message = "'{sparge}' is not valid in a construction literal"
 help = "name each field; copy-with-changes is 'Genus { field = value } {ex} source'"
 
+[diagnostics.PARSE002.issues.construction_source_repeated]
+message = "a construction literal takes exactly one '{ex}' source"
+help = "copy from one value; set the other changes as braced fields"
+
 [diagnostics.PARSE010]
 message = "invalid declaration"
 help = "check declaration keywords and required parts"
@@ -1779,6 +1783,10 @@ help = "make the expression type match the expected type"
 [diagnostics.SEM010.issues.field_initializer_type_mismatch]
 message = "field initializer type mismatch"
 help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.construction_source_type_mismatch]
+message = "the '{ex}' source must be the genus being constructed"
+help = "copy from a value of the same genus type"
 
 [diagnostics.SEM010.issues.failable_call_enclosing_error_type_mismatch]
 message = "failable call error type does not match enclosing ⇥"

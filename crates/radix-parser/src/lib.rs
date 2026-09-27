@@ -1417,6 +1417,10 @@ mod field_modifier_test;
 mod construction_spread_removed_test;
 
 #[cfg(test)]
+#[path = "construction_source_test.rs"]
+mod construction_source_test;
+
+#[cfg(test)]
 #[path = "mod_test.rs"]
 mod tests;
 

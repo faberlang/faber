@@ -46,6 +46,10 @@ pub const RUNES: &str = "g0";
 /// Go assembled rune output buffer.
 pub const SLICE_OUT: &str = "out0";
 
+/// Copy-with-changes base copy (`Genus { … } ex source`); override
+/// temporaries append an ordinal (`b0_1`, `b0_2`, …).
+pub const UPDATE_BASE: &str = "b0";
+
 /// Expression-or-receiver temporary (`struct`, `vec`, `list`, text base).
 #[must_use]
 pub fn temp(id: u32) -> String {

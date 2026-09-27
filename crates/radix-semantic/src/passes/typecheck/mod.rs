@@ -100,6 +100,10 @@ pub mod extremum;
 #[cfg(test)]
 #[path = "field_modifier_write_test.rs"]
 mod field_modifier_write_test;
+
+#[cfg(test)]
+#[path = "construction_source_test.rs"]
+mod construction_source_test;
 pub mod finalize;
 pub mod first_match;
 pub mod format;
