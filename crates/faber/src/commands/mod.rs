@@ -20,6 +20,7 @@ mod cost;
 #[cfg(test)]
 #[path = "cost_test.rs"]
 mod cost_test;
+mod doc;
 mod doctor;
 #[cfg(test)]
 #[path = "doctor_test.rs"]
@@ -67,6 +68,7 @@ use radix::services::{BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, V
 use check_library::cmd_check_library;
 use convert::cmd_convert;
 use cost::cmd_cost;
+use doc::cmd_doc;
 use doctor::cmd_doctor;
 use explain::cmd_explain;
 use field_modifier_codemod::cmd_field_modifier_codemod;
@@ -257,6 +259,10 @@ fn dispatch(command: Command) {
         Command::Targets => cmd_targets(),
         Command::CheckLibrary(args) => cmd_check_library(args),
         Command::Doctor => cmd_doctor(),
+        Command::Doc(args) => cmd_doc(&doc::DocCommand {
+            input: args.input,
+            json: args.json,
+        }),
         Command::Cost(args) => {
             reject_reader_locale_without_package(args.locale.as_deref(), &args.input, args.package);
             cmd_cost(args);
