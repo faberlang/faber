@@ -2131,6 +2131,23 @@ impl FunctionBuilder<'_> {
         true
     }
 
+    /// Whether the walk reads a conversation's content frames
+    /// (`cursor<scrinium<T>>`), whose length grows while the loop runs.
+    fn is_frame_cursor_walk(&self, kind: &CollectionIteraKind) -> bool {
+        let (CollectionIteraKind::Cursor(element) | CollectionIteraKind::AsyncCursor(element)) = kind else {
+            return false;
+        };
+        let frame = match self.normalized_type(*element) {
+            Type::Struct(def_id) => Some(*def_id),
+            Type::Applied(base, _) => match self.normalized_type(*base) {
+                Type::Struct(def_id) => Some(*def_id),
+                _ => None,
+            },
+            _ => None,
+        };
+        frame.is_some() && frame == self.context.scrinium_def
+    }
+
     /// Pointee classification for a borrowed itera receiver: the same
     /// lista/tabula arms the by-value lanes already iterate, applied to the
     /// carrier under the `Ref` marker. Other pointees stay unsupported so the
@@ -2410,7 +2427,10 @@ impl FunctionBuilder<'_> {
 
         // A stepped cursor re-reads its length at every condition check, so
         // the bound is lowered inside the condition block instead of here.
-        let hoisted_length = if stepped {
+        // A conversation cursor (`tuus.cursor()`, A4/U9) is walked the same
+        // way: its frames arrive while the loop runs, so the runner can pull
+        // one frame per step from a cursor handler.
+        let hoisted_length = if stepped || self.is_frame_cursor_walk(&collection_kind) {
             None
         } else if matches!(&collection_kind, CollectionIteraKind::Tensor(_)) {
             Some(MirOperand::Constant(MirConstant::Int(tensor_lanes)))

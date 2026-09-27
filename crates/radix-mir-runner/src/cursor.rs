@@ -11,9 +11,16 @@
 //! more item, the index reads it); every other read materializes the cursor
 //! into a `lista<T>` by pulling until the generator returns. Dropping the
 //! cursor abandons the generator — an early `rumpe` leaves it unreferenced.
+//!
+//! A `tuus.cursor()` view reuses the same stepped walk over a conversation
+//! (A4/U9): each pull takes the next content frame from the sermo, which in
+//! turn resumes a cursor handler only when its queue is empty, so a `fiunt`
+//! handler produces while the caller consumes.
 
 use super::{Frame, Host, Runner, RunnerError, Value};
-use radix_lexer::Span;
+use crate::sermo::SermoValue;
+use radix_hir::DefId;
+use radix_lexer::{Span, Symbol};
 use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
@@ -25,6 +32,9 @@ pub struct GeneratorCursor(Rc<RefCell<CursorState>>);
 struct CursorState {
     /// Parked generator frame; `None` once the generator returned or failed.
     frame: Option<Frame>,
+    /// Conversation this cursor reads content frames from instead of a
+    /// generator (`tuus.cursor()`), with the `scrinium` shape to wrap them in.
+    sermo: Option<SermoSource>,
     /// The item most recently pulled, not yet necessarily read.
     current: Option<Value>,
     /// Items pulled so far (the walk's `length`).
@@ -33,14 +43,51 @@ struct CursorState {
     read: usize,
 }
 
+struct SermoSource {
+    sermo: Rc<RefCell<SermoValue>>,
+    frame: DefId,
+    data_field: Symbol,
+}
+
+/// One resumption of a generator frame.
+pub(crate) enum GeneratorStep {
+    /// The generator parked at a `cede` with this item.
+    Yield(Value),
+    /// The generator returned; its own return value is not an item.
+    Return,
+    /// The generator raised through its `⇥` channel with this error value.
+    Raise(Value),
+}
+
 impl GeneratorCursor {
     pub(crate) fn new(frame: Frame) -> Self {
         Self(Rc::new(RefCell::new(CursorState {
             frame: Some(frame),
+            sermo: None,
             current: None,
             pulled: 0,
             read: 0,
         })))
+    }
+
+    /// Lazy content-frame cursor over a conversation's inbound direction.
+    pub(crate) fn sermo(sermo: Rc<RefCell<SermoValue>>, frame: DefId, data_field: Symbol) -> Self {
+        Self(Rc::new(RefCell::new(CursorState {
+            frame: None,
+            sermo: Some(SermoSource {
+                sermo,
+                frame,
+                data_field,
+            }),
+            current: None,
+            pulled: 0,
+            read: 0,
+        })))
+    }
+
+    /// Whether the generator can still be resumed.
+    pub(crate) fn is_live(&self) -> bool {
+        self.0.borrow().frame.is_some()
     }
 
     /// Stepped index read: only the item most recently pulled is readable.
@@ -112,16 +159,42 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         Ok(items)
     }
 
-    /// Resume the generator until its next `cede` (`Some(item)`) or until it
-    /// returns (`None`). A runtime failure inside the generator retires it and
-    /// propagates to the consumer.
+    /// Next item: the generator's next `cede` (`Some(item)`), or `None` once
+    /// it returns. A conversation cursor yields the next content frame. A
+    /// runtime failure inside the generator retires it and propagates to the
+    /// consumer.
     fn cursor_pull(
         &mut self,
         cursor: &GeneratorCursor,
         span: Span,
     ) -> Result<Option<Value>, RunnerError> {
+        let source = cursor
+            .0
+            .borrow()
+            .sermo
+            .as_ref()
+            .map(|source| (Rc::clone(&source.sermo), source.frame, source.data_field));
+        if let Some((sermo, frame, data_field)) = source {
+            return Ok(self
+                .sermo_next(&sermo, span)?
+                .map(|data| crate::sermo::frame_value(frame, data_field, data)));
+        }
+        match self.generator_resume(cursor, span)? {
+            GeneratorStep::Yield(item) => Ok(Some(item)),
+            GeneratorStep::Return | GeneratorStep::Raise(_) => Ok(None),
+        }
+    }
+
+    /// Resume the generator until its next `cede` or until it returns or
+    /// raises. A runtime failure inside the generator retires it and
+    /// propagates to the caller.
+    pub(crate) fn generator_resume(
+        &mut self,
+        cursor: &GeneratorCursor,
+        span: Span,
+    ) -> Result<GeneratorStep, RunnerError> {
         let Some(frame) = cursor.0.borrow_mut().frame.take() else {
-            return Ok(None);
+            return Ok(GeneratorStep::Return);
         };
         let depth = self.frames.len();
         self.resume_frame(frame);
@@ -143,11 +216,13 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 .take()
                 .ok_or_else(|| RunnerError::internal(span, "suspended generator has no yield"))?;
             cursor.0.borrow_mut().frame = Some(frame);
-            return Ok(Some(item));
+            return Ok(GeneratorStep::Yield(item));
         }
         // The generator's own return value is not an item.
         self.return_value = None;
-        self.return_error = None;
-        Ok(None)
+        Ok(match self.return_error.take() {
+            Some(error) => GeneratorStep::Raise(error),
+            None => GeneratorStep::Return,
+        })
     }
 }

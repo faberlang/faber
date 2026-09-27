@@ -78,6 +78,19 @@ pub trait Host {
     }
     fn exit(&mut self, code: i32) -> !;
 
+    /// Tier-3 conversation answer for a frame route (A4/U9): `Some(Ok(items))`
+    /// answers content items then `done`, `Some(Err(data))` an `error`
+    /// terminal. `None` means the host does not serve the route and the
+    /// router fails closed. No runner host serves frame routes yet.
+    fn sermo_route(
+        &mut self,
+        _route: &str,
+        _opener: &Value,
+        _span: Span,
+    ) -> Option<Result<Vec<Value>, Value>> {
+        None
+    }
+
     /// Write text to stdout **without** appending a newline (`consolum.write_partial`).
     ///
     /// Default hosts reject the surface so callers fail closed until a real

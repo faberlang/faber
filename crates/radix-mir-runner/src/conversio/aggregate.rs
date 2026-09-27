@@ -31,6 +31,26 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         if let Value::Octeti(bytes) = value {
             return self.convert_octeti_to_lista_u8(bytes, element, recovery, span);
         }
+        if let Value::Sermo(sermo) = value {
+            // `↦ lista<T>`: every content frame, each extracted as `T`.
+            let items = self.sermo_items(&sermo, span)?;
+            let converted = items
+                .into_iter()
+                .map(|item| {
+                    self.extract_dynamic_value_for_type(
+                        item,
+                        element,
+                        struct_defaults,
+                        span,
+                        MissingFieldPolicy::Valor,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>();
+            return match converted {
+                Ok(items) => Ok(Value::Array(Rc::new(RefCell::new(items)))),
+                Err(_) => self.recover_or_fail(recovery, span, "valor to lista conversion failed"),
+            };
+        }
         match self.convert_to_array_inner(value, source_ty, element, struct_defaults, span) {
             Ok(value) => Ok(value),
             Err(_) => self.recover_or_fail(recovery, span, "valor to lista conversion failed"),

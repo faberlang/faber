@@ -40,6 +40,8 @@ pub struct FmirValidationMetadata {
     pub variant_positions: HashMap<DefId, usize>,
     pub variant_fields: HashMap<DefId, HashMap<Symbol, MirType>>,
     pub closure_environments: Vec<MirClosureEnvironment>,
+    /// Tier-1 `@ ad` route table (route → handler source `DefId`).
+    pub ad_routes: HashMap<String, DefId>,
 }
 
 /// Snapshot the merged program's struct/variant validation surface from a
@@ -113,6 +115,11 @@ fn snapshot_validation_metadata(
             .map(|(def, fields)| (*def, fields.iter().map(|(name, ty)| (*name, *ty)).collect()))
             .collect(),
         closure_environments,
+        ad_routes: validation
+            .ad_routes
+            .iter()
+            .map(|(route, def)| (route.clone(), *def))
+            .collect(),
     }
 }
 
@@ -184,6 +191,11 @@ fn apply_validation_metadata(
         .closure_environments
         .iter()
         .map(|environment| (environment.id, environment.clone()))
+        .collect();
+    context.ad_routes = metadata
+        .ad_routes
+        .iter()
+        .map(|(route, def)| (route.clone(), *def))
         .collect();
 }
 

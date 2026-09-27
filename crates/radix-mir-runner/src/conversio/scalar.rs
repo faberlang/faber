@@ -232,7 +232,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     "numerus to numerus conversion out of range",
                 ),
             },
-            Value::Sermo(sermo) => match materialize_sermo_value(sermo, span) {
+            Value::Sermo(sermo) => match self.sermo_first_item(&sermo, span) {
                 Ok(value) => {
                     self.convert_to_numerus_from(value, source_ty, params, width, recovery, span)
                 }
@@ -269,7 +269,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Value::Float(value) => decimal_text_to_carrier(&value.to_string(), target_width),
             Value::Str(text) => decimal_text_to_carrier(&text, target_width),
             Value::Sermo(sermo) => {
-                let value = materialize_sermo_value(sermo, span)?;
+                let value = self.sermo_first_item(&sermo, span)?;
                 return self.convert_to_decimal(value, source_ty, target_width, recovery, span);
             }
             other => {
@@ -306,7 +306,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Value::Float(value) => decimal_text_to_carrier(&value.to_string(), source_width)
                 .map_err(|error| decimal_text_error(error, span)),
             Value::Sermo(sermo) => {
-                let value = materialize_sermo_value(sermo, span)?;
+                let value = self.sermo_first_item(&sermo, span)?;
                 return self.convert_decimal_to_integer(
                     value,
                     source_width,
@@ -480,7 +480,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 "unsupported conversio to vacuum",
             ));
         };
-        materialize_sermo_value(sermo, span)?;
+        self.sermo_items(&sermo, span)?;
         Ok(Value::Unit)
     }
 
@@ -717,13 +717,13 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     }
 
     pub(crate) fn convert_to_valor(
-        &self,
+        &mut self,
         value: Value,
         source_ty: TypeId,
         span: Span,
     ) -> Result<Value, RunnerError> {
         if let Value::Sermo(sermo) = value {
-            return materialize_sermo_value(sermo, span);
+            return self.sermo_first_item(&sermo, span);
         }
         if matches!(
             self.types.get(source_ty),
@@ -1025,10 +1025,16 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         recovery: Option<&MirOperand>,
         span: Span,
     ) -> Result<Value, RunnerError> {
-        match materialize_sermo_value(sermo, span)? {
-            Value::Str(text) => Ok(Value::Str(text)),
-            _ => self.recover_or_fail(recovery, span, "sermo to textus conversion failed"),
+        // Every textus content frame, concatenated (Rust
+        // `sermo_materialize_textus` parity).
+        let mut text = String::new();
+        for item in self.sermo_items(&sermo, span)? {
+            let Value::Str(part) = item else {
+                return self.recover_or_fail(recovery, span, "sermo to textus conversion failed");
+            };
+            text.push_str(&part);
         }
+        Ok(Value::Str(text))
     }
 
     pub(crate) fn convert_to_ascii_format_pack(
@@ -1268,20 +1274,6 @@ fn format_decimal_carrier(value: i64, width: NumericWidth) -> String {
         format!("-{integer}.{fraction}")
     } else {
         format!("{integer}.{fraction}")
-    }
-}
-
-fn materialize_sermo_value(
-    sermo: Rc<RefCell<SermoValue>>,
-    span: Span,
-) -> Result<Value, RunnerError> {
-    let sermo = sermo.borrow();
-    match sermo.route.as_str() {
-        "runtime:echo" => Ok(sermo.opener.clone()),
-        route => Err(RunnerError::unsupported(
-            span,
-            &format!("sermo route {route} before runner provider runtime"),
-        )),
     }
 }
 

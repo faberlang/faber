@@ -12,6 +12,7 @@ mod cursor;
 mod host;
 pub mod kernel;
 mod runtime;
+pub mod sermo;
 pub mod stats;
 mod textus_literal;
 pub mod value;
@@ -257,6 +258,8 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     /// Value-id static types per function (`MirStatementKind::Assign`), for
     /// display-width resolution at diagnostics.
     value_types: FxHashMap<(MirFunctionId, MirValueId), MirType>,
+    /// Last conversation id handed out by `SermoOpen` (§2.7 record).
+    next_conversation_id: u64,
 }
 
 impl<'a, H: Host + ?Sized> Runner<'a, H> {
@@ -302,6 +305,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             ascii_literals: RefCell::new(FxHashMap::default()),
             recovery_calls: index_orphan_recovery_calls(program),
             value_types: index_value_types(program),
+            next_conversation_id: 0,
         }
     }
 }
