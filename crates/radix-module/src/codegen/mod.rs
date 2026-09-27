@@ -175,15 +175,10 @@ fn mir_backed_requires_driver() -> CodegenError {
     }
 }
 
-/// Build the failable-def set and per-definition error-type overrides shared by
-/// the non-Rust backend fact structs.
+/// Convert analyzed function facts once at the dispatch boundary.
 ///
-/// Dispatch-boundary conversion that consumes the monolith's
-/// `FunctionFactTable`. Leaf crates deliberately never depend on
-/// `crate::semantic`, so the conversion cannot move into any single leaf
-/// without inventing a cross-leaf dependency. Gated to the non-rust
-/// backends that call it: a rust-only build compiles neither the helper
-/// nor its callers.
+/// All non-Rust HIR backends consume this neutral carrier, so target routing
+/// does not maintain one adapter and nominal wrapper per backend.
 #[cfg(any(
     feature = "hir-go",
     feature = "hir-ts",
@@ -191,49 +186,14 @@ fn mir_backed_requires_driver() -> CodegenError {
     feature = "hir-python",
     feature = "hir-haskell"
 ))]
-fn failable_facts_parts(
-    facts: &crate::semantic::FunctionFactTable,
-) -> (
-    rustc_hash::FxHashSet<crate::hir::DefId>,
-    rustc_hash::FxHashMap<crate::hir::DefId, crate::semantic::TypeId>,
-) {
+fn failable_facts(facts: &crate::semantic::FunctionFactTable) -> radix_hir::FailableFacts {
     let mut err_tys = rustc_hash::FxHashMap::default();
     for (def_id, fact) in facts.iter() {
         if let Some(err_ty) = fact.err_ty {
             err_tys.insert(def_id, err_ty);
         }
     }
-    (facts.failable_defs(), err_tys)
-}
-
-#[cfg(feature = "hir-go")]
-fn go_failable_facts(facts: &crate::semantic::FunctionFactTable) -> radix_hir_go::FailableFacts {
-    let (failable, err_tys) = failable_facts_parts(facts);
-    radix_hir_go::FailableFacts { failable, err_tys }
-}
-
-#[cfg(feature = "hir-ts")]
-fn ts_failable_facts(facts: &crate::semantic::FunctionFactTable) -> radix_hir_ts::FailableFacts {
-    let (failable, err_tys) = failable_facts_parts(facts);
-    radix_hir_ts::FailableFacts { failable, err_tys }
-}
-
-#[cfg(feature = "hir-swift")]
-fn swift_failable_facts(facts: &crate::semantic::FunctionFactTable) -> radix_hir_swift::SwiftFailableFacts {
-    let (failable, err_tys) = failable_facts_parts(facts);
-    radix_hir_swift::SwiftFailableFacts { failable, err_tys }
-}
-
-#[cfg(feature = "hir-python")]
-fn python_failable_facts(facts: &crate::semantic::FunctionFactTable) -> radix_hir_python::PythonFailableFacts {
-    let (failable, err_tys) = failable_facts_parts(facts);
-    radix_hir_python::PythonFailableFacts { failable, err_tys }
-}
-
-#[cfg(feature = "hir-haskell")]
-fn haskell_failable_facts(facts: &crate::semantic::FunctionFactTable) -> radix_hir_haskell::HaskellFailableFacts {
-    let (failable, err_tys) = failable_facts_parts(facts);
-    radix_hir_haskell::HaskellFailableFacts { failable, err_tys }
+    radix_hir::FailableFacts { failable: facts.failable_defs(), err_tys, async_defs: facts.async_defs() }
 }
 
 /// Dispatch the analyzed `HIR` program to the selected target backend.
@@ -362,7 +322,7 @@ pub fn generate_from_analyzed_with_options(
                     ts::TsCodegen::new(&analysis.hir, &analysis.types, &module_interner)
                 };
                 let mut r#gen = r#gen;
-                r#gen.set_failable_facts(&ts_failable_facts(&analysis.function_facts));
+                r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
                 r#gen.set_library_registry(&analysis.libraries);
                 r#gen.set_gpu_builtins(&ts_gpu_builtins(&analysis.gpu_builtins));
                 r#gen.set_intrinsic_surface(&ts_surface);
@@ -467,7 +427,7 @@ fn ts_gpu_builtins(
 #[cfg(feature = "hir-go")]
 fn generate_go_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
     let mut r#gen = go::GoCodegen::new(&analysis.hir, &analysis.types, &analysis.interner);
-    r#gen.set_failable_facts(&go_failable_facts(&analysis.function_facts));
+    r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
     r#gen.set_library_registry(&analysis.libraries);
     let output = r#gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
     Ok(crate::Output::Go(crate::GoOutput { code: output.code }))
@@ -485,7 +445,7 @@ fn generate_swift_from_analyzed(
     module_name: Option<&str>,
 ) -> Result<crate::Output, CodegenError> {
     let mut r#gen = swift::SwiftCodegen::new(&analysis.hir, &analysis.types, &analysis.interner);
-    r#gen.set_failable_facts(&swift_failable_facts(&analysis.function_facts));
+    r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
     r#gen.set_output_mode(
         match output_mode {
             OutputMode::Application => swift::OutputMode::Application,
@@ -509,7 +469,7 @@ fn generate_swift_from_analyzed(
 #[cfg(feature = "hir-python")]
 fn generate_python_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
     let mut r#gen = python::PythonCodegen::new(&analysis.hir, &analysis.types, &analysis.interner);
-    r#gen.set_failable_facts(&python_failable_facts(&analysis.function_facts));
+    r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
     let output = r#gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
     Ok(crate::Output::Python(crate::PythonOutput { code: output.code }))
 }
@@ -522,7 +482,7 @@ fn generate_python_from_analyzed(_analysis: &crate::driver::AnalyzedModule) -> R
 #[cfg(feature = "hir-haskell")]
 fn generate_haskell_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
     let mut r#gen = haskell::HaskellCodegen::new(&analysis.hir, &analysis.interner);
-    r#gen.set_failable_facts(&haskell_failable_facts(&analysis.function_facts));
+    r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
     let output = r#gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
     Ok(crate::Output::Haskell(crate::HaskellOutput { code: output.code }))
 }
