@@ -2099,6 +2099,12 @@ kind = "operator-group"
 category = "conversion"
 
 [[files]]
+path = "conversio/littera.fab"
+term = "char"
+kind = "conversio"
+category = "conversion"
+
+[[files]]
 path = "conversio/numeric-bool.fab"
 term = "↦"
 kind = "operator-group"

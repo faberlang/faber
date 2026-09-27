@@ -954,6 +954,13 @@ impl super::FaberCodegen<'_> {
                             if target_str.ends_with('>') {
                                 target_str.truncate(target_str.len() - 1);
                                 target_str.push_str(", ");
+                            } else if matches!(
+                                self.types.get(*ty),
+                                Type::Primitive(Primitive::Littera)
+                            ) {
+                                // D10.6 `n ↦ littera<Code>`: the hint is the
+                                // only generic argument of the scalar head.
+                                target_str.push('<');
                             } else {
                                 // Bare width marker target: the marker rides a
                                 // generic argument, so re-wrap the width in

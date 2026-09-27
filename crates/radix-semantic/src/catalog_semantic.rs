@@ -423,6 +423,9 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         "bits_pair_width_mismatch" => {
             Some("convert to the matching IEEE width first: u16 pairs with bf16 or f16, u32 with f32, or u64 with f64".to_owned())
         }
+        "code_hint_pair_mismatch" => {
+            Some("Code reads a code point as littera ↦ numerus<u32, Code> or builds one as numerus ↦ littera<Code>".to_owned())
+        }
         "conversio_bits_format_hint_conflict" => {
             Some("drop the Hex/Bin/Oct hint or the Bits hint; one interpretation per conversio".to_owned())
         }

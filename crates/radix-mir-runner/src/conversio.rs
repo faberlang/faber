@@ -24,6 +24,9 @@ use std::rc::Rc;
 mod aggregate;
 #[cfg(test)]
 mod bits_f16_test;
+mod littera;
+#[cfg(test)]
+mod littera_test;
 mod scalar;
 
 #[derive(Clone, Copy)]
@@ -106,6 +109,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 // WHY: `textus ↦ numerus<W>` must honor `W` exactly as Rust codegen's
                 // `.parse::<W>()` does — a value outside `W`'s signed range is a
                 // conversion failure (SA-002). Unsized numerus defaults to i64.
+                // D10.6: a `littera` source parses its digit (or, with
+                // `Code`, reads its code point) — never a text parse.
+                if matches!(
+                    self.types.get(source_ty),
+                    Type::Primitive(Primitive::Littera)
+                ) && let Some(ch) = littera::littera_value(&value)
+                {
+                    return self.convert_littera_to_numerus(ch, params, recovery, span);
+                }
                 let width = match &target {
                     Type::SizedNumeric(_, width) => *width,
                     _ => NumericWidth::I64,
@@ -123,6 +135,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             Type::Primitive(Primitive::Bivalens) => self.convert_to_bivalens(value, recovery, span),
             Type::Primitive(Primitive::Octeti) => self.convert_to_octeti(value, span),
             Type::Primitive(Primitive::Ascii) => self.convert_to_ascii(value, recovery, span),
+            Type::Primitive(Primitive::Littera) => {
+                self.convert_to_littera(value, params, recovery, span)
+            }
             Type::BoundedAscii { capacity } => {
                 if self.numerus_radix(params).is_some() {
                     self.convert_to_ascii_format_pack(value, *capacity, params, recovery, span)

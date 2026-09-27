@@ -2923,6 +2923,10 @@ help = "convert to an unsigned numerus width before packing"
 message = "conversion from bytes to float is unspecified (IEEE width and endianness); use `chorda` or explicit byte verbs instead"
 help = "use chorda or explicit byte conversion helpers"
 
+[diagnostics.SEM016.issues.code_hint_pair_mismatch]
+message = "the Code hint converts only char ↦ int<u32, Code> (read a code point) and int ↦ char<Code> (build one)"
+help = "use char ↦ int<u32, Code> or int ↦ char<Code>; without Code a number converts to its digits"
+
 [diagnostics.SEM016.issues.bits_pair_width_mismatch]
 message = "the Bits bitcast requires exact-width pairs: numerus<u32> ↔ fractus<f32> and numerus<u64> ↔ fractus<f64>"
 help = "convert to the matching IEEE width first: u32 pairs with f32, u64 with f64"

@@ -69,7 +69,7 @@ pub use instans_precision::{
 pub use numeric_width::{
     DECIMAL_INDEX_SCALAR_MSG, DECIMAL_TENSOR_MEDIA_MSG, NumericWidth, TENSOR_ELEMENT_NUMERIC_MSG,
     TENSOR_INDEX_VECTOR_MSG, WidthError, WidthLowerIssue, effective_width, is_ascii_format_hint,
-    is_conversio_radix_hint, is_decimal_index_scalar, is_integer_index_scalar,
+    is_code_point_hint, is_conversio_radix_hint, is_decimal_index_scalar, is_integer_index_scalar,
     is_integer_index_vector, is_numeric_assignable, is_numeric_width_type_sugar,
     is_tensor_element_type, is_tensor_numeric_element, lista_sugar_width_marker,
     lower_modular_word, lower_sized_primitive, lower_standalone_width_type,

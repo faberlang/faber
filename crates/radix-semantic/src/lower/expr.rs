@@ -1673,6 +1673,20 @@ fn lower_conversio_target_type(
         radix_syntax::TypeExprKind::Named(ident, target_params)
             if matches!(
                 Primitive::from_name(lowerer.interner.resolve(ident.name)),
+                Some(Primitive::Littera)
+            ) && let [hint] = target_params.as_slice()
+                && let Some(symbol) = conversio_hint_symbol(hint)
+                && crate::numeric_width::is_code_point_hint(lowerer.interner.resolve(symbol)) =>
+        {
+            // D10.6 `n ↦ littera<Code>`: the hint names the code-point row;
+            // type identity stays plain `littera`.
+            params.push(symbol);
+            let ty_id = lowerer.types.primitive(Primitive::Littera);
+            apply_type_target_wrappers(lowerer, ty, ty_id)
+        }
+        radix_syntax::TypeExprKind::Named(ident, target_params)
+            if matches!(
+                Primitive::from_name(lowerer.interner.resolve(ident.name)),
                 Some(Primitive::Ascii | Primitive::Octeti | Primitive::Textus)
             ) && !target_params.is_empty() =>
         {

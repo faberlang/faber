@@ -1092,6 +1092,9 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     ) -> Result<Value, RunnerError> {
         match value {
             Value::Ascii(b) => Ok(Value::Ascii(b)),
+            // D10.6 `n ↦ ascii`: the digits, which are always ASCII.
+            Value::Int(n) => Ok(Value::Str(n.to_string())),
+            Value::UInt(n) => Ok(Value::Str(n.to_string())),
             Value::Str(text) => {
                 if text.is_ascii() {
                     Ok(Value::Str(text))
