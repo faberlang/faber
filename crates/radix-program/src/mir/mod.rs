@@ -747,3 +747,7 @@ mod stats_route_tests;
 #[cfg(test)]
 #[path = "device_matrix_test.rs"]
 mod device_matrix_tests;
+
+#[cfg(test)]
+#[path = "lowering_symbol_remap_test.rs"]
+mod lowering_symbol_remap_tests;
