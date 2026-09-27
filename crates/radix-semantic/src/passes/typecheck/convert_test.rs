@@ -2089,11 +2089,19 @@ functio relabel(numerus n) → fractus {
 }
 
 #[test]
-fn verte_ascription_rejects_float_literal_target_cannot_hold() {
-    // 0.1 survives f32 rounding only as a different value; the target does
-    // not hold the literal, so the ascription is a conversion.
+fn verte_ascription_accepts_float_literal_rounding_to_target_width() {
+    test_support::assert_accepts(
+        r"incipit {
+    fixum fractus<f32> rounded ← 0.1 ∷ fractus<f32>
+    fixum fractus<f32> precise ← 0.7978845608028654 ∷ fractus<f32>
+}",
+    );
+}
+
+#[test]
+fn verte_ascription_rejects_float_literal_overflow_to_infinity() {
     test_support::assert_rejects_with_issue(
-        r"incipit { fixum fractus<f32> x ← 0.1 ∷ fractus<f32> }",
+        r"incipit { fixum fractus<f32> overflow ← 1e39 ∷ fractus<f32> }",
         "numeric_ascription_requires_conversion",
     );
 }
