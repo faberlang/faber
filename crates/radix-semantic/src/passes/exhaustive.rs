@@ -240,7 +240,7 @@ fn check_match(
             continue;
         }
 
-        for pattern in &arm.patterns {
+        for pattern in arm.patterns.iter().flat_map(pattern_alternatives) {
             if let Some(def_id) = pattern_variant_id(pattern) {
                 if !covered.insert(def_id) {
                     errors.push(
@@ -492,6 +492,7 @@ fn is_catchall_pattern(pattern: &HirPattern) -> bool {
     match pattern {
         HirPattern::Wildcard | HirPattern::Binding(_, _) => true,
         HirPattern::Alias(_, _, inner) => is_catchall_pattern(inner),
+        HirPattern::Or(alternatives) => alternatives.iter().any(is_catchall_pattern),
         HirPattern::Variant(_, _)
         | HirPattern::TypeTest { .. }
         | HirPattern::Literal(_)
@@ -524,5 +525,12 @@ fn scrutinee_has_null_constituent(ty: TypeId, types: &TypeTable) -> bool {
         Type::Ref(_, inner) => scrutinee_has_null_constituent(*inner, types),
         Type::Applied(base, _) => scrutinee_has_null_constituent(*base, types),
         _ => false,
+    }
+}
+
+fn pattern_alternatives(pattern: &HirPattern) -> Vec<&HirPattern> {
+    match pattern {
+        HirPattern::Or(alternatives) => alternatives.iter().collect(),
+        _ => vec![pattern],
     }
 }

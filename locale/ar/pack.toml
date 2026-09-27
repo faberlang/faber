@@ -2967,3 +2967,7 @@ quilibet = "quilibet"
 strue = "strue"
 summa = "summa"
 unio = "unio"
+
+[diagnostics.SEM010.issues.or_pattern_binding_mismatch]
+message = "يجب أن تربط بدائل نمط أو الأسماء والأنواع نفسها"
+help = "اجعل كل بديل aut يربط الأسماء نفسها بالأنواع نفسها"

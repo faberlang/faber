@@ -96,18 +96,31 @@ pub(crate) fn coverage(
 
     let mut rows = Vec::with_capacity(arms.len());
     for arm in arms {
-        let mut row = Vec::with_capacity(columns.len());
+        // An Or is one source arm but several coverage rows: each alternative
+        // independently covers its constructor while sharing the arm body.
+        let mut arm_rows = vec![Vec::with_capacity(columns.len())];
         for (pattern, (space, ty)) in arm.patterns.iter().zip(&columns) {
-            let Some(head) = normalize(pattern, space, *ty, types) else {
-                return Coverage::Unchecked;
-            };
-            match admit(head, space) {
-                Admit::Yes => row.push(head),
-                Admit::Unchecked => return Coverage::Unchecked,
-                Admit::Skipped => return Coverage::Skipped,
+            let alternatives = pattern_alternatives(pattern);
+            let mut next_rows = Vec::with_capacity(arm_rows.len() * alternatives.len());
+            for row in arm_rows {
+                for alternative in &alternatives {
+                    let Some(head) = normalize(alternative, space, *ty, types) else {
+                        return Coverage::Unchecked;
+                    };
+                    match admit(head, space) {
+                        Admit::Yes => {
+                            let mut row = row.clone();
+                            row.push(head);
+                            next_rows.push(row);
+                        }
+                        Admit::Unchecked => return Coverage::Unchecked,
+                        Admit::Skipped => return Coverage::Skipped,
+                    }
+                }
             }
+            arm_rows = next_rows;
         }
-        rows.push(row);
+        rows.extend(arm_rows);
     }
 
     let spaces: Vec<Space> = columns.into_iter().map(|(space, _)| space).collect();
@@ -162,6 +175,7 @@ fn is_catchall(pattern: &HirPattern) -> bool {
     match pattern {
         HirPattern::Wildcard | HirPattern::Binding(_, _) => true,
         HirPattern::Alias(_, _, inner) => is_catchall(inner),
+        HirPattern::Or(alternatives) => alternatives.iter().any(is_catchall),
         HirPattern::Variant(_, _)
         | HirPattern::TypeTest { .. }
         | HirPattern::Literal(_)
@@ -180,6 +194,7 @@ fn normalize(
     Some(match pattern {
         HirPattern::Wildcard | HirPattern::Binding(_, _) => Head::Wild,
         HirPattern::Alias(_, _, inner) => return normalize(inner, space, column_ty, types),
+        HirPattern::Or(_) => return None,
         HirPattern::Variant(def_id, payload) => {
             if !payload.iter().all(is_catchall) {
                 return None;
@@ -289,4 +304,11 @@ fn missing(rows: &[Vec<Head>], spaces: &[Space], types: &TypeTable) -> Option<Wi
         }
     }
     None
+}
+
+fn pattern_alternatives(pattern: &HirPattern) -> Vec<&HirPattern> {
+    match pattern {
+        HirPattern::Or(alternatives) => alternatives.iter().collect(),
+        _ => vec![pattern],
+    }
 }

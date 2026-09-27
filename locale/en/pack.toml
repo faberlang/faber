@@ -3932,3 +3932,7 @@ help = "call `close()` explicitly, or break the reference cycle"
 message = "`{type}.{field}` can hold a closable value inside a reference cycle; a cycle never reaches its last reference, so the value never closes automatically"
 help = "call `close()` explicitly, or break the reference cycle"
 
+
+[diagnostics.SEM010.issues.or_pattern_binding_mismatch]
+message = "or-pattern alternatives must bind the same names and types"
+help = "make every `aut` alternative bind the same names with the same types"

@@ -2979,3 +2979,7 @@ quilibet = "quilibet"
 strue = "strue"
 summa = "summa"
 unio = "unio"
+
+[diagnostics.SEM010.issues.or_pattern_binding_mismatch]
+message = "or-pattern विकल्पों को समान नाम और प्रकार बाँधने चाहिए"
+help = "हर aut विकल्प में समान नामों को समान प्रकारों से बाँधें"

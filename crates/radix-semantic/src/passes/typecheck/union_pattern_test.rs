@@ -516,3 +516,61 @@ incipit {
         "expected resolve-stage unknown_variant (SEM001) for an elige casu with a non-namespace prefix, got: {diagnostics:?}"
     );
 }
+
+// X7-b: `aut` alternatives are one arm and therefore must expose one body-safe
+// binding environment.
+#[test]
+fn or_pattern_accepts_payload_free_and_identical_payload_bindings() {
+    test_support::assert_accepts(
+        r#"discretio Eventum {
+    Ictus { numerus vis },
+    Tactus { numerus vis },
+    Sonitus,
+    Quietus
+}
+
+functio describe(Eventum e) → textus {
+    discerne e {
+        casu Eventum.Ictus fixum vis aut Eventum.Tactus fixum vis { redde vis ↦ textus }
+        casu Eventum.Sonitus { redde "sonitus" }
+        casu Eventum.Quietus { redde "quietus" }
+    }
+}
+
+functio quiet(Eventum e) → vacuum {
+    discerne e {
+        casu Eventum.Sonitus aut Eventum.Quietus { tacet }
+        casu Eventum.Ictus fixum vis { tacet }
+        casu Eventum.Tactus fixum vis { tacet }
+    }
+}"#,
+    );
+}
+
+#[test]
+fn or_pattern_rejects_mismatched_binding_names() {
+    test_support::assert_rejects_with_issue(
+        r#"discretio Eventum { Ictus { numerus vis }, Tactus { numerus vis } }
+
+functio describe(Eventum e) → textus {
+    discerne e {
+        casu Eventum.Ictus fixum left aut Eventum.Tactus fixum right { redde "x" }
+    }
+}"#,
+        "or_pattern_binding_mismatch",
+    );
+}
+
+#[test]
+fn or_pattern_rejects_mismatched_binding_types() {
+    test_support::assert_rejects_with_issue(
+        r#"discretio Eventum { Ictus { numerus vis }, Verbum { textus vis } }
+
+functio describe(Eventum e) → textus {
+    discerne e {
+        casu Eventum.Ictus fixum vis aut Eventum.Verbum fixum vis { redde "x" }
+    }
+}"#,
+        "or_pattern_binding_mismatch",
+    );
+}

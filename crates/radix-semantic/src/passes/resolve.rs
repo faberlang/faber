@@ -989,6 +989,20 @@ fn resolve_pattern(
             );
             resolve_pattern_bind(resolver, bind.as_ref(), errors);
         }
+        Pattern::Or(alternatives) => {
+            let Some((first, rest)) = alternatives.split_first() else {
+                return;
+            };
+            resolve_pattern(resolver, _interner, first, errors);
+            for alternative in rest {
+                // Alternative-only bindings must not collide with the arm's
+                // canonical first-alternative bindings. Lowering/typecheck
+                // compare the alternatives and expose the common environment.
+                resolver.enter_scope(ScopeKind::Match);
+                resolve_pattern(resolver, _interner, alternative, errors);
+                resolver.exit_scope();
+            }
+        }
         Pattern::Path(path) => {
             let segments = path.segments.as_slice();
             match segments {

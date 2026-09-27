@@ -155,6 +155,12 @@ impl Checker<'_> {
         let bind = match pattern {
             Pattern::Ident(_, bind) | Pattern::Type(_, bind) => bind.as_ref(),
             Pattern::Path(path) => path.bind.as_ref(),
+            Pattern::Or(alternatives) => {
+                for alternative in alternatives {
+                    self.pattern(alternative);
+                }
+                None
+            }
             Pattern::Wildcard(_) | Pattern::Literal(..) | Pattern::NegatedLiteral(..) => None,
         };
         if let Some(bind) = bind {

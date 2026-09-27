@@ -26,9 +26,12 @@ impl Parser {
     ///
     /// GRAMMAR:
     ///   patterns := pattern (',' pattern | `et` pattern)*
+    ///   pattern := pattern_atom (`aut` pattern_atom)*
     ///
-    /// Both comma and `et` are accepted as pattern separators. The parser stops
-    /// before `{` or `ergo` so the arm body is not consumed as another pattern.
+    /// Both comma and `et` are accepted as subject-pattern separators. `aut`
+    /// groups alternatives for one subject into a single AST node. The parser
+    /// stops before `{` or `ergo` so the arm body is not consumed as another
+    /// pattern.
     pub(super) fn parse_patterns(&mut self) -> Result<Vec<Pattern>, ParseError> {
         let mut patterns = Vec::new();
 
@@ -62,17 +65,34 @@ impl Parser {
         Ok(patterns)
     }
 
+    /// Parse one subject pattern and its `aut` alternatives.
+    fn parse_pattern(&mut self) -> Result<Pattern, ParseError> {
+        let first = self.parse_pattern_atom()?;
+        if !self.eat_keyword_ident(TokenKind::Aut) {
+            return Ok(first);
+        }
+
+        let mut alternatives = vec![first];
+        loop {
+            alternatives.push(self.parse_pattern_atom()?);
+            if !self.eat_keyword_ident(TokenKind::Aut) {
+                break;
+            }
+        }
+        Ok(Pattern::Or(alternatives))
+    }
+
     /// Parse one pattern atom plus its optional binding suffix.
     ///
     /// GRAMMAR:
-    ///   pattern := `_` | `-` number | literal | type-pattern [`bind`] | ident [`bind`] | path bind
+    ///   pattern_atom := `_` | `-` number | literal | type-pattern [`bind`] | ident [`bind`] | path bind
     ///   type-pattern := type-name [type-arguments]
     ///   bind := `ut` ident | (`fixum`|`varia`) binding-list
     ///   binding-list := ident [`ut` ident] (',' ident [`ut` ident])*
     ///
     /// Qualified paths are kept syntactic here; later phases decide whether a
     /// path names an enum variant, union variant, or invalid pattern target.
-    fn parse_pattern(&mut self) -> Result<Pattern, ParseError> {
+    fn parse_pattern_atom(&mut self) -> Result<Pattern, ParseError> {
         if let TokenKind::Underscore(_) = self.peek().kind {
             let span = self.peek().span;
             self.advance();
@@ -184,6 +204,7 @@ impl Parser {
             if self.check(&TokenKind::LBrace)
                 || self.check_keyword_ident(TokenKind::Ergo)
                 || self.check_keyword_ident(TokenKind::Et)
+                || self.check_keyword_ident(TokenKind::Aut)
             {
                 break;
             }

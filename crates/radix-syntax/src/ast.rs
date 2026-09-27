@@ -903,6 +903,8 @@ pub enum Pattern {
     /// `casu -∞`). The lexer never produces signed numbers, so the literal
     /// keeps its unsigned magnitude and the pattern owns the sign (D22.2).
     NegatedLiteral(Literal, Span),
+    /// Alternatives for one scrutinee, written `casu A aut B`.
+    Or(Vec<Pattern>),
     Path(PathPattern),
 }
 

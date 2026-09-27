@@ -290,6 +290,7 @@ fn is_catchall_pattern(pattern: &radix_hir::HirPattern) -> bool {
     match pattern {
         HirPattern::Wildcard | HirPattern::Binding(_, _) => true,
         HirPattern::Alias(_, _, inner) => is_catchall_pattern(inner),
+        HirPattern::Or(alternatives) => alternatives.iter().any(is_catchall_pattern),
         HirPattern::Variant(_, _)
         | HirPattern::TypeTest { .. }
         | HirPattern::Literal(_)

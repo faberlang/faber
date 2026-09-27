@@ -2967,3 +2967,7 @@ quilibet = "quilibet"
 strue = "strue"
 summa = "summa"
 unio = "unio"
+
+[diagnostics.SEM010.issues.or_pattern_binding_mismatch]
+message = "或模式的各分支必須繫結相同的名稱和型別"
+help = "讓每個 aut 分支以相同型別繫結相同名稱"
