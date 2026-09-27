@@ -705,6 +705,7 @@ dependencies = [
  "radix-diagnostics",
  "radix-hir",
  "radix-lexer",
+ "radix-target",
  "radix-types",
  "rustc-hash",
 ]
