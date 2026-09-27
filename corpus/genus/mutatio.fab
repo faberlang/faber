@@ -1,0 +1,80 @@
++++
+term = "genus"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Copy with changes: a new genus value from braced overrides and one source."
+syntax = "<Genus> { <field> = <expr>, … } from <source>"
+related = ["genus", "ex"]
+locale = "en"
++++
+# =============================================================================
+# genus — Copy with changes
+# =============================================================================
+#
+# What this teaches:
+#   • `Genus { field = value } from source` builds a new value: the braced
+#     fields override, every other field is copied from `source`.
+#   • The change comes first and the source last; there is exactly one source.
+#   • A `const` field can be set here, because this is a construction literal.
+#   • The copy is shallow: a list field is shared with the source. Use the
+#     `copy` marker on the value when you need an independent list.
+#
+# Common mistakes:
+#   • Copying from a different genus — the source must be the type being built.
+#   • Writing two sources (`from p from q`) — pick one and name the changes.
+#   • Starting `from` on the next line — it must follow the closing brace;
+#     a line that starts with `from` is the extraction statement.
+#
+# See also: genus, ex
+# =============================================================================
+
+# GRAMMAR:
+#   instance :← ident '{' fieldInit (',' fieldInit)* '}' 'from' postfixExpr
+#
+# EXPECTED OUTPUT:
+#   1, 2, origo, 1, 9, origo, 5, 9, finis, 2, 1, 2, origo, 7, 2, origo
+
+class Punctum {
+    const int x
+    var int y
+    const string nomen
+    const list<int> gradus
+}
+
+fn origo() → Punctum {
+    return Punctum { x = 7, y = 2, nomen = "origo", gradus = [0] }
+}
+
+main {
+    const Punctum p ← Punctum { x = 1, y = 2, nomen = "origo", gradus = [1, 2] }
+    print p.x
+    print p.y
+    print p.nomen
+
+    # One override; every other field comes from p
+    const Punctum q ← Punctum { y = 9 } from p
+    print q.x
+    print q.y
+    print q.nomen
+
+    # const fields can be set: this is still a construction literal
+    const Punctum r ← Punctum { x = 5, nomen = "finis" } from q
+    print r.x
+    print r.y
+    print r.nomen
+    print r.gradus.length()
+
+    # No overrides: a field-for-field copy
+    const Punctum s ← Punctum {} from p
+    print s.x
+    print s.y
+    print s.nomen
+
+    # The source may be any postfix expression, such as a call
+    const Punctum t ← Punctum { gradus = [3, 4] } from origo()
+    print t.x
+    print t.gradus.length()
+    print t.nomen
+}
