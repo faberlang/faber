@@ -69,22 +69,6 @@
     },
     {
       "src": "numerus",
-      "tgt": "ascii",
-      "target": "ts",
-      "predicted": "fallback",
-      "measured": "dedicated",
-      "detail": "arm:dedicated"
-    },
-    {
-      "src": "numerus",
-      "tgt": "ascii",
-      "target": "go",
-      "predicted": "fallback",
-      "measured": "dedicated",
-      "detail": "arm:dedicated"
-    },
-    {
-      "src": "numerus",
       "tgt": "json",
       "target": "rust",
       "predicted": "fallback",

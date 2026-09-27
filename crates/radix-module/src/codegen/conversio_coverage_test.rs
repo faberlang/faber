@@ -210,6 +210,7 @@ fn rust_scalar_bridges_are_dedicated() {
     let dedicated = [
         (Textus, Numerus),
         (Numerus, Fractus),
+        (Numerus, Ascii),
         (Octeti, Textus),
         (Ascii, Regex),
         (Instans, Textus),
@@ -452,6 +453,10 @@ fn ts_mirrors_rust_scalar_bridges_and_clamp() {
         classify_conversio_coverage(ConversioTypeFamily::Textus, ConversioTypeFamily::Numerus, TypeScript),
         ConversioCoverage::Dedicated
     );
+    assert_eq!(
+        classify_conversio_coverage(ConversioTypeFamily::Numerus, ConversioTypeFamily::Ascii, TypeScript),
+        ConversioCoverage::Dedicated
+    );
     // The operand clamp (`x ↦ 0‥100`) is dedicated via FaberIntervallum.coerce.
     assert_eq!(
         classify_conversio_coverage(ConversioTypeFamily::Numerus, ConversioTypeFamily::Intervallum, TypeScript),
@@ -470,6 +475,10 @@ fn go_scalar_bridges_are_dedicated_collections_fallback() {
     use ConversioCoverageTarget::Go;
     assert_eq!(
         classify_conversio_coverage(ConversioTypeFamily::Textus, ConversioTypeFamily::Numerus, Go),
+        ConversioCoverage::Dedicated
+    );
+    assert_eq!(
+        classify_conversio_coverage(ConversioTypeFamily::Numerus, ConversioTypeFamily::Ascii, Go),
         ConversioCoverage::Dedicated
     );
     assert_eq!(

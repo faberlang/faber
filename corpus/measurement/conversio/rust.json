@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "dedicated": 57,
-    "fallback": 193,
+    "dedicated": 58,
+    "fallback": 192,
     "rejected": 191,
     "not-emitted": 0
   },
@@ -38,7 +38,7 @@
     {
       "src": "numerus",
       "tgt": "ascii",
-      "tier": "fallback",
+      "tier": "dedicated",
       "measured": true
     },
     {
