@@ -67,7 +67,11 @@ reice = "reject"
 clausura = "lambda"
 libera = "free"
 falsum = "false"
-nihil = "null"
+# Null value literal (D23.2). The null *type* row lives under [types] below.
+# TRANSITIONAL (D23.2 window): `nihil` stays an accepted value-literal alias
+# until the sweep lands; delete this row with the registry alias then.
+nihil = "nihil"
+nulla = "null"
 verum = "true"
 nonnumerus = "nan"
 aut = "or"
@@ -134,10 +138,11 @@ solum_in = "only_in"
 tag = "tag"
 temporis = "timeout"
 # Legacy predicates
+# D23.4 dropped the retired `nulla` predicate row: `nulla` is now the null
+# value literal declared in the Values-and-logic group above.
 negativum = "negative"
 nonnihil = "some"
 nonnulla = "nonnulla"
-nulla = "none"
 positivum = "positive"
 # Annotation families (wave 1 — see docs/factory/annotation-locale)
 # Collision policy: fiet already owns "async"; fiunt owns "generator".
@@ -180,7 +185,11 @@ modulus = "wrapping_ty"
 saturatus = "saturating"
 fractus = "float"
 bivalens = "bool"
-nihil = "null_ty"
+# Null type (D23.2); the null value literal is `null` in [keywords] above.
+# TRANSITIONAL (D23.3 window): `null_ty` was the invented accept-only type
+# spelling that the pre-D23.2 uniqueness rule forced. It stays accepted until
+# the corpus sweep moves its sites to `none`; delete the alias then.
+nihil = { canonical = "none", aliases = ["null_ty"] }
 vacuum = "void"
 numquam = "never"
 ignotum = "unknown"
@@ -3809,7 +3818,7 @@ message = "wildcard absorbs null"
 help = "add an explicit `{casu} {nihil}` arm so the null case is handled deliberately"
 
 [diagnostics.WARN011.issues.wildcard_absorbs_null]
-message = "catchall arm absorbs null case of nullable scrutinee; use an explicit '{casu}' {nil} arm"
+message = "catchall arm absorbs null case of nullable scrutinee; use an explicit '{casu}' {nihil} arm"
 help = "add an explicit `{casu} {nihil}` arm so the null case is handled deliberately"
 
 [diagnostics.WARN013]

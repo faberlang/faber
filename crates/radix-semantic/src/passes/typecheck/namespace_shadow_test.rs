@@ -215,11 +215,13 @@ functio _numel_forma(lista<numerus> forma) → numerus ⇥ TensorError {
 /// surfaces, never on the binding name alone.
 #[test]
 fn shadowed_namespace_name_without_surface_types_as_local_value() {
+    // (The shadowing name is `cura`, not `nulla`: D23.4 revived `nulla` as the
+    // null value literal, so it is no longer an ordinary identifier.)
     let unit = crate::test_support::analyze_source_with_import_contract(
-        r#"importa ex "./nulla" nulla
+        r#"importa ex "./cura" cura
 
-functio _probe(lista<numerus> nulla) → numerus {
-    redde nulla.longitudo()
+functio _probe(lista<numerus> cura) → numerus {
+    redde cura.longitudo()
 }"#,
         BTreeMap::new(),
         BTreeMap::new(),

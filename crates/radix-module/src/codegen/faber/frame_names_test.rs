@@ -145,7 +145,7 @@ fn convert_la_to_en_spells_family_in_en() {
         "const channel s ←",
         "const send<value> outbound ← s.send<value>()",
         "const recv<string> t ← s.recv<string>()",
-        "const frame<string> ∪ null received",
+        "const frame<string> ∪ none received",
         "s.recv<string>().cursor()",
     ] {
         assert!(en.contains(needle), "en convert must contain `{needle}`:\n{en}");

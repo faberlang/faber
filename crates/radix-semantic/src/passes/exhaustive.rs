@@ -32,7 +32,7 @@
 //!   variant name, so later codegen can rely on resolved identity.
 
 use super::coverage::{Coverage, Ctor, Space, Witness, coverage, space_for};
-use crate::locale::LocalePack;
+use crate::locale::{LocalePack, TypeBindingKind};
 use crate::{
     Primitive, Resolver, SemanticError, SemanticErrorKind, Type, TypeId, TypeTable, WarningKind,
 };
@@ -309,8 +309,7 @@ fn check_match(
                 span,
             )
             .with_arg("issue", "wildcard_absorbs_null")
-            .with_arg("casu", "casu")
-            .with_arg("nil", "nihil"),
+            .with_arg("casu", "casu"),
         );
     }
 }
@@ -444,6 +443,18 @@ fn render_witness(
     }
 }
 
+/// Reader-locale surface spelling for the null *type* (D23.2: en `none`,
+/// la `nihil`), falling back to the Latin spelling when no pack is active.
+fn nil_type_surface(names: Option<&CoverageNames<'_>>) -> String {
+    names.and_then(|names| names.locale_pack).map_or_else(
+        || "nihil".to_owned(),
+        |pack| {
+            pack.type_surface(TypeBindingKind::Primitive(Primitive::Nihil))
+                .to_owned()
+        },
+    )
+}
+
 fn render_ctor(ctor: Option<Ctor>, types: &TypeTable, names: Option<&CoverageNames<'_>>) -> String {
     let keyword = |latin: &'static str| -> String {
         names
@@ -464,7 +475,7 @@ fn render_ctor(ctor: Option<Ctor>, types: &TypeTable, names: Option<&CoverageNam
         Some(Ctor::Bool(true)) => keyword("verum"),
         Some(Ctor::Bool(false)) => keyword("falsum"),
         Some(Ctor::Variant(def_id)) => def_name(def_id),
-        Some(Ctor::Member(member)) if type_is_nil(member, types) => keyword("nihil"),
+        Some(Ctor::Member(member)) if type_is_nil(member, types) => nil_type_surface(names),
         Some(Ctor::Member(member)) => match names {
             Some(names) => crate::format_faber_type(member, types, names.interner, &def_name),
             None => format!("Type{}", member.0),

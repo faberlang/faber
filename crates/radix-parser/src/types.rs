@@ -185,6 +185,15 @@ impl Parser {
             TypeExprKind::UnionHole
         } else {
             let name = if self.check_keyword_ident(TokenKind::Nihil) {
+                // The null *type* is `nihil` (D23.2). The null *value* literal
+                // (`null` / `nulla`) reaches this branch in a type position
+                // because it shares the literal token — that is the
+                // TRANSITIONAL acceptance window for the D23.2 sweep: sources
+                // still spell the nullable type `T ∪ null`, and `x est null`
+                // still parses as a type test, until the sweep moves those
+                // sites to the type word. Remove this branch (and the
+                // literal-as-type paths in `pattern.rs`, `decl.rs`,
+                // `peek_starts_type_name`) once the sweep lands.
                 let span = self.peek().span;
                 self.advance();
                 self.keyword_ident("nihil", span)

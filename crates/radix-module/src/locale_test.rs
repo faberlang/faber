@@ -1242,12 +1242,40 @@ fn keyword_token_kind_and_type_binding_use_spelling_index() {
     assert_eq!(pack.type_binding_kind("not_a_type_xyz"), None);
 }
 
-// ── F-113: duplicate spellings must be caught across keywords and types ─────
+// ── D23.2: spelling uniqueness is per block, not across blocks ──────────────
 
 #[test]
-fn duplicate_spellings_across_keywords_and_types_are_rejected() {
-    // A pack that uses a spelling in both a keyword and a type must fail
-    // validation — spellings are a shared namespace (F-113).
+fn same_spelling_across_keywords_and_types_is_allowed() {
+    // D23.2: one word may name both a keyword row and a type row. Latin
+    // `nihil` is the live case (the null type plus the transitional
+    // value-literal alias); before D23.2 the shared-namespace rule (F-113)
+    // forced the invented `nihil_t` / `null_ty` type spellings.
+    let pack = LocalePack::from_toml_str(
+        r#"
+[pack]
+id = "la-test"
+fallback = ["la"]
+
+[keywords]
+nihil = "nihil"
+
+[types]
+nihil = "nihil"
+
+[llm]
+system_prompt_snippet = "emit Latin reader-locale Faber"
+exemplars = ["./exemplars/salve-munde.fab"]
+"#,
+    )
+    .expect("shared spelling across keyword and type sections must load");
+
+    assert_eq!(pack.keywords["nihil"].canonical, "nihil");
+    assert_eq!(pack.types["nihil"].canonical, "nihil");
+}
+
+#[test]
+fn duplicate_spellings_within_keywords_are_rejected() {
+    // A duplicate *within* `[keywords]` is still a pack bug.
     let err = LocalePack::from_toml_str(
         r#"
 [pack]
@@ -1255,57 +1283,53 @@ id = "la-test"
 fallback = ["la"]
 
 [keywords]
-textus = "文本"
-
-[types]
-textus = "文本"
+functio = "dup"
+nota = "dup"
 
 [llm]
 system_prompt_snippet = "emit Chinese reader-locale Faber"
 exemplars = ["./exemplars/salve-munde.fab"]
 "#,
     )
-    .expect_err("shared spelling across keyword and type sections must fail");
+    .expect_err("duplicate spelling within [keywords] must fail");
 
     let super::LocalePackLoadError::Validation(issues) = err else {
         panic!("expected validation error");
     };
 
     assert!(
-        issues.contains(&LocalePackIssue::DuplicateSpelling { spelling: "文本".to_string() }),
-        "expected DuplicateSpelling for '文本' in issues: {issues:?}"
+        issues.contains(&LocalePackIssue::DuplicateSpelling { spelling: "dup".to_string() }),
+        "expected DuplicateSpelling for 'dup' in issues: {issues:?}"
     );
 }
 
 #[test]
-fn duplicate_spellings_across_keyword_and_type_aliases_are_rejected() {
-    // A pack where a keyword alias collides with a type canonical must fail.
+fn duplicate_spellings_within_types_are_rejected() {
+    // A duplicate *within* `[types]` is still a pack bug.
     let err = LocalePack::from_toml_str(
         r#"
 [pack]
 id = "la-test"
 fallback = ["la"]
 
-[keywords]
-textus = { canonical = "real_textus", aliases = ["文本"] }
-
 [types]
-textus = "文本"
+textus = "dup"
+numerus = "dup"
 
 [llm]
 system_prompt_snippet = "emit Chinese reader-locale Faber"
 exemplars = ["./exemplars/salve-munde.fab"]
 "#,
     )
-    .expect_err("keyword alias colliding with type spelling must fail");
+    .expect_err("duplicate spelling within [types] must fail");
 
     let super::LocalePackLoadError::Validation(issues) = err else {
         panic!("expected validation error");
     };
 
     assert!(
-        issues.contains(&LocalePackIssue::DuplicateSpelling { spelling: "文本".to_string() }),
-        "expected DuplicateSpelling for '文本' in issues: {issues:?}"
+        issues.contains(&LocalePackIssue::DuplicateSpelling { spelling: "dup".to_string() }),
+        "expected DuplicateSpelling for 'dup' in issues: {issues:?}"
     );
 }
 

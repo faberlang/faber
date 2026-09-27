@@ -892,14 +892,15 @@ impl Parser {
 
     fn literal_prefix_predicate_replacement(&self) -> Option<(&'static str, &'static str)> {
         // A boolean literal is a value, so the rewrite is the equality operator
-        // (DECISIONS D23.1 — `est` takes a type). `nihil` is the null *type*,
-        // so its rewrite stays a type test.
+        // (DECISIONS D23.1 — `est` takes a type). The null *literal* (D23.2:
+        // `nulla`) is a value too, but its rewrite names the null *type*
+        // (`nihil`), so the rewrite stays a type test.
         if self.check_keyword_ident(TokenKind::Verum) {
             Some(("verum", "value ≡ verum"))
         } else if self.check_keyword_ident(TokenKind::Falsum) {
             Some(("falsum", "value ≡ falsum"))
         } else if self.check_keyword_ident(TokenKind::Nihil) {
-            Some(("nihil", "value est nihil"))
+            Some(("nulla", "value est nihil"))
         } else {
             None
         }

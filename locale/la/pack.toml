@@ -61,7 +61,12 @@ reice = "reice"
 clausura = "clausura"
 libera = "libera"
 falsum = "falsum"
+# Null value literal (D23.2): `nulla`. The null *type* is `nihil` ([types]
+# below). TRANSITIONAL (D23.2 window): the pre-split value spelling `nihil`
+# stays an accepted alias until the value-position sweep lands; delete this
+# alias row then.
 nihil = "nihil"
+nulla = "nulla"
 verum = "verum"
 nonnumerus = "nonnumerus"
 aut = "aut"
@@ -115,10 +120,11 @@ solum = "solum"
 solum_in = "solum_in"
 tag = "tag"
 temporis = "temporis"
+# D23.4 dropped the retired `nulla` predicate row: `nulla` is now the null
+# value literal declared in the Values-and-logic group above.
 negativum = "negativum"
 nonnihil = "nonnihil"
 nonnulla = "nonnulla"
-nulla = "nulla"
 positivum = "positivum"
 # Contextual keywords (token_kind: None): recognized by spelling in parser-owned
 # grammar slots; not globally reserved lexer tokens.
@@ -167,7 +173,12 @@ modulus = "modulus_t"
 saturatus = "saturatus"
 fractus = "fractus"
 bivalens = "bivalens"
-nihil = "nihil_t"
+# Null type (D23.2). No `_t` suffix: the value literal is `nulla`, so `nihil`
+# names only the type.
+# TRANSITIONAL (D23.3 window): `nihil_t` was the invented accept-only type
+# spelling the pre-D23.2 uniqueness rule forced; it stays accepted until the
+# sweep lands. Delete the alias then.
+nihil = { canonical = "nihil", aliases = ["nihil_t"] }
 vacuum = "vacuum"
 numquam = "numquam"
 ignotum = "ignotum"
@@ -3600,7 +3611,7 @@ message = "wildcard absorbs null"
 help = "add an explicit `{casu} {nihil}` arm so the null case is handled deliberately"
 
 [diagnostics.WARN011.issues.wildcard_absorbs_null]
-message = "catchall arm absorbs null case of nullable scrutinee; use an explicit '{casu}' {nil} arm"
+message = "catchall arm absorbs null case of nullable scrutinee; use an explicit '{casu}' {nihil} arm"
 help = "add an explicit `{casu} {nihil}` arm so the null case is handled deliberately"
 
 [diagnostics.WARN013]

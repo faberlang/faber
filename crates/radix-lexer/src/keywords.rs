@@ -812,8 +812,25 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(LITERAL),
         category: KeywordKind::Literal,
     },
+    // Null literal. DECISIONS D23.2 splits the null *value* from the null
+    // *type*: the value literal is `nulla` (en `null`), the type stays `nihil`
+    // (en `none`). The canonical name is listed after its retired spelling so
+    // `keyword_spelling_for_token(TokenKind::Nihil)` resolves to `nulla`.
+    //
+    // TRANSITIONAL (D23.2 window): `nihil` remains an accepted alias of the
+    // value literal so Latin-spelled sources keep compiling until the sweep
+    // moves their value positions to `nulla`; delete this row and the packs'
+    // `nihil` [keywords] rows in that sweep (the registration is also what
+    // keeps the EBNF vocabulary triple green, since the public grammar still
+    // documents `nihil`).
     KeywordSpec {
         text: "nihil",
+        token_kind: Some(TokenKind::Nihil),
+        scope: KeywordScope::Alias { canonical: "nulla" },
+        category: KeywordKind::Literal,
+    },
+    KeywordSpec {
+        text: "nulla",
         token_kind: Some(TokenKind::Nihil),
         scope: KeywordScope::Contextual(LITERAL),
         category: KeywordKind::Literal,
@@ -1226,12 +1243,9 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(PREDICATE_OPERATOR),
         category: KeywordKind::Nullability,
     },
-    KeywordSpec {
-        text: "nulla",
-        token_kind: Some(TokenKind::Nulla),
-        scope: KeywordScope::Contextual(PREDICATE_OPERATOR),
-        category: KeywordKind::Nullability,
-    },
+    // The retired `nulla` prefix predicate row was removed with D23.4:
+    // `nulla` is now the null value literal (the row in the Boolean/null
+    // group above), not a predicate operator.
     KeywordSpec {
         text: "positivum",
         token_kind: Some(TokenKind::Positivum),

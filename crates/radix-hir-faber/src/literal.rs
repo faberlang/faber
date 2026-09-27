@@ -147,7 +147,7 @@ impl super::FaberCodegen<'_> {
             HirLiteral::Bool(value) => {
                 writer.write(surface.contextual_keyword(if *value { "verum" } else { "falsum" }));
             }
-            HirLiteral::Nil => writer.write(surface.contextual_keyword("nihil")),
+            HirLiteral::Nil => writer.write(surface.contextual_keyword("nulla")),
         }
     }
 

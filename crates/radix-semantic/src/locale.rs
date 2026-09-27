@@ -1267,7 +1267,9 @@ pub fn latin_locale_pack() -> LocalePack {
         // (see `codegen::faber::reemit_faber`), so the emitted `_t` spellings are
         // registered type names on the parse side.
         let canonical = match spec.text {
-            "nihil" => "nihil_t".to_owned(),
+            // `nihil` needs no disambiguating suffix: D23.2 makes the null
+            // *type* the only `nihil`, while the null *value* literal is
+            // `nulla`. (`modulus` still collides with its keyword spelling.)
             "modulus" => "modulus_t".to_owned(),
             text => text.to_owned(),
         };
@@ -1997,18 +1999,24 @@ fn validate_exemplar_paths(base_dir: &Path, llm: &LlmArtifacts) -> Vec<LocalePac
 }
 
 fn validate_unique_spellings(pack: &LocalePack, issues: &mut Vec<LocalePackIssue>) {
-    let mut all_spellings = BTreeSet::new();
+    // D23.2: a word may legitimately name both a keyword row and a type row —
+    // Latin `nihil` is the null *type* and the transitional null-*value*
+    // alias. Uniqueness is therefore per block: a duplicate within
+    // `[keywords]` or within `[types]` is still a pack bug, but the same
+    // spelling in both blocks is not.
+    let mut keyword_spellings = BTreeSet::new();
     for binding in pack.keywords.values() {
-        insert_spelling(&mut all_spellings, &binding.canonical, issues);
+        insert_spelling(&mut keyword_spellings, &binding.canonical, issues);
         for alias in &binding.aliases {
-            insert_spelling(&mut all_spellings, alias, issues);
+            insert_spelling(&mut keyword_spellings, alias, issues);
         }
     }
 
+    let mut type_spellings = BTreeSet::new();
     for binding in pack.types.values() {
-        insert_spelling(&mut all_spellings, &binding.canonical, issues);
+        insert_spelling(&mut type_spellings, &binding.canonical, issues);
         for alias in &binding.aliases {
-            insert_spelling(&mut all_spellings, alias, issues);
+            insert_spelling(&mut type_spellings, alias, issues);
         }
     }
 }

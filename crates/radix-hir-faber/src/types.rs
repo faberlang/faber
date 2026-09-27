@@ -173,7 +173,13 @@ impl super::FaberCodegen<'_> {
 
             Type::Option(inner) => {
                 let inner = self.type_to_faber(self.flatten_option(*inner), names, surface);
-                format!("{inner} ∪ {}", surface.contextual_keyword("nihil"))
+                // Nullable type: both members are type positions, so the null
+                // constituent uses the null *type* surface (D23.2: en `none`,
+                // la `nihil`), never the value literal.
+                format!(
+                    "{inner} ∪ {}",
+                    surface.type_surface(TypeBindingKind::Primitive(Primitive::Nihil))
+                )
             }
 
             Type::Ref(mutability, inner) => {
@@ -703,7 +709,10 @@ impl super::FaberCodegen<'_> {
                 [] => Ok(self.type_to_faber(form.ty, names, surface)),
                 [HirTypeFormArg::Type(child)] => {
                     let inner = self.type_form_to_faber(child, names, surface)?;
-                    Ok(format!("{inner} ∪ {}", surface.contextual_keyword("nihil")))
+                    Ok(format!(
+                        "{inner} ∪ {}",
+                        surface.type_surface(TypeBindingKind::Primitive(Primitive::Nihil))
+                    ))
                 }
                 _ => Err(malformed_type_form(
                     "option form carries unexpected children".to_owned(),

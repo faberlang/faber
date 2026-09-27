@@ -2870,7 +2870,10 @@ impl Parser {
             let literal = match self.interner.resolve(sym) {
                 "verum" => Some(Literal::Bool(true)),
                 "falsum" => Some(Literal::Bool(false)),
-                "nihil" => Some(Literal::Nil),
+                // D23.2: the null value literal is `nulla`. The transitional
+                // `nihil` alias still parses through the ordinary literal path
+                // in `parse_expression`.
+                "nulla" => Some(Literal::Nil),
                 _ => None,
             };
 

@@ -167,7 +167,7 @@ impl super::FaberCodegen<'_> {
             HirAnnotationValue::Bool(false) => writer.write(surface.contextual_keyword("falsum")),
             HirAnnotationValue::Int(n) => writer.write(&n.to_string()),
             HirAnnotationValue::Float(n) => writer.write(&n.to_string()),
-            HirAnnotationValue::Nihil => writer.write(surface.contextual_keyword("nihil")),
+            HirAnnotationValue::Nihil => writer.write(surface.contextual_keyword("nulla")),
             HirAnnotationValue::Type(ty) => {
                 let rendered = match (owner, field_ordinal) {
                     (Some(owner), Some(field)) => {

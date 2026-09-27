@@ -1032,10 +1032,11 @@ impl super::FaberCodegen<'_> {
                 writer.write(" ");
                 if matches!(self.types.get(*ty), Type::Primitive(Primitive::Nihil)) {
                     // A type test against the null type is the null-presence
-                    // probe: spell it with the null literal, exactly as the
-                    // retired value form did (DECISIONS D23.1), so the surface
-                    // round-trips.
-                    writer.write(surface.contextual_keyword("nihil"));
+                    // probe. D23.2 names the null *type* `none` (en) / `nihil`
+                    // (la), so emit the type surface here — not the value
+                    // literal.
+                    writer
+                        .write(surface.type_surface(TypeBindingKind::Primitive(Primitive::Nihil)));
                 } else {
                     let site = HirTypeSite {
                         owner: HirOwnerRef::Hir(expr.id),
@@ -1142,7 +1143,7 @@ impl super::FaberCodegen<'_> {
             HirExpressionKind::FirstMatch { .. } => {
                 // AFM-2 is source-shaped only; keep re-emission fail-closed
                 // until AFM-3 provides a valid Faber surface.
-                writer.write(surface.contextual_keyword("nihil"));
+                writer.write(surface.contextual_keyword("nulla"));
             }
             HirExpressionKind::Transfer { sink, payloads } => {
                 // `sink ⇇ p1 ⇇ p2` — the glyph is an operator token, never a
@@ -1164,7 +1165,7 @@ impl super::FaberCodegen<'_> {
                 writer.write(" ¶ ");
                 self.write_textus_literal(*spec, writer);
             }
-            HirExpressionKind::Error => writer.write(surface.contextual_keyword("nihil")),
+            HirExpressionKind::Error => writer.write(surface.contextual_keyword("nulla")),
         }
 
         if needs_parens {

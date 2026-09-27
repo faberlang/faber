@@ -312,11 +312,9 @@ fn warns_when_wildcard_absorbs_nullable_constituent() {
     expect_structured_error(
         &errors,
         SemanticErrorKind::Warning(WarningKind::WildcardAbsorbsNull),
-        &[
-            ("issue", "wildcard_absorbs_null"),
-            ("casu", "casu"),
-            ("nil", "nihil"),
-        ],
+        // The null-arm word is resolved from the locale pack's `[types] nihil`
+        // surface at render time (D23.2), so it is not a literal arg.
+        &[("issue", "wildcard_absorbs_null"), ("casu", "casu")],
     );
 }
 

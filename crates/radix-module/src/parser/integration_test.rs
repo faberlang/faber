@@ -98,13 +98,15 @@ fn assert_semantic_rejection(source: &str) {
 fn retired_prefix_predicates_emit_rewrite_diagnostics() {
     assert_retired_prefix_predicate("fixum _ x ← falsum disabled", "falsum", "value ≡ falsum");
     assert_retired_prefix_predicate("fixum _ x ← verum enabled", "verum", "value ≡ verum");
-    assert_retired_prefix_predicate("fixum _ x ← nihil maybe", "nihil", "value est nihil");
+    // D23.2/D23.4: `nulla` is the null value literal, so both its canonical
+    // spelling and the transitional `nihil` alias are literal-prefix forms.
+    assert_retired_prefix_predicate("fixum _ x ← nihil maybe", "nulla", "value est nihil");
+    assert_retired_prefix_predicate("fixum _ x ← nulla maybe", "nulla", "value est nihil");
 }
 
 #[test]
 fn required_prefix_predicates_stay_rejected() {
     assert_semantic_rejection("incipit { fixum _ x ← nonnihil maybe }");
-    assert_semantic_rejection("incipit { fixum _ x ← nulla maybe }");
     assert_semantic_rejection("incipit { fixum _ x ← nonnulla maybe }");
     assert_semantic_rejection("incipit { fixum _ x ← negativum count }");
     assert_semantic_rejection("incipit { fixum _ x ← positivum count }");
