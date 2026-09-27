@@ -44,442 +44,446 @@ param_list ::= (parameter (',' parameter)*)?
 # [017] generic_params
 generic_params ::= '<' generic_param (',' generic_param)* '>'
 # [018] generic_param
-generic_param ::= IDENTIFIER generic_type_default? | '尺寸' IDENTIFIER generic_size_default?
-# [019] generic_type_default
+generic_param ::= IDENTIFIER generic_bound? generic_type_default? | '尺寸' IDENTIFIER generic_size_default?
+# [019] generic_bound
+generic_bound ::= '實作' contract_ref ('∩' contract_ref)*
+# [020] contract_ref
+contract_ref ::= IDENTIFIER ('<' type_annotation (',' type_annotation)* '>')?
+# [021] generic_type_default
 generic_type_default ::= '=' type_annotation
-# [020] generic_size_default
+# [022] generic_size_default
 generic_size_default ::= '=' NATURAL
-# [021] call_type_args
+# [023] call_type_args
 call_type_args ::= '<' type_annotation (',' type_annotation)* '>'
-# [022] parameter
+# [024] parameter
 parameter ::= '其餘'? type_annotation IDENTIFIER '可選'? ('作為' IDENTIFIER)? ('或取' expression)?
-# [023] func_modifier
+# [025] func_modifier
 func_modifier ::= '引數' IDENTIFIER | '錯誤' IDENTIFIER | '出口' (IDENTIFIER | NUMBER) | '不變' | '可拋' | '可選項' IDENTIFIER
-# [024] callable_posture
+# [026] callable_posture
 callable_posture ::= '異步' | '流' | '異流'
-# [025] return_clause
+# [027] return_clause
 return_clause ::= '→' type_annotation
-# [026] alternate_exit_clause
+# [028] alternate_exit_clause
 alternate_exit_clause ::= '⇥' type_annotation
-# [027] ergo_joint
+# [029] ergo_joint
 ergo_joint ::= '則'
-# [028] clausura_joint
+# [030] clausura_joint
 clausura_joint ::= '∴'
-# [029] clausura_expr
+# [031] clausura_expr
 clausura_expr ::= compact_clausura_expr | clausura_legacy_expr
-# [030] compact_clausura_expr
+# [032] compact_clausura_expr
 compact_clausura_expr ::= clausura_signature clausura_joint (expression | fac_block)
-# [031] clausura_signature
+# [033] clausura_signature
 clausura_signature ::= (clausura_param | '(' clausura_params? ')') closure_modifier? return_clause? alternate_exit_clause?
-# [032] closure_modifier
+# [034] closure_modifier
 closure_modifier ::= '自由' | '內核'
-# [033] fac_block
+# [035] fac_block
 fac_block ::= '執行' block_stmt cape_clause?
-# [034] clausura_legacy_expr
+# [036] clausura_legacy_expr
 clausura_legacy_expr ::= '閉包' clausura_params? closure_modifier? ('→' type_annotation)? (':' expression | block_stmt)
-# [035] clausura_params
+# [037] clausura_params
 clausura_params ::= clausura_param (',' clausura_param)*
-# [036] clausura_param
+# [038] clausura_param
 clausura_param ::= type_annotation IDENTIFIER
-# [037] genus_decl
-genus_decl ::= '類型' IDENTIFIER generic_params? ('實作' IDENTIFIER ((',' | '∩') IDENTIFIER)*)? '{' genus_member* '}'
-# [038] genus_member
+# [039] genus_decl
+genus_decl ::= '類型' IDENTIFIER generic_params? ('實作' contract_ref ((',' | '∩') contract_ref)*)? '{' genus_member* '}'
+# [040] genus_member
 genus_member ::= annotation* (field_decl | functio_method_decl)
-# [039] field_decl
-field_decl ::= '靜態'? type_annotation IDENTIFIER '可選'? ('=' expression)?
-# [040] functio_method_decl
+# [041] field_decl
+field_decl ::= ('定值' | '變值' | '靜態')? type_annotation IDENTIFIER '可選'? ('=' expression)?
+# [042] functio_method_decl
 functio_method_decl ::= '函式' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
-# [041] annotation
+# [043] annotation
 annotation ::= nucleum_annotation | radix_annotation | ad_annotation | braced_annotation | annotation_sugar
-# [042] annotation_name
+# [044] annotation_name
 annotation_name ::= ANNOTATION_NAME
-# [043] braced_annotation
+# [045] braced_annotation
 braced_annotation ::= '@' annotation_name '{' annotation_field_list? '}'
-# [044] annotation_field_list
+# [046] annotation_field_list
 annotation_field_list ::= annotation_field (',' annotation_field)*
-# [045] annotation_field
+# [047] annotation_field
 annotation_field ::= ANNOTATION_FIELD_NAME '=' (expression | type_annotation)
-# [046] annotation_sugar
+# [048] annotation_sugar
 annotation_sugar ::= '@' annotation_name NON_NEWLINE_TOKEN* NEWLINE
-# [047] nucleum_annotation
+# [049] nucleum_annotation
 nucleum_annotation ::= nucleum_sugar | nucleum_braced
-# [048] nucleum_sugar
+# [050] nucleum_sugar
 nucleum_sugar ::= '@' '內核' nucleum_modifier? NEWLINE
-# [049] nucleum_braced
+# [051] nucleum_braced
 nucleum_braced ::= '@' '內核' '{' nucleum_field_list? '}'
-# [050] nucleum_modifier
+# [052] nucleum_modifier
 nucleum_modifier ::= '片段'
-# [051] nucleum_field_list
+# [053] nucleum_field_list
 nucleum_field_list ::= nucleum_field (',' nucleum_field)*
-# [052] nucleum_field
+# [054] nucleum_field
 nucleum_field ::= '片段' '=' ('真' | '假')
-# [053] radix_annotation
+# [055] radix_annotation
 radix_annotation ::= '@' 'radix' radix_directive NEWLINE
-# [054] radix_directive
+# [056] radix_directive
 radix_directive ::= '車道' STRING | 'backward' STRING | '型別' IDENTIFIER '傳入' type_annotation+
-# [055] ad_annotation
+# [057] ad_annotation
 ad_annotation ::= '@' '端點' ASCII_STRING NEWLINE
-# [056] implendum_decl
+# [058] implendum_decl
 implendum_decl ::= '待實作介面' IDENTIFIER generic_params? '{' implendum_method_decl* '}'
-# [057] implendum_method_decl
+# [059] implendum_method_decl
 implendum_method_decl ::= annotation* '函式' IDENTIFIER '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
-# [058] typus_decl
+# [060] typus_decl
 typus_decl ::= '型別' IDENTIFIER generic_params? '=' type_annotation
-# [059] ordo_decl
+# [061] ordo_decl
 ordo_decl ::= '列舉' IDENTIFIER '{' enum_member (',' enum_member)* '}'
-# [060] enum_member
+# [062] enum_member
 enum_member ::= IDENTIFIER ('=' ('-'? NUMBER | STRING))?
-# [061] discretio_decl
+# [063] discretio_decl
 discretio_decl ::= '分支聯集' IDENTIFIER generic_params? '{' union_member* variant (',' variant)* '}'
-# [062] union_member
+# [064] union_member
 union_member ::= annotation* field_decl
-# [063] variant
+# [065] variant
 variant ::= IDENTIFIER ('{' variant_fields '}')?
-# [064] variant_fields
+# [066] variant_fields
 variant_fields ::= (type_annotation IDENTIFIER)*
-# [065] schema_decl
+# [067] schema_decl
 schema_decl ::= '結構' IDENTIFIER '{' schema_column* '}'
-# [066] schema_column
+# [068] schema_column
 schema_column ::= '欄位' type_annotation IDENTIFIER (':' IDENTIFIER)?
-# [067] importa_decl
+# [069] importa_decl
 importa_decl ::= importa_record | importa_sugar
-# [068] importa_record
+# [070] importa_record
 importa_record ::= '匯入' '{' import_field_list? '}'
-# [069] import_field_list
+# [071] import_field_list
 import_field_list ::= import_field (',' import_field)*
-# [070] import_field
+# [072] import_field
 import_field ::= ex_field | visibilitas_field | nomen_field | ut_field | omnia_field
-# [071] ex_field
+# [073] ex_field
 ex_field ::= '取自' '=' STRING
-# [072] visibilitas_field
+# [074] visibilitas_field
 visibilitas_field ::= 'visibilitas' '=' publica
-# [073] nomen_field
+# [075] nomen_field
 nomen_field ::= '名稱' '=' IDENTIFIER
-# [074] ut_field
+# [076] ut_field
 ut_field ::= '作為' '=' IDENTIFIER
-# [075] omnia_field
+# [077] omnia_field
 omnia_field ::= '全部' '=' IDENTIFIER
-# [076] importa_sugar
+# [078] importa_sugar
 importa_sugar ::= '匯入' '取自' STRING publica? (named_import | wildcard_import | selective_import)?
-# [077] publica
+# [079] publica
 publica ::= '公開'
-# [078] named_import
+# [080] named_import
 named_import ::= IDENTIFIER ('作為' IDENTIFIER)?
-# [079] wildcard_import
+# [081] wildcard_import
 wildcard_import ::= '*' '作為' IDENTIFIER
-# [080] selective_import
+# [082] selective_import
 selective_import ::= '定值' import_value_binding (',' import_value_binding)*
-# [081] import_value_binding
+# [083] import_value_binding
 import_value_binding ::= IDENTIFIER ('作為' IDENTIFIER)?
-# [082] type_annotation
+# [084] type_annotation
 type_annotation ::= intersection_type ('∪' intersection_type)*
-# [083] intersection_type
+# [085] intersection_type
 intersection_type ::= owned_type ('∩' owned_type)*
-# [084] owned_type
+# [086] owned_type
 owned_type ::= ('從' | '傳入' | '擁有' | '拷貝')? base_type
-# [085] base_type
+# [087] base_type
 base_type ::= hole_type | function_type | width_type_sugar | ratio_type | qualified_type type_arguments? | '(' type_annotation ')'
-# [086] ratio_type
+# [088] ratio_type
 ratio_type ::= 'ratio' '<' labeled_type_argument (',' labeled_type_argument)* '>'
-# [087] hole_type
+# [089] hole_type
 hole_type ::= '_' | '∪'
-# [088] qualified_type
+# [090] qualified_type
 qualified_type ::= IDENTIFIER ('.' IDENTIFIER)*
-# [089] type_arguments
+# [091] type_arguments
 type_arguments ::= '<' type_argument (',' type_argument)* '>'
-# [090] type_argument
+# [092] type_argument
 type_argument ::= labeled_type_argument | type_annotation | NATURAL | '[' figura_list? ']'
-# [091] labeled_type_argument
+# [093] labeled_type_argument
 labeled_type_argument ::= IDENTIFIER ':' type_annotation
-# [092] width_type_sugar
+# [094] width_type_sugar
 width_type_sugar ::= WIDTH_MARKER | LISTA_WIDTH_SUGAR | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix? | MATRIX_WIDTH_SUGAR shape_suffix
-# [093] shape_suffix
+# [095] shape_suffix
 shape_suffix ::= '[' figura_list? ']'
-# [094] figura
+# [096] figura
 figura ::= '_' | NATURAL | IDENTIFIER | '[' figura_list? ']'
-# [095] figura_list
+# [097] figura_list
 figura_list ::= figura (',' figura)*
-# [096] function_type
+# [098] function_type
 function_type ::= '(' type_list? ')' '→' type_annotation alternate_exit_clause?
-# [097] type_list
+# [099] type_list
 type_list ::= type_annotation (',' type_annotation)*
-# [098] si_stmt
+# [100] si_stmt
 si_stmt ::= '若' expression arm ('否則若' si_stmt | secus_clause)?
-# [099] secus_clause
+# [101] secus_clause
 secus_clause ::= '否則' else_arm
-# [100] arm
+# [102] arm
 arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [101] else_arm
+# [103] else_arm
 else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [102] dum_stmt
+# [104] dum_stmt
 dum_stmt ::= '當' expression (block_stmt | ergo_joint statement) cape_clause?
-# [103] itera_stmt
+# [105] itera_stmt
 itera_stmt ::= '遍歷' ('取自' expression (',' expression)* | '從' expression | '範圍' expression (',' expression)*) apud_clause? ('定值' | '變值') itera_binding (block_stmt | ergo_joint statement) cape_clause?
-# [104] itera_binding
+# [106] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
-# [105] apud_clause
+# [107] apud_clause
 apud_clause ::= '於' '[' IDENTIFIER (',' IDENTIFIER)* ']'
-# [106] elige_stmt
+# [108] elige_stmt
 elige_stmt ::= '選擇' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
-# [107] casu_elige_clause
+# [109] casu_elige_clause
 casu_elige_clause ::= '分支' expression (block_stmt | ergo_joint statement)
-# [108] ceterum_clause
+# [110] ceterum_clause
 ceterum_clause ::= '預設' (block_stmt | ergo_joint statement)
-# [109] discerne_stmt
+# [111] discerne_stmt
 discerne_stmt ::= '比對' '全部'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
-# [110] discriminants
+# [112] discriminants
 discriminants ::= expression (',' expression)*
-# [111] casu_variant_clause
+# [113] casu_variant_clause
 casu_variant_clause ::= '分支' patterns (block_stmt | ergo_joint statement)
-# [112] patterns
+# [114] patterns
 patterns ::= pattern ((',' | '且') pattern)*
-# [113] pattern
+# [115] pattern
 pattern ::= '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_pattern?)
-# [114] negated_number
+# [116] negated_number
 negated_number ::= '-' NUMBER
-# [115] type_pattern
+# [117] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
-# [116] ut_pattern
+# [118] ut_pattern
 ut_pattern ::= ('作為' IDENTIFIER) | (('定值' | '變值') pattern_binding (',' pattern_binding)*)
-# [117] pattern_binding
+# [119] pattern_binding
 pattern_binding ::= IDENTIFIER ('作為' IDENTIFIER)?
-# [118] custodi_stmt
+# [120] custodi_stmt
 custodi_stmt ::= '守衛' '{' si_guard_clause+ '}'
-# [119] si_guard_clause
+# [121] si_guard_clause
 si_guard_clause ::= '若' expression (block_stmt | ergo_joint statement)
-# [120] ex_stmt
+# [122] ex_stmt
 ex_stmt ::= '取自' expression ('定值' | '變值') extract_fields
-# [121] extract_fields
+# [123] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
-# [122] extract_field
+# [124] extract_field
 extract_field ::= IDENTIFIER ('作為' IDENTIFIER)?
-# [123] ceteri_field
+# [125] ceteri_field
 ceteri_field ::= '其餘' IDENTIFIER
-# [124] redde_stmt
+# [126] redde_stmt
 redde_stmt ::= '傳回' expression?
-# [125] reddet_stmt
+# [127] reddet_stmt
 reddet_stmt ::= '等返' expression
-# [126] tacebit_stmt
+# [128] tacebit_stmt
 tacebit_stmt ::= '等棄' expression
-# [127] cede_stmt
+# [129] cede_stmt
 cede_stmt ::= '讓出' expression
-# [128] rumpe_stmt
+# [130] rumpe_stmt
 rumpe_stmt ::= '中斷'
-# [129] perge_stmt
+# [131] perge_stmt
 perge_stmt ::= '繼續'
-# [130] tacet_stmt
+# [132] tacet_stmt
 tacet_stmt ::= '靜默'
-# [131] iace_stmt
+# [133] iace_stmt
 iace_stmt ::= iace_expr | iace_guarded_expr
-# [132] iace_expr
+# [134] iace_expr
 iace_expr ::= ('拋出' | '崩潰') expression
-# [133] iace_guarded_expr
+# [135] iace_guarded_expr
 iace_guarded_expr ::= ('拋出' | '崩潰') expression NO_NEWLINE '若' expression
-# [134] cape_clause
+# [136] cape_clause
 cape_clause ::= '捕捉' IDENTIFIER block_stmt
-# [135] adfirma_stmt
+# [137] adfirma_stmt
 adfirma_stmt ::= '斷言' expression ('崩潰' expression)?
-# [136] requirit_stmt
+# [138] requirit_stmt
 requirit_stmt ::= '需要' expression '拋出' expression
-# [137] reice_stmt
+# [139] reice_stmt
 reice_stmt ::= '拒絕' expression '拋出' expression
-# [138] expression
+# [140] expression
 expression ::= assignment
-# [139] transfer
+# [141] transfer
 transfer ::= ternary ('⇇' ternary)*
-# [140] assignment
+# [142] assignment
 assignment ::= transfer ('←' assignment | '↤' assignment inline_default?)?
-# [141] inc_dec_stmt
+# [143] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
-# [142] place
+# [144] place
 place ::= call_expr
-# [143] ternary
+# [145] ternary
 ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
-# [144] aut_expr
+# [146] aut_expr
 aut_expr ::= et_expr (('或') et_expr)*
-# [145] et_expr
+# [147] et_expr
 et_expr ::= equality (('且') equality)*
-# [146] equality
+# [148] equality
 equality ::= comparison equality_tail*
-# [147] equality_tail
+# [149] equality_tail
 equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉' | '是' | '非' '是') comparison
-# [148] comparison
+# [150] comparison
 comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | '內含' | '之間') format_expr)*
-# [149] format_expr
+# [151] format_expr
 format_expr ::= bitwise_or_expr ('¶' STRING)?
-# [150] bitwise_or_expr
+# [152] bitwise_or_expr
 bitwise_or_expr ::= bitwise_xor_expr ('∨' bitwise_xor_expr)*
-# [151] bitwise_xor_expr
+# [153] bitwise_xor_expr
 bitwise_xor_expr ::= bitwise_and_expr ('⊻' bitwise_and_expr)*
-# [152] bitwise_and_expr
+# [154] bitwise_and_expr
 bitwise_and_expr ::= shift_expr ('∧' shift_expr)*
-# [153] shift_expr
+# [155] shift_expr
 shift_expr ::= range_expr (('⇐' | '⇒') range_expr)*
-# [154] range_expr
+# [156] range_expr
 range_expr ::= additive_expr range_tail?
-# [155] range_tail
+# [157] range_tail
 range_tail ::= ('‥' | '…' | '之前' | '直到') additive_expr ('每' additive_expr)?
-# [156] additive_expr
+# [158] additive_expr
 additive_expr ::= multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
-# [157] multiplicative_expr
+# [159] multiplicative_expr
 multiplicative_expr ::= vel_expr (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
-# [158] vel_expr
+# [160] vel_expr
 vel_expr ::= unary_expr ('或取' vel_rhs)*
-# [159] vel_rhs
+# [161] vel_rhs
 vel_rhs ::= unary_expr vel_range_tail?
-# [160] vel_range_tail
+# [162] vel_range_tail
 vel_range_tail ::= ('‥' | '…' | '之前' | '直到') unary_expr ('每' unary_expr)?
-# [161] unary_expr
+# [163] unary_expr
 unary_expr ::= ('-' | '¬' | '非') unary_expr | finge_expr | cast_expr
-# [162] gradient_expr
+# [164] gradient_expr
 gradient_expr ::= call_expr ('∇' gradient_selection?)?
-# [163] gradient_selection
+# [165] gradient_selection
 gradient_selection ::= '[' gradient_place (',' gradient_place)* ']'
-# [164] gradient_place
+# [166] gradient_place
 gradient_place ::= expression
-# [165] cast_expr
+# [167] cast_expr
 cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)*
-# [166] conversio_expr
+# [168] conversio_expr
 conversio_expr ::= '↦' type_annotation inline_default?
-# [167] inline_default
+# [169] inline_default
 inline_default ::= '⊥' unary_expr
-# [168] call_expr
+# [170] call_expr
 call_expr ::= primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
-# [169] call_suffix
+# [171] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
-# [170] member_suffix
+# [172] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
-# [171] transpose_suffix
+# [173] transpose_suffix
 transpose_suffix ::= 'ᵀ'
-# [172] optional_suffix
+# [174] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
-# [173] non_null_suffix
+# [175] non_null_suffix
 non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
-# [174] argument_list
+# [176] argument_list
 argument_list ::= (argument (',' argument)*)?
-# [175] argument
+# [177] argument
 argument ::= template_argument | '展開'? expression
-# [176] template_argument
+# [178] template_argument
 template_argument ::= '展開'? IDENTIFIER ':' expression
-# [177] literal
+# [179] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '真' | '假' | '空' | '∞' | 'nan'
-# [178] primary
+# [180] primary
 primary ::= IDENTIFIER | literal | '自身' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | summa_expr | capta_expr | '(' expression ')'
-# [179] ad_expr
+# [181] ad_expr
 ad_expr ::= '端點' ASCII_STRING ad_opener?
-# [180] ad_opener
+# [182] ad_opener
 ad_opener ::= '(' expression ')'
-# [181] array_literal
+# [183] array_literal
 array_literal ::= '[' argument_list? ']'
-# [182] iuncta_expr
+# [184] iuncta_expr
 iuncta_expr ::= '元組' type_arguments '[' argument_list? ']'
-# [183] json_literal
+# [185] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
-# [184] json_member
+# [186] json_member
 json_member ::= STRING ':' json_value
-# [185] typed_constructor
+# [187] typed_constructor
 typed_constructor ::= type_annotation '{' field_list? '}'
-# [186] field_list
+# [188] field_list
 field_list ::= field_init (',' field_init)*
-# [187] field_init
+# [189] field_init
 field_init ::= (field_key '=' expression) | IDENTIFIER
-# [188] field_key
+# [190] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
-# [189] json_value
+# [191] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
-# [190] json_object
+# [192] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
-# [191] json_array
+# [193] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
-# [192] json_string
+# [194] json_string
 json_string ::= STRING
-# [193] json_number
+# [195] json_number
 json_number ::= NUMBER
-# [194] finge_expr
+# [196] finge_expr
 finge_expr ::= '虛構' qualified_ident ('{' field_list '}')? ('∷' type_annotation)?
-# [195] qualified_ident
+# [197] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
-# [196] praefixum_expr
+# [198] praefixum_expr
 praefixum_expr ::= '前綴' (block_stmt | '(' expression ')')
-# [197] scriptum_expr
+# [199] scriptum_expr
 scriptum_expr ::= '格式文字' '(' STRING (',' expression)* ')'
-# [198] lege_expr
+# [200] lege_expr
 lege_expr ::= '讀取' '行'?
-# [199] first_match_expr
+# [201] first_match_expr
 first_match_expr ::= '首個匹配' '(' expression apud_clause? ',' '其中' IDENTIFIER block_stmt ')'
-# [200] summa_expr
+# [202] summa_expr
 summa_expr ::= '求和' '取自' expression apud_clause? filum_clause? ('定值' | '變值') IDENTIFIER block_stmt
-# [201] filum_clause
+# [203] filum_clause
 filum_clause ::= '執行緒' IDENTIFIER
-# [202] capta_expr
+# [204] capta_expr
 capta_expr ::= '陷阱' block_stmt
-# [203] object_pattern
+# [205] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [204] pattern_property
+# [206] pattern_property
 pattern_property ::= '其餘'? IDENTIFIER ('作為' IDENTIFIER)?
-# [205] array_pattern
+# [207] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [206] array_pattern_element
+# [208] array_pattern_element
 array_pattern_element ::= '_' | '其餘'? IDENTIFIER
-# [207] nota_stmt
+# [209] nota_stmt
 nota_stmt ::= ('註記' | '檢視' | '警告' | '寫出') expression (',' expression)*
-# [208] entry_header
+# [210] entry_header
 entry_header ::= ('引數' IDENTIFIER)? ('出口' expression)?
-# [209] incipit_stmt
+# [211] incipit_stmt
 incipit_stmt ::= '入口' entry_header block_stmt
-# [210] incipiet_stmt
+# [212] incipiet_stmt
 incipiet_stmt ::= '非同步入口' entry_header block_stmt
-# [211] probandum_decl
+# [213] probandum_decl
 probandum_decl ::= '測試規格' STRING proba_modifier* '{' probandum_body '}'
-# [212] probandum_body
+# [214] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [213] proba_stmt
+# [215] proba_stmt
 proba_stmt ::= '測試' STRING proba_modifier* block_stmt
-# [214] proba_modifier
+# [216] proba_modifier
 proba_modifier ::= '預期失敗' | '略過' STRING | '預期' STRING | '僅限' | '標籤' STRING | '時限' NUMBER | '測量' | '重複' NUMBER | '脆弱' NUMBER | '僅限於' STRING
-# [215] praepara_block
+# [217] praepara_block
 praepara_block ::= ('準備' | '準備非同步' | '後置準備' | '後置準備非同步') '全部'? block_stmt
-# [216] fac_stmt
+# [218] fac_stmt
 fac_stmt ::= '執行' block_stmt cape_clause? ('當' expression)?
-# [217] IDENTIFIER
+# [219] IDENTIFIER
 IDENTIFIER ::=
-# [218] NUMBER
+# [220] NUMBER
 NUMBER ::=
-# [219] NATURAL
+# [221] NATURAL
 NATURAL ::=
-# [220] STRING
+# [222] STRING
 STRING ::=
-# [221] ASCII_STRING
+# [223] ASCII_STRING
 ASCII_STRING ::=
-# [222] BACKTICK_STRING
+# [224] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [223] OCTETI_STRING
+# [225] OCTETI_STRING
 OCTETI_STRING ::=
-# [224] NEWLINE
+# [226] NEWLINE
 NEWLINE ::=
-# [225] WIDTH_MARKER
+# [227] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [226] LISTA_WIDTH_SUGAR
+# [228] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [227] TENSOR_WIDTH_SUGAR
+# [229] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [228] SPARSA_WIDTH_SUGAR
+# [230] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [229] VECTOR_WIDTH_SUGAR
+# [231] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [230] MATRIX_WIDTH_SUGAR
+# [232] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [231] FRONTMATTER_DELIMITER
+# [233] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [232] TOML_LINES
+# [234] TOML_LINES
 TOML_LINES ::=
-# [233] ANNOTATION_NAME
+# [235] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [234] ANNOTATION_FIELD_NAME
+# [236] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [235] NON_NEWLINE_TOKEN
+# [237] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [236] NO_NEWLINE
+# [238] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -525,6 +529,8 @@ NO_NEWLINE ::=
 | [`param_list`](#param-list) | `#param-list` | live |
 | [`generic_params`](#generic-params) | `#generic-params` | live |
 | [`generic_param`](#generic-param) | `#generic-param` | live |
+| [`generic_bound`](#generic-bound) | `#generic-bound` | live |
+| [`contract_ref`](#contract-ref) | `#contract-ref` | live |
 | [`generic_type_default`](#generic-type-default) | `#generic-type-default` | live |
 | [`generic_size_default`](#generic-size-default) | `#generic-size-default` | live |
 | [`call_type_args`](#call-type-args) | `#call-type-args` | live |
@@ -1093,6 +1099,20 @@ construction literal (`Genus { field = value }`).
   methods and its `實作` contracts are declared on the type itself. Code
   elsewhere cannot add either. Allowing it would need coherence rules, and is
   revisited together with the contract features that are deferred.
+- **Contract bounds on type parameters (D1.1-D1.3).** `函式 maior<T 實作 Orderable<T>>(T a, T b) → T`
+  bounds a *callable's* type parameter to witnesses that declare that
+  contract. Several bounds on one parameter join with `∩` only
+  (`<T 實作 Orderable<T> ∩ Equatable<T>>` — never a comma there; a comma
+  starts the next parameter). The bound is checked, and its methods become
+  callable inside the bounded body, only on a `函式`/method type parameter
+  (`generic_bound`); the same clause parses on a `類型`/`型別`/`分支聯集`/
+  `待實作介面` type parameter but is rejected there
+  (`implet_bound_on_type_declaration`) — those declarations state contracts
+  through the genus's own `實作` clause instead (below). Every generic
+  contract is written with its type arguments in full — `Orderable<Persona>`,
+  `Orderable<T>` — never a bare name (`implet_contract_arity` on a mismatched
+  count). Satisfaction stays nominal (D1.3): a witness must declare the bound
+  itself.
 
 ### Annotations
 
@@ -1170,10 +1190,19 @@ wire operation such as `json.pange(value ↦ json)`.
 - `@ protecta` is reserved and rejected with a semantic diagnostic; it has no package, subclass, or sibling-file visibility meaning
 - `@ doc` is not an annotation. Comments are the documentation: a line comment attaches forward to the declaration it precedes, and there is no doc marker.
 
-- `實作` = implements (conformance to an `待實作介面` contract)
-- `靜態` = static (type-level) field. A field has no other modifier; the
-  former `nexum` field modifier is removed and rejected with a migration
-  diagnostic.
+- `實作` = implements (conformance to an `待實作介面` contract), written
+  with the contract's type arguments in full
+  (`類型 Persona 實作 Orderable<Persona>`, D1.2).
+- Every field declares exactly one of `定值` / `變值` / `靜態` (D16.1);
+  the modifier is grammatically optional today, pending a follow-up unit that
+  makes it mandatory with no default. `定值 T x`: per instance, set only in
+  a construction literal (`Genus { field = value }`), never reassigned;
+  `Genus { … } 取自 p` copies it unchanged (D16.3), independent of visibility
+  (`@ privata` + `定值` is legal). `變值 T x`: per instance, reassignable.
+  `靜態 T X = …`: one per type, compile-time (unchanged). A write to a
+  `定值` field outside a construction literal is `SEM020`
+  (`assignment_to_fixum_field`). The former `nexum` field modifier is removed
+  and rejected with a migration diagnostic.
 - Members are public by default. Until member privacy is enforced,
   `@ privata` or `@ interna` on a `類型` member is an error
   (`member_privacy_unenforced`), because it promises privacy nothing checks;
@@ -2150,6 +2179,20 @@ ordinary postfix `conversio` materializes the resulting conversation handle.
   `s.recv<T>()`). The Latin spellings are unchanged.
 - `sermo ↦ T` materializes inbound frames into one value of type `T` using
   the type-directed collector for `T`.
+- **`sermo<O, R>` (D6.11, D6.12).** A conversation carries its types: `O` is
+  what the caller sends (the opener; `空` when the call sends none) and
+  `R` is each item frame back. `sermo` (en `channel`) takes zero or exactly
+  two type arguments — bare `sermo` means `sermo<valor, valor>`, the same
+  rule as bare `numerus` meaning `numerus<i64>` (any other argument count is
+  `sermo_arity`). For a route served by a Faber `@ 端點` handler visible to the
+  caller's module (its own handlers plus its imports), the compiler fills
+  `O`/`R` from that handler's own signature — its one parameter (or `空`)
+  and its item type; every other route (a host route, or a handler outside
+  that visibility) keeps bare `sermo`. `s.tuus<T>()`, `s.meus<T>()`, and
+  postfix `↦ T` are checked against, or infer, `O`/`R`. `sermo<O, R>` assigns
+  to bare `sermo`; the reverse is an error. The type arguments are
+  compile-time only — the wire is unchanged, and frames still carry loose
+  data.
 
 See [`docs/design/frame-stream-types.md`](docs/design/frame-stream-types.md).
 
@@ -2208,22 +2251,41 @@ key types are rejected.
 
 ### Iteration coordinates (`於`)
 
-The optional `於` coordinate clause binds per-axis indices for an `遍歷 取自`
-loop: `遍歷 取自 grid 於 [r, c] 定值 cell { … }`. The en reader spelling is
-"at" — `遍歷 取自 grid 於 [r, c]` reads as iterating `grid` at coordinates
-`[r, c]`.
+The optional `於` coordinate clause names the index a loop is walking. The
+en reader spelling is "at": `遍歷 取自 grid 於 [r, c]` reads as iterating
+`grid` at coordinates `[r, c]`.
 
-- **First bound name = outer axis.** The first identifier in the bracket group
-  walks the first (outermost) axis; later names walk successively inner axes.
-- **Bracket-group convention.** The coordinate group follows the tensor
-  bracket-index convention `grid[[r, c]]`: one bracketed group, comma-separated
-  coordinate names, in axis order.
-- **Arity == rank.** The number of coordinate names must equal the tensor rank.
-  Fewer or more names is a structured reject (arity mismatch).
+- **`lista`** (D3.1): one name binds the element's position
+  (`遍歷 取自 items 於 [i] 定值 v`).
+- **`tabula`** (D3.1-D3.3): one name binds the entry's key
+  (`遍歷 取自 m 於 [k] 定值 v`); a composite-key
+  `tabula<元組<K1, …, Kn>, V>` takes N names, one per part of the `元組`
+  key, in declared part order.
+- **Tensor / matrix**: as before — one name per axis, first name = outermost
+  axis, and later names walk successively inner axes; arity must equal rank
+  (fewer or more names is a structured reject).
+- **No index surface, no `於`.** `copia`, cursors, generators, `textus`, and
+  `sparsa` have no index to name; `於` on any of them is a structured
+  reject (`itera_apud_requires_indexed_iterable`), not a silent no-op.
 - **`於` requires `取自`.** The coordinate clause is only valid on `遍歷 取自`
   (element iteration); `遍歷 範圍` range loops and `遍歷 從` reject it.
 - The coordinate names are immutable index bindings scoped to the loop body,
   distinct from the element binder that follows the clause.
+
+**Composite-key index (D3.2, D3.3).** The same bracket-list shape indexes a
+composite key outside a loop, too: on a `tabula<元組<K1, …, Kn>, V>`,
+`m[[k1, …, kn]]` reads or writes the entry keyed by that `元組` — an
+ordinary index expression, not a distinct production. A bracket list of the
+wrong part count or part type falls through to the ordinary map-index
+type-mismatch report.
+
+**Hashable keys and elements (D3.4).** A `tabula` key or `copia` element must
+be hashable: no `fractus` of any width (NaN breaks equality; ±0 hash apart on
+some targets), no mutable collection (`lista`, `tabula`, `copia`, and the
+other reference collections), no `valor`/`json`/`regex`. `元組`, `類型`,
+and `分支聯集` keys/elements are hashable when every part is. A non-hashable
+map key is `tabula_key_not_hashable`; a non-hashable set element is
+`copia_element_not_hashable`. See Loops for map/set iteration order.
 
 ---
 

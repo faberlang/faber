@@ -43,6 +43,7 @@ role_table = [
   "tensor_product",
   "transpose",
   "type_ascription",
+  "type_intersection",
   "type_union",
   "unary",
 ]
@@ -298,6 +299,13 @@ codepoint = "U+2228"
 unicode_name = "LOGICAL OR"
 role = "bitwise"
 claiming_slots = ["bitwise_or_expr"]
+
+[[glyphs]]
+glyph = "∩"
+codepoint = "U+2229"
+unicode_name = "INTERSECTION"
+role = "type_intersection"
+claiming_slots = ["generic_bound", "genus_decl"]
 
 [[glyphs]]
 glyph = "∪"
@@ -889,8 +897,25 @@ object_destruct := ('fixum' | 'varia') object_pattern '←' expression
 functio_decl     := 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 param_list    := (parameter (',' parameter)*)?
 generic_params := '<' generic_param (',' generic_param)* '>'
-generic_param  := IDENTIFIER generic_type_default? | 'magnitudo' IDENTIFIER generic_size_default?
+generic_param  := IDENTIFIER generic_bound? generic_type_default? | 'magnitudo' IDENTIFIER generic_size_default?
 # defaults are declaration-time facts; once one parameter defaults, every following parameter must default
+# `generic_bound` (D1.1-D1.3, C1): a type parameter may name the contracts its
+# witnesses must declare. Inside `<…>` the comma separates parameters, so
+# several bounds on one parameter join with `∩` only — a comma there would
+# read as the next parameter. Bounds are checked (and usable inside the
+# bounded body) only on a `functio_decl` / `functio_method_decl` type
+# parameter; the same clause parses on `genus_decl` / `typus_decl` /
+# `discretio_decl` / `implendum_decl` type parameters but is rejected there
+# (`implet_bound_on_type_declaration`) — those declarations state contracts
+# through `genus_decl`'s own `implet` clause, not a parameter bound.
+generic_bound := 'implet' contract_ref ('∩' contract_ref)*
+# `contract_ref` (C1): a generic contract is always written with its type
+# arguments in full (`Orderable<Persona>`, `Orderable<T>`); there is no
+# bare-name shorthand for a generic `implendum` (`implet_contract_arity` when
+# the argument count does not match the contract's declared parameters). The
+# angle-bracket part is grammatically optional only for a zero-parameter
+# contract.
+contract_ref := IDENTIFIER ('<' type_annotation (',' type_annotation)* '>')?
 generic_type_default := '=' type_annotation
 generic_size_default := '=' NATURAL
 call_type_args  := '<' type_annotation (',' type_annotation)* '>'
@@ -910,9 +935,18 @@ clausura_legacy_expr := 'clausura' clausura_params? closure_modifier? ('→' typ
 clausura_params := clausura_param (',' clausura_param)*
 clausura_param  := type_annotation IDENTIFIER
 
-genus_decl    := 'genus' IDENTIFIER generic_params? ('implet' IDENTIFIER ((',' | '∩') IDENTIFIER)*)? '{' genus_member* '}'
+genus_decl    := 'genus' IDENTIFIER generic_params? ('implet' contract_ref ((',' | '∩') contract_ref)*)? '{' genus_member* '}'
 genus_member  := annotation* (field_decl | functio_method_decl)
-field_decl    := 'generis'? type_annotation IDENTIFIER 'sponte'? ('=' expression)?
+# `field_decl` (D16.1-D16.3, D5a): the modifier is grammatically optional for
+# now (backward compatibility during the migration sweep); a follow-up unit
+# makes exactly one of `fixum` / `varia` / `generis` mandatory on every genus
+# field (no default). `fixum T x`: set only in a construction literal
+# (`Genus { … }`), never reassigned (`SEM020 assignment_to_fixum_field`);
+# `Genus { … } ex p` copies it unchanged. `varia T x`: reassignable per
+# instance. `generis T X = …`: one per type, compile-time. Independent of
+# visibility (`@ privata` + `fixum` is legal). `discretio`/union member
+# fields (`union_member`) are unchanged by this ruling.
+field_decl    := ('fixum' | 'varia' | 'generis')? type_annotation IDENTIFIER 'sponte'? ('=' expression)?
 functio_method_decl   := 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 
 annotation            := nucleum_annotation | radix_annotation | ad_annotation | braced_annotation | annotation_sugar
@@ -1010,6 +1044,18 @@ dum_stmt  := 'dum' expression (block_stmt | ergo_joint statement) cape_clause?
 # `de` stays single-source. Patterns bind only the single-source form.
 itera_stmt  := 'itera' ('ex' expression (',' expression)* | 'de' expression | 'ab' expression (',' expression)*) apud_clause? ('fixum' | 'varia') itera_binding (block_stmt | ergo_joint statement) cape_clause?
 itera_binding := array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
+# `apud` (C7, D3.1-D3.4): one name binds a `lista` position, a `tabula` key,
+# or (for a composite `tabula<iuncta<K1, …, Kn>, V>`) N names for the parts of
+# the `iuncta` key, in addition to the tensor/matrix axis coordinates above.
+# `copia`, cursors, generators, `textus`, and `sparsa` have no index surface
+# and reject `apud` fail-closed (`SEM010 itera_apud_requires_indexed_iterable`).
+# The same-shaped bracket list indexes a composite key directly outside a
+# loop: `m[[k1, …, kn]]` on that `tabula` reads/writes the entry keyed by that
+# `iuncta` (ordinary `index_expr`, not a distinct production). A `tabula` key
+# or `copia` element must be hashable — no `fractus`, no mutable collection,
+# no `valor`/`json`/regex; `iuncta`/`genus`/`discretio` keys are hashable when
+# every part is (`tabula_key_not_hashable`, `copia_element_not_hashable`).
+# Map/set iteration order is unspecified.
 apud_clause := 'apud' '[' IDENTIFIER (',' IDENTIFIER)* ']'
 
 elige_stmt    := 'elige' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
