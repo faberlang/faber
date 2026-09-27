@@ -1300,6 +1300,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     _ => Err(RunnerError::internal(span, "sort receiver type mismatch")),
                 }
             }
+            MirCollectionOp::Compare => {
+                let [lhs, rhs] = args else {
+                    return Err(RunnerError::internal(span, "collection compare arity"));
+                };
+                let lhs = self.eval_operand(lhs, span)?;
+                let rhs = self.eval_operand(rhs, span)?;
+                let ordering = super::value::contract_compare_values(&lhs, &rhs)
+                    .ok_or_else(|| RunnerError::internal(span, "compare operand type mismatch"))?;
+                Ok(Value::Int(ordering as i64))
+            }
             MirCollectionOp::SortByKeys => {
                 let [receiver, keys] = args else {
                     return Err(RunnerError::internal(span, "collection sort_by_keys arity"));

@@ -1155,6 +1155,31 @@ pub(crate) fn compare_sort_values(left: &Value, right: &Value) -> std::cmp::Orde
     }
 }
 
+/// Three-way compare through the ordering contract (D1.4).
+///
+/// Integers by value, `fractus` by IEEE 754 totalOrder (operator default
+/// F2), text by Unicode code point (D1.6), `instans` by point in time, and
+/// tuples lexicographically. `None` for any other operand pair: a genus
+/// witness calls its own `compare` and never reaches this helper.
+pub(crate) fn contract_compare_values(left: &Value, right: &Value) -> Option<std::cmp::Ordering> {
+    match (left, right) {
+        (Value::Int(_) | Value::UInt(_), Value::Int(_) | Value::UInt(_))
+        | (Value::Float(_), Value::Float(_))
+        | (Value::Str(_), Value::Str(_)) => Some(compare_sort_values(left, right)),
+        (Value::Instans(a), Value::Instans(b)) => a.partial_cmp_at_coarser(*b),
+        (Value::Tuple(a), Value::Tuple(b)) if a.len() == b.len() => {
+            for (x, y) in a.iter().zip(b) {
+                let ordering = contract_compare_values(x, y)?;
+                if ordering.is_ne() {
+                    return Some(ordering);
+                }
+            }
+            Some(std::cmp::Ordering::Equal)
+        }
+        _ => None,
+    }
+}
+
 /// IEEE 754-2019 `minimum` (operator ruling 2026-09-24): NaN in either
 /// operand propagates, and -0.0 orders below +0.0.
 pub(crate) fn ieee_minimum(a: f64, b: f64) -> f64 {

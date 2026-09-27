@@ -150,7 +150,17 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             }
         };
         let function_index = MirFunctionIndex::for_functions(&lowerer.functions);
-        let (contract_methods, genus_methods) = contract_dispatch_tables(&lowerer.unit.hir);
+        let (mut contract_methods, genus_methods) = contract_dispatch_tables(&lowerer.unit.hir);
+        // D1.4: ordering-bound calls name the contract itself (it may be
+        // imported); a genus witness resolves to its own `compare`.
+        if let (Some(contract), Some(compare)) = (
+            lowerer.types.ordering_contract,
+            lowerer
+                .interner
+                .lookup(crate::semantic::radix_contract::ORDERING_METHOD),
+        ) {
+            contract_methods.insert(contract, compare);
+        }
         Self {
             lowerer,
             templates,
@@ -693,6 +703,30 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
     ) -> bool {
         match &mut statement.kind {
             MirStatementKind::Assign { value, .. } => self.substitute_value(value, bindings, span),
+            MirStatementKind::Call { callee, .. } if self.is_builtin_ordering_call(callee, bindings, span) => {
+                // D1.4: a built-in or tuple witness of the ordering bound
+                // compares through the compiler-supplied three-way compare.
+                let MirStatementKind::Call { destination, args, .. } = std::mem::replace(
+                    &mut statement.kind,
+                    MirStatementKind::Call {
+                        destination: None,
+                        callee: MirCallee::Value(MirOperand::Constant(MirConstant::Unit)),
+                        args: Vec::new(),
+                    },
+                ) else {
+                    unreachable!("guarded by the match arm");
+                };
+                let return_ty = MirType::semantic(self.types().primitive(Primitive::Numerus));
+                statement.kind = MirStatementKind::RuntimeCall {
+                    destination,
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::Compare),
+                        args,
+                        return_ty,
+                    },
+                };
+                true
+            }
             MirStatementKind::Call { callee, .. } => self.substitute_callee(callee, bindings, shape_params, span),
             MirStatementKind::RuntimeCall { call, .. } => self.substitute_runtime_call(call, bindings, span),
             MirStatementKind::Construct { aggregate, .. } => self.substitute_aggregate(aggregate, bindings, span),
@@ -729,6 +763,27 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             *callee = MirCallee::definition(target);
         }
         true
+    }
+
+    /// Whether `callee` is an ordering-bound call (D1.4) whose substituted
+    /// witness is a built-in or tuple rather than a genus.
+    fn is_builtin_ordering_call(&mut self, callee: &MirCallee, bindings: &MirGenericBindings, span: Span) -> bool {
+        let MirCallee::Definition { source, type_args } = callee else {
+            return false;
+        };
+        if self.types().ordering_contract != Some(*source) {
+            return false;
+        }
+        let Some(witness) = type_args.first() else {
+            return false;
+        };
+        let Some(witness) = self.substitute_ty(*witness, bindings, span) else {
+            return false;
+        };
+        let witness = witness.semantic_id();
+        !type_contains_param(self.types(), witness)
+            && struct_def_of(self.types(), witness).is_none()
+            && radix_types::ordering::builtin_ordering_kind(self.types(), witness).is_some()
     }
 
     /// Resolve a contract-method callee (a D1.1 bound call) whose receiver

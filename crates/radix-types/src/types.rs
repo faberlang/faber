@@ -106,6 +106,17 @@ pub struct TypeTable {
     /// Populated during typecheck (see [`ResolvedGenericCall`]) so consumers
     /// read the binding result instead of re-running inference.
     pub resolved_generic_calls: Vec<ResolvedGenericCall>,
+
+    /// The implendum marked `@ radix contract "ordering"` (norma's
+    /// `Orderable`, DECISIONS D1.4) when this unit declares or imports it.
+    ///
+    /// Populated during typecheck so MIR lowering and backends recognize
+    /// ordering bounds without re-reading annotations.
+    pub ordering_contract: Option<DefId>,
+
+    /// Selective import bindings that name the ordering contract. The
+    /// compiler supplies that contract, so backends emit no import for them.
+    pub ordering_contract_bindings: rustc_hash::FxHashSet<DefId>,
 }
 
 /// Opaque serialized view of a [`TypeTable`] for MIR images.
@@ -172,6 +183,8 @@ impl TypeTable {
             first_modular_word: None,
             variant_parent: FxHashMap::default(),
             resolved_generic_calls: Vec::new(),
+            ordering_contract: None,
+            ordering_contract_bindings: rustc_hash::FxHashSet::default(),
         };
 
         for prim in [
@@ -395,6 +408,8 @@ impl TypeTable {
             first_modular_word,
             variant_parent: FxHashMap::default(),
             resolved_generic_calls: Vec::new(),
+            ordering_contract: None,
+            ordering_contract_bindings: rustc_hash::FxHashSet::default(),
         })
     }
 

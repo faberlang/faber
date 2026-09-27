@@ -181,6 +181,12 @@ pub fn collect(
                 // Catch-all: validate that every @ radix annotation uses a
                 // recognized directive (lane, backward, or braced typus).
                 validate_radix_directives_for_annotations(&annotations, interner, &mut errors);
+                crate::radix_contract::validate_declaration(
+                    &stmt.annotations,
+                    false,
+                    interner,
+                    &mut errors,
+                );
 
                 // Backward annotation is valid only when paired with lane "air".
                 if backward.is_some() && lane != Some(RadixLane::Air) {
@@ -214,6 +220,12 @@ pub fn collect(
                 }
             }
             StmtKind::Class(decl) => {
+                crate::radix_contract::validate_declaration(
+                    &stmt.annotations,
+                    false,
+                    interner,
+                    &mut errors,
+                );
                 reject_unsupported_radix_annotations(
                     &stmt.annotations,
                     interner,
@@ -256,6 +268,12 @@ pub fn collect(
                 }
             }
             _ => {
+                crate::radix_contract::validate_declaration(
+                    &stmt.annotations,
+                    matches!(stmt.kind, StmtKind::Interface(_)),
+                    interner,
+                    &mut errors,
+                );
                 reject_unsupported_radix_annotations(
                     &stmt.annotations,
                     interner,
@@ -666,7 +684,8 @@ fn validate_radix_directives_for_annotations(
             continue;
         };
         let directive_str = interner.resolve(symbol);
-        if directive_str == "lane" || directive_str == "backward" {
+        // `contract` is validated by `radix_contract::validate_declaration`.
+        if matches!(directive_str, "lane" | "backward" | "contract") {
             continue;
         }
         // Unrecognized directive on @ radix.

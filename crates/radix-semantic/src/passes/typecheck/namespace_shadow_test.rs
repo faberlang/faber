@@ -29,6 +29,7 @@ fn shape_namespace_interface() -> FileInterface {
             name: "ShapeError".to_owned(),
             methods: Vec::new(),
             shared_fields: Vec::new(),
+            radix_contract: None,
             variants: vec![InterfaceEnumVariant {
                 name: "Invalid".to_owned(),
                 fields: Vec::new(),

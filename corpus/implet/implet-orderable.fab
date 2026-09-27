@@ -1,0 +1,85 @@
++++
+term = "implet"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "selective_import", "import_value_binding", "generic_params", "generic_param", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "si_stmt", "redde_stmt", "incipit_stmt", "fixum_decl", "typed_constructor", "field_list", "field_init", "field_key", "iuncta_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "comparison", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Orders values through norma's Orderable contract: one compare drives every comparison glyph; built-ins and tuples conform without code."
+syntax = "class <name> implements Orderable<<name>> <block> | fn <name><T implements Orderable<T>>(…)"
+aliases = ["Orderable", "compare"]
+related = ["implet", "implendum", "≺"]
+locale = "en"
++++
+# =============================================================================
+# Orderable — one ordering contract (DECISIONS D1.4)
+# =============================================================================
+#
+# What this teaches:
+#   • `Orderable<T>` lives in norma (`norma:order`) and has one method,
+#     `compare(T other) → int`: negative, zero, or positive.
+#   • A class opts in with `implements Orderable<Self>`. Then `≺ ≻ ≤ ≥` on
+#     that class call its `compare`, so the glyphs can never disagree.
+#   • `T implements Orderable<T>` bounds a generic; `≻` on `T` calls
+#     `compare` too.
+#   • int, float, string and instant conform without any code. float orders
+#     by IEEE 754 totalOrder through the contract, so NaN sorts above every
+#     number (the bare glyphs on float stay IEEE: NaN compares false).
+#   • Tuples order lexicographically when every element is Orderable.
+#
+# See also: implet, implendum, ≺
+# =============================================================================
+#
+# EXPECTED OUTPUT:
+#   verum
+#   verum
+#   falsum
+#   older: Anna
+#   larger int: 9
+#   larger text: pear
+#   larger float: 2.5
+#   verum
+#   falsum
+#   verum
+#   larger tuple: c
+
+import from "norma:order" const Orderable
+
+class Person implements Orderable<Person> {
+    string label = ""
+    int years = 0
+
+    fn compare(Person other) → int {
+        return self.years - other.years
+    }
+}
+
+fn larger<T implements Orderable<T>>(T a, T b) → T {
+    if a ≻ b {
+        return a
+    }
+    return b
+}
+
+main {
+    const Person anna ← Person { label = "Anna", years = 31 }
+    const Person marcus ← Person { label = "Marcus", years = 27 }
+    print anna ≻ marcus
+    print marcus ≤ anna
+    print anna ≺ marcus
+    print "older: §"(larger(anna, marcus).label)
+
+    print "larger int: §"(larger(3, 9))
+    print "larger text: §"(larger("pear", "apple"))
+    print "larger float: §"(larger(2.5, -1.0))
+
+    # Through the contract NaN is the largest float, so `larger` returns it
+    # (NaN is never equal to itself). The bare glyph stays IEEE: false.
+    const f64 top ← larger(1.5, nan)
+    print top ≠ top
+    print top ≻ 1.5
+
+    const tuple<int, string> first ← tuple<int, string>[2, "b"]
+    const tuple<int, string> second ← tuple<int, string>[2, "c"]
+    print first ≺ second
+    print "larger tuple: §"(larger(first, second)[1])
+}

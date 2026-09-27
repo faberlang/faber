@@ -54,6 +54,7 @@ fn shape_error_interface() -> FileInterface {
             name: "ShapeError".to_owned(),
             methods: Vec::new(),
             shared_fields: vec![message.clone()],
+            radix_contract: None,
             variants: vec![
                 InterfaceEnumVariant {
                     name: "Incompatible".to_owned(),

@@ -184,7 +184,9 @@ impl TypeChecker<'_> {
                     contract: bound.contract,
                     args,
                 };
-                if self.witness_declares(witness, &required) {
+                if self.witness_declares(witness, &required)
+                    || self.builtin_satisfies_contract(witness, &required)
+                {
                     continue;
                 }
                 let param_name = self.interner.map_or_else(

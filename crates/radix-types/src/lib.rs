@@ -15,6 +15,7 @@ pub mod format_spec;
 mod index;
 pub mod instans_precision;
 pub mod numeric_width;
+pub mod ordering;
 mod schema;
 mod schema_subset;
 mod types;

@@ -809,6 +809,10 @@ pub struct Resolver {
     /// the same `TypeId` as the qualified path. Runtime-only; excluded from
     /// snapshots (type positions are resolved before the artifact is cut).
     selective_type_imports: FxHashMap<DefId, (LexSymbol, LexSymbol)>,
+    /// Declaration parameter names of imported implendum exports (D1.2).
+    imported_contract_type_params: FxHashMap<DefId, Vec<LexSymbol>>,
+    /// `@ radix contract` roles of imported implendum exports (D1.4).
+    imported_contract_roles: FxHashMap<DefId, String>,
 }
 
 impl Resolver {
@@ -861,6 +865,8 @@ impl Resolver {
             scribe_family_surfaces: FxHashSet::default(),
             tuple_element_labels: FxHashMap::default(),
             selective_type_imports: FxHashMap::default(),
+            imported_contract_type_params: FxHashMap::default(),
+            imported_contract_roles: FxHashMap::default(),
         }
     }
 
@@ -1086,15 +1092,35 @@ impl Resolver {
                             }
                         }
                     }
-                    FileExportKind::Interface(nominal) => self.import_nominal_file_export(
-                        interner.intern(&nominal.name),
-                        SymbolKind::Interface,
-                        types,
-                        Type::Interface,
-                        Vec::new(),
-                        export_identity.clone(),
-                        InterfaceGenericParam::kinds(&nominal.params),
-                    ),
+                    FileExportKind::Interface(nominal) => {
+                        let imported = self.import_nominal_file_export(
+                            interner.intern(&nominal.name),
+                            SymbolKind::Interface,
+                            types,
+                            Type::Interface,
+                            Vec::new(),
+                            export_identity.clone(),
+                            InterfaceGenericParam::kinds(&nominal.params),
+                        );
+                        // Contract arity and argument substitution (D1.2)
+                        // need the imported implendum's parameter names.
+                        if let ImportedFileExport::Type(ImportedFileType {
+                            def_id: Some(def_id),
+                            ..
+                        }) = &imported
+                        {
+                            let params = nominal
+                                .params
+                                .iter()
+                                .map(|param| interner.intern(&param.name))
+                                .collect();
+                            self.imported_contract_type_params.insert(*def_id, params);
+                            if let Some(role) = &nominal.radix_contract {
+                                self.imported_contract_roles.insert(*def_id, role.clone());
+                            }
+                        }
+                        imported
+                    }
                     FileExportKind::TypeAlias(_)
                     | FileExportKind::Const(_)
                     | FileExportKind::Function(_) => continue,
@@ -2488,6 +2514,22 @@ impl Resolver {
             .collect()
     }
 
+    /// Declaration parameter names of an imported implendum (D1.2).
+    #[must_use]
+    pub fn imported_contract_type_params(&self, def_id: DefId) -> Option<&[LexSymbol]> {
+        self.imported_contract_type_params
+            .get(&def_id)
+            .map(Vec::as_slice)
+    }
+
+    /// `@ radix contract` role of an imported implendum (D1.4).
+    #[must_use]
+    pub fn imported_contract_role(&self, def_id: DefId) -> Option<&str> {
+        self.imported_contract_roles
+            .get(&def_id)
+            .map(String::as_str)
+    }
+
     #[must_use]
     pub fn imported_file_interfaces(&self) -> Vec<(DefId, Vec<ImportedFileInterfaceMethod>)> {
         self.file_interfaces
@@ -3747,6 +3789,8 @@ impl Resolver {
             scribe_family_surfaces: FxHashSet::default(),
             tuple_element_labels: FxHashMap::default(),
             selective_type_imports: FxHashMap::default(),
+            imported_contract_type_params: FxHashMap::default(),
+            imported_contract_roles: FxHashMap::default(),
         }
     }
 

@@ -112,6 +112,10 @@ pub mod json_genus;
 pub mod lockstep;
 pub mod lookup;
 pub mod ops;
+mod ordering;
+#[cfg(test)]
+#[path = "ordering_test.rs"]
+mod ordering_test;
 pub mod ordo_conversio;
 pub mod pattern;
 pub mod range;
@@ -288,6 +292,9 @@ pub(crate) struct TypeChecker<'a> {
     /// checked (D1.1): bound members are callable on a `T` receiver, and a
     /// bounded `T` satisfies the same bound at a nested call.
     pub current_generic_bounds: FxHashMap<Symbol, Vec<radix_types::ContractRef>>,
+    /// Next id for expressions the checker synthesizes (D1.4 glyph
+    /// rewrites); seeded above the module's largest id in `check_program`.
+    next_hir_id: u32,
 
     /// Type-alias declaration parameter names keyed by alias def-id, in
     /// declaration order. Populated from HIR items so applied alias types
@@ -533,6 +540,7 @@ impl<'a> TypeChecker<'a> {
             implemented_interfaces: FxHashMap::default(),
             implemented_contracts: FxHashMap::default(),
             current_generic_bounds: FxHashMap::default(),
+            next_hir_id: u32::MAX / 2,
             alias_type_params: FxHashMap::default(),
             import_receivers: FxHashSet::default(),
             target,
@@ -656,11 +664,16 @@ impl<'a> TypeChecker<'a> {
                     )
                 })
                 .collect();
+            self.register_imported_contract_role(def_id);
+            if let Some(params) = self.resolver.imported_contract_type_params(def_id) {
+                self.type_params_by_def.insert(def_id, params.to_vec());
+            }
             self.interfaces.insert(def_id, methods);
         }
     }
 
     pub fn check_program(&mut self, hir: &mut HirModule) {
+        self.next_hir_id = crate::passes::statica::max_hir_id(hir) + 1;
         self.reject_json_annotations_on_site(&hir.entry_annotations, "incipit");
         self.collect_ad_route_types(hir);
         for item in &mut hir.items {

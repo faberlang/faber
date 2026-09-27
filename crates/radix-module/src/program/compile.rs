@@ -842,7 +842,14 @@ pub(crate) fn import_contract_for_parsed_file(
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
-        let Some(binding) = import_binding(interner, &decl.kind) else {
+        // A selective import introduces no namespace; key its interface by
+        // the import path, as the package analysis does, so the resolve pass
+        // finds its members (`importa ex "norma:order" fixum Orderable`).
+        let binding = match &decl.kind {
+            crate::syntax::ImportKind::Selective { .. } => Some(interner.resolve(decl.path).to_owned()),
+            kind => import_binding(interner, kind),
+        };
+        let Some(binding) = binding else {
             continue;
         };
         let import_path = interner.resolve(decl.path);
@@ -1671,6 +1678,7 @@ fn file_export_from_stmt(
                     methods: Vec::new(),
                     variants,
                     shared_fields: Vec::new(),
+                    radix_contract: None,
                 }),
             })
         }
@@ -1749,19 +1757,39 @@ fn file_export_from_stmt(
                     methods: Vec::new(),
                     variants,
                     shared_fields,
+                    radix_contract: None,
                 }),
             })
         }
         StmtKind::Interface(decl) => {
             let name = interner.resolve(decl.name.name).to_owned();
+            // Method signatures ride the interface so importers can implement
+            // the contract and call it through a bound (D1.1/D1.2); the
+            // contract's own parameters stay symbolic.
+            let type_param_names: BTreeSet<&str> = decl
+                .type_params
+                .iter()
+                .map(|tp| interner.resolve(tp.name.name))
+                .collect();
+            let methods = decl
+                .methods
+                .iter()
+                .filter_map(|method| interface_method_from_ast(method, interner, &type_param_names, nominal_kinds, ctx))
+                .collect();
+            let radix_contract = stmt.annotations.iter().find_map(|annotation| {
+                crate::semantic::radix_contract::role_from_ast(annotation, interner)
+                    .and_then(Result::ok)
+                    .map(|role| role.as_str().to_owned())
+            });
             Some(FileExport {
                 name: name.clone(),
                 kind: FileExportKind::Interface(InterfaceNominalExport {
                     name,
                     params: interface_generic_params(&decl.type_params, interner),
-                    methods: Vec::new(),
+                    methods,
                     variants: Vec::new(),
                     shared_fields: Vec::new(),
+                    radix_contract,
                 }),
             })
         }
@@ -2206,6 +2234,52 @@ fn parse_program_for_namespace_exports(
 }
 
 pub(crate) use crate::import_resolve::resolve_namespace_import;
+
+/// One implendum method as an importable signature (bodyless).
+fn interface_method_from_ast(
+    method: &crate::syntax::InterfaceMethod,
+    interner: &crate::lexer::Interner,
+    type_param_names: &BTreeSet<&str>,
+    nominal_kinds: &BTreeMap<String, InterfaceNominalKind>,
+    ctx: &SnapshotContext,
+) -> Option<InterfaceMethodExport> {
+    let mut params = Vec::new();
+    for param in &method.params {
+        params.push(InterfaceParam {
+            ty: interface_type_from_type_expr(&param.ty, interner, type_param_names, nominal_kinds, ctx)?,
+            mode: semantic_param_mode(param.mode),
+            optional: param.sponte || param.default.is_some(),
+        });
+    }
+    let ret = match &method.ret {
+        Some(ret) => interface_type_from_type_expr(ret, interner, type_param_names, nominal_kinds, ctx)?,
+        None => InterfaceTypeSnapshot::Primitive(Primitive::Vacuum),
+    };
+    let err = match &method.err {
+        Some(err_ty) => Some(Box::new(interface_type_from_type_expr(
+            err_ty,
+            interner,
+            type_param_names,
+            nominal_kinds,
+            ctx,
+        )?)),
+        None => None,
+    };
+    Some(InterfaceMethodExport {
+        name: interner.resolve(method.name.name).to_owned(),
+        callable: InterfaceCallable {
+            type_params: Vec::new(),
+            params,
+            ret: Box::new(ret),
+            err,
+            is_async: method.posture.is_async()
+                || annotations_include_callable_family(&method.annotations, interner, "futura"),
+            is_generator: method.posture.is_stream()
+                || annotations_include_callable_family(&method.annotations, interner, "cursor"),
+            device: None,
+        },
+    })
+}
 
 fn annotations_include_callable_family(
     annotations: &[Annotation],

@@ -241,6 +241,10 @@ pub struct InterfaceNominalExport {
     /// imported union type (`e.message`) reads this table, not variant
     /// payloads.
     pub shared_fields: Vec<InterfaceStructField>,
+    /// Compiler contract role an implendum carries through
+    /// `@ radix contract "<role>"` (DECISIONS D1.4): `"ordering"` marks
+    /// norma's `Orderable`. `None` for every other nominal.
+    pub radix_contract: Option<String>,
 }
 
 /// One enum variant carried by a [`InterfaceNominalExport`].

@@ -375,13 +375,21 @@ impl TypeChecker<'_> {
                         for import_item in &import.items {
                             self.import_receivers.insert(import_item.def_id);
                         }
+                    } else {
+                        self.record_ordering_contract_bindings(import);
                     }
                 }
                 HirItemKind::Struct(struct_item) => {
                     self.collect_struct(item.def_id, &item.annotations, struct_item, item.span)
                 }
                 HirItemKind::Interface(interface_item) => {
-                    self.collect_interface(item.def_id, interface_item)
+                    self.collect_interface(item.def_id, interface_item);
+                    self.register_local_contract_role(
+                        item.def_id,
+                        &item.annotations,
+                        interface_item,
+                        item.span,
+                    );
                 }
                 HirItemKind::Enum(enum_item) => self.collect_enum(enum_item, item.def_id),
                 HirItemKind::Constant(const_item) => {
