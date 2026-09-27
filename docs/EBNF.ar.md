@@ -1211,9 +1211,11 @@ wire operation such as `json.pange(value ↦ json)`.
 - `حقق` = implements (conformance to an `عقد` contract), written
   with the contract's type arguments in full
   (`صنف Persona حقق Orderable<Persona>`, D1.2).
-- Every field declares exactly one of `ثابت` / `متغير` / `سكوني` (D16.1);
-  the modifier is grammatically optional today, pending a follow-up unit that
-  makes it mandatory with no default. `ثابت T x`: per instance, set only in
+- Every `صنف` field declares exactly one of `ثابت` / `متغير` / `سكوني`
+  (D16.1); there is no default — an unmarked field is a parse error: PARSE010
+  `field_modifier_missing` (D5c). The `تمايز` shared-field position
+  (`union_member`) keeps today's unmarked form (fork F7 held).
+  `ثابت T x`: per instance, set only in
   a construction literal (`Genus { field = value }`), never reassigned;
   `Genus { … } من p` copies it unchanged (D16.3), independent of visibility
   (`@ privata` + `ثابت` is legal). `متغير T x`: per instance, reassignable.

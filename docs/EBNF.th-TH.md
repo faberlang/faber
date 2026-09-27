@@ -1211,9 +1211,11 @@ wire operation such as `json.pange(value ↦ json)`.
 - `เติมเต็ม` = implements (conformance to an `สัญญา` contract), written
   with the contract's type arguments in full
   (`ชนิด Persona เติมเต็ม Orderable<Persona>`, D1.2).
-- Every field declares exactly one of `คงที่` / `แปร` / `ของชนิด` (D16.1);
-  the modifier is grammatically optional today, pending a follow-up unit that
-  makes it mandatory with no default. `คงที่ T x`: per instance, set only in
+- Every `ชนิด` field declares exactly one of `คงที่` / `แปร` / `ของชนิด`
+  (D16.1); there is no default — an unmarked field is a parse error: PARSE010
+  `field_modifier_missing` (D5c). The `สหภาพแยก` shared-field position
+  (`union_member`) keeps today's unmarked form (fork F7 held).
+  `คงที่ T x`: per instance, set only in
   a construction literal (`Genus { field = value }`), never reassigned;
   `Genus { … } ออก p` copies it unchanged (D16.3), independent of visibility
   (`@ privata` + `คงที่` is legal). `แปร T x`: per instance, reassignable.

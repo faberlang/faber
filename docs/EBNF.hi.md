@@ -1211,9 +1211,11 @@ wire operation such as `json.pange(value ↦ json)`.
 - `लागूकरता` = implements (conformance to an `अनुबन्ध` contract), written
   with the contract's type arguments in full
   (`वर्ग Persona लागूकरता Orderable<Persona>`, D1.2).
-- Every field declares exactly one of `स्थिर` / `चर` / `स्थैतिक` (D16.1);
-  the modifier is grammatically optional today, pending a follow-up unit that
-  makes it mandatory with no default. `स्थिर T x`: per instance, set only in
+- Every `वर्ग` field declares exactly one of `स्थिर` / `चर` / `स्थैतिक`
+  (D16.1); there is no default — an unmarked field is a parse error: PARSE010
+  `field_modifier_missing` (D5c). The `विभेद` shared-field position
+  (`union_member`) keeps today's unmarked form (fork F7 held).
+  `स्थिर T x`: per instance, set only in
   a construction literal (`Genus { field = value }`), never reassigned;
   `Genus { … } सेवन p` copies it unchanged (D16.3), independent of visibility
   (`@ privata` + `स्थिर` is legal). `चर T x`: per instance, reassignable.

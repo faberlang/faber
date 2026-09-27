@@ -970,19 +970,18 @@ clausura_param  := type_annotation IDENTIFIER
 
 genus_decl    := 'genus' IDENTIFIER generic_params? ('implet' contract_ref ((',' | '∩') contract_ref)*)? '{' genus_member* '}'
 genus_member  := annotation* (field_decl | functio_method_decl)
-# `field_decl` (D16.1-D16.3, D5a): the modifier is grammatically optional for
-# now (backward compatibility during the migration sweep); a follow-up unit
-# makes exactly one of `fixum` / `varia` / `generis` mandatory on every genus
-# field (no default). `fixum T x`: set only in a construction literal
-# (`Genus { … }`), never reassigned (`SEM020 assignment_to_fixum_field`);
-# `Genus { … } ex p` copies it unchanged. `varia T x`: reassignable per
-# instance. `generis T X = …`: one per type, compile-time. Independent of
-# visibility (`@ privata` + `fixum` is legal). `discretio`/union member
-# fields (`union_member`) are unchanged by this ruling. The initializer is
-# `static_init` (D8.10) so a `generis` field may also open with the
-# build-time `insere_expr`; `fixum`/`varia` fields only ever take the
-# `expression` alternative — `insere` there parses as an ordinary
-# identifier, not the build-time embed.
+# `field_decl` (D16.1-D16.3, D5c): every `genus` field declares exactly one of
+# `fixum` / `varia` / `generis` — there is no default, and an unmarked genus
+# field is PARSE010 `field_modifier_missing`. The unmarked form survives only
+# in the `discretio` shared-field position (`union_member`, fork F7 held).
+# `fixum T x`: set only in a construction literal (`Genus { … }`), never
+# reassigned (`SEM020 assignment_to_fixum_field`); `Genus { … } ex p` copies
+# it unchanged. `varia T x`: reassignable per instance. `generis T X = …`: one
+# per type, compile-time. Independent of visibility (`@ privata` + `fixum` is
+# legal). The initializer is `static_init` (D8.10) so a `generis` field may
+# also open with the build-time `insere_expr`; `fixum`/`varia` fields only
+# ever take the `expression` alternative — `insere` there parses as an
+# ordinary identifier, not the build-time embed.
 field_decl    := ('fixum' | 'varia' | 'generis')? type_annotation IDENTIFIER 'sponte'? ('=' static_init)?
 functio_method_decl   := 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 

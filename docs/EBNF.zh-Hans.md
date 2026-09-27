@@ -1211,9 +1211,11 @@ wire operation such as `json.pange(value ↦ json)`.
 - `实现` = implements (conformance to an `契约` contract), written
   with the contract's type arguments in full
   (`类 Persona 实现 Orderable<Persona>`, D1.2).
-- Every field declares exactly one of `常量` / `变量` / `静态` (D16.1);
-  the modifier is grammatically optional today, pending a follow-up unit that
-  makes it mandatory with no default. `常量 T x`: per instance, set only in
+- Every `类` field declares exactly one of `常量` / `变量` / `静态`
+  (D16.1); there is no default — an unmarked field is a parse error: PARSE010
+  `field_modifier_missing` (D5c). The `判别` shared-field position
+  (`union_member`) keeps today's unmarked form (fork F7 held).
+  `常量 T x`: per instance, set only in
   a construction literal (`Genus { field = value }`), never reassigned;
   `Genus { … } 取自 p` copies it unchanged (D16.3), independent of visibility
   (`@ privata` + `常量` is legal). `变量 T x`: per instance, reassignable.
