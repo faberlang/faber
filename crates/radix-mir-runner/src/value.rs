@@ -483,8 +483,13 @@ fn display_tabula_map(
     span: Span,
     float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
+    // D19.2/D19.6: tabula order is unspecified; shuffle the snapshot under
+    // the test-only seed so a `print tabula` golden cannot quietly pin the
+    // runner's FxHashMap order.
+    let mut rows: Vec<(&MapKey, &Value)> = entries.iter().collect();
+    crate::shuffle::shuffle_unordered(&mut rows);
     let mut parts = Vec::new();
-    for (key, value) in entries {
+    for (key, value) in rows {
         let key_str = match key {
             MapKey::Str(s) => format!("\"{s}\""),
             MapKey::Int(v) => v.to_string(),

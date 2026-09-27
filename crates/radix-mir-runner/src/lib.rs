@@ -13,6 +13,7 @@ mod host;
 pub mod kernel;
 mod runtime;
 pub mod sermo;
+pub(crate) mod shuffle;
 pub mod stats;
 mod textus_literal;
 pub mod value;
@@ -2334,3 +2335,7 @@ mod stats_test;
 #[cfg(test)]
 #[path = "format_value_test.rs"]
 mod format_value_test;
+
+#[cfg(test)]
+#[path = "shuffle_test.rs"]
+mod shuffle_test;
