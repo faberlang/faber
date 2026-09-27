@@ -355,6 +355,7 @@ fn conflicting_kind_snapshot_fails_closed_through_canonical_key() {
                 required: true,
                 default: None,
                 modifier: None,
+                visibility: crate::syntax::MemberVisibility::Publica,
             }],
             methods: Vec::new(),
             annotation_contract: None,
@@ -570,6 +571,7 @@ fn strict_locale_pack_keeps_supported_struct_fields_without_field_rows() {
                     required: true,
                     default: None,
                     modifier: None,
+                    visibility: crate::syntax::MemberVisibility::Publica,
                 },
                 InterfaceStructField {
                     name: "unsupported".to_owned(),
@@ -578,6 +580,7 @@ fn strict_locale_pack_keeps_supported_struct_fields_without_field_rows() {
                     required: true,
                     default: None,
                     modifier: None,
+                    visibility: crate::syntax::MemberVisibility::Publica,
                 },
             ],
             methods: Vec::new(),

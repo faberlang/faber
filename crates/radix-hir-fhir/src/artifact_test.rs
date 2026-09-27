@@ -117,7 +117,8 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // Schema 21 (D7.7) adds `HirPresentation::region` and the `Region` trivia
     // owner kind.
     // Schema 22 (D8.10) adds `HirPresentation::insere_exprs`.
-    assert_eq!(SCHEMA_VERSION, 22);
+    // Schema 23 (D5.3) carries member visibility on `StructFieldSnapshot`.
+    assert_eq!(SCHEMA_VERSION, 23);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────

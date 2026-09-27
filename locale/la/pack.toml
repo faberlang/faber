@@ -2882,10 +2882,6 @@ help = "elige viam extra praefixum `runtime:` et vias internas"
 message = "`{annotation}` is reserved and has no active visibility meaning"
 help = "use `{publica}` for explicit export intent or `{privata}` for file-private intent"
 
-[diagnostics.SEM018.issues.member_privacy_unenforced]
-message = "member privacy is not enforced yet; remove the annotation"
-help = "remove `{annotation}` from the member; members are public until member privacy is enforced"
-
 [diagnostics.SEM018.issues.conflicting_lane]
 message = "conflicting @ radix lane annotations: '{existing}' and '{parsed}'"
 help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
@@ -3433,6 +3429,38 @@ help = "use `{generis} T X = …` for a compile-time constant, or move the bindi
 [diagnostics.SEM062.issues.top_level_binding]
 message = "top-level `{name}`: module-level mutable state does not exist"
 help = "use `{generis} T X = …` for a compile-time constant, or move the binding into a function"
+
+[diagnostics.SEM063]
+message = "member is not accessible here"
+help = "reach the member through the type's own methods, or change its visibility"
+
+[diagnostics.SEM063.issues.member_private_read]
+message = "`{member}` is private to `{owner}`; only its own methods can read it"
+help = "read it through a method of `{owner}`"
+
+[diagnostics.SEM063.issues.member_private_write]
+message = "`{member}` is private to `{owner}`; only its own methods can write it"
+help = "set it in a construction literal, or through a method of `{owner}`"
+
+[diagnostics.SEM063.issues.member_private_call]
+message = "`{member}` is private to `{owner}`; only its own methods can call it"
+help = "call a public method of `{owner}` instead"
+
+[diagnostics.SEM063.issues.member_interna_read]
+message = "`{member}` of `{owner}` is internal to its package and cannot be read from another package"
+help = "use a public member of `{owner}`"
+
+[diagnostics.SEM063.issues.member_interna_write]
+message = "`{member}` of `{owner}` is internal to its package and cannot be written from another package"
+help = "set it in a construction literal, or use a public member of `{owner}`"
+
+[diagnostics.SEM063.issues.member_interna_call]
+message = "`{member}` of `{owner}` is internal to its package and cannot be called from another package"
+help = "call a public method of `{owner}` instead"
+
+[diagnostics.SEM063.issues.union_member_visibility_differs]
+message = "`{member}` is written through a union whose members declare different visibility: {detail}"
+help = "declare `{member}` with the same visibility on every member of the union"
 
 [diagnostics.WARN001]
 message = "unused variable"

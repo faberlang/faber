@@ -14,6 +14,7 @@
 //! treated as permissive access shapes only where the code explicitly says so;
 //! they are recovery/escape behavior, not target-specific codegen policy.
 
+use super::member_privacy::MemberAccess;
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
@@ -74,6 +75,7 @@ impl TypeChecker<'_> {
                 }
             }
             HirExpressionKind::Field(object, name) => {
+                self.place_write = true;
                 let ty = self.check_field(object, *name);
                 if let Some(object_ty) = object.ty
                     && let Some(enum_def) = self.enum_def_from_type(object_ty)
@@ -123,7 +125,8 @@ impl TypeChecker<'_> {
     /// Reject a field write the declared modifier forbids (D16.1, D16.3, D9.2).
     ///
     /// Construction literals never reach this path, so a `fixum` field is set
-    /// only there. Unmarked fields stay writable until D5c.
+    /// only there. Unmarked fields stay writable until D5c. A union write also
+    /// needs one member visibility across the overlap (D9.2, D5.3).
     fn check_field_write_modifier(
         &mut self,
         object_ty: TypeId,
@@ -141,6 +144,7 @@ impl TypeChecker<'_> {
                 })
                 .map(|member| self.display_union_constituent(*member))
                 .collect::<Vec<_>>();
+            self.check_union_write_visibility(&members, name, span);
             if !not_varia.is_empty() {
                 self.immutable_assignment_with_args(
                     "union_member_not_varia",
@@ -390,6 +394,28 @@ impl TypeChecker<'_> {
     /// object shapes return the shared error type so the caller decides whether
     /// a higher-level access form should emit a user-facing diagnostic.
     pub fn check_field_from_type(
+        &mut self,
+        object_ty: TypeId,
+        name: Symbol,
+        span: radix_lexer::Span,
+    ) -> TypeId {
+        self.check_field_access_from_type(object_ty, name, span, MemberAccess::Read)
+    }
+
+    /// Field access from a precomputed object type, gated by the member
+    /// visibility of each genus the access reaches (D5.3).
+    pub(super) fn check_field_access_from_type(
+        &mut self,
+        object_ty: TypeId,
+        name: Symbol,
+        span: radix_lexer::Span,
+        access: MemberAccess,
+    ) -> TypeId {
+        self.check_field_visibility(object_ty, name, access, span);
+        self.field_type_from_type(object_ty, name, span)
+    }
+
+    fn field_type_from_type(
         &mut self,
         object_ty: TypeId,
         name: Symbol,
@@ -970,7 +996,10 @@ impl TypeChecker<'_> {
         object: &mut HirExpression,
         index: &mut HirExpression,
     ) -> TypeId {
+        // `p.xs[0] ← …` writes through the field `xs`.
+        self.place_write = matches!(object.kind, HirExpressionKind::Field(..));
         let obj_ty = self.check_expr(object);
+        self.place_write = false;
         let idx_ty = match self.check_tuple_key_bracket(obj_ty, index) {
             Some(ty) => ty,
             None => self.check_expr_allowing_direct_intervallum_step(index),
@@ -1016,7 +1045,12 @@ impl TypeChecker<'_> {
         }
     }
     /// Checks ordinary field syntax by synthesizing the receiver first.
+    ///
+    /// Inside an assignment place (`place_write`, set by `check_lvalue`) the
+    /// access is a write, and so is every field segment the place passes
+    /// through (`p.inner.y ← …` writes through `inner`).
     pub fn check_field(&mut self, object: &mut HirExpression, name: Symbol) -> TypeId {
+        let write = std::mem::take(&mut self.place_write);
         // Namespace const data members (`module.CONST`) are first-class value
         // references: resolve the const's remapped type from the installed
         // file interface, mirroring how the call path resolves namespace
@@ -1042,8 +1076,15 @@ impl TypeChecker<'_> {
                 return ty;
             }
         }
+        self.place_write = write && matches!(object.kind, HirExpressionKind::Field(..));
         let obj_ty = self.check_expr(object);
-        self.check_field_from_type(obj_ty, name, object.span)
+        self.place_write = false;
+        let access = if write {
+            MemberAccess::Write
+        } else {
+            MemberAccess::Read
+        };
+        self.check_field_access_from_type(obj_ty, name, object.span, access)
     }
 
     fn scrinium_payload_field_type(

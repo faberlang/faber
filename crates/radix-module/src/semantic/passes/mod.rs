@@ -9,5 +9,9 @@ pub use radix_semantic::passes::*;
 mod import_seam_test;
 
 #[cfg(test)]
+#[path = "member_privacy_seam_test.rs"]
+mod member_privacy_seam_test;
+
+#[cfg(test)]
 #[path = "typecheck/mod.rs"]
 pub mod typecheck;

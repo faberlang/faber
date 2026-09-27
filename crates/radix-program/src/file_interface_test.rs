@@ -156,6 +156,7 @@ fn extract_file_interface_round_trips_public_commune_fields() {
             required: true,
             default: None,
             modifier: None,
+            visibility: radix_module::syntax::MemberVisibility::Publica,
         }]
     );
     assert_eq!(export.variants.len(), 2);

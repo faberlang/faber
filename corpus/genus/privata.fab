@@ -1,0 +1,80 @@
++++
+term = "genus"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_sugar", "annotation_name", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "param_list", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "construction_source", "field_list", "field_init", "field_key", "assignment", "place", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Member privacy: private fields and methods are reachable only from the type's own methods."
+syntax = "genus <Name> { @ privata <modifier> <type> <field> … }"
+related = ["genus", "privata", "interna"]
+locale = "en"
++++
+# =============================================================================
+# genus — Member privacy
+# =============================================================================
+#
+# What this teaches:
+#   • Members are public by default; unmarked fields and methods need no
+#     annotation.
+#   • `@ private` limits a member to the type: only the type's own methods
+#     may read, write, or call it.
+#   • `@ internal` limits a member to code in the same package.
+#   • A construction literal may still set a private field, from any file,
+#     and `Genus { … } from source` copies private fields across.
+#
+# Common mistakes:
+#   • Reading a private field from outside the type (`r.summa`) — add a public
+#     method that returns what callers need.
+#   • Writing `@ public` on a member — members are already public (WARN028).
+#
+# See also: genus, privata, interna
+# =============================================================================
+
+# GRAMMAR:
+#   genus_member :← annotation* (field_decl | functio_method_decl)
+#
+# EXPECTED OUTPUT:
+#   12, 2, gradus, 12, 2, copia
+
+class Tabula {
+    @ private
+    var int summa
+    @ private
+    var int numerus
+    @ internal
+    var string nomen
+
+    fn adde(int valor) → void {
+        self.summa ← self.summa + valor
+        self.numerus ← self.numerus + 1
+    }
+
+    fn totum() → int {
+        return self.summa
+    }
+
+    fn mensura() → int {
+        return self.numera()
+    }
+
+    @ private
+    fn numera() → int {
+        return self.numerus
+    }
+}
+
+main {
+    # A construction literal may set private fields
+    var Tabula t ← Tabula { summa = 0, numerus = 0, nomen = "gradus" }
+    t.adde(4)
+    t.adde(8)
+    print t.totum()
+    print t.mensura()
+    print t.nomen
+
+    # Copy with changes carries the private fields across
+    const Tabula copia ← Tabula { nomen = "copia" } from t
+    print copia.totum()
+    print copia.mensura()
+    print copia.nomen
+}

@@ -5,18 +5,19 @@
 //! declarations are module-private; `@ privata` on a declaration is an explicit
 //! module-private marker (accepted, no warning).
 //!
-//! Member privacy is not enforced yet (D5.5 interim, until D5.3/D5.4 land):
-//! `@ privata` / `@ interna` on a `genus` member is an error because it
-//! promises privacy nothing checks, and `@ publica` on a member is a
-//! redundancy warning (WARN028) because members are public by default.
+//! `genus` members are public by default (D5.2). `@ privata` / `@ interna` on
+//! a member set its [`MemberVisibility`], which typecheck enforces at every
+//! read, write, and call (D5.3). `@ publica` on a member is a redundancy
+//! warning (WARN028) because members are already public.
 //! `@ protecta` is not part of the file-namespace visibility model, so it is
 //! rejected as reserved instead of being treated as documentation.
 
 use crate::{SemanticError, SemanticErrorKind, WarningKind};
 use radix_lexer::{Interner, Span};
-use radix_syntax::{Annotation, AnnotationKind, ClassMemberKind, Program, Stmt, StmtKind};
+use radix_syntax::{
+    Annotation, AnnotationKind, ClassMemberKind, MemberVisibility, Program, Stmt, StmtKind,
+};
 
-const ISSUE_MEMBER_PRIVACY_UNENFORCED: &str = "member_privacy_unenforced";
 const ISSUE_REDUNDANT_MEMBER_PUBLICA: &str = "redundant_member_publica";
 
 /// Effective visibility tier for the file-namespace model.
@@ -149,30 +150,68 @@ fn check_member_annotations(
     push_protecta_diagnostics(annotations, interner, errors);
 }
 
-/// D5.5 interim: reject unenforced member privacy and warn on redundant
-/// member `@ publica` on `genus` members.
+/// Warn on redundant member `@ publica` and reject a `genus` member that
+/// mixes distinct visibility tiers. `@ privata` / `@ interna` are enforced
+/// by typecheck (D5.3).
 fn check_genus_member_annotations(
     annotations: &[Annotation],
     interner: &Interner,
     errors: &mut Vec<SemanticError>,
 ) {
-    check_member_annotations(annotations, interner, errors);
+    check_declaration_visibility(annotations, interner, errors);
     for annotation in annotations {
-        let Some(tier) = visibility_tier(annotation, interner) else {
-            continue;
-        };
-        let diagnostic = match tier {
-            VisibilityTier::Publica => SemanticError::structured(
-                SemanticErrorKind::Warning(WarningKind::RedundantMemberVisibility),
-                annotation.span,
-            )
-            .with_arg("issue", ISSUE_REDUNDANT_MEMBER_PUBLICA),
-            VisibilityTier::Interna | VisibilityTier::Privata => {
-                SemanticError::structured(SemanticErrorKind::AnnotationInvalid, annotation.span)
-                    .with_arg("issue", ISSUE_MEMBER_PRIVACY_UNENFORCED)
-            }
-        };
-        errors.push(diagnostic.with_arg("annotation", tier_spelling(tier)));
+        if visibility_tier(annotation, interner) == Some(VisibilityTier::Publica) {
+            errors.push(
+                SemanticError::structured(
+                    SemanticErrorKind::Warning(WarningKind::RedundantMemberVisibility),
+                    annotation.span,
+                )
+                .with_arg("issue", ISSUE_REDUNDANT_MEMBER_PUBLICA)
+                .with_arg("annotation", tier_spelling(VisibilityTier::Publica)),
+            );
+        }
+    }
+}
+
+fn member_visibility_for_tier(tier: VisibilityTier) -> MemberVisibility {
+    match tier {
+        VisibilityTier::Publica => MemberVisibility::Publica,
+        VisibilityTier::Interna => MemberVisibility::Interna,
+        VisibilityTier::Privata => MemberVisibility::Privata,
+    }
+}
+
+/// Visibility of a `genus` member from its parsed annotations (D5.2, D5.3).
+/// Unmarked members are public; the first visibility annotation wins (a
+/// member mixing tiers is separately diagnosed by this pass).
+#[must_use]
+pub fn member_visibility(annotations: &[Annotation], interner: &Interner) -> MemberVisibility {
+    annotations
+        .iter()
+        .find_map(|annotation| visibility_tier(annotation, interner))
+        .map_or(MemberVisibility::Publica, member_visibility_for_tier)
+}
+
+/// Visibility of a `genus` member from its lowered HIR annotations. Lowering
+/// normalizes every visibility spelling to the canonical family name.
+#[must_use]
+pub fn hir_member_visibility(
+    annotations: &[radix_hir::HirAnnotation],
+    interner: &Interner,
+) -> MemberVisibility {
+    annotations
+        .iter()
+        .find_map(|annotation| tier_for_name(interner.resolve(annotation.family)))
+        .map_or(MemberVisibility::Publica, member_visibility_for_tier)
+}
+
+/// Canonical annotation spelling of a member visibility, for diagnostics.
+#[must_use]
+pub fn member_visibility_spelling(visibility: MemberVisibility) -> &'static str {
+    match visibility {
+        MemberVisibility::Publica => tier_spelling(VisibilityTier::Publica),
+        MemberVisibility::Interna => tier_spelling(VisibilityTier::Interna),
+        MemberVisibility::Privata => tier_spelling(VisibilityTier::Privata),
     }
 }
 
@@ -202,8 +241,8 @@ fn check_stmt(stmt: &Stmt, interner: &Interner, errors: &mut Vec<SemanticError>)
 /// # Errors
 ///
 /// Returns a list of [`SemanticError`]s for reserved `@ protecta` annotations,
-/// conflicting visibility tiers on one declaration, unenforced `genus` member
-/// privacy, and redundant member `@ publica` (a warning).
+/// conflicting visibility tiers on one declaration or member, and redundant
+/// member `@ publica` (a warning).
 pub fn check(program: &Program, interner: &Interner) -> Result<(), Vec<SemanticError>> {
     let mut errors = Vec::new();
     for stmt in &program.statements {
