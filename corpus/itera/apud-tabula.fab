@@ -1,0 +1,48 @@
++++
+term = "itera"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "varia_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "itera_stmt", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "`apud [k]` over a tabula binds each key next to its value."
+syntax = "for from <tabula> at [k] const <value> { }"
+related = ["apud", "itera", "ex", "tabula", "ordina"]
+locale = "en"
++++
+# =============================================================================
+# apud tabula — `at [k]` walks a map's keys and values together.
+# =============================================================================
+#
+# What this teaches:
+#   • the `at` names are exactly what goes in the index brackets to get the
+#     element back: `stock[name]` is `count`, so `at [name]` binds the key
+#   • `for from m const v` alone still binds only the value
+#   • map iteration order is unspecified: collect rows and `sort` them when
+#     the output must be stable
+#
+# Common mistakes:
+#   • relying on insertion order — sort before printing
+#   • writing `at [k]` over a set — a set has no index to name (rejected)
+#
+# See also: apud, itera, ex, tabula
+# =============================================================================
+
+# for from <tabula> at [k] const <value> { <body> }
+#
+# EXPECTED OUTPUT:
+#   key=value rows in sorted key order.
+
+main {
+    var map<string, int> stock ← empty
+    stock["pear"] ← 3
+    stock["apple"] ← 5
+    stock["fig"] ← 1
+    const list<string> rows ← empty
+    for from stock at [name] const count {
+        rows.append("§=§"(name, count))
+    }
+    rows.sort()
+    for from rows const row {
+        print row
+    }
+}

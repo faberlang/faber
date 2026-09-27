@@ -65,6 +65,33 @@ expected = true
 note = "batch 3: value iteration over tabula; .expected pinned from runner stdout (map order + order-independent sum)"
 
 [[cells]]
+id = "itera.ex.lista-apud"
+family = "itera"
+cell = "ex × lista + apud[1] (enumerate)"
+status = "direct"
+exemplum = "itera/apud-lista.fab"
+expected = true
+note = "D3.1: the apud name is the index that reads the element back"
+
+[[cells]]
+id = "itera.ex.tabula-apud"
+family = "itera"
+cell = "ex × tabula + apud[1] (key and value)"
+status = "direct"
+exemplum = "itera/apud-tabula.fab"
+expected = true
+note = "D3.1; order unspecified (D19.2), rows sorted before printing"
+
+[[cells]]
+id = "itera.ex.tabula-tuple-apud"
+family = "itera"
+cell = "ex × tabula<iuncta<K1, K2>, V> + apud[2] (composite key)"
+status = "direct"
+exemplum = "tabula/composite-key.fab"
+expected = true
+note = "D3.2/D3.3: composite-key map is rank N; rows sorted before printing"
+
+[[cells]]
 id = "itera.ex.textus"
 family = "itera"
 cell = "ex × textus (character iteration)"
@@ -256,11 +283,22 @@ note = "pinned diagnostics"
 [[cells]]
 id = "itera.reject.lista-apud"
 family = "itera"
-cell = "REJECT: lista apud (ragged)"
+cell = "REJECT: lista apud rank 2 (ragged lista is rank 1)"
 status = "direct"
 exemplum = "itera/apud-decline.fab"
 expected = true
 decline = true
+note = "D3.1: lista apud [i] is admitted; two names over list<list<T>> are an arity mismatch"
+
+[[cells]]
+id = "itera.reject.apud-unindexed"
+family = "itera"
+cell = "REJECT: apud on copia (no index surface)"
+status = "direct"
+exemplum = "itera/apud-decline.fab"
+expected = true
+decline = true
+note = "D3.1: itera_apud_requires_indexed_iterable"
 
 [[cells]]
 id = "itera.reject.apud-on-ab"

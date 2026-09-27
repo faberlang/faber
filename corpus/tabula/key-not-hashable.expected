@@ -1,0 +1,4 @@
+# Reject oracle for map-key / set-element hashability (D3.4).
+# Tokens: stable diagnostic identities (faber check output); one per line.
+SEM010:tabula_key_not_hashable
+SEM010:copia_element_not_hashable

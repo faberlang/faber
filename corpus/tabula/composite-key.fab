@@ -1,0 +1,56 @@
++++
+term = "tabula"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "varia_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "itera_stmt", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "A composite-key tabula keys by `iuncta`: lookup `m[[k1, k2]]`, iteration `at [k1, k2]`."
+syntax = "tabula<iuncta<K1, K2>, V>"
+related = ["tabula", "iuncta", "apud", "itera"]
+locale = "en"
++++
+# =============================================================================
+# composite key — `map<tuple<K1, K2>, V>` is a rank-2 map.
+# =============================================================================
+#
+# What this teaches:
+#   • a composite key is a tuple key; there is no separate composite-index
+#     feature
+#   • the map is rank 2, like a sparse grid: the bracket list is the key,
+#     `sales[[region, year]]`, and `at [region, year]` binds each key part
+#   • writing the same key parts again replaces the entry
+#   • map iteration order is unspecified: collect rows and `sort` them when
+#     the output must be stable
+#
+# Common mistakes:
+#   • `at [key]` with one name — a rank-2 map takes two (arity mismatch)
+#   • a `f64` key part — keys must be hashable (no floats)
+#
+# See also: tabula, iuncta, apud, itera
+# =============================================================================
+
+# sales[[k1, k2]] ← v
+# for from sales at [k1, k2] const v { <body> }
+#
+# EXPECTED OUTPUT:
+#   two lookups, the entry count, then region/year=total rows sorted.
+
+main {
+    var map<tuple<string, int>, int> sales ← empty
+    const string east ← "east"
+    sales[[east, 2024]] ← 5
+    sales[["west", 2024]] ← 7
+    sales[[east, 2025]] ← 9
+    sales[[east, 2024]] ← 6
+    print sales[[east, 2024]]
+    print sales[["west", 2024]]
+    print sales.length()
+    const list<string> rows ← empty
+    for from sales at [region, year] const total {
+        rows.append("§/§=§"(region, year, total))
+    }
+    rows.sort()
+    for from rows const row {
+        print row
+    }
+}
