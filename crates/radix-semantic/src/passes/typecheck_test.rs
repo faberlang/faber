@@ -172,7 +172,7 @@ fn bit_operator_constrains_inferred_operand() {
 #[test]
 fn struct_field_default_provides_context_for_vacua() {
     // Struct field with default = vacua in a collection-typed field
-    test_support::assert_accepts("genus S { lista<numerus> f = vacua }");
+    test_support::assert_accepts("genus S { varia lista<numerus> f = vacua }");
 }
 
 #[test]
@@ -182,8 +182,8 @@ fn same_named_fn_wins_over_bare_vacua_marker_and_typechecks_loudly() {
     // therefore report ordinary type errors, while `vacua()` remains callable.
     test_support::assert_rejects_with_issue(
         r#"
-genus Header { textus name = "" }
-genus Headers { lista<Header> entries = vacua }
+genus Header { varia textus name = "" }
+genus Headers { varia lista<Header> entries = vacua }
 functio vacua() → Headers { redde Headers { } }
 functio probe() → lista<Header> {
   varia lista<Header> out ← vacua
@@ -208,10 +208,10 @@ fn same_named_en_empty_fn_wins_over_bare_marker_and_typechecks_loudly() {
     let result = crate::test_support::analyze_source_with_config(
         r#"
 class Header {
-    string name = ""
+    var string name = ""
 }
 class Headers {
-    list<Header> entries = empty
+    var list<Header> entries = empty
 }
 fn empty() → Headers {
     return Headers { }
@@ -247,7 +247,7 @@ fn struct_literal_field_provides_context_for_vacua() {
     // The parser produces a Verte for `S { ... }`, which typecheck resolves
     // to the struct target.
     test_support::assert_accepts(
-        "genus S { lista<numerus> f } incipit { fixum _ s ← S { f = vacua } }",
+        "genus S { varia lista<numerus> f } incipit { fixum _ s ← S { f = vacua } }",
     );
 }
 
@@ -256,7 +256,7 @@ fn verte_struct_field_provides_context_for_vacua() {
     // Verte operator: `S { fields }` is the canonical typed-constructor syntax.
     // The lowerer detects the Object inside Verte and uses Tuple as placeholder source.
     test_support::assert_accepts(
-        "genus S { lista<numerus> f } incipit { fixum _ s ← S { f = vacua } }",
+        "genus S { varia lista<numerus> f } incipit { fixum _ s ← S { f = vacua } }",
     );
 }
 
@@ -340,8 +340,8 @@ fn callable_struct_field_is_invocable_as_member_call() {
     test_support::assert_accepts(
         r#"
 discretio Nuntius { Electus { textus identitas } }
-genus Eventum { textus nomen }
-genus Ligatio { (Eventum) → Nuntius nuntius }
+genus Eventum { varia textus nomen }
+genus Ligatio { varia (Eventum) → Nuntius nuntius }
 functio selectum(textus identitas) → Nuntius {
     redde finge Electus { identitas = identitas } ∷ Nuntius
 }
@@ -362,7 +362,7 @@ functio usus() → Nuntius {
 fn non_callable_struct_field_member_call_remains_unknown_method() {
     test_support::assert_rejects_with_issue(
         r#"
-genus Ligatio { textus nuntius }
+genus Ligatio { varia textus nuntius }
 functio usus(Ligatio ligatio) → textus {
     redde ligatio.nuntius("x")
 }
@@ -375,8 +375,8 @@ functio usus(Ligatio ligatio) → textus {
 fn callable_struct_field_member_call_checks_argument_count() {
     test_support::assert_rejects_with_issue(
         r"
-genus Eventum { textus nomen }
-genus Ligatio { (Eventum) → textus nuntius }
+genus Eventum { varia textus nomen }
+genus Ligatio { varia (Eventum) → textus nuntius }
 functio usus(Ligatio ligatio) → textus {
     redde ligatio.nuntius()
 }
@@ -389,8 +389,8 @@ functio usus(Ligatio ligatio) → textus {
 fn callable_struct_field_member_call_checks_argument_types() {
     test_support::assert_rejects_with_issue(
         r#"
-genus Eventum { textus nomen }
-genus Ligatio { (Eventum) → textus nuntius }
+genus Eventum { varia textus nomen }
+genus Ligatio { varia (Eventum) → textus nuntius }
 functio usus(Ligatio ligatio) → textus {
     redde ligatio.nuntius("x")
 }
@@ -403,9 +403,9 @@ functio usus(Ligatio ligatio) → textus {
 fn explicit_method_wins_over_same_named_callable_struct_field() {
     test_support::assert_accepts(
         r#"
-genus Eventum { textus nomen }
+genus Eventum { varia textus nomen }
 genus Ligatio {
-    (Eventum) → textus nuntius
+    varia (Eventum) → textus nuntius
     functio nuntius() → textus { redde "method" }
 }
 functio usus(Ligatio ligatio) → textus {
@@ -959,7 +959,7 @@ fn item_expected_type_mismatches_use_structured_issue_args() {
     let diags = compile_and_diagnostics(
         "fixum numerus C ← \"bad\"\n\
          functio f(numerus p vel \"bad\") → textus { redde \"ok\" }\n\
-         genus S { numerus f = \"bad\" }",
+         genus S { varia numerus f = \"bad\" }",
     );
     for issue in &[
         "constant_annotation_mismatch",
@@ -987,7 +987,7 @@ fn assert_condition_type_mismatch_uses_structured_issue_arg() {
 #[test]
 fn struct_literal_field_initializer_type_mismatch_uses_structured_issue_arg() {
     test_support::assert_rejects_with_issue(
-        "genus S { numerus f } incipit { fixum _ s ← S { f = \"bad\" } }",
+        "genus S { varia numerus f } incipit { fixum _ s ← S { f = \"bad\" } }",
         "field_initializer_type_mismatch",
     );
 }
@@ -996,7 +996,7 @@ fn struct_literal_field_initializer_type_mismatch_uses_structured_issue_arg() {
 fn verte_field_initializer_type_mismatch_uses_structured_issue_arg() {
     // Verte struct constructor with wrong field type
     test_support::assert_rejects_with_issue(
-        "genus S { numerus f } incipit { fixum _ s ← S { f = \"bad\" } }",
+        "genus S { varia numerus f } incipit { fixum _ s ← S { f = \"bad\" } }",
         "field_initializer_type_mismatch",
     );
 }
@@ -1327,7 +1327,7 @@ fn string_add_invalid_operand_uses_structured_issue_arg() {
 #[test]
 fn reports_unknown_struct_field_access() {
     test_support::assert_rejects_with_issue(
-        "genus S { numerus f } incipit { fixum S s nota s.g }",
+        "genus S { varia numerus f } incipit { fixum S s nota s.g }",
         "unknown_struct_field",
     );
 }

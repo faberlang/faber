@@ -275,17 +275,17 @@ functio f() → vacuum { }"#,
     // 22. typed object fields
     accept(
         22,
-        "genus Point { numerus x = 0 numerus y = 0 }\nfixum _ p ← Point { x = 10, y = 20 }",
+        "genus Point { varia numerus x = 0 varia numerus y = 0 }\nfixum _ p ← Point { x = 10, y = 20 }",
     ),
     trailing(
         22,
         "object_fields",
-        "genus Point { numerus x = 0 numerus y = 0 }\nfixum _ p ← Point { x = 10, y = 20, }",
+        "genus Point { varia numerus x = 0 varia numerus y = 0 }\nfixum _ p ← Point { x = 10, y = 20, }",
     ),
     missing(
         22,
         "object_fields",
-        "genus Point { numerus x = 0 numerus y = 0 }\nfixum _ p ← Point { x = 10 y = 20 }",
+        "genus Point { varia numerus x = 0 varia numerus y = 0 }\nfixum _ p ← Point { x = 10 y = 20 }",
     ),
     // 23. JSON object members
     accept(23, r#"fixum _ v ← { "a": 1, "b": 2 }"#),

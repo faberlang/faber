@@ -102,8 +102,8 @@ fn imported_union_variant_value_in_registry_initializer_checks_green() {
     let source = r#"importa ex "./token" token
 
 genus KeywordSpec {
-    textus text
-    token.TokenKind ∪ nihil token_kind
+    varia textus text
+    varia token.TokenKind ∪ nihil token_kind
 }
 
 incipit {
@@ -167,7 +167,7 @@ fn imported_union_variant_value_in_field_initializer_checks_green() {
     let source = r#"importa ex "./token" token
 
 genus TokenRow {
-    token.TokenKind kind
+    varia token.TokenKind kind
 }
 
 incipit {
@@ -187,8 +187,8 @@ fn imported_union_variant_value_in_nullable_field_initializer_checks_green() {
     let source = r#"importa ex "./token" token
 
 genus KeywordSpec {
-    textus text
-    token.TokenKind ∪ nihil token_kind
+    varia textus text
+    varia token.TokenKind ∪ nihil token_kind
 }
 
 incipit {

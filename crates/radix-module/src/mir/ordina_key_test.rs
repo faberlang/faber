@@ -17,8 +17,8 @@ fn run_lines(source: &str) -> Vec<String> {
 
 const PERSONAE: &str = r#"
 genus Persona {
-    textus nomen
-    numerus aetas
+    varia textus nomen
+    varia numerus aetas
 }
 
 functio nomina(lista<Persona> ps) → lista<textus> {

@@ -57,7 +57,7 @@ fn generic_class_construction_substitutes_expected_witness() {
     // the field type before the initializer is checked.
     accepts(
         r"genus C<T> {
-    T value
+    varia T value
 }
 
 functio facere() → C<numerus> {
@@ -73,7 +73,7 @@ fn generic_class_construction_rejects_uninstantiated_field() {
     // site, never silently from the field.
     rejects_with_issue(
         r#"genus C<T> {
-    T value
+    varia T value
 }
 
 functio facere() → C<numerus> {
@@ -391,7 +391,7 @@ fn generic_method_type_param_shadows_class_param_name() {
     // set<textus>("x") accepting proves the method's A bound the call.
     accepts(
         r#"genus Box<A> {
-    A hidden
+    varia A hidden
     functio set<A>(A x) → A { redde x }
 }
 
@@ -414,7 +414,7 @@ fn generic_sibling_method_cannot_see_method_type_param() {
     // Method type params are method-local: a sibling cannot name another's C.
     rejects_with_issue(
         r"genus Something<A> {
-    A field
+    varia A field
     functio run<C>(A b, C c) → A {
         redde b
     }
@@ -430,7 +430,7 @@ fn generic_sibling_method_cannot_see_method_type_param() {
 fn generic_class_type_param_in_field_type_accepts() {
     accepts(
         r"genus Something<A> {
-    A field
+    varia A field
 }",
     );
 }

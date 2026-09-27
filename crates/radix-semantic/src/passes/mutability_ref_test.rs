@@ -124,7 +124,7 @@ fn genus_field_projection_is_a_ref_view() {
     let result = analyze_ok(
         r"
 genus Persona {
-    lista<numerus> amici
+    varia lista<numerus> amici
 }
 incipit {
     fixum de Persona p ← Persona { amici = [1, 2] }
@@ -164,7 +164,7 @@ fn genus_field_mutating_receiver_rejects() {
     assert_rejects_with_issue(
         r"
 genus Persona {
-    lista<numerus> amici
+    varia lista<numerus> amici
 }
 incipit {
     fixum de Persona p ← Persona { amici = [1, 2] }
@@ -180,7 +180,7 @@ fn genus_field_projection_assignment_rejects() {
     assert_rejects_with_issue(
         r"
 genus Persona {
-    lista<numerus> amici
+    varia lista<numerus> amici
 }
 incipit {
     fixum de Persona p ← Persona { amici = [1, 2] }

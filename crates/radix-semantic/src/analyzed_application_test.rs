@@ -192,7 +192,7 @@ incipit {
 fn resolved_uses_retain_local_ids_for_portable_calls_and_signature_types() {
     let source = r#"
 genus Persona {
-  textus name
+  varia textus name
 }
 functio identity(Persona value) → Persona {
   redde value

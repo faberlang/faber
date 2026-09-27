@@ -217,7 +217,7 @@ fn radix_lane_rejects_unsupported_placement() {
         r#"
 @ radix lane "mir"
 genus Model {
-    numerus x
+    varia numerus x
 }
 "#,
     );
@@ -377,7 +377,7 @@ fn radix_backward_unsupported_placement_rejects() {
         r#"
 @ radix backward "name"
 genus Model {
-    numerus x
+    varia numerus x
 }
 "#,
     );

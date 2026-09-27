@@ -7,7 +7,7 @@
 use crate::test_support;
 
 const CARRIER: &str = r"genus ErrorDetail {
-    textus body
+    varia textus body
 }
 
 discretio Carrier {

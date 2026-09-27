@@ -8,7 +8,7 @@ fn zero_argument_named_types_apply_trailing_defaults() {
         r#"typus Alias<T = textus> = T
 
 genus Box<T = textus> {
-    T value
+    varia T value
 }
 
 discretio Maybe<T = textus> {
@@ -41,8 +41,8 @@ functio use_contract(Contract value) → numerus {
 fn explicit_prefix_and_full_named_type_arguments_share_the_descriptor_law() {
     test_support::assert_accepts(
         r"genus Pair<T, U = textus> {
-    T first
-    U second
+    varia T first
+    varia U second
 }
 
 functio prefix(Pair<numerus> value) → numerus {
@@ -54,7 +54,7 @@ functio full(Pair<numerus, textus> value) → numerus {
 }
 
 genus Sized<magnitudo N = 4> {
-    vector<f32, N> lanes
+    varia vector<f32, N> lanes
 }
 
 functio sized_default(Sized value) → numerus {
@@ -71,7 +71,7 @@ functio sized_explicit(Sized<8> value) → numerus {
 fn named_type_application_rejects_wrong_kind() {
     test_support::assert_rejects_with_issue(
         r"genus Box<T = textus> {
-    T value
+    varia T value
 }
 
 functio use(Box<4> value) → numerus {
@@ -85,7 +85,7 @@ functio use(Box<4> value) → numerus {
 fn named_type_application_rejects_excess_arguments() {
     test_support::assert_rejects_with_issue(
         r"genus Box<T = textus> {
-    T value
+    varia T value
 }
 
 functio use(Box<numerus, textus> value) → numerus {
@@ -99,8 +99,8 @@ functio use(Box<numerus, textus> value) → numerus {
 fn named_type_application_rejects_missing_required_arguments() {
     test_support::assert_rejects_with_issue(
         r"genus Pair<T, U = textus> {
-    T first
-    U second
+    varia T first
+    varia U second
 }
 
 functio use(Pair value) → numerus {

@@ -59,8 +59,9 @@ fn bound_precedes_default() {
 
 #[test]
 fn genus_implet_takes_type_arguments() {
-    let class =
-        first_class("genus Persona implet Ordinabile<Persona>, Nominatum {\n    textus nomen\n}\n");
+    let class = first_class(
+        "genus Persona implet Ordinabile<Persona>, Nominatum {\n    varia textus nomen\n}\n",
+    );
     assert_eq!(class.implements.len(), 2);
     assert_eq!(class.implements[0].args.len(), 1);
     assert!(class.implements[1].args.is_empty());
@@ -68,7 +69,7 @@ fn genus_implet_takes_type_arguments() {
 
 #[test]
 fn genus_implet_accepts_cap_between_generic_contracts() {
-    let class = first_class("genus Arca<T> implet A<T> ∩ B<lista<T>> {\n    T x\n}\n");
+    let class = first_class("genus Arca<T> implet A<T> ∩ B<lista<T>> {\n    varia T x\n}\n");
     assert_eq!(class.implements.len(), 2);
     assert_eq!(class.implements[1].args.len(), 1);
 }

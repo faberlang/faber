@@ -1240,10 +1240,10 @@ fn genus_field_defaults_with_literals_do_not_consume_following_fields() {
     let result = parse_ok(
         r"
 genus Thing {
-    bivalens visible = falsum
-    bivalens enabled = verum
-    textus maybe = nihil
-    textus name
+    varia bivalens visible = falsum
+    varia bivalens enabled = verum
+    varia textus maybe = nihil
+    varia textus name
 }
 ",
     );
@@ -1974,8 +1974,8 @@ fn parses_structural_equals_fields_and_typed_construction() {
     let result = parse_ok(
         r#"
 genus Point {
-    numerus x = 0
-    numerus y = 0
+    varia numerus x = 0
+    varia numerus y = 0
 }
 
 functio main() → numerus {
@@ -2051,7 +2051,7 @@ fn parses_applied_generic_typed_constructor_with_size_argument() {
     let result = parse_ok(
         r"
 genus Gen<magnitudo N> {
-    vector<f32, N> lanes
+    varia vector<f32, N> lanes
 }
 
 functio facere(vector<f32, 3> lanes) → Gen<3> {
@@ -2093,7 +2093,7 @@ fn parses_qualified_applied_generic_typed_constructor() {
     let result = parse_ok(
         r"
 genus Gen<magnitudo N> {
-    vector<f32, N> lanes
+    varia vector<f32, N> lanes
 }
 
 functio facere(vector<f32, 3> lanes) → Gen<3> {
@@ -3758,7 +3758,7 @@ fn si_is_usable_as_a_type_name_after_tokenless_migration() {
         "functio f(si handle) → vacuum {}\n",
         "functio find() → si { redde nihil }\n",
         "typus MaybeSi = si\n",
-        "genus User { si email }\n",
+        "genus User { varia si email }\n",
     ] {
         let result = parse_program(source);
         assert!(

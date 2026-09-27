@@ -9,7 +9,7 @@ use crate::driver::{Config, ModuleCompileRequest, Session, WarnPolicy};
 const MEMBER_PUBLICA_SOURCE: &str = r#"
 genus Demo {
     @ publica
-    textus nomen
+    varia textus nomen
 }
 incipit {
     nota "salve"

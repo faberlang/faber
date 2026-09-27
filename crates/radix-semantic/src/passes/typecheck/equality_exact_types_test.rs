@@ -225,7 +225,7 @@ fn ref_view_field_read_exact_equality_uses_carrier_type() {
     let result = compile(
         r#"
 genus Euler {
-    textus order
+    varia textus order
 }
 
 functio same(de Euler value) → bivalens {
@@ -245,7 +245,7 @@ fn non_view_field_read_keeps_exact_equality_rejection() {
     let result = compile(
         r"
 genus Euler {
-    textus order
+    varia textus order
 }
 
 functio same(Euler value) → bivalens {

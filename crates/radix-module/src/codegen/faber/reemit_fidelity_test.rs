@@ -42,7 +42,7 @@ fn assert_idempotent(source: &str) -> String {
 
 #[test]
 fn access_marked_parameter_forms_keep_their_inner_type() {
-    let source = "genus Box { numerus value }\nfunctio update(in Box box, de lista<numerus> items, in numerus count, de li32 compact) { tacet }\n";
+    let source = "genus Box { varia numerus value }\nfunctio update(in Box box, de lista<numerus> items, in numerus count, de li32 compact) { tacet }\n";
     let emitted = assert_idempotent(source);
     assert!(emitted.contains("in Box box"), "{emitted}");
     assert!(emitted.contains("de lista<numerus> items"), "{emitted}");
@@ -762,7 +762,7 @@ fn array_destructuring_reemits_as_pattern() {
 
 #[test]
 fn object_destructuring_reemits_as_pattern() {
-    let source = "genus Punctum {\n    numerus x\n    numerus y\n}\nfunctio fac() → Punctum {\n    redde Punctum { x = 1, y = 2 }\n}\nincipit {\n    fixum {x, y ut z} ← fac()\n    nota x + z\n}\n";
+    let source = "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nfunctio fac() → Punctum {\n    redde Punctum { x = 1, y = 2 }\n}\nincipit {\n    fixum {x, y ut z} ← fac()\n    nota x + z\n}\n";
     let emitted = assert_idempotent(source);
     assert!(emitted.contains("fixum {x, y ut z} ← fac()\n"), "{emitted}");
 }

@@ -97,8 +97,8 @@ fn canonical_format_rewrites_ascii_comparison_to_glyph() {
 locale = "en"
 +++
 class Proba {
-    float x
-    float y
+    var float x
+    var float y
     fn compara(float other) → bool {
         return self.x < other and self.x > other and self.x ≤ other and self.x ≥ other
     }
@@ -406,7 +406,7 @@ const NAMED_TUPLE_LABEL_PROBE: &str = "+++\nlocale = \"en\"\n+++\nmain {\n    co
 /// (`gradus/src/gradient.fab`): generic shape parameters, tensor element
 /// types, a labeled tuple binding, and a by-label read. The genus field and
 /// the generic return type also cover the named aggregate positions.
-const GRADUS_SHAPED_TUPLE_LABEL_PROBE: &str = "+++\nlocale = \"en\"\n+++\nclass GradPack<size R, size C> {\n    tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> grads\n}\n\nfn backward<size R, size C>(tensor<f32, [R, C]> x, tensor<f32, [R, C]> w) → tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> {\n    const tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> grads ← tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> [x, w]\n    return grads\n}\n\nfn pick_w<size R, size C>(tensor<f32, [R, C]> x, tensor<f32, [R, C]> w) → tensor<f32, [R, C]> {\n    const tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> grads ← tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> [x, w]\n    return grads.grad_w\n}\n";
+const GRADUS_SHAPED_TUPLE_LABEL_PROBE: &str = "+++\nlocale = \"en\"\n+++\nclass GradPack<size R, size C> {\n    var tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> grads\n}\n\nfn backward<size R, size C>(tensor<f32, [R, C]> x, tensor<f32, [R, C]> w) → tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> {\n    const tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> grads ← tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> [x, w]\n    return grads\n}\n\nfn pick_w<size R, size C>(tensor<f32, [R, C]> x, tensor<f32, [R, C]> w) → tensor<f32, [R, C]> {\n    const tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> grads ← tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> [x, w]\n    return grads.grad_w\n}\n";
 
 /// A source that already is canonical output must format to itself — for the
 /// named-tuple probes that is exactly the labels-and-label-access assertion.

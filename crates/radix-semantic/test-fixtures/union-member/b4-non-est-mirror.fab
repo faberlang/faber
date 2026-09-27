@@ -1,9 +1,9 @@
 class Errata {
-    string message
+    var string message
 }
 
 class Bonum {
-    string payload
+    var string payload
 }
 
 fn probe(Errata ∪ Bonum r) → string {

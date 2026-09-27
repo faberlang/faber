@@ -56,7 +56,7 @@ functio f() → f32 {
 fn pos_f32_field_assign() {
     test_support::assert_analysis_accepts(
         r"
-genus Vec { f32 x }
+genus Vec { varia f32 x }
 functio f() → Vec {
     redde Vec { x = 1.0 }
 }
@@ -156,7 +156,7 @@ functio f() → f32 {
 fn neg_f32_field_assign() {
     test_support::assert_analysis_accepts(
         r"
-genus Vec { f32 x }
+genus Vec { varia f32 x }
 functio f() → Vec {
     redde Vec { x = -1.0 }
 }

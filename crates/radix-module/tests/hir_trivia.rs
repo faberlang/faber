@@ -168,7 +168,7 @@ fn comment_before_top_level_item_attaches_to_item_owner() {
 
 #[test]
 fn comment_before_genus_field_attaches_to_member_owner() {
-    let source = "genus Persona {\n  # before field\n  textus nomen\n}\n";
+    let source = "genus Persona {\n  # before field\n  varia textus nomen\n}\n";
     let (lowered, errors, interner) = lower_source(source);
     assert!(errors.is_empty(), "lower failed: {errors:?}");
     let presentation = &lowered.presentation;
@@ -354,7 +354,7 @@ fn comment_before_genus_close_attaches_as_class_end_trivia() {
     // invalid_comment_placement. U-1 invalid placement still applies to
     // genuinely unnamed points and is covered parser-side (e.g. a comment
     // between annotations).
-    let source = "genus Canis {\n  textus nomen\n  # before close\n}\n";
+    let source = "genus Canis {\n  varia textus nomen\n  # before close\n}\n";
     let lex_result = radix_module::lexer::lex(source);
     let parse_result = radix_module::parser::parse(lex_result);
     assert!(parse_result.success(), "expected parse success: {:?}", parse_result.errors);

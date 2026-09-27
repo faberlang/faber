@@ -22,12 +22,12 @@ use radix_module::mir::{MirConversion, MirConversionFlavor};
 use radix_module::semantic::Resolver;
 use std::path::PathBuf;
 
-const METHOD_LIB: &str = "@ publica\ngenus Punctum {\n    numerus x\n\n    functio dupla() → numerus {\n        redde ego.x * 2\n    }\n}\n\n@ publica\nfunctio structa(numerus x) → Punctum {\n    redde Punctum { x = x }\n}\n";
+const METHOD_LIB: &str = "@ publica\ngenus Punctum {\n    varia numerus x\n\n    functio dupla() → numerus {\n        redde ego.x * 2\n    }\n}\n\n@ publica\nfunctio structa(numerus x) → Punctum {\n    redde Punctum { x = x }\n}\n";
 const METHOD_MAIN: &str = "import from \"methlib:lib\" lib\n\nmain {\n    const lib.Punctum p ← lib.structa(21)\n    print p.dupla()\n}\n";
-const LOCAL_METHOD_LIB: &str = "@ public {}\nclass Punctum {\n    int x\n\n    fn dupla() → int {\n        return self.x * 2\n    }\n}\n\n@ public {}\nfn structa(int x) → Punctum {\n    return Punctum { x = x }\n}\n";
+const LOCAL_METHOD_LIB: &str = "@ public {}\nclass Punctum {\n    var int x\n\n    fn dupla() → int {\n        return self.x * 2\n    }\n}\n\n@ public {}\nfn structa(int x) → Punctum {\n    return Punctum { x = x }\n}\n";
 const LOCAL_METHOD_MAIN: &str = "import from \"./math\" math\n\nmain {\n    const math.Punctum p ← math.structa(21)\n    print p.dupla()\n}\n";
 
-const CALLBACK_LIB: &str = "@ publica\ngenus Lectio {\n    bivalens successus\n    numerus valor\n    textus causa\n}\n\n@ publica\nfunctio applica((numerus, numerus) → Lectio f, numerus x) → numerus {\n    fixum Lectio lectio ← f(x, 2)\n    si non lectio.successus ergo redde 0\n    redde lectio.valor\n}\n";
+const CALLBACK_LIB: &str = "@ publica\ngenus Lectio {\n    varia bivalens successus\n    varia numerus valor\n    varia textus causa\n}\n\n@ publica\nfunctio applica((numerus, numerus) → Lectio f, numerus x) → numerus {\n    fixum Lectio lectio ← f(x, 2)\n    si non lectio.successus ergo redde 0\n    redde lectio.valor\n}\n";
 const CALLBACK_MAIN: &str = "importa ex \"callbacklib:lib\" lib\n\nincipit {\n    fixum numerus factor ← 1\n    nota lib.applica((numerus x, numerus y) → lib.Lectio ∴ lib.Lectio { successus = verum, valor = x * y * factor, causa = \"\" }, 21)\n}\n";
 
 // The forma-shadowing guard (fd0c939) false-positive exclusion: a local
@@ -37,7 +37,7 @@ const CALLBACK_MAIN: &str = "importa ex \"callbacklib:lib\" lib\n\nincipit {\n  
 // rewrote ANY HIR-generated receiver def (>= 1_000_000), so `h1b.gelu()` was
 // rewritten to `nn.gelu(h1b)` — an arity-corrupting synthetic-path call.
 const GELU_LIB: &str = "@ publica\nfunctio gelu() → numerus {\n    redde 7\n}\n";
-const GELU_MAIN: &str = "import from \"gelulib:lib\" nn\n\nclass H1B {\n    int x\n\n    fn gelu() → int {\n        return self.x * 2\n    }\n}\n\nfn structa(int x) → H1B {\n    return H1B { x = x }\n}\n\nmain {\n    const int nn_value ← nn.gelu()\n    const H1B h1b ← structa(21)\n    print h1b.gelu()\n    print nn_value\n}\n";
+const GELU_MAIN: &str = "import from \"gelulib:lib\" nn\n\nclass H1B {\n    var int x\n\n    fn gelu() → int {\n        return self.x * 2\n    }\n}\n\nfn structa(int x) → H1B {\n    return H1B { x = x }\n}\n\nmain {\n    const int nn_value ← nn.gelu()\n    const H1B h1b ← structa(21)\n    print h1b.gelu()\n    print nn_value\n}\n";
 
 #[test]
 fn package_mir_rewrites_runtime_conversion_types_with_imported_types() {
@@ -284,7 +284,7 @@ import from "geomlib:codes" codes
 
 @ public
 class Mesh {
-    int n
+    var int n
 
     fn layout_count() → int ∪ null {
         if self.n ≡ 0 then return null
@@ -433,7 +433,7 @@ fn package_mir_passes_captured_entry_closure_to_linked_library_function() {
 // MIR lowerer lowered it as a plain call and the cape handler's blocks
 // orphaned ("block bbN is not reachable from entry", PKG001). The success
 // path (`4`) and the error path (`caught`) both prove handler reachability.
-const FAILABLE_METHOD_LIB: &str = "@ publica\ngenus Divisor {\n    numerus x\n\n    functio reciproca() → numerus ⇥ textus {\n        si ego.x ≡ 0 {\n            iace \"division by zero\"\n        }\n        redde 100 / ego.x\n    }\n}\n\n@ publica\nfunctio structa(numerus x) → Divisor {\n    redde Divisor { x = x }\n}\n";
+const FAILABLE_METHOD_LIB: &str = "@ publica\ngenus Divisor {\n    varia numerus x\n\n    functio reciproca() → numerus ⇥ textus {\n        si ego.x ≡ 0 {\n            iace \"division by zero\"\n        }\n        redde 100 / ego.x\n    }\n}\n\n@ publica\nfunctio structa(numerus x) → Divisor {\n    redde Divisor { x = x }\n}\n";
 const FAILABLE_METHOD_MAIN: &str = "import from \"failib:lib\" lib\n\nmain {\n    const lib.Divisor ok ← lib.structa(25)\n    do {\n        const int r ← ok.reciproca()\n        print r\n    }\n    catch err {\n        print \"caught\"\n    }\n    const lib.Divisor bad ← lib.structa(0)\n    do {\n        const int r2 ← bad.reciproca()\n        print r2\n    }\n    catch err {\n        print \"caught\"\n    }\n}\n";
 
 #[test]

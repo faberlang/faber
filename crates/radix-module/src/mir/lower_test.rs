@@ -689,7 +689,7 @@ fn lowers_tensor_vacua_to_rank_zero_aggregate() {
 fn lowers_genus_method_calls_with_explicit_receiver_param() {
     let dump = dump_source(
         r"genus Capsa {
-  numerus n = 1
+  varia numerus n = 1
   functio value() → numerus { redde ego.n }
 }
 
@@ -766,12 +766,12 @@ fn lowers_coalesce_with_literal_fallback_as_single_option_op() {
 fn lowers_optional_chain_on_known_present_base() {
     let dump = dump_source(
         r#"genus Address {
-  textus city
+  varia textus city
 }
 
 genus User {
-  textus name
-  Address address sponte
+  varia textus name
+  varia Address address sponte
 }
 
 incipit {
@@ -1309,8 +1309,9 @@ fn failed_top_level_const_initializer_does_not_bind_const() {
 
 #[test]
 fn ignores_top_level_type_metadata_items() {
-    let mut unit =
-        analyze("genus Persona { textus nomen } discretio Eventus { Bonum { textus nuntius } } functio salve() {}");
+    let mut unit = analyze(
+        "genus Persona { varia textus nomen } discretio Eventus { Bonum { textus nuntius } } functio salve() {}",
+    );
     let program = lower_analyzed_unit(&mut unit, MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
         .expect("type metadata should not block MIR lowering");
@@ -2100,7 +2101,7 @@ fn borrowed_receiver_itera_ex_lowers_by_pointee_with_by_value_identical_dump() {
     let field_borrowed = twin_dump(
         "de",
         r"genus Crater {
-  lista<numerus> mensurae
+  varia lista<numerus> mensurae
 }
 
 functio summaCrateris(MODUS Crater c) → numerus {
@@ -2114,7 +2115,7 @@ functio summaCrateris(MODUS Crater c) → numerus {
     let field_by_value = twin_dump(
         "",
         r"genus Crater {
-  lista<numerus> mensurae
+  varia lista<numerus> mensurae
 }
 
 functio summaCrateris(MODUS Crater c) → numerus {
@@ -2215,7 +2216,7 @@ fn erase_type_ids(dump: &str) -> String {
 #[test]
 fn borrowed_receiver_itera_runs_runtime_correct_results() {
     let source = r#"genus Crater {
-  lista<numerus> mensurae
+  varia lista<numerus> mensurae
 }
 
 functio summa(de lista<numerus> xs) → numerus {
@@ -2621,7 +2622,7 @@ fn lowers_trap_type_narrowed_member_projection() {
     // materialize a member-typed temp before adding the field projection.
     let dump = dump_source(
         r#"
-        genus Errata { textus message }
+        genus Errata { varia textus message }
         functio fail() → numerus ⇥ Errata { iace Errata { message = "bad" } }
         functio inspect() → textus {
             fixum numerus ∪ Errata r ← capta { fail() }
@@ -2996,7 +2997,7 @@ functio mensura(lista<numerus> f) → numerus ⇥ FormaError {
 fn lowers_struct_construction_and_field_read() {
     let dump = dump_source(
         r#"
-genus Persona { textus nomen numerus aetas }
+genus Persona { varia textus nomen varia numerus aetas }
 functio nomen() → textus {
     fixum Persona p ← Persona { nomen = "Ada", aetas = 36 }
     redde p.nomen
@@ -3015,7 +3016,7 @@ functio nomen() → textus {
 fn lowers_struct_construction_field_defaults() {
     let dump = dump_source(
         r#"
-genus Persona { textus nomen numerus aetas = 0 }
+genus Persona { varia textus nomen varia numerus aetas = 0 }
 functio aetas() → numerus {
     fixum Persona p ← Persona { nomen = "Ada" }
     redde p.aetas
@@ -3111,7 +3112,7 @@ incipit {
 fn lowers_field_and_index_assignment_places() {
     let field_dump = dump_source(
         r#"
-genus Persona { textus nomen numerus aetas }
+genus Persona { varia textus nomen varia numerus aetas }
 functio muta() → numerus {
     varia Persona p ← Persona { nomen = "Ada", aetas = 36 }
     p.aetas ← 37
@@ -3211,7 +3212,7 @@ functio copy(tf32[4] input, tf32[4] output, u32 id) → vacuum {
 fn lowers_optional_chain_non_null_and_coalesce() {
     let chain_dump = dump_source(
         r"
-genus Persona { textus nomen }
+genus Persona { varia textus nomen }
 functio maybe(Persona ∪ nihil p) → textus ∪ nihil {
     redde p?.nomen
 }
@@ -3221,7 +3222,7 @@ functio maybe(Persona ∪ nihil p) → textus ∪ nihil {
 
     let non_null_dump = dump_source(
         r"
-genus Persona { textus nomen }
+genus Persona { varia textus nomen }
 functio certum(Persona ∪ nihil p) → textus {
     redde p!.nomen
 }
@@ -3298,9 +3299,9 @@ fn varia_nominal_struct_with_tagged_union_field_gets_recursive_zero_init() {
         r"
 discretio Statio { Trainabilis, Gelida }
 genus Parametrum {
-    numerus versio
-    f32 lentus
-    Statio statio
+    varia numerus versio
+    varia f32 lentus
+    varia Statio statio
 }
 functio f() → numerus {
     varia Parametrum p2
@@ -4543,8 +4544,8 @@ functio scale(bivalens compact, numerus base) → numerus {
 fn lowers_sponte_struct_field_with_type_zero() {
     let source = r#"
 genus User {
-    textus name
-    textus email sponte
+    varia textus name
+    varia textus email sponte
 }
 incipit {
     fixum User u ← User { name = "Ada" }
@@ -4602,8 +4603,8 @@ incipit {
 fn lowers_multi_arm_nullable_sponte_struct_field_to_nil_zero() {
     let source = r#"
 genus User {
-    textus name
-    textus ∪ numerus ∪ nihil tag sponte
+    varia textus name
+    varia textus ∪ numerus ∪ nihil tag sponte
 }
 incipit {
     fixum User u ← User { name = "Ada" }
@@ -5088,7 +5089,7 @@ incipit {
 fn mir_generic_call_with_projected_struct_field_lowers_and_validates() {
     let source = r#"
 genus Capsa {
-    textus nomen
+    varia textus nomen
 }
 
 functio identitas<T>(T x) → T {
@@ -5786,7 +5787,7 @@ fn conflicting_shader_annotations_with_nucleum_emit_diagnostic() {
 #[test]
 fn lowers_vertex_method_inside_genus_to_shader_stage() {
     let mut unit = analyze(
-        "genus Renderer {\n  numerus dummy = 0\n  @ vertex\n  functio draw() → vacuum { redde }\n}\n\nincipit {\n  fixum _ r ← Renderer {}\n}",
+        "genus Renderer {\n  varia numerus dummy = 0\n  @ vertex\n  functio draw() → vacuum { redde }\n}\n\nincipit {\n  fixum _ r ← Renderer {}\n}",
     );
     let program = lower_analyzed_unit(&mut unit, MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
@@ -5806,7 +5807,7 @@ fn lowers_vertex_method_inside_genus_to_shader_stage() {
 #[test]
 fn lowers_fragment_method_inside_genus_to_shader_stage() {
     let mut unit = analyze(
-        "genus Renderer {\n  numerus dummy = 0\n  @ fragment\n  functio shade() → vacuum { redde }\n}\n\nincipit {\n  fixum _ r ← Renderer {}\n}",
+        "genus Renderer {\n  varia numerus dummy = 0\n  @ fragment\n  functio shade() → vacuum { redde }\n}\n\nincipit {\n  fixum _ r ← Renderer {}\n}",
     );
     let program = lower_analyzed_unit(&mut unit, MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)

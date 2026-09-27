@@ -47,7 +47,7 @@ fn function_name_warns() {
 #[test]
 fn method_name_warns() {
     assert_single(
-        "genus Punctum {\n    numerus x\n    functio _norma() → numerus { redde ego.x }\n}",
+        "genus Punctum {\n    varia numerus x\n    functio _norma() → numerus { redde ego.x }\n}",
         "_norma",
         "function",
     );
@@ -55,7 +55,11 @@ fn method_name_warns() {
 
 #[test]
 fn type_name_warns() {
-    assert_single("genus _Punctum {\n    numerus x\n}", "_Punctum", "type");
+    assert_single(
+        "genus _Punctum {\n    varia numerus x\n}",
+        "_Punctum",
+        "type",
+    );
 }
 
 #[test]
@@ -65,7 +69,7 @@ fn type_alias_name_warns() {
 
 #[test]
 fn field_name_warns() {
-    assert_single("genus Punctum {\n    numerus _x\n}", "_x", "field");
+    assert_single("genus Punctum {\n    varia numerus _x\n}", "_x", "field");
 }
 
 #[test]

@@ -114,8 +114,8 @@ fn en_family_words_stay_ordinary_identifiers() {
 locale = "en"
 +++
 class Packet {
-    int frame = 0
-    string channel = ""
+    var int frame = 0
+    var string channel = ""
 }
 
 fn send(int recv) → int {

@@ -642,8 +642,8 @@ fn ex_destructured_object_fields_can_be_used_in_arithmetic() {
 }
 
 genus Point {
-  numerus x = 0
-  numerus y = 0
+  varia numerus x = 0
+  varia numerus y = 0
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -659,7 +659,7 @@ genus Point {
 fn typed_constructor_uses_type_namespace_after_value_shadowing() {
     let session = test_session(Target::HirRust);
     let source = r#"genus persona {
-  textus nomen
+  varia textus nomen
 }
 
 functio main() → vacuum {
@@ -685,8 +685,8 @@ fn object_destructured_aliases_can_be_used_in_arithmetic() {
 }
 
 genus Point {
-  numerus x = 0
-  numerus y = 0
+  varia numerus x = 0
+  varia numerus y = 0
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -899,8 +899,8 @@ incipit {
 fn optional_chain_no_longer_reports_lowering_stub() {
     let session = test_session(Target::HirRust);
     let source = r#"genus User {
-  textus name = "Anon"
-  lista<numerus> nums = [1, 2, 3]
+  varia textus name = "Anon"
+  varia lista<numerus> nums = [1, 2, 3]
 }
 
 functio id(textus x) → textus {
@@ -924,7 +924,7 @@ incipit {
 fn rust_output_emits_option_map_and_and_then_for_optional_chain() {
     let session = test_session(Target::HirRust);
     let source = r#"genus User {
-  textus name = "Anon"
+  varia textus name = "Anon"
 }
 
 functio id(textus x) → textus {
@@ -972,8 +972,8 @@ fn rust_output_translates_stdlib_lista_methods() {
 fn struct_construction_requires_fields_and_checks_defaults() {
     let session = test_session(Target::HirRust);
     let missing = r#"genus User {
-  textus name
-  textus email sponte
+  varia textus name
+  varia textus email sponte
 }
 
 incipit {
@@ -988,7 +988,7 @@ incipit {
     );
 
     let bad_default = r#"genus User {
-  numerus score = "bad"
+  varia numerus score = "bad"
 }
 
 incipit {
@@ -1025,9 +1025,9 @@ fn rust_output_emits_coalesce_unwrap() {
 fn rust_output_wraps_sponte_fields_in_verte_struct_literals() {
     let session = test_session(Target::HirRust);
     let source = r#"genus User {
-  textus name
-  textus email sponte
-  numerus score sponte
+  varia textus name
+  varia textus email sponte
+  varia numerus score sponte
 }
 
 incipit {
@@ -1056,9 +1056,9 @@ incipit {
 fn rust_output_applies_nullable_field_defaults_in_verte_struct_literals() {
     let session = test_session(Target::HirRust);
     let source = r#"genus User {
-  textus name
-  textus nickname = "Anonymous"
-  textus ∪ nihil email = "Anonymous"
+  varia textus name
+  varia textus nickname = "Anonymous"
+  varia textus ∪ nihil email = "Anonymous"
 }
 
 incipit {
@@ -1618,7 +1618,7 @@ incipit {
 fn ego_field_access_no_longer_reports_non_struct_member_error() {
     let session = test_session(Target::HirRust);
     let source = r"genus Counter {
-  numerus count = 0
+  varia numerus count = 0
   functio inc() → numerus {
     ego.count ← ego.count + 1
     redde ego.count

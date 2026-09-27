@@ -188,7 +188,7 @@ fn applied_nominal_receiver_keeps_unknown_method() {
     // application does not expose the carrier's intrinsic surface.
     test_support::assert_rejects_with_issue(
         "genus Capsula<magnitudo N> {
-    vector<f32, N> lanes
+    varia vector<f32, N> lanes
 }
 
 functio probe(Capsula<3> c) → fractus<f32> {

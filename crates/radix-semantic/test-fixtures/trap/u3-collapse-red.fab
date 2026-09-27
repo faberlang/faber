@@ -7,7 +7,7 @@ locale = "en"
 # `trap_union_collapsed` diagnostic.
 
 class Payload {
-    string message
+    var string message
 }
 
 fn same() → Payload ⇥ Payload {

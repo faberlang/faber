@@ -7,10 +7,10 @@ use crate::codegen::Target;
 use crate::driver::{Config, ModuleCompileRequest, Session};
 
 const DECLS: &str = "
-genus Celsius { fractus gradus }
-genus Fahrenheit { fractus gradus }
-genus Lectio { numerus valor }
-genus Mensura { numerus valor }
+genus Celsius { varia fractus gradus }
+genus Fahrenheit { varia fractus gradus }
+genus Lectio { varia numerus valor }
+genus Mensura { varia numerus valor }
 
 @ conversio
 functio adFahrenheit(Celsius c) → Fahrenheit {

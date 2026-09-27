@@ -32,8 +32,8 @@ use radix_module::semantic::{IndexExpr, Type};
 
 const SEAM_UTIL: &str = r"@ public
 class Box<size D, size Q> {
-    tensor<f32, [D]> ln1
-    tensor<f32, [D, Q]> wq
+    var tensor<f32, [D]> ln1
+    var tensor<f32, [D, Q]> wq
 }
 
 @ public

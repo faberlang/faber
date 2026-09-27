@@ -759,6 +759,10 @@ help = "write `{generis} T NAME = value`"
 message = "a field takes exactly one of {fixum}, {varia} or {generis}"
 help = "keep one modifier; a {generis} field is already immutable"
 
+[diagnostics.PARSE010.issues.field_modifier_missing]
+message = "a {genus} field must declare {fixum}, {varia} or {generis}"
+help = "write `{varia} T name` to keep today's meaning (or {fixum} when never reassigned); `faber field-modifier-codemod <PATH>` migrates whole files"
+
 [diagnostics.PARSE010.issues.static_sponte]
 message = "a {generis} static cannot be {sponte}"
 help = "remove {sponte}; a static always has its compile-time value"

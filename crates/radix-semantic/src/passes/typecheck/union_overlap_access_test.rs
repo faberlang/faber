@@ -17,15 +17,15 @@ use crate::test_support;
 
 const FIGURA: &str = "\
 genus Circulus {
-    textus nomen
-    fractus radius
+    varia textus nomen
+    varia fractus radius
 
     functio area() → fractus { redde 3.0 * ego.radius * ego.radius }
 }
 
 genus Quadratum {
-    textus nomen
-    fractus latus
+    varia textus nomen
+    varia fractus latus
 
     functio area() → fractus { redde ego.latus * ego.latus }
 }
@@ -81,8 +81,8 @@ fn field_outside_overlap_names_lacking_member() {
 fn field_type_mismatch_names_each_member() {
     test_support::assert_rejects_with_args(
         concat!(
-            "genus Circulus {\n    fractus area\n}\n\n",
-            "genus Quadratum {\n    numerus area\n}\n\n",
+            "genus Circulus {\n    varia fractus area\n}\n\n",
+            "genus Quadratum {\n    varia numerus area\n}\n\n",
             "functio f(Circulus ∪ Quadratum x) → fractus { redde x.area }",
         ),
         &[
@@ -97,8 +97,8 @@ fn field_type_mismatch_names_each_member() {
 fn field_write_type_mismatch_is_rejected() {
     test_support::assert_rejects_with_issue(
         concat!(
-            "genus Circulus {\n    fractus area\n}\n\n",
-            "genus Quadratum {\n    numerus area\n}\n\n",
+            "genus Circulus {\n    varia fractus area\n}\n\n",
+            "genus Quadratum {\n    varia numerus area\n}\n\n",
             "functio f(Circulus ∪ Quadratum x) {\n    varia Circulus ∪ Quadratum y ← x\n    y.area ← 1\n}",
         ),
         "union_member_differs",
@@ -129,7 +129,7 @@ fn method_outside_overlap_names_lacking_member() {
     test_support::assert_rejects_with_args(
         concat!(
             "genus Circulus {\n    functio area() → fractus { redde 1.0 }\n}\n\n",
-            "genus Quadratum {\n    textus nomen\n}\n\n",
+            "genus Quadratum {\n    varia textus nomen\n}\n\n",
             "functio f(Circulus ∪ Quadratum x) → fractus { redde x.area() }",
         ),
         &[

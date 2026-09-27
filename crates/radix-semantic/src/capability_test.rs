@@ -490,8 +490,8 @@ fn nominal_struct_equality_follows_field_laws() {
     let (queries, hir, _types) = source_queries(
         r"
 genus Mixtum {
-    numerus n
-    lista<numerus> items
+    varia numerus n
+    varia lista<numerus> items
 }
 functio clare(Mixtum m) → numerus {
     redde 1
@@ -515,7 +515,7 @@ fn nominal_struct_reflexivity_rejects_float_fields() {
     let (queries, hir, _types) = source_queries(
         r"
 genus Vivum {
-    fractus<f32> v
+    varia fractus<f32> v
 }
 functio clare(Vivum v) → numerus {
     redde 1
@@ -544,7 +544,7 @@ fn recursive_nominal_shape_fails_closed_as_unsupported_recursion() {
     let (queries, hir, _types) = source_queries(
         r"
 genus Catena {
-    de Catena cauda
+    varia de Catena cauda
 }
 functio pingam(de Catena c) → numerus {
     redde 1

@@ -5,8 +5,8 @@
 //! It behaves like the `fixum` binding form (mutability-engine D-1): an
 //! assignment whose place passes through the field (`p.inner.y ← …`,
 //! `p.xs[0] ← …`) is rejected, while a mutating method on it
-//! (`p.xs.appende(3)`) is allowed. `varia` and unmarked fields stay writable
-//! (the unmarked form is legal until the D5c tightening).
+//! (`p.xs.appende(3)`) is allowed. `varia` fields stay writable (an unmarked
+//! genus field is a parse error since D5c).
 //!
 //! Writes through a union overlap need `varia` on the member fields: a member
 //! whose field declares any other modifier is named in `union_member_not_varia`.
@@ -22,7 +22,7 @@ const PUNCTUM: &str = "\
 genus Punctum {
     fixum numerus x
     varia numerus y
-    numerus w
+    varia numerus w
     fixum lista<numerus> xs
 }
 
@@ -83,7 +83,7 @@ fn place_write_through_fixum_field_is_rejected_like_the_binding_form() {
 }
 
 #[test]
-fn varia_and_unmarked_fields_stay_writable() {
+fn varia_fields_stay_writable() {
     test_support::assert_accepts(&punctum(&format!(
         "incipit {{\n    {NEW}\n    p.y ← 5\n    p.w ← 6\n    nota p.y\n}}"
     )));
@@ -120,16 +120,6 @@ fn union_write_names_the_member_that_is_not_varia() {
             DiagnosticArg::new("members", "Quadratum"),
         ],
     );
-}
-
-#[test]
-fn union_write_rejects_a_fixum_member_beside_an_unmarked_one() {
-    test_support::assert_rejects_with_issue(&figura("", "fixum "), "union_member_not_varia");
-}
-
-#[test]
-fn union_write_with_unmarked_members_stays_legal() {
-    test_support::assert_accepts(&figura("", ""));
 }
 
 /// An imported genus keeps its field modifiers across the file interface.

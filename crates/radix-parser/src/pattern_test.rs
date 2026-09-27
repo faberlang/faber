@@ -52,7 +52,7 @@ discerne event {
 #[test]
 fn parses_type_pattern_atoms_and_null_member() {
     let result = parse_ok(
-        "genus Formal { textus greeting }\nfunctio f(Formal ∪ nihil u) → vacuum {\n    discerne u {\n        casu Formal fixum f { tacet }\n        casu nihil { tacet }\n    }\n}",
+        "genus Formal { varia textus greeting }\nfunctio f(Formal ∪ nihil u) → vacuum {\n    discerne u {\n        casu Formal fixum f { tacet }\n        casu nihil { tacet }\n    }\n}",
     );
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[1].kind else {

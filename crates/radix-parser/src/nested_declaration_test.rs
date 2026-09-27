@@ -12,7 +12,7 @@ use crate::test_support::{has_arg, parse_ok, parse_program};
 /// Each declaration form the rule covers, spelled as a complete top-level item.
 const DECLARATIONS: &[&str] = &[
     "functio g() → numerus { redde 1 }",
-    "genus Punctum { numerus x }",
+    "genus Punctum { varia numerus x }",
     "implendum Mensura { functio area() → fractus }",
     "ordo Color { Ruber, Viridis }",
     "discretio Signum { Unus, Duo }",
@@ -76,8 +76,9 @@ fn annotated_nested_function_is_rejected() {
 
 #[test]
 fn method_inside_genus_stays_legal() {
-    let _ =
-        parse_ok("genus Punctum {\n    numerus x\n    functio duplex() → numerus { redde 2 }\n}");
+    let _ = parse_ok(
+        "genus Punctum {\n    varia numerus x\n    functio duplex() → numerus { redde 2 }\n}",
+    );
 }
 
 #[test]

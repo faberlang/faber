@@ -6,11 +6,11 @@ use crate::test_support;
 fn class_member_type_patterns_narrow_arm_bindings() {
     test_support::assert_accepts(
         r"genus Formal {
-    textus greeting
+    varia textus greeting
 }
 
 genus Casual {
-    textus greeting
+    varia textus greeting
 }
 
 functio probe(Formal ∪ Casual u) → textus {
@@ -25,8 +25,8 @@ functio probe(Formal ∪ Casual u) → textus {
 #[test]
 fn type_pattern_narrows_the_scrutinee_binding_inside_an_arm() {
     test_support::assert_accepts(
-        r"genus Formal { textus greeting }
-genus Casual { textus greeting }
+        r"genus Formal { varia textus greeting }
+genus Casual { varia textus greeting }
 functio probe(Formal ∪ Casual u) → textus {
     discerne u {
         casu Formal { redde u.greeting }
@@ -52,9 +52,9 @@ fn primitive_and_nil_type_patterns_cover_nullable_union() {
 #[test]
 fn type_pattern_exhaustiveness_reports_missing_union_member() {
     test_support::assert_rejects_with_issue(
-        r"genus Formal { textus greeting }
-genus Casual { textus greeting }
-genus Other { textus greeting }
+        r"genus Formal { varia textus greeting }
+genus Casual { varia textus greeting }
+genus Other { varia textus greeting }
 functio probe(Formal ∪ Casual ∪ Other u) → textus {
     discerne u {
         casu Formal fixum f { redde f.greeting }
@@ -68,8 +68,8 @@ functio probe(Formal ∪ Casual ∪ Other u) → textus {
 #[test]
 fn type_pattern_catchall_closes_union_coverage() {
     test_support::assert_accepts(
-        r#"genus Formal { textus greeting }
-genus Casual { textus greeting }
+        r#"genus Formal { varia textus greeting }
+genus Casual { varia textus greeting }
 functio probe(Formal ∪ Casual u) → textus {
     discerne u {
         casu Formal fixum f { redde f.greeting }
@@ -82,7 +82,7 @@ functio probe(Formal ∪ Casual u) → textus {
 #[test]
 fn type_pattern_rejects_member_not_in_scrutinee_union() {
     test_support::assert_rejects_with_issue(
-        r"genus Formal { textus greeting }
+        r"genus Formal { varia textus greeting }
 functio probe(textus u) → vacuum {
     discerne u {
         casu Formal fixum f { nota f }

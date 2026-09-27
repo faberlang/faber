@@ -31,26 +31,26 @@ locale = "la"
 
 # Local geometry-like structure: one vertex-buffer attribute (shader input).
 genus BufferAttribute {
-    textus semantic
-    numerus location
-    numerus format
-    numerus offset_bytes
-    numerus stride_bytes
-    numerus step_mode
+    varia textus semantic
+    varia numerus location
+    varia numerus format
+    varia numerus offset_bytes
+    varia numerus stride_bytes
+    varia numerus step_mode
 }
 
 # Local geometry-like structure: a vertex-buffer layout holding attributes.
 genus BufferLayout {
-    textus name
-    numerus array_stride
-    lista<BufferAttribute> attributes
+    varia textus name
+    varia numerus array_stride
+    varia lista<BufferAttribute> attributes
 }
 
 # Local geometry-like structure: a fragment render-target output.
 genus FragmentOutput {
-    textus semantic
-    numerus location
-    numerus format
+    varia textus semantic
+    varia numerus location
+    varia numerus format
 }
 
 # Contract-role function body (annotation added by U2's recognition).

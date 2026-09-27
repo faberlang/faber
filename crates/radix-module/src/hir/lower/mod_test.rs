@@ -383,7 +383,7 @@ fn preserves_sponte_markers_on_hir_declarations() {
     let source = r#"functio invite(textus email sponte vel "anon") → vacuum {}
 
 genus User {
-  textus nickname sponte = "Anonymous"
+  varia textus nickname sponte = "Anonymous"
 }"#;
 
     let (lowered, interner, _) = lower_source(source);

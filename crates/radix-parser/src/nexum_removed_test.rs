@@ -40,7 +40,7 @@ fn nexum_generic_field_reports_nexum_removed() {
 #[test]
 fn nexum_is_an_ordinary_identifier_elsewhere() {
     // A field of a user type spelled `nexum`, then a field on the next line.
-    let result = parse_ok("genus Animal {\n    nexum vinculum\n    numerus aetas\n}\n");
+    let result = parse_ok("genus Animal {\n    varia nexum vinculum\n    varia numerus aetas\n}\n");
     let program = result.program.expect("program");
     let StmtKind::Class(class) = &program.statements[0].kind else {
         panic!("expected class declaration");

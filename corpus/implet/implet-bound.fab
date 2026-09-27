@@ -34,7 +34,7 @@ interface Weighable<T> {
 }
 
 class Box implements Weighable<Box> {
-    int weight = 0
+    var int weight = 0
 
     fn weigh(Box other) → int {
         return self.weight - other.weight
@@ -42,7 +42,7 @@ class Box implements Weighable<Box> {
 }
 
 class Chest implements Weighable<Chest> {
-    int load = 0
+    var int load = 0
 
     fn weigh(Chest other) → int {
         return self.load - other.load
