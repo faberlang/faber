@@ -460,7 +460,7 @@ impl FmirDeviceArtifact {
     /// contract §`IdentityDomains` rule 1/3).
     #[must_use]
     pub fn compute_content_sha256(&self) -> String {
-        crate::schema::content_sha256(&self.bytes)
+        crate::schema::sha256_digest(&self.bytes)
     }
 
     /// The canonical `packet_sha256` over the versioned artifact metadata +

@@ -7,19 +7,13 @@ use crate::schema::{
 /// §`IdentityDomains` digest rules). Digests cover decoded bytes, never the
 /// transport spelling — the base64 spelling, the length prefix, and the
 /// encoding tag are transport, not payload.
+///
+/// The artifact **content identity** (contract §`IdentityDomains` rule 1) is
+/// this digest over the canonical decoded raw payload bytes only; the domain
+/// name does not need a second spelling of the computation.
 #[must_use]
 pub fn sha256_digest(bytes: &[u8]) -> String {
     format!("sha256:{}", handroll::sha256_hex(bytes))
-}
-
-/// `content_sha256` (DDCP2-U3 / contract §`IdentityDomains` rule 1): the
-/// plain SHA-256 over the **canonical decoded raw payload bytes only** —
-/// never the transport spelling (the unpadded base64 spelling, the length
-/// prefix, and the encoding tag are transport, not payload). This is the
-/// artifact's content identity.
-#[must_use]
-pub fn content_sha256(bytes: &[u8]) -> String {
-    sha256_digest(bytes)
 }
 
 /// `packet_sha256` (DDCP2-U3 / contract §`IdentityDomains` rule 1): the
@@ -205,7 +199,7 @@ fn push_field(out: &mut Vec<u8>, tag: &str, bytes: &[u8]) {
 /// SHA-256 same-package identity (A10 / §3.4): over (a) the source content
 /// hashes and (b) the canonical backend-neutral device-program payload bytes.
 /// Backend blobs are excluded (each artifact carries its own content/packet
-/// identity via [`content_sha256`] / [`packet_sha256`]). Metal and CUDA
+/// identity via [`sha256_digest`] / [`packet_sha256`]). Metal and CUDA
 /// routes derive identical semantic bytes and therefore an identical
 /// identity hash.
 ///

@@ -30,12 +30,6 @@ use radix_mir::distributed::{DistributedExecutionPlan, encode_logical_plan};
 /// identity domain (A10, logical plan, bound plan).
 pub const SHA256_IDENTITY_PREFIX: &str = "sha256:";
 
-/// SHA-256 digest of the canonical bytes as lowercase hex — the
-/// [`SHA256_IDENTITY_PREFIX`]-suffixed part of every identity spelling.
-fn sha256_hex(canonical_bytes: &[u8]) -> String {
-    handroll::sha256_hex(canonical_bytes)
-}
-
 /// The portable logical-plan identity (naming contract §2; MD2-H1).
 ///
 /// `sha256:` over the radix-mir canonical logical-plan bytes
@@ -50,6 +44,6 @@ fn sha256_hex(canonical_bytes: &[u8]) -> String {
 pub fn logical_distributed_plan_hash(plan: &DistributedExecutionPlan) -> String {
     format!(
         "{SHA256_IDENTITY_PREFIX}{}",
-        sha256_hex(&encode_logical_plan(plan))
+        handroll::sha256_hex(&encode_logical_plan(plan))
     )
 }
