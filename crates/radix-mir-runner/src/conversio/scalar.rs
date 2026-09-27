@@ -469,6 +469,37 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         Ok(modular_word_result(raw, width))
     }
 
+    /// D11.1: converting into `saturatus<W>` range-checks like `modulus` —
+    /// a conversion never clamps; only arithmetic does.
+    pub(crate) fn convert_to_saturating_word(
+        &self,
+        value: Value,
+        width: NumericWidth,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let raw = match value {
+            Value::Int(value) => i128::from(value),
+            Value::UInt(value) => i128::from(value),
+            _ => {
+                return Err(RunnerError::internal(
+                    span,
+                    "saturatus conversion requires an integer value",
+                ));
+            }
+        };
+        let (lo, hi) = int_width_range(width);
+        if raw < lo || raw > hi {
+            return Err(RunnerError::internal(
+                span,
+                format!(
+                    "saturatus conversion value is outside {} range",
+                    width.rust_type()
+                ),
+            ));
+        }
+        Ok(saturating_word_result(raw, width))
+    }
+
     pub(crate) fn convert_to_vacuum(
         &mut self,
         value: Value,

@@ -1,0 +1,56 @@
++++
+term = "saturatus"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "unary_expr", "comparison", "additive_expr", "multiplicative_expr", "assignment", "place", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = true
+summary = "Saturating integers: arithmetic clamps at both ends of the width."
+syntax = "saturating<W>"
+related = ["numerus", "modulus<u32>"]
+locale = "en"
++++
+# =============================================================================
+# saturatus — Saturating integers: arithmetic clamps at both ends of the width.
+# =============================================================================
+#
+# What this teaches:
+#   • Clamp contract — `saturating<W>` never traps or wraps on overflow; a result
+#     past either end of `W` stays at that end (pixels, audio, levels).
+#   • Signed or unsigned — `saturating<i16>` clamps at −32768 and 32767.
+#   • Literals adapt to the saturating width; a literal outside it is an error.
+#
+# Common mistakes:
+#   • Mixing families — `saturating<u8> + int<u8>` is an error; convert with `↦`.
+#   • Expecting `↦` to clamp — a conversion into `saturating<W>` range-checks.
+#
+# See also: numerus, modulus
+# =============================================================================
+
+main {
+    const saturating<u8> high ← 250
+    const saturating<u8> low ← 5
+    print high + 10
+    print low - 10
+    print high * 2
+    print high / 2
+    print high % 7
+    const saturating<i16> big ← 30000
+    const saturating<i16> neg ← -30000
+    const saturating<i16> floor ← neg - 10000
+    print big + 10000
+    print floor
+    print big * -2
+    print -floor
+    print floor / -1
+    var saturating<u8> level ← 200
+    level ← level + 100
+    print level
+    level ← level - 255
+    print level
+    const int n ← 200
+    const saturating<u8> fromInt ← n ↦ saturating<u8>
+    const int back ← high ↦ int
+    print fromInt
+    print back
+    print high ≻ low
+}

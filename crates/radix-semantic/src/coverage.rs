@@ -371,6 +371,7 @@ fn type_children(ty: &Type) -> Vec<TypeId> {
         Type::Primitive(_)
         | Type::SizedNumeric(_, _)
         | Type::ModularWord(_)
+        | Type::SaturatingWord(_)
         | Type::SizedInstans(_)
         | Type::Param(_)
         | Type::Infer(_)

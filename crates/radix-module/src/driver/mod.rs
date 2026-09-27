@@ -633,6 +633,7 @@ fn generate_output(
             // sized-numeric carrier policy (see radix-mir-wasm operand.rs
             // `scalar_ty`); the shared MIR layout classifies ModularWord with
             // `int_layout`. All other unsupported targets keep the gate.
+            reject_saturating_word_target(analysis, "Wasm text")?;
             generate_wasm_text_output(analysis, no_fuse)
         }
         #[cfg(not(feature = "mir-wasm"))]
@@ -643,6 +644,7 @@ fn generate_output(
             // the modular-word family (modulus<u8|u16|u32|u64>) as unsigned
             // integral scalars. All other unsupported targets keep the gate.
             // `llvm-host` is the product routing name for the SAME emitter.
+            reject_saturating_word_target(analysis, "LLVM text")?;
             generate_llvm_text_output(analysis, no_fuse, emit_nvvm_device_module)
         }
         #[cfg(not(feature = "mir-llvm"))]
@@ -675,6 +677,7 @@ fn generate_output(
         #[cfg(feature = "mir-metal")]
         Target::MirMetal => {
             reject_modular_word_target(analysis, "Metal text")?;
+            reject_saturating_word_target(analysis, "Metal text")?;
             generate_metal_text_output(analysis, no_fuse)
         }
         #[cfg(not(feature = "mir-metal"))]
@@ -682,6 +685,7 @@ fn generate_output(
         #[cfg(feature = "mir-wgsl")]
         Target::MirWgsl => {
             reject_modular_word_target(analysis, "WGSL text")?;
+            reject_saturating_word_target(analysis, "WGSL text")?;
             generate_wgsl_text_output(analysis, no_fuse)
         }
         #[cfg(not(feature = "mir-wgsl"))]
@@ -689,6 +693,7 @@ fn generate_output(
         #[cfg(feature = "mir-sexp")]
         Target::MirSexp => {
             reject_modular_word_target(analysis, "S-expression")?;
+            reject_saturating_word_target(analysis, "S-expression")?;
             generate_sexp_output(analysis, no_fuse)
         }
         #[cfg(not(feature = "mir-sexp"))]
@@ -737,12 +742,12 @@ fn generate_output(
         // S7-U5: Swift's fixed-width carriers and wrapping operators lifted its
         // modular-word gate. S7-U6: TS's per-width wrapping and passing fixtures
         // lifted its stale gate. Both targets now share the forwarding path.
-        Target::HirRust
-        | Target::HirFaber
-        | Target::HirSwift
-        | Target::HirHaskell
-        | Target::HirTypeScript
-        | Target::HirPython => {
+        Target::HirRust | Target::HirFaber | Target::HirSwift | Target::HirHaskell | Target::HirTypeScript => {
+            codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
+                .map_err(std::convert::Into::into)
+        }
+        Target::HirPython => {
+            reject_saturating_word_target(analysis, "Python")?;
             codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
                 .map_err(std::convert::Into::into)
         }
@@ -763,6 +768,18 @@ fn reject_modular_word_target(analysis: &AnalyzedModule, target_name: &str) -> R
                 "modulus<{marker}> is not supported by the {target_name} target until modular edge-vector parity is landed"
             ),
             args: vec![DiagnosticArg::new("issue", "modular_word_target_unsupported")],
+        });
+    }
+    Ok(())
+}
+
+/// D11.1: targets without a clamping lowering for `saturatus<W>` fail closed.
+fn reject_saturating_word_target(analysis: &AnalyzedModule, target_name: &str) -> Result<(), codegen::CodegenError> {
+    if let Some(width) = analysis.types.first_saturating_word_width() {
+        let marker = width.faber_marker();
+        return Err(codegen::CodegenError {
+            message: format!("saturatus<{marker}> is not supported by the {target_name} target"),
+            args: vec![DiagnosticArg::new("issue", "saturating_word_target_unsupported")],
         });
     }
     Ok(())

@@ -516,6 +516,7 @@ fn contains_unresolved_type(
         Type::Param(_) | Type::Infer(_) | Type::InferUnion(_) | Type::MarkerHole { .. } => true,
         Type::Primitive(_)
         | Type::ModularWord(_)
+        | Type::SaturatingWord(_)
         | Type::SizedInstans(_)
         | Type::Struct(_)
         | Type::Enum(_)

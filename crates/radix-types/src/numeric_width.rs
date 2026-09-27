@@ -64,6 +64,12 @@ pub enum WidthLowerIssue {
     ModularWordUnsupported,
     /// `modulus` marker is a float spelling.
     ModularWordUnsignedRequired,
+    /// `saturatus` requires exactly one width marker.
+    SaturatingWordRequired,
+    /// `saturatus` argument is not a bare width marker.
+    SaturatingWordShape,
+    /// `saturatus` marker is not one of i8…i64 / u8…u64.
+    SaturatingWordUnsupported,
 }
 
 impl WidthLowerIssue {
@@ -82,6 +88,9 @@ impl WidthLowerIssue {
     pub const MODULAR_WORD_WIDTH_SHAPE: &str = "modular_word_width_shape";
     pub const UNSUPPORTED_MODULAR_WORD_WIDTH: &str = "unsupported_modular_word_width";
     pub const MODULAR_WORD_UNSIGNED_WIDTH_REQUIRED: &str = "modular_word_unsigned_width_required";
+    pub const SATURATING_WORD_WIDTH_REQUIRED: &str = "saturating_word_width_required";
+    pub const SATURATING_WORD_WIDTH_SHAPE: &str = "saturating_word_width_shape";
+    pub const UNSUPPORTED_SATURATING_WORD_WIDTH: &str = "unsupported_saturating_word_width";
 
     /// Diagnostic issue identity for this failure.
     #[must_use]
@@ -101,6 +110,9 @@ impl WidthLowerIssue {
             Self::ModularWordShape => Self::MODULAR_WORD_WIDTH_SHAPE,
             Self::ModularWordUnsupported => Self::UNSUPPORTED_MODULAR_WORD_WIDTH,
             Self::ModularWordUnsignedRequired => Self::MODULAR_WORD_UNSIGNED_WIDTH_REQUIRED,
+            Self::SaturatingWordRequired => Self::SATURATING_WORD_WIDTH_REQUIRED,
+            Self::SaturatingWordShape => Self::SATURATING_WORD_WIDTH_SHAPE,
+            Self::SaturatingWordUnsupported => Self::UNSUPPORTED_SATURATING_WORD_WIDTH,
         }
     }
 }
@@ -537,6 +549,41 @@ pub fn lower_modular_word(
     }
 }
 
+/// Lower the compiler-owned saturating integer family (D11.1).
+///
+/// Admits every integer width i8…i64 / u8…u64; decimal and float markers
+/// reject. Arithmetic on the result clamps at both ends of the width.
+pub fn lower_saturating_word(
+    params: &[radix_syntax::TypeExpr],
+    interner: &radix_lexer::Interner,
+    types: &mut TypeTable,
+    report: &mut dyn FnMut(WidthLowerIssue),
+) -> TypeId {
+    if params.len() != 1 {
+        report(WidthLowerIssue::SaturatingWordRequired);
+        return types.intern(Type::Error);
+    }
+    if matches!(params[0].kind, radix_syntax::TypeExprKind::Infer) {
+        return types.intern(Type::MarkerHole {
+            family: crate::MarkerFamily::Saturatus,
+            var: crate::InferVar(params[0].span.start),
+        });
+    }
+    let Some(marker) = type_expr_width_marker(&params[0], interner) else {
+        report(WidthLowerIssue::SaturatingWordShape);
+        return types.intern(Type::Error);
+    };
+    match NumericWidth::from_marker(marker, Primitive::Numerus) {
+        Ok(width) if width.is_signed_int() || width.is_unsigned_int() => {
+            types.intern(Type::SaturatingWord(width))
+        }
+        _ => {
+            report(WidthLowerIssue::SaturatingWordUnsupported);
+            types.intern(Type::Error)
+        }
+    }
+}
+
 fn type_expr_width_marker<'a>(
     ty: &'a radix_syntax::TypeExpr,
     interner: &'a radix_lexer::Interner,
@@ -549,6 +596,19 @@ fn type_expr_width_marker<'a>(
     }
 }
 
+/// Largest non-negative value of an integer width (`i8` → 127, `u8` → 255);
+/// `None` for float and decimal widths.
+#[must_use]
+pub fn integer_width_max(width: NumericWidth) -> Option<u64> {
+    match width {
+        NumericWidth::I8 => Some(i8::MAX as u64),
+        NumericWidth::I16 => Some(i16::MAX as u64),
+        NumericWidth::I32 => Some(i32::MAX as u64),
+        NumericWidth::I64 => Some(i64::MAX as u64),
+        _ => width.unsigned_max(),
+    }
+}
+
 /// Effective width for bare or sized numeric types.
 #[must_use]
 #[allow(clippy::match_same_arms)]
@@ -557,7 +617,7 @@ pub fn effective_width(types: &TypeTable, ty: TypeId) -> Option<NumericWidth> {
         Type::Primitive(Primitive::Numerus) => Some(NumericWidth::I64),
         Type::Primitive(Primitive::Fractus) => Some(NumericWidth::F64),
         Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, width) => Some(*width),
-        Type::ModularWord(width) => Some(*width),
+        Type::ModularWord(width) | Type::SaturatingWord(width) => Some(*width),
         Type::Alias(_, inner) => effective_width(types, *inner),
         _ => None,
     }
@@ -591,6 +651,32 @@ pub fn checked_integer_conversio(
     let to_width = numerus_integer_width(types, to)?;
     NumericWidth::is_checked_integer_conversio(from_width, to_width)
         .then_some((from_width, to_width))
+}
+
+/// D11.1: the `(source, target)` integer widths of a `↦` into or out of a
+/// `saturatus<W>`, when both sides are integer widths. Such conversions are
+/// range-checked like `numerus` narrowing — a conversion never clamps.
+#[must_use]
+pub fn saturating_integer_conversio(
+    types: &TypeTable,
+    from: TypeId,
+    to: TypeId,
+) -> Option<(NumericWidth, NumericWidth)> {
+    if !is_saturating_word(types, from) && !is_saturating_word(types, to) {
+        return None;
+    }
+    let integer_width = |ty: TypeId| match types.get(ty) {
+        Type::SaturatingWord(width) => Some(*width),
+        _ => numerus_integer_width(types, ty),
+    };
+    let unalias = |ty: TypeId| {
+        let mut ty = ty;
+        while let Type::Alias(_, inner) = types.get(ty) {
+            ty = *inner;
+        }
+        ty
+    };
+    Some((integer_width(unalias(from))?, integer_width(unalias(to))?))
 }
 
 pub const TENSOR_ELEMENT_NUMERIC_MSG: &str = "tensor arithmetic requires numeric element type";
@@ -720,16 +806,26 @@ pub fn tensor_method_requires_numeric_element(method_name: &str) -> bool {
 /// Whether two numeric types are assignable via equality or widening.
 #[must_use]
 pub fn is_numeric_assignable(types: &TypeTable, from: TypeId, to: TypeId) -> bool {
-    // WHY: modular words share an integer carrier with `numerus`, but their
+    // WHY: modular and saturating words share an integer carrier with `numerus`, but their
     // arithmetic policy is part of the type family. Only explicit `↦`
     // conversion can cross that boundary.
-    if is_modular_word(types, from) != is_modular_word(types, to) {
+    if is_modular_word(types, from) != is_modular_word(types, to)
+        || is_saturating_word(types, from) != is_saturating_word(types, to)
+    {
         return false;
     }
     let from_w = effective_width(types, from);
     let to_w = effective_width(types, to);
     match (from_w, to_w) {
         (Some(a), Some(b)) => NumericWidth::is_widening_assignable(a, b),
+        _ => false,
+    }
+}
+
+fn is_saturating_word(types: &TypeTable, ty: TypeId) -> bool {
+    match types.get(ty) {
+        Type::SaturatingWord(_) => true,
+        Type::Alias(_, inner) => is_saturating_word(types, *inner),
         _ => false,
     }
 }

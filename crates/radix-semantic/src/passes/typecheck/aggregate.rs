@@ -421,6 +421,7 @@ impl TypeChecker<'_> {
             Type::Ref(..) => "reference".to_owned(),
             Type::Applied(..) => "applied type".to_owned(),
             Type::ModularWord(_) => "modulus".to_owned(),
+            Type::SaturatingWord(_) => "saturatus".to_owned(),
             Type::SizedInstans(_) => "instans".to_owned(),
             _ => "unresolved type".to_owned(),
         }

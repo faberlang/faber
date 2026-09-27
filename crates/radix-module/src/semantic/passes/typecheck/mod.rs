@@ -44,5 +44,9 @@ mod textus_index_warn_test;
 mod modular_word_width_test;
 
 #[cfg(test)]
+#[path = "saturating_word_test.rs"]
+mod saturating_word_test;
+
+#[cfg(test)]
 #[path = "nary_range_test.rs"]
 mod nary_range_test;

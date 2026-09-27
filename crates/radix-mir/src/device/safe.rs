@@ -259,6 +259,10 @@ impl<'a> DeviceSafeClassifier<'a> {
                 self.check_device_layout(ty);
             }
             Type::ModularWord(_) => self.check_device_layout(ty),
+            // D11.1: no device clamp lowering yet — fail closed.
+            Type::SaturatingWord(_) => {
+                self.record_policy(format!("device host value type {semantic:?}"));
+            }
             Type::SizedNumeric(_, _) => {
                 self.record_policy(format!("device host value type {semantic:?}"));
             }

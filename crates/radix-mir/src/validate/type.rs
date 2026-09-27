@@ -700,6 +700,7 @@ impl Validator<'_, '_> {
             Type::Primitive(_)
             | Type::SizedNumeric(_, _)
             | Type::ModularWord(_)
+            | Type::SaturatingWord(_)
             | Type::SizedInstans(_)
             | Type::Intervallum(_)
             | Type::Tuple(_)
@@ -785,7 +786,7 @@ impl Validator<'_, '_> {
                     (None, None) => false,
                 }
             }
-            Type::SizedNumeric(Primitive::Numerus, width) => {
+            Type::SizedNumeric(Primitive::Numerus, width) | Type::SaturatingWord(width) => {
                 let (lo, hi) = numerus_width_range(*width);
                 match (signed, unsigned) {
                     (Some(v), _) => (lo..=hi).contains(&i128::from(v)),

@@ -730,6 +730,73 @@ pub fn modular_word_compare_values(
 // (`check_uint_width`, used for `Value::UInt` operands) keeps upper-half
 // magnitudes exact.
 
+/// Operand of a `saturatus<W>` operation widened to i128 (exact for every
+/// integer width, including `u64`).
+fn saturating_operand(value: Value, span: Span) -> Result<i128, RunnerError> {
+    match value {
+        Value::Int(value) => Ok(i128::from(value)),
+        Value::UInt(value) => Ok(i128::from(value)),
+        _ => Err(RunnerError::internal(span, "saturatus operand mismatch")),
+    }
+}
+
+/// Clamp an exact i128 result into `W`. The carrier follows the width like
+/// `modular_word_result`: `UInt` at `u64`, `Int` below it.
+pub(crate) fn saturating_word_result(value: i128, width: NumericWidth) -> Value {
+    let (lo, hi) = int_width_range(width);
+    let clamped = value.clamp(lo, hi);
+    if width == NumericWidth::U64 {
+        Value::UInt(u64::try_from(clamped).unwrap_or(0))
+    } else {
+        Value::Int(i64::try_from(clamped).unwrap_or(0))
+    }
+}
+
+/// Execute one `saturatus<W>` arithmetic operation (D11.1): the exact result
+/// clamps to `W`'s range. Division and remainder by zero still fail.
+pub fn saturating_word_numeric_binop(
+    left: Value,
+    right: Value,
+    op: MirBinOp,
+    width: NumericWidth,
+    span: Span,
+) -> Result<Value, RunnerError> {
+    let left = saturating_operand(left, span)?;
+    let right = saturating_operand(right, span)?;
+    let division_failed = || {
+        RunnerError::internal_with_issue(
+            span,
+            "saturatus division failed",
+            "saturating_division_by_zero",
+        )
+    };
+    // Every operand fits 64 bits, so i128 add/sub/mul/div/rem are exact.
+    let value = match op {
+        MirBinOp::Add => left + right,
+        MirBinOp::Sub => left - right,
+        MirBinOp::Mul => left * right,
+        MirBinOp::Div => left.checked_div(right).ok_or_else(division_failed)?,
+        MirBinOp::Mod => left.checked_rem(right).ok_or_else(division_failed)?,
+        _ => {
+            return Err(RunnerError::internal(
+                span,
+                "invalid saturatus arithmetic operator",
+            ));
+        }
+    };
+    Ok(saturating_word_result(value, width))
+}
+
+/// Negate a signed `saturatus<W>` value; `MIN` clamps to `MAX`.
+pub fn saturating_word_neg(
+    value: Value,
+    width: NumericWidth,
+    span: Span,
+) -> Result<Value, RunnerError> {
+    let value = saturating_operand(value, span)?;
+    Ok(saturating_word_result(-value, width))
+}
+
 /// Signed `[min, max]` of an integer width as i128, so every Faber integer width
 /// — including `u64` — range-checks without host overflow.
 #[must_use]

@@ -8,6 +8,7 @@
 use super::value::{
     MapKey, SermoValue, TensorValue, Value, decimal_scale_factor, float_to_numerus_width,
     int_width_range, modular_word_mask, modular_word_result, round_half_even_division,
+    saturating_word_result,
 };
 use super::{Runner, RunnerError, runtime_regex_pattern};
 use radix_lexer::{Span, Symbol};
@@ -125,6 +126,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 self.convert_to_numerus_from(value, source_ty, params, width, recovery, span)
             }
             Type::ModularWord(width) => self.convert_to_modular_word(value, *width, span),
+            Type::SaturatingWord(width) => self.convert_to_saturating_word(value, *width, span),
             Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
                 let width = match &target {
                     Type::SizedNumeric(_, width) => *width,

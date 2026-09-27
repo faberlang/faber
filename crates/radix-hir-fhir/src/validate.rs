@@ -594,6 +594,7 @@ fn validate_type_form(
                 }
                 radix_types::Type::Primitive(_)
                 | radix_types::Type::ModularWord(_)
+                | radix_types::Type::SaturatingWord(_)
                 | radix_types::Type::SizedInstans(_)
                 | radix_types::Type::BoundedTextus { .. }
                 | radix_types::Type::BoundedAscii { .. }
@@ -3135,6 +3136,7 @@ pub(crate) fn validate_referential_integrity(
             radix_types::Type::Primitive(_)
             | radix_types::Type::SizedNumeric(_, _)
             | radix_types::Type::ModularWord(_)
+            | radix_types::Type::SaturatingWord(_)
             | radix_types::Type::SizedInstans(_)
             | radix_types::Type::Infer(_)
             | radix_types::Type::InferUnion(_)

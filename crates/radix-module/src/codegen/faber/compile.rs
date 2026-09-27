@@ -640,6 +640,7 @@ fn canonical_type_shape(analysis: &AnalyzedModule, type_id: TypeId, active: &mut
         Type::Intervallum(bound) => format!("intervallum<{}>", canonical_type_shape(analysis, *bound, active)),
         Type::SizedNumeric(primitive, width) => format!("sized-numeric:{primitive:?}:{}", width.faber_marker()),
         Type::ModularWord(width) => format!("modular-word:{}", width.faber_marker()),
+        Type::SaturatingWord(width) => format!("saturating-word:{}", width.faber_marker()),
         Type::SizedInstans(precision) => format!("sized-instans:{precision:?}"),
         Type::Option(inner) => format!("option<{}>", canonical_type_shape(analysis, *inner, active)),
         Type::Ref(mutability, inner) => {

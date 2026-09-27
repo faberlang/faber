@@ -671,7 +671,7 @@ impl<'a> DerivedCapabilityQueries<'a> {
             },
             Type::Primitive(prim) => Ok(self.primitive_law(*prim, law)),
             Type::SizedNumeric(prim, _) => Ok(self.sized_numeric_law(*prim, law)),
-            Type::ModularWord(_) | Type::SizedInstans(_) => Ok(true),
+            Type::ModularWord(_) | Type::SaturatingWord(_) | Type::SizedInstans(_) => Ok(true),
             Type::Option(inner) => {
                 Ok(self.type_law(*inner, law, visiting)? && !matches!(law, TypeLaw::Ordering))
             }

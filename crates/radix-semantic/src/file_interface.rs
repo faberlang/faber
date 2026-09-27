@@ -293,6 +293,7 @@ pub enum InterfaceTypeSnapshot {
     Intervallum(Box<InterfaceTypeSnapshot>),
     SizedNumeric(Primitive, NumericWidth),
     ModularWord(NumericWidth),
+    SaturatingWord(NumericWidth),
     SizedInstans(InstansPrecision),
     Option(Box<InterfaceTypeSnapshot>),
     Ref(SemanticMutability, Box<InterfaceTypeSnapshot>),
@@ -753,6 +754,7 @@ fn snapshot_interface_type_inner(
             Ok(InterfaceTypeSnapshot::SizedNumeric(*primitive, *width))
         }
         Type::ModularWord(width) => Ok(InterfaceTypeSnapshot::ModularWord(*width)),
+        Type::SaturatingWord(width) => Ok(InterfaceTypeSnapshot::SaturatingWord(*width)),
         Type::SizedInstans(precision) => Ok(InterfaceTypeSnapshot::SizedInstans(*precision)),
         Type::Option(inner) => Ok(InterfaceTypeSnapshot::Option(Box::new(
             snapshot_interface_type_inner(*inner, types, interner, resolver, module_identity)?,
@@ -1008,6 +1010,9 @@ fn import_interface_type_inner(
             Ok(types.sized_numeric(*primitive, *width))
         }
         InterfaceTypeSnapshot::ModularWord(width) => Ok(types.intern(Type::ModularWord(*width))),
+        InterfaceTypeSnapshot::SaturatingWord(width) => {
+            Ok(types.intern(Type::SaturatingWord(*width)))
+        }
         InterfaceTypeSnapshot::SizedInstans(precision) => Ok(types.sized_instans(*precision)),
         InterfaceTypeSnapshot::Option(inner) => {
             let inner = import_interface_type_inner(inner, types, interner, resolver)?;
