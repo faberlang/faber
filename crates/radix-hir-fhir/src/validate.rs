@@ -1976,6 +1976,77 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
     registry
 }
 
+struct IntegrityChecks<'a> {
+    def_registry: &'a FxHashSet<radix_types::DefId>,
+    hir_registry: &'a FxHashSet<radix_hir::HirId>,
+    type_count: usize,
+    interner_len: usize,
+    index_count: usize,
+}
+
+impl IntegrityChecks<'_> {
+    fn check_symbol(&self, sym: radix_lexer::Symbol) -> Result<(), HirArtifactError> {
+        let idx = sym.0 as usize;
+        if idx >= self.interner_len {
+            return Err(HirArtifactError::DanglingIndex {
+                kind: "Symbol",
+                index: sym.0,
+                arena_size: self.interner_len,
+            });
+        }
+        Ok(())
+    }
+
+    fn check_def(&self, def_id: radix_types::DefId) -> Result<(), HirArtifactError> {
+        if def_id.is_builtin() {
+            return Ok(());
+        }
+        if !self.def_registry.contains(&def_id) {
+            return Err(HirArtifactError::DanglingIndex {
+                kind: "DefId",
+                index: def_id.0,
+                arena_size: self.def_registry.len(),
+            });
+        }
+        Ok(())
+    }
+
+    fn check_hir(&self, hir_id: radix_hir::HirId) -> Result<(), HirArtifactError> {
+        if !self.hir_registry.contains(&hir_id) {
+            return Err(HirArtifactError::DanglingIndex {
+                kind: "HirId",
+                index: hir_id.0,
+                arena_size: self.hir_registry.len(),
+            });
+        }
+        Ok(())
+    }
+
+    fn check_type(&self, ty: radix_types::TypeId) -> Result<(), HirArtifactError> {
+        let idx = ty.0 as usize;
+        if idx >= self.type_count {
+            return Err(HirArtifactError::DanglingIndex {
+                kind: "TypeId",
+                index: ty.0,
+                arena_size: self.type_count,
+            });
+        }
+        Ok(())
+    }
+
+    fn check_index(&self, index: radix_types::IndexId) -> Result<(), HirArtifactError> {
+        let idx = index.0 as usize;
+        if idx >= self.index_count {
+            return Err(HirArtifactError::DanglingIndex {
+                kind: "IndexId",
+                index: index.0,
+                arena_size: self.index_count,
+            });
+        }
+        Ok(())
+    }
+}
+
 /// Validate every arena index in the deserialized artifact against its target
 /// arena bounds. Returns `Err(DanglingIndex)` on the first out-of-bounds index
 /// (fail-fast per CSO §F). Runs after arena reconstruction and before
@@ -1996,52 +2067,12 @@ pub(crate) fn validate_referential_integrity(
     // membership test is correct.
     let hir_registry = collect_hir_registry(artifact);
 
-    // Convenience closures that return Err on first violation.
-    let check_symbol = |sym: radix_lexer::Symbol| -> Result<(), HirArtifactError> {
-        let idx = sym.0 as usize;
-        if idx >= interner_len {
-            return Err(HirArtifactError::DanglingIndex {
-                kind: "Symbol",
-                index: sym.0,
-                arena_size: interner_len,
-            });
-        }
-        Ok(())
-    };
-    let check_def = |def_id: radix_types::DefId| -> Result<(), HirArtifactError> {
-        // Builtin ids are always valid.
-        if def_id.is_builtin() {
-            return Ok(());
-        }
-        if !def_registry.contains(&def_id) {
-            return Err(HirArtifactError::DanglingIndex {
-                kind: "DefId",
-                index: def_id.0,
-                arena_size: def_registry.len(),
-            });
-        }
-        Ok(())
-    };
-    let check_hir = |hir_id: radix_hir::HirId| -> Result<(), HirArtifactError> {
-        if !hir_registry.contains(&hir_id) {
-            return Err(HirArtifactError::DanglingIndex {
-                kind: "HirId",
-                index: hir_id.0,
-                arena_size: hir_registry.len(),
-            });
-        }
-        Ok(())
-    };
-    let check_type = |ty: radix_types::TypeId| -> Result<(), HirArtifactError> {
-        let idx = ty.0 as usize;
-        if idx >= type_count {
-            return Err(HirArtifactError::DanglingIndex {
-                kind: "TypeId",
-                index: ty.0,
-                arena_size: type_count,
-            });
-        }
-        Ok(())
+    let checks = IntegrityChecks {
+        def_registry: &def_registry,
+        hir_registry: &hir_registry,
+        type_count,
+        interner_len,
+        index_count: artifact.types.indices().len(),
     };
 
     use radix_hir::{HirExpressionKind, HirItemKind, HirStatementKind};
@@ -2050,10 +2081,10 @@ pub(crate) fn validate_referential_integrity(
     // are literals and carry no reference.
     fn validate_type_param_default(
         default: Option<&radix_types::SemanticGenericParamDefault>,
-        check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
+        checks: &IntegrityChecks<'_>,
     ) -> Result<(), HirArtifactError> {
         if let Some(radix_types::SemanticGenericParamDefault::Typus(ty)) = default {
-            check_type(*ty)?;
+            checks.check_type(*ty)?;
         }
         Ok(())
     }
@@ -2061,84 +2092,78 @@ pub(crate) fn validate_referential_integrity(
     // Recursive walkers for the HIR tree.
     fn validate_items(
         items: &[radix_hir::HirItem],
-        check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
-        check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
-        check_hir: &dyn Fn(radix_hir::HirId) -> Result<(), HirArtifactError>,
-        check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
+        checks: &IntegrityChecks<'_>,
     ) -> Result<(), HirArtifactError> {
         for item in items {
-            check_hir(item.id)?;
-            check_def(item.def_id)?;
+            checks.check_hir(item.id)?;
+            checks.check_def(item.def_id)?;
             for ann in &item.annotations {
-                validate_annotation(ann, check_symbol, check_def, check_hir, check_type)?;
+                validate_annotation(ann, checks)?;
             }
-            validate_item_kind(&item.kind, check_symbol, check_def, check_hir, check_type)?;
+            validate_item_kind(&item.kind, checks)?;
         }
         Ok(())
     }
 
     fn validate_function(
         func: &radix_hir::HirFunction,
-        check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
-        check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
-        check_hir: &dyn Fn(radix_hir::HirId) -> Result<(), HirArtifactError>,
-        check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
+        checks: &IntegrityChecks<'_>,
     ) -> Result<(), HirArtifactError> {
-        check_symbol(func.name)?;
+        checks.check_symbol(func.name)?;
         for tp in &func.type_params {
-            check_def(tp.def_id)?;
-            check_symbol(tp.name)?;
+            checks.check_def(tp.def_id)?;
+            checks.check_symbol(tp.name)?;
             match &tp.constraint {
                 radix_hir::HirTypeParamConstraint::Any => {}
                 radix_hir::HirTypeParamConstraint::OneOf(tys) => {
                     for ty in tys {
-                        check_type(*ty)?;
+                        checks.check_type(*ty)?;
                     }
                 }
                 radix_hir::HirTypeParamConstraint::Implet(bounds) => {
                     for bound in bounds {
-                        check_def(bound.contract)?;
+                        checks.check_def(bound.contract)?;
                         for ty in &bound.args {
-                            check_type(*ty)?;
+                            checks.check_type(*ty)?;
                         }
                     }
                 }
             }
-            validate_type_param_default(tp.default.as_ref(), check_type)?;
+            validate_type_param_default(tp.default.as_ref(), checks)?;
         }
         for param in &func.params {
-            check_def(param.def_id)?;
-            check_symbol(param.name)?;
-            check_type(param.ty)?;
+            checks.check_def(param.def_id)?;
+            checks.check_symbol(param.name)?;
+            checks.check_type(param.ty)?;
             if let Some(ref init) = param.default {
-                validate_expr(init, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(init, checks)?;
             }
         }
         if let Some(ref cli_args) = func.cli_args {
-            check_def(cli_args.def_id)?;
-            check_symbol(cli_args.name)?;
-            check_type(cli_args.ty)?;
+            checks.check_def(cli_args.def_id)?;
+            checks.check_symbol(cli_args.name)?;
+            checks.check_type(cli_args.ty)?;
         }
         if let Some(ty) = func.ret_ty {
-            check_type(ty)?;
+            checks.check_type(ty)?;
         }
         if let Some(ty) = func.err_ty {
-            check_type(ty)?;
+            checks.check_type(ty)?;
         }
         if let Some(ref body) = func.body {
-            validate_block(body, check_symbol, check_def, check_hir, check_type)?;
+            validate_block(body, checks)?;
         }
         if let Some(ref test_meta) = func.test {
-            check_symbol(test_meta.name)?;
+            checks.check_symbol(test_meta.name)?;
             for sym in &test_meta.suite_path {
-                check_symbol(*sym)?;
+                checks.check_symbol(*sym)?;
             }
             for m in &test_meta.modifiers {
                 match m {
                     radix_hir::HirTestModifier::Omitte(s)
                     | radix_hir::HirTestModifier::Futurum(s)
                     | radix_hir::HirTestModifier::Tag(s)
-                    | radix_hir::HirTestModifier::SolumIn(s) => check_symbol(*s)?,
+                    | radix_hir::HirTestModifier::SolumIn(s) => checks.check_symbol(*s)?,
                     _ => {}
                 }
             }
@@ -2148,202 +2173,193 @@ pub(crate) fn validate_referential_integrity(
 
     fn validate_item_kind(
         kind: &HirItemKind,
-        check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
-        check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
-        check_hir: &dyn Fn(radix_hir::HirId) -> Result<(), HirArtifactError>,
-        check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
+        checks: &IntegrityChecks<'_>,
     ) -> Result<(), HirArtifactError> {
         match kind {
             HirItemKind::Function(func) => {
-                validate_function(func, check_symbol, check_def, check_hir, check_type)?;
+                validate_function(func, checks)?;
             }
             HirItemKind::Struct(s) => {
-                check_symbol(s.name)?;
+                checks.check_symbol(s.name)?;
                 for tp in &s.type_params {
-                    check_def(tp.def_id)?;
-                    check_symbol(tp.name)?;
+                    checks.check_def(tp.def_id)?;
+                    checks.check_symbol(tp.name)?;
                     match &tp.constraint {
                         radix_hir::HirTypeParamConstraint::Any => {}
                         radix_hir::HirTypeParamConstraint::OneOf(tys) => {
                             for ty in tys {
-                                check_type(*ty)?;
+                                checks.check_type(*ty)?;
                             }
                         }
                         radix_hir::HirTypeParamConstraint::Implet(bounds) => {
                             for bound in bounds {
-                                check_def(bound.contract)?;
+                                checks.check_def(bound.contract)?;
                                 for ty in &bound.args {
-                                    check_type(*ty)?;
+                                    checks.check_type(*ty)?;
                                 }
                             }
                         }
                     }
-                    validate_type_param_default(tp.default.as_ref(), check_type)?;
+                    validate_type_param_default(tp.default.as_ref(), checks)?;
                 }
                 for field in &s.fields {
-                    check_def(field.def_id)?;
-                    check_symbol(field.name)?;
-                    check_type(field.ty)?;
+                    checks.check_def(field.def_id)?;
+                    checks.check_symbol(field.name)?;
+                    checks.check_type(field.ty)?;
                     for ann in &field.annotations {
-                        validate_annotation(ann, check_symbol, check_def, check_hir, check_type)?;
+                        validate_annotation(ann, checks)?;
                     }
                     if let Some(ref init) = field.init {
-                        validate_expr(init, check_symbol, check_def, check_hir, check_type)?;
+                        validate_expr(init, checks)?;
                     }
                 }
                 for method in &s.methods {
-                    check_def(method.def_id)?;
+                    checks.check_def(method.def_id)?;
                     for ann in &method.annotations {
-                        validate_annotation(ann, check_symbol, check_def, check_hir, check_type)?;
+                        validate_annotation(ann, checks)?;
                     }
-                    validate_function(
-                        &method.func,
-                        check_symbol,
-                        check_def,
-                        check_hir,
-                        check_type,
-                    )?;
+                    validate_function(&method.func, checks)?;
                 }
                 for contract in &s.implements {
-                    check_def(contract.contract)?;
+                    checks.check_def(contract.contract)?;
                     for arg in &contract.args {
-                        check_type(*arg)?;
+                        checks.check_type(*arg)?;
                     }
                 }
             }
             HirItemKind::Enum(e) => {
-                check_symbol(e.name)?;
+                checks.check_symbol(e.name)?;
                 for tp in &e.type_params {
-                    check_def(tp.def_id)?;
-                    check_symbol(tp.name)?;
+                    checks.check_def(tp.def_id)?;
+                    checks.check_symbol(tp.name)?;
                     match &tp.constraint {
                         radix_hir::HirTypeParamConstraint::Any => {}
                         radix_hir::HirTypeParamConstraint::OneOf(tys) => {
                             for ty in tys {
-                                check_type(*ty)?;
+                                checks.check_type(*ty)?;
                             }
                         }
                         radix_hir::HirTypeParamConstraint::Implet(bounds) => {
                             for bound in bounds {
-                                check_def(bound.contract)?;
+                                checks.check_def(bound.contract)?;
                                 for ty in &bound.args {
-                                    check_type(*ty)?;
+                                    checks.check_type(*ty)?;
                                 }
                             }
                         }
                     }
-                    validate_type_param_default(tp.default.as_ref(), check_type)?;
+                    validate_type_param_default(tp.default.as_ref(), checks)?;
                 }
                 for field in &e.commune_fields {
-                    check_symbol(field.name)?;
-                    check_type(field.ty)?;
+                    checks.check_symbol(field.name)?;
+                    checks.check_type(field.ty)?;
                 }
                 for variant in &e.variants {
-                    check_def(variant.def_id)?;
-                    check_symbol(variant.name)?;
+                    checks.check_def(variant.def_id)?;
+                    checks.check_symbol(variant.name)?;
                     for field in &variant.fields {
-                        check_symbol(field.name)?;
-                        check_type(field.ty)?;
+                        checks.check_symbol(field.name)?;
+                        checks.check_type(field.ty)?;
                     }
                 }
             }
             HirItemKind::Interface(iface) => {
-                check_symbol(iface.name)?;
+                checks.check_symbol(iface.name)?;
                 for tp in &iface.type_params {
-                    check_def(tp.def_id)?;
-                    check_symbol(tp.name)?;
+                    checks.check_def(tp.def_id)?;
+                    checks.check_symbol(tp.name)?;
                     match &tp.constraint {
                         radix_hir::HirTypeParamConstraint::Any => {}
                         radix_hir::HirTypeParamConstraint::OneOf(tys) => {
                             for ty in tys {
-                                check_type(*ty)?;
+                                checks.check_type(*ty)?;
                             }
                         }
                         radix_hir::HirTypeParamConstraint::Implet(bounds) => {
                             for bound in bounds {
-                                check_def(bound.contract)?;
+                                checks.check_def(bound.contract)?;
                                 for ty in &bound.args {
-                                    check_type(*ty)?;
+                                    checks.check_type(*ty)?;
                                 }
                             }
                         }
                     }
-                    validate_type_param_default(tp.default.as_ref(), check_type)?;
+                    validate_type_param_default(tp.default.as_ref(), checks)?;
                 }
                 for method in &iface.methods {
                     for a in &method.availability {
                         let radix_hir::HirAvailability::Nondum { target, reason } = a;
                         if let Some(t) = target {
-                            check_symbol(*t)?;
+                            checks.check_symbol(*t)?;
                         }
                         if let Some(r) = reason {
-                            check_symbol(*r)?;
+                            checks.check_symbol(*r)?;
                         }
                     }
-                    check_symbol(method.name)?;
+                    checks.check_symbol(method.name)?;
                     for param in &method.params {
-                        check_def(param.def_id)?;
-                        check_symbol(param.name)?;
-                        check_type(param.ty)?;
+                        checks.check_def(param.def_id)?;
+                        checks.check_symbol(param.name)?;
+                        checks.check_type(param.ty)?;
                         if let Some(ref init) = param.default {
-                            validate_expr(init, check_symbol, check_def, check_hir, check_type)?;
+                            validate_expr(init, checks)?;
                         }
                     }
                     if let Some(ty) = method.ret_ty {
-                        check_type(ty)?;
+                        checks.check_type(ty)?;
                     }
                     if let Some(ty) = method.err_ty {
-                        check_type(ty)?;
+                        checks.check_type(ty)?;
                     }
                 }
             }
             HirItemKind::TypeAlias(a) => {
-                check_symbol(a.name)?;
+                checks.check_symbol(a.name)?;
                 for tp in &a.type_params {
-                    check_def(tp.def_id)?;
-                    check_symbol(tp.name)?;
+                    checks.check_def(tp.def_id)?;
+                    checks.check_symbol(tp.name)?;
                     match &tp.constraint {
                         radix_hir::HirTypeParamConstraint::Any => {}
                         radix_hir::HirTypeParamConstraint::OneOf(tys) => {
                             for ty in tys {
-                                check_type(*ty)?;
+                                checks.check_type(*ty)?;
                             }
                         }
                         radix_hir::HirTypeParamConstraint::Implet(bounds) => {
                             for bound in bounds {
-                                check_def(bound.contract)?;
+                                checks.check_def(bound.contract)?;
                                 for ty in &bound.args {
-                                    check_type(*ty)?;
+                                    checks.check_type(*ty)?;
                                 }
                             }
                         }
                     }
-                    validate_type_param_default(tp.default.as_ref(), check_type)?;
+                    validate_type_param_default(tp.default.as_ref(), checks)?;
                 }
-                check_type(a.ty)?;
+                checks.check_type(a.ty)?;
             }
             HirItemKind::Schema(schema) => {
-                check_symbol(schema.name)?;
+                checks.check_symbol(schema.name)?;
                 for col in &schema.columns {
-                    check_symbol(col.name)?;
-                    check_symbol(col.source)?;
-                    check_type(col.ty)?;
+                    checks.check_symbol(col.name)?;
+                    checks.check_symbol(col.source)?;
+                    checks.check_type(col.ty)?;
                 }
             }
             HirItemKind::Constant(c) => {
-                check_symbol(c.name)?;
+                checks.check_symbol(c.name)?;
                 if let Some(ty) = c.ty {
-                    check_type(ty)?;
+                    checks.check_type(ty)?;
                 }
-                validate_expr(&c.value, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(&c.value, checks)?;
             }
             HirItemKind::Import(imp) => {
-                check_symbol(imp.path)?;
+                checks.check_symbol(imp.path)?;
                 for item in &imp.items {
-                    check_def(item.def_id)?;
-                    check_symbol(item.name)?;
+                    checks.check_def(item.def_id)?;
+                    checks.check_symbol(item.name)?;
                     if let Some(a) = item.alias {
-                        check_symbol(a)?;
+                        checks.check_symbol(a)?;
                     }
                 }
             }
@@ -2353,49 +2369,34 @@ pub(crate) fn validate_referential_integrity(
 
     fn validate_block(
         block: &radix_hir::HirBlock,
-        check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
-        check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
-        check_hir: &dyn Fn(radix_hir::HirId) -> Result<(), HirArtifactError>,
-        check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
+        checks: &IntegrityChecks<'_>,
     ) -> Result<(), HirArtifactError> {
         for stmt in &block.statements {
-            check_hir(stmt.id)?;
+            checks.check_hir(stmt.id)?;
             match &stmt.kind {
                 HirStatementKind::Local(local) => {
-                    check_def(local.def_id)?;
-                    check_symbol(local.name)?;
+                    checks.check_def(local.def_id)?;
+                    checks.check_symbol(local.name)?;
                     if let Some(ty) = local.ty {
-                        check_type(ty)?;
+                        checks.check_type(ty)?;
                     }
                     if let Some(ref init) = local.init {
-                        validate_expr(init, check_symbol, check_def, check_hir, check_type)?;
+                        validate_expr(init, checks)?;
                     }
                 }
                 HirStatementKind::Expr(expr) => {
-                    validate_expr(expr, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(expr, checks)?;
                 }
                 HirStatementKind::Redde(Some(expr)) => {
-                    validate_expr(expr, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(expr, checks)?;
                 }
                 HirStatementKind::IncDec(inc) => {
-                    validate_expr(&inc.target, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(&inc.target, checks)?;
                 }
                 HirStatementKind::Custodi(cust) => {
                     for clause in &cust.clauses {
-                        validate_expr(
-                            &clause.cond,
-                            check_symbol,
-                            check_def,
-                            check_hir,
-                            check_type,
-                        )?;
-                        validate_block(
-                            &clause.body,
-                            check_symbol,
-                            check_def,
-                            check_hir,
-                            check_type,
-                        )?;
+                        validate_expr(&clause.cond, checks)?;
+                        validate_block(&clause.body, checks)?;
                     }
                 }
                 HirStatementKind::Rumpe
@@ -2405,21 +2406,18 @@ pub(crate) fn validate_referential_integrity(
             }
         }
         if let Some(ref expr) = block.expr {
-            validate_expr(expr, check_symbol, check_def, check_hir, check_type)?;
+            validate_expr(expr, checks)?;
         }
         Ok(())
     }
 
     fn validate_expr(
         expr: &radix_hir::HirExpression,
-        check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
-        check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
-        check_hir: &dyn Fn(radix_hir::HirId) -> Result<(), HirArtifactError>,
-        check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
+        checks: &IntegrityChecks<'_>,
     ) -> Result<(), HirArtifactError> {
-        check_hir(expr.id)?;
+        checks.check_hir(expr.id)?;
         if let Some(ty) = expr.ty {
-            check_type(ty)?;
+            checks.check_type(ty)?;
         }
         match &expr.kind {
             HirExpressionKind::Summa {
@@ -2429,18 +2427,18 @@ pub(crate) fn validate_referential_integrity(
                 binding,
                 body,
             } => {
-                validate_expr(source, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(source, checks)?;
                 for (def_id, name) in coordinates {
-                    check_def(*def_id)?;
-                    check_symbol(*name)?;
+                    checks.check_def(*def_id)?;
+                    checks.check_symbol(*name)?;
                 }
                 if let Some((def_id, name)) = filum {
-                    check_def(*def_id)?;
-                    check_symbol(*name)?;
+                    checks.check_def(*def_id)?;
+                    checks.check_symbol(*name)?;
                 }
-                check_def(binding.0)?;
-                check_symbol(binding.1)?;
-                validate_block(body, check_symbol, check_def, check_hir, check_type)?;
+                checks.check_def(binding.0)?;
+                checks.check_symbol(binding.1)?;
+                validate_block(body, checks)?;
             }
             HirExpressionKind::Extremum {
                 source,
@@ -2448,13 +2446,13 @@ pub(crate) fn validate_referential_integrity(
                 coalesce,
                 ..
             } => {
-                validate_expr(source, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(source, checks)?;
                 for (def_id, name) in coordinates {
-                    check_def(*def_id)?;
-                    check_symbol(*name)?;
+                    checks.check_def(*def_id)?;
+                    checks.check_symbol(*name)?;
                 }
                 if let Some(identity) = coalesce {
-                    validate_expr(identity, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(identity, checks)?;
                 }
             }
             HirExpressionKind::FirstMatch {
@@ -2463,130 +2461,118 @@ pub(crate) fn validate_referential_integrity(
                 binding,
                 body,
             } => {
-                validate_expr(source, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(source, checks)?;
                 for (def_id, name) in coordinates {
-                    check_def(*def_id)?;
-                    check_symbol(*name)?;
+                    checks.check_def(*def_id)?;
+                    checks.check_symbol(*name)?;
                 }
-                check_def(binding.0)?;
-                check_symbol(binding.1)?;
-                validate_block(body, check_symbol, check_def, check_hir, check_type)?;
+                checks.check_def(binding.0)?;
+                checks.check_symbol(binding.1)?;
+                validate_block(body, checks)?;
             }
-            HirExpressionKind::Path(def_id) => check_def(*def_id)?,
+            HirExpressionKind::Path(def_id) => checks.check_def(*def_id)?,
             HirExpressionKind::Literal(lit) => match lit {
                 radix_hir::HirLiteral::String(s)
                 | radix_hir::HirLiteral::Ascii(s)
-                | radix_hir::HirLiteral::Octeti(s) => check_symbol(*s)?,
+                | radix_hir::HirLiteral::Octeti(s) => checks.check_symbol(*s)?,
                 radix_hir::HirLiteral::Regex(s, Some(f)) => {
-                    check_symbol(*s)?;
-                    check_symbol(*f)?;
+                    checks.check_symbol(*s)?;
+                    checks.check_symbol(*f)?;
                 }
-                radix_hir::HirLiteral::Regex(s, None) => check_symbol(*s)?,
+                radix_hir::HirLiteral::Regex(s, None) => checks.check_symbol(*s)?,
                 _ => {}
             },
             HirExpressionKind::Binary(_, lhs, rhs) => {
-                validate_expr(lhs, check_symbol, check_def, check_hir, check_type)?;
-                validate_expr(rhs, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(lhs, checks)?;
+                validate_expr(rhs, checks)?;
             }
             HirExpressionKind::Unary(_, inner) => {
-                validate_expr(inner, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(inner, checks)?;
             }
             HirExpressionKind::Call(callee, type_args, args, _) => {
-                validate_expr(callee, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(callee, checks)?;
                 for ty in type_args {
-                    check_type(*ty)?;
+                    checks.check_type(*ty)?;
                 }
                 for arg in args {
                     if let Some(n) = arg.name {
-                        check_symbol(n)?;
+                        checks.check_symbol(n)?;
                     }
-                    validate_expr(&arg.expr, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(&arg.expr, checks)?;
                 }
             }
             HirExpressionKind::Transfer { sink, payloads } => {
-                validate_expr(sink, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(sink, checks)?;
                 for payload in payloads {
-                    validate_expr(payload, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(payload, checks)?;
                 }
             }
             HirExpressionKind::Gradient {
                 call,
                 selected_arguments,
             } => {
-                validate_expr(call, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(call, checks)?;
                 for selector in selected_arguments {
-                    validate_expr(selector, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(selector, checks)?;
                 }
             }
             HirExpressionKind::MethodCall(receiver, method, type_args, args, _) => {
-                validate_expr(receiver, check_symbol, check_def, check_hir, check_type)?;
-                check_symbol(*method)?;
+                validate_expr(receiver, checks)?;
+                checks.check_symbol(*method)?;
                 for ty in type_args {
-                    check_type(*ty)?;
+                    checks.check_type(*ty)?;
                 }
                 for arg in args {
                     if let Some(n) = arg.name {
-                        check_symbol(n)?;
+                        checks.check_symbol(n)?;
                     }
-                    validate_expr(&arg.expr, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(&arg.expr, checks)?;
                 }
             }
             HirExpressionKind::Field(target, field) => {
-                validate_expr(target, check_symbol, check_def, check_hir, check_type)?;
-                check_symbol(*field)?;
+                validate_expr(target, checks)?;
+                checks.check_symbol(*field)?;
             }
             HirExpressionKind::Index(target, index) => {
-                validate_expr(target, check_symbol, check_def, check_hir, check_type)?;
-                validate_expr(index, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(target, checks)?;
+                validate_expr(index, checks)?;
             }
             HirExpressionKind::OptionalChain(base, chain) => {
-                validate_expr(base, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(base, checks)?;
                 match chain {
-                    radix_hir::HirOptionalChainKind::Member(s) => check_symbol(*s)?,
+                    radix_hir::HirOptionalChainKind::Member(s) => checks.check_symbol(*s)?,
                     radix_hir::HirOptionalChainKind::Index(e) => {
-                        validate_expr(e, check_symbol, check_def, check_hir, check_type)?;
+                        validate_expr(e, checks)?;
                     }
                     radix_hir::HirOptionalChainKind::Call(args) => {
                         for arg in args {
                             if let Some(n) = arg.name {
-                                check_symbol(n)?;
+                                checks.check_symbol(n)?;
                             }
-                            validate_expr(
-                                &arg.expr,
-                                check_symbol,
-                                check_def,
-                                check_hir,
-                                check_type,
-                            )?;
+                            validate_expr(&arg.expr, checks)?;
                         }
                     }
                 }
             }
             HirExpressionKind::NonNull(base, chain) => {
-                validate_expr(base, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(base, checks)?;
                 match chain {
-                    radix_hir::HirNonNullKind::Member(s) => check_symbol(*s)?,
+                    radix_hir::HirNonNullKind::Member(s) => checks.check_symbol(*s)?,
                     radix_hir::HirNonNullKind::Index(e) => {
-                        validate_expr(e, check_symbol, check_def, check_hir, check_type)?;
+                        validate_expr(e, checks)?;
                     }
                     radix_hir::HirNonNullKind::Call(args) => {
                         for arg in args {
                             if let Some(n) = arg.name {
-                                check_symbol(n)?;
+                                checks.check_symbol(n)?;
                             }
-                            validate_expr(
-                                &arg.expr,
-                                check_symbol,
-                                check_def,
-                                check_hir,
-                                check_type,
-                            )?;
+                            validate_expr(&arg.expr, checks)?;
                         }
                     }
                 }
             }
             HirExpressionKind::Block(block) => {
-                validate_block(block, check_symbol, check_def, check_hir, check_type)?;
+                validate_block(block, checks)?;
             }
             HirExpressionKind::Si {
                 cond,
@@ -2594,49 +2580,49 @@ pub(crate) fn validate_referential_integrity(
                 then_catch,
                 else_block,
             } => {
-                validate_expr(cond, check_symbol, check_def, check_hir, check_type)?;
-                validate_block(then_block, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(cond, checks)?;
+                validate_block(then_block, checks)?;
                 if let Some(cape) = then_catch {
-                    check_def(cape.binding_def_id)?;
-                    check_symbol(cape.binding_name)?;
+                    checks.check_def(cape.binding_def_id)?;
+                    checks.check_symbol(cape.binding_name)?;
                     if let Some(ty) = cape.binding_ty {
-                        check_type(ty)?;
+                        checks.check_type(ty)?;
                     }
-                    validate_block(&cape.body, check_symbol, check_def, check_hir, check_type)?;
+                    validate_block(&cape.body, checks)?;
                 }
                 if let Some(else_block) = else_block {
-                    validate_block(else_block, check_symbol, check_def, check_hir, check_type)?;
+                    validate_block(else_block, checks)?;
                 }
             }
             HirExpressionKind::Discerne {
                 scrutinees, arms, ..
             } => {
                 for s in scrutinees {
-                    validate_expr(s, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(s, checks)?;
                 }
                 for arm in arms {
                     for pat in &arm.patterns {
-                        validate_pattern(pat, check_symbol, check_def)?;
+                        validate_pattern(pat, checks)?;
                     }
-                    validate_expr(&arm.body, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(&arm.body, checks)?;
                 }
             }
             HirExpressionKind::Loop(body) => {
-                validate_block(body, check_symbol, check_def, check_hir, check_type)?;
+                validate_block(body, checks)?;
             }
             HirExpressionKind::Dum(cond, body) => {
-                validate_expr(cond, check_symbol, check_def, check_hir, check_type)?;
-                validate_block(body, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(cond, checks)?;
+                validate_block(body, checks)?;
             }
             HirExpressionKind::Itera(_, coordinates, def_id, sym, iterable, body) => {
                 for (coordinate_def_id, coordinate_name) in coordinates {
-                    check_def(*coordinate_def_id)?;
-                    check_symbol(*coordinate_name)?;
+                    checks.check_def(*coordinate_def_id)?;
+                    checks.check_symbol(*coordinate_name)?;
                 }
-                check_def(*def_id)?;
-                check_symbol(*sym)?;
-                validate_expr(iterable, check_symbol, check_def, check_hir, check_type)?;
-                validate_block(body, check_symbol, check_def, check_hir, check_type)?;
+                checks.check_def(*def_id)?;
+                checks.check_symbol(*sym)?;
+                validate_expr(iterable, checks)?;
+                validate_block(body, checks)?;
             }
             HirExpressionKind::IteraLockstep {
                 sources,
@@ -2645,17 +2631,17 @@ pub(crate) fn validate_referential_integrity(
                 body,
             } => {
                 for (coordinate_def_id, coordinate_name) in coordinates {
-                    check_def(*coordinate_def_id)?;
-                    check_symbol(*coordinate_name)?;
+                    checks.check_def(*coordinate_def_id)?;
+                    checks.check_symbol(*coordinate_name)?;
                 }
                 for (binding_def_id, binding_name) in bindings {
-                    check_def(*binding_def_id)?;
-                    check_symbol(*binding_name)?;
+                    checks.check_def(*binding_def_id)?;
+                    checks.check_symbol(*binding_name)?;
                 }
                 for source in sources {
-                    validate_expr(source, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(source, checks)?;
                 }
-                validate_block(body, check_symbol, check_def, check_hir, check_type)?;
+                validate_block(body, checks)?;
             }
             // NR-5 (nary-range-walk): validate product binder defs/symbols
             // and ranges/body; dangling binder indices fail closed through
@@ -2666,36 +2652,36 @@ pub(crate) fn validate_referential_integrity(
                 body,
             } => {
                 for (binding_def_id, binding_name) in bindings {
-                    check_def(*binding_def_id)?;
-                    check_symbol(*binding_name)?;
+                    checks.check_def(*binding_def_id)?;
+                    checks.check_symbol(*binding_name)?;
                 }
                 for range in ranges {
-                    validate_expr(range, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(range, checks)?;
                 }
-                validate_block(body, check_symbol, check_def, check_hir, check_type)?;
+                validate_block(body, checks)?;
             }
             HirExpressionKind::Intervallum {
                 start, end, step, ..
             } => {
-                validate_expr(start, check_symbol, check_def, check_hir, check_type)?;
-                validate_expr(end, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(start, checks)?;
+                validate_expr(end, checks)?;
                 if let Some(s) = step {
-                    validate_expr(s, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(s, checks)?;
                 }
             }
             HirExpressionKind::Assign(lhs, rhs) => {
-                validate_expr(lhs, check_symbol, check_def, check_hir, check_type)?;
-                validate_expr(rhs, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(lhs, checks)?;
+                validate_expr(rhs, checks)?;
             }
             HirExpressionKind::ConversioAssign {
                 target,
                 source,
                 recovery,
             } => {
-                validate_expr(target, check_symbol, check_def, check_hir, check_type)?;
-                validate_expr(source, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(target, checks)?;
+                validate_expr(source, checks)?;
                 if let Some(recovery) = recovery {
-                    validate_expr(recovery, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(recovery, checks)?;
                 }
             }
             HirExpressionKind::Array(elements) => {
@@ -2703,113 +2689,113 @@ pub(crate) fn validate_referential_integrity(
                     match elem {
                         radix_hir::HirArrayElement::Expr(e)
                         | radix_hir::HirArrayElement::Spread(e) => {
-                            validate_expr(e, check_symbol, check_def, check_hir, check_type)?;
+                            validate_expr(e, checks)?;
                         }
                     }
                 }
             }
             HirExpressionKind::Struct(def_id, fields) => {
-                check_def(*def_id)?;
+                checks.check_def(*def_id)?;
                 for (sym, e) in fields {
-                    check_symbol(*sym)?;
-                    validate_expr(e, check_symbol, check_def, check_hir, check_type)?;
+                    checks.check_symbol(*sym)?;
+                    validate_expr(e, checks)?;
                 }
             }
             HirExpressionKind::Tuple(elements, type_args) => {
                 for e in elements {
-                    validate_expr(e, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(e, checks)?;
                 }
                 if let Some(tas) = type_args {
                     for ty in tas {
-                        check_type(*ty)?;
+                        checks.check_type(*ty)?;
                     }
                 }
             }
             HirExpressionKind::Scribe(_, args) => {
                 for a in args {
-                    validate_expr(a, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(a, checks)?;
                 }
             }
             HirExpressionKind::Scriptum(template, args) => {
-                check_symbol(*template)?;
+                checks.check_symbol(*template)?;
                 for a in args {
-                    validate_expr(a, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(a, checks)?;
                 }
             }
             HirExpressionKind::Adfirma(expr, msg) => {
-                validate_expr(expr, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(expr, checks)?;
                 if let Some(m) = msg {
-                    validate_expr(m, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(m, checks)?;
                 }
             }
             HirExpressionKind::Panic(expr) | HirExpressionKind::Throw(expr) => {
-                validate_expr(expr, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(expr, checks)?;
             }
             HirExpressionKind::Handled { body, catch } => {
-                validate_block(body, check_symbol, check_def, check_hir, check_type)?;
-                check_def(catch.binding_def_id)?;
-                check_symbol(catch.binding_name)?;
+                validate_block(body, checks)?;
+                checks.check_def(catch.binding_def_id)?;
+                checks.check_symbol(catch.binding_name)?;
                 if let Some(ty) = catch.binding_ty {
-                    check_type(ty)?;
+                    checks.check_type(ty)?;
                 }
-                validate_block(&catch.body, check_symbol, check_def, check_hir, check_type)?;
+                validate_block(&catch.body, checks)?;
             }
             HirExpressionKind::Trap(body) => {
-                validate_block(body, check_symbol, check_def, check_hir, check_type)?;
+                validate_block(body, checks)?;
             }
             HirExpressionKind::CallDefault {
                 body,
                 default,
                 err_ty,
             } => {
-                validate_block(body, check_symbol, check_def, check_hir, check_type)?;
-                validate_expr(default, check_symbol, check_def, check_hir, check_type)?;
+                validate_block(body, checks)?;
+                validate_expr(default, checks)?;
                 if let Some(ty) = err_ty {
-                    check_type(*ty)?;
+                    checks.check_type(*ty)?;
                 }
             }
             HirExpressionKind::Clausura(params, ret_ty, err_ty, body, _) => {
                 for param in params {
-                    check_def(param.def_id)?;
-                    check_symbol(param.name)?;
-                    check_type(param.ty)?;
+                    checks.check_def(param.def_id)?;
+                    checks.check_symbol(param.name)?;
+                    checks.check_type(param.ty)?;
                     if let Some(ref init) = param.default {
-                        validate_expr(init, check_symbol, check_def, check_hir, check_type)?;
+                        validate_expr(init, checks)?;
                     }
                 }
                 if let Some(ty) = ret_ty {
-                    check_type(*ty)?;
+                    checks.check_type(*ty)?;
                 }
                 if let Some(ty) = err_ty {
-                    check_type(*ty)?;
+                    checks.check_type(*ty)?;
                 }
-                validate_expr(body, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(body, checks)?;
             }
             HirExpressionKind::Cede(inner)
             | HirExpressionKind::Reddet(inner)
             | HirExpressionKind::Tacebit(inner)
             | HirExpressionKind::Yield(inner) => {
-                validate_expr(inner, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(inner, checks)?;
             }
             HirExpressionKind::Verte {
                 source,
                 target,
                 entries,
             } => {
-                validate_expr(source, check_symbol, check_def, check_hir, check_type)?;
-                check_type(*target)?;
+                validate_expr(source, checks)?;
+                checks.check_type(*target)?;
                 if let Some(entries) = entries {
                     for entry in entries {
                         match &entry.key {
                             radix_hir::HirObjectKey::Ident(s)
-                            | radix_hir::HirObjectKey::String(s) => check_symbol(*s)?,
+                            | radix_hir::HirObjectKey::String(s) => checks.check_symbol(*s)?,
                             radix_hir::HirObjectKey::Computed(e)
                             | radix_hir::HirObjectKey::Spread(e) => {
-                                validate_expr(e, check_symbol, check_def, check_hir, check_type)?;
+                                validate_expr(e, checks)?;
                             }
                         }
                         if let Some(ref v) = entry.value {
-                            validate_expr(v, check_symbol, check_def, check_hir, check_type)?;
+                            validate_expr(v, checks)?;
                         }
                     }
                 }
@@ -2821,39 +2807,39 @@ pub(crate) fn validate_referential_integrity(
                 params,
                 recovery,
             } => {
-                validate_expr(source, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(source, checks)?;
                 match target {
-                    radix_hir::HirConversioTarget::Type(ty) => check_type(*ty)?,
+                    radix_hir::HirConversioTarget::Type(ty) => checks.check_type(*ty)?,
                     radix_hir::HirConversioTarget::Intervallum(e) => {
-                        validate_expr(e, check_symbol, check_def, check_hir, check_type)?;
+                        validate_expr(e, checks)?;
                     }
                 }
                 for sym in params {
-                    check_symbol(*sym)?;
+                    checks.check_symbol(*sym)?;
                 }
                 if let Some(r) = recovery {
-                    validate_expr(r, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(r, checks)?;
                 }
             }
             HirExpressionKind::Ad { route, opener } => {
-                check_symbol(*route)?;
+                checks.check_symbol(*route)?;
                 if let Some(o) = opener {
-                    validate_expr(o, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(o, checks)?;
                 }
             }
             HirExpressionKind::Ref(_, inner) | HirExpressionKind::Deref(inner) => {
-                validate_expr(inner, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(inner, checks)?;
             }
             HirExpressionKind::TypeCheck { expr, ty, .. } => {
-                validate_expr(expr, check_symbol, check_def, check_hir, check_type)?;
-                check_type(*ty)?;
+                validate_expr(expr, checks)?;
+                checks.check_type(*ty)?;
             }
             HirExpressionKind::Praefixum(inner) => {
-                validate_expr(inner, check_symbol, check_def, check_hir, check_type)?;
+                validate_expr(inner, checks)?;
             }
             HirExpressionKind::Format { value, spec } => {
-                check_symbol(*spec)?;
-                validate_expr(value, check_symbol, check_def, check_hir, check_type)?;
+                checks.check_symbol(*spec)?;
+                validate_expr(value, checks)?;
             }
             HirExpressionKind::Vacua
             | HirExpressionKind::ReadLine(_)
@@ -2864,42 +2850,41 @@ pub(crate) fn validate_referential_integrity(
 
     fn validate_pattern(
         pat: &radix_hir::HirPattern,
-        check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
-        check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
+        checks: &IntegrityChecks<'_>,
     ) -> Result<(), HirArtifactError> {
         match pat {
             radix_hir::HirPattern::Binding(def_id, sym) => {
-                check_def(*def_id)?;
-                check_symbol(*sym)?;
+                checks.check_def(*def_id)?;
+                checks.check_symbol(*sym)?;
             }
             radix_hir::HirPattern::Alias(def_id, sym, inner) => {
-                check_def(*def_id)?;
-                check_symbol(*sym)?;
-                validate_pattern(inner, check_symbol, check_def)?;
+                checks.check_def(*def_id)?;
+                checks.check_symbol(*sym)?;
+                validate_pattern(inner, checks)?;
             }
             radix_hir::HirPattern::Variant(def_id, subpatterns) => {
-                check_def(*def_id)?;
+                checks.check_def(*def_id)?;
                 for sp in subpatterns {
-                    validate_pattern(sp, check_symbol, check_def)?;
+                    validate_pattern(sp, checks)?;
                 }
             }
             radix_hir::HirPattern::Literal(lit) | radix_hir::HirPattern::NegatedLiteral(lit) => {
                 match lit {
                     radix_hir::HirLiteral::String(s)
                     | radix_hir::HirLiteral::Ascii(s)
-                    | radix_hir::HirLiteral::Octeti(s) => check_symbol(*s)?,
+                    | radix_hir::HirLiteral::Octeti(s) => checks.check_symbol(*s)?,
                     radix_hir::HirLiteral::Regex(s, Some(f)) => {
-                        check_symbol(*s)?;
-                        check_symbol(*f)?;
+                        checks.check_symbol(*s)?;
+                        checks.check_symbol(*f)?;
                     }
-                    radix_hir::HirLiteral::Regex(s, None) => check_symbol(*s)?,
+                    radix_hir::HirLiteral::Regex(s, None) => checks.check_symbol(*s)?,
                     _ => {}
                 }
             }
             radix_hir::HirPattern::TypeTest { binding, .. } => {
                 if let Some((def_id, sym)) = binding {
-                    check_def(*def_id)?;
-                    check_symbol(*sym)?;
+                    checks.check_def(*def_id)?;
+                    checks.check_symbol(*sym)?;
                 }
             }
             radix_hir::HirPattern::Wildcard => {}
@@ -2909,24 +2894,21 @@ pub(crate) fn validate_referential_integrity(
 
     fn validate_annotation(
         ann: &radix_hir::HirAnnotation,
-        check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
-        check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
-        check_hir: &dyn Fn(radix_hir::HirId) -> Result<(), HirArtifactError>,
-        check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
+        checks: &IntegrityChecks<'_>,
     ) -> Result<(), HirArtifactError> {
-        check_symbol(ann.family)?;
+        checks.check_symbol(ann.family)?;
         if let Some(def_id) = ann.contract_id {
-            check_def(def_id)?;
+            checks.check_def(def_id)?;
         }
         for field in &ann.fields {
-            check_symbol(field.name)?;
+            checks.check_symbol(field.name)?;
             match &field.value {
                 radix_hir::HirAnnotationValue::Expr(e) => {
-                    validate_expr(e, check_symbol, check_def, check_hir, check_type)?;
+                    validate_expr(e, checks)?;
                 }
-                radix_hir::HirAnnotationValue::Type(ty) => check_type(*ty)?,
+                radix_hir::HirAnnotationValue::Type(ty) => checks.check_type(*ty)?,
                 radix_hir::HirAnnotationValue::Symbol(s)
-                | radix_hir::HirAnnotationValue::String(s) => check_symbol(*s)?,
+                | radix_hir::HirAnnotationValue::String(s) => checks.check_symbol(*s)?,
                 _ => {}
             }
         }
@@ -2947,11 +2929,7 @@ pub(crate) fn validate_referential_integrity(
     fn validate_presentation(
         artifact: &HirArtifact,
         presentation: &radix_hir::HirPresentation,
-        check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
-        check_hir: &dyn Fn(radix_hir::HirId) -> Result<(), HirArtifactError>,
-        check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
-        check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
-        check_index: &dyn Fn(radix_types::IndexId) -> Result<(), HirArtifactError>,
+        checks: &IntegrityChecks<'_>,
     ) -> Result<(), HirArtifactError> {
         // Owner anchor ids must be unique. Each owner's semantic back-ref,
         // when present, must resolve to an in-tree node (HirId) or a known
@@ -2965,8 +2943,8 @@ pub(crate) fn validate_referential_integrity(
                 });
             }
             match &owner.semantic {
-                Some(radix_hir::HirOwnerRef::Hir(id)) => check_hir(*id)?,
-                Some(radix_hir::HirOwnerRef::Def(def_id)) => check_def(*def_id)?,
+                Some(radix_hir::HirOwnerRef::Hir(id)) => checks.check_hir(*id)?,
+                Some(radix_hir::HirOwnerRef::Def(def_id)) => checks.check_def(*def_id)?,
                 None => {}
             }
         }
@@ -2975,7 +2953,7 @@ pub(crate) fn validate_referential_integrity(
         radix_hir::visit::walk_program(&mut await_bindings, &artifact.hir);
         let mut await_assignment_defs = FxHashSet::default();
         for def_id in &presentation.await_assignment_bindings {
-            check_def(*def_id)?;
+            checks.check_def(*def_id)?;
             if !await_bindings.defs.contains(def_id) {
                 return Err(HirArtifactError::InvalidPresentation {
                     issue: "await_assignment_binding_not_awaited",
@@ -3009,7 +2987,7 @@ pub(crate) fn validate_referential_integrity(
             }
             for trivia in &attachment.leading {
                 if let radix_hir::HirTrivia::CommentLine { text, .. } = trivia {
-                    check_symbol(*text)?;
+                    checks.check_symbol(*text)?;
                 }
             }
         }
@@ -3028,9 +3006,9 @@ pub(crate) fn validate_referential_integrity(
         // The `regio` declaration (D7.7): interned name and doc lines, and an
         // anchor that names a registered owner.
         if let Some(region) = presentation.region.as_ref() {
-            check_symbol(region.name)?;
+            checks.check_symbol(region.name)?;
             for line in &region.doc {
-                check_symbol(*line)?;
+                checks.check_symbol(*line)?;
             }
             if let Some(anchor) = region.anchor.as_ref()
                 && !owner_ids.contains(&anchor.0)
@@ -3095,14 +3073,19 @@ pub(crate) fn validate_referential_integrity(
             }
         }
 
+        let check_symbol = |sym| checks.check_symbol(sym);
+        let check_hir = |hir_id| checks.check_hir(hir_id);
+        let check_def = |def_id| checks.check_def(def_id);
+        let check_type = |ty| checks.check_type(ty);
+        let check_index = |index| checks.check_index(index);
         validate_authored_type_records(
             artifact,
             presentation,
-            check_symbol,
-            check_hir,
-            check_def,
-            check_type,
-            check_index,
+            &check_symbol,
+            &check_hir,
+            &check_def,
+            &check_type,
+            &check_index,
         )?;
 
         // Each by-label `iuncta` read annotates exactly one rewritten index
@@ -3110,8 +3093,8 @@ pub(crate) fn validate_referential_integrity(
         // would otherwise silently keep the numeric spelling.
         let mut label_access_ids: FxHashSet<radix_hir::HirId> = FxHashSet::default();
         for access in &presentation.tuple_label_accesses {
-            check_symbol(access.label)?;
-            check_hir(access.expr_id)?;
+            checks.check_symbol(access.label)?;
+            checks.check_hir(access.expr_id)?;
             if !label_access_ids.insert(access.expr_id) {
                 return Err(HirArtifactError::InvalidPresentation {
                     issue: "duplicate_tuple_label_access",
@@ -3127,10 +3110,7 @@ pub(crate) fn validate_referential_integrity(
 
     fn validate_type(
         ty: &radix_types::Type,
-        check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
-        check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
-        check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
-        check_index: &dyn Fn(radix_types::IndexId) -> Result<(), HirArtifactError>,
+        checks: &IntegrityChecks<'_>,
     ) -> Result<(), HirArtifactError> {
         match ty {
             radix_types::Type::Primitive(_)
@@ -3151,24 +3131,24 @@ pub(crate) fn validate_referential_integrity(
             | radix_types::Type::Atomic(t)
             | radix_types::Type::Intervallum(t)
             | radix_types::Type::Option(t) => {
-                check_type(*t)?;
+                checks.check_type(*t)?;
             }
             radix_types::Type::PromissumFailable(t, e) => {
-                check_type(*t)?;
-                check_type(*e)?;
+                checks.check_type(*t)?;
+                checks.check_type(*e)?;
             }
             radix_types::Type::AsyncCursor(t, e) => {
-                check_type(*t)?;
-                check_type(*e)?;
+                checks.check_type(*t)?;
+                checks.check_type(*e)?;
             }
             radix_types::Type::Map(k, v) => {
-                check_type(*k)?;
-                check_type(*v)?;
+                checks.check_type(*k)?;
+                checks.check_type(*v)?;
             }
             radix_types::Type::Record(fields) => {
                 for (&sym, &tid) in fields {
-                    check_symbol(sym)?;
-                    check_type(tid)?;
+                    checks.check_symbol(sym)?;
+                    checks.check_type(tid)?;
                 }
             }
             radix_types::Type::Tensor(t, i)
@@ -3187,67 +3167,67 @@ pub(crate) fn validate_referential_integrity(
                 element: t,
                 capacity: i,
             } => {
-                check_type(*t)?;
-                check_index(*i)?;
+                checks.check_type(*t)?;
+                checks.check_index(*i)?;
             }
             radix_types::Type::BoundedTextus { capacity }
             | radix_types::Type::BoundedAscii { capacity }
             | radix_types::Type::BoundedOcteti { capacity } => {
-                check_index(*capacity)?;
+                checks.check_index(*capacity)?;
             }
             radix_types::Type::Ref(_, t) => {
-                check_type(*t)?;
+                checks.check_type(*t)?;
             }
             radix_types::Type::Struct(d)
             | radix_types::Type::Enum(d)
             | radix_types::Type::Interface(d) => {
-                check_def(*d)?;
+                checks.check_def(*d)?;
             }
             radix_types::Type::Alias(d, t) => {
-                check_def(*d)?;
-                check_type(*t)?;
+                checks.check_def(*d)?;
+                checks.check_type(*t)?;
             }
             radix_types::Type::Func(sig) => {
-                check_type(sig.ret)?;
+                checks.check_type(sig.ret)?;
                 if let Some(et) = sig.err {
-                    check_type(et)?;
+                    checks.check_type(et)?;
                 }
                 for param in &sig.type_params {
                     match &param.constraint {
                         radix_types::TypeParamConstraint::Any => {}
                         radix_types::TypeParamConstraint::OneOf(tys) => {
                             for ty in tys {
-                                check_type(*ty)?;
+                                checks.check_type(*ty)?;
                             }
                         }
                         radix_types::TypeParamConstraint::Implet(bounds) => {
                             for bound in bounds {
-                                check_def(bound.contract)?;
+                                checks.check_def(bound.contract)?;
                                 for ty in &bound.args {
-                                    check_type(*ty)?;
+                                    checks.check_type(*ty)?;
                                 }
                             }
                         }
                     }
                     if let Some(radix_types::SemanticGenericParamDefault::Typus(ty)) = param.default
                     {
-                        check_type(ty)?;
+                        checks.check_type(ty)?;
                     }
-                    check_symbol(param.name)?;
+                    checks.check_symbol(param.name)?;
                 }
                 for pt in &sig.params {
-                    check_type(pt.ty)?;
+                    checks.check_type(pt.ty)?;
                 }
             }
             radix_types::Type::Param(name) => {
-                check_symbol(*name)?;
+                checks.check_symbol(*name)?;
             }
             radix_types::Type::Applied(base, args) => {
-                check_type(*base)?;
+                checks.check_type(*base)?;
                 for arg in args {
                     match arg {
-                        radix_types::AppliedArg::Type(id) => check_type(*id)?,
-                        radix_types::AppliedArg::Size(id) => check_index(*id)?,
+                        radix_types::AppliedArg::Type(id) => checks.check_type(*id)?,
+                        radix_types::AppliedArg::Size(id) => checks.check_index(*id)?,
                     }
                 }
             }
@@ -3255,7 +3235,7 @@ pub(crate) fn validate_referential_integrity(
             | radix_types::Type::Intersection(members)
             | radix_types::Type::Tuple(members) => {
                 for m in members {
-                    check_type(*m)?;
+                    checks.check_type(*m)?;
                 }
             }
         }
@@ -3266,33 +3246,31 @@ pub(crate) fn validate_referential_integrity(
 
     fn validate_file_interface_snapshot(
         iface: &crate::artifact::FileInterfaceSnapshot,
-        check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
-        check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
-        check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
+        checks: &IntegrityChecks<'_>,
     ) -> Result<(), HirArtifactError> {
         use crate::artifact::FileExportSnapshot;
 
         for (sym, export) in &iface.exports {
-            check_symbol(*sym)?;
+            checks.check_symbol(*sym)?;
             match export {
                 FileExportSnapshot::Function(sig) => {
-                    check_type(sig.ret)?;
+                    checks.check_type(sig.ret)?;
                     if let Some(et) = sig.err {
-                        check_type(et)?;
+                        checks.check_type(et)?;
                     }
                     for param in &sig.type_params {
                         match &param.constraint {
                             radix_types::TypeParamConstraint::Any => {}
                             radix_types::TypeParamConstraint::OneOf(tys) => {
                                 for ty in tys {
-                                    check_type(*ty)?;
+                                    checks.check_type(*ty)?;
                                 }
                             }
                             radix_types::TypeParamConstraint::Implet(bounds) => {
                                 for bound in bounds {
-                                    check_def(bound.contract)?;
+                                    checks.check_def(bound.contract)?;
                                     for ty in &bound.args {
-                                        check_type(*ty)?;
+                                        checks.check_type(*ty)?;
                                     }
                                 }
                             }
@@ -3300,27 +3278,27 @@ pub(crate) fn validate_referential_integrity(
                         if let Some(radix_types::SemanticGenericParamDefault::Typus(ty)) =
                             param.default
                         {
-                            check_type(ty)?;
+                            checks.check_type(ty)?;
                         }
                     }
                     for pt in &sig.params {
-                        check_type(pt.ty)?;
+                        checks.check_type(pt.ty)?;
                     }
                 }
                 FileExportSnapshot::Type { ty, def_id } => {
-                    check_type(*ty)?;
+                    checks.check_type(*ty)?;
                     if let Some(d) = def_id {
-                        check_def(*d)?;
+                        checks.check_def(*d)?;
                     }
                 }
                 FileExportSnapshot::Struct {
                     def_id, ty, fields, ..
                 } => {
-                    check_def(*def_id)?;
-                    check_type(*ty)?;
+                    checks.check_def(*def_id)?;
+                    checks.check_type(*ty)?;
                     for field in fields {
-                        check_symbol(field.name)?;
-                        check_type(field.ty)?;
+                        checks.check_symbol(field.name)?;
+                        checks.check_type(field.ty)?;
                     }
                 }
             }
@@ -3331,87 +3309,81 @@ pub(crate) fn validate_referential_integrity(
     // ── Top-level validation ───────────────────────────────────────────
 
     // 1. HirModule items and entry.
-    validate_items(
-        &artifact.hir.items,
-        &check_symbol,
-        &check_def,
-        &check_hir,
-        &check_type,
-    )?;
+    validate_items(&artifact.hir.items, &checks)?;
     if let Some(ref entry) = artifact.hir.entry {
-        validate_block(entry, &check_symbol, &check_def, &check_hir, &check_type)?;
+        validate_block(entry, &checks)?;
     }
     for ann in &artifact.hir.entry_annotations {
-        validate_annotation(ann, &check_symbol, &check_def, &check_hir, &check_type)?;
+        validate_annotation(ann, &checks)?;
     }
     if let Some(sym) = artifact.hir.entry_args_name {
-        check_symbol(sym)?;
+        checks.check_symbol(sym)?;
     }
 
     // 2. gpu_builtins: DefId keys.
     for (def_id, _) in &artifact.gpu_builtins {
-        check_def(*def_id)?;
+        checks.check_def(*def_id)?;
     }
 
     // 3. function_facts: DefId keys and internal index-bearing fields.
     for (def_id, fact) in &artifact.function_facts.entries {
-        check_def(*def_id)?;
+        checks.check_def(*def_id)?;
         for edge in &fact.call_edges {
-            check_def(*edge)?;
+            checks.check_def(*edge)?;
         }
         for capture in &fact.captures {
-            check_def(capture.def_id)?;
+            checks.check_def(capture.def_id)?;
         }
         for (pd, _mode) in &fact.param_modes {
-            check_def(*pd)?;
+            checks.check_def(*pd)?;
         }
         if let Some(ty) = fact.err_ty {
-            check_type(ty)?;
+            checks.check_type(ty)?;
         }
     }
     if let Some(ref entry_fact) = artifact.function_facts.entry {
         for edge in &entry_fact.call_edges {
-            check_def(*edge)?;
+            checks.check_def(*edge)?;
         }
         for capture in &entry_fact.captures {
-            check_def(capture.def_id)?;
+            checks.check_def(capture.def_id)?;
         }
         for (pd, _mode) in &entry_fact.param_modes {
-            check_def(*pd)?;
+            checks.check_def(*pd)?;
         }
         if let Some(ty) = entry_fact.err_ty {
-            check_type(ty)?;
+            checks.check_type(ty)?;
         }
     }
 
     // 4. resolved_uses: DefId keys (Local) and enclosing DefIds.
     for use_wire in &artifact.resolved_uses {
         if let crate::artifact::ResolvedUseKeyWire::Local(def_id) = use_wire.key {
-            check_def(def_id)?;
+            checks.check_def(def_id)?;
         }
         if let Some(enclosing) = use_wire.enclosing {
-            check_def(enclosing)?;
+            checks.check_def(enclosing)?;
         }
     }
 
     // 5. libraries: deep walk.
     for def_id in artifact.libraries.bindings.keys() {
-        check_def(*def_id)?;
+        checks.check_def(*def_id)?;
     }
     for binding in artifact.libraries.bindings.values() {
-        check_def(binding.local_def_id)?;
+        checks.check_def(binding.local_def_id)?;
     }
     for def_id in artifact.libraries.items.keys() {
-        check_def(*def_id)?;
+        checks.check_def(*def_id)?;
     }
     for item in artifact.libraries.items.values() {
-        check_def(item.def_id)?;
+        checks.check_def(item.def_id)?;
     }
     for def_id in artifact.libraries.exports.keys() {
-        check_def(*def_id)?;
+        checks.check_def(*def_id)?;
     }
     for (pair, _) in artifact.libraries.reexports.keys() {
-        check_def(*pair)?;
+        checks.check_def(*pair)?;
     }
 
     // 6. cli_program: resolved-use-like fields only (no Symbol-bearing fields in CliProgramWire).
@@ -3419,52 +3391,40 @@ pub(crate) fn validate_referential_integrity(
     // 7. resolver snapshot: deep walk. E3 conversion rows are validated
     // here rather than silently dropped at the artifact boundary.
     for (sym, _) in &artifact.resolver.namespace_exports {
-        check_symbol(*sym)?;
+        checks.check_symbol(*sym)?;
     }
     for (sym, iface) in &artifact.resolver.file_interfaces {
-        check_symbol(*sym)?;
-        validate_file_interface_snapshot(iface, &check_symbol, &check_def, &check_type)?;
+        checks.check_symbol(*sym)?;
+        validate_file_interface_snapshot(iface, &checks)?;
     }
     for sym in &artifact.resolver.used_namespaces {
-        check_symbol(*sym)?;
+        checks.check_symbol(*sym)?;
     }
     for ((_, sym), ty) in &artifact.resolver.imported_nominal_types {
-        check_symbol(*sym)?;
-        check_type(*ty)?;
+        checks.check_symbol(*sym)?;
+        checks.check_type(*ty)?;
     }
     for row in &artifact.resolver.conversion_rows {
         if let Some(fn_def_id) = row.fn_def_id {
-            check_def(fn_def_id)?;
+            checks.check_def(fn_def_id)?;
         }
-        check_type(row.source)?;
-        check_type(row.destination)?;
+        checks.check_type(row.source)?;
+        checks.check_type(row.destination)?;
     }
 
     // 8. Type arena walk: validate TypeId/DefId/Symbol/IndexId
     //    cross-references inside the type-table snapshot.
-    let check_index = |xi: radix_types::IndexId| -> Result<(), HirArtifactError> {
-        let idx_count = artifact.types.indices().len();
-        let i = xi.0 as usize;
-        if i >= idx_count {
-            return Err(HirArtifactError::DanglingIndex {
-                kind: "IndexId",
-                index: xi.0,
-                arena_size: idx_count,
-            });
-        }
-        Ok(())
-    };
     for ty in artifact.types.types() {
-        validate_type(ty, &check_def, &check_symbol, &check_type, &check_index)?;
+        validate_type(ty, &checks)?;
     }
     for index in artifact.types.indices() {
         if let radix_types::IndexExpr::Tuple(children) = index {
             for child in children {
-                check_index(*child)?;
+                checks.check_index(*child)?;
             }
         }
         if let radix_types::IndexExpr::Param(symbol) = index {
-            check_symbol(*symbol)?;
+            checks.check_symbol(*symbol)?;
         }
     }
 
@@ -3475,33 +3435,27 @@ pub(crate) fn validate_referential_integrity(
     //    in the interner table, and every HirOwnerRef back-reference must
     //    name an in-tree node or known def. The entry-start anchor, when
     //    present, must name a registered owner.
-    validate_presentation(
-        artifact,
-        &artifact.presentation,
-        &check_symbol,
-        &check_hir,
-        &check_def,
-        &check_type,
-        &check_index,
-    )?;
+    validate_presentation(artifact, &artifact.presentation, &checks)?;
 
     // 10. Capability provenance (SCR-04, schema v8): every identity key —
     //     function rows, provenance/relationship DefIds, and last-use
     //     borrower/site pairs — must resolve against the HIR arenas.
     for row in &artifact.capability_provenance.functions {
-        check_def(row.function)?;
+        checks.check_def(row.function)?;
         match row.returned_borrow {
             crate::artifact::ReturnedBorrowWire::None => {}
             crate::artifact::ReturnedBorrowWire::Parameter(def_id)
-            | crate::artifact::ReturnedBorrowWire::Definition(def_id) => check_def(def_id)?,
+            | crate::artifact::ReturnedBorrowWire::Definition(def_id) => {
+                checks.check_def(def_id)?
+            }
         }
         for relationship in &row.required_regions {
-            check_def(relationship.from)?;
-            check_def(relationship.to)?;
+            checks.check_def(relationship.from)?;
+            checks.check_def(relationship.to)?;
         }
         for last_use in &row.last_uses {
-            check_def(last_use.borrower)?;
-            check_hir(last_use.site)?;
+            checks.check_def(last_use.borrower)?;
+            checks.check_hir(last_use.site)?;
         }
     }
 
@@ -3509,10 +3463,10 @@ pub(crate) fn validate_referential_integrity(
     //     kind-tagged witness must resolve against the interner and arenas.
     for row in &artifact.resolved_generic_calls {
         for binding in &row.bindings {
-            check_symbol(binding.name)?;
+            checks.check_symbol(binding.name)?;
             match binding.witness {
-                radix_types::GenericWitness::Typus(ty) => check_type(ty)?,
-                radix_types::GenericWitness::Magnitudo(xi) => check_index(xi)?,
+                radix_types::GenericWitness::Typus(ty) => checks.check_type(ty)?,
+                radix_types::GenericWitness::Magnitudo(xi) => checks.check_index(xi)?,
             }
         }
     }
@@ -3520,10 +3474,10 @@ pub(crate) fn validate_referential_integrity(
     // 12. Compiler lane metadata (schema v11): a rehydrated AIR unit must
     // reference only declarations and symbols present in the same artifact.
     for entry in &artifact.radix_lanes {
-        check_def(entry.def_id)?;
+        checks.check_def(entry.def_id)?;
         if let Some(backward) = entry.backward {
-            check_symbol(backward.companion_name)?;
-            check_def(backward.companion_def_id)?;
+            checks.check_symbol(backward.companion_name)?;
+            checks.check_def(backward.companion_def_id)?;
         }
     }
 
