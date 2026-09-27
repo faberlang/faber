@@ -26,6 +26,7 @@ mod doctor;
 mod doctor_test;
 mod emit;
 mod explain;
+mod field_modifier_codemod;
 mod format;
 #[cfg(test)]
 #[path = "format_corpus_test.rs"]
@@ -68,6 +69,7 @@ use convert::cmd_convert;
 use cost::cmd_cost;
 use doctor::cmd_doctor;
 use explain::cmd_explain;
+use field_modifier_codemod::cmd_field_modifier_codemod;
 use format::cmd_format;
 use host::cmd_host;
 use init::cmd_init;
@@ -433,6 +435,13 @@ fn dispatch(command: Command) {
                 stdout: args.stdout,
                 write: args.write,
                 stdin: args.stdin,
+            });
+        }
+        Command::FieldModifierCodemod(args) => {
+            cmd_field_modifier_codemod(&field_modifier_codemod::FieldModifierCodemodCommand {
+                paths: args.paths,
+                check: args.check,
+                stdout: args.stdout,
             });
         }
         Command::Host(args) => cmd_host(args.command),

@@ -197,6 +197,11 @@ pub enum Command {
     #[command(name = "output-transfer-codemod")]
     OutputTransferCodemod(OutputTransferCodemodArgs),
 
+    /// Insert `var`/`varia` before every unmarked genus field (D16.1 migration;
+    /// span-based, every other byte unchanged)
+    #[command(name = "field-modifier-codemod")]
+    FieldModifierCodemod(FieldModifierCodemodArgs),
+
     /// Script host introspection (kernel manifest)
     Host(crate::commands::host::HostArgs),
 
@@ -269,6 +274,24 @@ pub struct ConvertArgs {
     /// result to stdout
     #[arg(long, conflicts_with_all = ["check", "stdout", "paths"])]
     pub stdin: bool,
+}
+
+/// Arguments for `faber field-modifier-codemod`.
+#[derive(clap::Args, Debug)]
+pub struct FieldModifierCodemodArgs {
+    /// Files or directories to codemod (default: current directory)
+    #[arg(value_name = "PATH")]
+    pub paths: Vec<PathBuf>,
+
+    /// Dry run: report per-file insertion counts without writing; exit 1 if
+    /// any file would change
+    #[arg(long)]
+    pub check: bool,
+
+    /// Write the codemodded source to stdout instead of updating the file
+    /// (exactly one input file)
+    #[arg(long, conflicts_with = "check")]
+    pub stdout: bool,
 }
 
 /// Arguments for `faber output-transfer-codemod`.
