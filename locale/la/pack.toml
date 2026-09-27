@@ -1852,6 +1852,18 @@ help = "make the expression type match the expected type"
 message = "{apud} coordinates require {ex} iteration"
 help = "make the expression type match the expected type"
 
+[diagnostics.SEM010.issues.itera_apud_requires_indexed_iterable]
+message = "{apud} iterabile indicatum requirit: {lista}, {tabula}, tensor, aut matrix"
+help = "hunc fontem sine {apud} itera; valores eius indicem nominandum non habent"
+
+[diagnostics.SEM010.issues.tabula_key_not_hashable]
+message = "clavis {tabula} digeri non potest"
+help = "clavem sine valoribus {fractus} aut collectionibus mutabilibus adhibe: {textus}, {numerus}, {iuncta}, aut {genus} eorum"
+
+[diagnostics.SEM010.issues.copia_element_not_hashable]
+message = "elementum {copia} digeri non potest"
+help = "elementum sine valoribus {fractus} aut collectionibus mutabilibus adhibe: {textus}, {numerus}, {iuncta}, aut {genus} eorum"
+
 [diagnostics.SEM010.issues.itera_apud_requires_shaped_iterable]
 message = "{apud} requires a tensor or matrix iterable"
 help = "make the expression type match the expected type"

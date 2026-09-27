@@ -38,6 +38,9 @@ const ISSUE_ITERA_APUD_REQUIRES_EX: &str = "itera_apud_requires_ex";
 pub(super) const ISSUE_ITERA_APUD_ARITY_MISMATCH: &str = "itera_apud_arity_mismatch";
 pub(super) const ISSUE_ITERA_APUD_REQUIRES_SHAPED_ITERABLE: &str =
     "itera_apud_requires_shaped_iterable";
+/// D3.1: `itera ex … apud` over a source with no index surface (copia,
+/// cursors and generators, text, sparsa).
+const ISSUE_ITERA_APUD_REQUIRES_INDEXED_ITERABLE: &str = "itera_apud_requires_indexed_iterable";
 /// Lockstep `itera ex` N-ary series laws. All are the same
 /// fail-closed SEM family as the `apud` arity rule above.
 pub(super) const ISSUE_ITERA_LOCKSTEP_SOURCE_BINDER_ARITY_MISMATCH: &str =
@@ -106,6 +109,64 @@ pub(super) fn apud_arity(
         },
         None if has_coordinates => ApudArity::RequiresShaped,
         None => ApudArity::Admitted,
+    }
+}
+
+/// `itera ex … apud` admission (D3.1): the coordinate types when the names
+/// match the iterable's index surface.
+enum IteraApud {
+    /// One type per `apud` name (empty when there are none).
+    Admitted(Vec<TypeId>),
+    /// The iterable has no index surface for `apud` names.
+    RequiresIndexed,
+    /// Name count does not equal the iterable's rank.
+    Mismatch { expected: u64, actual: usize },
+}
+
+/// Index types of an indexed iterable: `lista` is rank 1 over `numerus`;
+/// `tabula` is rank 1 over its key, or rank N over the parts of an
+/// `iuncta` key (D3.2/D3.3). Tensors and matrices keep the shared
+/// [`apud_arity`] law with `numerus` coordinates.
+fn itera_apud_coordinates(
+    types: &TypeTable,
+    dispatch_ty: TypeId,
+    numerus: TypeId,
+    has_coordinates: bool,
+    coordinate_count: usize,
+) -> IteraApud {
+    let index_types = match types.get(dispatch_ty) {
+        Type::Array(_) => vec![numerus],
+        Type::Map(key, _) => {
+            let mut peeled = *key;
+            while let Type::Alias(_, inner) = types.get(peeled) {
+                peeled = *inner;
+            }
+            match types.get(peeled) {
+                Type::Tuple(parts) => parts.clone(),
+                _ => vec![*key],
+            }
+        }
+        _ => {
+            return match apud_arity(types, dispatch_ty, has_coordinates, coordinate_count) {
+                ApudArity::Admitted => IteraApud::Admitted(vec![numerus; coordinate_count]),
+                ApudArity::RequiresShaped => IteraApud::RequiresIndexed,
+                ApudArity::Mismatch { expected, actual } => {
+                    IteraApud::Mismatch { expected, actual }
+                }
+            };
+        }
+    };
+    // Coordinate-free value iteration over a lista or tabula stays legal.
+    if !has_coordinates || index_types.len() == coordinate_count {
+        return IteraApud::Admitted(if has_coordinates {
+            index_types
+        } else {
+            Vec::new()
+        });
+    }
+    IteraApud::Mismatch {
+        expected: index_types.len() as u64,
+        actual: coordinate_count,
     }
 }
 
@@ -219,26 +280,30 @@ impl TypeChecker<'_> {
                     );
                 }
 
-                // Arity rule: the coordinate count must equal the iterable's
-                // rank (tensor shape length; matrix = 2) — never partial
-                // binding. A rank >= 2 iterable without an `apud` clause is
-                // arity 0 != rank, hence also a type error. Non-shaped
-                // iterables reject `apud` fail-closed. Shared with the summa
-                // admission (SFR-3): same rule, same causae.
+                // Arity rule (D3.1): the `apud` names are exactly what goes in
+                // the index brackets to get the element back, so their count
+                // equals the iterable's rank — tensor shape length, matrix 2,
+                // lista 1, tabula 1 or its tuple-key arity — never a partial
+                // bind. A rank >= 2 tensor without an `apud` clause is arity
+                // 0 != rank. Unindexed iterables (copia, cursors, text, …)
+                // reject `apud` fail-closed.
+                let numerus = self.numerus_type();
+                let mut coordinate_types = vec![numerus; coordinate_bindings.len()];
                 if matches!(mode, radix_hir::HirIteraMode::Ex) {
-                    match apud_arity(
+                    match itera_apud_coordinates(
                         self.types,
                         dispatch_ty,
+                        numerus,
                         has_coordinates,
                         coordinate_bindings.len(),
                     ) {
-                        ApudArity::Admitted => {}
-                        ApudArity::RequiresShaped => self.error_issue(
+                        IteraApud::Admitted(types) => coordinate_types = types,
+                        IteraApud::RequiresIndexed => self.error_issue(
                             SemanticErrorKind::TypeMismatch,
-                            ISSUE_ITERA_APUD_REQUIRES_SHAPED_ITERABLE,
+                            ISSUE_ITERA_APUD_REQUIRES_INDEXED_ITERABLE,
                             iter.span,
                         ),
-                        ApudArity::Mismatch { expected, actual } => self.errors.push(
+                        IteraApud::Mismatch { expected, actual } => self.errors.push(
                             SemanticError::structured(SemanticErrorKind::TypeMismatch, iter.span)
                                 .with_arg("issue", ISSUE_ITERA_APUD_ARITY_MISMATCH)
                                 .with_arg("expected", expected.to_string())
@@ -262,9 +327,8 @@ impl TypeChecker<'_> {
                     self.itera_element_type(dispatch_ty, *mode, iter.span)
                 };
                 self.push_scope();
-                let numerus = self.numerus_type();
-                for (def_id, _name) in coordinate_bindings {
-                    self.insert_binding(*def_id, numerus);
+                for ((def_id, _name), ty) in coordinate_bindings.iter().zip(coordinate_types) {
+                    self.insert_binding(*def_id, ty);
                 }
                 self.insert_binding(*binding, elem_ty);
                 self.check_loop_block(block);

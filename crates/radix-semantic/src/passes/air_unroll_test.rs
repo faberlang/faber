@@ -1245,11 +1245,12 @@ functio ragged(lista<lista<f32>> pairs) → f32 {
 }
 "#,
     );
-    // Ragged `lista<lista<T>>` fails closed at the shaped-iterable rule;
-    // the loop is never unrolled. With typecheck failed the AIR purity pass
-    // is skipped (S03-9: it would read unreliable types), so the decline is
-    // the shaped-iterable error alone — no `itera_loop` stacked on top.
-    expect_issue(&result.diagnostics, "itera_apud_requires_shaped_iterable");
+    // Ragged `lista<lista<T>>` is rank 1 (D3.1), so two names fail closed
+    // at the arity rule; the loop is never unrolled. With typecheck failed
+    // the AIR purity pass is skipped (S03-9: it would read unreliable
+    // types), so the decline is the arity error alone — no `itera_loop`
+    // stacked on top.
+    expect_issue(&result.diagnostics, "itera_apud_arity_mismatch");
     assert!(
         !result
             .diagnostics

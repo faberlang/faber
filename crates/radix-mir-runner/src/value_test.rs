@@ -289,3 +289,22 @@ fn float_sort_order_is_ieee_total_order() {
     .collect();
     assert_eq!(bits, expected);
 }
+
+#[test]
+fn tuple_value_keys_by_its_parts_and_reads_back() {
+    // D3.2: a composite `iuncta` key hashes by value, so an equal tuple
+    // built elsewhere finds the same entry.
+    let span = Span::default();
+    let key = Value::Tuple(vec![Value::Str("east".to_owned()), Value::Int(2024)])
+        .to_key(span)
+        .expect("tuple of hashable parts is a key");
+    assert_eq!(
+        key,
+        MapKey::Tuple(vec![MapKey::Str("east".to_owned()), MapKey::UInt(2024)])
+    );
+    assert!(matches!(key.to_value(), Value::Tuple(parts) if parts.len() == 2));
+    assert!(
+        Value::Tuple(vec![Value::Float(1.5)]).to_key(span).is_err(),
+        "a fractus part is not a key"
+    );
+}

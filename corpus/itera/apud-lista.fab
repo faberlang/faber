@@ -1,0 +1,40 @@
++++
+term = "itera"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "itera_stmt", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "`apud [i]` over a lista binds each position next to its element (enumerate)."
+syntax = "for from <lista> at [i] const <element> { }"
+related = ["apud", "itera", "ex", "lista"]
+locale = "en"
++++
+# =============================================================================
+# apud lista — `at [i]` enumerates a list: position and element together.
+# =============================================================================
+#
+# What this teaches:
+#   • the `at` names are exactly what goes in the index brackets to get the
+#     element back: `days[i]` is `day`, so `at [i]` binds the position
+#   • a lista is rank 1 — one name, bound as a `numerus` counting from 0
+#
+# Common mistakes:
+#   • writing `at [i, j]` over `list<list<T>>` — a list of lists is still
+#     rank 1 (arity mismatch); nest two loops instead
+#   • keeping a hand-rolled counter beside `for from` — `at [i]` is the
+#     enumerate form
+#
+# See also: apud, itera, ex, lista
+# =============================================================================
+
+# for from <lista> at [i] const <element> { <body> }
+#
+# EXPECTED OUTPUT:
+#   one line per element: its position, then the element.
+
+main {
+    const list<string> days ← ["mon", "tue", "wed"]
+    for from days at [i] const day {
+        print i, day
+    }
+}

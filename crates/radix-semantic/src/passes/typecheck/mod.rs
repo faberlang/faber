@@ -101,6 +101,7 @@ pub mod finalize;
 pub mod first_match;
 pub mod format;
 pub mod generic;
+pub mod hashable;
 pub mod index_infer;
 pub mod infer;
 pub mod intervallum;
@@ -811,6 +812,14 @@ mod infer_test;
 #[cfg(test)]
 #[path = "itera_apud_test.rs"]
 mod itera_apud_test;
+
+#[cfg(test)]
+#[path = "hashable_key_test.rs"]
+mod hashable_key_test;
+
+#[cfg(test)]
+#[path = "tuple_key_index_test.rs"]
+mod tuple_key_index_test;
 
 #[cfg(test)]
 #[path = "itera_element_test.rs"]

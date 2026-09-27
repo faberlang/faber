@@ -866,11 +866,67 @@ impl TypeChecker<'_> {
             let idx_ty = self.check_expr(index);
             return self.check_tuple_index(&elements, index, object.span, index.span, idx_ty);
         }
-        let idx_ty = self.check_expr_allowing_direct_intervallum_step(index);
+        let idx_ty = match self.check_tuple_key_bracket(resolved, index) {
+            Some(ty) => ty,
+            None => self.check_expr_allowing_direct_intervallum_step(index),
+        };
         let result = self.check_index_from_type(obj_ty, idx_ty, object.span, index.span);
         super::tensor_index::reject_static_bounded_index_oob(self, obj_ty, index);
         self.reject_static_octeti_index_oob(object, index);
         result
+    }
+
+    /// Composite-key lookup (D3.2/D3.3): on a `tabula<iuncta<K1, …, Kn>, V>`
+    /// the bracket list is the key, so `m[[k1, …, kn]]` reads the entry for
+    /// that `iuncta`. A plain list literal of exactly n elements becomes the
+    /// tuple construction checked against the key type; any other index
+    /// shape returns `None` and keeps the ordinary map-index rule (which
+    /// reports a wrong part count as `map_index_type_mismatch`).
+    fn check_tuple_key_bracket(
+        &mut self,
+        object_ty: TypeId,
+        index: &mut HirExpression,
+    ) -> Option<TypeId> {
+        let map_ty = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(object_ty))
+            .1;
+        let Type::Map(key, _) = self.types.get(map_ty).clone() else {
+            return None;
+        };
+        let mut peeled = key;
+        while let Type::Alias(_, inner) = self.types.get(peeled) {
+            peeled = *inner;
+        }
+        let Type::Tuple(parts) = self.types.get(peeled) else {
+            return None;
+        };
+        let HirExpressionKind::Array(elements) = &index.kind else {
+            return None;
+        };
+        if elements.len() != parts.len()
+            || elements
+                .iter()
+                .any(|element| matches!(element, HirArrayElement::Spread(_)))
+        {
+            return None;
+        }
+        let HirExpressionKind::Array(elements) =
+            std::mem::replace(&mut index.kind, HirExpressionKind::Error)
+        else {
+            unreachable!("index kind was matched as an array literal above");
+        };
+        let items = elements
+            .into_iter()
+            .map(|element| match element {
+                HirArrayElement::Expr(expr) => expr,
+                HirArrayElement::Spread(_) => unreachable!("spreads were excluded above"),
+            })
+            .collect();
+        index.kind = HirExpressionKind::Tuple(items, None);
+        let ty = self.check_expr_with_expected(index, Some(key));
+        index.ty = Some(ty);
+        Some(ty)
     }
 
     /// Resolve a `Type::Tuple` index access to the element at the given position.
@@ -915,7 +971,10 @@ impl TypeChecker<'_> {
         index: &mut HirExpression,
     ) -> TypeId {
         let obj_ty = self.check_expr(object);
-        let idx_ty = self.check_expr_allowing_direct_intervallum_step(index);
+        let idx_ty = match self.check_tuple_key_bracket(obj_ty, index) {
+            Some(ty) => ty,
+            None => self.check_expr_allowing_direct_intervallum_step(index),
+        };
         let resolved = self.resolve_inferred_type(obj_ty);
         if let Type::Tensor(elem, shape) = self.types.get(resolved).clone() {
             self.check_tensor_bracket_index(elem, shape, idx_ty, object.span, index.span);

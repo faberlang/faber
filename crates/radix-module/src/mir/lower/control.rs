@@ -71,6 +71,13 @@ enum CollectionIteraKind {
     Stack(TypeId),
     MapKeys(TypeId),
     MapValues(TypeId),
+    /// `itera ex m apud [k] fixum v` (D3.1): walk a key snapshot and read
+    /// each value back by key; an `iuncta` key binds one name per part
+    /// (D3.3). Order is unspecified (D19.2).
+    MapEntries {
+        key: TypeId,
+        value: TypeId,
+    },
     Cursor(TypeId),
     AsyncCursor(TypeId),
     Tensor(TypeId),
@@ -2153,8 +2160,16 @@ impl FunctionBuilder<'_> {
     /// carrier under the `Ref` marker. Other pointees stay unsupported so the
     /// fail-closed decline (and the sibling tensor/bounded admission goals)
     /// is untouched.
-    fn borrowed_collection_itera_kind(&self, pointee: TypeId, mode: HirIteraMode) -> CollectionIteraKind {
+    fn borrowed_collection_itera_kind(
+        &self,
+        pointee: TypeId,
+        mode: HirIteraMode,
+        has_coordinates: bool,
+    ) -> CollectionIteraKind {
         match self.normalized_type(pointee) {
+            Type::Map(key, value) if matches!(mode, HirIteraMode::Ex) && has_coordinates => {
+                CollectionIteraKind::MapEntries { key: *key, value: *value }
+            }
             Type::Array(item) => CollectionIteraKind::Array(*item),
             Type::Queue(item) | Type::BoundedQueue { element: item, .. } if matches!(mode, HirIteraMode::Ex) => {
                 CollectionIteraKind::Queue(*item)
@@ -2284,13 +2299,16 @@ impl FunctionBuilder<'_> {
                 {
                     CollectionIteraKind::Stack(*item)
                 }
+                Type::Map(key, value) if matches!(iter.mode, HirIteraMode::Ex) && has_coordinates => {
+                    CollectionIteraKind::MapEntries { key: *key, value: *value }
+                }
                 Type::Map(key, _) if matches!(iter.mode, HirIteraMode::De) => CollectionIteraKind::MapKeys(*key),
                 Type::Map(_, value) if matches!(iter.mode, HirIteraMode::Ex) => CollectionIteraKind::MapValues(*value),
                 // Borrowed receiver (`de`/`in` param, or a field read through
                 // a reference): classify by pointee. Only the by-value carrier
                 // arms are admitted through the borrow; other pointees keep
                 // the fail-closed decline below.
-                Type::Ref(_, inner) => self.borrowed_collection_itera_kind(*inner, iter.mode),
+                Type::Ref(_, inner) => self.borrowed_collection_itera_kind(*inner, iter.mode, has_coordinates),
                 Type::Cursor(value) if matches!(iter.mode, HirIteraMode::Ex) => CollectionIteraKind::Cursor(*value),
                 Type::AsyncCursor(value, _) if matches!(iter.mode, HirIteraMode::Ex) => {
                     CollectionIteraKind::AsyncCursor(*value)
@@ -2366,6 +2384,9 @@ impl FunctionBuilder<'_> {
             return self.lower_shaped_itera(&iter, collection, *element, dimensions, *matrix);
         }
 
+        // The map itself stays addressable for the per-key value read.
+        let entries_map =
+            matches!(&collection_kind, CollectionIteraKind::MapEntries { .. }).then(|| collection.clone());
         let (iteration_place, binding_ty, array_de) = match &collection_kind {
             CollectionIteraKind::Array(item) => {
                 let item_ty = MirType::semantic(*item);
@@ -2388,6 +2409,11 @@ impl FunctionBuilder<'_> {
                 let (snapshot_place, binding_ty) =
                     self.lower_map_itera_snapshot(collection, *value, MirCollectionOp::Values, iter.iter.span)?;
                 (snapshot_place, binding_ty, false)
+            }
+            CollectionIteraKind::MapEntries { key, value } => {
+                let (snapshot_place, _) =
+                    self.lower_map_itera_snapshot(collection, *key, MirCollectionOp::Keys, iter.iter.span)?;
+                (snapshot_place, MirType::semantic(*value), false)
             }
             CollectionIteraKind::Cursor(value) | CollectionIteraKind::AsyncCursor(value) => {
                 (collection, MirType::semantic(*value), false)
@@ -2456,6 +2482,12 @@ impl FunctionBuilder<'_> {
         });
         self.bindings
             .insert(iter.binding, LocalBinding { local: binding, ty: binding_ty });
+        // `itera ex xs apud [i]` (D3.1): the position is the loop counter,
+        // exactly the index `xs[i]` reads back.
+        if let (CollectionIteraKind::Array(_), [(coordinate, _)]) = (&collection_kind, iter.coordinates) {
+            self.bindings
+                .insert(*coordinate, LocalBinding { local: index, ty: numerus });
+        }
 
         let cond_id = self.fresh_block(iter.span);
         let body_id = self.fresh_block(iter.body.span);
@@ -2508,7 +2540,15 @@ impl FunctionBuilder<'_> {
         } else {
             MirOperand::Place(MirPlace::local(index))
         };
-        let value = if matches!(&collection_kind, CollectionIteraKind::Queue(_) | CollectionIteraKind::Stack(_)) {
+        let value = if let (CollectionIteraKind::MapEntries { key, .. }, Some(map_place)) =
+            (&collection_kind, entries_map.clone())
+        {
+            let mut key_place = iteration_place;
+            key_place
+                .projections
+                .push(MirProjection::Index(source_index));
+            self.lower_map_entry_key_binding(&iter, *key, key_place, map_place)
+        } else if matches!(&collection_kind, CollectionIteraKind::Queue(_) | CollectionIteraKind::Stack(_)) {
             // Queue/stack carriers intentionally remain opaque MIR handles for
             // method access. Read their array-backed runtime value through the
             // collection index intrinsic rather than an index projection, whose
@@ -3129,6 +3169,67 @@ impl FunctionBuilder<'_> {
             self.seal_unreachable(after_id, iter.span);
         }
         Some(())
+    }
+
+    /// Bind one `apud` map entry (D3.1/D3.3): the key read from the key
+    /// snapshot lands in the single `apud` name, or — for an `iuncta` key
+    /// with one name per part — in a hidden key local whose parts project
+    /// into the names. Returns the value read back as `map[key]`.
+    fn lower_map_entry_key_binding(
+        &mut self,
+        iter: &ArrayIteraLowering<'_>,
+        key: TypeId,
+        key_read: MirPlace,
+        map_place: MirPlace,
+    ) -> MirOperand {
+        let key_ty = MirType::semantic(key);
+        let key_local = self.next_local_id();
+        let single = match iter.coordinates {
+            [(coordinate, name)] => Some((*coordinate, *name)),
+            _ => None,
+        };
+        self.locals.push(MirLocalDecl {
+            id: key_local,
+            name: single.map(|(_, name)| name),
+            ty: key_ty,
+            mutable: true,
+            span: iter.span,
+        });
+        self.assign(MirPlace::local(key_local), MirOperand::Place(key_read), key_ty, iter.span);
+        if let Some((coordinate, _)) = single {
+            self.bindings
+                .insert(coordinate, LocalBinding { local: key_local, ty: key_ty });
+        } else {
+            let parts = match self.normalized_type(key) {
+                Type::Tuple(parts) => parts.clone(),
+                _ => Vec::new(),
+            };
+            for (position, ((coordinate, name), part)) in iter.coordinates.iter().zip(parts).enumerate() {
+                let part_ty = MirType::semantic(part);
+                let part_local = self.next_local_id();
+                self.locals.push(MirLocalDecl {
+                    id: part_local,
+                    name: Some(*name),
+                    ty: part_ty,
+                    mutable: true,
+                    span: iter.span,
+                });
+                let mut part_read = MirPlace::local(key_local);
+                part_read
+                    .projections
+                    .push(MirProjection::Index(MirOperand::Constant(MirConstant::Int(
+                        i64::try_from(position).unwrap_or(i64::MAX),
+                    ))));
+                self.assign(MirPlace::local(part_local), MirOperand::Place(part_read), part_ty, iter.span);
+                self.bindings
+                    .insert(*coordinate, LocalBinding { local: part_local, ty: part_ty });
+            }
+        }
+        let mut value_read = map_place;
+        value_read
+            .projections
+            .push(MirProjection::Index(MirOperand::Place(MirPlace::local(key_local))));
+        MirOperand::Place(value_read)
     }
 
     fn lower_map_itera_snapshot(

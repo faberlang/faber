@@ -1,4 +1,4 @@
 # Reject oracle for apud coordinate iteration declines.
 # Tokens: stable diagnostic identities (faber check output); one per line.
 SEM010:itera_apud_arity_mismatch
-SEM010:itera_apud_requires_shaped_iterable
+SEM010:itera_apud_requires_indexed_iterable

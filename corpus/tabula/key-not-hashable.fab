@@ -1,0 +1,37 @@
++++
+term = "tabula"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "redde_stmt", "call_expr", "call_suffix", "member_suffix", "expression"]
+category = "collection"
+canonical = false
+summary = "Map keys and set elements must be hashable: floats and mutable collections are rejected."
+syntax = "tabula<K, V> / copia<T> with hashable K / T"
+related = ["tabula", "copia", "iuncta", "genus"]
+locale = "en"
++++
+# =============================================================================
+# key-not-hashable — map keys and set elements must be hashable.
+# =============================================================================
+#
+# Decline rows (reject reason in each comment):
+#   1. `map<f64, string>` — a float key (NaN is not equal to itself):
+#      SEM010 tabula_key_not_hashable
+#   2. `set<list<int>>` — a mutable collection as a set element:
+#      SEM010 copia_element_not_hashable
+#
+# What is hashable: text, integers, booleans, and tuples or classes whose
+# every part is hashable.
+#
+# Common mistakes:
+#   • keying by a float measurement — round to an integer unit first
+#
+# See also: tabula, copia, iuncta
+# =============================================================================
+
+fn weights(map<f64, string> m) → int {
+    return m.length()
+}
+
+fn members(set<list<int>> s) → int {
+    return s.length()
+}

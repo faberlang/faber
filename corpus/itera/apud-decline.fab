@@ -4,24 +4,28 @@ kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "generic_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "itera_stmt", "expression", "literal", "nota_stmt"]
 category = "control-flow"
 canonical = false
-summary = "apud coordinate iteration declines arity mismatch and non-shaped iterables with structured issues."
+summary = "apud coordinate iteration declines arity mismatch and unindexed iterables with structured issues."
 syntax = "for from <iterable> at [coords] const cell { }"
-related = ["apud", "itera", "ex", "tensor", "matrix"]
+related = ["apud", "itera", "ex", "tensor", "matrix", "lista", "copia"]
 locale = "en"
 +++
 
 # =============================================================================
-# apud decline — arity mismatch and non-shaped iterables fail closed.
+# apud decline — arity mismatch and unindexed iterables fail closed.
 # =============================================================================
 #
 # Decline rows (reject reason in each comment):
 #   1. arity mismatch — `at [i]` over tensor<f32, [2, 3]> binds 1 coordinate
 #      for rank 2: SEM010 itera_apud_arity_mismatch (expected=2, actual=1);
 #      partial binding never happens — the statement declines whole
-#   2. ragged — `list<list<f32>>` has no static rank: SEM010
-#      itera_apud_requires_shaped_iterable (apud requires a tensor or matrix
-#      iterable with a static rank)
-#   3. generic dims — `size R, size C` dims are not concrete at lowering, so
+#   2. ragged — `list<list<f32>>` is a lista, and a lista is rank 1
+#      (`rows[r]` takes one index): SEM010 itera_apud_arity_mismatch
+#      (expected=1, actual=2). Changed by D3.1 — it was
+#      itera_apud_requires_shaped_iterable while lists had no `at` form.
+#   3. set — a copia has no index to name: SEM010
+#      itera_apud_requires_indexed_iterable (`at` needs a lista, tabula,
+#      tensor, or matrix)
+#   4. generic dims — `size R, size C` dims are not concrete at lowering, so
 #      the base lane declines with the MIR unsupported diagnostic
 #      "itera collection before iterator MIR lowering" (declared fail-closed;
 #      `faber check` admits the symbolic rank — the decline is at MIR, pinned
@@ -36,10 +40,10 @@ locale = "en"
 
 # apud reject cases — expected compile failure
 #
-# WHY: documents the arity and shaped-iterable contracts for coordinate
-# iteration. Cases 1 and 2 must reject under `faber check` with the tokens
-# pinned in apud-decline.expected; case 3 is an MIR-lane decline kept here as
-# the documented third row.
+# WHY: documents the arity and indexed-iterable contracts for coordinate
+# iteration. Cases 1–3 must reject under `faber check` with the tokens
+# pinned in apud-decline.expected; case 4 is an MIR-lane decline kept here as
+# the documented fourth row.
 
 fn arity(tensor<f32, [2, 3]> grid) → void {
     for from grid at [i] const cell {
@@ -50,6 +54,12 @@ fn arity(tensor<f32, [2, 3]> grid) → void {
 fn ragged(list<list<f32>> rows) → void {
     for from rows at [r, c] const cell {
         print cell
+    }
+}
+
+fn members(set<int> s) → void {
+    for from s at [i] const member {
+        print member
     }
 }
 

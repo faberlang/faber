@@ -1,0 +1,84 @@
+//! D3.1–D3.3 emission pins: `itera ex … apud` over a lista/tabula and
+//! composite `iuncta` keys on the HIR backends (Rust, Go, TypeScript) and
+//! the Faber re-emitter. Behavior is proven by the corpus goldens
+//! (`itera/apud-lista`, `itera/apud-tabula`, `tabula/composite-key`); these
+//! pins name the carrier each backend must use.
+
+use crate::codegen::Target;
+use crate::codegen::faber::reemit_faber;
+use crate::driver::{Config, ModuleCompileRequest, Session, compile};
+
+const COMPOSITE: &str = r#"
+incipit {
+    varia tabula<iuncta<textus, numerus>, numerus> sales ← vacua
+    fixum textus east ← "east"
+    sales[[east, 2024]] ← 5
+    sales[[east, 2025]] ← 9
+    nota sales[[east, 2024]]
+    itera ex sales apud [regio, annus] fixum v {
+        nota regio, annus, v
+    }
+}"#;
+
+const LISTA: &str = r#"
+incipit {
+    fixum lista<textus> xs ← ["a", "b"]
+    itera ex xs apud [i] fixum x {
+        nota i, x
+    }
+}"#;
+
+fn emit(target: Target, source: &str) -> String {
+    let session = Session::new(Config::default().with_target(target));
+    let result = compile(&session, "apud.fab", source, ModuleCompileRequest::default());
+    assert!(result.success(), "{:?}", result.diagnostics);
+    match result.output {
+        Some(crate::Output::Rust(output)) => output.code,
+        Some(crate::Output::Go(output)) => output.code,
+        Some(crate::Output::TypeScript(output)) => output.code,
+        _ => panic!("expected HIR backend output"),
+    }
+}
+
+#[test]
+fn rust_enumerates_lista_and_destructures_composite_keys() {
+    let lista = emit(Target::HirRust, LISTA);
+    assert!(lista.contains(".iter().enumerate()"), "{lista}");
+    let composite = emit(Target::HirRust, COMPOSITE);
+    // The path key part clones so `east` survives its next use (E0382).
+    assert!(composite.contains("(east.clone(), 2024)"), "{composite}");
+    assert!(composite.contains("let (regio, annus) = "), "{composite}");
+}
+
+#[test]
+fn go_keys_composite_maps_by_comparable_array() {
+    let lista = emit(Target::HirGo, LISTA);
+    assert!(lista.contains("for i, x := range xs"), "{lista}");
+    let composite = emit(Target::HirGo, COMPOSITE);
+    assert!(composite.contains("sales[faberTupleKey([]any{east, 2024})] = 5"), "{composite}");
+    assert!(composite.contains("func faberTupleKey("), "{composite}");
+    assert!(composite.contains("faberTupleParts("), "{composite}");
+}
+
+#[test]
+fn ts_builds_value_keyed_tuple_map() {
+    let lista = emit(Target::HirTypeScript, LISTA);
+    assert!(lista.contains("for (const [i, x] of (xs).entries())"), "{lista}");
+    let composite = emit(Target::HirTypeScript, COMPOSITE);
+    assert!(
+        composite.contains("new FaberTupleMap<[string, number], number>()"),
+        "{composite}"
+    );
+    assert!(composite.contains("for (const [[regio, annus], v] of (sales))"), "{composite}");
+}
+
+#[test]
+fn faber_reemit_keeps_the_bracket_list_key() {
+    let session = Session::new(Config::default().with_dev_locale_root());
+    let pack = crate::locale::latin_locale_pack();
+    let result = reemit_faber(&session, &pack, "apud.fab", COMPOSITE);
+    assert!(result.success(), "{:?}", result.diagnostics);
+    let code = result.output.expect("re-emit output").code;
+    assert!(code.contains("sales[[east, 2024]]"), "{code}");
+    assert!(!code.contains("iuncta<textus, numerus> ["), "{code}");
+}
