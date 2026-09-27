@@ -106,13 +106,24 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 struct_defaults,
                 span,
             )?,
-            Value::Set(cell) => cell
-                .borrow()
-                .iter()
-                .cloned()
-                .map(map_key_to_value)
-                .collect(),
-            Value::Map(cell) => self.map_to_array(&cell.borrow(), element, span)?,
+            Value::Set(cell) => {
+                let mut items: Vec<Value> = cell
+                    .borrow()
+                    .iter()
+                    .cloned()
+                    .map(map_key_to_value)
+                    .collect();
+                // D19.2/D19.6: copia order is unspecified; shuffle under the
+                // test-only seed so `copia ↦ lista<T>` cannot quietly pin the
+                // runner's FxHashSet order.
+                crate::shuffle::shuffle_unordered(&mut items);
+                items
+            }
+            Value::Map(cell) => {
+                let mut items = self.map_to_array(&cell.borrow(), element, span)?;
+                crate::shuffle::shuffle_unordered(&mut items);
+                items
+            }
             other => {
                 return Err(RunnerError::internal(
                     span,

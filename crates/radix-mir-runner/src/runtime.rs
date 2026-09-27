@@ -3178,7 +3178,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let receiver = self.eval_operand(receiver, span)?;
         match receiver {
             Value::Map(cell) => {
-                let items = if values {
+                let mut items = if values {
                     cell.borrow().values().cloned().collect::<Vec<_>>()
                 } else {
                     cell.borrow()
@@ -3186,6 +3186,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         .map(Self::key_to_value)
                         .collect::<Vec<_>>()
                 };
+                // D19.2/D19.6: tabula order is unspecified; the test-only
+                // shuffle (RADIX_RUNNER_SHUFFLE_SEED) perturbs it so a
+                // golden cannot quietly pin the runner's FxHashMap order.
+                crate::shuffle::shuffle_unordered(&mut items);
                 Ok(Value::Array(Rc::new(RefCell::new(items))))
             }
             _ => Err(RunnerError::internal(

@@ -33,6 +33,8 @@ locale = "en"
 #   a.is_subset(b) | a.is_superset(b)
 #
 # Set operations return new copia<T> values; operands are not mutated.
+# copia iteration order is unspecified (D19.2); each result is materialized
+# to a lista and sorted before printing.
 #
 # EXPECTED OUTPUT:
 #   Smoke asserts exit 0 only.
@@ -54,6 +56,16 @@ main {
     const set<int> disiuncta ← primi.symmetric_difference(pares)
     const bool subcopiaest ← communia.is_subset(omnes)
     const bool supercopiaest ← omnes.is_superset(communia)
-    print omnes, communia, reliqua, disiuncta
+
+    # copia iteration order is unspecified (D19.2) — sort before printing
+    const list<int> omnesOrd ← omnes ↦ list<int>
+    omnesOrd.sort()
+    const list<int> communiaOrd ← communia ↦ list<int>
+    communiaOrd.sort()
+    const list<int> reliquaOrd ← reliqua ↦ list<int>
+    reliquaOrd.sort()
+    const list<int> disiunctaOrd ← disiuncta ↦ list<int>
+    disiunctaOrd.sort()
+    print omnesOrd, communiaOrd, reliquaOrd, disiunctaOrd
     print subcopiaest, supercopiaest
 }
