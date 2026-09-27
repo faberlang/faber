@@ -3024,6 +3024,10 @@ help = "write the map with `empty`, an empty or keyed object literal, or convert
 message = "an array is not a tensor: `∷` asserts a type the expression already has, and matching rank and lengths is a coincidence, not structural compatibility"
 help = "convert explicitly with `↦`, as in `flat ↦ tensor<f32, [8]>`"
 
+[diagnostics.SEM016.issues.numeric_ascription_requires_conversion]
+message = "`∷` states a fact the compiler can prove; this numeric ascription narrows, loses float precision, or crosses int↔float, so it is a conversion"
+help = "convert explicitly with `↦`, as in `n ↦ int<u8>`"
+
 [diagnostics.SEM016.issues.cross_collection_unsupported]
 message = "cross-collection conversion has no default `↦` meaning; use an explicit stdlib verb"
 help = "use an explicit stdlib conversion verb"

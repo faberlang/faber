@@ -100,6 +100,7 @@ const ISSUE_RATIO_FIELD_MISSING: &str = "ratio_field_missing";
 const ISSUE_UNKNOWN_RECORD_FIELD: &str = "unknown_record_field";
 const ISSUE_FIELD_INITIALIZER_TYPE_MISMATCH: &str = "field_initializer_type_mismatch";
 const ISSUE_VALOR_VERTE_UNSUPPORTED: &str = "valor_verte_unsupported";
+const ISSUE_NUMERIC_ASCRIPTION_REQUIRES_CONVERSION: &str = "numeric_ascription_requires_conversion";
 const ISSUE_INVALID_CAST: &str = "invalid_cast";
 const ISSUE_ARRAY_ELEMENT_TYPE_MISMATCH: &str = "array_element_type_mismatch";
 const ISSUE_ARRAY_SPREAD_ELEMENT_TYPE_MISMATCH: &str = "array_spread_element_type_mismatch";
@@ -215,6 +216,173 @@ fn static_integer_magnitude(source: &HirExpression) -> Option<i128> {
             _ => None,
         },
         _ => None,
+    }
+}
+
+fn static_float_magnitude(source: &HirExpression) -> Option<f64> {
+    match &source.kind {
+        HirExpressionKind::Literal(HirLiteral::Float(value)) => Some(*value),
+        HirExpressionKind::Literal(HirLiteral::FloatText { value, .. }) => Some(*value),
+        HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => match &inner.kind {
+            HirExpressionKind::Literal(HirLiteral::Float(value)) => Some(-*value),
+            HirExpressionKind::Literal(HirLiteral::FloatText { value, .. }) => Some(-*value),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// One arithmetic widening family for F3 `∷` facts (DECISIONS D1.11).
+///
+/// Ranks order lossless widening inside a family; distinct variants are
+/// distinct families, and mixing them is a `↦` conversion. `BF16` stays
+/// rankless: no exactness proof without soft-float arithmetic.
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum NumericFactFamily {
+    SignedInt { rank: u8 },
+    UnsignedInt { rank: u8 },
+    Modular { rank: u8 },
+    SaturatingSigned { rank: u8 },
+    SaturatingUnsigned { rank: u8 },
+    Float { rank: Option<u8> },
+    Decimal { rank: u8 },
+}
+
+impl NumericFactFamily {
+    /// Whether a value of `self` flows into `other` unchanged.
+    fn admits(self, other: Self) -> bool {
+        match (self, other) {
+            (Self::SignedInt { rank: a }, Self::SignedInt { rank: b })
+            | (Self::UnsignedInt { rank: a }, Self::UnsignedInt { rank: b })
+            | (Self::Modular { rank: a }, Self::Modular { rank: b })
+            | (Self::SaturatingSigned { rank: a }, Self::SaturatingSigned { rank: b })
+            | (Self::SaturatingUnsigned { rank: a }, Self::SaturatingUnsigned { rank: b })
+            | (Self::Decimal { rank: a }, Self::Decimal { rank: b }) => a <= b,
+            (Self::Float { rank: a }, Self::Float { rank: b }) => {
+                matches!((a, b), (Some(x), Some(y)) if x <= y)
+            }
+            _ => false,
+        }
+    }
+}
+
+fn signed_width_rank(width: NumericWidth) -> Option<u8> {
+    match width {
+        NumericWidth::I8 => Some(0),
+        NumericWidth::I16 => Some(1),
+        NumericWidth::I32 => Some(2),
+        NumericWidth::I64 => Some(3),
+        _ => None,
+    }
+}
+
+fn unsigned_width_rank(width: NumericWidth) -> Option<u8> {
+    match width {
+        NumericWidth::U8 => Some(0),
+        NumericWidth::U16 => Some(1),
+        NumericWidth::U32 => Some(2),
+        NumericWidth::U64 => Some(3),
+        _ => None,
+    }
+}
+
+fn float_width_rank(width: NumericWidth) -> Option<u8> {
+    match width {
+        NumericWidth::F16 => Some(0),
+        NumericWidth::F32 => Some(1),
+        NumericWidth::F64 => Some(2),
+        _ => None,
+    }
+}
+
+fn decimal_width_rank(width: NumericWidth) -> Option<u8> {
+    match width {
+        NumericWidth::D32 => Some(0),
+        NumericWidth::D64 => Some(1),
+        _ => None,
+    }
+}
+
+/// A scalar numeric type as F3 sees it: widening family plus the carrier
+/// width for the literal-holds clause.
+struct NumericFact {
+    family: NumericFactFamily,
+    width: Option<NumericWidth>,
+}
+
+fn numeric_fact(ty: &Type) -> Option<NumericFact> {
+    let fact = |family| NumericFact {
+        family,
+        width: None,
+    };
+    match ty {
+        Type::Primitive(Primitive::Numerus) => Some(fact(NumericFactFamily::SignedInt { rank: 3 })),
+        Type::Primitive(Primitive::Fractus) => {
+            Some(fact(NumericFactFamily::Float { rank: Some(2) }))
+        }
+        Type::SizedNumeric(_, width) => {
+            let family = if let Some(rank) = signed_width_rank(*width) {
+                NumericFactFamily::SignedInt { rank }
+            } else if let Some(rank) = unsigned_width_rank(*width) {
+                NumericFactFamily::UnsignedInt { rank }
+            } else if let Some(rank) = decimal_width_rank(*width) {
+                NumericFactFamily::Decimal { rank }
+            } else {
+                float_width_rank(*width)
+                    .map(|rank| NumericFactFamily::Float { rank: Some(rank) })?
+            };
+            Some(NumericFact {
+                family,
+                width: Some(*width),
+            })
+        }
+        Type::ModularWord(width) => {
+            let rank = unsigned_width_rank(*width)?;
+            Some(NumericFact {
+                family: NumericFactFamily::Modular { rank },
+                width: Some(*width),
+            })
+        }
+        Type::SaturatingWord(width) => {
+            let family = if let Some(rank) = signed_width_rank(*width) {
+                NumericFactFamily::SaturatingSigned { rank }
+            } else {
+                NumericFactFamily::SaturatingUnsigned {
+                    rank: unsigned_width_rank(*width)?,
+                }
+            };
+            Some(NumericFact {
+                family,
+                width: Some(*width),
+            })
+        }
+        _ => None,
+    }
+}
+
+/// Inclusive value range an integer-family width holds; `None` for
+/// non-integer widths.
+fn integer_width_range(width: NumericWidth) -> Option<(i128, i128)> {
+    match width {
+        NumericWidth::I8 => Some((i128::from(i8::MIN), i128::from(i8::MAX))),
+        NumericWidth::I16 => Some((i128::from(i16::MIN), i128::from(i16::MAX))),
+        NumericWidth::I32 => Some((i128::from(i32::MIN), i128::from(i32::MAX))),
+        NumericWidth::I64 => Some((i128::from(i64::MIN), i128::from(i64::MAX))),
+        NumericWidth::U8 => Some((0, i128::from(u8::MAX))),
+        NumericWidth::U16 => Some((0, i128::from(u16::MAX))),
+        NumericWidth::U32 => Some((0, i128::from(u32::MAX))),
+        NumericWidth::U64 => Some((0, i128::from(u64::MAX))),
+        _ => None,
+    }
+}
+
+/// Whether a float width holds an f64 value exactly. `f16`/`bf16` have no
+/// exactness proof without soft-float arithmetic, so they hold nothing here.
+fn float_width_holds(width: NumericWidth, value: f64) -> bool {
+    match width {
+        NumericWidth::F64 => true,
+        NumericWidth::F32 => f64::from(value as f32) == value,
+        _ => false,
     }
 }
 
@@ -2716,7 +2884,12 @@ impl TypeChecker<'_> {
             Type::Vector(elem_ty, width) => {
                 self.check_verte_vector_target(source, elem_ty, width, span);
             }
-            Type::ModularWord(_) => {}
+            Type::ModularWord(_)
+            | Type::SaturatingWord(_)
+            | Type::SizedNumeric(..)
+            | Type::Primitive(Primitive::Numerus | Primitive::Fractus) => {
+                self.check_verte_numeric_fact(source, source_resolved, effective_target, span);
+            }
             Type::Map(..) => {
                 self.check_array_source_cross_kind_ascription(
                     source_resolved,
@@ -2765,6 +2938,64 @@ impl TypeChecker<'_> {
             Type::Array(_) | Type::BoundedArray { .. }
         ) {
             self.invalid_conversion(issue, span);
+        }
+    }
+
+    /// Enforce F3 on scalar numeric `∷` targets (DECISIONS D1.11, fork F3):
+    /// the ascription must state a provable fact — an integer literal the
+    /// target width holds, a float literal the target width holds exactly,
+    /// or lossless widening inside one arithmetic family. Narrowing, float
+    /// precision loss, and int↔float are conversions and take `↦`. Sources
+    /// outside these families (valor, unresolved shapes, error) keep their
+    /// own law.
+    fn check_verte_numeric_fact(
+        &mut self,
+        source: &HirExpression,
+        source_resolved: TypeId,
+        target: TypeId,
+        span: radix_lexer::Span,
+    ) {
+        let source_ty = self.resolve_inferred_type(source_resolved);
+        let target_ty = self.resolve_inferred_type(target);
+        if matches!(self.types.get(source_ty), Type::Error | Type::Infer(_)) {
+            return;
+        }
+        let (Some(source_fact), Some(target_fact)) = (
+            numeric_fact(self.types.get(source_ty)),
+            numeric_fact(self.types.get(target_ty)),
+        ) else {
+            return;
+        };
+
+        // A folded integer literal is a fact when the target width holds the
+        // value; int↔float and int→decimal stay conversions (decimal law:
+        // integer literals keep their own family).
+        if let Some(value) = static_integer_magnitude(source) {
+            let holds = target_fact
+                .width
+                .and_then(integer_width_range)
+                .is_some_and(|(min, max)| value >= min && value <= max);
+            if !holds {
+                self.invalid_conversion(ISSUE_NUMERIC_ASCRIPTION_REQUIRES_CONVERSION, span);
+            }
+            return;
+        }
+        if let Some(value) = static_float_magnitude(source) {
+            let holds = match target_fact.family {
+                NumericFactFamily::Float { .. } => target_fact
+                    .width
+                    .is_some_and(|width| float_width_holds(width, value)),
+                _ => false,
+            };
+            if !holds {
+                self.invalid_conversion(ISSUE_NUMERIC_ASCRIPTION_REQUIRES_CONVERSION, span);
+            }
+            return;
+        }
+
+        // Non-literal sources: lossless widening inside one family only.
+        if !source_fact.family.admits(target_fact.family) {
+            self.invalid_conversion(ISSUE_NUMERIC_ASCRIPTION_REQUIRES_CONVERSION, span);
         }
     }
 

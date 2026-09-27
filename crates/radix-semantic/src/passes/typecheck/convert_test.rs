@@ -2038,3 +2038,94 @@ fn conversio_assign_channel_mismatch_keeps_sem010_shape() {
             .any(|arg| arg.name == "destination" && arg.value == "numerus")
     );
 }
+
+#[test]
+fn verte_ascription_rejects_runtime_narrowing_into_sized_numerus() {
+    // DECISIONS D1.11 probe: `n ∷ int<u8>` on a run-time `n` compiled and
+    // printed 300 — a u8 holding 300. F3: a value change is a `↦`
+    // conversion, never a `∷` fact.
+    test_support::assert_rejects_with_issue(
+        r"
+functio probe(numerus n) → numerus<u8> {
+    redde n ∷ numerus<u8>
+}
+",
+        "numeric_ascription_requires_conversion",
+    );
+}
+
+#[test]
+fn verte_ascription_rejects_literal_over_target_width() {
+    // D1.11: a literal the target cannot hold (`300 ∷ int<u8>`) is a
+    // compile error, not a silent cast.
+    test_support::assert_rejects_with_issue(
+        r"incipit { fixum numerus<u8> b ← 300 ∷ numerus<u8> }",
+        "numeric_ascription_requires_conversion",
+    );
+}
+
+#[test]
+fn verte_ascription_rejects_float_precision_loss() {
+    test_support::assert_rejects_with_issue(
+        r"
+functio narrow(fractus x) → fractus<f32> {
+    redde x ∷ fractus<f32>
+}
+",
+        "numeric_ascription_requires_conversion",
+    );
+}
+
+#[test]
+fn verte_ascription_rejects_int_float_crossing() {
+    test_support::assert_rejects_with_issue(
+        r"
+functio relabel(numerus n) → fractus {
+    redde n ∷ fractus
+}
+",
+        "numeric_ascription_requires_conversion",
+    );
+}
+
+#[test]
+fn verte_ascription_rejects_float_literal_target_cannot_hold() {
+    // 0.1 survives f32 rounding only as a different value; the target does
+    // not hold the literal, so the ascription is a conversion.
+    test_support::assert_rejects_with_issue(
+        r"incipit { fixum fractus<f32> x ← 0.1 ∷ fractus<f32> }",
+        "numeric_ascription_requires_conversion",
+    );
+}
+
+#[test]
+fn verte_ascription_keeps_provable_numeric_facts() {
+    // The F3 fact cases: an in-range literal, i32→i64, f32→f64, and a
+    // float literal the target width holds exactly.
+    test_support::assert_accepts(r"incipit { fixum numerus<u8> port ← 42 ∷ numerus<u8> }");
+    test_support::assert_accepts(
+        r"
+functio widen(numerus<i32> n) → numerus {
+    redde n ∷ numerus
+}
+",
+    );
+    test_support::assert_accepts(
+        r"
+functio widen_fractus(fractus<f32> x) → fractus {
+    redde x ∷ fractus
+}
+",
+    );
+    test_support::assert_accepts(r"incipit { fixum fractus<f32> two ← 2.5 ∷ fractus<f32> }");
+}
+#[test]
+fn verte_ascription_keeps_modular_widening() {
+    test_support::assert_accepts(
+        r"
+functio probe(modulus<u8> m) → modulus<u32> {
+    redde m ∷ modulus<u32>
+}
+",
+    );
+}
