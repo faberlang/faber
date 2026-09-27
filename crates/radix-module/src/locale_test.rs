@@ -1498,9 +1498,9 @@ fn installed_packs_resolve_batch_a_keyword_surfaces() {
     assert_eq!(zh.contextual_keyword_surface("iuncta"), "元组");
 
     let llm = installed_pack("en");
-    assert_eq!(llm.keyword_latin_key("uint"), Some("modulus"));
+    assert_eq!(llm.keyword_latin_key("wrapping"), Some("modulus"));
     assert_eq!(llm.keyword_latin_key("tuple"), Some("iuncta"));
-    assert_eq!(llm.contextual_keyword_surface("modulus"), "uint");
+    assert_eq!(llm.contextual_keyword_surface("modulus"), "wrapping");
     assert_eq!(llm.contextual_keyword_surface("iuncta"), "tuple");
 }
 

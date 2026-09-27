@@ -31,9 +31,9 @@ locale = "en"
 #   Division and remainder by zero fail.
 
 main {
-    var uint<u8> max ← 255
-    const uint<u8> one ← 1
-    var uint<u8> zero ← 0
+    var wrapping<u8> max ← 255
+    const wrapping<u8> one ← 1
+    var wrapping<u8> zero ← 0
     const int<u8> converted ↤ one
     print max + one
     print zero - one
@@ -47,15 +47,15 @@ main {
     zero ↓
     print max
     print zero
-    const uint<u8> methodSum ← max.added(one)
-    const uint<u8> methodShift ← max.shifted_left(8)
-    var uint<u8> methodAcc ← 0
+    const wrapping<u8> methodSum ← max.added(one)
+    const wrapping<u8> methodShift ← max.shifted_left(8)
+    var wrapping<u8> methodAcc ← 0
     methodAcc.add(one)
     methodAcc.shift_left(8)
     print converted
     print methodSum
     print methodShift
     print methodAcc
-    const list<uint<u8>> words ← [one, max]
-    print words.get(1) coalesce 0 ∷ uint<u8>
+    const list<wrapping<u8>> words ← [one, max]
+    print words.get(1) coalesce 0 ∷ wrapping<u8>
 }

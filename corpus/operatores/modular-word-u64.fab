@@ -31,9 +31,9 @@ locale = "en"
 #   Division and remainder by zero fail.
 
 main {
-    var uint<u64> max ← 18446744073709551615
-    const uint<u64> one ← 1
-    var uint<u64> zero ← 0
+    var wrapping<u64> max ← 18446744073709551615
+    const wrapping<u64> one ← 1
+    var wrapping<u64> zero ← 0
     const int<u64> converted ↤ one
     print max + one
     print zero - one
@@ -46,25 +46,25 @@ main {
 
     # Carrier-mix equality: conversions and arithmetic results compare by
     # value against literals (review regression).
-    const uint<u64> uno ↤ 1
+    const wrapping<u64> uno ↤ 1
     print one ≡ uno
     print one ≡ one + 0
     max ↑
     zero ↓
     print max
     print zero
-    const uint<u64> methodSum ← max.added(one)
-    const uint<u64> methodShift ← max.shifted_left(64)
-    var uint<u64> methodAcc ← 0
+    const wrapping<u64> methodSum ← max.added(one)
+    const wrapping<u64> methodShift ← max.shifted_left(64)
+    var wrapping<u64> methodAcc ← 0
     methodAcc.add(one)
     methodAcc.shift_left(64)
     print converted
     print methodSum
     print methodShift
     print methodAcc
-    const list<uint<u64>> words ← [one, max]
-    print words.get(1) coalesce 0 ∷ uint<u64>
-    var list<uint<u64>> sorted ← [18446744073709551615, 3, 10, 2]
+    const list<wrapping<u64>> words ← [one, max]
+    print words.get(1) coalesce 0 ∷ wrapping<u64>
+    var list<wrapping<u64>> sorted ← [18446744073709551615, 3, 10, 2]
     sorted.sort()
     print sorted
 }

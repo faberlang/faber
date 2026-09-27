@@ -328,7 +328,7 @@ fn run_faber_convert_stdin(to: &str, source: &str) -> (String, String, bool) {
 const AUTHORED_TYPE_FORMS_SOURCE: &str = r#"+++
 locale = "en"
 +++
-type Word = uint<u32>
+type Word = wrapping<u32>
 
 fn forms() → int {
     const int scalar_long ← 1
