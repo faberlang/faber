@@ -119,7 +119,9 @@ fn intersection_implements_flattens_like_the_comma_list() {
                 hir.items
                     .iter()
                     .find_map(|item| match &item.kind {
-                        radix_hir::HirItemKind::Interface(interface) if item.def_id == *def_id => {
+                        radix_hir::HirItemKind::Interface(interface)
+                            if item.def_id == def_id.contract =>
+                        {
                             Some(unit.interner.resolve(interface.name).to_owned())
                         }
                         _ => None,

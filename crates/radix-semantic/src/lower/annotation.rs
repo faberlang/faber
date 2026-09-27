@@ -786,6 +786,13 @@ impl Lowerer<'_> {
             let mut allowed = match &type_params[param_index].constraint {
                 HirTypeParamConstraint::Any => Vec::new(),
                 HirTypeParamConstraint::OneOf(existing) => existing.clone(),
+                // A closed type list and a contract bound are two admission
+                // rules for one parameter; D1.9 keeps them separate.
+                HirTypeParamConstraint::Implet(_) => {
+                    self.current_span = param_field.span;
+                    self.error("radix_typus_bounded_param");
+                    continue;
+                }
             };
             for field in &annotation.fields {
                 if self.interner.resolve(field.name) != "allowed" {

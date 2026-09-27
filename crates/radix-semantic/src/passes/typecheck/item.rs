@@ -52,6 +52,7 @@ impl TypeChecker<'_> {
                 .map(|param| (param.name, param.kind))
                 .collect(),
         );
+        let previous_generic_bounds = self.enter_generic_bounds(&func.type_params);
         self.push_scope();
         for (idx, param) in func.params.iter_mut().enumerate() {
             if let Some(default) = &mut param.default {
@@ -127,6 +128,7 @@ impl TypeChecker<'_> {
         self.allow_inferred_return = prev_allow_inferred;
         self.pop_scope();
         self.current_generic_param_kinds = previous_generic_param_kinds;
+        self.current_generic_bounds = previous_generic_bounds;
     }
 
     /// Check a constant initializer and record the resulting global type.

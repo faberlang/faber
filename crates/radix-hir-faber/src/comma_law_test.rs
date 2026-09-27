@@ -691,7 +691,13 @@ fn declaration_and_annotation_lists_emit_between_only() {
             },
         ],
         methods: Vec::new(),
-        implements: vec![DefId(100), DefId(101), DefId(102)],
+        implements: [100, 101, 102]
+            .into_iter()
+            .map(|id| radix_types::ContractRef {
+                contract: DefId(id),
+                args: Vec::new(),
+            })
+            .collect(),
     };
     let enm = HirEnum {
         name: interner.intern("E"),

@@ -23,11 +23,11 @@ use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     DefId, HirAnnotation, HirAvailability, HirBlock, HirEnum, HirExpressionKind, HirFunction,
     HirInterface, HirItem, HirItemKind, HirOwnerRef, HirParam, HirStruct, HirTestModifier,
-    HirTypeParam, HirTypeSite, HirTypeSlot,
+    HirTypeParam, HirTypeParamConstraint, HirTypeSite, HirTypeSlot,
 };
 use radix_lexer::{Interner, Symbol, TokenKind};
 use radix_syntax::{CallablePosture, GenericParamKind};
-use radix_types::{SemanticGenericParamDefault, TypeId};
+use radix_types::{ContractRef, SemanticGenericParamDefault, TypeId};
 use rustc_hash::FxHashMap;
 
 impl super::FaberCodegen<'_> {
@@ -332,11 +332,11 @@ impl super::FaberCodegen<'_> {
             writer.write(" ");
             writer.write(surface.contextual_keyword("implet"));
             writer.write(" ");
-            for (i, interface) in s.implements.iter().enumerate() {
+            for (i, contract) in s.implements.iter().enumerate() {
                 if i > 0 {
                     writer.write(", ");
                 }
-                writer.write(&self.name_for_def(*interface, names));
+                self.write_contract_ref(contract, names, surface, writer);
             }
         }
 
@@ -788,6 +788,17 @@ impl super::FaberCodegen<'_> {
             match param.kind {
                 GenericParamKind::Typus => {
                     writer.write(&self.symbol_to_string(param.name));
+                    if let HirTypeParamConstraint::Implet(bounds) = &param.constraint {
+                        writer.write(" ");
+                        writer.write(surface.contextual_keyword("implet"));
+                        writer.write(" ");
+                        for (i, bound) in bounds.iter().enumerate() {
+                            if i > 0 {
+                                writer.write(" ∩ ");
+                            }
+                            self.write_contract_ref(bound, names, surface, writer);
+                        }
+                    }
                 }
                 GenericParamKind::Magnitudo => {
                     writer.write(surface.keyword(TokenKind::Magnitudo));
@@ -806,6 +817,28 @@ impl super::FaberCodegen<'_> {
                     }
                 }
             }
+        }
+        writer.write(">");
+    }
+
+    /// `Contract` or `Contract<A, B>` as written in an `implet` clause.
+    fn write_contract_ref(
+        &self,
+        contract: &ContractRef,
+        names: &FxHashMap<DefId, Symbol>,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        writer.write(&self.name_for_def(contract.contract, names));
+        if contract.args.is_empty() {
+            return;
+        }
+        writer.write("<");
+        for (i, arg) in contract.args.iter().enumerate() {
+            if i > 0 {
+                writer.write(", ");
+            }
+            writer.write(&self.type_to_faber(*arg, names, surface));
         }
         writer.write(">");
     }

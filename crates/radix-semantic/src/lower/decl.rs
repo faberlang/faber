@@ -56,6 +56,9 @@ use radix_syntax::{
 type ModifierLocal = (DefId, Symbol, Span);
 type ShaderLocal = (DefId, Symbol, Span, TypeId, bool);
 const ISSUE_CALLABLE_POSTURE_CONFLICT: &str = "callable_posture_conflict";
+/// A type declaration parameter carries an `implet` bound (bounds are for
+/// callables; D1.1).
+const ISSUE_IMPLET_BOUND_ON_TYPE_DECLARATION: &str = "implet_bound_on_type_declaration";
 
 struct LanePathCollector<'a> {
     resolver: &'a crate::Resolver,
@@ -165,6 +168,65 @@ impl Lowerer<'_> {
                 }),
             })
             .collect()
+    }
+
+    /// Lower the `implet` bounds of one callable's generic row (D1.1).
+    ///
+    /// Runs after the row is pushed so a bound may name any parameter of the
+    /// row. A bounded parameter's constraint becomes
+    /// [`HirTypeParamConstraint::Implet`]; typecheck validates each contract.
+    fn lower_type_param_bounds(&mut self, lowered: &mut [HirTypeParam], params: &[TypeParam]) {
+        for (hir_param, param) in lowered.iter_mut().zip(params) {
+            if param.bounds.is_empty() {
+                continue;
+            }
+            let bounds: Vec<_> = param
+                .bounds
+                .iter()
+                .filter_map(|bound| self.lower_contract_ref(bound))
+                .collect();
+            if bounds.len() == param.bounds.len() {
+                hir_param.constraint = HirTypeParamConstraint::Implet(bounds);
+            }
+        }
+    }
+
+    /// Bounds belong on callables only: a bound on a type declaration's
+    /// parameter would need checking at every construction and use, which
+    /// D1.1 does not rule. Reject it by name rather than drop it silently.
+    fn reject_type_declaration_bounds(&mut self, params: &[TypeParam]) {
+        for param in params {
+            if let Some(bound) = param.bounds.first() {
+                self.error_with_args_at(
+                    vec![DiagnosticArg::new(
+                        "issue",
+                        ISSUE_IMPLET_BOUND_ON_TYPE_DECLARATION,
+                    )],
+                    bound.span,
+                );
+            }
+        }
+    }
+
+    /// Resolve one `implet` contract name and lower its written arguments.
+    fn lower_contract_ref(
+        &mut self,
+        contract: &radix_syntax::ContractRefExpr,
+    ) -> Option<radix_types::ContractRef> {
+        let Some(def_id) = self.resolver.lookup(contract.name.name) else {
+            self.current_span = contract.span;
+            self.error("unknown_interface");
+            return None;
+        };
+        let args = contract
+            .args
+            .iter()
+            .map(|arg| self.lower_type(arg))
+            .collect();
+        Some(radix_types::ContractRef {
+            contract: def_id,
+            args,
+        })
     }
 
     fn lower_param(
@@ -484,6 +546,7 @@ impl Lowerer<'_> {
                 .iter()
                 .map(|param| (param.def_id, param.name, param.kind)),
         );
+        self.lower_type_param_bounds(&mut type_params, &decl.type_params);
         self.apply_type_param_constraints_from_annotations(&mut type_params, &annotations);
         let mut params = Vec::new();
         for (ordinal, param) in decl.params.iter().enumerate() {
@@ -688,6 +751,7 @@ impl Lowerer<'_> {
         let def_id = self.def_id_for(decl.name.name);
 
         let type_params = self.lower_type_params(&decl.type_params);
+        self.reject_type_declaration_bounds(&decl.type_params);
 
         self.push_type_params(
             type_params
@@ -747,6 +811,7 @@ impl Lowerer<'_> {
                             .iter()
                             .map(|param| (param.def_id, param.name, param.kind)),
                     );
+                    self.lower_type_param_bounds(&mut method_type_params, &method.type_params);
                     self.apply_type_param_constraints_from_annotations(
                         &mut method_type_params,
                         &annotations,
@@ -841,19 +906,15 @@ impl Lowerer<'_> {
             }
         }
 
-        self.pop_type_params();
-
+        // Contract arguments may name the genus's own parameters
+        // (`genus Arca<T> implet Capsa<T>`), so lower them in that scope.
         let implements = decl
             .implements
             .iter()
-            .filter_map(|ident| {
-                let def_id = self.resolver.lookup(ident.name);
-                if def_id.is_none() {
-                    self.error("unknown_interface");
-                }
-                def_id
-            })
+            .filter_map(|contract| self.lower_contract_ref(contract))
             .collect();
+
+        self.pop_type_params();
 
         let struct_item = HirStruct {
             name: decl.name.name,
@@ -956,6 +1017,7 @@ impl Lowerer<'_> {
         let annotations = self.lower_item_annotations(def_id, &stmt.annotations);
 
         let type_params = self.lower_type_params(&decl.type_params);
+        self.reject_type_declaration_bounds(&decl.type_params);
 
         self.push_type_params(
             type_params
@@ -1019,6 +1081,7 @@ impl Lowerer<'_> {
         let annotations = self.lower_annotations(&method.annotations);
         let posture = self.resolve_callable_posture(method.posture, &annotations, method.span);
         HirInterfaceMethod {
+            def_id: self.next_def_id(),
             availability: self.lower_availability_from_annotations(&annotations),
             name: method.name.name,
             // Interface signatures keep the declared name; aliases are binding-only.
@@ -1044,6 +1107,7 @@ impl Lowerer<'_> {
         let annotations = self.lower_item_annotations(def_id, &stmt.annotations);
 
         let type_params = self.lower_type_params(&decl.type_params);
+        self.reject_type_declaration_bounds(&decl.type_params);
 
         self.push_type_params(
             type_params
@@ -1086,6 +1150,7 @@ impl Lowerer<'_> {
         let def_id = self.def_id_for(decl.name.name);
         let annotations = self.lower_item_annotations(def_id, &stmt.annotations);
         let type_params = self.lower_type_params(&decl.type_params);
+        self.reject_type_declaration_bounds(&decl.type_params);
         self.push_type_params(
             type_params
                 .iter()

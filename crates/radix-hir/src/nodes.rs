@@ -29,8 +29,8 @@
 use radix_lexer::{Span, Symbol, Token};
 use radix_syntax::{CallablePosture, GenericParamKind, JsonValue, TypeFormLevel, Visibility};
 use radix_types::{
-    GenericParamDescriptor, GenericParamSort, IndexId, SemanticGenericParamDefault, TypeId,
-    TypeParamConstraint,
+    ContractRef, GenericParamDescriptor, GenericParamSort, IndexId, SemanticGenericParamDefault,
+    TypeId, TypeParamConstraint,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
@@ -479,6 +479,8 @@ pub struct HirTypeParam {
 pub enum HirTypeParamConstraint {
     Any,
     OneOf(Vec<TypeId>),
+    /// Contract bounds written `T implet C<…> ∩ D<…>` (DECISIONS D1.1).
+    Implet(Vec<ContractRef>),
 }
 
 impl HirTypeParam {
@@ -506,6 +508,9 @@ impl HirTypeParam {
                 HirTypeParamConstraint::Any => TypeParamConstraint::Any,
                 HirTypeParamConstraint::OneOf(allowed) => {
                     TypeParamConstraint::OneOf(allowed.clone())
+                }
+                HirTypeParamConstraint::Implet(bounds) => {
+                    TypeParamConstraint::Implet(bounds.clone())
                 }
             },
             default: self.default.clone(),
@@ -578,8 +583,9 @@ pub struct HirStruct {
     pub fields: Vec<HirField>,
     pub methods: Vec<HirMethod>,
 
-    /// Resolved interfaces this type claims to implement.
-    pub implements: Vec<DefId>,
+    /// Resolved contracts this type declares in its `implet` clause, each
+    /// with its type arguments (`implet Orderable<Persona>`, D1.2).
+    pub implements: Vec<ContractRef>,
 }
 
 /// Field declaration inside a product type.
@@ -691,6 +697,10 @@ pub struct HirInterface {
 /// Signature required by an interface.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirInterfaceMethod {
+    /// Contract-method identity. A call through a type-parameter bound
+    /// (D1.1) targets this id until monomorphization picks the witness's
+    /// own method.
+    pub def_id: DefId,
     /// Target availability metadata. Empty means available for every target.
     pub availability: Vec<HirAvailability>,
     pub name: Symbol,

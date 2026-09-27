@@ -511,8 +511,12 @@ pub struct FunctionProvenanceTableWire {
 /// inheritance removed, DECISIONS D8.1); the serialized struct shape changed,
 /// so schema-v16 artifacts fail closed. Version 18 adds
 /// `HirExpressionKind::Format` (the `¶` operator, D2.1), shifting the serde
-/// ordinal of `Error`; schema-v17 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 18;
+/// ordinal of `Error`; schema-v17 artifacts fail closed. Version 19 carries
+/// contract bounds and generic `implet` (D1.1/D1.2): `HirStruct.implements`
+/// holds contract references with type arguments, `HirTypeParamConstraint`
+/// gains `Implet`, and `HirInterfaceMethod` gains a `def_id`; schema-v18
+/// artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 19;
 
 /// Serializable snapshot of one analyzed provider unit carried for HIR
 /// emission (ARCH-U4 carriage).

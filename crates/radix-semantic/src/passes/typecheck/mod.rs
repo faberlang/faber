@@ -83,6 +83,10 @@ pub mod call;
 #[path = "cfa_join_test.rs"]
 mod cfa_join_test;
 pub mod collect;
+mod contract_bound;
+#[cfg(test)]
+#[path = "contract_bound_test.rs"]
+mod contract_bound_test;
 pub mod control;
 pub mod convert;
 #[cfg(test)]
@@ -260,12 +264,21 @@ pub(crate) struct TypeChecker<'a> {
 
     /// Declared `implet` contracts of local genus declarations in item order,
     /// with their spans, so contract resolution reports deterministically.
-    pub struct_implements: Vec<(DefId, radix_lexer::Span, Vec<DefId>)>,
+    pub struct_implements: Vec<(DefId, radix_lexer::Span, Vec<radix_types::ContractRef>)>,
 
     /// Kind-checked `implet` contracts keyed by struct def. There is no class
     /// inheritance (DECISIONS D8.1), so this is exactly the genus's own
     /// declaration, and interface-to-interface heritage is not in the grammar.
     pub implemented_interfaces: FxHashMap<DefId, FxHashSet<DefId>>,
+
+    /// Well-formed `implet` contracts with their type arguments, keyed by
+    /// struct def (D1.2). Bound satisfaction compares against these (D1.3).
+    pub implemented_contracts: FxHashMap<DefId, Vec<radix_types::ContractRef>>,
+
+    /// `implet` bounds of the generic parameters on the body currently being
+    /// checked (D1.1): bound members are callable on a `T` receiver, and a
+    /// bounded `T` satisfies the same bound at a nested call.
+    pub current_generic_bounds: FxHashMap<Symbol, Vec<radix_types::ContractRef>>,
 
     /// Type-alias declaration parameter names keyed by alias def-id, in
     /// declaration order. Populated from HIR items so applied alias types
@@ -505,6 +518,8 @@ impl<'a> TypeChecker<'a> {
             interfaces: FxHashMap::default(),
             struct_implements: Vec::new(),
             implemented_interfaces: FxHashMap::default(),
+            implemented_contracts: FxHashMap::default(),
+            current_generic_bounds: FxHashMap::default(),
             alias_type_params: FxHashMap::default(),
             import_receivers: FxHashSet::default(),
             target,

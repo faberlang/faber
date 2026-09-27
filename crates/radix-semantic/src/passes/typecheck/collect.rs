@@ -170,6 +170,16 @@ impl TypeChecker<'_> {
         }
 
         self.interfaces.insert(def_id, methods);
+        // Contract arity and argument substitution (D1.2) read the
+        // implendum's own parameter row.
+        self.type_params_by_def.insert(
+            def_id,
+            interface_item
+                .type_params
+                .iter()
+                .map(|param| param.name)
+                .collect(),
+        );
     }
 
     fn collect_builtin_scrinium(&mut self) {
@@ -403,23 +413,17 @@ impl TypeChecker<'_> {
     fn resolve_struct_implements(&mut self) {
         let declared = std::mem::take(&mut self.struct_implements);
         for (def_id, span, implements) in &declared {
-            let interfaces: Vec<DefId> = implements
+            let contracts: Vec<radix_types::ContractRef> = implements
                 .iter()
-                .copied()
-                .filter(|iface| self.interfaces.contains_key(iface))
+                .filter(|contract| self.validate_contract_ref(contract, *span))
+                .cloned()
                 .collect();
-            if interfaces.len() < implements.len() {
-                self.error_issue(
-                    SemanticErrorKind::TypeMismatch,
-                    ISSUE_IMPLET_REQUIRES_IMPLENDUM,
-                    *span,
-                );
-            }
-            self.implemented_interfaces
-                .insert(*def_id, interfaces.into_iter().collect());
+            self.implemented_interfaces.insert(
+                *def_id,
+                contracts.iter().map(|contract| contract.contract).collect(),
+            );
+            self.implemented_contracts.insert(*def_id, contracts);
         }
         self.struct_implements = declared;
     }
 }
-
-const ISSUE_IMPLET_REQUIRES_IMPLENDUM: &str = "implet_requires_implendum";

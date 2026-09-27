@@ -77,6 +77,16 @@ impl FunctionBuilder<'_> {
         if let Some(result) = self.lower_union_method_call(receiver, method, args, conversion, expr) {
             return result;
         }
+        if let Some(target) = self.bound_method_target(receiver, method) {
+            // D1.1: a call through a type-parameter bound targets the contract
+            // method with the receiver type as its witness; monomorphization
+            // rewrites it to the witness's own method.
+            let receiver_ty = MirType::semantic(receiver.ty?);
+            let mut lowered_args = Vec::with_capacity(args.len() + 1);
+            lowered_args.push(self.lower_expr_value(receiver)?);
+            lowered_args.extend(self.lower_hir_call_args(args)?);
+            return self.lower_definition_call(target, vec![receiver_ty], lowered_args, conversion, expr);
+        }
 
         let imported_method_target = receiver.ty.and_then(|receiver_ty| {
             let def_id = self.method_receiver_struct_def(receiver_ty)?;
@@ -2182,6 +2192,17 @@ impl FunctionBuilder<'_> {
             }));
         }
         Some(args)
+    }
+
+    /// Contract method reached through the enclosing callable's bound on the
+    /// receiver's type parameter (D1.1).
+    fn bound_method_target(&self, receiver: &HirExpression, method: Symbol) -> Option<DefId> {
+        let receiver_ty = receiver.ty?;
+        let (_, payload) = self.types.peel_access_marker(receiver_ty);
+        let Type::Param(param) = self.types.get(payload) else {
+            return None;
+        };
+        self.bound_methods.get(&(*param, method)).copied()
     }
 
     fn genus_method_target(&self, receiver: &HirExpression, method: Symbol) -> Option<MethodTarget> {

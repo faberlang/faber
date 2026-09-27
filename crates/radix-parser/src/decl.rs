@@ -789,7 +789,8 @@ impl Parser {
     /// Parse a class declaration.
     ///
     /// GRAMMAR:
-    ///   class-decl := genus ident [type-params] [implet ident-list] { member* }
+    ///   class-decl := genus ident [type-params] [implet contract-list] { member* }
+    ///   contract-list := contract-ref ((',' | '∩') contract-ref)*
     ///
     /// Class headers are intentionally narrow: a comma-separated `implet` list
     /// and nothing else. Class inheritance (`sub`, `abstractus`) was removed
@@ -818,7 +819,7 @@ impl Parser {
                     )
                     .with_arg("issue", "implements_slot_requires_name"));
                 }
-                implements.push(self.parse_decl_name()?);
+                implements.push(self.parse_contract_ref()?);
                 // `∩` is the same separator as the comma: the implements
                 // clause is a conjunctive (intersection) list. `∪` and holes
                 // are not item separators, so they fail closed here (R1).
@@ -2980,8 +2981,10 @@ impl Parser {
     ///
     /// GRAMMAR:
     ///   generic-params       := '<' generic-param (',' generic-param)* '>'
-    ///   generic-param        := ident generic-type-default?
+    ///   generic-param        := ident generic-bound? generic-type-default?
     ///                          | `magnitudo` ident generic-size-default?
+    ///   generic-bound        := `implet` contract-ref ('∩' contract-ref)*
+    ///   contract-ref         := ident ('<' type (',' type)* '>')?
     ///   generic-type-default := '=' type
     ///   generic-size-default := '=' NATURAL
     ///
@@ -3010,6 +3013,20 @@ impl Parser {
                 (GenericParamKind::Typus, self.parse_ident()?)
             };
 
+            // D1.1: a type parameter may name contracts its witnesses must
+            // declare. Inside `<…>` the comma separates parameters, so
+            // several bounds join with `∩` only. Size parameters take no
+            // bound; `implet` after one fails at the separator below.
+            let mut bounds = Vec::new();
+            if kind == GenericParamKind::Typus && self.eat_keyword_ident(TokenKind::Implet) {
+                loop {
+                    bounds.push(self.parse_contract_ref()?);
+                    if !self.eat(&TokenKind::Cap) {
+                        break;
+                    }
+                }
+            }
+
             if self.check_keyword_ident(TokenKind::Vel) {
                 return Err(self.vel_generic_default_error());
             }
@@ -3023,11 +3040,14 @@ impl Parser {
                 }
                 None
             };
-            let span = start.merge(name.span);
+            let span = bounds
+                .last()
+                .map_or(start.merge(name.span), |bound| start.merge(bound.span));
             params.push(TypeParam {
                 kind,
                 name,
                 default,
+                bounds,
                 span,
             });
 
@@ -3038,6 +3058,29 @@ impl Parser {
 
         self.expect(&TokenKind::GtAscii, "expected '>' after generic parameters")?;
         Ok(params)
+    }
+
+    /// Parse one contract reference in an `implet` clause or bound.
+    ///
+    /// GRAMMAR:
+    ///   contract-ref := ident ('<' type (',' type)* '>')?
+    ///
+    /// A generic contract is written with its arguments in full
+    /// (`Orderable<Persona>`, `Orderable<T>`); arity is a semantic check.
+    fn parse_contract_ref(&mut self) -> Result<ContractRefExpr, ParseError> {
+        let name = self.parse_decl_name()?;
+        let mut args = Vec::new();
+        if self.eat(&TokenKind::LtAscii) {
+            loop {
+                args.push(self.parse_type()?);
+                if !self.consume_item_separator(&TokenKind::GtAscii, "type_parameters")? {
+                    break;
+                }
+            }
+            self.expect(&TokenKind::GtAscii, "expected '>'")?;
+        }
+        let span = name.span.merge(self.previous_span());
+        Ok(ContractRefExpr { name, args, span })
     }
 
     /// Parse the `=` default of one generic parameter, by declared sort.

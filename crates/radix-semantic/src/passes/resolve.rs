@@ -302,6 +302,7 @@ fn resolve_stmt(
             for param in &decl.type_params {
                 define_generic_param(resolver, param, errors);
             }
+            resolve_generic_bounds(resolver, interner, &decl.type_params, errors);
             for param in &decl.params {
                 resolve_type_expr(resolver, interner, &param.ty, errors);
                 let binding_name = param.alias.as_ref().unwrap_or(&param.name);
@@ -354,8 +355,8 @@ fn resolve_stmt(
             for param in &decl.type_params {
                 define_generic_param(resolver, param, errors);
             }
-            for iface in &decl.implements {
-                resolve_type_ident(resolver, interner, iface, errors);
+            for contract in &decl.implements {
+                resolve_contract_ref(resolver, interner, contract, errors);
             }
             for member in &decl.members {
                 match &member.kind {
@@ -370,6 +371,7 @@ fn resolve_stmt(
                         for param in &method.type_params {
                             define_generic_param(resolver, param, errors);
                         }
+                        resolve_generic_bounds(resolver, interner, &method.type_params, errors);
                         for param in &method.params {
                             resolve_type_expr(resolver, interner, &param.ty, errors);
                             let binding_name = param.alias.as_ref().unwrap_or(&param.name);
@@ -3905,6 +3907,36 @@ fn define_generic_param(
         false,
         errors,
     );
+}
+
+/// Resolve the `implet` bounds of one generic row (D1.1).
+///
+/// Runs after every parameter of the row is defined, so a bound may name a
+/// later parameter (`<T implet R<U>, U>`).
+fn resolve_generic_bounds(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    params: &[radix_syntax::TypeParam],
+    errors: &mut Vec<SemanticError>,
+) {
+    for param in params {
+        for bound in &param.bounds {
+            resolve_contract_ref(resolver, interner, bound, errors);
+        }
+    }
+}
+
+/// Resolve one contract reference: its name and each written type argument.
+fn resolve_contract_ref(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    contract: &radix_syntax::ContractRefExpr,
+    errors: &mut Vec<SemanticError>,
+) {
+    resolve_type_ident(resolver, interner, &contract.name, errors);
+    for arg in &contract.args {
+        resolve_type_expr(resolver, interner, arg, errors);
+    }
 }
 
 fn modifier_bindings(modifiers: &[radix_syntax::FuncModifier]) -> Vec<&radix_syntax::Ident> {

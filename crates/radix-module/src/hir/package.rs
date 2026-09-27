@@ -915,6 +915,12 @@ fn device_body_from_hir(
                 .map(|ty| format_constraint_type(*ty, analysis))
                 .collect::<Vec<_>>()
                 .join("|"),
+            // Device bodies record the contract definitions a bound names.
+            HirTypeParamConstraint::Implet(bounds) => bounds
+                .iter()
+                .map(|bound| format!("implet#{}", bound.contract.0))
+                .collect::<Vec<_>>()
+                .join("&"),
         };
         if param.is_typus() {
             type_constraints.push(DeviceBodyConstraint { param: name, binding });

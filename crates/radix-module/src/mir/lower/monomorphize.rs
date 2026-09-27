@@ -113,6 +113,11 @@ struct MonomorphizationState<'lowerer, 'unit> {
     /// its position so fresh instances resolve like the seed set.
     function_index: MirFunctionIndex,
     next_id: MirFunctionId,
+    /// Contract bound dispatch (D1.1): contract method → its name, and
+    /// `(genus, method) → method` for rewriting a bound call once its
+    /// receiver witness is concrete.
+    contract_methods: FxHashMap<DefId, Symbol>,
+    genus_methods: FxHashMap<(DefId, Symbol), DefId>,
 }
 
 impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
@@ -145,6 +150,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             }
         };
         let function_index = MirFunctionIndex::for_functions(&lowerer.functions);
+        let (contract_methods, genus_methods) = contract_dispatch_tables(&lowerer.unit.hir);
         Self {
             lowerer,
             templates,
@@ -154,6 +160,8 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             instance_index: FxHashMap::default(),
             function_index,
             next_id,
+            contract_methods,
+            genus_methods,
         }
     }
 
@@ -697,10 +705,10 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         shape_params: &FxHashSet<Symbol>,
         span: Span,
     ) -> bool {
-        let MirCallee::Definition { type_args, .. } = callee else {
+        let MirCallee::Definition { source, type_args } = callee else {
             return true;
         };
-        for type_arg in type_args {
+        for type_arg in type_args.iter_mut() {
             // GSF-1: a forwarded size witness stays a symbolic `Param` in
             // callee type args — it is not a typus binding and is resolved
             // through the calling instance's shape bindings at key
@@ -717,7 +725,32 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 None => return false,
             };
         }
+        if let Some(target) = self.bound_call_target(*source, type_args, span) {
+            *callee = MirCallee::definition(target);
+        }
         true
+    }
+
+    /// Resolve a contract-method callee (a D1.1 bound call) whose receiver
+    /// witness is now concrete to the witness genus's own method. Typecheck
+    /// admitted the witness only when its `implet` clause names the contract,
+    /// so a missing method is a conformance hole reported here, not guessed.
+    fn bound_call_target(&mut self, source: DefId, type_args: &[MirType], span: Span) -> Option<DefId> {
+        let method = *self.contract_methods.get(&source)?;
+        let witness = type_args.first()?.semantic_id();
+        if type_contains_param(self.types(), witness) {
+            return None;
+        }
+        let genus = struct_def_of(self.types(), witness);
+        let target = genus.and_then(|genus| self.genus_methods.get(&(genus, method)).copied());
+        if target.is_none() {
+            let witness = self.format_ty(MirType::semantic(witness));
+            self.lowerer.errors.push(MirError::validation(
+                span,
+                format!("bound call witness {witness} declares no method for the contract"),
+            ));
+        }
+        target
     }
 
     fn substitute_value(&mut self, value: &mut MirValue, bindings: &MirGenericBindings, span: Span) -> bool {
@@ -1011,6 +1044,40 @@ enum ParamKind {
 struct OrderedParam {
     name: Symbol,
     kind: ParamKind,
+}
+
+/// Contract-method names and genus method targets for bound-call dispatch.
+fn contract_dispatch_tables(
+    hir: &crate::hir::HirModule,
+) -> (FxHashMap<DefId, Symbol>, FxHashMap<(DefId, Symbol), DefId>) {
+    let mut contract_methods = FxHashMap::default();
+    let mut genus_methods = FxHashMap::default();
+    for item in &hir.items {
+        match &item.kind {
+            crate::hir::HirItemKind::Interface(interface) => {
+                for method in &interface.methods {
+                    contract_methods.insert(method.def_id, method.name);
+                }
+            }
+            crate::hir::HirItemKind::Struct(strukt) => {
+                for method in &strukt.methods {
+                    genus_methods.insert((item.def_id, method.func.name), method.def_id);
+                }
+            }
+            _ => {}
+        }
+    }
+    (contract_methods, genus_methods)
+}
+
+/// The genus a concrete witness type names, through access markers.
+fn struct_def_of(types: &TypeTable, ty: TypeId) -> Option<DefId> {
+    match types.get(ty) {
+        Type::Struct(def) => Some(*def),
+        Type::Ref(_, inner) => struct_def_of(types, *inner),
+        Type::Applied(base, _) => struct_def_of(types, *base),
+        _ => None,
+    }
 }
 
 fn generic_param_order(hir: &crate::hir::HirModule) -> FxHashMap<DefId, Vec<OrderedParam>> {
