@@ -31,6 +31,7 @@ fn genus(name: &str) -> FileExport {
                 optional: false,
                 required: true,
                 default: None,
+                modifier: None,
             }],
             methods: Vec::new(),
             annotation_contract: None,

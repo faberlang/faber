@@ -106,6 +106,8 @@ pub struct StructFieldSnapshot {
     pub ty: TypeId,
     pub optional: bool,
     pub required: bool,
+    /// Authored genus field modifier (D16.1).
+    pub modifier: Option<radix_syntax::FieldModifier>,
 }
 
 // ---------------------------------------------------------------------------
@@ -515,8 +517,11 @@ pub struct FunctionProvenanceTableWire {
 /// contract bounds and generic `implet` (D1.1/D1.2): `HirStruct.implements`
 /// holds contract references with type arguments, `HirTypeParamConstraint`
 /// gains `Implet`, and `HirInterfaceMethod` gains a `def_id`; schema-v18
+/// artifacts fail closed. Version 20 replaces `HirField.is_static` with the
+/// authored field modifier (`fixum` / `varia` / `generis`, D16.1) and carries
+/// it on `StructFieldSnapshot`; schema-v19
 /// artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 19;
+pub const SCHEMA_VERSION: u32 = 20;
 
 /// Serializable snapshot of one analyzed provider unit carried for HIR
 /// emission (ARCH-U4 carriage).

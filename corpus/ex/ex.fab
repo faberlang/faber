@@ -36,8 +36,8 @@ locale = "en"
 #
 
 class Persona {
-    string nomen
-    int aetas
+    var string nomen
+    var int aetas
 }
 
 main {

@@ -38,7 +38,7 @@ locale = "en"
 
 class Color {
     static string ruber = "#ff0000"
-    string nomen = "ruber"
+    var string nomen = "ruber"
 }
 
 main {

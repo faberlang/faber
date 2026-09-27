@@ -749,6 +749,10 @@ help = "write `{generis} T NAME = value`; a static is a compile-time fact"
 message = "a {generis} static needs an initializer"
 help = "write `{generis} T NAME = value`"
 
+[diagnostics.PARSE010.issues.field_modifier_repeated]
+message = "a field takes exactly one of {fixum}, {varia} or {generis}"
+help = "keep one modifier; a {generis} field is already immutable"
+
 [diagnostics.PARSE010.issues.static_sponte]
 message = "a {generis} static cannot be {sponte}"
 help = "remove {sponte}; a static always has its compile-time value"
@@ -3088,6 +3092,14 @@ help = "use a `var` binding to allow reassignment, or remove the extra assignmen
 [diagnostics.SEM020.issues.assignment_to_commune_field]
 message = "assignment to commune field"
 help = "commune fields are read-only through the union projection"
+
+[diagnostics.SEM020.issues.assignment_to_fixum_field]
+message = "assignment to {fixum} field '{field}'"
+help = "a {fixum} field is set only in a construction literal; declare it {varia} to allow reassignment"
+
+[diagnostics.SEM020.issues.union_member_not_varia]
+message = "union field '{member}' is not {varia} in: {members}"
+help = "a write through a union needs the field declared {varia} in every member, or narrow the receiver (`est M`, `discerne`)"
 
 [diagnostics.SEM020.issues.immutable_second_assignment]
 message = "second assignment to immutable binding"

@@ -83,6 +83,7 @@ fn token_union_interface() -> FileInterface {
                         optional: false,
                         required: true,
                         default: None,
+                        modifier: None,
                     }],
                 },
             ],

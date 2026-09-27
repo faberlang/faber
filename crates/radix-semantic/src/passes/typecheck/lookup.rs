@@ -103,6 +103,20 @@ impl TypeChecker<'_> {
         self.error_issue(SemanticErrorKind::ImmutableAssignment, issue, span);
     }
 
+    pub fn immutable_assignment_with_args(
+        &mut self,
+        issue: &'static str,
+        span: radix_lexer::Span,
+        args: &[(&'static str, String)],
+    ) {
+        let mut error = SemanticError::structured(SemanticErrorKind::ImmutableAssignment, span)
+            .with_arg("issue", issue);
+        for (name, value) in args {
+            error = error.with_arg(name, value);
+        }
+        self.errors.push(error);
+    }
+
     pub fn missing_type_annotation(&mut self, issue: &'static str, span: radix_lexer::Span) {
         self.error_issue(SemanticErrorKind::TypeAnnotationAbsent, issue, span);
     }

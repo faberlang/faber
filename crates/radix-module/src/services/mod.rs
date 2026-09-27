@@ -3,6 +3,7 @@
 mod check;
 mod commands;
 mod emit;
+mod field_modifier_codemod;
 mod inspect;
 pub(crate) mod json;
 #[cfg(feature = "mir-core")]
@@ -20,6 +21,7 @@ pub use crate::program::{
 pub use check::{CheckDiagnosticsResult, check_diagnostics_for_source, check_diagnostics_for_source_with_locale_pack};
 pub use commands::{BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand};
 pub use emit::{build_output_path, output_code};
+pub use field_modifier_codemod::{FieldModifierCodemod, insert_field_modifiers};
 #[cfg(feature = "mir-core")]
 pub use inspect::mir_output_for_source;
 pub use inspect::{

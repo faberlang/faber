@@ -220,6 +220,9 @@ pub struct InterfaceStructField {
     pub required: bool,
     /// Producer-side compile-time initializer for imported class construction.
     pub default: Option<HirExpression>,
+    /// Authored genus field modifier (D16.1); `None` for unmarked and
+    /// variant/union payload fields.
+    pub modifier: Option<radix_syntax::FieldModifier>,
 }
 
 /// Nominal declarations whose import contract is their type identity.

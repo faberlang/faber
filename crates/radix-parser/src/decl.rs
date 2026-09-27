@@ -891,7 +891,14 @@ impl Parser {
 
     /// Parse the field portion shared by genus and union declaration members.
     fn parse_field_decl(&mut self) -> Result<FieldDecl, ParseError> {
-        let is_static = self.eat_keyword_ident(TokenKind::Generis);
+        let modifier = self.eat_field_modifier();
+        if modifier.is_some() && self.current_field_modifier().is_some() {
+            return Err(ParseError::structured(
+                ParseErrorKind::DeclarationInvalid,
+                self.current_span(),
+            )
+            .with_arg("issue", "field_modifier_repeated"));
+        }
         if self.at_removed_nexum_modifier() {
             return Err(
                 ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
@@ -908,12 +915,35 @@ impl Parser {
         };
 
         Ok(FieldDecl {
-            is_static,
+            modifier,
             sponte,
             ty,
             name,
             init,
         })
+    }
+
+    /// The field modifier the current word spells, if any (DECISIONS D16.1).
+    fn current_field_modifier(&self) -> Option<FieldModifier> {
+        match self.current_keyword_ident()? {
+            TokenKind::Fixum => Some(FieldModifier::Fixum),
+            TokenKind::Varia => Some(FieldModifier::Varia),
+            TokenKind::Generis => Some(FieldModifier::Generis),
+            _ => None,
+        }
+    }
+
+    /// Consume one leading field modifier, if present.
+    ///
+    /// GRAMMAR:
+    ///   field-decl := ('fixum' | 'varia' | 'generis')? type ident 'sponte'? ('=' expr)?
+    ///
+    /// Exactly one modifier: the caller rejects a second one
+    /// (`generis fixum`, `generis varia`, `fixum varia`).
+    fn eat_field_modifier(&mut self) -> Option<FieldModifier> {
+        let modifier = self.current_field_modifier()?;
+        self.advance();
+        Some(modifier)
     }
 
     /// Whether the current word is the removed `nexum` field modifier.

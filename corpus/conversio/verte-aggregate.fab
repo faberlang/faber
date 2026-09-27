@@ -41,9 +41,9 @@ locale = "en"
 #   10
 
 class Civis {
-    string nomen
-    string regio = "Roma"
-    int aetas optional
+    var string nomen
+    var string regio = "Roma"
+    var int aetas optional
 }
 
 main {

@@ -13,8 +13,8 @@ locale = "en"
 # =============================================================================
 
 class Holder {
-    f64 x = 0.0
-    list<int> marks = []
+    var f64 x = 0.0
+    var list<int> marks = []
 }
 
 main {

@@ -53,7 +53,7 @@ fn multiplica(int x, int y) → int {
 }
 
 class Computator {
-    int valor = 0
+    var int valor = 0
 
     fn pone(int n) → Computator {
         self.valor ← n

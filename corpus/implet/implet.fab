@@ -39,7 +39,7 @@ interface Nominatum {
 }
 
 class Civis implements Nominatum {
-    string nomen
+    var string nomen
 
     fn plenum() → string {
         # satisfies implendum requirement

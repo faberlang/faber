@@ -41,8 +41,8 @@ locale = "en"
 #   Rust: assertio !. not yet emitted — compile-only smoke.
 
 class Persona {
-    string nomen
-    string urbs optional
+    var string nomen
+    var string urbs optional
 }
 
 main {

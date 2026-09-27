@@ -1409,6 +1409,10 @@ mod nexum_removed_test;
 mod static_decl_test;
 
 #[cfg(test)]
+#[path = "field_modifier_test.rs"]
+mod field_modifier_test;
+
+#[cfg(test)]
 #[path = "construction_spread_removed_test.rs"]
 mod construction_spread_removed_test;
 

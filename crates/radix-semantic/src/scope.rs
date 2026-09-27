@@ -319,6 +319,8 @@ pub struct ImportedFileStructField {
     pub ty: TypeId,
     pub optional: bool,
     pub required: bool,
+    /// Authored genus field modifier (D16.1), carried across the interface.
+    pub modifier: Option<radix_syntax::FieldModifier>,
     pub init: Option<HirExpression>,
 }
 
@@ -1501,6 +1503,7 @@ impl Resolver {
                                 ty,
                                 optional: field.optional,
                                 required: field.required,
+                                modifier: field.modifier,
                                 init: field.default.clone(),
                             }),
                             Err(_) => {
@@ -1727,6 +1730,7 @@ impl Resolver {
                 ty,
                 optional: field.optional,
                 required: field.required,
+                modifier: field.modifier,
                 init: field.default.clone(),
             });
         }
@@ -3578,6 +3582,7 @@ impl Resolver {
                                         ty: field.ty,
                                         optional: field.optional,
                                         required: field.required,
+                                        modifier: field.modifier,
                                         init: None,
                                     })
                                     .collect();
@@ -3722,6 +3727,7 @@ impl Resolver {
                                         ty: field.ty,
                                         optional: field.optional,
                                         required: field.required,
+                                        modifier: field.modifier,
                                     })
                                     .collect(),
                             },

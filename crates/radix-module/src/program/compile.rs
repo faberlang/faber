@@ -1559,6 +1559,7 @@ fn file_export_from_stmt(
                         optional: field.sponte,
                         required: !field.sponte && field.init.is_none(),
                         default: None,
+                        modifier: field.modifier,
                     })
                 })
                 .collect::<Vec<_>>();
@@ -1709,6 +1710,7 @@ fn file_export_from_stmt(
                                     optional: false,
                                     required: true,
                                     default: None,
+                                    modifier: None,
                                 })
                             })
                             .collect::<Vec<_>>();
@@ -1731,6 +1733,7 @@ fn file_export_from_stmt(
                             optional: false,
                             required: true,
                             default: None,
+                            modifier: None,
                         })
                     })
                     .collect::<Vec<_>>();

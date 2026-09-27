@@ -13,7 +13,7 @@ locale = "en"
 # =============================================================================
 
 class Counter {
-    int n = 0
+    var int n = 0
 
     fn inc() → void {
         self.n ← self.n + 1

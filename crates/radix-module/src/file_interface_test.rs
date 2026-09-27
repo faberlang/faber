@@ -354,6 +354,7 @@ fn conflicting_kind_snapshot_fails_closed_through_canonical_key() {
                 optional: false,
                 required: true,
                 default: None,
+                modifier: None,
             }],
             methods: Vec::new(),
             annotation_contract: None,
@@ -568,6 +569,7 @@ fn strict_locale_pack_keeps_supported_struct_fields_without_field_rows() {
                     optional: false,
                     required: true,
                     default: None,
+                    modifier: None,
                 },
                 InterfaceStructField {
                     name: "unsupported".to_owned(),
@@ -575,6 +577,7 @@ fn strict_locale_pack_keeps_supported_struct_fields_without_field_rows() {
                     optional: false,
                     required: true,
                     default: None,
+                    modifier: None,
                 },
             ],
             methods: Vec::new(),

@@ -34,13 +34,13 @@ locale = "en"
 #   10, 20, "Marcus", 0
 
 class Punctum {
-    int x
-    int y
+    var int x
+    var int y
 }
 
 class Persona {
-    string nomen
-    int aetas = 0
+    var string nomen
+    var int aetas = 0
 }
 
 main {

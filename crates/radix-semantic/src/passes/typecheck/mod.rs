@@ -94,6 +94,9 @@ pub mod convert;
 mod enum_access_honesty_test;
 pub mod expr;
 pub mod extremum;
+#[cfg(test)]
+#[path = "field_modifier_write_test.rs"]
+mod field_modifier_write_test;
 pub mod finalize;
 pub mod first_match;
 pub mod format;
@@ -180,6 +183,10 @@ struct StructFieldInfo {
 
     /// Declaration span used when reporting missing required fields.
     span: radix_lexer::Span,
+
+    /// Authored field modifier (D16.1); `None` for unmarked and builtin
+    /// fields. Gates writes outside construction literals.
+    modifier: Option<radix_syntax::FieldModifier>,
 }
 
 /// Current alternate-exit context for `iace` and handled failable calls.
@@ -594,6 +601,7 @@ impl<'a> TypeChecker<'a> {
                             optional: field.optional,
                             required: field.required,
                             span: radix_lexer::Span::default(),
+                            modifier: field.modifier,
                         },
                     )
                 })

@@ -30,10 +30,10 @@ locale = "en"
 # (recoverable via a `⊥` default). Extra JSON keys are ignored.
 
 class Persona {
-    string nomen
-    int aetas optional
-    string regio = "Roma"
-    instant born
+    var string nomen
+    var int aetas optional
+    var string regio = "Roma"
+    var instant born
 }
 
 main {

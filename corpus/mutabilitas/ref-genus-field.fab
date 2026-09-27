@@ -14,7 +14,7 @@ locale = "en"
 # This exemplum intentionally fails to compile.
 
 class Person {
-    list<int> friends
+    var list<int> friends
 }
 
 main {

@@ -474,7 +474,7 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
         def_id: DefId(100),
         name: interner.intern("name"),
         ty: textus,
-        is_static: false,
+        modifier: None,
         sponte: false,
         annotations: Vec::new(),
         init: None,

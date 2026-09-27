@@ -93,9 +93,90 @@ impl TypeChecker<'_> {
                 self.error_type
             }
         };
+        self.check_place_write_modifiers(target);
         target.ty = Some(self.resolve_inferred_type(ty));
         ty
     }
+
+    /// Check every field segment an assignment place passes through.
+    ///
+    /// A `fixum` field behaves like the `fixum` binding form (mutability-engine
+    /// D-1): no assignment place may pass through it (`p.x`, `p.inner.y`,
+    /// `p.xs[0]`), while mutating methods on it stay legal because they are
+    /// calls, not places.
+    fn check_place_write_modifiers(&mut self, target: &HirExpression) {
+        let span = target.span;
+        let mut place = target;
+        loop {
+            match &place.kind {
+                HirExpressionKind::Field(object, name) => {
+                    if let Some(object_ty) = object.ty {
+                        self.check_field_write_modifier(object_ty, *name, span);
+                    }
+                    place = object;
+                }
+                HirExpressionKind::Index(object, _) => place = object,
+                _ => break,
+            }
+        }
+    }
+    /// Reject a field write the declared modifier forbids (D16.1, D16.3, D9.2).
+    ///
+    /// Construction literals never reach this path, so a `fixum` field is set
+    /// only there. Unmarked fields stay writable until D5c.
+    fn check_field_write_modifier(
+        &mut self,
+        object_ty: TypeId,
+        name: Symbol,
+        span: radix_lexer::Span,
+    ) {
+        if let Some(members) = self.union_members_of(object_ty) {
+            // A write through the overlap reaches every member's field, so each
+            // one that declares a modifier must declare `varia`.
+            let not_varia = members
+                .iter()
+                .filter(|member| {
+                    self.declared_field_modifier(**member, name)
+                        .is_some_and(|modifier| modifier != radix_syntax::FieldModifier::Varia)
+                })
+                .map(|member| self.display_union_constituent(*member))
+                .collect::<Vec<_>>();
+            if !not_varia.is_empty() {
+                self.immutable_assignment_with_args(
+                    "union_member_not_varia",
+                    span,
+                    &[
+                        ("member", self.member_display_name(name)),
+                        ("members", not_varia.join(", ")),
+                    ],
+                );
+            }
+            return;
+        }
+        if self.declared_field_modifier(object_ty, name) == Some(radix_syntax::FieldModifier::Fixum)
+        {
+            self.immutable_assignment_with_args(
+                "assignment_to_fixum_field",
+                span,
+                &[("field", self.member_display_name(name))],
+            );
+        }
+    }
+
+    /// The authored modifier of a `genus` field reached through `ty`, if any.
+    fn declared_field_modifier(
+        &self,
+        ty: TypeId,
+        name: Symbol,
+    ) -> Option<radix_syntax::FieldModifier> {
+        let peeled = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(ty))
+            .1;
+        let struct_def = self.struct_def_from_type(peeled)?;
+        self.structs.get(&struct_def)?.fields.get(&name)?.modifier
+    }
+
     /// Computes the result of indexing an already-typed object with an
     /// already-typed index expression.
     ///
