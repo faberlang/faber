@@ -92,18 +92,18 @@ fn depinge(Expr e) → string {
 
 class Nodus {
     var int valor
-    var Nodus ∪ null sequens
+    var Nodus ∪ none sequens
 }
 
-fn summa(Nodus ∪ null n) → int {
-    if n is null {
+fn summa(Nodus ∪ none n) → int {
+    if n is none {
         return 0
     }
     return n.valor + summa(n.sequens)
 }
 
-fn longitudo(Nodus ∪ null n) → int {
-    if n is null {
+fn longitudo(Nodus ∪ none n) → int {
+    if n is none {
         return 0
     }
     return 1 + longitudo(n.sequens)

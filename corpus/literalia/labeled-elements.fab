@@ -57,7 +57,7 @@ main {
     print labeled_hole[1]
 
     # A wanted union element is a binary cup, not ∪ in the slot.
-    const tuple<f32, string ∪ null> cup ← tuple<f32, string ∪ null> [1.0, "x"]
+    const tuple<f32, string ∪ none> cup ← tuple<f32, string ∪ none> [1.0, "x"]
     print cup[1]
 
     # objectPattern binds by label.

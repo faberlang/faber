@@ -70,8 +70,8 @@ fn all_nan_argmax(list<f64> xs) → int {
 
 # Contract 2 — empty → nihil, no sentinel. The raw twin keeps the nullable
 # shape so the caller sees nihil and composes the default at the call site.
-fn raw_argmax(list<f64> xs) → int ∪ null {
-    const int ∪ null winner ← xs.argmax()
+fn raw_argmax(list<f64> xs) → int ∪ none {
+    const int ∪ none winner ← xs.argmax()
     return winner
 }
 

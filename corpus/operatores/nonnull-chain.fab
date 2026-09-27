@@ -40,7 +40,7 @@ class Persona {
 }
 
 main {
-    const Persona ∪ null p ← Persona { nomen = "Marcus", urbs = "Roma" }
+    const Persona ∪ none p ← Persona { nomen = "Marcus", urbs = "Roma" }
     print p!.nomen
     print p!.urbs
     const list<string, 3> litterae ← ["a", "b", "c"]

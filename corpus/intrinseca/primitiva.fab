@@ -39,7 +39,7 @@ fn ping() → void {
 }
 
 fn describe(any value) → string {
-    if value is null then return "nihil est"
+    if value is none then return "nihil est"
     return "aliud est"
 }
 

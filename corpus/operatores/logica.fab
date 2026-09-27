@@ -41,12 +41,12 @@ main {
     const int velata ← vexilla ∨ persona
     # 14 (0b1110)
     print velata
-    const string ∪ null praesens ← "salve"
-    const string ∪ null absens ← null
-    const bool habetValorem ← praesens not is null
+    const string ∪ none praesens ← "salve"
+    const string ∪ none absens ← null
+    const bool habetValorem ← praesens not is none
     # verum
     print habetValorem
-    const bool caretValorem ← absens not is null
+    const bool caretValorem ← absens not is none
     # falsum
     print caretValorem
 }

@@ -43,7 +43,7 @@ locale = "en"
 #   est.expected
 
 fn explora(any x) → string {
-    if x is null then return "nihil est"
+    if x is none then return "nihil est"
     return "aliud est"
 }
 
@@ -55,8 +55,8 @@ fn explora_bivalens(bool x) → string {
 
 main {
     # Null checking with est
-    const int ∪ null forsitan ← null
-    const _ nihil_est ← forsitan is null
+    const int ∪ none forsitan ← null
+    const _ nihil_est ← forsitan is none
     print nihil_est
 
     # Boolean true comparison with ≡
@@ -70,12 +70,12 @@ main {
     print falsum_est
 
     # Chained with logical operators
-    const string ∪ null nomen ← null
-    const _ defectum_debet ← nomen is null and enabled ≡ true
+    const string ∪ none nomen ← null
+    const _ defectum_debet ← nomen is none and enabled ≡ true
     print defectum_debet
 
     # Parenthesized for clarity
-    const _ utraque_nihil ← forsitan is null and nomen is null
+    const _ utraque_nihil ← forsitan is none and nomen is none
     print utraque_nihil
 
     # Dynamic ignotum dispatch for nihil and exact boolean checks on bivalens

@@ -36,14 +36,14 @@ locale = "en"
 # BACKEND:
 #   Cross-ref nihil/nihil.fab.
 
-fn maybe() → int ∪ null {
+fn maybe() → int ∪ none {
     return 42
 }
 
 main {
-    const int ∪ null absent ← null
+    const int ∪ none absent ← null
     print absent
-    const bool nihilne ← absent is null
+    const bool nihilne ← absent is none
     print nihilne
-    print maybe() not is null
+    print maybe() not is none
 }

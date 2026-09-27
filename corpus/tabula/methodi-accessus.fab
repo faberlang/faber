@@ -46,8 +46,8 @@ main {
     var map<string, int> puncta ← empty
     puncta.put("aelia", 95)
     puncta.put("balbus", 87)
-    const int ∪ null aelia ← puncta.get("aelia")
-    const int ∪ null absens ← puncta.get("carus")
+    const int ∪ none aelia ← puncta.get("aelia")
+    const int ∪ none absens ← puncta.get("carus")
     const int carus ← puncta.get("carus") coalesce 0
     const bool habetbalbum ← puncta.has("balbus")
     const bool remotus ← puncta.delete("balbus")

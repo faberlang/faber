@@ -37,7 +37,7 @@ locale = "en"
 #   codex length and metire results, civis summary strings
 
 fn saluta(string nomen, string titulus optional) → string {
-    if titulus is null then return "Salve, §!"(nomen)
+    if titulus is none then return "Salve, §!"(nomen)
     return "Salve, § §!"(titulus, nomen)
 }
 
@@ -46,7 +46,7 @@ fn pagina(int pagina optional coalesce 1, int quantitas optional coalesce 10) �
 }
 
 fn metire(string fons, ref int altitudo optional) → int {
-    if altitudo is null {
+    if altitudo is none {
         # de = shared borrow of fons
         return fons.length()
     }

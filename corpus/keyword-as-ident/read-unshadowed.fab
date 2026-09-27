@@ -39,6 +39,6 @@ locale = "en"
 #   Rust/Go/roundtrip e2e follow the lege/lege.fab stdin-read class.
 
 main {
-    const string ∪ null input ← read
+    const string ∪ none input ← read
     print input
 }

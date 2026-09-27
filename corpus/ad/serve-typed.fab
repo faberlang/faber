@@ -45,7 +45,7 @@ main {
     const int doubled ← s ↦ int
     print doubled
 
-    const channel<null, string> g ← call 'salutatio:greeting'
+    const channel<none, string> g ← call 'salutatio:greeting'
     print g ↦ string
 
     const channel<int, int> t ← call 'numeri:twice' (5)

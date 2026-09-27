@@ -47,7 +47,7 @@ class Persona {
 
 main {
     # Optional genus value — !. asserts it is not nihil before field access
-    const Persona ∪ null p ← Persona { nomen = "Marcus", urbs = "Roma" }
+    const Persona ∪ none p ← Persona { nomen = "Marcus", urbs = "Roma" }
     print p!.nomen
     print p!.urbs
 

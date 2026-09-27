@@ -41,6 +41,6 @@ locale = "en"
 main {
     const regex pattern ← "(?g)\d+" ↦ regex
     print pattern
-    const string ∪ null input ← read
+    const string ∪ none input ← read
     print input
 }

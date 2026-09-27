@@ -41,7 +41,7 @@ fn identitas<T>(T value) → T {
     return value
 }
 
-fn primum<T>(list<T> res) → T ∪ null {
+fn primum<T>(list<T> res) → T ∪ none {
     return res.first()
 }
 

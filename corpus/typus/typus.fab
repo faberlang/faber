@@ -54,7 +54,7 @@ type Puncta = list<int>
 type Index = map<string, int>
 
 # Nullable type alias (canonical T ∪ nihil form)
-type NomenOptivum = string ∪ null
+type NomenOptivum = string ∪ none
 
 main {
     # Using primitive aliases

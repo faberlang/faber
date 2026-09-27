@@ -35,7 +35,7 @@ main {
     const Payload payload ← narrowed ↦ Payload
     const json encoded ← payload ↦ json
     const string wire ← json.stringify(encoded)
-    const json ∪ null tentativa ← json.try_parse(wire)
+    const json ∪ none tentativa ← json.try_parse(wire)
     print payload.name
     print wire
     print tentativa

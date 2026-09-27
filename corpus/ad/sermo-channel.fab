@@ -42,6 +42,6 @@ main {
     print count_items(s)
 
     const channel second ← call 'runtime:echo' ("vale")
-    const frame<string> ∪ null first ← second.recv<string>().accipe()
+    const frame<string> ∪ none first ← second.recv<string>().accipe()
     print first?.data
 }

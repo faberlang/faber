@@ -63,14 +63,14 @@ main {
     print b ≺ 0
 
     # Null checks
-    const string ∪ null forsitan ← null
+    const string ∪ none forsitan ← null
     # verum
-    print forsitan is null
+    print forsitan is none
     # falsum
-    print forsitan not is null
-    const string ∪ null adest ← "salve"
+    print forsitan not is none
+    const string ∪ none adest ← "salve"
     # falsum
-    print adest is null
+    print adest is none
     # verum
-    print adest not is null
+    print adest not is none
 }

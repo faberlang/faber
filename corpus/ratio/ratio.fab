@@ -49,7 +49,7 @@ main {
     print hole.w
 
     # A wanted union element is a binary cup, not ∪ in the slot.
-    const ratio<g: string ∪ null> cup ← ratio<g: string ∪ null> { g = "x" }
+    const ratio<g: string ∪ none> cup ← ratio<g: string ∪ none> { g = "x" }
     print cup.g
 
     # objectPattern binds by label.

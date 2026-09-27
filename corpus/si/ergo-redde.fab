@@ -46,7 +46,7 @@ fn classis(int x) → string {
 }
 
 # Optional return: nihil when divisor is zero
-fn divide(int a, int b) → int ∪ null {
+fn divide(int a, int b) → int ∪ none {
     if b ≡ 0 then return null
     return a / b
 }
@@ -61,7 +61,7 @@ fn gradus(int puncta) → string {
 }
 
 # Early return inside itera ex loop
-fn inveni(list<int> res, int quaesitum) → int ∪ null {
+fn inveni(list<int> res, int quaesitum) → int ∪ none {
     for from res const item {
         if item ≡ quaesitum then return item
     }

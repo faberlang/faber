@@ -41,7 +41,7 @@ fn clamp(int x) → int {
     return x
 }
 
-fn inveni(list<int> res, int quaesitum) → int ∪ null {
+fn inveni(list<int> res, int quaesitum) → int ∪ none {
     for from res const item {
         if item ≡ quaesitum then return item
     }

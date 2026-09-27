@@ -93,11 +93,11 @@ main {
     print short
 
     # vel
-    const string ∪ null nomen ← null
+    const string ∪ none nomen ← null
     const string solutum ← nomen coalesce "defectum"
     print solutum
-    const string ∪ null primum ← null
-    const string ∪ null secundum ← null
+    const string ∪ none primum ← null
+    const string ∪ none secundum ← null
     const string tertium ← "inventum"
     const string inventum ← (primum coalesce secundum) coalesce tertium
     print inventum

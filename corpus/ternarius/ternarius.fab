@@ -67,8 +67,8 @@ main {
     print "maximum: §"(maximum)
 
     # Narrowing: the ✓ branch sees a non-null string
-    var string ∪ null forsitan ← null ∷ string ∪ null
-    const string solutum ← forsitan not is null ✓ forsitan ✗ "defectum"
+    var string ∪ none forsitan ← null ∷ string ∪ none
+    const string solutum ← forsitan not is none ✓ forsitan ✗ "defectum"
     # "defectum"
     print solutum
 

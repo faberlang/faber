@@ -32,13 +32,13 @@ fn accepts(queue<int> q, queue<int, 8> bounded_q, stack<string> s, stack<string,
 # C2 receiver methods — FIFO/LIFO walkers and the settled asymmetry
 # =============================================================================
 
-fn queue_walk(queue<int> input) → int ∪ null {
+fn queue_walk(queue<int> input) → int ∪ none {
     var queue<int> q ← input
     q.append(1)
     return q.remove_first()
 }
 
-fn stack_walk(stack<string> input) → string ∪ null {
+fn stack_walk(stack<string> input) → string ∪ none {
     var stack<string> s ← input
     s.append("top")
     return s.remove_last()

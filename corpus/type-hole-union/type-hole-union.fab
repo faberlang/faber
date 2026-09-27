@@ -63,7 +63,7 @@ fn consume(string ∪ int value) → int {
 }
 
 # `T ∪ null` is one optional inhabitant, so a `null` arm is the null case.
-fn maybe_len(string ∪ null value) → int {
+fn maybe_len(string ∪ none value) → int {
     match value {
         case null_ty {
             return 0
@@ -86,8 +86,8 @@ test "the two hole kinds infer cleanly without shape warnings" {
     const list<string ∪ int> nodes ← [1, "two", 3]
 
     # `T ∪ null`: one optional inhabitant — `_` over it stays quiet.
-    const string ∪ null opt ← "text"
-    const string ∪ null maybe ← opt
+    const string ∪ none opt ← "text"
+    const string ∪ none maybe ← opt
     const int m ← member_count(nodes)
     const int n ← consume(mixed)
     const int o ← maybe_len(maybe)
@@ -111,8 +111,8 @@ main {
     const list<string ∪ int> nodes ← [1, "two", 3]
 
     # `T ∪ null`: one optional inhabitant — `_` over it stays quiet.
-    const string ∪ null opt ← "text"
-    const string ∪ null maybe ← opt
+    const string ∪ none opt ← "text"
+    const string ∪ none maybe ← opt
     const int m ← member_count(nodes)
     const int n ← consume(mixed)
     const int o ← maybe_len(maybe)
