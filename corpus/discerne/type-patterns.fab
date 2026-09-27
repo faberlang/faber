@@ -12,11 +12,11 @@ locale = "en"
 # Type-pattern cases use the same member predicate as `est` and bind the
 # narrowed value for the arm body.
 class Formal {
-    string greeting
+    var string greeting
 }
 
 class Casual {
-    string greeting
+    var string greeting
 }
 
 fn classify(Formal ∪ Casual u) → string {

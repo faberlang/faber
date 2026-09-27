@@ -13,7 +13,7 @@ locale = "en"
 # =============================================================================
 
 class Capsule {
-    int stored
+    var int stored
 }
 
 fn take() → void {

@@ -36,13 +36,13 @@ locale = "en"
 #   Optional call ?( — syntax in frontmatter; Rust e2e defers to driver optional-chain tests.
 
 class Locus {
-    string urbs
-    string regio optional
+    var string urbs
+    var string regio optional
 }
 
 class Civis {
-    string nomen
-    Locus locus optional
+    var string nomen
+    var Locus locus optional
 }
 
 main {

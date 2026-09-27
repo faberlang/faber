@@ -40,7 +40,7 @@ locale = "en"
 #   50, 100 (clamped), then radius 5 with derived diameter 10 and area
 
 class Terminus {
-    int valor = 0
+    var int valor = 0
 
     fn creo() → void {
         if self.valor ≺ 0 {
@@ -57,9 +57,9 @@ class Terminus {
 }
 
 class Circulus {
-    int radius = 1
-    int diameter = 0
-    float area = 0
+    var int radius = 1
+    var int diameter = 0
+    var float area = 0
 
     fn creo() → void {
         self.diameter ← self.radius * 2

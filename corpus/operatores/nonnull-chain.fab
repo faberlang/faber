@@ -35,8 +35,8 @@ locale = "en"
 #   Rust: non-null chain lowering gap (whitelist: operatores/nonnull-chain.fab).
 
 class Persona {
-    string nomen
-    string urbs optional
+    var string nomen
+    var string urbs optional
 }
 
 main {

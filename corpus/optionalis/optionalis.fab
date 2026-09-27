@@ -34,14 +34,14 @@ locale = "en"
 #   optionalis.expected — present and absent path samples.
 
 class Locus {
-    string urbs
-    string regio optional
+    var string urbs
+    var string regio optional
 }
 
 class Civis {
-    string nomen
+    var string nomen
     # voluntary nested record
-    Locus locus optional
+    var Locus locus optional
 }
 
 main {

@@ -39,15 +39,15 @@ locale = "en"
 #   Field values for Punctum and Persona instances (defaults and overrides).
 
 class Punctum {
-    int x
-    int y
+    var int x
+    var int y
 }
 
 class Persona {
-    string nomen
+    var string nomen
     # default when omitted at instantiation
-    int aetas = 0
-    bool activus = true
+    var int aetas = 0
+    var bool activus = true
 }
 
 main {

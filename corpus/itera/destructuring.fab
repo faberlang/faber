@@ -51,8 +51,8 @@ locale = "en"
 #   destructuring.expected — sums and elements from every pattern form.
 
 class Punctum {
-    int x
-    int y
+    var int x
+    var int y
 }
 
 main {

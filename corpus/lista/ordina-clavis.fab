@@ -27,8 +27,8 @@ locale = "en"
 #   [1, 2, 3]
 
 class Persona {
-    string nomen
-    int aetas
+    var string nomen
+    var int aetas
 }
 
 fn nomina(list<Persona> ps) → string {

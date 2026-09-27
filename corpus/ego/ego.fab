@@ -35,7 +35,7 @@ locale = "en"
 #   capsa: prima
 
 class Capsa {
-    string titulus
+    var string titulus
 
     fn narra() → string {
         # ego = the receiver instance

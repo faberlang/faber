@@ -38,37 +38,37 @@ locale = "en"
 #   membrum.expected — chained access samples.
 
 class Punctum {
-    int x
-    int y
+    var int x
+    var int y
 }
 
 class Figura {
-    string nomen
-    int valor
+    var string nomen
+    var int valor
 }
 
 class Imum {
-    string imum
+    var string imum
 }
 
 class Medium {
-    Imum medium
+    var Imum medium
 }
 
 class Extra {
-    Medium extra
+    var Medium extra
 }
 
 class Datum {
-    list<string> nomina
+    var list<string> nomina
 }
 
 class Adest {
-    int valor
+    var int valor
 }
 
 class Forsitan {
-    Adest adest
+    var Adest adest
 }
 
 main {

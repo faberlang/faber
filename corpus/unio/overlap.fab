@@ -29,8 +29,8 @@ locale = "en"
 # =============================================================================
 
 class Circulus {
-    string nomen
-    int radius
+    var string nomen
+    var int radius
 
     fn area() → int {
         return 3 * self.radius * self.radius
@@ -42,8 +42,8 @@ class Circulus {
 }
 
 class Quadratum {
-    string nomen
-    int latus
+    var string nomen
+    var int latus
 
     fn area() → int {
         return self.latus * self.latus

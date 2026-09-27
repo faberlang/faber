@@ -15,15 +15,15 @@ locale = "en"
 # the source, whether the source is a local or a field place.
 
 class V3 {
-    f64 x = 0.0
+    var f64 x = 0.0
 }
 
 class Inner {
-    int n = 0
+    var int n = 0
 }
 
 class Outer {
-    Inner inner = Inner {}
+    var Inner inner = Inner {}
 }
 
 main {

@@ -47,6 +47,6 @@ fn paginate(int pagina optional coalesce 1) → string {
 }
 
 class User {
-    string name
-    string email optional
+    var string name
+    var string email optional
 }

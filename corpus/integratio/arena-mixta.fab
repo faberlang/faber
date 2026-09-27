@@ -40,9 +40,9 @@ locale = "en"
 #   Go e2e whitelist — expression-valued block / arena typing not yet for Go.
 
 class Nauta {
-    string nomen
-    string navis optional
-    int gradus = 0
+    var string nomen
+    var string navis optional
+    var int gradus = 0
 
     fn titulus() → string {
         return "§@§"(self.nomen, self.navis coalesce "terra")

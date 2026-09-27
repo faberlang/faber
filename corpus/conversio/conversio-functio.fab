@@ -28,19 +28,19 @@ locale = "en"
 # =============================================================================
 
 class Celsius {
-    float degrees
+    var float degrees
 }
 
 class Fahrenheit {
-    float degrees
+    var float degrees
 }
 
 class Reading {
-    int value
+    var int value
 }
 
 class Gauged {
-    int value
+    var int value
 }
 
 @ conversion
