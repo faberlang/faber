@@ -21,13 +21,8 @@
 )]
 
 use super::*;
+use radix_codegen_shared::hints::{self, EndianHint};
 use radix_types::IndexExpr;
-
-#[derive(Copy, Clone)]
-enum EndianHint {
-    Be,
-    Le,
-}
 
 fn octeti_array<const N: usize>(bytes: &[u8]) -> [u8; N] {
     let mut arr = [0_u8; N];
@@ -414,19 +409,15 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     }
 
     fn endian_hint(&self, params: &[Symbol]) -> Option<EndianHint> {
-        params
-            .iter()
-            .find_map(|param| match self.interner.resolve(*param) {
-                "Be" => Some(EndianHint::Be),
-                "Le" => Some(EndianHint::Le),
-                _ => None,
-            })
+        hints::endian_hint(params, |param| {
+            hints::classify(self.interner.resolve(*param))
+        })
     }
 
     fn has_bits_hint(&self, params: &[Symbol]) -> bool {
-        params
-            .iter()
-            .any(|param| self.interner.resolve(*param) == "Bits")
+        hints::has_bits_hint(params, |param| {
+            hints::classify(self.interner.resolve(*param))
+        })
     }
 
     pub(crate) fn convert_to_modular_word(
