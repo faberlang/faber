@@ -59,6 +59,8 @@ type ConditionRefinement = (Option<(DefId, TypeId)>, Option<(DefId, TypeId)>);
 
 pub(super) const ISSUE_TRAP_MEMBER_TYPE_MISMATCH: &str = "trap_member_type_mismatch";
 pub(super) const ISSUE_TRAP_UNION_COLLAPSED: &str = "trap_union_collapsed";
+const ISSUE_CALL_DEFAULT_ON_INFALLIBLE_CALL: &str = "call_default_on_infallible_call";
+const ISSUE_CALL_DEFAULT_TYPE_MISMATCH: &str = "call_default_type_mismatch";
 
 impl TypeChecker<'_> {
     /// Check a catch clause for a handled alternate exit.
@@ -181,6 +183,47 @@ impl TypeChecker<'_> {
         }
 
         self.union_hole_type_id(var)
+    }
+
+    /// Check `call ⊥ default` (D17.7).
+    ///
+    /// The body (the call) runs under a local error sink, exactly like a
+    /// `fac` body: the call's `⇥` channel is the handled channel. A sink that
+    /// never received an error type means nothing inside can fail, which is
+    /// the infallible-call rejection. The default is checked afterwards,
+    /// outside the sink (a failable default needs its own handler), against
+    /// the call's success type. The solved error type is recorded on the
+    /// node for backends.
+    pub fn check_call_default(
+        &mut self,
+        body: &mut HirBlock,
+        default: &mut HirExpression,
+        err_slot: &mut Option<TypeId>,
+        expected: Option<TypeId>,
+        span: radix_lexer::Span,
+    ) -> TypeId {
+        let err_ty = self.fresh_infer();
+        let prev_error = self.current_error.replace(ErrorSink::Local(err_ty));
+        let body_ty = self.check_block(body, expected);
+        self.current_error = prev_error;
+
+        let resolved_err = self.resolve_inferred_type(err_ty);
+        if self.is_infer(resolved_err) {
+            self.invalid_operand_types(ISSUE_CALL_DEFAULT_ON_INFALLIBLE_CALL, span);
+            self.check_expr(default);
+            return self.error_type;
+        }
+        *err_slot = Some(resolved_err);
+
+        let success_ty = self.resolve_inferred_type(body_ty);
+        let default_ty = self.check_expr_with_expected(default, Some(success_ty));
+        self.unify_assign_issue(
+            default_ty,
+            success_ty,
+            default.span,
+            ISSUE_CALL_DEFAULT_TYPE_MISMATCH,
+        );
+        body_ty
     }
 
     /// The single surviving member of a trap hole after the existing

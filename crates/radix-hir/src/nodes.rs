@@ -1377,6 +1377,21 @@ pub enum HirExpressionKind {
     /// `Handled` — do/catch is derivable as trap+match, not the reverse.
     Trap(Box<HirBlock>),
 
+    /// Call default `call ⊥ default` (D17.7), desugared through the trap
+    /// machinery: `body` is a trap body whose trailing expression is the
+    /// failable call. On success the expression is the call's value; when
+    /// the call fails through its `⇥` channel, `default` is evaluated (only
+    /// then) and becomes the value. `mori` and runtime traps are never
+    /// caught. The expression type is the call's success type.
+    CallDefault {
+        body: Box<HirBlock>,
+        default: Box<HirExpression>,
+        /// Error channel type the body's failure carries, recorded by
+        /// typecheck; backends use it to type the discarded error.
+        #[serde(default)]
+        err_ty: Option<TypeId>,
+    },
+
     /// Closure with parameters, optional return/error types, expression body,
     /// and one signature modifier (marker-carry only; semantic analysis owns
     /// each modifier's contract).

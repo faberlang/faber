@@ -3462,6 +3462,7 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         // UT: trap lowers through `visit_trap_expr`; kept exhaustive here for
         // any future caller.
         HirExpressionKind::Trap(_) => "capta trap before capture-boundary MIR lowering",
+        HirExpressionKind::CallDefault { .. } => "call default before capture-boundary MIR lowering",
         HirExpressionKind::Si { .. } => "si before control-flow MIR lowering",
         HirExpressionKind::Discerne { .. } => "discerne before switch MIR lowering",
         HirExpressionKind::Loop(_) => "loop before control-flow MIR lowering",

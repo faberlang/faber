@@ -479,6 +479,15 @@ impl SummaBodyState {
                 );
                 self.walk_block(checker, body);
             }
+            HirExpressionKind::CallDefault { body, default, .. } => {
+                checker.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_SUMMA_BODY_FORBIDS_CAPE,
+                    expr.span,
+                );
+                self.walk_block(checker, body);
+                self.walk_expr(checker, default);
+            }
             HirExpressionKind::Clausura(params, _, _, body, _) => {
                 effect(checker, expr.span, "dynamic_function");
                 for param in params {

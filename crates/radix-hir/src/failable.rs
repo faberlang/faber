@@ -209,6 +209,12 @@ impl HirVisitor for DependencyVisitor<'_> {
             HirExpressionKind::Trap(body) => {
                 self.with_suppressed(true, |visitor| visitor.visit_block(body));
             }
+            // D17.7: `call ⊥ default` contains the call's failure; the
+            // default itself is evaluated outside the boundary.
+            HirExpressionKind::CallDefault { body, default, .. } => {
+                self.with_suppressed(true, |visitor| visitor.visit_block(body));
+                self.visit_expr(default);
+            }
             HirExpressionKind::Si {
                 cond,
                 then_block,

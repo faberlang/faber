@@ -244,6 +244,61 @@ impl FunctionBuilder<'_> {
         Some(MirOperand::Temp(destination_temp))
     }
 
+    /// Lower `call ⊥ default` (D17.7) through the trap machinery.
+    ///
+    /// A trap context whose destination is a discarded error temp and whose
+    /// join is a fail block: every error path of the call (the existing
+    /// `TryCall` error block) stores its payload there and jumps to the fail
+    /// block, which alone lowers the default into the result. The default is
+    /// therefore evaluated only on failure, and panics never reach it.
+    pub(super) fn lower_call_default_expr(
+        &mut self,
+        body: &HirBlock,
+        default: &HirExpression,
+        err_ty: Option<TypeId>,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let ty = self.expr_ty(expr)?;
+        let span = expr.span;
+        let Some(err_ty) = err_ty else {
+            self.errors
+                .push(MirError::missing_type(span, "call default error channel"));
+            return None;
+        };
+        let destination_temp = self.push_temp(ty, span);
+        let destination = MirPlace::temp(destination_temp);
+        let error_temp = self.push_temp(MirType::semantic(err_ty), span);
+        let fail_block = self.fresh_block(span);
+        let join = self.fresh_block(span);
+
+        self.capture_depth += 1;
+        self.traps.push(TrapContext {
+            destination: MirPlace::temp(error_temp),
+            join_block: fail_block,
+            error_paths: false,
+            depth: self.capture_depth,
+        });
+        self.lower_block_to_destination(body, destination.clone(), ty, span);
+        let error_paths = self.traps.pop().is_some_and(|trap| trap.error_paths);
+        let body_reaches = self.terminate_open_current(MirTerminatorKind::Goto(join), span);
+
+        let mut default_reaches = false;
+        if error_paths {
+            self.switch_to(fail_block);
+            self.lower_expr_to_destination(default, destination, ty)?;
+            default_reaches = self.terminate_open_current(MirTerminatorKind::Goto(join), default.span);
+        } else {
+            self.seal_unreachable(fail_block, span);
+        }
+
+        if body_reaches || default_reaches {
+            self.switch_to(join);
+        } else {
+            self.seal_unreachable(join, span);
+        }
+        Some(MirOperand::Temp(destination_temp))
+    }
+
     /// Lower any expression into an already-chosen destination place.
     ///
     /// This is the join-point contract for expression-valued blocks and `si`:

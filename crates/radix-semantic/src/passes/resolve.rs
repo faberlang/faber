@@ -1503,6 +1503,10 @@ fn resolve_expr(
         ExprKind::Trap(trap) => {
             resolve_block(resolver, interner, &trap.body, errors);
         }
+        ExprKind::CallDefault(call_default) => {
+            resolve_expr(resolver, interner, &call_default.call, errors);
+            resolve_expr(resolver, interner, &call_default.default, errors);
+        }
     }
 }
 

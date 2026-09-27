@@ -112,14 +112,13 @@ impl Parser {
     /// on `↤` (and after `↦ T`) and attaches to the nearest `↤` in a
     /// right-associated chain.
     ///
-    /// A `⊥` left over after a complete assignment follows a non-conversion
-    /// expression. Defaults on failable calls are a later stage, so that
-    /// position is a structured "not yet supported" rejection rather than a
-    /// leftover-token error.
+    /// A `⊥` left over after a complete assignment follows neither a call
+    /// (whose default the postfix tier claims) nor a conversion, so it gets a
+    /// structured rejection rather than a leftover-token error.
     fn parse_assignment(&mut self) -> Result<Expr, ParseError> {
         let expr = self.parse_assignment_open()?;
         if self.check(&TokenKind::UpTack) {
-            return Err(self.invalid_expression_error("default_requires_conversion"));
+            return Err(self.invalid_expression_error("default_requires_failable"));
         }
         Ok(expr)
     }
@@ -1018,7 +1017,33 @@ impl Parser {
             }
         }
 
+        if matches!(expr.kind, ExprKind::Call(_)) && self.check(&TokenKind::UpTack) {
+            return self.parse_call_default(start, expr);
+        }
         Ok(expr)
+    }
+
+    /// Parse the `⊥ default` (D17.7) that follows a complete call chain.
+    ///
+    /// GRAMMAR:
+    ///   callDefault := call '⊥' unary
+    ///
+    /// WHY: the default binds at the postfix tier, like the conversion
+    /// default, so `f() ⊥ 0 + 1` is `(f() ⊥ 0) + 1`. Only a call operand is
+    /// admitted here; whether the call is failable is a semantic question.
+    fn parse_call_default(&mut self, start: Span, call: Expr) -> Result<Expr, ParseError> {
+        self.advance();
+        let default = Box::new(self.parse_unary()?);
+        if self.check(&TokenKind::ExitArrow) {
+            return Err(self.invalid_expression_error("default_with_propagation"));
+        }
+        Ok(self.postfix_expr(
+            start,
+            ExprKind::CallDefault(CallDefaultExpr {
+                call: Box::new(call),
+                default,
+            }),
+        ))
     }
 
     fn postfix_expr(&mut self, start: Span, kind: ExprKind) -> Expr {
