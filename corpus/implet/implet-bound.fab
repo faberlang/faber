@@ -1,0 +1,64 @@
++++
+term = "implet"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "implendum_decl", "implendum_method_decl", "generic_params", "generic_param", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "si_stmt", "redde_stmt", "incipit_stmt", "fixum_decl", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Bounds a type parameter with a generic contract via implet."
+syntax = "functio <name><T implet <Contract><T>>(…) | genus <name> implet <Contract><<name>> <block>"
+aliases = ["implements"]
+related = ["implet", "implendum", "generic"]
+locale = "en"
++++
+# =============================================================================
+# implet on a type parameter — bound a generic by a contract (D1.1, D1.2)
+# =============================================================================
+#
+# What this teaches:
+#   • `T implements Weighable<T>` bounds a type parameter: inside the function,
+#     the contract's methods are callable on `T`.
+#   • A generic contract is always written with its arguments, both on the
+#     bound and on the class: `class Box implements Weighable<Box>`.
+#   • Every call checks that the argument type declares the bound; a type
+#     that does not `implements Weighable<…>` is rejected at compile time.
+#
+# See also: implet, implendum, generic
+# =============================================================================
+#
+# EXPECTED OUTPUT:
+#   heavier box: 5
+#   heavier chest: 9
+
+interface Weighable<T> {
+    fn weigh(T other) → int
+}
+
+class Box implements Weighable<Box> {
+    int weight = 0
+
+    fn weigh(Box other) → int {
+        return self.weight - other.weight
+    }
+}
+
+class Chest implements Weighable<Chest> {
+    int load = 0
+
+    fn weigh(Chest other) → int {
+        return self.load - other.load
+    }
+}
+
+fn larger<T implements Weighable<T>>(T a, T b) → T {
+    if a.weigh(b) > 0 {
+        return a
+    }
+    return b
+}
+
+main {
+    const Box heavyBox ← larger(Box { weight = 3 }, Box { weight = 5 })
+    const Chest heavyChest ← larger(Chest { load = 9 }, Chest { load = 4 })
+    print "heavier box: §"(heavyBox.weight)
+    print "heavier chest: §"(heavyChest.load)
+}

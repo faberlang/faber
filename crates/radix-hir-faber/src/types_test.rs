@@ -1742,6 +1742,7 @@ fn interface_publica_annotation_reemits() {
             name: interner.intern("Legibile"),
             type_params: Vec::new(),
             methods: vec![HirInterfaceMethod {
+                def_id: DefId(radix_types::USER_DEF_ID_BASE + 1),
                 availability: Vec::new(),
                 name: interner.intern("lege"),
                 params: Vec::new(),

@@ -221,10 +221,14 @@ impl TypeChecker<'_> {
         if self.reject_unbound_shape_params(&shape_vars, span) {
             return self.error_type;
         }
-        if let Some(param_vars) = inferred_vars
-            && self.reject_inferred_type_arg_domain_misses(&sig, &param_vars, span)
-        {
-            return self.error_type;
+        if let Some(param_vars) = inferred_vars {
+            if self.reject_inferred_type_arg_domain_misses(&sig, &param_vars, span) {
+                return self.error_type;
+            }
+            // D1.3: every witness nominally declares its parameter's bounds.
+            // The call's result type stays known, so a miss reports once
+            // without cascading into the surrounding binding.
+            self.reject_bound_misses(&sig, &param_vars, span);
         }
         if self.reject_failable_call(&sig, span) {
             return self.error_type;

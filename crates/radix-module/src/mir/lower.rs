@@ -1129,6 +1129,10 @@ impl<'a> MirLowerer<'a> {
             CallableLoweringTarget::Function(function) => size_param_names(&function.type_params),
             CallableLoweringTarget::Method { method, .. } => size_param_names(&method.func.type_params),
         };
+        builder.bound_methods = match &config.target {
+            CallableLoweringTarget::Function(function) => self.bound_method_targets(&function.type_params),
+            CallableLoweringTarget::Method { method, .. } => self.bound_method_targets(&method.func.type_params),
+        };
         let (body, cli_args) = match config.target {
             CallableLoweringTarget::Function(function) => {
                 for param in &function.params {
@@ -1380,6 +1384,40 @@ fn shader_stage_for_function(function: &HirFunction) -> Option<MirKernelShaderSt
 /// Body-visible `magnitudo` parameters of one callable, def → name. A value
 /// position naming one of these defs carries its compile-time size into MIR
 /// (sgr C2a); `typus` parameters are types, never values.
+impl MirLowerer<'_> {
+    /// `(type parameter, method) → contract method` for one callable's
+    /// `implet` bounds (D1.1). The first bound that declares a method wins,
+    /// matching the typechecker's lookup order.
+    fn bound_method_targets(&self, params: &[HirTypeParam]) -> FxHashMap<(Symbol, Symbol), DefId> {
+        let mut targets = FxHashMap::default();
+        for param in params {
+            let crate::hir::HirTypeParamConstraint::Implet(bounds) = &param.constraint else {
+                continue;
+            };
+            for bound in bounds {
+                let Some(interface) = self
+                    .unit
+                    .hir
+                    .items
+                    .iter()
+                    .find_map(|item| match &item.kind {
+                        HirItemKind::Interface(interface) if item.def_id == bound.contract => Some(interface),
+                        _ => None,
+                    })
+                else {
+                    continue;
+                };
+                for method in &interface.methods {
+                    targets
+                        .entry((param.name, method.name))
+                        .or_insert(method.def_id);
+                }
+            }
+        }
+        targets
+    }
+}
+
 fn size_param_names(params: &[HirTypeParam]) -> FxHashMap<DefId, Symbol> {
     params
         .iter()
@@ -1681,6 +1719,10 @@ struct FunctionBuilder<'a> {
     /// to one of these defs lowers to the symbolic size operand, never a
     /// runtime local (sgr C2a).
     size_params: FxHashMap<DefId, Symbol>,
+    /// Enclosing callable's contract-bound methods (D1.1), keyed by
+    /// `(type parameter, method)`: the contract method a `T` receiver call
+    /// targets until monomorphization picks the witness's own method.
+    bound_methods: FxHashMap<(Symbol, Symbol), DefId>,
     parent_function_id: MirFunctionId,
     device_role: Option<MirDeviceRole>,
     shader_stage: Option<MirKernelShaderStage>,
@@ -1735,6 +1777,7 @@ impl<'a> FunctionBuilder<'a> {
             shared_bindings: FxHashSet::default(),
             shared_cells: FxHashMap::default(),
             size_params: FxHashMap::default(),
+            bound_methods: FxHashMap::default(),
             parent_function_id,
             device_role,
             shader_stage,

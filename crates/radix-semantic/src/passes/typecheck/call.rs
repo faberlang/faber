@@ -458,6 +458,11 @@ impl TypeChecker<'_> {
             self.undefined_member("optional_receiver_requires_chain", receiver.span);
             return self.error_type;
         }
+        // D1.1: a bounded type parameter receiver reaches its bound
+        // contracts' methods.
+        if let Some(ret) = self.check_bound_method_call(receiver_ty, *name, args, receiver.span) {
+            return ret;
+        }
         if let Some(sig) = self.lookup_method_signature(receiver_ty, *name) {
             if let Some(method) = self.lookup_interface_method_info(receiver_ty, *name) {
                 let availability = method.availability.clone();

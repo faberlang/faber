@@ -1370,11 +1370,11 @@ fn implements_clause_accepts_cap_separator() {
     };
     assert_eq!(class.implements.len(), 2);
     assert_eq!(
-        result.interner.resolve(class.implements[0].name),
+        result.interner.resolve(class.implements[0].name.name),
         "Readable"
     );
     assert_eq!(
-        result.interner.resolve(class.implements[1].name),
+        result.interner.resolve(class.implements[1].name.name),
         "Seekable"
     );
 }

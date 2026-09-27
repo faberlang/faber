@@ -1116,9 +1116,17 @@ help = "fix the AST construct for lowering"
 message = "atomic requires compiler-owned syntax; use atomic<T>"
 help = "fix the AST construct for lowering"
 
+[diagnostics.SEM008.issues.implet_bound_on_type_declaration]
+message = "an {implet} bound is allowed only on a function's type parameter"
+help = "move the bound to the functions that use the type, or remove it"
+
 [diagnostics.SEM008.issues.iuncta_union_type_arg_unsupported]
 message = "iuncta element type argument ∪ is unsupported"
 help = "use _ for a monomorphic hole or a concrete union type"
+
+[diagnostics.SEM008.issues.radix_typus_bounded_param]
+message = "@ radix typus cannot constrain a type parameter that already has an {implet} bound"
+help = "keep either the {implet} bound or the closed type list, not both"
 
 [diagnostics.SEM008.issues.ratio_union_type_arg_unsupported]
 message = "ratio element type argument ∪ is unsupported"
@@ -1784,6 +1792,14 @@ help = "make the expression type match the expected type"
 message = "ignored expression result must resolve"
 help = "make the expression type match the expected type"
 
+[diagnostics.SEM010.issues.implet_contract_arity]
+message = "contract {contract} takes {expected} type argument(s), found {found}"
+help = "write the contract with its type arguments in full, e.g. Orderable<Persona>"
+
+[diagnostics.SEM010.issues.implet_requires_implendum]
+message = "{implet} must name an {implendum} (a contract)"
+help = "name an {implendum} declaration after {implet}"
+
 [diagnostics.SEM010.issues.initializer_annotation_mismatch]
 message = "initializer does not match annotation"
 help = "make the expression type match the expected type"
@@ -2067,6 +2083,10 @@ help = "gradient selection (`∇`) is parse-only in Phase 2A; the eligibility/se
 [diagnostics.SEM011]
 message = "invalid operand types"
 help = "use compatible operand types"
+
+[diagnostics.SEM011.issues.generic_type_arg_bound]
+message = "type argument {rejected} does not satisfy {param} {implet} {contract}"
+help = "declare `{implet} {contract}` on the type, or call with a type that does"
 
 [diagnostics.SEM011.issues.nucleum_lane_fragment_clash]
 message = "fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"

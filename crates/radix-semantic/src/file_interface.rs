@@ -1392,6 +1392,11 @@ fn snapshot_type_param_constraint(
             .map(|option| snapshot_interface_type(*option, types, interner))
             .collect::<FileInterfaceResult<Vec<_>>>()
             .map(InterfaceTypeParamConstraint::OneOf),
+        // Contract bounds (D1.1) have no portable interface shape yet; the
+        // export is skipped (fail closed) rather than exported unbounded.
+        TypeParamConstraint::Implet(_) => Err(FileInterfaceError::NominalTypeUnsupported {
+            kind: InterfaceNominalKind::Interface,
+        }),
     }
 }
 

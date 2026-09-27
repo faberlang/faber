@@ -1397,6 +1397,10 @@ mod allocator_surface_removed_test;
 mod inheritance_removed_test;
 
 #[cfg(test)]
+#[path = "contract_bound_test.rs"]
+mod contract_bound_test;
+
+#[cfg(test)]
 #[path = "nexum_removed_test.rs"]
 mod nexum_removed_test;
 

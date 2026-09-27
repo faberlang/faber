@@ -316,6 +316,21 @@ pub struct TypeParam {
     /// the variant always matches the declared sort; semantic phases read it
     /// instead of re-deriving the class from the payload shape.
     pub default: Option<GenericParamDefault>,
+    /// Contract bounds written `T implet C<T> ∩ D<T>` (DECISIONS D1.1).
+    /// Empty when the parameter is unbounded.
+    pub bounds: Vec<ContractRefExpr>,
+    pub span: Span,
+}
+
+/// One contract named by an `implet` clause, with its written type arguments.
+///
+/// Shared by genus headers (`genus Persona implet Orderable<Persona>`, D1.2)
+/// and type-parameter bounds (`T implet Orderable<T>`, D1.1). A generic
+/// contract is always written in full; there is no bare-name shorthand.
+#[derive(Debug)]
+pub struct ContractRefExpr {
+    pub name: Ident,
+    pub args: Vec<TypeExpr>,
     pub span: Span,
 }
 
@@ -391,7 +406,7 @@ pub enum ExitusValue {
 pub struct ClassDecl {
     pub name: Ident,
     pub type_params: Vec<TypeParam>,
-    pub implements: Vec<Ident>,
+    pub implements: Vec<ContractRefExpr>,
     pub members: Vec<ClassMember>,
 
     /// Comments and newlines collected immediately before the consuming `}`.

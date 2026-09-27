@@ -1203,6 +1203,18 @@ impl TypeTable {
             (TypeParamConstraint::OneOf(a_types), TypeParamConstraint::OneOf(b_types)) => {
                 self.union_members_equal(a_types, b_types)
             }
+            (TypeParamConstraint::Implet(a_refs), TypeParamConstraint::Implet(b_refs)) => {
+                a_refs.len() == b_refs.len()
+                    && a_refs.iter().zip(b_refs).all(|(a_ref, b_ref)| {
+                        a_ref.contract == b_ref.contract
+                            && a_ref.args.len() == b_ref.args.len()
+                            && a_ref
+                                .args
+                                .iter()
+                                .zip(&b_ref.args)
+                                .all(|(a_arg, b_arg)| self.equals(*a_arg, *b_arg))
+                    })
+            }
             _ => false,
         }
     }
@@ -2218,6 +2230,9 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
                 && sig.type_params.iter().all(|param| match &param.constraint {
                     TypeParamConstraint::Any => true,
                     TypeParamConstraint::OneOf(ids) => ids.iter().all(type_in_bounds),
+                    TypeParamConstraint::Implet(refs) => refs
+                        .iter()
+                        .all(|contract| contract.args.iter().all(type_in_bounds)),
                 })
         }
         Type::Tensor(e, s) | Type::Vector(e, s) | Type::Matrix(e, s) | Type::Sparsa(e, s) => {
@@ -2354,6 +2369,21 @@ pub struct GenericParamDescriptor {
 pub enum TypeParamConstraint {
     Any,
     OneOf(Vec<TypeId>),
+    /// `T implet C<…> ∩ D<…>` (DECISIONS D1.1): every witness must nominally
+    /// declare each contract with these arguments (D1.3). Arguments may
+    /// mention the callable's own type parameters.
+    Implet(Vec<ContractRef>),
+}
+
+/// One contract named by an `implet` clause, with its type arguments.
+///
+/// A genus header (`genus Persona implet Orderable<Persona>`) and a type
+/// parameter bound (`T implet Orderable<T>`) share this shape (D1.1/D1.2).
+/// `args` is empty for a non-generic contract.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ContractRef {
+    pub contract: DefId,
+    pub args: Vec<TypeId>,
 }
 
 /// How the call binder resolved one generic parameter.

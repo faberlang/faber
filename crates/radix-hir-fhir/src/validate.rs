@@ -2079,9 +2079,20 @@ pub(crate) fn validate_referential_integrity(
         for tp in &func.type_params {
             check_def(tp.def_id)?;
             check_symbol(tp.name)?;
-            if let radix_hir::HirTypeParamConstraint::OneOf(tys) = &tp.constraint {
-                for ty in tys {
-                    check_type(*ty)?;
+            match &tp.constraint {
+                radix_hir::HirTypeParamConstraint::Any => {}
+                radix_hir::HirTypeParamConstraint::OneOf(tys) => {
+                    for ty in tys {
+                        check_type(*ty)?;
+                    }
+                }
+                radix_hir::HirTypeParamConstraint::Implet(bounds) => {
+                    for bound in bounds {
+                        check_def(bound.contract)?;
+                        for ty in &bound.args {
+                            check_type(*ty)?;
+                        }
+                    }
                 }
             }
             validate_type_param_default(tp.default.as_ref(), check_type)?;
@@ -2142,9 +2153,20 @@ pub(crate) fn validate_referential_integrity(
                 for tp in &s.type_params {
                     check_def(tp.def_id)?;
                     check_symbol(tp.name)?;
-                    if let radix_hir::HirTypeParamConstraint::OneOf(tys) = &tp.constraint {
-                        for ty in tys {
-                            check_type(*ty)?;
+                    match &tp.constraint {
+                        radix_hir::HirTypeParamConstraint::Any => {}
+                        radix_hir::HirTypeParamConstraint::OneOf(tys) => {
+                            for ty in tys {
+                                check_type(*ty)?;
+                            }
+                        }
+                        radix_hir::HirTypeParamConstraint::Implet(bounds) => {
+                            for bound in bounds {
+                                check_def(bound.contract)?;
+                                for ty in &bound.args {
+                                    check_type(*ty)?;
+                                }
+                            }
                         }
                     }
                     validate_type_param_default(tp.default.as_ref(), check_type)?;
@@ -2173,8 +2195,11 @@ pub(crate) fn validate_referential_integrity(
                         check_type,
                     )?;
                 }
-                for d in &s.implements {
-                    check_def(*d)?;
+                for contract in &s.implements {
+                    check_def(contract.contract)?;
+                    for arg in &contract.args {
+                        check_type(*arg)?;
+                    }
                 }
             }
             HirItemKind::Enum(e) => {
@@ -2182,9 +2207,20 @@ pub(crate) fn validate_referential_integrity(
                 for tp in &e.type_params {
                     check_def(tp.def_id)?;
                     check_symbol(tp.name)?;
-                    if let radix_hir::HirTypeParamConstraint::OneOf(tys) = &tp.constraint {
-                        for ty in tys {
-                            check_type(*ty)?;
+                    match &tp.constraint {
+                        radix_hir::HirTypeParamConstraint::Any => {}
+                        radix_hir::HirTypeParamConstraint::OneOf(tys) => {
+                            for ty in tys {
+                                check_type(*ty)?;
+                            }
+                        }
+                        radix_hir::HirTypeParamConstraint::Implet(bounds) => {
+                            for bound in bounds {
+                                check_def(bound.contract)?;
+                                for ty in &bound.args {
+                                    check_type(*ty)?;
+                                }
+                            }
                         }
                     }
                     validate_type_param_default(tp.default.as_ref(), check_type)?;
@@ -2207,9 +2243,20 @@ pub(crate) fn validate_referential_integrity(
                 for tp in &iface.type_params {
                     check_def(tp.def_id)?;
                     check_symbol(tp.name)?;
-                    if let radix_hir::HirTypeParamConstraint::OneOf(tys) = &tp.constraint {
-                        for ty in tys {
-                            check_type(*ty)?;
+                    match &tp.constraint {
+                        radix_hir::HirTypeParamConstraint::Any => {}
+                        radix_hir::HirTypeParamConstraint::OneOf(tys) => {
+                            for ty in tys {
+                                check_type(*ty)?;
+                            }
+                        }
+                        radix_hir::HirTypeParamConstraint::Implet(bounds) => {
+                            for bound in bounds {
+                                check_def(bound.contract)?;
+                                for ty in &bound.args {
+                                    check_type(*ty)?;
+                                }
+                            }
                         }
                     }
                     validate_type_param_default(tp.default.as_ref(), check_type)?;
@@ -2246,9 +2293,20 @@ pub(crate) fn validate_referential_integrity(
                 for tp in &a.type_params {
                     check_def(tp.def_id)?;
                     check_symbol(tp.name)?;
-                    if let radix_hir::HirTypeParamConstraint::OneOf(tys) = &tp.constraint {
-                        for ty in tys {
-                            check_type(*ty)?;
+                    match &tp.constraint {
+                        radix_hir::HirTypeParamConstraint::Any => {}
+                        radix_hir::HirTypeParamConstraint::OneOf(tys) => {
+                            for ty in tys {
+                                check_type(*ty)?;
+                            }
+                        }
+                        radix_hir::HirTypeParamConstraint::Implet(bounds) => {
+                            for bound in bounds {
+                                check_def(bound.contract)?;
+                                for ty in &bound.args {
+                                    check_type(*ty)?;
+                                }
+                            }
                         }
                     }
                     validate_type_param_default(tp.default.as_ref(), check_type)?;
@@ -3116,9 +3174,20 @@ pub(crate) fn validate_referential_integrity(
                     check_type(et)?;
                 }
                 for param in &sig.type_params {
-                    if let radix_types::TypeParamConstraint::OneOf(tys) = &param.constraint {
-                        for ty in tys {
-                            check_type(*ty)?;
+                    match &param.constraint {
+                        radix_types::TypeParamConstraint::Any => {}
+                        radix_types::TypeParamConstraint::OneOf(tys) => {
+                            for ty in tys {
+                                check_type(*ty)?;
+                            }
+                        }
+                        radix_types::TypeParamConstraint::Implet(bounds) => {
+                            for bound in bounds {
+                                check_def(bound.contract)?;
+                                for ty in &bound.args {
+                                    check_type(*ty)?;
+                                }
+                            }
                         }
                     }
                     if let Some(radix_types::SemanticGenericParamDefault::Typus(ty)) = param.default
@@ -3173,9 +3242,20 @@ pub(crate) fn validate_referential_integrity(
                         check_type(et)?;
                     }
                     for param in &sig.type_params {
-                        if let radix_types::TypeParamConstraint::OneOf(tys) = &param.constraint {
-                            for ty in tys {
-                                check_type(*ty)?;
+                        match &param.constraint {
+                            radix_types::TypeParamConstraint::Any => {}
+                            radix_types::TypeParamConstraint::OneOf(tys) => {
+                                for ty in tys {
+                                    check_type(*ty)?;
+                                }
+                            }
+                            radix_types::TypeParamConstraint::Implet(bounds) => {
+                                for bound in bounds {
+                                    check_def(bound.contract)?;
+                                    for ty in &bound.args {
+                                        check_type(*ty)?;
+                                    }
+                                }
                             }
                         }
                         if let Some(radix_types::SemanticGenericParamDefault::Typus(ty)) =
