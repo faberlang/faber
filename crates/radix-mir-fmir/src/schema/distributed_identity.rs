@@ -44,6 +44,6 @@ pub const SHA256_IDENTITY_PREFIX: &str = "sha256:";
 pub fn logical_distributed_plan_hash(plan: &DistributedExecutionPlan) -> String {
     format!(
         "{SHA256_IDENTITY_PREFIX}{}",
-        handroll::sha256_hex(&encode_logical_plan(plan))
+        handroll::sha256_hex(encode_logical_plan(plan))
     )
 }
