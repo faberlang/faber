@@ -355,6 +355,16 @@ impl TypeChecker<'_> {
             self.invalid_conversion(issue, span);
             return self.error_type;
         }
+        // D10.6: `littera` text rows and the `Code` hint.
+        if let Some(result_ty) = self.check_littera_conversio(
+            source_ty,
+            target_resolved,
+            params,
+            recovery.as_deref_mut(),
+            span,
+        ) {
+            return result_ty;
+        }
         // D9.4: built-in `ordo` rows. Pairs outside the three rows fall
         // through to the ordinary rules (and their `unsupported_conversio`).
         if let Some((result_ty, ordo_route)) =
@@ -2252,6 +2262,12 @@ impl TypeChecker<'_> {
         if !self.conversio_can_propagate_failure(source_ty, target_resolved) {
             return;
         }
+        self.check_text_failure_channel(span);
+    }
+
+    /// A bare failable `↦` propagates its text failure payload through the
+    /// active alternate-exit channel, which must accept `textus`.
+    pub(super) fn check_text_failure_channel(&mut self, span: radix_lexer::Span) {
         let Some(error_ty) = self.current_error.map(|sink| match sink {
             ErrorSink::Function(ty) | ErrorSink::Local(ty) => ty,
             // UT: a bare failable `↦` inside a trap accumulates its failure

@@ -369,6 +369,17 @@ fn conversio_markers_ride_target_generic_arguments() {
 }
 
 #[test]
+fn littera_code_marker_rides_the_scalar_head() {
+    // D10.6 `n ↦ littera<Code>`: the hint is the scalar head's only generic
+    // argument, never the float-family width wrap (`fractus<littera, Code>`).
+    let code = assert_idempotent("incipit {\n    fixum littera c ← 65 ↦ littera<Code> ⊥ '?'\n    scribe c\n}\n");
+    assert!(
+        code.contains("↦ littera<Code>"),
+        "the Code hint must stay on the littera head:\n{code}"
+    );
+}
+
+#[test]
 fn itera_coordinates_survive_reemission() {
     // `itera ex src apud [i] fixum x` — the coordinate binding is
     // loop-visible; dropping it breaks bodies that reference it.

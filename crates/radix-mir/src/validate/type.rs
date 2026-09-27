@@ -747,10 +747,24 @@ impl Validator<'_, '_> {
         {
             return;
         }
-        if self.integer_constant_fits(operand, expected) {
+        if self.integer_constant_fits(operand, expected)
+            || self.littera_constant_fits(operand, expected)
+        {
             return;
         }
         self.error(span, message);
+    }
+
+    /// D10.5 `ascii<1> → littera`: an ASCII literal constant (MIR types every
+    /// `MirConstant::Ascii` as bare `ascii`) stands for a one-scalar value
+    /// where semantic analysis already typed it `littera` — e.g. the `⊥`
+    /// default of `n ↦ littera ⊥ '?'` (D10.6).
+    fn littera_constant_fits(&self, operand: &MirOperand, expected: MirType) -> bool {
+        matches!(operand, MirOperand::Constant(MirConstant::Ascii(_)))
+            && matches!(
+                self.type_kind(expected),
+                Type::Primitive(Primitive::Littera)
+            )
     }
 
     pub(crate) fn integer_constant_fits(&self, operand: &MirOperand, expected: MirType) -> bool {

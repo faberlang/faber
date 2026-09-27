@@ -116,6 +116,7 @@ pub mod intrinsics;
 pub mod item;
 pub mod itera_element;
 pub mod json_genus;
+pub mod littera_conversio;
 pub mod lockstep;
 pub mod lookup;
 pub mod ops;
@@ -732,6 +733,10 @@ mod ascii_index_test;
 #[cfg(test)]
 #[path = "littera_test.rs"]
 mod littera_test;
+
+#[cfg(test)]
+#[path = "littera_conversio_test.rs"]
+mod littera_conversio_test;
 
 #[cfg(test)]
 #[path = "ascii_format_pack_conversio_test.rs"]
