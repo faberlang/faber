@@ -1,7 +1,7 @@
 +++
 term = "insere"
 kind = "keyword"
-grammar = ["fab_file", "program", "statement", "statement_core", "static_decl", "genus_decl", "genus_member", "field_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "expression", "literal", "nota_stmt", "call_expr", "call_suffix", "member_suffix"]
+grammar = ["fab_file", "program", "statement", "statement_core", "static_decl", "static_init", "insere_expr", "genus_decl", "genus_member", "field_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "expression", "literal", "nota_stmt", "call_expr", "call_suffix", "member_suffix"]
 category = "comptime"
 canonical = true
 summary = "Embeds a package file into a static at build time."
