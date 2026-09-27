@@ -28,7 +28,7 @@ use std::cell::Cell;
 use super::ast::{
     ArrayElement, BindingPattern, BlockStmt, ClassMemberKind, ClausuraBody, ConversioTarget, Expr,
     ExprKind, GenericArgExpr, Ident, IfBody, ImportKind, NonNullKind, OptionalChainKind, Pattern,
-    PatternBind, PraefixumBody, Program, SecusClause, Stmt, StmtKind, TypeExpr, TypeExprKind,
+    PatternBind, Program, SecusClause, Stmt, StmtKind, TypeExpr, TypeExprKind,
 };
 
 /// Maximum AST nesting depth before the walker refuses to descend further.
@@ -628,10 +628,7 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
                 visitor.visit_expr(arg);
             }
         }
-        ExprKind::Praefixum(praefixum) => match &praefixum.body {
-            PraefixumBody::Block(b) => visitor.visit_block(b),
-            PraefixumBody::Expr(e) => visitor.visit_expr(e),
-        },
+        ExprKind::Praefixum(praefixum) => visitor.visit_block(&praefixum.body),
         ExprKind::TypeCheck(type_check) => {
             visitor.visit_expr(&type_check.expr);
             visitor.visit_type_expr(&type_check.ty);

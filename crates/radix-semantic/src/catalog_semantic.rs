@@ -35,6 +35,7 @@ pub(crate) const SEMANTIC_ERROR_KINDS: &[SemanticErrorKind] = &[
     SemanticErrorKind::AirPurityViolation,
     SemanticErrorKind::StaticInitializerInvalid,
     SemanticErrorKind::InsereInvalid,
+    SemanticErrorKind::PraefixumInvalid,
     SemanticErrorKind::ImmutableAssignment,
     SemanticErrorKind::AssignmentTargetInvalid,
     SemanticErrorKind::UseBeforeInit,
@@ -178,13 +179,17 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
         },
         SemanticErrorKind::StaticInitializerInvalid => DiagnosticSpec {
             code: "SEM060",
-            help: Some("move the computation into a function, or use `praefixum` (planned)"),
+            help: Some("move the computation into a function, or use `praefixum { … }`"),
         },
         SemanticErrorKind::InsereInvalid => DiagnosticSpec {
             code: "SEM061",
             help: Some(
                 "embed a package-relative file that exists, as `textus` (UTF-8) or `octeti`",
             ),
+        },
+        SemanticErrorKind::PraefixumInvalid => DiagnosticSpec {
+            code: "SEM062",
+            help: Some("keep a `praefixum` body to pure computation that yields a literal value"),
         },
         SemanticErrorKind::AirPurityViolation => DiagnosticSpec {
             code: "SEM059",

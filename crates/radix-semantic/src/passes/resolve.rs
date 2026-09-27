@@ -1466,14 +1466,13 @@ fn resolve_expr(
         // is live. This makes binding lookup win uniformly in expression
         // position while preserving the marker when the name is unbound.
         ExprKind::Vacua(ident) => record_shadowed_builtin(resolver, expr.id, ident.name),
-        ExprKind::Praefixum(expr) => match &expr.body {
-            radix_syntax::PraefixumBody::Block(block) => {
-                resolve_block(resolver, interner, block, errors)
-            }
-            radix_syntax::PraefixumBody::Expr(expr) => {
-                resolve_expr(resolver, interner, expr, errors)
-            }
-        },
+        // A `praefixum` body is a function body: `redde` yields the static's
+        // value (D8.4).
+        ExprKind::Praefixum(expr) => {
+            resolver.enter_scope(ScopeKind::Function);
+            resolve_block(resolver, interner, &expr.body, errors);
+            resolver.exit_scope();
+        }
         ExprKind::Ego(_) | ExprKind::Insere(_) => {}
         ExprKind::Paren(expr) => resolve_expr(resolver, interner, expr, errors),
         ExprKind::TypeCheck(expr) => {

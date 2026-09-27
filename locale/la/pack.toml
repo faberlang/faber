@@ -734,6 +734,10 @@ help = "the value conditional is 'c ✓ a ✗ b' (U+2713, U+2717) in every local
 message = "'⇥' names an error type; use '⊥' for a default"
 help = "write '↦ T ⊥ value' (or '↤ … ⊥ value'); '⇥' never takes a value"
 
+[diagnostics.PARSE030.issues.praefixum_expression_form_retired]
+message = "`{praefixum}(expression)` is retired"
+help = "write a static: `{generis} T NAME = {praefixum}` followed by a block that ends in `{redde}` value"
+
 [diagnostics.PARSE030.issues.default_with_propagation]
 message = "an expression either propagates with '⇥' or defaults with '⊥', never both"
 help = "keep the '⊥' default, or drop it and let the error propagate"
@@ -3380,11 +3384,11 @@ help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lan
 
 [diagnostics.SEM060]
 message = "invalid static initializer"
-help = "move the computation into a function, or use `{praefixum}` (planned)"
+help = "move the computation into a function, or use a `{praefixum}` block"
 
 [diagnostics.SEM060.issues.static_initializer_not_constant]
 message = "the initializer of static `{name}` is not a compile-time constant"
-help = "a static allows literals, arithmetic, text, collection literals of those, and other statics; move the computation into a function, or use `{praefixum}` (planned)"
+help = "a static allows literals, arithmetic, text, collection literals of those, and other statics; move the computation into a function, or use a `{praefixum}` block"
 
 [diagnostics.SEM060.issues.static_arithmetic_overflow]
 message = "the initializer of static `{name}` overflows its type"
@@ -3425,6 +3429,38 @@ help = "declare the static as `octeti` to embed raw bytes"
 [diagnostics.SEM061.issues.insere_type_invalid]
 message = "an `{insere}` initializer must declare `textus` or `octeti`"
 help = "declare `textus` for UTF-8 text or `octeti` for raw bytes"
+
+[diagnostics.SEM062]
+message = "invalid `{praefixum}` initializer"
+help = "keep a `{praefixum}` body to pure computation that yields a literal value"
+
+[diagnostics.SEM062.issues.praefixum_outside_static]
+message = "`{praefixum}` is allowed only as a `{generis}` initializer"
+help = "move the computation into a `{generis}` initializer: `{generis} T NAME = {praefixum}` followed by a block"
+
+[diagnostics.SEM062.issues.praefixum_forbidden]
+message = "`{praefixum}` initializer of `{name}` reaches `{effect}` through {chain}"
+help = "a build-time body may compute, loop, and call pure Faber functions; it may not use `{ad}`, await, async code, external code, input, or output"
+
+[diagnostics.SEM062.issues.praefixum_failed]
+message = "`{praefixum}` initializer of `{name}` failed at build time: {message}"
+help = "fix the computation or the condition it asserts"
+
+[diagnostics.SEM062.issues.praefixum_step_limit]
+message = "`{praefixum}` initializer of `{name}` did not finish within {limit} steps"
+help = "check for an endless loop or runaway recursion"
+
+[diagnostics.SEM062.issues.praefixum_no_result]
+message = "`{praefixum}` initializer of `{name}` finished without a value"
+help = "end every path of the body with `{redde}` and the value"
+
+[diagnostics.SEM062.issues.praefixum_result_not_literal]
+message = "the value of `{praefixum}` initializer `{name}` has no literal form"
+help = "return scalars, text, bytes, collections of those, tuples, or a non-generic genus; never closures or handles"
+
+[diagnostics.SEM062.issues.praefixum_unsupported]
+message = "`{praefixum}` initializer of `{name}` cannot run at build time: {detail}"
+help = "use only constructs the build-time runner supports"
 
 [diagnostics.WARN001]
 message = "unused variable"

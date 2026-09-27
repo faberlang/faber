@@ -65,6 +65,7 @@ pub mod kernel_namespace;
 pub mod libera;
 pub mod lint;
 pub mod live_tuus_cursor_escape;
+pub mod praefixum;
 pub mod resolve;
 pub mod return_path;
 pub mod statica;
@@ -220,6 +221,9 @@ mod ratio_test;
 #[path = "typecheck/ratio_hole_test.rs"]
 mod ratio_hole_test;
 
+#[cfg(test)]
+#[path = "praefixum_test.rs"]
+mod praefixum_test;
 #[cfg(test)]
 #[path = "statica_test.rs"]
 mod statica_test;

@@ -413,10 +413,7 @@ fn scan_go_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
                 scan_go_expr(expr, file, diagnostics);
             }
         }
-        ExprKind::Praefixum(praefixum) => match &praefixum.body {
-            PraefixumBody::Block(block) => scan_go_block(block, file, diagnostics),
-            PraefixumBody::Expr(expr) => scan_go_expr(expr, file, diagnostics),
-        },
+        ExprKind::Praefixum(praefixum) => scan_go_block(&praefixum.body, file, diagnostics),
         // UT: the capture boundary's body is ordinary scanned source.
         ExprKind::Trap(trap) => scan_go_block(&trap.body, file, diagnostics),
         ExprKind::CallDefault(call_default) => {
@@ -792,10 +789,7 @@ fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
                 scan_rust_expr(expr, file, diagnostics);
             }
         }
-        ExprKind::Praefixum(praefixum) => match &praefixum.body {
-            PraefixumBody::Block(block) => scan_rust_block(block, file, diagnostics),
-            PraefixumBody::Expr(expr) => scan_rust_expr(expr, file, diagnostics),
-        },
+        ExprKind::Praefixum(praefixum) => scan_rust_block(&praefixum.body, file, diagnostics),
         // UT: the capture boundary's body is ordinary scanned source.
         ExprKind::Trap(trap) => scan_rust_block(&trap.body, file, diagnostics),
         ExprKind::CallDefault(call_default) => {

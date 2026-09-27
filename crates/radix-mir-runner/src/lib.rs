@@ -588,6 +588,72 @@ fn run_function_with_explicit_limits_and_stats<H: Host + ?Sized>(
     Ok(RunnerRunOutcome { result, stats })
 }
 
+/// Why a build-time evaluation ([`evaluate_function`]) produced no value.
+#[derive(Debug)]
+pub enum EvaluationFailure {
+    /// Runner errors: an unsupported construct, an internal failure, or the
+    /// exhausted step budget.
+    Errors(Vec<RunnerError>),
+    /// The function ended on its `⇥` channel with this error value.
+    Raised(Value),
+    /// The function ended without a return value.
+    NoValue,
+    /// The step budget ran out (an endless or runaway computation).
+    StepLimit,
+}
+
+/// Run a specific MIR function under a step budget and return its value.
+///
+/// This is the build-time evaluator for `praefixum` statics (DECISIONS
+/// D8.5): the caller supplies a fixed budget so an endless loop fails the
+/// build. A `mori` reaches the host's `abort`, which the caller traps.
+///
+/// # Errors
+///
+/// Returns [`EvaluationFailure`] when execution fails, raises on its error
+/// channel, or returns nothing.
+pub fn evaluate_function<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    host: &mut H,
+    step_budget: u64,
+) -> Result<Value, EvaluationFailure> {
+    let context = validated.validation();
+    let program = validated.program();
+    let interner = context.interner.as_interner().ok_or_else(|| {
+        EvaluationFailure::Errors(vec![RunnerError::internal(
+            Span::default(),
+            "runner requires interner context",
+        )])
+    })?;
+    if validated.function_by_id(function_id).is_none() {
+        return Err(EvaluationFailure::Errors(vec![RunnerError::internal(
+            Span::default(),
+            format!("no MIR function with id {}", function_id.0),
+        )]));
+    }
+    let mut runner = Runner::new(program, context, context.types.as_table(), interner, host);
+    runner.step_limit = Some(step_budget);
+    runner.push_frame(function_id, MirBlockId(0));
+    runner.run_until_depth(0);
+    runner.close_all_frames();
+    if runner.steps_taken >= step_budget {
+        return Err(EvaluationFailure::StepLimit);
+    }
+    if !runner.errors.is_empty() {
+        return Err(EvaluationFailure::Errors(std::mem::take(
+            &mut runner.errors,
+        )));
+    }
+    if let Some(raised) = runner.return_error.take() {
+        return Err(EvaluationFailure::Raised(raised));
+    }
+    match runner.return_value.take() {
+        Some(Value::Unit) | None => Err(EvaluationFailure::NoValue),
+        Some(value) => Ok(value),
+    }
+}
+
 fn function_unsupported_bounded_carrier(
     function: &MirFunction,
     types: &TypeTable,

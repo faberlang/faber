@@ -181,4 +181,18 @@ impl HirVisitor for FaberNameCollector {
     fn visit_def(&mut self, def_id: DefId, name: Symbol) {
         self.names.insert(def_id, name);
     }
+
+    // A folded static re-emits its authored initializer, whose locals (a
+    // `praefixum` body's bindings, D8.5) live only there.
+    fn visit_item(&mut self, item: &radix_hir::HirItem) {
+        if let HirItemKind::Constant(konst) = &item.kind
+            && let Some(authored) = konst
+                .statica
+                .as_ref()
+                .and_then(|statica| statica.authored.as_deref())
+        {
+            self.visit_expr(authored);
+        }
+        radix_hir::visit::walk_item(self, item);
+    }
 }

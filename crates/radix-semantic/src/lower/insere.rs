@@ -16,12 +16,25 @@ use radix_syntax::{Expr, ExprKind, InsereExpr};
 
 impl Lowerer<'_> {
     /// Lower a `generis` initializer, folding a build-time embed against the
-    /// declared type. Every other initializer lowers as an ordinary expression.
+    /// declared type. A `praefixum { … }` body lowers to `Praefixum(Block)`
+    /// for the driver's build-time evaluation (D8.5); it is legal only here.
+    /// Every other initializer lowers as an ordinary expression.
     pub(super) fn lower_static_initializer(
         &mut self,
         init: &Expr,
         declared: Option<TypeId>,
     ) -> HirExpression {
+        if let ExprKind::Praefixum(praefixum) = &init.kind {
+            self.current_span = init.span;
+            let id = self.next_hir_id();
+            let kind = self.lower_praefixum(praefixum, init.span);
+            return HirExpression {
+                id,
+                kind,
+                ty: None,
+                span: init.span,
+            };
+        }
         let ExprKind::Insere(insere) = &init.kind else {
             return self.lower_expr(init);
         };

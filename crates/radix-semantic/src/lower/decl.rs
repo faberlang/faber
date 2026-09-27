@@ -789,12 +789,12 @@ impl Lowerer<'_> {
                 ClassMemberKind::Field(field) => {
                     let annotations = self.lower_annotations(&member.annotations);
                     // A static field's embed folds against the declared type,
-                    // so it lowers once the field type is known (below).
+                    // so it lowers once the field type is known (below); a
+                    // `praefixum` body takes the same static-initializer path.
                     let embeds = field.is_static()
-                        && field
-                            .init
-                            .as_ref()
-                            .is_some_and(|init| matches!(init.kind, ExprKind::Insere(_)));
+                        && field.init.as_ref().is_some_and(|init| {
+                            matches!(init.kind, ExprKind::Insere(_) | ExprKind::Praefixum(_))
+                        });
                     let mut init = if embeds {
                         None
                     } else {

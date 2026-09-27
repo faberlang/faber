@@ -27,6 +27,10 @@
 //! [`HirStatic::authored`] so Faber re-emission prints the source, not the
 //! folded value.
 //!
+//! A `praefixum { … }` initializer (D8.4) is not evaluated here: the driver
+//! runs it on the MIR runner, substitutes the literal, and calls [`fold`]
+//! again so statics that read it fold too.
+//!
 //! D5.7: a legacy top-level `fixum`/`varia` is WARN030 `top_level_binding`
 //! until the library sweep lands, when it becomes an error.
 
@@ -91,6 +95,7 @@ pub fn fold(hir: &mut HirModule, types: &TypeTable, interner: &mut Interner) -> 
     for def_id in &order {
         if let Err(fault) = evaluator.eval_static(*def_id, interner)
             && fault.issue != ISSUE_DEPENDENCY
+            && fault.issue != ISSUE_DEFERRED
         {
             let name = evaluator.inits[def_id].0;
             let kind = if fault.issue == ISSUE_CYCLE {
@@ -138,6 +143,11 @@ pub fn fold(hir: &mut HirModule, types: &TypeTable, interner: &mut Interner) -> 
 /// Marker issue: a static failed because a static it references failed.
 /// The referenced static carries the diagnostic; this one stays quiet.
 const ISSUE_DEPENDENCY: &str = "static_dependency";
+
+/// Marker issue: a `praefixum { … }` initializer (D8.5). The driver evaluates
+/// it on the MIR runner after analysis, then folds again; statics that
+/// depend on it stay quiet until then.
+const ISSUE_DEFERRED: &str = "static_deferred";
 
 #[derive(Debug, Clone, PartialEq)]
 enum Value {
@@ -234,6 +244,7 @@ impl Evaluator<'_> {
                         _ => Fault::at(ISSUE_DEPENDENCY, expr.span),
                     })?
             }
+            HirExpressionKind::Praefixum(_) => return Err(Fault::at(ISSUE_DEFERRED, expr.span)),
             HirExpressionKind::Unary(op, operand) => {
                 let operand = self.eval(operand, interner)?;
                 unary(*op, operand).ok_or(Fault::at(ISSUE_NOT_CONSTANT, expr.span))?
@@ -523,7 +534,7 @@ fn is_literal_form(expr: &HirExpression) -> bool {
     }
 }
 
-pub(crate) fn max_hir_id(hir: &HirModule) -> u32 {
+pub fn max_hir_id(hir: &HirModule) -> u32 {
     struct MaxId(u32);
     impl HirVisitor for MaxId {
         fn visit_item(&mut self, item: &radix_hir::HirItem) {

@@ -1604,3 +1604,6 @@ mod format_operator_test;
 #[cfg(test)]
 #[path = "insere_test.rs"]
 mod insere_test;
+#[cfg(test)]
+#[path = "praefixum_test.rs"]
+mod praefixum_test;

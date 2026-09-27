@@ -1032,7 +1032,10 @@ impl super::FaberCodegen<'_> {
                     .unwrap_or_else(|error| self.record_type_emission_error(error));
                 writer.write(&rendered);
             }
+            // `praefixum { … }` (D8.4): the keyword, then the body block.
             HirExpressionKind::Praefixum(inner) => {
+                writer.write(surface.keyword(TokenKind::Praefixum));
+                writer.write(" ");
                 self.write_expr(inner, names, surface, writer);
             }
             HirExpressionKind::Summa {

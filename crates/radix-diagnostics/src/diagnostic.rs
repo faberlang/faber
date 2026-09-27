@@ -298,6 +298,10 @@ pub enum SemanticErrorKind {
     /// A build-time file embed (`insere "path"`, D8.10) that cannot be
     /// resolved or does not fit its declared type.
     InsereInvalid,
+    /// A `praefixum { … }` build-time initializer (D8.4–D8.6) that is
+    /// misplaced, reaches a forbidden effect, fails, or yields a value with
+    /// no literal form.
+    PraefixumInvalid,
 
     // Assignment
     ImmutableAssignment,

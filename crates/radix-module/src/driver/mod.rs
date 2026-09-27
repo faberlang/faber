@@ -29,6 +29,7 @@
 mod file_frontmatter;
 mod frontmatter;
 mod insere;
+mod praefixum;
 mod session;
 #[cfg(feature = "mir-core")]
 mod shader_contract;
@@ -3224,6 +3225,14 @@ fn analyze_source_with_kernel_template_admissions_unadjusted(
     let mut unit = analyzed_unit_from_semantic(interner, cli_program, semantic_result, name, &mut diagnostics)
         .map_err(|()| diagnostics)?;
     unit.embedded_inputs = insere.inputs;
+    // D8.5: evaluate `praefixum` statics on the MIR runner so every backend
+    // receives literals. Faber re-emission keeps the authored body.
+    if session.config.target != Target::HirFaber
+        && let Err(praefixum_errors) = praefixum::evaluate(&mut unit, name, body)
+    {
+        unit.diagnostics.extend(praefixum_errors);
+        return Err(unit.diagnostics);
+    }
     if !rust_omit.is_empty() {
         unit.hir
             .items

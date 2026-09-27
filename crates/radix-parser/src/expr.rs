@@ -2894,15 +2894,19 @@ impl Parser {
         })
     }
 
-    /// Parse `praefixum(expr)`, the source-level compile-time evaluation marker.
+    /// Parse `praefixum { … }`, the build-time initializer body of a static
+    /// (DECISIONS D8.4). The retired Zig-era `praefixum(expr)` form gets the
+    /// migration diagnostic `praefixum_expression_form_retired`.
+    ///
+    /// GRAMMAR:
+    ///   praefixum-expr := `praefixum` block
     fn parse_praefixum_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         self.expect_keyword_ident(TokenKind::Praefixum, "expected 'praefixum'")?;
-        self.expect(&TokenKind::LParen, "expected '(' after 'praefixum'")?;
-
-        let body = PraefixumBody::Expr(Box::new(self.parse_expression()?));
-
-        self.expect(&TokenKind::RParen, "expected ')'")?;
+        if self.check(&TokenKind::LParen) {
+            return Err(self.invalid_expression_error("praefixum_expression_form_retired"));
+        }
+        let body = self.parse_block()?;
 
         let span = start.merge(self.previous_span());
         let id = self.next_id();

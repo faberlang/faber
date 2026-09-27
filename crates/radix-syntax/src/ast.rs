@@ -1632,10 +1632,11 @@ pub struct AdExpr {
     pub span: Span,
 }
 
-/// Compile-time `praefixum` body; evaluation is forced at compile time.
+/// `praefixum { … }`: a static's build-time initializer body (D8.4). The
+/// block runs on the MIR runner during the build and `redde`s the value.
 #[derive(Debug)]
 pub struct PraefixumExpr {
-    pub body: PraefixumBody,
+    pub body: BlockStmt,
 }
 
 /// Build-time file embed: `insere "path"` (D8.10).
@@ -1646,12 +1647,6 @@ pub struct PraefixumExpr {
 pub struct InsereExpr {
     pub path: Symbol,
     pub path_span: Span,
-}
-
-#[derive(Debug)]
-pub enum PraefixumBody {
-    Block(BlockStmt),
-    Expr(Box<Expr>),
 }
 
 /// Runtime variant check: `expr est <type>` / `expr non est <type>`.

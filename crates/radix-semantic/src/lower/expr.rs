@@ -29,7 +29,7 @@
 use super::{Lowerer, issue_args};
 use crate::builtins::forma::{self as builtin_forma};
 use crate::template_holes::{TemplateHoleAnalysis, analyze_template};
-use crate::{Primitive, TypeId};
+use crate::{Primitive, SemanticErrorKind, TypeId};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
     HirArrayElement, HirBinOp, HirCallArg, HirConversioTarget, HirExpression, HirExpressionKind,
@@ -89,7 +89,16 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
             .lower_shadowed_builtin(expr.id, lege.symbol)
             .unwrap_or(HirExpressionKind::ReadLine(lege.is_line)),
 
-        ExprKind::Praefixum(praefixum) => lowerer.lower_praefixum(praefixum),
+        // `praefixum` is legal only as a `generis` initializer, which lowers
+        // through `lower_static_initializer` (D8.6).
+        ExprKind::Praefixum(_) => {
+            lowerer.push_error(
+                SemanticErrorKind::PraefixumInvalid,
+                vec![DiagnosticArg::new("issue", "praefixum_outside_static")],
+                expr.span,
+            );
+            HirExpressionKind::Error
+        }
         // The parser claims `insere` only as a `generis` initializer, which
         // lowers through `lower_static_initializer`; reaching here means a
         // parser invariant broke.
@@ -1522,15 +1531,18 @@ impl Lowerer<'_> {
         HirExpressionKind::Call(Box::new(callee), Vec::new(), args, None)
     }
 
-    fn lower_praefixum(&mut self, praefixum: &radix_syntax::PraefixumExpr) -> HirExpressionKind {
-        let inner = match &praefixum.body {
-            radix_syntax::PraefixumBody::Expr(expr) => lower_expr(self, expr),
-            radix_syntax::PraefixumBody::Block(block) => HirExpression {
-                id: self.next_hir_id(),
-                kind: HirExpressionKind::Block(self.lower_block(block)),
-                ty: None,
-                span: self.current_span,
-            },
+    /// Lower a static's `praefixum { … }` body to `Praefixum(Block)`; the
+    /// driver evaluates it on the MIR runner (D8.5).
+    pub(super) fn lower_praefixum(
+        &mut self,
+        praefixum: &radix_syntax::PraefixumExpr,
+        span: radix_lexer::Span,
+    ) -> HirExpressionKind {
+        let inner = HirExpression {
+            id: self.next_hir_id(),
+            kind: HirExpressionKind::Block(self.lower_block(&praefixum.body)),
+            ty: None,
+            span,
         };
         HirExpressionKind::Praefixum(Box::new(inner))
     }

@@ -1387,58 +1387,26 @@ fn assert_matching_hir_annotations_on_first_item(sugar: &str, canonical: &str) {
     }
 }
 
-// ── F-013: Praefixum marker preservation ──
+// ── F-013: Praefixum block form (D8.4) ──
 #[test]
-fn preserves_praefixum_marker() {
+fn preserves_praefixum_static_block() {
     let source = r"
-functio computationem() → numerus {
-  redde praefixum(2 + 3)
+generis numerus N = praefixum {
+  redde 2 + 3
 }
 ";
 
     let (lowered, _, _) = lower_source(source);
-    let HirItemKind::Function(function) = &lowered.hir.items[0].kind else {
-        panic!("expected function");
+    let HirItemKind::Constant(konst) = &lowered.hir.items[0].kind else {
+        panic!("expected static");
     };
-    let body = function.body.as_ref().expect("expected function body");
-    let HirStatementKind::Redde(Some(ret)) = &body.statements[0].kind else {
-        panic!("expected redde statement");
-    };
-    assert!(
-        matches!(ret.kind, HirExpressionKind::Praefixum(_)),
-        "praefixum marker was erased; expected Praefixum, got {:?}",
-        ret.kind
-    );
-}
-
-// ── F-013: Praefixum block form ──
-// NOTE: The parser currently does not support `praefixum { ... }` block form,
-// only `praefixum(expr)`. The HIR lowerer handles both shapes; block form
-// coverage will be added when the parser adds support.
-#[test]
-fn preserves_praefixum_block_lowering_path() {
-    // Test the lowerer's block path directly by constructing a synthetic
-    // PraefixumExpr with a PraefixumBody::Block and verifying it produces
-    // HirExpressionKind::Praefixum. This guards against regressions in the
-    // already-implemented lowering path.
-
-    let source = r"
-functio computationem() → numerus {
-  redde praefixum(2 + 3)
-}
-";
-
-    let (lowered, _, _) = lower_source(source);
-    let HirItemKind::Function(function) = &lowered.hir.items[0].kind else {
-        panic!("expected function");
-    };
-    let body = function.body.as_ref().expect("expected function body");
-    let HirStatementKind::Redde(Some(ret)) = &body.statements[0].kind else {
-        panic!("expected redde statement");
+    let HirExpressionKind::Praefixum(inner) = &konst.value.kind else {
+        panic!("praefixum marker was erased; got {:?}", konst.value.kind);
     };
     assert!(
-        matches!(ret.kind, HirExpressionKind::Praefixum(_)),
-        "praefixum marker was erased in expr form"
+        matches!(inner.kind, HirExpressionKind::Block(_)),
+        "praefixum body must lower to a block, got {:?}",
+        inner.kind
     );
 }
 

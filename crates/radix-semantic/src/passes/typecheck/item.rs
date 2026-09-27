@@ -173,6 +173,48 @@ impl TypeChecker<'_> {
         self.consts.insert(def_id, ty);
     }
 
+    /// Check a static's `praefixum { … }` body (D8.4) as the body of a
+    /// synchronous function returning the declared type: `redde` yields the
+    /// static's value and must type-check as `T`. There is no error channel
+    /// and no await context; the purity pass names the forbidden effects.
+    pub fn check_praefixum(
+        &mut self,
+        inner: &mut radix_hir::HirExpression,
+        expected: Option<TypeId>,
+    ) -> TypeId {
+        let HirExpressionKind::Block(body) = &mut inner.kind else {
+            return self.check_expr(inner);
+        };
+        let prev_return = self.current_return;
+        let prev_error = self.current_error;
+        let prev_generator_function = self.current_generator_function;
+        let prev_await_context = self.current_await_context;
+        let prev_await_return_context = self.current_await_return_context;
+        let prev_inferred = self.inferred_return;
+        let prev_allow_inferred = self.allow_inferred_return;
+        self.current_return = expected;
+        self.current_error = None;
+        self.current_generator_function = false;
+        self.current_await_context = false;
+        self.current_await_return_context = false;
+        self.inferred_return = None;
+        self.allow_inferred_return = expected.is_none();
+        self.push_scope();
+        self.check_block(body, None);
+        self.pop_scope();
+        let inferred = self.inferred_return.take();
+        self.current_return = prev_return;
+        self.current_error = prev_error;
+        self.current_generator_function = prev_generator_function;
+        self.current_await_context = prev_await_context;
+        self.current_await_return_context = prev_await_return_context;
+        self.inferred_return = prev_inferred;
+        self.allow_inferred_return = prev_allow_inferred;
+        let ty = expected.or(inferred).unwrap_or_else(|| self.vacuum_type());
+        inner.ty = Some(ty);
+        ty
+    }
+
     /// Dispatch item checking after the type metadata collection pass.
     ///
     /// Only items with executable or value-bearing bodies need work here.

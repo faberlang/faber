@@ -637,6 +637,9 @@ pub fn analyze_with_cli(
     diagnostics.extend(passes::statica::warn_top_level_bindings(&hir, interner));
     if !diagnostics.iter().any(SemanticError::is_error) {
         diagnostics.extend(passes::statica::fold(&mut hir, &types, interner));
+        // `praefixum` bodies: transitive purity and static cycles (D8.6);
+        // the driver evaluates them on the MIR runner afterwards.
+        diagnostics.extend(passes::praefixum::check(&hir, &types, interner));
     }
     // Concrete generic AIR instances must exist before named unroll: symbolic
     // templates remain source/FHIR facts, while their reachable concrete clones
