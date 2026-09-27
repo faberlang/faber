@@ -244,7 +244,12 @@ impl TypeChecker<'_> {
     /// being treated as an ordinary expression result.
     pub fn check_stmt(&mut self, stmt: &mut HirStatement) {
         match &mut stmt.kind {
-            HirStatementKind::Local(local) => self.check_local(local),
+            HirStatementKind::Local(local) => {
+                if let Some(ty) = local.ty {
+                    self.check_hashable_keys(ty, stmt.span);
+                }
+                self.check_local(local);
+            }
             HirStatementKind::Expr(expr) => {
                 let expr_ty = self.check_expr(expr);
                 // U1R: an `adfirma` whose condition narrows a binding holds

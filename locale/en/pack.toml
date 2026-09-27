@@ -2053,6 +2053,18 @@ help = "make the expression type match the expected type"
 message = "{apud} coordinates require {ex} iteration"
 help = "make the expression type match the expected type"
 
+[diagnostics.SEM010.issues.itera_apud_requires_indexed_iterable]
+message = "{apud} requires an indexed iterable: {lista}, {tabula}, tensor, or matrix"
+help = "iterate this source without {apud}; its values have no index to name"
+
+[diagnostics.SEM010.issues.tabula_key_not_hashable]
+message = "{tabula} key type is not hashable"
+help = "use a key without {fractus} values or mutable collections: {textus}, {numerus}, {iuncta}, or a {genus} of those"
+
+[diagnostics.SEM010.issues.copia_element_not_hashable]
+message = "{copia} element type is not hashable"
+help = "use an element without {fractus} values or mutable collections: {textus}, {numerus}, {iuncta}, or a {genus} of those"
+
 [diagnostics.SEM010.issues.itera_apud_requires_shaped_iterable]
 message = "{apud} requires a tensor or matrix iterable"
 help = "make the expression type match the expected type"

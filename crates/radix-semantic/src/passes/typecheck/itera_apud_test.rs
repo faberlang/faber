@@ -236,23 +236,83 @@ functio indices(lista<numerus> xs) → vacuum {
 }
 
 #[test]
-fn apud_on_ragged_nested_list_rejects_fail_closed() {
-    let result = test_support::analyze_source(
+fn apud_on_ragged_nested_list_rejects_with_rank1_arity() {
+    // D3.1: a lista is rank 1 — `xs[i]` takes one index — so two names are
+    // an arity mismatch, never a ragged rank-2 walk.
+    assert_rejects_arity(
         r"
 functio ragged(lista<lista<numerus>> pairs) → vacuum {
     itera ex pairs apud [i, j] fixum cell {
         tacet
     }
 }",
+        "1",
+        "2",
     );
-    assert!(
-        !result.is_ok(),
-        "expected fail-closed rejection, got: {:?}",
-        result.diagnostics
+}
+
+#[test]
+fn apud_on_plain_list_binds_numerus_index_and_element() {
+    test_support::assert_accepts(
+        r"
+functio flat(lista<textus> xs) → vacuum {
+    itera ex xs apud [i] fixum cell {
+        fixum numerus n ← i
+        fixum textus t ← cell
+        nota n, t
+    }
+}",
     );
-    let err = find_error(&result, "itera_apud_requires_shaped_iterable").unwrap_or_else(|| {
+}
+
+#[test]
+fn apud_on_tabula_binds_key_and_value() {
+    test_support::assert_accepts(
+        r"
+functio pairs(tabula<textus, numerus> m) → vacuum {
+    itera ex m apud [k] fixum v {
+        fixum textus key ← k
+        fixum numerus value ← v
+        nota key, value
+    }
+}",
+    );
+}
+
+#[test]
+fn apud_on_tuple_key_tabula_binds_each_key_part() {
+    test_support::assert_accepts(
+        r"
+functio sales(tabula<iuncta<textus, numerus>, numerus> m) → vacuum {
+    itera ex m apud [regio, annus] fixum v {
+        fixum textus r ← regio
+        fixum numerus a ← annus
+        fixum numerus value ← v
+        nota r, a, value
+    }
+}",
+    );
+}
+
+#[test]
+fn apud_on_tuple_key_tabula_with_one_name_rejects_arity() {
+    assert_rejects_arity(
+        r"
+functio sales(tabula<iuncta<textus, numerus>, numerus> m) → vacuum {
+    itera ex m apud [k] fixum v {
+        tacet
+    }
+}",
+        "2",
+        "1",
+    );
+}
+
+fn assert_rejects_indexed(source: &str) {
+    let result = test_support::analyze_source(source);
+    let err = find_error(&result, "itera_apud_requires_indexed_iterable").unwrap_or_else(|| {
         panic!(
-            "missing itera_apud_requires_shaped_iterable in {:?}",
+            "missing itera_apud_requires_indexed_iterable in {:?}",
             result.diagnostics
         )
     });
@@ -260,32 +320,32 @@ functio ragged(lista<lista<numerus>> pairs) → vacuum {
 }
 
 #[test]
-fn apud_on_plain_list_rejects_fail_closed() {
-    let result = test_support::analyze_source(
+fn apud_on_copia_rejects_as_not_indexed() {
+    assert_rejects_indexed(
         r"
-functio flat(lista<numerus> xs) → vacuum {
-    itera ex xs apud [i] fixum cell {
+functio members(copia<numerus> s) → vacuum {
+    itera ex s apud [i] fixum x {
         tacet
     }
 }",
     );
-    assert!(
-        !result.is_ok(),
-        "expected fail-closed rejection, got: {:?}",
-        result.diagnostics
+}
+
+#[test]
+fn apud_on_cursor_rejects_as_not_indexed() {
+    assert_rejects_indexed(
+        r"
+functio stream(cursor<numerus> c) → vacuum {
+    itera ex c apud [i] fixum x {
+        tacet
+    }
+}",
     );
-    let err = find_error(&result, "itera_apud_requires_shaped_iterable").unwrap_or_else(|| {
-        panic!(
-            "missing itera_apud_requires_shaped_iterable in {:?}",
-            result.diagnostics
-        )
-    });
-    assert_eq!(crate::semantic_spec(err.kind).code, "SEM010");
 }
 
 #[test]
 fn apud_on_sparsa_rejects_fail_closed() {
-    let result = test_support::analyze_source(
+    assert_rejects_indexed(
         r"
 functio sparse(sparsa<f32, [2, 3]> s) → vacuum {
     itera ex s apud [i, j] fixum cell {
@@ -293,16 +353,4 @@ functio sparse(sparsa<f32, [2, 3]> s) → vacuum {
     }
 }",
     );
-    assert!(
-        !result.is_ok(),
-        "expected fail-closed rejection, got: {:?}",
-        result.diagnostics
-    );
-    let err = find_error(&result, "itera_apud_requires_shaped_iterable").unwrap_or_else(|| {
-        panic!(
-            "missing itera_apud_requires_shaped_iterable in {:?}",
-            result.diagnostics
-        )
-    });
-    assert_eq!(crate::semantic_spec(err.kind).code, "SEM010");
 }
