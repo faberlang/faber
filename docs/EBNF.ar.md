@@ -1034,9 +1034,8 @@ use a top-level function.
 
 
 `ثابت` and `متغير` are not allowed at top level (D5.7): module-level mutable
-state does not exist. A top-level `ثابت`/`متغير` binding is a migration
-warning (`top_level_binding`) until the library sweep lands, when it becomes
-an error.
+state does not exist. A top-level `ثابت`/`متغير` binding is a compile error: SEM062
+`top_level_binding`.
 
 The top-level static is `سكوني` (en `static`): `سكوني numerus LIMES = 4096`
 (D5.8) — the same production as a `صنف` static field, used in a second,
@@ -2270,7 +2269,7 @@ non-generic, bodied `دالة` serves that route.
   program, including imported libraries. Two definitions of the same route are
   a compile error.
 - Parsing, checking, and the route table exist today; serving is implemented
-  on Rust, Go, and TypeScript. The MIR runner does not serve `@ اتصل` yet.
+  on Rust, Go, TypeScript, and the MIR runner.
 
 Web, HTTP, and framework routing stay libraries (see Annotations).
 
