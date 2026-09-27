@@ -5,7 +5,9 @@
 //! every emit tier on the same carrier math as the MIR runner without
 //! re-importing runner internals.
 
-use radix_types::NumericWidth;
+use radix_hir::{DefId, HirBinOp, HirExpression, HirExpressionKind, HirLiteral};
+use radix_lexer::Symbol;
+use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
 
 #[cfg(test)]
 #[path = "decimal_test.rs"]
@@ -29,6 +31,84 @@ pub fn decimal_carrier_rust_type(width: NumericWidth) -> Option<&'static str> {
         NumericWidth::D64 => Some("i64"),
         _ => None,
     }
+}
+
+/// The decimal width of an expression, if its HIR type is decimal.
+#[must_use]
+pub fn decimal_expr_width(expr: &HirExpression, types: &TypeTable) -> Option<NumericWidth> {
+    match expr.ty.map(|ty| types.get(ty)) {
+        Some(Type::SizedNumeric(Primitive::Numerus, width)) if width.is_decimal() => Some(*width),
+        _ => None,
+    }
+}
+
+/// The decimal width of an arithmetic operation over decimal operands.
+#[must_use]
+pub fn decimal_binop_width(
+    op: HirBinOp,
+    lhs: &HirExpression,
+    rhs: &HirExpression,
+    types: &TypeTable,
+) -> Option<NumericWidth> {
+    if !matches!(
+        op,
+        HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div | HirBinOp::Mod
+    ) {
+        return None;
+    }
+    let lhs_decimal = decimal_expr_width(lhs, types);
+    let rhs_decimal = decimal_expr_width(rhs, types);
+    lhs_decimal.or(rhs_decimal)
+}
+
+/// The decimal literal payload and width, if `expr` is a decimal literal.
+#[must_use]
+pub fn decimal_literal_payload(
+    expr: &HirExpression,
+    types: &TypeTable,
+) -> Option<(Symbol, NumericWidth)> {
+    let HirExpressionKind::Literal(HirLiteral::FloatText { text, .. }) = &expr.kind else {
+        return None;
+    };
+    let width = expr.ty.and_then(|ty| match types.get(ty) {
+        Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal() => Some(*width),
+        _ => None,
+    })?;
+    Some((*text, width))
+}
+
+/// Resolve a decimal source width, recovering a path binding's declared type.
+#[must_use]
+pub fn decimal_flow_source_width<F>(
+    expr: &HirExpression,
+    types: &TypeTable,
+    binding_type: F,
+) -> Option<NumericWidth>
+where
+    F: Fn(DefId) -> Option<TypeId>,
+{
+    let ty = if let HirExpressionKind::Path(def_id) = &expr.kind {
+        binding_type(*def_id).or(expr.ty)
+    } else {
+        expr.ty
+    }?;
+    match types.get(ty) {
+        Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal() => Some(*width),
+        _ => None,
+    }
+}
+
+/// Alias for call sites that describe the source rather than a flow node.
+#[must_use]
+pub fn decimal_source_width<F>(
+    source: &HirExpression,
+    types: &TypeTable,
+    binding_type: F,
+) -> Option<NumericWidth>
+where
+    F: Fn(DefId) -> Option<TypeId>,
+{
+    decimal_flow_source_width(source, types, binding_type)
 }
 
 /// Pure round-half-even quotient for values whose intermediate arithmetic has
