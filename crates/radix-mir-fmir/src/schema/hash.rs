@@ -16,50 +16,6 @@ pub fn sha256_digest(bytes: &[u8]) -> String {
     format!("sha256:{}", handroll::sha256_hex(bytes))
 }
 
-/// `packet_sha256` (DDCP2-U3 / contract §`IdentityDomains` rule 1): the
-/// digest over the **versioned artifact metadata + `content_sha256`** —
-/// ABI/schema version, backend, format, materialization stage, target id +
-/// required features (canonical order), the entrypoint symbol map (canonical
-/// order), the content digest, and the parent `compiler_input_packet_sha256`
-/// provenance when present. Canonical map ordering, domain tags, target
-/// normalization, and ABI-version inputs are normative inputs (rule 4).
-/// **Never semantic identity** (the artifact packet is an artifact fact, not
-/// a program semantic).
-///
-/// Backward-compatible reflection-less form: equivalent to
-/// [`packet_sha256_canonical`] with `reflection: None` (a carried `None`
-/// folds nothing into the digest). The canonical ordering enforcement is the
-/// DDCP3-U0 (b) change — `required_features`/`entrypoints` are canonicalized
-/// internally before hashing, so equivalent sets produce an identical packet
-/// identity and a stored packet whose `packet_sha256` was computed over a
-/// non-canonical order fails admission re-verification.
-#[must_use]
-#[allow(clippy::too_many_arguments)] // public packet-identity API — a params struct would change the public hashing surface
-pub fn packet_sha256(
-    abi_version: u32,
-    backend: &str,
-    format: &str,
-    stage: MaterializationStage,
-    target_id: &str,
-    required_features: &[String],
-    entrypoints: &[FmirDeviceSymbol],
-    content_sha256: &str,
-    compiler_input_packet_sha256: Option<&str>,
-) -> String {
-    packet_sha256_canonical(
-        abi_version,
-        backend,
-        format,
-        stage,
-        target_id,
-        required_features,
-        entrypoints,
-        None,
-        content_sha256,
-        compiler_input_packet_sha256,
-    )
-}
-
 /// The canonical packet/admission identity (DDCP3-U0 (a)/(b); CTO9-6 a/b):
 /// `packet_sha256` over the versioned artifact metadata + `content_sha256`
 /// with `required_features`, `entrypoints`, and the typed `reflection`
@@ -199,7 +155,7 @@ fn push_field(out: &mut Vec<u8>, tag: &str, bytes: &[u8]) {
 /// SHA-256 same-package identity (A10 / §3.4): over (a) the source content
 /// hashes and (b) the canonical backend-neutral device-program payload bytes.
 /// Backend blobs are excluded (each artifact carries its own content/packet
-/// identity via [`sha256_digest`] / [`packet_sha256`]). Metal and CUDA
+/// identity via [`sha256_digest`] / [`packet_sha256_canonical`]). Metal and CUDA
 /// routes derive identical semantic bytes and therefore an identical
 /// identity hash.
 ///

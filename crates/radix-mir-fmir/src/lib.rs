@@ -42,9 +42,8 @@ pub use schema::{
     WireUniformBinding, WireWorkgroupCount, WireWorkgroupSize, WireWorkspaceBinding,
     admit_device_section_with_compat, canonical_program_bytes, canonical_unpadded_base64,
     default_compatibility_table, device_identity_hash, is_known_host_requirement,
-    is_known_target_feature, packet_sha256, packet_sha256_canonical, sha256_digest,
-    validate_artifact_combination, validate_compiled_in_target, validate_duplicate_target_features,
-    validate_target_features,
+    is_known_target_feature, packet_sha256_canonical, sha256_digest, validate_artifact_combination,
+    validate_compiled_in_target, validate_duplicate_target_features, validate_target_features,
 };
 pub use schema::{
     HOST_EXECUTION_SCHEMA, HOST_EXECUTION_WIRE_VERSION, HOST_INVOCATION_SCHEMA,
