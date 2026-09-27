@@ -21,6 +21,7 @@ pub mod value;
 pub use capability::{RunnerDispatchStatus, classify_runner_lowerability, runner_dispatch_status};
 
 pub use host::{BufferHost, Host, StdioHost};
+pub use kernel::reset_execution_state;
 pub use stats::{FunctionStats, IntrinsicStats, RunnerStats};
 pub use value::{MapKey, Value};
 

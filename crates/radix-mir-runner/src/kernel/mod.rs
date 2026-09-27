@@ -16,6 +16,11 @@ use super::{Host, RunnerError, Value};
 use radix_lexer::Span;
 use radix_mir::KernelModule;
 
+/// Reset process-global kernel state that must not cross program executions.
+pub fn reset_execution_state() {
+    aleator::reset_seed();
+}
+
 /// Dispatch a kernel verb after operands are evaluated to [`Value`]s.
 ///
 /// # Errors

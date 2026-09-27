@@ -1,5 +1,21 @@
+use super::{dispatch, reset_seed, rng_state};
+use crate::Value;
 use handroll::uuid_v4;
+use radix_lexer::Span;
 use regex::Regex;
+
+#[test]
+fn execution_reset_clears_an_earlier_programs_seed() {
+    dispatch("seed", &[Value::Int(42)], Span::default()).expect("seed accepted");
+    assert!(rng_state().seeded.is_some(), "seed must be installed");
+
+    reset_seed();
+
+    assert!(
+        rng_state().seeded.is_none(),
+        "execution boundary must remove an earlier program's seed"
+    );
+}
 
 #[test]
 fn uuid_v4_is_canonical_lowercase_v4_shape() {

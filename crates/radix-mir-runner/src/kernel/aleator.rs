@@ -27,6 +27,11 @@ fn with_rng<R>(f: impl FnOnce(&mut Rng) -> R) -> R {
     }
 }
 
+/// Clear the deterministic seed at an execution boundary.
+pub(super) fn reset_seed() {
+    rng_state().seeded = None;
+}
+
 /// Dispatch for the `faber:aleator` kernel module.
 ///
 /// `random_float`/`random_int` draw from the seeded (or entropy-initialized) RNG;

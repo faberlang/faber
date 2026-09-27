@@ -249,6 +249,30 @@ incipit {
 }
 
 #[test]
+fn semantic_name_suggestion_skips_edit_distance_for_impossible_lengths() {
+    let parsed = parse(lex(r#"
+incipit {
+  fixum _ greeting ← "salve"
+}
+"#));
+    assert!(
+        parsed.errors.is_empty(),
+        "parse errors: {:?}",
+        parsed.errors
+    );
+    let program = parsed.program.as_ref().expect("program");
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    collect::collect(program, &mut resolver, &mut types).expect("collect");
+    let hostile = "x".repeat(1_000_000);
+
+    assert_eq!(
+        resolve::semantic_name_suggestion(&resolver, &parsed.interner, &hostile),
+        None
+    );
+}
+
+#[test]
 fn semantic_undefined_variables_reuse_suggestion_cache() {
     let parsed = parse(lex(r#"
 incipit {

@@ -2412,7 +2412,7 @@ fn fold_interned_symbol(interner: &Interner, name: radix_lexer::Symbol) -> Strin
     name_suggestion_key(interner.resolve(name))
 }
 
-fn semantic_name_suggestion(
+pub(super) fn semantic_name_suggestion(
     resolver: &Resolver,
     interner: &Interner,
     spelling: &str,
@@ -2465,16 +2465,20 @@ fn semantic_name_suggestion(
         return Some(exact.to_owned());
     }
 
+    let input_len = folded.chars().count();
     folded_candidates
         .into_iter()
         .filter_map(|(candidate_fold, candidate)| {
+            let threshold = name_suggestion_distance_threshold(candidate_fold);
+            let candidate_len = candidate_fold.chars().count();
+            if input_len.abs_diff(candidate_len) > threshold {
+                return None;
+            }
             let distance = edit_distance(&folded, candidate_fold);
-            (distance <= name_suggestion_distance_threshold(candidate_fold)).then_some(
-                NameSuggestionCandidate {
-                    spelling: candidate,
-                    distance,
-                },
-            )
+            (distance <= threshold).then_some(NameSuggestionCandidate {
+                spelling: candidate,
+                distance,
+            })
         })
         .min_by(|left, right| {
             left.distance
