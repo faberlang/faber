@@ -14484,7 +14484,7 @@ functio simple_loss(
     .expect("write tensor module");
     fs::write(
         lib_root.join("testgrad/src/math.fab"),
-        "fixum f32 epsilon ← 0.00001\n",
+        "generis f32 epsilon = 0.00001\n",
     )
     .expect("write math module");
 

@@ -127,7 +127,7 @@ locale = "en"
 +++
 
 @ public
-const list<string> KEYS ← ["a", "b"]
+static list<string> KEYS = ["a", "b"]
 
 @ public
 fn admits(string k) → bool {
@@ -216,11 +216,18 @@ test "sibling fn reads module const" {
     );
 }
 
-/// Face 2: the linked const initializer carries the conversion shape
-/// (`[…] ↦ set<string>`); the transplant must carry the `↦` expression
+/// Face 2 used to prove: the linked const initializer carries the conversion
+/// shape (`[…] ↦ set<string>`); the transplant must carry the `↦` expression
 /// instead of failing closed on it.
+///
+/// D5.7 retired top-level `const`/`fixum`/`varia` outright (SEM062). The
+/// top-level equivalent, `static`, only accepts a compile-time-evaluable `=`
+/// initializer (D5.9); `↦` is a runtime conversion and is not part of that
+/// evaluable surface, and `static`'s own grammar accepts only `=`. There is
+/// no way to write this fixture as legal Faber any more — assert the SEM062
+/// rejection instead of the old transplant behavior.
 #[test]
-fn package_test_module_const_set_conversion_runs() {
+fn package_test_module_const_set_conversion_rejects_as_top_level_binding() {
     let dir = crate::test_support::test_temp_dir("module-const-set-conversion");
     let src = write_const_member_package(
         dir.as_ref(),
@@ -255,10 +262,25 @@ test "module const set conversion membership" {
 "#,
     )
     .expect("write main.proba");
-    let output = run_const_member_package_tests(&src);
-    assert_eq!(
-        output,
-        vec!["verum".to_owned(), "falsum".to_owned()],
-        "module const set-conversion initializer must transplant and answer between"
+    let package_root = src.parent().unwrap().to_path_buf();
+    let stdlib_home = package_root.parent().unwrap().to_path_buf();
+    let config = Config::default().with_library_home(stdlib_home);
+    let Err(diagnostics) = crate::analyze::analyze_package_for_tests(
+        &config,
+        &package_root,
+        None,
+        &crate::test_support::test_analysis_seams(),
+    ) else {
+        panic!("top-level const with a `↦` initializer must fail closed at analysis (SEM062)")
+    };
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diag| diag.issue() == Some("top_level_binding")),
+        "expected top_level_binding rejection: {:?}",
+        diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue()))
+            .collect::<Vec<_>>()
     );
 }

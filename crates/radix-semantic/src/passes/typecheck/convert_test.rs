@@ -1194,14 +1194,14 @@ fn conversio_assign_typed_fixum_initializer_accepts() {
 }
 
 #[test]
-fn conversio_assign_typed_fixum_item_scope_initializer_accepts() {
-    // Item-scope typed `fixum T x ↤ y` is the same conversion-directed
-    // initializer as the local form, not SEM020 assignment to a constant.
-    test_support::assert_accepts(r#"fixum numerus n ↤ "42""#);
-    test_support::assert_rejects_with_issue(
-        "fixum numerus n ↤ \"42\"\nincipit { n ← 1 }",
-        "assignment_to_constant",
-    );
+fn conversio_assign_typed_fixum_item_scope_initializer_rejects_as_top_level_binding() {
+    // D5.7: top-level `fixum`/`varia` is retired (SEM062 `top_level_binding`).
+    // This used to prove item-scope typed `fixum T x ↤ y` typechecked the
+    // same conversion-directed initializer as the local form; that surface
+    // no longer exists, so the same source must now be rejected outright,
+    // and a conversion-directed initializer is not compile-time evaluable
+    // (D5.9), so there is no `generis` static equivalent to redirect to.
+    test_support::assert_rejects_with_issue(r#"fixum numerus n ↤ "42""#, "top_level_binding");
 }
 
 #[test]

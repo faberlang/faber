@@ -76,10 +76,10 @@ fn sibling_exported_function_links_module_private_helper() {
     .unwrap_or_else(|errors| panic!("private sibling helper must link, got {errors:?}"));
 }
 
-const CONSTS: &str = r"const int N ← 3
+const CONSTS: &str = r"static int N = 3
 
 @ public
-const int M ← N * 2
+static int M = N * 2
 
 @ public
 fn m() → int {

@@ -314,8 +314,13 @@ fn en_surface_is_family_scoped() {
 /// `ASCII_ALNUM_CHARS` queried with `.contains(c)`. The en surface rewrites to
 /// the canonical `continet` on the HIR and lowers to the same `Contains` MIR
 /// runtime call as the canonical spelling — same intrinsic, same semantics.
-const EN_ALNUM_SOURCE: &str = "const string ASCII_ALNUM_CHARS ← \"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"\nfn is_ascii_alphanumeric(string c) → bool {\n    return ASCII_ALNUM_CHARS.contains(c)\n}\n";
-const EN_ALNUM_CANONICAL: &str = "const string ASCII_ALNUM_CHARS ← \"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"\nfn is_ascii_alphanumeric(string c) → bool {\n    return ASCII_ALNUM_CHARS.continet(c)\n}\n";
+// D5.7 retired top-level `const`/`fixum`; the top-level equivalent is the
+// `static` (en) / `generis` (la) compile-time-evaluable declaration
+// (D5.8-D5.9). The literal textus initializer here is compile-time
+// evaluable, so the fold pass folds it in place without changing the
+// `.contains`/`.continet` proof under test.
+const EN_ALNUM_SOURCE: &str = "static string ASCII_ALNUM_CHARS = \"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"\nfn is_ascii_alphanumeric(string c) → bool {\n    return ASCII_ALNUM_CHARS.contains(c)\n}\n";
+const EN_ALNUM_CANONICAL: &str = "static string ASCII_ALNUM_CHARS = \"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"\nfn is_ascii_alphanumeric(string c) → bool {\n    return ASCII_ALNUM_CHARS.continet(c)\n}\n";
 
 /// L4 done_when 1 — the en proof: `ASCII_ALNUM_CHARS.contains(c)` on a textus
 /// passes faber check and lowers to the same `Contains` MIR op as canonical
@@ -355,7 +360,7 @@ fn en_proof_ascii_alnum_chars_contains() {
 /// identity-by-absence) with `.continet(c)` still passes under the la pack.
 #[test]
 fn la_proof_ascii_alnum_chars_continet() {
-    let la_source = "fixum textus ASCII_ALNUM_CHARS ← \"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"\nfunctio is_ascii_alphanumeric(textus c) → bivalens {\n    redde ASCII_ALNUM_CHARS.continet(c)\n}\n";
+    let la_source = "generis textus ASCII_ALNUM_CHARS = \"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"\nfunctio is_ascii_alphanumeric(textus c) → bivalens {\n    redde ASCII_ALNUM_CHARS.continet(c)\n}\n";
     let mut unit = analyze(la_source, Some(la_pack())).expect("la proof `.continet(c)` must pass with the la pack");
     assert_eq!(
         method_call_spellings(&unit.hir, &unit.interner),

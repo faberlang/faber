@@ -193,6 +193,7 @@ fn semantic_error_codes_are_stable() {
         (SemanticErrorKind::AirPurityViolation, "SEM059"),
         (SemanticErrorKind::StaticInitializerInvalid, "SEM060"),
         (SemanticErrorKind::InsereInvalid, "SEM061"),
+        (SemanticErrorKind::TopLevelBindingForbidden, "SEM062"),
         (SemanticErrorKind::MemberInaccessible, "SEM063"),
         (SemanticErrorKind::PraefixumInvalid, "SEM064"),
     ];

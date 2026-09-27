@@ -88,10 +88,17 @@ fn assert_checks_green(source: &str, label: &str) {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn imported_union_variant_value_in_const_initializer_checks_green() {
-    // uvf-u4 done_when (c): the collapse oracle — a top-level const table
-    // whose rows carry imported `token.TokenKind` variant values (replacing
-    // the `token.token_kind_*()` constructor calls in `keywords.fab`).
+fn imported_union_variant_value_in_registry_initializer_checks_green() {
+    // uvf-u4 done_when (c): the collapse oracle — a registry table whose rows
+    // carry imported `token.TokenKind` variant values (replacing the
+    // `token.token_kind_*()` constructor calls in `keywords.fab`).
+    //
+    // D5.7 retired top-level `fixum`/`varia`; the immutable-registry shape
+    // moves into the function that builds it. It cannot become a top-level
+    // `generis` static instead: D5.9 requires a compile-time-evaluable
+    // initializer, and an imported union variant reference (a `Path` to a
+    // def outside this module's static set) is not part of the fold
+    // evaluator's evaluable surface (`radix-semantic/src/passes/statica.rs`).
     let source = r#"importa ex "./token" token
 
 genus KeywordSpec {
@@ -99,24 +106,32 @@ genus KeywordSpec {
     token.TokenKind ∪ nihil token_kind
 }
 
-fixum lista<KeywordSpec> KEYWORDS ← [
-    KeywordSpec { text = "palabra", token_kind = token.TokenKind.Palabra },
-    KeywordSpec { text = "numerus", token_kind = finge token.TokenKind.Numerus { code = 3 } ∷ token.TokenKind },
-    KeywordSpec { text = "vacua", token_kind = nihil }
-]"#;
-    assert_checks_green(source, "imported-union variant values in a const table");
+incipit {
+    fixum lista<KeywordSpec> KEYWORDS ← [
+        KeywordSpec { text = "palabra", token_kind = token.TokenKind.Palabra },
+        KeywordSpec { text = "numerus", token_kind = finge token.TokenKind.Numerus { code = 3 } ∷ token.TokenKind },
+        KeywordSpec { text = "vacua", token_kind = nihil }
+    ]
+    nota KEYWORDS
+}"#;
+    assert_checks_green(source, "imported-union variant values in a registry table");
 }
 
 #[test]
-fn imported_union_variant_single_const_initializer_checks_green() {
-    // The simplest const surface: a single imported variant value bound to a
-    // top-level const.
+fn imported_union_variant_single_local_initializer_checks_green() {
+    // The simplest surface: a single imported variant value bound to a
+    // local binding. Was a top-level const before D5.7 retired top-level
+    // `fixum`; not evaluable as a `generis` static for the same reason as
+    // the registry-table case above, so it moves into a function body.
     let source = r#"importa ex "./token" token
 
-fixum token.TokenKind PALABRA ← token.TokenKind.Palabra"#;
+incipit {
+    fixum token.TokenKind PALABRA ← token.TokenKind.Palabra
+    nota PALABRA
+}"#;
     assert_checks_green(
         source,
-        "imported-union variant value in a single const initializer",
+        "imported-union variant value in a single local initializer",
     );
 }
 
