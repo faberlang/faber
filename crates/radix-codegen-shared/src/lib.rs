@@ -45,6 +45,16 @@ use radix_hir::HirModule;
 use radix_lexer::Interner;
 use radix_types::TypeTable;
 
+/// Reader-locale intrinsic spelling projected into a target emitter.
+///
+/// The locale pack owns the mapping from canonical registry names to reader
+/// spellings; codegen leaves consume this one narrow contract when installed.
+pub trait IntrinsicSurface {
+    /// Surface spelling for one canonical intrinsic name, or `None` when the
+    /// adapter has no row for it.
+    fn intrinsic_surface(&self, canonical: &str) -> Option<String>;
+}
+
 /// Indentation-aware code writer.
 ///
 /// The struct is intentionally small and backend-agnostic. It provides enough
