@@ -664,6 +664,7 @@ impl FunctionBuilder<'_> {
             match method_name {
                 "meus" => crate::mir::MirSermoOp::ViewMeus,
                 "tuus" => crate::mir::MirSermoOp::ViewTuus,
+                "close" if args.is_empty() => return self.lower_sermo_close(receiver, expr),
                 _ => return None,
             }
         } else if Some(receiver_def) == self.context.meus_def {
@@ -693,6 +694,35 @@ impl FunctionBuilder<'_> {
         lowered_args.extend(self.lower_hir_call_args(args)?);
         let return_ty = self.expr_ty(expr)?;
         Some(self.runtime_call_value(MirIntrinsic::Sermo(op), lowered_args, return_ty, expr.span))
+    }
+
+    /// `s.close()` (D8.3): close, then route a reported error through the
+    /// innermost alternate exit like `iace` with a `textus` payload.
+    fn lower_sermo_close(&mut self, receiver: &HirExpression, expr: &HirExpression) -> Option<MirOperand> {
+        let span = expr.span;
+        let sermo = self.lower_expr_value(receiver)?;
+        let bool_ty = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
+        let sermo_op = |op| MirIntrinsic::Sermo(op);
+        let closed =
+            self.runtime_call_value(sermo_op(crate::mir::MirSermoOp::Close), vec![sermo.clone()], bool_ty, span);
+        let failed = self.runtime_call_value(
+            sermo_op(crate::mir::MirSermoOp::CloseFailed),
+            vec![sermo.clone()],
+            bool_ty,
+            span,
+        );
+        let fail_id = self.fresh_block(span);
+        let ok_id = self.fresh_block(span);
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition: failed, then_block: fail_id, else_block: ok_id },
+            span,
+        );
+        self.switch_to(fail_id);
+        let message = self.runtime_call_value(sermo_op(crate::mir::MirSermoOp::CloseError), vec![sermo], textus, span);
+        self.fail_with_textus(message, span);
+        self.switch_to(ok_id);
+        Some(closed)
     }
 
     fn lower_atomic_method(

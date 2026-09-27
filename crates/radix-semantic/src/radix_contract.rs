@@ -25,11 +25,17 @@ pub const CONTRACT_DIRECTIVE: &str = "contract";
 
 pub use radix_types::ordering::ORDERING_METHOD;
 
+/// The closing contract's one method (D8.3).
+pub const CLOSING_METHOD: &str = "close";
+
 /// Compiler roles a norma contract can carry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RadixContractRole {
     /// Three-way `compare(T other) → int`; drives `≺ ≻ ≤ ≥` (D1.4).
     Ordering,
+    /// `close() → bool ⇥ string`; `sermo` conforms, and a closable type
+    /// that can sit in a reference cycle is warned about (D8.3).
+    Closing,
 }
 
 impl RadixContractRole {
@@ -37,6 +43,7 @@ impl RadixContractRole {
     pub fn parse(role: &str) -> Option<Self> {
         match role {
             "ordering" => Some(Self::Ordering),
+            "closing" => Some(Self::Closing),
             _ => None,
         }
     }
@@ -45,6 +52,7 @@ impl RadixContractRole {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Ordering => "ordering",
+            Self::Closing => "closing",
         }
     }
 }

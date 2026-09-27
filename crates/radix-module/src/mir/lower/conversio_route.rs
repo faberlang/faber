@@ -186,6 +186,13 @@ impl FunctionBuilder<'_> {
     /// mirroring `iace` with a `textus` payload; panic when none is active.
     fn fail_ordo_conversio(&mut self, span: Span) {
         let message = MirOperand::Constant(MirConstant::String(self.context.diagnostic_ordo_no_member));
+        self.fail_with_textus(message, span);
+    }
+
+    /// Route a `textus` failure through the innermost alternate exit (trap,
+    /// `cape`/`⊥` handler, or the function's `⇥`), mirroring `iace`; panic
+    /// when none is active.
+    pub(super) fn fail_with_textus(&mut self, message: MirOperand, span: Span) {
         let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
         if let Some(trap) = self.take_innermost_trap() {
             self.assign(trap.destination, message, textus, span);

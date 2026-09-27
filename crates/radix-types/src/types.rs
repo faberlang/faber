@@ -117,6 +117,11 @@ pub struct TypeTable {
     /// Selective import bindings that name the ordering contract. The
     /// compiler supplies that contract, so backends emit no import for them.
     pub ordering_contract_bindings: rustc_hash::FxHashSet<DefId>,
+
+    /// The implendum marked `@ radix contract "closing"` (norma's
+    /// `Closable`, DECISIONS D8.3) when this unit declares or imports it.
+    /// `sermo` conforms without an `implet` clause.
+    pub closing_contract: Option<DefId>,
 }
 
 /// Opaque serialized view of a [`TypeTable`] for MIR images.
@@ -185,6 +190,7 @@ impl TypeTable {
             resolved_generic_calls: Vec::new(),
             ordering_contract: None,
             ordering_contract_bindings: rustc_hash::FxHashSet::default(),
+            closing_contract: None,
         };
 
         for prim in [
@@ -421,6 +427,7 @@ impl TypeTable {
             resolved_generic_calls: Vec::new(),
             ordering_contract: None,
             ordering_contract_bindings: rustc_hash::FxHashSet::default(),
+            closing_contract: None,
         })
     }
 

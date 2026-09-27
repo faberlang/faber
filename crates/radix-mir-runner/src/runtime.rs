@@ -260,18 +260,22 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             )))),
             MirSermoOp::Send => Ok(Value::Unit),
             MirSermoOp::Finish => {
-                self.sermo_finish(&sermo, span)?;
+                let terminal = self.sermo_finish(&sermo, span)?;
                 let Type::Enum(status) = self.types.get(return_ty.semantic_id()) else {
                     return Err(RunnerError::internal(
                         span,
                         "sermo finish status type mismatch",
                     ));
                 };
+                let variant = self.status_variant(*status, &terminal, span)?;
                 Ok(Value::EnumVariant(
-                    *status,
+                    variant,
                     Rc::new(RefCell::new(FxHashMap::default())),
                 ))
             }
+            MirSermoOp::Close => Ok(Value::Bool(self.sermo_close(&sermo))),
+            MirSermoOp::CloseFailed => Ok(Value::Bool(Self::sermo_close_failed(&sermo))),
+            MirSermoOp::CloseError => Ok(Value::Str(Self::sermo_take_close_error(&sermo))),
             MirSermoOp::Receive { frame, data_field } => {
                 Ok(self.sermo_next(&sermo, span)?.map_or(Value::Nil, |data| {
                     crate::sermo::frame_value(*frame, *data_field, data)
@@ -286,6 +290,28 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 Err(RunnerError::internal(span, "nested cursor drain dispatch"))
             }
         }
+    }
+
+    /// The `status` variant naming a conversation terminal. The builtin
+    /// enum declares `request item byte bulk done error cancel` in that
+    /// order (`radix-semantic` `frame_types::STATUS_VARIANTS`).
+    fn status_variant(
+        &self,
+        status: radix_hir::DefId,
+        terminal: &crate::sermo::SermoTerminal,
+        span: Span,
+    ) -> Result<radix_hir::DefId, RunnerError> {
+        let position = match terminal {
+            crate::sermo::SermoTerminal::Done => 4,
+            crate::sermo::SermoTerminal::Error(_) => 5,
+            crate::sermo::SermoTerminal::Cancel => 6,
+        };
+        self.context
+            .enum_variants
+            .get(&status)
+            .and_then(|variants| variants.get(position))
+            .copied()
+            .ok_or_else(|| RunnerError::internal(span, "status enum variants missing"))
     }
 
     /// `cede <expr>` — yield inside a stream generator.

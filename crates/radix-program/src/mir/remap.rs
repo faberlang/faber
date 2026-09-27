@@ -304,6 +304,9 @@ fn remap_sermo_text_symbols(op: &mut MirSermoOp, source: &Interner, target: &mut
         | MirSermoOp::ViewTuus
         | MirSermoOp::Send
         | MirSermoOp::Finish
+        | MirSermoOp::Close
+        | MirSermoOp::CloseFailed
+        | MirSermoOp::CloseError
         | MirSermoOp::DrainCursor => {}
     }
 }

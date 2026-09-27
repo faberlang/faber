@@ -1,0 +1,98 @@
++++
+term = "sermo"
+kind = "method"
+grammar = []
+category = "endpoint"
+canonical = true
+summary = "A sermo closes itself when its conversation completes; a pool of many keeps only the unfinished ones open, and close() ends one early and reports its error."
+syntax = "fixum bivalens clausa ← s.close()"
+related = ["ad", "sermo", "tuus", "fac", "cape"]
+locale = "la"
++++
+# =============================================================================
+# sermo — a conversation closes itself when it completes; `close()` is early.
+# =============================================================================
+#
+# What this teaches:
+#   • Completion closes — when the handler returns (or fails), the sermo
+#     releases its handler task and router slot at once, even while its
+#     handle still sits in a tabula; the handle keeps reading as its result
+#   • A pool of many — finished conversations cost nothing while the pool
+#     waits on the rest, so a tabula of many sermones is cheap
+#   • Explicit close — `s.close()` ends a conversation early (a live handler
+#     is cancelled, unread frames are dropped) and reports the error the
+#     conversation ended with through `⇥ textus`; it returns `verum` when
+#     this call closed the handle
+#   • Last reference — a sermo nobody can reach is closed as a safety net,
+#     but errors from that automatic close are lost; call `close()` when the
+#     error matters
+#
+# Common mistakes:
+#   • expecting close() to wait — a handler still running is cancelled, so
+#     read to the end first when its outcome matters
+#   • keeping a sermo inside a reference cycle — a cycle never reaches its
+#     last reference, so the compiler warns (WARN031) and it never
+#     auto-closes; `close()` it explicitly
+#
+# See also: ad, sermo, tuus, fac, cape
+# =============================================================================
+
+@ ad 'numeri:bis'
+functio bis(numerus n) → numerus {
+    redde n * 2
+}
+
+@ ad 'numeri:numera'
+functio numera(numerus n) fiunt → numerus {
+    itera ab 0‥n fixum i {
+        cede i
+    }
+}
+
+@ ad 'numeri:defice'
+functio defice(numerus n) → numerus ⇥ textus {
+    iace "defecit §"(n)
+}
+
+functio summa(lista<numerus> partes) → numerus {
+    varia numerus totum ← 0
+    itera ex partes fixum pars {
+        totum ← totum + pars
+    }
+    redde totum
+}
+
+incipit {
+    # Four conversations finish at once; their handles wait in the pool.
+    varia tabula<numerus, sermo> piscina ← vacua
+    itera ab 0‥4 fixum i {
+        piscina[i] ← ad 'numeri:bis' (i)
+    }
+
+    # A longer conversation streams while the finished ones hold nothing.
+    fixum sermo longus ← ad 'numeri:numera' (5)
+    itera ab 0‥4 fixum i {
+        nota piscina[i] ↦ numerus
+    }
+    nota summa(longus ↦ lista<numerus>)
+
+    # Reading waits for the handler (a failed read defaults to 0); close()
+    # then reports the error the conversation ended with.
+    fixum sermo fractus ← ad 'numeri:defice' (7)
+    nota fractus ↦ numerus ⊥ 0
+    fac {
+        fixum bivalens clausa ← fractus.close()
+        nota clausa
+    } cape err {
+        nota err
+    }
+
+    # Closing early drops the unread reply; a live handler is cancelled.
+    fac {
+        fixum sermo ultimus ← ad 'numeri:bis' (21)
+        fixum bivalens clausa ← ultimus.close()
+        nota clausa
+    } cape err {
+        nota err
+    }
+}

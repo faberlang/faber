@@ -1021,8 +1021,22 @@ pub enum MirSermoOp {
     ViewTuus,
     Send,
     Finish,
-    Receive { frame: DefId, data_field: Symbol },
-    Cursor { frame: DefId, data_field: Symbol },
+    /// `s.close()` (D8.3): close the handle; `bivalens` says whether this
+    /// call closed it. A failure is kept for [`Self::CloseFailed`] and
+    /// [`Self::CloseError`], which lowering reads right after.
+    Close,
+    /// Whether the last `close()` on this conversation reported an error.
+    CloseFailed,
+    /// The last `close()` error message (`textus`), taken.
+    CloseError,
+    Receive {
+        frame: DefId,
+        data_field: Symbol,
+    },
+    Cursor {
+        frame: DefId,
+        data_field: Symbol,
+    },
     DrainCursor,
 }
 
@@ -1034,6 +1048,9 @@ impl MirSermoOp {
             Self::ViewTuus => "view_tuus",
             Self::Send => "send",
             Self::Finish => "finish",
+            Self::Close => "close",
+            Self::CloseFailed => "close_failed",
+            Self::CloseError => "close_error",
             Self::Receive { .. } => "receive",
             Self::Cursor { .. } => "cursor",
             Self::DrainCursor => "drain_cursor",

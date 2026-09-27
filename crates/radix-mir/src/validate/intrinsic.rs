@@ -425,6 +425,9 @@ impl Validator<'_, '_> {
             MirSermoOp::ViewMeus
             | MirSermoOp::ViewTuus
             | MirSermoOp::Finish
+            | MirSermoOp::Close
+            | MirSermoOp::CloseFailed
+            | MirSermoOp::CloseError
             | MirSermoOp::Receive { .. }
             | MirSermoOp::Cursor { .. }
             | MirSermoOp::DrainCursor => 1,
@@ -457,6 +460,22 @@ impl Validator<'_, '_> {
                 if !matches!(self.type_kind(call.return_ty), Type::Enum(_)) {
                     self.error(span, "sermo finish result is not status enum");
                 }
+            }
+            MirSermoOp::Close | MirSermoOp::CloseFailed => {
+                self.require_exact(
+                    call.return_ty,
+                    self.primitive(Primitive::Bivalens),
+                    span,
+                    "sermo close result is not bivalens",
+                );
+            }
+            MirSermoOp::CloseError => {
+                self.require_exact(
+                    call.return_ty,
+                    self.primitive(Primitive::Textus),
+                    span,
+                    "sermo close error is not textus",
+                );
             }
             MirSermoOp::Receive { frame, data_field } => {
                 if !matches!(
