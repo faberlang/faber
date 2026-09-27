@@ -24,6 +24,7 @@ fn program() -> Program {
         statements: Vec::new(),
         end_trivia: Vec::new(),
         span: Span::new(1, 9),
+        region: None,
     }
 }
 

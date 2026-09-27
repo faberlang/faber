@@ -39,6 +39,7 @@ fn parse_file(path: PathBuf, source: &str) -> PackageFile {
         interner: parse.interner,
         library_imports: Vec::new(),
         expanded_library_imports: Vec::new(),
+        default_import_names: std::collections::BTreeMap::new(),
     }
 }
 

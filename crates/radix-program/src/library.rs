@@ -834,18 +834,8 @@ fn visit_transitive_library_import(
     walk.visiting.insert(key.clone());
     walk.stack.push(module_label);
 
-    let inner_imports = match load_cached_library_interface(&import.module, library_cache) {
-        Ok(cached) => library_imports_from_cached(
-            cached,
-            &import.module.interface_path,
-            library_resolver,
-            diagnostics,
-        ),
-        Err(diag) => {
-            diagnostics.push(diag);
-            Vec::new()
-        }
-    };
+    let (inner_imports, _) =
+        library_imports_for_module(&import.module, library_resolver, library_cache, diagnostics);
     for inner in &inner_imports {
         visit_transitive_library_import(inner, library_resolver, library_cache, walk, diagnostics);
         if walk.cycle_detected {
@@ -999,6 +989,22 @@ fn load_cached_library_interface<'a>(
         crate::package_diagnostic_error("library interface cache missing entry after insert")
             .with_file(module.interface_path.display().to_string())
     })
+}
+
+/// The declared `regio` name of one library module (D7.7), read through the
+/// interface cache so the parse is shared with later interface work.
+///
+/// # Errors
+/// Returns an error when the interface cannot be read or parsed.
+pub fn library_module_region_name(
+    module: &ResolvedLibraryModule,
+    library_cache: &mut LibraryInterfaceCache,
+) -> Result<Option<String>, Diagnostic> {
+    let cached = load_cached_library_interface(module, library_cache)?;
+    Ok(radix_module::program::program_region_name(
+        &cached.program,
+        &cached.interner,
+    ))
 }
 
 /// Peeled Faber body of one cached library interface module — the provider
@@ -1206,15 +1212,12 @@ fn analyze_cached_library_interface_body(
         }
     }
 
-    let direct_imports = {
-        let cached = load_cached_library_interface(&import.module, library_cache)?;
-        library_imports_from_cached(
-            cached,
-            &import.module.interface_path,
-            library_resolver,
-            &mut diagnostics,
-        )
-    };
+    let (direct_imports, default_import_names) = library_imports_for_module(
+        &import.module,
+        library_resolver,
+        library_cache,
+        &mut diagnostics,
+    );
     if let Some(error) = take_first_error(&mut diagnostics) {
         return Err(error);
     }
@@ -1309,6 +1312,7 @@ fn analyze_cached_library_interface_body(
                 file_interfaces,
                 namespace_seams,
                 namespace_declarations,
+                default_import_names,
             },
         },
         &kernel_template_admissions,
@@ -1373,13 +1377,53 @@ fn analyze_cached_library_interface_body(
     Ok(())
 }
 
+/// A library module's own import bindings, with default names bound (D7.7).
+///
+/// Returns the bindings and the import path → declared `regio` name map the
+/// module's analysis contract carries, so the driver's parse of the module
+/// binds the same names.
+fn library_imports_for_module(
+    module: &ResolvedLibraryModule,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> (Vec<LibraryImportBinding>, BTreeMap<String, String>) {
+    let (mut imports, defaults) = match load_cached_library_interface(module, library_cache) {
+        Ok(cached) => library_imports_from_cached(
+            cached,
+            &module.interface_path,
+            library_resolver,
+            diagnostics,
+        ),
+        Err(diag) => {
+            diagnostics.push(diag);
+            return (Vec::new(), BTreeMap::new());
+        }
+    };
+    let mut names = BTreeMap::new();
+    for (index, import_path) in defaults {
+        match library_module_region_name(&imports[index].module, library_cache) {
+            Ok(Some(region)) => {
+                imports[index].binding.clone_from(&region);
+                names.insert(import_path, region);
+            }
+            Ok(None) => {}
+            Err(diag) => diagnostics.push(diag),
+        }
+    }
+    (imports, names)
+}
+
+/// Import bindings of one cached library module, plus the index and import
+/// path of every default-named binding (D7.7) for the caller to bind.
 fn library_imports_from_cached(
     cached: &CachedLibraryInterface,
     interface_path: &Path,
     library_resolver: &LibraryResolver,
     diagnostics: &mut Vec<Diagnostic>,
-) -> Vec<LibraryImportBinding> {
+) -> (Vec<LibraryImportBinding>, Vec<(usize, String)>) {
     let mut imports = Vec::new();
+    let mut defaults = Vec::new();
     for stmt in &cached.program.statements {
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
@@ -1388,6 +1432,9 @@ fn library_imports_from_cached(
         match library_resolver.resolve(import_path) {
             Ok(Some(resolved)) => {
                 if let Some(binding) = library_import_binding(&cached.interner, decl, resolved) {
+                    if radix_module::program::import_takes_default_name(decl) {
+                        defaults.push((imports.len(), import_path.to_owned()));
+                    }
                     imports.push(binding);
                 } else {
                     diagnostics.push(library_import_kind_diagnostic(
@@ -1419,7 +1466,7 @@ fn library_imports_from_cached(
         }
     }
 
-    imports
+    (imports, defaults)
 }
 
 /// # Errors
@@ -1622,14 +1669,14 @@ fn public_library_imports(
     library_resolver: &LibraryResolver,
     library_cache: &mut LibraryInterfaceCache,
 ) -> Result<Vec<LibraryImportBinding>, Diagnostic> {
-    let cached = load_cached_library_interface(&import.module, library_cache)?;
     let mut diagnostics = Vec::new();
-    let imports = library_imports_from_cached(
-        cached,
-        &import.module.interface_path,
+    let imports = library_imports_for_module(
+        &import.module,
         library_resolver,
+        library_cache,
         &mut diagnostics,
     )
+    .0
     .into_iter()
     .filter(|binding| binding.visibility == Visibility::Publica)
     .collect::<Vec<_>>();

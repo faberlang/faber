@@ -43,6 +43,7 @@ fn program(statements: Vec<Stmt>) -> Program {
         statements,
         end_trivia: Vec::new(),
         span: Span::default(),
+        region: None,
     }
 }
 
@@ -140,6 +141,44 @@ fn inferred_import_name_collision_requests_explicit_alias() {
         SemanticErrorKind::DefinitionDuplicate,
         &[("issue", "inferred_import_name_collision")],
     );
+}
+
+fn collect_source(source: &str) -> Result<(), Vec<SemanticError>> {
+    let parsed = parse(lex(source));
+    assert!(parsed.success(), "{:?}", parsed.errors);
+    let program = parsed.program.expect("program");
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    collect::collect(&program, &mut resolver, &mut types)
+}
+
+#[test]
+fn two_default_import_names_collide() {
+    // D7.7: two imports that would default to the same name are an error.
+    let errors = collect_source("importa ex \"./a/geo\"\nimporta ex \"./b/geo\"\n")
+        .expect_err("default-name collision");
+    expect_structured_error(
+        &errors,
+        SemanticErrorKind::DefinitionDuplicate,
+        &[("issue", "default_import_name_collision")],
+    );
+}
+
+#[test]
+fn default_import_name_colliding_with_explicit_binding_is_an_error() {
+    let errors = collect_source("importa ex \"./a/geo\" geo\nimporta ex \"./b/geo\"\n")
+        .expect_err("default-name collision");
+    expect_structured_error(
+        &errors,
+        SemanticErrorKind::DefinitionDuplicate,
+        &[("issue", "default_import_name_collision")],
+    );
+}
+
+#[test]
+fn aliasing_one_default_import_resolves_the_collision() {
+    collect_source("importa ex \"./a/geo\"\nimporta ex \"./b/geo\" geo_b\n")
+        .expect("aliased imports bind distinct names");
 }
 
 #[test]

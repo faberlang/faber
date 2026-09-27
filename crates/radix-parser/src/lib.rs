@@ -45,7 +45,9 @@ use radix_lexer::{
     Interner, KeywordOwner, KeywordScope, KeywordSurfaceMode, LexResult, Span, Symbol, Token,
     TokenKind, keyword_allowed_as_ident, keyword_spelling_for_token, lookup_keyword_spec,
 };
-use radix_syntax::{ClosureModifier, CommentLine, Ident, Newline, NodeId, Program, Trivia};
+use radix_syntax::{
+    ClosureModifier, CommentLine, Ident, Newline, NodeId, Program, RegionDecl, Trivia,
+};
 use std::collections::{HashMap, HashSet};
 
 /// Result of the parsing phase for one compilation unit.
@@ -389,8 +391,12 @@ impl Parser {
     pub fn parse_program(&mut self) -> ParseResult {
         let start = self.current_span();
         let mut stmts = Vec::new();
+        let region = self.parse_leading_region_decl();
 
         while !self.is_at_end() && !self.budget_exhausted {
+            if self.reject_misplaced_region_decl(region.is_some()) {
+                continue;
+            }
             match self.parse_stmt() {
                 Ok(stmt) => stmts.push(stmt),
                 Err(e) => {
@@ -411,6 +417,7 @@ impl Parser {
             statements: stmts,
             span,
             end_trivia,
+            region,
         };
 
         // Claimed-comment accounting: every `LineComment` token is either
@@ -426,6 +433,84 @@ impl Parser {
             errors: std::mem::take(&mut self.errors),
             interner: std::mem::take(&mut self.interner),
         }
+    }
+
+    // FILE NAME DECLARATION (D7.7)
+
+    /// The declared name when the current top-level word starts `regio NAME`.
+    ///
+    /// `regio` (en `module`) is contextual (F8): it is claimed only in
+    /// statement-initial position at file top level and only when a name
+    /// follows, so the spelling stays an ordinary identifier everywhere else.
+    fn region_decl_name(&self) -> Option<radix_lexer::Symbol> {
+        let TokenKind::Ident(sym) = self.peek().kind else {
+            return None;
+        };
+        if self.keyword_claim_key(sym) != Some("regio") {
+            return None;
+        }
+        match self.peek_at(1).kind {
+            TokenKind::Ident(name) => Some(name),
+            _ => None,
+        }
+    }
+
+    /// Parse `regio NAME` with its leading trivia when it opens the file.
+    ///
+    /// Leading comments stay with the first statement when the file has no
+    /// `regio` declaration, so the checkpoint rewinds past them.
+    fn parse_leading_region_decl(&mut self) -> Option<RegionDecl> {
+        let checkpoint = self.checkpoint();
+        let leading_trivia = self.parse_leading_trivia();
+        let Some(name) = self.region_decl_name() else {
+            self.restore(checkpoint);
+            return None;
+        };
+        Some(self.parse_region_decl(leading_trivia, name))
+    }
+
+    fn parse_region_decl(
+        &mut self,
+        leading_trivia: Vec<Trivia>,
+        name: radix_lexer::Symbol,
+    ) -> RegionDecl {
+        let start = self.current_span();
+        self.advance();
+        self.advance();
+        let name_span = self.previous_span();
+        RegionDecl {
+            name: Ident {
+                name,
+                span: name_span,
+            },
+            span: start.merge(name_span),
+            leading_trivia,
+        }
+    }
+
+    /// Report a `regio` declaration that is not the file's first declaration.
+    ///
+    /// Returns whether one was consumed. A second declaration is a duplicate;
+    /// one after any import or declaration is misplaced.
+    fn reject_misplaced_region_decl(&mut self, has_region: bool) -> bool {
+        let checkpoint = self.checkpoint();
+        let leading_trivia = self.parse_leading_trivia();
+        let Some(name) = self.region_decl_name() else {
+            self.restore(checkpoint);
+            return false;
+        };
+        let decl = self.parse_region_decl(leading_trivia, name);
+        let issue = if has_region {
+            "module_declaration_duplicate"
+        } else {
+            "module_declaration_misplaced"
+        };
+        self.errors.push(
+            ParseError::structured(ParseErrorKind::DeclarationInvalid, decl.span)
+                .with_arg("issue", issue)
+                .with_arg("name", self.interner.resolve(decl.name.name).to_owned()),
+        );
+        true
     }
 
     // TOKEN NAVIGATION
@@ -1403,6 +1488,10 @@ mod contract_bound_test;
 #[cfg(test)]
 #[path = "nexum_removed_test.rs"]
 mod nexum_removed_test;
+
+#[cfg(test)]
+#[path = "region_decl_test.rs"]
+mod region_decl_test;
 
 #[cfg(test)]
 #[path = "static_decl_test.rs"]

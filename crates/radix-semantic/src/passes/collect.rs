@@ -44,6 +44,10 @@ pub fn collect(
     _types: &mut TypeTable,
 ) -> Result<(), Vec<SemanticError>> {
     let mut errors = Vec::new();
+    // Namespace bindings introduced by this file's imports, with whether each
+    // is a default (path- or `regio`-derived) name. Two imports that would
+    // bind the same default name are ambiguous (D7.7); alias one.
+    let mut import_bindings: Vec<(radix_lexer::Symbol, bool)> = Vec::new();
 
     for stmt in &program.statements {
         match &stmt.kind {
@@ -154,15 +158,38 @@ pub fn collect(
                     inferred,
                 } => {
                     let binding = alias.as_ref().unwrap_or(name);
+                    let is_default = *inferred && alias.is_none();
+                    if default_import_name_collides(&import_bindings, binding.name, is_default) {
+                        errors.push(
+                            SemanticError::structured(
+                                SemanticErrorKind::DefinitionDuplicate,
+                                binding.span,
+                            )
+                            .with_arg("issue", "default_import_name_collision"),
+                        );
+                        continue;
+                    }
+                    import_bindings.push((binding.name, is_default));
                     define_import_symbol(
                         resolver,
                         &mut errors,
                         binding.name,
                         binding.span,
-                        *inferred && alias.is_none(),
+                        is_default,
                     );
                 }
                 radix_syntax::ImportKind::Wildcard { alias } => {
+                    if default_import_name_collides(&import_bindings, alias.name, false) {
+                        errors.push(
+                            SemanticError::structured(
+                                SemanticErrorKind::DefinitionDuplicate,
+                                alias.span,
+                            )
+                            .with_arg("issue", "default_import_name_collision"),
+                        );
+                        continue;
+                    }
+                    import_bindings.push((alias.name, false));
                     define_import_symbol(resolver, &mut errors, alias.name, alias.span, false);
                 }
                 // EOT-2M: each selective member binds a caller-owned immutable
@@ -204,6 +231,18 @@ pub fn collect(
     } else {
         Err(errors)
     }
+}
+
+/// Whether an import binding repeats an earlier import's name where at least
+/// one of the two is a default name nobody spelled (D7.7: "alias one").
+fn default_import_name_collides(
+    earlier: &[(radix_lexer::Symbol, bool)],
+    name: radix_lexer::Symbol,
+    is_default: bool,
+) -> bool {
+    earlier
+        .iter()
+        .any(|&(bound, bound_default)| bound == name && (is_default || bound_default))
 }
 
 fn define_import_symbol(

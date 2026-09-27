@@ -10,6 +10,7 @@ functio = "fn"
 genus = "class"
 implendum = "interface"
 importa = "import"
+regio = "module"
 modulus = "uint"
 ordo = "enum"
 sit = "let"
@@ -757,6 +758,14 @@ help = "keep one modifier; a {generis} field is already immutable"
 message = "a {generis} static cannot be {sponte}"
 help = "remove {sponte}; a static always has its compile-time value"
 
+[diagnostics.PARSE010.issues.module_declaration_misplaced]
+message = "a {regio} declaration must be the first declaration of the file, before any {importa}"
+help = "move `{regio} {name}` to the top of the file, directly after the frontmatter"
+
+[diagnostics.PARSE010.issues.module_declaration_duplicate]
+message = "a file declares {regio} at most once"
+help = "delete the second `{regio} {name}`"
+
 [diagnostics.PARSE011]
 message = "expected function name after '{functio}'"
 help = "add a function name after '{functio}'"
@@ -1248,6 +1257,10 @@ help = "serve each route from exactly one handler in the program"
 [diagnostics.SEM005.issues.duplicate_definition]
 message = "duplicate definition"
 help = "rename one of the definitions"
+
+[diagnostics.SEM005.issues.default_import_name_collision]
+message = "two imports bind the same default name"
+help = "alias one of them: `{importa} {ex} \"…\" other_name`"
 
 [diagnostics.SEM005.issues.inferred_import_name_collision]
 message = "inferred import name conflicts with an existing definition"

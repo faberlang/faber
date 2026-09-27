@@ -5,6 +5,7 @@
 //! Public admission is `radix::program` / `radix_program`, not module analysis.
 
 pub mod compile;
+pub mod default_import;
 pub mod export_surface;
 pub use compile::{
     PreparedProgramModule, analyze_prepared_program_name, analyze_prepared_program_path, compile_cli_input,
@@ -14,6 +15,7 @@ pub use compile::{
     prepare_program_module_for_name, provider_unit_for_target, resolve_package_mode, should_treat_as_package,
 };
 
+pub use default_import::{apply_default_import_names, import_takes_default_name, program_region_name};
 pub use export_surface::{program_declaration_surface, program_export_surface};
 
 pub use crate::import_resolve::{

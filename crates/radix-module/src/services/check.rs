@@ -119,6 +119,8 @@ pub fn check_diagnostics_for_source_with_locale_pack(
             );
             return CheckDiagnosticsResult { diagnostics, success: false };
         }
+        // D7.7: default-named imports bind their targets' `regio` names.
+        crate::program::apply_default_import_names(&mut program, &mut interner, &contract.default_import_names);
         pass_config.namespace_exports = contract.namespace_exports;
         pass_config.namespace_seams = contract.namespace_seams;
         pass_config.namespace_declarations = contract.namespace_declarations;
