@@ -3635,6 +3635,14 @@ help = "declare the static as `octeti` to embed raw bytes"
 message = "an `{insere}` initializer must declare `textus` or `octeti`"
 help = "declare `textus` for UTF-8 text or `octeti` for raw bytes"
 
+[diagnostics.SEM062]
+message = "top-level binding"
+help = "use `{generis} T X = …` for a compile-time constant, or move the binding into a function"
+
+[diagnostics.SEM062.issues.top_level_binding]
+message = "top-level `{name}`: module-level mutable state does not exist"
+help = "use `{generis} T X = …` for a compile-time constant, or move the binding into a function"
+
 [diagnostics.WARN001]
 message = "unused variable"
 help = "remove the variable or prefix it with '_'"
@@ -3819,10 +3827,3 @@ help = "add a '{ceterum}' arm, or split the match so each pattern kind is checka
 message = "coverage of this match could not be computed for its pattern kinds; exhaustiveness was not checked"
 help = "add a '{ceterum}' arm, or split the match so each pattern kind is checkable"
 
-[diagnostics.WARN030]
-message = "top-level binding"
-help = "use `{generis} T X = …` for a compile-time constant, or move the binding into a function"
-
-[diagnostics.WARN030.issues.top_level_binding]
-message = "top-level `{name}`: module-level mutable state does not exist"
-help = "use `{generis} T X = …` for a compile-time constant, or move the binding into a function"

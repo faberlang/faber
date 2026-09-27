@@ -9,10 +9,11 @@
 //! - a non-constant initializer is SEM060 with a named issue;
 //! - a cycle between statics is SEM007 `static_cycle`;
 //! - arithmetic overflow and division by zero are compile errors;
-//! - a legacy top-level `fixum`/`varia` is the migration warning WARN030
-//!   `top_level_binding` (an error once the library sweep lands).
+//! - a legacy top-level `fixum`/`varia` is SEM062 `top_level_binding`
+//!   (D5.7: the library sweep landed, so the migration warning is now an
+//!   error).
 
-use crate::test_support::{analyze_source, assert_rejects_with_issue, assert_warns_with_issue};
+use crate::test_support::{analyze_source, assert_rejects_with_issue};
 use radix_hir::{
     HirConst, HirExpression, HirExpressionKind, HirItemKind, HirLiteral, HirStatic, HirUnOp,
 };
@@ -152,10 +153,13 @@ fn call_initializer_is_not_constant() {
 }
 
 #[test]
-fn reference_to_top_level_fixum_is_not_constant() {
+fn reference_to_top_level_fixum_rejects_the_fixum_itself() {
+    // D5.7: the top-level `fixum` is illegal on its own now, so a static
+    // that references it never reaches the "not constant" fold check —
+    // the fixum's own top_level_binding error is what's reported.
     assert_rejects_with_issue(
         "fixum numerus A ← 1\ngeneris numerus N = A + 1\n",
-        "static_initializer_not_constant",
+        "top_level_binding",
     );
 }
 
@@ -202,17 +206,17 @@ fn statics_are_immutable() {
 }
 
 #[test]
-fn top_level_fixum_warns_with_migration_issue() {
-    assert_warns_with_issue("fixum numerus N ← 4\n", "top_level_binding");
+fn top_level_fixum_rejects_with_migration_issue() {
+    assert_rejects_with_issue("fixum numerus N ← 4\n", "top_level_binding");
 }
 
 #[test]
-fn top_level_varia_warns_with_migration_issue() {
-    assert_warns_with_issue("varia numerus N ← 4\n", "top_level_binding");
+fn top_level_varia_rejects_with_migration_issue() {
+    assert_rejects_with_issue("varia numerus N ← 4\n", "top_level_binding");
 }
 
 #[test]
-fn top_level_static_does_not_warn() {
+fn top_level_static_does_not_reject() {
     let fixture = analyze_source("generis numerus N = 4\n");
     assert!(
         fixture.diagnostics.is_empty(),
