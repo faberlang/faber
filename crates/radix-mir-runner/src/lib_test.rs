@@ -1599,6 +1599,19 @@ fn provider_failure_uses_stable_identity() {
 }
 
 #[test]
+fn provider_identity_rewrite_ignores_prose_matches() {
+    // WHY: the rewrite keys on the structured code + `feature=provider` arg.
+    // A diagnostic that merely mentions the MIR dump spelling (`provider sym#`)
+    // must keep its own message and issue.
+    let error = RunnerError::internal(Span::default(), "runtime provider sym#30::sym#31")
+        .with_provider_identity("package:camera::include");
+
+    assert_eq!(error.message, "runtime provider sym#30::sym#31");
+    assert_eq!(error.issue, "runner_runtime_provider_sym_30_sym_31");
+    assert!(error.args.iter().all(|(key, _)| key != "identity"));
+}
+
+#[test]
 fn provider_identity_keeps_declared_package_route() {
     let mut interner = Interner::new();
     let provider = MirProvider {
