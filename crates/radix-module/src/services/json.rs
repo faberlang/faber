@@ -132,6 +132,7 @@ fn hir_owner_kind_name(kind: &radix_hir::HirTriviaOwnerKind) -> &'static str {
         radix_hir::HirTriviaOwnerKind::Entry => "Entry",
         radix_hir::HirTriviaOwnerKind::BlockEnd => "BlockEnd",
         radix_hir::HirTriviaOwnerKind::ProgramEnd => "ProgramEnd",
+        radix_hir::HirTriviaOwnerKind::Region => "Region",
     }
 }
 

@@ -1560,6 +1560,7 @@ impl Parser {
                 members: self.parse_selective_import_members()?,
             }
         } else if self.is_import_named_binding_start()
+            && !self.at_following_import_decl()
             && (explicit_visibility || !self.import_binding_continues_expression())
             && (explicit_visibility || !matches!(self.peek().kind, TokenKind::Tag))
         {
@@ -1679,6 +1680,18 @@ impl Parser {
         } else {
             Err(self.invalid_import_error("invalid_import_visibility"))
         }
+    }
+
+    /// Whether the word after an import source opens the next import
+    /// (`importa ex …` / `importa {`) rather than naming this one's binding.
+    ///
+    /// Without this, a default-named import followed by another import
+    /// swallowed the next line's `importa` as its binding (D7.7 makes
+    /// back-to-back default imports the ordinary shape).
+    fn at_following_import_decl(&self) -> bool {
+        self.check_keyword_ident(TokenKind::Importa)
+            && (self.keyword_ident_at(1) == Some(TokenKind::Ex)
+                || self.peek_at(1).kind == TokenKind::LBrace)
     }
 
     fn is_import_named_binding_start(&self) -> bool {

@@ -438,6 +438,15 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
         category: KeywordKind::Declaration,
     },
+    // `regio` (en `module`) names the file (D7.7). Tokenless: the parser
+    // claims it only as the first declaration of a file; everywhere else the
+    // spelling stays an ordinary identifier (F8 contextual keyword).
+    KeywordSpec {
+        text: "regio",
+        token_kind: None,
+        scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
+        category: KeywordKind::Declaration,
+    },
     KeywordSpec {
         text: "modulus",
         token_kind: Some(TokenKind::Modulus),

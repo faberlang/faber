@@ -27,6 +27,10 @@ mod cape_roundtrip_test;
 mod field_modifier_roundtrip_test;
 
 #[cfg(test)]
+#[path = "region_roundtrip_test.rs"]
+mod region_roundtrip_test;
+
+#[cfg(test)]
 #[path = "conditional_roundtrip_test.rs"]
 mod conditional_roundtrip_test;
 

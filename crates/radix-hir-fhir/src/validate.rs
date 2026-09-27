@@ -3024,6 +3024,24 @@ pub(crate) fn validate_referential_integrity(
             });
         }
 
+        // The `regio` declaration (D7.7): interned name and doc lines, and an
+        // anchor that names a registered owner.
+        if let Some(region) = presentation.region.as_ref() {
+            check_symbol(region.name)?;
+            for line in &region.doc {
+                check_symbol(*line)?;
+            }
+            if let Some(anchor) = region.anchor.as_ref()
+                && !owner_ids.contains(&anchor.0)
+            {
+                return Err(HirArtifactError::DanglingIndex {
+                    kind: "HirSourceAnchorId",
+                    index: anchor.0,
+                    arena_size: owner_ids.len(),
+                });
+            }
+        }
+
         // Structural ends (block ends + program end) must be anchor-consistent
         // with the owners registry. Lowering allocates every anchor from one
         // arena, so end ids are unique and never shared with a non-end owner;

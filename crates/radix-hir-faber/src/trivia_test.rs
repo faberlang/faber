@@ -143,6 +143,7 @@ fn empty_presentation() -> HirPresentation {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        region: None,
     }
 }
 
@@ -282,6 +283,7 @@ fn emits_statement_trivia_before_each_statement() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        region: None,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -332,6 +334,7 @@ fn emits_block_end_trivia_before_closing_brace() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        region: None,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -377,6 +380,7 @@ fn emits_program_end_trivia_before_eof() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        region: None,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -423,6 +427,7 @@ fn emits_item_trivia_before_item() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        region: None,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -456,6 +461,7 @@ fn emits_entry_trivia_before_incipit_keyword() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        region: None,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -554,6 +560,7 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        region: None,
     };
 
     let code = FaberCodegen::new(&types, &interner)
@@ -615,6 +622,7 @@ fn emits_trivia_before_annotation_sequence() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        region: None,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -690,6 +698,7 @@ fn comment_bearing_branch_stays_braced_not_ergo() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        region: None,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -798,6 +807,7 @@ fn comment_bearing_branch_prevents_sic_secus_compaction() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        region: None,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -918,6 +928,7 @@ fn boundary_newline_normalization_does_not_manufacture_blank_lines() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        region: None,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -978,6 +989,7 @@ fn file_start_trivia_keeps_no_leading_blank_lines() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        region: None,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -1035,6 +1047,7 @@ fn explicit_tacet_prints_implicit_ends_do_not() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        region: None,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -1098,6 +1111,7 @@ fn rendering_is_deterministic() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        region: None,
     };
 
     let first = render(&hir, &presentation, &interner);

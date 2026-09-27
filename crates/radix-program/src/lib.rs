@@ -118,6 +118,10 @@ pub struct PackageFile {
     /// Transitive closure of [`PackageFile::library_imports`], dependencies
     /// first, deduped by identity.
     pub expanded_library_imports: Vec<LibraryImportBinding>,
+    /// Import path → target `regio` name for this file's default-named imports
+    /// (D7.7); already applied to [`PackageFile::program`] and handed to the
+    /// driver's import contract so the unit's own parse binds the same names.
+    pub default_import_names: std::collections::BTreeMap<String, String>,
 }
 
 /// One expanded library-import binding carried by a package file or analyzed

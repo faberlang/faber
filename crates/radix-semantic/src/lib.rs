@@ -839,6 +839,7 @@ pub(crate) fn empty_presentation() -> HirPresentation {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        region: None,
     }
 }
 

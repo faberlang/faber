@@ -520,8 +520,10 @@ pub struct FunctionProvenanceTableWire {
 /// artifacts fail closed. Version 20 replaces `HirField.is_static` with the
 /// authored field modifier (`fixum` / `varia` / `generis`, D16.1) and carries
 /// it on `StructFieldSnapshot`; schema-v19
-/// artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 20;
+/// artifacts fail closed. Version 21 adds the authored `regio` declaration
+/// (`HirPresentation::region`, D7.7) and the `HirTriviaOwnerKind::Region`
+/// owner that carries the module doc; schema-v20 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 21;
 
 /// Serializable snapshot of one analyzed provider unit carried for HIR
 /// emission (ARCH-U4 carriage).
