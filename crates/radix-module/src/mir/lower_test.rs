@@ -3086,8 +3086,8 @@ functio lectio() → numerus {
 }
 
 #[test]
-fn edge_empty_tabula_ascribed_from_empty_lista_lowers_to_construct_map() {
-    let dump = dump_source(
+fn edge_empty_lista_ascribed_to_tabula_fails_closed() {
+    let mut unit = analyze(
         r#"
 incipit {
     varia tabula<textus, numerus> vides ← [] ∷ tabula<textus, numerus>
@@ -3096,14 +3096,70 @@ incipit {
 }
 "#,
     );
-
+    let errors = dump_analyzed_unit(&mut unit)
+        .expect_err("an empty lista ascribed to tabula is a cross-kind shape and must fail closed");
     assert!(
-        dump.contains("construct map:"),
-        "an empty lista ascribed to tabula is the no-entry spelling and must construct the empty map: {dump}"
+        errors.iter().any(|error| error
+            .message
+            .contains("map construction without object entries")),
+        "the refusal must name the unsupported map-construction shape: {errors:?}"
+    );
+}
+
+#[test]
+fn sanctioned_empty_tabula_constructions_still_lower() {
+    let object_dump = dump_source(
+        r#"
+incipit {
+    varia tabula<textus, numerus> vides ← { "alpha": 1 }
+    nota vides["alpha"]
+}
+"#,
     );
     assert!(
-        !dump.contains("map construction without object entries"),
-        "the empty lista ascription must not fail closed: {dump}"
+        object_dump.contains("construct map:"),
+        "the object/entry construction must still build the map: {object_dump}"
+    );
+
+    let braces_dump = dump_source(
+        r#"
+incipit {
+    varia tabula<textus, numerus> vides ← {}
+    nota vides.longitudo()
+}
+"#,
+    );
+    assert!(
+        braces_dump.contains("construct map:"),
+        "the empty braced literal is the no-entry object spelling and must construct the empty map: {braces_dump}"
+    );
+
+    let vacua_dump = dump_source(
+        r#"
+incipit {
+    varia tabula<textus, numerus> vides ← vacua
+    nota vides.longitudo()
+}
+"#,
+    );
+    assert!(
+        vacua_dump.contains("construct map:"),
+        "the vacua marker must still construct the empty map: {vacua_dump}"
+    );
+
+    let en_empty_dump = dump_source(
+        r#"+++
+locale = "en"
++++
+main {
+    var map<string, int> seen ← empty
+    print seen.length()
+}
+"#,
+    );
+    assert!(
+        en_empty_dump.contains("construct map:"),
+        "the en-locale empty marker must still construct the empty map: {en_empty_dump}"
     );
 }
 
