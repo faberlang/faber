@@ -1,0 +1,90 @@
++++
+term = "char"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "inline_default", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "A char (littera) is a one-letter string: numbers convert to their digits, and code points use the Code hint."
+syntax = "<n> ↦ string | ascii | char, <char> ↦ int | string, <string> ↦ char, <char> ↦ int<u32, Code>, <n> ↦ char<Code>"
+related = ["↦", "char", "string", "ascii", "bytes", "Code"]
+locale = "en"
++++
+# =============================================================================
+# char — conversions of a one-letter string (littera, D10.6).
+# =============================================================================
+#
+# What this teaches:
+#   • A char means a one-letter string, so a number converted to any text type
+#     is its digits: `7 ↦ string` is "7", `7 ↦ ascii` is "7", `7 ↦ char` is '7'.
+#   • `n ↦ char` fails unless n is a single digit 0–9; `42 ↦ char` fails
+#     because "42" is two letters.
+#   • `c ↦ int` parses the digit and fails otherwise; `c ↦ string` is the
+#     one-letter string and never fails.
+#   • `s ↦ char` is the only letter of s and fails unless s has exactly one.
+#   • `bytes ↦ string` decodes UTF-8 and can fail; `bytes ↦ ascii` checks every
+#     byte is below 128; one byte converts through a window `b[i‥i+1] ↦ ascii`.
+#   • Code points use the `Code` hint: `'A' ↦ int<u32, Code>` is 65 and
+#     `65 ↦ char<Code>` is 'A' (fails above U+10FFFF and on surrogates).
+#   • Every failable row takes a `⊥` default (or propagates through `⇥`).
+#     A one-letter literal is ascii<1>, so a bare ascii default needs two.
+#
+# Common mistakes:
+#   • Expecting `65 ↦ char` to be 'A' — without `Code` it is the digits rule
+#     and fails (two letters). A byte is a number, so `b ↦ char` is digits too.
+#
+# See also: ↦, char, string, ascii, bytes
+# =============================================================================
+
+main {
+    # A number converted to text is its digits.
+    const string s ← 7 ↦ string
+    print s
+    const ascii a ← 42 ↦ ascii
+    print a
+    const char seven ← 7 ↦ char ⊥ '?'
+    print seven
+    const char two ← 42 ↦ char ⊥ '?'
+    print two
+
+    # A char parses as its digit.
+    const char d ← '7'
+    const int n ← d ↦ int ⊥ -1
+    print n
+    const char x ← 'x'
+    const int bad ← x ↦ int ⊥ -1
+    print bad
+
+    # A char is a one-letter string.
+    const string letter ← x ↦ string
+    print letter
+
+    # A string converts to a char only with exactly one letter.
+    const string u ← "ü"
+    const char uc ← u ↦ char ⊥ '?'
+    print uc
+    const string pair ← "xy"
+    const char pc ← pair ↦ char ⊥ '?'
+    print pc
+
+    # Bytes decode to text; one byte converts through a window.
+    const bytes raw ← |68 69 ff|
+    const string hi ← raw[0‥2] ↦ string ⊥ "?"
+    print hi
+    const string broken ← raw ↦ string ⊥ "?"
+    print broken
+    const ascii first ← raw[0‥1] ↦ ascii ⊥ '--'
+    print first
+    const ascii high ← raw[2‥3] ↦ ascii ⊥ '--'
+    print high
+
+    # Code points use the Code hint.
+    const char big ← 'A'
+    const int<u32> code ← big ↦ int<u32, Code>
+    print code
+    const char back ← 65 ↦ char<Code> ⊥ '?'
+    print back
+    const char surrogate ← 55296 ↦ char<Code> ⊥ '?'
+    print surrogate
+    const char beyond ← 1114112 ↦ char<Code> ⊥ '?'
+    print beyond
+}
