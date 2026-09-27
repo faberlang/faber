@@ -2979,3 +2979,7 @@ quilibet = "quilibet"
 strue = "strue"
 summa = "summa"
 unio = "unio"
+
+[diagnostics.SEM010.issues.or_pattern_binding_mismatch]
+message = "ทางเลือกของรูปแบบ or ต้องผูกชื่อและชนิดเดียวกัน"
+help = "ให้ทุกทางเลือก aut ผูกชื่อเดียวกันด้วยชนิดเดียวกัน"

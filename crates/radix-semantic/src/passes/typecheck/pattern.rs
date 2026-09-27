@@ -33,6 +33,13 @@ pub fn resolve_type_test_target(
     pattern: &mut HirPattern,
     expected: TypeId,
 ) -> Option<TypeId> {
+    if let HirPattern::Or(alternatives) = pattern {
+        for alternative in alternatives {
+            resolve_type_test_target(checker, alternative, expected);
+        }
+        return None;
+    }
+
     let HirPattern::TypeTest {
         ty,
         candidate,
@@ -82,6 +89,7 @@ impl TypeChecker<'_> {
             HirPattern::Binding(def_id, _name) => {
                 self.insert_binding(*def_id, expected);
             }
+            HirPattern::Or(alternatives) => self.check_or_pattern(alternatives, expected, span),
             HirPattern::TypeTest { ty, binding, .. } => {
                 let target = self.resolve_inferred_type(*ty);
                 let constrained = self.constrain_type_pattern(
@@ -192,5 +200,85 @@ impl TypeChecker<'_> {
                 }
             }
         }
+    }
+    /// Check every `aut` alternative in an isolated scope, then expose the
+    /// common binding environment to the arm body.
+    fn check_or_pattern(
+        &mut self,
+        alternatives: &[HirPattern],
+        expected: TypeId,
+        span: radix_lexer::Span,
+    ) {
+        let mut first_bindings: Option<Vec<(DefId, radix_lexer::Symbol, TypeId)>> = None;
+        let mut agrees = !alternatives.is_empty();
+
+        for alternative in alternatives {
+            self.push_scope();
+            self.check_pattern(alternative, expected, span);
+            let bindings = or_pattern_bindings(alternative)
+                .into_iter()
+                .filter_map(|(def_id, name)| {
+                    self.scopes
+                        .last()
+                        .and_then(|scope| scope.get(&def_id))
+                        .map(|info| (def_id, name, info.ty))
+                })
+                .collect::<Vec<_>>();
+            self.pop_scope();
+
+            if let Some(first) = &first_bindings {
+                agrees &= first.len() == bindings.len()
+                    && first.iter().zip(&bindings).all(|(left, right)| {
+                        left.1 == right.1 && self.types.equals(left.2, right.2)
+                    });
+            } else {
+                first_bindings = Some(bindings);
+            }
+        }
+
+        if !agrees {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                "or_pattern_binding_mismatch",
+                span,
+            );
+            return;
+        }
+        for (def_id, _, ty) in first_bindings.unwrap_or_default() {
+            self.insert_binding(def_id, ty);
+        }
+    }
+}
+
+fn or_pattern_bindings(pattern: &HirPattern) -> Vec<(DefId, radix_lexer::Symbol)> {
+    let mut bindings = Vec::new();
+    collect_or_pattern_bindings(pattern, &mut bindings);
+    bindings
+}
+
+fn collect_or_pattern_bindings(
+    pattern: &HirPattern,
+    bindings: &mut Vec<(DefId, radix_lexer::Symbol)>,
+) {
+    match pattern {
+        HirPattern::Binding(def_id, name) => bindings.push((*def_id, *name)),
+        HirPattern::Alias(def_id, name, inner) => {
+            bindings.push((*def_id, *name));
+            collect_or_pattern_bindings(inner, bindings);
+        }
+        HirPattern::TypeTest { binding, .. } => {
+            if let Some((def_id, name)) = binding {
+                bindings.push((*def_id, *name));
+            }
+        }
+        HirPattern::Variant(_, patterns) => {
+            for pattern in patterns {
+                collect_or_pattern_bindings(pattern, bindings);
+            }
+        }
+        HirPattern::Or(_)
+        | HirPattern::Wildcard
+        | HirPattern::Literal(_)
+        | HirPattern::NegatedLiteral(_) => {}
     }
 }

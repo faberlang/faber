@@ -1039,3 +1039,30 @@ fn non_binding_payload_subpattern_warns_coverage_unchecked() {
         "expected CoverageUnchecked, got {errors:?}"
     );
 }
+
+#[test]
+fn or_pattern_union_covers_each_alternative() {
+    let mut types = TypeTable::new();
+    let enum_def = DefId(1);
+    let enum_ty = types.intern(Type::Enum(enum_def));
+    let match_expr = match_expr_with_arms(
+        enum_ty,
+        vec![vec![HirPattern::Or(vec![
+            HirPattern::Variant(DefId(2), Vec::new()),
+            HirPattern::Variant(DefId(3), Vec::new()),
+        ])]],
+    );
+    let program = program_with_match(enum_def, match_expr);
+
+    let result = check(
+        &program,
+        &types,
+        &collect_enum_variants(&program),
+        &FxHashSet::default(),
+        None,
+    );
+    assert!(
+        result.is_ok(),
+        "an Or arm covers the union of its alternatives"
+    );
+}

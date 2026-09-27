@@ -575,6 +575,11 @@ pub fn walk_casu_arm<V: HirVisitor>(visitor: &mut V, arm: &HirCasuArm) {
 pub fn walk_pattern<V: HirVisitor>(visitor: &mut V, pattern: &HirPattern) {
     match pattern {
         HirPattern::Wildcard | HirPattern::Literal(_) | HirPattern::NegatedLiteral(_) => {}
+        HirPattern::Or(alternatives) => {
+            for alternative in alternatives {
+                visitor.visit_pattern(alternative);
+            }
+        }
         HirPattern::TypeTest { binding, .. } => {
             if let Some((def_id, name)) = binding {
                 visitor.visit_def(*def_id, *name);
@@ -1163,6 +1168,11 @@ pub fn walk_casu_arm_mut<V: HirVisitorMut>(visitor: &mut V, arm: &mut HirCasuArm
 pub fn walk_pattern_mut<V: HirVisitorMut>(visitor: &mut V, pattern: &mut HirPattern) {
     match pattern {
         HirPattern::Wildcard | HirPattern::Literal(_) | HirPattern::NegatedLiteral(_) => {}
+        HirPattern::Or(alternatives) => {
+            for alternative in alternatives {
+                visitor.visit_pattern_mut(alternative);
+            }
+        }
         HirPattern::TypeTest { binding, .. } => {
             if let Some((def_id, name)) = binding {
                 visitor.visit_def(*def_id, *name);

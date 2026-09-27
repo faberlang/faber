@@ -47,7 +47,102 @@ pub fn lower_pattern(lowerer: &mut Lowerer, pattern: &Pattern) -> HirPattern {
         Pattern::Type(ty, bind) => lower_type_pattern(lowerer, ty, bind.as_ref()),
         Pattern::Literal(lit, span) => lower_literal(lowerer, lit, *span),
         Pattern::NegatedLiteral(lit, span) => lower_negated_literal(lowerer, lit, *span),
+        Pattern::Or(alternatives) => lower_or_pattern(lowerer, alternatives),
         Pattern::Path(path) => lower_path_pattern(lowerer, path),
+    }
+}
+
+/// Lower alternatives while preserving one binding identity for an agreeing arm.
+fn lower_or_pattern(lowerer: &mut Lowerer, alternatives: &[Pattern]) -> HirPattern {
+    let mut lowered: Vec<_> = alternatives
+        .iter()
+        .map(|alternative| lower_pattern(lowerer, alternative))
+        .collect();
+    let Some(first) = lowered.first() else {
+        return HirPattern::Or(Vec::new());
+    };
+    let canonical = pattern_bindings(first);
+    if lowered.iter().skip(1).all(|alternative| {
+        pattern_bindings(alternative)
+            .iter()
+            .map(|(_, name)| *name)
+            .eq(canonical.iter().map(|(_, name)| *name))
+    }) {
+        for alternative in lowered.iter_mut().skip(1) {
+            rewrite_pattern_bindings(alternative, &canonical);
+        }
+        for (def_id, name) in canonical {
+            lowerer.bind_local(name, def_id);
+        }
+    }
+    HirPattern::Or(lowered)
+}
+
+fn pattern_bindings(pattern: &HirPattern) -> Vec<(radix_hir::DefId, radix_lexer::Symbol)> {
+    let mut bindings = Vec::new();
+    collect_pattern_bindings(pattern, &mut bindings);
+    bindings
+}
+
+fn collect_pattern_bindings(
+    pattern: &HirPattern,
+    bindings: &mut Vec<(radix_hir::DefId, radix_lexer::Symbol)>,
+) {
+    match pattern {
+        HirPattern::Binding(def_id, name) => bindings.push((*def_id, *name)),
+        HirPattern::Alias(def_id, name, inner) => {
+            bindings.push((*def_id, *name));
+            collect_pattern_bindings(inner, bindings);
+        }
+        HirPattern::TypeTest { binding, .. } => {
+            if let Some((def_id, name)) = binding {
+                bindings.push((*def_id, *name));
+            }
+        }
+        HirPattern::Variant(_, patterns) | HirPattern::Or(patterns) => {
+            for pattern in patterns {
+                collect_pattern_bindings(pattern, bindings);
+            }
+        }
+        HirPattern::Wildcard | HirPattern::Literal(_) | HirPattern::NegatedLiteral(_) => {}
+    }
+}
+
+fn rewrite_pattern_bindings(
+    pattern: &mut HirPattern,
+    canonical: &[(radix_hir::DefId, radix_lexer::Symbol)],
+) {
+    let mut index = 0;
+    rewrite_pattern_bindings_at(pattern, canonical, &mut index);
+}
+
+fn rewrite_pattern_bindings_at(
+    pattern: &mut HirPattern,
+    canonical: &[(radix_hir::DefId, radix_lexer::Symbol)],
+    index: &mut usize,
+) {
+    match pattern {
+        HirPattern::Binding(def_id, _) => {
+            *def_id = canonical[*index].0;
+            *index += 1;
+        }
+        HirPattern::Alias(def_id, _, inner) => {
+            *def_id = canonical[*index].0;
+            *index += 1;
+            rewrite_pattern_bindings_at(inner, canonical, index);
+        }
+        HirPattern::TypeTest { binding, .. } => {
+            if let Some((def_id, _)) = binding {
+                *def_id = canonical[*index].0;
+                *index += 1;
+            }
+        }
+        HirPattern::Variant(_, patterns) | HirPattern::Or(patterns) => {
+            for pattern in patterns {
+                rewrite_pattern_bindings_at(pattern, canonical, index);
+            }
+        }
+        HirPattern::Wildcard | HirPattern::Literal(_) | HirPattern::NegatedLiteral(_) => {}
     }
 }
 

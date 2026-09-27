@@ -3734,3 +3734,7 @@ help = "call `close()` explicitly, or break the reference cycle"
 [llm]
 system_prompt_snippet = "Emit canonical Latin Faber source using the registered Latin keywords, canonical type spellings, and invariant glyph syntax."
 exemplars = ["./exemplars/salve-munde.la.fab"]
+
+[diagnostics.SEM010.issues.or_pattern_binding_mismatch]
+message = "alternativa aut eadem nomina et genera ligare debent"
+help = "fac ut unaquaeque alternativa aut eadem nomina eisdem generibus liget"

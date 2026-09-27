@@ -200,9 +200,8 @@ fn nonnumerus_in_pattern_position_is_a_nan_literal_not_a_binding() {
 
 #[test]
 fn or_alternative_arm_parses_as_one_pattern() {
-    let result = parse_ok(
-        "discerne color {\n    casu Color.Rubrum aut Color.Caeruleum { tacet }\n}",
-    );
+    let result =
+        parse_ok("discerne color {\n    casu Color.Rubrum aut Color.Caeruleum { tacet }\n}");
     let patterns = discerne_patterns(&result);
     let Pattern::Or(alternatives) = &patterns[0] else {
         panic!("expected or pattern");
@@ -214,9 +213,7 @@ fn or_alternative_arm_parses_as_one_pattern() {
 
 #[test]
 fn or_alternative_arm_accepts_negated_literals_and_subject_separators() {
-    let result = parse_ok(
-        "discerne left, right {\n    casu -1 aut -2, -3 aut -4 ergo tacet\n}",
-    );
+    let result = parse_ok("discerne left, right {\n    casu -1 aut -2, -3 aut -4 ergo tacet\n}");
     let patterns = discerne_patterns(&result);
     assert_eq!(patterns.len(), 2);
     assert!(matches!(patterns[0], Pattern::Or(ref alternatives) if alternatives.len() == 2));

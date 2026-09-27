@@ -313,7 +313,7 @@ impl<'a> DefiniteAssignmentChecker<'a> {
                 self.mark_assigned(*def_id);
                 self.assign_pattern_binding(inner);
             }
-            HirPattern::Variant(_, patterns) => {
+            HirPattern::Variant(_, patterns) | HirPattern::Or(patterns) => {
                 for pattern in patterns {
                     self.assign_pattern_binding(pattern);
                 }

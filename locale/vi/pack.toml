@@ -2967,3 +2967,7 @@ quilibet = "quilibet"
 strue = "strue"
 summa = "summa"
 unio = "unio"
+
+[diagnostics.SEM010.issues.or_pattern_binding_mismatch]
+message = "các lựa chọn mẫu or phải liên kết cùng tên và kiểu"
+help = "hãy để mỗi lựa chọn aut liên kết cùng tên với cùng kiểu"

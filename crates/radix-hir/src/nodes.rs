@@ -1830,6 +1830,12 @@ pub enum HirPattern {
         binding: Option<(DefId, Symbol)>,
     },
 
+    /// Alternatives for one subject pattern, written `casu A aut B`.
+    ///
+    /// Every alternative shares one binding environment; semantic checking
+    /// rejects alternatives that do not bind the same names and types.
+    Or(Vec<HirPattern>),
+
     /// Literal pattern.
     Literal(HirLiteral),
 
