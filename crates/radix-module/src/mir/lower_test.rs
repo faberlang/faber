@@ -3114,6 +3114,32 @@ incipit {
 }
 
 #[test]
+fn mir_rejects_map_construction_without_object_entries() {
+    let mut types = TypeTable::new();
+    let textus = types.primitive(Primitive::Textus);
+    let numerus = types.primitive(Primitive::Numerus);
+    let array = types.intern(Type::Array(numerus));
+    let map = types.intern(Type::Map(textus, numerus));
+    let span = Span::default();
+    let source = HirExpression { id: HirId(0), kind: HirExpressionKind::Array(Vec::new()), ty: Some(array), span };
+    let expr = HirExpression { id: HirId(1), kind: HirExpressionKind::Vacua, ty: Some(map), span };
+    let mut builder = FunctionBuilder::new(&types);
+    let entry = builder.fresh_block(span);
+    builder.switch_to(entry);
+
+    assert!(builder.lower_verte(&source, map, None, &expr).is_none());
+    assert!(
+        builder.blocks[0].statements.is_empty(),
+        "rejected construction must emit no MIR"
+    );
+    assert_eq!(builder.errors.len(), 1, "the fail-closed guard must report one error");
+    assert_eq!(
+        builder.errors[0].issue,
+        "unsupported_mir_lowering_map_construction_without_object_entries_before_aggregate_mir_lowering"
+    );
+}
+
+#[test]
 fn sanctioned_empty_tabula_constructions_still_lower() {
     let object_dump = dump_source(
         r#"
