@@ -3423,34 +3423,42 @@ message = "an `{insere}` initializer must declare `textus` or `octeti`"
 help = "declare `textus` for UTF-8 text or `octeti` for raw bytes"
 
 [diagnostics.SEM062]
+message = "top-level binding"
+help = "use `{generis} T X = …` for a compile-time constant, or move the binding into a function"
+
+[diagnostics.SEM062.issues.top_level_binding]
+message = "top-level `{name}`: module-level mutable state does not exist"
+help = "use `{generis} T X = …` for a compile-time constant, or move the binding into a function"
+
+[diagnostics.SEM063]
 message = "member is not accessible here"
 help = "reach the member through the type's own methods, or change its visibility"
 
-[diagnostics.SEM062.issues.member_private_read]
+[diagnostics.SEM063.issues.member_private_read]
 message = "`{member}` is private to `{owner}`; only its own methods can read it"
 help = "read it through a method of `{owner}`"
 
-[diagnostics.SEM062.issues.member_private_write]
+[diagnostics.SEM063.issues.member_private_write]
 message = "`{member}` is private to `{owner}`; only its own methods can write it"
 help = "set it in a construction literal, or through a method of `{owner}`"
 
-[diagnostics.SEM062.issues.member_private_call]
+[diagnostics.SEM063.issues.member_private_call]
 message = "`{member}` is private to `{owner}`; only its own methods can call it"
 help = "call a public method of `{owner}` instead"
 
-[diagnostics.SEM062.issues.member_interna_read]
+[diagnostics.SEM063.issues.member_interna_read]
 message = "`{member}` of `{owner}` is internal to its package and cannot be read from another package"
 help = "use a public member of `{owner}`"
 
-[diagnostics.SEM062.issues.member_interna_write]
+[diagnostics.SEM063.issues.member_interna_write]
 message = "`{member}` of `{owner}` is internal to its package and cannot be written from another package"
 help = "set it in a construction literal, or use a public member of `{owner}`"
 
-[diagnostics.SEM062.issues.member_interna_call]
+[diagnostics.SEM063.issues.member_interna_call]
 message = "`{member}` of `{owner}` is internal to its package and cannot be called from another package"
 help = "call a public method of `{owner}` instead"
 
-[diagnostics.SEM062.issues.union_member_visibility_differs]
+[diagnostics.SEM063.issues.union_member_visibility_differs]
 message = "`{member}` is written through a union whose members declare different visibility: {detail}"
 help = "declare `{member}` with the same visibility on every member of the union"
 
@@ -3645,14 +3653,6 @@ help = "add a '{ceterum}' arm, or split the match so each pattern kind is checka
 [diagnostics.WARN029.issues.coverage_unchecked]
 message = "coverage of this match could not be computed for its pattern kinds; exhaustiveness was not checked"
 help = "add a '{ceterum}' arm, or split the match so each pattern kind is checkable"
-
-[diagnostics.WARN030]
-message = "top-level binding"
-help = "use `{generis} T X = …` for a compile-time constant, or move the binding into a function"
-
-[diagnostics.WARN030.issues.top_level_binding]
-message = "top-level `{name}`: module-level mutable state does not exist"
-help = "use `{generis} T X = …` for a compile-time constant, or move the binding into a function"
 
 [llm]
 system_prompt_snippet = "Emit canonical Latin Faber source using the registered Latin keywords, canonical type spellings, and invariant glyph syntax."

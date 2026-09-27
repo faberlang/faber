@@ -55,6 +55,7 @@ pub(crate) const SEMANTIC_ERROR_KINDS: &[SemanticErrorKind] = &[
     SemanticErrorKind::LifetimeMismatch,
     SemanticErrorKind::AssignToImmutableBorrow,
     SemanticErrorKind::ModeMismatch,
+    SemanticErrorKind::TopLevelBindingForbidden,
 ];
 
 pub(crate) const WARNING_KINDS: &[WarningKind] = &[
@@ -82,7 +83,6 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::ComplexityBudgetExceeded,
     WarningKind::RedundantMemberVisibility,
     WarningKind::CoverageUnchecked,
-    WarningKind::TopLevelBinding,
 ];
 
 // STABLE CODES
@@ -188,7 +188,7 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
             ),
         },
         SemanticErrorKind::MemberInaccessible => DiagnosticSpec {
-            code: "SEM062",
+            code: "SEM063",
             help: Some("reach the member through the type's own methods, or change its visibility"),
         },
         SemanticErrorKind::AirPurityViolation => DiagnosticSpec {
@@ -272,6 +272,12 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
         SemanticErrorKind::ModeMismatch => DiagnosticSpec {
             code: "SEM057",
             help: Some("align parameter modes between caller and callee"),
+        },
+        SemanticErrorKind::TopLevelBindingForbidden => DiagnosticSpec {
+            code: "SEM062",
+            help: Some(
+                "use `generis T X = …` for a compile-time constant, or move the binding into a function",
+            ),
         },
         SemanticErrorKind::Warning(kind) => warning_spec(kind),
     }
@@ -1152,12 +1158,6 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::CoverageUnchecked => DiagnosticSpec {
             code: "WARN029",
             help: Some("add a 'ceterum' arm, or split the match so each pattern kind is checkable"),
-        },
-        WarningKind::TopLevelBinding => DiagnosticSpec {
-            code: "WARN030",
-            help: Some(
-                "use `generis T X = …` for a compile-time constant, or move the binding into a function",
-            ),
         },
     }
 }

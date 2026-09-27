@@ -90,7 +90,7 @@ fn assert_issue(result: &CheckDiagnosticsResult, issue: &str) {
         .iter()
         .find(|diag| diag.issue() == Some(issue))
         .unwrap_or_else(|| panic!("missing {issue}: {:?}", result.diagnostics));
-    assert_eq!(diag.code, Some("SEM062"), "{diag:?}");
+    assert_eq!(diag.code, Some("SEM063"), "{diag:?}");
     assert!(
         diag.args
             .iter()

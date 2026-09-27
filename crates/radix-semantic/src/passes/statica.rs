@@ -27,10 +27,13 @@
 //! [`HirStatic::authored`] so Faber re-emission prints the source, not the
 //! folded value.
 //!
-//! D5.7: a legacy top-level `fixum`/`varia` is WARN030 `top_level_binding`
-//! until the library sweep lands, when it becomes an error.
+//! D5.7: a legacy top-level `fixum`/`varia` is SEM062 `top_level_binding`.
+//! It was WARN030 until the library sweep landed; the library sweep is
+//! complete (norma, gradus, triga, tela, examples, and the radix corpora
+//! carry zero top-level `fixum`/`varia`), so the migration diagnostic is
+//! now a hard error.
 
-use crate::{SemanticError, SemanticErrorKind, Type, TypeTable, WarningKind};
+use crate::{SemanticError, SemanticErrorKind, Type, TypeTable};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_program};
 use radix_hir::{
     DefId, HirArrayElement, HirBinOp, HirExpression, HirExpressionKind, HirId, HirItemKind,
@@ -46,19 +49,16 @@ const ISSUE_CYCLE: &str = "static_cycle";
 const ISSUE_OVERFLOW: &str = "static_arithmetic_overflow";
 const ISSUE_DIVISION_BY_ZERO: &str = "static_division_by_zero";
 
-/// Warn on every legacy top-level `fixum`/`varia` binding (D5.7 migration).
+/// Reject every legacy top-level `fixum`/`varia` binding (D5.7 migration).
 #[must_use]
-pub fn warn_top_level_bindings(hir: &HirModule, interner: &Interner) -> Vec<SemanticError> {
+pub fn reject_top_level_bindings(hir: &HirModule, interner: &Interner) -> Vec<SemanticError> {
     hir.items
         .iter()
         .filter_map(|item| match &item.kind {
             HirItemKind::Constant(konst) if konst.statica.is_none() => Some(
-                SemanticError::structured(
-                    SemanticErrorKind::Warning(WarningKind::TopLevelBinding),
-                    item.span,
-                )
-                .with_arg("issue", ISSUE_TOP_LEVEL_BINDING)
-                .with_arg("name", interner.resolve(konst.name)),
+                SemanticError::structured(SemanticErrorKind::TopLevelBindingForbidden, item.span)
+                    .with_arg("issue", ISSUE_TOP_LEVEL_BINDING)
+                    .with_arg("name", interner.resolve(konst.name)),
             ),
             _ => None,
         })

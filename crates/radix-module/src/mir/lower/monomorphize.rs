@@ -703,19 +703,16 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
     ) -> bool {
         match &mut statement.kind {
             MirStatementKind::Assign { value, .. } => self.substitute_value(value, bindings, span),
-            MirStatementKind::Call { callee, .. } if self.is_builtin_ordering_call(callee, bindings, span) => {
+            MirStatementKind::Call { callee, destination, args }
+                if self.is_builtin_ordering_call(callee, bindings, span) =>
+            {
                 // D1.4: a built-in or tuple witness of the ordering bound
                 // compares through the compiler-supplied three-way compare.
-                let MirStatementKind::Call { destination, args, .. } = std::mem::replace(
-                    &mut statement.kind,
-                    MirStatementKind::Call {
-                        destination: None,
-                        callee: MirCallee::Value(MirOperand::Constant(MirConstant::Unit)),
-                        args: Vec::new(),
-                    },
-                ) else {
-                    unreachable!("guarded by the match arm");
-                };
+                // Take the fields the arm already destructured instead of
+                // matching the variant a second time — the shape is proven
+                // by this pattern, not by a runtime check.
+                let destination = destination.take();
+                let args = std::mem::take(args);
                 let return_ty = MirType::semantic(self.types().primitive(Primitive::Numerus));
                 statement.kind = MirStatementKind::RuntimeCall {
                     destination,
