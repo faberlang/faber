@@ -129,11 +129,7 @@ impl MatrixValue {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct SermoValue {
-    pub route: String,
-    pub opener: Value,
-}
+pub use crate::sermo::SermoValue;
 
 /// Hashable key subset for `tabula` / `copia`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -324,7 +320,9 @@ impl Value {
             Value::Octeti(bytes) => String::from_utf8_lossy(bytes).into_owned(),
             Value::Instans(value) => value.to_rfc3339(),
             Value::Regex(pattern) => pattern.clone(),
-            Value::Sermo(sermo) => format!("sermo({})", sermo.borrow().route),
+            Value::Sermo(sermo) => {
+                format!("sermo({})", sermo.borrow().conversation.borrow().route)
+            }
             Value::Function(id) => format!("function f{}", id.0),
             Value::Closure(id, environment, _) => {
                 format!("closure f{} env{}", id.0, environment.0)

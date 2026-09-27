@@ -217,6 +217,7 @@ impl<'a> LoweringContextMaps<'a> {
                 variant_fields: FxHashMap::default(),
                 scalar_value_domains: FxHashMap::default(),
                 closure_environments: FxHashMap::default(),
+                ad_routes: FxHashMap::default(),
             },
         };
         maps.record_package_import_identities(unit);
@@ -368,6 +369,20 @@ impl<'a> LoweringContextMaps<'a> {
                     self.interner.resolve(function.name),
                 ),
             );
+        }
+    }
+
+    /// Tier-1 `@ ad` handler: route → handler `DefId` for the MIR runner's
+    /// static table (A4/U9). Legality was proven by `passes::ad_routes`.
+    fn record_ad_route(&mut self, item: &HirItem) {
+        if let Some(route) = item
+            .annotations
+            .iter()
+            .find_map(|annotation| annotation.ad_route(self.interner))
+        {
+            self.validation
+                .ad_routes
+                .insert(self.interner.resolve(route).to_owned(), item.def_id);
         }
     }
 
@@ -913,7 +928,10 @@ pub(super) fn struct_field_map(unit: &AnalyzedModule) -> FxHashMap<DefId, Vec<&H
 impl HirVisitor for LoweringContextMaps<'_> {
     fn visit_item(&mut self, item: &HirItem) {
         match &item.kind {
-            HirItemKind::Function(function) => self.record_function_item(item.def_id, function),
+            HirItemKind::Function(function) => {
+                self.record_function_item(item.def_id, function);
+                self.record_ad_route(item);
+            }
             HirItemKind::Struct(strukt) => {
                 self.record_struct_item(item.def_id, &item.annotations, strukt);
             }

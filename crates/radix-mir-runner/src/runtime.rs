@@ -30,11 +30,11 @@
 )]
 
 use super::cursor::GeneratorCursor;
+use super::sermo::SermoView;
 use super::value::{
-    GradientStorage, MapKey, SermoValue, TensorValue, Value, float_to_numerus_width,
-    format_template, modular_operand, modular_word_mask, modular_word_result,
-    uint_width_checked_add, uint_width_checked_mul, values_equal, width_checked_add,
-    width_checked_mul,
+    GradientStorage, MapKey, TensorValue, Value, float_to_numerus_width, format_template,
+    modular_operand, modular_word_mask, modular_word_result, uint_width_checked_add,
+    uint_width_checked_mul, values_equal, width_checked_add, width_checked_mul,
 };
 use super::{Runner, RunnerError, gelu_f64, host::provider_identity};
 use radix_hir::DefId;
@@ -188,10 +188,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let route = self
             .eval_operand(route, span)?
             .display(self.interner, span)?;
-        Ok(Value::Sermo(Rc::new(RefCell::new(SermoValue {
-            route,
-            opener: Value::Nil,
-        }))))
+        self.sermo_open(route, span)
     }
 
     fn eval_sermo_set_opener(
@@ -212,7 +209,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             ));
         };
         let opener = self.eval_operand(opener, span)?;
-        sermo.borrow_mut().opener = opener;
+        self.sermo_set_opener(&sermo, opener, span)?;
         Ok(Value::Unit)
     }
 
@@ -227,14 +224,20 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             let [cursor] = args else {
                 return Err(RunnerError::internal(span, "sermo cursor drain arity"));
             };
-            let Value::Array(frames) = self.eval_operand(cursor, span)? else {
-                return Err(RunnerError::internal(
+            return match self.eval_operand(cursor, span)? {
+                Value::Array(frames) => {
+                    let frames = frames.borrow().clone();
+                    Ok(Value::Array(Rc::new(RefCell::new(frames))))
+                }
+                // WHY: a conversation cursor stays lazy (D6.6) — the walk
+                // pulls one frame per step, so a cursor handler produces
+                // while the caller consumes.
+                Value::Cursor(cursor) => Ok(Value::Cursor(cursor)),
+                _ => Err(RunnerError::internal(
                     span,
                     "sermo cursor drain requires cursor carrier",
-                ));
+                )),
             };
-            let frames = frames.borrow().clone();
-            return Ok(Value::Array(Rc::new(RefCell::new(frames))));
         }
         let Some(receiver) = args.first() else {
             return Err(RunnerError::internal(
@@ -249,9 +252,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             ));
         };
         match op {
-            MirSermoOp::ViewMeus | MirSermoOp::ViewTuus => Ok(Value::Sermo(sermo)),
+            MirSermoOp::ViewMeus => Ok(Value::Sermo(Rc::new(RefCell::new(
+                sermo.borrow().with_view(SermoView::Meus),
+            )))),
+            MirSermoOp::ViewTuus => Ok(Value::Sermo(Rc::new(RefCell::new(
+                sermo.borrow().with_view(SermoView::Tuus),
+            )))),
             MirSermoOp::Send => Ok(Value::Unit),
             MirSermoOp::Finish => {
+                self.sermo_finish(&sermo, span)?;
                 let Type::Enum(status) = self.types.get(return_ty.semantic_id()) else {
                     return Err(RunnerError::internal(
                         span,
@@ -264,13 +273,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 ))
             }
             MirSermoOp::Receive { frame, data_field } => {
-                Ok(sermo_frame_value(&sermo.borrow(), *frame, *data_field))
+                Ok(self.sermo_next(&sermo, span)?.map_or(Value::Nil, |data| {
+                    crate::sermo::frame_value(*frame, *data_field, data)
+                }))
             }
-            MirSermoOp::Cursor { frame, data_field } => Ok(array_value(vec![sermo_frame_value(
-                &sermo.borrow(),
+            MirSermoOp::Cursor { frame, data_field } => Ok(Value::Cursor(GeneratorCursor::sermo(
+                sermo,
                 *frame,
                 *data_field,
-            )])),
+            ))),
             MirSermoOp::DrainCursor => {
                 Err(RunnerError::internal(span, "nested cursor drain dispatch"))
             }
@@ -4081,12 +4092,6 @@ fn tensor_value(data: Vec<Value>, shape: Vec<i64>) -> Value {
 
 fn interval_value(start: Value, end: Value, inclusive: bool) -> Value {
     Value::Tuple(vec![start, end, Value::Bool(inclusive)])
-}
-
-fn sermo_frame_value(sermo: &SermoValue, frame: DefId, data_field: Symbol) -> Value {
-    let mut fields = FxHashMap::default();
-    fields.insert(data_field, sermo.opener.clone());
-    Value::Struct(frame, Rc::new(RefCell::new(fields)))
 }
 
 fn interval_parts(value: &Value, span: Span) -> Result<(Value, Value, bool), RunnerError> {

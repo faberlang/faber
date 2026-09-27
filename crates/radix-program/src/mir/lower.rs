@@ -41,6 +41,8 @@ pub(super) struct RemappedValidation {
     enum_variants: HashMap<DefId, Vec<DefId>>,
     variant_fields: HashMap<DefId, HashMap<Symbol, MirType>>,
     functions: HashMap<DefId, MirFunctionSignature>,
+    /// Tier-1 `@ ad` routes of the linked units (route → handler `DefId`).
+    ad_routes: HashMap<String, DefId>,
 }
 
 impl RemappedValidation {
@@ -80,6 +82,9 @@ impl RemappedValidation {
         union_field_maps(&mut self.variant_fields, &other.variant_fields);
         for (def, sig) in &other.functions {
             self.functions.entry(*def).or_insert_with(|| sig.clone());
+        }
+        for (route, def) in &other.ad_routes {
+            self.ad_routes.entry(route.clone()).or_insert(*def);
         }
     }
 
@@ -126,6 +131,9 @@ impl RemappedValidation {
         }
         for (def, sig) in &self.functions {
             context.functions.entry(*def).or_insert_with(|| sig.clone());
+        }
+        for (route, def) in &self.ad_routes {
+            context.ad_routes.entry(route.clone()).or_insert(*def);
         }
     }
 }
@@ -542,6 +550,11 @@ fn collect_remapped_validation(
             rewrite_type_id(&mut param.ty, type_rewrites);
         }
         out.functions.entry(remap_function_def(*def)).or_insert(sig);
+    }
+    for (route, def) in &source.ad_routes {
+        out.ad_routes
+            .entry(route.clone())
+            .or_insert_with(|| remap_function_def(*def));
     }
     out
 }

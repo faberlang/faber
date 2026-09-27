@@ -176,6 +176,11 @@ pub struct MirValidationContext<'a> {
     pub variant_fields: FxHashMap<DefId, FxHashMap<Symbol, MirType>>,
     pub scalar_value_domains: FxHashMap<TypeId, MirScalarValueDomain>,
     pub closure_environments: FxHashMap<MirClosureEnvironmentId, MirClosureEnvironment>,
+    /// Tier-1 `@ ad` route table (D6.9, F11): exact route → the handler
+    /// function's source `DefId`. Lowering records each module's handlers;
+    /// package linking merges them. The MIR runner answers these routes
+    /// in-process; emitters ignore the map.
+    pub ad_routes: FxHashMap<String, DefId>,
 }
 
 impl<'a> MirValidationContext<'a> {
@@ -201,6 +206,7 @@ impl<'a> MirValidationContext<'a> {
             variant_fields: FxHashMap::default(),
             scalar_value_domains: FxHashMap::default(),
             closure_environments: FxHashMap::default(),
+            ad_routes: FxHashMap::default(),
         }
     }
 
@@ -264,6 +270,7 @@ impl<'a> MirValidationContext<'a> {
         context
             .closure_environments
             .clone_from(&self.closure_environments);
+        context.ad_routes.clone_from(&self.ad_routes);
         context
     }
 
@@ -298,6 +305,7 @@ impl<'a> MirValidationContext<'a> {
             variant_fields,
             scalar_value_domains,
             closure_environments,
+            ad_routes,
             ..
         } = self;
         let layouts = MirLayoutTable::from_types(&types);
@@ -321,6 +329,7 @@ impl<'a> MirValidationContext<'a> {
             variant_fields,
             scalar_value_domains,
             closure_environments,
+            ad_routes,
         }
     }
 
