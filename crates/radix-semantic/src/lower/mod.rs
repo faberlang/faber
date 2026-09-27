@@ -54,6 +54,7 @@ pub struct LoweredProgram {
 pub mod annotation;
 pub(crate) mod decl;
 mod expr;
+mod insere;
 mod literal;
 mod pattern;
 mod stmt;
@@ -74,7 +75,8 @@ pub(super) struct TypeFormFrame {
 use crate::cli::{CliProgram, CliType};
 use crate::locale::LocalePack;
 use crate::{
-    AnnotationContractMetadata, Primitive, Resolver, SemanticParamMode, Type, TypeId, TypeTable,
+    AnnotationContractMetadata, Primitive, Resolver, SemanticErrorKind, SemanticParamMode, Type,
+    TypeId, TypeTable,
 };
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
@@ -209,7 +211,13 @@ pub struct Lowerer<'a> {
     /// `DefId`. Consumed by `itera` lowering to label the synthetic element
     /// local so by-label loop patterns resolve like binding-position forms.
     list_element_labels: FxHashMap<radix_hir::DefId, Vec<Option<Symbol>>>,
+
+    /// Driver-resolved build-time embed files (`insere`, D8.10).
+    insere_files: &'a crate::insere::InsereFiles,
 }
+
+/// Embed table for lowerers built without a driver file context.
+static NO_INSERE_FILES: crate::insere::InsereFiles = crate::insere::InsereFiles::new();
 
 /// Recoverable diagnostic emitted while converting resolved AST into HIR.
 ///
@@ -218,6 +226,9 @@ pub struct Lowerer<'a> {
 /// diagnostic rendering owns human-readable prose.
 #[derive(Debug, Clone)]
 pub struct LowerError {
+    /// Diagnostic family; ordinary lowering failures are `LoweringError`.
+    pub kind: SemanticErrorKind,
+
     /// Named facts for catalog templates and future locale renderers.
     pub args: Vec<DiagnosticArg>,
 
@@ -260,6 +271,7 @@ impl<'a> Lowerer<'a> {
                 variant_paths: Vec::new(),
                 authored_types: Vec::new(),
                 tuple_label_accesses: Vec::new(),
+                insere_exprs: Vec::new(),
                 region: None,
             },
             local_variant_path_indices: Vec::new(),
@@ -280,6 +292,7 @@ impl<'a> Lowerer<'a> {
             locale_pack,
             annotation_contracts,
             list_element_labels: FxHashMap::default(),
+            insere_files: &NO_INSERE_FILES,
         }
     }
 
@@ -811,14 +824,29 @@ impl<'a> Lowerer<'a> {
     /// Record a recoverable lowering diagnostic with explicit named facts.
     fn error_with_args(&mut self, args: Vec<DiagnosticArg>) {
         self.errors.push(LowerError {
+            kind: SemanticErrorKind::LoweringError,
             args,
             span: self.current_span,
         });
     }
 
+    /// Record a recoverable diagnostic of a specific semantic family.
+    pub(super) fn push_error(
+        &mut self,
+        kind: SemanticErrorKind,
+        args: Vec<DiagnosticArg>,
+        span: Span,
+    ) {
+        self.errors.push(LowerError { kind, args, span });
+    }
+
     /// Record a recoverable lowering diagnostic with explicit named facts at a known span.
     pub(super) fn error_with_args_at(&mut self, args: Vec<DiagnosticArg>, span: Span) {
-        self.errors.push(LowerError { args, span });
+        self.errors.push(LowerError {
+            kind: SemanticErrorKind::LoweringError,
+            args,
+            span,
+        });
     }
 
     /// Convert legacy shared-helper messages to stable lowering issue facts.
@@ -1058,6 +1086,7 @@ pub struct LowerRequest<'a> {
     pub cli_program: Option<&'a CliProgram>,
     pub locale_pack: Option<&'a LocalePack>,
     pub annotation_contracts: Option<&'a AnnotationContractMetadata>,
+    pub insere_files: &'a crate::insere::InsereFiles,
 }
 
 /// Lower resolved AST to HIR.
@@ -1071,6 +1100,7 @@ pub fn lower(request: LowerRequest<'_>) -> (LoweredProgram, Vec<LowerError>) {
         cli_program,
         locale_pack,
         annotation_contracts,
+        insere_files,
     } = request;
     let mut lowerer = Lowerer::new_with_contracts(
         resolver,
@@ -1080,6 +1110,7 @@ pub fn lower(request: LowerRequest<'_>) -> (LoweredProgram, Vec<LowerError>) {
         locale_pack,
         annotation_contracts,
     );
+    lowerer.insere_files = insere_files;
     let hir = lowerer.lower_program(program);
     let errors = lowerer.take_errors();
     let mut presentation = lowerer.presentation;

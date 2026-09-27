@@ -162,6 +162,12 @@ impl super::FaberCodegen<'_> {
                     writer.write(&self.name_for_def_imported(*def_id, names));
                 }
             }
+            HirExpressionKind::Literal(_) if let Some(path) = self.insere_exprs.get(&expr.id) => {
+                // D8.10: a folded build-time embed re-emits as authored.
+                writer.write(surface.keyword(TokenKind::Insere));
+                writer.write(" ");
+                self.write_textus_literal(*path, writer);
+            }
             HirExpressionKind::Literal(lit) => self.write_literal(lit, surface, writer),
             HirExpressionKind::ReadLine(_) => writer.write(surface.contextual_keyword("lege")),
             HirExpressionKind::Binary(op, lhs, rhs) => {

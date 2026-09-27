@@ -30,6 +30,7 @@ iuncta = "tuple"
 optiones = "options"
 prae = "prae"
 praefixum = "comptime"
+insere = "embed"
 privata = "private"
 protecta = "protected"
 publica = "public"
@@ -3601,6 +3602,38 @@ help = "use a wider type or a smaller value"
 [diagnostics.SEM060.issues.static_division_by_zero]
 message = "the initializer of static `{name}` divides by zero"
 help = "fix the divisor"
+
+[diagnostics.SEM061]
+message = "invalid build-time embed"
+help = "embed a package-relative file that exists, as `textus` (UTF-8) or `octeti`"
+
+[diagnostics.SEM061.issues.insere_file_missing]
+message = "embedded file `{path}` does not exist"
+help = "paths resolve against the package root (the nearest `faber.toml`), or the source file's directory when there is none"
+
+[diagnostics.SEM061.issues.insere_file_unreadable]
+message = "embedded file `{path}` cannot be read"
+help = "embed a regular, readable file"
+
+[diagnostics.SEM061.issues.insere_path_absolute]
+message = "embedded path `{path}` is absolute"
+help = "write the path relative to the package root"
+
+[diagnostics.SEM061.issues.insere_path_escapes_package]
+message = "embedded path `{path}` leaves the package"
+help = "embed only files inside the package; `..` may not climb above the package root"
+
+[diagnostics.SEM061.issues.insere_no_source_root]
+message = "embedded path `{path}` has no package to resolve against"
+help = "`{insere}` needs a source file on disk; it cannot be used from stdin"
+
+[diagnostics.SEM061.issues.insere_invalid_utf8]
+message = "embedded file `{path}` is not valid UTF-8"
+help = "declare the static as `octeti` to embed raw bytes"
+
+[diagnostics.SEM061.issues.insere_type_invalid]
+message = "an `{insere}` initializer must declare `textus` or `octeti`"
+help = "declare `textus` for UTF-8 text or `octeti` for raw bytes"
 
 [diagnostics.WARN001]
 message = "unused variable"

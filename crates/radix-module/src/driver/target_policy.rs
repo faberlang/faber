@@ -455,6 +455,7 @@ fn scan_go_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
         | ExprKind::Ident(_)
         | ExprKind::Lege(_)
         | ExprKind::Ego(_)
+        | ExprKind::Insere(_)
         | ExprKind::Ad(_) => {}
     }
 }
@@ -831,6 +832,7 @@ fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
         | ExprKind::Ident(_)
         | ExprKind::Lege(_)
         | ExprKind::Ego(_)
+        | ExprKind::Insere(_)
         | ExprKind::Ad(_) => {}
     }
 }

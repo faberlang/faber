@@ -116,7 +116,8 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // Schema 20 (D16.1) replaces `HirField.is_static` with the field modifier.
     // Schema 21 (D7.7) adds `HirPresentation::region` and the `Region` trivia
     // owner kind.
-    assert_eq!(SCHEMA_VERSION, 21);
+    // Schema 22 (D8.10) adds `HirPresentation::insere_exprs`.
+    assert_eq!(SCHEMA_VERSION, 22);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────

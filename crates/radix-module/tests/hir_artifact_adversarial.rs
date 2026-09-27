@@ -87,6 +87,7 @@ fn minimal_test_artifact() -> radix_hir_fhir::HirArtifact {
             variant_paths: Vec::new(),
             authored_types: Vec::new(),
             tuple_label_accesses: Vec::new(),
+            insere_exprs: Vec::new(),
             region: None,
         },
         cli_program: None,
@@ -282,6 +283,7 @@ fn hir_artifact_adversarial_dangling_attachment_anchor() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
     let bytes = serialize_artifact(&artifact);
@@ -331,6 +333,7 @@ fn hir_artifact_adversarial_duplicate_owner_anchor() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
     let bytes = serialize_artifact(&artifact);
@@ -375,6 +378,7 @@ fn hir_artifact_adversarial_duplicate_attachment_owner() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
     let bytes = serialize_artifact(&artifact);
@@ -419,6 +423,7 @@ fn hir_artifact_adversarial_dangling_comment_symbol() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
     let bytes = serialize_artifact(&artifact);
@@ -477,6 +482,7 @@ fn hir_artifact_adversarial_duplicate_block_end_anchor() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
     let bytes = serialize_artifact(&artifact);
@@ -517,6 +523,7 @@ fn hir_artifact_adversarial_program_end_collides_with_block_end() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
     let bytes = serialize_artifact(&artifact);
@@ -561,6 +568,7 @@ fn hir_artifact_adversarial_end_anchor_reused_as_owner() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
     let bytes = serialize_artifact(&artifact);
@@ -602,6 +610,7 @@ fn hir_artifact_adversarial_block_end_owner_without_end() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
     let bytes = serialize_artifact(&artifact);
@@ -643,6 +652,7 @@ fn hir_artifact_adversarial_program_end_owner_mismatch() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
     let bytes = serialize_artifact(&artifact);

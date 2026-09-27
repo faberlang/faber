@@ -50,6 +50,7 @@ fn lower_source_result(source: &str) -> (crate::hir::LoweredProgram, Vec<crate::
         cli_program: None,
         locale_pack: None,
         annotation_contracts: None,
+        insere_files: &Default::default(),
     });
     (lowered, errors, interner, types)
 }
@@ -99,6 +100,7 @@ fn lower_source_with_locale_pack(
         cli_program: None,
         locale_pack: None,
         annotation_contracts: None,
+        insere_files: &Default::default(),
     });
     assert!(errors.is_empty(), "lower failed: {errors:?}");
     (lowered, interner, types)

@@ -49,8 +49,9 @@ use radix_hir::{
 use radix_lexer::{Span, Symbol};
 use radix_syntax::{
     AstMutability, AstParamMode, BindingPattern, CallablePosture, ClassDecl, ClassMemberKind,
-    EnumDecl, EnumValue, FuncDecl, ImportDecl, ImportKind, InterfaceDecl, InterfaceMethod, Param,
-    SchemaDecl, Stmt, TypeAliasDecl, TypeParam, UnionDecl, VarDecl, Variant,
+    EnumDecl, EnumValue, ExprKind, FuncDecl, ImportDecl, ImportKind, InterfaceDecl,
+    InterfaceMethod, Param, SchemaDecl, Stmt, TypeAliasDecl, TypeParam, UnionDecl, VarDecl,
+    Variant,
 };
 
 type ModifierLocal = (DefId, Symbol, Span);
@@ -518,7 +519,11 @@ impl Lowerer<'_> {
             )
         });
         let value = if let Some(init) = &decl.init {
-            self.lower_expr(init)
+            if decl.is_static {
+                self.lower_static_initializer(init, ty)
+            } else {
+                self.lower_expr(init)
+            }
         } else {
             self.error("top_level_initializer");
             error_expr(self, name_span)
@@ -783,7 +788,18 @@ impl Lowerer<'_> {
             match &member.kind {
                 ClassMemberKind::Field(field) => {
                     let annotations = self.lower_annotations(&member.annotations);
-                    let init = field.init.as_ref().map(|expr| self.lower_expr(expr));
+                    // A static field's embed folds against the declared type,
+                    // so it lowers once the field type is known (below).
+                    let embeds = field.is_static()
+                        && field
+                            .init
+                            .as_ref()
+                            .is_some_and(|init| matches!(init.kind, ExprKind::Insere(_)));
+                    let mut init = if embeds {
+                        None
+                    } else {
+                        field.init.as_ref().map(|expr| self.lower_expr(expr))
+                    };
                     let def_id = self.next_def_id();
                     let member_trivia = self.hir_trivia(&member.leading_trivia);
                     if !member_trivia.is_empty() {
@@ -793,18 +809,22 @@ impl Lowerer<'_> {
                             member_trivia,
                         );
                     }
+                    let field_ty = self.lower_authored_type(
+                        radix_hir::HirTypeSite {
+                            owner: HirOwnerRef::Def(def_id),
+                            slot: HirTypeSlot::Field(field_ordinal),
+                        },
+                        &field.ty,
+                        false,
+                        false,
+                    );
+                    if embeds && let Some(expr) = &field.init {
+                        init = Some(self.lower_static_initializer(expr, Some(field_ty)));
+                    }
                     fields.push(HirField {
                         def_id,
                         name: field.name.name,
-                        ty: self.lower_authored_type(
-                            radix_hir::HirTypeSite {
-                                owner: HirOwnerRef::Def(def_id),
-                                slot: HirTypeSlot::Field(field_ordinal),
-                            },
-                            &field.ty,
-                            false,
-                            false,
-                        ),
+                        ty: field_ty,
                         modifier: field.modifier,
                         sponte: field.sponte,
                         annotations,

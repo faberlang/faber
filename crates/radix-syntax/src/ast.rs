@@ -1118,6 +1118,10 @@ pub enum ExprKind {
     Ad(Box<AdExpr>),
     /// `praefixum(expr)` comptime.
     Praefixum(PraefixumExpr),
+    /// Build-time file embed `insere "path"` (en `embed`, D8.10). Claimed
+    /// only as a `generis` initializer; the result type follows the
+    /// declaration (`textus` or `octeti`).
+    Insere(InsereExpr),
     /// `ego` self reference.
     Ego(Span),
     Paren(Box<Expr>),
@@ -1632,6 +1636,16 @@ pub struct AdExpr {
 #[derive(Debug)]
 pub struct PraefixumExpr {
     pub body: PraefixumBody,
+}
+
+/// Build-time file embed: `insere "path"` (D8.10).
+///
+/// The path is a string literal, resolved package-relative by the driver
+/// before semantic analysis; the parser records only the authored spelling.
+#[derive(Debug)]
+pub struct InsereExpr {
+    pub path: Symbol,
+    pub path_span: Span,
 }
 
 #[derive(Debug)]

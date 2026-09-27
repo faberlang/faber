@@ -226,6 +226,8 @@ pub enum TokenKind {
     Lineam,
     Omnia,
     Praefixum,
+    /// Build-time file embed in a static initializer (en `embed`, D8.10).
+    Insere,
     Scriptum,
     Sparge,
     Ut,
@@ -465,6 +467,7 @@ impl TokenKind {
                 | Lineam
                 | Omnia
                 | Praefixum
+                | Insere
                 | Scriptum
                 | Sparge
                 | Ut

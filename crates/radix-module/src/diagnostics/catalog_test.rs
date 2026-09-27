@@ -192,6 +192,7 @@ fn semantic_error_codes_are_stable() {
         (SemanticErrorKind::UseBeforeInit, "SEM058"),
         (SemanticErrorKind::AirPurityViolation, "SEM059"),
         (SemanticErrorKind::StaticInitializerInvalid, "SEM060"),
+        (SemanticErrorKind::InsereInvalid, "SEM061"),
     ];
     for (kind, expected_code) in &cases {
         let spec = semantic_spec(*kind);

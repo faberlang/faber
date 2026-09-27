@@ -2027,10 +2027,23 @@ pub struct HirPresentation {
     #[serde(default)]
     pub tuple_label_accesses: Vec<HirTupleLabelAccess>,
 
+    /// Authored build-time embeds (`insere "path"`, D8.10) whose initializer
+    /// lowering folded to a literal. Faber re-emission prints the embed for
+    /// exactly these expression ids instead of the embedded bytes.
+    #[serde(default)]
+    pub insere_exprs: Vec<HirInsere>,
+
     /// The file's `regio` (en `module`) declaration, when authored (D7.7).
     /// Emission re-renders it first; its doc block is the module doc.
     #[serde(default)]
     pub region: Option<HirRegion>,
+}
+
+/// One authored build-time embed: the folded literal's id and its path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirInsere {
+    pub expr: HirId,
+    pub path: Symbol,
 }
 
 /// An authored `regio NAME` file-name declaration (D7.7).

@@ -59,3 +59,29 @@ fn swift_emits_folded_statics() {
     assert!(code.contains("let LIMES: Int = 4096"), "swift static:\n{code}");
     assert_folded(Target::HirSwift);
 }
+
+/// A Rust const item cannot build a heap `Vec` (E0015): a static `octeti`
+/// (a byte literal or a D8.10 file embed) is a `&'static [u8]`, and use sites
+/// own it with `.to_vec()` like a const list.
+#[cfg(feature = "hir-rust")]
+#[test]
+fn rust_emits_octeti_static_as_byte_slice() {
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirRust)
+            .with_dev_locale_root(),
+    );
+    let source = "generis octeti SIGNUM = |de ad|\nincipit {\n    nota SIGNUM.longitudo()\n}\n";
+    let result = crate::driver::compile(&session, "<test>", source, ModuleCompileRequest::default());
+    assert!(result.success(), "compilation failed: {:?}", result.diagnostics);
+    let crate::Output::Rust(out) = result.output.expect("output") else {
+        panic!("expected rust output");
+    };
+    assert!(
+        out.code
+            .contains("pub const SIGNUM: &'static [u8] = &[0xde, 0xad];"),
+        "octeti static:\n{}",
+        out.code
+    );
+    assert!(!out.code.contains("vec![0xde"), "heap vec in const:\n{}", out.code);
+}

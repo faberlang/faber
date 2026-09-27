@@ -143,6 +143,7 @@ fn empty_presentation() -> HirPresentation {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     }
 }
@@ -283,6 +284,7 @@ fn emits_statement_trivia_before_each_statement() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
 
@@ -334,6 +336,7 @@ fn emits_block_end_trivia_before_closing_brace() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
 
@@ -380,6 +383,7 @@ fn emits_program_end_trivia_before_eof() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
 
@@ -427,6 +431,7 @@ fn emits_item_trivia_before_item() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
 
@@ -461,6 +466,7 @@ fn emits_entry_trivia_before_incipit_keyword() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
 
@@ -560,6 +566,7 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
 
@@ -622,6 +629,7 @@ fn emits_trivia_before_annotation_sequence() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
 
@@ -698,6 +706,7 @@ fn comment_bearing_branch_stays_braced_not_ergo() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
 
@@ -807,6 +816,7 @@ fn comment_bearing_branch_prevents_sic_secus_compaction() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
 
@@ -928,6 +938,7 @@ fn boundary_newline_normalization_does_not_manufacture_blank_lines() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
 
@@ -989,6 +1000,7 @@ fn file_start_trivia_keeps_no_leading_blank_lines() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
 
@@ -1047,6 +1059,7 @@ fn explicit_tacet_prints_implicit_ends_do_not() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
 
@@ -1111,6 +1124,7 @@ fn rendering_is_deterministic() {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
         region: None,
     };
 

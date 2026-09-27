@@ -242,6 +242,7 @@ pub fn hir_inspection_for_source(name: &str, source: &str) -> SourceInspection {
         cli_program: None,
         locale_pack: None,
         annotation_contracts: None,
+        insere_files: &crate::semantic::insere::InsereFiles::new(),
     });
     SourceInspection {
         text: hir_inspection_json(&source_file, &lowered.hir, Some(&lowered.presentation), &interner, &errors),
