@@ -1511,3 +1511,7 @@ mod sum_type_data_only_test;
 #[cfg(test)]
 #[path = "format_operator_test.rs"]
 mod format_operator_test;
+
+#[cfg(test)]
+#[path = "insere_test.rs"]
+mod insere_test;

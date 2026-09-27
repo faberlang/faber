@@ -48,6 +48,7 @@ pub mod index;
 pub mod index_infer;
 pub mod index_unify;
 pub mod init_state;
+pub mod insere;
 pub mod instans_precision;
 pub mod lista_tensor_conversio;
 pub mod matrix_shape;
@@ -320,6 +321,9 @@ pub struct PassConfig {
     /// ([`passes::complexity::DEFAULT_KERNEL_COMPLEXITY_BUDGET`]). Warns
     /// only — it never gates kernel admission.
     pub kernel_complexity_budget: Option<u32>,
+    /// Build-time embed files the driver resolved for `insere` initializers
+    /// (DECISIONS D8.10). Empty outside a driver file context.
+    pub insere_files: crate::insere::InsereFiles,
 }
 
 impl PassConfig {
@@ -343,6 +347,7 @@ impl PassConfig {
             import_path_templates: None,
             complexity_budget: None,
             kernel_complexity_budget: None,
+            insere_files: crate::insere::InsereFiles::default(),
         }
     }
 
@@ -575,12 +580,12 @@ pub fn analyze_with_cli(
         cli_program,
         locale_pack: config.locale_pack.as_ref(),
         annotation_contracts: Some(&annotation_contracts),
+        insere_files: &config.insere_files,
     });
     let mut hir = lowered.hir;
 
     for err in lower_errors {
-        let mut semantic_error =
-            SemanticError::structured(SemanticErrorKind::LoweringError, err.span);
+        let mut semantic_error = SemanticError::structured(err.kind, err.span);
         semantic_error.args.extend(err.args);
         diagnostics.push(semantic_error);
     }
@@ -839,6 +844,7 @@ pub(crate) fn empty_presentation() -> HirPresentation {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
     }
 }
 
@@ -1033,6 +1039,10 @@ mod broadcast_reduction_test;
 #[cfg(test)]
 #[path = "def_id_closure_test.rs"]
 mod def_id_closure_test;
+
+#[cfg(test)]
+#[path = "insere_test.rs"]
+mod insere_test;
 
 #[cfg(test)]
 #[path = "error_test.rs"]

@@ -93,6 +93,9 @@ pub struct FaberCodegen<'a> {
     /// index node's `HirId`: those nodes re-emit as `.label`, every other
     /// index read keeps `[i]`.
     pub(crate) tuple_label_accesses: FxHashMap<radix_hir::HirId, Symbol>,
+    /// Authored build-time embed paths (`insere "path"`, D8.10), keyed by the
+    /// folded literal's `HirId`: those literals re-emit as the embed.
+    pub(crate) insere_exprs: FxHashMap<radix_hir::HirId, Symbol>,
     /// First malformed authored type form observed during emission.
     type_emission_error: RefCell<Option<CodegenError>>,
 }
@@ -141,6 +144,7 @@ impl<'a> FaberCodegen<'a> {
             ordo_enums: FxHashMap::default(),
             authored_type_forms: FxHashMap::default(),
             tuple_label_accesses: FxHashMap::default(),
+            insere_exprs: FxHashMap::default(),
             type_emission_error: RefCell::new(None),
         }
     }
@@ -202,6 +206,7 @@ pub fn empty_presentation() -> HirPresentation {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
     }
 }
 
@@ -270,6 +275,11 @@ impl FaberCodegen<'_> {
             .tuple_label_accesses
             .iter()
             .map(|access| (access.expr_id, access.label))
+            .collect();
+        self.insere_exprs = presentation
+            .insere_exprs
+            .iter()
+            .map(|insere| (insere.expr, insere.path))
             .collect();
 
         let mut writer = CodeWriter::new();

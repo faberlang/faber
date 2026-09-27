@@ -28,6 +28,7 @@
 
 mod file_frontmatter;
 mod frontmatter;
+mod insere;
 mod session;
 #[cfg(feature = "mir-core")]
 mod shader_contract;
@@ -2825,6 +2826,11 @@ pub struct AnalyzedModule {
     #[cfg(feature = "mir-core")]
     pub graphics_source: GraphicsSourceFacts,
 
+    /// Files read at build time by `insere` embeds (D8.10), canonical paths.
+    /// They are build inputs: a package driver that caches analysis must
+    /// rebuild when one changes. Empty for loaded artifacts.
+    pub embedded_inputs: Vec<std::path::PathBuf>,
+
     /// Warnings and informational diagnostics accumulated before codegen.
     pub diagnostics: Vec<Diagnostic>,
 }
@@ -2922,6 +2928,7 @@ impl AnalyzedModule {
             gpu_builtins,
             #[cfg(feature = "mir-core")]
             graphics_source,
+            embedded_inputs: Vec::new(),
             diagnostics,
         }
     }
@@ -3171,6 +3178,7 @@ fn analyze_source_with_kernel_template_admissions_unadjusted(
     };
 
     let ModuleImportContract { namespace_exports, file_interfaces, namespace_seams, namespace_declarations } = contract;
+    let insere = insere::resolve_insere_files(&program, &interner, name);
 
     let Ok(semantic_result) = analyze_semantic_program(SemanticAnalysisInput {
         session,
@@ -3184,6 +3192,7 @@ fn analyze_source_with_kernel_template_admissions_unadjusted(
         name,
         body,
         diagnostics: &mut diagnostics,
+        insere_files: insere.files,
         lex_pack,
     }) else {
         return Err(diagnostics);
@@ -3203,6 +3212,7 @@ fn analyze_source_with_kernel_template_admissions_unadjusted(
 
     let mut unit = analyzed_unit_from_semantic(interner, cli_program, semantic_result, name, &mut diagnostics)
         .map_err(|()| diagnostics)?;
+    unit.embedded_inputs = insere.inputs;
     if !rust_omit.is_empty() {
         unit.hir
             .items
@@ -3538,6 +3548,8 @@ struct SemanticAnalysisInput<'a> {
     name: &'a str,
     body: &'a str,
     diagnostics: &'a mut Vec<Diagnostic>,
+    /// Driver-resolved build-time embed files (`insere`, D8.10).
+    insere_files: semantic::insere::InsereFiles,
     /// The reader pack used for lexing (frontmatter locale > session config).
     /// Used for type-spelling registration and HIR lowering so they match the
     /// input locale, not the output locale.
@@ -3557,6 +3569,7 @@ fn analyze_semantic_program(input: SemanticAnalysisInput<'_>) -> Result<semantic
         name,
         body,
         diagnostics,
+        insere_files,
         lex_pack,
     } = input;
 
@@ -3574,6 +3587,7 @@ fn analyze_semantic_program(input: SemanticAnalysisInput<'_>) -> Result<semantic
     pass_config.import_path_templates = session.config.import_path_templates.clone();
     pass_config.complexity_budget = session.config.complexity_budget;
     pass_config.kernel_complexity_budget = session.config.kernel_complexity_budget;
+    pass_config.insere_files = insere_files;
     let semantic_result = semantic::analyze_with_cli(program, &pass_config, interner, cli_program);
 
     for err in &semantic_result.diagnostics {
@@ -3904,6 +3918,7 @@ fn analyzed_unit_from_semantic(
         graphics_source,
         hir: fields.hir,
         presentation: semantic_result.presentation,
+        embedded_inputs: Vec::new(),
         diagnostics: std::mem::take(diagnostics),
     })
 }
@@ -3931,6 +3946,7 @@ fn empty_presentation() -> HirPresentation {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        insere_exprs: Vec::new(),
     }
 }
 

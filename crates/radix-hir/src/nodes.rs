@@ -2023,6 +2023,19 @@ pub struct HirPresentation {
     /// these ids back to the label spelling; `p[1]` keeps its index form.
     #[serde(default)]
     pub tuple_label_accesses: Vec<HirTupleLabelAccess>,
+
+    /// Authored build-time embeds (`insere "path"`, D8.10) whose initializer
+    /// lowering folded to a literal. Faber re-emission prints the embed for
+    /// exactly these expression ids instead of the embedded bytes.
+    #[serde(default)]
+    pub insere_exprs: Vec<HirInsere>,
+}
+
+/// One authored build-time embed: the folded literal's id and its path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirInsere {
+    pub expr: HirId,
+    pub path: Symbol,
 }
 
 /// Authored type-form facts for one source type position.

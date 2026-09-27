@@ -295,6 +295,9 @@ pub enum SemanticErrorKind {
     /// A top-level static initializer that is not a compile-time constant,
     /// or whose evaluation overflows or divides by zero (D5.9).
     StaticInitializerInvalid,
+    /// A build-time file embed (`insere "path"`, D8.10) that cannot be
+    /// resolved or does not fit its declared type.
+    InsereInvalid,
 
     // Assignment
     ImmutableAssignment,

@@ -1474,7 +1474,7 @@ fn resolve_expr(
                 resolve_expr(resolver, interner, expr, errors)
             }
         },
-        ExprKind::Ego(_) => {}
+        ExprKind::Ego(_) | ExprKind::Insere(_) => {}
         ExprKind::Paren(expr) => resolve_expr(resolver, interner, expr, errors),
         ExprKind::TypeCheck(expr) => {
             resolve_expr(resolver, interner, &expr.expr, errors);

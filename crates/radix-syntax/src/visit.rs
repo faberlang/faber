@@ -576,7 +576,11 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
             visitor.visit_ident(&first_match.binding);
             visitor.visit_block(&first_match.body);
         }
-        ExprKind::Vacua(_) | ExprKind::Literal(_) | ExprKind::Lege(_) | ExprKind::Ego(_) => {}
+        ExprKind::Vacua(_)
+        | ExprKind::Literal(_)
+        | ExprKind::Lege(_)
+        | ExprKind::Ego(_)
+        | ExprKind::Insere(_) => {}
         ExprKind::OptionalChain(opt) => {
             visitor.visit_expr(&opt.object);
             match &opt.chain {

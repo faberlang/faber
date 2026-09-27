@@ -23,7 +23,7 @@
 
 use super::{ParseError, ParseErrorKind, Parser};
 use radix_lexer::{
-    KeywordKind, KeywordOwner, KeywordScope, Span, TokenKind, keyword_allowed_as_ident,
+    KeywordKind, KeywordOwner, KeywordScope, Span, Symbol, TokenKind, keyword_allowed_as_ident,
     keyword_spelling_for_token, lookup_keyword_spec,
 };
 #[allow(clippy::wildcard_imports)]
@@ -909,7 +909,11 @@ impl Parser {
         let name = self.parse_param_name()?;
         let sponte = self.parse_post_name_marker();
         let init = if self.eat(&TokenKind::Eq) {
-            Some(Box::new(self.parse_expression()?))
+            if let Some(path) = self.insere_initializer_path(modifier) {
+                Some(Box::new(self.parse_insere_expr(path)))
+            } else {
+                Some(Box::new(self.parse_expression()?))
+            }
         } else {
             None
         };
@@ -921,6 +925,36 @@ impl Parser {
             name,
             init,
         })
+    }
+
+    /// The path literal when the current words open a build-time embed: the
+    /// `insere` keyword directly followed by a string literal, as the
+    /// initializer of a `generis` declaration (DECISIONS D8.10).
+    ///
+    /// F8: `insere` (en `embed`) is contextual. Only this slot claims it;
+    /// every other use of the spelling stays an identifier.
+    fn insere_initializer_path(&self, modifier: Option<FieldModifier>) -> Option<Symbol> {
+        if modifier != Some(FieldModifier::Generis) || !self.check_keyword_ident(TokenKind::Insere)
+        {
+            return None;
+        }
+        match self.peek_at(1).kind {
+            TokenKind::String(path) => Some(path),
+            _ => None,
+        }
+    }
+
+    /// Parse `insere "path"` once [`Self::insere_initializer_path`] matched.
+    fn parse_insere_expr(&mut self, path: Symbol) -> Expr {
+        let start = self.current_span();
+        self.advance();
+        let path_span = self.current_span();
+        self.advance();
+        Expr {
+            id: self.next_id(),
+            kind: ExprKind::Insere(InsereExpr { path, path_span }),
+            span: start.merge(path_span),
+        }
     }
 
     /// The field modifier the current word spells, if any (DECISIONS D16.1).

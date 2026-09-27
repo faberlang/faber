@@ -181,6 +181,9 @@ pub enum KeywordOwner {
 
     /// Route expression in expression or statement position (`ad`).
     RouteExpression,
+
+    /// Head of a `generis` static initializer (`insere "path"`, D8.10).
+    StaticInitializer,
 }
 
 /// Keyword grouping used by diagnostics, explain data, and registry consumers.
@@ -335,6 +338,7 @@ const OPERATOR: &[KeywordOwner] = &[KeywordOwner::Operator];
 const DECLARATION_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::DeclarationIntroducer];
 const CONTROL_FLOW: &[KeywordOwner] = &[KeywordOwner::ControlFlow];
 const EXPRESSION_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::ExpressionIntroducer];
+const STATIC_INITIALIZER: &[KeywordOwner] = &[KeywordOwner::StaticInitializer];
 const RANGE_OPERATOR: &[KeywordOwner] = &[KeywordOwner::RangeOperator];
 const STATEMENT_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::StatementIntroducer];
 const DECLARATION_MARKER: &[KeywordOwner] = &[KeywordOwner::DeclarationMarker];
@@ -1039,6 +1043,15 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
         category: KeywordKind::Misc,
     },
+    // `insere` (en `embed`, D8.10) is claimed only as the head of a `generis`
+    // initializer followed by a string literal; everywhere else the spelling
+    // stays an ordinary identifier (F8 contextual keyword).
+    KeywordSpec {
+        text: "insere",
+        token_kind: Some(TokenKind::Insere),
+        scope: KeywordScope::Contextual(STATIC_INITIALIZER),
+        category: KeywordKind::Misc,
+    },
     KeywordSpec {
         text: "scriptum",
         token_kind: Some(TokenKind::Scriptum),
@@ -1491,7 +1504,8 @@ fn keyword_owner_is_identifier_like(owner: KeywordOwner) -> bool {
         | KeywordOwner::RangeOperator
         | KeywordOwner::StatementIntroducer
         | KeywordOwner::DeclarationMarker
-        | KeywordOwner::RouteExpression => false,
+        | KeywordOwner::RouteExpression
+        | KeywordOwner::StaticInitializer => false,
     }
 }
 

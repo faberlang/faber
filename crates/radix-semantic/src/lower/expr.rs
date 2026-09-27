@@ -90,6 +90,13 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
             .unwrap_or(HirExpressionKind::ReadLine(lege.is_line)),
 
         ExprKind::Praefixum(praefixum) => lowerer.lower_praefixum(praefixum),
+        // The parser claims `insere` only as a `generis` initializer, which
+        // lowers through `lower_static_initializer`; reaching here means a
+        // parser invariant broke.
+        ExprKind::Insere(_) => {
+            lowerer.error_with_args(issue_args("unknown_lowering_error"));
+            HirExpressionKind::Error
+        }
         ExprKind::Ego(span) => lowerer.lower_ego(*span),
         ExprKind::Paren(expr) => lower_expr(lowerer, expr).kind,
         ExprKind::TypeCheck(type_check) => lowerer.lower_type_check(type_check, id),
