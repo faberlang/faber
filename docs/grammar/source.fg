@@ -818,7 +818,7 @@ OCTETI_STRING ::=
 @status capture-pending
 NEWLINE ::=
 
-# parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64 and decimal d32/d64 (numerus only), f16/bf16/f32/f64 (fractus only); not a lexer token
+# parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64 and decimal d32/d64 (numerus only), f16/bf16/f32/f64 (fractus only); u8/u16/u32/u64 (modulus), i8/i16/i32/i64/u8/u16/u32/u64 (saturatus); not a lexer token
 @status capture-pending
 WIDTH_MARKER ::=
 
