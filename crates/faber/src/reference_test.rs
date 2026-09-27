@@ -170,11 +170,12 @@ fn dev_fallback_loads_repo_exempla_index() {
     env_remove(REFERENCE_ROOT_ENV);
 
     let pack = ReferencePack::load().expect("dev fallback loads repo exempla");
-    // 202 → 196 on integrated main f4a89d453: seven retired terms left the
-    // registry (abstractus, sub: inheritance removal; cura, curata, arena:
-    // D8.2; nexum: D16.2; sic: D4.7) and one arrived (✓: D4.5).
-    assert_eq!(pack.term_count(), 196);
-    assert_eq!(pack.metadata().registry_terms, 196);
+    // 202 → 196 → 197 on integrated main f4a89d453: seven retired terms left
+    // the registry (abstractus, sub: inheritance removal; cura, curata,
+    // arena: D8.2; nexum: D16.2; sic: D4.7), two arrived (✓: D4.5; insere:
+    // D8.10's missing registry row added).
+    assert_eq!(pack.term_count(), 197);
+    assert_eq!(pack.metadata().registry_terms, 197);
     assert_eq!(pack.layout(), ReferenceLayout::Repo);
     assert!(pack.term("functio").is_some());
     assert!(pack.term("≡").is_some());
@@ -188,10 +189,11 @@ fn dev_fallback_loads_repo_exempla_index() {
 fn load_from_repo_root_lists_canonical_terms() {
     let root = repo_exempla_root();
     let pack = ReferencePack::load_from(&root).expect("load repo exempla");
-    // 202 → 196 on integrated main f4a89d453: seven retired terms left the
-    // registry (abstractus, sub: inheritance removal; cura, curata, arena:
-    // D8.2; nexum: D16.2; sic: D4.7) and one arrived (✓: D4.5).
-    assert_eq!(pack.term_count(), 196);
+    // 202 → 196 → 197 on integrated main f4a89d453: seven retired terms left
+    // the registry (abstractus, sub: inheritance removal; cura, curata,
+    // arena: D8.2; nexum: D16.2; sic: D4.7), two arrived (✓: D4.5; insere:
+    // D8.10's missing registry row added).
+    assert_eq!(pack.term_count(), 197);
     assert_eq!(pack.legacy_redirects().len(), 14);
     assert!(pack.resolve_exempla_path("functio/functio.fab").is_file());
 }
@@ -258,9 +260,10 @@ fn missing_root_reports_actionable_error() {
 fn build_registry_loads_canonical_and_legacy_entries() {
     let pack = ReferencePack::load_from(repo_exempla_root()).expect("load pack");
     let registry = pack.build_registry().expect("build registry");
-    // 216 → 210: the registry follows the canonical term count (202 → 196;
-    // see reference_test for the seven retired terms and the one arrival).
-    assert_eq!(registry.entries().len(), 210);
+    // 216 → 210 → 211: the registry follows the canonical term count (202 →
+    // 196 → 197, D8.10 `insere` gained its missing registry row; see
+    // reference_test for the seven retired terms and the two arrivals).
+    assert_eq!(registry.entries().len(), 211);
     assert!(registry.reference_root().is_some());
     assert!(registry.lookup("functio").is_some());
     assert!(matches!(registry.lookup("=="), Some(Lookup::Legacy { .. })));
@@ -336,9 +339,10 @@ fn load_from_disk_builds_explain_registry() {
     env_remove(REFERENCE_ROOT_ENV);
 
     let registry = Registry::load_from_disk().expect("disk registry");
-    // 216 → 210: the registry follows the canonical term count (202 → 196;
-    // see reference_test for the seven retired terms and the one arrival).
-    assert_eq!(registry.entries().len(), 210);
+    // 216 → 210 → 211: the registry follows the canonical term count (202 →
+    // 196 → 197, D8.10 `insere` gained its missing registry row; see
+    // reference_test for the seven retired terms and the two arrivals).
+    assert_eq!(registry.entries().len(), 211);
     let list = render_list(&registry);
     assert!(list.contains("reference:"));
 
