@@ -77,16 +77,20 @@ fn unmarked_field_offsets(pack: &LocalePack, body: &str) -> Result<Vec<usize>, S
     // Bodyless declarations (`@ externa`, contracts) are legal in packages;
     // the codemod parses leniently and only reads field spans.
     let parsed = parser::parse_with_options(lexed, parser::ParseOptions { allow_bodyless_functions: true });
-    if !parsed.success() {
-        let first = parsed
-            .errors
+    // An unmarked field is itself a (recoverable) parse error since D5c; it is
+    // exactly what this codemod repairs, so only other errors refuse the file.
+    let mut blocking = parsed
+        .errors
+        .iter()
+        .filter(|err| !is_missing_field_modifier(err))
+        .peekable();
+    if blocking.peek().is_some() || parsed.program.is_none() {
+        let blocking: Vec<_> = blocking.collect();
+        let first = blocking
             .first()
             .map(|err| format!("{:?}", err.kind))
             .unwrap_or_default();
-        return Err(format!(
-            "source does not parse ({} error(s), first {first})",
-            parsed.errors.len()
-        ));
+        return Err(format!("source does not parse ({} error(s), first {first})", blocking.len()));
     }
     let program = parsed
         .program
@@ -120,6 +124,14 @@ fn unmarked_field_offsets(pack: &LocalePack, body: &str) -> Result<Vec<usize>, S
     }
     offsets.sort_unstable();
     Ok(offsets)
+}
+
+/// Whether a parse error is the D16.1 missing-field-modifier error.
+fn is_missing_field_modifier(error: &parser::ParseError) -> bool {
+    error
+        .args
+        .iter()
+        .any(|arg| arg.name == "issue" && arg.value == "field_modifier_missing")
 }
 
 #[cfg(test)]

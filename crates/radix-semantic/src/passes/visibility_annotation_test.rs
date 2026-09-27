@@ -81,7 +81,7 @@ fn member_source(annotation: &str) -> String {
         r"
 genus Demo {{
     {annotation}
-    textus nomen
+    varia textus nomen
     {annotation}
     functio open() → vacuum {{
     }}

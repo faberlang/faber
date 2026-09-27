@@ -9,7 +9,7 @@ use crate::passes::typecheck::test_support;
 fn conversio_rejects_struct_to_numerus() {
     test_support::assert_rejects_with_issue(
         r"
-genus Foo { numerus n }
+genus Foo { varia numerus n }
 
 functio bad(Foo f) → numerus {
     redde f ↦ numerus
@@ -139,7 +139,7 @@ fn valor_to_genus_sized_fractus_field_rejects_until_width_policy_exists() {
     test_support::assert_rejects_with_issue(
         r#"
 genus Sample {
-    fractus<f32> ratio
+    varia fractus<f32> ratio
 }
 
 incipit {
@@ -1334,7 +1334,7 @@ fn conversio_assign_accepts_right_associated_chain() {
 fn conversio_assign_accepts_field_place() {
     test_support::assert_accepts(
         r#"
-genus Persona { textus nomen numerus aetas }
+genus Persona { varia textus nomen varia numerus aetas }
 functio muta() → numerus {
     varia Persona p ← Persona { nomen = "Ada", aetas = 36 }
     p.aetas ↤ "37"

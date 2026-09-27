@@ -1,5 +1,5 @@
 class Aliud {
-    string nuntius
+    var string nuntius
 }
 
 fn probe(Aliud ∪ string v) → bool {

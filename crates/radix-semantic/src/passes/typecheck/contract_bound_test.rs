@@ -14,19 +14,19 @@ implendum Comparabile<T> {
 }
 
 genus Arca implet Comparabile<Arca> {
-    numerus pondus
+    varia numerus pondus
 
     functio confer(Arca alius) → numerus { redde ego.pondus - alius.pondus }
 }
 
 genus Saccus implet Comparabile<Saccus> {
-    numerus massa
+    varia numerus massa
 
     functio confer(Saccus alius) → numerus { redde ego.massa - alius.massa }
 }
 
 genus Lapis {
-    numerus massa
+    varia numerus massa
 }
 
 functio maior<T implet Comparabile<T>>(T a, T b) → T {
@@ -92,7 +92,7 @@ fn non_conforming_type_names_type_and_contract() {
 fn contract_with_other_arguments_does_not_satisfy_the_bound() {
     test_support::assert_rejects_with_issue(
         &with_contract(
-            "genus Mixtum implet Comparabile<Arca> {\n    numerus m\n\n    \
+            "genus Mixtum implet Comparabile<Arca> {\n    varia numerus m\n\n    \
              functio confer(Arca alius) → numerus { redde 0 }\n}\n\n\
              incipit {\n    fixum Mixtum z ← maior(Mixtum { m = 1 }, Mixtum { m = 2 })\n    \
              nota z.m\n}\n",
@@ -121,7 +121,7 @@ fn unbounded_parameter_does_not_satisfy_a_bound_at_a_nested_call() {
 fn generic_contract_requires_its_type_arguments() {
     test_support::assert_rejects_with_args(
         "implendum Comparabile<T> {\n    functio confer(T alius) → numerus\n}\n\n\
-         genus Arca implet Comparabile {\n    numerus pondus\n\n    \
+         genus Arca implet Comparabile {\n    varia numerus pondus\n\n    \
          functio confer(Arca alius) → numerus { redde 0 }\n}\n",
         &[
             DiagnosticArg::new("issue", "implet_contract_arity"),
@@ -144,7 +144,7 @@ fn bound_without_type_arguments_is_rejected() {
 #[test]
 fn bound_must_name_an_implendum() {
     test_support::assert_rejects_with_issue(
-        "genus Arca {\n    numerus pondus\n}\n\nfunctio f<T implet Arca>(T a) → T { redde a }\n",
+        "genus Arca {\n    varia numerus pondus\n}\n\nfunctio f<T implet Arca>(T a) → T { redde a }\n",
         "implet_requires_implendum",
     );
 }
@@ -153,7 +153,7 @@ fn bound_must_name_an_implendum() {
 fn bound_on_type_declaration_parameter_is_rejected() {
     test_support::assert_rejects_with_issue(
         "implendum Comparabile<T> {\n    functio confer(T alius) → numerus\n}\n\n\
-         genus Capsa<T implet Comparabile<T>> {\n    T res\n}\n",
+         genus Capsa<T implet Comparabile<T>> {\n    varia T res\n}\n",
         "implet_bound_on_type_declaration",
     );
 }

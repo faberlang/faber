@@ -478,7 +478,7 @@ fn rejects_nucleum_closure_field_escape() {
     let result = analyze_source(
         r"
 genus Capsula {
-    numerus val
+    varia numerus val
 }
 functio take() → vacuum {
     fixum _ kernel ← (numerus value) nucleum ∴ value
@@ -502,7 +502,7 @@ fn rejects_nucleum_closure_direct_field_escape() {
     let result = analyze_source(
         r"
 genus Capsula {
-    numerus val
+    varia numerus val
 }
 functio take() → vacuum {
     fixum Capsula boxed ← Capsula { val = (numerus value) nucleum ∴ value }

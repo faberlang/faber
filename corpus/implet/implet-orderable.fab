@@ -45,8 +45,8 @@ locale = "en"
 import from "norma:order" const Orderable
 
 class Person implements Orderable<Person> {
-    string label = ""
-    int years = 0
+    var string label = ""
+    var int years = 0
 
     fn compare(Person other) → int {
         return self.years - other.years

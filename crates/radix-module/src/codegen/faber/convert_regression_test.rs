@@ -340,7 +340,7 @@ fn convert_nominal_receiver_method_keeps_canonical_spelling() {
 locale = "la"
 +++
 genus Tabulatio {
-    lista<numerus> historia
+    varia lista<numerus> historia
 
     functio longitudo() → numerus {
         redde ego.historia.longitudo()

@@ -89,7 +89,7 @@ functio workhorse() → numerus {
 
 genus Persona {
     # field comment
-    textus nomen
+    varia textus nomen
     # method comment
     functio saluta() → vacuum {
     }

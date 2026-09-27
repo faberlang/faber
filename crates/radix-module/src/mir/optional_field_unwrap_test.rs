@@ -47,16 +47,16 @@ fn dump_source(source: &str) -> String {
 }
 
 const SPONTE_FIELD_BANG_MEMBER: &str = r"
-genus Handle { numerus index }
-genus Node { Handle parent sponte }
+genus Handle { varia numerus index }
+genus Node { varia Handle parent sponte }
 functio cape_indicem(Node nodus) → numerus {
     redde nodus.parent!.index
 }
 ";
 
 const SCENE_PROBA_PARENT_BANG_INDEX: &str = r"
-genus Handle { numerus index }
-genus Node { Handle parent sponte }
+genus Handle { varia numerus index }
+genus Node { varia Handle parent sponte }
 functio cape_indicem(Node ∪ nihil nodus) → numerus {
     si nodus est nihil ergo redde 0
     si nodus!.parent est nihil ergo redde 0
@@ -65,15 +65,15 @@ functio cape_indicem(Node ∪ nihil nodus) → numerus {
 ";
 
 const EXPLICIT_NULLABLE_FIELD_BANG: &str = r"
-genus Handle { numerus index }
-genus Node { Handle ∪ nihil parent }
+genus Handle { varia numerus index }
+genus Node { varia Handle ∪ nihil parent }
 functio cape_indicem(Node nodus) → numerus {
     redde nodus.parent!.index
 }
 ";
 
 const TRUE_OPTION_LOCAL_BANG: &str = r"
-genus Handle { numerus index }
+genus Handle { varia numerus index }
 functio cape_indicem(Handle ∪ nihil manubrium) → numerus {
     redde manubrium!.index
 }

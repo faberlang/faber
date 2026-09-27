@@ -150,8 +150,8 @@ functio loopum(lista<lista<numerus>> rows) → vacuum {
             "object by-label",
             r"
 genus Point {
-    numerus x = 0
-    numerus y = 0
+    varia numerus x = 0
+    varia numerus y = 0
 }
 
 functio bind(Point point) → vacuum {
@@ -161,8 +161,8 @@ functio bind(Point point) → vacuum {
 ",
             r"
 genus Point {
-    numerus x = 0
-    numerus y = 0
+    varia numerus x = 0
+    varia numerus y = 0
 }
 
 functio loopum(lista<Point> points) → vacuum {
@@ -271,8 +271,8 @@ incipit {
 fn itera_ex_over_lista_of_records_validates_and_runs() {
     let source = r"
 genus Point {
-    numerus x = 0
-    numerus y = 0
+    varia numerus x = 0
+    varia numerus y = 0
 }
 
 functio sum_points(lista<Point> points) → numerus {

@@ -163,7 +163,7 @@ fn field_into_own_rejects_with_copy_suggestion() {
     assert_own_bind_rejects(
         r"
 genus Persona {
-    lista<numerus> amici
+    varia lista<numerus> amici
 }
 incipit {
     fixum Persona p ← Persona { amici = [1, 2] }

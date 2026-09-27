@@ -23,7 +23,7 @@ implendum Orderable<T> {
 }
 
 genus Persona implet Orderable<Persona> {
-    numerus anni
+    varia numerus anni
 
     functio compare(Persona other) → numerus { redde ego.anni - other.anni }
 }

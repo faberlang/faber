@@ -45,9 +45,9 @@ locale = "en"
         r"
 @ public
 class Vector3 {
-    int x
-    int y
-    int z
+    var int x
+    var int y
+    var int z
 
     fn quadratum() → int {
         return self.x * self.x + self.y * self.y + self.z * self.z

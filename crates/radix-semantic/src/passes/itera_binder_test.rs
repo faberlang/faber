@@ -176,8 +176,8 @@ fn object_loop_binder_matches_binding_position_fields_and_aliases() {
     let binding = test_support::analyze_ok(
         r"
 genus Point {
-    numerus x = 0
-    numerus y = 0
+    varia numerus x = 0
+    varia numerus y = 0
 }
 
 functio bind(Point point) → vacuum {
@@ -189,8 +189,8 @@ functio bind(Point point) → vacuum {
     let looping = test_support::analyze_ok(
         r"
 genus Point {
-    numerus x = 0
-    numerus y = 0
+    varia numerus x = 0
+    varia numerus y = 0
 }
 
 functio loopum(lista<Point> points) → vacuum {

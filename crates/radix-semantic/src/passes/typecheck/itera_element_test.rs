@@ -37,7 +37,7 @@ fn itera_ex_copia_textus_does_not_bind_numerus() {
 #[test]
 fn itera_ex_genus_rejects_as_not_iterable() {
     test_support::assert_rejects_with_issue(
-        "genus Arbor { numerus magnitudo }
+        "genus Arbor { varia numerus magnitudo }
 functio f(Arbor a) → vacuum {
     itera ex a fixum n {
         nota n
@@ -50,7 +50,7 @@ functio f(Arbor a) → vacuum {
 #[test]
 fn itera_de_genus_rejects_as_not_iterable() {
     test_support::assert_rejects_with_issue(
-        "genus Arbor { numerus magnitudo }
+        "genus Arbor { varia numerus magnitudo }
 functio f(Arbor a) → vacuum {
     itera de a fixum n {
         nota n

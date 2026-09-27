@@ -695,7 +695,7 @@ fn json_literal_genus_construction_keeps_faber_equals_grammar() {
     // This is the genus construction regression guard (contract §12).
     let result = parse_ok(
         r"
-genus Point { numerus x = 0 }
+genus Point { varia numerus x = 0 }
 functio main() → numerus {
     fixum _ p ← Point { x = 10 }
     redde 0

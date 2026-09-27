@@ -16,13 +16,13 @@ implendum Orderable<T> {
 }
 
 genus Persona implet Orderable<Persona> {
-    numerus anni
+    varia numerus anni
 
     functio compare(Persona other) → numerus { redde ego.anni - other.anni }
 }
 
 genus Lapis {
-    numerus massa
+    varia numerus massa
 }
 
 functio maior<T implet Orderable<T>>(T a, T b) → T {
@@ -192,7 +192,7 @@ fn unknown_contract_role_is_rejected() {
 #[test]
 fn contract_role_is_only_valid_on_an_implendum() {
     test_support::assert_analysis_rejects_with_issue(
-        "@ radix contract \"ordering\"\ngenus Lapis {\n    numerus massa\n}\n",
+        "@ radix contract \"ordering\"\ngenus Lapis {\n    varia numerus massa\n}\n",
         "radix_contract_placement",
     );
 }

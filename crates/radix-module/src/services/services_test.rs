@@ -1960,7 +1960,7 @@ fn emit_faber_file_preserves_namespace_qualified_type_references() {
     let dir = dir_td.path();
     let types = dir.join("types.fab");
     let main = dir.join("main.fab");
-    std::fs::write(&types, "@ publica\ngenus Box {\n    textus value\n}\n").expect("write types");
+    std::fs::write(&types, "@ publica\ngenus Box {\n    varia textus value\n}\n").expect("write types");
     std::fs::write(
         &main,
         "importa ex \"./types\" T\n\nincipit {\n    fixum T.Box box ← T.Box { value = \"ok\" }\n    nota box.value\n}\n",

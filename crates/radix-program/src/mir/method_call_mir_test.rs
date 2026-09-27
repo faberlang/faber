@@ -75,9 +75,9 @@ union TensorError {
 
 @ public { }
 class Tensor {
-    dtype.DType dtype
-    list<f32> data
-    list<int> shape
+    var dtype.DType dtype
+    var list<f32> data
+    var list<int> shape
 
     fn shape() → list<int> {
         return self.shape
@@ -110,7 +110,7 @@ fn construct(list<f32> data, list<int> shape) → Tensor ⇥ TensorError {
 
 @ public { }
 class Cache {
-    Tensor key
+    var Tensor key
 
     fn key() → Tensor {
         return self.key

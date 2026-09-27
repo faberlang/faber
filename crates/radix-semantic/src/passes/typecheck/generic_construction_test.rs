@@ -128,7 +128,7 @@ fn generic_class_construction_with_applied_ascription_typechecks() {
     // numerus` into the field before the initializer is checked.
     test_support::assert_accepts(
         r"genus C<T> {
-    T value
+    varia T value
 }
 
 functio facere() → C<numerus> {
@@ -142,7 +142,7 @@ fn generic_class_construction_return_directed_typechecks() {
     // Return-type-directed `C { value = 1 }` (no ascription).
     test_support::assert_accepts(
         r"genus C<T> {
-    T value
+    varia T value
 }
 
 functio facere() → C<numerus> {
@@ -155,7 +155,7 @@ functio facere() → C<numerus> {
 fn generic_class_construction_rejects_mismatched_field_witness() {
     test_support::assert_rejects_with_issue(
         r#"genus C<T> {
-    T value
+    varia T value
 }
 
 functio facere() → C<numerus> {
@@ -205,7 +205,7 @@ fn applied_generic_class_construction_with_size_argument_typechecks() {
     // type before the initializer is checked (S0-G1 done_when 1).
     test_support::assert_accepts(
         r"genus Gen<magnitudo N> {
-    vector<f32, N> lanes
+    varia vector<f32, N> lanes
 }
 
 functio facere(vector<f32, 3> lanes) → Gen<3> {
@@ -221,7 +221,7 @@ fn bare_generic_class_construction_adopts_contextual_size_witness() {
     // done_when 3) — never a silent wrong-arity acceptance.
     test_support::assert_accepts(
         r"genus Gen<magnitudo N> {
-    vector<f32, N> lanes
+    varia vector<f32, N> lanes
 }
 
 functio facere(vector<f32, 3> lanes) → Gen<3> {
@@ -237,7 +237,7 @@ fn applied_generic_class_construction_rejects_wrong_width_initializer() {
     // done_when 2).
     test_support::assert_rejects_with_issue(
         r"genus Gen<magnitudo N> {
-    vector<f32, N> lanes
+    varia vector<f32, N> lanes
 }
 
 functio facere(vector<f32, 4> wide) → Gen<3> {
@@ -253,7 +253,7 @@ fn applied_generic_class_construction_rejects_kind_mismatch() {
     // identity at the applied head.
     test_support::assert_rejects_with_issue(
         r"genus Gen<magnitudo N> {
-    vector<f32, N> lanes
+    varia vector<f32, N> lanes
 }
 
 functio facere(vector<f32, 3> lanes) → Gen<3> {
@@ -269,7 +269,7 @@ fn applied_generic_class_construction_rejects_wrong_arity() {
     // identity at the applied head.
     test_support::assert_rejects_with_issue(
         r"genus Gen<magnitudo N> {
-    vector<f32, N> lanes
+    varia vector<f32, N> lanes
 }
 
 functio facere(vector<f32, 3> lanes) → Gen<3> {
@@ -285,7 +285,7 @@ fn type_only_generic_class_construction_with_applied_head_typechecks() {
     // (S0-G1 done_when 4) — no type-argument regression.
     test_support::assert_accepts(
         r"genus Capsula<T> {
-    T payload
+    varia T payload
 }
 
 functio facere() → Capsula<numerus> {
@@ -323,7 +323,7 @@ incipit {
 fn non_generic_class_construction_unchanged() {
     test_support::assert_accepts(
         r"genus Plana {
-    numerus latitudo
+    varia numerus latitudo
 }
 
 functio facere() → Plana {
@@ -353,7 +353,7 @@ functio facere() → Eventum {
 fn applied_generic_field_read_substitutes_size_witness() {
     test_support::assert_accepts(
         r"genus Capsa<magnitudo N> {
-    vector<f32, N> minima
+    varia vector<f32, N> minima
 }
 
 functio minimum(Capsa<3> capsam) → vector<f32, 3> {
@@ -367,7 +367,7 @@ functio minimum(Capsa<3> capsam) → vector<f32, 3> {
 fn applied_generic_field_store_substitutes_size_witness() {
     test_support::assert_accepts(
         r"genus Capsa<magnitudo N> {
-    vector<f32, N> minima
+    varia vector<f32, N> minima
 }
 
 functio scribe(Capsa<3> capsam, vector<f32, 3> valor) → vector<f32, 3> {

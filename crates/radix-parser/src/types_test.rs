@@ -1209,7 +1209,7 @@ fn parses_union_hole_function_parameter_slot() {
 
 #[test]
 fn parses_union_hole_genus_field() {
-    let result = parse_ok("genus Panel { ∪ body }");
+    let result = parse_ok("genus Panel { varia ∪ body }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Class(class) = &program.statements[0].kind else {
         panic!("expected genus");

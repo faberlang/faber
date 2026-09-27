@@ -276,7 +276,7 @@ fn localized_type_spelling_after_initialized_field_is_not_an_operand() {
     // and the retired `true`-prefix predicate check fired (PARSE001) on
     // `bool visible = true` followed by `string name`.
     let mut parser =
-        parser_over_with_pack("genus X {\n    bool visible = true\n    string name\n}\n");
+        parser_over_with_pack("genus X {\n    var bool visible = true\n    var string name\n}\n");
     let result = parser.parse_program();
     assert!(
         result.errors.is_empty(),

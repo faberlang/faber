@@ -15,13 +15,13 @@ use super::*;
 use radix_module::mir::BufferHost;
 use radix_module::semantic::Type;
 
-const NOMINAL_UTIL: &str = "@ public\nclass Persona {\n    string nomen\n}\n\n@ public\nfn saluta(Persona p) → string {\n    return p.nomen\n}\n";
+const NOMINAL_UTIL: &str = "@ public\nclass Persona {\n    var string nomen\n}\n\n@ public\nfn saluta(Persona p) → string {\n    return p.nomen\n}\n";
 const NOMINAL_MAIN: &str = "import from \"./util\" * as utilModule\n\nfn run() → string {\n    const utilModule.Persona persona ← utilModule.Persona { nomen = \"salve\" }\n    return utilModule.saluta(persona)\n}\n\nmain {\n    print run()\n}\n";
 
 const NOMINAL_TWO_ALIASES_MAIN: &str = "import from \"./util\" * as utilModule\nimport from \"./util\" * as aliasModule\n\nfn run() → string {\n    const utilModule.Persona persona ← utilModule.Persona { nomen = \"salve\" }\n    return aliasModule.saluta(persona)\n}\n\nmain {\n    print run()\n}\n";
 
-const NOMINAL_DISTINCT_UTIL: &str = "@ public\nclass Persona {\n    string nomen\n}\n\n@ public\nfn util_nomen(Persona p) → string {\n    return p.nomen\n}\n";
-const NOMINAL_DISTINCT_OTHER: &str = "@ public\nclass Persona {\n    string titulus\n}\n\n@ public\nfn other_titulus(Persona p) → string {\n    return p.titulus\n}\n";
+const NOMINAL_DISTINCT_UTIL: &str = "@ public\nclass Persona {\n    var string nomen\n}\n\n@ public\nfn util_nomen(Persona p) → string {\n    return p.nomen\n}\n";
+const NOMINAL_DISTINCT_OTHER: &str = "@ public\nclass Persona {\n    var string titulus\n}\n\n@ public\nfn other_titulus(Persona p) → string {\n    return p.titulus\n}\n";
 const NOMINAL_DISTINCT_MAIN: &str = "import from \"./util\" * as utilModule\nimport from \"./other\" * as otherModule\n\nfn run() → string {\n    const utilModule.Persona una ← utilModule.Persona { nomen = \"salve\" }\n    const otherModule.Persona altera ← otherModule.Persona { titulus = \"hei\" }\n    return utilModule.util_nomen(una) + \"-\" + otherModule.other_titulus(altera)\n}\n\nmain {\n    print run()\n}\n";
 
 const NOMINAL_ENUM_UTIL: &str = "@ public\nunion Color {\n    rubrum,\n    caeruleum\n}\n\n@ public\nfn primus() → Color {\n    return Color.rubrum\n}\n\n@ public\nfn colore_nomen(Color c) → string {\n    match c {\n        case rubrum {\n            return \"rubrum\"\n        }\n        case caeruleum {\n            return \"caeruleum\"\n        }\n    }\n}\n";
@@ -405,8 +405,8 @@ fn canonical_nominal_identity_key_shape_is_module_qualified() {
 // payload — resolves in the consumer and the merge succeeds. The positive test
 // pins that CURRENT truth; the library-payload test below proves fail-closed
 // still fires where a payload module stays genuinely foreign to the consumer.
-const NOMINAL_VARIANT_OTHER: &str = "@ public\nclass Weird {\n    int gradus\n}\n";
-const NOMINAL_VARIANT_UTIL: &str = "import from \"./other\" * as otherModule\n\n@ public\nclass Gradus {\n    int gradus\n}\n\n@ public\nunion Color {\n    rubrum,\n    caeruleum { otherModule.Weird gradus }\n}\n\n@ public\nfn primus() → Color {\n    return Color.rubrum\n}\n";
+const NOMINAL_VARIANT_OTHER: &str = "@ public\nclass Weird {\n    var int gradus\n}\n";
+const NOMINAL_VARIANT_UTIL: &str = "import from \"./other\" * as otherModule\n\n@ public\nclass Gradus {\n    var int gradus\n}\n\n@ public\nunion Color {\n    rubrum,\n    caeruleum { otherModule.Weird gradus }\n}\n\n@ public\nfn primus() → Color {\n    return Color.rubrum\n}\n";
 const NOMINAL_VARIANT_MAIN: &str =
     "import from \"./util\" * as utilModule\n\nmain {\n    print 1\n}\n";
 
@@ -510,8 +510,8 @@ fn identity_bearing_enum_variant_sibling_payload_registers_transitively() {
 // consumer (council-11 correct_before_next_phase: the unknown variant must
 // not silently retain its source-local identity).
 const NOMINAL_LIBRARY_MOD: &str =
-    "+++\nlocale = \"en\"\n+++\n@ public\nclass Something {\n    int gradus\n}\n";
-const NOMINAL_VARIANT_UTIL_LIBRARY: &str = "import from \"prov:mod\" * as provModule\n\n@ public\nclass Gradus {\n    int gradus\n}\n\n@ public\nunion Color {\n    rubrum,\n    caeruleum { provModule.Something gradus }\n}\n\n@ public\nfn primus() → Color {\n    return Color.rubrum\n}\n";
+    "+++\nlocale = \"en\"\n+++\n@ public\nclass Something {\n    var int gradus\n}\n";
+const NOMINAL_VARIANT_UTIL_LIBRARY: &str = "import from \"prov:mod\" * as provModule\n\n@ public\nclass Gradus {\n    var int gradus\n}\n\n@ public\nunion Color {\n    rubrum,\n    caeruleum { provModule.Something gradus }\n}\n\n@ public\nfn primus() → Color {\n    return Color.rubrum\n}\n";
 const NOMINAL_VARIANT_MAIN_LIBRARY: &str =
     "import from \"./util\" * as utilModule\n\nmain {\n    print 1\n}\n";
 

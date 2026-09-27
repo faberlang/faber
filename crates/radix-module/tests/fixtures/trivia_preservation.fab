@@ -11,7 +11,7 @@ locale = "la"
 # item: comment before a genus declaration
 genus Salutatio {
     # member: comment immediately before a field
-    textus nomen
+    varia textus nomen
 }
 
 # entry: comment before the entry block

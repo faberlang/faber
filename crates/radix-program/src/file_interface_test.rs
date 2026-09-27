@@ -37,7 +37,7 @@ fn imported_json_struct_keeps_conversion_opt_in() {
     for annotated in [true, false] {
         let annotation = if annotated { "@ json {}" } else { "" };
         let producer = analyze(&format!(
-            "@ publica\n{annotation}\ngenus Data {{ numerus value }}"
+            "@ publica\n{annotation}\ngenus Data {{ varia numerus value }}"
         ));
         let interface = extract_file_interface_with_identity(
             &producer,
@@ -85,7 +85,7 @@ functio hidden() → vacuum {
 
 @ publica
 genus Persona {
-    textus nomen
+    varia textus nomen
 }
 
 @ publica

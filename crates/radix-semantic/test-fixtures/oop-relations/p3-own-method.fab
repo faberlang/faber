@@ -3,7 +3,7 @@ locale = "en"
 +++
 
 class Own {
-    string message
+    var string message
     fn message() → string { return self.message }
 }
 

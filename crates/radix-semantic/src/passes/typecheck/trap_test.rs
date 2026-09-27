@@ -158,7 +158,7 @@ fn trap_union_collapse_is_rejected_fail_closed() {
     // distinguish success from failure, the trap contract is unstateable.
     test_support::assert_rejects_with_issue(
         concat!(
-            "genus Pondero {\n    textus nuntius\n}\n\n",
+            "genus Pondero {\n    varia textus nuntius\n}\n\n",
             "functio f() → Pondero ⇥ Pondero {\n    redde Pondero { nuntius = \"x\" }\n}\n\n",
             "incipit {\n    fixum ∪ r ← capta { f() }\n    nota r\n}\n",
         ),

@@ -195,7 +195,7 @@ fn commune_field_on_genus_is_rejected() {
     test_support::assert_rejects_with_issue(
         r"genus Box {
     @ commune
-    textus message
+    varia textus message
 }
 
 incipit {

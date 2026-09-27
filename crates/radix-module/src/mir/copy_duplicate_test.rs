@@ -49,8 +49,8 @@ const COPY_BIND_DEEP: &str = r#"+++
 locale = "en"
 +++
 class V3 {
-    f64 x = 0.0
-    list<int> ys = []
+    var f64 x = 0.0
+    var list<int> ys = []
 }
 main {
     var V3 a ← V3 { x = 1.0 }
@@ -74,7 +74,7 @@ const COPY_GENUS_PARAM: &str = r#"+++
 locale = "en"
 +++
 class C {
-    int n = 0
+    var int n = 0
     fn inc() → void {
         self.n ← self.n + 1
     }
@@ -100,7 +100,7 @@ const GENUS_BIND_ALIAS: &str = r#"+++
 locale = "en"
 +++
 class V3 {
-    f64 x = 0.0
+    var f64 x = 0.0
 }
 main {
     var V3 a ← V3 { x = 1.0 }

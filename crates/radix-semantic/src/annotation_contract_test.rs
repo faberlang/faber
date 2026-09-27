@@ -79,7 +79,7 @@ fn local_annotatio_marks_genus_as_contract() {
     let source = r#"
 @ annotatio { target = functio }
 genus Meta {
-    textus selector
+    varia textus selector
 }
 
 @ Meta { selector = "main" }
@@ -124,7 +124,7 @@ fn bare_annotatio_defaults_to_functio_target() {
     let source = r#"
 @ annotatio
 genus Tag {
-    textus name
+    varia textus name
 }
 
 @ Tag { name = "x" }
@@ -160,7 +160,7 @@ fn rejects_duplicate_annotatio_marker() {
 @ annotatio
 @ annotatio
 genus Meta {
-    textus selector
+    varia textus selector
 }
 ",
         "annotatio_duplicate_marker",
@@ -184,7 +184,7 @@ fn rejects_non_contract_genus_as_annotation() {
     expect_issue(
         r#"
 genus Plain {
-    textus name
+    varia textus name
 }
 
 @ Plain { name = "x" }
@@ -201,7 +201,7 @@ fn rejects_unknown_payload_field() {
         r#"
 @ annotatio
 genus Meta {
-    textus selector
+    varia textus selector
 }
 
 @ Meta { selector = "x", extra = "y" }
@@ -218,7 +218,7 @@ fn rejects_missing_required_field() {
         r"
 @ annotatio
 genus Meta {
-    textus selector
+    varia textus selector
 }
 
 @ Meta { }
@@ -235,7 +235,7 @@ fn rejects_type_mismatched_payload() {
         r"
 @ annotatio
 genus Meta {
-    textus selector
+    varia textus selector
 }
 
 @ Meta { selector = 12 }
@@ -252,7 +252,7 @@ fn rejects_duplicate_payload_field() {
         r#"
 @ annotatio
 genus Meta {
-    textus selector
+    varia textus selector
 }
 
 @ Meta { selector = "a", selector = "b" }
@@ -269,7 +269,7 @@ fn rejects_contract_on_genus_attachment() {
         r#"
 @ annotatio
 genus Meta {
-    textus selector
+    varia textus selector
 }
 
 @ Meta { selector = "x" }
@@ -285,7 +285,7 @@ fn optional_field_allows_omission() {
     let source = r"
 @ annotatio
 genus Meta {
-    textus selector sponte
+    varia textus selector sponte
 }
 
 @ Meta { }
@@ -424,7 +424,7 @@ fn local_analyze_helper_collects_contract() {
     let source = r"
 @ annotatio
 genus Meta {
-    numerus n
+    varia numerus n
 }
 ";
     let lex_result = lex(source);

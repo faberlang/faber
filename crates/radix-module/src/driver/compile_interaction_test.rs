@@ -1403,7 +1403,7 @@ fn rejects_statement_level_legacy_ad_string_route() {
 #[test]
 fn compile_accepts_array_and_ex_destructuring_bindings() {
     let session = test_session(Target::HirRust);
-    let source = r#"genus Persona { textus name }
+    let source = r#"genus Persona { varia textus name }
 incipit {
   fixum _ xs ← [1, 2]
   fixum [a, b] ← xs
@@ -1637,7 +1637,7 @@ incipit {
 #[test]
 fn ex_object_varia_bindings_accept_same_type_reassignment() {
     let session = test_session(Target::HirRust);
-    let source = r"genus Datum { numerus count  bivalens active }
+    let source = r"genus Datum { varia numerus count  varia bivalens active }
 incipit {
   fixum _ data ← Datum { count = 100, active = verum }
   ex data varia count, active

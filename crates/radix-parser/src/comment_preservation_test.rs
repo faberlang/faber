@@ -355,7 +355,7 @@ secus {
 
 #[test]
 fn genus_block_end_comment_attaches_to_class_end_trivia() {
-    let source = "genus Canis {\n  textus nomen\n  # before close\n}\n";
+    let source = "genus Canis {\n  varia textus nomen\n  # before close\n}\n";
     let result = parse_source(source);
     assert!(result.success(), "{:?}", result.errors);
 
@@ -370,7 +370,7 @@ fn genus_block_end_comment_attaches_to_class_end_trivia() {
 
 #[test]
 fn comment_after_field_with_initializer_attaches_to_next_member() {
-    let source = "genus Thing {\n  numerus count = 42\n  # doc\n  bivalens flag\n}\n";
+    let source = "genus Thing {\n  varia numerus count = 42\n  # doc\n  varia bivalens flag\n}\n";
     let result = parse_source(source);
     assert!(result.success(), "{:?}", result.errors);
 
@@ -392,11 +392,11 @@ fn reader_state_shaped_genus_fixture_parses_green() {
     // one preceded by a full-line comment after a plain field.
     let source = "\
 genus ReaderState {
-    tabula<textus, textus> reader_keyword_latin_keys
-    tabula<textus, textus> reader_type_latin_keys
-    numerus current_line
+    varia tabula<textus, textus> reader_keyword_latin_keys
+    varia tabula<textus, textus> reader_type_latin_keys
+    varia numerus current_line
     # True once any non-trivia token has been emitted on the current line.
-    bivalens line_has_code
+    varia bivalens line_has_code
 }
 ";
     let result = parse_source(source);

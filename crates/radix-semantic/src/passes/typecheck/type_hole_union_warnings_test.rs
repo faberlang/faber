@@ -200,7 +200,7 @@ fn unsolved_union_hole_is_cannot_infer_union_type_error() {
     let diagnostics = test_support::analyze_and_get_diagnostics(
         r"
 genus G {
-    ∪ x
+    varia ∪ x
 }
 ",
     );

@@ -168,7 +168,7 @@ fn ratio_does_not_assign_to_same_field_genus() {
     test_support::assert_rejects_with_issue(
         r"
 genus P {
-    f32 g
+    varia f32 g
 }
 
 incipit {
@@ -241,7 +241,7 @@ fn ratio_to_genus_conversio_rejects() {
     test_support::assert_rejects_with_issue(
         r"
 genus P {
-    f32 g
+    varia f32 g
 }
 
 incipit {
@@ -259,7 +259,7 @@ fn genus_to_ratio_conversio_rejects() {
     test_support::assert_rejects_with_issue(
         r"
 genus P {
-    f32 g
+    varia f32 g
 }
 
 incipit {
@@ -304,7 +304,7 @@ fn args_to_genus_conversio_rejects_with_reconstruction_issue() {
     assert_cli_rejects_with_issue(
         r#"
 genus P {
-    bivalens verbose
+    varia bivalens verbose
 }
 
 @ cli "tool"
@@ -368,7 +368,7 @@ fn cli_seam_reconstruction() {
     assert_cli_accepts(
         r#"
 genus P {
-    bivalens verbose
+    varia bivalens verbose
 }
 
 @ cli "tool"

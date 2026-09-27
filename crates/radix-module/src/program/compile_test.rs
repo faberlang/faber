@@ -68,8 +68,8 @@ targets = ["rust"]
         provider.join("src/vectors.fab"),
         r#"@ public
 class Box<size N> {
-    vector<f32, N> minima
-    vector<f32, N> maxima
+    var vector<f32, N> minima
+    var vector<f32, N> maxima
 }
 
 @ public
@@ -271,7 +271,7 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         provider.join("src/triga.fab"),
-        "genus Vector3 { f32 x f32 y f32 z }\nfunctio vector3(f32 x, f32 y, f32 z) → Vector3 { redde Vector3 { x = x, y = y, z = z } }\n",
+        "genus Vector3 { varia f32 x varia f32 y varia f32 z }\nfunctio vector3(f32 x, f32 y, f32 z) → Vector3 { redde Vector3 { x = x, y = y, z = z } }\n",
     )
     .expect("source");
 
@@ -310,13 +310,13 @@ targets = ["rust"]
         r"
 @ publica
 genus Vector3 {
-    f32 x
-    f32 y
-    f32 z
+    varia f32 x
+    varia f32 y
+    varia f32 z
 }
 @ publica
 genus Matrix4 {
-    lista<f32> elements
+    varia lista<f32> elements
 }
 @ publica
 functio vector3(f32 x, f32 y, f32 z) → Vector3 {
@@ -556,7 +556,7 @@ targets = ["rust"]
         r#"
 @ interna
 genus Instrumentum {
-    textus nomen = ""
+    varia textus nomen = ""
 }
 "#,
     )
@@ -1069,9 +1069,9 @@ targets = ["rust"]
         r"
 @ publica
 genus Vector3 {
-    f32 x
-    f32 y
-    f32 z
+    varia f32 x
+    varia f32 y
+    varia f32 z
 }
 @ publica
 functio vector3(f32 x, f32 y, f32 z) → Vector3 {
@@ -1146,9 +1146,9 @@ targets = ["rust"]
         r"
 @ publica
 genus Vector3 {
-    f32 x
-    f32 y
-    f32 z
+    varia f32 x
+    varia f32 y
+    varia f32 z
 }
 @ publica
 functio vector3(f32 x, f32 y, f32 z) → Vector3 {
@@ -1516,7 +1516,7 @@ targets = ["rust"]
         r"
 @ publica
 genus Matrix4 {
-    f32 m00
+    varia f32 m00
 }
 ",
     )
@@ -1533,9 +1533,9 @@ discretio SceneNodeKind {
 
 @ publica
 genus SceneNode {
-    textus name
-    SceneNodeKind kind
-    math.Matrix4 local_matrix
+    varia textus name
+    varia SceneNodeKind kind
+    varia math.Matrix4 local_matrix
 }
 
 @ publica
@@ -1629,7 +1629,7 @@ discretio Visus {
 
 @ publica
 genus Thema {
-    textus nomen
+    varia textus nomen
 }
 
 @ publica
@@ -1648,14 +1648,14 @@ importa ex "probe:visus" visus
 
 @ publica
 genus Scope {
-    textus selector
+    varia textus selector
 }
 
 @ publica
 genus Mounted {
-    Scope scopus
-    visus.Visus visus
-    visus.Thema thema
+    varia Scope scopus
+    varia visus.Visus visus
+    varia visus.Thema thema
 }
 
 @ publica
@@ -1764,7 +1764,7 @@ targets = ["rust"]
         r#"
 @ public
 class Capsule {
-    string schema
+    var string schema
 }
 
 @ public
@@ -1949,8 +1949,8 @@ targets = ["rust"]
         r#"
 @ publica
 genus Scopulum {
-    textus nomen
-    textus valor
+    varia textus nomen
+    varia textus valor
 }
 
 @ publica
@@ -1967,8 +1967,8 @@ functio scopulum(textus nomen, textus valor) → Scopulum {
         r#"
 @ publica
 genus Scopulum {
-    textus nomen
-    textus valor
+    varia textus nomen
+    varia textus valor
 }
 
 @ publica
@@ -2294,12 +2294,12 @@ fn la_locale_pack() -> crate::locale::LocalePack {
 /// shape (Scope genus + scoped query/require).
 const LA_DOM_SOURCE: &str = r#"@ publica
 genus Scope {
-    textus selector = ""
+    varia textus selector = ""
 }
 
 @ publica
 genus Element {
-    textus selector = ""
+    varia textus selector = ""
 }
 
 @ publica
@@ -2411,8 +2411,8 @@ targets = ["rust"]
 import from "web:dom" public * as web
 
 class Mounted {
-    string selector
-    web.Scope scopus
+    var string selector
+    var web.Scope scopus
 }
 
 fn mount(string selector) → Mounted {
@@ -2623,7 +2623,7 @@ targets = ["rust"]
         r"
 @ public
 class Point {
-    int x
+    var int x
 }
 
 @ public
@@ -2867,8 +2867,8 @@ fn nested_local_import_prepared_analyze_does_not_frontend_fail() {
         r"
 @ publica
 genus Point {
-    f32 x
-    f32 y
+    varia f32 x
+    varia f32 y
 }
 ",
     )
@@ -2927,7 +2927,7 @@ targets = ["rust"]
         r#"
 @ publica
 genus Point {
-    textus value = ""
+    varia textus value = ""
 }
 @ publica
 functio make_point(textus value) → Point {
@@ -3296,7 +3296,7 @@ locale = "en"
 
 @ public
 class Punctum {
-    int<u32> gradus
+    var int<u32> gradus
 }
 "#,
     )
@@ -3311,7 +3311,7 @@ import from "./lib_punctum" * as p
 
 @ public
 class Catena {
-    list<p.Punctum> puncta
+    var list<p.Punctum> puncta
 }
 "#,
     )

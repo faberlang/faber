@@ -244,7 +244,7 @@ fn valor_to_tabula_conversio_emits_from_valor() {
 #[test]
 fn genus_to_valor_conversio_emits_tabula_boxing() {
     let session = test_session(Target::HirRust);
-    let source = r"genus Point { numerus x numerus y }
+    let source = r"genus Point { varia numerus x varia numerus y }
 incipit {
   fixum Point pt ← Point { x = 1, y = 2 }
   fixum valor v ← pt ↦ valor

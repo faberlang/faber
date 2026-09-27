@@ -97,7 +97,7 @@ fn preset_on_number_is_rejected() {
 #[test]
 fn user_type_points_to_an_ordinary_function() {
     test_support::assert_rejects_with_issue(
-        "genus Punctum { numerus x } functio f(Punctum p) → textus { redde p ¶ \"5\" }",
+        "genus Punctum { varia numerus x } functio f(Punctum p) → textus { redde p ¶ \"5\" }",
         "format_type_unsupported",
     );
 }

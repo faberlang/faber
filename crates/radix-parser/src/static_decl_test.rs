@@ -79,5 +79,5 @@ fn static_inside_a_block_is_rejected() {
 
 #[test]
 fn static_genus_field_keeps_member_meaning() {
-    let _ = parse_ok("genus Capsa {\n    generis numerus MAXIMUM = 8\n    numerus n\n}");
+    let _ = parse_ok("genus Capsa {\n    generis numerus MAXIMUM = 8\n    varia numerus n\n}");
 }

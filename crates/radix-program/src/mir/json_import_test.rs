@@ -23,7 +23,7 @@ locale = "en"
     .expect("write manifest");
     fs::write(
         src.join("model.fab"),
-        "@ public\n@ json {}\nclass Data { int count\nlist<int> cells }\n",
+        "@ public\n@ json {}\nclass Data { var int count\nvar list<int> cells }\n",
     )
     .expect("write model");
     fs::write(

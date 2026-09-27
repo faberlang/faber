@@ -335,7 +335,7 @@ incipit {
 fn genus_applied_hole_solves_from_field() {
     accepts(
         r"genus C<T> {
-    T value
+    varia T value
 }
 
 incipit {

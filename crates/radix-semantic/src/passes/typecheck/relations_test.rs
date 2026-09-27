@@ -158,11 +158,11 @@ main {
 fn implet_naming_non_implendum_is_rejected() {
     assert_en_rejects_with_issue(
         "class Base {
-    string message
+    var string message
 }
 
 class Weird implements Base {
-    string note
+    var string note
 }
 
 main {
@@ -202,11 +202,11 @@ main {
 fn genus_does_not_flow_into_an_unrelated_genus() {
     assert_en_rejects_with_issue(
         "class Base {
-    string message
+    var string message
 }
 
 class Other {
-    string message
+    var string message
 }
 
 fn probe(Base b) → string {

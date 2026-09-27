@@ -35,8 +35,8 @@ fn function_route_failable(source: &str) -> bool {
 }
 
 const TEMPERATURES: &str = "
-genus Celsius { fractus gradus }
-genus Fahrenheit { fractus gradus }
+genus Celsius { varia fractus gradus }
+genus Fahrenheit { varia fractus gradus }
 
 @ conversio
 functio adFahrenheit(Celsius c) → Fahrenheit {
@@ -45,8 +45,8 @@ functio adFahrenheit(Celsius c) → Fahrenheit {
 ";
 
 const FAILABLE: &str = "
-genus Mensura { numerus valor }
-genus Positiva { numerus valor }
+genus Mensura { varia numerus valor }
+genus Positiva { varia numerus valor }
 
 @ conversio
 functio adPositivam(Mensura m) → Positiva ⇥ textus {
@@ -109,7 +109,7 @@ fn failable_pair_without_default_or_channel_is_rejected() {
 fn registered_pairs_never_chain() {
     assert_rejects_with_issue(
         &format!(
-            "{TEMPERATURES}genus Kelvin {{ fractus gradus }}
+            "{TEMPERATURES}genus Kelvin {{ varia fractus gradus }}
 @ conversio
 functio adKelvin(Fahrenheit f) → Kelvin {{ redde Kelvin {{ gradus = f.gradus }} }}
 incipit {{

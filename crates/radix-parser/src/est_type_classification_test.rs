@@ -55,7 +55,7 @@ fn assert_value_equality(source: &str) {
 #[test]
 fn est_declared_genus_classifies_as_type_check() {
     assert_type_check(concat!(
-        "genus Errata {\n    textus nuntius\n}\n\n",
+        "genus Errata {\n    varia textus nuntius\n}\n\n",
         "functio f(Errata ∪ nihil r) → bivalens { redde r est Errata }",
     ));
 }
@@ -66,7 +66,7 @@ fn est_declared_type_classifies_before_its_declaration() {
     // genus declared later in the file still routes to `TypeCheck`.
     assert_type_check(concat!(
         "functio f(Posterius ∪ nihil r) → bivalens { redde r est Posterius }\n\n",
-        "genus Posterius {\n    textus nuntius\n}",
+        "genus Posterius {\n    varia textus nuntius\n}",
     ));
 }
 
@@ -112,7 +112,7 @@ fn declared_type_name_is_not_claimed_in_other_positions() {
     // of a declared type name, and the return annotation's named type,
     // parse unchanged.
     let result = parse_source(concat!(
-        "genus Punctum {\n    numerus x\n}\n\n",
+        "genus Punctum {\n    varia numerus x\n}\n\n",
         "functio f() → Punctum { redde Punctum { x = 1 } }",
     ));
     assert!(result.success(), "{:?}", result.errors);

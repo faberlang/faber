@@ -970,10 +970,12 @@ impl Parser {
     /// Consume one leading field modifier, if present.
     ///
     /// GRAMMAR:
-    ///   field-decl := ('fixum' | 'varia' | 'generis')? type ident 'sponte'? ('=' expr)?
+    ///   field-decl := ('fixum' | 'varia' | 'generis') type ident 'sponte'? ('=' expr)?
     ///
-    /// Exactly one modifier: the caller rejects a second one
-    /// (`generis fixum`, `generis varia`, `fixum varia`).
+    /// Exactly one modifier: a second one (`generis fixum`, `generis varia`,
+    /// `fixum varia`) is rejected here; a missing one on a `genus` field is
+    /// rejected by `parse_class_member`. `discretio` shared fields stay
+    /// unmarked (fork F7 held), so the modifier is optional at this level.
     fn eat_field_modifier(&mut self) -> Option<FieldModifier> {
         let modifier = self.current_field_modifier()?;
         self.advance();
@@ -1028,7 +1030,21 @@ impl Parser {
             };
             ClassMemberKind::Method(func)
         } else {
-            ClassMemberKind::Field(self.parse_field_decl()?)
+            let field_start = self.current_span();
+            let field = self.parse_field_decl()?;
+            if field.modifier.is_none() {
+                // D16.1: every genus field declares exactly one modifier.
+                // Recoverable, so one run reports every unmarked field; the
+                // migration is `faber field-modifier-codemod`.
+                self.errors.push(
+                    ParseError::structured(
+                        ParseErrorKind::DeclarationInvalid,
+                        field_start.merge(self.previous_span()),
+                    )
+                    .with_arg("issue", "field_modifier_missing"),
+                );
+            }
+            ClassMemberKind::Field(field)
         };
 
         let span = start.merge(self.previous_span());

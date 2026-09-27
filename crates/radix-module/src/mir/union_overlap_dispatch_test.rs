@@ -23,16 +23,16 @@ fn run(source: &str) -> Vec<String> {
 
 const FIGURA: &str = r"
 genus Circulus {
-    textus nomen
-    numerus radius
+    varia textus nomen
+    varia numerus radius
 
     functio area() → numerus { redde 3 * ego.radius * ego.radius }
     functio scala(numerus k) → numerus { redde k * ego.radius }
 }
 
 genus Quadratum {
-    textus nomen
-    numerus latus
+    varia textus nomen
+    varia numerus latus
 
     functio area() → numerus { redde ego.latus * ego.latus }
     functio scala(numerus k) → numerus { redde k + ego.latus }

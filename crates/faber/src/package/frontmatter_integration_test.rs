@@ -536,9 +536,9 @@ targets = ["rust"]
         src.join("math.fab"),
         r"@ public
 class Vector3 {
-    f32 x
-    f32 y
-    f32 z
+    var f32 x
+    var f32 y
+    var f32 z
 }
 
 @ public

@@ -752,8 +752,8 @@ import from "norma:json" json
 
 @ json
 class Payload {
-  string name
-  list<int> counts
+  var string name
+  var list<int> counts
 }
 
 main {
@@ -4375,7 +4375,7 @@ fn rust_field_names_default_preserves_source_spelling() {
         &entry,
         r#"
 class PersonaNova {
-  string nomenLongum
+  var string nomenLongum
 }
 
 main {
@@ -4430,7 +4430,7 @@ rust_field_names = "snake_case"
         &entry,
         r#"
 class PersonaNova {
-  string nomenLongum
+  var string nomenLongum
 }
 
 main {
@@ -4487,8 +4487,8 @@ rust_field_names = "snake_case"
         &entry,
         r#"
 class Collidens {
-  string fooBar
-  string foo_bar
+  var string fooBar
+  var string foo_bar
 }
 
 main {
@@ -4872,7 +4872,7 @@ main {
         r"
 @ public
 class Thing {
-    string name
+    var string name
 }
 ",
     )
@@ -4916,7 +4916,7 @@ fn compile_package_preserves_file_stem_named_type_under_import_alias() {
         r"
 @ publica
 genus Thing {
-    textus name
+    varia textus name
 }
 ",
     );
@@ -7812,7 +7812,7 @@ targets = ["ts"]
 
 @ publica
 genus Vector3 {
-    lista<numerus> elementa
+    varia lista<numerus> elementa
 
     functio validum() → bivalens {
         redde ego.elementa.longitudo() ≡ 3
@@ -8313,12 +8313,12 @@ main {
         r#"
 @ public
 class Canis {
-    string nomen
+    var string nomen
 }
 
 @ public
 class Felis {
-    string nomen
+    var string nomen
 }
 "#,
     )
@@ -8367,12 +8367,12 @@ main {
         r#"
 @ public
 class Canis {
-    string nomen
+    var string nomen
 }
 
 @ public
 class Felis {
-    string nomen
+    var string nomen
 }
 "#,
     )
@@ -8630,7 +8630,7 @@ main {
         r"
 @ public
 class Thing {
-    string label
+    var string label
 }
 ",
     )
@@ -8640,7 +8640,7 @@ class Thing {
         r"
 @ public
 class Thing {
-    string label
+    var string label
 }
 ",
     )
@@ -12377,7 +12377,7 @@ locale = "en"
 @ public
 @ annotatio { target = fn }
 class WebController {
-    string selector
+    var string selector
 }
 "#,
     )
@@ -12398,28 +12398,28 @@ locale = "en"
 
 @ public
 class Scope {
-    string selector = ""
+    var string selector = ""
 }
 
 @ public
 class Element {
-    string selector = ""
+    var string selector = ""
 }
 
 @ public
 class FrameState {
-    int frame = 0
-    f32 time_ms = 0.0
-    f32 delta_ms = 0.0
+    var int frame = 0
+    var f32 time_ms = 0.0
+    var f32 delta_ms = 0.0
 }
 
 @ public
 class SubmitOptions {
-    bool prevent_default = true
+    var bool prevent_default = true
 }
 
 class Subscription {
-    int id = 0
+    var int id = 0
 }
 
 type SubmitHandler = (Element) → void
@@ -12553,7 +12553,7 @@ fn write_tela_consumer_app_with_only_web_import(app: &Path, lib: &Path) {
 import from "tela:web" web
 
 class Scope {
-    string selector = ""
+    var string selector = ""
 }
 
 @ WebController { selector = "#shell" }
@@ -13081,11 +13081,11 @@ emit = "typescript"
         r##"
 @ annotatio
 genus WebController {
-    textus selector
+    varia textus selector
 }
 
 genus Scope {
-    textus selector = ""
+    varia textus selector = ""
 }
 
 @ WebController { selector = "#shell" }
@@ -13237,7 +13237,7 @@ import from "tela:dom" d
 
 @ annotatio { target = fn }
 class WebController {
-    string selector
+    var string selector
 }
 
 @ WebController { selector = "#shell" }

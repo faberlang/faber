@@ -7,11 +7,11 @@
 use crate::test_support;
 
 fn nominal_union() -> &'static str {
-    "genus Errata {\n    textus nuntius\n}\n\ngenus Bonum {\n    textus fructus\n}\n\n"
+    "genus Errata {\n    varia textus nuntius\n}\n\ngenus Bonum {\n    varia textus fructus\n}\n\n"
 }
 
 fn three_nominal_union() -> &'static str {
-    "genus Errata {\n    textus nuntius\n}\n\ngenus Medius {\n    textus proprium\n}\n\ngenus Tertius {\n    textus clausum\n}\n\n"
+    "genus Errata {\n    varia textus nuntius\n}\n\ngenus Medius {\n    varia textus proprium\n}\n\ngenus Tertius {\n    varia textus clausum\n}\n\n"
 }
 
 #[test]

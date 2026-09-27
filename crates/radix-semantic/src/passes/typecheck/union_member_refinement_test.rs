@@ -17,11 +17,11 @@ use crate::test_support;
 fn errata_bonum(body: &str) -> String {
     let decls = "\
 genus Errata {
-    textus nuntius
+    varia textus nuntius
 }
 
 genus Bonum {
-    textus fructus
+    varia textus fructus
 }
 
 ";
@@ -49,8 +49,8 @@ fn union_common_field_has_real_signature() {
     // Both constituents expose `nuntius : textus` — a common member with a
     // real signature, not ignotum.
     test_support::assert_accepts(concat!(
-        "genus Errata {\n    textus nuntius\n}\n\n",
-        "genus Signum {\n    textus nuntius\n    textus nota\n}\n\n",
+        "genus Errata {\n    varia textus nuntius\n}\n\n",
+        "genus Signum {\n    varia textus nuntius\n    varia textus nota\n}\n\n",
         "functio f(Errata ∪ Signum r) → textus { redde r.nuntius }",
     ));
 }
@@ -61,8 +61,8 @@ fn union_field_type_disagreement_is_not_common() {
     // member; D9.2 names each constituent's type.
     test_support::assert_rejects_with_issue(
         concat!(
-            "genus A {\n    textus commune\n}\n\n",
-            "genus B {\n    numerus commune\n}\n\n",
+            "genus A {\n    varia textus commune\n}\n\n",
+            "genus B {\n    varia numerus commune\n}\n\n",
             "functio f(A ∪ B r) → textus { redde r.commune }",
         ),
         "union_member_differs",
@@ -100,8 +100,8 @@ fn union_alias_receiver_follows_member_rule() {
     // transparency); the member rule sees through the alias.
     test_support::assert_rejects_with_issue(
         concat!(
-            "genus A {\n    textus commune\n}\n\n",
-            "genus B {\n    textus commune\n}\n\n",
+            "genus A {\n    varia textus commune\n}\n\n",
+            "genus B {\n    varia textus commune\n}\n\n",
             "typus U = A ∪ B\n\n",
             "functio f(U r) → textus { redde r.absens }",
         ),
@@ -277,8 +277,8 @@ fn shared_field_union_is_quiet() {
     // Common members exist, so guardrail 3 stays quiet, and the retired
     // guardrail 1 (WARN024) no longer teaches narrowing (D9.2).
     let result = test_support::analyze_and_get_diagnostics(concat!(
-        "genus A {\n    textus commune\n}\n\n",
-        "genus B {\n    textus commune\n}\n\n",
+        "genus A {\n    varia textus commune\n}\n\n",
+        "genus B {\n    varia textus commune\n}\n\n",
         "functio f(A ∪ B r) → textus { redde r.commune }",
     ));
     assert!(!result
@@ -322,7 +322,7 @@ fn primitive_union_annotation_does_not_warn() {
 // ---------------------------------------------------------------------------
 
 const CARRIER: &str = r"genus ErrorDetail {
-    textus body
+    varia textus body
 }
 
 discretio Carrier {

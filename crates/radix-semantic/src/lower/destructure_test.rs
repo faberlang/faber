@@ -70,7 +70,7 @@ fn array_destructuring_calls_initializer_once() {
 #[test]
 fn object_destructuring_calls_initializer_once() {
     let unit = test_support::analyze_ok(
-        "genus Punctum {\n    numerus x\n    numerus y\n}\nfunctio fac() → Punctum {\n    redde Punctum { x = 1, y = 2 }\n}\nincipit {\n    fixum {x, y} ← fac()\n    nota x + y\n}\n",
+        "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nfunctio fac() → Punctum {\n    redde Punctum { x = 1, y = 2 }\n}\nincipit {\n    fixum {x, y} ← fac()\n    nota x + y\n}\n",
     );
     assert_eq!(entry_call_count(&unit), 1);
 }
