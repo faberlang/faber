@@ -566,7 +566,7 @@ fn layout_kind_for_type(
         // Fallthrough law: every sized-numeric combination resolves through a
         // named arm or errors loudly; nothing reaches `OpaqueHandle` silently.
         Type::SizedNumeric(prim, width) => sized_numeric_layout(*prim, *width),
-        Type::ModularWord(width) => int_layout(*width),
+        Type::ModularWord(width) | Type::SaturatingWord(width) => int_layout(*width),
         Type::Primitive(Primitive::Vacuum) => LayoutResolution::Resolved(MirLayoutKind::Void),
         Type::Primitive(Primitive::Numquam) => LayoutResolution::Resolved(MirLayoutKind::Never),
         Type::Alias(_, target) => layout_kind_for_type(types, *target, memo, visiting),

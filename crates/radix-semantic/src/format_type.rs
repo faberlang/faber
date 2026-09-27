@@ -139,6 +139,7 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
         },
 
         Type::ModularWord(width) => format!("modulus<{}>", width.faber_marker()),
+        Type::SaturatingWord(width) => format!("saturatus<{}>", width.faber_marker()),
 
         Type::Option(inner) => {
             let inner =
@@ -199,6 +200,7 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
             MarkerFamily::Numerus => "numerus<_>",
             MarkerFamily::Fractus => "fractus<_>",
             MarkerFamily::Modulus => "modulus<_>",
+            MarkerFamily::Saturatus => "saturatus<_>",
             MarkerFamily::Instans => "instans<_>",
         }
         .to_owned(),

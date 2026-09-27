@@ -81,6 +81,7 @@ impl LeafKeywordSurface for LocaleKeywordBridge<'_> {
             LeafTypeBindingKind::Collection(collection) => TypeBindingKind::Collection(collection),
             LeafTypeBindingKind::TensorFamily(family) => TypeBindingKind::TensorFamily(family),
             LeafTypeBindingKind::ModularWord => TypeBindingKind::ModularWord,
+            LeafTypeBindingKind::SaturatingWord => TypeBindingKind::SaturatingWord,
             LeafTypeBindingKind::Frame(frame) => TypeBindingKind::Frame(match frame {
                 FrameFamily::Sermo => locale::FrameTypeKind::Sermo,
                 FrameFamily::Scrinium => locale::FrameTypeKind::Scrinium,

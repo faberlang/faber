@@ -247,6 +247,17 @@ impl TypeTable {
         self.first_modular_word
     }
 
+    /// First interned [`Type::SaturatingWord`] width, if any.
+    ///
+    /// Linear scan used by backend rejection (targets without a clamp lowering).
+    #[must_use]
+    pub fn first_saturating_word_width(&self) -> Option<NumericWidth> {
+        self.types.iter().find_map(|ty| match ty {
+            Type::SaturatingWord(width) => Some(*width),
+            _ => None,
+        })
+    }
+
     /// Normalize a type for hash-cons insertion without changing semantic meaning.
     fn canonicalize_for_intern(ty: Type) -> Type {
         match ty {
@@ -654,7 +665,10 @@ impl TypeTable {
                     | Primitive::Numquam
                     | Primitive::Instans
             ),
-            Type::SizedNumeric(_, _) | Type::ModularWord(_) | Type::SizedInstans(_) => true,
+            Type::SizedNumeric(_, _)
+            | Type::ModularWord(_)
+            | Type::SaturatingWord(_)
+            | Type::SizedInstans(_) => true,
             _ => false,
         }
     }
@@ -927,7 +941,8 @@ impl TypeTable {
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U8)
             ),
             (Type::SizedNumeric(pa, aw), Type::SizedNumeric(pb, bw)) => pa == pb && aw == bw,
-            (Type::ModularWord(aw), Type::ModularWord(bw)) => aw == bw,
+            (Type::ModularWord(aw), Type::ModularWord(bw))
+            | (Type::SaturatingWord(aw), Type::SaturatingWord(bw)) => aw == bw,
             (Type::SizedInstans(ap), Type::SizedInstans(bp)) => ap == bp,
             // Bare seconds default and explicit `instans<N>` are distinct semantic types.
             (Type::Primitive(Primitive::Instans), Type::SizedInstans(_))
@@ -1627,6 +1642,10 @@ pub enum Type {
     /// Fixed-width unsigned modular word. The first supported width is `u32`.
     ModularWord(NumericWidth),
 
+    /// Fixed-width saturating integer (`saturatus<W>`, en `saturating<W>`):
+    /// arithmetic clamps at both ends of `W` (D11.1). Signed or unsigned.
+    SaturatingWord(NumericWidth),
+
     /// Sized `instans<N>` primitive (`ms`, `us`, `ns`).
     SizedInstans(InstansPrecision),
 
@@ -1733,7 +1752,7 @@ impl Hash for Type {
                 p.hash(state);
                 w.hash(state);
             }
-            Self::ModularWord(w) => w.hash(state),
+            Self::ModularWord(w) | Self::SaturatingWord(w) => w.hash(state),
             Self::SizedInstans(p) => p.hash(state),
             Self::Ref(m, t) => {
                 m.hash(state);
@@ -2154,6 +2173,7 @@ fn is_numeric_carrier(ty: &Type) -> bool {
         Type::Primitive(Primitive::Numerus | Primitive::Fractus)
             | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
             | Type::ModularWord(_)
+            | Type::SaturatingWord(_)
     )
 }
 
@@ -2264,6 +2284,7 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
         Type::Primitive(_)
         | Type::SizedNumeric(_, _)
         | Type::ModularWord(_)
+        | Type::SaturatingWord(_)
         | Type::SizedInstans(_)
         | Type::Struct(_)
         | Type::Enum(_)
@@ -2475,6 +2496,7 @@ pub enum MarkerFamily {
     Numerus,
     Fractus,
     Modulus,
+    Saturatus,
     Instans,
 }
 

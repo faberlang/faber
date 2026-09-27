@@ -193,6 +193,9 @@ impl TypeChecker<'_> {
             (MarkerFamily::Modulus, Type::ModularWord(width)) => {
                 Some(self.types.intern(Type::ModularWord(width)))
             }
+            (MarkerFamily::Saturatus, Type::SaturatingWord(width)) => {
+                Some(self.types.intern(Type::SaturatingWord(width)))
+            }
             (MarkerFamily::Instans, Type::SizedInstans(precision)) => {
                 Some(self.types.sized_instans(precision))
             }

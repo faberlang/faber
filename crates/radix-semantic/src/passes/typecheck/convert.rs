@@ -2167,6 +2167,13 @@ impl TypeChecker<'_> {
             return false;
         }
 
+        // D11.1: `saturatus<W>` converts only to and from integer families
+        // (a range-checked narrowing, never a clamp or a text parse).
+        if self.is_saturating_word(source) || self.is_saturating_word(target) {
+            return self.is_integer_conversio_operand(source)
+                && self.is_integer_conversio_operand(target);
+        }
+
         for ty in [source, target] {
             match self.types.get(ty) {
                 Type::Primitive(Primitive::Valor | Primitive::Ignotum)
@@ -2225,6 +2232,33 @@ impl TypeChecker<'_> {
                 | Type::Tuple(_)
                 | Type::ModularWord(_)
         )
+    }
+
+    fn peel_alias_chain(&self, ty: TypeId) -> TypeId {
+        let mut ty = ty;
+        while let Type::Alias(_, inner) = self.types.get(ty) {
+            ty = *inner;
+        }
+        ty
+    }
+
+    fn is_saturating_word(&self, ty: TypeId) -> bool {
+        matches!(
+            self.types.get(self.peel_alias_chain(ty)),
+            Type::SaturatingWord(_)
+        )
+    }
+
+    /// Integer operand of a saturating-word conversion: `numerus<W>` (not a
+    /// decimal width), `modulus<W>`, or `saturatus<W>`.
+    fn is_integer_conversio_operand(&self, ty: TypeId) -> bool {
+        match self.types.get(self.peel_alias_chain(ty)) {
+            Type::Primitive(Primitive::Numerus)
+            | Type::ModularWord(_)
+            | Type::SaturatingWord(_) => true,
+            Type::SizedNumeric(Primitive::Numerus, width) => !width.is_decimal(),
+            _ => false,
+        }
     }
 
     fn is_record_type(&self, ty: TypeId) -> bool {
@@ -2646,7 +2680,10 @@ impl TypeChecker<'_> {
         }
 
         let source_expected = constructor_source.then_some(effective_target);
-        let source_ty = if matches!(self.types.get(effective_target), Type::ModularWord(_)) {
+        let source_ty = if matches!(
+            self.types.get(effective_target),
+            Type::ModularWord(_) | Type::SaturatingWord(_)
+        ) {
             // WHY: modular ascription shapes integer literals so the ordinary
             // literal checker enforces the u32 range. Non-literal numerus
             // values remain a different family and require explicit `↦`.

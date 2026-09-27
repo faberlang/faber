@@ -2531,6 +2531,7 @@ fn is_builtin_type(name: &str) -> bool {
             | "textus"
             | "numerus"
             | "modulus"
+            | "saturatus"
             | "fractus"
             | "bivalens"
             | "nihil"
@@ -3570,6 +3571,27 @@ fn lower_named_type(
     types: &mut TypeTable,
 ) -> Result<TypeId, TypeLowerError> {
     let name_str = interner.resolve(name.name);
+
+    if name_str == "saturatus" {
+        let Some(type_params) = generic_type_exprs(params) else {
+            return Err(TypeLowerError::Issue(
+                "generic_size_argument_in_type_position",
+            ));
+        };
+        let mut error = None;
+        let ty = crate::numeric_width::lower_saturating_word(
+            &type_params,
+            interner,
+            types,
+            &mut |issue| {
+                error = Some(issue);
+            },
+        );
+        if let Some(issue) = error {
+            return Err(TypeLowerError::Issue(issue.issue()));
+        }
+        return Ok(ty);
+    }
 
     if name_str == "modulus" {
         let Some(type_params) = generic_type_exprs(params) else {

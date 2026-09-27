@@ -165,6 +165,12 @@ impl super::FaberCodegen<'_> {
                 width.faber_marker()
             ),
 
+            Type::SaturatingWord(width) => format!(
+                "{}<{}>",
+                surface.type_surface(TypeBindingKind::SaturatingWord),
+                width.faber_marker()
+            ),
+
             Type::Option(inner) => {
                 let inner = self.type_to_faber(self.flatten_option(*inner), names, surface);
                 format!("{inner} ∪ {}", surface.contextual_keyword("nihil"))
@@ -256,6 +262,9 @@ impl super::FaberCodegen<'_> {
                         surface.type_surface(TypeBindingKind::Primitive(Primitive::Fractus))
                     }
                     MarkerFamily::Modulus => surface.contextual_keyword("modulus"),
+                    MarkerFamily::Saturatus => {
+                        surface.type_surface(TypeBindingKind::SaturatingWord)
+                    }
                     MarkerFamily::Instans => {
                         surface.type_surface(TypeBindingKind::Primitive(Primitive::Instans))
                     }
@@ -551,6 +560,14 @@ impl super::FaberCodegen<'_> {
                 Ok(format!(
                     "{}<{}>",
                     surface.contextual_keyword("modulus"),
+                    width.faber_marker()
+                ))
+            }
+            Type::SaturatingWord(width) => {
+                Self::expect_no_form_args(form)?;
+                Ok(format!(
+                    "{}<{}>",
+                    surface.type_surface(TypeBindingKind::SaturatingWord),
                     width.faber_marker()
                 ))
             }

@@ -371,6 +371,7 @@ impl UseVisitor<'_> {
             Type::Primitive(_)
             | Type::SizedNumeric(_, _)
             | Type::ModularWord(_)
+            | Type::SaturatingWord(_)
             | Type::SizedInstans(_)
             | Type::Tuple(_)
             | Type::Param(_)

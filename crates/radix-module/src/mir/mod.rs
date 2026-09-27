@@ -264,6 +264,9 @@ mod potentia_tests;
 #[path = "rank2_reduction_readiness_test.rs"]
 mod rank2_reduction_readiness_tests;
 #[cfg(test)]
+#[path = "saturating_word_test.rs"]
+mod saturating_word_tests;
+#[cfg(test)]
 #[path = "tensor_operation_floor_test.rs"]
 mod tensor_operation_floor_tests;
 #[cfg(test)]

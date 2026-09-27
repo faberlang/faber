@@ -808,6 +808,7 @@ fn build_type_fallbacks(type_surfaces: &HashMap<TypeBindingKind, String>) -> Vec
                 .map(|spec| TypeBindingKind::TensorFamily(spec.kind)),
         )
         .chain(std::iter::once(TypeBindingKind::ModularWord))
+        .chain(std::iter::once(TypeBindingKind::SaturatingWord))
         .chain(std::iter::once(TypeBindingKind::ByteWord))
         .filter(|kind| !type_surfaces.contains_key(kind))
         .collect()
@@ -834,6 +835,7 @@ fn latin_type_surface(kind: TypeBindingKind) -> &'static str {
             .find(|spec| spec.canonical && spec.kind == family)
             .map_or("ignotum", |spec| spec.text),
         TypeBindingKind::ModularWord => "modulus",
+        TypeBindingKind::SaturatingWord => "saturatus",
         TypeBindingKind::ByteWord => "octetus",
         // Relational type names keep the canonical Latin spelling as the
         // Latin fallback (identity surface; all 8 packs own rows today).
@@ -991,6 +993,8 @@ pub enum TypeBindingKind {
     Collection(CollectionKind),
     TensorFamily(TensorFamilyKind),
     ModularWord,
+    /// `saturatus<W>` (en `saturating<W>`): the clamping integer family (D11.1).
+    SaturatingWord,
     /// `octetus` (en `byte`): the byte scalar, an exact alias of
     /// `numerus<u8>` (D10.4) and the element of `octeti`.
     ByteWord,
@@ -1308,6 +1312,15 @@ pub fn latin_locale_pack() -> LocalePack {
             canonical: "modulus_t".to_owned(),
             aliases: Vec::new(),
             kind: TypeBindingKind::ModularWord,
+        },
+    );
+    types.insert(
+        "saturatus".to_owned(),
+        TypeBinding {
+            key: "saturatus".to_owned(),
+            canonical: "saturatus".to_owned(),
+            aliases: Vec::new(),
+            kind: TypeBindingKind::SaturatingWord,
         },
     );
     types.insert(
@@ -2348,6 +2361,9 @@ fn canonical_and_aliases(
 fn type_binding_kind_for_key(key: &str) -> Option<TypeBindingKind> {
     if key == "modulus" {
         return Some(TypeBindingKind::ModularWord);
+    }
+    if key == "saturatus" {
+        return Some(TypeBindingKind::SaturatingWord);
     }
     if key == "octetus" {
         return Some(TypeBindingKind::ByteWord);

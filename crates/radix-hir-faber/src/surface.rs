@@ -13,6 +13,8 @@ pub enum TypeBindingKind {
     Collection(CollectionKind),
     TensorFamily(TensorFamilyKind),
     ModularWord,
+    /// `saturatus<W>` (en `saturating<W>`, D11.1).
+    SaturatingWord,
     /// Compiler-owned conversation family (DECISIONS D6.16).
     Frame(FrameFamily),
 }

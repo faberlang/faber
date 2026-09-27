@@ -526,6 +526,7 @@ impl TypeName for Type {
             Type::Atomic(_) => "atomic",
             Type::Intervallum(_) => "intervallum",
             Type::ModularWord(_) => "modular",
+            Type::SaturatingWord(_) => "saturating",
             Type::Union(_) => "union",
             Type::Intersection(_) => "intersection",
             Type::Ref(_, _) => "ref",

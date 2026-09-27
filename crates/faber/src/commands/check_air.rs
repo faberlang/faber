@@ -429,7 +429,7 @@ fn is_numeric_or_tensor(ty: TypeId, types: &TypeTable) -> bool {
         Type::Alias(_, inner) => is_numeric_or_tensor(*inner, types),
         Type::Primitive(Primitive::Numerus | Primitive::Fractus) => true,
         Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _) => true,
-        Type::ModularWord(_) => true,
+        Type::ModularWord(_) | Type::SaturatingWord(_) => true,
         _ => false,
     }
 }

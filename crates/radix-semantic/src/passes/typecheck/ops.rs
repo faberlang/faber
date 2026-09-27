@@ -72,9 +72,10 @@ impl TypeChecker<'_> {
         let rhs_shape = self.numeric_shape(self.resolve_inferred_type(rhs));
         if lhs_shape
             .zip(rhs_shape)
-            .is_some_and(|(lhs, rhs)| lhs.modular != rhs.modular)
+            .is_some_and(|(lhs, rhs)| lhs.family != rhs.family)
         {
-            self.invalid_operand_types(MODULAR_WORD_FAMILY_MISMATCH, span);
+            let issue = family_mismatch_issue(lhs_shape, rhs_shape);
+            self.invalid_operand_types(issue, span);
             return self.error_type;
         }
 
@@ -141,8 +142,9 @@ impl TypeChecker<'_> {
             self.invalid_operand_types(NUMERIC_ARITHMETIC_OPERANDS_IDENTICAL, span);
             return self.error_type;
         }
-        if lhs_shape.modular != rhs_shape.modular {
-            self.invalid_operand_types(MODULAR_WORD_FAMILY_MISMATCH, span);
+        if lhs_shape.family != rhs_shape.family {
+            let issue = family_mismatch_issue(Some(lhs_shape), Some(rhs_shape));
+            self.invalid_operand_types(issue, span);
             return self.error_type;
         }
 
@@ -405,7 +407,7 @@ impl TypeChecker<'_> {
         let Some(rhs) = self.numeric_shape(rhs) else {
             return false;
         };
-        lhs.prim == rhs.prim && lhs.width == rhs.width && lhs.modular == rhs.modular
+        lhs.prim == rhs.prim && lhs.width == rhs.width && lhs.family == rhs.family
     }
 
     fn numeric_shape(&self, ty: TypeId) -> Option<NumericShape> {
@@ -414,24 +416,29 @@ impl TypeChecker<'_> {
             Type::Primitive(Primitive::Numerus) => Some(NumericShape {
                 prim: Primitive::Numerus,
                 width: NumericWidth::I64,
-                modular: false,
+                family: IntFamily::Plain,
             }),
             Type::Primitive(Primitive::Fractus) => Some(NumericShape {
                 prim: Primitive::Fractus,
                 width: NumericWidth::F64,
-                modular: false,
+                family: IntFamily::Plain,
             }),
             Type::SizedNumeric(prim @ (Primitive::Numerus | Primitive::Fractus), width) => {
                 Some(NumericShape {
                     prim: *prim,
                     width: *width,
-                    modular: false,
+                    family: IntFamily::Plain,
                 })
             }
             Type::ModularWord(width) => Some(NumericShape {
                 prim: Primitive::Numerus,
                 width: *width,
-                modular: true,
+                family: IntFamily::Modular,
+            }),
+            Type::SaturatingWord(width) => Some(NumericShape {
+                prim: Primitive::Numerus,
+                width: *width,
+                family: IntFamily::Saturating,
             }),
             Type::Alias(_, target) => self.numeric_shape(*target),
             _ => None,
@@ -446,13 +453,13 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         if matches!(
             self.types.get(lhs),
-            Type::SizedNumeric(_, _) | Type::ModularWord(_)
+            Type::SizedNumeric(_, _) | Type::ModularWord(_) | Type::SaturatingWord(_)
         ) {
             return lhs;
         }
         if matches!(
             self.types.get(rhs),
-            Type::SizedNumeric(_, _) | Type::ModularWord(_)
+            Type::SizedNumeric(_, _) | Type::ModularWord(_) | Type::SaturatingWord(_)
         ) {
             return rhs;
         }
@@ -706,12 +713,19 @@ impl TypeChecker<'_> {
             return self.error_type;
         };
 
+        if lhs_shape.family == IntFamily::Saturating || rhs_shape.family == IntFamily::Saturating {
+            // D11.1: clamping has no bit-pattern meaning; bitwise and shift
+            // operators stay on `numerus` and `modulus` (fail closed).
+            self.invalid_operand_types(SATURATING_WORD_OPERATOR_UNSUPPORTED, span);
+            return self.error_type;
+        }
         if lhs_shape.width != rhs_shape.width {
             self.invalid_operand_types(SAME_WIDTH_INTEGER_OPERANDS_REQUIRED, span);
             return self.error_type;
         }
-        if lhs_shape.modular != rhs_shape.modular {
-            self.invalid_operand_types(MODULAR_WORD_FAMILY_MISMATCH, span);
+        if lhs_shape.family != rhs_shape.family {
+            let issue = family_mismatch_issue(Some(lhs_shape), Some(rhs_shape));
+            self.invalid_operand_types(issue, span);
             return self.error_type;
         }
 
@@ -779,6 +793,15 @@ impl TypeChecker<'_> {
         let target_ty = self.check_lvalue(target);
         if !self.is_integer(target_ty) {
             self.invalid_operand_types(POSTFIX_INC_DEC_NUMERUS_OPERAND, span);
+            return;
+        }
+        if self
+            .numeric_shape(self.resolve_inferred_type(target_ty))
+            .is_some_and(|shape| shape.family == IntFamily::Saturating)
+        {
+            // Fail closed until every backend carries a clamping `↑`/`↓`;
+            // `x ← x + 1` is the clamping spelling today.
+            self.invalid_operand_types(SATURATING_WORD_OPERATOR_UNSUPPORTED, span);
         }
     }
 
@@ -983,6 +1006,17 @@ impl TypeChecker<'_> {
                 if !self.is_numeric(operand_ty) {
                     self.invalid_operand_types(NUMERIC_OPERAND_REQUIRED, operand.span);
                 }
+                if self
+                    .numeric_shape(self.resolve_inferred_type(operand_ty))
+                    .is_some_and(|shape| {
+                        shape.family == IntFamily::Saturating && !shape.width.is_signed_int()
+                    })
+                {
+                    // An unsigned saturating word has no negative values to
+                    // clamp toward; negation is rejected rather than zeroed.
+                    self.invalid_operand_types(SATURATING_WORD_OPERATOR_UNSUPPORTED, operand.span);
+                    return self.error_type;
+                }
                 operand_ty
             }
             radix_hir::HirUnOp::Not => {
@@ -1021,8 +1055,12 @@ impl TypeChecker<'_> {
                     );
                     return self.numerus_type();
                 }
-                if self.integer_shape(operand_resolved).is_none() {
+                let Some(shape) = self.integer_shape(operand_resolved) else {
                     self.invalid_operand_types(INTEGER_OPERAND_REQUIRED, operand.span);
+                    return self.error_type;
+                };
+                if shape.family == IntFamily::Saturating {
+                    self.invalid_operand_types(SATURATING_WORD_OPERATOR_UNSUPPORTED, operand.span);
                     return self.error_type;
                 }
                 operand_resolved
@@ -2007,6 +2045,23 @@ const MIXED_DECIMAL_FRACTUS_ORDERING: &str = "mixed_decimal_fractus_ordering";
 const MIXED_DECIMAL_FRACTUS_EQUALITY: &str = "mixed_decimal_fractus_equality";
 const NUMERIC_ARITHMETIC_OPERANDS_IDENTICAL: &str = "numeric_arithmetic_operands_identical";
 const MODULAR_WORD_FAMILY_MISMATCH: &str = "modular_word_family_mismatch";
+const SATURATING_WORD_FAMILY_MISMATCH: &str = "saturating_word_family_mismatch";
+/// D11.1: bitwise, shift, and unsigned-negation operators on `saturatus`.
+const SATURATING_WORD_OPERATOR_UNSUPPORTED: &str = "saturating_word_operator_unsupported";
+
+/// Mixed integer families name the saturating family when it is involved,
+/// otherwise the modular family (both require an explicit `↦`).
+fn family_mismatch_issue(lhs: Option<NumericShape>, rhs: Option<NumericShape>) -> &'static str {
+    let saturating = [lhs, rhs]
+        .into_iter()
+        .flatten()
+        .any(|shape| shape.family == IntFamily::Saturating);
+    if saturating {
+        SATURATING_WORD_FAMILY_MISMATCH
+    } else {
+        MODULAR_WORD_FAMILY_MISMATCH
+    }
+}
 // TENSOR-GLYPHS-1B rank-rule diagnostics. Each carries `op` (the glyph
 // spelling) so renderers and tests identify the operator without prose.
 const GLYPH_OPERANDS_UNSUPPORTED: &str = "glyph_operands_unsupported";
@@ -2042,7 +2097,15 @@ const ARGUMENT_TYPE_MISMATCH: &str = "argument_type_mismatch";
 struct NumericShape {
     prim: Primitive,
     width: NumericWidth,
-    modular: bool,
+    family: IntFamily,
+}
+
+/// Overflow policy family of an integer shape (D11.1): trap, wrap, or clamp.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum IntFamily {
+    Plain,
+    Modular,
+    Saturating,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

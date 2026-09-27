@@ -2396,6 +2396,7 @@ impl Validator<'_, '_> {
             Type::Primitive(Primitive::Numerus | Primitive::Fractus)
                 | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
                 | Type::ModularWord(_)
+                | Type::SaturatingWord(_)
         )
     }
 
@@ -2405,6 +2406,7 @@ impl Validator<'_, '_> {
             Type::Primitive(Primitive::Numerus)
                 | Type::SizedNumeric(Primitive::Numerus, _)
                 | Type::ModularWord(_)
+                | Type::SaturatingWord(_)
         )
     }
 

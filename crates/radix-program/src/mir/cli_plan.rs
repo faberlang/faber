@@ -1429,6 +1429,7 @@ pub(super) fn import_semantic_type_with_nominal(
         }
         Type::SizedNumeric(primitive, width) => target.sized_numeric(primitive, width),
         Type::ModularWord(width) => target.intern(Type::ModularWord(width)),
+        Type::SaturatingWord(width) => target.intern(Type::SaturatingWord(width)),
         Type::SizedInstans(precision) => target.intern(Type::SizedInstans(precision)),
         Type::Option(inner) => {
             let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);

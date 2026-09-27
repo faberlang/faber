@@ -2557,7 +2557,7 @@ impl<'a> FunctionBuilder<'a> {
             match self.types.get(ty) {
                 Type::Alias(_, inner) => ty = *inner,
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64) => return true,
-                Type::ModularWord(NumericWidth::U64) => return true,
+                Type::ModularWord(NumericWidth::U64) | Type::SaturatingWord(NumericWidth::U64) => return true,
                 _ => return false,
             }
         }

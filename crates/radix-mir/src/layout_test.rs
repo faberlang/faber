@@ -124,7 +124,9 @@ fn intended_bucket(ty: &Type) -> Bucket {
             | Primitive::Valor
             | Primitive::Instans,
         ) => Bucket::OpaqueHandle,
-        Type::SizedNumeric(_, _) | Type::ModularWord(_) => Bucket::Physical,
+        Type::SizedNumeric(_, _) | Type::ModularWord(_) | Type::SaturatingWord(_) => {
+            Bucket::Physical
+        }
         // MLC-4: `sparsa` with a scalar element and resolvable figura rank
         // resolves a sparse-marker `DeviceView` row.
         Type::Tensor(_, _)
@@ -197,6 +199,7 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     }
     rows.push(Type::SizedNumeric(Primitive::Numerus, NumericWidth::I64));
     rows.push(Type::ModularWord(NumericWidth::U32));
+    rows.push(Type::SaturatingWord(NumericWidth::I16));
     rows.push(Type::Tensor(float64_ty, tensor_shape));
     rows.push(Type::Vector(float64_ty, vector_width));
     rows.push(Type::Matrix(float64_ty, matrix_shape));
