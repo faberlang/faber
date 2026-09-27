@@ -4995,7 +4995,7 @@ main {
     };
 
     assert!(output.code.contains("fn split_frontmatter"));
-    assert!(output.code.contains("fn _delimiter_end"));
+    assert!(output.code.contains("fn delimiter_end"));
     assert!(!output.code.contains("norma::text::split_frontmatter"));
     assert!(!output.code.contains("faber::frame::sermo_open"));
 }
