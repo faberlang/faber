@@ -188,6 +188,10 @@ pub enum Command {
     #[command(long_about = FORMAT_LONG_ABOUT)]
     Format(FormatArgs),
 
+    /// Render exported declarations with their signatures and doc comments
+    /// (plain text, or a stable machine-readable surface with --json)
+    Doc(DocArgs),
+
     /// Convert source between reader-locale surfaces (en, la, zh-Hans, …) —
     /// HIR-backed round-trip; not a formatter (see `faber convert --help`)
     #[command(long_about = CONVERT_LONG_ABOUT)]
@@ -211,6 +215,19 @@ pub enum Command {
     /// Manage this faber installation (update / uninstall)
     #[command(name = "self")]
     SelfManage(crate::commands::self_update::SelfManageArgs),
+}
+
+/// Arguments for `faber doc`.
+#[derive(clap::Args, Debug)]
+pub struct DocArgs {
+    /// A `.fab` file, or a package directory / `faber.toml` (every package
+    /// source file under its source root)
+    #[arg(value_name = "PATH")]
+    pub input: PathBuf,
+
+    /// Emit one JSON document (`schema_version` 1) instead of plain text
+    #[arg(long)]
+    pub json: bool,
 }
 
 /// Arguments for `faber format`.
