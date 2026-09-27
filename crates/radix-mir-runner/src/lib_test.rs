@@ -1599,6 +1599,19 @@ fn provider_failure_uses_stable_identity() {
 }
 
 #[test]
+fn provider_identity_rewrite_ignores_prose_matches() {
+    // WHY: the rewrite keys on the structured code + `feature=provider` arg.
+    // A diagnostic that merely mentions the MIR dump spelling (`provider sym#`)
+    // must keep its own message and issue.
+    let error = RunnerError::internal(Span::default(), "runtime provider sym#30::sym#31")
+        .with_provider_identity("package:camera::include");
+
+    assert_eq!(error.message, "runtime provider sym#30::sym#31");
+    assert_eq!(error.issue, "runner_runtime_provider_sym_30_sym_31");
+    assert!(error.args.iter().all(|(key, _)| key != "identity"));
+}
+
+#[test]
 fn provider_identity_keeps_declared_package_route() {
     let mut interner = Interner::new();
     let provider = MirProvider {
@@ -4769,10 +4782,10 @@ fn none_step_budget_applies_default_guard_to_infinite_loop() {
     let mut host = BufferHost::default();
     let result = run_function_with_limits(&validated, MirFunctionId(0), &mut host, None, None);
     let errors = result.expect_err("default step budget must stop an infinite loop");
-    // Issue identity only: `RunnerError::internal` derives the stable issue
-    // slug from the exhaustion detail — non-renderer tests never assert the
-    // prose message (hygiene: `non_renderer_tests_do_not_assert_diagnostic_text`).
-    let exhaustion = "runner_interpreter_step_budget_exhausted_after_100000000_steps";
+    // Issue identity only: the exhaustion identity is a named constant, so the
+    // step count never enters the diagnostic identity (hygiene:
+    // `non_renderer_tests_do_not_assert_diagnostic_text`).
+    let exhaustion = RUNNER_ISSUE_STEP_BUDGET_EXHAUSTED;
     assert!(
         errors.iter().any(|error| error.issue == exhaustion),
         "expected default-budget exhaustion, got: {errors:?}"

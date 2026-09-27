@@ -37,7 +37,7 @@ use crate::schema::{
     WireRowSoftmaxPlan, WireSemanticValue, WireSemanticValueOrigin, WireSharedMemoryLayout,
     WireSsmConv1dPlan, WireSsmScanPlan, WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
     admit_executor_plan_section_v2_with_version, canonical_program_bytes,
-    canonical_unpadded_base64, content_sha256, device_identity_hash, packet_sha256_canonical,
+    canonical_unpadded_base64, device_identity_hash, packet_sha256_canonical, sha256_digest,
 };
 use radix_mir::MirProgram;
 use radix_types::TypeTable;
@@ -1029,12 +1029,12 @@ fn content_sha256_covers_decoded_bytes_never_the_base64_spelling() {
     let decoded = FIXTURE_METALLIB_BYTES;
     let base64_string = "bWV0YWxsaWItc3R1Yi12MQ=="; // the PADDED spelling of the same bytes
     assert_eq!(
-        content_sha256(decoded),
+        sha256_digest(decoded),
         "sha256:84433df026a63d867a6e10c08d574e887d0d315006fd8f0b1a48dbcbbebcd8a7"
     );
     assert_ne!(
-        content_sha256(decoded),
-        content_sha256(base64_string.as_bytes()),
+        sha256_digest(decoded),
+        sha256_digest(base64_string.as_bytes()),
         "the digest of the base64 STRING differs from the digest of the decoded bytes"
     );
     // The artifact's content digest is over its decoded bytes only: a
@@ -2913,7 +2913,7 @@ fn text_encoded_artifact_with_computed_digests_admits_cleanly() {
     let image = binary_image_with_device(Some(section));
     let bytes = encode_binary_image(&image).expect("encode binary image");
     let decoded = decode_binary_image(&bytes, TOOLCHAIN).expect("admits cleanly");
-    let expected = content_sha256(blob.as_bytes());
+    let expected = sha256_digest(blob.as_bytes());
     assert_eq!(
         decoded.device.unwrap().artifacts.artifact[0].content_sha256,
         expected
@@ -3012,7 +3012,7 @@ fn finalized_artifact_parent_provenance_is_hash_bound() {
     // P3-1 pin: a well-formed `sha256:` parent that is NOT the sibling's
     // packet digest fails closed — wrongness, not just absence.
     let mut wrong_parent = finalized.clone();
-    wrong_parent.compiler_input_packet_sha256 = Some(content_sha256(b"an unrelated packet"));
+    wrong_parent.compiler_input_packet_sha256 = Some(sha256_digest(b"an unrelated packet"));
     wrong_parent.packet_sha256 = wrong_parent.compute_packet_sha256();
     let mut section = sample_device_section();
     section.artifacts.artifact = vec![parent_input.clone(), wrong_parent];

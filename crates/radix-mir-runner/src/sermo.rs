@@ -492,9 +492,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     ),
                 ))
             }
-            (Some(SermoTerminal::Error(_) | SermoTerminal::Cancel), _) => {
-                Err(RunnerError::internal(span, "sermo reply conversion failed"))
-            }
+            (Some(SermoTerminal::Error(_) | SermoTerminal::Cancel), _) => Err(
+                RunnerError::conversion(span, "sermo reply conversion failed"),
+            ),
         }
     }
 

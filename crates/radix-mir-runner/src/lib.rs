@@ -55,6 +55,11 @@ pub(crate) const RUNNER_CODE_UNSUPPORTED: &str = "runner_unsupported";
 /// Stable diagnostic code for internal runner failures (D-02-07).
 pub(crate) const RUNNER_CODE_INTERNAL: &str = "runner_internal";
 
+/// Stable diagnostic code for recoverable conversion failures: malformed
+/// source text or a value outside the target width (SA-002). The `cape`
+/// classifier keys on this code, never on the rendered message.
+pub(crate) const RUNNER_CODE_CONVERSION: &str = "runner_conversion";
+
 /// Malformed input to the failable JSON parser follows its text alternate exit.
 pub(crate) const RUNNER_JSON_PARSE_FAILED: &str = "runner_json_parse_failed";
 
@@ -62,6 +67,14 @@ pub(crate) const RUNNER_JSON_PARSE_FAILED: &str = "runner_json_parse_failed";
 /// function. The runner's execution policy keys on MIR shader-stage metadata,
 /// not on source names or rendered diagnostic text.
 pub const RUNNER_KERNEL_REFUSED_ISSUE: &str = "runner_kernel_refused";
+
+/// Stable diagnostic identity for a step-budget stop. The step count is a
+/// message fact and never part of the identity: a caller that bounds an
+/// execution keys on this, not on the rendered wording.
+pub const RUNNER_ISSUE_STEP_BUDGET_EXHAUSTED: &str = "runner_interpreter_step_budget_exhausted";
+
+/// Stable diagnostic identity for a wall-clock deadline stop.
+pub const RUNNER_ISSUE_WALL_CLOCK_TIMEOUT: &str = "runner_wall_clock_timeout_exceeded";
 
 /// Issue stem for the unsupported family; identity comes from the structured
 /// code + feature arg, never from parsing the prose message.
@@ -128,13 +141,30 @@ impl RunnerError {
         }
     }
 
+    /// Recoverable conversion failure (`cape`-able): malformed source text or a
+    /// value outside the target width (SA-002).
+    ///
+    /// Carries [`RUNNER_CODE_CONVERSION`] so the caller classifies it from the
+    /// structured code instead of the message wording.
+    pub(crate) fn conversion(span: Span, message: impl Into<String>) -> Self {
+        let message = message.into();
+        let issue = format!("runner_{}", runner_slug(&message));
+        Self {
+            args: vec![("detail".to_owned(), message.clone())],
+            issue,
+            span,
+            code: RUNNER_CODE_CONVERSION,
+            message,
+        }
+    }
+
     fn is_conversion_failure(&self) -> bool {
-        // WHY: both parse failures ("... conversion failed") and width-overflow
-        // failures ("... conversion out of range", SA-002) are recoverable
+        // WHY: parse failures ("... conversion failed") and width-overflow
+        // failures ("... conversion out of range", SA-002) are both recoverable
         // `cape`-able conversion failures — parity with Rust codegen's fallible
-        // `.parse::<W>()` path.
-        self.message.ends_with(" conversion failed")
-            || self.message.ends_with(" conversion out of range")
+        // `.parse::<W>()` path. The structured code carries that fact; the
+        // message wording never classifies a diagnostic.
+        self.code == RUNNER_CODE_CONVERSION
     }
 }
 
@@ -331,6 +361,36 @@ pub fn run_entry<H: Host + ?Sized>(
     validated: &ValidatedMir<'_>,
     host: &mut H,
 ) -> Result<(), Vec<RunnerError>> {
+    let entry = explicit_entry_id(validated)?;
+    run_function_unbounded(validated, entry, host)
+}
+
+/// Run the entry (`incipit`) function under explicit interpreter limits.
+///
+/// The bounded counterpart to [`run_entry`]: in-process classifiers that
+/// execute corpus programs (the coverage matrix) use this so a program with
+/// unbounded work stops at a named limit instead of stalling the caller.
+/// `step_budget: None` applies [`DEFAULT_TEST_STEP_BUDGET`]; a deadline is
+/// checked cooperatively every [`DEADLINE_CHECK_INTERVAL`] steps.
+///
+/// # Errors
+///
+/// Returns a list of runner errors if the program cannot be executed, the step
+/// budget is exhausted ([`RUNNER_ISSUE_STEP_BUDGET_EXHAUSTED`]), or the
+/// wall-clock deadline passes ([`RUNNER_ISSUE_WALL_CLOCK_TIMEOUT`]).
+pub fn run_entry_with_limits<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    host: &mut H,
+    step_budget: Option<u64>,
+    deadline: Option<Instant>,
+) -> Result<(), Vec<RunnerError>> {
+    let entry = explicit_entry_id(validated)?;
+    run_function_with_limits(validated, entry, host, step_budget, deadline)
+}
+
+/// Resolve the explicit entry function's id, or the refusal for a program that
+/// has none. Both entry runners share this so their pre-execution errors agree.
+fn explicit_entry_id(validated: &ValidatedMir<'_>) -> Result<MirFunctionId, Vec<RunnerError>> {
     let context = validated.validation();
     let program = validated.program();
     let interner = context.interner.as_interner().ok_or_else(|| {
@@ -340,13 +400,15 @@ pub fn run_entry<H: Host + ?Sized>(
         )]
     })?;
     let names = radix_mir::names::MirNames::new(program, context.types.as_table(), interner);
-    let Some(entry) = names.explicit_entry_function() else {
-        return Err(vec![RunnerError::internal(
-            Span::default(),
-            "no entry function in MIR program",
-        )]);
-    };
-    run_function_unbounded(validated, entry.id, host)
+    names
+        .explicit_entry_function()
+        .map(|entry| entry.id)
+        .ok_or_else(|| {
+            vec![RunnerError::internal(
+                Span::default(),
+                "no entry function in MIR program",
+            )]
+        })
 }
 
 /// Run the explicit entry function with the diagnostic meter armed.
@@ -908,16 +970,20 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             && let Some(deadline) = self.deadline
             && Instant::now() >= deadline
         {
-            self.errors
-                .push(RunnerError::internal(span, "wall-clock timeout exceeded"));
+            self.errors.push(RunnerError::internal_with_issue(
+                span,
+                "wall-clock timeout exceeded",
+                RUNNER_ISSUE_WALL_CLOCK_TIMEOUT,
+            ));
             return false;
         }
         if let Some(limit) = self.step_limit
             && self.steps_taken >= limit
         {
-            self.errors.push(RunnerError::internal(
+            self.errors.push(RunnerError::internal_with_issue(
                 span,
                 format!("interpreter step budget exhausted after {limit} steps"),
+                RUNNER_ISSUE_STEP_BUDGET_EXHAUSTED,
             ));
             return false;
         }

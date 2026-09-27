@@ -522,7 +522,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     ) {
                         Ok(value) => value,
                         Err(_) => {
-                            return Err(RunnerError::internal(
+                            return Err(RunnerError::conversion(
                                 span,
                                 "valor to genus conversion failed",
                             ));
@@ -537,7 +537,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                         .eval_struct_default(def_id, name, struct_defaults, span)?
                         .unwrap_or(default),
                     None => {
-                        return Err(RunnerError::internal(
+                        return Err(RunnerError::conversion(
                             span,
                             "valor to genus conversion failed",
                         ));
@@ -578,14 +578,14 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         match self.types.get(target) {
             Type::Primitive(Primitive::Nihil) => match value {
                 Value::Nil => Ok(Value::Nil),
-                _ => Err(RunnerError::internal(
+                _ => Err(RunnerError::conversion(
                     span,
                     "valor to nihil conversion failed",
                 )),
             },
             Type::Primitive(Primitive::Bivalens) => match value {
                 Value::Bool(value) => Ok(Value::Bool(value)),
-                _ => Err(RunnerError::internal(
+                _ => Err(RunnerError::conversion(
                     span,
                     "valor to bivalens conversion failed",
                 )),
@@ -593,7 +593,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {
                 match value {
                     Value::Int(value) => Ok(Value::Int(value)),
-                    _ => Err(RunnerError::internal(
+                    _ => Err(RunnerError::conversion(
                         span,
                         "valor to numerus conversion failed",
                     )),
@@ -603,7 +603,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 match value {
                     Value::Float(value) => Ok(Value::Float(value)),
                     Value::Int(value) => Ok(Value::Float(value as f64)),
-                    _ => Err(RunnerError::internal(
+                    _ => Err(RunnerError::conversion(
                         span,
                         "valor to fractus conversion failed",
                     )),
@@ -612,7 +612,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Type::Primitive(Primitive::Textus) => match value {
                 Value::Str(value) => Ok(Value::Str(value)),
                 Value::Instans(value) => Ok(Value::Str(value.to_rfc3339())),
-                _ => Err(RunnerError::internal(
+                _ => Err(RunnerError::conversion(
                     span,
                     "valor to textus conversion failed",
                 )),
@@ -620,7 +620,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Type::Primitive(Primitive::Ascii) => match value {
                 Value::Ascii(b) => Ok(Value::Ascii(b)),
                 Value::Str(value) if value.is_ascii() => Ok(Value::Str(value)),
-                _ => Err(RunnerError::internal(
+                _ => Err(RunnerError::conversion(
                     span,
                     "valor to ascii conversion failed",
                 )),
@@ -644,12 +644,12 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     }
                 };
                 instans.map(Value::Instans).ok_or_else(|| {
-                    RunnerError::internal(span, "valor to instans conversion failed")
+                    RunnerError::conversion(span, "valor to instans conversion failed")
                 })
             }
             Type::Array(element) => {
                 let Value::Array(items) = value else {
-                    return Err(RunnerError::internal(
+                    return Err(RunnerError::conversion(
                         span,
                         "valor to lista conversion failed",
                     ));
@@ -672,7 +672,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Type::Map(key, value_ty) => {
                 self.require_textus_map_key(*key, span)?;
                 let Value::Map(items) = value else {
-                    return Err(RunnerError::internal(
+                    return Err(RunnerError::conversion(
                         span,
                         "valor to tabula conversion failed",
                     ));
@@ -712,14 +712,14 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                         missing_policy,
                     )
                 }
-                _ => Err(RunnerError::internal(
+                _ => Err(RunnerError::conversion(
                     span,
                     "valor to genus conversion failed",
                 )),
             },
             Type::Tensor(element, _) => {
                 let Value::Array(items) = value else {
-                    return Err(RunnerError::internal(
+                    return Err(RunnerError::conversion(
                         span,
                         "valor to tensor conversion failed",
                     ));
@@ -821,7 +821,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         if let Some(recovery) = recovery {
             self.eval_recovery(recovery, span)
         } else {
-            Err(RunnerError::internal(span, message))
+            Err(RunnerError::conversion(span, message))
         }
     }
 }

@@ -132,6 +132,13 @@ impl MirDeviceContext {
         self.by_def_id.get(&def_id).copied()
     }
 
+    /// The declared per-def role map, for callers that hand roles to an
+    /// emitter probe (the probes take the map, not a built context).
+    #[must_use]
+    pub fn roles_by_def(&self) -> &FxHashMap<DefId, MirDeviceRole> {
+        &self.by_def_id
+    }
+
     #[must_use]
     pub fn has_roles(&self) -> bool {
         !self.by_function_id.is_empty()
