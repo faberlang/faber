@@ -29,6 +29,7 @@ role_table = [
   "conversion",
   "default",
   "equality",
+  "format",
   "generic",
   "gradient",
   "increment",
@@ -107,7 +108,7 @@ glyph = "="
 codepoint = "U+003D"
 unicode_name = "EQUALS SIGN"
 role = "assignment"
-claiming_slots = ["annotation_field", "enum_member", "field_decl", "field_init", "ut_field", "nomen_field", "ex_field", "visibilitas_field", "omnia_field", "nucleum_field", "typus_decl"]
+claiming_slots = ["annotation_field", "enum_member", "field_decl", "field_init", "ut_field", "nomen_field", "ex_field", "visibilitas_field", "omnia_field", "nucleum_field", "typus_decl", "static_decl"]
 
 [[glyphs]]
 glyph = ">"
@@ -129,6 +130,13 @@ codepoint = "U+0040"
 unicode_name = "COMMERCIAL AT"
 role = "annotation"
 claiming_slots = ["ad_annotation", "annotation_sugar", "braced_annotation", "nucleum_braced", "nucleum_sugar", "radix_annotation"]
+
+[[glyphs]]
+glyph = "¶"
+codepoint = "U+00B6"
+unicode_name = "PILCROW SIGN"
+role = "format"
+claiming_slots = ["format_expr"]
 
 [[glyphs]]
 glyph = "¬"
@@ -855,7 +863,7 @@ frontmatter   := FRONTMATTER_DELIMITER NEWLINE TOML_LINES FRONTMATTER_DELIMITER 
 program       := statement*
 statement     := annotation* statement_core
 statement_core := importa_decl | binding_decl | functio_decl | genus_decl | implendum_decl
-               | typus_decl | ordo_decl | discretio_decl | schema_decl
+               | typus_decl | ordo_decl | discretio_decl | schema_decl | static_decl
                | si_stmt | dum_stmt | itera_stmt
                | elige_stmt | discerne_stmt | custodi_stmt | fac_stmt
                | redde_stmt | reddet_stmt | tacebit_stmt | cede_stmt
@@ -866,6 +874,11 @@ statement_core := importa_decl | binding_decl | functio_decl | genus_decl | impl
 binding_decl   := fixum_decl | sit_decl | array_destruct | object_destruct | figendum_decl
 expr_stmt      := expression
 block_stmt     := '{' statement* '}'
+# `static_decl` is a top-level-only declaration (D5.8): a `generis` binding
+# inside a `block_stmt` is parsed by this same production and rejected with
+# `static_not_top_level`, the same enforcement shape as `functio_decl` /
+# `genus_decl` / `ordo_decl` / `discretio_decl` (`declaration_not_top_level`).
+static_decl    := 'generis' type_annotation IDENTIFIER '=' expression
 
 fixum_decl      := ('fixum' | 'varia') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_default?) | ('↢' expression))?
 figendum_decl := ('figendum' | 'variandum') type_annotation IDENTIFIER '←' expression
@@ -1059,10 +1072,15 @@ aut_expr         := et_expr (('aut') et_expr)*
 et_expr        := equality (('et') equality)*
 equality   := comparison equality_tail*
 equality_tail := ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉' | 'est' | 'non' 'est') comparison
-comparison := bitwise_or_expr (('≺' | '≻' | '≤' | '≥' | 'intra' | 'inter') bitwise_or_expr)*
+comparison := format_expr (('≺' | '≻' | '≤' | '≥' | 'intra' | 'inter') format_expr)*
 # Ordering operators use the canonical Unicode glyphs `≺`/`≻`/`≤`/`≥`;
 # membership uses Latin keywords `intra`/`inter` (Faber prose identity).
 # Glyph aliases such as `∈` are not in the active contract.
+# `¶` (D2.1) is looser than arithmetic and tighter than comparison, so both
+# operands of a comparison see the format tier first: `a + b ¶ ".2" ≤ 100 ¶ ".2"`
+# is `(a + b ¶ ".2") ≤ (100 ¶ ".2")`. The spec must be a string literal
+# (D2.2); `¶` does not chain (`format_chained`).
+format_expr := bitwise_or_expr ('¶' STRING)?
 bitwise_or_expr  := bitwise_xor_expr ('∨' bitwise_xor_expr)*
 bitwise_xor_expr := bitwise_and_expr ('⊻' bitwise_and_expr)*
 bitwise_and_expr := shift_expr ('∧' shift_expr)*
