@@ -291,6 +291,17 @@ struct ImportedFileType {
     decl_param_kinds: Vec<radix_syntax::GenericParamKind>,
 }
 
+/// One `@ ad` route served by an imported file, with its conversation
+/// types materialized into this file's type table (D6.11).
+#[derive(Debug, Clone, Copy)]
+pub struct ImportedAdRoute {
+    pub route: LexSymbol,
+    /// Handler parameter type, or `nihil`.
+    pub opener: TypeId,
+    /// Item type, or `vacuum`.
+    pub reply: TypeId,
+}
+
 #[derive(Debug, Clone)]
 pub struct ImportedFileInterfaceMethod {
     /// Canonical library method identity.
@@ -697,6 +708,8 @@ pub struct Resolver {
     builtin_sermo_def_id: Option<DefId>,
     builtin_meus_def_id: Option<DefId>,
     builtin_tuus_def_id: Option<DefId>,
+    /// Conversation types of `@ ad` routes served by imported files (D6.11).
+    imported_ad_routes: Vec<ImportedAdRoute>,
     builtin_status_variants: Vec<(DefId, LexSymbol)>,
     variant_parents: FxHashMap<DefId, DefId>,
     variants_by_parent_name: FxHashMap<(DefId, LexSymbol), DefId>,
@@ -818,6 +831,7 @@ impl Resolver {
             builtin_sermo_def_id: None,
             builtin_meus_def_id: None,
             builtin_tuus_def_id: None,
+            imported_ad_routes: Vec::new(),
             builtin_status_variants: Vec::new(),
             variant_parents: FxHashMap::default(),
             variants_by_parent_name: FxHashMap::default(),
@@ -1311,7 +1325,64 @@ impl Resolver {
             }
         }
         self.file_interfaces = imported_interfaces;
+        self.import_ad_routes(interfaces, interner, types);
         Ok(skipped)
+    }
+
+    /// Materialize the conversation types of imported `@ ad` handlers. A
+    /// route whose opener or reply names a nominal this file cannot see stays
+    /// untyped: its call sites keep bare `sermo` (D6.12).
+    fn import_ad_routes(
+        &mut self,
+        interfaces: &BTreeMap<String, FileInterface>,
+        interner: &mut radix_lexer::Interner,
+        types: &mut TypeTable,
+    ) {
+        let mut routes = Vec::new();
+        for export in interfaces
+            .values()
+            .flat_map(|interface| interface.routes.values())
+        {
+            let import = |snapshot: Option<&crate::file_interface::InterfaceTypeSnapshot>,
+                          fallback: radix_types::Primitive,
+                          types: &mut TypeTable,
+                          interner: &mut radix_lexer::Interner| {
+                match snapshot {
+                    Some(snapshot) => {
+                        import_interface_type_with_resolver(snapshot, types, interner, self).ok()
+                    }
+                    None => Some(types.primitive(fallback)),
+                }
+            };
+            let Some(opener) = import(
+                export.opener.as_ref(),
+                radix_types::Primitive::Nihil,
+                types,
+                interner,
+            ) else {
+                continue;
+            };
+            let Some(reply) = import(
+                export.reply.as_ref(),
+                radix_types::Primitive::Vacuum,
+                types,
+                interner,
+            ) else {
+                continue;
+            };
+            routes.push(ImportedAdRoute {
+                route: interner.intern(&export.route),
+                opener,
+                reply,
+            });
+        }
+        self.imported_ad_routes = routes;
+    }
+
+    /// Conversation types of routes served by imported files.
+    #[must_use]
+    pub fn imported_ad_routes(&self) -> &[ImportedAdRoute] {
+        &self.imported_ad_routes
     }
 
     fn import_nominal_file_export(
@@ -3643,6 +3714,7 @@ impl Resolver {
             builtin_sermo_def_id: None,
             builtin_meus_def_id: None,
             builtin_tuus_def_id: None,
+            imported_ad_routes: Vec::new(),
             builtin_status_variants: Vec::new(),
             variant_parents: FxHashMap::default(),
             variants_by_parent_name: FxHashMap::default(),

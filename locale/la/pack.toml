@@ -1436,6 +1436,14 @@ help = "fix the AST construct for lowering"
 message = "builtin scrinium type is not registered"
 help = "fix the AST construct for lowering"
 
+[diagnostics.SEM008.issues.sermo_arity]
+message = "{sermo} aut nulla argumenta generis aut duo accipit: {sermo}<O, R>"
+help = "scribe {sermo}<Aperiens, Responsum> aut {sermo} nudum"
+
+[diagnostics.SEM008.issues.sermo_missing_builtin]
+message = "builtin sermo type is not registered"
+help = "fix the AST construct for lowering"
+
 [diagnostics.SEM008.issues.series_params]
 message = "series cannot accept parameters"
 help = "fix the AST construct for lowering"
@@ -2039,6 +2047,38 @@ help = "make the expression type match the expected type"
 [diagnostics.SEM010.issues.stream_ad_opener_type_mismatch]
 message = "stream ad opener must lower to {valor}"
 help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.ad_route_opener_type_mismatch]
+message = "aperiens parametro tractatricis viae `{route}` non congruit"
+help = "transmitte valorem generis parametri tractatricis"
+
+[diagnostics.SEM010.issues.ad_route_opener_missing]
+message = "tractatrix viae `{route}` aperientem accipit, sed nullus transmissus est"
+help = "transmitte aperientem: ad '{route}' (valor)"
+
+[diagnostics.SEM010.issues.ad_route_opener_unexpected]
+message = "tractatrix viae `{route}` nullum parametrum accipit, itaque aperiens transmitti non potest"
+help = "remove aperientem: ad '{route}'"
+
+[diagnostics.SEM010.issues.sermo_reply_type_mismatch]
+message = "sermo typatus solum in genus responsi R aut in {lista}<R> convertitur"
+help = "converte in genus rei tractatricis, aut prius {sermo} nudo assigna"
+
+[diagnostics.SEM010.issues.sermo_view_type_mismatch]
+message = "genus aspectus sermoni congruere debet: {tuus} genus responsi R accipit, {meus} genus aperientis O"
+help = "genus sermonis scribe aut argumentum generis omitte ut inferatur"
+
+[diagnostics.SEM010.issues.ad_handler_send_closed]
+message = "tractatrix viae Faber scrinia posteriora legere non potest, itaque ad eam mittere non licet"
+help = "omnia in aperiente transmitte; fini() claudere licet"
+
+[diagnostics.SEM010.issues.sermo_typed_from_untyped]
+message = "{sermo} nudus scrinia {valor} portat nec sermo typatus fieri potest"
+help = "declara nexum ut {sermo} nudum, aut sermonem in via Faber aperi"
+
+[diagnostics.SEM010.issues.sermo_type_arguments_mismatch]
+message = "genera sermonis declarato {sermo}<O, R> non congruunt"
+help = "genera aperientis et rei tractatricis declara, aut annotationem omitte ut inferantur"
 
 [diagnostics.SEM010.issues.tensor_formata_element_type_mismatch]
 message = "formata target element type must match the receiver element type"

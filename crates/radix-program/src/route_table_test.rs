@@ -144,3 +144,51 @@ fn duplicate_route_across_local_modules_is_rejected() {
     };
     assert_eq!(arg(duplicate(&diagnostics), "route"), "x:y");
 }
+
+// ---- A5/U10: imported handlers type the caller's conversation (D6.11) ----
+
+fn issue_present(diagnostics: &[Diagnostic], issue: &str) -> bool {
+    diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.issue() == Some(issue))
+}
+
+fn caller_body(body: &str) -> String {
+    format!(
+        "+++\nlocale = \"en\"\n+++\n\nimport from \"shop:serve\" serve\n\nmain {{\n    print serve.marker()\n{body}\n}}\n"
+    )
+}
+
+#[test]
+fn imported_handler_types_the_opener() {
+    let dir = test_temp_dir("route-typing-imported-opener");
+    write_two_packages(
+        &dir,
+        &[("serve", SERVE_ORDERS)],
+        &caller_body("    const int n ← call 'orders:list' (\"three\") ↦ int\n    print n"),
+    );
+    let Err(diagnostics) = analyze(&dir) else {
+        panic!("opener mismatch must fail");
+    };
+    assert!(
+        issue_present(&diagnostics, "ad_route_opener_type_mismatch"),
+        "{diagnostics:?}"
+    );
+}
+
+#[test]
+fn imported_handler_types_the_reply() {
+    let dir = test_temp_dir("route-typing-imported-reply");
+    write_two_packages(
+        &dir,
+        &[("serve", SERVE_ORDERS)],
+        &caller_body("    const string n ← call 'orders:list' (3) ↦ string\n    print n"),
+    );
+    let Err(diagnostics) = analyze(&dir) else {
+        panic!("reply mismatch must fail");
+    };
+    assert!(
+        issue_present(&diagnostics, "sermo_reply_type_mismatch"),
+        "{diagnostics:?}"
+    );
+}

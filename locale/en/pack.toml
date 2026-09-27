@@ -1645,6 +1645,14 @@ help = "fix the AST construct for lowering"
 message = "builtin scrinium type is not registered"
 help = "fix the AST construct for lowering"
 
+[diagnostics.SEM008.issues.sermo_arity]
+message = "{sermo} takes no type arguments or exactly two: {sermo}<O, R>"
+help = "write {sermo}<Opener, Reply> or bare {sermo}"
+
+[diagnostics.SEM008.issues.sermo_missing_builtin]
+message = "builtin sermo type is not registered"
+help = "fix the AST construct for lowering"
+
 [diagnostics.SEM008.issues.series_params]
 message = "series cannot accept parameters"
 help = "fix the AST construct for lowering"
@@ -2248,6 +2256,38 @@ help = "make the expression type match the expected type"
 [diagnostics.SEM010.issues.stream_ad_opener_type_mismatch]
 message = "stream ad opener must lower to {valor}"
 help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.ad_route_opener_type_mismatch]
+message = "the opener does not match the parameter of the handler serving `{route}`"
+help = "pass a value of the handler's parameter type"
+
+[diagnostics.SEM010.issues.ad_route_opener_missing]
+message = "the handler serving `{route}` takes an opener, but none was passed"
+help = "pass the opener: ad '{route}' (value)"
+
+[diagnostics.SEM010.issues.ad_route_opener_unexpected]
+message = "the handler serving `{route}` takes no parameter, so the call cannot pass an opener"
+help = "remove the opener: ad '{route}'"
+
+[diagnostics.SEM010.issues.sermo_reply_type_mismatch]
+message = "a typed conversation materializes only as its reply type R or as {lista}<R>"
+help = "materialize as the handler's item type, or assign it to a bare {sermo} first"
+
+[diagnostics.SEM010.issues.sermo_view_type_mismatch]
+message = "the view type must match the conversation: {tuus} takes the reply type R, {meus} takes the opener type O"
+help = "use the conversation's type or omit the type argument to infer it"
+
+[diagnostics.SEM010.issues.ad_handler_send_closed]
+message = "a Faber route handler cannot read later frames, so sending toward it is not allowed"
+help = "pass all data in the opener; closing the outbound side with fini() stays legal"
+
+[diagnostics.SEM010.issues.sermo_typed_from_untyped]
+message = "a bare {sermo} carries {valor} frames and cannot become a typed conversation"
+help = "declare the binding as bare {sermo}, or open the conversation on a Faber route"
+
+[diagnostics.SEM010.issues.sermo_type_arguments_mismatch]
+message = "the conversation types do not match the declared {sermo}<O, R>"
+help = "declare the handler's opener and item types, or omit the annotation to infer them"
 
 [diagnostics.SEM010.issues.tensor_formata_element_type_mismatch]
 message = "formata target element type must match the receiver element type"

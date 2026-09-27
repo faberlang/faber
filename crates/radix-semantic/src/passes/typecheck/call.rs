@@ -703,6 +703,11 @@ impl TypeChecker<'_> {
             self.wrong_arity_with_arg("method_accepts_no_arguments", span, "method", method_label);
             return Some(self.error_type);
         }
+        if let Some(view_ty) =
+            self.check_typed_sermo_view(receiver_ty, entry.return_kind, explicit_type_args, span)
+        {
+            return Some(view_ty);
+        }
         if super::intrinsics::reject_catalog_arity(
             self,
             entry.generic,
@@ -774,6 +779,15 @@ impl TypeChecker<'_> {
         let nihil = self.types.primitive(Primitive::Nihil);
 
         match (view_kind, method_name) {
+            (DirectionalViewKind::Meus, "da") if self.is_closed_meus(receiver_ty) => {
+                self.typecheck_call_arg_exprs(args);
+                self.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    super::sermo_route::ISSUE_AD_HANDLER_SEND_CLOSED,
+                    span,
+                );
+                Some(self.error_type)
+            }
             (DirectionalViewKind::Meus, "da") => Some(self.check_known_method_args(
                 args,
                 vec![ParamType {
@@ -883,7 +897,8 @@ impl TypeChecker<'_> {
         let Type::Applied(base, args) = self.types.get(resolved) else {
             return None;
         };
-        if args.len() != 1 {
+        // A second argument is the typecheck-only closed-`meus` marker.
+        if args.is_empty() || args.len() > 2 {
             return None;
         }
         let Type::Struct(def_id) = self.types.get(*base) else {
@@ -924,14 +939,51 @@ impl TypeChecker<'_> {
         }
     }
 
-    fn is_sermo_receiver(&self, receiver_ty: TypeId) -> bool {
-        let Some(sermo_def_id) = crate::builtins::frame_types::sermo_def_id(self.resolver) else {
-            return false;
+    /// `s.tuus<T>()` / `s.meus<T>()` on `sermo<O, R>` (D6.11): the payload is
+    /// checked against, or inferred from, `R` / `O`. The `meus` view toward a
+    /// Faber handler is closed for sending. `None` for a bare conversation.
+    fn check_typed_sermo_view(
+        &mut self,
+        receiver_ty: TypeId,
+        return_kind: radix_intrinsics::NamespaceReturnKind,
+        explicit_type_args: &[TypeId],
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        let view = match return_kind {
+            radix_intrinsics::NamespaceReturnKind::SermoTuus => super::sermo_route::SermoView::Tuus,
+            radix_intrinsics::NamespaceReturnKind::SermoMeus => super::sermo_route::SermoView::Meus,
+            radix_intrinsics::NamespaceReturnKind::GenericTypus => return None,
         };
-        matches!(
-            self.types.get(self.resolve_inferred_type(receiver_ty)),
-            Type::Struct(def_id) if *def_id == sermo_def_id
-        )
+        let payload = self.typed_sermo_view_payload(receiver_ty, view, explicit_type_args, span)?;
+        if payload == self.error_type {
+            return Some(self.error_type);
+        }
+        let view_def = match view {
+            super::sermo_route::SermoView::Tuus => {
+                crate::builtins::frame_types::tuus_def_id(self.resolver)
+            }
+            super::sermo_route::SermoView::Meus => {
+                crate::builtins::frame_types::meus_def_id(self.resolver)
+            }
+        };
+        let Some(view_def) = view_def else {
+            self.missing_type_annotation("directional_view_type_not_registered", span);
+            return Some(self.error_type);
+        };
+        Some(match view {
+            super::sermo_route::SermoView::Tuus => {
+                crate::builtins::frame_types::directional_view_payload_type_id(
+                    self.types, view_def, payload,
+                )
+            }
+            super::sermo_route::SermoView::Meus => {
+                crate::builtins::frame_types::closed_meus_type_id(self.types, view_def, payload)
+            }
+        })
+    }
+
+    fn is_sermo_receiver(&self, receiver_ty: TypeId) -> bool {
+        self.sermo_shape(receiver_ty).is_some()
     }
 
     // moves params into FuncSig

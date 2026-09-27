@@ -272,6 +272,9 @@ impl TypeChecker<'_> {
         // arms recurse through `unify_with_policy` directly — so conformance
         // never leaks into type-argument positions and parameterized types
         // stay invariant (`lista<Concrete>` is not `lista<Contract>`).
+        if let Some(rejected) = self.sermo_assign_precheck(a, b, span) {
+            return rejected;
+        }
         if let Some(destination) = self.conformance_destination(a, b) {
             return destination;
         }
