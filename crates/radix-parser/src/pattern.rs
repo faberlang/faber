@@ -204,6 +204,7 @@ impl Parser {
             if self.check(&TokenKind::LBrace)
                 || self.check_keyword_ident(TokenKind::Ergo)
                 || self.check_keyword_ident(TokenKind::Et)
+                || self.check_keyword_ident(TokenKind::Aut)
             {
                 break;
             }

@@ -89,6 +89,16 @@ impl super::FaberCodegen<'_> {
                 writer.write(" ");
                 writer.write(&self.symbol_to_string(name));
             }
+            HirPattern::Or(patterns) => {
+                for (index, pattern) in patterns.iter().enumerate() {
+                    if index > 0 {
+                        writer.write(" ");
+                        writer.write(surface.keyword(TokenKind::Aut));
+                        writer.write(" ");
+                    }
+                    self.write_pattern(pattern, names, surface, writer);
+                }
+            }
             HirPattern::Variant(def_id, patterns) => {
                 // Keep an authored qualified path when lowering erased its
                 // segments. If no path fact exists, qualify only when the

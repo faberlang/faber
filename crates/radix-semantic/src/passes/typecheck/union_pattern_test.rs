@@ -525,20 +525,23 @@ fn or_pattern_accepts_payload_free_and_identical_payload_bindings() {
         r#"discretio Eventum {
     Ictus { numerus vis },
     Tactus { numerus vis },
-    Sonitus
+    Sonitus,
+    Quietus
 }
 
 functio describe(Eventum e) → textus {
     discerne e {
         casu Eventum.Ictus fixum vis aut Eventum.Tactus fixum vis { redde vis ↦ textus }
         casu Eventum.Sonitus { redde "sonitus" }
+        casu Eventum.Quietus { redde "quietus" }
     }
 }
 
 functio quiet(Eventum e) → vacuum {
     discerne e {
-        casu Eventum.Sonitus aut Eventum.Tactus fixum vis { tacet }
+        casu Eventum.Sonitus aut Eventum.Quietus { tacet }
         casu Eventum.Ictus fixum vis { tacet }
+        casu Eventum.Tactus fixum vis { tacet }
     }
 }"#,
     );
