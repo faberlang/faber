@@ -5,8 +5,8 @@
 //! an error that names each member (`union_member_not_common` when a member
 //! lacks the name, `union_member_differs` when every member has it but the
 //! types or signatures disagree). Writes follow the read rule; field
-//! mutability (D16.1) and member visibility (D5.3) have no per-field surface
-//! yet, so every declared field is today writable and public.
+//! mutability (D16.1) on writes is covered in `field_modifier_write_test.rs`; member visibility
+//! (D5.3) has no per-field surface yet.
 //!
 //! Fixtures use latin spellings because the radix unit-test harness compiles
 //! bare source without the en-locale lex pack.

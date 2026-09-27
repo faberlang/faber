@@ -27,7 +27,9 @@
 //!   target-specific lowering belong in later phases.
 
 use radix_lexer::{Span, Symbol, Token};
-use radix_syntax::{CallablePosture, GenericParamKind, JsonValue, TypeFormLevel, Visibility};
+use radix_syntax::{
+    CallablePosture, FieldModifier, GenericParamKind, JsonValue, TypeFormLevel, Visibility,
+};
 use radix_types::{
     GenericParamDescriptor, GenericParamSort, IndexId, SemanticGenericParamDefault, TypeId,
     TypeParamConstraint,
@@ -593,8 +595,10 @@ pub struct HirField {
     pub name: Symbol,
     pub ty: TypeId,
 
-    /// Whether this field belongs to the type rather than instances.
-    pub is_static: bool,
+    /// Authored leading modifier (DECISIONS D16.1): `fixum`, `varia`, or
+    /// `generis` (belongs to the type rather than instances). `None` is an
+    /// unmarked field, legal until the D5c tightening.
+    pub modifier: Option<FieldModifier>,
 
     /// Post-name declaration marker: the field is voluntary in object literals / construction.
     pub sponte: bool,
@@ -603,6 +607,20 @@ pub struct HirField {
     /// Optional source initializer/default expression.
     pub init: Option<HirExpression>,
     pub span: Span,
+}
+
+impl HirField {
+    /// Whether this field belongs to the type (`generis`) rather than instances.
+    #[must_use]
+    pub fn is_static(&self) -> bool {
+        self.modifier == Some(FieldModifier::Generis)
+    }
+
+    /// Whether this field is `fixum`: set only by construction (D16.3).
+    #[must_use]
+    pub fn is_fixum(&self) -> bool {
+        self.modifier == Some(FieldModifier::Fixum)
+    }
 }
 
 /// Method declaration paired with receiver metadata.

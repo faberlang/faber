@@ -406,14 +406,14 @@ impl<'a> LoweringContextMaps<'a> {
         let is_json_struct = annotations_contain_family(annotations, self.interner, "json");
         if is_json_struct {
             for field in &strukt.fields {
-                if !field.is_static {
+                if !field.is_static() {
                     let key = json_annotation_nomen(&field.annotations, self.interner).unwrap_or(field.name);
                     json_field_keys.insert(field.name, self.interner.resolve(key).to_owned());
                 }
             }
         }
         for field in &strukt.fields {
-            if !field.is_static {
+            if !field.is_static() {
                 fields.insert(field.name, MirType::semantic(field.ty));
                 if field.sponte || field.init.is_some() {
                     optional_fields.insert(field.name);
@@ -902,7 +902,7 @@ pub(super) fn struct_field_map(unit: &AnalyzedModule) -> FxHashMap<DefId, Vec<&H
             let fields = strukt
                 .fields
                 .iter()
-                .filter(|field| !field.is_static)
+                .filter(|field| !field.is_static())
                 .collect();
             structs.insert(item.def_id, fields);
         }

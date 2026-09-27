@@ -45,6 +45,7 @@ fn shape_error_interface() -> FileInterface {
         optional: false,
         required: true,
         default: None,
+        modifier: None,
     };
     interface.insert(FileExport {
         name: "ShapeError".to_owned(),
@@ -67,6 +68,7 @@ fn shape_error_interface() -> FileInterface {
                             optional: false,
                             required: true,
                             default: None,
+                            modifier: None,
                         },
                         InterfaceStructField {
                             name: "actual".to_owned(),
@@ -74,6 +76,7 @@ fn shape_error_interface() -> FileInterface {
                             optional: false,
                             required: true,
                             default: None,
+                            modifier: None,
                         },
                     ],
                 },

@@ -23,6 +23,10 @@ mod canonical_test;
 mod cape_roundtrip_test;
 
 #[cfg(test)]
+#[path = "field_modifier_roundtrip_test.rs"]
+mod field_modifier_roundtrip_test;
+
+#[cfg(test)]
 #[path = "conditional_roundtrip_test.rs"]
 mod conditional_roundtrip_test;
 

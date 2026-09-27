@@ -106,6 +106,8 @@ pub struct StructFieldSnapshot {
     pub ty: TypeId,
     pub optional: bool,
     pub required: bool,
+    /// Authored genus field modifier (D16.1).
+    pub modifier: Option<radix_syntax::FieldModifier>,
 }
 
 // ---------------------------------------------------------------------------
@@ -511,8 +513,11 @@ pub struct FunctionProvenanceTableWire {
 /// inheritance removed, DECISIONS D8.1); the serialized struct shape changed,
 /// so schema-v16 artifacts fail closed. Version 18 adds
 /// `HirExpressionKind::Format` (the `¶` operator, D2.1), shifting the serde
-/// ordinal of `Error`; schema-v17 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 18;
+/// ordinal of `Error`; schema-v17 artifacts fail closed. Version 19 replaces
+/// `HirField.is_static` with the authored field modifier (`fixum` / `varia`
+/// / `generis`, D16.1) and carries it on `StructFieldSnapshot`; schema-v18
+/// artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 19;
 
 /// Serializable snapshot of one analyzed provider unit carried for HIR
 /// emission (ARCH-U4 carriage).

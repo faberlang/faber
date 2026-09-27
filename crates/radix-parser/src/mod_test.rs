@@ -1908,7 +1908,7 @@ genus Animal<T> implet Canens, Currens {
     let ClassMemberKind::Field(static_field) = &class.members[1].kind else {
         panic!("expected static field");
     };
-    assert!(static_field.is_static);
+    assert!(static_field.is_static());
 }
 
 #[test]

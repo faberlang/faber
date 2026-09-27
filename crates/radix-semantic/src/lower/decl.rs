@@ -731,7 +731,7 @@ impl Lowerer<'_> {
                             false,
                             false,
                         ),
-                        is_static: field.is_static,
+                        modifier: field.modifier,
                         sponte: field.sponte,
                         annotations,
                         init,

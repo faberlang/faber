@@ -113,7 +113,8 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // serialized HIR removal, so schema-v15 artifacts fail closed.
     // Schema 17 (D8.1) drops `HirStruct.extends` and `HirStruct.is_abstract`.
     // Schema 18 (D2.1) adds `HirExpressionKind::Format`.
-    assert_eq!(SCHEMA_VERSION, 18);
+    // Schema 19 (D16.1) replaces `HirField.is_static` with the field modifier.
+    assert_eq!(SCHEMA_VERSION, 19);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────

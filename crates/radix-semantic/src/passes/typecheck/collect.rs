@@ -111,6 +111,7 @@ impl TypeChecker<'_> {
                     optional: field.sponte,
                     required: !field.sponte && field.init.is_none(),
                     span: field.span,
+                    modifier: field.modifier,
                 },
             );
         }
@@ -223,6 +224,7 @@ impl TypeChecker<'_> {
                     optional: sponte,
                     required: !sponte,
                     span,
+                    modifier: None,
                 },
             );
         }
@@ -283,6 +285,7 @@ impl TypeChecker<'_> {
                     optional: false,
                     required: true,
                     span,
+                    modifier: None,
                 },
             );
             fields.insert(
@@ -292,6 +295,7 @@ impl TypeChecker<'_> {
                     optional: false,
                     required: true,
                     span,
+                    modifier: None,
                 },
             );
         }

@@ -63,7 +63,7 @@ impl TypeChecker<'_> {
                 continue;
             }
 
-            if field.is_static {
+            if field.is_static() {
                 self.error_issue(
                     SemanticErrorKind::AnnotationInvalid,
                     ISSUE_JSON_GENUS_FIELD_TYPE_UNSUPPORTED,

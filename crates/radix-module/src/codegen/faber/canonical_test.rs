@@ -213,7 +213,7 @@ fn emits_post_name_declaration_markers_for_params_and_fields() {
                         def_id: DefId(4),
                         name,
                         ty: textus,
-                        is_static: false,
+                        modifier: None,
                         sponte: true,
                         annotations: Vec::new(),
                         init: None,

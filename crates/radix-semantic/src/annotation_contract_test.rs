@@ -344,6 +344,7 @@ functio apply() → vacuum {
                 optional: false,
                 required: true,
                 default: None,
+                modifier: None,
             }],
             methods: Vec::new(),
             annotation_contract: Some(InterfaceAnnotationContract {

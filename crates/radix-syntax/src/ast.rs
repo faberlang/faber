@@ -420,13 +420,34 @@ pub enum ClassMemberKind {
     Method(FuncDecl),
 }
 
+/// Leading modifier of a `genus` field (DECISIONS D16.1).
+///
+/// A field declares exactly one: `fixum` (per instance, set only at
+/// construction), `varia` (per instance, reassignable) or `generis` (one per
+/// type, compile-time). The modifier is optional until the D5c tightening
+/// makes it mandatory; `None` is an unmarked field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FieldModifier {
+    Fixum,
+    Varia,
+    Generis,
+}
+
 #[derive(Debug)]
 pub struct FieldDecl {
-    pub is_static: bool, // generis
-    pub sponte: bool,    // sponte — voluntary field
+    pub modifier: Option<FieldModifier>,
+    pub sponte: bool, // sponte — voluntary field
     pub ty: TypeExpr,
     pub name: Ident,
     pub init: Option<Box<Expr>>,
+}
+
+impl FieldDecl {
+    /// Whether the field belongs to the type (`generis`) rather than instances.
+    #[must_use]
+    pub fn is_static(&self) -> bool {
+        self.modifier == Some(FieldModifier::Generis)
+    }
 }
 
 #[derive(Debug)]

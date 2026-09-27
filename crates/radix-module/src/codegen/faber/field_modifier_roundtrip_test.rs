@@ -1,0 +1,60 @@
+//! Genus field modifiers survive Faber re-emission (DECISIONS D16.1).
+//!
+//! `fixum` / `varia` / `generis` are recorded on the field and re-emitted in
+//! the target locale (`const` / `var` / `static` in en). An unmarked field
+//! stays unmarked: format never invents a modifier (the codemod does that).
+
+use super::reemit_faber;
+use crate::codegen::Target;
+use crate::driver::{Config, Session};
+use crate::locale::LocalePack;
+
+fn pack(locale: &str) -> LocalePack {
+    LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path(locale))
+        .unwrap_or_else(|err| panic!("installed {locale} pack should load: {err:?}"))
+}
+
+fn reemit(source: &str, to: &str) -> String {
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirFaber)
+            .with_dev_locale_root(),
+    );
+    let result = reemit_faber(&session, &pack(to), "test.fab", source);
+    assert!(
+        result.success(),
+        "source must re-emit to {to} and re-validate:\n{source}\n{:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    result
+        .output
+        .expect("successful re-emit must carry output")
+        .code
+}
+
+const BODY: &str = "class Punctum {\n    const int x\n    var int y\n    static int Z = 3\n    int w\n}\n\nmain {\n    const Punctum p ← Punctum { x = 1, y = 2, w = 4 }\n    print p.x\n}\n";
+
+#[test]
+fn en_format_keeps_each_field_modifier() {
+    let en = format!("+++\nlocale = \"en\"\n+++\n{BODY}");
+    let formatted = reemit(&en, "en");
+    assert!(formatted.contains("    const int x\n"), "{formatted}");
+    assert!(formatted.contains("    var int y\n"), "{formatted}");
+    assert!(formatted.contains("    static int Z = 3\n"), "{formatted}");
+    assert!(formatted.contains("    int w\n"), "{formatted}");
+}
+
+#[test]
+fn en_to_la_round_trip_keeps_field_modifiers() {
+    let en = format!("+++\nlocale = \"en\"\n+++\n{BODY}");
+    let la = reemit(&en, "la");
+    assert!(la.contains("    fixum numerus x\n"), "{la}");
+    assert!(la.contains("    varia numerus y\n"), "{la}");
+    assert!(la.contains("    generis numerus Z = 3\n"), "{la}");
+    assert!(la.contains("    numerus w\n"), "{la}");
+    assert_eq!(reemit(&la, "en"), reemit(&en, "en"));
+}

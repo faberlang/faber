@@ -378,7 +378,7 @@ fn inject_scrinium(
             name: interner.intern(field_name),
             ty,
             sponte,
-            is_static: false,
+            modifier: None,
             annotations: Vec::new(),
             init: None,
             span: Span::default(),

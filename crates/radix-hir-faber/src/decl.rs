@@ -344,8 +344,12 @@ impl super::FaberCodegen<'_> {
         writer.indented(|writer| {
             for (ordinal, field) in s.fields.iter().enumerate() {
                 self.write_member_trivia(field.def_id, false, writer);
-                if field.is_static {
-                    writer.write(surface.keyword(TokenKind::Generis));
+                if let Some(modifier) = field.modifier {
+                    writer.write(surface.keyword(match modifier {
+                        radix_syntax::FieldModifier::Fixum => TokenKind::Fixum,
+                        radix_syntax::FieldModifier::Varia => TokenKind::Varia,
+                        radix_syntax::FieldModifier::Generis => TokenKind::Generis,
+                    }));
                     writer.write(" ");
                 }
                 let site = HirTypeSite {

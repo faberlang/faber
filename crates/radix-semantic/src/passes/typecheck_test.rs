@@ -896,7 +896,7 @@ fn struct_computed_key_uses_structured_issue_arg() {
                     def_id: DefId(1),
                     name: field_name,
                     ty: numerus,
-                    is_static: false,
+                    modifier: None,
                     sponte: false,
                     annotations: Vec::new(),
                     init: None,

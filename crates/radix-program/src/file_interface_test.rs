@@ -155,6 +155,7 @@ fn extract_file_interface_round_trips_public_commune_fields() {
             optional: false,
             required: true,
             default: None,
+            modifier: None,
         }]
     );
     assert_eq!(export.variants.len(), 2);
