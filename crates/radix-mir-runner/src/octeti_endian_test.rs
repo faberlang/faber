@@ -33,8 +33,11 @@ fn eval_bytes(bytes: Vec<u8>, hint: &str, width: NumericWidth) -> Result<Value, 
     let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
     let fn0 = program.functions.first().unwrap();
     runner.push_frame(fn0.id, MirBlockId(0));
-    runner.convert_to_numerus(
+    // Source type: the octeti window conversion reads its endian hint from
+    // `params`, not from the type id.
+    runner.convert_to_numerus_from(
         Value::Octeti(bytes),
+        TypeId(0),
         &[hint_sym],
         width,
         None,

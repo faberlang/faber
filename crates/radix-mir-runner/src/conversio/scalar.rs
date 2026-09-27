@@ -141,18 +141,6 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         }))
     }
 
-    #[allow(dead_code, clippy::only_used_in_recursion)]
-    pub(crate) fn convert_to_numerus(
-        &mut self,
-        value: Value,
-        params: &[Symbol],
-        width: NumericWidth,
-        recovery: Option<&MirOperand>,
-        span: Span,
-    ) -> Result<Value, RunnerError> {
-        self.convert_to_numerus_from(value, TypeId(0), params, width, recovery, span)
-    }
-
     pub(crate) fn convert_to_numerus_from(
         &mut self,
         value: Value,

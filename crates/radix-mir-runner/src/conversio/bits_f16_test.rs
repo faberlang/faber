@@ -55,7 +55,10 @@ fn eval_convert_with(
     let fn0 = program.functions.first().unwrap();
     runner.push_frame(fn0.id, MirBlockId(0));
     if matches!(target, NumericWidth::U16) {
-        runner.convert_to_numerus(value, &[bits_sym], target, None, Span::default())
+        // Source type: these carriers carry no decimal source width, so the
+        // type id is the untyped one the conversion path only reads for
+        // decimal widening.
+        runner.convert_to_numerus_from(value, TypeId(0), &[bits_sym], target, None, Span::default())
     } else if bits_hint {
         runner.convert_to_fractus(value, &[bits_sym], target, None, Span::default())
     } else {
