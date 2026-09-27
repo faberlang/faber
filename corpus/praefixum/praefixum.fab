@@ -1,64 +1,101 @@
 +++
 term = "praefixum"
 kind = "keyword"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "type_arguments", "type_argument", "praefixum_expr", "conversio_expr", "multiplicative_expr", "expression", "literal", "json_literal", "json_member", "json_value", "json_number", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix"]
+grammar = ["fab_file", "program", "statement", "statement_core", "static_decl", "praefixum_expr", "block_stmt", "genus_decl", "genus_member", "field_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "functio_decl", "redde_stmt", "fixum_decl", "itera_stmt", "range_expr", "si_stmt", "assignment", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "nota_stmt"]
 category = "comptime"
 canonical = true
-summary = "Forces compile-time evaluation of an expression."
-syntax = "praefixum(<expression>)"
+summary = "Computes a static's value at build time."
+syntax = "static <type> <name> = comptime { … return <value> }"
+related = ["generis", "insere", "redde"]
 locale = "en"
 +++
-
-
 # =============================================================================
-# praefixum — Forces compile-time evaluation of an expression.
+# praefixum — Computes a static's value at build time.
 # =============================================================================
 #
 # What this teaches:
-#   • Compile-time evaluation — `praefixum(expr)` folds expressions at compile time, enabling constant computation.
-#   • Block evaluation — `praefixum { ... }` evaluates a block at compile time for complex constants like maps.
+#   • A `comptime { … }` body is the initializer of a static. It runs once,
+#     during the build, and `return`s the value; the program only ever sees
+#     the finished literal.
+#   • The body is ordinary Faber: loops, `if`, locals, collections, genus
+#     values, and calls to pure functions.
+#   • Statics may read other statics; the build evaluates them in dependency
+#     order.
 #
 # Common mistakes:
-#   • Confusing `praefixum` (compile-time evaluation) with `scriptum` (string formatting) or `∷` (type ascription).
+#   • Using `comptime` outside a static initializer — it is legal only as
+#     `static T NAME = comptime { … }`.
+#   • The retired `comptime(expr)` form — a plain expression needs no marker:
+#     `static int N = 4 * 1024` already folds at compile time.
+#   • Reaching I/O, `call`, or async code — the build rejects the static and
+#     names the call chain that got there.
 #
-# See also: (none)
+# See also: generis, insere
 # =============================================================================
 
-# praefixum — compile-time constant evaluation
-#
-# praefixum(<expr>)   -- fold a single expression at compile time
-# praefixum { … }      -- fold a block literal at compile time
-#
 # GRAMMAR:
-#   constExpr :← 'praefixum' '(' expr ')'
-#   constBlock :← 'praefixum' block
+#   static_decl    :← 'generis' type IDENTIFIER '=' praefixum_expr
+#   praefixum_expr :← 'praefixum' block
 #
 # EXPECTED OUTPUT:
-#   pi/tau strings, computed day/hour/second counts, block-evaluated sum.
+#   praefixum.expected — the values computed at build time.
+
+class Punctum {
+    const int x
+    const int y
+}
+
+fn quadratum(int n) → int {
+    return n * n
+}
+
+# A loop that calls a pure function.
+static int SUMMA_QUADRATORUM = comptime {
+    var int total ← 0
+    for range 1‥11 const i {
+        total ← total + quadratum(i)
+    }
+    return total
+}
+
+# A collection built at build time.
+static list<int> PRIMI = comptime {
+    const list<int> found ← empty
+    for range 2‥30 const n {
+        var bool isPrime ← true
+        for range 2 ‥ n const d {
+            if n % d ≡ 0 {
+                isPrime ← false
+            }
+        }
+        if isPrime {
+            found.append(n)
+        }
+    }
+    return found
+}
+
+# Text and a genus value.
+static string LINEA = comptime {
+    var string stripe ← ""
+    for range 0‥8 const i {
+        stripe ← stripe + "="
+    }
+    return stripe
+}
+
+static Punctum ORIGO = comptime {
+    return Punctum { x = SUMMA_QUADRATORUM % 10, y = -3 }
+}
+
+# A plain static reading a build-time one folds after it.
+static int DUPLEX = SUMMA_QUADRATORUM * 2
 
 main {
-    # Constant expression
-    const _ pi ← comptime(3.14159)
-    const _ tau ← comptime((2 ↦ float) * 3.14159)
-    print "pi: §"(pi)
-    print "tau: §"(tau)
-
-    # Computation
-    const _ diesanno ← comptime(365)
-    const _ horaeanno ← comptime(365 * 24)
-    const _ secundaanno ← comptime(365 * 24 * 60 * 60)
-
-    print "dies: §"(diesanno)
-    print "horae: §"(horaeanno)
-    print "secunda: §"(secundaanno)
-
-    # Block
-    const map<string, int> codices ← comptime({
-        "ok": 200,
-        "creatum": 201,
-        "noninventum": 404,
-        "error": 500
-    })
-
-    print "codex rectus: §"(codices["ok"])
+    print SUMMA_QUADRATORUM
+    print PRIMI
+    print LINEA
+    print ORIGO.x
+    print ORIGO.y
+    print DUPLEX
 }
