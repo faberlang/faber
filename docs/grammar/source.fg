@@ -1111,9 +1111,12 @@ discerne_stmt := 'discerne' 'omnia'? discriminants '{' casu_variant_clause* cete
 discriminants := expression (',' expression)*
 casu_variant_clause  := 'casu' patterns (block_stmt | ergo_joint statement)
 patterns     := pattern ((',' | 'et') pattern)*
+# `aut` joins alternatives for one subject into one pattern; commas and `et`
+# still separate patterns for multi-subject arms.
+pattern      := pattern_atom ('aut' pattern_atom)*
 # A one-segment type name in a `discerne` arm is classified as a type pattern
 # by the parser's type-name lookahead; qualified paths remain variant patterns.
-pattern      := '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_pattern?)
+pattern_atom  := '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_pattern?)
 # The lexer never signs a number, so a pattern claims a leading `-` directly
 # before a number literal as its sign (`casu -1`). `∞` is a NUMBER, so `-∞` is
 # a negated number. `-` before anything else is not pattern syntax. A NaN
