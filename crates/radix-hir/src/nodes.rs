@@ -1903,6 +1903,9 @@ pub enum HirTriviaOwnerKind {
 
     /// The program's structural end.
     ProgramEnd,
+
+    /// The file's `regio` declaration (module doc owner, D7.7).
+    Region,
 }
 
 /// Back-reference from a presentation owner to the semantic node it annotates.
@@ -2029,6 +2032,11 @@ pub struct HirPresentation {
     /// exactly these expression ids instead of the embedded bytes.
     #[serde(default)]
     pub insere_exprs: Vec<HirInsere>,
+
+    /// The file's `regio` (en `module`) declaration, when authored (D7.7).
+    /// Emission re-renders it first; its doc block is the module doc.
+    #[serde(default)]
+    pub region: Option<HirRegion>,
 }
 
 /// One authored build-time embed: the folded literal's id and its path.
@@ -2036,6 +2044,25 @@ pub struct HirPresentation {
 pub struct HirInsere {
     pub expr: HirId,
     pub path: Symbol,
+}
+
+/// An authored `regio NAME` file-name declaration (D7.7).
+///
+/// The name is already applied at the import sites that default to it; this
+/// record keeps the declaration for re-emission and carries the module
+/// documentation anchor (D7.3, D7.6).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirRegion {
+    pub name: Symbol,
+    pub span: Span,
+
+    /// Owner of the declaration's leading trivia, when it has any.
+    pub anchor: Option<HirSourceAnchorId>,
+
+    /// Module doc: the comment block directly above the declaration with no
+    /// blank line between (D7.6), one entry per `#` line, in source order.
+    /// Empty when the file has no module doc.
+    pub doc: Vec<Symbol>,
 }
 
 /// Authored type-form facts for one source type position.

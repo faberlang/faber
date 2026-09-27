@@ -458,6 +458,7 @@ fn twin_signature_consumer_round_trip_binds_concrete_shapes() {
         file_interfaces: BTreeMap::from([("nn".to_owned(), interface)]),
         namespace_seams: BTreeMap::from([("nn".to_owned(), false)]),
         namespace_declarations: BTreeMap::new(),
+        default_import_names: BTreeMap::new(),
     };
     analyze_source(
         &session,

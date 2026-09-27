@@ -92,6 +92,10 @@ pub struct ModuleImportContract {
     /// All target top-level names including module-private, keyed by binding.
     pub namespace_declarations:
         BTreeMap<String, BTreeMap<String, crate::semantic::passes::visibility_annotation::VisibilityTier>>,
+    /// Import path spelling → the target's declared `regio` name (D7.7).
+    /// Default-named imports of these paths bind the declared name instead of
+    /// the last path segment; the keys of every map above already use it.
+    pub default_import_names: BTreeMap<String, String>,
 }
 
 /// The analyzed facts HIR provider-module emission maps over (ARCH-U4 /
@@ -3157,11 +3161,12 @@ fn analyze_source_with_kernel_template_admissions_unadjusted(
     let AnalyzeRequest { cli_program: cli_program_override, contract } = request;
     let mut diagnostics = Vec::new();
 
-    let Ok(ParsedSourceBody { body, program, mut interner, lex_pack }) =
+    let Ok(ParsedSourceBody { body, mut program, mut interner, lex_pack }) =
         parse_frontend_source(session, name, source, &mut diagnostics)
     else {
         return Err(diagnostics);
     };
+    crate::program::apply_default_import_names(&mut program, &mut interner, &contract.default_import_names);
 
     collect_target_policy_diagnostics(session.config.target, &program, name, &interner, &mut diagnostics);
     // Recovered-parse continuation: parse-phase diagnostics must not stop the
@@ -3177,7 +3182,13 @@ fn analyze_source_with_kernel_template_admissions_unadjusted(
         return Err(diagnostics);
     };
 
-    let ModuleImportContract { namespace_exports, file_interfaces, namespace_seams, namespace_declarations } = contract;
+    let ModuleImportContract {
+        namespace_exports,
+        file_interfaces,
+        namespace_seams,
+        namespace_declarations,
+        default_import_names: _,
+    } = contract;
     let insere = insere::resolve_insere_files(&program, &interner, name);
 
     let Ok(semantic_result) = analyze_semantic_program(SemanticAnalysisInput {
@@ -3947,6 +3958,7 @@ fn empty_presentation() -> HirPresentation {
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
         insere_exprs: Vec::new(),
+        region: None,
     }
 }
 

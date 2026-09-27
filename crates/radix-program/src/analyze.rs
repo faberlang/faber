@@ -45,7 +45,7 @@ use crate::library::{
     LibraryInterfaceCache, LibraryResolver, LocaleLoader, analysis_source_for_file,
     attach_library_provenance_with_links, expand_library_imports, library_cached_file_interface,
     library_interface_declaration_surface, library_interface_export_surface,
-    library_interface_has_module, library_interface_source,
+    library_interface_has_module, library_interface_source, library_module_region_name,
 };
 use crate::manifest::read_manifest;
 use crate::modules::module_segments_for_file;
@@ -590,6 +590,7 @@ fn analyze_package_spec_with_deadline(
                     file_interfaces,
                     namespace_seams,
                     namespace_declarations,
+                    default_import_names: file.default_import_names.clone(),
                 },
             },
             &kernel_template_admissions,
@@ -1074,6 +1075,7 @@ fn load_package_with_session(
     let mut queue = VecDeque::from(initial_files);
     let mut seen = BTreeSet::new();
     let mut files = Vec::new();
+    let mut file_import_targets = Vec::new();
     let mut diagnostics = Vec::new();
 
     while let Some(path) = queue.pop_front() {
@@ -1092,14 +1094,15 @@ fn load_package_with_session(
             continue;
         };
 
-        let mut library_imports = Vec::new();
-        for stmt in &loaded.program.statements {
+        let mut import_targets = Vec::new();
+        for (index, stmt) in loaded.program.statements.iter().enumerate() {
             let StmtKind::Import(decl) = &stmt.kind else {
                 continue;
             };
             let import_path = loaded.interner.resolve(decl.path);
             match resolve_import(spec, library_resolver, &canonical, import_path) {
                 ImportResolution::Local(target) => {
+                    import_targets.push((index, ImportTarget::Local(normalize_path(&target))));
                     // Test sources may import product `.fab` modules; never the reverse.
                     if is_proba_source_path(&target) {
                         diagnostics.push(
@@ -1116,15 +1119,7 @@ fn load_package_with_session(
                     }
                 }
                 ImportResolution::Library(module) => {
-                    if let Some(binding) = library_import_binding(&loaded.interner, decl, module) {
-                        library_imports.push(binding);
-                    } else {
-                        diagnostics.push(library_import_kind_diagnostic(
-                            &canonical,
-                            decl,
-                            import_path,
-                        ));
-                    }
+                    import_targets.push((index, ImportTarget::Library(module)));
                 }
                 ImportResolution::Unsupported => {
                     diagnostics.push(import_unsupported_diagnostic(&canonical, decl, import_path));
@@ -1149,9 +1144,11 @@ fn load_package_with_session(
             locale_pack: loaded.locale_pack,
             program: loaded.program,
             interner: loaded.interner,
-            library_imports,
+            library_imports: Vec::new(),
             expanded_library_imports: Vec::new(),
+            default_import_names: BTreeMap::new(),
         });
+        file_import_targets.push(import_targets);
     }
 
     if diagnostics.iter().any(radix_module::Diagnostic::is_error) {
@@ -1159,6 +1156,12 @@ fn load_package_with_session(
     } else {
         let mut library_cache =
             LibraryInterfaceCache::default().with_locale_loader(seams.locale_loader);
+        bind_package_imports(
+            &mut files,
+            file_import_targets,
+            &mut library_cache,
+            &mut diagnostics,
+        );
         for file in &mut files {
             file.expanded_library_imports = expand_library_imports(
                 &file.library_imports,
@@ -1176,6 +1179,84 @@ fn load_package_with_session(
             return Err(diagnostics);
         }
         Ok(files)
+    }
+}
+
+/// Resolved target of one import statement, recorded while the package source
+/// graph loads so default import names can be bound once every target parsed.
+enum ImportTarget {
+    Local(PathBuf),
+    Library(crate::library::ResolvedLibraryModule),
+}
+
+/// Bind every package file's imports once the whole source graph has loaded.
+///
+/// D7.7: a default-named import binds its target's declared `regio` name, so
+/// bindings wait until every local target is parsed (and library targets are
+/// read through the interface cache). The consumer's AST is rewritten in place
+/// — every later binding-keyed surface (namespace exports, file interfaces,
+/// module graph edges) reads the declared name — and the path → name map rides
+/// the file so the driver rewrites its own parse identically.
+fn bind_package_imports(
+    files: &mut [PackageFile],
+    file_import_targets: Vec<Vec<(usize, ImportTarget)>>,
+    library_cache: &mut LibraryInterfaceCache,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let local_regions = files
+        .iter()
+        .filter_map(|file| {
+            radix_module::program::program_region_name(&file.program, &file.interner)
+                .map(|region| (file.path.clone(), region))
+        })
+        .collect::<BTreeMap<_, _>>();
+    for (file, targets) in files.iter_mut().zip(file_import_targets) {
+        let mut names = BTreeMap::new();
+        for (index, target) in &targets {
+            let StmtKind::Import(decl) = &file.program.statements[*index].kind else {
+                continue;
+            };
+            if !radix_module::program::import_takes_default_name(decl) {
+                continue;
+            }
+            let region = match target {
+                ImportTarget::Local(path) => local_regions.get(path).cloned(),
+                ImportTarget::Library(module) => {
+                    match library_module_region_name(module, library_cache) {
+                        Ok(region) => region,
+                        Err(diagnostic) => {
+                            diagnostics.push(diagnostic);
+                            None
+                        }
+                    }
+                }
+            };
+            if let Some(region) = region {
+                names.insert(file.interner.resolve(decl.path).to_owned(), region);
+            }
+        }
+        radix_module::program::apply_default_import_names(
+            &mut file.program,
+            &mut file.interner,
+            &names,
+        );
+        for (index, target) in targets {
+            let (StmtKind::Import(decl), ImportTarget::Library(module)) =
+                (&file.program.statements[index].kind, target)
+            else {
+                continue;
+            };
+            if let Some(binding) = library_import_binding(&file.interner, decl, module) {
+                file.library_imports.push(binding);
+            } else {
+                diagnostics.push(library_import_kind_diagnostic(
+                    &file.path,
+                    decl,
+                    file.interner.resolve(decl.path),
+                ));
+            }
+        }
+        file.default_import_names = names;
     }
 }
 
@@ -1617,3 +1698,7 @@ fn import_binding(interner: &Interner, decl: &ImportDecl) -> Option<String> {
 #[cfg(test)]
 #[path = "analyze_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "default_import_name_test.rs"]
+mod default_import_name_test;

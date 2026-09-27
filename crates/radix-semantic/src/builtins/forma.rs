@@ -259,6 +259,7 @@ mod forma_usage_budget_test {
             }],
             span: Span::default(),
             end_trivia: Vec::new(),
+            region: None,
         }
     }
 

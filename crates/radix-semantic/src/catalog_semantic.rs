@@ -810,6 +810,9 @@ fn semantic_duplicate_definition_help(args: &[DiagnosticArg]) -> Option<String> 
             "add an explicit import alias with `ut` so the imported binding has a unique name"
                 .to_owned(),
         ),
+        "default_import_name_collision" => {
+            Some("alias one of the imports so each binding has a unique name".to_owned())
+        }
         "duplicate_commune_field" => {
             Some("declare each commune field once in the union region".to_owned())
         }

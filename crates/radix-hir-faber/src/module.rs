@@ -207,6 +207,7 @@ pub fn empty_presentation() -> HirPresentation {
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
         insere_exprs: Vec::new(),
+        region: None,
     }
 }
 
@@ -311,7 +312,7 @@ impl FaberCodegen<'_> {
         self.qualified_local_variants = self.ambiguous_local_variant_spellings(hir);
         self.imported_variant_union_path_ids = self.imported_variants_needing_union_path(hir);
 
-        let mut rendered_any_item = false;
+        let mut rendered_any_item = self.write_region(presentation, hir, surface, &mut writer);
         for (idx, item) in hir.items.iter().enumerate() {
             if is_compiler_injected_item(item) {
                 continue;
@@ -400,6 +401,34 @@ impl FaberCodegen<'_> {
             });
             u32::MAX
         })
+    }
+
+    /// Emit the file's `regio NAME` declaration (D7.7) with its leading
+    /// trivia (the module doc), first in the file. Returns whether it rendered.
+    fn write_region(
+        &self,
+        presentation: &HirPresentation,
+        hir: &HirModule,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) -> bool {
+        let Some(region) = &presentation.region else {
+            return false;
+        };
+        if let Some(trivia) = region
+            .anchor
+            .as_ref()
+            .and_then(|anchor| self.trivia.for_anchor(anchor))
+        {
+            write_leading_trivia(crate::trivia::at_file_start(trivia), self.interner, writer);
+        }
+        writer.write(surface.contextual_keyword("regio"));
+        writer.write(" ");
+        writer.writeln(&self.symbol_to_string(region.name));
+        if !self.following_slot_has_trivia(&hir.items) {
+            writer.newline();
+        }
+        true
     }
 
     /// Emit item leading trivia before the item (and before its annotations).

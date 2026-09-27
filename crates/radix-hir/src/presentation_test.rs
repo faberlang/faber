@@ -84,6 +84,7 @@ fn sample_presentation() -> HirPresentation {
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
         insere_exprs: Vec::new(),
+        region: None,
     }
 }
 

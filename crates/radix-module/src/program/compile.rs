@@ -37,6 +37,9 @@ pub(crate) struct CachedImportTarget {
     /// consumer without a fresh filesystem resolution, which would fail once
     /// the target has been deleted and change the contract across calls.
     target_path: PathBuf,
+    /// The target's declared `regio` name (D7.7): the default binding for a
+    /// path-inferred import of this target.
+    region_name: Option<String>,
     /// Analyzed unit carried for HIR emission (ARCH-U4 / S01-3): the target
     /// is analyzed once per driver run, right where this entry parses it,
     /// under the contract codegen needs — backend emission maps over carried
@@ -57,7 +60,7 @@ pub(crate) struct CachedImportTarget {
 /// scopes and deduplicates the failure).
 #[derive(Clone)]
 pub(crate) enum CachedImportTargetEntry {
-    Parsed(CachedImportTarget),
+    Parsed(Box<CachedImportTarget>),
     Unparsable(PathBuf),
 }
 
@@ -68,7 +71,7 @@ pub(crate) enum CachedImportTargetEntry {
 /// bare-driver empty contracts) live here and must not trip the fail-closed
 /// gate.
 enum ImportTargetLookup {
-    Parsed(CachedImportTarget),
+    Parsed(Box<CachedImportTarget>),
     Unparsable(PathBuf),
     Unresolved,
 }
@@ -358,6 +361,10 @@ pub(crate) struct ImportContract {
     /// namespace surface stays uninstalled — it stops silently matching — and
     /// the driver surfaces each fact as a named import-site `Diagnostic`.
     pub(crate) import_site_failures: Vec<ImportSiteFailure>,
+    /// Import path spelling → target `regio` name for default-named imports
+    /// whose target declares one (D7.7). Every binding-keyed map above is
+    /// keyed by the declared name; the driver rewrites its own parse to match.
+    pub(crate) default_import_names: BTreeMap<String, String>,
 }
 
 /// One parse-failed import target, recorded at the consumer's import site.
@@ -396,6 +403,7 @@ impl ImportContract {
             file_interfaces: self.file_interfaces,
             namespace_seams: self.namespace_seams,
             namespace_declarations: self.namespace_declarations,
+            default_import_names: self.default_import_names,
         }
     }
 }
@@ -451,7 +459,7 @@ pub fn prepare_program_module(
         frontmatter_locale_pack_from_source(&path.display().to_string(), source)
             .or_else(|| session.config.locale_pack.clone())
     };
-    let parsed = parse_program_for_namespace_exports(&path.display().to_string(), source, pack.as_ref());
+    let mut parsed = parse_program_for_namespace_exports(&path.display().to_string(), source, pack.as_ref());
     let import = parsed
         .as_ref()
         .map_or_else(ImportContract::default, |(program, interner)| {
@@ -481,6 +489,11 @@ pub fn prepare_program_module(
     let mut config = session.config.clone();
     if let Some(pack) = pack.as_ref() {
         config = config.with_resolved_locale_pack(pack.clone());
+    }
+    // Package identities key by binding: rewrite default-named imports to
+    // their targets' declared names first (D7.7), as the driver will.
+    if let Some((program, interner)) = parsed.as_mut() {
+        super::default_import::apply_default_import_names(program, interner, &import.default_import_names);
     }
     let provider_units = import.provider_units.clone();
     Ok(PreparedProgramModule {
@@ -661,11 +674,18 @@ fn cached_import_target(
     let declarations = program_declaration_surface(&target_program, &target_interner);
     let module_identity = import_target_identity(import_path, None);
     let interface = file_interface_for_program(&target_program, &target_interner, module_identity.as_ref());
-    let cached =
-        CachedImportTarget { exports, declarations, interface, target_path: target_path.clone(), provider_unit: None };
+    let region_name = super::default_import::program_region_name(&target_program, &target_interner);
+    let cached = CachedImportTarget {
+        exports,
+        declarations,
+        interface,
+        target_path: target_path.clone(),
+        region_name,
+        provider_unit: None,
+    };
     {
         let mut cache = session.memos.import_targets.borrow_mut();
-        let entry = CachedImportTargetEntry::Parsed(cached.clone());
+        let entry = CachedImportTargetEntry::Parsed(Box::new(cached.clone()));
         cache.insert(raw_key.clone(), entry.clone());
         if let Some(key) = canonical_key.clone() {
             cache.insert(key, entry);
@@ -686,7 +706,7 @@ fn cached_import_target(
             }
         }
     }
-    ImportTargetLookup::Parsed(CachedImportTarget { provider_unit: Some(provider_unit), ..cached })
+    ImportTargetLookup::Parsed(Box::new(CachedImportTarget { provider_unit: Some(provider_unit), ..cached }))
 }
 
 /// Analyze one parsed import target under the contract codegen needs
@@ -849,7 +869,7 @@ pub(crate) fn import_contract_for_parsed_file(
             crate::syntax::ImportKind::Selective { .. } => Some(interner.resolve(decl.path).to_owned()),
             kind => import_binding(interner, kind),
         };
-        let Some(binding) = binding else {
+        let Some(mut binding) = binding else {
             continue;
         };
         let import_path = interner.resolve(decl.path);
@@ -858,6 +878,17 @@ pub(crate) fn import_contract_for_parsed_file(
             continue;
         }
         let target = cached_import_target(session, path, import_path, pack_key.as_ref(), resolved_pack, templates);
+        // D7.7: a default-named import binds the target's declared `regio`
+        // name; the driver rewrites its parse through `default_import_names`.
+        if let ImportTargetLookup::Parsed(target) = &target
+            && super::default_import::import_takes_default_name(decl)
+            && let Some(region) = &target.region_name
+        {
+            binding.clone_from(region);
+            contract
+                .default_import_names
+                .insert(import_path.to_owned(), region.clone());
+        }
         let target = match target {
             ImportTargetLookup::Parsed(target) => target,
             ImportTargetLookup::Unparsable(target_path) => {
@@ -1035,6 +1066,12 @@ fn collect_transitive_same_package_interfaces(
         if !visited.insert(target.target_path.clone()) {
             continue;
         }
+        // D7.7: the producer's own default-named import binds its target's
+        // declared `regio` name, exactly as the producer's analysis does.
+        let binding = match &target.region_name {
+            Some(region) if super::default_import::import_takes_default_name(decl) => region.clone(),
+            _ => binding,
+        };
         let mut interface = target.interface.clone();
         if let Some(identity) = import_target_identity(import_path, from_identity) {
             interface.identity = Some(identity);

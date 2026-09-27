@@ -43,6 +43,7 @@ fn program(statements: Vec<Stmt>) -> Program {
         statements,
         end_trivia: Vec::new(),
         span: Span::default(),
+        region: None,
     }
 }
 

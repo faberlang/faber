@@ -55,6 +55,27 @@ pub struct Program {
     /// program end boundary so the post-parse completeness check can claim it.
     pub end_trivia: Vec<Trivia>,
     pub span: Span,
+
+    /// The file's optional `regio` (en `module`) declaration (D7.7).
+    ///
+    /// At most one, and only as the first declaration of the body (after the
+    /// peeled `+++` frontmatter, before any import). It names the file for
+    /// default import binding and anchors the module doc comment.
+    pub region: Option<RegionDecl>,
+}
+
+/// `regio NAME` — a file naming itself (D7.7).
+///
+/// The declared name is the default binding for a path-inferred import of
+/// this file; the comment block directly above it is the module doc (D7.3,
+/// D7.6).
+#[derive(Debug, Clone)]
+pub struct RegionDecl {
+    pub name: Ident,
+    pub span: Span,
+
+    /// Comments and newlines before the declaration, in source order.
+    pub leading_trivia: Vec<Trivia>,
 }
 
 // =============================================================================

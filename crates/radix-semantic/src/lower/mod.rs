@@ -81,7 +81,7 @@ use crate::{
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
     HirBlock, HirBlockEnd, HirExpression, HirId, HirItem, HirModule, HirModuleEnd, HirOwnerRef,
-    HirParamMode, HirPresentation, HirSourceAnchorId, HirStatement, HirStatementKind,
+    HirParamMode, HirPresentation, HirRegion, HirSourceAnchorId, HirStatement, HirStatementKind,
     HirTestMetadata, HirTestModifier, HirTrivia, HirTriviaAttachment, HirTriviaOwner,
     HirTriviaOwnerKind, HirTypeFormArg, HirVariantPath,
 };
@@ -272,6 +272,7 @@ impl<'a> Lowerer<'a> {
                 authored_types: Vec::new(),
                 tuple_label_accesses: Vec::new(),
                 insere_exprs: Vec::new(),
+                region: None,
             },
             local_variant_path_indices: Vec::new(),
             form_frames: Vec::new(),
@@ -368,6 +369,7 @@ impl<'a> Lowerer<'a> {
     /// HIR like a target-language module with a separate runnable body.
     pub fn lower_program(&mut self, program: &Program) -> HirModule {
         self.collect_kernel_glob_imports(program);
+        self.lower_region(program);
 
         let mut items = Vec::new();
         let mut entry = None;
@@ -520,6 +522,26 @@ impl<'a> Lowerer<'a> {
     }
 
     /// Convert syntax trivia into HIR presentation trivia, preserving order.
+    /// Record the file's `regio` declaration and its module doc (D7.7).
+    ///
+    /// The declaration's leading trivia is registered like any other owner so
+    /// re-emission keeps every comment; the doc is only the comment block
+    /// directly above the declaration (D7.6) — a block separated from it by a
+    /// blank line is a note, not documentation.
+    fn lower_region(&mut self, program: &Program) {
+        let Some(region) = &program.region else {
+            return;
+        };
+        let trivia = self.hir_trivia(&region.leading_trivia);
+        let anchor = self.register_attachment(HirTriviaOwnerKind::Region, None, trivia);
+        self.presentation.region = Some(HirRegion {
+            name: region.name.name,
+            span: region.span,
+            anchor,
+            doc: attached_doc_lines(&region.leading_trivia),
+        });
+    }
+
     fn hir_trivia(&self, trivia: &[Trivia]) -> Vec<HirTrivia> {
         trivia
             .iter()
@@ -1204,6 +1226,28 @@ fn lowering_issue_args_from_message(message: &str) -> Vec<DiagnosticArg> {
 
 fn issue_args(issue: &'static str) -> Vec<DiagnosticArg> {
     vec![DiagnosticArg::new("issue", issue)]
+}
+
+/// The comment block directly above an anchor (D7.6): trailing `#` lines of
+/// `trivia` with no blank line between them and the anchor, in source order.
+///
+/// Each comment line ends with its own newline token, so two newlines in a
+/// row (read backwards) are a blank line and end the block.
+fn attached_doc_lines(trivia: &[Trivia]) -> Vec<Symbol> {
+    let mut lines = Vec::new();
+    let mut line_ended = false;
+    for item in trivia.iter().rev() {
+        match item {
+            Trivia::Newline(_) if line_ended => break,
+            Trivia::Newline(_) => line_ended = true,
+            Trivia::CommentLine(comment) => {
+                lines.push(comment.text);
+                line_ended = false;
+            }
+        }
+    }
+    lines.reverse();
+    lines
 }
 
 #[cfg(test)]

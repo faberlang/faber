@@ -63,6 +63,9 @@ pub(crate) fn claimed_comment_spans(program: &Program) -> HashSet<u32> {
 
 fn claim_program(program: &Program, claimed: &mut HashSet<u32>) {
     claim_trivia(&program.end_trivia, claimed);
+    if let Some(region) = &program.region {
+        claim_trivia(&region.leading_trivia, claimed);
+    }
     for stmt in &program.statements {
         claim_stmt(stmt, claimed);
     }

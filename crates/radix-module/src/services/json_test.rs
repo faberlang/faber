@@ -71,6 +71,7 @@ fn presentation_json_exposes_owners_attachments_and_ends() {
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
         insere_exprs: Vec::new(),
+        region: None,
     };
 
     let json = presentation_json(&presentation, &interner);
@@ -143,6 +144,7 @@ fn presentation_json_emits_null_semantic_refs_and_null_entry_anchor() {
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
         insere_exprs: Vec::new(),
+        region: None,
     };
 
     let json = presentation_json(&presentation, &interner);
@@ -179,6 +181,7 @@ fn presentation_json_escapes_comment_payloads() {
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
         insere_exprs: Vec::new(),
+        region: None,
     };
 
     let json = presentation_json(&presentation, &interner);
