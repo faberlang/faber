@@ -36,6 +36,7 @@ pub mod hygiene;
 pub mod ident;
 pub mod names;
 pub mod text_literal;
+pub mod unsupported;
 pub use text_literal::unescape_faber_text;
 pub mod validation;
 
