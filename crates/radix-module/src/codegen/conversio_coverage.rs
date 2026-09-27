@@ -592,7 +592,8 @@ fn rust_dedicated_scalar_arm(src: ConversioTypeFamily, tgt: ConversioTypeFamily)
             | (Textus | Numerus | Bivalens, Fractus)
             | (Textus | Numerus | Fractus | Ascii, Bivalens)
             | (Numerus | Fractus | Ascii | Octeti | Instans, Textus)
-            | (Textus | Octeti, Ascii)
+            // D10.6: integer values pack into the ASCII carrier via their digits.
+            | (Textus | Numerus | Octeti, Ascii)
             | (Textus | Ascii, Regex | Octeti)
     )
 }
