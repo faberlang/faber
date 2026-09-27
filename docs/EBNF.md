@@ -1211,9 +1211,11 @@ wire operation such as `json.pange(value ↦ json)`.
 - `implet` = implements (conformance to an `implendum` contract), written
   with the contract's type arguments in full
   (`genus Persona implet Orderable<Persona>`, D1.2).
-- Every field declares exactly one of `fixum` / `varia` / `generis` (D16.1);
-  the modifier is grammatically optional today, pending a follow-up unit that
-  makes it mandatory with no default. `fixum T x`: per instance, set only in
+- Every `genus` field declares exactly one of `fixum` / `varia` / `generis`
+  (D16.1); there is no default — an unmarked field is a parse error: PARSE010
+  `field_modifier_missing` (D5c). The `discretio` shared-field position
+  (`union_member`) keeps today's unmarked form (fork F7 held).
+  `fixum T x`: per instance, set only in
   a construction literal (`Genus { field = value }`), never reassigned;
   `Genus { … } ex p` copies it unchanged (D16.3), independent of visibility
   (`@ privata` + `fixum` is legal). `varia T x`: per instance, reassignable.

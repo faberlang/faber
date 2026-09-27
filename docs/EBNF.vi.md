@@ -1211,9 +1211,11 @@ wire operation such as `json.pange(value ↦ json)`.
 - `thực_thi` = implements (conformance to an `giao_ước` contract), written
   with the contract's type arguments in full
   (`kiểu Persona thực_thi Orderable<Persona>`, D1.2).
-- Every field declares exactly one of `hằng` / `biến` / `tĩnh` (D16.1);
-  the modifier is grammatically optional today, pending a follow-up unit that
-  makes it mandatory with no default. `hằng T x`: per instance, set only in
+- Every `kiểu` field declares exactly one of `hằng` / `biến` / `tĩnh`
+  (D16.1); there is no default — an unmarked field is a parse error: PARSE010
+  `field_modifier_missing` (D5c). The `hợp_nhất` shared-field position
+  (`union_member`) keeps today's unmarked form (fork F7 held).
+  `hằng T x`: per instance, set only in
   a construction literal (`Genus { field = value }`), never reassigned;
   `Genus { … } từ p` copies it unchanged (D16.3), independent of visibility
   (`@ privata` + `hằng` is legal). `biến T x`: per instance, reassignable.

@@ -1211,9 +1211,11 @@ wire operation such as `json.pange(value ↦ json)`.
 - `實作` = implements (conformance to an `待實作介面` contract), written
   with the contract's type arguments in full
   (`類型 Persona 實作 Orderable<Persona>`, D1.2).
-- Every field declares exactly one of `定值` / `變值` / `靜態` (D16.1);
-  the modifier is grammatically optional today, pending a follow-up unit that
-  makes it mandatory with no default. `定值 T x`: per instance, set only in
+- Every `類型` field declares exactly one of `定值` / `變值` / `靜態`
+  (D16.1); there is no default — an unmarked field is a parse error: PARSE010
+  `field_modifier_missing` (D5c). The `分支聯集` shared-field position
+  (`union_member`) keeps today's unmarked form (fork F7 held).
+  `定值 T x`: per instance, set only in
   a construction literal (`Genus { field = value }`), never reassigned;
   `Genus { … } 取自 p` copies it unchanged (D16.3), independent of visibility
   (`@ privata` + `定值` is legal). `變值 T x`: per instance, reassignable.
