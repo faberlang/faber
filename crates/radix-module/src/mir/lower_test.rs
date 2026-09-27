@@ -272,10 +272,16 @@ function f0 -> ty#5 {
 // ===========================================================================
 
 #[test]
-fn lowers_top_level_const_as_entry_prefix_local() {
+fn lowers_top_level_static_as_entry_prefix_local() {
+    // D5.7 retired top-level `fixum`; the top-level equivalent is `generis`
+    // (a static, D5.8-D5.9). `generis` requires an explicit type (no `_`
+    // inference hole), but MIR entry lowering (`mir/lower.rs::lower_entry`)
+    // still lowers every top-level `HirItemKind::Constant` item — `generis`
+    // included — as a local prefixed onto the entry function; there is no
+    // separate MIR-level static/global representation.
     let dump = dump_source(
         r"
-fixum _ age ← 25
+generis numerus age = 25
 
 incipit {
     nota age
@@ -290,10 +296,11 @@ incipit {
 }
 
 #[test]
-fn lowers_top_level_const_paths_inside_functions() {
+fn lowers_top_level_static_paths_inside_functions() {
+    // D5.7 retired top-level `fixum`; the top-level equivalent is `generis`.
     let dump = dump_source(
         r"
-fixum numerus answer ← 42
+generis numerus answer = 42
 
 functio readAnswer() → numerus {
     redde answer
@@ -308,28 +315,34 @@ functio readAnswer() → numerus {
 }
 
 #[test]
-fn lowers_top_level_const_conversio_init_through_shared_conversion_owner() {
-    let dump = dump_source(
-        r#"
+fn top_level_conversio_init_rejects_as_top_level_binding() {
+    // Used to prove: an item-scope `↤` conversion-directed initializer
+    // lowers through the shared conversion owner exactly once. D5.7 retired
+    // top-level `fixum`/`varia` (SEM062); `generis` statics accept only a
+    // compile-time-evaluable `=` initializer (D5.9), which `↤` (a runtime
+    // conversion) can never be — `generis`'s own grammar only accepts `=`.
+    // There is no static equivalent for this fixture; assert the rejection.
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let source = r#"
 fixum numerus answer ↤ "42"
 
 incipit {
     nota answer
 }
-"#,
+"#;
+    let Err(errors) = crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()) else {
+        panic!("item-scope ↤ init must fail closed at analysis (SEM062)")
+    };
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.issue() == Some("top_level_binding")),
+        "expected top_level_binding rejection: {:?}",
+        errors
+            .iter()
+            .map(|e| (e.code, e.issue()))
+            .collect::<Vec<_>>()
     );
-
-    assert_eq!(
-        count_occurrences(&dump, "runtime convert runtime"),
-        1,
-        "item-scope ↤ init must convert exactly once:\n{dump}"
-    );
-    assert_eq!(
-        count_occurrences(&dump, " = %"),
-        1,
-        "item-scope ↤ init must store into the const exactly once:\n{dump}"
-    );
-    assert!(!dump.contains("unsupported"), "no unsupported surface:\n{dump}");
 }
 
 #[test]

@@ -89,20 +89,27 @@ incipit {
 }
 
 #[test]
-fn annotated_const_provides_context_for_vacua() {
+fn top_level_const_vacua_rejects_as_top_level_binding() {
+    // Used to prove: a top-level const `vacua` with a declared element type
+    // must not emit a static slice, and instead fails closed with CODEGEN001.
+    // D5.7 retired top-level `fixum`/`varia` outright (SEM062), which now
+    // fires before codegen ever sees the vacua initializer. `vacua` is also
+    // not part of the `generis` static fold evaluator's compile-time-constant
+    // surface (D5.9), so there is no static equivalent to redirect this
+    // fixture to; assert the SEM062 rejection instead.
     let result = Compiler::new(Config::default().with_target(Target::HirRust))
         .compile_str("vacua.fab", "fixum lista<numerus> name ← vacua");
     assert!(
         !result.success(),
-        "const vacua must not emit a static slice, got: {:?}",
+        "top-level fixum vacua must fail closed, got: {:?}",
         result.diagnostics
     );
     assert!(
         result
             .diagnostics
             .iter()
-            .any(|diag| diag.is_error() && diag.code == Some("CODEGEN001")),
-        "expected CODEGEN001, got: {:?}",
+            .any(|diag| diag.is_error() && diag.issue() == Some("top_level_binding")),
+        "expected top_level_binding, got: {:?}",
         result.diagnostics
     );
 }

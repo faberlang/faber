@@ -337,7 +337,14 @@ fn implicit_entry_reemits_top_level_statements() {
     // An implicit entry (no `incipit`) must not gain an explicit wrapper:
     // wrapped statements change the document form and can outlaw
     // top-level-only statements.
-    let code = assert_idempotent("fixum numerus answer ← 42\nscribe answer\n");
+    //
+    // D5.7 retired top-level `fixum`/`varia` entirely (SEM062), including
+    // under an implicit entry: `lower_program` still lowers any top-level
+    // `fixum`/`varia` statement to a module item, not an implicit-entry
+    // local. The fixture below uses only executable statements, which is
+    // what this test actually exercises (the absence of an `incipit`
+    // wrapper), not a declaration.
+    let code = assert_idempotent("scribe 40 + 2\nscribe 41 + 1\n");
     assert!(!code.contains("incipit"), "implicit entry must stay implicit:\n{code}");
 }
 
@@ -361,7 +368,10 @@ fn negated_type_check_uses_infix_non_est() {
 fn conversio_markers_ride_target_generic_arguments() {
     // `↦ numerus<u32, Be>` — markers are extra generic arguments; a trailing
     // `<Be>` append is not the source form.
-    let code = assert_idempotent("fixum numerus<u32> le ← |de ad be ef|[0‥4] ↦ numerus<u32, Be>\n");
+    //
+    // D5.7 retired top-level `fixum`; this binding moves inside `incipit`
+    // (the marker spelling under test is unrelated to item vs. local scope).
+    let code = assert_idempotent("incipit {\n    fixum numerus<u32> le ← |de ad be ef|[0‥4] ↦ numerus<u32, Be>\n}\n");
     assert!(
         code.contains("↦ numerus<u32, Be>"),
         "conversio marker must fold into the target generics:\n{code}"
@@ -372,8 +382,11 @@ fn conversio_markers_ride_target_generic_arguments() {
 fn itera_coordinates_survive_reemission() {
     // `itera ex src apud [i] fixum x` — the coordinate binding is
     // loop-visible; dropping it breaks bodies that reference it.
+    //
+    // D5.7 retired top-level `fixum`; the tensor binding moves inside
+    // `incipit` (the coordinate spelling under test is unrelated to scope).
     let code = assert_idempotent(
-        "fixum tensor<fractus<f32>, [3]> linea ← vacua\nitera ex linea apud [i] fixum n {\n    scribe i\n}\n",
+        "incipit {\n    fixum tensor<fractus<f32>, [3]> linea ← vacua\n    itera ex linea apud [i] fixum n {\n        scribe i\n    }\n}\n",
     );
     assert!(
         code.contains("itera ex linea apud [i] fixum n"),
@@ -407,7 +420,10 @@ fn extremum_coalesce_parenthesizes_binary_source() {
 fn inference_hole_locals_stay_holes() {
     // `fixum _ x ← …` must not materialize the inferred type: a materialized
     // bounded-lista annotation narrows later spread legality on re-check.
-    let code = assert_idempotent("fixum _ numeri ← [1, 2, 3]\nscribe numeri\n");
+    //
+    // D5.7 retired top-level `fixum`; this binding moves inside `incipit`
+    // (the hole spelling under test is unrelated to item vs. local scope).
+    let code = assert_idempotent("incipit {\n    fixum _ numeri ← [1, 2, 3]\n    scribe numeri\n}\n");
     assert!(code.contains("fixum _ numeri ←"), "inference hole must stay a hole:\n{code}");
 }
 
@@ -416,8 +432,11 @@ fn ratio_authored_type_stays_stable_after_witness_normalization() {
     // Record fields are stored in canonical map order, while authored ratio
     // children retain source order. Re-emission must normalize both analyses
     // without changing the authored ratio declaration.
+    //
+    // D5.7 retired top-level `fixum`; this binding moves inside `incipit`
+    // (the ratio-type spelling under test is unrelated to item vs. local scope).
     let code = assert_idempotent(
-        "fixum ratio<g: f32, w: numerus> point ← ratio<g: f32, w: numerus> { g = 1.0, w = 2 }\nscribe point.g\nscribe point.w\n",
+        "incipit {\n    fixum ratio<g: f32, w: numerus> point ← ratio<g: f32, w: numerus> { g = 1.0, w = 2 }\n    scribe point.g\n    scribe point.w\n}\n",
     );
     assert!(
         code.contains("ratio<g: f32, w: numerus> point"),
