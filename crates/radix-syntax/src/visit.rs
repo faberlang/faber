@@ -808,6 +808,11 @@ fn walk_pattern<V: Visitor>(visitor: &mut V, pattern: &Pattern) {
     };
     match pattern {
         Pattern::Wildcard(_) | Pattern::Literal(_, _) | Pattern::NegatedLiteral(_, _) => {}
+        Pattern::Or(alternatives) => {
+            for alternative in alternatives {
+                walk_pattern(visitor, alternative);
+            }
+        }
         Pattern::Ident(ident, bind) => {
             visitor.visit_ident(ident);
             if let Some(bind) = bind {
