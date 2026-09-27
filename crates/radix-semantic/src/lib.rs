@@ -756,6 +756,8 @@ pub fn analyze_with_cli(
         if let Err(e) = passes::visibility_annotation::check(program, interner) {
             diagnostics.extend(e);
         }
+        // D5.6: a leading `_` on a declared identifier is a style warning.
+        diagnostics.extend(passes::leading_underscore::check(program, interner));
 
         // lint findings include non-fatal warnings (Warning-kind entries);
         // fatality is decided downstream via SemanticError::is_error.

@@ -1004,3 +1004,54 @@ mod json_valor_tests;
 mod regression_tests;
 #[path = "templating_test.rs"]
 mod templating_tests;
+
+// -- D5.6: leading `_` (WARN030) is a warning by default, an error under
+// `deny_warnings`.
+
+const LEADING_UNDERSCORE_SOURCE: &str = r"
+functio _auxilium() → numerus { redde 1 }
+incipit { nota _auxilium() }
+";
+
+#[test]
+fn leading_underscore_is_warning_by_default() {
+    use crate::driver::{Config, Session};
+
+    let session = Session::new(Config::default());
+    let result = compile(
+        &session,
+        "lead-underscore.fab",
+        LEADING_UNDERSCORE_SOURCE,
+        ModuleCompileRequest::default(),
+    );
+
+    let warned = result
+        .diagnostics
+        .iter()
+        .find(|diag| diag.code == Some("WARN030"))
+        .unwrap_or_else(|| panic!("expected WARN030, got: {:?}", result.diagnostics));
+    assert!(!warned.is_error(), "leading `_` must stay a warning without deny policy");
+    assert!(result.output.is_some(), "a warning must not stop codegen output");
+}
+
+#[test]
+fn deny_warnings_promotes_leading_underscore_in_real_compile() {
+    use crate::driver::{Config, Session, WarnPolicy};
+
+    let session =
+        Session::new(Config::default().with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] }));
+    let result = compile(
+        &session,
+        "lead-underscore-deny.fab",
+        LEADING_UNDERSCORE_SOURCE,
+        ModuleCompileRequest::default(),
+    );
+
+    let denied = result
+        .diagnostics
+        .iter()
+        .find(|diag| diag.code == Some("WARN030"))
+        .unwrap_or_else(|| panic!("expected WARN030, got: {:?}", result.diagnostics));
+    assert!(denied.is_error(), "--deny-warnings must promote WARN030 to error");
+    assert!(result.output.is_none(), "promoted warning must stop codegen output");
+}

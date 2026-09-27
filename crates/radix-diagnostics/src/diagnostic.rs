@@ -251,6 +251,10 @@ pub enum WarningKind {
     /// kinds (D4.8): the match is compiled, but exhaustiveness was not
     /// checked, so the author is told rather than left in silence.
     CoverageUnchecked,
+    /// A declared identifier starts with `_` (other than the bare `_` hole).
+    /// Not Faber style: unmarked top-level declarations are already private
+    /// (D5.6). Warn-only; strict builds deny it through `deny_warnings`.
+    LeadingUnderscore,
 }
 
 /// Semantic diagnostic categories used by passes and command policy.

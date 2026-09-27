@@ -3690,6 +3690,14 @@ help = "add a '{ceterum}' arm, or split the match so each pattern kind is checka
 message = "coverage of this match could not be computed for its pattern kinds; exhaustiveness was not checked"
 help = "add a '{ceterum}' arm, or split the match so each pattern kind is checkable"
 
+[diagnostics.WARN030]
+message = "leading `_` on an identifier is not Faber style"
+help = "drop the leading `_`; unmarked top-level declarations are already private"
+
+[diagnostics.WARN030.issues.leading_underscore]
+message = "`{name}`: a leading `_` is not Faber style"
+help = "drop the leading `_`; unmarked top-level declarations are already private"
+
 [llm]
 system_prompt_snippet = "Emit canonical Latin Faber source using the registered Latin keywords, canonical type spellings, and invariant glyph syntax."
 exemplars = ["./exemplars/salve-munde.la.fab"]

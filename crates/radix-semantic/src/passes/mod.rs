@@ -62,6 +62,7 @@ pub mod fragment_definition;
 pub mod import_path;
 pub mod import_seam;
 pub mod kernel_namespace;
+pub mod leading_underscore;
 pub mod libera;
 pub mod lint;
 pub mod live_tuus_cursor_escape;

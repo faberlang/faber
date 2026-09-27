@@ -84,6 +84,7 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::ComplexityBudgetExceeded,
     WarningKind::RedundantMemberVisibility,
     WarningKind::CoverageUnchecked,
+    WarningKind::LeadingUnderscore,
 ];
 
 // STABLE CODES
@@ -1163,6 +1164,10 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::CoverageUnchecked => DiagnosticSpec {
             code: "WARN029",
             help: Some("add a 'ceterum' arm, or split the match so each pattern kind is checkable"),
+        },
+        WarningKind::LeadingUnderscore => DiagnosticSpec {
+            code: "WARN030",
+            help: Some("drop the leading `_`; unmarked top-level declarations are already private"),
         },
     }
 }
