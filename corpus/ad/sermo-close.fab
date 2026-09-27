@@ -1,7 +1,7 @@
 +++
 term = "sermo"
 kind = "method"
-grammar = []
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "callable_posture", "return_clause", "alternate_exit_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "binding_decl", "ad_expr", "ad_opener", "conversio_expr", "inline_default", "itera_stmt", "itera_binding", "range_expr", "range_tail", "cede_stmt", "assignment", "place", "fac_stmt", "cape_clause", "iace_stmt", "iace_expr", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "member_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
 category = "endpoint"
 canonical = true
 summary = "A sermo closes itself when its conversation completes; a pool of many keeps only the unfinished ones open, and close() ends one early and reports its error."
