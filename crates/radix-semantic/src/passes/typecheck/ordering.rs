@@ -49,9 +49,14 @@ impl TypeChecker<'_> {
         let Some(interner) = self.interner else {
             return;
         };
-        let Some(RadixContractRole::Ordering) = role_from_hir(annotations, interner) else {
+        let role = role_from_hir(annotations, interner);
+        if role == Some(RadixContractRole::Closing) {
+            self.register_local_closing_contract(def_id, interface, span);
             return;
-        };
+        }
+        if role != Some(RadixContractRole::Ordering) {
+            return;
+        }
         if !self.ordering_contract_shape_ok(interface) {
             self.errors
                 .push(contract_error(span, ISSUE_ORDERING_CONTRACT_SHAPE));
@@ -62,6 +67,7 @@ impl TypeChecker<'_> {
 
     /// Record an imported implendum whose file interface names the role.
     pub(super) fn register_imported_contract_role(&mut self, def_id: DefId) {
+        self.register_imported_closing_contract(def_id);
         if self
             .resolver
             .imported_contract_role(def_id)
@@ -167,6 +173,9 @@ impl TypeChecker<'_> {
         witness: TypeId,
         required: &ContractRef,
     ) -> bool {
+        if self.builtin_satisfies_closing(witness, required) {
+            return true;
+        }
         if self.types.ordering_contract != Some(required.contract) {
             return false;
         }

@@ -255,6 +255,11 @@ pub enum WarningKind {
     /// Not Faber style: unmarked top-level declarations are already private
     /// (D5.6). Warn-only; strict builds deny it through `deny_warnings`.
     LeadingUnderscore,
+    /// A field of a type on a reference cycle can hold a closable value
+    /// (`sermo`, or a type implementing norma's `Closable`). Reference
+    /// cycles never reach their last reference, so the value never
+    /// auto-closes (D8.3). Warn-only.
+    ClosableInCycle,
 }
 
 /// Semantic diagnostic categories used by passes and command policy.

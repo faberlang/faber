@@ -18,6 +18,7 @@ pub mod numeric_width;
 pub mod ordering;
 mod schema;
 mod schema_subset;
+pub mod type_graph;
 mod types;
 pub mod vocabulary;
 pub mod width_pattern;

@@ -20,9 +20,20 @@
 //! Go/Rust choice); a finished handler's remaining frames are drained to their
 //! terminal instead.
 //!
-//! Each conversation keeps the §2.7 record A7 closes over: id and route,
-//! answering tier, the handler task, inbound and outbound terminals, and one
-//! release point that drops the task once the inbound direction terminates.
+//! Each conversation keeps the §2.7 record: id and route, answering tier, the
+//! handler task, inbound and outbound terminals, and one release point.
+//!
+//! # Lifecycle (D8.3)
+//!
+//! A conversation takes a router slot when it opens and gives it back at its
+//! single release point, which runs the moment the conversation completes:
+//! the handler returns or fails (its terminal is known), the consumer reads
+//! or cancels to a terminal, or `close()` ends it. Release drops the handler
+//! task and the opener; the handle lives on as a finished record whose unread
+//! frames still read as its result. `close()` closes early and reports an
+//! error terminal. The last reference is the safety net: dropping the final
+//! `Rc` of an unreleased conversation releases it exactly then (the runner is
+//! reference counted), and any error it carried is lost.
 
 use super::{CallOutcome, Host, MirBlockId, MirFunctionId, Runner, RunnerError, Value};
 use crate::conversio::MissingFieldPolicy;
@@ -30,12 +41,52 @@ use crate::cursor::{GeneratorCursor, GeneratorStep};
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
 use rustc_hash::FxHashMap;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
 use std::rc::Rc;
 
 /// Builtin route answered in-process (tier 2).
 const ECHO_ROUTE: &str = "runtime:echo";
+
+/// Router slots of one runner (D8.3): a conversation takes one at open and
+/// gives it back at its release point.
+#[derive(Debug, Default, PartialEq)]
+pub struct ConversationSlots {
+    opened: Cell<u64>,
+    live: Cell<usize>,
+    peak: Cell<usize>,
+}
+
+impl ConversationSlots {
+    fn take(&self) {
+        self.opened.set(self.opened.get() + 1);
+        self.live.set(self.live.get() + 1);
+        self.peak.set(self.peak.get().max(self.live.get()));
+    }
+
+    fn give_back(&self) {
+        self.live.set(self.live.get().saturating_sub(1));
+    }
+
+    /// The counts observed so far.
+    #[must_use]
+    pub fn ledger(&self) -> ConversationLedger {
+        ConversationLedger {
+            opened: self.opened.get(),
+            live_peak: self.peak.get(),
+            live: self.live.get(),
+        }
+    }
+}
+
+/// Conversation counts of one run: how many opened, the most that held a
+/// router slot at once, and how many still held one.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ConversationLedger {
+    pub opened: u64,
+    pub live_peak: usize,
+    pub live: usize,
+}
 
 /// Which side of a conversation a handle views.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,15 +155,62 @@ pub struct Conversation {
     pub incoming_terminal: Option<SermoTerminal>,
     /// Whether the outbound direction was closed with `meus.fini()`.
     pub meus_closed: bool,
+    /// Router slots of the owning runner; this conversation holds one until
+    /// it is released.
+    slots: Rc<ConversationSlots>,
+    /// Whether the release point has run.
+    pub released: bool,
+    /// Whether `close()` closed this handle.
+    pub closed: bool,
+    /// Error the last `close()` reported, until lowering takes it.
+    close_error: Option<String>,
 }
 
 impl Conversation {
-    /// Record the inbound terminal and run the single release point: the
-    /// handler task handle is dropped (A7 hangs completion-close here).
+    /// Record the inbound terminal; the conversation is complete.
     fn finish_inbound(&mut self, terminal: SermoTerminal) {
         self.incoming_terminal = Some(terminal);
         self.queue.clear();
+        self.release();
+    }
+
+    /// The single release point (D8.3): drop the handler task and the
+    /// opener, and give the router slot back. Idempotent.
+    fn release(&mut self) {
+        if self.released {
+            return;
+        }
+        self.released = true;
         self.task = None;
+        self.opener = Value::Nil;
+        self.slots.give_back();
+    }
+
+    /// Release once the producer is finished: its terminal is known and no
+    /// live task remains to produce more.
+    fn release_if_complete(&mut self) {
+        if self.producer_terminal.is_some() && self.task.is_none() {
+            self.release();
+        }
+    }
+}
+
+impl Drop for Conversation {
+    /// Last-reference safety net: an abandoned conversation is released when
+    /// its final handle goes away. Any error it carried is lost.
+    fn drop(&mut self) {
+        self.release();
+    }
+}
+
+/// Text of an `error` terminal's data, as `close()` reports it (`⇥ textus`).
+fn error_text(data: &Value) -> String {
+    match data {
+        Value::Str(text) => text.clone(),
+        Value::Int(value) => value.to_string(),
+        Value::Float(value) => value.to_string(),
+        Value::Bool(value) => value.to_string(),
+        other => format!("{other:?}"),
     }
 }
 
@@ -131,6 +229,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             None => None,
         };
         self.next_conversation_id += 1;
+        self.conversation_slots.take();
         let sermo = Rc::new(RefCell::new(SermoValue {
             view: SermoView::Whole,
             conversation: Rc::new(RefCell::new(Conversation {
@@ -144,6 +243,10 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 task: None,
                 incoming_terminal: None,
                 meus_closed: false,
+                slots: Rc::clone(&self.conversation_slots),
+                released: false,
+                closed: false,
+                close_error: None,
             })),
         }));
         // WHY: a tier-1 handler is a task that starts when the conversation
@@ -229,6 +332,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         conversation.queue.extend(items);
         conversation.producer_terminal = terminal;
         conversation.task = task;
+        conversation.release_if_complete();
         Ok(())
     }
 
@@ -360,6 +464,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             let mut state = conversation.borrow_mut();
             state.task = None;
             state.producer_terminal = Some(terminal);
+            state.release_if_complete();
         }
     }
 
@@ -438,5 +543,52 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         };
         state.finish_inbound(terminal.clone());
         Ok(terminal)
+    }
+
+    /// `s.close()` (D8.3): close the handle early. A live handler is
+    /// cancelled, unread frames are dropped, and the conversation is
+    /// released. Returns whether this call closed the handle; an `error`
+    /// terminal is kept for [`Self::sermo_take_close_error`].
+    pub(crate) fn sermo_close(&mut self, sermo: &Rc<RefCell<SermoValue>>) -> bool {
+        let conversation = Rc::clone(&sermo.borrow().conversation);
+        let mut state = conversation.borrow_mut();
+        state.close_error = None;
+        if state.closed {
+            return false;
+        }
+        state.closed = true;
+        if state.incoming_terminal.is_none() {
+            let producer_live = state.task.as_ref().is_some_and(GeneratorCursor::is_live);
+            let terminal = if state.tier.is_none() || producer_live {
+                SermoTerminal::Cancel
+            } else {
+                state
+                    .producer_terminal
+                    .take()
+                    .unwrap_or(SermoTerminal::Done)
+            };
+            state.finish_inbound(terminal);
+        }
+        if let Some(SermoTerminal::Error(data)) = &state.incoming_terminal {
+            state.close_error = Some(error_text(data));
+        }
+        state.release();
+        true
+    }
+
+    /// Whether the last `close()` reported an error.
+    pub(crate) fn sermo_close_failed(sermo: &Rc<RefCell<SermoValue>>) -> bool {
+        sermo.borrow().conversation.borrow().close_error.is_some()
+    }
+
+    /// Take the last `close()` error message.
+    pub(crate) fn sermo_take_close_error(sermo: &Rc<RefCell<SermoValue>>) -> String {
+        sermo
+            .borrow()
+            .conversation
+            .borrow_mut()
+            .close_error
+            .take()
+            .unwrap_or_default()
     }
 }

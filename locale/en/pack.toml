@@ -3167,6 +3167,10 @@ help = "move the mark to the {implendum} that declares the contract"
 message = "the ordering contract must declare exactly `compare(T other) → {numerus}` over one type parameter"
 help = "declare `{implendum} Orderable<T>` with the single method `{functio} compare(T other) → {numerus}`"
 
+[diagnostics.SEM018.issues.radix_contract_closing_shape]
+message = "the closing contract must declare exactly `close() → {bivalens} ⇥ {textus}` and no type parameters"
+help = "declare `{implendum} Closable` with the single method `{functio} close() → {bivalens} ⇥ {textus}`"
+
 [diagnostics.SEM018.issues.radix_contract_duplicate]
 message = "a second {implendum} claims the ordering contract"
 help = "import or declare exactly one ordering contract"
@@ -3902,4 +3906,12 @@ help = "drop the leading `_`; unmarked top-level declarations are already privat
 [diagnostics.WARN030.issues.leading_underscore]
 message = "`{name}`: a leading `_` is not Faber style"
 help = "drop the leading `_`; unmarked top-level declarations are already private"
+
+[diagnostics.WARN031]
+message = "a closable value can sit in a reference cycle"
+help = "call `close()` explicitly, or break the reference cycle"
+
+[diagnostics.WARN031.issues.closable_in_cycle]
+message = "`{type}.{field}` can hold a closable value inside a reference cycle; a cycle never reaches its last reference, so the value never closes automatically"
+help = "call `close()` explicitly, or break the reference cycle"
 

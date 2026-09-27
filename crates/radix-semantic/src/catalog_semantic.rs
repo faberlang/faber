@@ -85,6 +85,7 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::RedundantMemberVisibility,
     WarningKind::CoverageUnchecked,
     WarningKind::LeadingUnderscore,
+    WarningKind::ClosableInCycle,
 ];
 
 // STABLE CODES
@@ -1171,6 +1172,10 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::LeadingUnderscore => DiagnosticSpec {
             code: "WARN030",
             help: Some("drop the leading `_`; unmarked top-level declarations are already private"),
+        },
+        WarningKind::ClosableInCycle => DiagnosticSpec {
+            code: "WARN031",
+            help: Some("call `close()` explicitly, or break the reference cycle"),
         },
     }
 }

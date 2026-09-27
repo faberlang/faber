@@ -11,6 +11,10 @@ pub use radix_mir_runner::{
 };
 
 #[cfg(test)]
+#[path = "ad_close_test.rs"]
+mod ad_close_tests;
+
+#[cfg(test)]
 #[path = "ad_serve_test.rs"]
 mod ad_serve_tests;
 

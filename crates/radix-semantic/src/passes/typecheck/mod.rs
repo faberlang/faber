@@ -101,6 +101,7 @@ pub mod extremum;
 #[path = "field_modifier_write_test.rs"]
 mod field_modifier_write_test;
 
+mod closing;
 #[cfg(test)]
 #[path = "construction_source_test.rs"]
 mod construction_source_test;
@@ -122,6 +123,10 @@ pub mod lookup;
 mod member_privacy;
 pub mod ops;
 mod ordering;
+
+#[cfg(test)]
+#[path = "closing_test.rs"]
+mod closing_test;
 #[cfg(test)]
 #[path = "ordering_test.rs"]
 mod ordering_test;
@@ -725,6 +730,7 @@ impl<'a> TypeChecker<'a> {
         for item in &mut hir.items {
             self.check_item(item);
         }
+        self.warn_closable_cycles(hir);
 
         if let Some(entry) = &mut hir.entry {
             let prev_await_context = self.current_await_context;

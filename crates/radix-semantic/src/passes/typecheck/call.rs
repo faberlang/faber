@@ -36,7 +36,8 @@ const ISSUE_TRANSFER_PAYLOAD_TYPE_MISMATCH: &str = "transfer_payload_type_mismat
 const ISSUE_TRANSFER_SINK_MUST_BE_UNARY: &str = "transfer_sink_must_be_unary";
 const ISSUE_TRANSFER_SINK_MUST_RETURN_VACUUM: &str = "transfer_sink_must_return_vacuum";
 const ISSUE_TRANSFER_SINK_NOT_CALLABLE: &str = "transfer_sink_not_callable";
-const ISSUE_DIRECTIONAL_VIEW_METHOD_TYPE_ARGS: &str = "directional_view_method_type_args";
+pub(super) const ISSUE_DIRECTIONAL_VIEW_METHOD_TYPE_ARGS: &str =
+    "directional_view_method_type_args";
 const ISSUE_DYNAMIC_CALLEE_TYPE_ARGS: &str = "dynamic_callee_type_args";
 const ISSUE_DYNAMIC_RECEIVER_METHOD_TYPE_ARGS: &str = "dynamic_receiver_method_type_args";
 const ISSUE_FAILABLE_CALL_ENCLOSING_ERROR_TYPE_MISMATCH: &str =
@@ -425,6 +426,15 @@ impl TypeChecker<'_> {
             method_name
         };
         if let Some(result) = self.check_directional_view_method(
+            receiver_ty,
+            &method_name,
+            explicit_type_args,
+            args,
+            receiver.span,
+        ) {
+            return result;
+        }
+        if let Some(result) = self.check_sermo_close(
             receiver_ty,
             &method_name,
             explicit_type_args,

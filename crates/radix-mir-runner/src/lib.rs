@@ -210,6 +210,9 @@ enum StatementOutcome {
 pub struct RunnerRunOutcome {
     pub result: Result<(), Vec<RunnerError>>,
     pub stats: RunnerStats,
+    /// Conversation router slots (D8.3), read after every frame closed, so
+    /// `live` counts conversations the last-reference net did not release.
+    pub conversations: sermo::ConversationLedger,
 }
 
 pub(crate) struct Runner<'a, H: Host + ?Sized> {
@@ -260,6 +263,9 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     value_types: FxHashMap<(MirFunctionId, MirValueId), MirType>,
     /// Last conversation id handed out by `SermoOpen` (§2.7 record).
     next_conversation_id: u64,
+    /// Router slots held by open conversations (D8.3); each conversation
+    /// gives its slot back at its release point.
+    conversation_slots: Rc<sermo::ConversationSlots>,
 }
 
 impl<'a, H: Host + ?Sized> Runner<'a, H> {
@@ -306,6 +312,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             recovery_calls: index_orphan_recovery_calls(program),
             value_types: index_value_types(program),
             next_conversation_id: 0,
+            conversation_slots: Rc::default(),
         }
     }
 }
@@ -585,7 +592,12 @@ fn run_function_with_explicit_limits_and_stats<H: Host + ?Sized>(
         Err(std::mem::take(&mut runner.errors))
     };
     let stats = runner.take_stats().unwrap_or_default();
-    Ok(RunnerRunOutcome { result, stats })
+    let conversations = runner.conversation_slots.ledger();
+    Ok(RunnerRunOutcome {
+        result,
+        stats,
+        conversations,
+    })
 }
 
 /// Why a build-time evaluation ([`evaluate_function`]) produced no value.
