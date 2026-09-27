@@ -627,7 +627,12 @@ intro = "The `patterns` production is part of the canonical Faber grammar."
 [productions.pattern]
 status = "live"
 formerly = []
-intro = "The `pattern` production is part of the canonical Faber grammar."
+intro = "A `pattern` is one subject pattern and may contain one or more `aut` alternatives. All alternatives must bind the same names and types; semantic checking owns that agreement. Commas and `et` continue to separate patterns for multi-subject `discerne` arms."
+
+[productions.pattern_atom]
+status = "live"
+formerly = []
+intro = "The `pattern_atom` production is a single `discerne` pattern before any `aut` alternatives are joined."
 
 [productions.negated_number]
 status = "live"
