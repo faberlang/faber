@@ -3012,6 +3012,14 @@ help = "add `@ json` to the class or convert through `{valor}` explicitly"
 message = "{lista} to map conversion has no default key/value derivation; use a map constructor verb or `.in.map(k, v)`; pair-destructuring default deferred"
 help = "construct the map with explicit key/value selection"
 
+[diagnostics.SEM016.issues.array_ascription_to_map]
+message = "an array is not a map: `∷` asserts a type the expression already has, and treating an array's indexes as the key values is still a conversion"
+help = "write the map with `empty`, an empty or keyed object literal, or convert explicitly with `↦`"
+
+[diagnostics.SEM016.issues.array_ascription_to_tensor]
+message = "an array is not a tensor: `∷` asserts a type the expression already has, and matching rank and lengths is a coincidence, not structural compatibility"
+help = "convert explicitly with `↦`, as in `flat ↦ tensor<f32, [8]>`"
+
 [diagnostics.SEM016.issues.cross_collection_unsupported]
 message = "cross-collection conversion has no default `↦` meaning; use an explicit stdlib verb"
 help = "use an explicit stdlib conversion verb"

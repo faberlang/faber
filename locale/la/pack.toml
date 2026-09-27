@@ -2803,6 +2803,14 @@ help = "add `@ json` to the genus or convert through `{valor}` explicitly"
 message = "{lista} to tabula conversion has no default key/value derivation; use a tabula constructor verb or `.in.tabula(k, v)`; pair-destructuring default deferred"
 help = "construct the tabula with explicit key/value selection"
 
+[diagnostics.SEM016.issues.array_ascription_to_map]
+message = "an array is not a tabula: `∷` asserts a type the expression already has, and treating an array's indexes as the key values is still a conversion"
+help = "write the tabula with `vacua`, an empty or keyed object literal, or convert explicitly with `↦`"
+
+[diagnostics.SEM016.issues.array_ascription_to_tensor]
+message = "an array is not a tensor: `∷` asserts a type the expression already has, and matching rank and lengths is a coincidence, not structural compatibility"
+help = "convert explicitly with `↦`, as in `flat ↦ tensor<fractus, [8]>`"
+
 [diagnostics.SEM016.issues.cross_collection_unsupported]
 message = "cross-collection conversion has no default `↦` meaning; use an explicit stdlib verb"
 help = "use an explicit stdlib conversion verb"

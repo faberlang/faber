@@ -109,6 +109,8 @@ const ISSUE_MAP_SPREAD_KEY_TYPE_MISMATCH: &str = "map_spread_key_type_mismatch";
 const ISSUE_MAP_SPREAD_VALUE_TYPE_MISMATCH: &str = "map_spread_value_type_mismatch";
 const ISSUE_MAP_VALUE_TYPE_MISMATCH: &str = "map_value_type_mismatch";
 const ISSUE_LISTA_TO_TABULA_UNSUPPORTED: &str = "lista_to_tabula_unsupported";
+const ISSUE_ARRAY_ASCRIPTION_TO_MAP: &str = "array_ascription_to_map";
+const ISSUE_ARRAY_ASCRIPTION_TO_TENSOR: &str = "array_ascription_to_tensor";
 const ISSUE_CROSS_COLLECTION_UNSUPPORTED: &str = "cross_collection_unsupported";
 const ISSUE_LISTA_TO_TENSOR_NESTED: &str = "lista_to_tensor_nested";
 const ISSUE_LISTA_TO_TENSOR_ELEMENT_MISMATCH: &str = "lista_to_tensor_element_mismatch";
@@ -2715,6 +2717,20 @@ impl TypeChecker<'_> {
                 self.check_verte_vector_target(source, elem_ty, width, span);
             }
             Type::ModularWord(_) => {}
+            Type::Map(..) => {
+                self.check_array_source_cross_kind_ascription(
+                    source_resolved,
+                    ISSUE_ARRAY_ASCRIPTION_TO_MAP,
+                    span,
+                );
+            }
+            Type::Tensor(..) => {
+                self.check_array_source_cross_kind_ascription(
+                    source_resolved,
+                    ISSUE_ARRAY_ASCRIPTION_TO_TENSOR,
+                    span,
+                );
+            }
             // Non-collection targets already typechecked the source above
             // (with the effective target as constructor context when the
             // source is a constructor); re-checking here would duplicate
@@ -2722,6 +2738,34 @@ impl TypeChecker<'_> {
             _ => {}
         }
         effective_target
+    }
+
+    /// Reject an array source ascribed to a cross-container-kind target —
+    /// a map or a tensor, whatever the target's key or shape is.
+    ///
+    /// An array is neither a map nor a tensor: `∷` asserts a type the
+    /// expression already has, and crossing container kinds is a conversion,
+    /// never an ascription (operator rulings 2026-09-21). Index-keying does
+    /// not make an array a map, and shape agreement does not make it a
+    /// tensor: matching rank and lengths is a coincidence, while structural
+    /// compatibility is an assumption the source does not establish — like
+    /// casting a signed integer to unsigned, the result is probably not what
+    /// you expected. The sanctioned path is the conversion operator `↦`.
+    /// Only a source whose family is definite fires the rule: an identifier
+    /// or unresolved-type expression is what ascription is for
+    /// (`raw ∷ lista<textus>` stays legal).
+    fn check_array_source_cross_kind_ascription(
+        &mut self,
+        source: TypeId,
+        issue: &'static str,
+        span: radix_lexer::Span,
+    ) {
+        if matches!(
+            self.types.get(source),
+            Type::Array(_) | Type::BoundedArray { .. }
+        ) {
+            self.invalid_conversion(issue, span);
+        }
     }
 
     /// Whether a `∷` source is a variant-constructor call (finge-lowered

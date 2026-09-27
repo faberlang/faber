@@ -648,6 +648,178 @@ fn lista_to_tabula_conversio_rejects() {
 }
 
 #[test]
+fn array_ascription_to_generic_map_key_rejects() {
+    // Operator ruling (2026-09-21, total): an array is not a map, so an
+    // array-to-map ascription is rejected whatever the key type is.
+    test_support::assert_rejects_with_issue(
+        r"functio selecta<K, V>() → tabula<K, V> {
+  redde [] ∷ tabula<K, V>
+}",
+        "array_ascription_to_map",
+    );
+}
+
+#[test]
+fn generic_genus_field_array_ascription_to_generic_map_key_rejects() {
+    // The norma `SortedMap<K, V>` shape: a generic class field default.
+    test_support::assert_rejects_with_issue(
+        r"genus SortedMap<K, V> {
+  tabula<K, V> entries = [] ∷ tabula<K, V>
+}",
+        "array_ascription_to_map",
+    );
+}
+
+#[test]
+fn lista_source_ascription_to_generic_map_key_rejects() {
+    // The rule keys on the source's container family, not on literal syntax.
+    test_support::assert_rejects_with_issue(
+        r"functio selecta<K, V>(lista<numerus> src) → tabula<K, V> {
+  redde src ∷ tabula<K, V>
+}",
+        "array_ascription_to_map",
+    );
+}
+
+#[test]
+fn array_ascription_to_holed_map_key_rejects() {
+    // `tabula<_, V>` leaves the key uninferred: same array-to-map family.
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum tabula<_, numerus> m ← [] ∷ tabula<_, numerus> }",
+        "array_ascription_to_map",
+    );
+}
+
+#[test]
+fn index_keyed_array_ascription_to_map_rejects() {
+    // The ruling's named shape: "even if technically it's a conversion that
+    // should be allowed by treating the indexes as the key values, it's
+    // still a conversion." Index-keyedness does not make the ascription
+    // true.
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum tabula<numerus, numerus> m ← [] ∷ tabula<numerus, numerus> }",
+        "array_ascription_to_map",
+    );
+}
+
+#[test]
+fn concrete_key_array_ascription_to_map_rejects() {
+    // Totality is not about genericity: a concrete key is rejected too.
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum tabula<textus, numerus> m ← [] ∷ tabula<textus, numerus> }",
+        "array_ascription_to_map",
+    );
+}
+
+#[test]
+fn fractus_key_array_ascription_to_map_rejects() {
+    // Any concrete key family is the same rejection; the rule is not a
+    // textus special case.
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum tabula<fractus, numerus> m ← [] ∷ tabula<fractus, numerus> }",
+        "array_ascription_to_map",
+    );
+}
+
+#[test]
+fn sized_integer_key_array_ascription_to_map_rejects() {
+    // A sized integer key is as index-keyed as bare numerus, and the ruling
+    // rejects the index-keyed reading itself.
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum tabula<u32, numerus> m ← [] ∷ tabula<u32, numerus> }",
+        "array_ascription_to_map",
+    );
+}
+
+#[test]
+fn shape_matching_array_ascription_to_tensor_rejects() {
+    // The falsifier the second ruling names: rank and lengths agree, and it
+    // is still a conversion — "it assumes that the internal structure of the
+    // array matches with the internal structure of the tensor", which the
+    // source does not establish (signed-to-unsigned cast analogy, operator
+    // ruling 2026-09-21).
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum tensor<fractus, [2, 2]> t ← [[1.0, 0.0], [0.0, 2.0]] ∷ tensor<fractus, [2, 2]> }",
+        "array_ascription_to_tensor",
+    );
+}
+
+#[test]
+fn flat_array_ascription_to_tensor_rejects() {
+    // Total over shapes: a flat, exact-length literal is the same
+    // cross-container-kind conversion.
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum tensor<numerus, [3]> t ← [1, 2, 3] ∷ tensor<numerus, [3]> }",
+        "array_ascription_to_tensor",
+    );
+}
+
+#[test]
+fn shape_mismatched_array_ascription_to_tensor_rejects() {
+    // The rejection is unconditional: a disagreeing shape does not get a
+    // gentler ruling than an agreeing one — both are conversions.
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum tensor<numerus, [8]> t ← [1, 2, 3] ∷ tensor<numerus, [8]> }",
+        "array_ascription_to_tensor",
+    );
+}
+
+#[test]
+fn empty_array_ascription_to_tensor_rejects() {
+    // The norma tensor.fab shape: `[]` is a definite array literal, so the
+    // rule fires even with nothing to shape-match.
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum tensor<fractus, [8]> t ← [] ∷ tensor<fractus, [8]> }",
+        "array_ascription_to_tensor",
+    );
+}
+
+#[test]
+fn lista_source_ascription_to_tensor_rejects() {
+    // As on the map side, the rule keys on the source's container family,
+    // not on literal syntax: a typed lista identifier is a definite
+    // cross-family source (bounded lista included).
+    test_support::assert_rejects_with_issue(
+        r"functio selecta(lista<fractus, 4> src) → tensor<fractus, [4]> {
+  redde src ∷ tensor<fractus, [4]>
+}",
+        "array_ascription_to_tensor",
+    );
+}
+
+#[test]
+fn unresolved_source_ascription_to_tensor_typechecks() {
+    // The boundary that is not a loophole: an identifier or unresolved-type
+    // source is exactly what ascription is for, so the rule must not fire.
+    test_support::assert_accepts(
+        r"functio asserta<T>(T raw) → tensor<fractus, [8]> {
+  redde raw ∷ tensor<fractus, [8]>
+}",
+    );
+}
+
+#[test]
+fn sanctioned_empty_and_keyed_map_construction_typechecks() {
+    // `vacua` is the la-pack marker (`empty` is its en twin, covered by the
+    // corpus); the keyed literal and the empty object literal stay the typed
+    // construction paths.
+    test_support::assert_accepts(
+        r#"incipit {
+  fixum tabula<textus, numerus> a ← vacua
+  fixum tabula<textus, numerus> b ← { "alpha": 1 }
+  fixum tabula<textus, numerus> c ← {}
+}"#,
+    );
+}
+
+#[test]
+fn array_ascription_to_lista_still_typechecks() {
+    test_support::assert_accepts(
+        "incipit { fixum lista<numerus> xs ← [1, 2, 3] ∷ lista<numerus> }",
+    );
+}
+
+#[test]
 fn sync_to_promissum_conversio_rejects() {
     test_support::assert_rejects_with_issue(
         "incipit { fixum _ p ← 42 ↦ promissum<numerus> }",
