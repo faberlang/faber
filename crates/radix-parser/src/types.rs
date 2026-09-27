@@ -186,15 +186,20 @@ impl Parser {
         } else {
             let name = if self.check_keyword_ident(TokenKind::Nihil) {
                 // The null *type* is `nihil` (D23.2). The null *value* literal
-                // (`null` / `nulla`) reaches this branch in a type position
-                // because it shares the literal token — that is the
-                // TRANSITIONAL acceptance window for the D23.2 sweep: sources
-                // still spell the nullable type `T ∪ null`, and `x est null`
-                // still parses as a type test, until the sweep moves those
-                // sites to the type word. Remove this branch (and the
-                // literal-as-type paths in `pattern.rs`, `decl.rs`,
-                // `peek_starts_type_name`) once the sweep lands.
+                // (`null` / `nulla`) shares the literal token, so a type
+                // position may see it: rewrite only the canonical null-type
+                // spelling, and reject every other spelling as the value
+                // literal where a type is required (D23.1/D23.2).
                 let span = self.peek().span;
+                let source = self.current_ident_source();
+                if source != "nihil" {
+                    self.advance();
+                    let type_surface = self.null_type_surface();
+                    return Err(ParseError::structured(ParseErrorKind::TypeInvalid, span)
+                        .with_arg("issue", "null_value_in_type_position")
+                        .with_arg("value", source)
+                        .with_arg("type", type_surface));
+                }
                 self.advance();
                 self.keyword_ident("nihil", span)
             } else if self.check_keyword_ident(TokenKind::Modulus) {

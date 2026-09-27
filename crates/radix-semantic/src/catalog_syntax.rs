@@ -825,6 +825,10 @@ fn invalid_type_message(args: &[DiagnosticArg]) -> Option<String> {
                 "type `{ty}` is not declared on this reader surface"
             ))
         }
+        "null_value_in_type_position" => {
+            let value = arg_value(args, "value")?;
+            Some(format!("`{value}` is the null value, not a type"))
+        }
         "lista_sugar_bracket_form" => Some("lista sugar has no bracket form".to_owned()),
         "matrix_sugar_missing_shape" => {
             Some("matrix sugar requires a two-dimensional bracket shape".to_owned())
@@ -848,6 +852,12 @@ fn invalid_type_help(args: &[DiagnosticArg]) -> Option<String> {
         }
         "wrong_locale_type" => {
             Some("use the type spelling declared by this reader locale".to_owned())
+        }
+        "null_value_in_type_position" => {
+            let ty = arg_value(args, "type")?;
+            Some(format!(
+                "the null type is `{ty}`; write `{ty}` where a type is required"
+            ))
         }
         "lista_sugar_bracket_form" => Some("use tensor sugar for shaped buffers".to_owned()),
         "matrix_sugar_missing_shape" => Some("write matrix sugar as mf32[4, 4]".to_owned()),

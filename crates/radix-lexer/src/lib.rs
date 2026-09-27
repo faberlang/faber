@@ -162,6 +162,18 @@ pub trait KeywordPack {
         None
     }
 
+    /// Localized type-surface rows as `(Latin type identity, declared spelling)`.
+    ///
+    /// Mirrors [`Self::keyword_spelling`] for type names. It returns the whole
+    /// row set rather than taking one identity at a time because this crate
+    /// owns the keyword registry (enumerable in [`crate::keyword_specs`]) while
+    /// the type registry lives downstream, so the pack is the only side that
+    /// can enumerate its own type rows. Packs that declare none return the
+    /// default empty list.
+    fn type_surfaces(&self) -> Vec<(String, String)> {
+        Vec::new()
+    }
+
     /// Whether canonical Latin type spellings are an explicit pack fallback.
     ///
     /// This is separate from keyword claiming: a fallback pack keeps its
@@ -207,6 +219,13 @@ pub struct LexResult {
 
     /// Exact source spelling → Latin type identity, for parser-owned type slots.
     pub reader_type_latin_keys: HashMap<String, String>,
+
+    /// Latin type identity → declared source spelling, for locale diagnostics.
+    ///
+    /// The reverse view of [`LexResult::reader_type_latin_keys`]: a parser
+    /// diagnostic names a type by its reader-locale surface rather than the
+    /// locale-independent Latin identity it canonicalized to.
+    pub reader_type_surfaces: HashMap<String, String>,
 
     /// Whether the active pack explicitly permits canonical Latin type fallback.
     pub has_latin_fallback: bool,

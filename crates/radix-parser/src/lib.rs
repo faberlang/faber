@@ -137,6 +137,7 @@ pub struct Parser {
     reader_keyword_latin_keys: HashMap<String, String>,
     reader_keyword_surfaces: HashMap<String, String>,
     reader_type_latin_keys: HashMap<String, String>,
+    reader_type_surfaces: HashMap<String, String>,
     has_latin_fallback: bool,
     /// Source spellings that declare a nominal type in this file (U1R).
     ///
@@ -206,6 +207,7 @@ pub fn parse_with_options(lex_result: LexResult, options: ParseOptions) -> Parse
         reader_keyword_latin_keys,
         reader_keyword_surfaces,
         reader_type_latin_keys,
+        reader_type_surfaces,
         has_latin_fallback,
         keyword_surface,
         interner,
@@ -226,6 +228,7 @@ pub fn parse_with_options(lex_result: LexResult, options: ParseOptions) -> Parse
         reader_keyword_latin_keys,
         reader_keyword_surfaces,
         reader_type_latin_keys,
+        reader_type_surfaces,
         keyword_surface,
         has_latin_fallback,
     );
@@ -256,10 +259,12 @@ impl Parser {
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
+            HashMap::new(),
             KeywordSurfaceMode::RegistryDirect,
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn new_with_reader_identities(
         tokens: Vec<Token>,
         interner: Interner,
@@ -267,6 +272,7 @@ impl Parser {
         reader_keyword_latin_keys: HashMap<String, String>,
         reader_keyword_surfaces: HashMap<String, String>,
         reader_type_latin_keys: HashMap<String, String>,
+        reader_type_surfaces: HashMap<String, String>,
         keyword_surface: KeywordSurfaceMode,
     ) -> Self {
         Self::new_with_reader_identities_and_fallback(
@@ -276,6 +282,7 @@ impl Parser {
             reader_keyword_latin_keys,
             reader_keyword_surfaces,
             reader_type_latin_keys,
+            reader_type_surfaces,
             keyword_surface,
             false,
         )
@@ -289,6 +296,7 @@ impl Parser {
         reader_keyword_latin_keys: HashMap<String, String>,
         reader_keyword_surfaces: HashMap<String, String>,
         reader_type_latin_keys: HashMap<String, String>,
+        reader_type_surfaces: HashMap<String, String>,
         keyword_surface: KeywordSurfaceMode,
         has_latin_fallback: bool,
     ) -> Self {
@@ -317,6 +325,7 @@ impl Parser {
             reader_keyword_latin_keys,
             reader_keyword_surfaces,
             reader_type_latin_keys,
+            reader_type_surfaces,
             has_latin_fallback,
             declared_type_names: HashSet::new(),
             nesting_depth: 0,
@@ -693,9 +702,19 @@ impl Parser {
     /// interner hop. Tokenless/contextual keyword claims that hold a source
     /// string (annotation-name dispatch) must route through this same gate so
     /// an undeclared Latin spelling cannot claim under a non-`la` pack.
+    ///
+    /// A spelling the active surface declares as a *type* is a type and never
+    /// falls back to the registry. The fallback below exists for keywords the
+    /// active pack leaves unrecorded, and it must not shadow the pack's own
+    /// type rows: D23.2 makes `nihil` the null *type* and `nulla` the null
+    /// *value*, so the Latin `nihil` type row must not fall back to the
+    /// retired `nihil` value alias (registry-direct `la`).
     fn keyword_claim_key_for_text<'a>(&'a self, text: &'a str) -> Option<&'a str> {
         if let Some(latin_key) = self.reader_keyword_latin_keys.get(text) {
             return Some(latin_key);
+        }
+        if self.reader_type_latin_keys.contains_key(text) {
+            return None;
         }
         match self.keyword_surface {
             KeywordSurfaceMode::RegistryDirect => Some(text),
@@ -1051,6 +1070,29 @@ impl Parser {
             return ident;
         };
         self.keyword_ident(&latin_key, ident.span)
+    }
+
+    /// Authored source spelling of the current word, when it is an identifier.
+    ///
+    /// Keyword token *kinds* carry no spelling, but pack-aware lexing emits
+    /// every declared spelling as an `Ident` with its identity recorded beside
+    /// it, so the authored word is recoverable where a diagnostic must name it.
+    fn current_ident_source(&self) -> String {
+        match self.peek().kind {
+            TokenKind::Ident(sym) => self.interner.resolve(sym).to_owned(),
+            _ => "nulla".to_owned(),
+        }
+    }
+
+    /// Active surface spelling of the null *type* (D23.2).
+    ///
+    /// Falls back to the canonical Latin `nihil` when the active surface
+    /// declares no type rows (registry-direct Latin).
+    fn null_type_surface(&self) -> String {
+        self.reader_type_surfaces
+            .get("nihil")
+            .cloned()
+            .unwrap_or_else(|| "nihil".to_owned())
     }
 
     fn is_canonical_type_spelling(source: &str) -> bool {

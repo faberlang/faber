@@ -186,10 +186,7 @@ saturatus = "saturating"
 fractus = "float"
 bivalens = "bool"
 # Null type (D23.2); the null value literal is `null` in [keywords] above.
-# TRANSITIONAL (D23.3 window): `null_ty` was the invented accept-only type
-# spelling that the pre-D23.2 uniqueness rule forced. It stays accepted until
-# the corpus sweep moves its sites to `none`; delete the alias then.
-nihil = { canonical = "none", aliases = ["null_ty"] }
+nihil = "none"
 vacuum = "void"
 numquam = "never"
 ignotum = "unknown"
@@ -1048,6 +1045,10 @@ help = "reduce the iuncta arity to 16 or fewer, or declare a class for more fiel
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
 help = "use the type spelling declared by this reader locale"
+
+[diagnostics.PARSE040.issues.null_value_in_type_position]
+message = "'{value}' is the null value, not a type"
+help = "the null type is '{type}'; write '{type}' where a type is required"
 
 [diagnostics.PARSE041]
 message = "invalid type annotation"

@@ -2508,6 +2508,16 @@ impl radix_lexer::KeywordPack for LocalePack {
         LocalePack::type_latin_key(self, text)
     }
 
+    fn type_surfaces(&self) -> Vec<(String, String)> {
+        // The reverse view of `type_latin_key`: the lexer has no type registry
+        // to enumerate, so the pack supplies `(latin identity, surface)` pairs
+        // from its own rows.
+        self.type_surfaces
+            .iter()
+            .map(|(kind, surface)| (latin_type_surface(*kind).to_owned(), surface.clone()))
+            .collect()
+    }
+
     fn has_latin_fallback(&self) -> bool {
         LocalePack::has_latin_fallback(self)
     }

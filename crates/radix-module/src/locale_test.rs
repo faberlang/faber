@@ -69,22 +69,26 @@ fn pack_key_set<'a>(keys: impl Iterator<Item = &'a String>) -> BTreeSet<String> 
     keys.cloned().collect()
 }
 
-/// The lexer registry retains `conversion` as an identity alias for tooling,
-/// but the sealed English and Latin reader surfaces intentionally omit it.
-/// Completeness compares each installed pack with the scaffold after applying
-/// that settled per-locale surface exception; no pack row is synthesized here.
-const SEALED_CONVERSIO_ALIAS_OMISSIONS: &[(&str, &str)] = &[("en", "conversion"), ("la", "conversion")];
+/// Registry spellings that a sealed reader surface intentionally omits.
+///
+/// The lexer registry keeps `conversion` as a keyword identity alias for
+/// tooling, and the D23.2 null split moves `nihil` out of the keyword block
+/// into the type block; the sealed English and Latin reader surfaces declare
+/// neither as a keyword. Completeness compares each installed pack with the
+/// scaffold after applying these settled per-locale exceptions; no pack row is
+/// synthesized here.
+const SEALED_KEYWORD_ROW_OMISSIONS: &[(&str, &str)] = &[("en", "conversion"), ("la", "conversion"), ("la", "nihil")];
 
-fn is_sealed_conversio_alias_omission(pack_id: &str, section: &str, key: &str) -> bool {
+fn is_sealed_keyword_row_omission(pack_id: &str, section: &str, key: &str) -> bool {
     section == "keyword"
-        && SEALED_CONVERSIO_ALIAS_OMISSIONS
+        && SEALED_KEYWORD_ROW_OMISSIONS
             .iter()
             .any(|&(sealed_locale, omitted_key)| sealed_locale == pack_id && omitted_key == key)
 }
 
 fn assert_pack_keys_match(pack_id: &str, section: &str, mut expected: BTreeSet<String>, actual: BTreeSet<String>) {
-    for &(_, omitted_key) in SEALED_CONVERSIO_ALIAS_OMISSIONS {
-        if is_sealed_conversio_alias_omission(pack_id, section, omitted_key) {
+    for &(_, omitted_key) in SEALED_KEYWORD_ROW_OMISSIONS {
+        if is_sealed_keyword_row_omission(pack_id, section, omitted_key) {
             expected.remove(omitted_key);
         }
     }

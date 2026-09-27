@@ -62,10 +62,7 @@ clausura = "clausura"
 libera = "libera"
 falsum = "falsum"
 # Null value literal (D23.2): `nulla`. The null *type* is `nihil` ([types]
-# below). TRANSITIONAL (D23.2 window): the pre-split value spelling `nihil`
-# stays an accepted alias until the value-position sweep lands; delete this
-# alias row then.
-nihil = "nihil"
+# below).
 nulla = "nulla"
 verum = "verum"
 nonnumerus = "nonnumerus"
@@ -173,12 +170,9 @@ modulus = "modulus_t"
 saturatus = "saturatus"
 fractus = "fractus"
 bivalens = "bivalens"
-# Null type (D23.2). No `_t` suffix: the value literal is `nulla`, so `nihil`
-# names only the type.
-# TRANSITIONAL (D23.3 window): `nihil_t` was the invented accept-only type
-# spelling the pre-D23.2 uniqueness rule forced; it stays accepted until the
-# sweep lands. Delete the alias then.
-nihil = { canonical = "nihil", aliases = ["nihil_t"] }
+# Null type (D23.2). The value literal is `nulla`, so `nihil` names only the
+# type.
+nihil = "nihil"
 vacuum = "vacuum"
 numquam = "numquam"
 ignotum = "ignotum"
@@ -841,6 +835,10 @@ help = "reduce the iuncta arity to 16 or fewer, or declare a genus for more fiel
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
 help = "use the type spelling declared by this reader locale"
+
+[diagnostics.PARSE040.issues.null_value_in_type_position]
+message = "'{value}' est valor nullus, non typus"
+help = "typus nullus est '{type}'; scribe '{type}' ubi typus requiritur"
 
 [diagnostics.PARSE041]
 message = "invalid type annotation"

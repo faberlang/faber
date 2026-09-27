@@ -119,6 +119,7 @@ fn parser_over_with_pack(source: &str) -> Parser {
         reader_keyword_latin_keys,
         reader_keyword_surfaces,
         reader_type_latin_keys,
+        reader_type_surfaces,
         keyword_surface,
         interner,
         ..
@@ -130,6 +131,7 @@ fn parser_over_with_pack(source: &str) -> Parser {
         reader_keyword_latin_keys,
         reader_keyword_surfaces,
         reader_type_latin_keys,
+        reader_type_surfaces,
         keyword_surface,
     )
 }
@@ -446,6 +448,7 @@ fn parser_over_en_modifier(source: &str) -> Parser {
         reader_keyword_latin_keys,
         reader_keyword_surfaces,
         reader_type_latin_keys,
+        reader_type_surfaces,
         keyword_surface,
         interner,
         ..
@@ -457,6 +460,7 @@ fn parser_over_en_modifier(source: &str) -> Parser {
         reader_keyword_latin_keys,
         reader_keyword_surfaces,
         reader_type_latin_keys,
+        reader_type_surfaces,
         keyword_surface,
     )
 }
