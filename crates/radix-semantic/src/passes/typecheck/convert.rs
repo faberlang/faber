@@ -376,12 +376,12 @@ fn integer_width_range(width: NumericWidth) -> Option<(i128, i128)> {
     }
 }
 
-/// Whether a float width holds an f64 value exactly. `f16`/`bf16` have no
-/// exactness proof without soft-float arithmetic, so they hold nothing here.
+/// Whether a float width can hold the value after rounding. `f16`/`bf16` have
+/// no rounding proof without soft-float arithmetic, so they hold nothing here.
 fn float_width_holds(width: NumericWidth, value: f64) -> bool {
     match width {
         NumericWidth::F64 => true,
-        NumericWidth::F32 => f64::from(value as f32) == value,
+        NumericWidth::F32 => (value as f32).is_finite(),
         _ => false,
     }
 }
@@ -2943,11 +2943,11 @@ impl TypeChecker<'_> {
 
     /// Enforce F3 on scalar numeric `∷` targets (DECISIONS D1.11, fork F3):
     /// the ascription must state a provable fact — an integer literal the
-    /// target width holds, a float literal the target width holds exactly,
-    /// or lossless widening inside one arithmetic family. Narrowing, float
-    /// precision loss, and int↔float are conversions and take `↦`. Sources
-    /// outside these families (valor, unresolved shapes, error) keep their
-    /// own law.
+    /// target width holds, a float literal that rounds to a finite value at
+    /// the target width, or lossless widening inside one arithmetic family.
+    /// Narrowing, float precision loss, and int↔float are conversions and take
+    /// `↦`. Sources outside these families (valor, unresolved shapes, error) keep
+    /// their own law.
     fn check_verte_numeric_fact(
         &mut self,
         source: &HirExpression,
