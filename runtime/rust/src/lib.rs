@@ -100,3 +100,7 @@ mod frame_live_test;
 #[cfg(test)]
 #[path = "frame_router_test.rs"]
 mod frame_router_test;
+
+#[cfg(test)]
+#[path = "frame_close_test.rs"]
+mod frame_close_test;

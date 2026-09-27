@@ -218,17 +218,18 @@ fn opener_static_handler_starts_when_opener_is_set() {
 }
 
 #[test]
-fn release_point_drops_handler_task_after_terminal() {
+fn release_point_drops_handler_task_when_the_handler_finishes() {
     let mut sermo = frame::sermo_open_with_static_routes("test:static", ROUTES, None);
     frame::sermo_set_opener(&mut sermo, Valor::Nihil);
-    assert!(sermo.handler_task_held());
 
-    while let Some(frame) = frame::sermo_recv(&mut sermo) {
-        if frame.status.is_terminal() {
-            break;
-        }
+    // D8.3: completion releases without the caller reading anything.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while sermo.handler_task_held() {
+        assert!(Instant::now() < deadline, "handler task never released");
+        std::thread::sleep(Duration::from_millis(1));
     }
-    assert!(!sermo.handler_task_held());
+    assert!(sermo.released());
+    assert_eq!(first_item(&mut sermo), Valor::Textus("static:Nihil".into()));
 }
 
 #[test]
