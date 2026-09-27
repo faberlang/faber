@@ -566,6 +566,7 @@ impl Validator<'_, '_> {
             | MirCollectionOp::ArrayDiv
             | MirCollectionOp::Append
             | MirCollectionOp::SortByKeys
+            | MirCollectionOp::Compare
             | MirCollectionOp::AppendImmutable
             | MirCollectionOp::Delete
             | MirCollectionOp::Index
@@ -686,6 +687,21 @@ impl Validator<'_, '_> {
                     span,
                     "collection length result is not numerus",
                 );
+            }
+            MirCollectionOp::Compare => {
+                self.require_exact(
+                    call.return_ty,
+                    self.primitive(Primitive::Numerus),
+                    span,
+                    "collection compare result is not numerus",
+                );
+                let second_arg_ty = call
+                    .args
+                    .get(1)
+                    .and_then(|arg| self.validate_operand(scope, arg, span));
+                if let (Some(lhs), Some(rhs)) = (first_arg_ty, second_arg_ty) {
+                    self.require_assignable(rhs, lhs, span, "collection compare operands differ");
+                }
             }
             MirCollectionOp::IsEmpty => {
                 self.require_exact(

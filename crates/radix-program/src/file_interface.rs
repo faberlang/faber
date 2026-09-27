@@ -136,9 +136,23 @@ pub fn extract_file_interface_with_identity(
             HirItemKind::Enum(enm) => {
                 FileExportKind::Enum(snapshot_enum(enm, analysis, file_label, export_identity)?)
             }
-            HirItemKind::Interface(interface_decl) => FileExportKind::Interface(
-                snapshot_interface(interface_decl, analysis, file_label, &name, export_identity)?,
-            ),
+            HirItemKind::Interface(interface_decl) => {
+                let mut nominal = snapshot_interface(
+                    interface_decl,
+                    analysis,
+                    file_label,
+                    &name,
+                    export_identity,
+                )?;
+                // D1.4: the `@ radix contract` role rides the interface so
+                // importers recognize norma's `Orderable` by its mark.
+                nominal.radix_contract = radix_module::semantic::radix_contract::role_from_hir(
+                    &item.annotations,
+                    &analysis.interner,
+                )
+                .map(|role| role.as_str().to_owned());
+                FileExportKind::Interface(nominal)
+            }
             HirItemKind::Constant(konst) => FileExportKind::Const(snapshot_const(
                 konst,
                 analysis,
@@ -268,6 +282,7 @@ fn snapshot_interface(
         methods,
         variants: Vec::new(),
         shared_fields: Vec::new(),
+        radix_contract: None,
     })
 }
 
@@ -342,6 +357,7 @@ fn snapshot_enum(
         methods: Vec::new(),
         variants,
         shared_fields,
+        radix_contract: None,
     })
 }
 

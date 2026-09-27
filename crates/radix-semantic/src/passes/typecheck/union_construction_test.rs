@@ -70,6 +70,7 @@ fn token_union_interface() -> FileInterface {
             name: "TokenKind".to_owned(),
             methods: Vec::new(),
             shared_fields: Vec::new(),
+            radix_contract: None,
             variants: vec![
                 InterfaceEnumVariant {
                     name: "Palabra".to_owned(),
@@ -282,6 +283,7 @@ fn two_import_interfaces() -> BTreeMap<String, FileInterface> {
             name: "A".to_owned(),
             methods: Vec::new(),
             shared_fields: Vec::new(),
+            radix_contract: None,
             variants: vec![InterfaceEnumVariant {
                 name: "X".to_owned(),
                 fields: Vec::new(),
@@ -296,6 +298,7 @@ fn two_import_interfaces() -> BTreeMap<String, FileInterface> {
             name: "B".to_owned(),
             methods: Vec::new(),
             shared_fields: Vec::new(),
+            radix_contract: None,
             variants: vec![
                 InterfaceEnumVariant {
                     name: "X".to_owned(),
@@ -518,6 +521,7 @@ fn colliding_import_interface() -> FileInterface {
             name: "Foreign".to_owned(),
             methods: Vec::new(),
             shared_fields: Vec::new(),
+            radix_contract: None,
             variants: vec![
                 InterfaceEnumVariant {
                     name: "ElementaMismatch".to_owned(),

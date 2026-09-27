@@ -523,7 +523,7 @@ fn is_literal_form(expr: &HirExpression) -> bool {
     }
 }
 
-fn max_hir_id(hir: &HirModule) -> u32 {
+pub(crate) fn max_hir_id(hir: &HirModule) -> u32 {
     struct MaxId(u32);
     impl HirVisitor for MaxId {
         fn visit_item(&mut self, item: &radix_hir::HirItem) {

@@ -54,6 +54,7 @@ pub mod matrix_shape;
 pub mod numeric_width;
 pub mod passes;
 pub mod qualified_identity;
+pub mod radix_contract;
 pub mod radix_lane;
 pub mod resolved_use;
 pub mod scope;

@@ -218,6 +218,16 @@ impl Lowerer<'_> {
             self.error("unknown_interface");
             return None;
         };
+        // A selectively imported contract (`importa ex "norma:order" fixum
+        // Orderable`) names the imported implendum, not the local binding.
+        let def_id = match self
+            .resolver
+            .selective_import_type(def_id)
+            .map(|ty| self.types.get(ty))
+        {
+            Some(radix_types::Type::Interface(imported)) => *imported,
+            _ => def_id,
+        };
         let args = contract
             .args
             .iter()

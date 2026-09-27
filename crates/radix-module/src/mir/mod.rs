@@ -246,6 +246,9 @@ mod nodes_tests;
 #[path = "numeric_unary_test.rs"]
 mod numeric_unary_tests;
 #[cfg(test)]
+#[path = "ordering_test.rs"]
+mod ordering_tests;
+#[cfg(test)]
 #[path = "ordina_key_test.rs"]
 mod ordina_key_tests;
 #[cfg(test)]

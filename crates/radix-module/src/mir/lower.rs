@@ -340,6 +340,9 @@ pub fn lower_analyzed_unit(
     // symbols intern into this clone, so the analyzed unit's interner keeps
     // exactly the symbols upstream phases produced.
     let mut interner = unit.interner.clone();
+    // The snapshot carries only the arena; the ordering-contract fact (D1.4)
+    // rides along for monomorphization's bound dispatch.
+    types.ordering_contract = unit.types.ordering_contract;
     ensure_map_iteration_array_types(&mut types);
     ensure_itera_coordinate_array_types(&unit.hir, &mut types);
     ensure_tensor_bracket_index_array_types(&unit.hir, &mut types);
@@ -1395,6 +1398,21 @@ impl MirLowerer<'_> {
                 continue;
             };
             for bound in bounds {
+                // D1.4: a call through the ordering bound targets the
+                // contract itself; monomorphization picks the witness genus's
+                // `compare` or the built-in compare. The contract may be
+                // imported, so its method has no local definition.
+                if self.unit.types.ordering_contract == Some(bound.contract)
+                    && let Some(compare) = self
+                        .unit
+                        .interner
+                        .lookup(crate::semantic::radix_contract::ORDERING_METHOD)
+                {
+                    targets
+                        .entry((param.name, compare))
+                        .or_insert(bound.contract);
+                    continue;
+                }
                 let Some(interface) = self
                     .unit
                     .hir
@@ -2667,6 +2685,13 @@ impl<'a> FunctionBuilder<'a> {
         {
             return self.lower_lista_elementwise(op, lhs, rhs, expr);
         }
+        if matches!(op, HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq)
+            && lhs
+                .ty
+                .is_some_and(|ty| matches!(self.types.get(self.types.peel_access_marker(ty).1), Type::Tuple(_)))
+        {
+            return self.lower_tuple_order(op, lhs, rhs, expr);
+        }
         let Some(mir_op) = mir_bin_op(op) else {
             self.errors
                 .push(MirError::unsupported(expr.span, "binary operator without a MIR primitive"));
@@ -2695,6 +2720,43 @@ impl<'a> FunctionBuilder<'a> {
         let ty = self.expr_ty(expr)?;
 
         Some(self.assign_temp(MirValueKind::Binary { op: mir_op, lhs, rhs }, ty, expr.span))
+    }
+
+    /// Tuple `≺ ≻ ≤ ≥` (D1.4): lexicographic three-way compare, then the
+    /// glyph against zero. Elements must be built-in orderables; a genus
+    /// element would need its own `compare` call per position, which MIR
+    /// does not expand yet, so it fails closed here.
+    fn lower_tuple_order(
+        &mut self,
+        op: HirBinOp,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let tuple_ty = lhs.ty?;
+        if radix_types::ordering::builtin_ordering_kind(self.types, tuple_ty).is_none() {
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "tuple ordering over a genus element is not lowered on MIR",
+            ));
+            return None;
+        }
+        let lhs_value = self.lower_expr_value(lhs)?;
+        let rhs_value = self.lower_expr_value(rhs)?;
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let ordering = self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::Compare),
+            vec![lhs_value, rhs_value],
+            numerus,
+            expr.span,
+        );
+        let mir_op = mir_bin_op(op)?;
+        let ty = self.expr_ty(expr)?;
+        Some(self.assign_temp(
+            MirValueKind::Binary { op: mir_op, lhs: ordering, rhs: MirOperand::Constant(MirConstant::Int(0)) },
+            ty,
+            expr.span,
+        ))
     }
 
     fn lower_logical_short_circuit(

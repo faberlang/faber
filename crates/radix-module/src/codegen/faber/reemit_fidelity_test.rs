@@ -59,6 +59,7 @@ fn imported_token_interface() -> FileInterface {
             name: "TokenKind".to_owned(),
             methods: Vec::new(),
             shared_fields: Vec::new(),
+            radix_contract: None,
             variants: vec![InterfaceEnumVariant { name: "Palabra".to_owned(), fields: Vec::new() }],
         }),
     });

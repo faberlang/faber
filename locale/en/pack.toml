@@ -2297,6 +2297,10 @@ help = "use compatible operand types"
 message = "type argument {rejected} does not satisfy {param} {implet} {contract}"
 help = "declare `{implet} {contract}` on the type, or call with a type that does"
 
+[diagnostics.SEM011.issues.ordering_operands_differ]
+message = "ordered operands have different types"
+help = "compare values of one {implet} Orderable type, or tuples of the same element types"
+
 [diagnostics.SEM011.issues.nucleum_lane_fragment_clash]
 message = "fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"
 help = "keep caller and fragment lane bindings distinct"
@@ -3056,6 +3060,26 @@ help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"h
 [diagnostics.SEM018.issues.unknown_directive]
 message = "unknown @ radix directive; expected `lane`"
 help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
+
+[diagnostics.SEM018.issues.radix_contract_role_missing]
+message = "@ radix contract requires one role string"
+help = "write `@ radix contract \"ordering\"` on the {implendum}"
+
+[diagnostics.SEM018.issues.radix_contract_unknown_role]
+message = "unknown @ radix contract role '{role}'; expected 'ordering'"
+help = "write `@ radix contract \"ordering\"` on the {implendum}"
+
+[diagnostics.SEM018.issues.radix_contract_placement]
+message = "@ radix contract is only valid on an {implendum}"
+help = "move the mark to the {implendum} that declares the contract"
+
+[diagnostics.SEM018.issues.radix_contract_ordering_shape]
+message = "the ordering contract must declare exactly `compare(T other) → {numerus}` over one type parameter"
+help = "declare `{implendum} Orderable<T>` with the single method `{functio} compare(T other) → {numerus}`"
+
+[diagnostics.SEM018.issues.radix_contract_duplicate]
+message = "a second {implendum} claims the ordering contract"
+help = "import or declare exactly one ordering contract"
 
 [diagnostics.SEM018.issues.unknown_lane]
 message = "unknown @ radix lane '{lane}'; expected 'air', 'mir', or 'hir-direct'"

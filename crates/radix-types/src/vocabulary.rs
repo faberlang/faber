@@ -190,6 +190,11 @@ pub enum MirCollectionOp {
     /// `ordina(key)`): args `[receiver, keys]`, same length; keys are
     /// numbers or `textus`. Returns the reordered receiver elements.
     SortByKeys,
+    /// Three-way compare through the ordering contract (D1.4): args
+    /// `[a, b]` of one conforming built-in or tuple type; returns `numerus`
+    /// negative, zero, or positive. `fractus` uses IEEE 754 totalOrder,
+    /// `textus` code-point order, tuples lexicographic order.
+    Compare,
     Union,
     Intersection,
     Difference,
