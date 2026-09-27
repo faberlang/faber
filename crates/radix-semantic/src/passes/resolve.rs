@@ -95,6 +95,8 @@ const ISSUE_QUALIFIED_TYPE_MIDDLE_NOT_NAMESPACE: &str = "qualified_type_middle_n
 const ISSUE_QUALIFIED_TYPE_PREFIX_NOT_NAMESPACE: &str = "qualified_type_prefix_not_namespace";
 const ISSUE_FIGURA_NOT_INDEX_PARAM: &str = "figura_not_index_param";
 const ISSUE_SCRINIUM_ARITY: &str = "scrinium_arity";
+const ISSUE_SERMO_ARITY: &str = "sermo_arity";
+const ISSUE_SERMO_MISSING_BUILTIN: &str = "sermo_missing_builtin";
 const ISSUE_SCRINIUM_MISSING_BUILTIN: &str = "scrinium_missing_builtin";
 const ISSUE_SERIES_PARAMS: &str = "series_params";
 const ISSUE_SCHEMA_DUPLICATE_VISIBLE: &str = "schema_duplicate_visible";
@@ -3705,6 +3707,20 @@ fn lower_named_type(
             return Err(TypeLowerError::Issue(ISSUE_INTERVALLUM_BOUND));
         }
         return Ok(types.intervallum(bound));
+    }
+
+    if name_str == "sermo" && !params.is_empty() {
+        let Some(def_id) = crate::builtins::frame_types::sermo_def_id(resolver) else {
+            return Err(TypeLowerError::Issue(ISSUE_SERMO_MISSING_BUILTIN));
+        };
+        let [opener, reply] = params else {
+            return Err(TypeLowerError::Issue(ISSUE_SERMO_ARITY));
+        };
+        let opener = lower_generic_type_arg(opener, resolver, interner, types)?;
+        let reply = lower_generic_type_arg(reply, resolver, interner, types)?;
+        return Ok(crate::builtins::frame_types::sermo_typed_type_id(
+            types, def_id, opener, reply,
+        ));
     }
 
     if name_str == "scrinium" {

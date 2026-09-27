@@ -719,6 +719,9 @@ impl TypeChecker<'_> {
         if !self.is_sermo_type(source_ty) {
             return None;
         }
+        if self.check_typed_sermo_materialize(source_ty, target_resolved, span) == Some(false) {
+            return Some(self.error_type);
+        }
         if self.is_sermo_materialize_target(target_resolved) {
             return Some(target_resolved);
         }
@@ -727,13 +730,7 @@ impl TypeChecker<'_> {
     }
 
     fn is_sermo_type(&self, ty: TypeId) -> bool {
-        let Some(sermo_def_id) = crate::builtins::frame_types::sermo_def_id(self.resolver) else {
-            return false;
-        };
-        matches!(
-            self.types.get(self.resolve_inferred_type(ty)),
-            Type::Struct(def_id) if *def_id == sermo_def_id
-        )
+        self.sermo_shape(ty).is_some()
     }
 
     fn is_sermo_materialize_target(&self, ty: TypeId) -> bool {

@@ -74,6 +74,15 @@ impl TypeChecker<'_> {
 
     fn canonicalize_type_uncached(&mut self, ty: TypeId) -> TypeId {
         let resolved = self.resolve_inferred_type(ty);
+        // D6.11 erasure: `sermo<O, R>` is compile-time only; the finalized
+        // HIR carries the unchanged carrier every backend matches.
+        if let Some(erased) = crate::builtins::frame_types::erase_conversation_type(
+            self.types,
+            self.resolver,
+            resolved,
+        ) {
+            return erased;
+        }
         match self.types.get(resolved).clone() {
             Type::Infer(var) => {
                 let subst = self.substitutions.borrow().get(&var).copied();

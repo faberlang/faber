@@ -1,0 +1,54 @@
++++
+term = "ad"
+kind = "annotation"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "redde_stmt", "incipit_stmt", "fixum_decl", "ad_expr", "ad_opener", "conversio_expr", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "endpoint"
+canonical = true
+summary = "A call to a Faber-served route is a typed conversation channel<O, R>: the opener and every reply are checked against the handler."
+syntax = "const channel<O, R> s ← call 'prefix:name' (o)"
+related = ["ad", "sermo", "tuus", "conversio"]
+locale = "en"
++++
+# =============================================================================
+# call — a conversation with a Faber handler is typed `channel<O, R>`.
+# =============================================================================
+#
+# What this teaches:
+#   • Typed conversation — when a Faber function serves the route, `call` has
+#     type `channel<O, R>`: `O` is the handler's parameter, `R` each item back
+#   • Inference — `const _ s ← call '…'` infers `channel<O, R>` from the route
+#   • Dropping the types — a typed channel assigns to a bare `channel`, which
+#     reads its frames as loose values again
+#   • No opener — a handler without a parameter has `O = null`, and the call
+#     passes no opener
+#
+# Common mistakes:
+#   • materializing as a type other than `R` or `list<R>` — a compile error
+#   • passing an opener of the wrong type — the handler's parameter decides
+#   • a bare `channel` is `channel<value, value>`; host routes stay untyped
+#
+# See also: ad, sermo, tuus, conversio
+# =============================================================================
+
+@ call 'numeri:twice'
+fn twice(int n) → int {
+    return n * 2
+}
+
+@ call 'salutatio:greeting'
+fn greeting() → string {
+    return "salve"
+}
+
+main {
+    const _ s ← call 'numeri:twice' (21)
+    const int doubled ← s ↦ int
+    print doubled
+
+    const channel<null, string> g ← call 'salutatio:greeting'
+    print g ↦ string
+
+    const channel<int, int> t ← call 'numeri:twice' (5)
+    const channel loose ← t
+    print loose ↦ int
+}

@@ -727,6 +727,24 @@ impl Lowerer<'_> {
             return self.types.intervallum(bound);
         }
 
+        if name_str == "sermo" && !params.is_empty() {
+            // `sermo<O, R>` (D6.11); bare `sermo` is `sermo<valor, valor>`
+            // and resolves through the ordinary builtin symbol.
+            let Some(def_id) = crate::builtins::frame_types::sermo_def_id(self.resolver) else {
+                self.error("sermo_missing_builtin");
+                return self.types.intern(Type::Error);
+            };
+            let [opener, reply] = params else {
+                self.error("sermo_arity");
+                return self.types.intern(Type::Error);
+            };
+            let opener = self.lower_generic_type_arg(opener);
+            let reply = self.lower_generic_type_arg(reply);
+            return crate::builtins::frame_types::sermo_typed_type_id(
+                self.types, def_id, opener, reply,
+            );
+        }
+
         if name_str == "scrinium" {
             let Some(def_id) = crate::builtins::frame_types::scrinium_def_id(self.resolver) else {
                 self.error("scrinium_missing_builtin");

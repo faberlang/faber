@@ -117,6 +117,7 @@ pub mod range;
 #[cfg(test)]
 pub mod relations_test;
 pub mod scalar_text;
+pub mod sermo_route;
 pub mod stmt;
 pub mod summa;
 pub mod tensor_index;
@@ -425,6 +426,10 @@ pub(crate) struct TypeChecker<'a> {
     /// narrows a binding. Assignment invalidation restores this state instead
     /// of treating the narrowed type as the binding's new declaration.
     pub(crate) flow_bases: FxHashMap<DefId, BindingInfo>,
+
+    /// Conversation types of the `@ ad` routes this module can see, keyed
+    /// by route (D6.11). Routes absent here type as bare `sermo`.
+    pub ad_routes: FxHashMap<Symbol, sermo_route::AdRouteTypes>,
 }
 
 /// Typecheck resolved HIR and attach table-local types to declarations and expressions.
@@ -563,6 +568,7 @@ impl<'a> TypeChecker<'a> {
             locale_pack: None,
             assert_refinements: Vec::new(),
             flow_bases: FxHashMap::default(),
+            ad_routes: FxHashMap::default(),
         }
     }
 
@@ -655,6 +661,7 @@ impl<'a> TypeChecker<'a> {
 
     pub fn check_program(&mut self, hir: &mut HirModule) {
         self.reject_json_annotations_on_site(&hir.entry_annotations, "incipit");
+        self.collect_ad_route_types(hir);
         for item in &mut hir.items {
             self.check_item(item);
         }
@@ -987,3 +994,7 @@ mod named_type_defaults_test;
 #[cfg(test)]
 #[path = "format_test.rs"]
 mod format_test;
+
+#[cfg(test)]
+#[path = "sermo_route_typing_test.rs"]
+mod sermo_route_typing_test;

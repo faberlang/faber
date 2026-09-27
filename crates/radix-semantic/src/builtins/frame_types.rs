@@ -225,6 +225,107 @@ pub fn sermo_type_id(types: &mut TypeTable, def_id: DefId) -> TypeId {
     types.intern(Type::Struct(def_id))
 }
 
+/// `sermo<O, R>` (DECISIONS D6.11). `sermo<valor, valor>` is the bare
+/// carrier (D6.12), so the loose form has exactly one `TypeId`.
+pub fn sermo_typed_type_id(
+    types: &mut TypeTable,
+    def_id: DefId,
+    opener: TypeId,
+    reply: TypeId,
+) -> TypeId {
+    let base = sermo_type_id(types, def_id);
+    let valor = types.primitive(Primitive::Valor);
+    if opener == valor && reply == valor {
+        return base;
+    }
+    types.intern(Type::Applied(
+        base,
+        vec![
+            radix_types::AppliedArg::Type(opener),
+            radix_types::AppliedArg::Type(reply),
+        ],
+    ))
+}
+
+/// Static view of a conversation type: bare `sermo` or `sermo<O, R>`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SermoShape {
+    /// Bare `sermo`, meaning `sermo<valor, valor>`.
+    Bare,
+    /// `sermo<O, R>` from a Faber route or a written annotation.
+    Typed { opener: TypeId, reply: TypeId },
+}
+
+/// Classify `ty` (already resolved past inference) as a conversation type.
+#[must_use]
+pub fn sermo_shape(types: &TypeTable, sermo_def: DefId, ty: TypeId) -> Option<SermoShape> {
+    match types.get(ty) {
+        Type::Struct(def_id) if *def_id == sermo_def => Some(SermoShape::Bare),
+        Type::Applied(base, args) => {
+            if !matches!(types.get(*base), Type::Struct(def_id) if *def_id == sermo_def) {
+                return None;
+            }
+            match args.as_slice() {
+                [
+                    radix_types::AppliedArg::Type(opener),
+                    radix_types::AppliedArg::Type(reply),
+                ] => Some(SermoShape::Typed {
+                    opener: *opener,
+                    reply: *reply,
+                }),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Marker argument on a `meus<T>` view whose peer is a Faber handler: the
+/// handler cannot read later frames (two-way handlers are deferred, D6.11),
+/// so `da` on it is a compile error. Typecheck-only; finalize erases it.
+#[must_use]
+pub fn closed_meus_marker(types: &mut TypeTable) -> TypeId {
+    types.primitive(Primitive::Numquam)
+}
+
+/// `meus<T>` whose outbound side is closed toward a Faber handler.
+pub fn closed_meus_type_id(types: &mut TypeTable, meus_def: DefId, payload_ty: TypeId) -> TypeId {
+    let base = types.intern(Type::Struct(meus_def));
+    let marker = closed_meus_marker(types);
+    types.intern(Type::Applied(
+        base,
+        vec![
+            radix_types::AppliedArg::Type(payload_ty),
+            radix_types::AppliedArg::Type(marker),
+        ],
+    ))
+}
+
+/// Compile-time-only erasure of conversation typing (D6.11: the wire is
+/// unchanged). `sermo<O, R>` becomes the bare `sermo` carrier and a closed
+/// `meus<T>` becomes `meus<T>`, so every backend keeps matching the shapes it
+/// already knows. `None` when `ty` needs no erasure.
+#[must_use]
+pub fn erase_conversation_type(
+    types: &mut TypeTable,
+    resolver: &Resolver,
+    ty: TypeId,
+) -> Option<TypeId> {
+    let Type::Applied(base, args) = types.get(ty).clone() else {
+        return None;
+    };
+    let Type::Struct(def_id) = types.get(base).clone() else {
+        return None;
+    };
+    if Some(def_id) == sermo_def_id(resolver) {
+        return Some(base);
+    }
+    if Some(def_id) == meus_def_id(resolver) && args.len() == 2 {
+        return Some(types.intern(Type::Applied(base, vec![args[0]])));
+    }
+    None
+}
+
 pub fn directional_view_payload_type_id(
     types: &mut TypeTable,
     view_def: DefId,

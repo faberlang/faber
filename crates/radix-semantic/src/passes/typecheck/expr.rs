@@ -30,7 +30,7 @@ use super::*;
 const ISSUE_IACE_REQUIRES_ALTERNATE_EXIT: &str = "iace_requires_alternate_exit";
 const ISSUE_IACE_VALUE_TYPE_MISMATCH: &str = "iace_value_type_mismatch";
 const ISSUE_ASSERT_CONDITION_TYPE_MISMATCH: &str = "assert_condition_type_mismatch";
-const ISSUE_STREAM_AD_OPENER_TYPE_MISMATCH: &str = "stream_ad_opener_type_mismatch";
+pub(super) const ISSUE_STREAM_AD_OPENER_TYPE_MISMATCH: &str = "stream_ad_opener_type_mismatch";
 const ISSUE_EXPRESSION_TYPE_MISMATCH: &str = "expression_type_mismatch";
 const ISSUE_ITERA_AB_SOURCE_REQUIRES_RANGE: &str = "itera_ab_source_requires_range";
 pub(super) const ISSUE_CURSOR_ITERATION_REQUIRES_EX: &str = "cursor_iteration_requires_ex";
@@ -155,6 +155,7 @@ impl TypeChecker<'_> {
             HirExpressionKind::MethodCall(receiver, name, type_args, args, conversion) => {
                 let ty = self.check_method_call(receiver, name, type_args, args, expected);
                 *conversion = self.pending_conversion.take();
+                self.record_inferred_sermo_view_type_arg(receiver, *name, type_args, ty);
                 ty
             }
             HirExpressionKind::Field(object, name) => self.check_field(object, *name),
@@ -487,23 +488,8 @@ impl TypeChecker<'_> {
                 self.types.reference(mutability, inner_ty)
             }
             HirExpressionKind::Deref(inner) => self.check_deref(inner, expr.span),
-            HirExpressionKind::Ad { opener, .. } => {
-                if let Some(opener) = opener {
-                    let valor = self.types.primitive(Primitive::Valor);
-                    let opener_ty = self.check_expr_with_expected(opener, Some(valor));
-                    self.unify_assign_issue(
-                        opener_ty,
-                        valor,
-                        opener.span,
-                        ISSUE_STREAM_AD_OPENER_TYPE_MISMATCH,
-                    );
-                }
-                if let Some(def_id) = crate::builtins::frame_types::sermo_def_id(self.resolver) {
-                    crate::builtins::frame_types::sermo_type_id(self.types, def_id)
-                } else {
-                    self.missing_type_annotation("sermo_type_not_registered", expr.span);
-                    self.types.primitive(Primitive::Ignotum)
-                }
+            HirExpressionKind::Ad { route, opener } => {
+                self.check_ad_expr(*route, opener.as_deref_mut(), expr.span)
             }
             HirExpressionKind::TypeCheck {
                 positive: _,
