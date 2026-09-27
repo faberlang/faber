@@ -54,7 +54,7 @@ MIR_TARGETS = [
     "wgsl-text",
     "sexp-struct",
     "sexp",
-    "scena",
+    "runner",
 ]
 
 CARGO_HIR = [

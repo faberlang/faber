@@ -5,16 +5,10 @@
   "lane": "hir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 319,
-    "analyzable": 344
+    "capable": 328,
+    "analyzable": 355
   },
   "terms": [
-    {
-      "term": "abstractus",
-      "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
-    },
     {
       "term": "ab",
       "rule": "keyword",
@@ -25,7 +19,7 @@
       "term": "ad",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 3
+      "analyzable": 5
     },
     {
       "term": "adfirma",
@@ -88,12 +82,6 @@
       "analyzable": 1
     },
     {
-      "term": "arena",
-      "rule": "existing-home",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
       "term": "argumenta",
       "rule": "keyword",
       "capable": 1,
@@ -119,6 +107,12 @@
     },
     {
       "term": "↤",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⊥",
       "rule": "operator-group",
       "capable": 1,
       "analyzable": 1
@@ -204,8 +198,8 @@
     {
       "term": "clausura",
       "rule": "keyword",
-      "capable": 4,
-      "analyzable": 4
+      "capable": 5,
+      "analyzable": 5
     },
     {
       "term": "cli",
@@ -216,26 +210,14 @@
     {
       "term": "↦",
       "rule": "operator-group",
-      "capable": 21,
-      "analyzable": 21
+      "capable": 22,
+      "analyzable": 22
     },
     {
       "term": "copia",
       "rule": "keyword",
       "capable": 2,
       "analyzable": 2
-    },
-    {
-      "term": "cura",
-      "rule": "keyword",
-      "capable": 2,
-      "analyzable": 2
-    },
-    {
-      "term": "curata",
-      "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
     },
     {
       "term": "cursor",
@@ -342,8 +324,8 @@
     {
       "term": "ex",
       "rule": "keyword",
-      "capable": 5,
-      "analyzable": 5
+      "capable": 6,
+      "analyzable": 6
     },
     {
       "term": "exitus",
@@ -396,8 +378,8 @@
     {
       "term": "fiunt",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "fixum",
@@ -450,8 +432,8 @@
     {
       "term": "genus",
       "rule": "keyword",
-      "capable": 4,
-      "analyzable": 4
+      "capable": 6,
+      "analyzable": 6
     },
     {
       "term": "≥",
@@ -498,8 +480,8 @@
     {
       "term": "implet",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "importa",
@@ -512,6 +494,12 @@
       "rule": "keyword",
       "capable": 0,
       "analyzable": 0
+    },
+    {
+      "term": "insere",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "incipiet",
@@ -546,8 +534,8 @@
     {
       "term": "itera",
       "rule": "keyword",
-      "capable": 16,
-      "analyzable": 18
+      "capable": 18,
+      "analyzable": 20
     },
     {
       "term": "iuncta",
@@ -642,12 +630,6 @@
     {
       "term": "named-holes",
       "rule": "existing-home",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "nexum",
-      "rule": "keyword",
       "capable": 1,
       "analyzable": 1
     },
@@ -750,8 +732,8 @@
     {
       "term": "perge",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 3,
+      "analyzable": 3
     },
     {
       "term": "⊚",
@@ -768,8 +750,8 @@
     {
       "term": "∪",
       "rule": "operator-group",
-      "capable": 2,
-      "analyzable": 2
+      "capable": 3,
+      "analyzable": 3
     },
     {
       "term": "↑",
@@ -798,8 +780,8 @@
     {
       "term": "praefixum",
       "rule": "keyword",
-      "capable": 0,
-      "analyzable": 0
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "praepara",
@@ -958,10 +940,10 @@
       "analyzable": 2
     },
     {
-      "term": "sic",
-      "rule": "keyword",
-      "capable": 2,
-      "analyzable": 2
+      "term": "✓",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "sin",
@@ -1016,12 +998,6 @@
       "rule": "operator-group",
       "capable": 1,
       "analyzable": 1
-    },
-    {
-      "term": "sub",
-      "rule": "keyword",
-      "capable": 0,
-      "analyzable": 0
     },
     {
       "term": "selective_import",
@@ -1080,8 +1056,8 @@
     {
       "term": "tabula",
       "rule": "keyword",
-      "capable": 2,
-      "analyzable": 2
+      "capable": 3,
+      "analyzable": 3
     },
     {
       "term": "tag",
