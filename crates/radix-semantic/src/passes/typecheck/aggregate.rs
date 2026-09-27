@@ -24,6 +24,7 @@ use radix_syntax::ClosureModifier;
 const ISSUE_ARRAY_SPREAD_REQUIRES_LISTA: &str = "array_spread_requires_lista";
 const ISSUE_CLOSURE_PARAMETER_TYPE_MISMATCH: &str = "closure_parameter_type_mismatch";
 const ISSUE_CLOSURE_RETURN_TYPE_MISMATCH: &str = "closure_return_type_mismatch";
+const ISSUE_CONSTRUCTION_SOURCE_TYPE_MISMATCH: &str = "construction_source_type_mismatch";
 const ISSUE_FIELD_INITIALIZER_TYPE_MISMATCH: &str = "field_initializer_type_mismatch";
 const ISSUE_STRUCT_COMPUTED_KEY_FORBIDDEN: &str = "struct_computed_key_forbidden";
 const ISSUE_UNKNOWN_STRUCT: &str = "unknown_struct";
@@ -40,11 +41,17 @@ impl TypeChecker<'_> {
     /// have their parameters substituted before initializer checking (U-D1):
     /// `AppliedArg::Type` binds typus slots, `AppliedArg::Size` binds
     /// magnitudo slots (S0-G1 — size witnesses must reach vector/matrix widths).
+    ///
+    /// A copy-with-changes source (`Genus { … } ex source`, D15.1) arrives as
+    /// the `Spread` entry. It must be the same genus as `target` (D15.2) and it
+    /// supplies every field the braces omit, so required-field accounting is
+    /// skipped when it is present.
     pub fn check_struct_fields(
         &mut self,
         def_id: DefId,
         fields: &mut [HirObjectField],
         args: &[radix_types::AppliedArg],
+        target: TypeId,
         span: radix_lexer::Span,
     ) {
         let field_types = if let Some(info) = self.structs.get(&def_id) {
@@ -85,6 +92,7 @@ impl TypeChecker<'_> {
                 .collect()
         };
         let mut supplied = FxHashSet::default();
+        let mut has_source = false;
 
         for field in fields.iter_mut() {
             match &mut field.key {
@@ -111,20 +119,67 @@ impl TypeChecker<'_> {
                     self.check_expr(expr);
                     self.invalid_operand_types(ISSUE_STRUCT_COMPUTED_KEY_FORBIDDEN, expr.span);
                 }
-                // The parser rejects `sparge` in construction literals
-                // (D15.4, `construction_spread_removed`); no source reaches here.
+                // Only the `ex source` suffix produces this key; `sparge` left
+                // construction literals (D15.4).
                 HirObjectKey::Spread(expr) => {
-                    self.check_expr(expr);
+                    has_source = true;
+                    self.check_construction_source(def_id, expr, target);
                 }
             }
         }
 
+        if has_source {
+            return;
+        }
         for (name, info) in field_types {
             if info.required && !supplied.contains(&name) {
                 self.undefined_member("missing_required_struct_field", info.span);
             }
         }
     }
+    /// Check a copy-with-changes source against the constructed genus.
+    ///
+    /// The source is typed with the target as context, then must name the
+    /// same genus (`Genus` or an application of it); any other type — another
+    /// genus, a scalar, a nullable carrier — is
+    /// `construction_source_type_mismatch`. For the same genus the ordinary
+    /// assignment check then binds or compares the type arguments.
+    fn check_construction_source(
+        &mut self,
+        def_id: DefId,
+        source: &mut HirExpression,
+        target: TypeId,
+    ) {
+        let source_ty = self.check_expr_with_expected(source, Some(target));
+        let resolved = self.resolve_inferred_type(source_ty);
+        let resolved = match self.types.get(resolved) {
+            Type::Ref(_, inner) => self.resolve_inferred_type(*inner),
+            _ => resolved,
+        };
+        let source_def = match self.types.get(resolved) {
+            Type::Struct(source_def) => Some(*source_def),
+            Type::Applied(base, _) => match self.types.get(self.resolve_inferred_type(*base)) {
+                Type::Struct(source_def) => Some(*source_def),
+                _ => None,
+            },
+            _ => None,
+        };
+        if source_def == Some(def_id) {
+            self.unify_assign_issue(
+                resolved,
+                target,
+                source.span,
+                ISSUE_CONSTRUCTION_SOURCE_TYPE_MISMATCH,
+            );
+        } else {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_CONSTRUCTION_SOURCE_TYPE_MISMATCH,
+                source.span,
+            );
+        }
+    }
+
     /// Checks a closure expression and returns its function type.
     ///
     /// Closures are both synthesized and expected-context driven. If an

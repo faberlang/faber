@@ -712,6 +712,9 @@ fn unexpected_message(args: &[DiagnosticArg]) -> Option<String> {
         "construction_spread_removed" => {
             Some("'sparge' is not valid in a construction literal".to_owned())
         }
+        "construction_source_repeated" => {
+            Some("a construction literal takes exactly one 'ex' source".to_owned())
+        }
         _ => None,
     }
 }
@@ -744,6 +747,9 @@ fn unexpected_help(args: &[DiagnosticArg]) -> Option<String> {
         }
         "construction_spread_removed" => Some(
             "name each field; copy-with-changes is 'Genus { field = value } ex source'".to_owned(),
+        ),
+        "construction_source_repeated" => Some(
+            "copy from one value; set the other changes as braced fields".to_owned(),
         ),
         _ => None,
     }

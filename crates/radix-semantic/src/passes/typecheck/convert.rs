@@ -2429,7 +2429,7 @@ impl TypeChecker<'_> {
             Type::Struct(def_id) => {
                 // Bare non-generic target (or a generic target whose witnesses
                 // could not be resolved): validate against the declared fields.
-                self.check_struct_fields(def_id, entries, &[], span);
+                self.check_struct_fields(def_id, entries, &[], target_resolved, span);
                 Some(target_resolved)
             }
             Type::Applied(base, args) => {
@@ -2440,7 +2440,7 @@ impl TypeChecker<'_> {
                 if let Type::Struct(def_id) =
                     self.types.get(self.resolve_inferred_type(base)).clone()
                 {
-                    self.check_struct_fields(def_id, entries, &args, span);
+                    self.check_struct_fields(def_id, entries, &args, target_resolved, span);
                     return Some(target_resolved);
                 }
                 None

@@ -1749,8 +1749,9 @@ impl Parser {
                 {
                     let type_span = ident.span;
                     self.advance();
-                    let fields = self.parse_object_fields()?;
+                    let mut fields = self.parse_object_fields()?;
                     self.expect(&TokenKind::RBrace, "expected '}'")?;
+                    self.parse_construction_source(&mut fields)?;
                     let object = Expr {
                         id: self.next_id(),
                         kind: ExprKind::Object(ObjectExpr { fields }),
@@ -1855,8 +1856,9 @@ impl Parser {
             &TokenKind::LBrace,
             "expected '{' after ratio type arguments",
         )?;
-        let fields = self.parse_object_fields()?;
+        let mut fields = self.parse_object_fields()?;
         self.expect(&TokenKind::RBrace, "expected '}' after ratio fields")?;
+        self.parse_construction_source(&mut fields)?;
 
         let object = Expr {
             id: self.next_id(),
@@ -1927,8 +1929,9 @@ impl Parser {
             type_span = type_span.merge(self.previous_span());
         }
         self.advance();
-        let fields = self.parse_object_fields()?;
+        let mut fields = self.parse_object_fields()?;
         self.expect(&TokenKind::RBrace, "expected '}'")?;
+        self.parse_construction_source(&mut fields)?;
         let object = Expr {
             id: self.next_id(),
             kind: ExprKind::Object(ObjectExpr { fields }),
@@ -2442,6 +2445,42 @@ impl Parser {
         }
 
         Ok(elements)
+    }
+
+    /// Parse the optional copy-with-changes source after a construction
+    /// literal's closing `}` (DECISIONS D15.1–D15.2).
+    ///
+    /// GRAMMAR:
+    ///   construction-source := `ex` postfix-expr
+    ///
+    /// The source becomes the literal's last field (`ObjectKey::Spread`):
+    /// every field the braces do not name is copied from it. The suffix must
+    /// start on the closing brace's line, because a line-leading `ex` is the
+    /// extraction statement (`ex p fixum x`). Exactly one source is legal, so
+    /// a second same-line `ex` is `construction_source_repeated`.
+    fn parse_construction_source(
+        &mut self,
+        fields: &mut Vec<ObjectField>,
+    ) -> Result<(), ParseError> {
+        if !self.check_keyword_ident(TokenKind::Ex) || self.raw_newline_before_next_word() {
+            return Ok(());
+        }
+        let start = self.current_span();
+        self.advance();
+        let source = self.parse_postfix_inner(false)?;
+        if self.check_keyword_ident(TokenKind::Ex) && !self.raw_newline_before_next_word() {
+            return Err(
+                ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
+                    .with_arg("issue", "construction_source_repeated"),
+            );
+        }
+        let span = start.merge(self.previous_span());
+        fields.push(ObjectField {
+            key: ObjectKey::Spread(Box::new(source)),
+            value: None,
+            span,
+        });
+        Ok(())
     }
 
     fn parse_object_fields(&mut self) -> Result<Vec<ObjectField>, ParseError> {

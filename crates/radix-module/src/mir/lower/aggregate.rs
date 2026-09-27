@@ -389,6 +389,7 @@ impl FunctionBuilder<'_> {
         span: Span,
     ) -> Option<Vec<MirNamedOperand>> {
         let mut explicit = Vec::with_capacity(entries.len());
+        let mut source = None;
         for entry in entries {
             let name = match &entry.key {
                 HirObjectKey::Ident(name) | HirObjectKey::String(name) => *name,
@@ -400,15 +401,61 @@ impl FunctionBuilder<'_> {
                     return None;
                 }
                 HirObjectKey::Spread(expr) => {
-                    self.errors
-                        .push(MirError::unsupported(expr.span, "struct spread before aggregate MIR lowering"));
-                    return None;
+                    source = Some(expr);
+                    continue;
                 }
             };
             let value = self.required_object_value(entry, span, "struct")?;
             explicit.push((name, value));
         }
-        self.materialize_struct_fields(def_id, &explicit, StructFieldFill::Construction, span)
+        match source {
+            Some(source) => self.lower_struct_update_fields(def_id, &explicit, source),
+            None => self.materialize_struct_fields(def_id, &explicit, StructFieldFill::Construction, span),
+        }
+    }
+
+    /// Lower copy-with-changes (`Genus { … } ex source`, D15.1–D15.3).
+    ///
+    /// Evaluation follows source order: the braced overrides first, then the
+    /// source. Every instance field the braces omit is read from the source
+    /// place, so the copy is shallow — a collection field shares its value
+    /// with the source (D15.3). Field defaults never apply: the source
+    /// supplies every omitted field.
+    fn lower_struct_update_fields(
+        &mut self,
+        def_id: DefId,
+        explicit: &[(crate::lexer::Symbol, &HirExpression)],
+        source: &HirExpression,
+    ) -> Option<Vec<MirNamedOperand>> {
+        let mut supplied = FxHashSet::default();
+        let mut fields = Vec::with_capacity(explicit.len());
+        for (name, value) in explicit {
+            supplied.insert(*name);
+            fields.push(MirNamedOperand { name: *name, value: self.lower_expr_value(value)? });
+        }
+        let base = self.lower_projectable_place(source)?;
+        let names: Vec<crate::lexer::Symbol> = if let Some(field_defs) = self.context.structs.get(&def_id) {
+            field_defs.iter().map(|field| field.name).collect()
+        } else if let Some(field_types) = self.context.struct_field_types.get(&def_id) {
+            let mut names: Vec<_> = field_types.keys().copied().collect();
+            names.sort_by_key(|name| name.0);
+            names
+        } else {
+            self.errors.push(MirError::unsupported(
+                source.span,
+                "copy-with-changes source of a genus without field metadata",
+            ));
+            return None;
+        };
+        for name in names {
+            if supplied.contains(&name) {
+                continue;
+            }
+            let mut place = base.clone();
+            place.projections.push(MirProjection::Field(name));
+            fields.push(MirNamedOperand { name, value: MirOperand::Place(place) });
+        }
+        Some(fields)
     }
 
     /// Merge explicit struct fields with static defaults and omitted `sponte` fields.

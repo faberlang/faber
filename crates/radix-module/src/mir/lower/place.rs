@@ -147,7 +147,7 @@ impl FunctionBuilder<'_> {
         }
     }
 
-    fn lower_projectable_place(&mut self, expr: &HirExpression) -> Option<MirPlace> {
+    pub(super) fn lower_projectable_place(&mut self, expr: &HirExpression) -> Option<MirPlace> {
         match &expr.kind {
             HirExpressionKind::Path(def_id) => {
                 if let Some(place) = self.captured_bindings.get(def_id).cloned() {

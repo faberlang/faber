@@ -1178,21 +1178,34 @@ impl super::FaberCodegen<'_> {
                         .get(&target)
                         .cloned()
                         .unwrap_or_else(|| self.name_for_def(*def_id, names));
+                    // The copy-with-changes source (D15.1) is the `Spread`
+                    // entry; it re-emits after the braces as `ex source`.
+                    let (sources, fields): (Vec<_>, Vec<_>) = entries
+                        .iter()
+                        .partition(|field| matches!(field.key, HirObjectKey::Spread(_)));
                     writer.write(&name);
                     writer.write(" {");
-                    if !entries.is_empty() {
+                    if !fields.is_empty() {
                         writer.write(" ");
                     }
-                    for (idx, field) in entries.iter().enumerate() {
+                    for (idx, field) in fields.iter().enumerate() {
                         if idx > 0 {
                             writer.write(", ");
                         }
                         self.write_genus_field(field, names, surface, writer);
                     }
-                    if !entries.is_empty() {
+                    if !fields.is_empty() {
                         writer.write(" ");
                     }
                     writer.write("}");
+                    for source in sources {
+                        if let HirObjectKey::Spread(expr) = &source.key {
+                            writer.write(" ");
+                            writer.write(surface.keyword(TokenKind::Ex));
+                            writer.write(" ");
+                            self.write_expr_prec(expr, 12, names, surface, writer);
+                        }
+                    }
                     return;
                 }
                 Type::Record(_) => {

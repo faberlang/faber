@@ -1518,7 +1518,10 @@ pub enum HirObjectKey {
     /// Computed key expression.
     Computed(HirExpression),
 
-    /// Spread object expression.
+    /// Copy-with-changes source (`Genus { … } ex source`, DECISIONS D15.1):
+    /// every field the entries omit is copied, shallowly, from this value.
+    /// Produced only by the construction-literal `ex` suffix, as the last
+    /// entry of a struct construction.
     Spread(HirExpression),
 }
 
