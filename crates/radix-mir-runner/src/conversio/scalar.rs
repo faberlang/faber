@@ -75,7 +75,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             // the prior `value_to_runtime_json_valor` -> `faber::Json::to_wire`
             // composition without the `Valor`/`Json` middleman.
             if !self.check_json_document(&value, span)? {
-                return Err(RunnerError::internal(
+                return Err(RunnerError::conversion(
                     span,
                     "json to textus conversion failed",
                 ));
@@ -328,7 +328,8 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             scale,
             span,
             "decimal to numerus conversion failed",
-        )?;
+        )
+        .map_err(|error| RunnerError::conversion(span, error.message))?;
         let (lo, hi) = int_width_range(target_width);
         if !(lo..=hi).contains(&rounded) {
             return self.recover_or_fail(
@@ -339,12 +340,12 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         }
         if target_width.is_unsigned_int() {
             return u64::try_from(rounded).map(Value::UInt).map_err(|_| {
-                RunnerError::internal(span, "decimal to numerus conversion out of range")
+                RunnerError::conversion(span, "decimal to numerus conversion out of range")
             });
         }
-        i64::try_from(rounded)
-            .map(Value::Int)
-            .map_err(|_| RunnerError::internal(span, "decimal to numerus conversion out of range"))
+        i64::try_from(rounded).map(Value::Int).map_err(|_| {
+            RunnerError::conversion(span, "decimal to numerus conversion out of range")
+        })
     }
 
     fn convert_octeti_endian_numerus(
@@ -1043,7 +1044,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         if self.check_json_document(value, span)? {
             Ok(())
         } else {
-            Err(RunnerError::internal(
+            Err(RunnerError::conversion(
                 span,
                 "valor to json conversion failed",
             ))
@@ -1210,12 +1211,19 @@ fn decimal_source_width(types: &TypeTable, ty: TypeId) -> Option<NumericWidth> {
 }
 
 fn decimal_text_error(error: DecimalTextError, span: Span) -> RunnerError {
-    let message = match error {
-        DecimalTextError::Invalid => "textus to numerus conversion failed",
-        DecimalTextError::OutOfRange => "textus to numerus conversion out of range",
-        DecimalTextError::Narrowing => "decimal width narrowing rejected",
-    };
-    RunnerError::internal(span, message)
+    // WHY: only the parse/width failures are recoverable conversion failures
+    // (SA-002); the narrowing rejection is an internal policy error.
+    match error {
+        DecimalTextError::Invalid => {
+            RunnerError::conversion(span, "textus to numerus conversion failed")
+        }
+        DecimalTextError::OutOfRange => {
+            RunnerError::conversion(span, "textus to numerus conversion out of range")
+        }
+        DecimalTextError::Narrowing => {
+            RunnerError::internal(span, "decimal width narrowing rejected")
+        }
+    }
 }
 
 fn decimal_carrier_value(value: i64, width: NumericWidth, span: Span) -> Result<i64, RunnerError> {

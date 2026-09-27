@@ -54,6 +54,11 @@ pub(crate) const RUNNER_CODE_UNSUPPORTED: &str = "runner_unsupported";
 /// Stable diagnostic code for internal runner failures (D-02-07).
 pub(crate) const RUNNER_CODE_INTERNAL: &str = "runner_internal";
 
+/// Stable diagnostic code for recoverable conversion failures: malformed
+/// source text or a value outside the target width (SA-002). The `cape`
+/// classifier keys on this code, never on the rendered message.
+pub(crate) const RUNNER_CODE_CONVERSION: &str = "runner_conversion";
+
 /// Malformed input to the failable JSON parser follows its text alternate exit.
 pub(crate) const RUNNER_JSON_PARSE_FAILED: &str = "runner_json_parse_failed";
 
@@ -127,13 +132,30 @@ impl RunnerError {
         }
     }
 
+    /// Recoverable conversion failure (`cape`-able): malformed source text or a
+    /// value outside the target width (SA-002).
+    ///
+    /// Carries [`RUNNER_CODE_CONVERSION`] so the caller classifies it from the
+    /// structured code instead of the message wording.
+    pub(crate) fn conversion(span: Span, message: impl Into<String>) -> Self {
+        let message = message.into();
+        let issue = format!("runner_{}", runner_slug(&message));
+        Self {
+            args: vec![("detail".to_owned(), message.clone())],
+            issue,
+            span,
+            code: RUNNER_CODE_CONVERSION,
+            message,
+        }
+    }
+
     fn is_conversion_failure(&self) -> bool {
-        // WHY: both parse failures ("... conversion failed") and width-overflow
-        // failures ("... conversion out of range", SA-002) are recoverable
+        // WHY: parse failures ("... conversion failed") and width-overflow
+        // failures ("... conversion out of range", SA-002) are both recoverable
         // `cape`-able conversion failures — parity with Rust codegen's fallible
-        // `.parse::<W>()` path.
-        self.message.ends_with(" conversion failed")
-            || self.message.ends_with(" conversion out of range")
+        // `.parse::<W>()` path. The structured code carries that fact; the
+        // message wording never classifies a diagnostic.
+        self.code == RUNNER_CODE_CONVERSION
     }
 }
 
