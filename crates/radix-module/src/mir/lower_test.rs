@@ -3087,8 +3087,11 @@ functio lectio() → numerus {
 }
 
 #[test]
-fn edge_empty_lista_ascribed_to_tabula_fails_closed() {
-    let mut unit = analyze(
+fn edge_empty_lista_ascribed_to_tabula_rejects_semantically() {
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let errors = crate::driver::analyze_source(
+        &session,
+        "test.fab",
         r#"
 incipit {
     varia tabula<textus, numerus> vides ← [] ∷ tabula<textus, numerus>
@@ -3096,14 +3099,17 @@ incipit {
     nota vides["alpha"]
 }
 "#,
+        AnalyzeRequest::default(),
     );
-    let errors = dump_analyzed_unit(&mut unit)
-        .expect_err("an empty lista ascribed to tabula is a cross-kind shape and must fail closed");
+    let errors = match errors {
+        Ok(_) => panic!("an array ascribed to tabula must be rejected semantically"),
+        Err(errors) => errors,
+    };
     assert!(
-        errors.iter().any(|error| error
-            .message
-            .contains("map construction without object entries")),
-        "the refusal must name the unsupported map-construction shape: {errors:?}"
+        errors
+            .iter()
+            .any(|error| error.issue() == Some("array_ascription_to_map")),
+        "the rejection must identify the array-to-map ascription rule: {errors:?}"
     );
 }
 
