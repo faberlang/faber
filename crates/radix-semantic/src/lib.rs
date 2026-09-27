@@ -631,10 +631,10 @@ pub fn analyze_with_cli(
         Ok(()) => {}
         Err(e) => diagnostics.extend(e),
     }
-    // Top-level statics: legacy `fixum`/`varia` migration warning, then
+    // Top-level statics: legacy `fixum`/`varia` migration error (D5.7), then
     // compile-time evaluation. Folding rewrites static initializers before any
     // later pass or backend reads them; it needs the finished types.
-    diagnostics.extend(passes::statica::warn_top_level_bindings(&hir, interner));
+    diagnostics.extend(passes::statica::reject_top_level_bindings(&hir, interner));
     if !diagnostics.iter().any(SemanticError::is_error) {
         diagnostics.extend(passes::statica::fold(&mut hir, &types, interner));
     }
