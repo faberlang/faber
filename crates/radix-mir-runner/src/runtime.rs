@@ -3975,13 +3975,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     }
 
     fn key_to_value(key: &MapKey) -> Value {
-        match key {
-            MapKey::Int(v) => Value::Int(*v),
-            MapKey::UInt(v) => Value::UInt(*v),
-            MapKey::Bool(v) => Value::Bool(*v),
-            MapKey::Str(v) => Value::Str(v.clone()),
-            MapKey::Unit => Value::Unit,
-        }
+        key.to_value()
     }
 
     // PROVIDERS

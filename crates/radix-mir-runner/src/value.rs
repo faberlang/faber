@@ -142,6 +142,41 @@ pub enum MapKey {
     Bool(bool),
     Str(String),
     Unit,
+    /// Composite `iuncta` key (D3.2): hashable when every part is.
+    Tuple(Vec<MapKey>),
+}
+
+impl MapKey {
+    /// The runner value a key reads back as (map keys, set elements).
+    #[must_use]
+    pub fn to_value(&self) -> Value {
+        match self {
+            MapKey::Int(v) => Value::Int(*v),
+            MapKey::UInt(v) => Value::UInt(*v),
+            MapKey::Bool(v) => Value::Bool(*v),
+            MapKey::Str(v) => Value::Str(v.clone()),
+            MapKey::Unit => Value::Unit,
+            MapKey::Tuple(parts) => Value::Tuple(parts.iter().map(MapKey::to_value).collect()),
+        }
+    }
+
+    /// Plain-text key spelling for document encoders (JSON/TOML object
+    /// keys); a composite key spells its parts comma-separated.
+    #[must_use]
+    pub fn document_key(&self) -> String {
+        match self {
+            MapKey::Str(value) => value.clone(),
+            MapKey::Int(value) => value.to_string(),
+            MapKey::UInt(value) => value.to_string(),
+            MapKey::Bool(value) => value.to_string(),
+            MapKey::Unit => String::new(),
+            MapKey::Tuple(parts) => parts
+                .iter()
+                .map(MapKey::document_key)
+                .collect::<Vec<_>>()
+                .join(","),
+        }
+    }
 }
 
 impl Value {
@@ -361,6 +396,11 @@ impl Value {
             Value::Ascii(b) => Ok(MapKey::Str(char::from(*b).to_string())),
             Value::Char(ch) => Ok(MapKey::Str(ch.to_string())),
             Value::Unit => Ok(MapKey::Unit),
+            Value::Tuple(items) => items
+                .iter()
+                .map(|item| item.to_key(span))
+                .collect::<Result<Vec<_>, _>>()
+                .map(MapKey::Tuple),
             _ => Err(RunnerError::internal(
                 span,
                 "value is not a valid map/set key",
@@ -451,6 +491,7 @@ fn display_tabula_map(
             MapKey::UInt(v) => v.to_string(),
             MapKey::Bool(v) => format!("{v}"),
             MapKey::Unit => "nihil".to_owned(),
+            MapKey::Tuple(_) => key.document_key(),
         };
         let val_str = display_in_collection(value, interner, span, float_width)?;
         parts.push(format!("{key_str}: {val_str}"));

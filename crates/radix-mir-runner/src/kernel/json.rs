@@ -195,11 +195,5 @@ fn value_to_json(value: &Value, span: Span) -> Result<serde_json::Value, RunnerE
 }
 
 fn format_map_key(key: &MapKey) -> String {
-    match key {
-        MapKey::Str(value) => value.clone(),
-        MapKey::Int(value) => value.to_string(),
-        MapKey::UInt(value) => value.to_string(),
-        MapKey::Bool(value) => value.to_string(),
-        MapKey::Unit => String::new(),
-    }
+    key.document_key()
 }

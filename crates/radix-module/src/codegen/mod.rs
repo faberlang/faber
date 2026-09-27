@@ -46,6 +46,10 @@ pub mod ts;
 mod coherence_test;
 
 #[cfg(test)]
+#[path = "indexed_apud_emit_test.rs"]
+mod indexed_apud_emit_test;
+
+#[cfg(test)]
 #[path = "statica_emit_test.rs"]
 mod statica_emit_test;
 

@@ -816,13 +816,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
 }
 
 fn map_key_to_value(key: MapKey) -> Value {
-    match key {
-        MapKey::Int(value) => Value::Int(value),
-        MapKey::UInt(value) => Value::UInt(value),
-        MapKey::Bool(value) => Value::Bool(value),
-        MapKey::Str(value) => Value::Str(value),
-        MapKey::Unit => Value::Unit,
-    }
+    key.to_value()
 }
 
 fn lista_to_tensor_shape(target_ty: TypeId, types: &TypeTable, flat_len: usize) -> Vec<i64> {

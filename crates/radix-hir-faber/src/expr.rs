@@ -104,6 +104,28 @@ impl<'a> From<&'a HirNonNullKind> for PostfixChainTail<'a> {
 }
 
 impl super::FaberCodegen<'_> {
+    /// Whether `object` is a `tabula` keyed by an `iuncta` (composite key).
+    fn is_tuple_keyed_map(&self, object: &HirExpression) -> bool {
+        let Some(mut ty) = object.ty else {
+            return false;
+        };
+        loop {
+            match self.types.get(ty) {
+                radix_types::Type::Alias(_, inner) | radix_types::Type::Ref(_, inner) => {
+                    ty = *inner
+                }
+                radix_types::Type::Map(key, _) => {
+                    let mut key = *key;
+                    while let radix_types::Type::Alias(_, inner) = self.types.get(key) {
+                        key = *inner;
+                    }
+                    return matches!(self.types.get(key), radix_types::Type::Tuple(_));
+                }
+                _ => return false,
+            }
+        }
+    }
+
     /// Write an expression with enough parentheses to survive a Faber reparse.
     ///
     /// The `parent_prec` contract is shared with `expr_precedence` in `ops.rs`.
@@ -203,6 +225,20 @@ impl super::FaberCodegen<'_> {
                 if let Some(label) = self.tuple_label_accesses.get(&expr.id) {
                     writer.write(".");
                     writer.write(&self.symbol_to_string(*label));
+                } else if let HirExpressionKind::Tuple(parts, None) = &index.kind
+                    && self.is_tuple_keyed_map(object)
+                {
+                    // Composite-key lookup `m[[k1, k2]]` (D3.3): the checker
+                    // rewrote the authored bracket list into the key tuple;
+                    // restore the bracket list, not an `iuncta<…>` prefix.
+                    writer.write("[[");
+                    for (idx, part) in parts.iter().enumerate() {
+                        if idx > 0 {
+                            writer.write(", ");
+                        }
+                        self.write_expr(part, names, surface, writer);
+                    }
+                    writer.write("]]");
                 } else {
                     writer.write("[");
                     self.write_expr(index, names, surface, writer);

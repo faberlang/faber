@@ -29,6 +29,9 @@ mod wgsl_text;
 pub mod test_support;
 
 #[cfg(test)]
+#[path = "itera_apud_indexed_test.rs"]
+mod itera_apud_indexed_tests;
+#[cfg(test)]
 #[path = "itera_destructure_test.rs"]
 mod itera_destructure_tests;
 

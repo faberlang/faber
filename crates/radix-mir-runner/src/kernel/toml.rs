@@ -252,11 +252,5 @@ fn value_to_toml(value: &Value, span: Span) -> Result<toml::Value, RunnerError> 
 }
 
 fn format_map_key(key: &MapKey) -> String {
-    match key {
-        MapKey::Str(value) => value.clone(),
-        MapKey::Int(value) => value.to_string(),
-        MapKey::UInt(value) => value.to_string(),
-        MapKey::Bool(value) => value.to_string(),
-        MapKey::Unit => String::new(),
-    }
+    key.document_key()
 }
