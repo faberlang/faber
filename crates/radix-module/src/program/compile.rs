@@ -14,7 +14,7 @@ use crate::file_interface::{
     InterfaceMethodExport, InterfaceNominalExport, InterfaceNominalKind, InterfaceNominalType, InterfaceParam,
     InterfaceStructExport, InterfaceStructField, InterfaceTypeParamConstraint, InterfaceTypeSnapshot,
 };
-use crate::semantic::passes::visibility_annotation::VisibilityTier;
+use crate::semantic::passes::visibility_annotation::{VisibilityTier, member_visibility};
 use crate::semantic::{ContractFieldType, InstansPrecision, NumericWidth, Primitive, SemanticParamMode};
 use crate::syntax::{
     Annotation, AnnotationFieldValue, AnnotationKind, AstParamMode, ClassDecl, ClassMemberKind, ExprKind, FiguraExpr,
@@ -1604,6 +1604,7 @@ fn file_export_from_stmt(
                         required: !field.sponte && field.init.is_none(),
                         default: None,
                         modifier: field.modifier,
+                        visibility: member_visibility(&member.annotations, interner),
                     })
                 })
                 .collect::<Vec<_>>();
@@ -1671,6 +1672,12 @@ fn file_export_from_stmt(
                             is_async,
                             is_generator,
                             device: None,
+                        },
+                        visibility: match member_visibility(&member.annotations, interner) {
+                            crate::syntax::MemberVisibility::Publica => {
+                                member_visibility(&method.annotations, interner)
+                            }
+                            visibility => visibility,
                         },
                     })
                 })
@@ -1756,6 +1763,7 @@ fn file_export_from_stmt(
                                     required: true,
                                     default: None,
                                     modifier: None,
+                                    visibility: crate::syntax::MemberVisibility::Publica,
                                 })
                             })
                             .collect::<Vec<_>>();
@@ -1779,6 +1787,7 @@ fn file_export_from_stmt(
                             required: true,
                             default: None,
                             modifier: None,
+                            visibility: crate::syntax::MemberVisibility::Publica,
                         })
                     })
                     .collect::<Vec<_>>();
@@ -2315,6 +2324,7 @@ fn interface_method_from_ast(
                 || annotations_include_callable_family(&method.annotations, interner, "cursor"),
             device: None,
         },
+        visibility: crate::syntax::MemberVisibility::Publica,
     })
 }
 

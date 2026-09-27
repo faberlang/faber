@@ -3626,6 +3626,7 @@ fn lowers_imported_nominal_method_to_provider_runtime_call() {
                     is_generator: false,
                     device: None,
                 },
+                visibility: crate::syntax::MemberVisibility::Publica,
             }],
             annotation_contract: None,
         }),

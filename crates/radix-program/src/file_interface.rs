@@ -19,7 +19,9 @@ use radix_module::hir::{
     DefId, HirConst, HirEnum, HirFunction, HirInterface, HirInterfaceMethod, HirItemKind,
     HirParamMode, HirStruct, HirTypeAlias, HirTypeParam, NucleumRole,
 };
+use radix_module::semantic::passes::visibility_annotation::hir_member_visibility;
 use radix_module::semantic::{FuncSig, ParamType, SemanticParamMode, Type};
+use radix_module::syntax::MemberVisibility;
 use std::collections::BTreeSet;
 
 /// Portable export identity for annotation contracts on library file interfaces.
@@ -272,6 +274,7 @@ fn snapshot_interface(
                     name,
                     export_identity,
                 )?,
+                visibility: MemberVisibility::Publica,
             })
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;
@@ -319,6 +322,7 @@ fn snapshot_enum(
                         required: true,
                         default: None,
                         modifier: None,
+                        visibility: MemberVisibility::Publica,
                     })
                     .map_err(|err| {
                         interface_error(file_label, &variant_name(analysis, variant), err)
@@ -349,6 +353,7 @@ fn snapshot_enum(
                 required: true,
                 default: None,
                 modifier: None,
+                visibility: MemberVisibility::Publica,
             })
             .map_err(|err| interface_error(file_label, &name, err))
         })
@@ -440,6 +445,7 @@ fn snapshot_struct(
                 required: !field.sponte && field.init.is_none(),
                 default: field.init.clone(),
                 modifier: field.modifier,
+                visibility: hir_member_visibility(&field.annotations, &analysis.interner),
             })
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;
@@ -459,6 +465,7 @@ fn snapshot_struct(
                     name,
                     export_identity,
                 )?,
+                visibility: hir_member_visibility(&method.annotations, &analysis.interner),
             })
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;

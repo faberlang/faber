@@ -298,6 +298,10 @@ pub enum SemanticErrorKind {
     /// A build-time file embed (`insere "path"`, D8.10) that cannot be
     /// resolved or does not fit its declared type.
     InsereInvalid,
+    /// A read, write, or call of a `genus` member its visibility does not
+    /// admit here (`@ privata` outside the type's own methods, `@ interna`
+    /// from another package; D5.3).
+    MemberInaccessible,
 
     // Assignment
     ImmutableAssignment,

@@ -118,6 +118,7 @@ pub mod itera_element;
 pub mod json_genus;
 pub mod lockstep;
 pub mod lookup;
+mod member_privacy;
 pub mod ops;
 mod ordering;
 #[cfg(test)]
@@ -172,6 +173,9 @@ pub(crate) struct StructInfo {
     /// Method signatures keyed by method name; receiver handling is performed
     /// by lookup/call checking rather than encoded in the signature table.
     methods: FxHashMap<Symbol, FuncSig>,
+
+    /// Visibility of methods that are not public (D5.3); absent is public.
+    method_visibility: FxHashMap<Symbol, radix_syntax::MemberVisibility>,
 }
 
 /// Interface method contract plus availability metadata.
@@ -200,6 +204,10 @@ struct StructFieldInfo {
     /// Authored field modifier (D16.1); `None` for unmarked and builtin
     /// fields. Gates writes outside construction literals.
     modifier: Option<radix_syntax::FieldModifier>,
+
+    /// Member visibility (D5.2, D5.3); gates access outside construction
+    /// literals.
+    visibility: radix_syntax::MemberVisibility,
 }
 
 /// Current alternate-exit context for `iace` and handled failable calls.
@@ -445,6 +453,18 @@ pub(crate) struct TypeChecker<'a> {
     /// Conversation types of the `@ ad` routes this module can see, keyed
     /// by route (D6.11). Routes absent here type as bare `sermo`.
     pub ad_routes: FxHashMap<Symbol, sermo_route::AdRouteTypes>,
+
+    /// The `genus` whose members are being checked (its methods and field
+    /// defaults); its `@ privata` members are reachable here (D5.3).
+    pub current_member_owner: Option<DefId>,
+
+    /// Imported `genus` declarations from another package; their `@ interna`
+    /// members are unreachable here (D5.3).
+    pub cross_package_structs: FxHashSet<DefId>,
+
+    /// Set by lvalue checking for the field access it is about to check, so
+    /// the member-visibility gate reports a write rather than a read.
+    pub(crate) place_write: bool,
 }
 
 /// Typecheck resolved HIR and attach table-local types to declarations and expressions.
@@ -585,6 +605,9 @@ impl<'a> TypeChecker<'a> {
             assert_refinements: Vec::new(),
             flow_bases: FxHashMap::default(),
             ad_routes: FxHashMap::default(),
+            current_member_owner: None,
+            cross_package_structs: FxHashSet::default(),
+            place_write: false,
         }
     }
 
@@ -605,6 +628,8 @@ impl<'a> TypeChecker<'a> {
     pub fn collect_imported_file_structs(&mut self) {
         self.json_structs
             .extend(self.resolver.imported_json_structs());
+        self.cross_package_structs
+            .extend(self.resolver.imported_cross_package_structs());
         for (def_id, fields, methods, type_params) in self.resolver.imported_file_structs() {
             // Imported generic structs substitute construction size args into
             // field types exactly like local ones (S0-G1); without this entry
@@ -624,15 +649,28 @@ impl<'a> TypeChecker<'a> {
                             required: field.required,
                             span: radix_lexer::Span::default(),
                             modifier: field.modifier,
+                            visibility: field.visibility,
                         },
                     )
                 })
+                .collect();
+            let method_visibility = methods
+                .iter()
+                .filter(|method| method.visibility != radix_syntax::MemberVisibility::Publica)
+                .map(|method| (method.name, method.visibility))
                 .collect();
             let methods = methods
                 .into_iter()
                 .map(|method| (method.name, method.sig))
                 .collect();
-            self.structs.insert(def_id, StructInfo { fields, methods });
+            self.structs.insert(
+                def_id,
+                StructInfo {
+                    fields,
+                    methods,
+                    method_visibility,
+                },
+            );
         }
     }
 
@@ -885,6 +923,9 @@ mod namespace_shadow_test;
 #[path = "conditional_narrowing_test.rs"]
 mod conditional_narrowing_test;
 
+#[cfg(test)]
+#[path = "member_privacy_test.rs"]
+mod member_privacy_test;
 #[cfg(test)]
 #[path = "null_narrowing_test.rs"]
 mod null_narrowing_test;

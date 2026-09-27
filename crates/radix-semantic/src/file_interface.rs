@@ -172,7 +172,8 @@ pub struct InterfaceStructExport {
     /// Ordered generic-declaration parameters (`typus`/`magnitudo`).
     pub params: Vec<InterfaceGenericParam>,
     pub fields: Vec<InterfaceStructField>,
-    /// Public inherent methods (`genus` methods) remapped like interface methods.
+    /// Inherent methods (`genus` methods) remapped like interface methods,
+    /// each with its member visibility (D5.3).
     pub methods: Vec<InterfaceMethodExport>,
     /// Present when the genus was marked `@ annotatio` in the exporting unit.
     pub annotation_contract: Option<InterfaceAnnotationContract>,
@@ -223,6 +224,10 @@ pub struct InterfaceStructField {
     /// Authored genus field modifier (D16.1); `None` for unmarked and
     /// variant/union payload fields.
     pub modifier: Option<radix_syntax::FieldModifier>,
+    /// Member visibility (D5.3); `Publica` for unmarked and variant/union
+    /// payload fields. Private fields still cross so construction literals
+    /// can set them (D5.4) and access can be rejected by name.
+    pub visibility: radix_syntax::MemberVisibility,
 }
 
 /// Nominal declarations whose import contract is their type identity.
@@ -259,6 +264,9 @@ pub struct InterfaceEnumVariant {
 pub struct InterfaceMethodExport {
     pub name: String,
     pub callable: InterfaceCallable,
+    /// Member visibility of a `genus` method (D5.3); `Publica` for contract
+    /// and nominal methods.
+    pub visibility: radix_syntax::MemberVisibility,
 }
 
 /// Structural type snapshot independent from a producer `TypeTable`.

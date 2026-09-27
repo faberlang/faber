@@ -2,9 +2,9 @@
 //!
 //! These tests prove that the pass rejects the reserved `@ protecta`
 //! annotation, accepts `@ publica`/`@ privata`/`@ interna`, errors on
-//! conflicting visibility tiers on one declaration, rejects `@ privata` /
-//! `@ interna` on `genus` members (privacy is not enforced yet, D5.5), and
-//! warns on redundant member `@ publica` (WARN028).
+//! conflicting visibility tiers on one declaration or member, accepts
+//! `@ privata` / `@ interna` on `genus` members (enforced by typecheck, D5.3),
+//! and warns on redundant member `@ publica` (WARN028).
 
 use super::visibility_annotation::check;
 use crate::test_support::args_have_no_legacy_message;
@@ -101,28 +101,24 @@ fn member_diagnostics(annotation: &str) -> Vec<SemanticError> {
 }
 
 #[test]
-fn member_privata_and_interna_are_errors_until_privacy_is_enforced() {
-    for (annotation, spelling) in [("@ privata", "@ privata"), ("@ interna", "@ interna")] {
+fn member_privata_and_interna_are_accepted_now_that_privacy_is_enforced() {
+    // D5.3 retired the D5.5 interim `member_privacy_unenforced` error: the
+    // annotation is a real visibility, checked at access sites by typecheck.
+    for annotation in ["@ privata", "@ interna"] {
         let errors = member_diagnostics(annotation);
-        let unenforced: Vec<_> = errors
-            .iter()
-            .filter(|err| err.issue() == Some("member_privacy_unenforced"))
-            .collect();
-        assert_eq!(
-            unenforced.len(),
-            2,
-            "field and method each diagnosed: {errors:?}"
-        );
-        for err in unenforced {
-            assert_eq!(err.kind, SemanticErrorKind::AnnotationInvalid);
-            assert!(err.is_error());
-            assert!(
-                err.args
-                    .iter()
-                    .any(|arg| arg.name == "annotation" && arg.value == spelling)
-            );
-        }
+        assert!(errors.is_empty(), "{annotation}: {errors:?}");
     }
+}
+
+#[test]
+fn member_mixing_visibility_tiers_is_a_conflict() {
+    let errors = member_diagnostics("@ publica\n    @ privata");
+    assert!(
+        errors
+            .iter()
+            .any(|err| err.kind == SemanticErrorKind::ConflictingVisibility),
+        "{errors:?}"
+    );
 }
 
 #[test]
@@ -153,9 +149,9 @@ fn member_publica_warning_survives_full_analysis_as_non_fatal() {
 }
 
 #[test]
-fn member_privata_fails_full_analysis() {
+fn member_privata_passes_full_analysis() {
     let result = crate::test_support::analyze_source(&member_source("@ privata"));
-    assert!(!result.is_ok(), "{:?}", result.diagnostics);
+    assert!(result.is_ok(), "{:?}", result.diagnostics);
 }
 
 #[test]

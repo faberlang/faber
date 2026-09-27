@@ -469,6 +469,19 @@ pub enum FieldModifier {
     Generis,
 }
 
+/// Visibility of a `genus` member (DECISIONS D5.2, D5.3).
+///
+/// Members are public by default. `@ privata` limits a member to the type's
+/// own methods; `@ interna` limits it to code in the declaring package. A
+/// construction literal may still set any field (D5.4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum MemberVisibility {
+    #[default]
+    Publica,
+    Interna,
+    Privata,
+}
+
 #[derive(Debug)]
 pub struct FieldDecl {
     pub modifier: Option<FieldModifier>,

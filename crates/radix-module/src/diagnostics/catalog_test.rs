@@ -193,6 +193,7 @@ fn semantic_error_codes_are_stable() {
         (SemanticErrorKind::AirPurityViolation, "SEM059"),
         (SemanticErrorKind::StaticInitializerInvalid, "SEM060"),
         (SemanticErrorKind::InsereInvalid, "SEM061"),
+        (SemanticErrorKind::MemberInaccessible, "SEM062"),
     ];
     for (kind, expected_code) in &cases {
         let spec = semantic_spec(*kind);

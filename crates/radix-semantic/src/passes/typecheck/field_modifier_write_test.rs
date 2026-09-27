@@ -146,6 +146,7 @@ fn imported_punctum_interface() -> crate::file_interface::FileInterface {
         required: true,
         default: None,
         modifier,
+        visibility: radix_syntax::MemberVisibility::Publica,
     };
     let mut interface = FileInterface::new();
     interface.insert(FileExport {

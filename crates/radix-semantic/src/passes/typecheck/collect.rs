@@ -23,6 +23,7 @@ fn empty_struct_info() -> StructInfo {
     StructInfo {
         fields: FxHashMap::default(),
         methods: FxHashMap::default(),
+        method_visibility: FxHashMap::default(),
     }
 }
 
@@ -112,13 +113,19 @@ impl TypeChecker<'_> {
                     required: !field.sponte && field.init.is_none(),
                     span: field.span,
                     modifier: field.modifier,
+                    visibility: self.hir_member_visibility(&field.annotations),
                 },
             );
         }
 
+        let mut method_visibility = FxHashMap::default();
         for method in &struct_item.methods {
             let sig = self.function_signature(&method.func);
             methods.insert(method.func.name, sig);
+            let visibility = self.hir_member_visibility(&method.annotations);
+            if visibility != radix_syntax::MemberVisibility::Publica {
+                method_visibility.insert(method.func.name, visibility);
+            }
             if let Some(role) = method.func.nucleum_role() {
                 self.nucleum_roles.insert(method.def_id, role);
                 self.method_nucleum_roles
@@ -138,7 +145,14 @@ impl TypeChecker<'_> {
         self.struct_implements
             .push((def_id, span, struct_item.implements.clone()));
 
-        self.structs.insert(def_id, StructInfo { fields, methods });
+        self.structs.insert(
+            def_id,
+            StructInfo {
+                fields,
+                methods,
+                method_visibility,
+            },
+        );
     }
 
     fn collect_interface(&mut self, def_id: DefId, interface_item: &radix_hir::HirInterface) {
@@ -235,6 +249,7 @@ impl TypeChecker<'_> {
                     required: !sponte,
                     span,
                     modifier: None,
+                    visibility: radix_syntax::MemberVisibility::Publica,
                 },
             );
         }
@@ -243,6 +258,7 @@ impl TypeChecker<'_> {
             StructInfo {
                 fields,
                 methods: FxHashMap::default(),
+                method_visibility: FxHashMap::default(),
             },
         );
     }
@@ -296,6 +312,7 @@ impl TypeChecker<'_> {
                     required: true,
                     span,
                     modifier: None,
+                    visibility: radix_syntax::MemberVisibility::Publica,
                 },
             );
             fields.insert(
@@ -306,6 +323,7 @@ impl TypeChecker<'_> {
                     required: true,
                     span,
                     modifier: None,
+                    visibility: radix_syntax::MemberVisibility::Publica,
                 },
             );
         }
@@ -316,6 +334,7 @@ impl TypeChecker<'_> {
                 StructInfo {
                     fields,
                     methods: FxHashMap::default(),
+                    method_visibility: FxHashMap::default(),
                 },
             );
         }

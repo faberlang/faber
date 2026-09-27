@@ -25,6 +25,9 @@ mod cape_roundtrip_test;
 #[cfg(test)]
 #[path = "field_modifier_roundtrip_test.rs"]
 mod field_modifier_roundtrip_test;
+#[cfg(test)]
+#[path = "member_visibility_roundtrip_test.rs"]
+mod member_visibility_roundtrip_test;
 
 #[cfg(test)]
 #[path = "region_roundtrip_test.rs"]

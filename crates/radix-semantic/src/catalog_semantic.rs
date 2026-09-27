@@ -35,6 +35,7 @@ pub(crate) const SEMANTIC_ERROR_KINDS: &[SemanticErrorKind] = &[
     SemanticErrorKind::AirPurityViolation,
     SemanticErrorKind::StaticInitializerInvalid,
     SemanticErrorKind::InsereInvalid,
+    SemanticErrorKind::MemberInaccessible,
     SemanticErrorKind::ImmutableAssignment,
     SemanticErrorKind::AssignmentTargetInvalid,
     SemanticErrorKind::UseBeforeInit,
@@ -185,6 +186,10 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
             help: Some(
                 "embed a package-relative file that exists, as `textus` (UTF-8) or `octeti`",
             ),
+        },
+        SemanticErrorKind::MemberInaccessible => DiagnosticSpec {
+            code: "SEM062",
+            help: Some("reach the member through the type's own methods, or change its visibility"),
         },
         SemanticErrorKind::AirPurityViolation => DiagnosticSpec {
             code: "SEM059",
@@ -990,12 +995,6 @@ fn semantic_invalid_annotation_help(args: &[DiagnosticArg]) -> Option<String> {
             let privata = arg_value(args, "privata")?;
             Some(format!(
                 "use `{publica}` for explicit export intent or `{privata}` for file-private intent"
-            ))
-        }
-        "member_privacy_unenforced" => {
-            let annotation = arg_value(args, "annotation")?;
-            Some(format!(
-                "remove `{annotation}` from the member; members are public until member privacy is enforced"
             ))
         }
         "empty_radix_typus_domain" | "missing_type_param" | "non_identifier_type_param" | "non_type_allowed" => {
