@@ -1233,6 +1233,24 @@ fn analyze_cached_library_interface_body(
             library_cached_file_interface(dependency, library_resolver, library_cache)?,
         );
     }
+    // Transitive library leaves install under their producer-side bindings,
+    // mirroring the file-mode and package-unit paths (B10): a direct
+    // import's public surface can name a nominal from a module this unit
+    // does not import (`tensor.TensorError.ShapeFailure { shape.ShapeError
+    // inner }`), and without that module's nominal registrations the payload
+    // fails remap, so the variant loses its own fields and drops out of
+    // coverage. A direct binding for the same name always wins; the extra
+    // namespaces stay inert (no HIR import binding).
+    for dependency in &expanded {
+        let dependency_key = library_identity_key(&library_identity(&dependency.module));
+        if &dependency_key == key || file_interfaces.contains_key(&dependency.binding) {
+            continue;
+        }
+        file_interfaces.insert(
+            dependency.binding.clone(),
+            library_cached_file_interface(dependency, library_resolver, library_cache)?,
+        );
+    }
 
     let analysis_source = {
         let cached = load_cached_library_interface(&import.module, library_cache)?;
@@ -1824,6 +1842,10 @@ fn hir_item_name_and_kind(
 #[cfg(test)]
 #[path = "library_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "library_transitive_nominal_test.rs"]
+mod transitive_nominal_tests;
 
 // In-file pin for the interface scan above.
 #[cfg(test)]
