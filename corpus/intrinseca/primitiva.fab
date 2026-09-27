@@ -44,7 +44,7 @@ fn describe(any value) → string {
 }
 
 fn describe_boolean(bool value) → string {
-    if value is true then return "verum est"
+    if value ≡ true then return "verum est"
     return "aliud est"
 }
 

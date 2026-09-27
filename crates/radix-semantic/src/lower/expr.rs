@@ -1390,7 +1390,26 @@ impl Lowerer<'_> {
         owner: HirId,
     ) -> HirExpressionKind {
         let expr = lower_expr(self, &tc.expr);
-        let ty = self.lower_authored_type(
+        let ty = self.lower_est_target_type(tc, owner);
+        HirExpressionKind::TypeCheck {
+            positive: tc.positive,
+            expr: Box::new(expr),
+            ty,
+        }
+    }
+
+    /// Lower the right-hand side of an `est` test.
+    ///
+    /// The right-hand side is always a type (DECISIONS D23.1). An enum-variant
+    /// name is the one target the type namespace does not carry: `r est M`
+    /// targets the variant's member type, exactly as the prior value-shaped
+    /// promotion did. Everything else is ordinary authored-type lowering.
+    fn lower_est_target_type(&mut self, tc: &radix_syntax::TypeCheckExpr, owner: HirId) -> TypeId {
+        if let Some(variant_def) = crate::passes::resolve::est_target_variant(self.resolver, &tc.ty)
+        {
+            return self.types.intern(crate::Type::Struct(variant_def));
+        }
+        self.lower_authored_type(
             radix_hir::HirTypeSite {
                 owner: radix_hir::HirOwnerRef::Hir(owner),
                 slot: radix_hir::HirTypeSlot::TypeCheckTarget,
@@ -1398,12 +1417,7 @@ impl Lowerer<'_> {
             &tc.ty,
             false,
             false,
-        );
-        HirExpressionKind::TypeCheck {
-            positive: tc.positive,
-            expr: Box::new(expr),
-            ty,
-        }
+        )
     }
 
     /// Lower backtick template capture into builtin `forma` genus construction.

@@ -1,16 +1,14 @@
-//! est-RHS classification tests (type-algebra U1R).
+//! `est` / `non est` right-hand-side shape (DECISIONS D23.1, D23.5).
 //!
-//! `est <name>` routes to a `TypeCheck` node only when the name declares a
-//! type visible to the parser: the primitive spellings plus — since U1R —
-//! identifiers this file declares as nominal types (`genus`, `implendum`,
-//! `ordo`, `discretio`, `typus`), order-independently through one pre-parse
-//! token scan. A name that declares no type keeps `Binary(Is)`
-//! value-equality classification, which is why an imported type stays a
-//! value test at this layer (open row 8's documented miss).
+//! The right-hand side is always a type: the parser builds a `TypeCheck` node
+//! for every `est` / `non est` and never guesses type-vs-value. A name that
+//! turns out to be a value is rejected in semantic analysis, where the imported
+//! file's interface is available.
 
 use crate::{ParseResult, parse};
 use radix_lexer::lex;
-use radix_syntax::{BinOp, ExprKind, StmtKind, TypeExprKind};
+use radix_syntax::{ExprKind, StmtKind, TypeExprKind};
+
 fn parse_source(source: &str) -> ParseResult {
     parse(lex(source))
 }
@@ -30,7 +28,12 @@ fn est_rhs_kind(result: &ParseResult) -> Option<&'static str> {
             let value = redde.value.as_deref()?;
             return match &value.kind {
                 ExprKind::TypeCheck(_) => Some("type_check"),
-                ExprKind::Binary(binary) if matches!(binary.op, BinOp::Is | BinOp::IsNot) => {
+                ExprKind::Binary(binary)
+                    if matches!(
+                        binary.op,
+                        radix_syntax::BinOp::Is | radix_syntax::BinOp::IsNot
+                    ) =>
+                {
                     Some("value_is")
                 }
                 _ => None,
@@ -46,14 +49,8 @@ fn assert_type_check(source: &str) {
     assert_eq!(est_rhs_kind(&result), Some("type_check"), "{source}");
 }
 
-fn assert_value_equality(source: &str) {
-    let result = parse_source(source);
-    assert!(result.success(), "{:?}", result.errors);
-    assert_eq!(est_rhs_kind(&result), Some("value_is"), "{source}");
-}
-
 #[test]
-fn est_declared_genus_classifies_as_type_check() {
+fn est_declared_genus_is_a_type_test() {
     assert_type_check(concat!(
         "genus Errata {\n    varia textus nuntius\n}\n\n",
         "functio f(Errata ∪ nihil r) → bivalens { redde r est Errata }",
@@ -61,9 +58,9 @@ fn est_declared_genus_classifies_as_type_check() {
 }
 
 #[test]
-fn est_declared_type_classifies_before_its_declaration() {
-    // The declared-type scan is order-independent: a body referencing a
-    // genus declared later in the file still routes to `TypeCheck`.
+fn est_declared_type_before_its_declaration_is_a_type_test() {
+    // Order-independent: a body referencing a genus declared later in the
+    // file still builds a type test.
     assert_type_check(concat!(
         "functio f(Posterius ∪ nihil r) → bivalens { redde r est Posterius }\n\n",
         "genus Posterius {\n    varia textus nuntius\n}",
@@ -71,7 +68,7 @@ fn est_declared_type_classifies_before_its_declaration() {
 }
 
 #[test]
-fn est_declared_implendum_ordo_typus_classify() {
+fn est_declared_implendum_ordo_typus_are_type_tests() {
     assert_type_check(concat!(
         "implendum Salutat {\n    functio saluta() → textus\n}\n\n",
         "functio f(Salutat ∪ nihil r) → bivalens { redde r est Salutat }",
@@ -86,31 +83,78 @@ fn est_declared_implendum_ordo_typus_classify() {
 }
 
 #[test]
-fn est_value_name_stays_value_equality() {
-    // `aliud` declares no type, so the test stays `Binary(Is)` value
-    // equality — the classification must not guess from casing.
-    assert_value_equality("functio f(numerus x, numerus aliud) → bivalens { redde x est aliud }");
-}
-
-#[test]
-fn est_primitive_stays_type_check() {
+fn est_primitive_is_a_type_test() {
     assert_type_check("functio f(numerus ∪ textus u) → bivalens { redde u est numerus }");
 }
 
 #[test]
-fn est_nihil_stays_binary_value_form() {
-    // `est nihil` keeps the nn-u1 binary form: the null check refines
-    // through the literal probe, not a TypeCheck node.
+fn est_nihil_is_a_type_test_on_the_null_type() {
+    // `nihil` is the null type, so the right-hand side is a type; nil
+    // narrowing is preserved through the TypeCheck path (D23.1).
     let result = parse_source("functio f(textus ∪ nihil x) → bivalens { redde x est nihil }");
     assert!(result.success(), "{:?}", result.errors);
-    assert_eq!(est_rhs_kind(&result), Some("value_is"));
+    assert_eq!(est_rhs_kind(&result), Some("type_check"));
+    let program = result.program.as_ref().unwrap();
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let StmtKind::Redde(redde) = &func.body.as_ref().unwrap().statements[0].kind else {
+        panic!("expected redde");
+    };
+    let ExprKind::TypeCheck(check) = &redde.value.as_deref().unwrap().kind else {
+        panic!("expected TypeCheck");
+    };
+    assert!(matches!(check.ty.kind, TypeExprKind::Named(..)));
+}
+
+#[test]
+fn non_est_is_a_negative_type_test() {
+    let result = parse_source(
+        "genus Errata {\n    varia textus nuntius\n}\n\n\
+         functio f(Errata ∪ nihil r) → bivalens { redde r non est Errata }",
+    );
+    assert!(result.success(), "{:?}", result.errors);
+    let program = result.program.as_ref().unwrap();
+    let StmtKind::Func(func) = &program.statements[1].kind else {
+        panic!("expected function");
+    };
+    let StmtKind::Redde(redde) = &func.body.as_ref().unwrap().statements[0].kind else {
+        panic!("expected redde");
+    };
+    let ExprKind::TypeCheck(check) = &redde.value.as_deref().unwrap().kind else {
+        panic!("expected TypeCheck");
+    };
+    assert!(!check.positive);
+}
+
+#[test]
+fn est_value_name_is_still_parsed_as_a_type() {
+    // The parser does not guess: an identifier that names no type still parses
+    // as a type. The semantic pass rejects the value target by name (D23.1).
+    assert_type_check("functio f(numerus x, numerus aliud) → bivalens { redde x est aliud }");
+}
+
+#[test]
+fn est_qualified_imported_name_is_a_type_test() {
+    // D18.1 interim routing sent `x est aux.Felis` down the value path; D23.5
+    // removes the lookahead, so the qualified name parses as a type.
+    assert_type_check(
+        "importa ex \"./aux\" aux\n\n\
+         functio f(aux.Felis ∪ nihil x) → bivalens { redde x est aux.Felis }",
+    );
+}
+
+#[test]
+fn est_value_literal_is_an_error() {
+    // A literal is not type syntax; the right-hand side must be a type.
+    let result = parse_source("incipit { si 1 est 1 { nota \"ok\" } }");
+    assert!(!result.success(), "literal RHS must not parse as a type");
 }
 
 #[test]
 fn declared_type_name_is_not_claimed_in_other_positions() {
-    // The scan only feeds the est classifier: an ordinary construction use
-    // of a declared type name, and the return annotation's named type,
-    // parse unchanged.
+    // Ordinary construction use of a declared type name, and the return
+    // annotation's named type, parse unchanged.
     let result = parse_source(concat!(
         "genus Punctum {\n    varia numerus x\n}\n\n",
         "functio f() → Punctum { redde Punctum { x = 1 } }",
@@ -128,7 +172,6 @@ fn declared_type_name_is_not_claimed_in_other_positions() {
     };
     let value = redde.value.as_deref().expect("redde value");
     // Typed construction lowers as a `verte` conversion of the object
-    // literal — the declared name is consumed by the ordinary type grammar,
-    // not the est classifier.
+    // literal — the declared name is consumed by the ordinary type grammar.
     assert!(matches!(value.kind, ExprKind::Verte(_)));
 }

@@ -253,10 +253,13 @@ fn est_member_absent_from_union_warns() {
 }
 
 #[test]
-fn est_value_equality_stays_untouched() {
-    // A name that declares no type keeps Binary(Is) value-equality
-    // classification — no TypeCheck node, no member warning.
-    test_support::assert_accepts("functio f(numerus x) → bivalens { redde x est 5 }");
+fn est_value_rhs_is_rejected() {
+    // `est` tests a type (D23.1): a right-hand side that names a value is
+    // rejected by name, never compared.
+    test_support::assert_rejects_with_issue(
+        "functio f(numerus x, numerus aliud) → bivalens { redde x est aliud }",
+        "est_value_rhs",
+    );
 }
 
 // ---------------------------------------------------------------------------

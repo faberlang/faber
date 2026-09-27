@@ -2613,6 +2613,13 @@ impl<'a> FunctionBuilder<'a> {
     ) -> Option<MirOperand> {
         let operand = self.lower_expr_value(expr)?;
         let result_ty = self.expr_ty(outer)?;
+        // A type test against the null type is the null-presence probe: route
+        // it back to the unary `is_nil` / `is_not_nil` lowering that the
+        // legacy `est nihil` value form used, rather than the runner-dispatched
+        // variant-tag intrinsic (DECISIONS D23.1).
+        if matches!(self.types.get(ty), Type::Primitive(Primitive::Nihil)) {
+            return Some(self.lower_nil_test(positive, operand, result_ty, outer.span));
+        }
         Some(self.runtime_call_value(
             MirIntrinsic::TypeCheck(MirTypeCheckOp { positive, ty: MirType::semantic(ty) }),
             vec![operand],
@@ -3004,11 +3011,12 @@ impl<'a> FunctionBuilder<'a> {
         result_ty: MirType,
         span: Span,
     ) -> MirOperand {
-        let op = if matches!(op, HirBinOp::Is) {
-            MirUnOp::IsNil
-        } else {
-            MirUnOp::IsNotNil
-        };
+        self.lower_nil_test(matches!(op, HirBinOp::Is), operand, result_ty, span)
+    }
+
+    /// `est nihil` → `IsNil`, `non est nihil` → `IsNotNil`.
+    fn lower_nil_test(&mut self, positive: bool, operand: MirOperand, result_ty: MirType, span: Span) -> MirOperand {
+        let op = if positive { MirUnOp::IsNil } else { MirUnOp::IsNotNil };
         self.assign_temp(MirValueKind::Unary { op, operand }, result_ty, span)
     }
 

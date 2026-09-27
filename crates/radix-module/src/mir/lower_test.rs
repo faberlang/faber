@@ -1014,8 +1014,8 @@ fn lowers_canonical_predicate_replacements_to_mir_primitives() {
 functio pred(numerus n, fractus f, bivalens flag, textus ∪ nihil maybe) → bivalens {
     fixum _ positive ← n > 0
     fixum _ negative ← f < 0
-    fixum _ enabled ← flag est verum
-    fixum _ disabled ← flag est falsum
+    fixum _ enabled ← flag ≡ verum
+    fixum _ disabled ← flag ≡ falsum
     fixum _ absent ← maybe est nihil
     redde positive et negative et enabled et disabled et absent
 }

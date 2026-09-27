@@ -358,11 +358,14 @@ impl Parser {
                 op
             };
 
-            // `est`/`non est` with a type RHS produces a TypeCheck node (variant
-            // tag check). `est nihil` and value-RHS forms stay as Binary(Is).
+            // `est`/`non est` is a type test only (DECISIONS D23.1): the
+            // right-hand side is always parsed as a type, so there is no
+            // type-vs-value lookahead here (D23.5). A right-hand side that
+            // names a value is a semantic error naming the equality operator,
+            // not a second meaning for `est`.
             let positive = matches!(op, BinOp::Is);
-            if self.peek_starts_type_name() {
-                let ty = self.parse_type()?;
+            if matches!(op, BinOp::Is | BinOp::IsNot) {
+                let ty = self.parse_est_type_rhs()?;
                 let span = start.merge(self.previous_span());
                 let id = self.next_id();
                 left = Expr {
@@ -888,10 +891,13 @@ impl Parser {
     }
 
     fn literal_prefix_predicate_replacement(&self) -> Option<(&'static str, &'static str)> {
+        // A boolean literal is a value, so the rewrite is the equality operator
+        // (DECISIONS D23.1 — `est` takes a type). `nihil` is the null *type*,
+        // so its rewrite stays a type test.
         if self.check_keyword_ident(TokenKind::Verum) {
-            Some(("verum", "value est verum"))
+            Some(("verum", "value ≡ verum"))
         } else if self.check_keyword_ident(TokenKind::Falsum) {
-            Some(("falsum", "value est falsum"))
+            Some(("falsum", "value ≡ falsum"))
         } else if self.check_keyword_ident(TokenKind::Nihil) {
             Some(("nihil", "value est nihil"))
         } else {

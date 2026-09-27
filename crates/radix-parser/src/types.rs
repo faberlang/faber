@@ -86,6 +86,38 @@ impl Parser {
         })
     }
 
+    /// Parse the right-hand side of `est` / `non est` (DECISIONS D23.1).
+    ///
+    /// The right-hand side is always a type, so this is the ordinary type
+    /// parse with one exception: a boolean literal keyword (`verum`/`falsum`)
+    /// is not type syntax, but it still parses so the semantic layer can name
+    /// the equality operator instead. It is recorded under its canonical latin
+    /// spelling, exactly as `nihil` is, so the diagnostic does not depend on
+    /// the reader locale.
+    pub(super) fn parse_est_type_rhs(&mut self) -> Result<TypeExpr, ParseError> {
+        let literal = if self.check_keyword_ident(TokenKind::Verum) {
+            Some("verum")
+        } else if self.check_keyword_ident(TokenKind::Falsum) {
+            Some("falsum")
+        } else {
+            None
+        };
+        let Some(latin) = literal else {
+            return self.parse_type();
+        };
+        let span = self.current_span();
+        self.advance();
+        let name = self.keyword_ident(latin, span);
+        Ok(TypeExpr {
+            nullable: false,
+            mode: None,
+            kind: TypeExprKind::Named(name, Vec::new()),
+            span,
+            form: TypeFormLevel::LONG,
+            iuncta_label: None,
+        })
+    }
+
     /// Type body beneath the depth budget; see [`Parser::parse_type`].
     fn parse_type_body(&mut self, start: Span) -> Result<TypeExpr, ParseError> {
         let core = self.parse_type_atom(start)?;

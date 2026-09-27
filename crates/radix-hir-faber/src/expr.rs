@@ -1030,14 +1030,22 @@ impl super::FaberCodegen<'_> {
                 }
                 writer.write(surface.contextual_keyword("est"));
                 writer.write(" ");
-                let site = HirTypeSite {
-                    owner: HirOwnerRef::Hir(expr.id),
-                    slot: HirTypeSlot::TypeCheckTarget,
-                };
-                let rendered = self
-                    .type_to_faber_at(&site, *ty, names, surface)
-                    .unwrap_or_else(|error| self.record_type_emission_error(error));
-                writer.write(&rendered);
+                if matches!(self.types.get(*ty), Type::Primitive(Primitive::Nihil)) {
+                    // A type test against the null type is the null-presence
+                    // probe: spell it with the null literal, exactly as the
+                    // retired value form did (DECISIONS D23.1), so the surface
+                    // round-trips.
+                    writer.write(surface.contextual_keyword("nihil"));
+                } else {
+                    let site = HirTypeSite {
+                        owner: HirOwnerRef::Hir(expr.id),
+                        slot: HirTypeSlot::TypeCheckTarget,
+                    };
+                    let rendered = self
+                        .type_to_faber_at(&site, *ty, names, surface)
+                        .unwrap_or_else(|error| self.record_type_emission_error(error));
+                    writer.write(&rendered);
+                }
             }
             // `praefixum { … }` (D8.4): the keyword, then the body block.
             HirExpressionKind::Praefixum(inner) => {

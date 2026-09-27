@@ -512,17 +512,17 @@ fn vel_chains_left_associatively() {
 }
 
 #[test]
-fn non_est_parses_as_identity_negation() {
+fn non_est_parses_as_a_negative_type_test() {
     let result = parse_ok("fixum _ present ← value non est nihil");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
     };
     let expr = var.init.as_deref().expect("initializer");
-    let ExprKind::Binary(binary) = &expr.kind else {
-        panic!("expected binary expression, got {:?}", expr.kind);
+    let ExprKind::TypeCheck(check) = &expr.kind else {
+        panic!("expected type test, got {:?}", expr.kind);
     };
-    assert_eq!(binary.op, BinOp::IsNot);
+    assert!(!check.positive);
 }
 
 #[test]
@@ -1139,35 +1139,29 @@ fn json_literal_rejects_unquoted_key() {
 // ── non est edge tests ──────────────────────────────────────────────────────
 
 #[test]
-fn non_est_with_concrete_rhs_parses_as_inequality() {
-    let result = parse_ok("fixum _ v ← value non est 0");
-    let program = result.program.as_ref().expect("program");
-    let StmtKind::Var(var) = &program.statements[0].kind else {
-        panic!("expected variable declaration");
-    };
-    let expr = var.init.as_deref().expect("initializer");
-    let ExprKind::Binary(binary) = &expr.kind else {
-        panic!("expected binary expression, got {:?}", expr.kind);
-    };
-    assert_eq!(binary.op, BinOp::IsNot);
+fn non_est_with_literal_rhs_is_rejected_as_a_type_test() {
+    // `non est` takes a type right-hand side (D23.1); a literal is not type
+    // syntax, so this is a parse error rather than a value comparison.
+    let result = parse(lex("fixum _ v ← value non est 0"));
+    assert!(!result.success(), "literal RHS must not parse as a type");
 }
 
 #[test]
-fn nihil_non_est_parses_as_identity_negation() {
-    // A value followed by `non est` is a comparison chain, not the retired
+fn nihil_non_est_is_a_type_test_not_a_prefix_predicate() {
+    // A value followed by `non est` starts a type test, not the retired
     // `nihil <value>` prefix predicate. Batch D made `non` tokenless; the
     // retired-prefix lookahead must not treat the operator as a value
     // operand start (`Operator` is not expression-primary).
-    let result = parse_ok("fixum _ v ← nihil non est 0");
+    let result = parse_ok("fixum _ v ← nihil non est Sacculus");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
     };
     let expr = var.init.as_deref().expect("initializer");
-    let ExprKind::Binary(binary) = &expr.kind else {
-        panic!("expected binary expression, got {:?}", expr.kind);
+    let ExprKind::TypeCheck(check) = &expr.kind else {
+        panic!("expected type test, got {:?}", expr.kind);
     };
-    assert_eq!(binary.op, BinOp::IsNot);
+    assert!(!check.positive);
 }
 
 /// `≺`/`≻` are the canonical strict comparison glyphs; they parse as Lt/Gt.

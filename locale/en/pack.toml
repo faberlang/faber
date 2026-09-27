@@ -2392,9 +2392,9 @@ help = "compare values of one {implet} Orderable type, or tuples of the same ele
 message = "fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"
 help = "keep caller and fragment lane bindings distinct"
 
-[diagnostics.SEM011.issues.est_imported_type]
-message = "`{est}` cannot test against imported type '{type}' yet; it would compare values, not types"
-help = "test against a type declared in this file, or restructure the check without `{est}`"
+[diagnostics.SEM011.issues.est_value_rhs]
+message = "`est` tests types; this right-hand side names a value"
+help = "compare values with the equality operator: `≡`, or `≠` for `non est`"
 
 [diagnostics.SEM011.issues.range_step_must_be_numeric]
 message = "range step must be numeric"

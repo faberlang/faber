@@ -30,9 +30,6 @@ const ISSUE_CONVERSIO_ASSIGN_ROUTE_UNSUPPORTED: &str = "conversio_assign_route_u
 const ISSUE_CONVERSIO_ASSIGN_INFERENCE_HOLE_DESTINATION: &str =
     "conversio_assign_inference_hole_destination";
 
-/// `x est T` where `T` names an imported type (DECISIONS D18.1).
-const ISSUE_EST_IMPORTED_TYPE: &str = "est_imported_type";
-
 #[cold]
 fn fresh_tensor_result_missing_shape() -> ! {
     unreachable!("fresh tensor result carries a shape");
@@ -1237,18 +1234,6 @@ impl TypeChecker<'_> {
             | HirBinOp::StrictNotEq
             | HirBinOp::Is
             | HirBinOp::IsNot => {
-                if matches!(op, HirBinOp::Is | HirBinOp::IsNot)
-                    && let Some(type_name) = self.imported_type_est_target(rhs)
-                {
-                    self.check_expr(lhs);
-                    let type_name = self.member_display_name(type_name);
-                    self.invalid_operand_types_with_args(
-                        ISSUE_EST_IMPORTED_TYPE,
-                        rhs.span,
-                        &[("type", type_name)],
-                    );
-                    return self.bool_type();
-                }
                 let (lhs_ty, rhs_ty) = self.check_littera_operands(lhs, rhs);
                 let lhs_is_nil = matches!(
                     self.types.get(self.resolve_inferred_type(lhs_ty)),
@@ -1988,44 +1973,6 @@ impl TypeChecker<'_> {
                 self.common_type(lhs_ty, rhs_ty, lhs.span)
             }
         }
-    }
-}
-
-impl TypeChecker<'_> {
-    /// The imported type an `est` right-hand side names, if any.
-    ///
-    /// The parser classifies `est T` as a type test only for types declared
-    /// in the same file; an imported type reaches here as `Binary(Is)` value
-    /// equality. Until `type-algebra-error-lifecycle` open row 8 designs
-    /// cross-file type tests, that shape is rejected by name (D18.1) rather
-    /// than compared as a value. Const exports stay values. Both spellings
-    /// qualify: the qualified `module.Type` path and a selective import
-    /// binding that names a type (D22.5).
-    fn imported_type_est_target(&self, rhs: &HirExpression) -> Option<Symbol> {
-        if let HirExpressionKind::Path(def_id) = rhs.kind {
-            self.resolver.selective_import_type(def_id)?;
-            return self.resolver.get_symbol(def_id).map(|symbol| symbol.name);
-        }
-        let HirExpressionKind::Field(base, member) = &rhs.kind else {
-            return None;
-        };
-        let HirExpressionKind::Path(base_def) = base.kind else {
-            return None;
-        };
-        let symbol = self.resolver.get_symbol(base_def)?;
-        if symbol.kind != crate::SymbolKind::Module {
-            return None;
-        }
-        let namespace = symbol.name;
-        (self
-            .resolver
-            .namespace_file_type(namespace, *member)
-            .is_some()
-            && self
-                .resolver
-                .namespace_file_const(namespace, *member)
-                .is_none())
-        .then_some(*member)
     }
 }
 

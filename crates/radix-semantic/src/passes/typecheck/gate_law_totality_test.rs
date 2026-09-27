@@ -5,8 +5,11 @@
 //! every cell pinned to exactly one defined join (probe analyzes clean) or
 //! one named SEM rejection (probe fails with that issue). Two tests back the
 //! table: a static completeness walk (a new operator or carrier family leaves
-//! a visible hole and breaks the 90-cell / 62-join / 28-reject tallies) and a
+//! a visible hole and breaks the 81-cell / 59-join / 22-reject tallies) and a
 //! live reprobe of every cell against the current gate arms.
+//!
+//! `est` / `non est` is not a table column: DECISIONS D23.1 made it a type
+//! test, so it is no longer an equality gate.
 //!
 //! Closed findings (GT-1..GT-4, 2026-08-26): every contested cell is now a
 //! defined join or a named rejection, pinned by the corpus exemplum and this
@@ -83,10 +86,9 @@ enum Op {
     Ge,
     Arith,
     Conversio,
-    Est,
 }
 
-const OPS: [Op; 10] = [
+const OPS: [Op; 9] = [
     Op::StrictEq,
     Op::PromotedExact,
     Op::Fuzzy,
@@ -96,11 +98,10 @@ const OPS: [Op; 10] = [
     Op::Ge,
     Op::Arith,
     Op::Conversio,
-    Op::Est,
 ];
 
-/// The 90-cell truth table, row = operator, column = carrier-pair family.
-const TABLE: [[Pin; 9]; 10] = [
+/// The 81-cell truth table, row = operator, column = carrier-pair family.
+const TABLE: [[Pin; 9]; 9] = [
     // ≡ / ≠ — strict equality is fail-closed: identical types only.
     [
         join(),
@@ -213,18 +214,6 @@ const TABLE: [[Pin; 9]; 10] = [
         join(),
         join(),
     ],
-    // est / non est — is-membership follows strict equality: identical types.
-    [
-        join(),
-        reject(EXACT_EQ),
-        reject(EXACT_EQ),
-        reject(EXACT_EQ),
-        reject(EXACT_EQ),
-        reject(EXACT_EQ),
-        reject(EXACT_EQ),
-        reject(EXACT_EQ),
-        reject(EXACT_EQ),
-    ],
 ];
 
 fn pair_types(family: Family) -> (&'static str, &'static str) {
@@ -252,7 +241,6 @@ fn op_glyph(op: Op) -> &'static str {
         Op::Ge => "≥",
         Op::Arith => "+",
         Op::Conversio => "↦",
-        Op::Est => "est",
     }
 }
 
@@ -283,8 +271,9 @@ fn probe(op: Op, family: Family) -> String {
 
 /// Static completeness: the table is closed over the enumerated product, the
 /// reject pins name real issues, and the tallies match the corpus table
-/// (90 cells = 60 joins + 30 rejections; GT-2 moved the two decimal/fractus
-/// equality cells from joins to named rejections).
+/// (81 cells = 59 joins + 22 rejections; GT-2 moved the two decimal/fractus
+/// equality cells from joins to named rejections; D23.1 removed the `est`
+/// row, which is a type test rather than an equality gate).
 #[test]
 fn gate_law_table_is_total() {
     assert_eq!(TABLE.len(), OPS.len(), "one row per operator");
@@ -305,7 +294,7 @@ fn gate_law_table_is_total() {
             }
         }
     }
-    assert_eq!((joins, rejects), (60, 30));
+    assert_eq!((joins, rejects), (59, 22));
 }
 
 /// Live reprobe: every cell's probe must meet its pin against the current

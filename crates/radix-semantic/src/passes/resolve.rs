@@ -112,6 +112,8 @@ const ISSUE_TYPE_ALIAS_CYCLE: &str = "type_alias_cycle";
 const ISSUE_TYPE_NAME_NOT_TYPE: &str = "type_name_not_type";
 const ISSUE_VARIANT_AMBIGUOUS: &str = "variant_ambiguous";
 const ISSUE_UNION_ONLY_NIHIL: &str = "union_only_nihil";
+/// `x est V` where `V` names a value, not a type (DECISIONS D23.1).
+const ISSUE_EST_VALUE_RHS: &str = "est_value_rhs";
 const ISSUE_UNKNOWN_TYPE_LOWERING: &str = "unknown_type_lowering_error";
 const ISSUE_NAME_NOT_VALUE: &str = "name_not_value";
 const ISSUE_NAMESPACE_MISSING_EXPORT: &str = "namespace_missing_export";
@@ -1491,7 +1493,7 @@ fn resolve_expr(
         ExprKind::Paren(expr) => resolve_expr(resolver, interner, expr, errors),
         ExprKind::TypeCheck(expr) => {
             resolve_expr(resolver, interner, &expr.expr, errors);
-            resolve_type_expr(resolver, interner, &expr.ty, errors);
+            resolve_est_type_target(resolver, interner, &expr.ty, errors);
         }
         ExprKind::Iuncta(expr) => {
             for ty in &expr.type_args {
@@ -1540,6 +1542,109 @@ fn record_shadowed_builtin(
         return;
     }
     resolver.record_shadowed_builtin(node, def_id);
+}
+
+/// The enum-variant definition an `est` right-hand side names, if any.
+///
+/// The right-hand side of `est`/`non est` is always a type (DECISIONS D23.1),
+/// so an enum variant name is not a value path any more. It is also not a
+/// nominal type the type namespace carries: `r est DetailCarrier` targets the
+/// variant's member type. This classifies that case for both name resolution
+/// and the HIR type lowering of the test target. Bare names and
+/// module-qualified imported variant paths (`aux.Carrier.Detail`) are covered;
+/// a locally-qualified `Carrier.Detail` was already rejected as a type before
+/// D23.1 and stays rejected.
+pub(crate) fn est_target_variant(resolver: &Resolver, ty: &TypeExpr) -> Option<DefId> {
+    match &ty.kind {
+        TypeExprKind::Named(name, params) if params.is_empty() => {
+            resolver.lookup_variant_bare(name.name).def_id()
+        }
+        TypeExprKind::Qualified(path, params) if path.len() >= 2 && params.is_empty() => {
+            match resolver
+                .qualified_variant_path(&path.iter().map(|ident| ident.name).collect::<Vec<_>>())
+            {
+                QualifiedVariantPathLookup::Variant(def_id) => Some(def_id),
+                QualifiedVariantPathLookup::NotQualified
+                | QualifiedVariantPathLookup::UnknownVariant => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Resolve the right-hand side of `est` / `non est` (DECISIONS D23.1).
+///
+/// The right-hand side is always a type, so this is ordinary type resolution
+/// with one addition and one subtraction. An enum-variant target (`r est M`)
+/// is legal — it tests the variant's member type. A name that resolves to a
+/// value — a declared constant, or the `verum`/`falsum` literals — is rejected
+/// by name: value comparison belongs to the equality family.
+fn resolve_est_type_target(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    ty: &TypeExpr,
+    errors: &mut Vec<SemanticError>,
+) {
+    if est_target_variant(resolver, ty).is_some() {
+        return;
+    }
+    match &ty.kind {
+        TypeExprKind::Named(name, params) if params.is_empty() => {
+            let source = interner.resolve(name.name);
+            if !is_builtin_type(source)
+                && resolver.lookup_type(name.name).is_none()
+                && resolver.lookup_selective_import_type(name.name).is_none()
+            {
+                // `verum` / `falsum` are boolean literal keywords, never types.
+                if matches!(
+                    radix_lexer::lookup_keyword_spec(source)
+                        .and_then(|spec| spec.token_kind.clone()),
+                    Some(radix_lexer::TokenKind::Verum | radix_lexer::TokenKind::Falsum)
+                ) {
+                    errors.push(est_value_rhs_error(name.span));
+                    return;
+                }
+                if let Some(def_id) = resolver.lookup(name.name) {
+                    if resolver
+                        .get_symbol(def_id)
+                        .is_some_and(|symbol| symbol.kind.is_value_name())
+                    {
+                        errors.push(est_value_rhs_error(name.span));
+                        return;
+                    }
+                } else if let BareVariantLookup::Ambiguous { .. } =
+                    resolver.lookup_variant_bare(name.name)
+                {
+                    errors.push(
+                        SemanticError::structured(SemanticErrorKind::VariableUndefined, name.span)
+                            .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
+                    );
+                    return;
+                }
+            }
+        }
+        TypeExprKind::Qualified(path, params) if params.is_empty() => {
+            if let Some((namespace, member)) = path.first().zip(path.last())
+                && resolver.namespace_exports_member(namespace.name, member.name)
+                && (resolver
+                    .namespace_file_const(namespace.name, member.name)
+                    .is_some()
+                    || resolver
+                        .namespace_file_function(namespace.name, member.name)
+                        .is_some())
+            {
+                errors.push(est_value_rhs_error(member.span));
+                return;
+            }
+        }
+        _ => {}
+    }
+    resolve_type_expr(resolver, interner, ty, errors);
+}
+
+fn est_value_rhs_error(span: radix_lexer::Span) -> SemanticError {
+    SemanticError::structured(SemanticErrorKind::OperandTypesInvalid, span)
+        .with_arg("issue", ISSUE_EST_VALUE_RHS)
 }
 
 fn resolve_type_expr(

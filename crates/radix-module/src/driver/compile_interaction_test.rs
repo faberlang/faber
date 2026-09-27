@@ -1500,7 +1500,9 @@ incipit {
 }
 
 #[test]
-fn est_verum_and_falsum_accept_ignotum_operands() {
+fn est_verum_and_falsum_are_rejected_as_value_targets() {
+    // `est` tests a type (DECISIONS D23.1); the boolean literals are values,
+    // so both spellings are rejected by name rather than compared.
     let session = test_session(Target::HirRust);
     let source = r#"functio check(ignotum x) → vacuum {
   si x est verum { nota "t" }
@@ -1512,12 +1514,12 @@ incipit {
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .all(|d| d.issue() != Some("boolean_operand_required"))
-    );
+    let hits = result
+        .diagnostics
+        .iter()
+        .filter(|d| d.issue() == Some("est_value_rhs"))
+        .count();
+    assert_eq!(hits, 2, "{:?}", result.diagnostics);
 }
 
 #[test]

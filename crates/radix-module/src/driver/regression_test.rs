@@ -542,8 +542,8 @@ fn compile_supports_extended_unary_operators() {
   nota maybe non est nihil
   nota n < 0
   nota n > 0
-  nota flag est verum
-  nota flag est falsum
+  nota flag ≡ verum
+  nota flag ≠ verum
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 

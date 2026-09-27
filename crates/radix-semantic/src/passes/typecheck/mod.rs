@@ -1057,8 +1057,8 @@ mod union_construction_test;
 mod union_pattern_test;
 
 #[cfg(test)]
-#[path = "est_imported_type_test.rs"]
-mod est_imported_type_test;
+#[path = "est_type_target_test.rs"]
+mod est_type_target_test;
 
 #[cfg(test)]
 #[path = "union_value_test.rs"]

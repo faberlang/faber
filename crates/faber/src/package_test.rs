@@ -8336,9 +8336,9 @@ class Felis {
 }
 
 #[test]
-fn check_package_rejects_est_against_imported_type() {
-    // D18.1: `x is aux.Felis` / `x is Canis` on imported types is an error,
-    // never a value-equality fallback.
+fn check_package_admits_est_against_imported_types() {
+    // D23.1/D23.5 (supersedes D18.1): `x is aux.Felis` / `x is Canis` on
+    // imported types is a legal type test.
     let dir = test_temp_dir("package-est-imported-type");
     let entry = dir.join("main.fab");
     fs::write(
@@ -8379,14 +8379,9 @@ class Felis {
     .expect("write module");
 
     let diagnostics = check_with_faber_seams(&Config::default(), &entry);
-    let hits = diagnostics
-        .iter()
-        .filter(|diag| diagnostic_has_issue(diag, "est_imported_type"))
-        .count();
-    assert_eq!(
-        hits,
-        2,
-        "expected est_imported_type for both spellings, got {:?}",
+    assert!(
+        !diagnostics.iter().any(radix::Diagnostic::is_error),
+        "expected imported-type est targets to check, got {:?}",
         diagnostics
             .iter()
             .map(|diag| (diag.code, diag.issue()))

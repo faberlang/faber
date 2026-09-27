@@ -434,9 +434,15 @@ impl TypeChecker<'_> {
     /// `(DefId, narrowed TypeId)` for the visible binding.
     fn condition_refinement(&mut self, cond: &HirExpression) -> ConditionRefinement {
         if let HirExpressionKind::TypeCheck { positive, expr, ty } = &cond.kind {
+            // A type test against the null type is the null-presence probe:
+            // `x non est nihil` narrows the taken branch, `x est nihil` the
+            // fallthrough. Every other target is a member test.
+            if self.type_is_nihil(*ty) {
+                return self.nil_probe_refinement(*positive, expr);
+            }
             return self.type_check_refinement(*positive, expr, *ty);
         }
-        let HirExpressionKind::Binary(op, lhs, rhs) = &cond.kind else {
+        let HirExpressionKind::Binary(op, lhs, _) = &cond.kind else {
             return (None, None);
         };
         // Compound conjunction: keep only the taken-branch refinement of the
@@ -445,29 +451,27 @@ impl TypeChecker<'_> {
             let (then_refine, _) = self.condition_refinement(lhs);
             return (then_refine, None);
         }
-        // Enum variants are value paths in HIR, so `r est Variant` arrives as
-        // the same Binary(Is) shape as value equality. Promote only a known
-        // variant path to the closed variant-member predicate; literals and
-        // ordinary values retain their equality semantics.
-        if matches!(op, HirBinOp::Is | HirBinOp::IsNot)
-            && let HirExpressionKind::Path(variant_def) = rhs.kind
-            && self.variant_parent.contains_key(&variant_def)
-        {
-            let member = self.types.intern(Type::Struct(variant_def));
-            return self.type_check_refinement(matches!(op, HirBinOp::Is), lhs, member);
-        }
-        // `x non est nihil` narrows the taken branch; `x est nihil` narrows
-        // the fallthrough.
-        let taken_branch_narrows = match op {
-            HirBinOp::IsNot => true,
-            HirBinOp::Is => false,
-            _ => return (None, None),
-        };
-        // The null probe must be the literal `nihil` on the right.
-        if !matches!(&rhs.kind, HirExpressionKind::Literal(HirLiteral::Nil)) {
-            return (None, None);
-        }
-        let HirExpressionKind::Path(def_id) = &lhs.kind else {
+        (None, None)
+    }
+
+    /// Return whether a type id is exactly the null type `nihil`.
+    fn type_is_nihil(&self, ty: TypeId) -> bool {
+        matches!(
+            self.types.get(self.resolve_inferred_type(ty)),
+            Type::Primitive(Primitive::Nihil)
+        )
+    }
+
+    /// Refinement for a type test against the null type (`x non est nihil`
+    /// narrows the taken branch, `x est nihil` the fallthrough, nn-u1).
+    ///
+    /// The operand must be a binding path whose type peels a null member.
+    fn nil_probe_refinement(
+        &mut self,
+        positive: bool,
+        expr: &HirExpression,
+    ) -> ConditionRefinement {
+        let HirExpressionKind::Path(def_id) = &expr.kind else {
             return (None, None);
         };
         let Some(binding_ty) = self.lookup_binding(*def_id).map(|binding| binding.ty) else {
@@ -477,10 +481,10 @@ impl TypeChecker<'_> {
         let Some(refined) = self.peel_member_type(binding_ty, nihil) else {
             return (None, None);
         };
-        if taken_branch_narrows {
-            (Some((*def_id, refined)), None)
-        } else {
+        if positive {
             (None, Some((*def_id, refined)))
+        } else {
+            (Some((*def_id, refined)), None)
         }
     }
 

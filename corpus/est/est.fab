@@ -4,36 +4,37 @@ kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "fixum_decl", "si_stmt", "arm", "redde_stmt", "et_expr", "adfirma_stmt", "conversio_expr", "type_arguments", "type_argument", "equality", "equality_tail", "comparison", "array_literal", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix"]
 category = "logic"
 canonical = true
-summary = "Tests whether a value is or matches a type-like target."
-syntax = "<expression> est <expression>"
-related = ["non est"]
+summary = "Tests whether a value's runtime type is a given type."
+syntax = "<expression> est <type>"
+related = ["non est", "≡"]
 locale = "en"
 +++
 # =============================================================================
-# est — Tests whether a value is or matches a type-like target.
+# est — Tests whether a value's runtime type is a given type.
 # =============================================================================
 #
 # What this teaches:
 #   • Type checking — `<expr> est <type>` tests a valor's runtime variant tag without extraction.
-#   • Null checking — `<expr> est nihil` checks for null values.
-#   • Boolean checks — `<expr> est verum` / `<expr> est falsum` for exact boolean comparison.
+#   • Null checking — `<expr> est null` tests the null type (the null value is `null`).
 #   • Negation — `<expr> non est <type>` negates the type check.
 #   • Chaining — `est` composes with `et` and parenthesized expressions.
 #
 # Common mistakes:
-#   • Using `est` for equality comparison — `est` checks variant tags and type-like targets, not structural equality; use `≡` for value comparison.
+#   • Using `est` to compare values — its right-hand side is always a type; use `≡` (or `≠`) for value comparison: `<expr> ≡ verum`, `<expr> ≡ falsum`.
 #
-# See also: non est
+# See also: non est, ≡
 # =============================================================================
 
 
-# est — type, null, and boolean checks
+# est — type and null checks
 #
-# <expr> est nihil       — null check (legacy, lowers to == Valor::Nihil)
+# <expr> est null       — null-type check (lowers to is_nil)
 # <expr> est <type>      — variant tag check (lowers to matches!)
 # <expr> non est <type>  — negated variant tag check
-# <expr> est verum       — exact true check
-# <expr> est falsum      — exact false check
+#
+# Value comparison is the equality family's job:
+# <expr> ≡ verum         — exact true comparison
+# <expr> ≡ falsum        — exact false comparison
 #
 # GRAMMAR:
 #   typeCheckExpr :← expr 'est' type
@@ -47,8 +48,8 @@ fn explora(any x) → string {
 }
 
 fn explora_bivalens(bool x) → string {
-    if x is true then return "verum est"
-    if x is false then return "falsum est"
+    if x ≡ true then return "verum est"
+    if x ≡ false then return "falsum est"
     return "aliud est"
 }
 
@@ -58,19 +59,19 @@ main {
     const _ nihil_est ← forsitan is null
     print nihil_est
 
-    # Boolean true check with est
+    # Boolean true comparison with ≡
     const _ enabled ← true
-    const _ verum_est ← enabled is true
+    const _ verum_est ← enabled ≡ true
     print verum_est
 
-    # Boolean false check with est
+    # Boolean false comparison with ≡
     const _ disabled ← false
-    const _ falsum_est ← disabled is false
+    const _ falsum_est ← disabled ≡ false
     print falsum_est
 
     # Chained with logical operators
     const string ∪ null nomen ← null
-    const _ defectum_debet ← nomen is null and enabled is true
+    const _ defectum_debet ← nomen is null and enabled ≡ true
     print defectum_debet
 
     # Parenthesized for clarity

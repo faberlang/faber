@@ -962,19 +962,20 @@ impl Parser {
 
     /// Peek whether the next token is an identifier naming a type.
     ///
-    /// WHY: `est <type>` needs to disambiguate a type-name `RHS` from a value
-    /// expression at parse time. The primitive type names (`numerus`, `textus`,
-    /// `bivalens`, `fractus`, `instans`, `json`, `valor`, `lista`, `tabula`, `regex`,
-    /// `octeti`, `ascii`, `vacuum`) are not reserved keywords — they are
-    /// contextual identifiers that resolve to types. Localized pack spellings
-    /// of those types (via `reader_type_latin_keys`) route the same way. This
-    /// peek lets the parser route `est numerus` to `TypeCheck` without
-    /// consuming the token.
+    /// WHY: pattern position (`case <type>`) distinguishes a type pattern from
+    /// a value pattern at parse time. The primitive type names (`numerus`,
+    /// `textus`, `bivalens`, `fractus`, `instans`, `json`, `valor`, `lista`,
+    /// `tabula`, `regex`, `octeti`, `ascii`, `vacuum`) are not reserved
+    /// keywords — they are contextual identifiers that resolve to types.
+    /// Localized pack spellings of those types (via `reader_type_latin_keys`)
+    /// route the same way. This peek lets the pattern parser route
+    /// `case numerus` to a type pattern without consuming the token.
     ///
     /// U1R extends the same classification to identifiers this file declares
-    /// as nominal types (`est Errata` → `TypeCheck`). A name that declares no
-    /// type stays value-equality `Binary(Is)` — an imported type is the
-    /// documented miss, not a parse guess.
+    /// as nominal types (`case Errata`). A name that declares no type stays a
+    /// value pattern — an imported type is the documented miss, not a parse
+    /// guess. `est` no longer consults this: D23.5 made the right-hand side of
+    /// `est`/`non est` always a type.
     fn peek_starts_type_name(&self) -> bool {
         let TokenKind::Ident(sym) = self.peek().kind else {
             return false;

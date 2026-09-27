@@ -1,10 +1,9 @@
-//! `est` against an imported type (DECISIONS D18.1).
+//! `est` / `non est` type-target resolution (DECISIONS D23.1, superseding D18.1).
 //!
-//! The parser routes `x est T` to a `TypeCheck` node only for types it can
-//! see in the same file; an imported type (`aux.Felis`, or a selectively
-//! imported `Felis`) arrives as `Binary(Is)` value equality. Until
-//! `type-algebra-error-lifecycle` open row 8 designs cross-file type tests,
-//! that shape is a named compile error, never a silent value comparison.
+//! The right-hand side is always a type (D23.1/D23.5), so an imported type —
+//! qualified (`aux.Felis`) or selectively imported (`Canis`) — is a legal
+//! target. A right-hand side that resolves to a value is rejected by name:
+//! value comparison belongs to the equality family.
 
 use std::collections::BTreeMap;
 
@@ -16,7 +15,7 @@ use crate::file_interface::{
 use crate::passes::visibility_annotation::VisibilityTier;
 use crate::test_support;
 
-const ISSUE: &str = "est_imported_type";
+const ISSUE: &str = "est_value_rhs";
 
 fn genus(name: &str) -> FileExport {
     FileExport {
@@ -85,7 +84,7 @@ fn has_issue(result: &test_support::AnalyzedFixture, issue: &str) -> bool {
         .any(|err| err.is_error() && test_support::issue(err) == Some(issue))
 }
 
-fn assert_est_imported_type(source: &str) {
+fn assert_est_value_rhs(source: &str) {
     let result = analyze(source);
     assert!(
         has_issue(&result, ISSUE),
@@ -94,9 +93,13 @@ fn assert_est_imported_type(source: &str) {
     );
 }
 
+// ---------------------------------------------------------------------------
+// D23.1/D23.5: imported types are legal `est` targets
+// ---------------------------------------------------------------------------
+
 #[test]
-fn est_qualified_imported_type_is_an_error() {
-    assert_est_imported_type(
+fn est_qualified_imported_type_is_legal() {
+    let result = analyze(
         r#"importa ex "./aux" aux
 
 functio f(aux.Felis ∪ aux.Canis x) → bivalens {
@@ -105,11 +108,19 @@ functio f(aux.Felis ∪ aux.Canis x) → bivalens {
 
 incipit { tacet }"#,
     );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(crate::SemanticError::is_error),
+        "{:?}",
+        result.diagnostics
+    );
 }
 
 #[test]
-fn non_est_qualified_imported_type_is_an_error() {
-    assert_est_imported_type(
+fn non_est_qualified_imported_type_is_legal() {
+    let result = analyze(
         r#"importa ex "./aux" aux
 
 functio f(aux.Felis ∪ aux.Canis x) → bivalens {
@@ -118,37 +129,45 @@ functio f(aux.Felis ∪ aux.Canis x) → bivalens {
 
 incipit { tacet }"#,
     );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(crate::SemanticError::is_error),
+        "{:?}",
+        result.diagnostics
+    );
 }
 
 #[test]
-fn est_imported_type_names_the_type() {
+fn est_selective_imported_type_is_legal() {
     let result = analyze(
-        r#"importa ex "./aux" aux
+        r#"importa ex "./aux" fixum Felis, Canis
 
-functio f(aux.Felis ∪ aux.Canis x) → bivalens {
-    redde x est aux.Felis
+functio f(Felis ∪ Canis x) → bivalens {
+    redde x est Canis
 }
 
 incipit { tacet }"#,
     );
-    let err = result
-        .diagnostics
-        .iter()
-        .find(|err| test_support::issue(err) == Some(ISSUE))
-        .expect("est_imported_type diagnostic");
     assert!(
-        err.args
+        !result
+            .diagnostics
             .iter()
-            .any(|arg| arg.name == "type" && arg.value == "Felis"),
-        "args: {:?}",
-        err.args
+            .any(crate::SemanticError::is_error),
+        "{:?}",
+        result.diagnostics
     );
 }
 
+// ---------------------------------------------------------------------------
+// D23.1: a value right-hand side names the equality operator
+// ---------------------------------------------------------------------------
+
 #[test]
-fn est_imported_const_value_stays_value_equality() {
-    // A const export is a value: `est` against it is ordinary equality.
-    let result = analyze(
+fn est_imported_const_value_is_rejected() {
+    // A const export is a value: `est` against it is not a type test.
+    assert_est_value_rhs(
         r#"importa ex "./aux" aux
 
 functio f(textus x) → bivalens {
@@ -157,7 +176,17 @@ functio f(textus x) → bivalens {
 
 incipit { tacet }"#,
     );
-    assert!(!has_issue(&result, ISSUE), "{:?}", result.diagnostics);
+}
+
+#[test]
+fn est_local_value_name_is_rejected() {
+    assert_est_value_rhs("functio f(numerus x, numerus aliud) → bivalens { redde x est aliud }");
+}
+
+#[test]
+fn est_boolean_literal_is_rejected() {
+    assert_est_value_rhs("functio f(ignotum x) → bivalens { redde x est verum }");
+    assert_est_value_rhs("functio f(ignotum x) → bivalens { redde x non est falsum }");
 }
 
 // ---------------------------------------------------------------------------
@@ -231,19 +260,6 @@ incipit { tacet }"#,
             .any(crate::SemanticError::is_error),
         "{:?}",
         result.diagnostics
-    );
-}
-
-#[test]
-fn est_selective_imported_type_is_an_error() {
-    assert_est_imported_type(
-        r#"importa ex "./aux" fixum Felis, Canis
-
-functio f(Felis ∪ Canis x) → bivalens {
-    redde x est Canis
-}
-
-incipit { tacet }"#,
     );
 }
 

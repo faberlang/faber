@@ -20,7 +20,7 @@ locale = "en"
 #     asserted by the radix-semantic coverage audit).
 #   • The gate arms: numeric_ordering_bin (< ≤ > ≥), numeric_arithmetic_bin
 #     (+ - * / %), numeric_value_equality_types (≅ ≇ ≈ ≉),
-#     exact_equality_types (≡ ≠ est), check_conversio (↦).
+#     exact_equality_types (≡ ≠), check_conversio (↦).
 #   • New carrier families (e.g. GEA4) must land a row here before their
 #     cells count as proven.
 #
@@ -31,25 +31,27 @@ locale = "en"
 #   • Expecting decimal `≅`/`≈` to stay carrier-blind — the d64-scale join
 #     (GT-1) makes 4.2 d32 ≅ 4.2 d64 verum; decimal × fractus never compares
 #     (GT-2), on either the ordering or the equality tier.
+#   • Expecting `est` to compare values — it is a type test (D23.1); the
+#     value right-hand side that used to sit in this table names `≡` instead.
 #
 # See also: ≅, ≈, ≡, ↦, mixed-ordering-join, numeric-value-eq, comparatio, est
 # =============================================================================
 
 # =============================================================================
-# THE TABLE — 10 operator rows × 9 carrier-pair families = 90 cells.
+# THE TABLE — 9 operator rows × 9 carrier-pair families = 81 cells.
 # J = defined join (executed below, verdict pinned). R = named SEM rejection
 # (asserted by the coverage audit, never compiled).
 #
-#                     ≡/≠   ≅/≇   ≈/≉    <     ≤     >     ≥    arith   ↦       est
-# P1 int identical     J     J     J     J     J     J     J     J       J        J
-# P2 int cross-width   R-eq  J     J     J     J     J     J     R-ai    J        R-eq
-# P3 signed×unsigned   R-eq  J     J     J     J     J     J     R-ai    J        R-eq
-# P4 int×f32           R-eq  J     J     J     J     J     J     R-ai    J        R-eq
-# P5 int×f64           R-eq  J     J     J     J     J     J     R-ai    J        R-eq
-# P6 f32×f64           R-eq  J     J     J     J     J     J     R-ai    J        R-eq
-# P7 d32×d64           R-eq  J     J     J     J     J     J     R-ai  J / R-narr  R-eq
-# P8 decimal×integer   R-eq  J     J     J     J     J     J     R-ai    J        R-eq
-# P9 decimal×fractus   R-eq  R-eq²  R-eq²  R-ord R-ord R-ord R-ord  R-ai    J        R-eq
+#                     ≡/≠   ≅/≇   ≈/≉    <     ≤     >     ≥    arith   ↦
+# P1 int identical     J     J     J     J     J     J     J     J       J
+# P2 int cross-width   R-eq  J     J     J     J     J     J     R-ai    J
+# P3 signed×unsigned   R-eq  J     J     J     J     J     J     R-ai    J
+# P4 int×f32           R-eq  J     J     J     J     J     J     R-ai    J
+# P5 int×f64           R-eq  J     J     J     J     J     J     R-ai    J
+# P6 f32×f64           R-eq  J     J     J     J     J     J     R-ai    J
+# P7 d32×d64           R-eq  J     J     J     J     J     J     R-ai  J / R-narr
+# P8 decimal×integer   R-eq  J     J     J     J     J     J     R-ai    J
+# P9 decimal×fractus   R-eq  R-eq²  R-eq²  R-ord R-ord R-ord R-ord  R-ai    J
 #
 # R-eq    SEM010:equality_exact_types_required
 # R-ai    SEM011:numeric_arithmetic_operands_identical
@@ -228,8 +230,8 @@ main {
     print d32v ↦ float
     print four_two ↦ int<d64>
 
-    # ----------------------------------------------------- est (P1 join)
-    # is-membership follows strict equality: identical types only
-    # (SEM010:equality_exact_types_required for every mixed pair).
-    print a is a
+    # ----------------------------------------------------- est (type test)
+    # D23.1: `est` / `non est` is a type test, not an equality cell, so it is
+    # no longer a column of the table above. The right-hand side is a type.
+    print a is int
 }

@@ -1,4 +1,7 @@
-//! Typecheck probes for exact-type equality (`≡`, `≠`, `est`, `non est`).
+//! Typecheck probes for exact-type equality (`≡`, `≠`).
+//!
+//! `est` / `non est` is a type test, not an equality operator (DECISIONS
+//! D23.1); its value-target rejection is pinned here too.
 
 use crate::SemanticErrorKind;
 
@@ -11,6 +14,8 @@ fn compile(source: &str) -> crate::test_support::AnalyzedFixture {
 enum EqualityExpect {
     Accepts,
     RejectsIssue(&'static str),
+    /// A rejection outside the equality family: the issue under its own kind.
+    RejectsIssueKind(SemanticErrorKind, &'static str),
 }
 
 struct EqualityCase {
@@ -168,9 +173,14 @@ incipit {
             expect: EqualityExpect::Accepts,
         },
         EqualityCase {
-            name: "est_same_type",
-            source: "incipit { si 1 est 1 { nota \"ok\" } }",
-            expect: EqualityExpect::Accepts,
+            name: "est_value_rhs_rejects",
+            // `est` tests a type (D23.1); a value right-hand side is rejected
+            // by name rather than compared.
+            source: "incipit {\n    fixum numerus unus ← 1\n    si unus est unus { nota \"bad\" }\n}",
+            expect: EqualityExpect::RejectsIssueKind(
+                SemanticErrorKind::OperandTypesInvalid,
+                "est_value_rhs",
+            ),
         },
         EqualityCase {
             name: "unrelated_types_reject",
@@ -212,6 +222,26 @@ fn equality_exact_types_matrix() {
                                 .any(|arg| arg.name == "issue" && arg.value == issue)
                     }),
                     "case {}: expected diagnostic issue {issue:?} as SEM010 TypeMismatch, got: {:?}",
+                    case.name,
+                    result.diagnostics
+                );
+            }
+            EqualityExpect::RejectsIssueKind(kind, issue) => {
+                assert!(
+                    !result.is_ok(),
+                    "case {} should fail: {:?}",
+                    case.name,
+                    result.diagnostics
+                );
+                assert!(
+                    result.diagnostics.iter().any(|diag| {
+                        diag.kind == kind
+                            && diag
+                                .args
+                                .iter()
+                                .any(|arg| arg.name == "issue" && arg.value == issue)
+                    }),
+                    "case {}: expected diagnostic issue {issue:?} as {kind:?}, got: {:?}",
                     case.name,
                     result.diagnostics
                 );

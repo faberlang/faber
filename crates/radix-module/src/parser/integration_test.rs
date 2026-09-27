@@ -96,8 +96,8 @@ fn assert_semantic_rejection(source: &str) {
 
 #[test]
 fn retired_prefix_predicates_emit_rewrite_diagnostics() {
-    assert_retired_prefix_predicate("fixum _ x ← falsum disabled", "falsum", "value est falsum");
-    assert_retired_prefix_predicate("fixum _ x ← verum enabled", "verum", "value est verum");
+    assert_retired_prefix_predicate("fixum _ x ← falsum disabled", "falsum", "value ≡ falsum");
+    assert_retired_prefix_predicate("fixum _ x ← verum enabled", "verum", "value ≡ verum");
     assert_retired_prefix_predicate("fixum _ x ← nihil maybe", "nihil", "value est nihil");
 }
 
