@@ -412,7 +412,7 @@ finge_expr ::= '虛構' qualified_ident ('{' field_list '}')? ('∷' type_annota
 # [201] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
 # [202] praefixum_expr
-praefixum_expr ::= '前綴' (block_stmt | '(' expression ')')
+praefixum_expr ::= '前綴' block_stmt
 # [203] scriptum_expr
 scriptum_expr ::= '格式文字' '(' STRING (',' expression)* ')'
 # [204] lege_expr
@@ -1222,11 +1222,7 @@ wire operation such as `json.pange(value ↦ json)`.
   `定值` field outside a construction literal is `SEM020`
   (`assignment_to_fixum_field`). The former `nexum` field modifier is removed
   and rejected with a migration diagnostic.
-- Members are public by default. Until member privacy is enforced,
-  `@ privata` or `@ interna` on a `類型` member is an error
-  (`member_privacy_unenforced`), because it promises privacy nothing checks;
-  `@ 公開` on a member is a redundant-annotation warning
-  (`redundant_member_publica`), an error when warnings are denied.
+- `類型` members are public by default (D5.2). `@ privata` on a member restricts it to the type's own methods: only code inside the type's own function bodies may read, write, or call it (D5.3); `@ interna` restricts it to code in the declaring package. A construction literal may still set a private field, from any file, and `Genus { … } 取自 p` copies it unchanged (D5.4). Reading, writing, or calling an inaccessible member from outside its allowed scope is `SEM063` (`member_private_read`/`_write`/`_call`, or `member_interna_read`/`_write`/`_call`); `@ 公開` on a member is a redundant-annotation warning `WARN028` (`redundant_member_publica`), an error when warnings are denied.
 - A type may refer to itself: `分支聯集 Expr { Adde { Expr sinister, Expr dexter } }`
   and `類型 Nodus { Nodus ∪ 空 next }` need no keyword and no box type.
   Values have reference semantics, so the indirection is implied; a backend
@@ -1830,6 +1826,12 @@ The second type argument of a `↦` target is the convert-hint slot. `Hex` / `Bi
 - `octeti[lo‥hi] ↦ fractus<f32, Be|Le>` / `… ↦ fractus<f64, Be|Le>` — shipped alongside the integer rows (float endian unpack of an exact-width window, 4 / 8 bytes; same fail rules: exact window required, a short window fails, `Be`/`Le` mandatory).
 - `n ↦ numerus<u32, Bits>` / `n ↦ numerus<u64, Bits>` / `n ↦ fractus<f32, Bits>` / `n ↦ fractus<f64, Bits>` / `n ↦ fractus<f16, Bits>` — shipped; the `Bits` hint reinterprets between exact-width integer/float pairs (u32↔f32, u64↔f64, u16↔f16, u16↔bf16) bit-identically. It is reinterpretation, not value conversion; wrong-pair rows reject with the structured issue, and `Bits` is never a base or an ascii format hint. `Bits` is a convert-slot hint in the same Hex slot, not a keyword and not a `baseType` production.
 - `n ↦ octeti<N, Be>` / `… ↦ octeti<N, Le>` — proposed (not shipped); write convert after `octeti<N>` (`N` ∈ {2, 4, 8}). `Be`/`Le` stay Hex-slot hints, not a second capacity.
+- `'A' ↦ numerus<u32, Code>` — shipped; the code point as a `u32` (`u32` holds every code point, as Rust's `char as u32`); the source must be `littera`. `65 ↦ littera<Code>` — shipped; builds the character for that code point, failing above U+10FFFF and on a surrogate. `Code` occupies the same convert-slot hint position as `Hex`/`Bits`; any other type argument, or a source/target type other than `littera`/`numerus<u32>`, is `SEM016` (`code_hint_pair_mismatch`).
+- `n ↦ textus` / `n ↦ ascii` / `n ↦ littera` — a number's digits (D10.6): `7 ↦ textus` = `"7"`, `7 ↦ ascii` = `"7"`, `7 ↦ littera` = `'7'`; `littera` fails outside 0–9 (`42 ↦ littera` fails, two letters).
+- `littera ↦ numerus` — parses the digit, failing otherwise (as `"22" ↦ numerus` parses).
+- `littera ↦ textus` — the one-letter string; never fails.
+- `textus ↦ littera` — the only letter; fails unless the text is exactly one letter.
+- `octeti ↦ textus` — UTF-8 decode; can fail. `octeti ↦ ascii` — checks every byte is below 128, same bytes; can fail. `octeti[i‥i+1] ↦ ascii` — one byte through a window (mirrors `octeti[lo‥hi] ↦ numerus<W, Be>`).
 
 Explicit integer narrowing is magnitude-checked on every backend:
 `n ↦ numerus<u8>` converts a value that fits unchanged, and a value out of the

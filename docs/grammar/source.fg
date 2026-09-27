@@ -1271,7 +1271,26 @@ json_number := NUMBER
 
 finge_expr     := 'finge' qualified_ident ('{' field_list '}')? ('∷' type_annotation)?
 qualified_ident := IDENTIFIER ('.' IDENTIFIER)*
-praefixum_expr := 'praefixum' (block_stmt | '(' expression ')')
+# `praefixum` (D8.4-D8.6, D9): the compile-time initializer for a static. The
+# retired parenthesized form (`'praefixum' '(' expression ')'`) is gone; a
+# bare block is the only shape, rejected with `praefixum_expression_form_retired`
+# when written. It is legal only as a `static_decl` or static `field_decl`
+# initializer (`static_init`) — anywhere else it is `SEM064`
+# (`praefixum_outside_static`). The body is a `block_stmt` ending in a
+# `redde`; it lowers to MIR and runs on `radix-mir-runner` during the build
+# under a step budget (10M steps), so an endless loop fails the build instead
+# of hanging it (`SEM064 praefixum_step_limit`), and `mori` or a propagated
+# `⇥` is a build error carrying its message (`praefixum_failed`). Allowed:
+# pure computation (arithmetic, `textus`, collections, loops, `si`,
+# `discerne`, building `genus` values), calls to ordinary functions that obey
+# the same rules (checked transitively), reading other statics in dependency
+# order (a cycle is an error), and sync generators (`fiunt`). Forbidden: any
+# `ad`, await, async cursors, and `externa` — each rejected as `SEM064`
+# (`praefixum_forbidden`). A body with no `redde` value is
+# `praefixum_no_result`; a result with no literal form on every backend
+# (closure, handle, generic genus) is `praefixum_result_not_literal`; a
+# construct the runner cannot lower is `praefixum_unsupported`.
+praefixum_expr := 'praefixum' block_stmt
 scriptum_expr  := 'scriptum' '(' STRING (',' expression)* ')'
 lege_expr      := 'lege' 'lineam'?
 # Dedicated first-match selection: total over a bounded source, first-live
