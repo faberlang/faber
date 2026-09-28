@@ -1113,16 +1113,16 @@ def keyword_spine(source_text: str, source_path: Path) -> set[str]:
 
 
 IDENTITY_BANNER = (
-    "This file is generated from `docs/grammar/source.fg`; hand edits fail the\n"
-    "stage-1 normative-triple gate."
+    "This file is generated from `docs/grammar/source.fg`, its `sidecar.en.toml`\n"
+    "and its `prose.en.md`; hand edits fail the stage-1 normative-triple gate."
 )
 
 
 def stamp_locale_banner(text: str, locale: str) -> str:
     replacement = (
-        f"This file is generated from `docs/grammar/source.fg` and "
-        f"`docs/grammar/glossary.{locale}.toml`;\n"
-        "hand edits fail the locale-render gate."
+        "This file is generated from `docs/grammar/source.fg`, its "
+        f"`sidecar.en.toml` and its `prose.en.md`, and\n`docs/grammar/"
+        f"glossary.{locale}.toml`; hand edits fail the locale-render gate."
     )
     if IDENTITY_BANNER not in text:
         raise SubstitutionError(
@@ -1213,9 +1213,9 @@ def render_identity(
     lines = [
         "# Faber Language Specification",
         "",
-        "This file is generated from `docs/grammar/source.fg`; hand edits fail the",
-        "stage-1 normative-triple gate. Production IDs are the grammar's stable",
-        "snake_case spine and their anchors are derived from those IDs.",
+        *IDENTITY_BANNER.split("\n"),
+        "Production IDs are the grammar's stable snake_case spine and their",
+        "anchors are derived from those IDs.",
         "",
         "## Grammar {#grammar}",
         "",
