@@ -33,13 +33,13 @@ message = "Legacy return-arrow spelling; use → in Faber source."
 
 [[redirects]]
 term = "==="
-canonical = "est"
-message = "Legacy equality spelling; use est in Faber source."
+canonical = "≡"
+message = "Legacy equality spelling; use ≡ in Faber source."
 
 [[redirects]]
 term = "!=="
-canonical = "non est"
-message = "Legacy inequality spelling; use non est in Faber source."
+canonical = "≠"
+message = "Legacy inequality spelling; use ≠ in Faber source."
 
 [[redirects]]
 term = "ubi"
@@ -58,15 +58,15 @@ message = "Retired prefix predicate; use value > 0."
 
 [[redirects]]
 term = "nonnihil"
-canonical = "est"
-message = "Retired prefix predicate; use value non est nihil."
+canonical = "≠"
+message = "Retired prefix predicate; use value ≠ nulla (D23.4)."
 
 [[redirects]]
 term = "nonnulla"
-canonical = "est"
-message = "Retired prefix predicate; use value non est nihil."
+canonical = "≠"
+message = "Retired prefix predicate; use value ≠ nulla (D23.4)."
 
-[[redirects]]
-term = "nulla"
-canonical = "est"
-message = "Retired prefix predicate; use value est nihil."
+# The `nulla` redirect is retired with D23.4 (2026-09-27): `nulla` is the null
+# value literal again, so a bare `nulla` is an expression, not a predicate.
+# The prefix-predicate form `nulla value` still has no exemplum; its message is
+# owned by the retired-predicate diagnostics, not by this reference list.
