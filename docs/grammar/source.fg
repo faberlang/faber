@@ -711,7 +711,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Async | `variandum` | await-bind mutable |
 # | Endpoints | `ad` | capability call |
 # | Boolean | `aut` | or |
-# | Boolean | `est` | is / equality |
+# | Boolean | `est` | is / type test |
 # | Boolean | `et` | and |
 # | Boolean | `falsum` | false |
 # | Boolean | `non` | not |
@@ -729,6 +729,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Type | `copy` | copy ownership |
 # | Type | `de` | borrow / for-in keys |
 # | Type | `in` | ownership in |
+# | Type | `nihil` | none (the null type; D23.2) |
 # | Type | `own` | owned |
 # | Iteration | `ab` | range iteration |
 # | Iteration | `ante` | range until exclusive |
@@ -750,7 +751,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Diagnostics | `nota` | note |
 # | Diagnostics | `scribe` | diagnostic channel |
 # | Diagnostics | `vide` | debug |
-# | Literals | `nihil` | none |
+# | Literals | `nulla` | null |
 # | Literals | `nonnumerus` | named NaN literal (`nan` outside the Latin pack) |
 # | JSON | `false` | JSON false |
 # | JSON | `null` | JSON null |
@@ -1164,7 +1165,11 @@ ternary    := aut_expr ('✓' expression '✗' aut_expr)?
 aut_expr         := et_expr (('aut') et_expr)*
 et_expr        := equality (('et') equality)*
 equality   := comparison equality_tail*
-equality_tail := ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉' | 'est' | 'non' 'est') comparison
+# The equality tier carries two jobs that share a precedence level, not a
+# meaning (D23.1): a value comparison with a `comparison` on the right, and a
+# type test (`est` / `non est`) with a *type* on the right.
+equality_tail := ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉') comparison
+               | ('est' | 'non' 'est') type_annotation
 comparison := format_expr (('≺' | '≻' | '≤' | '≥' | 'intra' | 'inter') format_expr)*
 # Ordering operators use the canonical Unicode glyphs `≺`/`≻`/`≤`/`≥`;
 # membership uses Latin keywords `intra`/`inter` (Faber prose identity).
@@ -1232,7 +1237,7 @@ template_argument := 'sparge'? IDENTIFIER ':' expression
 # `∞` and `nonnumerus` are non-finite floating-point literals; `nonnumerus`
 # is claimed only in the literal slot (a following `(` keeps it a call).
 literal := NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING
-         | 'verum' | 'falsum' | 'nihil' | '∞' | 'nonnumerus'
+         | 'verum' | 'falsum' | 'nulla' | '∞' | 'nonnumerus'
 primary := IDENTIFIER | literal | 'ego'
          | array_literal | json_literal | typed_constructor | iuncta_expr
          | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr

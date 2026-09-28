@@ -314,7 +314,7 @@ et_expr ::= equality (('และ') equality)*
 # [152] equality
 equality ::= comparison equality_tail*
 # [153] equality_tail
-equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉' | 'เป็น' | 'ไม่' 'เป็น') comparison
+equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉') comparison | ('เป็น' | 'ไม่' 'เป็น') type_annotation
 # [154] comparison
 comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | 'ภายใน' | 'ระหว่าง') format_expr)*
 # [155] format_expr
@@ -374,7 +374,7 @@ argument ::= template_argument | 'กระจาย'? expression
 # [182] template_argument
 template_argument ::= 'กระจาย'? IDENTIFIER ':' expression
 # [183] literal
-literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'จริง' | 'เท็จ' | 'ว่าง' | '∞' | 'nan'
+literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'จริง' | 'เท็จ' | 'ว่างเปล่า' | '∞' | 'nan'
 # [184] primary
 primary ::= IDENTIFIER | literal | 'ตัวฉัน' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | summa_expr | capta_expr | '(' expression ')'
 # [185] ad_expr
@@ -808,7 +808,7 @@ productions. It is not a second keyword authority.
 | Control | `ดังนั้น` | compact statement-body joint |
 | Params | `ข้อผิดพลาด` | error channel |
 | Testing | `คาดหวัง_ล้มเหลว` | expect failure |
-| Boolean | `เป็น` | is / equality |
+| Boolean | `เป็น` | is / type test |
 | Boolean | `และ` | and |
 | Iteration | `ออก` | for-of / import from |
 | Params | `ทางออก` | exit code |
@@ -850,13 +850,13 @@ productions. It is not a second keyword authority.
 | Testing | `วัด` | benchmark |
 | Diagnostics | `เตือน` | warn |
 | Error | `ตาย` | panic |
-| Literals | `ว่าง` | none |
 | Declarations | `ชื่อ` | import binding name |
 | Boolean | `ไม่` | not |
 | Literals | `nan` | named NaN literal (`nan` outside the Latin pack) |
 | Diagnostics | `บันทึก` | note |
 | Annotation | `เคอร์เนล` | kernel annotation; kernel closure modifier |
 | JSON | `null` | JSON null |
+| Literals | `ว่างเปล่า` | null |
 | Testing | `ละเว้น` | skip |
 | Params | `ทั้งหมด` | all / glob |
 | Params | `ทางเลือก` | options modifier |
@@ -1163,7 +1163,7 @@ and resolve through local declarations or imported file-interface exports.
 Resolved applications lower to `HirAnnotation` with `contract_id: Some(DefId)`
 and constant field values. v1 attachment target is `ฟังก์ชัน` only; payload
 scalars are `textus`, `numerus`, `fractus`, and `bivalens` (optional via
-`สมัครใจ` or `T ∪ ว่าง`). Web, HTTP, controller, and framework route families
+`สมัครใจ` or `T ∪ nihil`). Web, HTTP, controller, and framework route families
 are not compiler-owned; they are built as libraries, from annotation contracts
 or on top of `@ ถึง`. The one exception is `@ ถึง` itself: it is the
 compiler-owned serving half of `ถึง` (see Capability Calls).
@@ -1175,8 +1175,8 @@ run time. An annotation that changes compilation is compiler-owned (`@ json`,
 
 **JSON genera:** `@ json` on a `ชนิด` is a compiler-owned data-model contract,
 not a generic annotation schema. Fields must be JSON-safe (`textus`, `ascii`,
-`numerus`, `fractus`, `bivalens`, `instans`, `ว่าง`, `lista<T>`,
-`tabula<textus, T>`, nullable `T ∪ ว่าง`, or another `@ json ชนิด`). Field
+`numerus`, `fractus`, `bivalens`, `instans`, `nihil`, `lista<T>`,
+`tabula<textus, T>`, nullable `T ∪ nihil`, or another `@ json ชนิด`). Field
 metadata `@ json { ชื่อ = "wire_name" }` changes the emitted object key used by
 `value ↦ valor`, `value ↦ json`, and `json ↦ Genus`; JSON text remains a Norma
 wire operation such as `json.pange(value ↦ json)`.
@@ -1228,7 +1228,7 @@ wire operation such as `json.pange(value ↦ json)`.
   and rejected with a migration diagnostic.
 - `ชนิด` members are public by default (D5.2). `@ privata` on a member restricts it to the type's own methods: only code inside the type's own function bodies may read, write, or call it (D5.3); `@ interna` restricts it to code in the declaring package. A construction literal may still set a private field, from any file, and `Genus { … } ออก p` copies it unchanged (D5.4). Reading, writing, or calling an inaccessible member from outside its allowed scope is `SEM063` (`member_private_read`/`_write`/`_call`, or `member_interna_read`/`_write`/`_call`); `@ สาธารณะ` on a member is a redundant-annotation warning `WARN028` (`redundant_member_publica`), an error when warnings are denied.
 - A type may refer to itself: `สหภาพแยก Expr { Adde { Expr sinister, Expr dexter } }`
-  and `ชนิด Nodus { Nodus ∪ ว่าง next }` need no keyword and no box type.
+  and `ชนิด Nodus { Nodus ∪ nihil next }` need no keyword and no box type.
   Values have reference semantics, so the indirection is implied; a backend
   that stores fields inline inserts it on the fields that close a type cycle.
 
@@ -1298,7 +1298,7 @@ when every constituent has it but the declared types disagree, it is
 `สคีมา Name { คอลัมน์ T name … }` declares an application-owned relational
 heading for database results. It names only the columns the application reads;
 extra source columns stay invisible. Each `คอลัมน์` row takes a type (use
-`T ∪ ว่าง` for a nullable column) and a name, with an optional
+`T ∪ nihil` for a nullable column) and a name, with an optional
 `: sourceName` alias mapping the public column to a source column (absent means
 identity). Column rows are a declaration block (no commas). A schema has no
 methods (`schema_method`), no `เติมเต็ม`
@@ -1395,17 +1395,17 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 - Labels are erased from type identity: `ทูเพิล<gx: A, B> ≡ ทูเพิล<A, B>` for assignment, `≡`/`↦`, unify, and every emitter.
 - Bracket index on a tuple requires a literal integer (`i[0]`); every element is reachable by position, labeled or not. Non-literal index expressions stay rejected. Positions are brackets only — no `.0`.
 - Member-by-label (`i.gx`) requires that label to be present on the receiver's `ทูเพิล` annotation.
-- `ทูเพิล` element slots admit `_` (monomorphic hole, solved element-wise from the single position witness) and reject `∪`. A wanted union element is declared with binary cup (`ทูเพิล<f32, textus ∪ ว่าง>`). `lista<∪>` / `tabula<K, ∪>` keep heterogeneous-union behavior. Labels compose with holes (`ทูเพิล<loss: _, T>`).
+- `ทูเพิล` element slots admit `_` (monomorphic hole, solved element-wise from the single position witness) and reject `∪`. A wanted union element is declared with binary cup (`ทูเพิล<f32, textus ∪ nihil>`). `lista<∪>` / `tabula<K, ∪>` keep heterogeneous-union behavior. Labels compose with holes (`ทูเพิล<loss: _, T>`).
 - `ratio` type arguments require a label for every element, labels are unique, `_` is admitted as a monomorphic element hole, and `∪` is rejected in an element slot. A `ratio` has no positional or bracket access, and it has no structural equivalence with another ratio or a genus; fields are accessed by label only.
 - Arrays are written `lista<T>` (unbounded, shipped). Postfix `T[]` is not accepted. `lista<T, N>` is the shipped bounded form; see Generic Collections.
 - `จาก`/`ใน` mark ownership (borrow/mut-borrow) on the immediately following union member. Parenthesize when grouping must be explicit.
 - Two hole kinds share the `holeType` production. `_` is the monomorphic hole ("infer exactly one inhabitant type"); the standalone `∪` is the union hole ("infer a finite multi-member union"). Both are legal wherever a base type is: bindings, returns, params, fields, and type arguments (`lista<∪>`, `tabula<K, ∪>`, `→ ∪`).
 - **Lone-`∪` rule:** a `∪` hole consumes the whole type expression — any following `∪` is a parse error (`A ∪ ∪`, `∪ B` rejected, issue `unexpected_cup_after_union_hole`). `_` keeps today's behavior and may still appear as a binary-cup member (`_ ∪ B`).
-- **Binary-cup disambiguation:** `∪` between two non-hole types remains the inline value-union operator (`A ∪ B`, nullable `T ∪ ว่าง`); the hole reading applies only when `∪` stands alone in a base-type position.
-- Inline union `T ∪ U` (cup) for ad-hoc value unions; `T ∪ ว่าง` is the canonical nullable type form (lowers to Option<T>).
+- **Binary-cup disambiguation:** `∪` between two non-hole types remains the inline value-union operator (`A ∪ B`, nullable `T ∪ nihil`); the hole reading applies only when `∪` stands alone in a base-type position.
+- Inline union `T ∪ U` (cup) for ad-hoc value unions; `T ∪ nihil` is the canonical nullable type form (lowers to Option<T>).
 - Inline intersection `T ∩ U` (cap) is the nominal type intersection: `type Reversible = Readable ∩ Seekable` names the conjunction, and the implements clause accepts `∩` as the same separator as the comma (`class A implements Readable ∩ Seekable` ≡ the comma list). `∩` binds tighter than `∪` (`A ∩ B ∪ C` is `(A ∩ B) ∪ C`); nested intersections flatten like unions. Intersection operands are nominal-only (interfaces/structs; aliases resolve through) — primitive operands are rejected at lowering. Implements slots admit `∩` only: `∪` or a hole in an implements position is a parse error (disjunctive conformance is not a checkable contract).
 - Signature clauses stay explicit: `_` and a standalone `∪` are rejected in return (`→ _`) and error-channel (`⇥ _`) positions; both holes stay legal in local binding slots (`const _ v`, `const ∪ v`).
-- Unions are parsed as a flat member list; duplicates and `ว่าง`-only cases are diagnosed in semantic lowering.
+- Unions are parsed as a flat member list; duplicates and `nihil`-only cases are diagnosed in semantic lowering.
 - `สมัครใจ` is a declaration marker (post-name on params/fields), never a prefix on types.
 - Qualified type paths such as `terminus.Terminus` name a type through an
   imported namespace binding. The prefix must resolve to a namespace; the final
@@ -1436,7 +1436,7 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | `saturatus<W>` | en `saturating<W>`; saturating integer; arithmetic clamps at both ends of W |
 | `fractus`  | float (default `f64`) |
 | `bivalens` | boolean |
-| `ว่าง`    | null |
+| `nihil`    | null |
 | `vacuum`   | void |
 | `numquam`  | never |
 | `ignotum`  | unknown |
@@ -1541,7 +1541,7 @@ Construct multi-dimensional tensors via `crea` / `structa` / `↦`.
 
 Tensor index/shape intrinsic slots (`accipe`, `ponde`, `forma`, `crea`, `structa`) accept integer lists that fit the canonical `lista<numerus>` / `&[i64]` runtime boundary at call sites (e.g. `lista<u32>` for GPU thread ids; not `lista<u64>`). This is a structural exception scoped to those slots — it does not widen the signed↔unsigned numeric lattice (see Index vector parameter policy in `tensor-intrinsics.md`).
 
-Value unions use inline `T ∪ U` (nullable: `T ∪ ว่าง`). The standalone `∪` hole infers a multi-member union; `_` infers a single inhabitant (see `docs/design/type-hole-union.md`). Tagged unions use `สหภาพแยก`.
+Value unions use inline `T ∪ U` (nullable: `T ∪ nihil`). The standalone `∪` hole infers a multi-member union; `_` infers a single inhabitant (see `docs/design/type-hole-union.md`). Tagged unions use `สหภาพแยก`.
 `copia.unio()` is a set method, not a type constructor.
 
 ### Type Sugar
@@ -1741,16 +1741,18 @@ rewritten to `←` or `↦`. Typed `คงที่`/`แปร` initializers ac
 (convert to the written type, then initialize); `คงที่ _`, `อนุมานคงที่`, and untyped
 destructuring have no concrete destination and are rejected.
 
-`เป็น` and `ไม่ เป็น` inspect an existing value; they never convert it. Core type
-spellings on the right perform runtime variant/type tests, while `ว่าง`,
-`จริง`, `เท็จ`, and ordinary value expressions use the value-test path. Radix
-currently recognizes type targets through a fixed core-type vocabulary. Extending
-that recognition to arbitrary declared types is a separate language decision.
+`เป็น` and `ไม่ เป็น` are a **type test**: the right-hand side is always a type —
+including a declared or imported one — and the result is a runtime variant/type
+test on the value. They never convert and never compare values; a value spelling
+on the right is rejected in the reader's own words (`SEM011:est_value_rhs`),
+pointing at the equality family. The null type is the one type spelling that also
+names a literal slot: `x เป็น nihil` tests the null *type*, while the null *value*
+is `ว่างเปล่า` (`null` in the English reader).
 Use `≡` / `≠` (or `≢`) for structural value equality, `≅` / `≇` for promoted exact equality (same value after numeric widths join), `≈` / `≉` for fuzzy equality (tolerance match with Python-isclose defaults: rel_tol 1e-09, abs_tol 0.0), and `↦` for runtime conversion.
 
-Retired predicate keywords are not prefix unary syntax. Use `expr เป็น จริง`,
-`expr เป็น เท็จ`, `expr เป็น ว่าง`, `expr ไม่ เป็น ว่าง`, `expr ≺ 0`, or
-`expr ≻ 0`.
+Retired predicate keywords are not prefix unary syntax. Use `expr ≡ จริง`,
+`expr ≡ เท็จ`, `expr ≡ ว่างเปล่า`, `expr เป็น nihil` (the null *type* test),
+`expr ≺ 0`, or `expr ≻ 0`.
 
 The legacy ASCII spellings `<` and `>` are not productions of this grammar — both remain generic delimiters — though the shipped parser still accepts them as comparisons during the glyph migration; prefer the canonical `≺` and `≻`.
 
@@ -2003,8 +2005,8 @@ xs[i] ← v
 
 Lista bracket access is **plain**, not nullable: it returns the bare element
 `T` and traps on out-of-bounds. This differs from `tensor`, whose bracket read
-is `accipe` sugar and returns `T ∪ ว่าง`. For nullable list access, use
-`xs.accipe(i) → T ∪ ว่าง` with `หรือว่าง`.
+is `accipe` sugar and returns `T ∪ nihil`. For nullable list access, use
+`xs.accipe(i) → T ∪ nihil` with `หรือว่าง`.
 
 For `tensor<T, Figura>`, bracket indexing is sugar over the tensor intrinsic
 surface:
@@ -2020,7 +2022,7 @@ grid[[r, c]]
 grid[[r, c]] ← v
 ```
 
-Reads return `T ∪ ว่าง`, matching `accipe`; use `หรือว่าง` or another ordinary
+Reads return `T ∪ nihil`, matching `accipe`; use `หรือว่าง` or another ordinary
 option-handling form before arithmetic. Rank-1 tensors accept scalar integer
 indices that fit the tensor `i64` runtime boundary (`u64` is rejected).
 Rank-N tensors use a list-shaped index expression such as `[[r, c]]` or a
@@ -2096,8 +2098,8 @@ call arguments. Copy-with-changes is planned as `Genus { … } ออก source`
 `ตรงแรก(source, ที่ซึ่ง binder { predicate })` is the dedicated first-match
 selection expression over a statically bounded source: the predicate is
 evaluated for every candidate lane (total evaluation, no early exit), the
-first live match is selected, and a no-match or empty source yields `ว่าง`
-(the result type is `T ∪ ว่าง`). The `ที่ซึ่ง` predicate tail is owned by this
+first live match is selected, and a no-match or empty source yields `nihil`
+(the result type is `T ∪ nihil`). The `ที่ซึ่ง` predicate tail is owned by this
 head and never shares the reduce/scan `คงที่`/`แปร` binder tail.
 `ตรงแรก` claims only the expression-head position immediately followed
 by `(`; elsewhere the spelling stays an ordinary identifier. An optional
@@ -2232,13 +2234,13 @@ ordinary postfix `conversio` materializes the resulting conversation handle.
 - `sermo ↦ T` materializes inbound frames into one value of type `T` using
   the type-directed collector for `T`.
 - **`sermo<O, R>` (D6.11, D6.12).** A conversation carries its types: `O` is
-  what the caller sends (the opener; `ว่าง` when the call sends none) and
+  what the caller sends (the opener; `nihil` when the call sends none) and
   `R` is each item frame back. `sermo` (en `channel`) takes zero or exactly
   two type arguments — bare `sermo` means `sermo<valor, valor>`, the same
   rule as bare `numerus` meaning `numerus<i64>` (any other argument count is
   `sermo_arity`). For a route served by a Faber `@ ถึง` handler visible to the
   caller's module (its own handlers plus its imports), the compiler fills
-  `O`/`R` from that handler's own signature — its one parameter (or `ว่าง`)
+  `O`/`R` from that handler's own signature — its one parameter (or `nihil`)
   and its item type; every other route (a host route, or a handler outside
   that visibility) keeps bare `sermo`. `s.tuus<T>()`, `s.meus<T>()`, and
   postfix `↦ T` are checked against, or infer, `O`/`R`. `sermo<O, R>` assigns
@@ -2383,5 +2385,5 @@ outside the checker is foreign code, written outside Faber.
 1. **Type-first parameters**: `ฟังก์ชัน f(numerus x)` NOT `ฟังก์ชัน f(x: numerus)`
 2. **Type-first declarations**: `คงที่ textus name` NOT `คงที่ name: textus`
 3. **Iteration loops**: `วน ออก/จาก collection คงที่/แปร item { }` or `วน ช่วง range คงที่/แปร item { }` (verb-first, source, then binding)
-4. **Parentheses around conditions are valid but not idiomatic**: prefer `ถ้า x ≻ 0 { }` or `ถ้า flag เป็น จริง { }` over `ถ้า (x ≻ 0) { }`
+4. **Parentheses around conditions are valid but not idiomatic**: prefer `ถ้า x ≻ 0 { }` or `ถ้า flag ≡ จริง { }` over `ถ้า (x ≻ 0) { }`
 5. **Scribe-family keywords claim statement-initial position only when not followed by `(`** — `บันทึก x` is the output statement; a statement-initial `บันทึก(x)` is a call to the identifier `บันทึก`

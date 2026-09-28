@@ -314,7 +314,7 @@ et_expr ::= equality (('و') equality)*
 # [152] equality
 equality ::= comparison equality_tail*
 # [153] equality_tail
-equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉' | 'هو' | 'ليس' 'هو') comparison
+equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉') comparison | ('هو' | 'ليس' 'هو') type_annotation
 # [154] comparison
 comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | 'ضمن' | 'بين') format_expr)*
 # [155] format_expr
@@ -374,7 +374,7 @@ argument ::= template_argument | 'انشر'? expression
 # [182] template_argument
 template_argument ::= 'انشر'? IDENTIFIER ':' expression
 # [183] literal
-literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'صواب' | 'خطأ' | 'لاشيء' | '∞' | 'nan'
+literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'صواب' | 'خطأ' | 'خال' | '∞' | 'nan'
 # [184] primary
 primary ::= IDENTIFIER | literal | 'ذات' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | summa_expr | capta_expr | '(' expression ')'
 # [185] ad_expr
@@ -808,7 +808,7 @@ productions. It is not a second keyword authority.
 | Control | `إذن` | compact statement-body joint |
 | Params | `مخطئ` | error channel |
 | Testing | `توقع_الفشل` | expect failure |
-| Boolean | `هو` | is / equality |
+| Boolean | `هو` | is / type test |
 | Boolean | `و` | and |
 | Iteration | `من` | for-of / import from |
 | Params | `مخرج` | exit code |
@@ -850,13 +850,13 @@ productions. It is not a second keyword authority.
 | Testing | `قس` | benchmark |
 | Diagnostics | `نبه` | warn |
 | Error | `انهر` | panic |
-| Literals | `لاشيء` | none |
 | Declarations | `اسم` | import binding name |
 | Boolean | `ليس` | not |
 | Literals | `nan` | named NaN literal (`nan` outside the Latin pack) |
 | Diagnostics | `اعرض` | note |
 | Annotation | `نواة` | kernel annotation; kernel closure modifier |
 | JSON | `null` | JSON null |
+| Literals | `خال` | null |
 | Testing | `أهمل` | skip |
 | Params | `جميع` | all / glob |
 | Params | `خيارات` | options modifier |
@@ -1163,7 +1163,7 @@ and resolve through local declarations or imported file-interface exports.
 Resolved applications lower to `HirAnnotation` with `contract_id: Some(DefId)`
 and constant field values. v1 attachment target is `دالة` only; payload
 scalars are `textus`, `numerus`, `fractus`, and `bivalens` (optional via
-`اختياري` or `T ∪ لاشيء`). Web, HTTP, controller, and framework route families
+`اختياري` or `T ∪ nihil`). Web, HTTP, controller, and framework route families
 are not compiler-owned; they are built as libraries, from annotation contracts
 or on top of `@ اتصل`. The one exception is `@ اتصل` itself: it is the
 compiler-owned serving half of `اتصل` (see Capability Calls).
@@ -1175,8 +1175,8 @@ run time. An annotation that changes compilation is compiler-owned (`@ json`,
 
 **JSON genera:** `@ json` on a `صنف` is a compiler-owned data-model contract,
 not a generic annotation schema. Fields must be JSON-safe (`textus`, `ascii`,
-`numerus`, `fractus`, `bivalens`, `instans`, `لاشيء`, `lista<T>`,
-`tabula<textus, T>`, nullable `T ∪ لاشيء`, or another `@ json صنف`). Field
+`numerus`, `fractus`, `bivalens`, `instans`, `nihil`, `lista<T>`,
+`tabula<textus, T>`, nullable `T ∪ nihil`, or another `@ json صنف`). Field
 metadata `@ json { اسم = "wire_name" }` changes the emitted object key used by
 `value ↦ valor`, `value ↦ json`, and `json ↦ Genus`; JSON text remains a Norma
 wire operation such as `json.pange(value ↦ json)`.
@@ -1228,7 +1228,7 @@ wire operation such as `json.pange(value ↦ json)`.
   and rejected with a migration diagnostic.
 - `صنف` members are public by default (D5.2). `@ privata` on a member restricts it to the type's own methods: only code inside the type's own function bodies may read, write, or call it (D5.3); `@ interna` restricts it to code in the declaring package. A construction literal may still set a private field, from any file, and `Genus { … } من p` copies it unchanged (D5.4). Reading, writing, or calling an inaccessible member from outside its allowed scope is `SEM063` (`member_private_read`/`_write`/`_call`, or `member_interna_read`/`_write`/`_call`); `@ عام` on a member is a redundant-annotation warning `WARN028` (`redundant_member_publica`), an error when warnings are denied.
 - A type may refer to itself: `تمايز Expr { Adde { Expr sinister, Expr dexter } }`
-  and `صنف Nodus { Nodus ∪ لاشيء next }` need no keyword and no box type.
+  and `صنف Nodus { Nodus ∪ nihil next }` need no keyword and no box type.
   Values have reference semantics, so the indirection is implied; a backend
   that stores fields inline inserts it on the fields that close a type cycle.
 
@@ -1298,7 +1298,7 @@ when every constituent has it but the declared types disagree, it is
 `مخطط Name { عمود T name … }` declares an application-owned relational
 heading for database results. It names only the columns the application reads;
 extra source columns stay invisible. Each `عمود` row takes a type (use
-`T ∪ لاشيء` for a nullable column) and a name, with an optional
+`T ∪ nihil` for a nullable column) and a name, with an optional
 `: sourceName` alias mapping the public column to a source column (absent means
 identity). Column rows are a declaration block (no commas). A schema has no
 methods (`schema_method`), no `حقق`
@@ -1395,17 +1395,17 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 - Labels are erased from type identity: `توبل<gx: A, B> ≡ توبل<A, B>` for assignment, `≡`/`↦`, unify, and every emitter.
 - Bracket index on a tuple requires a literal integer (`i[0]`); every element is reachable by position, labeled or not. Non-literal index expressions stay rejected. Positions are brackets only — no `.0`.
 - Member-by-label (`i.gx`) requires that label to be present on the receiver's `توبل` annotation.
-- `توبل` element slots admit `_` (monomorphic hole, solved element-wise from the single position witness) and reject `∪`. A wanted union element is declared with binary cup (`توبل<f32, textus ∪ لاشيء>`). `lista<∪>` / `tabula<K, ∪>` keep heterogeneous-union behavior. Labels compose with holes (`توبل<loss: _, T>`).
+- `توبل` element slots admit `_` (monomorphic hole, solved element-wise from the single position witness) and reject `∪`. A wanted union element is declared with binary cup (`توبل<f32, textus ∪ nihil>`). `lista<∪>` / `tabula<K, ∪>` keep heterogeneous-union behavior. Labels compose with holes (`توبل<loss: _, T>`).
 - `ratio` type arguments require a label for every element, labels are unique, `_` is admitted as a monomorphic element hole, and `∪` is rejected in an element slot. A `ratio` has no positional or bracket access, and it has no structural equivalence with another ratio or a genus; fields are accessed by label only.
 - Arrays are written `lista<T>` (unbounded, shipped). Postfix `T[]` is not accepted. `lista<T, N>` is the shipped bounded form; see Generic Collections.
 - `عن`/`في` mark ownership (borrow/mut-borrow) on the immediately following union member. Parenthesize when grouping must be explicit.
 - Two hole kinds share the `holeType` production. `_` is the monomorphic hole ("infer exactly one inhabitant type"); the standalone `∪` is the union hole ("infer a finite multi-member union"). Both are legal wherever a base type is: bindings, returns, params, fields, and type arguments (`lista<∪>`, `tabula<K, ∪>`, `→ ∪`).
 - **Lone-`∪` rule:** a `∪` hole consumes the whole type expression — any following `∪` is a parse error (`A ∪ ∪`, `∪ B` rejected, issue `unexpected_cup_after_union_hole`). `_` keeps today's behavior and may still appear as a binary-cup member (`_ ∪ B`).
-- **Binary-cup disambiguation:** `∪` between two non-hole types remains the inline value-union operator (`A ∪ B`, nullable `T ∪ لاشيء`); the hole reading applies only when `∪` stands alone in a base-type position.
-- Inline union `T ∪ U` (cup) for ad-hoc value unions; `T ∪ لاشيء` is the canonical nullable type form (lowers to Option<T>).
+- **Binary-cup disambiguation:** `∪` between two non-hole types remains the inline value-union operator (`A ∪ B`, nullable `T ∪ nihil`); the hole reading applies only when `∪` stands alone in a base-type position.
+- Inline union `T ∪ U` (cup) for ad-hoc value unions; `T ∪ nihil` is the canonical nullable type form (lowers to Option<T>).
 - Inline intersection `T ∩ U` (cap) is the nominal type intersection: `type Reversible = Readable ∩ Seekable` names the conjunction, and the implements clause accepts `∩` as the same separator as the comma (`class A implements Readable ∩ Seekable` ≡ the comma list). `∩` binds tighter than `∪` (`A ∩ B ∪ C` is `(A ∩ B) ∪ C`); nested intersections flatten like unions. Intersection operands are nominal-only (interfaces/structs; aliases resolve through) — primitive operands are rejected at lowering. Implements slots admit `∩` only: `∪` or a hole in an implements position is a parse error (disjunctive conformance is not a checkable contract).
 - Signature clauses stay explicit: `_` and a standalone `∪` are rejected in return (`→ _`) and error-channel (`⇥ _`) positions; both holes stay legal in local binding slots (`const _ v`, `const ∪ v`).
-- Unions are parsed as a flat member list; duplicates and `لاشيء`-only cases are diagnosed in semantic lowering.
+- Unions are parsed as a flat member list; duplicates and `nihil`-only cases are diagnosed in semantic lowering.
 - `اختياري` is a declaration marker (post-name on params/fields), never a prefix on types.
 - Qualified type paths such as `terminus.Terminus` name a type through an
   imported namespace binding. The prefix must resolve to a namespace; the final
@@ -1436,7 +1436,7 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | `saturatus<W>` | en `saturating<W>`; saturating integer; arithmetic clamps at both ends of W |
 | `fractus`  | float (default `f64`) |
 | `bivalens` | boolean |
-| `لاشيء`    | null |
+| `nihil`    | null |
 | `vacuum`   | void |
 | `numquam`  | never |
 | `ignotum`  | unknown |
@@ -1541,7 +1541,7 @@ Construct multi-dimensional tensors via `crea` / `structa` / `↦`.
 
 Tensor index/shape intrinsic slots (`accipe`, `ponde`, `forma`, `crea`, `structa`) accept integer lists that fit the canonical `lista<numerus>` / `&[i64]` runtime boundary at call sites (e.g. `lista<u32>` for GPU thread ids; not `lista<u64>`). This is a structural exception scoped to those slots — it does not widen the signed↔unsigned numeric lattice (see Index vector parameter policy in `tensor-intrinsics.md`).
 
-Value unions use inline `T ∪ U` (nullable: `T ∪ لاشيء`). The standalone `∪` hole infers a multi-member union; `_` infers a single inhabitant (see `docs/design/type-hole-union.md`). Tagged unions use `تمايز`.
+Value unions use inline `T ∪ U` (nullable: `T ∪ nihil`). The standalone `∪` hole infers a multi-member union; `_` infers a single inhabitant (see `docs/design/type-hole-union.md`). Tagged unions use `تمايز`.
 `copia.unio()` is a set method, not a type constructor.
 
 ### Type Sugar
@@ -1741,16 +1741,18 @@ rewritten to `←` or `↦`. Typed `ثابت`/`متغير` initializers accept `
 (convert to the written type, then initialize); `ثابت _`, `ليكن`, and untyped
 destructuring have no concrete destination and are rejected.
 
-`هو` and `ليس هو` inspect an existing value; they never convert it. Core type
-spellings on the right perform runtime variant/type tests, while `لاشيء`,
-`صواب`, `خطأ`, and ordinary value expressions use the value-test path. Radix
-currently recognizes type targets through a fixed core-type vocabulary. Extending
-that recognition to arbitrary declared types is a separate language decision.
+`هو` and `ليس هو` are a **type test**: the right-hand side is always a type —
+including a declared or imported one — and the result is a runtime variant/type
+test on the value. They never convert and never compare values; a value spelling
+on the right is rejected in the reader's own words (`SEM011:est_value_rhs`),
+pointing at the equality family. The null type is the one type spelling that also
+names a literal slot: `x هو nihil` tests the null *type*, while the null *value*
+is `خال` (`null` in the English reader).
 Use `≡` / `≠` (or `≢`) for structural value equality, `≅` / `≇` for promoted exact equality (same value after numeric widths join), `≈` / `≉` for fuzzy equality (tolerance match with Python-isclose defaults: rel_tol 1e-09, abs_tol 0.0), and `↦` for runtime conversion.
 
-Retired predicate keywords are not prefix unary syntax. Use `expr هو صواب`,
-`expr هو خطأ`, `expr هو لاشيء`, `expr ليس هو لاشيء`, `expr ≺ 0`, or
-`expr ≻ 0`.
+Retired predicate keywords are not prefix unary syntax. Use `expr ≡ صواب`,
+`expr ≡ خطأ`, `expr ≡ خال`, `expr هو nihil` (the null *type* test),
+`expr ≺ 0`, or `expr ≻ 0`.
 
 The legacy ASCII spellings `<` and `>` are not productions of this grammar — both remain generic delimiters — though the shipped parser still accepts them as comparisons during the glyph migration; prefer the canonical `≺` and `≻`.
 
@@ -2003,8 +2005,8 @@ xs[i] ← v
 
 Lista bracket access is **plain**, not nullable: it returns the bare element
 `T` and traps on out-of-bounds. This differs from `tensor`, whose bracket read
-is `accipe` sugar and returns `T ∪ لاشيء`. For nullable list access, use
-`xs.accipe(i) → T ∪ لاشيء` with `عوض`.
+is `accipe` sugar and returns `T ∪ nihil`. For nullable list access, use
+`xs.accipe(i) → T ∪ nihil` with `عوض`.
 
 For `tensor<T, Figura>`, bracket indexing is sugar over the tensor intrinsic
 surface:
@@ -2020,7 +2022,7 @@ grid[[r, c]]
 grid[[r, c]] ← v
 ```
 
-Reads return `T ∪ لاشيء`, matching `accipe`; use `عوض` or another ordinary
+Reads return `T ∪ nihil`, matching `accipe`; use `عوض` or another ordinary
 option-handling form before arithmetic. Rank-1 tensors accept scalar integer
 indices that fit the tensor `i64` runtime boundary (`u64` is rejected).
 Rank-N tensors use a list-shaped index expression such as `[[r, c]]` or a
@@ -2096,8 +2098,8 @@ call arguments. Copy-with-changes is planned as `Genus { … } من source`.
 `أول_مطابقة(source, حيث binder { predicate })` is the dedicated first-match
 selection expression over a statically bounded source: the predicate is
 evaluated for every candidate lane (total evaluation, no early exit), the
-first live match is selected, and a no-match or empty source yields `لاشيء`
-(the result type is `T ∪ لاشيء`). The `حيث` predicate tail is owned by this
+first live match is selected, and a no-match or empty source yields `nihil`
+(the result type is `T ∪ nihil`). The `حيث` predicate tail is owned by this
 head and never shares the reduce/scan `ثابت`/`متغير` binder tail.
 `أول_مطابقة` claims only the expression-head position immediately followed
 by `(`; elsewhere the spelling stays an ordinary identifier. An optional
@@ -2232,13 +2234,13 @@ ordinary postfix `conversio` materializes the resulting conversation handle.
 - `sermo ↦ T` materializes inbound frames into one value of type `T` using
   the type-directed collector for `T`.
 - **`sermo<O, R>` (D6.11, D6.12).** A conversation carries its types: `O` is
-  what the caller sends (the opener; `لاشيء` when the call sends none) and
+  what the caller sends (the opener; `nihil` when the call sends none) and
   `R` is each item frame back. `sermo` (en `channel`) takes zero or exactly
   two type arguments — bare `sermo` means `sermo<valor, valor>`, the same
   rule as bare `numerus` meaning `numerus<i64>` (any other argument count is
   `sermo_arity`). For a route served by a Faber `@ اتصل` handler visible to the
   caller's module (its own handlers plus its imports), the compiler fills
-  `O`/`R` from that handler's own signature — its one parameter (or `لاشيء`)
+  `O`/`R` from that handler's own signature — its one parameter (or `nihil`)
   and its item type; every other route (a host route, or a handler outside
   that visibility) keeps bare `sermo`. `s.tuus<T>()`, `s.meus<T>()`, and
   postfix `↦ T` are checked against, or infer, `O`/`R`. `sermo<O, R>` assigns
@@ -2383,5 +2385,5 @@ outside the checker is foreign code, written outside Faber.
 1. **Type-first parameters**: `دالة f(numerus x)` NOT `دالة f(x: numerus)`
 2. **Type-first declarations**: `ثابت textus name` NOT `ثابت name: textus`
 3. **Iteration loops**: `كرر من/عن collection ثابت/متغير item { }` or `كرر نطاق range ثابت/متغير item { }` (verb-first, source, then binding)
-4. **Parentheses around conditions are valid but not idiomatic**: prefer `إذا x ≻ 0 { }` or `إذا flag هو صواب { }` over `إذا (x ≻ 0) { }`
+4. **Parentheses around conditions are valid but not idiomatic**: prefer `إذا x ≻ 0 { }` or `إذا flag ≡ صواب { }` over `إذا (x ≻ 0) { }`
 5. **Scribe-family keywords claim statement-initial position only when not followed by `(`** — `اعرض x` is the output statement; a statement-initial `اعرض(x)` is a call to the identifier `اعرض`

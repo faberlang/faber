@@ -314,7 +314,7 @@ et_expr ::= equality (('et') equality)*
 # [152] equality
 equality ::= comparison equality_tail*
 # [153] equality_tail
-equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉' | 'est' | 'non' 'est') comparison
+equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉') comparison | ('est' | 'non' 'est') type_annotation
 # [154] comparison
 comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | 'intra' | 'inter') format_expr)*
 # [155] format_expr
@@ -374,7 +374,7 @@ argument ::= template_argument | 'sparge'? expression
 # [182] template_argument
 template_argument ::= 'sparge'? IDENTIFIER ':' expression
 # [183] literal
-literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'verum' | 'falsum' | 'nihil' | '∞' | 'nonnumerus'
+literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'verum' | 'falsum' | 'nulla' | '∞' | 'nonnumerus'
 # [184] primary
 primary ::= IDENTIFIER | literal | 'ego' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | summa_expr | capta_expr | '(' expression ')'
 # [185] ad_expr
@@ -808,7 +808,7 @@ productions. It is not a second keyword authority.
 | Control | `ergo` | compact statement-body joint |
 | Params | `errata` | error channel |
 | Testing | `erratur` | expect failure |
-| Boolean | `est` | is / equality |
+| Boolean | `est` | is / type test |
 | Boolean | `et` | and |
 | Iteration | `ex` | for-of / import from |
 | Params | `exitus` | exit code |
@@ -850,13 +850,13 @@ productions. It is not a second keyword authority.
 | Testing | `metior` | benchmark |
 | Diagnostics | `mone` | warn |
 | Error | `mori` | panic |
-| Literals | `nihil` | none |
 | Declarations | `nomen` | import binding name |
 | Boolean | `non` | not |
 | Literals | `nonnumerus` | named NaN literal (`nan` outside the Latin pack) |
 | Diagnostics | `nota` | note |
 | Annotation | `nucleum` | kernel annotation; kernel closure modifier |
 | JSON | `null` | JSON null |
+| Literals | `nulla` | null |
 | Testing | `omitte` | skip |
 | Params | `omnia` | all / glob |
 | Params | `optiones` | options modifier |
@@ -1741,16 +1741,18 @@ rewritten to `←` or `↦`. Typed `fixum`/`varia` initializers accept `↤`
 (convert to the written type, then initialize); `fixum _`, `sit`, and untyped
 destructuring have no concrete destination and are rejected.
 
-`est` and `non est` inspect an existing value; they never convert it. Core type
-spellings on the right perform runtime variant/type tests, while `nihil`,
-`verum`, `falsum`, and ordinary value expressions use the value-test path. Radix
-currently recognizes type targets through a fixed core-type vocabulary. Extending
-that recognition to arbitrary declared types is a separate language decision.
+`est` and `non est` are a **type test**: the right-hand side is always a type —
+including a declared or imported one — and the result is a runtime variant/type
+test on the value. They never convert and never compare values; a value spelling
+on the right is rejected in the reader's own words (`SEM011:est_value_rhs`),
+pointing at the equality family. The null type is the one type spelling that also
+names a literal slot: `x est nihil` tests the null *type*, while the null *value*
+is `nulla` (`null` in the English reader).
 Use `≡` / `≠` (or `≢`) for structural value equality, `≅` / `≇` for promoted exact equality (same value after numeric widths join), `≈` / `≉` for fuzzy equality (tolerance match with Python-isclose defaults: rel_tol 1e-09, abs_tol 0.0), and `↦` for runtime conversion.
 
-Retired predicate keywords are not prefix unary syntax. Use `expr est verum`,
-`expr est falsum`, `expr est nihil`, `expr non est nihil`, `expr ≺ 0`, or
-`expr ≻ 0`.
+Retired predicate keywords are not prefix unary syntax. Use `expr ≡ verum`,
+`expr ≡ falsum`, `expr ≡ nulla`, `expr est nihil` (the null *type* test),
+`expr ≺ 0`, or `expr ≻ 0`.
 
 The legacy ASCII spellings `<` and `>` are not productions of this grammar — both remain generic delimiters — though the shipped parser still accepts them as comparisons during the glyph migration; prefer the canonical `≺` and `≻`.
 
@@ -2383,5 +2385,5 @@ outside the checker is foreign code, written outside Faber.
 1. **Type-first parameters**: `functio f(numerus x)` NOT `functio f(x: numerus)`
 2. **Type-first declarations**: `fixum textus name` NOT `fixum name: textus`
 3. **Iteration loops**: `itera ex/de collection fixum/varia item { }` or `itera ab range fixum/varia item { }` (verb-first, source, then binding)
-4. **Parentheses around conditions are valid but not idiomatic**: prefer `si x ≻ 0 { }` or `si flag est verum { }` over `si (x ≻ 0) { }`
+4. **Parentheses around conditions are valid but not idiomatic**: prefer `si x ≻ 0 { }` or `si flag ≡ verum { }` over `si (x ≻ 0) { }`
 5. **Scribe-family keywords claim statement-initial position only when not followed by `(`** — `nota x` is the output statement; a statement-initial `nota(x)` is a call to the identifier `nota`
