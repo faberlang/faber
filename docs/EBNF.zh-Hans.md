@@ -6,7 +6,7 @@ snake_case spine and their anchors are derived from those IDs.
 
 ## Grammar {#grammar}
 
-The grammar below is the identity rendering of the validated source. Normative detail is kept in this English sidecar and rendered as documentation; the source remains the syntax authority.
+The grammar below is the identity rendering of the validated source. Normative detail is kept in `prose.en.md` beside this file and rendered as documentation; the source remains the syntax authority.
 
 ```ebnf
 # [001] fab_file
