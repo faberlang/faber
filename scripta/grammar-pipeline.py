@@ -717,6 +717,31 @@ def default_sidecar_path() -> Path:
     return default_source_path().with_name("sidecar.en.toml")
 
 
+def prose_path_for(source_path: Path) -> Path:
+    """The normative prose input, a sibling Markdown file of `source.fg`.
+
+    The render inputs are three files, not two: the grammar (`source.fg`), the
+    structured sidecar (intro + render flags), and the prose. The prose lives
+    in its own Markdown file because it is a document, not configuration —
+    keeping it inside the TOML meant one 93 KB escaped string that no tool
+    could diff, lint, or spell-check.
+    """
+    return source_path.with_name("prose.en.md")
+
+
+def default_prose_path() -> Path:
+    return prose_path_for(default_source_path())
+
+
+def grammar_inputs(source_path: Path, sidecar_path: Path) -> tuple[str, str, str]:
+    """Read the three render inputs: source, sidecar, prose."""
+    return (
+        source_path.read_text(encoding="utf-8"),
+        sidecar_path.read_text(encoding="utf-8"),
+        prose_path_for(source_path).read_text(encoding="utf-8"),
+    )
+
+
 def default_jsonl_path() -> Path:
     return default_source_path().with_name("grammar.jsonl")
 
@@ -808,10 +833,11 @@ def canonical_source_grammar(source_text: str, source_path: Path) -> Grammar:
 
 
 def jsonl_records(
-    source_text: str, source_path: Path, sidecar_text: str
+    source_text: str, source_path: Path, sidecar_text: str, prose_text: str
 ) -> list[dict[str, object]]:
     grammar = canonical_source_grammar(source_text, source_path)
     sidecar_hash = "sha256:" + hashlib.sha256(sidecar_text.encode("utf-8")).hexdigest()
+    prose_hash = "sha256:" + hashlib.sha256(prose_text.encode("utf-8")).hexdigest()
     keyword_counts = keyword_literals(grammar)
     records: list[dict[str, object]] = []
     for production in grammar.productions:
@@ -830,6 +856,7 @@ def jsonl_records(
                 if literal in keyword_counts
             ),
             "sidecar": sidecar_hash,
+            "prose": prose_hash,
         }
         records.append(record)
     return records
@@ -1170,7 +1197,7 @@ def dumps_glossary(locale: str, mapping: dict[str, str]) -> str:
 
 
 def render_identity(
-    source_text: str, source_path: Path, sidecar_text: str
+    source_text: str, source_path: Path, sidecar_text: str, prose_text: str
 ) -> str:
     grammar = canonical_source_grammar(source_text, source_path)
     sidecar = tomllib.loads(sidecar_text)
@@ -1178,7 +1205,7 @@ def render_identity(
     if not isinstance(document, dict):
         document = {}
     intro = str(document.get("intro", ""))
-    prose = str(document.get("prose_markdown", "")).strip()
+    prose = prose_text.strip()
     lexicon = source_lexicon_rows(source_text)
     keywords = source_keyword_rows(source_text, grammar)
     comma_rows = comma_variance_rows(source_text, path=display_path(source_path))
@@ -1256,7 +1283,7 @@ def render_identity(
     if prose:
         lines.extend(prose.splitlines())
     else:
-        lines.append("Normative details are maintained in `docs/grammar/sidecar.en.toml`.")
+        lines.append("Normative details are maintained in `docs/grammar/prose.en.md`.")
     lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -1264,11 +1291,12 @@ def render_identity(
 def generated_artifacts(
     source_path: Path, sidecar_path: Path
 ) -> tuple[str, str]:
-    source_text = source_path.read_text(encoding="utf-8")
-    sidecar_text = sidecar_path.read_text(encoding="utf-8")
+    source_text, sidecar_text, prose_text = grammar_inputs(source_path, sidecar_path)
     return (
-        render_identity(source_text, source_path, sidecar_text),
-        dumps_jsonl(jsonl_records(source_text, source_path, sidecar_text)),
+        render_identity(source_text, source_path, sidecar_text, prose_text),
+        dumps_jsonl(
+            jsonl_records(source_text, source_path, sidecar_text, prose_text)
+        ),
     )
 
 
@@ -1301,9 +1329,8 @@ def check_locales(
     ebnf_path: Path,
     glossary_dir: Path | None = None,
 ) -> tuple[bool, dict[str, object]]:
-    source_text = source_path.read_text(encoding="utf-8")
-    sidecar_text = sidecar_path.read_text(encoding="utf-8")
-    identity = render_identity(source_text, source_path, sidecar_text)
+    source_text, sidecar_text, prose_text = grammar_inputs(source_path, sidecar_path)
+    identity = render_identity(source_text, source_path, sidecar_text, prose_text)
     keys = keyword_spine(source_text, source_path)
     mismatches: list[str] = []
     errors: list[str] = []
@@ -1366,9 +1393,8 @@ def render_locale_file(
     output: Path | None = None,
     glossary_path: Path | None = None,
 ) -> tuple[str, Path]:
-    source_text = source_path.read_text(encoding="utf-8")
-    sidecar_text = sidecar_path.read_text(encoding="utf-8")
-    identity = render_identity(source_text, source_path, sidecar_text)
+    source_text, sidecar_text, prose_text = grammar_inputs(source_path, sidecar_path)
+    identity = render_identity(source_text, source_path, sidecar_text, prose_text)
     keys = keyword_spine(source_text, source_path)
     glossary_file = glossary_path or default_glossary_path(locale)
     glossary = load_glossary(glossary_file, spine=keys)
@@ -1440,7 +1466,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--sidecar",
         type=Path,
         default=None,
-        help="sidecar.en.toml path for renderer modes",
+        help=(
+            "sidecar.en.toml path for renderer modes (the normative prose is read "
+            "from prose.en.md beside --source)"
+        ),
     )
     parser.add_argument(
         "--jsonl",
