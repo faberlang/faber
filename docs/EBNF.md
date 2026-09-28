@@ -1,8 +1,9 @@
 # Faber Language Specification
 
-This file is generated from `docs/grammar/source.fg`; hand edits fail the
-stage-1 normative-triple gate. Production IDs are the grammar's stable
-snake_case spine and their anchors are derived from those IDs.
+This file is generated from `docs/grammar/source.fg`, its `sidecar.en.toml`
+and its `prose.en.md`; hand edits fail the stage-1 normative-triple gate.
+Production IDs are the grammar's stable snake_case spine and their
+anchors are derived from those IDs.
 
 ## Grammar {#grammar}
 
