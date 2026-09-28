@@ -729,10 +729,6 @@ def prose_path_for(source_path: Path) -> Path:
     return source_path.with_name("prose.en.md")
 
 
-def default_prose_path() -> Path:
-    return prose_path_for(default_source_path())
-
-
 def grammar_inputs(source_path: Path, sidecar_path: Path) -> tuple[str, str, str]:
     """Read the three render inputs: source, sidecar, prose."""
     return (
