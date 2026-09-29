@@ -26,9 +26,9 @@ locale = "la"
 # =============================================================================
 
 # BACKEND:
-#   Lazy on the MIR runner, TypeScript, and Go (range-over-func iterator).
-#   Rust still collects the stream eagerly (the D6.6 stopgap), so the endless
-#   doubling overflows there.
+#   Lazy on the MIR runner, TypeScript, Go (range-over-func iterator) and
+#   Rust (`itera ex` over a same-module generator resumes an async-block
+#   state machine per step).
 
 functio potentiae() fiunt → numerus {
     varia numerus n ← 1
