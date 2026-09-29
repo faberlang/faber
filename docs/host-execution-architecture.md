@@ -5,6 +5,32 @@
 **Authority**: cross-repository ownership contract for Faber libraries, Radix,
 and platform/browser hosts
 
+> **Superseded in part — 2026-09-29.** The private Radix campaign
+> `radix/docs/factory/gpu-reset/CAMPAIGN.md` amends this document in three
+> places. Where they disagree, the campaign rulings win:
+>
+> 1. **The executor is an in-process runtime layer, not a separate Hosts
+>    repository or child process.** The ownership role in this document stands:
+>    the executor performs physical effects and never library semantics. The
+>    `hosts` repository is being retired into small crates inside the Faber
+>    product repository.
+> 2. **The running host Faber program is the launch graph.** Radix still emits
+>    each kernel artifact plus its per-dispatch facts (bindings, geometry,
+>    extents). The sequence of dispatches comes from the program as the MIR
+>    runner executes it, not from a precompiled whole-program descriptor. A
+>    captured or precompiled graph may return later as an optimization.
+> 3. **Protocol leaf exception.** A native effect leaf may wrap a standard
+>    protocol that platforms ship natively (TLS, HTTP, WebSocket).
+>    Library-specific composite behavior (Norma, Gradus, Triga, Tela semantics)
+>    remains forbidden in the executor.
+>
+> Everything else here remains the design direction: library ownership of
+> semantics, the forbidden-behavior list, kernels authored in Faber, the
+> logical/virtual/physical device model, and resident-session rules. Delivery
+> links and performance-proof sections are obsolete. A consolidated
+> replacement will be written into the top-level `ARCHITECTURE.md` during
+> gpu-reset Stage S1.
+
 This document defines the boundary between portable library behavior and the
 platform products that execute compiled Faber artifacts. It applies to every
 library, not only Gradus or GPU inference.
