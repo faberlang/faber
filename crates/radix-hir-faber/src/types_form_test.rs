@@ -870,6 +870,7 @@ fn generate_local_hole_uses_authored_form_without_legacy_flags() {
         mutable: false,
         is_await: false,
         runtime_provided: false,
+        await_store: None,
     };
     let hir = HirModule {
         items: Vec::new(),

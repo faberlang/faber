@@ -370,6 +370,7 @@ impl Lowerer<'_> {
                 mutable: false,
                 is_await,
                 runtime_provided: false,
+                await_store: None,
             }),
             span,
         };
@@ -413,6 +414,7 @@ impl Lowerer<'_> {
                 mutable,
                 is_await: false,
                 runtime_provided: false,
+                await_store: None,
             }),
             span,
         }
@@ -627,6 +629,7 @@ impl Lowerer<'_> {
                 mutable: stmt.mutability == radix_syntax::AstMutability::Mutable,
                 is_await: false,
                 runtime_provided: false,
+                await_store: None,
             };
             out.push(HirStatement {
                 id: self.next_hir_id(),
@@ -646,6 +649,7 @@ impl Lowerer<'_> {
                 mutable: stmt.mutability == radix_syntax::AstMutability::Mutable,
                 is_await: false,
                 runtime_provided: false,
+                await_store: None,
             };
             out.push(HirStatement {
                 id: self.next_hir_id(),
@@ -699,6 +703,7 @@ impl Lowerer<'_> {
                     mutable: decl.mutability == radix_syntax::AstMutability::Mutable,
                     is_await: decl.is_await(),
                     runtime_provided: false,
+                    await_store: None,
                 })
             }
             radix_syntax::BindingPattern::Wildcard(span) => {
@@ -1229,6 +1234,7 @@ impl Lowerer<'_> {
                         mutable: false,
                         is_await: false,
                         runtime_provided: true,
+                        await_store: None,
                     }),
                     span,
                 },

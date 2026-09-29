@@ -46,6 +46,10 @@ pub mod ts;
 mod coherence_test;
 
 #[cfg(test)]
+#[path = "await_store_emit_test.rs"]
+mod await_store_emit_test;
+
+#[cfg(test)]
 #[path = "indexed_apud_emit_test.rs"]
 mod indexed_apud_emit_test;
 

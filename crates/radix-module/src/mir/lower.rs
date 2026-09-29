@@ -2086,6 +2086,8 @@ impl<'a> FunctionBuilder<'a> {
                     span,
                     init,
                 )?;
+            } else if local.await_store.is_some() {
+                self.lower_await_store(init, MirPlace::local(id), mir_ty, span)?;
             } else if copy_bind {
                 // `copy` bind (D-6): deep-duplicate the initializer; the
                 // source stays live and shares nothing with the binding.
@@ -2143,6 +2145,8 @@ impl<'a> FunctionBuilder<'a> {
                     span,
                     init,
                 )?;
+            } else if local.await_store.is_some() {
+                self.lower_await_store(init, staging_place.clone(), mir_ty, span)?;
             } else {
                 self.lower_expr_to_destination(init, staging_place.clone(), mir_ty)?;
             }
@@ -2295,7 +2299,7 @@ impl<'a> FunctionBuilder<'a> {
         span: Span,
         expr: &HirExpression,
     ) -> Option<()> {
-        let converted = self.lower_conversio(source, ty.semantic_id(), &[], recovery, expr)?;
+        let converted = self.lower_conversio(source, ty.semantic_id(), &[], recovery, false, expr)?;
         self.assign(destination, converted, ty, span);
         Some(())
     }
@@ -2666,6 +2670,9 @@ impl<'a> FunctionBuilder<'a> {
         if op.is_glyph_product() {
             return self.lower_glyph_product(op, lhs, rhs, expr);
         }
+        if op == HirBinOp::TrueDiv {
+            return self.lower_true_division(lhs, rhs, expr);
+        }
         // Numeric tensor/vector/matrix `+`/`-` take the live `addita`/`subtrahe`
         // method paths (`TensorAdd` / `TensorSub`), never primitive scalar ops.
         if matches!(op, HirBinOp::Add | HirBinOp::Sub) && self.is_addita_plus_operands(lhs, rhs) {
@@ -2734,6 +2741,61 @@ impl<'a> FunctionBuilder<'a> {
         let ty = self.expr_ty(expr)?;
 
         Some(self.assign_temp(MirValueKind::Binary { op: mir_op, lhs, rhs }, ty, expr.span))
+    }
+
+    /// `÷` (d11-6 ruling 15): integer operands convert to `f64` and divide;
+    /// float and decimal operands lower exactly like `/`. An integer zero
+    /// divisor traps (ruling 19c) through a discarded integer `1 / divisor`,
+    /// which fails with the runtime's standard division error.
+    fn lower_true_division(
+        &mut self,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let ty = self.expr_ty(expr)?;
+        let lhs_ty = self.expr_ty(lhs)?;
+        let rhs_ty = self.expr_ty(rhs)?;
+        let is_integer = |this: &Self, ty: MirType| {
+            let semantic = this.types.peel_access_marker(ty.semantic_id()).1;
+            matches!(
+                this.normalized_type(semantic),
+                Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _)
+            ) && !matches!(
+                this.normalized_type(semantic),
+                Type::SizedNumeric(_, width) if width.is_decimal()
+            )
+        };
+        if !(is_integer(self, lhs_ty) && is_integer(self, rhs_ty)) {
+            let (lhs, rhs) = self.lower_decimal_join_operands(lhs, rhs)?;
+            return Some(self.assign_temp(MirValueKind::Binary { op: MirBinOp::Div, lhs, rhs }, ty, expr.span));
+        }
+        let lhs_value = self.lower_expr_value(lhs)?;
+        let rhs_value = self.lower_expr_value(rhs)?;
+        let one = MirOperand::Constant(MirConstant::Int(1));
+        self.binary_temp(MirBinOp::Div, one, rhs_value.clone(), rhs_ty, expr.span);
+        let convert = |this: &mut Self, value: MirOperand, source_ty: MirType| {
+            this.runtime_call_value(
+                MirIntrinsic::Convert(MirConversion {
+                    flavor: MirConversionFlavor::Runtime,
+                    source_ty,
+                    target_ty: ty,
+                    params: Vec::new(),
+                    recovery: None,
+                    struct_defaults: Vec::new(),
+                }),
+                vec![value],
+                ty,
+                expr.span,
+            )
+        };
+        let lhs_float = convert(self, lhs_value, lhs_ty);
+        let rhs_float = convert(self, rhs_value, rhs_ty);
+        Some(self.assign_temp(
+            MirValueKind::Binary { op: MirBinOp::Div, lhs: lhs_float, rhs: rhs_float },
+            ty,
+            expr.span,
+        ))
     }
 
     /// Tuple `≺ ≻ ≤ ≥` (D1.4): lexicographic three-way compare, then the
@@ -3522,6 +3584,8 @@ fn mir_bin_op(op: HirBinOp) -> Option<MirBinOp> {
         // Glyph products are intercepted by `lower_binary` before this point;
         // keep the explicit fail-closed arm for any future caller.
         HirBinOp::Dot | HirBinOp::Cross | HirBinOp::TensorProduct | HirBinOp::Hadamard | HirBinOp::HadamardDiv => None,
+        // `÷` (d11-6 ruling 15) has no MIR primitive yet; fail closed.
+        HirBinOp::TrueDiv => None,
     }
 }
 

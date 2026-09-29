@@ -75,7 +75,7 @@ functio same(instans<ns> fine, instans<ms> coarse) → bivalens {
             name: "signed_unsigned_approx_accepts",
             source: r"
 incipit {
-    fixum numerus<i32> signed ← -1 ∷ numerus<i32>
+    fixum numerus<i32> signed ← -1
     fixum numerus<u8> unsigned ← 255 ∷ numerus<u8>
     adfirma signed ≅ unsigned
 }

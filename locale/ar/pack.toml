@@ -1557,6 +1557,10 @@ help = "اجعل نوع قيمة التهيئة مطابقا للنوع المع
 message = "float constant is not exactly representable"
 help = "write a float literal, or a constant the float type holds exactly"
 
+[diagnostics.SEM010.issues.store_constant_out_of_range]
+message = "constant {value} does not fit {slot}"
+help = "write a value the slot holds"
+
 [diagnostics.SEM010.issues.integer_to_float_requires_conversio]
 message = "integer cannot convert to a float implicitly"
 help = "convert the integer explicitly with `↦`"
@@ -1844,6 +1848,14 @@ help = "استخدم numeric operands لهذا العامل"
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "numeric arithmetic operands يجب أن تكون أنواعها متطابقة؛ استخدم ↦ للتحويل الصريح"
 help = "حول operands صراحة قبل تطبيق هذا العامل العددي"
+
+[diagnostics.SEM011.issues.u64_signed_arithmetic_requires_conversion]
+message = "u64 and a signed integer have no lossless join in arithmetic"
+help = "convert one side with `↦` so both operands are u64 or both are signed"
+
+[diagnostics.SEM011.issues.numeric_family_crossing_requires_conversio]
+message = "integer, decimal and float operands cannot mix implicitly"
+help = "convert one operand explicitly with `↦`; a written constant may stand beside any number"
 
 [diagnostics.SEM011.issues.ascii_literal_invalid_escape]
 message = "{ascii} literal يحتوي escape sequence غير صالح"

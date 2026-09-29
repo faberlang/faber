@@ -152,7 +152,11 @@ incipit {{
 }
 
 #[test]
-fn modular_word_rejects_max_plus_one_literal_per_width() {
+fn modular_word_reduces_max_plus_one_literal_per_width() {
+    // d11-6 U4 (ruling 21, amended): a constant stored with `←` into a
+    // `wrapping` slot follows the slot's policy and reduces. This inverts the
+    // pre-U4 pin `modular_word_literal_out_of_range` for `←` positions; an `=`
+    // position (`generis`) still refuses a constant that does not fit.
     for row in MODULAR_WIDTH_ROWS {
         if row.max_plus_one.is_empty() {
             continue;
@@ -167,7 +171,13 @@ incipit {{
             w = row.width,
             max_plus_one = row.max_plus_one
         );
-        analysis_rejects_with_issue(&source, "modular_word_literal_out_of_range");
+        analysis_accepts(&source);
+        let generis = format!(
+            "generis modulus<{w}> TOO_BIG = {max_plus_one}\nincipit {{\n    nota TOO_BIG\n}}\n",
+            w = row.width,
+            max_plus_one = row.max_plus_one
+        );
+        analysis_rejects_with_issue(&generis, "store_constant_out_of_range");
     }
 }
 

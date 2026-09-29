@@ -2034,6 +2034,7 @@ fn transplant_expr(
             target,
             params,
             recovery,
+            implicit,
         } => {
             // A routed conversion (ordo row, registered `@ conversio`)
             // names definitions of the source analysis; fail closed rather
@@ -2094,12 +2095,19 @@ fn transplant_expr(
                 )?)),
                 None => None,
             };
+            let implicit = implicit.map(|site| radix_module::hir::HirStoreSite {
+                slot: site
+                    .slot
+                    .map(|slot| remap_symbol(slot, source_interner, entry_interner)),
+                ..site
+            });
             HirExpressionKind::Conversio {
                 route: None,
                 source,
                 target,
                 params,
                 recovery,
+                implicit,
             }
         }
         // Const-to-const reference: the initializer names another linked

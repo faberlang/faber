@@ -138,7 +138,7 @@ pub(super) fn check_summa_expr(
     }
 
     check_summa_body(checker, coordinates, filum, binding, body, elem_ty);
-    elem_ty
+    checker.summa_result_type(elem_ty)
 }
 
 /// Literal element-count `K` of a shaped summa source, when every dimension

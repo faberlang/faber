@@ -36,9 +36,11 @@
 //!   facts for bindings they touch before entry; untouched immutable facts may
 //!   enter as loop-invariant knowledge.
 
+use super::store::StoreSite;
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
+use radix_hir::HirStoreKind;
 use radix_hir::visit::{HirVisitor, walk_expr, walk_stmt};
 
 /// A snapshot of the visible binding state at one control-flow edge.
@@ -216,7 +218,8 @@ impl TypeChecker<'_> {
         *err_slot = Some(resolved_err);
 
         let success_ty = self.resolve_inferred_type(body_ty);
-        let default_ty = self.check_expr_with_expected(default, Some(success_ty));
+        let site = StoreSite::new(HirStoreKind::ConversionDefault);
+        let default_ty = self.check_store_expr(default, success_ty, site);
         self.unify_assign_issue(
             default_ty,
             success_ty,
@@ -345,16 +348,17 @@ impl TypeChecker<'_> {
             self.condition_refinement(cond)
         };
 
+        let block_expected = self.branch_expected(expected);
         let (then_ty, then_state) = if let Some(catch) = then_catch {
             let err_ty = self.fresh_infer();
             let prev_error = self.current_error;
             self.current_error = Some(ErrorSink::Local(err_ty));
-            let result = self.check_block_with_refinement(then_block, expected, then_refine);
+            let result = self.check_block_with_refinement(then_block, block_expected, then_refine);
             self.current_error = prev_error;
             self.check_cape(catch, err_ty);
             result
         } else {
-            self.check_block_with_refinement(then_block, expected, then_refine)
+            self.check_block_with_refinement(then_block, block_expected, then_refine)
         };
         let then_diverges = self.block_diverges(then_block);
 
@@ -364,7 +368,8 @@ impl TypeChecker<'_> {
         self.restore_flow_state(&incoming);
         let (else_ty, else_state, else_diverges) = match else_block {
             Some(block) => {
-                let (ty, state) = self.check_block_with_refinement(block, expected, else_refine);
+                let (ty, state) =
+                    self.check_block_with_refinement(block, block_expected, else_refine);
                 (ty, state, self.block_diverges(block))
             }
             None => {

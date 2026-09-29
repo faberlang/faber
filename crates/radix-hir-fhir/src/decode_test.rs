@@ -31,6 +31,7 @@ fn encode_decode_round_trip_preserves_await_assignment_presentation() {
                 mutable: false,
                 is_await: true,
                 runtime_provided: false,
+                await_store: None,
             }),
             span: Span::default(),
         }],

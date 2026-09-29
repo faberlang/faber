@@ -211,13 +211,15 @@ fn numerus_list_binding_accepts_u32_element() {
 }
 
 #[test]
-fn numerus_list_binding_still_rejects_u64_element() {
-    rejects_with_issue(
+fn numerus_list_binding_takes_a_u64_element_as_a_checked_store() {
+    // d11-6 U4 (rulings 2, 17): an element stored into a declared `lista<numerus>`
+    // is a store, so `u64 → numerus` narrows with a check instead of being
+    // rejected. This inverts the pre-U4 pin (`initializer_annotation_mismatch`).
+    accepts(
         r"functio check(tf32[16] input, u64 id) → f32 {
     fixum lista<numerus> idx ← [id]
     redde input.accipe(idx) vel 0.0
 }",
-        "initializer_annotation_mismatch",
     );
 }
 

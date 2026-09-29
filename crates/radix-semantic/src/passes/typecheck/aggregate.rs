@@ -16,9 +16,11 @@
 //! fields, computed keys, and spreads are diagnostics, not codegen-time policy
 //! choices.
 
+use super::store::StoreSite;
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
+use radix_hir::HirStoreKind;
 use radix_syntax::ClosureModifier;
 
 const ISSUE_ARRAY_SPREAD_REQUIRES_LISTA: &str = "array_spread_requires_lista";
@@ -107,7 +109,8 @@ impl TypeChecker<'_> {
                         self.undefined_member("struct_field_requires_value", span);
                         continue;
                     };
-                    let value_ty = self.check_expr_with_expected(value, Some(field_info.ty));
+                    let site = StoreSite::new(HirStoreKind::Field).named(*name);
+                    let value_ty = self.check_store_expr(value, field_info.ty, site);
                     self.unify_carrier_assign(
                         value_ty,
                         field_info.ty,
@@ -277,10 +280,12 @@ impl TypeChecker<'_> {
         self.inferred_return = None;
         self.allow_inferred_return = !body_uses_statement_returns;
 
-        let body_ty = if body_uses_statement_returns {
-            self.check_expr(body)
-        } else {
-            self.check_expr_with_expected(body, expected_ret)
+        let body_ty = match (body_uses_statement_returns, expected_ret) {
+            (true, _) => self.check_expr(body),
+            (false, Some(ret_slot)) => {
+                self.check_store_expr(body, ret_slot, StoreSite::new(HirStoreKind::Return))
+            }
+            (false, None) => self.check_expr_with_expected(body, None),
         };
         let inferred_return = self.inferred_return.take();
 
@@ -470,7 +475,7 @@ impl TypeChecker<'_> {
         for (i, item) in items.iter_mut().enumerate() {
             let expected_elem = element_types.as_ref().and_then(|e| e.get(i).copied());
             types.push(if let Some(elem) = expected_elem {
-                self.check_expr_with_expected(item, Some(elem))
+                self.check_store_expr(item, elem, StoreSite::new(HirStoreKind::TuplePosition))
             } else {
                 self.check_expr(item)
             });
@@ -536,7 +541,8 @@ impl TypeChecker<'_> {
                 continue;
             };
             supplied.insert(*name);
-            let value_ty = self.check_expr_with_expected(value, Some(field_info.ty));
+            let site = StoreSite::new(HirStoreKind::Field).named(*name);
+            let value_ty = self.check_store_expr(value, field_info.ty, site);
             self.unify_assign_issue(
                 value_ty,
                 field_info.ty,
@@ -704,7 +710,9 @@ impl TypeChecker<'_> {
                     self.check_expr(expr)
                 }
             } else if has_expected_element {
-                self.check_expr_with_expected(expr, Some(expected_elem))
+                // A declared element type makes each element a store; an open
+                // element type is bound by the elements (range rule) instead.
+                self.check_store_expr(expr, expected_elem, StoreSite::new(HirStoreKind::Element))
             } else {
                 self.check_expr(expr)
             };

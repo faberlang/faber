@@ -140,6 +140,17 @@ impl super::FaberCodegen<'_> {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
+        // An implicit store node (d11-6 ruling 17) is the checker's, not the
+        // author's: the printer keeps the authored spelling of its source.
+        if let HirExpressionKind::Conversio {
+            implicit: Some(_),
+            source,
+            ..
+        } = &expr.kind
+        {
+            self.write_expr_prec(source, parent_prec, names, surface, writer);
+            return;
+        }
         let expr_prec = self.expr_precedence(expr);
         let needs_parens = expr_prec <= parent_prec && parent_prec != 0;
         if needs_parens {
@@ -908,6 +919,7 @@ impl super::FaberCodegen<'_> {
                 target,
                 params,
                 recovery,
+                implicit: _,
             } => {
                 // Emit-arm detection probe: the Faber printer re-emits the
                 // `↦` spelling itself, so every conversion is a dedicated

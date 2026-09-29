@@ -102,84 +102,102 @@ functio keep(fractus<f16> x) → fractus<f16> {
     );
 }
 
+/// Inverted (d11-6 U3): mixed float widths join by the lossless lattice
+/// instead of requiring identical operands.
 #[test]
-fn fractus_f16_with_f32_arithmetic_rejects() {
-    test_support::assert_rejects_with_issue(
+fn fractus_f16_with_f32_arithmetic_joins_at_f32() {
+    test_support::assert_analysis_accepts(
         r"
 functio add(fractus<f16> x, fractus<f32> y) → fractus<f32> {
     redde x + y
 }
 ",
-        "numeric_arithmetic_operands_identical",
     );
 }
 
-#[cfg(feature = "hir-rust")]
+/// Inverted (d11-6 U3): the sum of two `i32` values is `i64` (range rule),
+/// not `i32`; storing it back into `i32` is the checked-store rule (U4).
 #[test]
-fn numerus_i32_arithmetic_preserves_width() {
-    test_support::assert_accepts(
+fn numerus_i32_arithmetic_grows_to_i64() {
+    test_support::assert_analysis_accepts(
         r"
-functio add(numerus<i32> x, numerus<i32> y) → numerus<i32> {
+functio add(numerus<i32> x, numerus<i32> y) → numerus<i64> {
     redde x + y
 }
 ",
     );
 }
 
-#[cfg(feature = "hir-rust")]
+/// Inverted (d11-6 U3): an integer constant joins by value, it is not shaped
+/// to the peer's width.
 #[test]
-fn numerus_i32_arithmetic_shapes_int_literal() {
-    test_support::assert_accepts(
+fn numerus_i32_arithmetic_joins_int_constant_by_value() {
+    test_support::assert_analysis_accepts(
         r"
-functio addOne(numerus<i32> x) → numerus<i32> {
+functio addOne(numerus<i32> x) → numerus<i64> {
     redde x + 1
 }
 ",
     );
 }
 
+/// Inverted (d11-6 ruling 20): an exactly representable integer constant
+/// beside a float operand is accepted.
 #[test]
-fn arithmetic_rejects_cross_family_literal() {
-    test_support::assert_rejects_with_issue(
+fn arithmetic_accepts_integer_constant_beside_float() {
+    test_support::assert_analysis_accepts(
         r"
 functio addOne(fractus<f32> x) → fractus<f32> {
     redde x + 1
 }
 ",
-        "numeric_arithmetic_operands_identical",
     );
 }
 
+/// A typed integer beside a float crosses number families (ruling 16).
 #[test]
-fn arithmetic_rejects_mixed_fractus_widths() {
+fn arithmetic_rejects_typed_integer_beside_float() {
     test_support::assert_rejects_with_issue(
+        r"
+functio add(fractus<f32> x, numerus<i32> n) → fractus<f32> {
+    redde x + n
+}
+",
+        "numeric_family_crossing_requires_conversio",
+    );
+}
+
+/// Inverted (d11-6 ruling 1): mixed float widths join by the lattice.
+#[test]
+fn arithmetic_joins_mixed_fractus_widths() {
+    test_support::assert_analysis_accepts(
         r"
 functio add(fractus<f32> x, fractus<f64> y) → fractus<f64> {
     redde x + y
 }
 ",
-        "numeric_arithmetic_operands_identical",
     );
 }
 
+/// Inverted (d11-6 ruling 12): mixed integer widths are range-typed, not
+/// rejected.
 #[test]
-fn arithmetic_rejects_mixed_numerus_widths() {
-    test_support::assert_rejects_with_issue(
+fn arithmetic_joins_mixed_numerus_widths() {
+    test_support::assert_analysis_accepts(
         r"
 functio add(numerus<i32> x, numerus<i64> y) → numerus<i64> {
     redde x + y
 }
 ",
-        "numeric_arithmetic_operands_identical",
     );
 }
 
-#[cfg(feature = "hir-rust")]
+/// Inverted (d11-6 U3): `u8 + u8` is `u16` (range rule), not `u8`.
 #[test]
-fn numerus_u8_arithmetic_preserves_scalar_width() {
-    test_support::assert_accepts(
+fn numerus_u8_arithmetic_grows_to_u16() {
+    test_support::assert_analysis_accepts(
         r"
-functio add(numerus<u8> x, numerus<u8> y) → numerus<u8> {
+functio add(numerus<u8> x, numerus<u8> y) → numerus<u16> {
     redde x + y
 }
 ",
@@ -327,14 +345,16 @@ functio keep(modulus<i16> x) → modulus<i16> {
 }
 
 #[test]
-fn modular_word_rejects_out_of_range_literals() {
-    test_support::assert_analysis_rejects_with_issue(
+fn modular_word_reduces_out_of_range_literals_at_the_store() {
+    // d11-6 U4 (ruling 21, amended): `redde` is a `←`-style store, so the
+    // constant reduces; this inverts the pre-U4 pin
+    // `modular_word_literal_out_of_range` for stores.
+    test_support::assert_analysis_accepts(
         r"
 functio keep(modulus<u32> x) → modulus<u32> {
     redde 4294967296
 }
 ",
-        "modular_word_literal_out_of_range",
     );
 }
 

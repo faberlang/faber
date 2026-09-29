@@ -1250,6 +1250,7 @@ fn failed_local_initializer_does_not_bind_local() {
         mutable: false,
         is_await: false,
         runtime_provided: false,
+        await_store: None,
     };
 
     assert!(builder.lower_local(&local, span).is_none());
@@ -1268,6 +1269,7 @@ fn failed_local_initializer_does_not_bind_local() {
         mutable: false,
         is_await: false,
         runtime_provided: false,
+        await_store: None,
     };
     assert!(builder.lower_local(&deferred, span).is_some());
     assert!(builder.bindings.contains_key(&DefId(10)));

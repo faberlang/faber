@@ -2811,6 +2811,7 @@ pub(crate) fn validate_referential_integrity(
                 target,
                 params,
                 recovery,
+                implicit: _,
             } => {
                 validate_expr(source, checks)?;
                 match target {

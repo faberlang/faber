@@ -5,7 +5,7 @@
 //! every cell pinned to exactly one defined join (probe analyzes clean) or
 //! one named SEM rejection (probe fails with that issue). Two tests back the
 //! table: a static completeness walk (a new operator or carrier family leaves
-//! a visible hole and breaks the 81-cell / 59-join / 22-reject tallies) and a
+//! a visible hole and breaks the 81-cell / 62-join / 19-reject tallies) and a
 //! live reprobe of every cell against the current gate arms.
 //!
 //! `est` / `non est` is not a table column: DECISIONS D23.1 made it a type
@@ -31,9 +31,8 @@
 use crate::test_support;
 
 const EXACT_EQ: &str = "equality_exact_types_required";
-const ARITH_IDENTICAL: &str = "numeric_arithmetic_operands_identical";
-const DECIMAL_FRACTUS_ORDERING: &str = "mixed_decimal_fractus_ordering";
-const DECIMAL_FRACTUS_EQUALITY: &str = "mixed_decimal_fractus_equality";
+const ARITH_U64_SIGNED: &str = "u64_signed_arithmetic_requires_conversion";
+const ARITH_FAMILY_CROSSING: &str = "numeric_family_crossing_requires_conversio";
 const DECIMAL_NARROWING: &str = "decimal_width_narrowing_rejected";
 
 const fn join() -> Pin {
@@ -124,7 +123,7 @@ const TABLE: [[Pin; 9]; 9] = [
         join(),
         join(), // GT-1 closed: d32/d64 join at the d64 scale in MIR
         join(),
-        reject(DECIMAL_FRACTUS_EQUALITY), // GT-2 closed: decimal/fractus rejects
+        join(), // ruling 22: cross-family comparison admitted
     ],
     // ≈ / ≉ — fuzzy at the joined precision; same admission shape as ≅.
     [
@@ -136,7 +135,7 @@ const TABLE: [[Pin; 9]; 9] = [
         join(),
         join(), // GT-1 closed: d32/d64 join at the d64 scale in MIR
         join(),
-        reject(DECIMAL_FRACTUS_EQUALITY), // GT-2 closed: decimal/fractus rejects
+        join(), // ruling 22: cross-family comparison admitted
     ],
     // < — ordering joins at the widened carrier; decimal/fractus rejects.
     [
@@ -148,7 +147,7 @@ const TABLE: [[Pin; 9]; 9] = [
         join(),
         join(),
         join(),
-        reject(DECIMAL_FRACTUS_ORDERING),
+        join(),
     ],
     // ≤ — same ordering gate.
     [
@@ -160,7 +159,7 @@ const TABLE: [[Pin; 9]; 9] = [
         join(),
         join(),
         join(),
-        reject(DECIMAL_FRACTUS_ORDERING),
+        join(),
     ],
     // > — same ordering gate.
     [
@@ -172,7 +171,7 @@ const TABLE: [[Pin; 9]; 9] = [
         join(),
         join(),
         join(),
-        reject(DECIMAL_FRACTUS_ORDERING),
+        join(),
     ],
     // ≥ — same ordering gate.
     [
@@ -184,19 +183,21 @@ const TABLE: [[Pin; 9]; 9] = [
         join(),
         join(),
         join(),
-        reject(DECIMAL_FRACTUS_ORDERING),
+        join(),
     ],
-    // + - * / % — arithmetic requires identical width and primitive.
+    // + - * / % — d11-6 U3: integer widths join by the range rule; float and
+    // decimal widths join by the lossless lattice; `u64` with a signed typed
+    // operand (ruling 8) and any number-family crossing (ruling 16) reject.
     [
         join(),
-        reject(ARITH_IDENTICAL),
-        reject(ARITH_IDENTICAL),
-        reject(ARITH_IDENTICAL),
-        reject(ARITH_IDENTICAL),
-        reject(ARITH_IDENTICAL),
-        reject(ARITH_IDENTICAL),
-        reject(ARITH_IDENTICAL),
-        reject(ARITH_IDENTICAL),
+        join(),
+        reject(ARITH_U64_SIGNED),
+        reject(ARITH_FAMILY_CROSSING),
+        reject(ARITH_FAMILY_CROSSING),
+        join(),
+        join(),
+        reject(ARITH_FAMILY_CROSSING),
+        reject(ARITH_FAMILY_CROSSING),
     ],
     // ↦ — conversio is directional; every family direction admits except the
     // d64 → d32 decimal narrowing (pinned by the reverse-probe test below).
@@ -261,7 +262,8 @@ fn probe(op: Op, family: Family) -> String {
     }
     let (lhs, rhs) = pair_types(family);
     if op == Op::Arith {
-        return format!("functio p({lhs} a, {rhs} b) → numerus {{ redde a + b }}");
+        // The sum lands in an inferred slot: the store rule (U4) is not probed.
+        return format!("functio p({lhs} a, {rhs} b) {{ fixum _ r ← a + b }}");
     }
     format!(
         "functio p({lhs} a, {rhs} b) → bivalens {{ redde a {} b }}",
@@ -271,7 +273,8 @@ fn probe(op: Op, family: Family) -> String {
 
 /// Static completeness: the table is closed over the enumerated product, the
 /// reject pins name real issues, and the tallies match the corpus table
-/// (81 cells = 59 joins + 22 rejections; GT-2 moved the two decimal/fractus
+/// (81 cells = 68 joins + 13 rejections; ruling 22 moved the six
+/// decimal/fractus comparison cells to joins; GT-2 moved the two decimal/fractus
 /// equality cells from joins to named rejections; D23.1 removed the `est`
 /// row, which is a type test rather than an equality gate).
 #[test]
@@ -294,7 +297,7 @@ fn gate_law_table_is_total() {
             }
         }
     }
-    assert_eq!((joins, rejects), (59, 22));
+    assert_eq!((joins, rejects), (68, 13));
 }
 
 /// Live reprobe: every cell's probe must meet its pin against the current

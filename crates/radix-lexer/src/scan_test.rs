@@ -662,6 +662,14 @@ fn lexes_glyph_product_operators() {
 }
 
 #[test]
+fn lexes_obelus_true_division() {
+    let result = lex("a ÷ b");
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(kinds[1], TokenKind::Obelus);
+}
+
+#[test]
 fn lexes_glyph_products_mixed_with_arithmetic_chain() {
     let result = lex("a · b × c");
     assert!(result.errors.is_empty());

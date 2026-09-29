@@ -1054,6 +1054,57 @@ pub struct HirLocal {
 
     /// Binding is initialized by runtime/entry effects before any user statement.
     pub runtime_provided: bool,
+
+    /// Set by typecheck on an await-binding whose awaited value narrows into
+    /// the declared slot (d11-6 §3(a) row 2). The stored value is the awaited
+    /// result, which has no expression node, so the store rides the local:
+    /// after the await, the value is checked against the slot under its
+    /// policy (trap, `wrapping` reduce, `saturating` clamp). `None` when the
+    /// result is assignable to the slot.
+    #[serde(default)]
+    pub await_store: Option<HirStoreSite>,
+}
+
+impl HirLocal {
+    /// The stored value of a narrowing await-binding, as one expression a
+    /// backend can emit through its ordinary checked-narrowing path:
+    /// `Conversio { implicit, source: Reddet(init) }` targeting the slot.
+    /// `None` when the local carries no [`HirLocal::await_store`].
+    ///
+    /// The synthetic nodes reuse the initializer's own node unchanged; their
+    /// ids are outside the range the lowering assigns, so no per-node plan
+    /// keyed on an id matches them.
+    #[must_use]
+    pub fn await_store_init(&self, types: &radix_types::TypeTable) -> Option<HirExpression> {
+        let site = self.await_store?;
+        let init = self.init.as_ref()?;
+        let slot = self.ty?;
+        let future = init.ty?;
+        let awaited = match types.get(future) {
+            radix_types::Type::Promissum(inner)
+            | radix_types::Type::PromissumFailable(inner, _) => *inner,
+            _ => return None,
+        };
+        let awaited_expr = HirExpression {
+            id: HirId(u32::MAX),
+            kind: HirExpressionKind::Reddet(Box::new(init.clone())),
+            ty: Some(awaited),
+            span: init.span,
+        };
+        Some(HirExpression {
+            id: HirId(u32::MAX - 1),
+            kind: HirExpressionKind::Conversio {
+                source: Box::new(awaited_expr),
+                target: HirConversioTarget::Type(slot),
+                params: Vec::new(),
+                recovery: None,
+                route: None,
+                implicit: Some(site),
+            },
+            ty: Some(slot),
+            span: init.span,
+        })
+    }
 }
 
 /// Expression node with stable identity, optional type facts, and source span.
@@ -1449,6 +1500,15 @@ pub enum HirExpressionKind {
         /// scalar/structural conversion rules decide the lowering.
         #[serde(default)]
         route: Option<HirConversioRoute>,
+
+        /// `Some` marks an **implicit store node** inserted by typecheck where
+        /// an integer value lands in a narrower slot (d11-6 ruling 17(b)).
+        /// The node's target type is the slot; the slot's overflow policy
+        /// decides the outcome: a trapping slot traps (never routed to `⇥`
+        /// or `cape`), a `wrapping` slot reduces, a `saturating` slot clamps.
+        /// Authored `↦` sites carry `None` and stay recoverable.
+        #[serde(default)]
+        implicit: Option<HirStoreSite>,
     },
 
     /// Expression-form stream `ad` (blockless, evaluates to `sermo`).
@@ -1595,6 +1655,47 @@ pub enum HirConversioTarget {
     Intervallum(Box<HirExpression>),
 }
 
+/// Store position of the d11-6 store table (ruling 21) that an implicit store
+/// node stands for. Names the row so the runtime trap can say where the value
+/// was being stored.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirStoreKind {
+    /// `fixum`/`varia T x ← e`.
+    Declaration,
+    /// `place ← e`.
+    Assignment,
+    /// Call, method or transfer argument.
+    Argument,
+    /// Parameter default `vel e`.
+    ParameterDefault,
+    /// `redde e` / `reddet e`, or a closure body against its declared return.
+    Return,
+    /// `cede e` against the generator element type.
+    Yield,
+    /// `iace e` against the `⇥` type.
+    Throw,
+    /// `T { f = e }` field, `finge` variant field or positional variant field.
+    Field,
+    /// Collection element, `tabula` key or value.
+    Element,
+    /// `iuncta<T1, T2>[a, b]` position.
+    TuplePosition,
+    /// The default of `x ↦ T ⊥ d`.
+    ConversionDefault,
+    /// `fixum T x ↢ future`, `figendum T x ← e`: the awaited value.
+    AwaitBinding,
+}
+
+/// Where an implicit store lands: the position kind, the slot's name when it
+/// has one, and — for a slot whose type was inferred (`_`) — the span of the
+/// expression the type was inferred from (ruling 19(i)).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirStoreSite {
+    pub kind: HirStoreKind,
+    pub slot: Option<Symbol>,
+    pub inferred_from: Option<Span>,
+}
+
 /// Conversion row resolved by typecheck for one `↦` site.
 ///
 /// Carried on the expression so every backend lowers the same decision; the
@@ -1718,6 +1819,7 @@ pub enum HirBinOp {
     Sub,
     Mul,
     Div,
+    TrueDiv, // ÷ true division (always f64 on integers)
     Mod,
     // Glyph products (tensor-glyphs family; multiplicative precedence)
     Dot,           // · inner product (dot / matvec / matmul)
@@ -1772,6 +1874,7 @@ impl HirBinOp {
             Self::TensorProduct => Some("⊗"),
             Self::Hadamard => Some("⊙"),
             Self::HadamardDiv => Some("⊘"),
+            Self::TrueDiv => Some("÷"),
             _ => None,
         }
     }

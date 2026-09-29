@@ -23,9 +23,11 @@
 //! This pass records resolved expression types on HIR nodes. It does not choose
 //! target-specific lowering policy, library translation, or codegen fallbacks.
 
+use super::store::StoreSite;
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
+use radix_hir::HirStoreKind;
 
 const ISSUE_IACE_REQUIRES_ALTERNATE_EXIT: &str = "iace_requires_alternate_exit";
 const ISSUE_IACE_VALUE_TYPE_MISMATCH: &str = "iace_value_type_mismatch";
@@ -200,6 +202,7 @@ impl TypeChecker<'_> {
         expected: Option<TypeId>,
     ) -> TypeId {
         let saved_pending_conversion = self.pending_conversion.take();
+        let store = self.pending_store.take();
         let ty = match &mut expr.kind {
             HirExpressionKind::Path(def_id) => self.check_path(*def_id, expr.span),
             HirExpressionKind::Literal(lit) => {
@@ -429,12 +432,24 @@ impl TypeChecker<'_> {
                 target,
                 entries,
             } => self.check_verte(source, *target, entries.as_mut(), expected, expr.span),
+            // An implicit store node is the checker's own output; re-checking
+            // it re-derives the slot type and never re-runs `↦` admission.
+            HirExpressionKind::Conversio {
+                source,
+                target: HirConversioTarget::Type(slot),
+                implicit: Some(_),
+                ..
+            } => {
+                self.check_expr(source);
+                *slot
+            }
             HirExpressionKind::Conversio {
                 route,
                 source,
                 target,
                 params,
                 recovery,
+                ..
             } => self.check_conversio(
                 source,
                 target,
@@ -481,7 +496,14 @@ impl TypeChecker<'_> {
                 self.vacuum_type()
             }
             HirExpressionKind::Throw(value) => {
-                let value_ty = self.check_expr(value);
+                // A declared `⇥ T` channel is a slot: the thrown value is a
+                // store into `T` (row 11). Local and trap sinks accumulate.
+                let value_ty = match self.current_error {
+                    Some(ErrorSink::Function(slot)) => {
+                        self.check_store_by_type(value, slot, StoreSite::new(HirStoreKind::Throw))
+                    }
+                    _ => self.check_expr(value),
+                };
                 if let Some(err_ty) = self.current_error.map(|sink| match sink {
                     ErrorSink::Function(ty) | ErrorSink::Local(ty) => ty,
                     // UT: the throw payload accumulates into the trap hole —
@@ -564,7 +586,16 @@ impl TypeChecker<'_> {
                     );
                     return self.error_type;
                 }
-                self.check_expr(inner)
+                // The declared element type is a slot: `cede e` is a store (row 10).
+                match self.current_return {
+                    Some(element) => {
+                        let site = StoreSite::new(HirStoreKind::Yield);
+                        let ty = self.check_store_by_type(inner, element, site);
+                        self.unify_expected(ty, element, inner.span);
+                        ty
+                    }
+                    None => self.check_expr(inner),
+                }
             }
             HirExpressionKind::Ref(kind, inner) => {
                 let inner_ty = self.check_expr(inner);
@@ -600,31 +631,41 @@ impl TypeChecker<'_> {
             }
         };
 
-        let ty = if let Some(expected) = expected {
-            let src_marked = self
-                .types
-                .peel_access_marker(self.resolve_inferred_type(ty))
-                .0
-                .is_some();
-            let dest_marked = self
-                .types
-                .peel_access_marker(self.resolve_inferred_type(expected))
-                .0
-                .is_some();
-            if src_marked || dest_marked {
-                // Keep the synthesized type so a `ref` Path retains its fact;
-                // payload compatibility is checked separately.
-                self.unify_carrier_assign(ty, expected, expr.span, ISSUE_EXPRESSION_TYPE_MISMATCH);
-                ty
-            } else {
-                self.unify_assign_issue(ty, expected, expr.span, ISSUE_EXPRESSION_TYPE_MISMATCH)
-            }
-        } else {
-            ty
+        let ty = match (expected, store) {
+            (Some(expected), Some(site)) => self.coerce_store(expr, ty, expected, site),
+            (Some(expected), None) => self.unify_expected(ty, expected, expr.span),
+            (None, _) => ty,
         };
         self.pending_conversion = saved_pending_conversion;
         expr.ty = Some(self.resolve_inferred_type(ty));
         ty
+    }
+
+    /// Unify a synthesized expression type with the expected type.
+    pub(super) fn unify_expected(
+        &mut self,
+        ty: TypeId,
+        expected: TypeId,
+        span: radix_lexer::Span,
+    ) -> TypeId {
+        let src_marked = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(ty))
+            .0
+            .is_some();
+        let dest_marked = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(expected))
+            .0
+            .is_some();
+        if src_marked || dest_marked {
+            // Keep the synthesized type so a `ref` Path retains its fact;
+            // payload compatibility is checked separately.
+            self.unify_carrier_assign(ty, expected, span, ISSUE_EXPRESSION_TYPE_MISMATCH);
+            ty
+        } else {
+            self.unify_assign_issue(ty, expected, span, ISSUE_EXPRESSION_TYPE_MISMATCH)
+        }
     }
 
     /// Checks the empty collection literal.

@@ -288,6 +288,7 @@ pub enum TokenKind {
     Minus,      // -
     Star,       // *
     Slash,      // /
+    Obelus,     // ÷ U+00F7 true division
     Percent,    // %
     BitwiseAnd, // ∧
     BitwiseOr,  // ∨

@@ -1,8 +1,8 @@
 //! Decimal ordering admission tests (OX P1).
 //!
 //! Decimal carriers join losslessly for ordering: d32/d64 use the d64 scale,
-//! and decimal/integer pairs use the same scaled join. Decimal/fractus stays
-//! rejected because the cross-family ordering carrier is not settled.
+//! and decimal/integer pairs use the same scaled join. Decimal/fractus is
+//! accepted (d11-6 ruling 22: cross-family comparison).
 
 use crate::test_support;
 
@@ -21,10 +21,9 @@ fn decimal_integer_ordering_accepts() {
 }
 
 #[test]
-fn decimal_fractus_ordering_rejects_cross_family() {
-    test_support::assert_rejects_with_issue(
+fn decimal_fractus_ordering_accepts_cross_family() {
+    test_support::assert_accepts(
         "functio maior(numerus<d32> a, fractus f) → bivalens { redde a > f }",
-        "mixed_decimal_fractus_ordering",
     );
 }
 

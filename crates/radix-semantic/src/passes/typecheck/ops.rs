@@ -20,6 +20,7 @@
 //! it can return either an optional type or the fallback's concrete type without
 //! changing the global assignability relation.
 
+use super::store::StoreSite;
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
@@ -83,7 +84,26 @@ impl TypeChecker<'_> {
         }
     }
 
-    fn numeric_arithmetic_bin(
+    /// Scalar `+ - * / %`: range-typed for trapping integers and integer
+    /// constants, family rules for everything else.
+    fn scalar_arithmetic(
+        &mut self,
+        op: HirBinOp,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+        lhs_ty: TypeId,
+        rhs_ty: TypeId,
+        expected: Option<TypeId>,
+    ) -> TypeId {
+        if let Some(result) =
+            self.arithmetic_range_type(op, lhs, rhs, lhs_ty, rhs_ty, expected, lhs.span)
+        {
+            return result;
+        }
+        self.numeric_arithmetic_bin(lhs_ty, rhs_ty, lhs.span)
+    }
+
+    pub(super) fn numeric_arithmetic_bin(
         &mut self,
         lhs: TypeId,
         rhs: TypeId,
@@ -135,6 +155,30 @@ impl TypeChecker<'_> {
             return self.error_type;
         };
 
+        if !self.current_device_function {
+            // d11-6 ruling 16: integer, decimal and float never mix implicitly.
+            if lhs_shape.prim != rhs_shape.prim
+                || lhs_shape.width.is_decimal() != rhs_shape.width.is_decimal()
+            {
+                self.invalid_operand_types(
+                    integer_range::NUMERIC_FAMILY_CROSSING_REQUIRES_CONVERSIO,
+                    span,
+                );
+                return self.error_type;
+            }
+            if lhs_shape.family == IntFamily::Plain
+                && rhs_shape.family == IntFamily::Plain
+                && lhs_shape.width != rhs_shape.width
+            {
+                // Floats and decimals join by the lossless lattice (ruling 1).
+                if NumericWidth::is_widening_assignable(lhs_shape.width, rhs_shape.width) {
+                    return rhs_resolved;
+                }
+                if NumericWidth::is_widening_assignable(rhs_shape.width, lhs_shape.width) {
+                    return lhs_resolved;
+                }
+            }
+        }
         if lhs_shape.prim != rhs_shape.prim || lhs_shape.width != rhs_shape.width {
             self.invalid_operand_types(NUMERIC_ARITHMETIC_OPERANDS_IDENTICAL, span);
             return self.error_type;
@@ -407,7 +451,7 @@ impl TypeChecker<'_> {
         lhs.prim == rhs.prim && lhs.width == rhs.width && lhs.family == rhs.family
     }
 
-    fn numeric_shape(&self, ty: TypeId) -> Option<NumericShape> {
+    pub(super) fn numeric_shape(&self, ty: TypeId) -> Option<NumericShape> {
         let (_, ty) = self.types.peel_access_marker(ty);
         match self.types.get(ty) {
             Type::Primitive(Primitive::Numerus) => Some(NumericShape {
@@ -491,8 +535,8 @@ impl TypeChecker<'_> {
     ///
     /// Decimal carriers are scaled integers, so a raw comparison is meaningful
     /// only after decimal widths join at `d64`. Decimal/integer ordering uses
-    /// the same scaled `d64` join; decimal/fractus remains fail-closed because
-    /// no exact cross-family carrier is established by the language contract.
+    /// the same scaled `d64` join; decimal/fractus is accepted too (ruling 22:
+    /// cross-family ordering compares exact values).
     fn numeric_ordering_bin(
         &mut self,
         lhs: TypeId,
@@ -505,16 +549,11 @@ impl TypeChecker<'_> {
         let rhs_shape = self.numeric_shape(rhs_resolved);
         let decimal_lhs = lhs_shape.is_some_and(|shape| shape.width.is_decimal());
         let decimal_rhs = rhs_shape.is_some_and(|shape| shape.width.is_decimal());
-        let fractus_lhs = lhs_shape.is_some_and(|shape| shape.prim == Primitive::Fractus);
-        let fractus_rhs = rhs_shape.is_some_and(|shape| shape.prim == Primitive::Fractus);
 
-        if (decimal_lhs && fractus_rhs) || (decimal_rhs && fractus_lhs) {
-            self.invalid_operand_types(MIXED_DECIMAL_FRACTUS_ORDERING, span);
-            return self.error_type;
-        }
-
+        // d11-6 ruling 22: ordering accepts every cross-family pair
+        // (integer, d64, float); the comparison is on exact values.
         let joined = self.numeric_bin(lhs, rhs, span);
-        if joined == self.error_type {
+        if joined == self.error_type || joined == self.fractus_type() {
             return joined;
         }
         if decimal_lhs || decimal_rhs {
@@ -578,11 +617,8 @@ impl TypeChecker<'_> {
     /// reuse the same widening policy as arithmetic/ordering (`numeric_bin`),
     /// then compare at the joined type in their respective lowerings.
     ///
-    /// GT-2: decimal × fractus equality mirrors the ordering gate
-    /// ([`Self::numeric_ordering_bin`] rejects the same family pair as
-    /// `mixed_decimal_fractus_ordering`). No exact cross-family carrier is
-    /// established by the language contract, so `≅`/`≈` reject the pair
-    /// instead of comparing a widened scaled integer against a float.
+    /// d11-6 ruling 22 (supersedes GT-2): `≅`/`≇`/`≈`/`≉` and ordering accept
+    /// every cross-family pair (integer, `d64`, float); `≡`/`≠` stay exact-type.
     pub fn numeric_value_equality_types(
         &mut self,
         lhs: TypeId,
@@ -602,16 +638,7 @@ impl TypeChecker<'_> {
             self.invalid_operand_types(NUMERIC_VALUE_EQUALITY_OPERANDS_REQUIRED, span);
             return;
         }
-        let lhs_shape = self.numeric_shape(lhs_resolved);
-        let rhs_shape = self.numeric_shape(rhs_resolved);
-        let decimal_lhs = lhs_shape.is_some_and(|shape| shape.width.is_decimal());
-        let decimal_rhs = rhs_shape.is_some_and(|shape| shape.width.is_decimal());
-        let fractus_lhs = lhs_shape.is_some_and(|shape| shape.prim == Primitive::Fractus);
-        let fractus_rhs = rhs_shape.is_some_and(|shape| shape.prim == Primitive::Fractus);
-        if (decimal_lhs && fractus_rhs) || (decimal_rhs && fractus_lhs) {
-            self.invalid_operand_types(MIXED_DECIMAL_FRACTUS_EQUALITY, span);
-            return;
-        }
+        // d11-6 ruling 22: `≅`/`≇`/`≈`/`≉` accept every cross-family pair.
         self.numeric_bin(lhs, rhs, span);
     }
 
@@ -772,6 +799,12 @@ impl TypeChecker<'_> {
         if self.types.is_assignable(right, left) {
             return left;
         }
+        if !self.current_device_function
+            && let Some(joined) = self.integer_hull_type(left, right)
+        {
+            // d11-6 ruling 21: the smallest integer type holding both branches.
+            return joined;
+        }
         if self.is_numeric(left) && self.is_numeric(right) {
             return self.numeric_bin(left, right, span);
         }
@@ -822,12 +855,30 @@ impl TypeChecker<'_> {
             self.unify_assign_issue(value_ty, target_ty, value.span, ASSIGNMENT_TYPE_MISMATCH);
             return target_ty;
         }
-        let value_ty = self.check_expr_with_expected(value, Some(target_ty));
+        let site = self.assignment_store_site(target);
+        let value_ty = self.check_store_expr(value, target_ty, site);
         self.unify_carrier_assign(value_ty, target_ty, value.span, ASSIGNMENT_TYPE_MISMATCH);
         if self.types.is_own_view(target_ty) {
             self.check_own_bind_rhs(value);
         }
         target_ty
+    }
+
+    /// The store position of `target ← value`: the receiving place's name and,
+    /// for a local whose type was inferred, where the type came from.
+    fn assignment_store_site(&self, target: &HirExpression) -> StoreSite {
+        let site = StoreSite::new(radix_hir::HirStoreKind::Assignment);
+        match &target.kind {
+            HirExpressionKind::Path(def_id) => {
+                let site = site.inferred_from(self.inferred_slot_sources.get(def_id).copied());
+                match self.binding_names.get(def_id) {
+                    Some(name) => site.named(*name),
+                    None => site,
+                }
+            }
+            HirExpressionKind::Field(_, name) => site.named(*name),
+            _ => site,
+        }
     }
 
     /// Check conversion-directed assignment (`target ↤ value`, U+21A4).
@@ -987,6 +1038,7 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         match op {
             radix_hir::HirUnOp::Neg => {
+                let expected = self.unary_operand_expected(operand, expected);
                 let operand_ty = self.check_expr_with_expected(operand, expected);
                 if self.is_error(operand_ty) {
                     return self.error_type;
@@ -1014,7 +1066,8 @@ impl TypeChecker<'_> {
                     self.invalid_operand_types(SATURATING_WORD_OPERATOR_UNSUPPORTED, operand.span);
                     return self.error_type;
                 }
-                operand_ty
+                self.unary_range_type(op, operand, operand_ty)
+                    .unwrap_or(operand_ty)
             }
             radix_hir::HirUnOp::Not => {
                 let operand_ty = self.check_expr(operand);
@@ -1037,6 +1090,7 @@ impl TypeChecker<'_> {
                 self.bool_type()
             }
             radix_hir::HirUnOp::BitNot => {
+                let expected = self.unary_operand_expected(operand, expected);
                 let operand_ty = self.check_expr_with_expected(operand, expected);
                 if self.is_error(operand_ty) {
                     return self.error_type;
@@ -1060,12 +1114,48 @@ impl TypeChecker<'_> {
                     self.invalid_operand_types(SATURATING_WORD_OPERATOR_UNSUPPORTED, operand.span);
                     return self.error_type;
                 }
-                operand_resolved
+                self.unary_range_type(op, operand, operand_resolved)
+                    .unwrap_or(operand_resolved)
             }
         }
     }
 
+    /// Check the operands of `+ - * / %`.
+    ///
+    /// Integer constants are untyped exact values (d11-6 ruling 12): beside a
+    /// trapping integer they are not shaped to its width. Float, word and
+    /// hole peers keep the peer-shaping rule. Device functions keep the
+    /// pre-range shaping unchanged.
     fn check_arithmetic_operands(
+        &mut self,
+        lhs: &mut HirExpression,
+        rhs: &mut HirExpression,
+        expected: Option<TypeId>,
+    ) -> (TypeId, TypeId) {
+        if self.current_device_function {
+            return self.check_arithmetic_operands_legacy(lhs, rhs, expected);
+        }
+        match (
+            integer_range::const_int_value(lhs).is_some(),
+            integer_range::const_int_value(rhs).is_some(),
+        ) {
+            (true, true) if self.const_pair_is_legacy(expected) => {
+                self.check_arithmetic_operands_legacy(lhs, rhs, expected)
+            }
+            (true, true) => (self.check_const_operand(lhs), self.check_const_operand(rhs)),
+            (true, false) => {
+                let rhs_ty = self.check_expr(rhs);
+                (self.check_const_beside(lhs, rhs_ty, expected), rhs_ty)
+            }
+            (false, true) => {
+                let lhs_ty = self.check_expr(lhs);
+                (lhs_ty, self.check_const_beside(rhs, lhs_ty, expected))
+            }
+            (false, false) => self.check_arithmetic_operands_legacy(lhs, rhs, expected),
+        }
+    }
+
+    fn check_arithmetic_operands_legacy(
         &mut self,
         lhs: &mut HirExpression,
         rhs: &mut HirExpression,
@@ -1101,7 +1191,7 @@ impl TypeChecker<'_> {
         }
     }
 
-    fn literal_numeric_expected(
+    pub(super) fn literal_numeric_expected(
         &self,
         expr: &HirExpression,
         expected: Option<TypeId>,
@@ -1113,7 +1203,7 @@ impl TypeChecker<'_> {
             .map(|_| self.numeric_expected_type(expected))
     }
 
-    fn literal_numeric_expected_from_peer(
+    pub(super) fn literal_numeric_expected_from_peer(
         &self,
         expr: &HirExpression,
         peer: TypeId,
@@ -1125,7 +1215,7 @@ impl TypeChecker<'_> {
             .map(|_| self.numeric_expected_type(peer))
     }
 
-    fn numeric_expected_type(&self, ty: TypeId) -> TypeId {
+    pub(super) fn numeric_expected_type(&self, ty: TypeId) -> TypeId {
         match self.types.get(ty) {
             Type::Alias(_, target) => self.numeric_expected_type(*target),
             _ => ty,
@@ -1180,7 +1270,7 @@ impl TypeChecker<'_> {
                     // Numeric tensor/vector/matrix `+` is the live `addita` / `.added()` op.
                     result
                 } else {
-                    self.numeric_arithmetic_bin(lhs_ty, rhs_ty, lhs.span)
+                    self.scalar_arithmetic(HirBinOp::Add, lhs, rhs, lhs_ty, rhs_ty, expected)
                 }
             }
             HirBinOp::Sub => {
@@ -1198,7 +1288,7 @@ impl TypeChecker<'_> {
                     // Same-shape / tensor-broadcast contract as `+` — no extra broadcast.
                     result
                 } else {
-                    self.numeric_arithmetic_bin(lhs_ty, rhs_ty, lhs.span)
+                    self.scalar_arithmetic(HirBinOp::Sub, lhs, rhs, lhs_ty, rhs_ty, expected)
                 }
             }
             HirBinOp::Mul | HirBinOp::Div => {
@@ -1212,12 +1302,16 @@ impl TypeChecker<'_> {
                 {
                     result
                 } else {
-                    self.numeric_arithmetic_bin(lhs_ty, rhs_ty, lhs.span)
+                    self.scalar_arithmetic(op, lhs, rhs, lhs_ty, rhs_ty, expected)
                 }
             }
             HirBinOp::Mod => {
                 let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);
-                self.numeric_arithmetic_bin(lhs_ty, rhs_ty, lhs.span)
+                self.scalar_arithmetic(op, lhs, rhs, lhs_ty, rhs_ty, expected)
+            }
+            HirBinOp::TrueDiv => {
+                let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);
+                self.true_division_type(lhs, rhs, lhs_ty, rhs_ty, lhs.span)
             }
             HirBinOp::ApproxEq
             | HirBinOp::ApproxNotEq
@@ -1243,7 +1337,9 @@ impl TypeChecker<'_> {
                     self.types.get(self.resolve_inferred_type(rhs_ty)),
                     Type::Primitive(Primitive::Nihil)
                 );
-                if !(lhs_is_nil || rhs_is_nil) {
+                if !(lhs_is_nil || rhs_is_nil)
+                    && !self.equality_constant_exempt(lhs, lhs_ty, rhs, rhs_ty)
+                {
                     self.exact_equality_types_for_operands(lhs, lhs_ty, rhs, rhs_ty, lhs.span);
                 }
                 self.bool_type()
@@ -1307,8 +1403,14 @@ impl TypeChecker<'_> {
             | HirBinOp::BitXor
             | HirBinOp::Shl
             | HirBinOp::Shr => {
-                let (lhs_ty, rhs_ty) = self.check_integer_operands(lhs, rhs);
-                self.integer_bin(lhs_ty, rhs_ty, lhs.span)
+                let (lhs_ty, rhs_ty) = self.check_integer_operands(lhs, rhs, expected);
+                if let Some(result) =
+                    self.bitwise_range_type(op, lhs, rhs, lhs_ty, rhs_ty, expected, lhs.span)
+                {
+                    result
+                } else {
+                    self.integer_bin(lhs_ty, rhs_ty, lhs.span)
+                }
             }
             // TENSOR-GLYPHS-1B rank rules: the glyph products dispatch on the
             // built-in static-shape families. Operand shapes that are not
@@ -1908,7 +2010,27 @@ impl TypeChecker<'_> {
         &mut self,
         lhs: &mut HirExpression,
         rhs: &mut HirExpression,
+        expected: Option<TypeId>,
     ) -> (TypeId, TypeId) {
+        if !self.current_device_function {
+            match (
+                integer_range::const_int_value(lhs).is_some(),
+                integer_range::const_int_value(rhs).is_some(),
+            ) {
+                (true, true) if !self.const_pair_is_legacy(expected) => {
+                    return (self.check_const_operand(lhs), self.check_const_operand(rhs));
+                }
+                (true, false) => {
+                    let rhs_ty = self.check_expr(rhs);
+                    return (self.check_const_beside(lhs, rhs_ty, expected), rhs_ty);
+                }
+                (false, true) => {
+                    let lhs_ty = self.check_expr(lhs);
+                    return (lhs_ty, self.check_const_beside(rhs, lhs_ty, expected));
+                }
+                _ => {}
+            }
+        }
         if is_numeric_literal(lhs) && !is_numeric_literal(rhs) {
             let rhs_ty = self.check_expr(rhs);
             let lhs_ty = if self
@@ -1988,8 +2110,6 @@ fn is_numeric_literal(expr: &HirExpression) -> bool {
 }
 
 const NUMERIC_OPERANDS_REQUIRED: &str = "numeric_operands_required";
-const MIXED_DECIMAL_FRACTUS_ORDERING: &str = "mixed_decimal_fractus_ordering";
-const MIXED_DECIMAL_FRACTUS_EQUALITY: &str = "mixed_decimal_fractus_equality";
 const NUMERIC_ARITHMETIC_OPERANDS_IDENTICAL: &str = "numeric_arithmetic_operands_identical";
 const MODULAR_WORD_FAMILY_MISMATCH: &str = "modular_word_family_mismatch";
 const SATURATING_WORD_FAMILY_MISMATCH: &str = "saturating_word_family_mismatch";
@@ -2041,15 +2161,15 @@ const MATRIX_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED: &str =
 const ARGUMENT_TYPE_MISMATCH: &str = "argument_type_mismatch";
 
 #[derive(Clone, Copy)]
-struct NumericShape {
-    prim: Primitive,
-    width: NumericWidth,
-    family: IntFamily,
+pub(super) struct NumericShape {
+    pub(super) prim: Primitive,
+    pub(super) width: NumericWidth,
+    pub(super) family: IntFamily,
 }
 
 /// Overflow policy family of an integer shape (D11.1): trap, wrap, or clamp.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum IntFamily {
+pub(super) enum IntFamily {
     Plain,
     Modular,
     Saturating,

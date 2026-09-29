@@ -1700,6 +1700,7 @@ fn const_into_mut_sequential_use_program(types: &mut TypeTable) -> HirModule {
                         mutable: false,
                         is_await: false,
                         runtime_provided: false,
+                        await_store: None,
                     }),
                     span: test_span(),
                 },

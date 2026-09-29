@@ -334,6 +334,7 @@ impl<'a> Lexer<'a> {
             '⊗' => TokenKind::CircledTimes,
             '⊙' => TokenKind::CircledDot,
             '⊘' => TokenKind::CircledDivide,
+            '÷' => TokenKind::Obelus,
 
             // Infix extrema (minmax-infix-glyphs family).
             '⤒' => TokenKind::Maximum,

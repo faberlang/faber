@@ -3007,8 +3007,12 @@ impl FunctionBuilder<'_> {
         target: TypeId,
         params: &[Symbol],
         recovery: Option<&HirExpression>,
+        implicit: bool,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        if implicit && let Some(folded) = self.fold_word_store_constant(source, target) {
+            return Some(folded);
+        }
         let source_ty = self.expr_ty(source)?;
         let source_type_id = source_ty.semantic_id();
         let ty = self.expr_ty(expr)?;
@@ -3067,7 +3071,10 @@ impl FunctionBuilder<'_> {
             Some(recovery) => Some(self.lower_conversio_recovery(recovery, expr.span)?),
             None => None,
         };
+        // An implicit store (d11-6 ruling 5) traps: it is never routed into an
+        // enclosing `fac … cape` or `⇥` channel, only an authored `↦` is.
         if recovery.is_none()
+            && !implicit
             && let Some(handler) = self.handlers.last().cloned()
         {
             return Some(self.lower_handled_conversio(HandledConversio {
@@ -3093,6 +3100,68 @@ impl FunctionBuilder<'_> {
             ty,
             expr.span,
         ))
+    }
+
+    /// An await-binding whose awaited value narrows into the declared slot
+    /// (d11-6 §3(a) row 2). The awaited call already yields the success
+    /// payload, so the payload is converted into the slot with the same
+    /// checked `Convert` an implicit store node uses: it traps, and is never
+    /// routed into an enclosing `fac … cape` or `⇥` channel.
+    pub(super) fn lower_await_store(
+        &mut self,
+        init: &HirExpression,
+        destination: MirPlace,
+        slot_ty: MirType,
+        span: Span,
+    ) -> Option<()> {
+        let init_ty = self.expr_ty(init)?.semantic_id();
+        let awaited = match self.normalized_type(init_ty) {
+            Type::Promissum(inner) | Type::PromissumFailable(inner, _) => *inner,
+            _ => init_ty,
+        };
+        let future = self.lower_expr_value(init)?;
+        // Materialize the payload into an awaited-typed temp, as `reddet`
+        // does, so the conversion validates against the payload type.
+        let source = self.assign_temp(MirValueKind::Operand(future), MirType::semantic(awaited), span);
+        self.runtime_call_to_place(
+            Some(destination),
+            MirIntrinsic::Convert(MirConversion {
+                flavor: MirConversionFlavor::Runtime,
+                source_ty: MirType::semantic(awaited),
+                target_ty: slot_ty,
+                params: Vec::new(),
+                recovery: None,
+                struct_defaults: Vec::new(),
+            }),
+            vec![source],
+            slot_ty,
+            span,
+        );
+        Some(())
+    }
+
+    /// A constant stored with `←` into a `wrapping` or `saturating` slot
+    /// follows the slot's policy (d11-6 ruling 21, amended): the value is
+    /// reduced or clamped here, at compile time, instead of by a runtime
+    /// conversion that would range-check.
+    fn fold_word_store_constant(&self, source: &HirExpression, target: TypeId) -> Option<MirOperand> {
+        let value = crate::semantic::passes::const_int_value(source)?;
+        let (width, saturating) = match self.normalized_type(target) {
+            Type::ModularWord(width) => (*width, false),
+            Type::SaturatingWord(width) => (*width, true),
+            _ => return None,
+        };
+        let (lo, hi) = width.integer_range()?;
+        let folded = if saturating {
+            value.clamp(lo, hi)
+        } else {
+            lo + (value - lo).rem_euclid(hi - lo + 1)
+        };
+        Some(MirOperand::Constant(if lo >= 0 {
+            MirConstant::UInt(u64::try_from(folded).ok()?)
+        } else {
+            MirConstant::Int(i64::try_from(folded).ok()?)
+        }))
     }
 
     /// Finalize the conversion target when semantic hole solving only updates

@@ -178,9 +178,23 @@ fn self_reference_is_a_cycle() {
 
 #[test]
 fn overflow_is_rejected() {
+    // A reference keeps the fold with the static pass: `MAX + 1` is not a
+    // literal-only constant, so the checked fold owns the overflow.
+    assert_rejects_with_issue(
+        "generis numerus MAX = 9223372036854775807\ngeneris numerus N = MAX + 1\n",
+        "static_arithmetic_overflow",
+    );
+}
+
+#[test]
+fn literal_constant_that_exceeds_the_slot_is_a_store_error() {
+    // d11-6 U4 (ruling 21, `=` rule): the exact value 2^63 is a valid
+    // intermediate, but a constant in an `=` position must fit its slot, so
+    // the literal form is refused at the store before the fold runs. This
+    // replaces the old literal-form pin on `static_arithmetic_overflow`.
     assert_rejects_with_issue(
         "generis numerus N = 9223372036854775807 + 1\n",
-        "static_arithmetic_overflow",
+        "store_constant_out_of_range",
     );
 }
 

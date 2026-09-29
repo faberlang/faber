@@ -536,6 +536,13 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "numeric_arithmetic_operands_identical" => {
             Some("convert operands explicitly before applying this numeric operator".to_owned())
         }
+        "u64_signed_arithmetic_requires_conversion" => Some(
+            "convert one side with `↦` so both operands are u64 or both are signed".to_owned(),
+        ),
+        "numeric_family_crossing_requires_conversio" => Some(
+            "convert one operand explicitly with `↦`; a written constant may stand beside any number"
+                .to_owned(),
+        ),
         "saturating_word_width_required" => Some(
             "write the saturating type with one integer width, such as saturatus<u8> or saturatus<i16>".to_owned(),
         ),

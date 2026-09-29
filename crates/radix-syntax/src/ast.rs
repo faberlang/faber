@@ -1347,6 +1347,7 @@ pub enum BinOp {
     Minimum, // ⤓ lower/min
     Mul,
     Div,
+    TrueDiv, // ÷ true division (always f64 on integers)
     Mod,
     // Glyph products (tensor-glyphs family; multiplicative precedence)
     Dot,           // · inner product (dot / matvec / matmul)

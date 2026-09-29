@@ -53,3 +53,51 @@ fn glyph_spellings_match_the_pinned_codepoints() {
     assert_eq!(HirBinOp::Hadamard.glyph_spelling(), Some("⊙"));
     assert_eq!(HirBinOp::HadamardDiv.glyph_spelling(), Some("⊘"));
 }
+
+#[test]
+fn walking_an_implicit_store_reaches_its_source() {
+    use super::{
+        HirConversioTarget, HirExpression, HirExpressionKind, HirId, HirLiteral, HirStoreKind,
+        HirStoreSite,
+    };
+    use crate::visit::{HirVisitor, walk_expr};
+    use radix_lexer::Span;
+    use radix_types::TypeId;
+
+    struct Literals(u32);
+    impl HirVisitor for Literals {
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            if matches!(expr.kind, HirExpressionKind::Literal(_)) {
+                self.0 += 1;
+            }
+            walk_expr(self, expr);
+        }
+    }
+
+    let source = HirExpression {
+        id: HirId(1),
+        kind: HirExpressionKind::Literal(HirLiteral::Int(300)),
+        ty: None,
+        span: Span::default(),
+    };
+    let store = HirExpression {
+        id: HirId(2),
+        kind: HirExpressionKind::Conversio {
+            source: Box::new(source),
+            target: HirConversioTarget::Type(TypeId(1)),
+            params: Vec::new(),
+            recovery: None,
+            route: None,
+            implicit: Some(HirStoreSite {
+                kind: HirStoreKind::Declaration,
+                slot: None,
+                inferred_from: None,
+            }),
+        },
+        ty: None,
+        span: Span::default(),
+    };
+    let mut literals = Literals(0);
+    literals.visit_expr(&store);
+    assert_eq!(literals.0, 1);
+}

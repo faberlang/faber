@@ -231,6 +231,9 @@ mod copy_duplicate_tests;
 #[path = "device_test.rs"]
 mod device_tests;
 #[cfg(test)]
+#[path = "implicit_store_test.rs"]
+mod implicit_store_tests;
+#[cfg(test)]
 #[path = "inference_blocker_matrix_test.rs"]
 mod inference_blocker_matrix_tests;
 #[cfg(test)]

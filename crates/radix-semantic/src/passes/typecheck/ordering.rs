@@ -281,7 +281,7 @@ impl TypeChecker<'_> {
     }
 
     /// A fresh expression id above every id in the module being checked.
-    fn fresh_hir_id(&mut self) -> HirId {
+    pub(super) fn fresh_hir_id(&mut self) -> HirId {
         let id = HirId(self.next_hir_id);
         self.next_hir_id += 1;
         id

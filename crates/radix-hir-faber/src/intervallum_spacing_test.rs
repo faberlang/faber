@@ -179,6 +179,7 @@ fn conversion_targets_follow_the_same_spacing_law() {
         ))),
         params: Vec::new(),
         recovery: None,
+        implicit: None,
     });
     assert_eq!(ctx.render(&tight), "1 ↦ 0‥10");
     let expanded = expr(HirExpressionKind::Conversio {
@@ -191,6 +192,7 @@ fn conversion_targets_follow_the_same_spacing_law() {
         ))),
         params: Vec::new(),
         recovery: None,
+        implicit: None,
     });
     assert_eq!(ctx.render(&expanded), "1 ↦ 0 ‥ n");
 }

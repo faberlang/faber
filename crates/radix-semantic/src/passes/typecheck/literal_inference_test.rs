@@ -255,7 +255,7 @@ functio f() → i32 {
 fn neg_i32_arithmetic_rhs() {
     test_support::assert_analysis_accepts(
         r"
-functio f(i32 x) → i32 {
+functio f(i32 x) → i64 {
     redde x + -1
 }
 ",

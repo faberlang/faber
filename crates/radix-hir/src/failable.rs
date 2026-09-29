@@ -419,6 +419,7 @@ mod tests {
                 }),
                 mutable: false,
                 runtime_provided: false,
+                await_store: None,
                 is_await: false,
             }),
             span,

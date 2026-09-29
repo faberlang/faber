@@ -98,6 +98,7 @@ impl super::FaberCodegen<'_> {
             HirBinOp::Add | HirBinOp::Sub => 10,
             HirBinOp::Mul
             | HirBinOp::Div
+            | HirBinOp::TrueDiv
             | HirBinOp::Mod
             | HirBinOp::Dot
             | HirBinOp::Cross
@@ -122,6 +123,7 @@ impl super::FaberCodegen<'_> {
             HirBinOp::Sub => "-".to_owned(),
             HirBinOp::Mul => "*".to_owned(),
             HirBinOp::Div => "/".to_owned(),
+            HirBinOp::TrueDiv => "÷".to_owned(),
             HirBinOp::Mod => "%".to_owned(),
             HirBinOp::Dot => "·".to_owned(),
             HirBinOp::Cross => "×".to_owned(),

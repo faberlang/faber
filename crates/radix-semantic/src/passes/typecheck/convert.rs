@@ -26,9 +26,11 @@
 //! including `ignotum` and union-like map values when the surrounding code has
 //! intentionally chosen an escape or broad shape.
 
+use super::store::StoreSite;
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
+use radix_hir::HirStoreKind;
 
 use crate::lista_tensor_conversio::{
     ListaToTensorError, RectangularListaLiteralError, analyze_rectangular_lista_literal,
@@ -2705,7 +2707,8 @@ impl TypeChecker<'_> {
                         self.invalid_operand_types(ISSUE_OBJECT_FIELD_REQUIRES_VALUE, span);
                         continue;
                     };
-                    let value_ty = self.check_expr_with_expected(value, Some(field_ty));
+                    let site = StoreSite::new(HirStoreKind::Field).named(*name);
+                    let value_ty = self.check_store_expr(value, field_ty, site);
                     self.unify_carrier_assign(
                         value_ty,
                         field_ty,
@@ -2739,7 +2742,8 @@ impl TypeChecker<'_> {
         // Check under the target as expected type so literal operands erase
         // their exact bounds exactly like a declared-type initializer
         // (`fixum lista<numerus> x ← [0]`).
-        let recovery_ty = self.check_expr_with_expected(recovery, Some(target_resolved));
+        let site = StoreSite::new(HirStoreKind::ConversionDefault);
+        let recovery_ty = self.check_store_expr(recovery, target_resolved, site);
         self.unify_assign_issue(
             recovery_ty,
             target_resolved,
@@ -3168,7 +3172,12 @@ impl TypeChecker<'_> {
                     self.unify_join(textus, key_ty, span, ISSUE_MAP_KEY_TYPE_MISMATCH);
                 }
                 HirObjectKey::Computed(key) => {
-                    let actual_key_ty = self.check_expr(key);
+                    // Row 12: a key lands in the declared key type as a store.
+                    let actual_key_ty = self.check_store_by_type(
+                        key,
+                        key_ty,
+                        StoreSite::new(HirStoreKind::Element),
+                    );
                     self.unify_join(actual_key_ty, key_ty, key.span, ISSUE_MAP_KEY_TYPE_MISMATCH);
                 }
                 HirObjectKey::Spread(expr) => {
@@ -3210,7 +3219,8 @@ impl TypeChecker<'_> {
                 self.invalid_operand_types(ISSUE_OBJECT_FIELD_REQUIRES_VALUE, span);
                 continue;
             };
-            let value_ty_actual = self.check_expr(value);
+            let value_ty_actual =
+                self.check_store_by_type(value, value_ty, StoreSite::new(HirStoreKind::Element));
             inferred_values.push(self.resolve_inferred_type(value_ty_actual));
             let value_resolved = self.resolve_inferred_type(value_ty);
             // WHY: infer/ignotum/union value targets are already broad enough to

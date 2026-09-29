@@ -376,6 +376,7 @@ impl Lowerer<'_> {
             radix_syntax::BinOp::Sub => HirBinOp::Sub,
             radix_syntax::BinOp::Mul => HirBinOp::Mul,
             radix_syntax::BinOp::Div => HirBinOp::Div,
+            radix_syntax::BinOp::TrueDiv => HirBinOp::TrueDiv,
             radix_syntax::BinOp::Mod => HirBinOp::Mod,
             radix_syntax::BinOp::Dot => HirBinOp::Dot,
             radix_syntax::BinOp::Cross => HirBinOp::Cross,
@@ -1378,6 +1379,7 @@ impl Lowerer<'_> {
             target,
             params,
             recovery,
+            implicit: None,
         }
     }
 

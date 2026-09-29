@@ -20,9 +20,11 @@
 //! - Struct field defaults are checked against their declared field types; they
 //!   do not create fresh field types.
 
+use super::store::StoreSite;
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
+use radix_hir::HirStoreKind;
 
 const ISSUE_PARAMETER_DEFAULT_TYPE_MISMATCH: &str = "parameter_default_type_mismatch";
 const ISSUE_CONSTANT_ANNOTATION_MISMATCH: &str = "constant_annotation_mismatch";
@@ -56,7 +58,8 @@ impl TypeChecker<'_> {
         self.push_scope();
         for (idx, param) in func.params.iter_mut().enumerate() {
             if let Some(default) = &mut param.default {
-                let default_ty = self.check_expr_with_expected(default, Some(param.ty));
+                let site = StoreSite::new(HirStoreKind::ParameterDefault).named(param.name);
+                let default_ty = self.check_store_expr(default, param.ty, site);
                 self.unify_assign_issue(
                     default_ty,
                     param.ty,
@@ -140,6 +143,14 @@ impl TypeChecker<'_> {
     /// phases read the annotated HIR.
     pub fn check_const(&mut self, def_id: DefId, const_item: &mut radix_hir::HirConst) {
         let ty = if let Some(annotated) = const_item.ty {
+            // `generis T X = e` states a compile-time fact (an `=` position);
+            // a legacy top-level `fixum T x ← e` is an ordinary store.
+            let site = StoreSite::new(HirStoreKind::Declaration).named(const_item.name);
+            let site = if const_item.statica.is_some() {
+                site.compile_time()
+            } else {
+                site
+            };
             // Typed `fixum T x ↤ y` at item scope is conversion-directed
             // initialization, not assignment to a constant. Expose the
             // binding only while the initializer is checked so lvalue
@@ -151,12 +162,11 @@ impl TypeChecker<'_> {
             ) {
                 self.push_scope();
                 self.insert_binding_with_scalar(def_id, annotated, false, const_item.mutable);
-                let value_ty =
-                    self.check_expr_with_expected(&mut const_item.value, Some(annotated));
+                let value_ty = self.check_store_expr(&mut const_item.value, annotated, site);
                 self.pop_scope();
                 value_ty
             } else {
-                self.check_expr_with_expected(&mut const_item.value, Some(annotated))
+                self.check_store_expr(&mut const_item.value, annotated, site)
             };
             self.unify_assign_issue(
                 value_ty,
@@ -235,7 +245,10 @@ impl TypeChecker<'_> {
                 for field in &mut struct_item.fields {
                     self.check_hashable_keys(field.ty, item.span);
                     if let Some(init) = &mut field.init {
-                        let init_ty = self.check_expr_with_expected(init, Some(field.ty));
+                        let site = StoreSite::new(HirStoreKind::Field)
+                            .named(field.name)
+                            .compile_time();
+                        let init_ty = self.check_store_expr(init, field.ty, site);
                         self.unify_assign_issue(
                             init_ty,
                             field.ty,

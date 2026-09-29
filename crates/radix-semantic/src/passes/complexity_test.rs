@@ -396,6 +396,7 @@ fn row_conversio_expression_recovery_counts_when_present() {
             target: HirConversioTarget::Type(radix_types::TypeId(1)),
             params: Vec::new(),
             recovery,
+            implicit: None,
         })
     };
     assert_eq!(score(vec![conv(None)]), 1, "no ⊥ fallback: 0");

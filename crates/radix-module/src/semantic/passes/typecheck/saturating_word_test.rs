@@ -86,7 +86,11 @@ functio keep(saturatus<u8, u8> x) → numerus {
 }
 
 #[test]
-fn saturating_word_literal_adapts_and_must_fit_the_width() {
+fn saturating_word_literal_adapts_and_clamps_at_the_store() {
+    // d11-6 U4 (ruling 21, amended): a constant stored with `←` into a
+    // `saturating` slot clamps. This inverts the pre-U4 pin
+    // `saturating_word_literal_out_of_range` for `←` positions; an `=`
+    // position (`generis`) still refuses a constant that does not fit.
     for (width, max, max_plus_one) in SATURATING_WIDTH_ROWS {
         analysis_accepts(&format!(
             r"
@@ -97,16 +101,17 @@ incipit {{
 }}
 "
         ));
-        analysis_rejects_with_issue(
-            &format!(
-                r"
+        analysis_accepts(&format!(
+            r"
 incipit {{
     fixum saturatus<{width}> tooBig ← {max_plus_one}
     nota tooBig
 }}
 "
-            ),
-            "saturating_word_literal_out_of_range",
+        ));
+        analysis_rejects_with_issue(
+            &format!("generis saturatus<{width}> TOO_BIG = {max_plus_one}\nincipit {{\n    nota TOO_BIG\n}}\n"),
+            "store_constant_out_of_range",
         );
     }
 }

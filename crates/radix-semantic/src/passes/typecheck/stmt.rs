@@ -21,9 +21,11 @@
 //!   dangling; finalization should only see genuinely unresolved declarations or
 //!   expressions.
 
+use super::store::StoreSite;
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
+use radix_hir::{HirStoreKind, HirStoreSite};
 
 const ISSUE_IGNORED_EXPR_RESULT_INFER: &str = "ignored_expression_result_must_resolve";
 const ISSUE_INITIALIZER_ANNOTATION_MISMATCH: &str = "initializer_annotation_mismatch";
@@ -58,7 +60,7 @@ impl TypeChecker<'_> {
         let value_ty = match value {
             Some(expr) => {
                 if let Some(expected) = self.current_return {
-                    self.check_expr_with_expected(expr, Some(expected))
+                    self.check_store_expr(expr, expected, StoreSite::new(HirStoreKind::Return))
                 } else {
                     self.check_expr(expr)
                 }
@@ -102,7 +104,12 @@ impl TypeChecker<'_> {
                 if matches!(init.kind, HirExpressionKind::ConversioAssign { .. }) {
                     self.insert_binding_with_scalar(local.def_id, *ty, false, local.mutable);
                 }
-                let init_ty = self.check_expr_with_expected(init, Some(*ty));
+                let inferred_slot = self.is_infer(self.resolve_inferred_type(*ty));
+                let site = StoreSite::new(HirStoreKind::Declaration).named(local.name);
+                let init_ty = self.check_store_expr(init, *ty, site);
+                if inferred_slot {
+                    self.inferred_slot_sources.insert(local.def_id, init.span);
+                }
                 self.unify_carrier_assign(
                     init_ty,
                     *ty,
@@ -124,6 +131,7 @@ impl TypeChecker<'_> {
             }
             (None, Some(init)) => {
                 let inferred = self.check_expr(init);
+                self.inferred_slot_sources.insert(local.def_id, init.span);
                 super::tensor_index::record_shape_witness_from_init(self, local.def_id, init);
                 inferred
             }
@@ -170,16 +178,29 @@ impl TypeChecker<'_> {
         };
 
         let local_ty = if let Some(ty) = local.ty {
-            self.unify_assign_issue(
-                awaited,
-                ty,
-                local
-                    .init
-                    .as_ref()
-                    .map_or(radix_lexer::Span::default(), |init| init.span),
-                ISSUE_INITIALIZER_ANNOTATION_MISMATCH,
-            );
-            ty
+            // Row 2: the awaited value is a store into the slot. A narrowing
+            // integer result is checked under the slot's policy after the
+            // await; the store rides the local (the awaited value has no node).
+            if self.store_narrowing_target(awaited, ty).is_some() {
+                let site = StoreSite::new(HirStoreKind::AwaitBinding).named(local.name);
+                local.await_store = Some(HirStoreSite {
+                    kind: site.kind,
+                    slot: site.slot,
+                    inferred_from: site.inferred_from,
+                });
+                ty
+            } else {
+                self.unify_assign_issue(
+                    awaited,
+                    ty,
+                    local
+                        .init
+                        .as_ref()
+                        .map_or(radix_lexer::Span::default(), |init| init.span),
+                    ISSUE_INITIALIZER_ANNOTATION_MISMATCH,
+                );
+                ty
+            }
         } else {
             local.ty = Some(awaited);
             awaited

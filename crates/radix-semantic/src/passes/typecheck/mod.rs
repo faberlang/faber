@@ -112,6 +112,7 @@ pub mod generic;
 pub mod hashable;
 pub mod index_infer;
 pub mod infer;
+pub mod integer_range;
 pub mod intervallum;
 pub mod intrinsics;
 pub mod item;
@@ -123,6 +124,7 @@ pub mod lookup;
 mod member_privacy;
 pub mod ops;
 mod ordering;
+mod store;
 
 #[cfg(test)]
 #[path = "closing_test.rs"]
@@ -316,6 +318,15 @@ pub(crate) struct TypeChecker<'a> {
     /// Next id for expressions the checker synthesizes (D1.4 glyph
     /// rewrites); seeded above the module's largest id in `check_program`.
     next_hir_id: u32,
+
+    /// Store position (d11-6 ruling 21) of the expression about to be checked;
+    /// consumed by the next `check_expr_with_expected` so only that node, not
+    /// its operands, is treated as landing in the slot.
+    pending_store: Option<store::StoreSite>,
+
+    /// For a local whose type was inferred (`_`): the span of the expression
+    /// the type came from, named by an implicit store's trap (ruling 19(i)).
+    inferred_slot_sources: FxHashMap<DefId, radix_lexer::Span>,
 
     /// Type-alias declaration parameter names keyed by alias def-id, in
     /// declaration order. Populated from HIR items so applied alias types
@@ -574,6 +585,8 @@ impl<'a> TypeChecker<'a> {
             implemented_contracts: FxHashMap::default(),
             current_generic_bounds: FxHashMap::default(),
             next_hir_id: u32::MAX / 2,
+            pending_store: None,
+            inferred_slot_sources: FxHashMap::default(),
             alias_type_params: FxHashMap::default(),
             import_receivers: FxHashSet::default(),
             target,
@@ -855,6 +868,14 @@ mod decimal_equality_test;
 mod gate_law_totality_test;
 
 #[cfg(test)]
+#[path = "integer_range_test.rs"]
+mod integer_range_test;
+
+#[cfg(test)]
+#[path = "store_position_test.rs"]
+mod store_position_test;
+
+#[cfg(test)]
 #[path = "generic_call_test.rs"]
 mod generic_call_test;
 
@@ -948,6 +969,10 @@ mod null_narrowing_test;
 #[cfg(test)]
 #[path = "numeric_value_equality_test.rs"]
 mod numeric_value_equality_test;
+
+#[cfg(test)]
+#[path = "true_division_test.rs"]
+mod true_division_test;
 
 #[cfg(test)]
 #[path = "octeti_endian_conversio_test.rs"]

@@ -1557,6 +1557,10 @@ help = "使初始值类型与声明类型一致"
 message = "浮点常量无法精确表示"
 help = "写成浮点字面量，或使用该浮点类型可精确表示的常量"
 
+[diagnostics.SEM010.issues.store_constant_out_of_range]
+message = "constant {value} does not fit {slot}"
+help = "write a value the slot holds"
+
 [diagnostics.SEM010.issues.integer_to_float_requires_conversio]
 message = "整数不能隐式转换为浮点数"
 help = "使用 `↦` 显式转换整数"
@@ -1844,6 +1848,14 @@ help = "为此运算符使用 numeric operands"
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "numeric arithmetic operands 必须类型完全一致；请用 ↦ 显式转换"
 help = "在应用此 numeric 运算符之前显式转换 operands"
+
+[diagnostics.SEM011.issues.u64_signed_arithmetic_requires_conversion]
+message = "u64 and a signed integer have no lossless join in arithmetic"
+help = "convert one side with `↦` so both operands are u64 or both are signed"
+
+[diagnostics.SEM011.issues.numeric_family_crossing_requires_conversio]
+message = "integer, decimal and float operands cannot mix implicitly"
+help = "convert one operand explicitly with `↦`; a written constant may stand beside any number"
 
 [diagnostics.SEM011.issues.ascii_literal_invalid_escape]
 message = "ascii literal 包含无效转义序列"

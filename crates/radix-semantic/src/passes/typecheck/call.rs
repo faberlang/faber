@@ -18,11 +18,12 @@
 //!   this pass only establishes the semantic result type and diagnostics.
 
 use super::member_privacy::MemberAccess;
+use super::store::{StoreSite, argument_site};
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
 use crate::format_faber_type;
-use radix_hir::HirCallArg;
+use radix_hir::{HirCallArg, HirStoreKind};
 
 enum DirectionalViewKind {
     Meus,
@@ -298,7 +299,8 @@ impl TypeChecker<'_> {
         }
 
         for (arg, param) in args.iter_mut().zip(sig.params.iter()) {
-            let arg_ty = self.check_expr_with_expected(&mut arg.expr, Some(param.ty));
+            let site = argument_site(arg.name);
+            let arg_ty = self.check_store_expr(&mut arg.expr, param.ty, site);
             if self.types.is_ref_view(arg_ty)
                 && (matches!(
                     param.mode,
@@ -1182,8 +1184,11 @@ impl TypeChecker<'_> {
                             continue;
                         };
                         if let Some(field_ty) = field_types.get(index).copied() {
-                            let arg_ty =
-                                self.check_expr_with_expected(&mut arg.expr, Some(field_ty));
+                            let arg_ty = self.check_store_expr(
+                                &mut arg.expr,
+                                field_ty,
+                                StoreSite::new(HirStoreKind::Field).named(name),
+                            );
                             self.unify_assign_issue(
                                 arg_ty,
                                 field_ty,
@@ -1194,7 +1199,11 @@ impl TypeChecker<'_> {
                     }
                 } else {
                     for (arg, field_ty) in args.iter_mut().zip(field_types.iter()) {
-                        let arg_ty = self.check_expr_with_expected(&mut arg.expr, Some(*field_ty));
+                        let arg_ty = self.check_store_expr(
+                            &mut arg.expr,
+                            *field_ty,
+                            StoreSite::new(HirStoreKind::Field),
+                        );
                         self.unify_assign_issue(
                             arg_ty,
                             *field_ty,
@@ -1711,7 +1720,8 @@ impl TypeChecker<'_> {
             let mut vars = FxHashMap::default();
             let instantiated = self.substitute_func_sig(&sig, &mut vars, None);
             let param = &instantiated.params[0];
-            let payload_ty = self.check_expr_with_expected(payload, Some(param.ty));
+            let payload_ty =
+                self.check_store_expr(payload, param.ty, StoreSite::new(HirStoreKind::Argument));
             if self.types.is_ref_view(payload_ty)
                 && (matches!(
                     param.mode,
