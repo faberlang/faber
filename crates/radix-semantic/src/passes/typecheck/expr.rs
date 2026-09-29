@@ -34,6 +34,7 @@ const ISSUE_IACE_VALUE_TYPE_MISMATCH: &str = "iace_value_type_mismatch";
 const ISSUE_ASSERT_CONDITION_TYPE_MISMATCH: &str = "assert_condition_type_mismatch";
 pub(super) const ISSUE_STREAM_AD_OPENER_TYPE_MISMATCH: &str = "stream_ad_opener_type_mismatch";
 const ISSUE_EXPRESSION_TYPE_MISMATCH: &str = "expression_type_mismatch";
+const ISSUE_INTEGER_QUOTIENT_TO_FLOAT: &str = "integer_quotient_to_float_requires_true_division";
 const ISSUE_ITERA_AB_SOURCE_REQUIRES_RANGE: &str = "itera_ab_source_requires_range";
 pub(super) const ISSUE_CURSOR_ITERATION_REQUIRES_EX: &str = "cursor_iteration_requires_ex";
 const ISSUE_ITERA_APUD_REQUIRES_EX: &str = "itera_apud_requires_ex";
@@ -632,6 +633,19 @@ impl TypeChecker<'_> {
         };
 
         let ty = match (expected, store) {
+            // Ruling 16: an integer quotient cannot land in a float slot; the
+            // help points at `÷`, which divides integers into an `f64`.
+            (Some(expected), _)
+                if matches!(expr.kind, HirExpressionKind::Binary(HirBinOp::Div, ..))
+                    && self.is_integer_into_float(ty, expected) =>
+            {
+                self.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_INTEGER_QUOTIENT_TO_FLOAT,
+                    expr.span,
+                );
+                self.error_type
+            }
             (Some(expected), Some(site)) => self.coerce_store(expr, ty, expected, site),
             (Some(expected), None) => self.unify_expected(ty, expected, expr.span),
             (None, _) => ty,

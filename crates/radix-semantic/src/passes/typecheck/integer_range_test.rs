@@ -227,10 +227,10 @@ fn strict_equality_takes_an_integer_constant_by_value() {
     test_support::assert_analysis_accepts(
         "functio p(numerus<u8> a) → bivalens {\n    redde a ≡ 200\n}\n",
     );
-    // A constant the width cannot hold is still not exactly equal-typed.
-    test_support::assert_analysis_rejects_with_issue(
+    // A constant the width cannot hold compares exactly and is simply false
+    // (ruling 22); it is not a type error.
+    test_support::assert_analysis_accepts(
         "functio p(numerus<u8> a) → bivalens {\n    redde a ≡ 300\n}\n",
-        "equality_exact_types_required",
     );
     // Typed operands of different widths stay exact-type only.
     test_support::assert_analysis_rejects_with_issue(

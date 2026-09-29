@@ -876,6 +876,10 @@ mod integer_range_test;
 mod store_position_test;
 
 #[cfg(test)]
+#[path = "g1_repair_test.rs"]
+mod g1_repair_test;
+
+#[cfg(test)]
 #[path = "generic_call_test.rs"]
 mod generic_call_test;
 

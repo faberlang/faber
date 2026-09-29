@@ -800,7 +800,7 @@ impl TypeChecker<'_> {
             return left;
         }
         if !self.current_device_function
-            && let Some(joined) = self.integer_hull_type(left, right)
+            && let Some(joined) = self.integer_hull_type(left, right, span)
         {
             // d11-6 ruling 21: the smallest integer type holding both branches.
             return joined;
@@ -1038,6 +1038,16 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         match op {
             radix_hir::HirUnOp::Neg => {
+                // `-9223372036854775808` is an exact constant that fits `int`;
+                // its magnitude alone does not, so the literal is read wide.
+                if matches!(
+                    operand.kind,
+                    HirExpressionKind::Literal(HirLiteral::Int(magnitude)) if magnitude == 1 << 63
+                ) && self.expected_float_slot_type(expected).is_none()
+                {
+                    self.check_const_operand(operand);
+                    return self.numerus_type();
+                }
                 let expected = self.unary_operand_expected(operand, expected);
                 let operand_ty = self.check_expr_with_expected(operand, expected);
                 if self.is_error(operand_ty) {
@@ -1404,6 +1414,9 @@ impl TypeChecker<'_> {
             | HirBinOp::Shl
             | HirBinOp::Shr => {
                 let (lhs_ty, rhs_ty) = self.check_integer_operands(lhs, rhs, expected);
+                if self.reject_negative_shift_count(op, rhs) {
+                    return self.error_type;
+                }
                 if let Some(result) =
                     self.bitwise_range_type(op, lhs, rhs, lhs_ty, rhs_ty, expected, lhs.span)
                 {
@@ -2092,7 +2105,11 @@ impl TypeChecker<'_> {
             Type::Primitive(Primitive::Nihil) => self.check_expr(rhs),
             _ => {
                 let rhs_ty = self.check_expr(rhs);
-                self.common_type(lhs_ty, rhs_ty, lhs.span)
+                self.common_type_with_consts(
+                    (lhs_ty, None),
+                    (rhs_ty, Self::const_join_range(rhs)),
+                    lhs.span,
+                )
             }
         }
     }

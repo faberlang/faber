@@ -625,6 +625,49 @@ pub fn integer_width_max(width: NumericWidth) -> Option<u64> {
     }
 }
 
+/// Significand bits (including the implicit one) and largest exponent of a
+/// float width; `None` for integer and decimal widths.
+fn float_format(width: NumericWidth) -> Option<(u32, i32)> {
+    match width {
+        NumericWidth::F16 => Some((11, 15)),
+        NumericWidth::BF16 => Some((8, 127)),
+        NumericWidth::F32 => Some((24, 127)),
+        NumericWidth::F64 => Some((53, 1023)),
+        _ => None,
+    }
+}
+
+/// Whether the finite magnitude `value` rounds to infinity in a float width
+/// (IEEE round-to-nearest). A constant that does is out of the float's finite
+/// range (d11-6 ruling 20(2)). `f64` never overflows a finite `f64`.
+#[must_use]
+pub fn float_overflows(width: NumericWidth, value: f64) -> bool {
+    let Some((precision, emax)) = float_format(width) else {
+        return false;
+    };
+    if emax >= 1023 || !value.is_finite() {
+        return false;
+    }
+    // Largest finite value plus half an ulp is the first magnitude that rounds up.
+    let threshold = 2f64.powi(emax + 1) - 2f64.powi(emax - precision.cast_signed());
+    value.abs() >= threshold
+}
+
+/// Whether an integer is exactly representable in a float width (ruling
+/// 20(1)): its significant bits fit the significand and it is finite there.
+#[must_use]
+pub fn float_holds_integer(width: NumericWidth, value: i128) -> bool {
+    let Some((precision, _)) = float_format(width) else {
+        return false;
+    };
+    let magnitude = value.unsigned_abs();
+    if magnitude == 0 {
+        return true;
+    }
+    let significant = 128 - magnitude.leading_zeros() - magnitude.trailing_zeros();
+    significant <= precision && !float_overflows(width, magnitude as f64)
+}
+
 /// Effective width for bare or sized numeric types.
 #[must_use]
 #[allow(clippy::match_same_arms)]

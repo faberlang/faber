@@ -267,6 +267,7 @@ impl TypeChecker<'_> {
             .map(|scrutinee| self.check_expr(scrutinee))
             .collect();
         let mut result_ty = None;
+        let mut result_const = None;
 
         for arm in arms {
             self.push_scope();
@@ -291,9 +292,24 @@ impl TypeChecker<'_> {
                 self.override_binding(def_id, narrowed);
             }
             let body_ty = self.check_expr_with_expected(&mut arm.body, expected);
+            let body_const = Self::const_join_range(&arm.body);
             result_ty = Some(match result_ty {
-                None => body_ty,
-                Some(existing) => self.common_type(existing, body_ty, arm.span),
+                None => {
+                    result_const = body_const;
+                    body_ty
+                }
+                Some(existing) => {
+                    let joined = self.common_type_with_consts(
+                        (existing, result_const),
+                        (body_ty, body_const),
+                        arm.span,
+                    );
+                    result_const = match (result_const, body_const) {
+                        (Some(a), Some(b)) => Some(radix_types::numeric_range::hull(a, b)),
+                        _ => None,
+                    };
+                    joined
+                }
             });
             self.pop_scope();
         }
@@ -349,6 +365,11 @@ impl TypeChecker<'_> {
         };
 
         let block_expected = self.branch_expected(expected);
+        let then_const = then_block.expr.as_deref().and_then(Self::const_join_range);
+        let else_const = else_block
+            .as_deref()
+            .and_then(|block| block.expr.as_deref())
+            .and_then(Self::const_join_range);
         let (then_ty, then_state) = if let Some(catch) = then_catch {
             let err_ty = self.fresh_infer();
             let prev_error = self.current_error;
@@ -408,7 +429,7 @@ impl TypeChecker<'_> {
             return self.unify_join(then_ty, else_ty, cond.span, "common_type_mismatch");
         }
 
-        self.common_type(then_ty, else_ty, cond.span)
+        self.common_type_with_consts((then_ty, then_const), (else_ty, else_const), cond.span)
     }
 
     /// Detect a narrowing condition on a visible immutable binding and compute

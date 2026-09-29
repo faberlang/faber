@@ -1557,6 +1557,18 @@ help = "使初始值类型与声明类型一致"
 message = "浮点常量无法精确表示"
 help = "写成浮点字面量，或使用该浮点类型可精确表示的常量"
 
+[diagnostics.SEM010.issues.float_constant_out_of_range]
+message = "float constant is outside the finite range of the float type"
+help = "write a value the float type can hold, or use a wider float type"
+
+[diagnostics.SEM010.issues.shift_count_negative]
+message = "shift count must not be negative"
+help = "write a shift count of zero or more"
+
+[diagnostics.SEM010.issues.integer_quotient_to_float_requires_true_division]
+message = "integer quotient cannot be a float implicitly"
+help = "divide with `÷` to get a float quotient, or convert an operand explicitly with `↦`"
+
 [diagnostics.SEM010.issues.store_constant_out_of_range]
 message = "constant {value} does not fit {slot}"
 help = "write a value the slot holds"

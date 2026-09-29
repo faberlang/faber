@@ -193,7 +193,12 @@ impl TypeChecker<'_> {
         };
 
         self.check_call_args(&sig, args, span);
-        if let Some(expected) = expected {
+        // A result that only needs a checked integer store to reach the slot
+        // (`int` into `u8`) is not a mismatch: the caller applies the store
+        // (rulings 17b, 21).
+        if let Some(expected) = expected
+            && self.store_narrowing_target(sig.ret, expected).is_none()
+        {
             self.unify_carrier_assign(sig.ret, expected, span, ISSUE_EXPRESSION_TYPE_MISMATCH);
         }
         // GPD-3: inference is complete, so declared defaults now bind every

@@ -84,7 +84,7 @@ pub(super) fn argument_site(name: Option<Symbol>) -> StoreSite {
 
 /// An integer slot: policy family, declared width and its exact range.
 #[derive(Clone, Copy)]
-struct IntSlot {
+pub(super) struct IntSlot {
     family: IntFamily,
     width: NumericWidth,
     range: IntRange,
@@ -181,7 +181,7 @@ impl TypeChecker<'_> {
 
     /// Integer shape of a concrete slot type (aliases and access markers
     /// peeled); `None` for floats, decimals, holes and non-numerics.
-    fn store_int_slot(&self, ty: TypeId) -> Option<(TypeId, IntSlot)> {
+    pub(super) fn store_int_slot(&self, ty: TypeId) -> Option<(TypeId, IntSlot)> {
         let mut ty = self.resolve_inferred_type(ty);
         ty = self.types.peel_access_marker(ty).1;
         while let Type::Alias(_, inner) = self.types.get(ty) {
@@ -249,7 +249,7 @@ impl TypeChecker<'_> {
         let value = const_int_value(expr)?;
         let (slot_int_ty, slot) = self.store_int_target(slot_ty)?;
         if slot.holds(value) {
-            return None;
+            return self.fold_word_slot_constant(expr, value, slot_int_ty, slot);
         }
         if site.compile_time || slot.family == IntFamily::Plain {
             self.check_const_operand(expr);
@@ -266,6 +266,48 @@ impl TypeChecker<'_> {
         // slot's policy. It is checked as a plain `int` and wrapped.
         let ty = self.check_const_operand(expr);
         Some(self.wrap_implicit_store(expr, ty, slot_int_ty, site))
+    }
+
+    /// A constant-only expression that fits a `wrapping` or `saturating` slot
+    /// is computed exactly first (ruling 12a); the slot then takes the value.
+    /// It is folded to the literal of that value, typed as the slot. A bare
+    /// literal, a negated literal and any other slot follow the ordinary path.
+    fn fold_word_slot_constant(
+        &mut self,
+        expr: &mut HirExpression,
+        value: i128,
+        slot_ty: TypeId,
+        slot: IntSlot,
+    ) -> Option<TypeId> {
+        let bare = match &expr.kind {
+            HirExpressionKind::Literal(_) => true,
+            HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => {
+                matches!(inner.kind, HirExpressionKind::Literal(_))
+            }
+            _ => false,
+        };
+        if slot.family == IntFamily::Plain || bare {
+            return None;
+        }
+        let magnitude = u64::try_from(value.unsigned_abs()).ok()?;
+        let span = expr.span;
+        let mut literal = HirExpression {
+            id: self.fresh_hir_id(),
+            kind: HirExpressionKind::Literal(HirLiteral::Int(magnitude)),
+            ty: Some(slot_ty),
+            span,
+        };
+        if value < 0 {
+            literal = HirExpression {
+                id: self.fresh_hir_id(),
+                kind: HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, Box::new(literal)),
+                ty: Some(slot_ty),
+                span,
+            };
+        }
+        expr.kind = literal.kind;
+        expr.ty = Some(slot_ty);
+        Some(slot_ty)
     }
 
     /// Replace `expr` by an implicit store node targeting `target`.

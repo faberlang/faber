@@ -697,6 +697,7 @@ impl TypeChecker<'_> {
         }
 
         let mut element_ty = None;
+        let mut elements_const = None;
         for element in elements {
             let (expr, spread) = match element {
                 HirArrayElement::Expr(expr) => (expr, false),
@@ -733,9 +734,31 @@ impl TypeChecker<'_> {
             } else {
                 ty
             };
+            let element_const = if spread {
+                None
+            } else {
+                Self::const_join_range(expr)
+            };
             element_ty = Some(match element_ty {
-                None => ty,
-                Some(existing) => self.array_common_type(existing, ty, expr.span),
+                None => {
+                    elements_const = element_const;
+                    ty
+                }
+                Some(existing) => {
+                    let joined = match (elements_const, element_const) {
+                        (Some(_), None) | (None, Some(_)) => self.common_type_with_consts(
+                            (existing, elements_const),
+                            (ty, element_const),
+                            expr.span,
+                        ),
+                        _ => self.array_common_type(existing, ty, expr.span),
+                    };
+                    elements_const = match (elements_const, element_const) {
+                        (Some(a), Some(b)) => Some(radix_types::numeric_range::hull(a, b)),
+                        _ => None,
+                    };
+                    joined
+                }
             });
         }
 

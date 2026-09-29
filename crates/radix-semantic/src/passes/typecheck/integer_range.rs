@@ -21,6 +21,8 @@ pub(super) const U64_SIGNED_ARITHMETIC_REQUIRES_CONVERSION: &str =
 pub(super) const NUMERIC_FAMILY_CROSSING_REQUIRES_CONVERSIO: &str =
     "numeric_family_crossing_requires_conversio";
 const FLOAT_CONSTANT_INEXACT: &str = "float_constant_inexact";
+const FLOAT_CONSTANT_OUT_OF_RANGE: &str = "float_constant_out_of_range";
+const SHIFT_COUNT_NEGATIVE: &str = "shift_count_negative";
 
 /// Exact value of an integer constant expression (literals and operators over
 /// literals), or `None` when the expression is not a pure integer constant.
@@ -91,7 +93,7 @@ enum ConstSlot {
     /// An integer slot: the constant takes its type.
     Integer(TypeId),
     /// A float slot: the constant takes its type after an exactness check.
-    Float(TypeId, NumericWidth),
+    Float(TypeId),
     /// A word or decimal slot keeps the pre-range shaping.
     Legacy,
     /// No slot: the constant defaults to `int`.
@@ -128,7 +130,7 @@ impl TypeChecker<'_> {
             return ConstSlot::Legacy;
         }
         if shape.prim == Primitive::Fractus {
-            return ConstSlot::Float(ty, shape.width);
+            return ConstSlot::Float(ty);
         }
         ConstSlot::Integer(ty)
     }
@@ -208,25 +210,82 @@ impl TypeChecker<'_> {
         match self.const_slot(expected) {
             ConstSlot::Legacy => None,
             ConstSlot::Integer(ty) => Some(ty),
-            ConstSlot::Float(ty, width) => {
-                let limit: i128 = match width {
-                    NumericWidth::F32 => 1 << 24,
-                    NumericWidth::F16 => 1 << 11,
-                    NumericWidth::BF16 => 1 << 8,
-                    _ => 1 << 53,
-                };
-                if value.is_some_and(|v| v.abs() > limit) {
-                    self.error_issue(
-                        SemanticErrorKind::TypeMismatch,
-                        FLOAT_CONSTANT_INEXACT,
-                        span,
-                    );
+            ConstSlot::Float(ty) => {
+                if value.is_some_and(|v| !self.check_float_integer_constant(ty, v, span)) {
                     return Some(self.error_type);
                 }
                 Some(ty)
             }
             ConstSlot::Default => Some(self.numerus_type()),
         }
+    }
+
+    /// Width of a float type, `f64` for the bare `fractus`.
+    fn float_slot_width(&self, float_ty: TypeId) -> NumericWidth {
+        match self.types.get(self.resolve_inferred_type(float_ty)) {
+            Type::SizedNumeric(Primitive::Fractus, width) => *width,
+            _ => NumericWidth::F64,
+        }
+    }
+
+    /// Ruling 20(1)/(2): an integer constant taking a float type must be
+    /// exactly representable there. Reports and returns `false` when it is not.
+    pub(super) fn check_float_integer_constant(
+        &mut self,
+        float_ty: TypeId,
+        value: i128,
+        span: radix_lexer::Span,
+    ) -> bool {
+        let width = self.float_slot_width(float_ty);
+        let issue = if radix_types::float_overflows(width, value as f64) {
+            FLOAT_CONSTANT_OUT_OF_RANGE
+        } else if !radix_types::float_holds_integer(width, value) {
+            FLOAT_CONSTANT_INEXACT
+        } else {
+            return true;
+        };
+        self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+        false
+    }
+
+    /// Ruling 20(2): a written float that rounds to infinity in the float
+    /// type is a compile error. Reports and returns `false` when it does.
+    pub(super) fn check_float_literal_range(
+        &mut self,
+        float_ty: TypeId,
+        value: f64,
+        span: radix_lexer::Span,
+    ) -> bool {
+        let width = self.float_slot_width(float_ty);
+        if radix_types::float_overflows(width, value) {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                FLOAT_CONSTANT_OUT_OF_RANGE,
+                span,
+            );
+            return false;
+        }
+        true
+    }
+
+    /// Ruling 10: a negative shift count is an error, and a compile error when
+    /// the count is a constant. Returns `true` when it reported one.
+    pub(super) fn reject_negative_shift_count(
+        &mut self,
+        op: HirBinOp,
+        count: &HirExpression,
+    ) -> bool {
+        if !matches!(op, HirBinOp::Shl | HirBinOp::Shr)
+            || !const_int_value(count).is_some_and(|n| n < 0)
+        {
+            return false;
+        }
+        self.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            SHIFT_COUNT_NEGATIVE,
+            count.span,
+        );
+        true
     }
 
     /// Range-typed result of a scalar arithmetic operator (`+ - * / %`).
@@ -307,9 +366,24 @@ impl TypeChecker<'_> {
             return self.constant_expression_type(fold_const_binary(op, a, b), expected, span);
         }
         let (a, b) = (Self::operand_range(l)?, Self::operand_range(r)?);
+        if let (Operand::Plain(x), Operand::Plain(y)) = (l, r)
+            && matches!(op, HirBinOp::BitAnd | HirBinOp::BitOr | HirBinOp::BitXor)
+            && ((x == NumericWidth::U64 && y.is_signed_int())
+                || (y == NumericWidth::U64 && x.is_signed_int()))
+        {
+            self.invalid_operand_types(U64_SIGNED_ARITHMETIC_REQUIRES_CONVERSION, span);
+            return Some(self.error_type);
+        }
         let result = match op {
             HirBinOp::BitAnd => range::bit_and(a, b),
-            HirBinOp::BitOr | HirBinOp::BitXor => range::hull(a, b),
+            HirBinOp::BitOr | HirBinOp::BitXor => {
+                let joined = range::hull(a, b);
+                if joined.0 < 0 && joined.1 > i128::from(i64::MAX) {
+                    self.invalid_operand_types(U64_SIGNED_ARITHMETIC_REQUIRES_CONVERSION, span);
+                    return Some(self.error_type);
+                }
+                joined
+            }
             HirBinOp::Shl => range::shl(a, b),
             HirBinOp::Shr => a,
             _ => return None,
@@ -363,11 +437,66 @@ impl TypeChecker<'_> {
     }
 
     /// Branch/element join of two trapping integer types: the smallest type
-    /// holding both ranges (ruling 21).
-    pub(super) fn integer_hull_type(&mut self, a: TypeId, b: TypeId) -> Option<TypeId> {
+    /// holding both ranges (ruling 21). A range that no single 64-bit type
+    /// holds (`u64` with a signed type) is the ruling-8 error, not a value
+    /// outside its own type.
+    pub(super) fn integer_hull_type(
+        &mut self,
+        a: TypeId,
+        b: TypeId,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
         let (wa, wb) = (self.plain_int_width(a)?, self.plain_int_width(b)?);
         let joined = range::hull(wa.integer_range()?, wb.integer_range()?);
-        Some(self.width_type(range::smallest_width(joined)))
+        Some(self.join_range_type(joined, span))
+    }
+
+    /// The type of a joined range, or the ruling-8 error when it spans both
+    /// negative values and values above `i64::MAX`.
+    fn join_range_type(&mut self, joined: IntRange, span: radix_lexer::Span) -> TypeId {
+        if joined.0 < 0 && joined.1 > i128::from(i64::MAX) {
+            self.invalid_operand_types(U64_SIGNED_ARITHMETIC_REQUIRES_CONVERSION, span);
+            return self.error_type;
+        }
+        self.width_type(range::smallest_width(joined))
+    }
+
+    /// Exact range of an untyped integer-constant branch or element.
+    pub(super) fn const_join_range(expr: &HirExpression) -> Option<IntRange> {
+        const_int_value(expr).map(|value| (value, value))
+    }
+
+    /// Join of two branch or element types where either may be an untyped
+    /// constant of a known range (ruling 8 extended: constants are exempt).
+    ///
+    /// A constant beside a typed integer joins by value, so `c ✓ x ✗ 0` with
+    /// `x: u64` stays `u64`; only a range no 64-bit type holds is an error.
+    /// Anything else is the plain [`Self::common_type`].
+    pub(super) fn common_type_with_consts(
+        &mut self,
+        a: (TypeId, Option<IntRange>),
+        b: (TypeId, Option<IntRange>),
+        span: radix_lexer::Span,
+    ) -> TypeId {
+        let (typed, konst) = match (a.1, b.1) {
+            (None, Some(range)) => (a.0, range),
+            (Some(range), None) => (b.0, range),
+            _ => return self.common_type(a.0, b.0, span),
+        };
+        let Some(width) = self
+            .plain_int_width(typed)
+            .filter(|_| !self.current_device_function)
+        else {
+            return self.common_type(a.0, b.0, span);
+        };
+        if width != NumericWidth::U64 && konst.1 <= i128::from(i64::MAX) {
+            return self.common_type(a.0, b.0, span);
+        }
+        let Some(typed_range) = width.integer_range() else {
+            return self.common_type(a.0, b.0, span);
+        };
+        let joined = range::hull(typed_range, konst);
+        self.join_range_type(joined, span)
     }
 
     /// Type of a `summa` reduction over integer terms: the element count is
@@ -413,13 +542,18 @@ impl TypeChecker<'_> {
         }
         expected.filter(|ty| {
             let resolved = self.resolve_inferred_type(*ty);
-            !self.is_infer(resolved) || self.infer_union_var_of(resolved).is_some()
+            // An integer slot is not a hint for the branches: each is typed on
+            // its own, the join is the range rule's, and the store into the
+            // slot narrows the joined value (rulings 17b, 21).
+            (!self.is_infer(resolved) || self.infer_union_var_of(resolved).is_some())
+                && self.store_int_slot(resolved).is_none()
         })
     }
 
     /// Strict equality compares exact types, but an untyped integer constant
-    /// beside a trapping-integer operand takes part by value (ruling 12):
-    /// `x % 2 ≡ 0` holds for every width of `x % 2` when 0 fits it.
+    /// beside a trapping-integer operand takes part by value (rulings 12, 22):
+    /// `x % 2 ≡ 0` holds for every width of `x % 2`, and `a ≡ 300` with
+    /// `a: u8` compares exactly and is simply false.
     pub(super) fn equality_constant_exempt(
         &self,
         lhs: &HirExpression,
@@ -430,13 +564,11 @@ impl TypeChecker<'_> {
         if self.current_device_function {
             return false;
         }
-        let (value, other) = match (const_int_value(lhs), const_int_value(rhs)) {
-            (Some(value), None) => (value, rhs_ty),
-            (None, Some(value)) => (value, lhs_ty),
+        let other = match (const_int_value(lhs), const_int_value(rhs)) {
+            (Some(_), None) => rhs_ty,
+            (None, Some(_)) => lhs_ty,
             _ => return false,
         };
-        self.plain_int_width(other)
-            .and_then(NumericWidth::integer_range)
-            .is_some_and(|(lo, hi)| lo <= value && value <= hi)
+        self.plain_int_width(other).is_some()
     }
 }

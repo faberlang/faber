@@ -291,7 +291,7 @@ impl TypeChecker<'_> {
 
     /// d11-6 ruling 16: a typed integer stored into a float slot. The issue's
     /// help points at the explicit `↦` conversion.
-    fn is_integer_into_float(&self, a: TypeId, b: TypeId) -> bool {
+    pub(super) fn is_integer_into_float(&self, a: TypeId, b: TypeId) -> bool {
         let from = self.peel_nominal_aliases(a);
         let to = self.peel_nominal_aliases(b);
         matches!(

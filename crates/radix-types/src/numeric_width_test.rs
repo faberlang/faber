@@ -572,3 +572,45 @@ fn i64_to_f64_is_not_assignable_but_tensor_element_conversio_allows_it() {
         &types, bare_int, bare_float
     ));
 }
+
+#[test]
+fn float_exactness_is_representability_not_a_magnitude_limit() {
+    use crate::float_holds_integer as holds;
+    // 2^53 + 1 needs 54 significant bits; 2^54 and 2^60 need one.
+    assert!(holds(NumericWidth::F64, 1 << 53));
+    assert!(!holds(NumericWidth::F64, (1 << 53) + 1));
+    assert!(holds(NumericWidth::F64, 1 << 54));
+    assert!(holds(NumericWidth::F64, 1 << 60));
+    assert!(holds(NumericWidth::F64, -(1 << 60)));
+    assert!(holds(NumericWidth::F64, 3 << 60));
+    assert!(!holds(NumericWidth::F64, (1 << 60) + 1));
+    assert!(holds(NumericWidth::F32, 16_777_216));
+    assert!(!holds(NumericWidth::F32, 16_777_217));
+    assert!(holds(NumericWidth::F32, 1 << 40));
+    assert!(holds(NumericWidth::F16, 2048));
+    assert!(!holds(NumericWidth::F16, 2049));
+    assert!(holds(NumericWidth::F16, 65504));
+    assert!(
+        !holds(NumericWidth::F16, 65536),
+        "finite range ends at 65504"
+    );
+    assert!(holds(NumericWidth::BF16, 256));
+    assert!(!holds(NumericWidth::BF16, 257));
+    assert!(holds(NumericWidth::BF16, 1 << 20));
+    assert!(holds(NumericWidth::F64, 0));
+    assert!(!holds(NumericWidth::I32, 1));
+}
+
+#[test]
+fn float_overflow_is_rounding_to_infinity() {
+    use crate::float_overflows as over;
+    assert!(!over(NumericWidth::F32, f64::from(f32::MAX)));
+    assert!(over(NumericWidth::F32, 1e40));
+    assert!(over(NumericWidth::F32, -1e40));
+    assert!(!over(NumericWidth::F16, 65504.0));
+    assert!(!over(NumericWidth::F16, 65519.0));
+    assert!(over(NumericWidth::F16, 65520.0));
+    assert!(!over(NumericWidth::BF16, 3.3895313892515355e38));
+    assert!(over(NumericWidth::BF16, 1e39));
+    assert!(!over(NumericWidth::F64, f64::MAX));
+}
