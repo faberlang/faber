@@ -2066,6 +2066,14 @@ help = "name an {implendum} declaration after {implet}"
 message = "initializer does not match annotation"
 help = "make the expression type match the expected type"
 
+[diagnostics.SEM010.issues.float_constant_inexact]
+message = "float constant is not exactly representable"
+help = "write a float literal, or a constant the float type holds exactly"
+
+[diagnostics.SEM010.issues.integer_to_float_requires_conversio]
+message = "integer cannot convert to a float implicitly"
+help = "convert the integer explicitly with `↦`"
+
 [diagnostics.SEM010.issues.incompatible_return_types]
 message = "incompatible return types"
 help = "make the expression type match the expected type"

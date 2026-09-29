@@ -281,7 +281,26 @@ impl TypeChecker<'_> {
         if let Some(destination) = self.conformance_destination(a, b) {
             return destination;
         }
+        let issue = if self.is_integer_into_float(a, b) {
+            INTEGER_TO_FLOAT_REQUIRES_CONVERSIO
+        } else {
+            issue
+        };
         self.unify_with_policy(a, b, span, issue, UnifyPolicy::Assign)
+    }
+
+    /// d11-6 ruling 16: a typed integer stored into a float slot. The issue's
+    /// help points at the explicit `↦` conversion.
+    fn is_integer_into_float(&self, a: TypeId, b: TypeId) -> bool {
+        let from = self.peel_nominal_aliases(a);
+        let to = self.peel_nominal_aliases(b);
+        matches!(
+            (self.types.get(from), self.types.get(to)),
+            (
+                Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _),
+                Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+            )
+        ) && !matches!(self.types.get(from), Type::SizedNumeric(_, w) if w.is_decimal())
     }
 
     /// The contract-accepted destination type for `a → b`, if any.
@@ -1113,3 +1132,5 @@ impl TypeChecker<'_> {
         self.union_hole_type_id(var)
     }
 }
+
+const INTEGER_TO_FLOAT_REQUIRES_CONVERSIO: &str = "integer_to_float_requires_conversio";

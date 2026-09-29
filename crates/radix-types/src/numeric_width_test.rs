@@ -506,3 +506,69 @@ fn checked_integer_guards_name_only_reachable_bounds() {
     );
     assert_eq!(NumericWidth::checked_integer_guards(U8, U16), (None, None));
 }
+
+#[test]
+fn implicit_widening_admits_unsigned_into_strictly_wider_signed() {
+    use NumericWidth::{I8, I16, I32, I64, U8, U16, U32, U64};
+    for (from, to) in [
+        (U8, I16),
+        (U8, I32),
+        (U8, I64),
+        (U16, I32),
+        (U16, I64),
+        (U32, I64),
+        (U8, U64),
+        (U32, U64),
+        (I8, I64),
+    ] {
+        assert!(
+            NumericWidth::is_widening_assignable(from, to),
+            "{from:?} -> {to:?}"
+        );
+    }
+    for (from, to) in [(U8, I8), (U16, I16), (U32, I32), (U64, I64), (U64, I8)] {
+        assert!(
+            !NumericWidth::is_widening_assignable(from, to),
+            "{from:?} -> {to:?}"
+        );
+    }
+}
+
+#[test]
+fn implicit_widening_never_crosses_integer_into_float() {
+    use NumericWidth::{F32, F64, I8, I16, I32, I64, U8, U16, U32, U64};
+    for from in [I8, I16, I32, I64, U8, U16, U32, U64] {
+        for to in [F32, F64] {
+            assert!(
+                !NumericWidth::is_widening_assignable(from, to),
+                "{from:?} -> {to:?}"
+            );
+        }
+    }
+    assert!(NumericWidth::is_widening_assignable(F32, F64));
+}
+
+#[test]
+fn conversio_widening_keeps_signed_into_f64_but_not_u64() {
+    use NumericWidth::{F64, I32, I64, U64};
+    assert!(NumericWidth::is_conversio_widening(I32, F64));
+    assert!(NumericWidth::is_conversio_widening(I64, F64));
+    assert!(!NumericWidth::is_conversio_widening(U64, F64));
+    assert!(!NumericWidth::is_explicit_narrowing_conversio(I64, F64));
+}
+
+#[test]
+fn i64_to_f64_is_not_assignable_but_tensor_element_conversio_allows_it() {
+    let mut types = TypeTable::new();
+    let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let f64 = types.sized_numeric(Primitive::Fractus, NumericWidth::F64);
+    let bare_int = types.primitive(Primitive::Numerus);
+    let bare_float = types.primitive(Primitive::Fractus);
+    assert!(!types.is_assignable(i64, f64));
+    assert!(!types.is_assignable(bare_int, bare_float));
+    assert!(!types.is_assignable(bare_int, f64));
+    assert!(super::tensor_element_conversio_allowed(&types, i64, f64));
+    assert!(super::tensor_element_conversio_allowed(
+        &types, bare_int, bare_float
+    ));
+}

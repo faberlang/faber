@@ -1553,6 +1553,14 @@ help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầ
 message = "initializer không khớp với annotation"
 help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
 
+[diagnostics.SEM010.issues.float_constant_inexact]
+message = "float constant is not exactly representable"
+help = "write a float literal, or a constant the float type holds exactly"
+
+[diagnostics.SEM010.issues.integer_to_float_requires_conversio]
+message = "integer cannot convert to a float implicitly"
+help = "convert the integer explicitly with `↦`"
+
 [diagnostics.SEM010.issues.incompatible_return_types]
 message = "các kiểu trả về không tương thích"
 help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"

@@ -520,6 +520,9 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         match lit {
             HirLiteral::Int(value) => {
+                if let Some(float_ty) = self.expected_float_slot_type(expected) {
+                    return self.integer_constant_in_float_slot(*value, float_ty, span);
+                }
                 let literal_ty = self
                     .expected_numerus_literal_type(expected, span)
                     .unwrap_or_else(|| self.numerus_type());
@@ -596,6 +599,41 @@ impl TypeChecker<'_> {
             }
             _ => None,
         }
+    }
+
+    /// The float type of an expected slot, when the expectation is `fractus`.
+    fn expected_float_slot_type(&self, expected: Option<TypeId>) -> Option<TypeId> {
+        self.expected_fractus_literal_type(expected)
+    }
+
+    /// d11-6 rulings 16/20: an integer constant stored into a float slot takes
+    /// the float type when it is exactly representable there; otherwise the
+    /// author must write the float themselves.
+    fn integer_constant_in_float_slot(
+        &mut self,
+        value: u64,
+        float_ty: TypeId,
+        span: radix_lexer::Span,
+    ) -> TypeId {
+        let width = match self.types.get(float_ty) {
+            Type::SizedNumeric(Primitive::Fractus, width) => *width,
+            _ => NumericWidth::F64,
+        };
+        let exact_limit: u64 = match width {
+            NumericWidth::F32 => 1 << 24,
+            NumericWidth::F16 => 1 << 11,
+            NumericWidth::BF16 => 1 << 8,
+            _ => 1 << 53,
+        };
+        if value > exact_limit {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                FLOAT_CONSTANT_INEXACT,
+                span,
+            );
+            return self.error_type;
+        }
+        float_ty
     }
 
     fn expected_numerus_literal_type(
@@ -919,4 +957,5 @@ const SATURATING_WORD_LITERAL_OUT_OF_RANGE: &str = "saturating_word_literal_out_
 const NUMERUS_LITERAL_OUT_OF_RANGE: &str = "numerus_literal_out_of_range";
 const DECIMAL_INTEGER_LITERAL_REJECTED: &str = "decimal_integer_literal_rejected";
 const DECIMAL_LITERAL_UNPARSEABLE: &str = "decimal_literal_unparseable";
+const FLOAT_CONSTANT_INEXACT: &str = "float_constant_inexact";
 const DECIMAL_LITERAL_OUT_OF_RANGE: &str = "decimal_literal_out_of_range";

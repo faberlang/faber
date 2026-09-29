@@ -1553,6 +1553,14 @@ help = "使運算式型別符合預期型別"
 message = "初始化式與註記不相符"
 help = "使運算式型別符合預期型別"
 
+[diagnostics.SEM010.issues.float_constant_inexact]
+message = "浮點常數無法精確表示"
+help = "寫成浮點字面量，或使用該浮點型別可精確表示的常數"
+
+[diagnostics.SEM010.issues.integer_to_float_requires_conversio]
+message = "整數不能隱式轉換為浮點數"
+help = "使用 `↦` 明確轉換整數"
+
 [diagnostics.SEM010.issues.incompatible_return_types]
 message = "傳回型別不相容"
 help = "使運算式型別符合預期型別"

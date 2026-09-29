@@ -4,8 +4,7 @@
 //! `structa`) accept integer lists that fit the runtime `i64` boundary, so
 //! GPU/KIR source can pass `lista<u32>` index vectors without a bare-`numerus`
 //! detour. `u64` and non-integer lists are rejected with a deliberate
-//! diagnostic. The global signed↔unsigned widening lattice is intentionally not
-//! relaxed.
+//! diagnostic.
 
 fn accepts(source: &str) {
     let result = crate::test_support::analyze_source(source);
@@ -199,12 +198,22 @@ fn ponde_rejects_float_index_list() {
 }
 
 /// WHY: the structural exception must not widen the global numeric lattice.
-/// `lista<numerus> ← [`u32`]` binding stays a type error; authors spell the
-/// target width explicitly (`lista<u32>`) or pass the literal to `accipe`.
+/// d11-6 U2: `u32` widens losslessly into `numerus`, so the binding is
+/// accepted; `u64` has no implicit signed target and stays a type error.
 #[test]
-fn numerus_list_binding_still_rejects_u32_element() {
-    rejects_with_issue(
+fn numerus_list_binding_accepts_u32_element() {
+    accepts(
         r"functio check(tf32[16] input, u32 id) → f32 {
+    fixum lista<numerus> idx ← [id]
+    redde input.accipe(idx) vel 0.0
+}",
+    );
+}
+
+#[test]
+fn numerus_list_binding_still_rejects_u64_element() {
+    rejects_with_issue(
+        r"functio check(tf32[16] input, u64 id) → f32 {
     fixum lista<numerus> idx ← [id]
     redde input.accipe(idx) vel 0.0
 }",

@@ -1553,6 +1553,14 @@ help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 message = "قيمة التهيئة لا تطابق النوع المعلن"
 help = "اجعل نوع قيمة التهيئة مطابقا للنوع المعلن"
 
+[diagnostics.SEM010.issues.float_constant_inexact]
+message = "float constant is not exactly representable"
+help = "write a float literal, or a constant the float type holds exactly"
+
+[diagnostics.SEM010.issues.integer_to_float_requires_conversio]
+message = "integer cannot convert to a float implicitly"
+help = "convert the integer explicitly with `↦`"
+
 [diagnostics.SEM010.issues.incompatible_return_types]
 message = "return types غير متوافقة"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"

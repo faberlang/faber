@@ -1347,7 +1347,6 @@ impl TypeTable {
             (_, Type::Option(inner)) => self.is_assignable(from, *inner),
 
             // Numeric widening is implicit; narrowing remains an explicit operation.
-            (Type::Primitive(Primitive::Numerus), Type::Primitive(Primitive::Fractus)) => true,
             (from_ty, to_ty) if is_numeric_carrier(from_ty) && is_numeric_carrier(to_ty) => {
                 is_numeric_assignable(self, from, to)
             }

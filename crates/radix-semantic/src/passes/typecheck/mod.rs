@@ -831,6 +831,10 @@ mod equality_exact_types_test;
 mod decimal_width_literal_test;
 
 #[cfg(test)]
+#[path = "float_family_crossing_test.rs"]
+mod float_family_crossing_test;
+
+#[cfg(test)]
 #[path = "decimal_taxonomy_test.rs"]
 mod decimal_taxonomy_test;
 

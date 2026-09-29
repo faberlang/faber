@@ -1171,8 +1171,8 @@ fn f003_alias_wrapped_sized_numeric_widening_assignable() {
 }
 
 #[test]
-fn f003_alias_wrapped_numerus_to_fractus_assignable() {
-    // Alias wrapping must not block the bare `numerus → fractus` widening rule.
+fn f003_alias_wrapped_numerus_to_fractus_not_assignable() {
+    // Alias wrapping must not reopen the integer -> float family crossing.
     let mut types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);
     let fractus = types.primitive(Primitive::Fractus);
@@ -1180,8 +1180,8 @@ fn f003_alias_wrapped_numerus_to_fractus_assignable() {
     let alias_fractus = types.intern(Type::Alias(DefId(4), fractus));
 
     assert!(
-        types.is_assignable(alias_numerus, alias_fractus),
-        "F-003: alias-wrapped numerus must be assignable to alias-wrapped fractus"
+        !types.is_assignable(alias_numerus, alias_fractus),
+        "F-003: alias-wrapped numerus must not be assignable to alias-wrapped fractus"
     );
 }
 

@@ -285,7 +285,11 @@ impl NumericWidth {
         matches!(self, Self::D32 | Self::D64)
     }
 
-    /// Whether `from` may flow into `to` along the v1 widening lattice.
+    /// Whether `from` may flow into `to` implicitly (assignment, argument
+    /// passing): lossless widening inside one number family only.
+    ///
+    /// Integer -> float never widens implicitly (d11-6 ruling 16); `u64` has
+    /// no signed target because it does not fit `i64`.
     #[must_use]
     pub fn is_widening_assignable(from: Self, to: Self) -> bool {
         if from == to {
@@ -297,19 +301,31 @@ impl NumericWidth {
         if let (Some(a), Some(b)) = (from.unsigned_rank(), to.unsigned_rank()) {
             return a <= b;
         }
+        // Unsigned -> strictly wider signed is lossless (u64 has none).
+        if let (Some(a), Some(b)) = (from.unsigned_rank(), to.signed_rank()) {
+            return a < b;
+        }
         if let (Some(a), Some(b)) = (from.float_rank(), to.float_rank()) {
             return a <= b;
         }
-        // decimal-widths D1: d32 → d64 is the only decimal widening; decimals
+        // decimal-widths D1: d32 -> d64 is the only decimal widening; decimals
         // never widen into or out of the integer/fractus lattices.
         if let (Some(a), Some(b)) = (from.decimal_rank(), to.decimal_rank()) {
             return a <= b;
         }
-        // Signed integer chain may widen into fractus<f64>.
-        if from.is_signed_int() && to == Self::F64 {
-            return true;
-        }
         false
+    }
+
+    /// Whether an explicit `↦` from `from` to `to` is ordinary widening (not a
+    /// narrowing): everything implicitly assignable, plus the signed-integer
+    /// chain into `f64`, which needs `↦` because it can round above 2^53.
+    #[must_use]
+    pub fn is_conversio_widening(from: Self, to: Self) -> bool {
+        // Unsigned -> signed is an implicit edge but not an ordinary tensor
+        // element widening; that pair set is pinned by the tensor lattice.
+        let unsigned_to_signed = from.unsigned_rank().is_some() && to.signed_rank().is_some();
+        (Self::is_widening_assignable(from, to) && !unsigned_to_signed)
+            || (from.is_signed_int() && to == Self::F64)
     }
 }
 
@@ -822,6 +838,20 @@ pub fn is_numeric_assignable(types: &TypeTable, from: TypeId, to: TypeId) -> boo
     }
 }
 
+/// Whether `from` -> `to` is ordinary widening for an explicit `↦` (looser
+/// than implicit assignability: signed integers may convert into `f64`).
+fn is_numeric_conversio_widening(types: &TypeTable, from: TypeId, to: TypeId) -> bool {
+    if is_modular_word(types, from) != is_modular_word(types, to)
+        || is_saturating_word(types, from) != is_saturating_word(types, to)
+    {
+        return false;
+    }
+    match (effective_width(types, from), effective_width(types, to)) {
+        (Some(a), Some(b)) => NumericWidth::is_conversio_widening(a, b),
+        _ => false,
+    }
+}
+
 fn is_saturating_word(types: &TypeTable, ty: TypeId) -> bool {
     match types.get(ty) {
         Type::SaturatingWord(_) => true,
@@ -847,7 +877,7 @@ pub fn tensor_element_conversio_allowed(types: &TypeTable, from: TypeId, to: Typ
     if !is_tensor_element_type(types, from) || !is_tensor_element_type(types, to) {
         return false;
     }
-    if is_numeric_assignable(types, from, to) {
+    if is_numeric_conversio_widening(types, from, to) {
         return true;
     }
     if let (
@@ -869,7 +899,7 @@ impl NumericWidth {
     /// Lossy width narrowing allowed only through explicit `↦` (not bare `←`).
     #[must_use]
     pub fn is_explicit_narrowing_conversio(from: Self, to: Self) -> bool {
-        if from == to || Self::is_widening_assignable(from, to) {
+        if from == to || Self::is_conversio_widening(from, to) {
             return false;
         }
         if let (Some(a), Some(b)) = (from.signed_rank(), to.signed_rank()) {

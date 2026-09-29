@@ -1565,6 +1565,14 @@ help = "ทำให้ชนิดของนิพจน์ตรงกับ
 message = "ตัวเริ่มต้นไม่ตรงกับคำกำกับชนิด"
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
 
+[diagnostics.SEM010.issues.float_constant_inexact]
+message = "float constant is not exactly representable"
+help = "write a float literal, or a constant the float type holds exactly"
+
+[diagnostics.SEM010.issues.integer_to_float_requires_conversio]
+message = "integer cannot convert to a float implicitly"
+help = "convert the integer explicitly with `↦`"
+
 [diagnostics.SEM010.issues.incompatible_return_types]
 message = "ชนิดค่าที่ส่งกลับเข้ากันไม่ได้"
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"

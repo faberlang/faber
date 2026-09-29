@@ -327,13 +327,13 @@ fn nullability_tightening_is_rejected_with_column_identity() {
 #[test]
 fn widening_o_column_type_is_compatible() {
     // Projection-direction consequence: an O that *widens* a column type is a
-    // compatible subset (numerus -> fractus is the language's implicit
-    // widening; TypeTable::is_assignable).
+    // compatible subset (i32 -> i64 is an implicit integer widening; integer
+    // -> float is not, d11-6 ruling 16).
     let mut interner = Interner::new();
-    let types = TypeTable::new();
-    let numerus = types.primitive(Primitive::Numerus);
+    let mut types = TypeTable::new();
+    let numerus = types.sized_numeric(Primitive::Numerus, crate::NumericWidth::I32);
     let textus = types.primitive(Primitive::Textus);
-    let fractus = types.primitive(Primitive::Fractus);
+    let fractus = types.sized_numeric(Primitive::Numerus, crate::NumericWidth::I64);
     let i = SchemaDef {
         name: interner.intern("PersonaI"),
         columns: vec![
