@@ -66,7 +66,7 @@ main {
     const send<value> outbound ← s.send<value>()
     const status closed ← outbound.fini()
     const recv<string> t ← s.recv<string>()
-    const frame<string> ∪ null received ← t.accipe()
+    const frame<string> ∪ none received ← t.accipe()
     print closed
     print received
     print drain(call 'runtime:echo' ("salve"))

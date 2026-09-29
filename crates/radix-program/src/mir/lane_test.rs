@@ -286,7 +286,7 @@ import from "geomlib:codes" codes
 class Mesh {
     var int n
 
-    fn layout_count() → int ∪ null {
+    fn layout_count() → int ∪ none {
         if self.n ≡ 0 then return null
         return codes.encoded(self.n) + 50
     }
