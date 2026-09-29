@@ -171,6 +171,20 @@ fn itera_apud_coordinates(
 }
 
 impl TypeChecker<'_> {
+    /// d11-6 ruling 20: an integer constant that typechecked into a float slot
+    /// becomes a float constant, so lowering and codegen never see an integer
+    /// literal carrying a `fractus` type.
+    fn retype_integer_constant_as_float(&self, lit: &mut HirLiteral, ty: TypeId) {
+        if let HirLiteral::Int(value) = lit
+            && matches!(
+                self.types.get(ty),
+                Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+            )
+        {
+            *lit = HirLiteral::Float(*value as f64);
+        }
+    }
+
     /// Synthesizes an expression type, optionally using an expected type as
     /// context for shape-sensitive expressions.
     ///
@@ -188,7 +202,11 @@ impl TypeChecker<'_> {
         let saved_pending_conversion = self.pending_conversion.take();
         let ty = match &mut expr.kind {
             HirExpressionKind::Path(def_id) => self.check_path(*def_id, expr.span),
-            HirExpressionKind::Literal(lit) => self.literal_type(lit, expr.span, expected),
+            HirExpressionKind::Literal(lit) => {
+                let ty = self.literal_type(lit, expr.span, expected);
+                self.retype_integer_constant_as_float(lit, ty);
+                ty
+            }
             HirExpressionKind::Vacua => self.check_vacua(expected, expr.span),
             HirExpressionKind::Binary(op, lhs, rhs) => self.check_binary(*op, lhs, rhs, expected),
             HirExpressionKind::Unary(op, operand) => self.check_unary(*op, operand, expected),

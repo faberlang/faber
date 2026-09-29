@@ -66,3 +66,57 @@ fn inexact_negative_integer_literal_into_float_slot_rejects() {
         "float_constant_inexact",
     );
 }
+
+/// Ruling 20 follow-up: an integer constant admitted into a float slot must
+/// leave typecheck as a float constant, not an integer literal with a float
+/// type, so MIR lowering and every backend see one representation.
+mod constant_representation {
+    use crate::test_support::analyze_ok;
+    use radix_hir::visit::{HirVisitor, walk_expr};
+    use radix_hir::{HirExpression, HirExpressionKind, HirLiteral};
+
+    #[derive(Default)]
+    struct Literals {
+        ints: Vec<u64>,
+        floats: Vec<f64>,
+    }
+
+    impl HirVisitor for Literals {
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            if let HirExpressionKind::Literal(lit) = &expr.kind {
+                match lit {
+                    HirLiteral::Int(v) => self.ints.push(*v),
+                    HirLiteral::Float(v) => self.floats.push(*v),
+                    _ => {}
+                }
+            }
+            walk_expr(self, expr);
+        }
+    }
+
+    fn literals(source: &str) -> Literals {
+        let result = analyze_ok(source);
+        let mut lits = Literals::default();
+        lits.visit_program(result.hir.as_ref().expect("hir"));
+        lits
+    }
+
+    #[test]
+    fn local_initializer_becomes_float_constant() {
+        let l = literals("incipit { fixum fractus f ← 3 }");
+        assert!(l.ints.is_empty(), "ints: {:?}", l.ints);
+        assert_eq!(l.floats, vec![3.0]);
+    }
+
+    #[test]
+    fn argument_return_list_and_field_default_become_float_constants() {
+        let l = literals(
+            "functio f(fractus x) → fractus { redde 3 }\n\
+             functio g() → fractus { redde f(4) }\n\
+             genus B { varia fractus area = 5 }\n\
+             incipit { fixum lista<fractus> xs ← [1, 2] }",
+        );
+        assert!(l.ints.is_empty(), "ints: {:?}", l.ints);
+        assert_eq!(l.floats, vec![3.0, 4.0, 5.0, 1.0, 2.0]);
+    }
+}
