@@ -50,6 +50,7 @@ fn hygiene_constants_are_correct() {
     assert_eq!(FAC_OK, "ok");
     assert_eq!(FAC_ERR, "err");
     assert_eq!(YIELDED, "y0");
+    assert_eq!(YIELD_FN, "y1");
     assert_eq!(INPUT, "u0");
     assert_eq!(OPTIONAL, "o0");
     assert_eq!(CLOSURE_ITEM, "x");

@@ -19,6 +19,9 @@ pub const FAC_ERR: &str = "err";
 /// `@ cursor` yield accumulator.
 pub const YIELDED: &str = "y0";
 
+/// Go lazy `fiunt` yield callback.
+pub const YIELD_FN: &str = "y1";
+
 /// `lege` stdin scratch buffer.
 pub const INPUT: &str = "u0";
 
