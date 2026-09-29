@@ -664,7 +664,7 @@ fn generic_genus_field_array_ascription_to_generic_map_key_rejects() {
     // The norma `SortedMap<K, V>` shape: a generic class field default.
     test_support::assert_rejects_with_issue(
         r"genus SortedMap<K, V> {
-  tabula<K, V> entries = [] ∷ tabula<K, V>
+  varia tabula<K, V> entries = [] ∷ tabula<K, V>
 }",
         "array_ascription_to_map",
     );

@@ -103,7 +103,7 @@ fn sermo_satisfies_the_closing_contract() {
 fn genus_without_implet_does_not_satisfy_closing() {
     test_support::assert_rejects_with_issue(
         &with_closable(
-            "genus Lapis {\n    numerus massa\n}\n\
+            "genus Lapis {\n    varia numerus massa\n}\n\
              incipit {\n\
              nota claude(Lapis { massa = 1 }) ⊥ falsum\n\
              }\n",
@@ -123,7 +123,7 @@ fn closing_mark_requires_the_close_shape() {
 #[test]
 fn sermo_field_on_a_cycle_warns() {
     let warnings = cycle_warnings(
-        "genus Nodus {\n    Nodus ∪ nihil sequens\n    sermo canalis\n}\nincipit {\n    fixum sermo s ← ad 'runtime:echo' (1)\n}\n",
+        "genus Nodus {\n    varia Nodus ∪ nihil sequens\n    varia sermo canalis\n}\nincipit {\n    fixum sermo s ← ad 'runtime:echo' (1)\n}\n",
     );
     assert_eq!(warnings, vec![("Nodus".to_owned(), "canalis".to_owned())]);
 }
@@ -131,8 +131,8 @@ fn sermo_field_on_a_cycle_warns() {
 #[test]
 fn sermo_list_on_a_mutual_cycle_warns() {
     let warnings = cycle_warnings(
-        "genus A {\n    B ∪ nihil b\n    lista<sermo> canales\n}\n\
-         genus B {\n    lista<A> filii\n}\nincipit {\n    fixum sermo s ← ad 'runtime:echo' (1)\n}\n",
+        "genus A {\n    varia B ∪ nihil b\n    varia lista<sermo> canales\n}\n\
+         genus B {\n    varia lista<A> filii\n}\nincipit {\n    fixum sermo s ← ad 'runtime:echo' (1)\n}\n",
     );
     assert_eq!(warnings, vec![("A".to_owned(), "canales".to_owned())]);
 }
@@ -140,7 +140,7 @@ fn sermo_list_on_a_mutual_cycle_warns() {
 #[test]
 fn sermo_field_off_a_cycle_does_not_warn() {
     let warnings = cycle_warnings(
-        "genus Piscina {\n    tabula<textus, sermo> canales\n}\nincipit {\n    fixum sermo s ← ad 'runtime:echo' (1)\n}\n",
+        "genus Piscina {\n    varia tabula<textus, sermo> canales\n}\nincipit {\n    fixum sermo s ← ad 'runtime:echo' (1)\n}\n",
     );
     assert!(warnings.is_empty(), "{warnings:?}");
 }
@@ -148,7 +148,7 @@ fn sermo_field_off_a_cycle_does_not_warn() {
 #[test]
 fn closable_genus_on_a_cycle_warns() {
     let warnings = cycle_warnings(&with_closable(
-        "genus Fasciculus implet Closable {\n    Fasciculus ∪ nihil proximus\n\n    \
+        "genus Fasciculus implet Closable {\n    varia Fasciculus ∪ nihil proximus\n\n    \
          functio close() → bivalens ⇥ textus { redde verum }\n}\nincipit {}\n",
     ));
     assert_eq!(
