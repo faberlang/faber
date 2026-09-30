@@ -120,11 +120,7 @@ fn lower_and_run(unit: &AnalyzedModule, span: Span) -> Result<Value, SemanticErr
         Ok(Err(EvaluationFailure::Errors(errors))) => Err(runner_failure(&errors, span)),
         Ok(Err(EvaluationFailure::Raised(value))) => {
             let message = value
-                .display(
-                    &lowered.interner,
-                    &lowered.validated.validation().struct_field_order,
-                    span,
-                )
+                .display(&lowered.interner, &lowered.validated.validation().struct_field_order, span)
                 .unwrap_or_else(|_| "error".to_owned());
             Err(invalid("praefixum_failed", span).with_arg("message", message))
         }
