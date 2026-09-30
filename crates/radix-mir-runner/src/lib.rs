@@ -2558,6 +2558,7 @@ mod shuffle_test;
 #[cfg(test)]
 mod exact_int_test;
 
+#[cfg(test)]
 #[path = "remainder_floor_test.rs"]
 mod remainder_floor_test;
 #[cfg(test)]
