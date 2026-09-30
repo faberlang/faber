@@ -2362,10 +2362,13 @@ impl FunctionBuilder<'_> {
         let Some(ty) = arg.ty else {
             return Some(value);
         };
-        let sized = matches!(
-            self.normalized_type(self.types.peel_access_marker(ty).1),
-            Type::SizedNumeric(Primitive::Numerus, width) if width.integer_range().is_some()
-        );
+        let sized = match self.normalized_type(self.types.peel_access_marker(ty).1) {
+            Type::SizedNumeric(Primitive::Numerus, width) => width.integer_range().is_some(),
+            // A `wrapping` / `saturating` parameter takes the constant at its
+            // own word type (ruling 12: a constant in a slot takes its type).
+            Type::ModularWord(_) | Type::SaturatingWord(_) => true,
+            _ => false,
+        };
         Some(if sized {
             self.assign_temp(MirValueKind::Operand(value), MirType::semantic(ty), arg.span)
         } else {

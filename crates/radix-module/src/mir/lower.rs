@@ -2669,11 +2669,22 @@ impl<'a> FunctionBuilder<'a> {
     }
 
     fn lower_unary(&mut self, op: HirUnOp, operand: &HirExpression, expr: &HirExpression) -> Option<MirOperand> {
-        let Some(op) = mir_un_op(op) else {
+        let Some(mir_op) = mir_un_op(op) else {
             self.errors
                 .push(MirError::unsupported(expr.span, "unary operator without a MIR primitive"));
             return None;
         };
+        // `-9223372036854775808`: the magnitude 2^63 has no `Int(i64)` form,
+        // but its negation is exactly `i64::MIN` (d11-6 ruling 12: an untyped
+        // constant is an exact value), so the negated literal is one constant.
+        if op == HirUnOp::Neg
+            && let HirExpressionKind::Literal(HirLiteral::Int(magnitude)) = &operand.kind
+            && *magnitude == i64::MIN.unsigned_abs()
+            && !self.literal_ty_is_unsigned(operand.ty)
+        {
+            return Some(MirOperand::Constant(MirConstant::Int(i64::MIN)));
+        }
+        let op = mir_op;
         let operand = self.lower_expr_value(operand)?;
         let ty = self.expr_ty(expr)?;
 

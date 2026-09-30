@@ -365,3 +365,38 @@ fn approximate_equality_unscales_a_decimal_operand() {
         ["falsum", "verum"]
     );
 }
+
+#[test]
+fn word_slot_constants_at_the_64_bit_edges() {
+    // lw1 (rulings 12, 21): i64::MIN folds from `-9223372036854775807 - 1`
+    // into a saturating slot, and the u64 maximum stores into 64-bit words by
+    // declaration, assignment, argument and as an operand beside a word.
+    assert_eq!(
+        ok("fixum saturatus<i64> x ← -9223372036854775807 - 1\nnota x"),
+        ["-9223372036854775808"]
+    );
+    assert_eq!(
+        ok(
+            "fixum saturatus<u64> a ← 18446744073709551615\nfixum modulus<u64> b ← 18446744073709551615\nnota a\nnota b"
+        ),
+        ["18446744073709551615", "18446744073709551615"]
+    );
+    assert_eq!(
+        ok("varia saturatus<u64> s ← 0\ns ← 18446744073709551615\nnota s"),
+        ["18446744073709551615"]
+    );
+    assert_eq!(
+        ok("fixum modulus<u64> m ← 5\nnota m + 18446744073709551615\nnota 18446744073709551615 + m"),
+        ["4", "4"]
+    );
+}
+
+#[test]
+fn word_parameter_takes_a_constant_argument() {
+    let functions = "functio f(saturatus<u64> a) → saturatus<u64> { redde a }\nfunctio g(modulus<u8> a) → modulus<u8> { redde a }\n";
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let program = format!("{functions}incipit {{\nnota f(18446744073709551615)\nnota g(5)\n}}\n");
+    let mut host = BufferHost::default();
+    run_source(&session, "exact.fab", &program, &mut host).expect("runs");
+    assert_eq!(host.stdout_lines, ["18446744073709551615", "5"]);
+}
