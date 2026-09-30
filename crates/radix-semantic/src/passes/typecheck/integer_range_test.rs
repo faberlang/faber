@@ -189,6 +189,20 @@ fn u64_with_constants_is_not_an_error() {
 }
 
 #[test]
+fn u64_range_endpoint_beside_signed_typed_endpoint_rejects() {
+    for (a, b) in [
+        ("numerus<u64> a", "numerus b"),
+        ("numerus<i32> a", "numerus<u64> b"),
+    ] {
+        test_support::assert_analysis_rejects_with_issue(
+            &format!("functio f({a}, {b}) {{\n    fixum _ r ← a‥b\n}}\n"),
+            "u64_signed_arithmetic_requires_conversion",
+        );
+    }
+    test_support::assert_analysis_accepts("functio f(numerus<u64> a) {\n    fixum _ r ← 0‥a\n}\n");
+}
+
+#[test]
 fn modular_and_saturating_words_keep_their_ring() {
     let decls = "fixum modulus<u8> a ← 200\nfixum modulus<u8> b ← 100";
     let source = format!("incipit {{\n{decls}\nfixum _ r ← a + b\n}}\n");
