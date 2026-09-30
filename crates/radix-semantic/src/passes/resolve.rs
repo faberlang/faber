@@ -184,7 +184,6 @@ pub fn resolve(
         }
     }
 
-    seed_nucleum_lane_fallbacks(program, resolver, interner, types);
     // Selective bindings resolve first: a binding that names an imported
     // type (D22.5) must be visible to the type positions resolved below.
     resolve_selective_imports(program, resolver, interner, types, &mut errors);
@@ -200,58 +199,6 @@ pub fn resolve(
         Ok(())
     } else {
         Err(errors)
-    }
-}
-
-fn seed_nucleum_lane_fallbacks(
-    program: &Program,
-    resolver: &mut Resolver,
-    interner: &Interner,
-    types: &mut TypeTable,
-) {
-    let lane_ty = types.sized_numeric(Primitive::Numerus, crate::NumericWidth::U32);
-    let mut lanes = Vec::new();
-    for stmt in &program.statements {
-        collect_nucleum_lane_values(&stmt.annotations, &mut lanes);
-        if let StmtKind::Class(decl) = &stmt.kind {
-            for member in &decl.members {
-                collect_nucleum_lane_values(&member.annotations, &mut lanes);
-            }
-        }
-    }
-    for (lane, span) in lanes {
-        let name = interner.resolve(lane);
-        if !valid_identifier(name) || resolver.lookup(lane).is_some() {
-            continue;
-        }
-        let def_id = resolver.fresh_def_id();
-        let _ = resolver.define(Symbol {
-            def_id,
-            name: lane,
-            kind: SymbolKind::Lane,
-            ty: Some(lane_ty),
-            mutable: false,
-            span,
-        });
-    }
-}
-
-fn collect_nucleum_lane_values(
-    annotations: &[radix_syntax::Annotation],
-    lanes: &mut Vec<(radix_lexer::Symbol, radix_lexer::Span)>,
-) {
-    for annotation in annotations {
-        let radix_syntax::AnnotationKind::Nucleum(nucleum) = &annotation.kind else {
-            continue;
-        };
-        for (index, lane) in nucleum.lane_values.iter().copied().enumerate() {
-            let span = nucleum
-                .lane_spans
-                .get(index)
-                .copied()
-                .unwrap_or(annotation.span);
-            lanes.push((lane, span));
-        }
     }
 }
 
@@ -338,7 +285,6 @@ fn resolve_stmt(
                     errors,
                 );
             }
-            define_nucleum_lane_for_resolution(resolver, interner, &stmt.annotations, errors);
             define_shader_stage_locals_for_resolution(
                 resolver,
                 interner,
@@ -408,12 +354,6 @@ fn resolve_stmt(
                                 errors,
                             );
                         }
-                        define_nucleum_lane_for_resolution(
-                            resolver,
-                            interner,
-                            &member.annotations,
-                            errors,
-                        );
                         if let Some(ret) = &method.ret {
                             resolve_type_expr(resolver, interner, ret, errors);
                         }
@@ -2770,95 +2710,6 @@ fn symbol_by_text(interner: &Interner, text: &str) -> Option<radix_lexer::Symbol
         .map(|index| {
             radix_lexer::Symbol(u32::try_from(index).expect("interned symbol count fits u32"))
         })
-}
-
-fn define_nucleum_lane_for_resolution(
-    resolver: &mut Resolver,
-    interner: &Interner,
-    annotations: &[radix_syntax::Annotation],
-    errors: &mut Vec<SemanticError>,
-) {
-    let mut clauses = Vec::new();
-    for annotation in annotations {
-        let radix_syntax::AnnotationKind::Nucleum(nucleum) = &annotation.kind else {
-            continue;
-        };
-        for (index, lane) in nucleum.lane_values.iter().copied().enumerate() {
-            let span = nucleum
-                .lane_spans
-                .get(index)
-                .copied()
-                .unwrap_or(annotation.span);
-            clauses.push((lane, span));
-        }
-    }
-    if clauses.is_empty() {
-        return;
-    }
-
-    let mut valid = Vec::new();
-    for (lane, span) in clauses {
-        let spelling = interner.resolve(lane);
-        if !valid_identifier(spelling) {
-            errors.push(
-                SemanticError::structured(SemanticErrorKind::AnnotationInvalid, span)
-                    .with_arg("issue", "nucleum_lane_invalid_identifier")
-                    .with_arg("name", spelling),
-            );
-            continue;
-        }
-        valid.push((lane, span));
-    }
-    if valid.len() != 1 {
-        for (index, (lane, span)) in valid.iter().enumerate().skip(1) {
-            errors.push(
-                SemanticError::structured(SemanticErrorKind::AnnotationInvalid, *span)
-                    .with_arg("issue", "nucleum_lane_conflicting")
-                    .with_arg("existing", interner.resolve(valid[0].0))
-                    .with_arg("parsed", interner.resolve(*lane))
-                    .with_arg("ordinal", index.to_string()),
-            );
-        }
-        return;
-    }
-
-    let (lane, span) = valid[0];
-    if let Some(existing) = resolver.lookup(lane) {
-        let existing_kind = resolver.get_symbol(existing).map(|symbol| symbol.kind);
-        if existing_kind != Some(SymbolKind::Lane) {
-            errors.push(
-                SemanticError::structured(SemanticErrorKind::AnnotationInvalid, span)
-                    .with_arg("issue", "nucleum_lane_collision")
-                    .with_arg("name", interner.resolve(lane)),
-            );
-        }
-        return;
-    }
-    let def_id = resolver.fresh_def_id();
-    let symbol = Symbol {
-        def_id,
-        name: lane,
-        kind: SymbolKind::Lane,
-        ty: None,
-        mutable: false,
-        span,
-    };
-    if resolver.define(symbol).is_err() {
-        errors.push(
-            SemanticError::structured(SemanticErrorKind::AnnotationInvalid, span)
-                .with_arg("issue", "nucleum_lane_collision")
-                .with_arg("name", interner.resolve(lane)),
-        );
-    }
-}
-
-fn valid_identifier(text: &str) -> bool {
-    let mut chars = text.chars();
-    let Some(first) = chars.next() else {
-        return false;
-    };
-    (first == '_' || unicode_ident::is_xid_start(first))
-        && chars.all(|character| character == '_' || unicode_ident::is_xid_continue(character))
 }
 
 fn define_shader_stage_locals_for_resolution(

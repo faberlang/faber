@@ -874,13 +874,9 @@ help = "add '{expected}' in this annotation position"
 message = "unexpected token after {context}"
 help = "remove the trailing annotation token"
 
-[diagnostics.PARSE018.issues.missing_nucleum_lane_value]
-message = "@ nucleum lane requires a string value"
-help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
-
-[diagnostics.PARSE018.issues.non_string_nucleum_lane_value]
-message = "@ nucleum lane value must be a string literal"
-help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
+[diagnostics.PARSE018.issues.nucleum_lane_removed]
+message = "the @ {nucleum} lane binding '{name}' was removed; a kernel never names its lane"
+help = "bind the iteration coordinate with `{apud}` on a `{filum}` loop: `{itera} {ex} t {apud} [i] {filum} f {fixum} v`"
 
 [diagnostics.PARSE018.issues.ad_annotation_route]
 message = "`@ {ad}` requires a single-quoted ASCII route"
@@ -1681,6 +1677,34 @@ help = "fix the AST construct for lowering"
 [diagnostics.SEM008.issues.nucleum_closure_escape]
 message = "kernel closure escapes as a {context} value; it may only initialize an immutable local or be called in the same expression"
 help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.nucleum_async]
+message = "a kernel cannot use {construct}: async and generator forms need the host"
+help = "make the kernel a plain synchronous function"
+
+[diagnostics.SEM008.issues.nucleum_host_call]
+message = "kernel call to '{callee}' is not device-legal (reason: {reason})"
+help = "call another kernel or a built-in device operation; a kernel call must resolve at compile time"
+
+[diagnostics.SEM008.issues.nucleum_host_effect]
+message = "kernel body performs '{operation}' ({reason}); a kernel needs no host runtime"
+help = "move the host operation out of the kernel and read results from the kernel's outputs"
+
+[diagnostics.SEM008.issues.nucleum_host_type]
+message = "a kernel cannot use a '{family}' value ({site}); it needs the host heap"
+help = "use tensors, vectors, matrices, value types, or a bounded collection with a static capacity"
+
+[diagnostics.SEM008.issues.nucleum_private_host_call]
+message = "host code cannot call the private kernel '{callee}'"
+help = "mark the kernel public to make it launchable, or call it from another kernel"
+
+[diagnostics.SEM008.issues.nucleum_recovery]
+message = "a kernel body cannot install a local handler ('{construct}')"
+help = "let the error reach the launching call, where the host handles it"
+
+[diagnostics.SEM008.issues.nucleum_workgroup]
+message = "a kernel cannot name '{construct}' ({site}); workgroup state is compiler-internal"
+help = "express the parallel pattern with a filum loop or a reduction"
 
 [diagnostics.SEM008.issues.numerus_width_params]
 message = "int accepts at most one width marker"
@@ -3249,18 +3273,6 @@ help = "use `{publica}` for explicit export intent or `{privata}` for file-priva
 [diagnostics.SEM018.issues.conflicting_lane]
 message = "conflicting @ radix lane annotations: '{existing}' and '{parsed}'"
 help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
-
-[diagnostics.SEM018.issues.nucleum_lane_invalid_identifier]
-message = "@ nucleum lane binding '{name}' is not a valid identifier"
-help = "use a valid identifier for the lane binding"
-
-[diagnostics.SEM018.issues.nucleum_lane_collision]
-message = "@ nucleum lane binding '{name}' collides with a parameter or local"
-help = "choose a lane binding name that is not already used in the entry"
-
-[diagnostics.SEM018.issues.nucleum_lane_conflicting]
-message = "conflicting @ nucleum lane bindings: '{existing}' and '{parsed}'"
-help = "declare exactly one @ nucleum lane binding"
 
 [diagnostics.SEM018.issues.missing_directive]
 message = "@ radix requires a directive such as `lane`"

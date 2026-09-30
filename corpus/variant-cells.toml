@@ -670,21 +670,32 @@ expected = true
 note = "sugar forms also in cli/cli.fab, json/json.fab, optio/optio.fab, meta/versio.fab (stdout unpinned there)"
 
 [[cells]]
-id = "ann.kernel-lane"
+id = "ann.kernel-bare"
 family = "annotations"
-cell = "@ kernel lane \"id\" (en)"
+cell = "@ kernel (en); the removed lane binding is a migration diagnostic"
 status = "direct"
 exemplum = "cuda/summa-proof.fab"
 expected = false
 note = "cuda device lane; no .expected by lane policy"
 
 [[cells]]
-id = "ann.nucleum-lane"
+id = "ann.nucleum-bare"
 family = "annotations"
-cell = "@ nucleum lane (la)"
+cell = "@ nucleum (la)"
 status = "direct"
 exemplum = "summa/filum.fab"
 expected = false
+
+[[cells]]
+id = "ann.nucleum-legality-reject"
+family = "annotations"
+cell = "REJECT: kernel legality (host effect, host call, host type, private host call)"
+status = "direct"
+exemplum = "kernel/legality-reject.fab"
+expected = true
+required = true
+decline = true
+note = "K7 semantic reject; nucleum_host_effect / nucleum_host_call / nucleum_host_type / nucleum_private_host_call"
 
 [[cells]]
 id = "ann.braced"

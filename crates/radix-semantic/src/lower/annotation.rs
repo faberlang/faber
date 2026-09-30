@@ -578,13 +578,6 @@ impl Lowerer<'_> {
                 span,
             });
         }
-        if let Some(lane) = nucleum.lane {
-            fields.push(HirAnnotationField {
-                name: self.intern_field_name("lane"),
-                value: HirAnnotationValue::String(lane),
-                span: nucleum.lane_spans.first().copied().unwrap_or(span),
-            });
-        }
         // Authored brace shape: `@ nucleum { … }` keeps braces; the sugar
         // markers (`@ kernel`, `@ kernel fragment`) stay bare.
         let mut annotation = HirAnnotation::with_fields(family, fields, span);

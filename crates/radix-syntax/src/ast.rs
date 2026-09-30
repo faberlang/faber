@@ -1906,21 +1906,15 @@ pub struct RadixLaneAnnotation {
     pub lane: Symbol,
 }
 
-/// Structured `@ nucleum` annotation, with optional `fragment` and `lane`
-/// modifiers. Modifiers are typed data on this family, not untyped annotation
-/// arguments; `fragment` remains distinct from graphics `@ fragment`.
+/// Structured `@ nucleum` annotation, with the optional `fragment` modifier.
+/// The modifier is typed data on this family, not an untyped annotation
+/// argument; `fragment` remains distinct from graphics `@ fragment`. The
+/// removed `lane` binding has no AST shape: the parser rejects its spelling.
 #[derive(Debug)]
 pub struct NucleumAnnotation {
     /// True when the `fragment` modifier is present (`@ nucleum fragment` or
     /// `@ nucleum { fragment = verum }`).
     pub is_fragment: bool,
-    /// The optional body-visible lane binding name.
-    pub lane: Option<Symbol>,
-    /// Every authored lane value, retained so duplicate clauses can fail
-    /// closed without discarding the primary value.
-    pub lane_values: Vec<Symbol>,
-    /// Every braced lane field span, retained for dual-span diagnostics.
-    pub lane_spans: Vec<Span>,
     /// True when the braced record form (`@ nucleum { … }`) was authored;
     /// re-emission keeps the authored brace shape.
     pub braced: bool,

@@ -91,9 +91,21 @@ fn en_annotation_spelling_is_sealed_in_both_nucleum_forms() {
 }
 
 #[test]
-fn en_nucleum_lane_modifier_is_sealed_in_both_directions() {
-    assert!(parse_en("@ kernel lane \"pos\"\nfn probe() { }\n").success());
-    assert!(parse_en("@ kernel { lane = \"pos\" }\nfn probe() { }\n").success());
+fn en_removed_lane_spelling_gets_the_migration_issue_and_stays_sealed() {
+    for source in [
+        "@ kernel lane \"pos\"\nfn probe() { }\n",
+        "@ kernel { lane = \"pos\" }\nfn probe() { }\n",
+    ] {
+        let result = parse_en(source);
+        assert!(
+            result.errors.iter().any(|error| error
+                .args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "nucleum_lane_removed")),
+            "expected nucleum_lane_removed for {source:?}, got {:?}",
+            result.errors
+        );
+    }
     assert_wrong_locale_annotation("@ nucleum lane \"pos\"\nfn probe() { }\n", "kernel");
     assert_wrong_locale_annotation("@ nucleum { lane = \"pos\" }\nfn probe() { }\n", "kernel");
 }

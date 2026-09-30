@@ -657,6 +657,12 @@ pub fn analyze_with_cli(
         // the driver evaluates them on the MIR runner afterwards.
         diagnostics.extend(passes::praefixum::check(&hir, &types, interner));
     }
+    // Kernel legality (gpu-reset rule 12) reads the typed HIR before any AIR
+    // rewrite reshapes it, and only when typecheck left types it can trust.
+    if !diagnostics.iter().any(SemanticError::is_error) {
+        diagnostics
+            .extend(passes::kernel_legality::check(&hir, &resolver, &types, interner).errors);
+    }
     // Concrete generic AIR instances must exist before named unroll: symbolic
     // templates remain source/FHIR facts, while their reachable concrete clones
     // expose literal shapes and bounds to the existing transform.

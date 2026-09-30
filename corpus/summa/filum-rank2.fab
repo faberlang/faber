@@ -25,11 +25,11 @@ locale = "la"
 # This is a declaration-only kernel reference. Device kernels have no host
 # entry for the in-process runner; the semantic check proves this cell.
 
-@ nucleum { lane = "id" }
+@ nucleum
 @ publica { }
 functio rank2(tensor<f32, [4, 8]> a, tensor<f32, [1]> out) → vacuum {
     fixum f32 total ← summa ex a apud [i, j] filum f fixum s {
         redde s
     }
-    out[id] ← total
+    out[0] ← total
 }

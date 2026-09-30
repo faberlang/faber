@@ -2204,15 +2204,12 @@ impl Parser {
             | AnnotationKind::Operandus(_)
             | AnnotationKind::RadixTypusDomain(_)
             | AnnotationKind::RadixLane(_) => false,
-            // Braced `@ nucleum { … }` shares the sugar variant; a lane-less
-            // nucleum is bare only when the form did not end at `}`.
-            AnnotationKind::Nucleum(nucleum) => {
-                nucleum.lane.is_none()
-                    && !matches!(
-                        self.tokens.get(self.pos - 1).map(|t| &t.kind),
-                        Some(TokenKind::RBrace)
-                    )
-            }
+            // Braced `@ nucleum { … }` shares the sugar variant; a nucleum is
+            // bare only when the form did not end at `}`.
+            AnnotationKind::Nucleum(_) => !matches!(
+                self.tokens.get(self.pos - 1).map(|t| &t.kind),
+                Some(TokenKind::RBrace)
+            ),
             // Markers (`@ publica`, `@ conversio`, …) carry no payload.
             _ => true,
         }
@@ -2616,21 +2613,12 @@ impl Parser {
         }
 
         let fragment = self.eat_annotation_ident(TokenKind::Fragment);
-        let lane = if self.eat_annotation_ident(TokenKind::Lane) {
-            Some(self.parse_nucleum_lane_value()?)
-        } else {
-            None
-        };
+        if self.eat_annotation_ident(TokenKind::Lane) {
+            return Err(self.removed_nucleum_lane_error());
+        }
         self.expect_annotation_end("unexpected token after @ nucleum")?;
-        let lane_spans = lane
-            .as_ref()
-            .map_or_else(Vec::new, |_| vec![self.previous_span()]);
-        let lane_values = lane.iter().copied().collect();
         Ok(AnnotationKind::Nucleum(NucleumAnnotation {
             is_fragment: fragment,
-            lane,
-            lane_values,
-            lane_spans,
             braced: false,
         }))
     }
@@ -2640,9 +2628,6 @@ impl Parser {
 
         let mut fragment = false;
         let mut saw_fragment_field = false;
-        let mut lane = None;
-        let mut lane_values = Vec::new();
-        let mut lane_spans = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
             let field_name = self.parse_annotation_field_name()?;
             let field_name_str = self.interner.resolve(field_name.name).to_owned();
@@ -2656,12 +2641,7 @@ impl Parser {
                     saw_fragment_field = true;
                     fragment = self.parse_nucleum_fragment_flag()?;
                 }
-                "lane" => {
-                    let value = self.parse_nucleum_lane_value()?;
-                    lane = Some(value);
-                    lane_values.push(value);
-                    lane_spans.push(self.previous_span());
-                }
+                "lane" => return Err(self.removed_nucleum_lane_error()),
                 _ => {
                     return Err(self
                         .invalid_annotation_error("invalid_nucleum_field")
@@ -2677,21 +2657,21 @@ impl Parser {
         self.expect(&TokenKind::RBrace, "expected '}' after annotation fields")?;
         Ok(AnnotationKind::Nucleum(NucleumAnnotation {
             is_fragment: fragment,
-            lane,
-            lane_values,
-            lane_spans,
             braced: true,
         }))
     }
 
-    fn parse_nucleum_lane_value(&mut self) -> Result<radix_lexer::Symbol, ParseError> {
-        let token = self.advance();
-        match token.kind {
-            TokenKind::String(symbol) | TokenKind::AsciiString(symbol) => Ok(symbol),
-            TokenKind::Eof => Err(self.invalid_annotation_error("missing_nucleum_lane_value")),
-            _ => Err(self
-                .invalid_annotation_error("non_string_nucleum_lane_value")
-                .with_arg("expected", "string literal")),
+    /// The `lane` binding was removed (gpu-reset rule 12 point 5): a lane is
+    /// never named; a `filum` loop binds its iteration coordinate with `apud`.
+    /// The old spelling gets a migration diagnostic naming the removed binding
+    /// instead of a parse of its former meaning.
+    fn removed_nucleum_lane_error(&self) -> ParseError {
+        let error = self.invalid_annotation_error("nucleum_lane_removed");
+        match self.peek().kind {
+            TokenKind::String(symbol) | TokenKind::AsciiString(symbol) => {
+                error.with_arg("name", self.interner.resolve(symbol).to_owned())
+            }
+            _ => error.with_arg("name", "id"),
         }
     }
 

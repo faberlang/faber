@@ -128,41 +128,26 @@ fn parses_nucleum_braced_fragment_falsum_as_structured_entry() {
 }
 
 #[test]
-fn parses_named_lane_sugar_as_string_binding() {
-    let result = parse_ok("@ nucleum lane \"position\"\nfunctio k() → vacuum { }\n");
-    let AnnotationKind::Nucleum(nucleum) =
-        &result.program.as_ref().expect("program").statements[0].annotations[0].kind
-    else {
-        panic!("expected structured nucleum");
-    };
-    assert_eq!(
-        result.interner.resolve(nucleum.lane.expect("lane")),
-        "position"
-    );
-    assert_eq!(nucleum.lane_values.len(), 1);
-}
-
-#[test]
-fn parses_named_lane_beside_fragment_in_braced_form() {
-    let result =
-        parse_ok("@ nucleum { lane = \"position\", fragment = verum }\nfunctio k() → vacuum { }\n");
-    let AnnotationKind::Nucleum(nucleum) =
-        &result.program.as_ref().expect("program").statements[0].annotations[0].kind
-    else {
-        panic!("expected structured nucleum");
-    };
-    assert!(nucleum.is_fragment);
-    assert_eq!(
-        result.interner.resolve(nucleum.lane.expect("lane")),
-        "position"
+fn rejects_removed_lane_sugar_with_the_migration_issue() {
+    assert_parse_error_matches(
+        "@ nucleum lane \"position\"\nfunctio k() → vacuum { }\n",
+        ParseExpectation::Args(&[("issue", "nucleum_lane_removed"), ("name", "position")]),
     );
 }
 
 #[test]
-fn rejects_non_string_named_lane_value() {
+fn rejects_removed_lane_beside_fragment_in_braced_form() {
+    assert_parse_error_matches(
+        "@ nucleum { lane = \"position\", fragment = verum }\nfunctio k() → vacuum { }\n",
+        ParseExpectation::Args(&[("issue", "nucleum_lane_removed"), ("name", "position")]),
+    );
+}
+
+#[test]
+fn rejects_removed_lane_even_when_the_value_is_not_a_string() {
     assert_parse_error_matches(
         "@ nucleum lane 1\nfunctio k() → vacuum { }\n",
-        ParseExpectation::Issue("non_string_nucleum_lane_value"),
+        ParseExpectation::Issue("nucleum_lane_removed"),
     );
 }
 

@@ -31,7 +31,9 @@
 //!     through without returning.
 //! 12. [`fragment_definition`] checks `@ nucleum fragment` bodies against the
 //!     device-safe effect subset and records a per-definition effect summary.
-//! 13. [`lint`] reports quality diagnostics that may be warnings rather than
+//! 13. [`kernel_legality`] decides `@ nucleum` body legality (gpu-reset
+//!     rule 12) and call legality between kernels and host code.
+//! 14. [`lint`] reports quality diagnostics that may be warnings rather than
 //!     hard semantic errors.
 //!
 //! ERROR POLICY
@@ -61,6 +63,9 @@ pub mod exhaustive;
 pub mod fragment_definition;
 pub mod import_path;
 pub mod import_seam;
+pub mod kernel_legality;
+mod kernel_legality_body;
+mod kernel_legality_types;
 pub mod kernel_namespace;
 pub mod leading_underscore;
 pub mod libera;
@@ -159,6 +164,10 @@ mod itera_binder_test;
 #[cfg(test)]
 #[path = "typecheck/iuncta_hole_test.rs"]
 mod iuncta_hole_test;
+
+#[cfg(test)]
+#[path = "kernel_legality_test.rs"]
+mod kernel_legality_test;
 
 #[cfg(test)]
 #[path = "kernel_namespace_test.rs"]

@@ -12,8 +12,8 @@ locale = "en"
 +++
 
 @ kernel
+@ public
 fn marked() → void {
-    print "must not execute"
 }
 
 main {

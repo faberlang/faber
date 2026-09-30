@@ -39,7 +39,7 @@ fn assert_wrapper_route(source: &str) {
     );
     let has_entry = source.lines().any(|line| {
         let trimmed = line.trim();
-        trimmed == "@ nucleum" || trimmed.starts_with("@ nucleum {") || trimmed.starts_with("@ nucleum lane ")
+        trimmed == "@ nucleum" || trimmed.starts_with("@ nucleum {")
     });
     assert!(
         has_entry,
@@ -104,6 +104,14 @@ fn expect_analyze_issue<'a>(errors: &'a [Diagnostic], issue: &str, reason: &str)
         .unwrap_or_else(|| panic!("expected {issue} reason={reason}, got {errors:?}"))
 }
 
+/// Check-time kernel legality: a kernel's call to a non-kernel callee.
+fn expect_analyze_call_issue<'a>(errors: &'a [Diagnostic], callee: &str) -> &'a Diagnostic {
+    errors
+        .iter()
+        .find(|err| err.issue() == Some("nucleum_host_call") && arg(&err.args, "callee") == Some(callee))
+        .unwrap_or_else(|| panic!("expected nucleum_host_call callee={callee}, got {errors:?}"))
+}
+
 fn expect_lower_issue<'a>(errors: &'a [crate::mir::MirError], issue: &str) -> &'a crate::mir::MirError {
     errors
         .iter()
@@ -136,155 +144,6 @@ fn assert_composed(source: &str) {
         .is_empty(),
         "no fragment call may survive the wrapper route: {:#?}",
         lowered.functions
-    );
-}
-
-#[test]
-fn caller_and_fragment_lane_bindings_fail_with_composition_issue() {
-    let source = r#"
-@ nucleum fragment lane "pos"
-functio helper(fractus<f32> x) → fractus<f32> {
-    redde x
-}
-
-@ nucleum { lane = "pos" }
-functio k(fractus<f32> x) → fractus<f32> {
-    redde helper(x)
-}
-"#;
-    let mut analysis = analyze(source).unwrap_or_else(|errors| panic!("source analyzes: {errors:?}"));
-    let errors = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
-        .expect_err("caller/fragment lane clash must fail closed");
-    let error = expect_lower_issue(&errors, "nucleum_lane_fragment_clash");
-    assert!(
-        span_in(error.span, source, "helper(x)"),
-        "primary span must mark the caller: {:?}",
-        error.span
-    );
-    let definition_span = error
-        .definition_span
-        .expect("lane clash must retain the fragment declaration span");
-    assert!(
-        span_in(definition_span, source, "lane \"pos\""),
-        "secondary span must mark the fragment lane declaration: {definition_span:?}"
-    );
-}
-
-#[test]
-fn fragment_lane_propagates_to_position_independent_caller() {
-    let source = r#"
-@ nucleum fragment lane "pos"
-functio helper() → u32 {
-    redde pos
-}
-
-@ nucleum
-functio k() → u32 {
-    redde helper()
-}
-"#;
-    let (analysis, lowered) = lower(source).unwrap_or_else(|errors| panic!("fragment lane must propagate: {errors:?}"));
-    let entry = kernel_function(&lowered.functions, &analysis);
-    assert!(
-        entry
-            .params
-            .iter()
-            .any(|param| param.mode == MirParamMode::Lane),
-        "fragment lane propagation must add the entry ABI position parameter: {entry:#?}"
-    );
-    assert!(
-        surviving_fragment_calls_with_metadata(
-            &lowered.functions,
-            &[],
-            &device_roles_from_hir(&analysis.hir),
-            &crate::mir::MirDeviceFunctionMetadataMap::default(),
-        )
-        .is_empty()
-    );
-}
-
-#[test]
-fn caller_lane_is_visible_to_fragment_body_after_composition() {
-    let source = r#"
-@ nucleum fragment
-functio helper() → u32 {
-    redde pos
-}
-
-@ nucleum lane "pos"
-functio k() → u32 {
-    redde helper()
-}
-"#;
-    let (analysis, lowered) = lower(source).unwrap_or_else(|errors| panic!("caller lane must compose: {errors:?}"));
-    let entry = kernel_function(&lowered.functions, &analysis);
-    let lane_name = entry
-        .params
-        .iter()
-        .find(|param| param.mode == MirParamMode::Lane)
-        .and_then(|param| param.name);
-    assert!(lane_name.is_some(), "entry retains its source lane parameter: {entry:#?}");
-    assert!(
-        entry
-            .params
-            .iter()
-            .all(|param| param.mode != MirParamMode::LaneInherited),
-        "inherited lane parameters must be consumed during composition: {entry:#?}"
-    );
-    assert_eq!(
-        entry
-            .locals
-            .iter()
-            .filter(|local| local.name == lane_name)
-            .count(),
-        1,
-        "fragment lane storage must resolve to the caller's one position local: {entry:#?}"
-    );
-    assert!(
-        surviving_fragment_calls_with_metadata(
-            &lowered.functions,
-            &[],
-            &device_roles_from_hir(&analysis.hir),
-            &crate::mir::MirDeviceFunctionMetadataMap::default(),
-        )
-        .is_empty()
-    );
-}
-
-#[test]
-fn transitive_fragment_chain_reuses_the_entry_lane_binding() {
-    let source = r#"
-@ nucleum fragment
-functio leaf() → u32 {
-    redde pos
-}
-
-@ nucleum fragment
-functio wrapper() → u32 {
-    redde leaf() + pos
-}
-
-@ nucleum lane "pos"
-functio k() → u32 {
-    redde wrapper()
-}
-"#;
-    let (analysis, lowered) = lower(source).unwrap_or_else(|errors| panic!("transitive lane must compose: {errors:?}"));
-    let entry = kernel_function(&lowered.functions, &analysis);
-    assert!(
-        entry
-            .params
-            .iter()
-            .all(|param| param.mode != MirParamMode::LaneInherited)
-    );
-    assert!(
-        surviving_fragment_calls_with_metadata(
-            &lowered.functions,
-            &[],
-            &device_roles_from_hir(&analysis.hir),
-            &crate::mir::MirDeviceFunctionMetadataMap::default(),
-        )
-        .is_empty()
     );
 }
 
@@ -388,7 +247,9 @@ functio k(fractus<f32> x) → fractus<f32> {
 }
 
 #[test]
-fn instantiation_type_emphasizes_call_site() {
+fn instantiation_type_is_rejected_at_check_time() {
+    // A host-only `textus` in a kernel signature is now a check-time
+    // diagnostic, before fragment composition could see it.
     let source = r"
 @ nucleum fragment
 functio helper(textus x) → textus {
@@ -400,15 +261,12 @@ functio k(textus x) → textus {
     redde helper(x)
 }
 ";
-    let mut analysis = analyze(source).unwrap_or_else(|errors| panic!("textus fragment must typecheck: {errors:?}"));
-    let errors = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
-        .expect_err("target-illegal fragment type must fail");
-    let err = expect_lower_issue(&errors, ISSUE_TYPE);
-    assert!(
-        span_in(err.span, source, "helper(x)"),
-        "instantiation TYPE must emphasize the wrapper call, span={:?}",
-        err.span
-    );
+    let errors = analyze_err(source);
+    let err = errors
+        .iter()
+        .find(|err| err.issue() == Some("nucleum_host_type") && arg(&err.args, "family") == Some("textus"))
+        .unwrap_or_else(|| panic!("expected nucleum_host_type textus, got {errors:?}"));
+    assert_eq!(arg(&err.args, "site"), Some("parameter"));
 }
 
 #[test]
@@ -563,15 +421,12 @@ functio k() → vacuum {
     redde helper()
 }
 ";
-    let mut analysis = analyze(source).unwrap_or_else(|errors| panic!("entry→graphics analyzes: {errors:?}"));
-    let errors = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
-        .expect_err("Entry→graphics must fail");
-    let err = expect_lower_issue(&errors, ISSUE_CONTEXT);
+    let errors = analyze_err(source);
+    let err = expect_analyze_call_issue(&errors, "shade");
     assert_eq!(
-        spanned(source, err.span),
+        spanned(source, err.span.expect("call diagnostic needs a span")),
         "shade()",
-        "entry→graphics span must be the call: {:?}",
-        err.span
+        "entry→graphics span must be the call"
     );
 }
 
@@ -592,15 +447,12 @@ functio k(fractus<f32> x) → fractus<f32> {
     redde host_add(helper(x))
 }
 ";
-    let mut analysis = analyze(source).unwrap_or_else(|errors| panic!("entry→host analyzes: {errors:?}"));
-    let errors = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
-        .expect_err("Entry→ordinary must fail");
-    let err = expect_lower_issue(&errors, ISSUE_CONTEXT);
+    let errors = analyze_err(source);
+    let err = expect_analyze_call_issue(&errors, "host_add");
     assert_eq!(
-        spanned(source, err.span),
+        spanned(source, err.span.expect("call diagnostic needs a span")),
         "host_add(helper(x))",
-        "nucleus→ordinary span must be the host call: {:?}",
-        err.span
+        "nucleus→ordinary span must be the host call"
     );
 }
 

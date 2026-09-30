@@ -1087,9 +1087,6 @@ fn semantic_invalid_annotation_help(args: &[DiagnosticArg]) -> Option<String> {
             Some("use `@ radix typus T in textus octeti` or braced `@ radix { param = T, allowed = textus }` with at least one allowed type".to_owned())
         }
         "conflicting_lane"
-        | "nucleum_lane_invalid_identifier"
-        | "nucleum_lane_collision"
-        | "nucleum_lane_conflicting"
         | "missing_directive"
         | "missing_lane_value"
         | "non_string_lane_value"

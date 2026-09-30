@@ -1,0 +1,4 @@
+error[SEM008:nucleum_host_effect]
+error[SEM008:nucleum_host_call]
+error[SEM008:nucleum_host_type]
+error[SEM008:nucleum_private_host_call]

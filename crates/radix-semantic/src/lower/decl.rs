@@ -38,7 +38,6 @@
 use super::Lowerer;
 use crate::{CommuneField, IndexExpr, NumericWidth, Primitive, Type, TypeId};
 use radix_diagnostics::DiagnosticArg;
-use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirAnnotation, HirBlock, HirConst, HirEnum, HirExpression, HirExpressionKind, HirField,
     HirFunction, HirImport, HirImportItem, HirInterface, HirInterfaceMethod, HirItem, HirItemKind,
@@ -60,24 +59,6 @@ const ISSUE_CALLABLE_POSTURE_CONFLICT: &str = "callable_posture_conflict";
 /// A type declaration parameter carries an `implet` bound (bounds are for
 /// callables; D1.1).
 const ISSUE_IMPLET_BOUND_ON_TYPE_DECLARATION: &str = "implet_bound_on_type_declaration";
-
-struct LanePathCollector<'a> {
-    resolver: &'a crate::Resolver,
-    lanes: Vec<(DefId, Symbol, Span)>,
-}
-
-impl HirVisitor for LanePathCollector<'_> {
-    fn visit_expr(&mut self, expr: &HirExpression) {
-        if let HirExpressionKind::Path(def_id) = expr.kind
-            && let Some(symbol) = self.resolver.get_symbol(def_id)
-            && symbol.kind == crate::SymbolKind::Lane
-            && !self.lanes.iter().any(|(existing, ..)| *existing == def_id)
-        {
-            self.lanes.push((def_id, symbol.name, expr.span));
-        }
-        walk_expr(self, expr);
-    }
-}
 
 fn error_expr(lowerer: &mut Lowerer, span: Span) -> HirExpression {
     HirExpression {
@@ -394,74 +375,6 @@ impl Lowerer<'_> {
         (def_id, name, span, ty, mutable)
     }
 
-    fn define_nucleum_lane_local(
-        &mut self,
-        annotations: &[radix_syntax::Annotation],
-        span: Span,
-    ) -> Option<ShaderLocal> {
-        let (lane, lane_span) =
-            annotations
-                .iter()
-                .find_map(|annotation| match &annotation.kind {
-                    radix_syntax::AnnotationKind::Nucleum(nucleum) => nucleum.lane.map(|lane| {
-                        (
-                            lane,
-                            nucleum
-                                .lane_spans
-                                .first()
-                                .copied()
-                                .unwrap_or(annotation.span),
-                        )
-                    }),
-                    _ => None,
-                })?;
-        let name = lane;
-        let ty = self
-            .types
-            .sized_numeric(Primitive::Numerus, NumericWidth::U32);
-        let def_id = self
-            .resolver
-            .lookup(name)
-            .filter(|def_id| {
-                self.resolver
-                    .get_symbol(*def_id)
-                    .is_some_and(|symbol| symbol.kind == crate::SymbolKind::Lane)
-            })
-            .unwrap_or_else(|| self.next_def_id());
-        if self.resolver.get_symbol(def_id).is_none() {
-            let _ = self.resolver.define(crate::Symbol {
-                def_id,
-                name,
-                kind: crate::SymbolKind::Lane,
-                ty: Some(ty),
-                mutable: false,
-                span,
-            });
-        }
-        Some((def_id, name, lane_span, ty, false))
-    }
-
-    fn inherited_nucleum_lane_locals(
-        &mut self,
-        body: &HirBlock,
-        explicit_lane: Option<DefId>,
-    ) -> Vec<ShaderLocal> {
-        let mut collector = LanePathCollector {
-            resolver: self.resolver,
-            lanes: Vec::new(),
-        };
-        collector.visit_block(body);
-        let ty = self
-            .types
-            .sized_numeric(Primitive::Numerus, NumericWidth::U32);
-        collector
-            .lanes
-            .into_iter()
-            .filter(|(def_id, ..)| Some(*def_id) != explicit_lane)
-            .map(|(def_id, name, span)| (def_id, name, span, ty, false))
-            .collect()
-    }
-
     fn prepend_runtime_provided_locals(
         &mut self,
         body: &mut HirBlock,
@@ -633,31 +546,16 @@ impl Lowerer<'_> {
             self.bind_local(name, def_id);
         }
 
-        let lane_local = self.define_nucleum_lane_local(&stmt.annotations, stmt.span);
-        if let Some((def_id, name, ..)) = lane_local.as_ref() {
-            self.bind_local(*name, *def_id);
-        }
-
         let body = decl.body.as_ref().map(|body| self.lower_block(body));
         self.pop_scope();
         self.pop_type_params();
         let (nucleum_entry, nucleum_fragment) =
             Self::nucleum_role_bits(&annotations, self.interner);
-        let explicit_lane = lane_local.as_ref().map(|(def_id, ..)| *def_id);
-        let inherited_lane_locals = if nucleum_fragment {
-            body.as_ref()
-                .map(|body| self.inherited_nucleum_lane_locals(body, explicit_lane))
-                .unwrap_or_default()
-        } else {
-            Vec::new()
-        };
         let mut body = body.map(|body| self.prepend_modifier_locals(body, modifier_locals));
         // Modifier locals sit innermost; stage I/O is prepended after them.
         if let Some(ref mut body) = body {
             self.prepend_runtime_provided_locals(body, vertex_locals.into_iter().rev());
             self.prepend_runtime_provided_locals(body, fragment_locals.into_iter().rev());
-            self.prepend_runtime_provided_locals(body, lane_local);
-            self.prepend_runtime_provided_locals(body, inherited_lane_locals);
         }
 
         let posture = self.resolve_callable_posture(decl.posture, &annotations, stmt.span);
@@ -865,19 +763,10 @@ impl Lowerer<'_> {
                     let prev_ego = self.current_ego_struct;
                     self.current_ego_struct = Some(def_id);
                     let modifier_locals = self.bind_modifier_locals(&method.modifiers);
-                    let lane_local =
-                        self.define_nucleum_lane_local(&member.annotations, member.span);
-                    if let Some((def_id, name, ..)) = lane_local.as_ref() {
-                        self.bind_local(*name, *def_id);
-                    }
                     let body = method.body.as_ref().map(|block| self.lower_block(block));
                     self.pop_scope();
                     self.current_ego_struct = prev_ego;
-                    let mut body =
-                        body.map(|body| self.prepend_modifier_locals(body, modifier_locals));
-                    if let Some(ref mut body) = body {
-                        self.prepend_runtime_provided_locals(body, lane_local);
-                    }
+                    let body = body.map(|body| self.prepend_modifier_locals(body, modifier_locals));
 
                     let ret_ty = method.ret.as_ref().map(|ty| self.lower_signature_type(ty));
                     let err_ty = method.err.as_ref().map(|ty| self.lower_signature_type(ty));

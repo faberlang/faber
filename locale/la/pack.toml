@@ -655,13 +655,9 @@ help = "add '{expected}' in this annotation position"
 message = "unexpected token after {context}"
 help = "remove the trailing annotation token"
 
-[diagnostics.PARSE018.issues.missing_nucleum_lane_value]
-message = "@ nucleum lane requires a string value"
-help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
-
-[diagnostics.PARSE018.issues.non_string_nucleum_lane_value]
-message = "@ nucleum lane value must be a string literal"
-help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
+[diagnostics.PARSE018.issues.nucleum_lane_removed]
+message = "ligatio @ {nucleum} lane '{name}' remota est; nucleum lane suam numquam nominat"
+help = "coordinatam iterationis per `{apud}` in ansa `{filum}` liga: `{itera} {ex} t {apud} [i] {filum} f {fixum} v`"
 
 [diagnostics.PARSE018.issues.ad_annotation_route]
 message = "`@ {ad}` viam ASCII inter apostrophos requirit"
@@ -1462,6 +1458,34 @@ help = "fix the AST construct for lowering"
 [diagnostics.SEM008.issues.nucleum_closure_escape]
 message = "kernel closure escapes as a {context} value; it may only initialize an immutable local or be called in the same expression"
 help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.nucleum_async]
+message = "nucleum {construct} adhibere non potest: formae asynchronae et generatoriae hospitem requirunt"
+help = "nucleum functionem synchronam simplicem facias"
+
+[diagnostics.SEM008.issues.nucleum_host_call]
+message = "vocatio nuclei ad '{callee}' non est legitima in machina (causa: {reason})"
+help = "aliud nucleum vel operationem machinae internam voca; vocatio tempore compilationis solvi debet"
+
+[diagnostics.SEM008.issues.nucleum_host_effect]
+message = "corpus nuclei '{operation}' facit ({reason}); nucleum hospitis tempus non requirit"
+help = "operationem hospitis extra nucleum move et eventus ex exitibus nuclei lege"
+
+[diagnostics.SEM008.issues.nucleum_host_type]
+message = "nucleum valorem '{family}' ({site}) adhibere non potest; acervum hospitis requirit"
+help = "tensores, vectores, matrices, typos valoris, vel collectionem terminatam capacitate statica adhibe"
+
+[diagnostics.SEM008.issues.nucleum_private_host_call]
+message = "codex hospitis nucleum privatum '{callee}' vocare non potest"
+help = "nucleum publicum fac ut lanceri possit, vel ex alio nucleo voca"
+
+[diagnostics.SEM008.issues.nucleum_recovery]
+message = "corpus nuclei tractatorem localem ('{construct}') ponere non potest"
+help = "errorem ad vocationem lancientem perveniat, ubi hospes eum tractat"
+
+[diagnostics.SEM008.issues.nucleum_workgroup]
+message = "nucleum '{construct}' ({site}) nominare non potest; status greigis internus compilatoris est"
+help = "exemplar parallelum per ansam filum vel reductionem exprime"
 
 [diagnostics.SEM008.issues.numerus_width_params]
 message = "numerus accepts at most one width marker"
@@ -3030,18 +3054,6 @@ help = "use `{publica}` for explicit export intent or `{privata}` for file-priva
 [diagnostics.SEM018.issues.conflicting_lane]
 message = "conflicting @ radix lane annotations: '{existing}' and '{parsed}'"
 help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
-
-[diagnostics.SEM018.issues.nucleum_lane_invalid_identifier]
-message = "@ nucleum lane binding '{name}' is not a valid identifier"
-help = "use a valid identifier for the lane binding"
-
-[diagnostics.SEM018.issues.nucleum_lane_collision]
-message = "@ nucleum lane binding '{name}' collides with a parameter or local"
-help = "choose a lane binding name that is not already used in the entry"
-
-[diagnostics.SEM018.issues.nucleum_lane_conflicting]
-message = "conflicting @ nucleum lane bindings: '{existing}' and '{parsed}'"
-help = "declare exactly one @ nucleum lane binding"
 
 [diagnostics.SEM018.issues.missing_directive]
 message = "@ radix requires a directive such as `lane`"
