@@ -58,13 +58,13 @@ main {
     const bool supercopiaest ← omnes.is_superset(communia)
 
     # copia iteration order is unspecified (D19.2) — sort before printing
-    const list<int> omnesOrd ← omnes ↦ list<int>
+    var list<int> omnesOrd ← omnes ↦ list<int>
     omnesOrd.sort()
-    const list<int> communiaOrd ← communia ↦ list<int>
+    var list<int> communiaOrd ← communia ↦ list<int>
     communiaOrd.sort()
-    const list<int> reliquaOrd ← reliqua ↦ list<int>
+    var list<int> reliquaOrd ← reliqua ↦ list<int>
     reliquaOrd.sort()
-    const list<int> disiunctaOrd ← disiuncta ↦ list<int>
+    var list<int> disiunctaOrd ← disiuncta ↦ list<int>
     disiunctaOrd.sort()
     print omnesOrd, communiaOrd, reliquaOrd, disiunctaOrd
     print subcopiaest, supercopiaest

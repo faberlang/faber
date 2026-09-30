@@ -36,6 +36,5 @@ locale = "en"
 #
 
 @ cli { name = "exitus-smoke" }
-main args args {
-    1
+main args args exit 1 {
 }

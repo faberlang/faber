@@ -203,9 +203,13 @@ pub fn receivers_for_type(ty: &Type) -> &'static [IntrinsicReceiver] {
         Type::Primitive(Primitive::Textus) | Type::BoundedTextus { .. } => {
             &[IntrinsicReceiver::Textus]
         }
-        Type::Primitive(Primitive::Ascii) | Type::BoundedAscii { .. } => {
-            &[IntrinsicReceiver::Ascii]
-        }
+        Type::Primitive(Primitive::Ascii) => &[IntrinsicReceiver::Ascii],
+        // WHY: bounded `ascii<N>` shares the live cord vocabulary with `textus`
+        // (bare `ascii` stays cursor-only). Naming the Textus family here lets
+        // every family-scoped consumer — notably the locale pack's
+        // surface→canonical spelling lookup — see `length` / `is_empty` on it,
+        // not just the registry row lookup.
+        Type::BoundedAscii { .. } => &[IntrinsicReceiver::Ascii, IntrinsicReceiver::Textus],
         Type::Primitive(Primitive::Regex) => &[IntrinsicReceiver::Regex],
         Type::Primitive(Primitive::Numerus) => &[IntrinsicReceiver::Numeric],
         Type::Primitive(Primitive::Fractus) => {
@@ -253,8 +257,7 @@ pub fn lookup_method_for_type(
             return Some(entry);
         }
     }
-    bounded_ascii_cord_ops(receiver_ty, method, arg_count)
-        .or_else(|| bounded_cord_appende(receiver_ty, method, arg_count))
+    bounded_cord_appende(receiver_ty, method, arg_count)
 }
 
 /// Resolve a promoted intrinsic from a type-table receiver ID, peeling aliases
@@ -276,22 +279,7 @@ pub fn lookup_method_for_type_id(
         }
     }
     let payload = types.get(payload_id);
-    bounded_ascii_cord_ops(payload, method, arg_count)
-        .or_else(|| bounded_cord_appende(payload, method, arg_count))
-}
-
-/// Bounded `ascii<N>` shares the live cord vocabulary with `textus`. Bare
-/// `ascii` stays cursor-only (do not route unbounded ascii through Textus).
-fn bounded_ascii_cord_ops(
-    receiver_ty: &Type,
-    method: &str,
-    arg_count: usize,
-) -> Option<&'static MethodIntrinsic> {
-    if matches!(receiver_ty, Type::BoundedAscii { .. }) {
-        lookup_method(IntrinsicReceiver::Textus, method, arg_count)
-    } else {
-        None
-    }
+    bounded_cord_appende(payload, method, arg_count)
 }
 
 /// Bounded cords reuse lista `appende` (Inner, Vacuum, Append) so overflow is

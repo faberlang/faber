@@ -194,9 +194,12 @@ fn receivers_for_type_maps_semantic_families() {
         &[IntrinsicReceiver::Textus]
     );
     let bounded_ascii = Type::BoundedAscii { capacity };
+    // ascii<N> shares the textus cord vocabulary, so the family list names
+    // Textus too: a family-scoped consumer (the locale pack's surface spelling
+    // lookup) must see `length` / `is_empty` on it.
     assert_eq!(
         receivers_for_type(&bounded_ascii),
-        &[IntrinsicReceiver::Ascii]
+        &[IntrinsicReceiver::Ascii, IntrinsicReceiver::Textus]
     );
     let bounded_octeti = Type::BoundedOcteti { capacity };
     assert_eq!(

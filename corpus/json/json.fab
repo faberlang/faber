@@ -25,6 +25,7 @@ import from "norma:json" json
 
 @ json { }
 class Payload {
+    @ json { name = "wire_name" }
     var string name
 }
 
