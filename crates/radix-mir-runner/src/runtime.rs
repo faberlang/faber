@@ -551,7 +551,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             MirAggregateKind::Array => {
                 let items = self.eval_ordered_fields(&aggregate.fields, span)?;
-                let items = self.apply_element_float_width(items, aggregate.ty.semantic_id());
+                let items = self.apply_element_display_width(items, aggregate.ty.semantic_id());
                 Ok(Value::Array(Rc::new(RefCell::new(items))))
             }
             MirAggregateKind::Record => {
@@ -683,7 +683,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         ),
                     ));
                 }
-                let values = self.apply_element_float_width(values, aggregate.ty.semantic_id());
+                let values = self.apply_element_display_width(values, aggregate.ty.semantic_id());
                 Ok(Value::Vector(Rc::new(RefCell::new(values))))
             }
             MirAggregateKind::Matrix => {
@@ -712,7 +712,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         ),
                     ));
                 }
-                let values = self.apply_element_float_width(values, aggregate.ty.semantic_id());
+                let values = self.apply_element_display_width(values, aggregate.ty.semantic_id());
                 Ok(Value::Matrix(Rc::new(RefCell::new(
                     super::value::MatrixValue {
                         rows,

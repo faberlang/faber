@@ -24,14 +24,17 @@ locale = "en"
 #     scale, all in a 128-bit intermediate. The slot that receives the value
 #     rounds half-even to scale 8 and traps past the range. So 4.2 + 0.1 =
 #     4.3 exactly, and `a * b * c` rounds once, when it is stored.
-#   • The runner prints the RAW scaled carrier — 4.2 prints as `420000000`
-#     (42 × 10⁷ at the d64 scale), and 4.2 + 0.1 prints `430000000`
-#     (43 × 10⁷). Exactness is visible in the carrier, not in a formatted
-#     decimal string.
+#   • A decimal prints in its shortest form (D2.6) — trailing zeros are
+#     dropped and a whole number has no fractional part: 4.2 prints `4.2`,
+#     4.2 + 0.1 prints `4.3`, and 4.2 / 0.1 prints `42`, never `42.0`.
+#   • A conditional, `discerne` or block that yields decimal arithmetic
+#     rounds at the slot like any other computed decimal: 0.00000005 * 0.5
+#     is 0.000000025 exactly and lands in a `d64` as `0.00000002`
+#     (half-even to scale 8).
 #
 # Common mistakes:
-#   • reading a printed carrier as a formatted decimal — `430000000` IS 4.3
-#     at the d64 scale, not four hundred thirty million
+#   • expecting a trailing zero or `.0` — `4.2 / 0.1` prints `42`, since a
+#     `.0` would read as a float
 #   • assuming decimal arithmetic degrades to float error — the scaled
 #     integer carrier keeps 4.2 + 0.1 = 4.3 exact where f64 rounds
 #   • treating integer literals as decimal literals — `a + 1`, `a / 2`, and
@@ -43,11 +46,11 @@ locale = "en"
 
 # decimal — 4.2 arithmetic at the d64 carrier
 #
-# WHY: pins the D4 runner contract end-to-end. Each line below prints the
-# raw scaled carrier of the expression to its right.
+# WHY: pins the D4 runner contract and the D2.6 display end-to-end. Each
+# line below prints the shortest decimal of the expression to its right.
 #
 # EXPECTED OUTPUT:
-#   decimal-arithmetic.expected — raw d64 carriers, one per print.
+#   arithmetic.expected — shortest decimals, one per print.
 
 main {
     const int<d64> a ← 4.2
@@ -58,4 +61,13 @@ main {
     print a - b
     print a * b
     print a / b
+    const int<d64> tiny ← 0.00000005
+    const int<d64> half ← 0.5
+    const int<d64> z ← true ✓ tiny * half ✗ a
+    print z
+    const int<d64> w ← false ✓ a ✗ tiny * half
+    print w
+    const int<d64> n ← -1.5
+    print n
+    print "§ and §"(a, n)
 }

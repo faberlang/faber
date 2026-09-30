@@ -422,3 +422,64 @@ fn f32_struct_field_and_list_display_at_declared_width() {
         "[66.666664]"
     );
 }
+
+#[test]
+fn d64_carrier_displays_as_shortest_decimal_by_declared_type() {
+    // D2.6: a stored d64 is `Int(carrier)`; the static type picks the form.
+    let d64 = Some(NumericWidth::D64);
+    for (carrier, shown) in [
+        (420_000_000_i64, "4.2"),
+        (1, "0.00000001"),
+        (-150_000_000, "-1.5"),
+        (10_000_000_000, "100"),
+        (i64::MAX, "92233720368.54775807"),
+        (0, "0"),
+    ] {
+        assert_eq!(display_int_at_width(carrier, d64), shown);
+    }
+    // An undeclared integer keeps its digits.
+    assert_eq!(display_int_at_width(420_000_000, None), "420000000");
+}
+
+#[test]
+fn d64_display_threads_through_lists_fields_and_templates() {
+    let mut interner = radix_lexer::Interner::new();
+    let field = interner.intern("price");
+    let def = radix_hir::DefId(11);
+    let structs = rustc_hash::FxHashMap::default();
+    let variants = rustc_hash::FxHashMap::default();
+    let mut widths = FieldFloatWidths::default();
+    widths.insert((def, field), NumericWidth::D64);
+    let order = FieldOrder {
+        structs: &structs,
+        variants: &variants,
+        float_widths: &widths,
+    };
+    let carrier = Value::Int(420_000_000);
+    let strukt = Value::Struct(def, field_map(&[(field, carrier.clone())]));
+    assert_eq!(
+        strukt.display(&interner, order, Span::default()).unwrap(),
+        r#"{"price": 4.2}"#
+    );
+    let list = Value::Array(std::rc::Rc::new(std::cell::RefCell::new(vec![
+        carrier.clone(),
+        Value::Int(-50_000_000),
+    ])));
+    assert_eq!(
+        list.display_typed(&interner, order, Span::default(), Some(NumericWidth::D64))
+            .unwrap(),
+        "[4.2, -0.5]"
+    );
+    assert_eq!(
+        format_template(
+            "§ / §",
+            &[carrier, Value::Dec(25, 9)],
+            &[Some(NumericWidth::D64), Some(NumericWidth::D64)],
+            &interner,
+            order,
+            Span::default()
+        )
+        .unwrap(),
+        "4.2 / 0.000000025"
+    );
+}

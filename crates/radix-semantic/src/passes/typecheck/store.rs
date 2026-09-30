@@ -133,7 +133,13 @@ impl TypeChecker<'_> {
                 let ty = self.saturating_inferred_slot(expr, ty, site);
                 return self.unify_expected(ty, slot_ty, expr.span);
             }
-            return self.check_expr_with_expected(expr, Some(slot_ty));
+            let ty = self.check_expr_with_expected(expr, Some(slot_ty));
+            // A conditional, `discerne` or block that yields exact decimal
+            // arithmetic rounds at the inferred `d64` slot too (n5b).
+            if self.is_infer(slot_ty) && self.is_decimal_arithmetic(expr, ty) {
+                return self.wrap_implicit_store(expr, ty, ty, site);
+            }
+            return ty;
         }
         if let Some(ty) = self.constant_store(expr, slot_ty, site) {
             return ty;
@@ -266,18 +272,40 @@ impl TypeChecker<'_> {
     /// Whether `expr` (of type `ty`) is decimal arithmetic: its value is
     /// computed exactly (D11.7), so a slot must round and range-check it.
     fn is_decimal_arithmetic(&self, expr: &HirExpression, ty: TypeId) -> bool {
-        let arithmetic = matches!(
-            expr.kind,
+        self.decimal_slot_type(ty).is_some() && Self::carries_exact_decimal(expr)
+    }
+
+    /// Whether `expr` can evaluate to an unrounded decimal intermediate:
+    /// decimal `+ - * / %` and unary `-`, or a conditional, `discerne` or
+    /// block that yields one from any branch (n5b).
+    fn carries_exact_decimal(expr: &HirExpression) -> bool {
+        let tail = |block: &radix_hir::HirBlock| {
+            block
+                .expr
+                .as_deref()
+                .is_some_and(Self::carries_exact_decimal)
+        };
+        match &expr.kind {
             HirExpressionKind::Binary(
                 radix_hir::HirBinOp::Add
-                    | radix_hir::HirBinOp::Sub
-                    | radix_hir::HirBinOp::Mul
-                    | radix_hir::HirBinOp::Div
-                    | radix_hir::HirBinOp::Mod,
+                | radix_hir::HirBinOp::Sub
+                | radix_hir::HirBinOp::Mul
+                | radix_hir::HirBinOp::Div
+                | radix_hir::HirBinOp::Mod,
+                ..,
+            )
+            | HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, _) => true,
+            HirExpressionKind::Block(block) => tail(block),
+            HirExpressionKind::Si {
+                then_block,
+                else_block,
                 ..
-            ) | HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, _)
-        );
-        arithmetic && self.decimal_slot_type(ty).is_some()
+            } => tail(then_block) || else_block.as_ref().is_some_and(tail),
+            HirExpressionKind::Discerne { arms, .. } => arms
+                .iter()
+                .any(|arm| Self::carries_exact_decimal(&arm.body)),
+            _ => false,
+        }
     }
 
     /// The `d64` type of a concrete slot type (aliases and access markers

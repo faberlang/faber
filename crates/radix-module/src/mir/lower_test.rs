@@ -136,7 +136,7 @@ fn decimal_literal_executes_at_the_exact_scaled_carrier() {
         &mut host,
     )
     .unwrap_or_else(|error| panic!("exact decimal carrier must run: {error:?}"));
-    assert_eq!(host.stdout_lines, ["9223372036854775807"]);
+    assert_eq!(host.stdout_lines, ["92233720368.54775807"]);
 }
 
 #[test]
@@ -6797,11 +6797,11 @@ fn run_lines(body: &str) -> Result<Vec<String>, String> {
 
 #[test]
 fn decimal_sum_is_exact_and_stores_at_scale_eight() {
-    // 0.1 + 0.2 = 0.3: carrier 30_000_000 at scale 8.
+    // 0.1 + 0.2 = 0.3 (carrier 30_000_000 at scale 8), printed shortest.
     let lines =
         run_lines("fixum numerus<d64> a ← 0.1\nfixum numerus<d64> b ← 0.2\nfixum numerus<d64> c ← a + b\nnota c")
             .expect("runs");
-    assert_eq!(lines, ["30000000"]);
+    assert_eq!(lines, ["0.3"]);
 }
 
 #[test]
@@ -6815,7 +6815,7 @@ fn decimal_product_keeps_its_exact_scale_until_a_slot_stores_it() {
          fixum numerus<d64> s ← p * r * r\nnota s",
     )
     .expect("runs");
-    assert_eq!(lines, ["144927500", "0.1050724375", "10507244"]);
+    assert_eq!(lines, ["1.449275", "0.1050724375", "0.10507244"]);
 }
 
 #[test]
@@ -6827,7 +6827,7 @@ fn decimal_expression_rounds_once_at_the_store_not_per_operation() {
          fixum numerus<d64> h ← 100.0\nfixum numerus<d64> t ← a * r * h\nnota t",
     )
     .expect("runs");
-    assert_eq!(lines, ["150"]);
+    assert_eq!(lines, ["0.0000015"]);
 }
 
 #[test]
@@ -6838,7 +6838,7 @@ fn decimal_division_rounds_half_even_to_the_larger_scale() {
          fixum numerus<d64> q ← one / three\nnota q\nfixum numerus<d64> w ← two / three\nnota w",
     )
     .expect("runs");
-    assert_eq!(lines, ["33333333", "66666667"]);
+    assert_eq!(lines, ["0.33333333", "0.66666667"]);
 }
 
 #[test]
@@ -6850,7 +6850,7 @@ fn decimal_intermediate_may_leave_the_range_until_the_store() {
          fixum numerus<d64> ok ← big + one - one\nnota ok",
     )
     .expect("runs");
-    assert_eq!(lines, ["9223372036800000000"]);
+    assert_eq!(lines, ["92233720368"]);
     let trap = run_lines(
         "fixum numerus<d64> big ← 92233720368.0\nfixum numerus<d64> two ← 2.0\n\
          fixum numerus<d64> boom ← big * two\nnota boom",
@@ -6903,6 +6903,13 @@ incipit {
     .unwrap_or_else(|error| panic!("store positions must run: {error:?}"));
     assert_eq!(
         host.stdout_lines,
-        ["38108", "38108", "38108", "38108", "38108", "0.000381078125"]
+        [
+            "0.00038108",
+            "0.00038108",
+            "0.00038108",
+            "0.00038108",
+            "0.00038108",
+            "0.000381078125"
+        ]
     );
 }

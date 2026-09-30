@@ -375,7 +375,7 @@ impl Value {
         float_width: Option<NumericWidth>,
     ) -> Result<String, RunnerError> {
         Ok(match self {
-            Value::Int(v) => v.to_string(),
+            Value::Int(v) => display_int_at_width(*v, float_width),
             Value::UInt(v) => v.to_string(),
             Value::Dec(carrier, scale) => crate::decimal::format(*carrier, *scale),
             Value::Float(v) => display_float_at_width(*v, float_width),
@@ -528,7 +528,7 @@ fn display_in_collection(
     float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
     Ok(match value {
-        Value::Int(v) => v.to_string(),
+        Value::Int(v) => display_int_at_width(*v, float_width),
         Value::UInt(v) => v.to_string(),
         Value::Array(items) => display_list(&items.borrow(), interner, order, span, float_width)?,
         Value::Map(entries) => {
@@ -623,6 +623,16 @@ fn display_ordered_fields(
         parts.push(format!("\"{name}\": {val_str}"));
     }
     Ok(format!("{{{}}}", parts.join(", ")))
+}
+
+/// Render an integer carrier at its declared width: a `d64` carrier prints as
+/// its shortest decimal (D2.6: `4.2`, `12`, never the raw `420000000`);
+/// every other integer prints as itself.
+pub fn display_int_at_width(value: i64, width: Option<NumericWidth>) -> String {
+    match width.and_then(NumericWidth::decimal_scale) {
+        Some(scale) => crate::decimal::format(i128::from(value), scale),
+        None => value.to_string(),
+    }
 }
 
 /// Render a float at its declared width: non-f64 floats use the shortest

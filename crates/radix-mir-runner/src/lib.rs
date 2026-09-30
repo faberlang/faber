@@ -33,8 +33,8 @@ use radix_lexer::{Interner, Span, Symbol};
 use radix_mir::{
     MirBinOp, MirBlock, MirBlockId, MirCallee, MirConstant, MirFunction, MirFunctionId,
     MirFunctionIndex, MirKernelShaderStage, MirLocalId, MirOperand, MirParamMode, MirPlace,
-    MirPlaceBase, MirProgram, MirStatementKind, MirTempId, MirTerminatorKind, MirType, MirUnOp,
-    MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir,
+    MirPlaceBase, MirProgram, MirProjection, MirStatementKind, MirTempId, MirTerminatorKind,
+    MirType, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir,
 };
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable, effective_width};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -364,18 +364,22 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
     }
 }
 
-fn element_float_width(ty: TypeId, types: &TypeTable, depth: u8) -> Option<NumericWidth> {
+fn element_display_width(ty: TypeId, types: &TypeTable, depth: u8) -> Option<NumericWidth> {
     if depth > 8 {
         return None;
     }
     match types.get(ty) {
-        Type::SizedNumeric(_, width) if width.is_float() => Some(*width),
+        Type::SizedNumeric(_, width) if width.is_float() || width.is_decimal() => Some(*width),
+        Type::Map(_, elem) | Type::Option(elem) => element_display_width(*elem, types, depth + 1),
+        Type::Queue(elem) | Type::Stack(elem) => element_display_width(*elem, types, depth + 1),
         Type::Vector(elem, _)
         | Type::Matrix(elem, _)
         | Type::Tensor(elem, _)
         | Type::Sparsa(elem, _)
         | Type::Array(elem)
-        | Type::BoundedArray { element: elem, .. } => element_float_width(*elem, types, depth + 1),
+        | Type::BoundedArray { element: elem, .. } => {
+            element_display_width(*elem, types, depth + 1)
+        }
         _ => None,
     }
 }
@@ -387,7 +391,7 @@ fn index_field_float_widths(
     let mut widths = FxHashMap::default();
     for (def, fields) in &context.struct_fields {
         for (name, ty) in fields {
-            if let Some(width) = element_float_width(ty.semantic_id(), types, 0)
+            if let Some(width) = element_display_width(ty.semantic_id(), types, 0)
                 && width != NumericWidth::F64
             {
                 widths.insert((*def, *name), width);
@@ -1527,44 +1531,60 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    /// Declared float width for a diagnostic operand (scalar or numeric
-    /// collection element), used to render floats at the operand width.
+    /// Declared display width for a diagnostic operand (scalar or numeric
+    /// collection element): the float width or `d64` decimal width its value
+    /// renders at. Struct-field and element projections resolve through the
+    /// field's declared type.
     fn operand_float_width(&self, operand: &MirOperand) -> Option<NumericWidth> {
+        let function = || {
+            self.program
+                .indexed_function(&self.function_index, self.frames.last()?.function)
+        };
         let ty = match operand {
-            MirOperand::Temp(id) => {
-                let function = self
-                    .program
-                    .indexed_function(&self.function_index, self.frames.last()?.function)?;
-                function.temps.iter().find(|t| t.id == *id).map(|t| t.ty)
+            MirOperand::Temp(id) => function()?.temps.iter().find(|t| t.id == *id).map(|t| t.ty),
+            MirOperand::Place(place) => {
+                let base = match place.base {
+                    MirPlaceBase::Temp(id) => {
+                        function()?.temps.iter().find(|t| t.id == id).map(|t| t.ty)
+                    }
+                    MirPlaceBase::Local(id) => {
+                        function()?.locals.iter().find(|l| l.id == id).map(|l| l.ty)
+                    }
+                }?;
+                let mut ty = base.semantic_id();
+                for projection in &place.projections {
+                    ty = match projection {
+                        MirProjection::Field(field) => {
+                            let Type::Struct(def) = self.types.get(ty) else {
+                                return None;
+                            };
+                            self.context
+                                .struct_fields
+                                .get(def)?
+                                .get(field)?
+                                .semantic_id()
+                        }
+                        // An element of a numeric collection renders at the
+                        // collection's element width.
+                        MirProjection::Index(_)
+                        | MirProjection::VectorLane(_)
+                        | MirProjection::MatrixCell { .. } => ty,
+                        _ => return None,
+                    };
+                }
+                return Self::element_display_width(ty, self.types, 0);
             }
-            MirOperand::Place(place) => match place.base {
-                MirPlaceBase::Temp(id) => {
-                    let function = self
-                        .program
-                        .indexed_function(&self.function_index, self.frames.last()?.function)?;
-                    function.temps.iter().find(|t| t.id == id).map(|t| t.ty)
-                }
-                // Locals and projections may narrow away from the numeric
-                // element; only a projection-free numeric base resolves.
-                MirPlaceBase::Local(id) if place.projections.is_empty() => {
-                    let function = self
-                        .program
-                        .indexed_function(&self.function_index, self.frames.last()?.function)?;
-                    function.locals.iter().find(|l| l.id == id).map(|l| l.ty)
-                }
-                MirPlaceBase::Local(_) => None,
-            },
             MirOperand::Value(id) => self
                 .value_types
                 .get(&(self.frames.last()?.function, *id))
                 .copied(),
             MirOperand::Constant(_) => None,
         }?;
-        Self::element_float_width(ty.semantic_id(), self.types, 0)
+        Self::element_display_width(ty.semantic_id(), self.types, 0)
     }
 
-    fn element_float_width(ty: TypeId, types: &TypeTable, depth: u8) -> Option<NumericWidth> {
-        element_float_width(ty, types, depth)
+    fn element_display_width(ty: TypeId, types: &TypeTable, depth: u8) -> Option<NumericWidth> {
+        element_display_width(ty, types, depth)
     }
 
     /// Apply declared float width to a newly stored scalar.
@@ -1581,8 +1601,8 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    fn apply_element_float_width(&self, items: Vec<Value>, ty: TypeId) -> Vec<Value> {
-        match Self::element_float_width(ty, self.types, 0) {
+    fn apply_element_display_width(&self, items: Vec<Value>, ty: TypeId) -> Vec<Value> {
+        match Self::element_display_width(ty, self.types, 0) {
             Some(width) if width.is_float() => items
                 .into_iter()
                 .map(|item| match item {

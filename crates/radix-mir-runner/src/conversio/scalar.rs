@@ -86,7 +86,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Value::Char(ch) => ch.to_string(),
             Value::Int(v) => v.to_string(),
             Value::UInt(v) => v.to_string(),
-            Value::Float(v) => match Self::element_float_width(source_ty, self.types, 0) {
+            Value::Float(v) => match Self::element_display_width(source_ty, self.types, 0) {
                 // Declared narrower float: same repr as `print`/interpolation.
                 Some(width) if width != NumericWidth::F64 => {
                     crate::value::display_float_at_width(v, Some(width))
