@@ -2672,6 +2672,7 @@ fn is_builtin_type(name: &str) -> bool {
             | "numerus"
             | "modulus"
             | "saturatus"
+            | "exactus"
             | "fractus"
             | "bivalens"
             | "nihil"
@@ -3720,6 +3721,27 @@ fn lower_named_type(
         };
         let mut error = None;
         let ty = crate::numeric_width::lower_saturating_word(
+            &type_params,
+            interner,
+            types,
+            &mut |issue| {
+                error = Some(issue);
+            },
+        );
+        if let Some(issue) = error {
+            return Err(TypeLowerError::Issue(issue.issue()));
+        }
+        return Ok(ty);
+    }
+
+    if name_str == "exactus" {
+        let Some(type_params) = generic_type_exprs(params) else {
+            return Err(TypeLowerError::Issue(
+                "generic_size_argument_in_type_position",
+            ));
+        };
+        let mut error = None;
+        let ty = crate::numeric_width::lower_trapping_word(
             &type_params,
             interner,
             types,

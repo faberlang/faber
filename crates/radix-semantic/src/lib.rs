@@ -1020,6 +1020,7 @@ fn register_locale_pack_type_spellings(
                 TypeBindingKind::TensorFamily(_) => None,
                 TypeBindingKind::ModularWord
                 | TypeBindingKind::SaturatingWord
+                | TypeBindingKind::TrappingWord
                 | TypeBindingKind::ByteWord => None,
                 // Census relational names are reader-surface rows only in S2;
                 // no bare `TypeId` until the S3/S4 type surface lands.

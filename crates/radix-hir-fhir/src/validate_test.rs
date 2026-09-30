@@ -583,7 +583,7 @@ fn unsupported_authored_level_fails_closed() {
     else {
         panic!("fixture must have a semantic form");
     };
-    *level = TypeFormLevel(2);
+    *level = TypeFormLevel(3);
     let err = crate::decode(&crate::encode(&artifact).expect("encode"))
         .expect_err("unsupported level must fail closed");
     assert!(matches!(

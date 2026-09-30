@@ -587,8 +587,11 @@ fn validate_type_form(
                 .get(form.ty.0 as usize)
                 .ok_or_else(|| type_presentation_issue("type_witness_missing", site))?;
             match ty {
-                radix_types::Type::SizedNumeric(_, _) => {
-                    if level.0 > 1 || !form.args.is_empty() {
+                radix_types::Type::SizedNumeric(prim, _) => {
+                    // Level 2 is the explicit policy word (`trapping<u8>`);
+                    // it only spells integer and `d64` widths, never floats.
+                    let policy_ok = level.0 != 2 || *prim == radix_types::Primitive::Numerus;
+                    if level.0 > 2 || !policy_ok || !form.args.is_empty() {
                         return Err(type_presentation_issue("numeric_level_or_arity", site));
                     }
                 }

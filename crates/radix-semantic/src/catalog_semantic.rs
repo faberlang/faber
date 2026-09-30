@@ -571,6 +571,16 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "unsupported_saturating_word_width" => Some(
             "use an integer width for saturatus: i8, i16, i32, i64, u8, u16, u32, or u64".to_owned(),
         ),
+        "trapping_word_width_required" => Some(
+            "write the trapping type with one width, such as exactus<u8> or exactus<i64>".to_owned(),
+        ),
+        "trapping_word_width_shape" => Some("use a bare width marker such as u8 or i64".to_owned()),
+        "unsupported_trapping_word_width" => Some(
+            "use an integer width or d64 for exactus: i8, i16, i32, i64, u8, u16, u32, u64, or d64".to_owned(),
+        ),
+        "trapping_float_not_implemented" => Some(
+            "write the bare float width (f16, bf16, f32, or f64) for IEEE arithmetic; trapping floats are not implemented yet".to_owned(),
+        ),
         "saturating_word_family_mismatch" => Some(
             "convert the other operand to the same saturatus width with `↦`; saturating, wrapping, and trapping integers never mix implicitly".to_owned(),
         ),

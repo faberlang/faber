@@ -1717,10 +1717,14 @@ impl TypeFormLevel {
     pub const LONG: Self = Self(0);
     /// Bare-width or width-prefixed compression (`u32`, `lu32`, `tf32[2, 2]`).
     pub const SHORT: Self = Self(1);
+    /// Explicit default-policy head (`trapping<u8>`, la `exactus<u8>`): the
+    /// author spelled out the policy word that the bare marker (`u8`) implies.
+    /// The type is identical either way; the level only keeps the spelling.
+    pub const POLICY: Self = Self(2);
 
     #[must_use]
     pub fn is_short(self) -> bool {
-        self.0 != 0
+        self.0 == 1
     }
 }
 

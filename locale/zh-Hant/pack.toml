@@ -163,6 +163,7 @@ textus = "文字"
 numerus = "整數"
 modulus = "模數类型"
 saturatus = "飽和"
+exactus = "精確"
 fractus = "小數"
 bivalens = "布林"
 nihil = "無"
@@ -952,6 +953,18 @@ help = "為 saturating 型別寫一個整數寬度，如 saturating<u8> 或 satu
 [diagnostics.SEM008.issues.saturating_word_width_shape]
 message = "saturating 寬度必須是單獨的整數寬度標記"
 help = "使用單獨的整數寬度標記，如 u8 或 i16"
+
+[diagnostics.SEM008.issues.trapping_word_width_required]
+message = "trapping type requires exactly one width"
+help = "write the trapping type with one width, such as trapping<u8> or trapping<i64>"
+
+[diagnostics.SEM008.issues.trapping_word_width_shape]
+message = "trapping width must be a bare width marker"
+help = "use a bare width marker such as u8 or i64"
+
+[diagnostics.SEM008.issues.trapping_float_not_implemented]
+message = "trapping floats are not implemented yet"
+help = "write the bare float width (f16, bf16, f32, or f64) for IEEE arithmetic; trapping floats are not implemented yet"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia 需要一個型別參數"

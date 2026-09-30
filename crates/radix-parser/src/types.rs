@@ -371,6 +371,14 @@ impl Parser {
             }
         };
 
+        // `exactus<W>` (en `trapping<W>`) is the policy word spelled out; keep
+        // that authored spelling apart from the bare marker for the formatter.
+        if matches!(&kind, TypeExprKind::Named(head, args)
+            if !args.is_empty() && self.interner.resolve(head.name) == "exactus")
+        {
+            form = TypeFormLevel::POLICY;
+        }
+
         let span = start.merge(self.previous_span());
         let core = TypeExpr {
             nullable: false,

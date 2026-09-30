@@ -48,5 +48,9 @@ mod modular_word_width_test;
 mod saturating_word_test;
 
 #[cfg(test)]
+#[path = "trapping_word_test.rs"]
+mod trapping_word_test;
+
+#[cfg(test)]
 #[path = "nary_range_test.rs"]
 mod nary_range_test;

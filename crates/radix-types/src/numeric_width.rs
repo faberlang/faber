@@ -75,6 +75,14 @@ pub enum WidthLowerIssue {
     SaturatingWordShape,
     /// `saturatus` marker is not one of i8…i64 / u8…u64.
     SaturatingWordUnsupported,
+    /// `exactus` (en `trapping`) requires exactly one width marker.
+    TrappingWordRequired,
+    /// `exactus` argument is not a bare width marker.
+    TrappingWordShape,
+    /// `exactus` marker is not an integer width or `d64`.
+    TrappingWordUnsupported,
+    /// `exactus<float width>`: the trapping float cell is not built yet (D11.8).
+    TrappingFloatNotImplemented,
 }
 
 impl WidthLowerIssue {
@@ -97,6 +105,10 @@ impl WidthLowerIssue {
     pub const SATURATING_WORD_WIDTH_REQUIRED: &str = "saturating_word_width_required";
     pub const SATURATING_WORD_WIDTH_SHAPE: &str = "saturating_word_width_shape";
     pub const UNSUPPORTED_SATURATING_WORD_WIDTH: &str = "unsupported_saturating_word_width";
+    pub const TRAPPING_WORD_WIDTH_REQUIRED: &str = "trapping_word_width_required";
+    pub const TRAPPING_WORD_WIDTH_SHAPE: &str = "trapping_word_width_shape";
+    pub const UNSUPPORTED_TRAPPING_WORD_WIDTH: &str = "unsupported_trapping_word_width";
+    pub const TRAPPING_FLOAT_NOT_IMPLEMENTED: &str = "trapping_float_not_implemented";
 
     /// Diagnostic issue identity for this failure.
     #[must_use]
@@ -120,6 +132,10 @@ impl WidthLowerIssue {
             Self::SaturatingWordRequired => Self::SATURATING_WORD_WIDTH_REQUIRED,
             Self::SaturatingWordShape => Self::SATURATING_WORD_WIDTH_SHAPE,
             Self::SaturatingWordUnsupported => Self::UNSUPPORTED_SATURATING_WORD_WIDTH,
+            Self::TrappingWordRequired => Self::TRAPPING_WORD_WIDTH_REQUIRED,
+            Self::TrappingWordShape => Self::TRAPPING_WORD_WIDTH_SHAPE,
+            Self::TrappingWordUnsupported => Self::UNSUPPORTED_TRAPPING_WORD_WIDTH,
+            Self::TrappingFloatNotImplemented => Self::TRAPPING_FLOAT_NOT_IMPLEMENTED,
         }
     }
 }
@@ -600,6 +616,40 @@ pub fn lower_saturating_word(
         }
         _ => {
             report(WidthLowerIssue::SaturatingWordUnsupported);
+            types.intern(Type::Error)
+        }
+    }
+}
+
+/// Lower the trapping policy word (D11.8): `exactus<W>` (en `trapping<W>`).
+///
+/// Names the default overflow policy explicitly, so the result is the very
+/// type the bare marker `W` denotes (`trapping<u8>` is `u8`, same `TypeId`).
+/// Admits the integer widths and `d64`. A float width would be the new
+/// trapping-float cell (D11.8 cell (e)), which is not built yet and rejects
+/// with its own issue rather than as an unknown type.
+pub fn lower_trapping_word(
+    params: &[radix_syntax::TypeExpr],
+    interner: &radix_lexer::Interner,
+    types: &mut TypeTable,
+    report: &mut dyn FnMut(WidthLowerIssue),
+) -> TypeId {
+    if params.len() != 1 {
+        report(WidthLowerIssue::TrappingWordRequired);
+        return types.intern(Type::Error);
+    }
+    let Some(marker) = type_expr_width_marker(&params[0], interner) else {
+        report(WidthLowerIssue::TrappingWordShape);
+        return types.intern(Type::Error);
+    };
+    match NumericWidth::from_marker(marker, Primitive::Numerus) {
+        Ok(width) => types.sized_numeric(Primitive::Numerus, width),
+        Err(WidthError::FloatOnNumerus) => {
+            report(WidthLowerIssue::TrappingFloatNotImplemented);
+            types.intern(Type::Error)
+        }
+        Err(_) => {
+            report(WidthLowerIssue::TrappingWordUnsupported);
             types.intern(Type::Error)
         }
     }

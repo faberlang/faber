@@ -682,6 +682,10 @@ impl Lowerer<'_> {
             return self.lower_saturating_word_type(params);
         }
 
+        if name_str == "exactus" {
+            return self.lower_trapping_word_type(params);
+        }
+
         if name_str == "octetus" {
             return self.lower_byte_word_type(params);
         }
@@ -965,6 +969,9 @@ impl Lowerer<'_> {
             crate::locale::TypeBindingKind::SaturatingWord => {
                 Some(self.lower_saturating_word_type(params))
             }
+            crate::locale::TypeBindingKind::TrappingWord => {
+                Some(self.lower_trapping_word_type(params))
+            }
             crate::locale::TypeBindingKind::ByteWord => Some(self.lower_byte_word_type(params)),
             // Census relational type names are reader-surface rows only in S2
             // (no HIR/MIR type yet; the real surface is S3/S4). Fall through to
@@ -1101,6 +1108,26 @@ impl Lowerer<'_> {
         };
         let mut issues = Vec::new();
         let ty = crate::numeric_width::lower_modular_word(
+            &type_params,
+            self.interner,
+            self.types,
+            &mut |issue| {
+                issues.push(issue);
+            },
+        );
+        if let Some(issue) = issues.first() {
+            self.error(issue.issue());
+        }
+        ty
+    }
+
+    fn lower_trapping_word_type(&mut self, params: &[GenericArgExpr]) -> TypeId {
+        let Some(type_params) = generic_type_exprs(params) else {
+            self.error("generic_size_argument_in_type_position");
+            return self.types.intern(Type::Error);
+        };
+        let mut issues = Vec::new();
+        let ty = crate::numeric_width::lower_trapping_word(
             &type_params,
             self.interner,
             self.types,

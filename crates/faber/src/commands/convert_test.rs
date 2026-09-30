@@ -456,6 +456,54 @@ fn lists() → int {
     );
 }
 
+/// D11.8: the formatter keeps the author's spelling of the default policy —
+/// `trapping<u8>` (la `exactus<u8>`), bare `u8`, and the long `int<u8>` are
+/// one type but three spellings, and each survives a locale round trip.
+#[test]
+fn convert_preserves_trapping_policy_word_spelling() {
+    let fixture = std::env::temp_dir().join("faber-convert-trapping-policy-word.fab");
+    fs::write(
+        &fixture,
+        r#"+++
+locale = "en"
++++
+fn policy(trapping<u8> a) → trapping<i64> {
+    const trapping<u8> spelled ← a
+    const u8 bare ← a
+    const int<u8> long_form ← a
+    const list<trapping<u16>> inner ← empty
+    return 0
+}
+"#,
+    )
+    .expect("write trapping fixture");
+    let path = fixture.to_str().expect("utf8 fixture path");
+    let latin = run_faber_convert_stdout_with_args(&["convert", "--to", "la", "--stdout", path]);
+    assert!(
+        latin.contains("functio policy(exactus<u8> a) → exactus<i64>"),
+        "{latin}"
+    );
+    assert!(latin.contains("fixum exactus<u8> spelled"), "{latin}");
+    assert!(latin.contains("fixum u8 bare"), "{latin}");
+    assert!(latin.contains("fixum numerus<u8> long_form"), "{latin}");
+    assert!(latin.contains("fixum lista<exactus<u16>> inner"), "{latin}");
+
+    fs::write(&fixture, &latin).expect("rewrite latin fixture");
+    let english = run_faber_convert_stdout_with_args(&["convert", "--to", "en", "--stdout", path]);
+    let _ = fs::remove_file(&fixture);
+    assert!(
+        english.contains("fn policy(trapping<u8> a) → trapping<i64>"),
+        "{english}"
+    );
+    assert!(english.contains("const trapping<u8> spelled"), "{english}");
+    assert!(english.contains("const u8 bare"), "{english}");
+    assert!(english.contains("const int<u8> long_form"), "{english}");
+    assert!(
+        english.contains("const list<trapping<u16>> inner"),
+        "{english}"
+    );
+}
+
 #[test]
 fn convert_preserves_template_application_sugar() {
     // Reader-locale packs re-render the same semantic program with different

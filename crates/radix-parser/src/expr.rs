@@ -1375,6 +1375,7 @@ impl Parser {
                 | "octeti"
                 | "octetus"
                 | "saturatus"
+                | "exactus"
                 | "littera"
                 | "regex"
                 | "json"

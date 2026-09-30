@@ -168,6 +168,7 @@ textus = "textus"
 numerus = "numerus"
 modulus = "modulus_t"
 saturatus = "saturatus"
+exactus = "exactus"
 fractus = "fractus"
 bivalens = "bivalens"
 # Null type (D23.2). The value literal is `nulla`, so `nihil` names only the
@@ -1199,6 +1200,18 @@ help = "scribe saturatus cum una latitudine integra, ut saturatus<u8> aut satura
 [diagnostics.SEM008.issues.saturating_word_width_shape]
 message = "latitudo saturati signum latitudinis integrae nudum esse debet"
 help = "utere signo latitudinis integrae nudo, ut u8 aut i16"
+
+[diagnostics.SEM008.issues.trapping_word_width_required]
+message = "exactus unam latitudinem requirit"
+help = "scribe exactus cum una latitudine, ut exactus<u8> aut exactus<i64>"
+
+[diagnostics.SEM008.issues.trapping_word_width_shape]
+message = "latitudo exacti signum latitudinis nudum esse debet"
+help = "utere signo latitudinis nudo, ut u8 aut i64"
+
+[diagnostics.SEM008.issues.trapping_float_not_implemented]
+message = "exactus cum latitudine fractionis nondum efficitur"
+help = "scribe latitudinem fractionis nudam (f16, bf16, f32 aut f64) pro arithmetica IEEE; fracta exacta nondum efficiuntur"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia requires one type parameter"

@@ -453,10 +453,35 @@ impl super::FaberCodegen<'_> {
         match level.0 {
             0 => self.semantic_long_form_to_faber(form, names, surface),
             1 => self.semantic_short_form_to_faber(form),
+            2 => self.semantic_policy_form_to_faber(form, surface),
             _ => Err(malformed_type_form(format!(
                 "authored type form carries unsupported level {}",
                 level.0
             ))),
+        }
+    }
+
+    /// POLICY spelling (D11.8): the explicit default-policy head over a
+    /// sized numeric witness, `trapping<u8>` / la `exactus<u8>`. The witness
+    /// is the bare marker's own type, so only integer and `d64` widths carry it.
+    fn semantic_policy_form_to_faber(
+        &self,
+        form: &HirTypeForm,
+        surface: &impl KeywordSurface,
+    ) -> Result<String, CodegenError> {
+        match self.types.get(form.ty) {
+            Type::Error => Ok("<error>".to_owned()),
+            Type::SizedNumeric(Primitive::Numerus, width) => {
+                Self::expect_no_form_args(form)?;
+                Ok(format!(
+                    "{}<{}>",
+                    surface.type_surface(TypeBindingKind::TrappingWord),
+                    width.faber_marker()
+                ))
+            }
+            _ => Err(malformed_type_form(
+                "authored POLICY level is illegal for this constructor".to_owned(),
+            )),
         }
     }
 

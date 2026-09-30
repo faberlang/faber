@@ -28,6 +28,7 @@ impl KeywordSurface for LaSurface {
             TypeBindingKind::Primitive(Primitive::Fractus) => "fractus",
             TypeBindingKind::Primitive(Primitive::Textus) => "textus",
             TypeBindingKind::Primitive(Primitive::Octeti) => "octeti",
+            TypeBindingKind::TrappingWord => "exactus",
             TypeBindingKind::Collection(CollectionKind::Lista) => "lista",
             TypeBindingKind::Collection(CollectionKind::Tabula) => "tabula",
             TypeBindingKind::TensorFamily(TensorFamilyKind::Tensor) => "tensor",
@@ -51,6 +52,7 @@ impl KeywordSurface for EnSurface {
     fn type_surface(&self, kind: TypeBindingKind) -> &str {
         match kind {
             TypeBindingKind::Primitive(Primitive::Numerus) => "int",
+            TypeBindingKind::TrappingWord => "trapping",
             TypeBindingKind::Collection(CollectionKind::Lista) => "list",
             other => LaSurface.type_surface(other),
         }
@@ -179,6 +181,51 @@ fn scalar_long_and_short_stay_distinct_over_one_type_id() {
     assert_eq!(
         render_at(&short, &declared_site(2), fx.u32_ty, &LaSurface),
         "u32"
+    );
+}
+
+/// D11.8: the explicit policy word, the long head and the bare marker stay
+/// three distinct spellings over one `TypeId`; each re-emits as authored, in
+/// both locales, and a list child keeps its own level.
+#[test]
+fn trapping_policy_word_keeps_its_own_spelling_over_one_type_id() {
+    let fx = fixture();
+    let policy = semantic_form(TypeFormLevel::POLICY, fx.u32_ty, Vec::new());
+    let codegen = codegen_with_forms(
+        &fx,
+        vec![
+            (declared_site(1), policy.clone()),
+            (declared_site(2), short_width(fx.u32_ty)),
+            (
+                declared_site(3),
+                semantic_form(TypeFormLevel::LONG, fx.u32_ty, Vec::new()),
+            ),
+            (
+                declared_site(4),
+                semantic_form(TypeFormLevel::LONG, fx.lista_u32, vec![type_arg(policy)]),
+            ),
+        ],
+    );
+
+    assert_eq!(
+        render_at(&codegen, &declared_site(1), fx.u32_ty, &LaSurface),
+        "exactus<u32>"
+    );
+    assert_eq!(
+        render_at(&codegen, &declared_site(1), fx.u32_ty, &EnSurface),
+        "trapping<u32>"
+    );
+    assert_eq!(
+        render_at(&codegen, &declared_site(2), fx.u32_ty, &EnSurface),
+        "u32"
+    );
+    assert_eq!(
+        render_at(&codegen, &declared_site(3), fx.u32_ty, &EnSurface),
+        "int<u32>"
+    );
+    assert_eq!(
+        render_at(&codegen, &declared_site(4), fx.lista_u32, &EnSurface),
+        "list<trapping<u32>>"
     );
 }
 
@@ -761,7 +808,19 @@ fn illegal_levels_and_arity_fail_closed() {
         (
             declared_site(2),
             fx.u32_ty,
-            semantic_form(TypeFormLevel(2), fx.u32_ty, Vec::new()),
+            semantic_form(TypeFormLevel(3), fx.u32_ty, Vec::new()),
+        ),
+        // POLICY over a float witness: `trapping<f32>` is not a form.
+        (
+            declared_site(9),
+            fx.f32_ty,
+            semantic_form(TypeFormLevel::POLICY, fx.f32_ty, Vec::new()),
+        ),
+        // POLICY on a constructor with no policy word.
+        (
+            declared_site(10),
+            numerus,
+            semantic_form(TypeFormLevel::POLICY, numerus, Vec::new()),
         ),
         // LONG lista with no children.
         (
