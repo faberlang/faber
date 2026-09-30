@@ -590,6 +590,15 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     "valor to bivalens conversion failed",
                 )),
             },
+            // Ruling 40: `valor ↦ inf` takes every integer carrier, including
+            // one beyond 64 bits (Rust `Magnus::from_valor`).
+            Type::SizedNumeric(Primitive::Numerus, NumericWidth::Inf) => match value {
+                Value::Int(_) | Value::UInt(_) | Value::Magnus(_) => Ok(value),
+                _ => Err(RunnerError::conversion(
+                    span,
+                    "valor to numerus conversion failed",
+                )),
+            },
             Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {
                 match value {
                     Value::Int(value) => Ok(Value::Int(value)),

@@ -973,3 +973,115 @@ fn constants_read_back_through_the_canonical_carrier() {
         },
     );
 }
+
+// ---------------------------------------------------------------------------
+// U8a: `inf` <-> `valor` and any-length JSON integer tokens (ruling 40).
+// ---------------------------------------------------------------------------
+
+const VALOR_TO_NUMERUS: &str = "valor to numerus conversion failed";
+
+fn valor_type() -> Type {
+    Type::Primitive(Primitive::Valor)
+}
+
+#[test]
+fn valor_to_inf_extracts_every_integer_carrier_and_nothing_else() {
+    let beyond = big("18446744073709551616");
+    for value in [
+        Value::Int(0),
+        Value::Int(i64::MIN),
+        Value::UInt(u64::MAX),
+        beyond.clone(),
+        big("-18446744073709551617"),
+    ] {
+        assert_eq!(
+            convert(valor_type(), inf_type(), value.clone(), &[], None).expect("integer valor"),
+            value
+        );
+    }
+    // The Rust `Magnus::from_valor` accepts only the integer variants.
+    for value in [
+        Value::Float(1.0),
+        Value::Str("7".to_owned()),
+        Value::Bool(true),
+    ] {
+        let err = convert(valor_type(), inf_type(), value, &[], None).expect_err("not integer");
+        assert_eq!(err.message, VALOR_TO_NUMERUS);
+    }
+    // A `⊥` recovery supplies the value instead.
+    assert_eq!(
+        convert(
+            valor_type(),
+            inf_type(),
+            Value::Float(1.0),
+            &[],
+            Some(MirOperand::Constant(MirConstant::Int(9))),
+        )
+        .expect("recovered"),
+        Value::Int(9)
+    );
+}
+
+#[test]
+fn inf_to_valor_keeps_the_canonical_carrier_and_narrowing_back_is_checked() {
+    let beyond = big("18446744073709551616");
+    assert_eq!(
+        convert(inf_type(), valor_type(), beyond.clone(), &[], None).expect("box"),
+        beyond
+    );
+    // `valor ↦ int<W>` from a beyond-64-bit integer fails (Rust `i64::from_valor` is `None`).
+    let err =
+        convert(valor_type(), sized(NumericWidth::I64), beyond, &[], None).expect_err("beyond i64");
+    assert_eq!(err.message, VALOR_TO_NUMERUS);
+}
+
+fn json_kernel(verb: &str, value: Value) -> Result<Value, RunnerError> {
+    let mut host = crate::host::BufferHost::default();
+    crate::kernel::dispatch_kernel(
+        &mut host,
+        radix_mir::KernelModule::Json,
+        verb,
+        &[value],
+        Span::default(),
+    )
+}
+
+#[test]
+fn json_parse_reads_any_length_integer_tokens_into_the_canonical_carrier() {
+    let parsed = json_kernel(
+        "parse",
+        Value::Str(
+            r#"{"a":18446744073709551616,"b":-18446744073709551617,"c":18446744073709551615,"d":-5,"e":1.5,"f":1e3}"#
+                .to_owned(),
+        ),
+    )
+    .expect("parse");
+    let Value::Map(fields) = parsed else {
+        panic!("not a map");
+    };
+    let fields = fields.borrow();
+    let field = |key: &str| fields[&crate::value::MapKey::Str(key.to_owned())].clone();
+    assert_eq!(field("a"), big("18446744073709551616"));
+    assert!(matches!(field("a"), Value::Magnus(_)));
+    assert_eq!(field("b"), big("-18446744073709551617"));
+    assert_eq!(field("c"), Value::UInt(u64::MAX));
+    assert_eq!(field("d"), Value::Int(-5));
+    assert_eq!(field("e"), Value::Float(1.5));
+    assert_eq!(field("f"), Value::Float(1000.0));
+}
+
+#[test]
+fn json_round_trips_an_inf_beyond_64_bits_as_a_bare_number() {
+    let digits = "123456789012345678901234567890123456789";
+    let source = format!(r#"{{"n":{digits},"xs":[{digits},-{digits}]}}"#);
+    let parsed = json_kernel("parse", Value::Str(source.clone())).expect("parse");
+    assert_eq!(
+        json_kernel("stringify", parsed).expect("stringify"),
+        Value::Str(source)
+    );
+    // A `Magnus` built directly renders as the digit string, not a JSON string.
+    assert_eq!(
+        json_kernel("stringify", big(digits)).expect("stringify"),
+        Value::Str(digits.to_owned())
+    );
+}

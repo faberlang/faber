@@ -16,7 +16,9 @@ radix-runtime-contract = { path = "../radix-runtime-contract" }
 radix-types = { path = "../radix-types" }
 regex = "1"
 rustc-hash = "2"
-serde_json = "1"
+# WHY: `arbitrary_precision` keeps the digit string of a JSON number so an
+# integer token of any length reaches `inf` (inf-delivery-spec ruling 40, U8a).
+serde_json = { version = "1", features = ["arbitrary_precision"] }
 toml = "1"
 
 [dev-dependencies]

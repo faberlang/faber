@@ -3,6 +3,8 @@
 use super::super::value::MapKey;
 use super::super::{RunnerError, Value};
 use super::args::{expect_str, optional_usize};
+use crate::inf::from_magnus;
+use handroll::Magnus;
 use radix_lexer::Span;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -63,6 +65,16 @@ fn serialize_json(
     result.map_err(|err| RunnerError::internal(span, format!("json.stringify failed: {err}")))
 }
 
+/// The exact integer of a JSON number token that has no fraction or exponent
+/// (`arbitrary_precision` keeps the source digits).
+fn integer_token(number: &serde_json::Number) -> Option<Magnus> {
+    let token = number.to_string();
+    if token.contains(['.', 'e', 'E']) {
+        return None;
+    }
+    Magnus::parse_decimal(&token).ok()
+}
+
 fn json_to_value(value: serde_json::Value, span: Span) -> Result<Value, RunnerError> {
     match value {
         serde_json::Value::Null => Ok(Value::Nil),
@@ -74,6 +86,9 @@ fn json_to_value(value: serde_json::Value, span: Span) -> Result<Value, RunnerEr
                 // F-084: json.parse large u64 (e.g. u64::MAX) must surface as
                 // UInt, not fall through to the lossy as_f64() path.
                 Ok(Value::UInt(number))
+            } else if let Some(exact) = integer_token(&value) {
+                // Ruling 40: an integer token of any length is an `inf`.
+                Ok(from_magnus(exact))
             } else if let Some(number) = value.as_f64() {
                 Ok(Value::Float(number))
             } else {
@@ -108,13 +123,13 @@ fn value_to_json(value: &Value, span: Span) -> Result<serde_json::Value, RunnerE
         Value::Bool(value) => Ok(serde_json::Value::Bool(*value)),
         Value::Int(value) => Ok(serde_json::Value::Number((*value).into())),
         Value::UInt(value) => Ok(serde_json::Value::Number((*value).into())),
-        // An `inf` beyond the 64-bit carriers has no serde_json number (the
-        // crate is built without `arbitrary_precision`); the any-length
-        // integer token is inf-delivery U8a (ruling 40, `valor`/`json` rows).
-        Value::Magnus(_) => Err(RunnerError::internal(
-            span,
-            "inf beyond 64 bits is not representable in a JSON kernel number (U8a)",
-        )),
+        // An `inf` beyond the 64-bit carriers renders as its digit string, a
+        // bare JSON number (ruling 40).
+        Value::Magnus(value) => value
+            .to_string()
+            .parse::<serde_json::Number>()
+            .map(serde_json::Value::Number)
+            .map_err(|err| RunnerError::internal(span, format!("inf is not a JSON number: {err}"))),
         Value::Dec(..) => Err(RunnerError::internal(
             span,
             "decimal intermediate reached JSON before a store",

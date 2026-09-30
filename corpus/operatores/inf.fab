@@ -55,7 +55,7 @@ locale = "en"
 #
 # WHY: pins F9 rulings 34–38 and 40–42 on the MIR runner (the oracle).
 # Each numbered section prints one idea; sections 1–4 are arithmetic, 5–6
-# compare and widen, 7–10 convert, 11–12 render and collect.
+# compare and widen, 7–10 convert, 11–12 render and collect, 13 boxes.
 #
 # EXPECTED OUTPUT:
 #   inf.expected — one result per print.
@@ -165,4 +165,10 @@ main {
     print sample
     const lista<inf> items ← [1, 18446744073709551616, 3]
     print items.sum()
+
+    # 13. `valor` carries an `inf` of any length and gives it back exactly.
+    const valor boxed ← big ↦ valor
+    print boxed
+    const inf unboxed ← boxed ↦ inf
+    print unboxed + 1
 }
