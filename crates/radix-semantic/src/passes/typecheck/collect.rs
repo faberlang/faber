@@ -50,7 +50,7 @@ impl TypeChecker<'_> {
             };
         }
         if is_generator {
-            ret = self.types.array(ret);
+            ret = self.types.cursor(ret);
         }
         (ret, err)
     }

@@ -156,7 +156,7 @@ fn pair() generator → int {
 
 main {
     print pair()
-    const list<int> all ← pair()
+    const list<int> all ← pair() ↦ list<int>
     print all.length()
     var int total ← 0
     for from pair() const n {

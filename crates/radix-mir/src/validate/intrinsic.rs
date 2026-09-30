@@ -216,7 +216,7 @@ impl Validator<'_, '_> {
             MirIntrinsic::CursorStream(_) => {
                 if !matches!(
                     self.type_kind(call.return_ty),
-                    Type::Array(_) | Type::AsyncCursor(_, _)
+                    Type::Array(_) | Type::Cursor(_) | Type::AsyncCursor(_, _)
                 ) {
                     self.error(
                         span,

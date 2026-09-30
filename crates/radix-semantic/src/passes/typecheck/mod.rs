@@ -791,6 +791,10 @@ mod access_operand_test;
 mod ascii_cursor_test;
 
 #[cfg(test)]
+#[path = "generator_cursor_test.rs"]
+mod generator_cursor_test;
+
+#[cfg(test)]
 #[path = "ascii_index_test.rs"]
 mod ascii_index_test;
 
