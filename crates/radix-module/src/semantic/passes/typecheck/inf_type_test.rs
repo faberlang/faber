@@ -185,7 +185,7 @@ fn inf_value_flow_still_lowers_to_mir() {
 fn every_hir_backend_fails_closed_with_a_named_diagnostic() {
     for (target, name) in [
         (Target::HirTypeScript, "HirTypeScript"),
-        (Target::HirGo, "HirGo"),
+        // HirGo carries `inf` as `*big.Int` (inf-U6g); it is no longer fail-closed.
         (Target::HirSwift, "HirSwift"),
         (Target::HirPython, "HirPython"),
         (Target::HirHaskell, "HirHaskell"),
@@ -202,6 +202,15 @@ fn every_hir_backend_fails_closed_with_a_named_diagnostic() {
 fn the_rust_backend_carries_inf() {
     let result = compile_for_target_and_get_result(INF_FILE, Target::HirRust);
     assert_accepts(&result.diagnostics);
+}
+
+/// Go carries `inf` as `*big.Int` (inf track U6g): the module compiles.
+#[test]
+fn the_go_backend_carries_inf() {
+    for source in [INF_FILE, INF_BIG_LITERAL] {
+        let result = compile_for_target_and_get_result(source, Target::HirGo);
+        assert_accepts(&result.diagnostics);
+    }
 }
 
 /// The Faber re-emitter carries `inf` (it only re-spells types).
