@@ -415,6 +415,22 @@ impl TypeChecker<'_> {
             }
             // A signed `potentia` with a variable exponent sits at the cap.
             HirExpressionKind::MethodCall(receiver, name, _, args, _) => {
+                // The `.summa()` method on a list or tensor is typed like the
+                // construct (ruling 21): at the cap, so the store checks.
+                let is_sum = args.is_empty()
+                    && self
+                        .interner
+                        .is_some_and(|interner| interner.resolve(*name) == "summa")
+                    && receiver.ty.is_some_and(|rty| {
+                        let peeled = self
+                            .types
+                            .peel_access_marker(self.resolve_inferred_type(rty))
+                            .1;
+                        matches!(self.types.get(peeled), Type::Array(_) | Type::Tensor(..))
+                    });
+                if is_sum {
+                    return self.plain_int_width(ty) == Some(NumericWidth::I64);
+                }
                 let is_power = self
                     .interner
                     .is_some_and(|interner| interner.resolve(*name) == "potentia");

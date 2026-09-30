@@ -33,8 +33,8 @@ use super::cursor::GeneratorCursor;
 use super::sermo::SermoView;
 use super::value::{
     GradientStorage, MapKey, TensorValue, Value, format_template, modular_operand,
-    modular_word_mask, modular_word_result, uint_width_checked_add, uint_width_checked_mul,
-    values_equal, width_checked_add, width_checked_mul,
+    modular_word_mask, modular_word_result, uint_width_checked_add, values_equal,
+    width_checked_add,
 };
 use super::{Runner, RunnerError, gelu_f64, host::provider_identity};
 use radix_hir::DefId;
@@ -2535,8 +2535,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let [left, right] = args else {
             return Err(RunnerError::internal(span, "tensor matmul arity"));
         };
-        let width =
-            effective_width(self.types, return_ty.semantic_id()).unwrap_or(NumericWidth::I64);
+        // Each finished cell is stored under the result element's width
+        // (ruling 19); the dot-product partials are exact.
+        let width = match self.types.get(return_ty.semantic_id()) {
+            Type::Tensor(element, _) | Type::Matrix(element, _) => {
+                effective_width(self.types, *element)
+            }
+            _ => None,
+        }
+        .unwrap_or(NumericWidth::I64);
         let left = self.tensor_arg(left, span)?;
         let right = self.tensor_arg(right, span)?;
         let borrow = left.borrow();
@@ -2591,7 +2598,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
         }
         Ok(tensor_value(
-            matmul_values(&borrow.data, &borrow_r.data, m, k_left, n, width, span)?,
+            matmul_values(
+                &borrow.data,
+                &borrow_r.data,
+                m,
+                k_left,
+                n,
+                NumericWidth::I64,
+                span,
+            )?,
             output_shape,
         ))
     }
@@ -3657,66 +3672,45 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Ok(modular_word_result(acc, width));
         }
 
-        // The integer path applies the same width-checking discipline as every
-        // other integer op (`numeric_binop`): the declared `numerus<W>` width
-        // governs the accumulation, so `sum` overflows exactly where a
-        // width-checked add would. Unsigned carriers accumulate in u64 and
-        // never sign-encode upper-half magnitudes.
+        // The integer path is exact (d11-6 rulings 17 and 21): partial sums
+        // are held wide and checked only against the 64-bit cap, so
+        // `[100, 100, -100]` of `numerus<i8>` sums to 100. The slot policy is
+        // applied by the store the typechecker puts after the sum. Only a
+        // narrower return type (a device function keeps the element type) is
+        // checked at its own width.
         let width =
             effective_width(self.types, return_ty.semantic_id()).unwrap_or(NumericWidth::I64);
-        let mut int_sum = 0_i64;
-        let mut uint_sum = 0_u64;
-        let mut saw_uint = false;
+        if !values.iter().any(|v| matches!(v, Value::Float(_))) {
+            let overflow = || RunnerError::internal(span, "numerus overflow");
+            let mut total: i128 = 0;
+            for value in &values {
+                let v = super::exact_int::int_value(value)
+                    .ok_or_else(|| RunnerError::internal(span, "sum element type mismatch"))?;
+                total = total.checked_add(v).ok_or_else(overflow)?;
+                if !(super::exact_int::EXACT_MIN..=super::exact_int::EXACT_MAX).contains(&total) {
+                    return Err(overflow());
+                }
+            }
+            let value = super::exact_int::exact_carrier(total, width).ok_or_else(overflow)?;
+            if matches!(width, NumericWidth::I64 | NumericWidth::U64) {
+                return Ok(value);
+            }
+            return match value {
+                Value::Int(v) => width_checked_add(v, 0, width, span).map(Value::Int),
+                Value::UInt(v) => uint_width_checked_add(v, 0, width, span).map(Value::UInt),
+                other => Ok(other),
+            };
+        }
         let mut float_sum = 0.0_f64;
-        let mut saw_float = false;
         for value in &values {
             match value {
-                Value::Int(v) if saw_float => float_sum += *v as f64,
-                Value::Int(v) if saw_uint => {
-                    uint_sum = uint_width_checked_add(
-                        uint_sum,
-                        u64::try_from(*v).map_err(|_| {
-                            RunnerError::internal(span, "sum element type mismatch")
-                        })?,
-                        width,
-                        span,
-                    )?;
-                }
-                Value::Int(v) => int_sum = width_checked_add(int_sum, *v, width, span)?,
-                Value::UInt(v) if saw_float => float_sum += *v as f64,
-                Value::UInt(v) => {
-                    if !saw_uint {
-                        // Carry any prior signed accumulation into the unsigned
-                        // lane; a negative prior sum cannot exist in an
-                        // unsigned-width context (width checks reject it).
-                        uint_sum = u64::try_from(int_sum).map_err(|_| {
-                            RunnerError::internal(span, "sum element type mismatch")
-                        })?;
-                        saw_uint = true;
-                    }
-                    uint_sum = uint_width_checked_add(uint_sum, *v, width, span)?;
-                }
-                Value::Float(v) => {
-                    if !saw_float {
-                        float_sum = if saw_uint {
-                            uint_sum as f64
-                        } else {
-                            int_sum as f64
-                        };
-                        saw_float = true;
-                    }
-                    float_sum += *v;
-                }
+                Value::Int(v) => float_sum += *v as f64,
+                Value::UInt(v) => float_sum += *v as f64,
+                Value::Float(v) => float_sum += *v,
                 _ => return Err(RunnerError::internal(span, "sum element type mismatch")),
             }
         }
-        if saw_float {
-            Ok(Value::Float(float_sum))
-        } else if saw_uint {
-            Ok(Value::UInt(uint_sum))
-        } else {
-            Ok(Value::Int(int_sum))
-        }
+        Ok(Value::Float(float_sum))
     }
 
     /// LSR-W0 argmax/argmin scan over an array-backed collection.
@@ -4445,6 +4439,37 @@ fn matmul_f64(left: &[f64], right: &[f64], m: i64, k: i64, n: i64) -> Vec<f64> {
     out
 }
 
+/// Exact dot-product accumulation (d11-6 rulings 17 and 19): every partial sum
+/// is held wide and checked only against the 64-bit cap; the finished cell is
+/// then stored under the element width, so a transient excursion outside the
+/// element type does not trap while a cell that does not fit does.
+fn matmul_exact(
+    left: &[i128],
+    right: &[i128],
+    (m, k, n): (i64, i64, i64),
+    span: Span,
+) -> Result<Vec<i128>, RunnerError> {
+    let overflow = || RunnerError::internal(span, "numerus overflow");
+    let (m, k, n) = matmul_dims(m, k, n);
+    let mut out = vec![0_i128; m.saturating_mul(n)];
+    for i in 0..m {
+        for kk in 0..k {
+            let a = left[i * k + kk];
+            let right_row = &right[kk * n..(kk + 1) * n];
+            let out_row = &mut out[i * n..(i + 1) * n];
+            for j in 0..n {
+                let prod = a.checked_mul(right_row[j]).ok_or_else(overflow)?;
+                let next = out_row[j].checked_add(prod).ok_or_else(overflow)?;
+                if !(super::exact_int::EXACT_MIN..=super::exact_int::EXACT_MAX).contains(&next) {
+                    return Err(overflow());
+                }
+                out_row[j] = next;
+            }
+        }
+    }
+    Ok(out)
+}
+
 fn matmul_i64(
     left: &[i64],
     right: &[i64],
@@ -4454,20 +4479,16 @@ fn matmul_i64(
     width: NumericWidth,
     span: Span,
 ) -> Result<Vec<i64>, RunnerError> {
-    let (m, k, n) = matmul_dims(m, k, n);
-    let mut out = vec![0_i64; m.saturating_mul(n)];
-    for i in 0..m {
-        for kk in 0..k {
-            let a = left[i * k + kk];
-            let right_row = &right[kk * n..(kk + 1) * n];
-            let out_row = &mut out[i * n..(i + 1) * n];
-            for j in 0..n {
-                let prod = width_checked_mul(a, right_row[j], width, span)?;
-                out_row[j] = width_checked_add(out_row[j], prod, width, span)?;
-            }
-        }
-    }
-    Ok(out)
+    let wide = |values: &[i64]| values.iter().map(|v| i128::from(*v)).collect::<Vec<_>>();
+    let cells = matmul_exact(&wide(left), &wide(right), (m, k, n), span)?;
+    cells
+        .into_iter()
+        .map(|cell| {
+            let cell =
+                i64::try_from(cell).map_err(|_| RunnerError::internal(span, "numerus overflow"))?;
+            width_checked_add(cell, 0, width, span)
+        })
+        .collect()
 }
 
 fn matmul_u64(
@@ -4479,20 +4500,16 @@ fn matmul_u64(
     width: NumericWidth,
     span: Span,
 ) -> Result<Vec<u64>, RunnerError> {
-    let (m, k, n) = matmul_dims(m, k, n);
-    let mut out = vec![0_u64; m.saturating_mul(n)];
-    for i in 0..m {
-        for kk in 0..k {
-            let a = left[i * k + kk];
-            let right_row = &right[kk * n..(kk + 1) * n];
-            let out_row = &mut out[i * n..(i + 1) * n];
-            for j in 0..n {
-                let prod = uint_width_checked_mul(a, right_row[j], width, span)?;
-                out_row[j] = uint_width_checked_add(out_row[j], prod, width, span)?;
-            }
-        }
-    }
-    Ok(out)
+    let wide = |values: &[u64]| values.iter().map(|v| i128::from(*v)).collect::<Vec<_>>();
+    let cells = matmul_exact(&wide(left), &wide(right), (m, k, n), span)?;
+    cells
+        .into_iter()
+        .map(|cell| {
+            let cell =
+                u64::try_from(cell).map_err(|_| RunnerError::internal(span, "numerus overflow"))?;
+            uint_width_checked_add(cell, 0, width, span)
+        })
+        .collect()
 }
 
 fn matmul_values(

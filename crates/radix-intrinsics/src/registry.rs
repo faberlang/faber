@@ -80,6 +80,9 @@ pub enum IntrinsicReturnKind {
     Textus,
     Inner,
     NumericInner,
+    /// Element type for floats; the 64-bit cap by the range rule for integers
+    /// (d11-6 ruling 21), the same typing as the `summa` construct.
+    NumericSum,
     OptionInner,
     OptionValue,
     ArrayInner,
@@ -369,7 +372,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         ArrayInner,
         collection Slice
     ),
-    intrinsic!(Lista, "summa", 0, &[], NumericInner, collection Sum),
+    intrinsic!(Lista, "summa", 0, &[], NumericSum, collection Sum),
     intrinsic!(Lista, "ultima", 1, &[IntrinsicParamKind::NumerusIndex], ArrayInner, collection TakeLast),
     intrinsic!(Lista, "ultimus", 0, &[], OptionInner, collection Last),
     intrinsic!(Lista, "vacua", 0, &[], Bool, collection IsEmpty),
@@ -763,7 +766,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     ),
     intrinsic!(Tensor, "maximus", 1, &[IntrinsicParamKind::Inner], SameAsReceiver, collection Maximum),
     intrinsic!(Tensor, "minimus", 1, &[IntrinsicParamKind::Inner], SameAsReceiver, collection Minimum),
-    intrinsic!(Tensor, "summa", 0, &[], NumericInner, collection Sum),
+    intrinsic!(Tensor, "summa", 0, &[], NumericSum, collection Sum),
     intrinsic!(Tensor, "media", 0, &[], FractusFromElement, collection TensorMean),
     intrinsic!(
         Tensor,

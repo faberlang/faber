@@ -733,13 +733,16 @@ fn resolve_return_type(
         IntrinsicReturnKind::Bool => checker.bool_type(),
         IntrinsicReturnKind::Numerus => checker.numerus_type(),
         IntrinsicReturnKind::Textus => checker.textus_type(),
-        IntrinsicReturnKind::NumericInner => {
+        IntrinsicReturnKind::NumericInner | IntrinsicReturnKind::NumericSum => {
             let Some(inner) = ctx.inner else {
                 return checker.error_type;
             };
             if !checker.is_numeric(inner) {
                 checker.invalid_operand_types(ISSUE_NUMERIC_LISTA_ELEMENTS_REQUIRED, span);
                 return checker.error_type;
+            }
+            if matches!(entry.return_kind, IntrinsicReturnKind::NumericSum) {
+                return checker.summa_result_type(inner);
             }
             inner
         }

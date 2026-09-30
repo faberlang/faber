@@ -656,3 +656,47 @@ fn in_place_twin_yields_no_value() {
     assert!(text.contains("expression_type_mismatch"), "{text}");
     assert!(text.contains("initializer_annotation_mismatch"), "{text}");
 }
+
+#[test]
+fn list_sum_is_typed_at_the_cap_and_exact() {
+    // ss4 (rulings 17, 21): the `.summa()` method is typed like the construct.
+    // Partial sums are exact; only the store applies the slot policy.
+    assert_eq!(ok("fixum lista<numerus<i8>> a ← [100, 100, -100]\nnota a.summa()"), ["100"]);
+    assert_eq!(
+        ok("fixum lista<numerus> a ← [9223372036854775807, 1, -1]\nnota a.summa()"),
+        ["9223372036854775807"]
+    );
+    assert_eq!(ok("fixum lista<numerus<u8>> c ← [200, 100]\nnota c.summa()"), ["300"]);
+    assert_eq!(
+        ok("fixum lista<numerus<i8>> a ← [100, 100, -100]\nvaria numerus<i8> t ← a.summa()\nnota t"),
+        ["100"]
+    );
+    let (out, _, message) = trap("fixum lista<numerus<u8>> c ← [200, 100]\nvaria numerus<u8> s ← c.summa()\nnota s");
+    assert!(out.is_empty());
+    assert!(message.contains("300 does not fit in `u8`"), "{message}");
+}
+
+#[test]
+fn list_sum_at_the_cap_is_a_checked_store() {
+    // The exact total above `i64::MAX` is a cap-typed value; storing it into
+    // `int` is the checked store.
+    let (_, issue, _) = trap(
+        "fixum lista<numerus> a ← [9223372036854775807, 9223372036854775807]\nfixum numerus s ← a.summa()\nnota s",
+    );
+    assert_eq!(issue, "implicit_store_out_of_range");
+}
+
+#[test]
+fn tensor_matmul_dot_products_are_exact_and_store_per_element() {
+    // Partial sum 200 leaves `i8`; the finished cell 0 fits and is stored.
+    let setup = "fixum tensor<numerus<i8>, []> seed ← vacua\nfixum tensor<numerus<i8>, [1, 3]> l ← seed.strue([100, 100, 100], [1, 3])\n";
+    let fits = format!(
+        "{setup}fixum tensor<numerus<i8>, [3, 1]> r ← seed.strue([1, 1, -2], [3, 1])\nfixum tensor<numerus<i8>, [1, 1]> p ← l.matmul(r)\nnota p.summa()"
+    );
+    assert_eq!(ok(&fits), ["0"]);
+    let too_big = format!(
+        "{setup}fixum tensor<numerus<i8>, [3, 1]> r ← seed.strue([1, 1, 1], [3, 1])\nfixum tensor<numerus<i8>, [1, 1]> p ← l.matmul(r)\nnota p.summa()"
+    );
+    let (_, issue, _) = trap(&too_big);
+    assert_eq!(issue, "runner_numerus_overflow");
+}
