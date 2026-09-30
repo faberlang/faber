@@ -1568,7 +1568,7 @@ fn gpu_builtin_call_rejects_non_device_function() {
 }
 
 #[test]
-fn gpu_builtin_call_typechecks_inside_device_function() {
+fn gpu_builtin_call_typechecks_inside_device_function_but_is_a_raw_lane_id() {
     let result = crate::test_support::analyze_source(
         r"
 @ nucleum fragment
@@ -1578,10 +1578,20 @@ functio helper() → u32 {
 ",
     );
 
-    if result.is_err() {
-        let errors = result.diagnostics.clone();
-        panic!("expected device GPU builtin call to typecheck: {errors:?}");
-    }
+    // The call is well typed; kernel legality (gpu-reset rule 12.5) is the
+    // only pass that rejects it.
+    let errors: Vec<_> = result
+        .diagnostics
+        .iter()
+        .filter(|err| err.is_error())
+        .collect();
+    assert!(
+        !errors.is_empty()
+            && errors
+                .iter()
+                .all(|err| err.issue() == Some("nucleum_raw_lane_id")),
+        "expected only nucleum_raw_lane_id: {errors:?}"
+    );
 }
 
 #[test]

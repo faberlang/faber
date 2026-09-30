@@ -689,13 +689,13 @@ expected = false
 [[cells]]
 id = "ann.nucleum-legality-reject"
 family = "annotations"
-cell = "REJECT: kernel legality (host effect, host call, host type, private host call)"
+cell = "REJECT: kernel legality (host effect, host call, host type, private host call, raw lane id)"
 status = "direct"
 exemplum = "kernel/legality-reject.fab"
 expected = true
 required = true
 decline = true
-note = "K7 semantic reject; nucleum_host_effect / nucleum_host_call / nucleum_host_type / nucleum_private_host_call"
+note = "K7 semantic reject; nucleum_host_effect / nucleum_host_call / nucleum_host_type / nucleum_private_host_call / nucleum_raw_lane_id"
 
 [[cells]]
 id = "ann.braced"

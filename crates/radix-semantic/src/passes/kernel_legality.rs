@@ -13,7 +13,9 @@
 //! ([`super::fragment_definition`]); they are callable kernels here but are not
 //! re-walked.
 
-use super::kernel_legality_body::{check_host_block, check_host_function, check_kernel_function};
+use super::kernel_legality_body::{
+    check_fragment_lane_ids, check_host_block, check_host_function, check_kernel_function,
+};
 use crate::{Resolver, SemanticError, SemanticErrorKind, TypeId, TypeTable};
 use radix_hir::{DefId, HirAnnotation, HirFunction, HirItemKind, HirModule, NucleumRole};
 use radix_lexer::{Interner, Span, Symbol};
@@ -34,6 +36,10 @@ pub const ISSUE_HOST_CALL: &str = "nucleum_host_call";
 pub const ISSUE_PRIVATE_HOST_CALL: &str = "nucleum_private_host_call";
 /// A kernel body installs a local handler.
 pub const ISSUE_RECOVERY: &str = "nucleum_recovery";
+/// User source calls a thread-id builtin (`global_invocation_id()` and its
+/// siblings). They are raw lane ids, a compiler-internal lowering surface
+/// (gpu-reset rule 12.5); the parallel pattern is a `filum` loop.
+pub const ISSUE_RAW_LANE_ID: &str = "nucleum_raw_lane_id";
 
 /// Outcome of the legality pass.
 #[derive(Debug, Clone, Default)]
@@ -171,8 +177,9 @@ fn check_function(
             let callees = check_kernel_function(env, sink, function, span);
             edges.insert(def_id, callees);
         }
-        // Graphics-stage fragments and composition helpers own their check.
-        Some(NucleumRole::Fragment) => {}
+        // Composition helpers own their definition check, but a raw lane id
+        // is illegal in every user-written device body.
+        Some(NucleumRole::Fragment) => check_fragment_lane_ids(env, sink, function),
         None => check_host_function(env, sink, function),
     }
 }

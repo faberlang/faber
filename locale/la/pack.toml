@@ -1479,6 +1479,10 @@ help = "tensores, vectores, matrices, typos valoris, vel collectionem terminatam
 message = "codex hospitis nucleum privatum '{callee}' vocare non potest"
 help = "nucleum publicum fac ut lanceri possit, vel ex alio nucleo voca"
 
+[diagnostics.SEM008.issues.nucleum_raw_lane_id]
+message = "'{builtin}' est index lineae crudus; nucleum lineam suam numquam nominat"
+help = "coordinatam iterationis per `{apud}` in ansa `{filum}` liga: `{itera} {ex} t {apud} [i, j] {filum} f {fixum} v`"
+
 [diagnostics.SEM008.issues.nucleum_recovery]
 message = "corpus nuclei tractatorem localem ('{construct}') ponere non potest"
 help = "errorem ad vocationem lancientem perveniat, ubi hospes eum tractat"

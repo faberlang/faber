@@ -615,18 +615,31 @@ function f0 -> ty#5 {
 }
 
 #[test]
-fn gpu_builtin_call_lowers_to_mir_intrinsic() {
-    let dump = dump_source(
+fn gpu_builtin_call_never_reaches_mir_lowering() {
+    // A thread-id builtin is a raw lane id (gpu-reset rule 12.5): user source
+    // that calls one is rejected at check time, so HIR-to-MIR lowering only
+    // sees builtin reads the compiler binds itself (lane parameters).
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let errors = crate::driver::analyze_source(
+        &session,
+        "test.fab",
         r"
 @ nucleum
 functio index() → u32 {
     redde global_invocation_x()
 }
 ",
-    );
+        AnalyzeRequest::default(),
+    )
+    .err()
+    .expect("a user-written thread-id call is rejected");
 
-    assert!(dump.contains("runtime gpu_builtin global_invocation_x"), "{dump}");
-    assert!(!dump.contains("call def#"), "{dump}");
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.issue() == Some("nucleum_raw_lane_id")),
+        "{errors:?}"
+    );
 }
 
 #[test]

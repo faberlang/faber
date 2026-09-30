@@ -9,7 +9,7 @@
 use super::fragment_definition::struct_def_from_type;
 use super::kernel_legality::{
     Env, ISSUE_ASYNC, ISSUE_HOST_CALL, ISSUE_HOST_EFFECT, ISSUE_HOST_TYPE, ISSUE_PRIVATE_HOST_CALL,
-    ISSUE_RECOVERY, ISSUE_WORKGROUP, Sink,
+    ISSUE_RAW_LANE_ID, ISSUE_RECOVERY, ISSUE_WORKGROUP, Sink,
 };
 use super::kernel_legality_types::{FAMILY_ATOMIC, host_only_family};
 use crate::{NumericWidth, Primitive, SymbolKind, Type, TypeId};
@@ -41,6 +41,14 @@ pub(super) fn check_kernel_function(
         walk.visit_block(body);
     }
     walk.callees
+}
+
+/// Check a `@ nucleum fragment` body for raw lane ids only; the fragment's
+/// device-safety contract is owned by `fragment_definition`.
+pub(super) fn check_fragment_lane_ids(env: &Env<'_>, sink: &mut Sink, function: &HirFunction) {
+    if let Some(body) = &function.body {
+        LaneIdScan { env, sink }.visit_block(body);
+    }
 }
 
 /// Check a non-kernel function for calls to private kernels.
@@ -174,7 +182,12 @@ impl KernelWalk<'_, '_> {
             self.dynamic_call(expr.span, "expression");
             return;
         };
-        if self.env.resolver.gpu_builtin(*def_id).is_some() {
+        if let Some(builtin) = self.env.resolver.gpu_builtin(*def_id) {
+            self.sink.report(
+                ISSUE_RAW_LANE_ID,
+                expr.span,
+                &[("builtin", builtin.spelling())],
+            );
             return;
         }
         if self.env.facts.kernels.contains_key(def_id) {
@@ -339,6 +352,28 @@ impl KernelWalk<'_, '_> {
         for arg in args {
             self.visit_expr(&arg.expr);
         }
+    }
+}
+
+/// Reports every thread-id builtin call in a body.
+struct LaneIdScan<'a, 'e> {
+    env: &'a Env<'e>,
+    sink: &'a mut Sink,
+}
+
+impl HirVisitor for LaneIdScan<'_, '_> {
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        if let HirExpressionKind::Call(callee, ..) = &expr.kind
+            && let HirExpressionKind::Path(def_id) = &callee.kind
+            && let Some(builtin) = self.env.resolver.gpu_builtin(*def_id)
+        {
+            self.sink.report(
+                ISSUE_RAW_LANE_ID,
+                expr.span,
+                &[("builtin", builtin.spelling())],
+            );
+        }
+        walk_expr(self, expr);
     }
 }
 

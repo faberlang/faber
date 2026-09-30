@@ -1698,6 +1698,10 @@ help = "use tensors, vectors, matrices, value types, or a bounded collection wit
 message = "host code cannot call the private kernel '{callee}'"
 help = "mark the kernel public to make it launchable, or call it from another kernel"
 
+[diagnostics.SEM008.issues.nucleum_raw_lane_id]
+message = "'{builtin}' is a raw lane id; a kernel never names its lane"
+help = "bind the iteration coordinate with `{apud}` on a `{filum}` loop: `{itera} {ex} t {apud} [i, j] {filum} f {fixum} v`"
+
 [diagnostics.SEM008.issues.nucleum_recovery]
 message = "a kernel body cannot install a local handler ('{construct}')"
 help = "let the error reach the launching call, where the host handles it"

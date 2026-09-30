@@ -489,6 +489,110 @@ functio k(f32 x) → f32 {
 }
 
 // ---------------------------------------------------------------------------
+// Raw lane ids (gpu-reset rule 12.5)
+// ---------------------------------------------------------------------------
+
+const RAW_LANE_ID: &str = "nucleum_raw_lane_id";
+
+/// The local declaration that binds one builtin call with its natural type.
+fn lane_id_local(builtin: radix_types::MirKernelBuiltin) -> String {
+    let ty = if builtin.returns_vector() {
+        "vector<u32, 3>"
+    } else {
+        "u32"
+    };
+    format!("fixum {ty} lane ← {}()", builtin.spelling())
+}
+
+#[test]
+fn every_thread_id_builtin_is_rejected_in_a_kernel_body() {
+    for builtin in radix_types::MirKernelBuiltin::ALL {
+        let source = format!(
+            "@ nucleum\n@ publica\nfunctio k(f32 x) → f32 {{\n    {}\n    redde x\n}}\n",
+            lane_id_local(builtin)
+        );
+        expect_kernel_error(&source, RAW_LANE_ID, &[("builtin", builtin.spelling())]);
+    }
+}
+
+#[test]
+fn every_thread_id_builtin_is_rejected_in_a_fragment_body() {
+    for builtin in radix_types::MirKernelBuiltin::ALL {
+        let source = format!(
+            "@ nucleum fragment\nfunctio helper(f32 x) → f32 {{\n    {}\n    redde x\n}}\n",
+            lane_id_local(builtin)
+        );
+        expect_kernel_error(&source, RAW_LANE_ID, &[("builtin", builtin.spelling())]);
+    }
+}
+
+#[test]
+fn a_thread_id_builtin_is_rejected_inside_a_kernel_loop() {
+    expect_kernel_error(
+        r"
+@ nucleum
+@ publica
+functio k(tensor<u32, [8]> x, tensor<u32, [8]> out) → vacuum {
+    itera ex x apud [i] fixum v {
+        out[global_invocation_x()] ← v
+    }
+}
+",
+        RAW_LANE_ID,
+        &[("builtin", "global_invocation_x")],
+    );
+}
+
+#[test]
+fn no_user_code_accepts_a_thread_id_builtin() {
+    for builtin in radix_types::MirKernelBuiltin::ALL {
+        let local = lane_id_local(builtin);
+        // Host code: the typechecker's device-only rule rejects it.
+        let host = analyze_source(&format!(
+            "functio host() → f32 {{\n    {local}\n    redde 1.0\n}}\n"
+        ));
+        assert!(
+            host.diagnostics
+                .iter()
+                .any(|err| err.is_error()
+                    && err.issue() == Some("gpu_builtin_device_function_required")),
+            "{}: {:?}",
+            builtin.spelling(),
+            host.diagnostics
+        );
+        // Kernel and fragment bodies: the legality rule rejects it.
+        for header in ["@ nucleum\n@ publica", "@ nucleum fragment"] {
+            let source =
+                format!("{header}\nfunctio k(f32 x) → f32 {{\n    {local}\n    redde x\n}}\n");
+            assert!(
+                !analyze_source(&source).is_ok(),
+                "{} accepted under `{header}`",
+                builtin.spelling()
+            );
+        }
+    }
+}
+
+#[test]
+fn a_compiler_bound_lane_parameter_is_unaffected() {
+    // The lane parameter is how the compiler itself binds a builtin input: no
+    // user call is written, so the raw-lane-id rule has nothing to reject.
+    let source = r"
+@ nucleum
+@ publica
+functio copy(tensor<u32, [4]> input, tensor<u32, [4]> output, u32 i) → vacuum {
+    output[i] ← input[i]
+}
+";
+    assert!(
+        kernel_errors(source).is_empty(),
+        "{:?}",
+        kernel_errors(source)
+    );
+    assert_accepts(source);
+}
+
+// ---------------------------------------------------------------------------
 // Diagnostic identity
 // ---------------------------------------------------------------------------
 

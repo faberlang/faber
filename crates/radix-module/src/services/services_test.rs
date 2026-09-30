@@ -1249,12 +1249,15 @@ functio copy(tf32[4] input, tf32[4] output, u32 id) → vacuum {
 }
 
 #[test]
-fn gpu_builtin_emit_reflection_json_serializes_called_builtins() {
+fn gpu_builtin_emit_reflection_json_serializes_compiler_bound_builtins() {
+    // The builtins are bound by the compiler from trailing parameters; no user
+    // call is written (a thread-id call is a raw lane id, gpu-reset rule 12.5),
+    // so nothing is reported as a called builtin.
     let source = r"
 @ nucleum
 @ publica
-functio copy(tensor<u32, [4]> input, tensor<u32, [4]> output, u32 i) → vacuum {
-    output[global_invocation_x()] ← input[global_invocation_x()] + workgroup_id_y()
+functio copy(tensor<u32, [4]> input, tensor<u32, [4]> output, u32 global_invocation_x, u32 workgroup_id_y) → vacuum {
+    output[global_invocation_x] ← input[global_invocation_x] + workgroup_id_y
 }
 ";
     let result = compile_cli_source("main.fab", source, crate::codegen::Target::MirWgsl);
@@ -1269,10 +1272,8 @@ functio copy(tensor<u32, [4]> input, tensor<u32, [4]> output, u32 i) → vacuum 
     let reflection: serde_json::Value = serde_json::from_str(&json).expect("reflection JSON");
     let kernel = &reflection["kernels"][0];
     assert_eq!(kernel["builtin_inputs"][0]["builtin"], serde_json::json!("global_invocation_x"));
-    assert_eq!(
-        kernel["called_builtins"],
-        serde_json::json!(["global_invocation_x", "workgroup_id_y"])
-    );
+    assert_eq!(kernel["builtin_inputs"][1]["builtin"], serde_json::json!("workgroup_id_y"));
+    assert_eq!(kernel["called_builtins"], serde_json::json!([]));
     assert_eq!(
         kernel["launch"]["builtin_inputs"][0]["builtin"],
         serde_json::json!("global_invocation_x")
@@ -1281,10 +1282,7 @@ functio copy(tensor<u32, [4]> input, tensor<u32, [4]> output, u32 i) → vacuum 
         kernel["launch"]["required_builtins"],
         serde_json::json!(["global_invocation_x", "workgroup_id_y"])
     );
-    assert_eq!(
-        kernel["launch"]["called_builtins"],
-        serde_json::json!(["global_invocation_x", "workgroup_id_y"])
-    );
+    assert_eq!(kernel["launch"]["called_builtins"], serde_json::json!([]));
 }
 
 #[test]
@@ -1813,7 +1811,10 @@ fn emit_reflection_json_serializes_deferred_gpu_builtin_facts() {
                     layout: crate::mir::MirScalarLayout::U32,
                 },
             ],
-            called_builtins: Vec::new(),
+            called_builtins: vec![
+                radix_types::MirKernelBuiltin::GlobalInvocationX,
+                radix_types::MirKernelBuiltin::WorkgroupIdY,
+            ],
             workgroup: crate::mir::MirWorkgroupSize { x: 1, y: 1, z: 1 },
             dispatch_size: crate::mir::MirKernelDispatchSize { x: 1, y: 1, z: 1 },
             workgroup_count: crate::mir::MirKernelWorkgroupCount { x: 1, y: 1, z: 1 },
@@ -1830,6 +1831,10 @@ fn emit_reflection_json_serializes_deferred_gpu_builtin_facts() {
         .as_array()
         .expect("builtin inputs");
 
+    assert_eq!(
+        reflection["kernels"][0]["called_builtins"],
+        serde_json::json!(["global_invocation_x", "workgroup_id_y"])
+    );
     assert_eq!(inputs.len(), 3);
     assert_eq!(inputs[0]["builtin"], serde_json::json!("workgroup_id_x"));
     assert_eq!(inputs[0]["axis"], serde_json::json!("x"));
