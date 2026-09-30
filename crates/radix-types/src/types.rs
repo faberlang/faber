@@ -653,6 +653,35 @@ impl TypeTable {
         )
     }
 
+    /// Whether `ty` is a container or buffer carrier whose unmarked bind
+    /// aliases its source place (R1, `faber/docs/semantics-rulings.md`).
+    ///
+    /// This is the one classification both the semantic borrow pass and the
+    /// Rust alias-bind emitter consume, so they cannot disagree on which
+    /// containers alias. Aliases peel; access markers do not (a marked bind
+    /// takes its own acquisition path). Genus and contract instances alias as
+    /// well but are decided by each consumer (the Rust emitter carves out
+    /// `dyn Trait` carriers), and scalars, text, and register-class
+    /// `vector`/`matrix` values are not containers here.
+    #[must_use]
+    pub fn is_aliasing_container(&self, ty: TypeId) -> bool {
+        match self.get(ty) {
+            Type::Alias(_, inner) => self.is_aliasing_container(*inner),
+            Type::Array(_)
+            | Type::BoundedArray { .. }
+            | Type::Queue(_)
+            | Type::BoundedQueue { .. }
+            | Type::Stack(_)
+            | Type::BoundedStack { .. }
+            | Type::Map(..)
+            | Type::Set(_)
+            | Type::Tensor(..)
+            | Type::Sparsa(..)
+            | Type::BoundedOcteti { .. } => true,
+            _ => false,
+        }
+    }
+
     /// Scalar numerics and `bivalens` reject `ref`/`mut`/`own`/`copy` markers.
     ///
     /// Referential types (collections, buffers, `textus`/`octeti`, tensors,

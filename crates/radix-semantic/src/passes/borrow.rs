@@ -790,19 +790,11 @@ impl<'a> BorrowChecker<'a> {
 
     fn is_aliasing_type(&self, ty: TypeId) -> bool {
         let (_, inner) = self.types.peel_access_marker(ty);
+        if self.types.is_aliasing_container(inner) {
+            return true;
+        }
         match self.types.get(inner) {
-            Type::Struct(_)
-            | Type::Interface(_)
-            | Type::Array(_)
-            | Type::BoundedArray { .. }
-            | Type::Queue(_)
-            | Type::BoundedQueue { .. }
-            | Type::Stack(_)
-            | Type::BoundedStack { .. }
-            | Type::Map(..)
-            | Type::Set(_)
-            | Type::Tensor(..)
-            | Type::Sparsa(..) => true,
+            Type::Struct(_) | Type::Interface(_) => true,
             Type::Option(inner) | Type::Alias(_, inner) => self.is_aliasing_type(*inner),
             _ => false,
         }
