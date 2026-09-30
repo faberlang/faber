@@ -992,6 +992,14 @@ help = "use a bare width marker such as u8 or i64"
 message = "trapping floats are not implemented yet"
 help = "write the bare float width (f16, bf16, f32, or f64) for IEEE arithmetic; trapping floats are not implemented yet"
 
+[diagnostics.SEM008.issues.callable_posture_conflict]
+message = "รูปแบบ callable ใน annotation '{annotation_posture}' ขัดกับรูปแบบที่เขียนไว้ '{written_posture}'"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.comment_without_owner]
+message = "ไม่มีคำสั่งหรือรายการที่ผ่านการ lowering ให้ผูกกับความคิดเห็นนี้"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia ต้องมีพารามิเตอร์ชนิดหนึ่งรายการ"
 help = "แก้โครงสร้าง AST สำหรับ lowering"

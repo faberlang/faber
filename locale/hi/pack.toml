@@ -992,6 +992,14 @@ help = "use a bare width marker such as u8 or i64"
 message = "trapping floats are not implemented yet"
 help = "write the bare float width (f16, bf16, f32, or f64) for IEEE arithmetic; trapping floats are not implemented yet"
 
+[diagnostics.SEM008.issues.callable_posture_conflict]
+message = "callable annotation posture '{annotation_posture}' लिखे हुए posture '{written_posture}' से टकराता है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.comment_without_owner]
+message = "टिप्पणी जोड़ने के लिए कोई lowered statement या item नहीं है"
+help = "lowering के लिए AST construct ठीक करें"
+
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia के लिए एक type parameter आवश्यक है"
 help = "lowering के लिए AST construct ठीक करें"
