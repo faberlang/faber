@@ -25,7 +25,7 @@ pub use capability::{RunnerDispatchStatus, classify_runner_lowerability, runner_
 pub use host::{BufferHost, Host, StdioHost};
 pub use kernel::reset_execution_state;
 pub use stats::{FunctionStats, IntrinsicStats, RunnerStats};
-pub use value::{MapKey, Value};
+pub use value::{FieldOrder, MapKey, Value};
 
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span, Symbol};
@@ -298,6 +298,8 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     /// Router slots held by open conversations (D8.3); each conversation
     /// gives its slot back at its release point.
     conversation_slots: Rc<sermo::ConversationSlots>,
+    /// Declared non-f64 float widths of struct fields, for width-aware display.
+    field_float_widths: value::FieldFloatWidths,
 }
 
 impl<'a, H: Host + ?Sized> Runner<'a, H> {
@@ -319,6 +321,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
                 block_cache.insert((function.id, block.id), Rc::new(block.clone()));
             }
         }
+        let field_float_widths = index_field_float_widths(context, types);
         Self {
             function_index: program.function_index(),
             program,
@@ -345,8 +348,52 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             value_types: index_value_types(program),
             next_conversation_id: 0,
             conversation_slots: Rc::default(),
+            field_float_widths,
         }
     }
+
+    /// Display metadata (field orders and declared float widths) for value
+    /// rendering.
+    pub(crate) fn field_order(&self) -> value::FieldOrder<'_> {
+        value::FieldOrder {
+            structs: &self.context.struct_field_order,
+            variants: &self.context.variant_field_order,
+            float_widths: &self.field_float_widths,
+        }
+    }
+}
+
+fn element_float_width(ty: TypeId, types: &TypeTable, depth: u8) -> Option<NumericWidth> {
+    if depth > 8 {
+        return None;
+    }
+    match types.get(ty) {
+        Type::SizedNumeric(_, width) if width.is_float() => Some(*width),
+        Type::Vector(elem, _)
+        | Type::Matrix(elem, _)
+        | Type::Tensor(elem, _)
+        | Type::Sparsa(elem, _)
+        | Type::Array(elem)
+        | Type::BoundedArray { element: elem, .. } => element_float_width(*elem, types, depth + 1),
+        _ => None,
+    }
+}
+
+fn index_field_float_widths(
+    context: &MirValidationContext<'_>,
+    types: &TypeTable,
+) -> value::FieldFloatWidths {
+    let mut widths = FxHashMap::default();
+    for (def, fields) in &context.struct_fields {
+        for (name, ty) in fields {
+            if let Some(width) = element_float_width(ty.semantic_id(), types, 0)
+                && width != NumericWidth::F64
+            {
+                widths.insert((*def, *name), width);
+            }
+        }
+    }
+    widths
 }
 
 /// Run the entry (`incipit`) function to completion.
@@ -1516,21 +1563,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     }
 
     fn element_float_width(ty: TypeId, types: &TypeTable, depth: u8) -> Option<NumericWidth> {
-        if depth > 8 {
-            return None;
-        }
-        match types.get(ty) {
-            Type::SizedNumeric(_, width) if width.is_float() => Some(*width),
-            Type::Vector(elem, _)
-            | Type::Matrix(elem, _)
-            | Type::Tensor(elem, _)
-            | Type::Sparsa(elem, _)
-            | Type::Array(elem)
-            | Type::BoundedArray { element: elem, .. } => {
-                Self::element_float_width(*elem, types, depth + 1)
-            }
-            _ => None,
-        }
+        element_float_width(ty, types, depth)
     }
 
     /// Apply declared float width to a newly stored scalar.
@@ -1751,9 +1784,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 }
             }
             radix_mir::MirProjection::Field(field) => match value {
-                Value::Record(cell) => {
+                Value::Record(cell, order) => {
                     cell.borrow_mut().insert(*field, assigned);
-                    Ok(Value::Record(cell))
+                    Ok(Value::Record(cell, order))
                 }
                 Value::Struct(def, cell) => {
                     cell.borrow_mut().insert(*field, assigned);

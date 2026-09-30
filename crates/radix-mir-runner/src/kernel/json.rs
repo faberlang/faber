@@ -153,7 +153,7 @@ fn value_to_json(value: &Value, span: Span) -> Result<serde_json::Value, RunnerE
             }
             Ok(serde_json::Value::Object(out))
         }
-        Value::Record(fields) | Value::Struct(_, fields) => {
+        Value::Record(fields, _) | Value::Struct(_, fields) => {
             let fields = fields.borrow();
             let mut keys = fields.keys().copied().collect::<Vec<_>>();
             keys.sort_by_key(|key| key.0);

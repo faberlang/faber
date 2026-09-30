@@ -35,6 +35,7 @@ use radix_module::mir::{MirDeviceFunctionMetadataMap, MirFunctionSignature};
 pub(super) struct RemappedValidation {
     struct_fields: HashMap<DefId, HashMap<Symbol, MirType>>,
     struct_field_order: HashMap<DefId, Vec<Symbol>>,
+    variant_field_order: HashMap<DefId, Vec<Symbol>>,
     struct_type_params: HashMap<DefId, Vec<Symbol>>,
     optional_struct_fields: HashMap<DefId, HashSet<Symbol>>,
     nullable_struct_fields: HashMap<DefId, HashSet<Symbol>>,
@@ -61,6 +62,11 @@ impl RemappedValidation {
         union_field_maps(&mut self.struct_fields, &other.struct_fields);
         for (def, order) in &other.struct_field_order {
             self.struct_field_order
+                .entry(*def)
+                .or_insert_with(|| order.clone());
+        }
+        for (def, order) in &other.variant_field_order {
+            self.variant_field_order
                 .entry(*def)
                 .or_insert_with(|| order.clone());
         }
@@ -102,6 +108,9 @@ impl RemappedValidation {
         }
         for (def, order) in &self.struct_field_order {
             context.struct_field_order.insert(*def, order.clone());
+        }
+        for (def, order) in &self.variant_field_order {
+            context.variant_field_order.insert(*def, order.clone());
         }
         for (def, params) in &self.struct_type_params {
             context
@@ -503,6 +512,15 @@ fn collect_remapped_validation(
     for (def, order) in &source.struct_field_order {
         out.struct_field_order.insert(
             remap_nominal_def(*def),
+            order
+                .iter()
+                .map(|name| remap_metadata_symbol(*name, source_interner, entry_interner))
+                .collect(),
+        );
+    }
+    for (def, order) in &source.variant_field_order {
+        out.variant_field_order.insert(
+            remap_variant_def(*def),
             order
                 .iter()
                 .map(|name| remap_metadata_symbol(*name, source_interner, entry_interner))
@@ -2334,6 +2352,13 @@ fn rewrite_validation_def_ids(
         }
     }
 
+    for (def, order) in std::mem::take(&mut context.variant_field_order) {
+        context
+            .variant_field_order
+            .entry(remap_variant(def))
+            .or_insert(order);
+    }
+
     for (variant, parent) in std::mem::take(&mut context.variant_parents) {
         context
             .variant_parents
@@ -2471,6 +2496,11 @@ fn remap_lowered_program_text_symbols<'a>(
             .collect();
     }
     for order in context.struct_field_order.values_mut() {
+        for name in order {
+            *name = remap_metadata_symbol(*name, source, target);
+        }
+    }
+    for order in context.variant_field_order.values_mut() {
         for name in order {
             *name = remap_metadata_symbol(*name, source, target);
         }

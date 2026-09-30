@@ -38,6 +38,36 @@ use std::rc::Rc;
 /// metadata; display renders struct fields in this order.
 pub type StructFieldOrder = FxHashMap<DefId, Vec<Symbol>>;
 
+/// Declared float width of a struct field, keyed by `(struct, field)`; only
+/// non-f64 float fields (or collections of them) are listed.
+pub type FieldFloatWidths = FxHashMap<(DefId, Symbol), NumericWidth>;
+
+static NO_FLOAT_WIDTHS: std::sync::LazyLock<FieldFloatWidths> =
+    std::sync::LazyLock::new(FxHashMap::default);
+
+/// Display metadata threaded through value rendering: declaration order of
+/// struct fields and of enum-variant payload fields, and declared float widths
+/// of struct fields.
+#[derive(Clone, Copy)]
+pub struct FieldOrder<'a> {
+    pub structs: &'a StructFieldOrder,
+    pub variants: &'a StructFieldOrder,
+    pub float_widths: &'a FieldFloatWidths,
+}
+
+impl<'a> FieldOrder<'a> {
+    /// Orders only, with no declared float widths (callers without a type
+    /// table, such as compile-time evaluation and tests).
+    #[must_use]
+    pub fn new(structs: &'a StructFieldOrder, variants: &'a StructFieldOrder) -> Self {
+        Self {
+            structs,
+            variants,
+            float_widths: &NO_FLOAT_WIDTHS,
+        }
+    }
+}
+
 /// Runtime value carried by the MIR runner.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -78,7 +108,9 @@ pub enum Value {
     Matrix(Rc<RefCell<MatrixValue>>),
     Map(Rc<RefCell<FxHashMap<MapKey, Value>>>),
     Set(Rc<RefCell<FxHashSet<MapKey>>>),
-    Record(Rc<RefCell<FxHashMap<Symbol, Value>>>),
+    /// Anonymous record: unordered fields plus the order they were written
+    /// in the record construct (display order).
+    Record(Rc<RefCell<FxHashMap<Symbol, Value>>>, Rc<[Symbol]>),
     Struct(DefId, Rc<RefCell<FxHashMap<Symbol, Value>>>),
     EnumVariant(DefId, Rc<RefCell<FxHashMap<Symbol, Value>>>),
     Tuple(Vec<Value>),
@@ -264,7 +296,16 @@ impl Value {
                 FxHashMap::default,
             ),
             Value::Set(rc) => Value::Set(Rc::new(RefCell::new(rc.borrow().clone()))),
-            Value::Record(rc) => cell(rc, memo, Value::Record, fields, FxHashMap::default),
+            Value::Record(rc, written) => {
+                let written = Rc::clone(written);
+                cell(
+                    rc,
+                    memo,
+                    move |r| Value::Record(r, Rc::clone(&written)),
+                    fields,
+                    FxHashMap::default,
+                )
+            }
             Value::Struct(def, rc) => {
                 let def = *def;
                 cell(
@@ -313,7 +354,7 @@ impl Value {
     pub fn display(
         &self,
         interner: &Interner,
-        order: &StructFieldOrder,
+        order: FieldOrder<'_>,
         span: Span,
     ) -> Result<String, RunnerError> {
         self.display_typed(interner, order, span, None)
@@ -325,30 +366,14 @@ impl Value {
     pub fn display_typed(
         &self,
         interner: &Interner,
-        order: &StructFieldOrder,
+        order: FieldOrder<'_>,
         span: Span,
         float_width: Option<NumericWidth>,
     ) -> Result<String, RunnerError> {
         Ok(match self {
             Value::Int(v) => v.to_string(),
             Value::UInt(v) => v.to_string(),
-            Value::Float(v) => match float_width {
-                Some(width) if width.is_float() && width != NumericWidth::F64 => {
-                    // f32 shortest repr, keeping the fractus `N.0` integral
-                    // shape (`5`, not `5.0`, is not a Faber fractus text).
-                    #[expect(clippy::cast_possible_truncation)]
-                    let narrowed = format!("{}", *v as f32);
-                    let integral = narrowed
-                        .chars()
-                        .all(|c| c.is_ascii_digit() || c == '-' || c == '+');
-                    if integral {
-                        format!("{narrowed}.0")
-                    } else {
-                        narrowed
-                    }
-                }
-                _ => display_fractus(*v),
-            },
+            Value::Float(v) => display_float_at_width(*v, float_width),
             Value::Bool(v) => display_bivalens(*v).to_owned(),
             Value::Str(v) => display_text_payload(v).to_owned(),
             Value::Ascii(b) => {
@@ -395,9 +420,14 @@ impl Value {
             Value::Struct(def, fields) => {
                 display_tabula_struct(*def, fields, interner, order, span, float_width)?
             }
-            Value::Set(_) | Value::Record(_) | Value::EnumVariant(_, _) | Value::Tuple(_) => {
-                format!("{self:?}")
+            Value::Record(fields, written) => {
+                display_ordered_fields(&fields.borrow(), written, None, interner, order, span)?
             }
+            Value::EnumVariant(def, fields) => {
+                let declared = order.variants.get(def).map_or(&[][..], Vec::as_slice);
+                display_ordered_fields(&fields.borrow(), declared, None, interner, order, span)?
+            }
+            Value::Set(_) | Value::Tuple(_) => format!("{self:?}"),
             Value::GradientHandle(id) => format!("gradient-handle#{id}"),
             Value::Cursor(_) => "cursor".to_owned(),
         })
@@ -447,7 +477,7 @@ impl Value {
 fn display_list(
     items: &[Value],
     interner: &Interner,
-    order: &StructFieldOrder,
+    order: FieldOrder<'_>,
     span: Span,
     float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
@@ -463,7 +493,7 @@ fn display_list(
 fn display_matrix(
     matrix: &MatrixValue,
     interner: &Interner,
-    order: &StructFieldOrder,
+    order: FieldOrder<'_>,
     span: Span,
     float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
@@ -488,7 +518,7 @@ fn display_matrix(
 fn display_in_collection(
     value: &Value,
     interner: &Interner,
-    order: &StructFieldOrder,
+    order: FieldOrder<'_>,
     span: Span,
     float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
@@ -509,7 +539,7 @@ fn display_in_collection(
 fn display_tabula_map(
     entries: &FxHashMap<MapKey, Value>,
     interner: &Interner,
-    order: &StructFieldOrder,
+    order: FieldOrder<'_>,
     span: Span,
     float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
@@ -538,14 +568,32 @@ fn display_tabula_struct(
     def: DefId,
     fields: &RefCell<FxHashMap<Symbol, Value>>,
     interner: &Interner,
-    order: &StructFieldOrder,
+    order: FieldOrder<'_>,
     span: Span,
     float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
-    // Declaration order from the struct metadata; any field the metadata does
-    // not list (unknown def) follows in name order so output stays stable.
-    let fields = fields.borrow();
-    let declared = order.get(&def).map_or(&[][..], Vec::as_slice);
+    let declared = order.structs.get(&def).map_or(&[][..], Vec::as_slice);
+    display_ordered_fields(
+        &fields.borrow(),
+        declared,
+        Some((def, float_width)),
+        interner,
+        order,
+        span,
+    )
+}
+
+/// Render named fields as `{"name": value, ...}` in `declared` order; any field
+/// the metadata does not list follows in name order so output stays stable.
+/// `owner` is the struct whose per-field declared float width applies.
+fn display_ordered_fields(
+    fields: &FxHashMap<Symbol, Value>,
+    declared: &[Symbol],
+    owner: Option<(DefId, Option<NumericWidth>)>,
+    interner: &Interner,
+    order: FieldOrder<'_>,
+    span: Span,
+) -> Result<String, RunnerError> {
     let mut rows: Vec<(&Symbol, &Value)> = declared
         .iter()
         .filter_map(|symbol| fields.get_key_value(symbol))
@@ -559,10 +607,38 @@ fn display_tabula_struct(
     let mut parts = Vec::new();
     for (symbol, value) in rows {
         let name = interner.resolve(*symbol);
-        let val_str = display_in_collection(value, interner, order, span, float_width)?;
+        let width = owner.and_then(|(def, inherited)| {
+            order
+                .float_widths
+                .get(&(def, *symbol))
+                .copied()
+                .or(inherited)
+        });
+        let val_str = display_in_collection(value, interner, order, span, width)?;
         parts.push(format!("\"{name}\": {val_str}"));
     }
     Ok(format!("{{{}}}", parts.join(", ")))
+}
+
+/// Render a float at its declared width: non-f64 floats use the shortest
+/// round-trip repr of that width (`66.666664`), keeping the fractus `N.0`
+/// integral shape; f64 (or unknown width) uses the standard fractus display.
+pub fn display_float_at_width(value: f64, width: Option<NumericWidth>) -> String {
+    match width {
+        Some(width) if width.is_float() && width != NumericWidth::F64 => {
+            #[expect(clippy::cast_possible_truncation)]
+            let narrowed = format!("{}", value as f32);
+            let integral = narrowed
+                .chars()
+                .all(|c| c.is_ascii_digit() || c == '-' || c == '+');
+            if integral {
+                format!("{narrowed}.0")
+            } else {
+                narrowed
+            }
+        }
+        _ => display_fractus(value),
+    }
 }
 
 /// Exact `& | ^ ⇐ ⇒` on integer carriers (rulings 9, 10, 19b): infinite
@@ -1326,8 +1402,9 @@ pub fn scalar_text_index(text: &str, index: usize, span: Span) -> Result<Value, 
 pub fn format_template(
     template: &str,
     args: &[Value],
+    widths: &[Option<NumericWidth>],
     interner: &Interner,
-    order: &StructFieldOrder,
+    order: FieldOrder<'_>,
     span: Span,
 ) -> Result<String, RunnerError> {
     let mut out = String::with_capacity(template.len());
@@ -1354,7 +1431,10 @@ pub fn format_template(
         };
         let rendered = args
             .get(arg_index)
-            .map(|arg| arg.display(interner, order, span))
+            .map(|arg| {
+                let width = widths.get(arg_index).copied().flatten();
+                arg.display_typed(interner, order, span, width)
+            })
             .transpose()?
             .unwrap_or_else(|| format!("§{index}"));
         out.push_str(&rendered);

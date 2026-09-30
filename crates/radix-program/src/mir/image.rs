@@ -30,6 +30,7 @@ use super::{
 pub struct FmirValidationMetadata {
     pub struct_fields: HashMap<DefId, HashMap<Symbol, MirType>>,
     pub struct_field_order: HashMap<DefId, Vec<Symbol>>,
+    pub variant_field_order: HashMap<DefId, Vec<Symbol>>,
     pub struct_type_params: HashMap<DefId, Vec<Symbol>>,
     pub enum_type_params: HashMap<DefId, Vec<Symbol>>,
     pub optional_struct_fields: HashMap<DefId, HashSet<Symbol>>,
@@ -64,6 +65,11 @@ fn snapshot_validation_metadata(
             .collect(),
         struct_field_order: validation
             .struct_field_order
+            .iter()
+            .map(|(def, order)| (*def, order.clone()))
+            .collect(),
+        variant_field_order: validation
+            .variant_field_order
             .iter()
             .map(|(def, order)| (*def, order.clone()))
             .collect(),
@@ -142,6 +148,11 @@ fn apply_validation_metadata(
         .collect();
     context.struct_field_order = metadata
         .struct_field_order
+        .iter()
+        .map(|(def, order)| (*def, order.clone()))
+        .collect();
+    context.variant_field_order = metadata
+        .variant_field_order
         .iter()
         .map(|(def, order)| (*def, order.clone()))
         .collect();

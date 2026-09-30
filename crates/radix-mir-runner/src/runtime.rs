@@ -112,12 +112,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 // 9007e12c3 follow-through: floats declared at a narrower
                 // width than f64 display at that width.
                 let float_width = self.operand_float_width(arg);
-                let text = value.display_typed(
-                    self.interner,
-                    &self.context.struct_field_order,
-                    span,
-                    float_width,
-                )?;
+                let text =
+                    value.display_typed(self.interner, self.field_order(), span, float_width)?;
                 self.host.scribe(*kind, &text)?;
                 Ok(Value::Unit)
             }
@@ -128,11 +124,19 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .iter()
                     .map(|arg| self.eval_operand(arg, span))
                     .collect::<Result<Vec<_>, _>>()?;
+                // One value, one display: interpolation renders each argument
+                // at its declared float width, as `print` does.
+                let widths: Vec<_> = call
+                    .args
+                    .iter()
+                    .map(|arg| self.operand_float_width(arg))
+                    .collect();
                 Ok(Value::Str(format_template(
                     template_text,
                     &args,
+                    &widths,
                     self.interner,
-                    &self.context.struct_field_order,
+                    self.field_order(),
                     span,
                 )?))
             }
@@ -143,7 +147,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let value = self.eval_operand(arg, span)?;
                 let float_width = self.operand_float_width(arg);
                 let spec = self.interner.resolve(*spec);
-                format_value(&value, spec, float_width, self.interner, span).map(Value::Str)
+                format_value(&value, spec, float_width, span).map(Value::Str)
             }
             MirIntrinsic::Convert(conversion) => self.eval_convert(conversion, &call.args, span),
             MirIntrinsic::Collection(op) => {
@@ -191,11 +195,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let [route] = args else {
             return Err(RunnerError::internal(span, "sermo_open runtime arity"));
         };
-        let route = self.eval_operand(route, span)?.display(
-            self.interner,
-            &self.context.struct_field_order,
-            span,
-        )?;
+        let route =
+            self.eval_operand(route, span)?
+                .display(self.interner, self.field_order(), span)?;
         self.sermo_open(route, span)
     }
 
@@ -558,7 +560,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     span,
                     "record construct requires named fields",
                 )?;
-                Ok(Value::Record(Rc::new(RefCell::new(map))))
+                // The construct's named-field vector is the record's written
+                // order; display renders in it (the map is unordered).
+                let written: Rc<[Symbol]> = match &aggregate.fields {
+                    MirAggregateFields::Named(fields) => {
+                        fields.iter().map(|field| field.name).collect()
+                    }
+                    _ => Rc::from([]),
+                };
+                Ok(Value::Record(Rc::new(RefCell::new(map)), written))
             }
             MirAggregateKind::Map => {
                 let mut map = FxHashMap::default();
@@ -1024,7 +1034,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 .get(1)
                 .map(|arg| self.eval_operand(arg, span))
                 .transpose()?
-                .map(|value| value.display(self.interner, &self.context.struct_field_order, span))
+                .map(|value| value.display(self.interner, self.field_order(), span))
                 .transpose()?
                 .unwrap_or_else(|| "assertion failed".to_owned());
             self.host.abort(&message);
@@ -1036,11 +1046,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let [arg] = args else {
             return Err(RunnerError::internal(span, "panic runtime arity"));
         };
-        let message = self.eval_operand(arg, span)?.display(
-            self.interner,
-            &self.context.struct_field_order,
-            span,
-        )?;
+        let message =
+            self.eval_operand(arg, span)?
+                .display(self.interner, self.field_order(), span)?;
         self.host.abort(&message);
     }
 
@@ -3995,7 +4003,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     format!("missing struct field sym#{}", field.0),
                 ))
             }
-            Value::Record(cell) => cell.borrow().get(&field).cloned().ok_or_else(|| {
+            Value::Record(cell, _) => cell.borrow().get(&field).cloned().ok_or_else(|| {
                 RunnerError::internal(span, format!("missing record field sym#{}", field.0))
             }),
             Value::Tuple(items) => {
@@ -4687,7 +4695,6 @@ fn format_value(
     value: &Value,
     spec: &str,
     float_width: Option<radix_types::NumericWidth>,
-    interner: &radix_lexer::Interner,
     span: Span,
 ) -> Result<String, RunnerError> {
     use radix_types::format_spec::{
@@ -4700,19 +4707,9 @@ fn format_value(
         (Value::Int(v), FormatSpec::Layout(layout)) => Ok(render_integer(i128::from(*v), &layout)),
         (Value::UInt(v), FormatSpec::Layout(layout)) => Ok(render_integer(i128::from(*v), &layout)),
         (Value::Float(v), FormatSpec::Layout(layout)) => {
-            let mut display_error = None;
-            let text = render_float(*v, &layout, |magnitude| {
-                Value::Float(magnitude)
-                    .display_typed(interner, &FxHashMap::default(), span, float_width)
-                    .unwrap_or_else(|err| {
-                        display_error = Some(err);
-                        String::new()
-                    })
-            });
-            match display_error {
-                Some(err) => Err(err),
-                None => Ok(text),
-            }
+            Ok(render_float(*v, &layout, |magnitude| {
+                crate::value::display_float_at_width(magnitude, float_width)
+            }))
         }
         (Value::Str(v), FormatSpec::Layout(layout)) => Ok(render_text(v, &layout)),
         (Value::Instans(v), FormatSpec::Preset(preset)) => {

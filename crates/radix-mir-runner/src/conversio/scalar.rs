@@ -83,7 +83,13 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Value::Char(ch) => ch.to_string(),
             Value::Int(v) => v.to_string(),
             Value::UInt(v) => v.to_string(),
-            Value::Float(v) => v.to_string(),
+            Value::Float(v) => match Self::element_float_width(source_ty, self.types, 0) {
+                // Declared narrower float: same repr as `print`/interpolation.
+                Some(width) if width != NumericWidth::F64 => {
+                    crate::value::display_float_at_width(v, Some(width))
+                }
+                _ => v.to_string(),
+            },
             Value::Bool(v) => v.to_string(),
             Value::Instans(v) => v.to_rfc3339(),
             Value::Sermo(sermo) => {
@@ -766,7 +772,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     }
 
     fn is_json_object_root(&self, value: &Value) -> bool {
-        matches!(value, Value::Map(_) | Value::Record(_) | Value::Struct(..))
+        matches!(value, Value::Map(_) | Value::Record(..) | Value::Struct(..))
     }
 
     fn materialize_json_value(&self, value: Value, span: Span) -> Result<Value, RunnerError> {
@@ -804,7 +810,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 }
                 Value::Map(Rc::new(RefCell::new(out)))
             }
-            Value::Record(fields) => {
+            Value::Record(fields, _) => {
                 let fields = fields.borrow();
                 let mut out = FxHashMap::default();
                 for (field, item) in fields.iter() {
@@ -856,7 +862,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 }
                 Ok(acc && self.json_node_is_safe(item, span)?)
             }),
-            Value::Record(fields) => fields.borrow().iter().try_fold(true, |acc, (_, item)| {
+            Value::Record(fields, _) => fields.borrow().iter().try_fold(true, |acc, (_, item)| {
                 Ok(acc && self.json_node_is_safe(item, span)?)
             }),
             Value::Struct(_, fields) => fields.borrow().iter().try_fold(true, |acc, (_, item)| {
@@ -949,7 +955,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     .join(",");
                 format!("{{{body}}}")
             }
-            Value::Record(fields) => {
+            Value::Record(fields, _) => {
                 let fields = fields.borrow();
                 let mut entries: Vec<(String, String)> = Vec::with_capacity(fields.len());
                 for (field, item) in fields.iter() {

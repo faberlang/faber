@@ -311,3 +311,114 @@ fn tuple_value_keys_by_its_parts_and_reads_back() {
         "a fractus part is not a key"
     );
 }
+
+fn field_map(
+    pairs: &[(radix_lexer::Symbol, Value)],
+) -> std::rc::Rc<std::cell::RefCell<rustc_hash::FxHashMap<radix_lexer::Symbol, Value>>> {
+    std::rc::Rc::new(std::cell::RefCell::new(pairs.iter().cloned().collect()))
+}
+
+#[test]
+fn record_displays_fields_in_written_order() {
+    let mut interner = radix_lexer::Interner::new();
+    let (zed, alpha, mid) = (
+        interner.intern("zed"),
+        interner.intern("alpha"),
+        interner.intern("mid"),
+    );
+    let record = Value::Record(
+        field_map(&[
+            (alpha, Value::Int(1)),
+            (mid, Value::Int(2)),
+            (zed, Value::Int(3)),
+        ]),
+        std::rc::Rc::from([zed, alpha, mid]),
+    );
+    let empty = rustc_hash::FxHashMap::default();
+    let text = record
+        .display(&interner, FieldOrder::new(&empty, &empty), Span::default())
+        .unwrap();
+    assert_eq!(text, r#"{"zed": 3, "alpha": 1, "mid": 2}"#);
+}
+
+#[test]
+fn enum_variant_displays_payload_in_declaration_order() {
+    let mut interner = radix_lexer::Interner::new();
+    let (x, y, z) = (
+        interner.intern("x"),
+        interner.intern("y"),
+        interner.intern("z"),
+    );
+    let variant_def = radix_hir::DefId(4097);
+    let variant = Value::EnumVariant(
+        variant_def,
+        field_map(&[(x, Value::Int(1)), (y, Value::Int(2)), (z, Value::Int(3))]),
+    );
+    let structs = rustc_hash::FxHashMap::default();
+    let mut variants = rustc_hash::FxHashMap::default();
+    variants.insert(variant_def, vec![z, x, y]);
+    let text = variant
+        .display(
+            &interner,
+            FieldOrder::new(&structs, &variants),
+            Span::default(),
+        )
+        .unwrap();
+    assert_eq!(text, r#"{"z": 3, "x": 1, "y": 2}"#);
+}
+
+#[test]
+fn f32_interpolation_matches_print_at_declared_width() {
+    let interner = radix_lexer::Interner::new();
+    let empty = rustc_hash::FxHashMap::default();
+    let order = FieldOrder::new(&empty, &empty);
+    let value = Value::Float(f64::from(200.0_f32 / 3.0_f32));
+    let printed = value
+        .display_typed(&interner, order, Span::default(), Some(NumericWidth::F32))
+        .unwrap();
+    assert_eq!(printed, "66.666664");
+    let interpolated = format_template(
+        "§",
+        &[value.clone()],
+        &[Some(NumericWidth::F32)],
+        &interner,
+        order,
+        Span::default(),
+    )
+    .unwrap();
+    assert_eq!(interpolated, printed);
+    // f64 (undeclared width) keeps full digits; integral f32 keeps `N.0`.
+    assert_eq!(display_float_at_width(5.0, Some(NumericWidth::F32)), "5.0");
+    assert_eq!(
+        format_template("§", &[value], &[None], &interner, order, Span::default()).unwrap(),
+        "66.66666412353516"
+    );
+}
+
+#[test]
+fn f32_struct_field_and_list_display_at_declared_width() {
+    let mut interner = radix_lexer::Interner::new();
+    let field = interner.intern("a");
+    let def = radix_hir::DefId(9);
+    let structs = rustc_hash::FxHashMap::default();
+    let variants = rustc_hash::FxHashMap::default();
+    let mut widths = FieldFloatWidths::default();
+    widths.insert((def, field), NumericWidth::F32);
+    let order = FieldOrder {
+        structs: &structs,
+        variants: &variants,
+        float_widths: &widths,
+    };
+    let value = Value::Float(f64::from(200.0_f32 / 3.0_f32));
+    let strukt = Value::Struct(def, field_map(&[(field, value.clone())]));
+    assert_eq!(
+        strukt.display(&interner, order, Span::default()).unwrap(),
+        r#"{"a": 66.666664}"#
+    );
+    let list = Value::Array(std::rc::Rc::new(std::cell::RefCell::new(vec![value])));
+    assert_eq!(
+        list.display_typed(&interner, order, Span::default(), Some(NumericWidth::F32))
+            .unwrap(),
+        "[66.666664]"
+    );
+}

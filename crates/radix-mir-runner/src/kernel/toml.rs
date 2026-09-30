@@ -162,7 +162,7 @@ fn value_to_toml_table(value: &Value, span: Span) -> Result<toml::Table, RunnerE
             }
             Ok(table)
         }
-        Value::Record(fields) | Value::Struct(_, fields) => {
+        Value::Record(fields, _) | Value::Struct(_, fields) => {
             let fields = fields.borrow();
             let mut keys = fields.keys().copied().collect::<Vec<_>>();
             keys.sort_by_key(|key| key.0);
@@ -220,7 +220,7 @@ fn value_to_toml(value: &Value, span: Span) -> Result<toml::Value, RunnerError> 
             }
             Ok(toml::Value::Array(out))
         }
-        Value::Map(_) | Value::Record(_) | Value::Struct(_, _) => {
+        Value::Map(_) | Value::Record(..) | Value::Struct(_, _) => {
             Ok(toml::Value::Table(value_to_toml_table(value, span)?))
         }
         Value::Tensor(tensor) => {

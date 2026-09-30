@@ -206,6 +206,7 @@ impl<'a> LoweringContextMaps<'a> {
                 package_product: None,
                 struct_fields: FxHashMap::default(),
                 struct_field_order: FxHashMap::default(),
+                variant_field_order: FxHashMap::default(),
                 struct_type_params: FxHashMap::default(),
                 enum_type_params: FxHashMap::default(),
                 optional_struct_fields: FxHashMap::default(),
@@ -492,6 +493,9 @@ impl<'a> LoweringContextMaps<'a> {
                     .map(|(name, _)| *name)
                     .chain(variant.fields.iter().map(|field| field.name))
                     .collect::<Vec<_>>();
+                self.validation
+                    .variant_field_order
+                    .insert(variant.def_id, field_names.clone());
                 self.variant_fields.insert(variant.def_id, field_names);
                 let mut fields = FxHashMap::default();
                 for (name, ty) in &commune {
@@ -673,6 +677,9 @@ impl<'a> LoweringContextMaps<'a> {
                 .chain(variant.fields.iter())
                 .map(|field| field.name)
                 .collect::<Vec<_>>();
+            self.validation
+                .variant_field_order
+                .insert(variant.def_id, field_names.clone());
             self.variant_fields.insert(variant.def_id, field_names);
             let mut fields = FxHashMap::default();
             for field in enum_item.commune_fields.iter().chain(variant.fields.iter()) {

@@ -164,6 +164,9 @@ pub struct MirValidationContext<'a> {
     /// Declaration order of each struct's instance fields (`struct_fields` is
     /// unordered); display paths render fields in this order.
     pub struct_field_order: FxHashMap<DefId, Vec<Symbol>>,
+    /// Declaration order of each enum variant's payload fields (common fields
+    /// first); `variant_fields` is unordered, display uses this order.
+    pub variant_field_order: FxHashMap<DefId, Vec<Symbol>>,
     pub struct_type_params: FxHashMap<DefId, Vec<Symbol>>,
     pub enum_type_params: FxHashMap<DefId, Vec<Symbol>>,
     pub optional_struct_fields: FxHashMap<DefId, FxHashSet<Symbol>>,
@@ -198,6 +201,7 @@ impl<'a> MirValidationContext<'a> {
             package_product: None,
             struct_fields: FxHashMap::default(),
             struct_field_order: FxHashMap::default(),
+            variant_field_order: FxHashMap::default(),
             struct_type_params: FxHashMap::default(),
             enum_type_params: FxHashMap::default(),
             optional_struct_fields: FxHashMap::default(),
@@ -252,6 +256,9 @@ impl<'a> MirValidationContext<'a> {
             .struct_field_order
             .clone_from(&self.struct_field_order);
         context
+            .variant_field_order
+            .clone_from(&self.variant_field_order);
+        context
             .struct_type_params
             .clone_from(&self.struct_type_params);
         context.enum_type_params.clone_from(&self.enum_type_params);
@@ -301,6 +308,7 @@ impl<'a> MirValidationContext<'a> {
             package_product,
             struct_fields,
             struct_field_order,
+            variant_field_order,
             struct_type_params,
             enum_type_params,
             optional_struct_fields,
@@ -326,6 +334,7 @@ impl<'a> MirValidationContext<'a> {
             package_product,
             struct_fields,
             struct_field_order,
+            variant_field_order,
             struct_type_params,
             enum_type_params,
             optional_struct_fields,
