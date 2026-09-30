@@ -1,7 +1,7 @@
 //! D11.1 runner contract for `saturatus<W>`: add, sub, mul, and div clamp at
 //! both ends of the width, signed and unsigned, including the 64-bit edges;
-//! division by zero still fails, and `↦` into a saturating width range-checks
-//! instead of clamping.
+//! division by zero still fails, and `↦` into a saturating width clamps to the
+//! range and never fails (ruling 24).
 
 use super::*;
 use crate::codegen::Target;
@@ -174,30 +174,25 @@ incipit {
 }
 
 #[test]
-fn saturating_conversio_range_checks_instead_of_clamping() {
+fn saturating_conversio_clamps_and_never_fails() {
+    // Ruling 24: `↦` into `saturatus<W>` clamps the exact source to the range.
     assert_eq!(
         run_lines(
             r"
 incipit {
     fixum numerus n ← 200
+    fixum numerus over ← 300
+    fixum numerus under ← -5
+    fixum numerus neg ← -200
     fixum saturatus<u8> level ← n ↦ saturatus<u8>
     nota level + 100
     nota level ↦ numerus
+    nota over ↦ saturatus<u8>
+    nota under ↦ saturatus<u8>
+    nota neg ↦ saturatus<i8>
 }
 ",
         ),
-        vec!["255", "200"]
+        vec!["255", "200", "255", "0", "-128"]
     );
-    let mut host = BufferHost::default();
-    run_fixture_source(
-        r"
-incipit {
-    fixum numerus n ← 300
-    fixum saturatus<u8> level ← n ↦ saturatus<u8>
-    nota level
-}
-",
-        &mut host,
-    )
-    .expect_err("an out-of-range conversion into saturatus<u8> fails, never clamps");
 }
