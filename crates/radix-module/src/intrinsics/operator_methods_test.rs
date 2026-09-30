@@ -212,10 +212,9 @@ fn numerus_potentia_codegen_uses_integer_pow_without_float_guard() {
     nota result
 }";
     let code = compile_rust("potentia-numerus.fab", source);
-    assert!(code.contains(".pow("), "integer potentia must use Rust integer pow:\n{code}");
     assert!(
-        code.contains(" as u32"),
-        "integer potentia exponent must use Rust pow's u32 count:\n{code}"
+        code.contains("__faber_pow(base as i128, 3_i128)"),
+        "integer potentia must use the exact i128 power helper:\n{code}"
     );
     assert!(
         !code.contains("<= 0.0"),
@@ -299,5 +298,29 @@ fn rejects_bitwise_operator_on_fractus_receiver() {
             .iter()
             .any(|arg| { arg.name == "issue" && arg.value == "bitwise_method_requires_numerus_receiver" })),
         "diagnostics: {diagnostics:?}"
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn sized_integer_absolutum_and_potentia_emit_exact_i128_values() {
+    let source = r"incipit {
+    fixum numerus<i8> n ← -128
+    fixum numerus<u8> m ← n.absolutum()
+    fixum numerus<i32> p ← 100000
+    nota m, p.potentia(2)
+}";
+    let code = compile_rust("abs-power-sized.fab", source);
+    assert!(
+        code.contains("__faber_fit::<u8>(__faber_int(Some((n as i128).abs())))"),
+        "sized absolutum must compute |x| exactly in i128:\n{code}"
+    );
+    assert!(
+        code.contains("__faber_pow(p as i128, 2_i128)"),
+        "sized potentia must use the exact i128 power helper:\n{code}"
+    );
+    assert!(
+        !code.contains("n.abs()") && !code.contains(".pow("),
+        "no native narrow ops:\n{code}"
     );
 }
