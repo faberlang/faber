@@ -184,7 +184,6 @@ fn inf_value_flow_still_lowers_to_mir() {
 #[test]
 fn every_hir_backend_fails_closed_with_a_named_diagnostic() {
     for (target, name) in [
-        (Target::HirRust, "HirRust"),
         (Target::HirTypeScript, "HirTypeScript"),
         (Target::HirGo, "HirGo"),
         (Target::HirSwift, "HirSwift"),
@@ -196,6 +195,13 @@ fn every_hir_backend_fails_closed_with_a_named_diagnostic() {
         assert_eq!(arg_of(diagnostic, "type"), Some("inf"), "{name}");
         assert_eq!(arg_of(diagnostic, "target"), Some(name), "{name}");
     }
+}
+
+/// The Rust backend carries `inf` as `faber::Magnus` (inf U6r).
+#[test]
+fn the_rust_backend_carries_inf() {
+    let result = compile_for_target_and_get_result(INF_FILE, Target::HirRust);
+    assert_accepts(&result.diagnostics);
 }
 
 /// The Faber re-emitter carries `inf` (it only re-spells types).

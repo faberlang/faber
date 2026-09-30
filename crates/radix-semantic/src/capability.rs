@@ -14,7 +14,9 @@ use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirEnum, HirExpressionKind, HirFunction, HirId, HirItemKind, HirModule, HirStruct,
 };
-use radix_types::{AccessMarker, AppliedArg, IndexExpr, IndexId, Primitive, Type, TypeId};
+use radix_types::{
+    AccessMarker, AppliedArg, IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId,
+};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
@@ -622,10 +624,12 @@ impl<'a> DerivedCapabilityQueries<'a> {
         }
     }
 
-    fn sized_numeric_law(&self, prim: Primitive, law: TypeLaw) -> bool {
+    fn sized_numeric_law(&self, prim: Primitive, width: NumericWidth, law: TypeLaw) -> bool {
         match prim {
             Primitive::Fractus => !matches!(law, TypeLaw::ReflexiveEquality),
-            _ => true,
+            // The unbounded `inf` is a heap bignum on every carrier: duplicating
+            // it is an explicit `clone`, never a bitwise copy.
+            _ => !(width.is_unbounded() && matches!(law, TypeLaw::TrivialDuplicate)),
         }
     }
 
@@ -670,7 +674,7 @@ impl<'a> DerivedCapabilityQueries<'a> {
                 (_, _) => self.type_law(*inner, law, visiting),
             },
             Type::Primitive(prim) => Ok(self.primitive_law(*prim, law)),
-            Type::SizedNumeric(prim, _) => Ok(self.sized_numeric_law(*prim, law)),
+            Type::SizedNumeric(prim, width) => Ok(self.sized_numeric_law(*prim, *width, law)),
             Type::ModularWord(_) | Type::SaturatingWord(_) | Type::SizedInstans(_) => Ok(true),
             Type::Option(inner) => {
                 Ok(self.type_law(*inner, law, visiting)? && !matches!(law, TypeLaw::Ordering))

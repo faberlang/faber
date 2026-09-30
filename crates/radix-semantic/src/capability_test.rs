@@ -313,6 +313,33 @@ fn transfer_and_duplication_laws_distinguish_markers_and_containers() {
 }
 
 #[test]
+fn the_unbounded_integer_duplicates_explicitly_never_trivially() {
+    // `inf` is a heap bignum: the backends clone it, so the ownership plan
+    // must not classify its duplication as a bitwise copy (inf U6r).
+    let mut table = TypeTable::new();
+    let inf = table.intern(Type::SizedNumeric(Prim::Numerus, NumericWidth::Inf));
+    let queries = table_queries(table);
+
+    assert_eq!(
+        queries
+            .type_capability(inf, TypeCapabilityKind::TriviallyDuplicable)
+            .reason(),
+        Some(CapabilityReason::UnsupportedRepresentation)
+    );
+    for kind in [
+        TypeCapabilityKind::Transferable,
+        TypeCapabilityKind::ExplicitlyDuplicable,
+        TypeCapabilityKind::StrictEquality,
+        TypeCapabilityKind::ReflexiveEquality,
+    ] {
+        assert!(
+            queries.type_capability(inf, kind).proof().is_some(),
+            "{kind:?} should be proven for inf"
+        );
+    }
+}
+
+#[test]
 fn option_propagates_trivial_copy_and_structural_equality_but_not_ordering() {
     let mut table = TypeTable::new();
     let num = table.primitive(Prim::Numerus);

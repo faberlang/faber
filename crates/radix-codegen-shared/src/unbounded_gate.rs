@@ -16,10 +16,11 @@ use radix_types::{Primitive, Type, TypeId, TypeTable};
 const ISSUE: &str = "inf_target_unsupported";
 
 /// Targets whose emitters carry `inf` faithfully. The Faber re-emitter keeps
-/// the authored spelling; no bignum-carrying target exists yet (units U6r,
-/// U6t, U6g, U6p of the `inf` track add Rust, TypeScript, Go and Python).
+/// the authored spelling; Rust carries it as the runtime bignum
+/// (`faber::Magnus`, unit U6r). Units U6t, U6g and U6p of the `inf` track add
+/// TypeScript, Go and Python.
 fn target_admits_inf(target: Target) -> bool {
-    matches!(target, Target::HirFaber | Target::HirFhir)
+    matches!(target, Target::HirFaber | Target::HirFhir | Target::HirRust)
 }
 
 /// The error for a big integer literal (beyond `u64`, ruling 34) reaching a
