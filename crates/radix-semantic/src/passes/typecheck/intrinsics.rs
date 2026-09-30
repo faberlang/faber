@@ -537,6 +537,9 @@ pub(super) fn check_intrinsic_method_call(
             } else {
                 result
             };
+            if checker.reject_negative_potentia_exponent(entry, receiver_ty, args) {
+                return Some(checker.error_type);
+            }
             let result = checker.integer_method_range_type(entry, receiver_ty, args, result);
             if entry.faber_name == "accipe" && !args.is_empty() {
                 super::tensor_index::reject_static_bounded_index_oob(

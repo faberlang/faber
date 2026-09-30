@@ -1,0 +1,53 @@
++++
+term = "numerus"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "fixum_decl", "unary_expr", "call_expr", "call_suffix", "argument_list", "member_suffix", "expression", "literal", "redde_stmt", "nota_stmt"]
+category = "arithmetic"
+canonical = true
+summary = "An integer power never has a negative exponent: a constant one is a compile error, any other traps."
+syntax = "<numerus>.power(<numerus>)"
+related = ["numerus", "fractus", "wrapping"]
+locale = "en"
++++
+# =============================================================================
+# numerus — An integer power never has a negative exponent.
+# =============================================================================
+#
+# What this teaches:
+#   • Exact integer powers — `2.power(10)` is 1024 and `0.power(0)` is 1 (the
+#     empty product) on every family, integer and fractus alike.
+#   • A constant negative exponent is a compile error — `2.power(-1)` has no
+#     integer value (it is 1/2), so the compiler rejects it with
+#     `potentia_exponent_negative`, the way it rejects a negative shift count.
+#   • A computed negative exponent traps — `2.power(minus())` aborts with
+#     "numerus potentia failed: negative exponent", in the class of a zero
+#     divisor. It is not an `⇥` failure: no handler is needed on any power.
+#   • fractus keeps IEEE pow — `half.power(-1.0)` is 0.5 with no error.
+#
+# Common mistakes:
+#   • Expecting `2.power(-1)` to be 0 or 1. It is neither; use a fractus base
+#     (`2.0.power(-1.0)` is 0.5).
+#   • Expecting the trap to be recoverable with `fac … cape`.
+#
+# See also: numerus, fractus, wrapping
+# =============================================================================
+
+# potentia-negative-exponent — integer power, negative exponent
+#
+# POLICY:
+#   `x.power(n)` on an integer needs n ≥ 0. The exponent of `2.power(-1)` is a
+#   constant, so the program would not compile; the exponent below comes from a
+#   function call, so the check is a runtime fact on every target.
+
+fn minus() → int {
+    return -1
+}
+
+main {
+    print 2.power(10)
+    print 0.power(0)
+    const float half ← 2.0
+    print half.power(-1.0)
+    print 2.power(minus())
+    print 99
+}

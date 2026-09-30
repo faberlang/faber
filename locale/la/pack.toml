@@ -1951,6 +1951,10 @@ help = "write a value the float type can hold, or use a wider float type"
 message = "shift count must not be negative"
 help = "write a shift count of zero or more"
 
+[diagnostics.SEM010.issues.potentia_exponent_negative]
+message = "an integer power cannot have a negative exponent"
+help = "write an exponent of zero or more, or use a `fractus` base for a fractional power"
+
 [diagnostics.SEM010.issues.integer_quotient_to_float_requires_true_division]
 message = "integer quotient cannot be a float implicitly"
 help = "divide with `÷` to get a float quotient, or convert an operand explicitly with `↦`"

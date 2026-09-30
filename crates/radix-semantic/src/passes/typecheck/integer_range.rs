@@ -23,6 +23,7 @@ pub(super) const NUMERIC_FAMILY_CROSSING_REQUIRES_CONVERSIO: &str =
 const FLOAT_CONSTANT_INEXACT: &str = "float_constant_inexact";
 const FLOAT_CONSTANT_OUT_OF_RANGE: &str = "float_constant_out_of_range";
 const SHIFT_COUNT_NEGATIVE: &str = "shift_count_negative";
+const POTENTIA_EXPONENT_NEGATIVE: &str = "potentia_exponent_negative";
 
 /// Exact value of an integer constant expression (literals and operators over
 /// literals), or `None` when the expression is not a pure integer constant.
@@ -295,6 +296,36 @@ impl TypeChecker<'_> {
             SemanticErrorKind::TypeMismatch,
             SHIFT_COUNT_NEGATIVE,
             count.span,
+        );
+        true
+    }
+
+    /// Ruling 28: a negative `potentia` exponent on an integer receiver (any
+    /// policy family) is an error of the negative-shift-count class, and a
+    /// compile error when the exponent is a constant. A `fractus` receiver
+    /// keeps IEEE `pow`. Returns `true` when it reported one.
+    pub(super) fn reject_negative_potentia_exponent(
+        &mut self,
+        entry: &radix_intrinsics::MethodIntrinsic,
+        receiver_ty: TypeId,
+        args: &[radix_hir::HirCallArg],
+    ) -> bool {
+        if entry.faber_name != "potentia"
+            || !matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Numeric)
+            || !self.is_integer(receiver_ty)
+        {
+            return false;
+        }
+        let Some(exponent) = args
+            .first()
+            .filter(|arg| const_int_value(&arg.expr).is_some_and(|n| n < 0))
+        else {
+            return false;
+        };
+        self.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            POTENTIA_EXPONENT_NEGATIVE,
+            exponent.expr.span,
         );
         true
     }

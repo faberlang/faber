@@ -930,6 +930,10 @@ mod gate_law_totality_test;
 mod integer_range_test;
 
 #[cfg(test)]
+#[path = "potentia_exponent_test.rs"]
+mod potentia_exponent_test;
+
+#[cfg(test)]
 #[path = "store_position_test.rs"]
 mod store_position_test;
 

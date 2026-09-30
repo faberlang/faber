@@ -29,5 +29,9 @@ mod bijection_ratchet_tests;
 mod operator_methods_tests;
 
 #[cfg(test)]
+#[path = "potentia_emit_test.rs"]
+mod potentia_emit_tests;
+
+#[cfg(test)]
 #[path = "registry_test.rs"]
 mod registry_tests;

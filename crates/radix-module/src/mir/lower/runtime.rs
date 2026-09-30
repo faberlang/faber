@@ -1947,7 +1947,8 @@ impl FunctionBuilder<'_> {
     /// accumulator for an odd exponent, halve the exponent, then square the
     /// base only when another iteration remains. This is O(log exponent) in
     /// multiplications, preserves negative-base signs without a float round
-    /// trip, and keeps overflow under checked integer MIR arithmetic.
+    /// trip, and keeps overflow under checked integer MIR arithmetic. A
+    /// negative exponent traps before the loop (ruling 28).
     fn lower_integer_potentia(
         &mut self,
         receiver: &HirExpression,
@@ -1997,7 +1998,7 @@ impl FunctionBuilder<'_> {
         let shift = self.fresh_block(expr.span);
         let square = self.fresh_block(expr.span);
         let done = self.fresh_block(expr.span);
-        self.terminate_current(MirTerminatorKind::Goto(loop_check), expr.span);
+        self.trap_negative_potentia_exponent(&exponent_place, loop_check, expr.span);
 
         self.switch_to(loop_check);
         let has_exponent = self.binary_temp(
@@ -2078,6 +2079,35 @@ impl FunctionBuilder<'_> {
         self.switch_to(done);
         self.assign(MirPlace::temp(destination), MirOperand::Place(accumulator_place), ty, expr.span);
         Some(MirOperand::Temp(destination))
+    }
+
+    /// Ruling 28: a negative integer exponent is an arithmetic trap (the class
+    /// of a zero divisor), never `⇥`. Branches to `proceed` for `exponent >= 0`.
+    fn trap_negative_potentia_exponent(&mut self, exponent: &MirPlace, proceed: MirBlockId, span: Span) {
+        let bool_ty = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let negative = self.binary_temp(
+            MirBinOp::Lt,
+            MirOperand::Place(exponent.clone()),
+            MirOperand::Constant(MirConstant::Int(0)),
+            bool_ty,
+            span,
+        );
+        let trap = self.fresh_block(span);
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition: negative, then_block: trap, else_block: proceed },
+            span,
+        );
+        self.switch_to(trap);
+        let message = MirOperand::Constant(MirConstant::String(self.context.diagnostic_potentia_negative_exponent));
+        let numquam = MirType::semantic(self.types.primitive(Primitive::Numquam));
+        self.append_stmt(MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination: None,
+                call: MirRuntimeCall { intrinsic: MirIntrinsic::Panic, args: vec![message], return_ty: numquam },
+            },
+            span,
+        });
+        self.terminate_current(MirTerminatorKind::Unreachable, span);
     }
 
     /// Lower `lista.ordina()` as an in-place update using the existing sorted
