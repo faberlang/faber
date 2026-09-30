@@ -1429,9 +1429,14 @@ fn generate_sexp_output(analysis: &mut AnalyzedModule, no_fuse: bool) -> Result<
     {
         prepare_mir_lowering_interner(analysis);
         let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
-        let code = crate::mir::emit_sexp_text(&mir.validated, &mir.interner).map_err(|error| {
-            codegen::CodegenError { message: error.message, args: vec![DiagnosticArg::new("category", error.category)] }
-        })?;
+        let code =
+            crate::mir::emit_sexp_text(&mir.validated, &mir.interner).map_err(|error| codegen::CodegenError {
+                message: error.message,
+                args: vec![
+                    DiagnosticArg::new("category", error.category),
+                    DiagnosticArg::new("shape", error.shape),
+                ],
+            })?;
         Ok(crate::Output::Sexp(crate::SexpOutput { code }))
     }
 }

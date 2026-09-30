@@ -164,6 +164,15 @@ impl RunnerError {
         }
     }
 
+    /// Value of the named structured fact, if the diagnostic carries it.
+    #[must_use]
+    pub fn arg(&self, name: &str) -> Option<&str> {
+        self.args
+            .iter()
+            .find(|(key, _)| key == name)
+            .map(|(_, value)| value.as_str())
+    }
+
     fn is_conversion_failure(&self) -> bool {
         // WHY: parse failures ("... conversion failed") and width-overflow
         // failures ("... conversion out of range", SA-002) are both recoverable

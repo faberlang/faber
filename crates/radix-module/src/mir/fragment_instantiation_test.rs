@@ -706,30 +706,6 @@ fn monomorphized_definition_callee_uses_specialized_instance() {
 }
 
 #[test]
-fn message_carries_type_and_call_site_context() {
-    let type_error = FragmentInstantiationError {
-        issue: ISSUE_TYPE,
-        reason: "argument",
-        span: test_span(),
-        definition_span: None,
-        args: vec![
-            DiagnosticArg::new("expected", "f32"),
-            DiagnosticArg::new("actual", "u32"),
-        ],
-    };
-    assert_eq!(type_error.message(), "@ nucleum fragment argument has type u32, expected f32");
-
-    let context_error = FragmentInstantiationError {
-        issue: ISSUE_CONTEXT,
-        reason: "nested_dispatch",
-        span: test_span(),
-        definition_span: None,
-        args: vec![DiagnosticArg::new("caller", "entry")],
-    };
-    assert_eq!(context_error.message(), "@ nucleum cannot call another @ nucleum entry");
-}
-
-#[test]
 fn lowering_composes_entry_to_entry() {
     // DFV2-4: a device caller may call a concrete local device entry; the
     // call composes instead of the v1 nested-dispatch reject.

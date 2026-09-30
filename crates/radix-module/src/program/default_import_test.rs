@@ -18,7 +18,7 @@ fn temp_dir(label: &str) -> (tempfile::TempDir, PathBuf) {
 const GEO_WITH_REGIO: &str = "regio geometria\n\n@ publica\nfunctio unum() → numerus {\n    redde 1\n}\n";
 const GEO_WITHOUT_REGIO: &str = "@ publica\nfunctio unum() → numerus {\n    redde 1\n}\n";
 
-fn check(dir: &Path, app: &str) -> Vec<(Option<String>, String)> {
+fn check(dir: &Path, app: &str) -> Vec<Option<String>> {
     let path = dir.join("app.fab");
     fs::write(&path, app).expect("app");
     let result = crate::services::check_diagnostics_for_source(&path.display().to_string(), app, false);
@@ -26,7 +26,7 @@ fn check(dir: &Path, app: &str) -> Vec<(Option<String>, String)> {
         .diagnostics
         .iter()
         .filter(|diagnostic| diagnostic.is_error())
-        .map(|diagnostic| (diagnostic.issue().map(str::to_owned), diagnostic.message.clone()))
+        .map(|diagnostic| diagnostic.issue().map(str::to_owned))
         .collect()
 }
 
@@ -82,7 +82,7 @@ fn two_imports_defaulting_to_one_regio_name_collide() {
     assert!(
         errors
             .iter()
-            .any(|(issue, _)| issue.as_deref() == Some("default_import_name_collision")),
+            .any(|issue| issue.as_deref() == Some("default_import_name_collision")),
         "{errors:?}"
     );
 }
@@ -133,7 +133,7 @@ fn driver_analysis_binds_declared_regio_name() {
             .err()
             .unwrap_or_default()
             .iter()
-            .map(|diagnostic| (diagnostic.issue().map(str::to_owned), diagnostic.message.clone()))
+            .map(|diagnostic| diagnostic.issue().map(str::to_owned))
             .collect::<Vec<_>>()
     );
 }

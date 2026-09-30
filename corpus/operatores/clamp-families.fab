@@ -110,6 +110,6 @@ main {
     const f64 pos_zero ← 0.0
     const f64 neg_zero ← -1.0 * pos_zero
     # The sign of a zero shows in the sign of its reciprocal.
-    print 1.0 ÷ (neg_zero ⤒ pos_zero) > 0.0
-    print 1.0 ÷ (pos_zero ⤓ neg_zero) > 0.0
+    print 1.0 ÷ (neg_zero ⤒ pos_zero) ≻ 0.0
+    print 1.0 ÷ (pos_zero ⤓ neg_zero) ≻ 0.0
 }

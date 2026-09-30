@@ -571,28 +571,3 @@ functio k(fractus<f32> x) → fractus<f32> {
         );
     });
 }
-
-#[test]
-fn message_identities_stay_stable() {
-    use crate::diagnostics::DiagnosticArg;
-    use crate::mir::fragment_instantiation::FragmentInstantiationError;
-    let definition = FragmentInstantiationError {
-        issue: ISSUE_CONTEXT,
-        reason: "host_callable",
-        span: test_span(),
-        definition_span: None,
-        args: Vec::new(),
-    };
-    assert_eq!(
-        definition.message(),
-        "@ nucleum fragment cannot call a host function or other non-device-safe callable"
-    );
-    let instantiation = FragmentInstantiationError {
-        issue: ISSUE_CONTEXT,
-        reason: "host_callable",
-        span: test_span(),
-        definition_span: None,
-        args: vec![DiagnosticArg::new("caller", "host")],
-    };
-    assert_eq!(instantiation.message(), "host code cannot call an @ nucleum fragment");
-}

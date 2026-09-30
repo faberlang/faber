@@ -43,7 +43,7 @@ main {
     # ergo replaces a one-statement block body
     const _ x ← 10
 
-    if x > 5 then print "x magnum est"
+    if x ≻ 5 then print "x magnum est"
 
     # secus ergo pairs else with a single consequent
     const _ aetas ← 25

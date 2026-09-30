@@ -29,7 +29,7 @@ fn emit(target: Target) -> String {
 fn assert_folded(target: Target) {
     let code = emit(target);
     assert!(code.contains("4096"), "{target:?} lacks folded LIMES:\n{code}");
-    assert!(code.contains("8192"), "{target:?} lacks folded DUPLEX:\n{code}");
+    assert!(code.contains("8192"), "{target:?} lacks folded doubled limit:\n{code}");
     assert!(code.contains("\"limes\""), "{target:?} lacks folded NOMEN:\n{code}");
     assert!(!code.contains("1024"), "{target:?} evaluates authored arithmetic:\n{code}");
 }

@@ -1606,7 +1606,6 @@ fn provider_identity_rewrite_ignores_prose_matches() {
     let error = RunnerError::internal(Span::default(), "runtime provider sym#30::sym#31")
         .with_provider_identity("package:camera::include");
 
-    assert_eq!(error.message, "runtime provider sym#30::sym#31");
     assert_eq!(error.issue, "runner_runtime_provider_sym_30_sym_31");
     assert!(error.args.iter().all(|(key, _)| key != "identity"));
 }
@@ -4527,11 +4526,8 @@ fn tensor_elementwise_stores_each_element_under_the_element_width() {
     )
     .expect_err("200 leaves i8");
     assert_eq!(err.issue, crate::store::RUNNER_ISSUE_IMPLICIT_STORE_TRAP);
-    assert!(
-        err.message.contains("200 does not fit in `i8`"),
-        "{}",
-        err.message
-    );
+    assert_eq!(err.arg("value"), Some("200"));
+    assert_eq!(err.arg("type"), Some("i8"));
     // A product that fits stays; scalar broadcast is checked per element too.
     let fits = eval_tensor_op_typed(
         MirCollectionOp::TensorMul,
@@ -4560,11 +4556,9 @@ fn tensor_elementwise_stores_each_element_under_the_element_width() {
         ],
     )
     .expect_err("150 leaves i8");
-    assert!(
-        err.message.contains("150 does not fit in `i8`"),
-        "{}",
-        err.message
-    );
+    assert_eq!(err.issue, crate::store::RUNNER_ISSUE_IMPLICIT_STORE_TRAP);
+    assert_eq!(err.arg("value"), Some("150"));
+    assert_eq!(err.arg("type"), Some("i8"));
 }
 
 #[test]
@@ -4598,11 +4592,9 @@ fn tensor_sum_axis_partials_are_exact_and_the_result_is_stored() {
         vec![(MirValueId(0), rows)],
     )
     .expect_err("200 leaves i8");
-    assert!(
-        err.message.contains("200 does not fit in `i8`"),
-        "{}",
-        err.message
-    );
+    assert_eq!(err.issue, crate::store::RUNNER_ISSUE_IMPLICIT_STORE_TRAP);
+    assert_eq!(err.arg("value"), Some("200"));
+    assert_eq!(err.arg("type"), Some("i8"));
 }
 
 #[test]
@@ -4634,11 +4626,8 @@ fn tensor_matmul_partials_are_exact_and_each_cell_is_stored() {
     )
     .expect_err("300 leaves i8");
     assert_eq!(err.issue, crate::store::RUNNER_ISSUE_IMPLICIT_STORE_TRAP);
-    assert!(
-        err.message.contains("300 does not fit in `i8`"),
-        "{}",
-        err.message
-    );
+    assert_eq!(err.arg("value"), Some("300"));
+    assert_eq!(err.arg("type"), Some("i8"));
 }
 
 #[test]

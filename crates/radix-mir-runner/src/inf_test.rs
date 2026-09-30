@@ -132,7 +132,7 @@ fn operations_match_i128_on_a_grid_inside_its_range() {
                 match expected {
                     Some(want) => assert_eq!(
                         digits(
-                            &got.unwrap_or_else(|e| panic!("{a} {operation:?} {b}: {}", e.message))
+                            &got.unwrap_or_else(|e| panic!("{a} {operation:?} {b}: {}", e.issue))
                         ),
                         want.to_string(),
                         "{a} {operation:?} {b}"
@@ -200,7 +200,7 @@ fn shifts_are_exact_and_the_right_shift_floors() {
 fn a_negative_shift_count_is_the_runtime_trap() {
     for operation in [MirBinOp::Shl, MirBinOp::Shr] {
         let error = op(operation, &Value::Int(1), &Value::Int(-1)).expect_err("negative count");
-        assert_eq!(error.message, "negative shift count");
+        assert_eq!(error.issue, "runner_negative_shift_count");
     }
 }
 
@@ -208,7 +208,7 @@ fn a_negative_shift_count_is_the_runtime_trap() {
 fn a_zero_divisor_is_the_division_trap() {
     for operation in [MirBinOp::Div, MirBinOp::Mod] {
         let error = op(operation, &big("18446744073709551616"), &Value::Int(0)).expect_err("zero");
-        assert_eq!(error.message, "numerus division failed");
+        assert_eq!(error.issue, "runner_numerus_division_failed");
     }
 }
 
@@ -251,7 +251,7 @@ fn a_bounded_result_width_keeps_the_64_bit_cap() {
     )
     .expect("integer carriers")
     .expect_err("u64::MAX + 1 traps in a bounded expression");
-    assert_eq!(error.message, "numerus overflow");
+    assert_eq!(error.issue, "runner_numerus_overflow");
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +262,7 @@ fn a_bounded_result_width_keeps_the_64_bit_cap() {
 fn a_runaway_shift_is_a_resource_fault_with_its_own_identity() {
     let error = op(MirBinOp::Shl, &Value::Int(1), &Value::Int(4_000_000_000)).expect_err("ceiling");
     assert_eq!(error.issue, RUNNER_ISSUE_INF_SIZE_EXHAUSTED);
-    assert!(error.message.contains("shift"), "{}", error.message);
+    assert_eq!(error.arg("operation"), Some("shift"));
     // A count beyond u64 is refused the same way, without allocating.
     let error = op(
         MirBinOp::Shl,
@@ -298,11 +298,7 @@ fn a_multiplication_past_the_work_ceiling_is_refused_before_it_runs() {
     // 2^15 limbs each: 2^30 limb products, past the 2^27 work ceiling.
     let error = op(MirBinOp::Mul, &wide, &wide).expect_err("work ceiling");
     assert_eq!(error.issue, RUNNER_ISSUE_INF_SIZE_EXHAUSTED);
-    assert!(
-        error.message.contains("multiplication"),
-        "{}",
-        error.message
-    );
+    assert_eq!(error.arg("operation"), Some("multiplication"));
 }
 
 // ---------------------------------------------------------------------------
@@ -910,12 +906,8 @@ fn an_inf_beyond_64_bits_stores_into_a_bounded_slot_with_the_store_identity() {
                 .expect("an integer slot")
                 .expect_err("2^64 does not fit u8");
             assert_eq!(trap.issue, crate::store::RUNNER_ISSUE_IMPLICIT_STORE_TRAP);
-            assert!(
-                trap.message
-                    .contains("18446744073709551616 does not fit in `u8`"),
-                "{}",
-                trap.message
-            );
+            assert_eq!(trap.arg("value"), Some("18446744073709551616"));
+            assert_eq!(trap.arg("type"), Some("u8"));
             let wrapped = runner
                 .eval_implicit_store(&store_site(), ids[1], &value, Span::default())
                 .expect("word slot")

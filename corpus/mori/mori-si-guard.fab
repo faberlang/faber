@@ -44,17 +44,17 @@ locale = "en"
 
 fn clamp(int x, int min, int max) → int {
     # Guard: abort if min > max — invariant violation
-    panic "range inverted" if min > max
+    panic "range inverted" if min ≻ max
 
     # Guard: abort if value out of range
-    panic "value out of range" if x < min or x > max
+    panic "value out of range" if x ≺ min or x ≻ max
 
     return x
 }
 
 fn accessus(list<int> res, int index) → int {
     # Unconditional mori — unchanged form
-    if index < 0 or index ≥ res.length() {
+    if index ≺ 0 or index ≥ res.length() {
         panic "index out of bounds"
     }
     return res[index]

@@ -203,7 +203,7 @@ incipit {{
         assert!(
             errors
                 .iter()
-                .any(|error| error.message == "numerus division failed"),
+                .any(|error| error.issue == "runner_numerus_division_failed"),
             "{body}: {errors:?}"
         );
     }

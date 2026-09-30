@@ -73,7 +73,11 @@ pub fn tensor_math_function(function: radix_types::MirTensorMath, target: Target
             function.name(),
             target_name(target)
         ),
-        args: vec![DiagnosticArg::new("function", function.name())],
+        args: vec![
+            DiagnosticArg::new("issue", "tensor_math_function_unsupported"),
+            DiagnosticArg::new("function", function.name()),
+            DiagnosticArg::new("target", target_name(target)),
+        ],
     }
 }
 

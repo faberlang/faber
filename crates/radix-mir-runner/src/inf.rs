@@ -49,27 +49,35 @@ const NEGATIVE_SHIFT: &str = "negative shift count";
 
 /// The resource fault of ruling 45, naming the operation that hit a ceiling.
 pub(crate) fn exhausted(span: Span, operation: &str) -> RunnerError {
-    RunnerError::internal_with_issue(
+    let mut error = RunnerError::internal_with_issue(
         span,
         format!(
             "inf size exhausted in {operation}: the value would exceed the runner ceiling of \
              {RUNNER_INF_BIT_CEILING} bits"
         ),
         RUNNER_ISSUE_INF_SIZE_EXHAUSTED,
-    )
+    );
+    error
+        .args
+        .push(("operation".to_owned(), operation.to_owned()));
+    error
 }
 
 /// The resource fault of ruling 45 for a multiplication whose schoolbook work
 /// alone passes [`RUNNER_INF_MUL_WORK_CEILING`] (same identity, distinct text).
 fn exhausted_work(span: Span) -> RunnerError {
-    RunnerError::internal_with_issue(
+    let mut error = RunnerError::internal_with_issue(
         span,
         format!(
             "inf size exhausted in multiplication: the work exceeds the runner ceiling of \
              {RUNNER_INF_MUL_WORK_CEILING} limb products"
         ),
         RUNNER_ISSUE_INF_SIZE_EXHAUSTED,
-    )
+    );
+    error
+        .args
+        .push(("operation".to_owned(), "multiplication".to_owned()));
+    error
 }
 
 /// The exact value of any integer carrier.

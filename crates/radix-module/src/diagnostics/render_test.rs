@@ -488,3 +488,108 @@ exemplars = ["./exemplars/salve-munde.fab"]
     )
     .expect("test pack should validate")
 }
+
+// Renderer-contract: the MIR fragment errors own English prose renderers
+// (`message()`); these tests pin how each issue's args substitute into it.
+// Moved from the mir fragment tests, where they asserted `.message()` prose.
+
+#[test]
+fn fragment_composition_message_carries_cycle_and_expansion() {
+    use crate::mir::fragment_composition::{FragmentCompositionError, ISSUE_CYCLE, ISSUE_EXPANSION};
+    let cycle_error = FragmentCompositionError {
+        issue: ISSUE_CYCLE,
+        reason: "cycle",
+        span: crate::test_support::test_span(),
+        definition_span: None,
+        args: vec![DiagnosticArg::new("cycle", "ping → pong → ping")],
+    };
+    assert_eq!(cycle_error.message(), "nucleum fragment call cycle: ping → pong → ping");
+
+    let expansion_error = FragmentCompositionError {
+        issue: ISSUE_EXPANSION,
+        reason: "depth",
+        span: crate::test_support::test_span(),
+        definition_span: None,
+        args: vec![
+            DiagnosticArg::new("kind", "depth"),
+            DiagnosticArg::new("observed", "17"),
+            DiagnosticArg::new("limit", "16"),
+            DiagnosticArg::new("chain", "k → a → b"),
+        ],
+    };
+    assert_eq!(
+        expansion_error.message(),
+        "nucleum fragment expansion exceeds depth limit 16 (observed 17) along k → a → b"
+    );
+}
+
+#[test]
+fn fragment_instantiation_message_carries_type_and_call_site_context() {
+    use crate::mir::fragment_instantiation::{FragmentInstantiationError, ISSUE_CONTEXT, ISSUE_TYPE};
+    let type_error = FragmentInstantiationError {
+        issue: ISSUE_TYPE,
+        reason: "argument",
+        span: crate::test_support::test_span(),
+        definition_span: None,
+        args: vec![
+            DiagnosticArg::new("expected", "f32"),
+            DiagnosticArg::new("actual", "u32"),
+        ],
+    };
+    assert_eq!(type_error.message(), "@ nucleum fragment argument has type u32, expected f32");
+
+    let context_error = FragmentInstantiationError {
+        issue: ISSUE_CONTEXT,
+        reason: "nested_dispatch",
+        span: crate::test_support::test_span(),
+        definition_span: None,
+        args: vec![DiagnosticArg::new("caller", "entry")],
+    };
+    assert_eq!(context_error.message(), "@ nucleum cannot call another @ nucleum entry");
+
+    let definition = FragmentInstantiationError {
+        issue: ISSUE_CONTEXT,
+        reason: "host_callable",
+        span: crate::test_support::test_span(),
+        definition_span: None,
+        args: Vec::new(),
+    };
+    assert_eq!(
+        definition.message(),
+        "@ nucleum fragment cannot call a host function or other non-device-safe callable"
+    );
+    let instantiation = FragmentInstantiationError {
+        issue: ISSUE_CONTEXT,
+        reason: "host_callable",
+        span: crate::test_support::test_span(),
+        definition_span: None,
+        args: vec![DiagnosticArg::new("caller", "host")],
+    };
+    assert_eq!(instantiation.message(), "host code cannot call an @ nucleum fragment");
+}
+
+#[test]
+fn mixed_script_advisory_renders_prose_in_every_installed_pack() {
+    let source = "const аdd ← 1\n";
+    let advisory = crate::lexer::lex(source)
+        .mixed_script_advisories
+        .first()
+        .expect("mixed-script advisory")
+        .clone();
+    let diagnostic = super::super::convert::convert_from_mixed_script_advisory("advisory.fab", source, &advisory);
+
+    for locale in ["ar", "en", "hi", "la", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
+        let path = crate::locale::workspace_locale_pack_path(locale);
+        let pack = LocalePack::from_toml_path(path)
+            .unwrap_or_else(|err| panic!("installed {locale} pack should load: {err:?}"));
+        let rendered = pack
+            .render_diagnostic_text(&diagnostic)
+            .expect("render should not error")
+            .unwrap_or_else(|| panic!("{locale} pack must own a LOCALE004 prose row"));
+        assert!(
+            rendered.message.contains("аdd"),
+            "{locale} prose must substitute the identifier: {}",
+            rendered.message
+        );
+    }
+}

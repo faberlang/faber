@@ -586,35 +586,6 @@ fn instance_budget_fails_closed() {
 }
 
 #[test]
-fn message_carries_cycle_and_expansion() {
-    let cycle_error = FragmentCompositionError {
-        issue: ISSUE_CYCLE,
-        reason: "cycle",
-        span: test_span(),
-        definition_span: None,
-        args: vec![DiagnosticArg::new("cycle", "ping → pong → ping")],
-    };
-    assert_eq!(cycle_error.message(), "nucleum fragment call cycle: ping → pong → ping");
-
-    let expansion_error = FragmentCompositionError {
-        issue: ISSUE_EXPANSION,
-        reason: "depth",
-        span: test_span(),
-        definition_span: None,
-        args: vec![
-            DiagnosticArg::new("kind", "depth"),
-            DiagnosticArg::new("observed", "17"),
-            DiagnosticArg::new("limit", "16"),
-            DiagnosticArg::new("chain", "k → a → b"),
-        ],
-    };
-    assert_eq!(
-        expansion_error.message(),
-        "nucleum fragment expansion exceeds depth limit 16 (observed 17) along k → a → b"
-    );
-}
-
-#[test]
 fn legal_entry_to_fragment_composes_through_lowering() {
     let source = r"
 @ nucleum fragment

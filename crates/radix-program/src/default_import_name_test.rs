@@ -21,30 +21,29 @@ fn write(dir: &Path, relative: &str, source: &str) {
     fs::write(path, source).expect("write");
 }
 
-fn errors(entry: &Path) -> Vec<(Option<String>, String)> {
-    match analyze_package(&Config::default(), entry, &test_analysis_seams()) {
-        Ok(program) => program
-            .diagnostics
+type ErrorFacts = (Option<String>, Vec<(String, String)>);
+
+fn error_facts(diagnostic: &radix_module::Diagnostic) -> ErrorFacts {
+    (
+        diagnostic.issue().map(str::to_owned),
+        diagnostic
+            .args
             .iter()
-            .filter(|diagnostic| diagnostic.is_error())
-            .map(|diagnostic| {
-                (
-                    diagnostic.issue().map(str::to_owned),
-                    diagnostic.message.clone(),
-                )
-            })
+            .map(|arg| (arg.name.to_owned(), arg.value.clone()))
             .collect(),
-        Err(diagnostics) => diagnostics
-            .iter()
-            .filter(|diagnostic| diagnostic.is_error())
-            .map(|diagnostic| {
-                (
-                    diagnostic.issue().map(str::to_owned),
-                    diagnostic.message.clone(),
-                )
-            })
-            .collect(),
-    }
+    )
+}
+
+fn errors(entry: &Path) -> Vec<ErrorFacts> {
+    let diagnostics = match analyze_package(&Config::default(), entry, &test_analysis_seams()) {
+        Ok(program) => program.diagnostics,
+        Err(diagnostics) => diagnostics,
+    };
+    diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.is_error())
+        .map(error_facts)
+        .collect()
 }
 
 #[test]
@@ -152,9 +151,9 @@ fn library_default_import_binds_declared_module_name() {
     let errors = diagnostics
         .iter()
         .filter(|diagnostic| diagnostic.is_error())
-        .map(|diagnostic| diagnostic.message.clone())
+        .map(error_facts)
         .collect::<Vec<_>>();
-    assert_eq!(errors, Vec::<String>::new());
+    assert_eq!(errors, Vec::<ErrorFacts>::new());
 }
 
 #[test]
@@ -195,7 +194,7 @@ fn library_internal_default_import_binds_declared_module_name() {
     let errors = diagnostics
         .iter()
         .filter(|diagnostic| diagnostic.is_error())
-        .map(|diagnostic| diagnostic.message.clone())
+        .map(error_facts)
         .collect::<Vec<_>>();
-    assert_eq!(errors, Vec::<String>::new());
+    assert_eq!(errors, Vec::<ErrorFacts>::new());
 }

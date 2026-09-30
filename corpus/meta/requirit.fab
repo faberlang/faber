@@ -45,7 +45,7 @@ union GuardError {
 }
 
 fn guarded(int value) → int ⇥ GuardError {
-    require value > 0 throw variant Invalid { causa = "value must be positive" }
+    require value ≻ 0 throw variant Invalid { causa = "value must be positive" }
     return value
 }
 

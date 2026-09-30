@@ -98,11 +98,8 @@ fn a_u8_element_store_traps_per_element() {
     )
     .expect_err("300 leaves u8");
     assert_eq!(err.issue, crate::store::RUNNER_ISSUE_IMPLICIT_STORE_TRAP);
-    assert!(
-        err.message.contains("300 does not fit in `u8`"),
-        "{}",
-        err.message
-    );
+    assert_eq!(err.arg("value"), Some("300"));
+    assert_eq!(err.arg("type"), Some("u8"));
     let fits = lift(
         MirLiftOp::Add,
         u8_element(),
@@ -116,11 +113,9 @@ fn a_u8_element_store_traps_per_element() {
         vec![ints(&[0], &[1]), Value::Int(1)],
     )
     .expect_err("-1 leaves u8");
-    assert!(
-        below.message.contains("-1 does not fit in `u8`"),
-        "{}",
-        below.message
-    );
+    assert_eq!(below.issue, crate::store::RUNNER_ISSUE_IMPLICIT_STORE_TRAP);
+    assert_eq!(below.arg("value"), Some("-1"));
+    assert_eq!(below.arg("type"), Some("u8"));
 }
 
 #[test]
@@ -258,7 +253,7 @@ fn two_tensors_of_different_shapes_are_an_error() {
         vec![floats(&[1.0, 2.0], &[2]), floats(&[1.0], &[2])],
     )
     .expect_err("backing mismatch");
-    assert!(err.message.contains("backing-length"), "{}", err.message);
+    assert_eq!(err.issue, "runner_tensor_lift_backing_length_mismatch");
 }
 
 #[test]

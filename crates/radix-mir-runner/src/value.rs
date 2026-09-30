@@ -16,7 +16,6 @@
 // i64/u64/f64 by design.
 #![expect(
     clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
     clippy::cast_sign_loss,
     clippy::cast_precision_loss,
     reason = "semantic numeric conversions between host value kinds in the runner value model"

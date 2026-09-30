@@ -296,10 +296,9 @@ fn integer_elements_are_rejected_by_float_only_functions() {
     for function in MirTensorMath::ALL.into_iter().filter(|f| f.float_only()) {
         let err = run(function, int_element(NumericWidth::I32), &[1], ints(&[4]))
             .expect_err("float-only function on integers");
-        assert!(
-            err.message.contains("element type mismatch"),
-            "{}",
-            err.message
+        assert_eq!(
+            err.issue,
+            format!("runner_tensor_{}_element_type_mismatch", function.name())
         );
     }
 }

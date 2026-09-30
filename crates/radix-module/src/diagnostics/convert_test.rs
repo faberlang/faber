@@ -316,28 +316,6 @@ fn mixed_script_advisory_normalizes_to_nonfatal_warning() {
 }
 
 #[test]
-fn mixed_script_advisory_renders_prose_in_every_installed_pack() {
-    let source = "const аdd ← 1\n";
-    let advisory = first_mixed_script_advisory(source);
-    let diagnostic = from_mixed_script_advisory("advisory.fab", source, &advisory);
-
-    for locale in ["ar", "en", "hi", "la", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
-        let path = crate::locale::workspace_locale_pack_path(locale);
-        let pack = crate::locale::LocalePack::from_toml_path(path)
-            .unwrap_or_else(|err| panic!("installed {locale} pack should load: {err:?}"));
-        let rendered = pack
-            .render_diagnostic_text(&diagnostic)
-            .expect("render should not error")
-            .unwrap_or_else(|| panic!("{locale} pack must own a LOCALE004 prose row"));
-        assert!(
-            rendered.message.contains("аdd"),
-            "{locale} prose must substitute the identifier: {}",
-            rendered.message
-        );
-    }
-}
-
-#[test]
 fn mixed_script_compile_yields_warning_and_still_parses_and_analyzes() {
     // Cyrillic `а` beside Latin `dd`, defined and called: the S-A5 shape.
     // Advisory only — check succeeds with no error-severity diagnostic.

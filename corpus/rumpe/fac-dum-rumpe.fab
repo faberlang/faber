@@ -29,7 +29,7 @@ locale = "en"
 main {
     var int x ← 0
     do {
-        while x < 3 {
+        while x ≺ 3 {
             x ← x + 1
             if x ≡ 2 then break
         }

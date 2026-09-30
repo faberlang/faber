@@ -6,7 +6,7 @@
 
 // Residual: HIR→MIR lowering (needs AnalyzedModule / driver).
 pub(crate) mod fragment_composition;
-mod fragment_instantiation;
+pub(crate) mod fragment_instantiation;
 mod lower;
 // Emit + interpret + coverage leaves (façades re-export radix-mir-*).
 #[cfg(feature = "mir-coverage")]
