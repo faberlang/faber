@@ -40,7 +40,7 @@ fn unmarked_list_mutating_receiver_stays_legal() {
     let _ = analyze_ok(
         r"
 incipit {
-    fixum lista<numerus> xs ← vacua
+    varia lista<numerus> xs ← vacua
     xs.appende(4)
 }
 ",

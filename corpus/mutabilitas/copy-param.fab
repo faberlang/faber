@@ -21,8 +21,9 @@ class Counter {
 }
 
 fn take(copy list<int> items) → int {
-    items.append(5)
-    return items.length()
+    var list<int> fresh ← items
+    fresh.append(5)
+    return fresh.length()
 }
 
 fn bump(copy Counter c) → int {

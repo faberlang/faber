@@ -18,8 +18,8 @@ use radix_hir::{HirCallArg, HirExpression, HirExpressionKind};
 use radix_intrinsics::{
     CatalogGenericDefault, CatalogGenericParam, IntrinsicMirKind, IntrinsicParamKind,
     IntrinsicReceiver, IntrinsicReturnKind, MethodIntrinsic, is_mutating_receiver,
-    is_numeric_bitwise_operator, is_numeric_imperativus_operator, lookup_method,
-    lookup_method_for_type, lookup_method_named, receivers_for_type,
+    is_numeric_bitwise_operator, lookup_method, lookup_method_for_type, lookup_method_named,
+    receivers_for_type,
 };
 use radix_lexer::Symbol;
 
@@ -374,10 +374,16 @@ pub(super) fn check_intrinsic_method_call(
         );
     }
 
-    // WHY: tensor elementwise `subtrahe`/`multiplica` share names with numeric
-    // imperativus ops but return `SameAsReceiver`; only `Vacuum` returns mutate.
-    if is_numeric_imperativus_operator(effective_name)
-        && matches!(entry.return_kind, IntrinsicReturnKind::Vacuum)
+    // A mutating intrinsic (registry `is_mutating_receiver`: Vacuum returns,
+    // in-place collection ops, atomic exchange) rewrites its receiver's
+    // contents in place, so a direct path to an immutable binding is rejected
+    // like a reassignment. Tensor elementwise `subtrahe`/`multiplica` share
+    // names with the numeric imperativus ops but return `SameAsReceiver`, so
+    // the registry predicate alone is the gate. Non-path receivers keep the
+    // shallow mutability-engine D-1 behavior: a `fixum` field's contents stay
+    // mutable through calls.
+    if matches!(receiver.kind, HirExpressionKind::Path(_))
+        && is_mutating_receiver(entry)
         && !checker.path_binding_is_mutable(receiver)
     {
         checker.error_issue(

@@ -106,11 +106,11 @@ functio stack_iter(stack<textus, 2> s) → vacuum {
 #[test]
 fn queue_and_stack_empty_pop_recover_with_coalesce_without_a_handler() {
     crate::test_support::assert_accepts(
-        r#"functio queue_recover(queue<numerus, 2> q) → numerus {
+        r#"functio queue_recover(in queue<numerus, 2> q) → numerus {
     redde q.decapita() vel 0
 }
 
-functio stack_recover(stack<textus, 2> s) → textus {
+functio stack_recover(in stack<textus, 2> s) → textus {
     redde s.detrahe() vel "empty"
 }"#,
     );

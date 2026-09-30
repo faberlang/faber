@@ -37,7 +37,7 @@ main {
     stock["pear"] ← 3
     stock["apple"] ← 5
     stock["fig"] ← 1
-    const list<string> rows ← empty
+    var list<string> rows ← empty
     for from stock at [name] const count {
         rows.append("§=§"(name, count))
     }

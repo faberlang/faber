@@ -60,7 +60,7 @@ static int SUMMA_QUADRATORUM = comptime {
 
 # A collection built at build time.
 static list<int> PRIMI = comptime {
-    const list<int> found ← empty
+    var list<int> found ← empty
     for range 2‥30 const n {
         var bool isPrime ← true
         for range 2 ‥ n const d {

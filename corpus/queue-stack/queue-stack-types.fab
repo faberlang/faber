@@ -73,12 +73,15 @@ fn stack_iteration(stack<int> input) → void {
 }
 
 # Empty pop is T ∪ null, so coalesce recovers a value instead of entering ⇥.
+# The in-place pop lands on a local copy, like the C2 walkers above.
 fn queue_pop_recover(queue<int> input) → int {
-    return input.remove_first() coalesce 0
+    var queue<int> q ← input
+    return q.remove_first() coalesce 0
 }
 
 fn stack_pop_recover(stack<int> input) → int {
-    return input.remove_last() coalesce 0
+    var stack<int> s ← input
+    return s.remove_last() coalesce 0
 }
 
 # =============================================================================

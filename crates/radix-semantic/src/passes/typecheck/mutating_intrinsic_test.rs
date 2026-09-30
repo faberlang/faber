@@ -1,0 +1,110 @@
+//! In-place mutating intrinsics against the binding modifier (tcs1).
+//!
+//! A mutating intrinsic (`is_mutating_receiver` in the registry) rewrites its
+//! receiver's contents in place. On a direct path to an immutable (`fixum`)
+//! binding it is rejected like a reassignment (SEM020,
+//! `imperativus_operator_method_requires_varia_receiver`); WARN013 agrees, so
+//! a `varia` that only feeds mutating intrinsics stays necessary. Non-path
+//! receivers keep the shallow mutability-engine D-1 behavior: a `fixum`
+//! field's list contents stay mutable through calls.
+//!
+//! Fixtures use latin spellings because the radix unit-test harness compiles
+//! bare source without the en-locale lex pack.
+
+use crate::test_support;
+use crate::{SemanticErrorKind, WarningKind};
+
+const ISSUE: &str = "imperativus_operator_method_requires_varia_receiver";
+
+fn rejects_with_mutating_receiver_issue(source: &str) {
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ImmutableAssignment)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM020 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+fn warns_unnecessary_varia(source: &str) -> bool {
+    let result = test_support::analyze_source(source);
+    result.diagnostics.iter().any(|diag| {
+        matches!(
+            diag.kind,
+            SemanticErrorKind::Warning(WarningKind::UnnecessaryVaria)
+        )
+    })
+}
+
+#[test]
+fn fixum_list_ordina_is_rejected() {
+    rejects_with_mutating_receiver_issue(
+        "incipit {\n    fixum lista<numerus> xs ← [3, 1, 2]\n    xs.ordina()\n}",
+    );
+}
+
+#[test]
+fn fixum_list_appende_is_rejected() {
+    rejects_with_mutating_receiver_issue(
+        "incipit {\n    fixum lista<numerus> xs ← [3, 1, 2]\n    xs.appende(4)\n}",
+    );
+}
+
+#[test]
+fn fixum_numerus_adde_still_rejected() {
+    rejects_with_mutating_receiver_issue(
+        "incipit {\n    fixum numerus n ← 1\n    n.adde(2)\n    nota n\n}",
+    );
+}
+
+#[test]
+fn varia_list_only_sorted_still_needs_varia() {
+    let source =
+        "incipit {\n    varia lista<numerus> ys ← [3, 1, 2]\n    ys.ordina()\n    nota ys\n}";
+    let result = test_support::analyze_source(source);
+    assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
+    assert!(
+        !warns_unnecessary_varia(source),
+        "in-place ordina is a mutation; WARN013 must stay silent: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn varia_list_only_appended_still_needs_varia() {
+    let source =
+        "incipit {\n    varia lista<numerus> ys ← [3, 1, 2]\n    ys.appende(4)\n    nota ys\n}";
+    let result = test_support::analyze_source(source);
+    assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
+    assert!(
+        !warns_unnecessary_varia(source),
+        "in-place appende is a mutation; WARN013 must stay silent: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn varia_list_never_mutated_still_warns() {
+    let source = "incipit {\n    varia lista<numerus> zs ← [3, 1, 2]\n    nota zs\n}";
+    assert!(warns_unnecessary_varia(source));
+}
+
+#[test]
+fn fixum_list_value_returning_twin_stays_accepted() {
+    // `addita` is the Perfectum twin (AppendImmutable): it yields a new list
+    // and leaves the receiver alone, so a `fixum` receiver stays legal.
+    test_support::assert_accepts(
+        "incipit {\n    fixum lista<numerus> xs ← [3, 1, 2]\n    nota xs.addita(4)\n}",
+    );
+}
+
+#[test]
+fn fixum_field_list_contents_stay_mutable() {
+    // Shallow D-1: the receiver is a field place, so the binding-modifier rule
+    // does not reach it.
+    test_support::assert_accepts(
+        "genus Punctum {\n    fixum lista<numerus> xs\n}\n\n\
+         incipit {\n    varia Punctum p ← Punctum { xs = [] }\n    p.xs.appende(3)\n    nota p.xs\n}",
+    );
+}

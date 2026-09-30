@@ -39,7 +39,7 @@ locale = "en"
 # BACKEND:
 #   Package and probe targets reject until atomic storage ABI lowering exists.
 
-fn atomic_ops(atomic<int<i32>> cell, int<i32> value) → bool {
+fn atomic_ops(mut atomic<int<i32>> cell, int<i32> value) → bool {
     const int<i32> loaded ← cell.load()
     cell.store(value)
     const int<i32> old ← cell.exchange(loaded)

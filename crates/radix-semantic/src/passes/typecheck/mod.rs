@@ -100,6 +100,9 @@ pub mod extremum;
 #[cfg(test)]
 #[path = "field_modifier_write_test.rs"]
 mod field_modifier_write_test;
+#[cfg(test)]
+#[path = "mutating_intrinsic_test.rs"]
+mod mutating_intrinsic_test;
 
 mod closing;
 #[cfg(test)]
