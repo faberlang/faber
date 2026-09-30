@@ -971,10 +971,13 @@ function f0 -> ty#1 {
 fn lowers_postfix_increment_and_decrement() {
     let dump = dump_source("functio computa() → numerus { varia numerus x ← 1 x ↑ x ↓ redde x }");
 
+    // The successor lands through the slot's checked store (cap2, ruling 17).
     assert!(dump.contains("%0 = _0 + const int 1: ty#1"));
-    assert!(dump.contains("_0 = %0: ty#1"));
-    assert!(dump.contains("%1 = _0 - const int 1: ty#1"));
+    assert!(dump.contains("%1 = runtime convert runtime ty#1 -> ty#1(%0) -> ty#1"));
     assert!(dump.contains("_0 = %1: ty#1"));
+    assert!(dump.contains("%2 = _0 - const int 1: ty#1"));
+    assert!(dump.contains("%3 = runtime convert runtime ty#1 -> ty#1(%2) -> ty#1"));
+    assert!(dump.contains("_0 = %3: ty#1"));
 }
 
 #[test]

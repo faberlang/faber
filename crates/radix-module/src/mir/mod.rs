@@ -237,6 +237,9 @@ mod conversio_function_tests;
 #[path = "copy_duplicate_test.rs"]
 mod copy_duplicate_tests;
 #[cfg(test)]
+#[path = "decimal_projection_compare_test.rs"]
+mod decimal_projection_compare_tests;
+#[cfg(test)]
 #[path = "device_test.rs"]
 mod device_tests;
 #[cfg(test)]
@@ -245,6 +248,9 @@ mod exact_integer_tests;
 #[cfg(test)]
 #[path = "implicit_store_test.rs"]
 mod implicit_store_tests;
+#[cfg(test)]
+#[path = "inc_dec_store_test.rs"]
+mod inc_dec_store_tests;
 #[cfg(test)]
 #[path = "inference_blocker_matrix_test.rs"]
 mod inference_blocker_matrix_tests;

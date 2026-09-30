@@ -2410,12 +2410,11 @@ impl<'a> FunctionBuilder<'a> {
     /// trapping `numerus`, a `wrapping` or a `saturating` word.
     fn is_integer_store_slot(&self, ty: MirType) -> bool {
         match self.normalized_type(self.types.peel_access_marker(ty.semantic_id()).1) {
-            // An `i64`/`u64` slot needs no node: the exact successor is stored
-            // and the runner guards a value past `i64::MAX` at the signed slot.
-            Type::ModularWord(_) | Type::SaturatingWord(_) => true,
-            Type::SizedNumeric(Primitive::Numerus, width) => {
-                width.integer_range().is_some() && *width != NumericWidth::I64
-            }
+            // Every integer slot takes the node: at the cap the exact successor
+            // (`i64::MAX + 1`) is a value the carrier holds, so only the store
+            // check keeps it out of an `i64` slot (ruling 17).
+            Type::ModularWord(_) | Type::SaturatingWord(_) | Type::Primitive(Primitive::Numerus) => true,
+            Type::SizedNumeric(Primitive::Numerus, width) => width.integer_range().is_some(),
             _ => false,
         }
     }
@@ -3562,13 +3561,24 @@ impl<'a> FunctionBuilder<'a> {
             let r = self.typed_decimal_operand(rhs, r)?;
             return Some((l, r));
         };
-        let lhs = self.lower_join_operand(lhs, lhs_ty, target_ty)?;
-        let rhs = self.lower_join_operand(rhs, rhs_ty, target_ty)?;
+        let (lhs_expr, rhs_expr) = (lhs, rhs);
+        let lhs = self.lower_join_operand(lhs_expr, lhs_ty, target_ty)?;
+        let rhs = self.lower_join_operand(rhs_expr, rhs_ty, target_ty)?;
+        // An operand already at the join type is read as it is; type it too.
+        let lhs = self.typed_decimal_operand(lhs_expr, lhs)?;
+        let rhs = self.typed_decimal_operand(rhs_expr, rhs)?;
         Some((lhs, rhs))
     }
 
     fn typed_decimal_operand(&mut self, expr: &HirExpression, operand: MirOperand) -> Option<MirOperand> {
-        if !matches!(operand, MirOperand::Constant(_)) {
+        // A projected place (`xs[0]`, `p.x`, `t[0]`) carries no type of its own
+        // either, so it is read into a typed temp like a constant.
+        let untyped = match &operand {
+            MirOperand::Constant(_) => true,
+            MirOperand::Place(place) => !place.projections.is_empty(),
+            _ => false,
+        };
+        if !untyped {
             return Some(operand);
         }
         let ty = self.expr_ty(expr)?;
