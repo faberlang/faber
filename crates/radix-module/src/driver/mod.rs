@@ -4293,3 +4293,7 @@ mod amd_target_tests;
 #[cfg(test)]
 #[path = "closure_shared_capture_test.rs"]
 mod closure_shared_capture_tests;
+
+#[cfg(test)]
+#[path = "print_text_kind_test.rs"]
+mod print_text_kind_tests;

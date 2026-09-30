@@ -46,8 +46,19 @@ pub type FieldFloatWidths = FxHashMap<(DefId, Symbol), NumericWidth>;
 /// (`Pulsus`, `Nuntius.Pulsus`), from MIR validation metadata (D2.8).
 pub type DisplayNames = FxHashMap<DefId, String>;
 
+/// Struct and variant fields whose declared type is (or holds, through
+/// collections and options) a `littera`, keyed by `(def, field)`. Display
+/// quotes such a value as a char (`'q'`); every other text, including every
+/// `ascii` / `ascii<N>`, quotes as text (`"q"`). The static type decides, never
+/// the value: a `'q'` literal reaches the runner as [`Value::Ascii`] whether
+/// its slot is a `littera`, an `ascii<1>` or an unbounded `ascii` (pr4).
+pub type FieldCharSet = FxHashSet<(DefId, Symbol)>;
+
 static NO_FLOAT_WIDTHS: std::sync::LazyLock<FieldFloatWidths> =
     std::sync::LazyLock::new(FxHashMap::default);
+
+static NO_CHAR_FIELDS: std::sync::LazyLock<FieldCharSet> =
+    std::sync::LazyLock::new(FxHashSet::default);
 
 static NO_DISPLAY_NAMES: std::sync::LazyLock<DisplayNames> =
     std::sync::LazyLock::new(FxHashMap::default);
@@ -60,6 +71,12 @@ pub struct FieldOrder<'a> {
     pub structs: &'a StructFieldOrder,
     pub variants: &'a StructFieldOrder,
     pub float_widths: &'a FieldFloatWidths,
+    /// Fields whose declared type holds a `littera` (see [`FieldCharSet`]).
+    pub char_fields: &'a FieldCharSet,
+    /// The value being shown holds a `littera` per its static type, so an
+    /// ascii-carried element prints as a char literal. Reset per field inside a
+    /// construction literal, where the field's declared type decides.
+    pub char_text: bool,
     pub names: &'a DisplayNames,
     /// The value is shown through a `valor`/`json` static type: a dynamic
     /// carrier displays as a JSON-shaped object, not a construction literal.
@@ -75,6 +92,8 @@ impl<'a> FieldOrder<'a> {
             structs,
             variants,
             float_widths: &NO_FLOAT_WIDTHS,
+            char_fields: &NO_CHAR_FIELDS,
+            char_text: false,
             names: &NO_DISPLAY_NAMES,
             dynamic: false,
         }
@@ -90,6 +109,21 @@ impl<'a> FieldOrder<'a> {
     #[must_use]
     pub fn with_dynamic(self, dynamic: bool) -> Self {
         Self { dynamic, ..self }
+    }
+
+    /// The same metadata with the declared `littera` fields attached.
+    #[must_use]
+    pub fn with_char_fields(self, char_fields: &'a FieldCharSet) -> Self {
+        Self {
+            char_fields,
+            ..self
+        }
+    }
+
+    /// The same metadata for a value whose static type holds a `littera`.
+    #[must_use]
+    pub fn with_char_text(self, char_text: bool) -> Self {
+        Self { char_text, ..self }
     }
 }
 
@@ -720,7 +754,10 @@ fn display_construction(
                 .copied()
                 .or(inherited)
         });
-        let val_str = display_element(value, interner, order, span, width)?;
+        // The field's declared type decides char vs text quoting; nothing is
+        // inherited from the enclosing value.
+        let field_order = order.with_char_text(order.char_fields.contains(&(def, *symbol)));
+        let val_str = display_element(value, interner, field_order, span, width)?;
         parts.push(format!("{field} = {val_str}"));
     }
     if parts.is_empty() {
@@ -734,8 +771,8 @@ fn display_construction(
 }
 
 /// A value inside a composite (list element or construction-literal field):
-/// text prints double-quoted and char / one-byte ascii single-quoted, as in
-/// source; everything else renders as it does in a collection. A value shown
+/// text and every `ascii` print double-quoted and a `littera` single-quoted, as
+/// in source (the static type decides, see [`FieldCharSet`]); everything else renders as it does in a collection. A value shown
 /// through a dynamic `valor`/`json` carrier keeps the unquoted JSON-shaped
 /// form.
 fn display_element(
@@ -750,10 +787,11 @@ fn display_element(
     }
     match value {
         Value::Str(text) => Ok(format!("{text:?}")),
-        // A one-byte ascii value is the widened single-quoted literal (`'q'`),
-        // which is also how a `littera` literal reaches the runner (D10.5), so
-        // both print as the char literal; longer ascii text is a `Str`.
-        Value::Ascii(byte) => Ok(format!("{:?}", char::from(*byte))),
+        // An ascii-carried value is a `littera` only when its static type says
+        // so (a `'q'` literal reaches the runner as `Ascii` whichever slot it
+        // fills); otherwise it is text, however short (D10.5).
+        Value::Ascii(byte) if order.char_text => Ok(format!("{:?}", char::from(*byte))),
+        Value::Ascii(byte) => Ok(format!("{:?}", char::from(*byte).to_string())),
         Value::Char(ch) => Ok(format!("{ch:?}")),
         Value::SharedCell(cell) => {
             display_element(&cell.borrow(), interner, order, span, float_width)
@@ -1525,6 +1563,7 @@ pub fn format_template(
     template: &str,
     args: &[Value],
     widths: &[Option<NumericWidth>],
+    char_text: &[bool],
     interner: &Interner,
     order: FieldOrder<'_>,
     span: Span,
@@ -1555,7 +1594,8 @@ pub fn format_template(
             .get(arg_index)
             .map(|arg| {
                 let width = widths.get(arg_index).copied().flatten();
-                arg.display_typed(interner, order, span, width)
+                let chars = char_text.get(arg_index).copied().unwrap_or(false);
+                arg.display_typed(interner, order.with_char_text(chars), span, width)
             })
             .transpose()?
             .unwrap_or_else(|| format!("§{index}"));

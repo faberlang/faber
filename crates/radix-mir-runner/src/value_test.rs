@@ -554,7 +554,16 @@ fn composites_quote_text_chars_and_ascii_but_top_level_scalars_do_not() {
         show(&list(vec![Value::Char('x'), Value::Char('y')])),
         "['x', 'y']"
     );
-    assert_eq!(show(&list(vec![Value::Ascii(b'k')])), "['k']");
+    // An ascii-carried value is text unless its static type is a `littera`
+    // (pr4): the byte count never decides.
+    assert_eq!(show(&list(vec![Value::Ascii(b'k')])), r#"["k"]"#);
+    let chars = order.with_char_text(true);
+    assert_eq!(
+        list(vec![Value::Ascii(b'k'), Value::Char('z')])
+            .display(&fx.interner, chars, Span::default())
+            .unwrap(),
+        "['k', 'z']"
+    );
     assert_eq!(
         show(&list(vec![list(vec![text("n")]), list(Vec::new())])),
         r#"[["n"], []]"#
@@ -673,6 +682,7 @@ fn f32_interpolation_matches_print_at_declared_width() {
         "§",
         &[value.clone()],
         &[Some(NumericWidth::F32)],
+        &[false],
         &interner,
         order,
         Span::default(),
@@ -682,7 +692,16 @@ fn f32_interpolation_matches_print_at_declared_width() {
     // f64 (undeclared width) keeps full digits; integral f32 keeps `N.0`.
     assert_eq!(display_float_at_width(5.0, Some(NumericWidth::F32)), "5.0");
     assert_eq!(
-        format_template("§", &[value], &[None], &interner, order, Span::default()).unwrap(),
+        format_template(
+            "§",
+            &[value],
+            &[None],
+            &[false],
+            &interner,
+            order,
+            Span::default()
+        )
+        .unwrap(),
         "66.66666412353516"
     );
 }
@@ -699,11 +718,9 @@ fn f32_struct_field_and_list_display_at_declared_width() {
     let mut names = DisplayNames::default();
     names.insert(def, "Mensura".to_owned());
     let order = FieldOrder {
-        structs: &structs,
-        variants: &variants,
         float_widths: &widths,
         names: &names,
-        dynamic: false,
+        ..FieldOrder::new(&structs, &variants)
     };
     let value = Value::Float(f64::from(200.0_f32 / 3.0_f32));
     let strukt = Value::Struct(def, field_map(&[(field, value.clone())]));
@@ -749,11 +766,9 @@ fn d64_display_threads_through_lists_fields_and_templates() {
     let mut names = DisplayNames::default();
     names.insert(def, "Pretium".to_owned());
     let order = FieldOrder {
-        structs: &structs,
-        variants: &variants,
         float_widths: &widths,
         names: &names,
-        dynamic: false,
+        ..FieldOrder::new(&structs, &variants)
     };
     let carrier = Value::Int(420_000_000);
     let strukt = Value::Struct(def, field_map(&[(field, carrier.clone())]));
@@ -775,6 +790,7 @@ fn d64_display_threads_through_lists_fields_and_templates() {
             "§ / §",
             &[carrier, Value::Dec(25, 9)],
             &[Some(NumericWidth::D64), Some(NumericWidth::D64)],
+            &[false, false],
             &interner,
             order,
             Span::default()
@@ -895,4 +911,57 @@ fn signed_wrapping_reduction_maps_out_of_range_values_into_the_ring() {
         &modular_word_result(-1, NumericWidth::U8),
         &Value::Int(255)
     ));
+}
+
+#[test]
+fn ascii_carried_fields_quote_by_declared_type_not_by_width() {
+    // pr4: `'q'` reaches the runner as `Ascii` whether its slot is a `littera`,
+    // an `ascii<1>` or an unbounded `ascii`. Only the declared `littera` field
+    // (and a list of them) prints as a char; every other ascii prints as text.
+    let mut interner = radix_lexer::Interner::new();
+    let (c, u, cs, us) = (
+        interner.intern("c"),
+        interner.intern("u"),
+        interner.intern("cs"),
+        interner.intern("us"),
+    );
+    let def = radix_hir::DefId(5201);
+    let mut structs = StructFieldOrder::default();
+    structs.insert(def, vec![c, u, cs, us]);
+    let variants = StructFieldOrder::default();
+    let mut names = DisplayNames::default();
+    names.insert(def, "Rec".to_owned());
+    let mut char_fields = FieldCharSet::default();
+    char_fields.insert((def, c));
+    char_fields.insert((def, cs));
+    let order = FieldOrder::new(&structs, &variants)
+        .with_names(&names)
+        .with_char_fields(&char_fields);
+    let list = |items: Vec<Value>| Value::Array(std::rc::Rc::new(std::cell::RefCell::new(items)));
+    let value = Value::Struct(
+        def,
+        field_map(&[
+            (c, Value::Ascii(b'q')),
+            (u, Value::Ascii(b'q')),
+            (cs, list(vec![Value::Ascii(b'x')])),
+            (us, list(vec![Value::Ascii(b'x'), text("abc")])),
+        ]),
+    );
+    assert_eq!(
+        value.display(&interner, order, Span::default()).unwrap(),
+        r#"Rec { c = 'q', u = "q", cs = ['x'], us = ["x", "abc"] }"#
+    );
+    // A nested genus resets the kind: its own fields decide.
+    let outer = interner.intern("outer");
+    let outer_def = radix_hir::DefId(5202);
+    structs.insert(outer_def, vec![outer]);
+    names.insert(outer_def, "Outer".to_owned());
+    let order = FieldOrder::new(&structs, &variants)
+        .with_names(&names)
+        .with_char_fields(&char_fields);
+    let nested = Value::Struct(outer_def, field_map(&[(outer, value)]));
+    assert_eq!(
+        nested.display(&interner, order, Span::default()).unwrap(),
+        r#"Outer { outer = Rec { c = 'q', u = "q", cs = ['x'], us = ["x", "abc"] } }"#
+    );
 }

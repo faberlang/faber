@@ -115,7 +115,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let float_width = self.operand_float_width(arg);
                 let order = self
                     .field_order()
-                    .with_dynamic(self.operand_is_dynamic(arg));
+                    .with_dynamic(self.operand_is_dynamic(arg))
+                    .with_char_text(self.operand_holds_littera(arg));
                 let text = value.display_typed(self.interner, order, span, float_width)?;
                 self.host.scribe(*kind, &text)?;
                 Ok(Value::Unit)
@@ -134,10 +135,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .iter()
                     .map(|arg| self.operand_float_width(arg))
                     .collect();
+                let char_text: Vec<_> = call
+                    .args
+                    .iter()
+                    .map(|arg| self.operand_holds_littera(arg))
+                    .collect();
                 Ok(Value::Str(format_template(
                     template_text,
                     &args,
                     &widths,
+                    &char_text,
                     self.interner,
                     self.field_order(),
                     span,

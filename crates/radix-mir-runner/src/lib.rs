@@ -302,6 +302,9 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     conversation_slots: Rc<sermo::ConversationSlots>,
     /// Declared non-f64 float widths of struct fields, for width-aware display.
     field_float_widths: value::FieldFloatWidths,
+    /// Struct and variant fields holding a `littera`, so display quotes them
+    /// as chars and every other ascii-carried text as text (pr4).
+    field_char_set: value::FieldCharSet,
 }
 
 impl<'a, H: Host + ?Sized> Runner<'a, H> {
@@ -324,6 +327,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             }
         }
         let field_float_widths = index_field_float_widths(context, types);
+        let field_char_set = index_field_char_set(context, types);
         Self {
             function_index: program.function_index(),
             program,
@@ -351,6 +355,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             next_conversation_id: 0,
             conversation_slots: Rc::default(),
             field_float_widths,
+            field_char_set,
         }
     }
 
@@ -361,6 +366,8 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             structs: &self.context.struct_field_order,
             variants: &self.context.variant_field_order,
             float_widths: &self.field_float_widths,
+            char_fields: &self.field_char_set,
+            char_text: false,
             names: &self.context.display_names,
             dynamic: false,
         }
@@ -403,6 +410,46 @@ fn dynamic_display_type(ty: TypeId, types: &TypeTable, depth: u8) -> bool {
         }
         _ => false,
     }
+}
+
+/// Whether `ty` is (or holds, through collections and options) a `littera`:
+/// such a value prints as a char literal inside a composite, where any other
+/// ascii-carried text prints double-quoted.
+fn holds_littera(ty: TypeId, types: &TypeTable, depth: u8) -> bool {
+    if depth > 8 {
+        return false;
+    }
+    match types.get(ty) {
+        Type::Primitive(Primitive::Littera) => true,
+        Type::Map(_, elem) | Type::Option(elem) => holds_littera(*elem, types, depth + 1),
+        Type::Queue(elem) | Type::Stack(elem) => holds_littera(*elem, types, depth + 1),
+        Type::Vector(elem, _)
+        | Type::Matrix(elem, _)
+        | Type::Tensor(elem, _)
+        | Type::Sparsa(elem, _)
+        | Type::Array(elem)
+        | Type::BoundedArray { element: elem, .. } => holds_littera(*elem, types, depth + 1),
+        _ => false,
+    }
+}
+
+fn index_field_char_set(
+    context: &MirValidationContext<'_>,
+    types: &TypeTable,
+) -> value::FieldCharSet {
+    let mut set = FxHashSet::default();
+    let owners = context
+        .struct_fields
+        .iter()
+        .chain(context.variant_fields.iter());
+    for (def, fields) in owners {
+        for (name, ty) in fields {
+            if holds_littera(ty.semantic_id(), types, 0) {
+                set.insert((*def, *name));
+            }
+        }
+    }
+    set
 }
 
 fn index_field_float_widths(
@@ -1565,6 +1612,13 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     fn operand_is_dynamic(&self, operand: &MirOperand) -> bool {
         self.operand_static_type(operand)
             .is_some_and(|ty| dynamic_display_type(ty, self.types, 0))
+    }
+
+    /// Whether a diagnostic operand's static type is (or holds) a `littera`,
+    /// so its ascii-carried elements print as chars rather than text.
+    fn operand_holds_littera(&self, operand: &MirOperand) -> bool {
+        self.operand_static_type(operand)
+            .is_some_and(|ty| holds_littera(ty, self.types, 0))
     }
 
     /// Static semantic type of an operand, resolving field and element

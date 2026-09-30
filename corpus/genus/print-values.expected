@@ -1,5 +1,5 @@
-Rec { ok = verum, opt = 3, c = 'q', a = "abc", names = ["a", "b"], price = 0.1, ratio = 0.1 }
-Rec { ok = falsum, opt = nihil, c = 'z', a = "xyz", names = [], price = 2, ratio = 0.25 }
+Rec { ok = verum, opt = 3, c = 'q', a = "abc", u = "q", names = ["a", "b"], price = 0.1, ratio = 0.1 }
+Rec { ok = falsum, opt = nihil, c = 'z', a = "xyz", u = "z", names = [], price = 2, ratio = 0.25 }
 Vacuus {}
 Node.Leaf { v = 1 }
 Node.Finis
@@ -9,9 +9,11 @@ Shape.Dot { kind = 1 }
 Shape.Circle { kind = 2, r = 1.5 }
 ["a", "b"]
 ['x', 'y']
+["q", "abc"]
 [0, 1, 2]
 [verum, falsum]
 hello
+q
 q
 7
 verum

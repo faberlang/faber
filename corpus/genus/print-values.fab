@@ -17,8 +17,11 @@ locale = "en"
 #   • A composite prints its construction literal and a scalar prints its
 #     value: `print "hello"` shows `hello`, but a text inside a composite is
 #     quoted as in source (`["a", "b"]`, `names = ["a", "b"]`).
-#   • Chars and ascii texts are quoted inside a composite too: `c = 'q'`,
-#     `a = "abc"` (an ascii text prints like a textus); at the top level `print 'q'` shows `q`.
+#   • Chars and ascii texts are quoted inside a composite too: a `char` is
+#     single-quoted (`c = 'q'`) and every `ascii` is double-quoted like a
+#     textus (`a = "abc"`, and a one-character `u = "q"` the same, since
+#     `ascii<1>` is text and not the char type); the declared type decides the
+#     quotes, never the length. At the top level `print 'q'` shows `q`.
 #   • An absent optional field prints `nihil`; a present one prints its bare
 #     value (`opt = 3`); booleans print `verum` and `falsum`.
 #   • A `generis` static is not part of the construction literal.
@@ -46,6 +49,7 @@ class Rec {
     var int ∪ none opt
     var char c
     var ascii a
+    var ascii u
     var list<string> names
     var int<d64> price
     var f32 ratio
@@ -83,10 +87,10 @@ union Shape {
 }
 
 main {
-    const Rec r ← Rec { ok = true, opt = 3, c = 'q', a = 'abc', names = ["a", "b"], price = 0.1, ratio = 0.1 }
+    const Rec r ← Rec { ok = true, opt = 3, c = 'q', a = 'abc', u = 'q', names = ["a", "b"], price = 0.1, ratio = 0.1 }
     print r
 
-    const Rec e ← Rec { ok = false, opt = nihil, c = 'z', a = 'xyz', names = [], price = 2.0, ratio = 0.25 }
+    const Rec e ← Rec { ok = false, opt = nihil, c = 'z', a = 'xyz', u = 'z', names = [], price = 2.0, ratio = 0.25 }
     print e
 
     print Vacuus {}
@@ -110,6 +114,8 @@ main {
     print words
     const list<char> letters ← ['x', 'y']
     print letters
+    const list<ascii> marks ← ['q', 'abc']
+    print marks
     const list<int> numbers ← [0, 1, 2]
     print numbers
     const list<bool> flags ← [true, false]
@@ -117,6 +123,8 @@ main {
 
     print "hello"
     print 'q'
+    const ascii one ← 'q'
+    print one
     print 7
     print true
 }
