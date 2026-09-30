@@ -470,3 +470,7 @@ pub fn is_atomic_operator_method(method: &str) -> bool {
 #[cfg(test)]
 #[path = "catalog_invariants_test.rs"]
 mod catalog_invariants_tests;
+
+#[cfg(test)]
+#[path = "tensor_math_test.rs"]
+mod tensor_math_tests;

@@ -318,6 +318,13 @@ pub enum MirCollectionOp {
     TensorSsmScan,
     TensorDiv,
     TensorNeg,
+    /// Elementwise built-in math function lifted over a tensor (gpu-reset
+    /// rule 15, K5): `[x]` → a tensor of the receiver's shape. Each element
+    /// is the scalar function of the same name. Values are IEEE 754 per
+    /// element: a domain miss is NaN, an overflow is infinity, and the result
+    /// is stored under the result element type. This is NOT the trapping
+    /// device-domain policy of the MIR unary `Exp`/`Sqrt`/`Log` ops.
+    TensorMath(MirTensorMath),
     /// Gaussian Error Linear Unit using the tanh approximation:
     /// 0.5*x*(1+tanh(√(2/π)*(x+0.044715*x³))). Error < 1e-6 vs exact Gelu.
     /// Elementwise unary activation on tensor values. All finite f32 inputs valid.
@@ -360,6 +367,89 @@ pub enum MirCollectionOp {
     /// Cord walk: `ascii.cursor()` / later `textus.cursor()` → `cursor<ascii<1>>`.
     /// One buffer of one-byte ascii values; not a per-step heap slice.
     CordCursor,
+}
+
+/// The built-in unary math functions lifted elementwise over a tensor
+/// (gpu-reset rule 15). One member per scalar built-in math function; the
+/// scalar meaning of each is the per-element meaning.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum MirTensorMath {
+    /// `absolutum` (en `abs`): magnitude. Integer elements are exact.
+    Abs,
+    /// `radix` (en `sqrt`): square root. `sqrt(x < 0)` is NaN.
+    Sqrt,
+    /// `exponentia` (en `exp`): `e^x`. Overflow is infinity.
+    Exp,
+    /// `logarithmus` (en `ln`): natural logarithm. `ln(0)` is `-inf`,
+    /// `ln(x < 0)` is NaN.
+    Ln,
+    /// `logarithmus_decimalis` (en `log10`): base-10 logarithm.
+    Log10,
+    /// `sinus` (en `sin`).
+    Sin,
+    /// `cosinus` (en `cos`).
+    Cos,
+    /// `tangens` (en `tan`).
+    Tan,
+}
+
+impl MirTensorMath {
+    /// Every lifted function, in catalog order.
+    pub const ALL: [Self; 8] = [
+        Self::Abs,
+        Self::Sqrt,
+        Self::Exp,
+        Self::Ln,
+        Self::Log10,
+        Self::Sin,
+        Self::Cos,
+        Self::Tan,
+    ];
+
+    /// Stable lowercase name used by MIR dumps and target import names.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Abs => "abs",
+            Self::Sqrt => "sqrt",
+            Self::Exp => "exp",
+            Self::Ln => "ln",
+            Self::Log10 => "log10",
+            Self::Sin => "sin",
+            Self::Cos => "cos",
+            Self::Tan => "tan",
+        }
+    }
+
+    /// The canonical Latin method name of the function (the registry key).
+    #[must_use]
+    pub const fn latin_name(self) -> &'static str {
+        match self {
+            Self::Abs => "absolutum",
+            Self::Sqrt => "radix",
+            Self::Exp => "exponentia",
+            Self::Ln => "logarithmus",
+            Self::Log10 => "logarithmus_decimalis",
+            Self::Sin => "sinus",
+            Self::Cos => "cosinus",
+            Self::Tan => "tangens",
+        }
+    }
+
+    /// The function a canonical Latin method name spells, if any.
+    #[must_use]
+    pub fn from_latin_name(name: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|function| function.latin_name() == name)
+    }
+
+    /// Whether the function is defined only on floating-point elements
+    /// (everything except `abs`, which also accepts integers).
+    #[must_use]
+    pub const fn float_only(self) -> bool {
+        !matches!(self, Self::Abs)
+    }
 }
 
 impl MirCollectionOp {

@@ -438,7 +438,12 @@ fn probe(source: &str, session: &Session) -> ProbeOutcome {
                 lower.contains("method")
                     || lower.contains("intrinsic")
                     || d.args.iter().any(|a| {
-                        a.value.contains("method") || a.value.contains("intrinsic") || a.value.contains("bitwise")
+                        a.value.contains("method")
+                            || a.value.contains("intrinsic")
+                            || a.value.contains("bitwise")
+                            // K5: the float-only lifted math rows reject integer
+                            // tensor dtypes at the element gate.
+                            || a.value == "tensor_math_float_element_required"
                     })
             });
             if mentions_method {
@@ -500,9 +505,7 @@ const AIR_LANE_CLASSES: &[&str] = &[
     // fail closed in AIR lowering today.
     "AIR.argmaxima",
     "AIR.argminima",
-    "AIR.exponentia",
-    "AIR.logarithmus",
-    "AIR.radix",
+    // K5 armed `exponentia`, `logarithmus` and `radix` as registry rows.
     "AIR.activatio_tanh",
     "AIR.summa_axis",
     "AIR.reducta",
@@ -700,7 +703,7 @@ fn bijection_ratchet_equals_probe_derived_gap_set() {
 #[test]
 fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
     // Typed enumeration (keeps the list compile-checked against the enum).
-    let all: Vec<MirCollectionOp> = vec![
+    let mut all: Vec<MirCollectionOp> = vec![
         MirCollectionOp::ArrayAdd,
         MirCollectionOp::ArraySub,
         MirCollectionOp::ArrayMul,
@@ -802,6 +805,8 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         MirCollectionOp::RegexMatches,
         MirCollectionOp::CordCursor,
     ];
+    // K5: one payload variant per lifted math function, all registry rows.
+    all.extend(radix_types::MirTensorMath::ALL.map(MirCollectionOp::TensorMath));
 
     // Permanent internal allowlist — a design fact, not a worklist.
     let permanent: &[MirCollectionOp] = &[

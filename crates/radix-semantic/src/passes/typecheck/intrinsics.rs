@@ -31,6 +31,10 @@ const ISSUE_NUMERIC_LISTA_ELEMENTS_REQUIRED: &str = "numeric_lista_elements_requ
 const ISSUE_ORDINA_KEY_NOT_ORDERED: &str = "ordina_key_not_ordered";
 const ISSUE_TENSOR_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED: &str =
     "tensor_arithmetic_numeric_element_required";
+/// K5: a lifted transcendental math function (`radix`, `exponentia`, ...)
+/// over a non-float tensor element. The scalar function takes `fractus`
+/// only, so an integer element crosses with an explicit `↦`.
+const ISSUE_TENSOR_MATH_FLOAT_ELEMENT_REQUIRED: &str = "tensor_math_float_element_required";
 const ISSUE_MATRIX_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED: &str =
     "matrix_arithmetic_numeric_element_required";
 const ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS: &str = "tensor_index_vector_integer_elements";
@@ -393,6 +397,10 @@ pub(super) fn check_intrinsic_method_call(
         return Some(checker.error_type);
     }
 
+    if !tensor_float_element_allowed(checker, entry, ctx.inner, span) {
+        return Some(checker.error_type);
+    }
+
     if !matrix_numeric_element_allowed(checker, entry, ctx.inner, span) {
         return Some(checker.error_type);
     }
@@ -595,6 +603,34 @@ fn tensor_numeric_element_allowed(
         return true;
     }
     checker.invalid_operand_types(ISSUE_TENSOR_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED, span);
+    false
+}
+
+/// The lifted float-only math functions (rule 15) take float elements.
+///
+/// The set is the registry's own: every tensor row whose MIR op is a
+/// `TensorMath` function that is float-only.
+fn tensor_float_element_allowed(
+    checker: &mut TypeChecker<'_>,
+    entry: &MethodIntrinsic,
+    inner: Option<TypeId>,
+    span: radix_lexer::Span,
+) -> bool {
+    let float_only = matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Tensor)
+        && matches!(
+            entry.mir_kind,
+            IntrinsicMirKind::Collection(radix_types::MirCollectionOp::TensorMath(function))
+                if function.float_only()
+        );
+    if !float_only {
+        return true;
+    }
+    if inner
+        .is_some_and(|inner| crate::numeric_width::is_tensor_float_element(checker.types, inner))
+    {
+        return true;
+    }
+    checker.invalid_operand_types(ISSUE_TENSOR_MATH_FLOAT_ELEMENT_REQUIRED, span);
     false
 }
 

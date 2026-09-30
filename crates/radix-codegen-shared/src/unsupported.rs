@@ -10,6 +10,8 @@ fn target_name(target: Target) -> &'static str {
         Target::HirTypeScript => "TypeScript",
         Target::HirGo => "Go",
         Target::HirSwift => "Swift",
+        Target::HirHaskell => "Haskell",
+        Target::HirPython => "Python",
         _ => "target",
     }
 }
@@ -38,6 +40,40 @@ pub fn addita_family(op: HirBinOp, target: Target) -> CodegenError {
             target_name(target)
         ),
         args: vec![DiagnosticArg::new("op", token)],
+    }
+}
+
+/// The lifted tensor math function a method call spells, when its receiver is
+/// a tensor (K5, gpu-reset rule 15). The method name is the canonical Latin
+/// registry spelling, which typecheck has already written into the HIR.
+#[must_use]
+pub fn lifted_tensor_math(
+    types: &radix_types::TypeTable,
+    receiver_ty: Option<radix_types::TypeId>,
+    method_name: &str,
+) -> Option<radix_types::MirTensorMath> {
+    let function = radix_types::MirTensorMath::from_latin_name(method_name)?;
+    let mut id = receiver_ty?;
+    loop {
+        match types.get(id) {
+            radix_types::Type::Alias(_, inner) | radix_types::Type::Ref(_, inner) => id = *inner,
+            radix_types::Type::Tensor(_, _) => return Some(function),
+            _ => return None,
+        }
+    }
+}
+
+/// Fail-closed diagnostic for a lifted tensor math function on a target with
+/// no tensor math lowering (only the MIR runner and Rust lower them).
+#[must_use]
+pub fn tensor_math_function(function: radix_types::MirTensorMath, target: Target) -> CodegenError {
+    CodegenError {
+        message: format!(
+            "tensor math function `{}` is not supported on the {} target",
+            function.name(),
+            target_name(target)
+        ),
+        args: vec![DiagnosticArg::new("function", function.name())],
     }
 }
 

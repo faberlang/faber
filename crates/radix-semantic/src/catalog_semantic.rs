@@ -714,6 +714,14 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "tensor_scalar_index_rank" => Some("use a scalar index only on rank-1 tensors".to_owned()),
         "tensor_bracket_index_integer_or_lista" => Some("use an integer scalar or lista of integer indices".to_owned()),
         "tensor_arithmetic_numeric_element_required" => Some("use numeric tensor or sparsa element types".to_owned()),
+        "tensor_math_float_element_required" => Some(
+            "convert the integer elements first with `↦` to a float tensor; only `absolutum` takes integer elements"
+                .to_owned(),
+        ),
+        "tensor_function_not_lifted" => Some(
+            "user functions are not lifted over tensors; apply the function to each element in a `filum` loop or with map, or use a built-in math method such as `abs`, `sqrt`, or `exp`"
+                .to_owned(),
+        ),
         "matrix_arithmetic_numeric_element_required" => Some("use numeric matrix element types".to_owned()),
         "tensor_receiver_structa_renamed" => Some("use seed.strue(data, shape)".to_owned()),
         "tensor_receiver_creata_type_args" => {

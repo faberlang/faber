@@ -567,6 +567,7 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorMax
             | MirCollectionOp::TensorMin
             | MirCollectionOp::TensorNeg
+            | MirCollectionOp::TensorMath(_)
             | MirCollectionOp::TensorGelu
             | MirCollectionOp::TensorRelu
             | MirCollectionOp::TensorSoftmax
@@ -1514,6 +1515,7 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorMatMul
             | MirCollectionOp::TensorDiv
             | MirCollectionOp::TensorNeg
+            | MirCollectionOp::TensorMath(_)
             | MirCollectionOp::TensorGelu
             | MirCollectionOp::TensorRelu
             | MirCollectionOp::TensorSoftmax

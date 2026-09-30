@@ -405,9 +405,8 @@ fn air_ratchet_rows_are_absent_from_the_tensor_catalog() {
         // without a row until the device lane admits them.
         "argmaxima",
         "argminima",
-        "exponentia",
-        "logarithmus",
-        "radix",
+        // K5 armed `exponentia`, `logarithmus` and `radix` as Tensor rows
+        // (the lifted math functions); they left this list with that unit.
         "activatio_tanh",
         "summa_axis",
         "reducta",

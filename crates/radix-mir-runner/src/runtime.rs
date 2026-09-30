@@ -33,7 +33,7 @@ use super::cursor::GeneratorCursor;
 use super::sermo::SermoView;
 use super::value::{
     GradientStorage, MapKey, TensorValue, Value, format_template, modular_operand,
-    modular_word_reduce, modular_word_result, uint_width_checked_add, values_equal,
+    modular_word_reduce, modular_word_result, round_float, uint_width_checked_add, values_equal,
     width_checked_add,
 };
 use super::{Runner, RunnerError, gelu_f64, host::provider_identity};
@@ -52,7 +52,8 @@ use radix_runtime_contract::tensor::{
     tensor_dim_non_negative, tensor_flat_offset, tensor_shape_element_count,
 };
 use radix_types::{
-    IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId, TypeTable, effective_width,
+    IndexExpr, IndexId, MirTensorMath, NumericWidth, Primitive, Type, TypeId, TypeTable,
+    effective_width,
 };
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
@@ -1538,6 +1539,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 self.tensor_elementwise_or_scalar(args, span, "tensor div", numeric_div, return_ty)
             }
             MirCollectionOp::TensorNeg => self.tensor_neg(args, span),
+            MirCollectionOp::TensorMath(function) => {
+                self.tensor_math(function, args, span, return_ty)
+            }
             MirCollectionOp::TensorGelu => self.tensor_gelu(args, span),
             MirCollectionOp::TensorRelu => self.tensor_relu(args, span),
             MirCollectionOp::TensorSoftmax => self.tensor_softmax(args, span),
@@ -2405,6 +2409,61 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 }
             })
         })
+    }
+
+    /// Elementwise built-in math function over a tensor (gpu-reset rule 15).
+    ///
+    /// Each element is the scalar function of the same name, IEEE 754 per
+    /// element: a domain miss is NaN, an overflow is infinity, `-0.0` and NaN
+    /// follow the libm special values. Float results are stored at the result
+    /// element width (`f32` rounds through `f32`). Integer `abs` is exact and
+    /// stored under the result element type's slot policy (the range rule
+    /// types a scalar `abs` of a non-device integer as the smallest holder).
+    fn tensor_math(
+        &mut self,
+        function: MirTensorMath,
+        args: &[MirOperand],
+        span: Span,
+        return_ty: MirType,
+    ) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(span, "tensor math arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let element = self.tensor_element_type(return_ty);
+        let width = element.and_then(|element| effective_width(self.types, element));
+        let int_width = width.unwrap_or(NumericWidth::I64);
+        let float_width = width
+            .filter(|width| width.is_float())
+            .unwrap_or(NumericWidth::F64);
+        let borrow = tensor.borrow();
+        let mut data = Vec::with_capacity(borrow.data.len());
+        for value in &borrow.data {
+            let mapped = match value {
+                Value::Float(number) => Value::Float(round_float(
+                    apply_tensor_math(function, *number),
+                    float_width,
+                )),
+                Value::Int(_) | Value::UInt(_) if function == MirTensorMath::Abs => {
+                    let exact = super::exact_int::int_value(value)
+                        .ok_or_else(|| RunnerError::internal(span, "tensor abs element"))?
+                        .abs();
+                    super::exact_int::exact_carrier(exact, int_width)
+                        .ok_or_else(|| RunnerError::internal(span, "numerus overflow"))?
+                }
+                _ => {
+                    return Err(RunnerError::internal(
+                        span,
+                        format!("tensor {} element type mismatch", function.name()),
+                    ));
+                }
+            };
+            data.push(match element {
+                Some(element) => self.store_tensor_element(element, mapped, span)?,
+                None => mapped,
+            });
+        }
+        Ok(tensor_value(data, borrow.shape.clone()))
     }
 
     fn tensor_gelu(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -4800,5 +4859,21 @@ fn format_value(
             span,
             "format_value operand not admitted by ¶",
         )),
+    }
+}
+
+/// The scalar IEEE function behind one lifted math function. Float `abs` is
+/// the sign-bit clear; the rest are the libm functions, so `sqrt(-x)` is NaN,
+/// `ln(0)` is `-inf`, and `exp` overflows to `+inf`.
+fn apply_tensor_math(function: MirTensorMath, value: f64) -> f64 {
+    match function {
+        MirTensorMath::Abs => value.abs(),
+        MirTensorMath::Sqrt => value.sqrt(),
+        MirTensorMath::Exp => value.exp(),
+        MirTensorMath::Ln => value.ln(),
+        MirTensorMath::Log10 => value.log10(),
+        MirTensorMath::Sin => value.sin(),
+        MirTensorMath::Cos => value.cos(),
+        MirTensorMath::Tan => value.tan(),
     }
 }

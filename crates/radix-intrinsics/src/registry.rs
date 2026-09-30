@@ -5,7 +5,7 @@
 //! lowering adapters; they must not grow parallel string tables for promoted
 //! intrinsics.
 
-use radix_types::{GenericParamSort, MirAtomicOp, MirCollectionOp};
+use radix_types::{GenericParamSort, MirAtomicOp, MirCollectionOp, MirTensorMath};
 
 /// Compiler-owned intrinsic receiver families.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -222,6 +222,22 @@ macro_rules! intrinsic {
             params: $params,
             return_kind: IntrinsicReturnKind::$ret,
             mir_kind: IntrinsicMirKind::Collection(MirCollectionOp::$op),
+            missing_generic_issue: None,
+            excess_generic_issue: None,
+            value_arity_issue: None,
+        }
+    };
+    ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, math $function:ident) => {
+        MethodIntrinsic {
+            receiver: IntrinsicReceiver::$receiver,
+            faber_name: $name,
+            generic: &[],
+            arg_count: $args,
+            params: $params,
+            return_kind: IntrinsicReturnKind::$ret,
+            mir_kind: IntrinsicMirKind::Collection(MirCollectionOp::TensorMath(
+                MirTensorMath::$function,
+            )),
             missing_generic_issue: None,
             excess_generic_issue: None,
             value_arity_issue: None,
@@ -857,6 +873,20 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     // GI3-1: SiLU is lowered by composition (`x / (1 + exp(-x))`) through
     // existing tensor elementwise operations; it owns no MIR collection op.
     intrinsic!(Tensor, "silu", 0, &[], SameAsReceiver, CodegenOnly),
+    // K5 (gpu-reset rule 15): the built-in scalar math functions lifted
+    // elementwise over a tensor. IEEE per element (domain miss is NaN,
+    // overflow is infinity); `absolutum` takes any numeric element, the rest
+    // take float elements only. User functions are never lifted. `radix`,
+    // `exponentia` and `logarithmus` are the names the AIR lane already
+    // carries for sqrt, exp and ln.
+    intrinsic!(Tensor, "absolutum", 0, &[], SameAsReceiver, math Abs),
+    intrinsic!(Tensor, "radix", 0, &[], SameAsReceiver, math Sqrt),
+    intrinsic!(Tensor, "exponentia", 0, &[], SameAsReceiver, math Exp),
+    intrinsic!(Tensor, "logarithmus", 0, &[], SameAsReceiver, math Ln),
+    intrinsic!(Tensor, "logarithmus_decimalis", 0, &[], SameAsReceiver, math Log10),
+    intrinsic!(Tensor, "sinus", 0, &[], SameAsReceiver, math Sin),
+    intrinsic!(Tensor, "cosinus", 0, &[], SameAsReceiver, math Cos),
+    intrinsic!(Tensor, "tangens", 0, &[], SameAsReceiver, math Tan),
     intrinsic!(
         Tensor,
         "activatio_relu",

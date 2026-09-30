@@ -2307,6 +2307,14 @@ help = "muta alterum operandum ad eandem latitudinem saturati per `↦`; integri
 message = "integer, decimal and float operands cannot mix implicitly"
 help = "convert one operand explicitly with `↦`; a written constant may stand beside any number"
 
+[diagnostics.SEM011.issues.tensor_math_float_element_required]
+message = "this math function needs a float tensor"
+help = "convert the integer elements first with `↦` to a float tensor; only `absolutum` takes integer elements"
+
+[diagnostics.SEM011.issues.tensor_function_not_lifted]
+message = "a function of one number is not applied to a whole tensor"
+help = "user functions are not lifted over tensors; apply the function to each element in a `{filum}` loop or with `mappata`, or use a built-in math method such as `absolutum`, `radix`, or `exponentia`"
+
 [diagnostics.SEM011.issues.ascii_literal_invalid_escape]
 message = "ascii literal contains invalid escape sequence"
 help = "use supported ASCII literal escape sequences"

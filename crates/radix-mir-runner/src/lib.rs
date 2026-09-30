@@ -2468,6 +2468,10 @@ pub(crate) fn runtime_regex_pattern(pattern: &str) -> String {
 mod lib_test;
 
 #[cfg(test)]
+#[path = "tensor_math_test.rs"]
+mod tensor_math_test;
+
+#[cfg(test)]
 #[path = "conversion_parity_test.rs"]
 mod conversion_parity_test;
 

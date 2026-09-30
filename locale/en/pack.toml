@@ -388,6 +388,15 @@ rms_norm = "rms_norm"
 rope_norm = "rope_norm"
 gelu = "gelu"
 silu = "silu"
+# K5 (rule 15): the built-in scalar math functions lifted over a tensor.
+# `absolutum` is shared with the numeric family above.
+radix = "sqrt"
+exponentia = "exp"
+logarithmus = "ln"
+logarithmus_decimalis = "log10"
+sinus = "sin"
+cosinus = "cos"
+tangens = "tan"
 activatio_relu = "relu"
 crux_entropia = "cross_entropy"
 activatio_softmax = "softmax"
@@ -2516,6 +2525,14 @@ help = "convert the other operand to the same saturating width with `↦`; satur
 [diagnostics.SEM011.issues.numeric_family_crossing_requires_conversio]
 message = "integer, decimal and float operands cannot mix implicitly"
 help = "convert one operand explicitly with `↦`; a written constant may stand beside any number"
+
+[diagnostics.SEM011.issues.tensor_math_float_element_required]
+message = "this math function needs a float tensor"
+help = "convert the integer elements first with `↦` to a float tensor; only `absolutum` takes integer elements"
+
+[diagnostics.SEM011.issues.tensor_function_not_lifted]
+message = "a function of one number is not applied to a whole tensor"
+help = "user functions are not lifted over tensors; apply the function to each element in a `{filum}` loop or with map, or use a built-in math method such as `abs`, `sqrt`, or `exp`"
 
 [diagnostics.SEM011.issues.ascii_literal_invalid_escape]
 message = "ascii literal contains invalid escape sequence"

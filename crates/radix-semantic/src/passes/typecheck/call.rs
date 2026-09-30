@@ -32,6 +32,8 @@ enum DirectionalViewKind {
 
 const ISSUE_ASCII_LITERAL_TEMPLATE_APPLICATION: &str = "ascii_literal_template_application";
 const ISSUE_ARGUMENT_TYPE_MISMATCH: &str = "argument_type_mismatch";
+/// K5 (gpu-reset rule 15): a function over one number called on a tensor.
+pub(crate) const ISSUE_TENSOR_FUNCTION_NOT_LIFTED: &str = "tensor_function_not_lifted";
 const ISSUE_CALLEE_NOT_CALLABLE: &str = "callee_not_callable";
 const ISSUE_TRANSFER_PAYLOAD_TYPE_MISMATCH: &str = "transfer_payload_type_mismatch";
 const ISSUE_TRANSFER_SINK_MUST_BE_UNARY: &str = "transfer_sink_must_be_unary";
@@ -287,6 +289,24 @@ impl TypeChecker<'_> {
         args: &mut [HirCallArg],
         span: radix_lexer::Span,
     ) {
+        self.check_call_args_lifting(sig, args, span, false);
+    }
+
+    /// [`Self::check_call_args`] for a call that may be a lifting attempt.
+    ///
+    /// `user_function` is true for a call to a user-defined or library
+    /// function (never an intrinsic row): passing a tensor where the function
+    /// takes one number is then the K5 diagnostic (gpu-reset rule 15), not a
+    /// bare argument mismatch. Returns whether a lifting attempt was
+    /// diagnosed, so the caller can stop the result-type cascade.
+    pub(super) fn check_call_args_lifting(
+        &mut self,
+        sig: &FuncSig,
+        args: &mut [HirCallArg],
+        span: radix_lexer::Span,
+        user_function: bool,
+    ) -> bool {
+        let mut lifted = false;
         let required = sig.params.iter().filter(|param| !param.optional).count();
         let spread_compat = args.len() == 1
             && sig.params.len() > 1
@@ -295,12 +315,23 @@ impl TypeChecker<'_> {
             self.wrong_arity("wrong_number_of_arguments", span);
         }
         if spread_compat {
-            return;
+            return false;
         }
 
         for (arg, param) in args.iter_mut().zip(sig.params.iter()) {
             let site = argument_site(arg.name);
+            let errors_before = self.errors.len();
             let arg_ty = self.check_store_expr(&mut arg.expr, param.ty, site);
+            if user_function
+                && self.errors.len() > errors_before
+                && self
+                    .last_synthesized_type
+                    .is_some_and(|ty| self.is_lifting_attempt(ty, param.ty))
+            {
+                self.replace_mismatch_with_lift_issue(errors_before, arg.span);
+                lifted = true;
+                continue;
+            }
             if self.types.is_ref_view(arg_ty)
                 && (matches!(
                     param.mode,
@@ -315,7 +346,46 @@ impl TypeChecker<'_> {
             }
             self.unify_carrier_assign(arg_ty, param.ty, arg.span, ISSUE_ARGUMENT_TYPE_MISMATCH);
         }
+        lifted
     }
+
+    /// Whether passing `arg_ty` for a `param_ty` slot is an attempt to lift a
+    /// scalar function over a tensor (gpu-reset rule 15): the parameter is one
+    /// number and the argument is a tensor, vector or matrix of numbers.
+    fn is_lifting_attempt(&self, arg_ty: TypeId, param_ty: TypeId) -> bool {
+        if !self.is_numeric(param_ty) {
+            return false;
+        }
+        let resolved = self.resolve_inferred_type(arg_ty);
+        let (_, mut payload) = self.types.peel_access_marker(resolved);
+        while let Type::Alias(_, inner) = self.types.get(payload) {
+            payload = *inner;
+        }
+        match self.types.get(payload) {
+            Type::Tensor(element, _) | Type::Vector(element, _) | Type::Matrix(element, _) => {
+                crate::numeric_width::is_tensor_numeric_element(self.types, *element)
+            }
+            _ => false,
+        }
+    }
+
+    /// Swap the argument-mismatch cascade a lifting attempt just produced for
+    /// the one structured diagnostic. Only the two mismatch issues the failed
+    /// store check raises are dropped; any other error in the argument stays.
+    fn replace_mismatch_with_lift_issue(&mut self, errors_before: usize, span: radix_lexer::Span) {
+        let mut index = 0;
+        self.errors.retain(|error| {
+            let keep = index < errors_before
+                || !matches!(
+                    error.issue(),
+                    Some("expression_type_mismatch" | ISSUE_ARGUMENT_TYPE_MISMATCH)
+                );
+            index += 1;
+            keep
+        });
+        self.invalid_operand_types(ISSUE_TENSOR_FUNCTION_NOT_LIFTED, span);
+    }
+
     /// Typecheck a Path receiver as an imported namespace function, if it is one.
     ///
     /// The HIR Path DefId is the nearest value binding. A local parameter can
@@ -341,7 +411,7 @@ impl TypeChecker<'_> {
             .cloned()?;
         self.set_chorda_scalar_closure_context(name);
         let ret =
-            self.check_instantiated_call(&sig, explicit_type_args, args, receiver.span, expected);
+            self.check_user_function_call(&sig, explicit_type_args, args, receiver.span, expected);
         self.validate_interval_bound_call_args(name, &sig, args);
         Some(ret)
     }

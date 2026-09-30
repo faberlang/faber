@@ -933,6 +933,20 @@ pub fn is_tensor_numeric_element(types: &TypeTable, ty: TypeId) -> bool {
     }
 }
 
+/// Whether `ty` is a floating-point tensor element (`fractus` or `fractus<W>`).
+///
+/// The lifted transcendental math functions (`radix`, `exponentia`, ...) take
+/// float elements only, as their scalar functions take `fractus` only: an
+/// integer element crosses to a float family with an explicit `↦`.
+#[must_use]
+pub fn is_tensor_float_element(types: &TypeTable, ty: TypeId) -> bool {
+    match types.get(ty) {
+        Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => true,
+        Type::Alias(_, inner) => is_tensor_float_element(types, *inner),
+        _ => false,
+    }
+}
+
 /// Whether `ty` is a numeric tensor element.
 ///
 /// Alias retained for conversio and lattice call sites that predate the Stage 6
@@ -959,6 +973,9 @@ pub fn tensor_method_requires_numeric_element(method_name: &str) -> bool {
             | "summa"
             | "media"
             | "silu"
+            // K5: the lifted `abs` takes any numeric element; the float-only
+            // members are gated separately (`is_tensor_float_element`).
+            | "absolutum"
     )
 }
 

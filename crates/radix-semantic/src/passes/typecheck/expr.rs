@@ -702,6 +702,7 @@ impl TypeChecker<'_> {
         } else {
             ty
         };
+        self.last_synthesized_type = Some(ty);
         let ty = match (expected, store) {
             // Ruling 16: an integer quotient cannot land in a float slot; the
             // help points at `÷`, which divides integers into an `f64`.

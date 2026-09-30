@@ -363,6 +363,12 @@ impl TypeChecker<'_> {
         args: &[radix_hir::HirCallArg],
         result: TypeId,
     ) -> TypeId {
+        if entry.faber_name == "absolutum"
+            && matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Tensor)
+            && !self.current_device_function
+        {
+            return self.tensor_abs_range_type(receiver_ty, result);
+        }
         if !matches!(entry.faber_name, "absolutum" | "potentia")
             || !matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Numeric)
             || self.current_device_function
@@ -387,6 +393,32 @@ impl TypeChecker<'_> {
             }
         };
         self.width_type(range::smallest_width(range))
+    }
+
+    /// Tensor `absolutum` follows the scalar `absolutum` typing (K5, rule 15:
+    /// lifting is "the scalar operation per element"). A trapping integer
+    /// element is range typed to the smallest width holding `|x|` (an `i8`
+    /// tensor gives a `u8` tensor); a float, decimal or word element keeps
+    /// the receiver's own type. Device functions keep the element type.
+    fn tensor_abs_range_type(&mut self, receiver_ty: TypeId, result: TypeId) -> TypeId {
+        let carrier = self.value_carrier_type(receiver_ty);
+        let (_, mut payload) = self.types.peel_access_marker(carrier);
+        while let Type::Alias(_, inner) = self.types.get(payload) {
+            payload = *inner;
+        }
+        let Type::Tensor(element, shape) = self.types.get(payload) else {
+            return result;
+        };
+        let (element, shape) = (*element, *shape);
+        let Some(base) = self
+            .plain_int_width(element)
+            .and_then(NumericWidth::integer_range)
+        else {
+            return result;
+        };
+        let width = range::smallest_width(range::abs(base));
+        let element = self.width_type(width);
+        self.types.tensor_with_shape(element, shape)
     }
 
     /// Whether an integer expression sits at the 64-bit cap with a value that

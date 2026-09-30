@@ -45,7 +45,38 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
         expected: Option<TypeId>,
     ) -> TypeId {
-        self.check_instantiated_call_impl(sig, explicit_type_args, args, span, expected, true, None)
+        self.check_instantiated_call_impl(
+            sig,
+            explicit_type_args,
+            args,
+            span,
+            expected,
+            true,
+            None,
+            false,
+        )
+    }
+
+    /// Typecheck a call to a library function reached through a namespace: a
+    /// user function for the K5 lifting diagnostic, without a stable callee id.
+    pub fn check_user_function_call(
+        &mut self,
+        sig: &FuncSig,
+        explicit_type_args: &[TypeId],
+        args: &mut [HirCallArg],
+        span: radix_lexer::Span,
+        expected: Option<TypeId>,
+    ) -> TypeId {
+        self.check_instantiated_call_impl(
+            sig,
+            explicit_type_args,
+            args,
+            span,
+            expected,
+            true,
+            None,
+            true,
+        )
     }
 
     /// Typecheck a direct call while retaining its declaration identity for
@@ -68,6 +99,7 @@ impl TypeChecker<'_> {
             expected,
             true,
             Some(callee),
+            true,
         )
     }
 
@@ -85,7 +117,7 @@ impl TypeChecker<'_> {
         args: &mut [HirCallArg],
         span: radix_lexer::Span,
     ) -> TypeId {
-        self.check_instantiated_call_impl(sig, &[], args, span, None, false, None)
+        self.check_instantiated_call_impl(sig, &[], args, span, None, false, None, false)
     }
 
     fn check_instantiated_call_impl(
@@ -97,6 +129,7 @@ impl TypeChecker<'_> {
         expected: Option<TypeId>,
         solve_shape_params: bool,
         callee: Option<radix_hir::DefId>,
+        user_function: bool,
     ) -> TypeId {
         // Magnitudo shape params are carried by the signature's generic
         // descriptors: the declared sort is authoritative, so a size param
@@ -192,7 +225,13 @@ impl TypeChecker<'_> {
             }
         };
 
-        self.check_call_args(&sig, args, span);
+        // A lifting attempt (a scalar user function called on a tensor) is one
+        // diagnosed error. The scalar result type is not the tensor the
+        // caller meant, so the call takes the type its context expects
+        // instead of cascading a second mismatch.
+        if self.check_call_args_lifting(&sig, args, span, user_function) {
+            return expected.unwrap_or(self.error_type);
+        }
         // A result that only needs a checked integer store to reach the slot
         // (`int` into `u8`) is not a mismatch: the caller applies the store
         // (rulings 17b, 21).

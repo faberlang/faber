@@ -1,0 +1,75 @@
++++
+term = "tensor"
+kind = "method"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Built-in math functions lifted over a tensor: abs, sqrt, exp, ln, log10, sin, cos, tan apply per element."
+syntax = "tensor.abs() | tensor.sqrt() | tensor.exp() | tensor.ln() | tensor.log10() | tensor.sin() | tensor.cos() | tensor.tan()"
+related = ["tensor", "fractus", "lista"]
+locale = "la"
++++
+# =============================================================================
+# tensor — Built-in math functions lifted elementwise over a tensor.
+# =============================================================================
+#
+# What this teaches:
+#   • Lifted math — `abs`, `sqrt`, `exp`, `ln`, `log10`, `sin`, `cos`, `tan` apply to each element and keep the shape
+#   • Per-element scalar meaning — a domain miss is NaN and an overflow is infinity, as for the scalar function
+#   • Typing — the float functions take float elements; `abs` also takes integers and gives the unsigned twin
+#
+# Common mistakes:
+#   • calling your own scalar function on a tensor — user functions are not lifted; loop per element instead
+#   • calling `sqrt` on an integer tensor — convert the elements to a float tensor first
+#
+# See also: tensor, fractus, lista
+# =============================================================================
+
+
+
+# tensor — lifted math functions
+#
+# WHY: rule 15 lifts the built-in math functions over a tensor. Each element is
+# the scalar function of the same name, so `sqrt` of a negative element is NaN
+# and the shape never changes.
+#
+# EXPECTED stdout:
+#   [2.0, 3.0, 4.0, 1.0]
+#   [1.0, 2.0, 3.0, 4.0]
+#   [1.0, 1.0]
+#   [0.0, 0.0]
+#   [2.0, 3.0]
+#   [0.0, 0.0]
+#   [1.0, 1.0]
+#   [1.0, NaN]
+#   [3, 0, 5]
+#   [3]
+
+incipit {
+    fixum tensor<f32, []> seed ← vacua
+    fixum lista<f32> squares ← [4.0, 9.0, 16.0, 1.0]
+    fixum tensor<f32, [2, 2]> grid ← seed.strue(squares, [2, 2])
+    nota grid.radix().planata()
+    fixum lista<f32> signed ← [-1.0, 2.0, -3.0, 4.0]
+    fixum tensor<f32, [4]> mixed ← seed.strue(signed, [4])
+    nota mixed.absolutum().planata()
+    fixum lista<f32> zeros ← [0.0, 0.0]
+    fixum tensor<f32, [2]> origin ← seed.strue(zeros, [2])
+    nota origin.exponentia().planata()
+    nota origin.sinus().planata()
+    fixum lista<f32> decades ← [100.0, 1000.0]
+    fixum tensor<f32, [2]> powers ← seed.strue(decades, [2])
+    nota powers.logarithmus_decimalis().planata()
+    fixum lista<f32> units ← [1.0, 1.0]
+    fixum tensor<f32, [2]> ones ← seed.strue(units, [2])
+    nota ones.logarithmus().planata()
+    nota origin.cosinus().planata()
+    fixum lista<f32> edge ← [1.0, -1.0]
+    fixum tensor<f32, [2]> domain ← seed.strue(edge, [2])
+    nota domain.radix().planata()
+    fixum tensor<i32, []> iseed ← vacua
+    fixum lista<i32> counts ← [-3, 0, 5]
+    fixum tensor<i32, [3]> whole ← iseed.strue(counts, [3])
+    nota whole.absolutum().planata()
+    nota whole.absolutum().magnitudines()
+}
