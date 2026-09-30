@@ -96,7 +96,9 @@ functio combine(tf32[2, 2] x, tf32[2, 2] y) → tf32[2, 2] {
 }
 
 #[test]
-fn rejects_tensor_intrinsic_method_names_on_scalar_receivers() {
+fn accepts_scalar_numeric_twin_as_its_operator() {
+    // ss1: `x.addita(y)` on a scalar is exactly `x + y`, so it is the pure
+    // operator the lane already admits, not a tensor method call.
     let errors = air_errors(
         r#"
 @ radix lane "air"
@@ -105,12 +107,25 @@ functio combine(fractus x, fractus y) → fractus {
 }
 "#,
     );
+    assert!(errors.is_empty(), "unexpected AIR errors: {errors:?}");
+}
+
+#[test]
+fn rejects_tensor_intrinsic_method_names_on_scalar_receivers() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio combine(fractus x) → fractus {
+    redde x.gelu()
+}
+"#,
+    );
 
     let err = expect_air_issue(&errors, "tensor_method_receiver");
     assert!(
         err.args
             .iter()
-            .any(|arg| arg.name == "method" && arg.value == "addita")
+            .any(|arg| arg.name == "method" && arg.value == "gelu")
     );
 }
 

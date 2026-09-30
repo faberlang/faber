@@ -348,6 +348,47 @@ impl TypeChecker<'_> {
         })
     }
 
+    /// Range-typed result of the integer methods that have no operator:
+    /// `absolutum` (`|x|`) and `potentia` (`x ^ n`).
+    ///
+    /// Only trapping integer receivers are range typed; every other receiver
+    /// (float, decimal, word) keeps the registry's `SameAsReceiver` result.
+    /// `potentia` with a constant exponent gets the exact interval of `x^n`;
+    /// with a variable exponent it sits at the 64-bit cap (ruling 13), and
+    /// the store check of ruling 17 applies where the value is used.
+    pub(super) fn integer_method_range_type(
+        &mut self,
+        entry: &radix_intrinsics::MethodIntrinsic,
+        receiver_ty: TypeId,
+        args: &[radix_hir::HirCallArg],
+        result: TypeId,
+    ) -> TypeId {
+        if !matches!(entry.faber_name, "absolutum" | "potentia")
+            || !matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Numeric)
+            || self.current_device_function
+        {
+            return result;
+        }
+        let carrier = self.value_carrier_type(receiver_ty);
+        let Some(base) = self
+            .plain_int_width(carrier)
+            .and_then(NumericWidth::integer_range)
+        else {
+            return result;
+        };
+        let range = if entry.faber_name == "absolutum" {
+            range::abs(base)
+        } else {
+            match args.first().and_then(|arg| const_int_value(&arg.expr)) {
+                Some(exponent) if (0..=range::MAX_CONST_EXPONENT).contains(&exponent) => {
+                    range::pow_const(base, exponent)
+                }
+                _ => range::pow_unbounded(base),
+            }
+        };
+        self.width_type(range::smallest_width(range))
+    }
+
     /// Whether an integer expression sits at the 64-bit cap with a range that
     /// reaches past `i64::MAX` (`i64 + i64`, `-i64`, `i64 ⇐ n`, a `summa`). Its type is
     /// `i64` but its value is not bounded by it, so a store into an `i64`
@@ -371,6 +412,20 @@ impl TypeChecker<'_> {
                 .and_then(|(a, b)| Self::scalar_binary_range(*op, a, b)),
             HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, operand) => {
                 operand_range(operand).map(range::neg)
+            }
+            // A signed `potentia` with a variable exponent sits at the cap.
+            HirExpressionKind::MethodCall(receiver, name, _, args, _) => {
+                let is_power = self
+                    .interner
+                    .is_some_and(|interner| interner.resolve(*name) == "potentia");
+                if !is_power
+                    || args.len() != 1
+                    || const_int_value(&args[0].expr).is_some()
+                    || self.plain_int_width(ty) != Some(NumericWidth::I64)
+                {
+                    return false;
+                }
+                operand_range(receiver).map(range::pow_unbounded)
             }
             _ => None,
         };

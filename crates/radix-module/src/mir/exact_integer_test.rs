@@ -503,3 +503,82 @@ fn saturating_bitwise_operators_are_exact_and_clamp_at_the_store() {
     assert_eq!(ok(&format!("{s}fixum saturatus<u8> t ← s ⇐ 2\nnota t")), ["255"]);
     assert_eq!(ok(&format!("{s}nota s ⇒ 2")), ["50"]);
 }
+
+// ── ss1: numeric method twins are their operators ─────────────────────────
+
+#[test]
+fn value_twin_is_exact_and_checked_at_the_store() {
+    assert_eq!(ok("fixum numerus<u8> x ← 200\nnota x.addita(100)"), ["300"]);
+    let (out, issue, message) =
+        trap("fixum numerus<u8> x ← 200\nnota \"a\"\nfixum numerus<u8> y ← x.addita(100)\nnota y");
+    assert_eq!(out, ["a"]);
+    assert_eq!(issue, "implicit_store_out_of_range");
+    assert!(
+        message.contains("300 does not fit in `u8`") && message.contains("`y`"),
+        "{message}"
+    );
+}
+
+#[test]
+fn in_place_twin_is_a_store_into_the_place() {
+    assert_eq!(ok("varia numerus<u8> x ← 100\nx.adde(100)\nnota x"), ["200"]);
+    for body in [
+        "varia numerus<u8> x ← 200\nnota \"a\"\nx.adde(100)\nnota x",
+        "varia numerus<u8> x ← 200\nnota \"a\"\nx.multiplica(2)\nnota x",
+        "varia numerus<u8> x ← 200\nnota \"a\"\nx.sinistra(1)\nnota x",
+    ] {
+        let (out, issue, message) = trap(body);
+        assert_eq!(out, ["a"], "{body}");
+        assert_eq!(issue, "implicit_store_out_of_range", "{body}");
+        assert!(message.contains("`x`"), "{message}");
+    }
+}
+
+#[test]
+fn in_place_twin_through_an_index_place() {
+    assert_eq!(
+        ok("varia _ xs ← [1, 2, 3] ∷ lista<numerus<i32>>\nxs[1].multiplica(10)\nnota xs[1]"),
+        ["20"]
+    );
+}
+
+#[test]
+fn unary_twins_follow_the_range_rule() {
+    assert_eq!(ok("fixum numerus<i8> n ← -128\nnota n.negativa()"), ["128"]);
+    let (_, issue, _) = trap("fixum numerus<i8> n ← -128\nfixum numerus<i8> m ← n.negativa()\nnota m");
+    assert_eq!(issue, "implicit_store_out_of_range");
+}
+
+#[test]
+fn word_twins_keep_the_word_semantics() {
+    assert_eq!(ok("varia modulus<u8> w ← 200\nw.adde(100)\nnota w"), ["44"]);
+    assert_eq!(ok("fixum modulus<u8> w ← 200\nnota w.addita(100)"), ["44"]);
+}
+
+#[test]
+fn absolutum_is_exact_for_sized_integers() {
+    assert_eq!(ok("fixum numerus<i8> n ← -128\nnota n.absolutum()"), ["128"]);
+    assert_eq!(
+        ok("fixum numerus<i8> n ← -128\nfixum numerus<u8> m ← n.absolutum()\nnota m"),
+        ["128"]
+    );
+    let (_, issue, _) = trap("fixum numerus<i8> n ← -128\nfixum numerus<i8> m ← n.absolutum()\nnota m");
+    assert_eq!(issue, "implicit_store_out_of_range");
+    // `|i64::MIN|` is 2^63, a valid exact value.
+    assert_eq!(
+        ok("fixum numerus m ← -9223372036854775807 - 1\nnota m.absolutum()"),
+        ["9223372036854775808"]
+    );
+}
+
+#[test]
+fn potentia_is_exact_and_range_typed() {
+    assert_eq!(ok("fixum numerus<i32> p ← 100000\nnota p.potentia(2)"), ["10000000000"]);
+    let (_, issue, message) = trap("fixum numerus<i32> p ← 100000\nfixum numerus<i32> q ← p.potentia(2)\nnota q");
+    assert_eq!(issue, "implicit_store_out_of_range");
+    assert!(message.contains("10000000000"), "{message}");
+    assert_eq!(
+        ok("fixum numerus<u8> u ← 3\nfixum numerus<u8> q ← u.potentia(3)\nnota q"),
+        ["27"]
+    );
+}

@@ -3228,9 +3228,7 @@ fn approximate_rejects_numerus_receiver() {
 // registry deliberately maps sized-fractus receivers (f32/f64) to the
 // `Fractus` family; MIR validation must accept a `SizedNumeric(Fractus, _)`
 // receiver (sibling to the Minimum/Maximum arm) while keeping the plain
-// result checks. The corpus (`intrinseca/numerus-methodi.fab`) relies on the
-// plain `numerus` surface, so it stays accepted; sized-numerus receivers
-// (`i32`) stay rejected.
+// result checks. Sized-numerus receivers are accepted too.
 
 const ABSOLUTE_SIGNUM_OPS: [MirCollectionOp; 2] =
     [MirCollectionOp::Absolute, MirCollectionOp::Signum];
@@ -3292,7 +3290,8 @@ fn absolute_signum_plain_numerus_receiver_valid_for_all_ops() {
 }
 
 #[test]
-fn absolute_signum_rejects_sized_numerus_receiver() {
+fn absolute_signum_sized_numerus_receiver_valid_for_all_ops() {
+    // A sized integer receiver is admitted (the runner used to crash on it).
     for op in ABSOLUTE_SIGNUM_OPS {
         let mut types = TypeTable::new();
         let receiver_ty = i32_receiver_mty(&mut types);
@@ -3300,12 +3299,36 @@ fn absolute_signum_rejects_sized_numerus_receiver() {
         let program = unary_scalar_collection_program(&mut types, op, receiver_ty, return_ty);
         let errors = validate(&program, &types);
         assert!(
-            errors
-                .iter()
-                .any(|e| e.contains("numeric intrinsic receiver is not numerus or fractus")),
-            "expected the numerus-or-fractus receiver diagnostic for {op:?}, got: {errors:?}"
+            errors.is_empty(),
+            "expected a valid sized-numerus receiver for {op:?}, got: {errors:?}"
         );
     }
+}
+
+#[test]
+fn absolute_of_sized_numerus_takes_a_range_typed_integer_result() {
+    // `|int<i32>|` is typed by the range rule, so the result width may differ
+    // from the receiver's; a non-integer result is still rejected.
+    let mut types = TypeTable::new();
+    let receiver_ty = i32_receiver_mty(&mut types);
+    let u32_ty =
+        MirType::semantic(types.sized_numeric(Primitive::Numerus, radix_types::NumericWidth::U32));
+    let program =
+        unary_scalar_collection_program(&mut types, MirCollectionOp::Absolute, receiver_ty, u32_ty);
+    assert!(validate(&program, &types).is_empty());
+
+    let fractus_ty = fractus_mty(&mut types);
+    let program = unary_scalar_collection_program(
+        &mut types,
+        MirCollectionOp::Absolute,
+        receiver_ty,
+        fractus_ty,
+    );
+    assert!(
+        validate(&program, &types)
+            .iter()
+            .any(|e| e.contains("numeric intrinsic result type mismatch"))
+    );
 }
 
 // -----------------------------------------------------------------------

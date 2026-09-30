@@ -113,6 +113,49 @@ pub fn bit_not(a: IntRange) -> IntRange {
     )
 }
 
+/// `|a|`: zero is included when the interval spans it.
+#[must_use]
+pub fn abs(a: IntRange) -> IntRange {
+    let (lo, hi) = (a.0.saturating_abs(), a.1.saturating_abs());
+    let low = if a.0 <= 0 && a.1 >= 0 { 0 } else { lo.min(hi) };
+    (low, lo.max(hi))
+}
+
+/// Largest constant exponent `pow_const` computes exactly; beyond it the
+/// result is taken at the cap.
+pub const MAX_CONST_EXPONENT: i128 = 128;
+
+fn saturating_pow(base: i128, exponent: u32) -> i128 {
+    (0..exponent).fold(1_i128, |acc, _| acc.saturating_mul(base))
+}
+
+/// `a ^ n` for a constant exponent `0 <= n <= MAX_CONST_EXPONENT`.
+#[must_use]
+pub fn pow_const(a: IntRange, n: i128) -> IntRange {
+    let n = u32::try_from(n.clamp(0, MAX_CONST_EXPONENT)).unwrap_or(0);
+    if n == 0 {
+        return (1, 1);
+    }
+    let (lo, hi) = (saturating_pow(a.0, n), saturating_pow(a.1, n));
+    if n % 2 == 1 || a.0 >= 0 {
+        (lo, hi)
+    } else if a.1 <= 0 {
+        (hi, lo)
+    } else {
+        (0, lo.max(hi))
+    }
+}
+
+/// `a ^ n` for an exponent that is not a constant: the 64-bit cap, whose sign
+/// follows the base (ruling 13).
+#[must_use]
+pub fn pow_unbounded(a: IntRange) -> IntRange {
+    (
+        if a.0 < 0 { i128::from(i64::MIN) } else { 0 },
+        i128::from(u64::MAX),
+    )
+}
+
 fn pow2(n: i128) -> i128 {
     if n >= 126 {
         i128::MAX

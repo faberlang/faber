@@ -341,7 +341,7 @@ incipit {
     nota word.addita(checked)
 }
 ",
-        "argument_type_mismatch",
+        "modular_word_family_mismatch",
     );
 }
 
@@ -355,7 +355,7 @@ incipit {
     nota checked.addita(word)
 }
 ",
-        "argument_type_mismatch",
+        "modular_word_family_mismatch",
     );
 }
 

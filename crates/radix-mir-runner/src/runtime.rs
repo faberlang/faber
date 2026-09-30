@@ -1454,8 +1454,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 };
                 Ok(Value::Str(text.replace(&from, &to)))
             }
-            MirCollectionOp::Absolute => self.map_numeric(args, span, return_ty, f64::abs),
-            MirCollectionOp::Signum => self.map_numeric(args, span, return_ty, f64::signum),
+            MirCollectionOp::Absolute => {
+                self.map_numeric(args, span, return_ty, f64::abs, i128::abs)
+            }
+            MirCollectionOp::Signum => {
+                self.map_numeric(args, span, return_ty, f64::signum, i128::signum)
+            }
             MirCollectionOp::Minimum => self.numeric_extremum(
                 args,
                 span,
@@ -1548,10 +1552,18 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::TensorTranspose => self.tensor_transpose(args, span),
             MirCollectionOp::SparseGet => self.sparse_get(args, span),
             MirCollectionOp::SparseSet => self.sparse_set(args, span),
-            MirCollectionOp::Round => self.map_numeric(args, span, return_ty, f64::round),
-            MirCollectionOp::Floor => self.map_numeric(args, span, return_ty, f64::floor),
-            MirCollectionOp::Ceiling => self.map_numeric(args, span, return_ty, f64::ceil),
-            MirCollectionOp::Truncate => self.map_numeric(args, span, return_ty, f64::trunc),
+            MirCollectionOp::Round => {
+                self.map_numeric(args, span, return_ty, f64::round, std::convert::identity)
+            }
+            MirCollectionOp::Floor => {
+                self.map_numeric(args, span, return_ty, f64::floor, std::convert::identity)
+            }
+            MirCollectionOp::Ceiling => {
+                self.map_numeric(args, span, return_ty, f64::ceil, std::convert::identity)
+            }
+            MirCollectionOp::Truncate => {
+                self.map_numeric(args, span, return_ty, f64::trunc, std::convert::identity)
+            }
             MirCollectionOp::Keys => self.eval_map_snapshot(args, span, false),
             MirCollectionOp::Values => self.eval_map_snapshot(args, span, true),
             MirCollectionOp::Put => {
@@ -3543,11 +3555,19 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         span: Span,
         return_ty: MirType,
         f: impl FnOnce(f64) -> f64,
+        exact: impl FnOnce(i128) -> i128,
     ) -> Result<Value, RunnerError> {
         let [receiver] = args else {
             return Err(RunnerError::internal(span, "numeric collection arity"));
         };
         let value = self.eval_operand(receiver, span)?;
+        // Integer receivers compute the exact result: `|i64::MIN|` is 2^63,
+        // and the result carries the declared result width's carrier.
+        if let Some(exact_value) = super::exact_int::int_value(&value) {
+            let width = self.resolve_int_width(return_ty);
+            return super::exact_int::exact_carrier(exact(exact_value), width)
+                .ok_or_else(|| RunnerError::internal(span, "numerus overflow"));
+        }
         let numeric = match value {
             Value::Int(v) => f(v as f64),
             Value::UInt(v) => f(v as f64),

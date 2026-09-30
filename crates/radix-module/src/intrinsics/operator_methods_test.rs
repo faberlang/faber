@@ -106,7 +106,8 @@ incipit {
     assert!(code.contains("a + 2.0") || code.contains("a+2.0"));
     assert!(code.contains("a > 1.0") || code.contains("a>1.0"));
     assert!(code.contains("a <= 2.0") || code.contains("a<=2.0"));
-    assert!(code.contains("acc += 5.0") || code.contains("acc+=5.0"));
+    // ss1: `acc.adde(5.0)` is the assignment `acc ← acc + 5.0`.
+    assert!(code.contains("acc = acc + 5.0"), "{code}");
     assert!(!code.contains(".addita("));
     assert!(!code.contains(".adde("));
 }
@@ -138,7 +139,11 @@ incipit {
     let code = compile_rust("bitwise-operator-methods.fab", source);
     assert!(code.contains(" & ") || code.contains('&'));
     assert!(code.contains('!'));
-    assert!(code.contains("&=") || code.contains("& ="));
+    // ss1: `acc.coniunge(8)` is the assignment `acc ← acc ∧ 8`.
+    assert!(
+        code.contains("acc = __faber_fit::<i64>(__faber_int(Some((acc as i128) & 8_i128)))"),
+        "{code}"
+    );
     assert!(!code.contains(".coniuncta("));
     assert!(!code.contains(".coniunge("));
 }
@@ -241,8 +246,10 @@ incipit {
     let code = compile_rust("shift-operator-methods.fab", source);
     assert!(code.contains("<<"));
     assert!(code.contains(">>"));
-    assert!(code.contains("<<=") || code.contains("<< ="));
-    assert!(code.contains(">>=") || code.contains(">> ="));
+    // ss1: `acc.sinistra(1)` is the assignment `acc ← acc ⇐ 1`.
+    assert!(code.contains("acc = "), "{code}");
+    assert!(code.matches("<<").count() >= 2, "{code}");
+    assert!(code.matches(">>").count() >= 2, "{code}");
     assert!(!code.contains(".sinistrata("));
     assert!(!code.contains(".sinistra("));
 }

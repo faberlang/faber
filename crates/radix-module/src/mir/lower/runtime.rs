@@ -1897,12 +1897,12 @@ impl FunctionBuilder<'_> {
         ))
     }
 
-    /// Lower compiler-owned numeric operator methods into ordinary MIR.
+    /// Lower `potentia`, the one numeric method twin with no operator.
     ///
-    /// WHY: these receiver names are glyph twins (`x.addita(y)` means `x + y`,
-    /// `acc.adde(y)` means `acc ← acc + y`). Keeping them as runtime calls would
-    /// make the runner execute a late provider surface that the language treats
-    /// as primitive arithmetic.
+    /// WHY: every other numeric twin (`addita`, `adde`, `negativa`, ...) is
+    /// rewritten to its operator or assignment during typecheck (ss1), so it
+    /// reaches lowering as an ordinary node. `potentia` composes from existing
+    /// MIR ops so the runner never sees a late provider method call.
     fn lower_numeric_operator_method(
         &mut self,
         receiver: &HirExpression,
@@ -1910,77 +1910,16 @@ impl FunctionBuilder<'_> {
         args: &[HirCallArg],
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        if method_name != "potentia" {
+            return None;
+        }
         let receiver_ty = receiver.ty?;
         let normalized = self.normalized_type(receiver_ty);
         let entry = crate::intrinsics::lookup_method_for_type(normalized, method_name, args.len())?;
         if !matches!(entry.receiver, crate::intrinsics::IntrinsicReceiver::Numeric) {
             return None;
         }
-
-        // `potentia` is a CodegenOnly registry row (no `MirCollectionOp`
-        // surface). Fractus receivers lower to IEEE 754 `pow` composed from
-        // existing MIR ops (`fractus_potentia.rs`); numerus receivers use exact
-        // integer exponentiation below. Both compose into ordinary MIR so the
-        // runner does not see a late provider method call.
-        if method_name == "potentia" {
-            return self.lower_potentia(receiver, receiver_ty, args, expr);
-        }
-
-        if let Some(op) = numeric_operator_binop(method_name) {
-            let [arg] = args else {
-                return None;
-            };
-            let lhs = self.lower_expr_value(receiver)?;
-            let rhs = self.lower_expr_value(&arg.expr)?;
-            let ty = self.expr_ty(expr)?;
-            return Some(self.assign_temp(MirValueKind::Binary { op, lhs, rhs }, ty, expr.span));
-        }
-
-        // WHY: on modular receivers `subtrahe` is the value-returning wrapping
-        // twin (matching typecheck), not the in-place numerus mutation.
-        if matches!(normalized, Type::ModularWord(_)) && method_name == "subtrahe" {
-            let [arg] = args else {
-                return None;
-            };
-            let lhs = self.lower_expr_value(receiver)?;
-            let rhs = self.lower_expr_value(&arg.expr)?;
-            let ty = self.expr_ty(expr)?;
-            return Some(self.assign_temp(MirValueKind::Binary { op: MirBinOp::Sub, lhs, rhs }, ty, expr.span));
-        }
-
-        if let Some(op) = numeric_imperativus_binop(method_name) {
-            let [arg] = args else {
-                return None;
-            };
-            let ty = self.expr_ty(receiver)?;
-            let (place, ty) = self.lower_assignment_place_with_fallback(receiver, ty)?;
-            let lhs = MirOperand::Place(place.clone());
-            let rhs = self.lower_expr_value(&arg.expr)?;
-            let value = self.assign_temp(MirValueKind::Binary { op, lhs, rhs }, ty, expr.span);
-            self.assign(place, value, ty, expr.span);
-            return Some(MirOperand::Constant(MirConstant::Unit));
-        }
-
-        // Numeric unary family (MC2): `negativa`/`complementata` are the
-        // value twins (`SameAsReceiver`), `nega`/`complementa` the
-        // Vacuum-return in-place forms. `complement*` reach here on numerus
-        // only — fractus is rejected earlier at SEM011 admission.
-        if let Some(op) = numeric_value_unop(method_name) {
-            let operand = self.lower_expr_value(receiver)?;
-            let ty = self.expr_ty(expr)?;
-            return Some(self.assign_temp(MirValueKind::Unary { op, operand }, ty, expr.span));
-        }
-
-        if let Some(op) = numeric_imperativus_unop(method_name) {
-            let ty = self.expr_ty(receiver)?;
-            let (place, ty) = self.lower_assignment_place_with_fallback(receiver, ty)?;
-            let operand = MirOperand::Place(place.clone());
-            let value = self.assign_temp(MirValueKind::Unary { op, operand }, ty, expr.span);
-            self.assign(place, value, ty, expr.span);
-            return Some(MirOperand::Constant(MirConstant::Unit));
-        }
-
-        None
+        self.lower_potentia(receiver, receiver_ty, args, expr)
     }
 
     /// Lower `potentia` by receiver family.
@@ -2028,9 +1967,17 @@ impl FunctionBuilder<'_> {
         let base_local = self.next_local_id();
         self.locals
             .push(MirLocalDecl { id: base_local, name: None, ty, mutable: true, span: expr.span });
+        // The exponent keeps its own type: the result type is the range of
+        // `base^exponent` and can be narrower than the exponent's type.
+        let exponent_ty = self.expr_ty(&arg.expr)?;
         let exponent_local = self.next_local_id();
-        self.locals
-            .push(MirLocalDecl { id: exponent_local, name: None, ty, mutable: true, span: expr.span });
+        self.locals.push(MirLocalDecl {
+            id: exponent_local,
+            name: None,
+            ty: exponent_ty,
+            mutable: true,
+            span: expr.span,
+        });
         let accumulator_place = MirPlace::local(accumulator);
         let base_place = MirPlace::local(base_local);
         let exponent_place = MirPlace::local(exponent_local);
@@ -2041,7 +1988,7 @@ impl FunctionBuilder<'_> {
             expr.span,
         );
         self.assign(base_place.clone(), base, ty, expr.span);
-        self.assign(exponent_place.clone(), exponent, ty, expr.span);
+        self.assign(exponent_place.clone(), exponent, exponent_ty, expr.span);
 
         let bool_ty = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         let loop_check = self.fresh_block(expr.span);
@@ -2070,7 +2017,7 @@ impl FunctionBuilder<'_> {
             MirBinOp::Mod,
             MirOperand::Place(exponent_place.clone()),
             MirOperand::Constant(MirConstant::Int(2)),
-            ty,
+            exponent_ty,
             expr.span,
         );
         let is_odd = self.binary_temp(
@@ -2101,10 +2048,10 @@ impl FunctionBuilder<'_> {
             MirBinOp::Div,
             MirOperand::Place(exponent_place.clone()),
             MirOperand::Constant(MirConstant::Int(2)),
-            ty,
+            exponent_ty,
             expr.span,
         );
-        self.assign(exponent_place.clone(), half, ty, expr.span);
+        self.assign(exponent_place.clone(), half, exponent_ty, expr.span);
         let has_more = self.binary_temp(
             MirBinOp::Gt,
             MirOperand::Place(exponent_place.clone()),
@@ -3685,26 +3632,6 @@ fn lista_index_operand(place: &MirPlace, index: usize) -> Option<MirOperand> {
     Some(MirOperand::Place(place))
 }
 
-fn numeric_operator_binop(method_name: &str) -> Option<MirBinOp> {
-    match method_name {
-        "addita" => Some(MirBinOp::Add),
-        "subtracta" => Some(MirBinOp::Sub),
-        "multiplicata" => Some(MirBinOp::Mul),
-        "divisa" => Some(MirBinOp::Div),
-        "modulata" => Some(MirBinOp::Mod),
-        "minor" => Some(MirBinOp::Lt),
-        "maior" => Some(MirBinOp::Gt),
-        "minime" => Some(MirBinOp::LtEq),
-        "maxime" => Some(MirBinOp::GtEq),
-        "coniuncta" => Some(MirBinOp::BitAnd),
-        "disiuncta" => Some(MirBinOp::BitOr),
-        "alternata" => Some(MirBinOp::BitXor),
-        "sinistrata" => Some(MirBinOp::Shl),
-        "dextrata" => Some(MirBinOp::Shr),
-        _ => None,
-    }
-}
-
 #[derive(Clone, Copy)]
 enum VectorMethodKind {
     Dot,
@@ -3793,40 +3720,6 @@ fn vector_lane_operand(place: &MirPlace, lane: u8) -> MirOperand {
 
 fn matrix_cell_operand(place: &MirPlace, row: u8, column: u8) -> MirOperand {
     projected_operand(place, MirProjection::MatrixCell { row, column })
-}
-
-fn numeric_imperativus_binop(method_name: &str) -> Option<MirBinOp> {
-    match method_name {
-        "adde" => Some(MirBinOp::Add),
-        "subtrahe" => Some(MirBinOp::Sub),
-        "multiplica" => Some(MirBinOp::Mul),
-        "divida" => Some(MirBinOp::Div),
-        "modula" => Some(MirBinOp::Mod),
-        "coniunge" => Some(MirBinOp::BitAnd),
-        "disiunge" => Some(MirBinOp::BitOr),
-        "alterna" => Some(MirBinOp::BitXor),
-        "sinistra" => Some(MirBinOp::Shl),
-        "dextra" => Some(MirBinOp::Shr),
-        _ => None,
-    }
-}
-
-/// Numeric unary value twins: return the negated/complemented receiver.
-fn numeric_value_unop(method_name: &str) -> Option<MirUnOp> {
-    match method_name {
-        "negativa" => Some(MirUnOp::Neg),
-        "complementata" => Some(MirUnOp::BitNot),
-        _ => None,
-    }
-}
-
-/// Numeric unary imperative twins: negate/complement the receiver in place.
-fn numeric_imperativus_unop(method_name: &str) -> Option<MirUnOp> {
-    match method_name {
-        "nega" => Some(MirUnOp::Neg),
-        "complementa" => Some(MirUnOp::BitNot),
-        _ => None,
-    }
 }
 
 /// Numeric zero of a Route C element type: the default dead-slot fill when the

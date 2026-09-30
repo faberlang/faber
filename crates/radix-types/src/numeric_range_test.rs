@@ -58,3 +58,20 @@ fn container_check() {
     assert_eq!(r::smallest_width((0, 0)), U8);
     assert_eq!(r::smallest_width((0, 70_000)), U32);
 }
+
+#[test]
+fn abs_and_power_ranges_are_exact() {
+    // ss1: `|x|` and `x ^ n` are typed by their exact interval.
+    assert_eq!(r::abs(of(I8)), (0, 128));
+    assert_eq!(r::abs((-5, -2)), (2, 5));
+    assert_eq!(r::abs((3, 9)), (3, 9));
+    assert_eq!(r::smallest_width(r::abs(of(I64))), U64);
+    assert_eq!(r::pow_const(of(I32), 2), (0, 1 << 62));
+    assert_eq!(r::pow_const((-3, 2), 3), (-27, 8));
+    assert_eq!(r::pow_const((-3, 2), 2), (0, 9));
+    assert_eq!(r::pow_const((-4, -2), 2), (4, 16));
+    assert_eq!(r::pow_const(of(U8), 0), (1, 1));
+    assert_eq!(r::smallest_width(r::pow_const(of(U8), 3)), U32);
+    assert_eq!(r::smallest_width(r::pow_unbounded(of(I8))), I64);
+    assert_eq!(r::smallest_width(r::pow_unbounded(of(U8))), U64);
+}

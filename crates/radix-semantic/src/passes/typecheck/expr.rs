@@ -261,6 +261,8 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         let saved_pending_conversion = self.pending_conversion.take();
         let store = self.pending_store.take();
+        // ss1: a numeric method twin means its operator; rewrite it first.
+        self.desugar_numeric_twin(expr);
         let ty = match &mut expr.kind {
             HirExpressionKind::Path(def_id) => self.check_path(*def_id, expr.span),
             HirExpressionKind::Literal(lit) => {

@@ -1245,12 +1245,30 @@ impl Validator<'_, '_> {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;
                 };
-                if !matches!(
+                let integer_receiver = matches!(
                     self.type_kind(receiver_ty),
-                    Type::Primitive(Primitive::Numerus | Primitive::Fractus)
-                        | Type::SizedNumeric(Primitive::Fractus, _)
-                ) {
+                    Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _)
+                );
+                if !integer_receiver
+                    && !matches!(
+                        self.type_kind(receiver_ty),
+                        Type::Primitive(Primitive::Fractus)
+                            | Type::SizedNumeric(Primitive::Fractus, _)
+                    )
+                {
                     self.error(span, "numeric intrinsic receiver is not numerus or fractus");
+                    return;
+                }
+                // `|x|` of an integer is typed by the range rule (`|int<i8>|`
+                // is `u8`), so the result only has to be an integer type.
+                if integer_receiver && matches!(op, MirCollectionOp::Absolute) {
+                    if !matches!(
+                        self.type_kind(call.return_ty),
+                        Type::Primitive(Primitive::Numerus)
+                            | Type::SizedNumeric(Primitive::Numerus, _)
+                    ) {
+                        self.error(span, "numeric intrinsic result type mismatch");
+                    }
                     return;
                 }
                 self.require_exact(
