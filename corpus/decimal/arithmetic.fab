@@ -1,60 +1,57 @@
 +++
-term = "numerus<d32>"
+term = "numerus<d64>"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "expression", "additive_expr", "multiplicative_expr", "literal", "nota_stmt"]
 category = "arithmetic"
 canonical = false
-summary = "numerus<d32>/<d64> arithmetic executes at a scaled-integer carrier — 4.2 + 0.1 = 4.3 exactly."
-syntax = "numerus<d32> a ← 4.2"
+summary = "numerus<d64> arithmetic executes at a scaled-integer carrier — 4.2 + 0.1 = 4.3 exactly."
+syntax = "numerus<d64> a ← 4.2"
 related = ["numerus", "d64", "↦", "fractus"]
 locale = "en"
 +++
 # =============================================================================
-# numerus<d32> — decimal arithmetic at the scaled carrier
+# numerus<d64> — decimal arithmetic at the scaled carrier
 # =============================================================================
 #
 # What this teaches:
-#   • Annotated decimal literals — `numerus<d32> a ← 4.2` carries the exact
+#   • Annotated decimal literals — `numerus<d64> a ← 4.2` carries the exact
 #     digit text to typing; 4.2 is 42×10⁻¹, not a float approximation.
 #   • Scaled-integer execution — arithmetic runs on `Value::Int` carriers
-#     (d32 = 10⁷, d64 = 10⁹) with checked 128-bit intermediates and
-#     round-half-even reductions, so 4.2 + 0.1 = 4.3 exactly.
-#   • The runner prints the RAW scaled carrier — 4.2 prints as `42000000`
-#     (42 × 10⁶ at the d32 scale), and 4.2 + 0.1 prints `43000000`
-#     (43 × 10⁶). Exactness is visible in the carrier, not in a formatted
+#     (d64 = 10⁹; `d64` is the only decimal width) with checked 128-bit
+#     intermediates and round-half-even reductions, so 4.2 + 0.1 = 4.3
+#     exactly.
+#   • The runner prints the RAW scaled carrier — 4.2 prints as `4200000000`
+#     (42 × 10⁸ at the d64 scale), and 4.2 + 0.1 prints `4300000000`
+#     (43 × 10⁸). Exactness is visible in the carrier, not in a formatted
 #     decimal string.
 #
 # Common mistakes:
-#   • reading a printed carrier as a formatted decimal — `43000000` IS 4.3
-#     at the d32 scale, not forty-three million
+#   • reading a printed carrier as a formatted decimal — `4300000000` IS 4.3
+#     at the d64 scale, not forty-three million
 #   • assuming decimal arithmetic degrades to float error — the scaled
 #     integer carrier keeps 4.2 + 0.1 = 4.3 exact where f64 rounds
 #   • treating integer literals as decimal literals — `a + 1`, `a / 2`, and
-#     `numerus<d32> e ← 5` reject with `decimal_integer_literal_rejected`;
+#     `numerus<d64> e ← 5` reject with `decimal_integer_literal_rejected`;
 #     write `1.0`, `2.0`, or `5.0`, or use explicit `↦` conversion
 #
 # See also: numerus, d64, ↦, fractus
 # =============================================================================
 
-# decimal — 4.2 arithmetic at the d32 carrier
+# decimal — 4.2 arithmetic at the d64 carrier
 #
 # WHY: pins the D4 runner contract end-to-end. Each line below prints the
 # raw scaled carrier of the expression to its right.
 #
 # EXPECTED OUTPUT:
-#   decimal-arithmetic.expected — raw d32/d64 carriers, one per print.
+#   decimal-arithmetic.expected — raw d64 carriers, one per print.
 
 main {
-    const int<d32> a ← 4.2
-    const int<d32> b ← 0.1
+    const int<d64> a ← 4.2
+    const int<d64> b ← 0.1
     print a
     print b
     print a + b
     print a - b
     print a * b
     print a / b
-    const int<d64> x ← 4.2
-    const int<d64> y ← 0.1
-    print x + y
-    print x * y
 }

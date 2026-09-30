@@ -348,16 +348,14 @@ def parse_disagreements(text: str) -> list[dict]:
 # Decimal conversio rows (decimal-widths goal D6). Width-refined cells in the
 # same stable order as the harness `DECIMAL_CELLS` table.
 DECIMAL_CELL_IDS = [
-    "d32-d64",
-    "d64-d32",
-    "d32-i64",
-    "i64-d32",
-    "d32-u32",
-    "u32-d32",
-    "fractus-d32",
-    "d32-fractus",
-    "textus-d32",
-    "d32-textus",
+    "d64-i64",
+    "i64-d64",
+    "d64-u32",
+    "u32-d64",
+    "fractus-d64",
+    "d64-fractus",
+    "textus-d64",
+    "d64-textus",
 ]
 
 

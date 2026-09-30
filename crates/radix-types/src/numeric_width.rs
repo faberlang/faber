@@ -23,16 +23,19 @@ pub enum NumericWidth {
     BF16,
     F32,
     F64,
-    /// Decimal-encoded numerus width (scaled integer, d32 = i32×10⁻⁷).
-    D32,
     /// Decimal-encoded numerus width (scaled integer, d64 = i64×10⁻⁹).
     D64,
 }
+
+/// The removed `d32` marker spelling (D11.7): diagnosed, never parsed.
+pub const REMOVED_D32_MARKER: &str = "d32";
 
 /// Family mismatch or unknown width marker for a primitive family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WidthError {
     UnrecognizedMarker,
+    /// `d32`, removed as a type (D11.7); `d64` is the only decimal width.
+    RemovedDecimal,
     FloatOnNumerus,
     IntOnFractus,
     TooManyParams,
@@ -54,6 +57,8 @@ pub enum WidthLowerIssue {
     IntOnFractus,
     /// Unrecognized marker for the primitive family.
     InvalidMarker(Primitive),
+    /// `d32` was removed (D11.7); `d64` is the only decimal width.
+    RemovedDecimalWidth,
     /// Too many width markers for the primitive.
     TooManyParams(Primitive),
     /// `modulus` requires exactly one width marker.
@@ -81,6 +86,7 @@ impl WidthLowerIssue {
     pub const INVALID_NUMERUS_WIDTH_MARKER: &str = "invalid_numerus_width_marker";
     pub const INVALID_FRACTUS_WIDTH_MARKER: &str = "invalid_fractus_width_marker";
     pub const INVALID_WIDTH_MARKER: &str = "invalid_width_marker";
+    pub const REMOVED_DECIMAL_WIDTH: &str = "removed_decimal_width_d32";
     pub const NUMERUS_WIDTH_PARAMS: &str = "numerus_width_params";
     pub const FRACTUS_WIDTH_PARAMS: &str = "fractus_width_params";
     pub const PRIMITIVE_WIDTH_PARAMS: &str = "primitive_width_params";
@@ -103,6 +109,7 @@ impl WidthLowerIssue {
             Self::InvalidMarker(Primitive::Numerus) => Self::INVALID_NUMERUS_WIDTH_MARKER,
             Self::InvalidMarker(Primitive::Fractus) => Self::INVALID_FRACTUS_WIDTH_MARKER,
             Self::InvalidMarker(_) => Self::INVALID_WIDTH_MARKER,
+            Self::RemovedDecimalWidth => Self::REMOVED_DECIMAL_WIDTH,
             Self::TooManyParams(Primitive::Numerus) => Self::NUMERUS_WIDTH_PARAMS,
             Self::TooManyParams(Primitive::Fractus) => Self::FRACTUS_WIDTH_PARAMS,
             Self::TooManyParams(_) => Self::PRIMITIVE_WIDTH_PARAMS,
@@ -123,6 +130,7 @@ fn width_lower_issue(err: WidthError, prim: Primitive) -> WidthLowerIssue {
         WidthError::FloatOnNumerus => WidthLowerIssue::FloatOnNumerus,
         WidthError::IntOnFractus => WidthLowerIssue::IntOnFractus,
         WidthError::UnrecognizedMarker => WidthLowerIssue::InvalidMarker(prim),
+        WidthError::RemovedDecimal => WidthLowerIssue::RemovedDecimalWidth,
         WidthError::TooManyParams => WidthLowerIssue::TooManyParams(prim),
     }
 }
@@ -160,10 +168,11 @@ impl NumericWidth {
             ("u16", Primitive::Numerus) => Ok(Self::U16),
             ("u32", Primitive::Numerus) => Ok(Self::U32),
             ("u64", Primitive::Numerus) => Ok(Self::U64),
-            // decimal-widths D1: d-markers are valid only on numerus (the
-            // surgical FloatOnNumerus relaxation — f-markers still reject).
-            ("d32", Primitive::Numerus) => Ok(Self::D32),
+            // d-markers are valid only on numerus (the surgical
+            // FloatOnNumerus relaxation — f-markers still reject). `d64` is
+            // the only decimal width; `d32` was removed (D11.7).
             ("d64", Primitive::Numerus) => Ok(Self::D64),
+            (REMOVED_D32_MARKER, Primitive::Numerus) => Err(WidthError::RemovedDecimal),
             ("f16" | "f32" | "f64" | "bf16", Primitive::Numerus) => Err(WidthError::FloatOnNumerus),
             ("f16", Primitive::Fractus) => Ok(Self::F16),
             ("bf16", Primitive::Fractus) => Ok(Self::BF16),
@@ -219,7 +228,6 @@ impl NumericWidth {
             Self::BF16 => "bf16",
             Self::F32 => "f32",
             Self::F64 => "f64",
-            Self::D32 => "d32",
             Self::D64 => "d64",
         }
     }
@@ -259,22 +267,12 @@ impl NumericWidth {
         }
     }
 
-    /// Decimal-width lattice rank; `d32 → d64` is the only decimal widening.
-    fn decimal_rank(self) -> Option<u8> {
-        match self {
-            Self::D32 => Some(0),
-            Self::D64 => Some(1),
-            _ => None,
-        }
-    }
-
     /// Decimal-digit scale exponent of the scaled-integer carrier.
     ///
-    /// d32 = i32×10⁻⁷, d64 = i64×10⁻⁹ (CTO ruling, decimal-widths D0).
+    /// d64 = i64×10⁻⁹ (scale rescale to 8 is separate work, N5).
     #[must_use]
     pub fn decimal_scale(self) -> Option<u32> {
         match self {
-            Self::D32 => Some(7),
             Self::D64 => Some(9),
             _ => None,
         }
@@ -282,7 +280,7 @@ impl NumericWidth {
 
     #[must_use]
     pub fn is_decimal(self) -> bool {
-        matches!(self, Self::D32 | Self::D64)
+        self == Self::D64
     }
 
     /// Whether `from` may flow into `to` implicitly (assignment, argument
@@ -306,11 +304,6 @@ impl NumericWidth {
             return a < b;
         }
         if let (Some(a), Some(b)) = (from.float_rank(), to.float_rank()) {
-            return a <= b;
-        }
-        // decimal-widths D1: d32 -> d64 is the only decimal widening; decimals
-        // never widen into or out of the integer/fractus lattices.
-        if let (Some(a), Some(b)) = (from.decimal_rank(), to.decimal_rank()) {
             return a <= b;
         }
         false
@@ -416,11 +409,19 @@ pub fn standalone_width_type(name: &str) -> Option<(Primitive, NumericWidth)> {
         })
 }
 
+/// Whether `name` is a bare width-marker type spelling: live sugar (`f32`) or
+/// the removed `d32`, which stays a type-position name so its use reports the
+/// dedicated removal diagnostic instead of an unknown identifier.
+#[must_use]
+pub fn is_standalone_width_name(name: &str) -> bool {
+    name == REMOVED_D32_MARKER || standalone_width_type(name).is_some()
+}
+
 /// Whether `name` is bare width sugar (`f32`), tensor sugar (`tf32`), vector
 /// sugar (`vf32`), matrix sugar (`mf32`), sparsa sugar (`sf32`), or lista sugar (`lf32`).
 #[must_use]
 pub fn is_numeric_width_type_sugar(name: &str) -> bool {
-    standalone_width_type(name).is_some()
+    is_standalone_width_name(name)
         || width_prefixed_sugar_marker(name, 't').is_some()
         || width_prefixed_sugar_marker(name, 'v').is_some()
         || width_prefixed_sugar_marker(name, 'm').is_some()
@@ -470,6 +471,10 @@ pub fn lower_standalone_width_type(
     types: &mut TypeTable,
     report: &mut dyn FnMut(WidthLowerIssue),
 ) -> Option<TypeId> {
+    if name == REMOVED_D32_MARKER {
+        report(WidthLowerIssue::RemovedDecimalWidth);
+        return Some(types.intern(Type::Error));
+    }
     let (prim, width) = standalone_width_type(name)?;
     if !params.is_empty() {
         report(WidthLowerIssue::Params);
@@ -791,7 +796,7 @@ pub const TENSOR_ELEMENT_NUMERIC_MSG: &str = "tensor arithmetic requires numeric
 pub const TENSOR_INDEX_VECTOR_MSG: &str = "tensor index vector requires lista of integer elements";
 
 /// decimal-widths D2 (wildcard audit): decimal widths are value scalars, not
-/// positions. A `numerus<d32|d64>` index would scale-address storage — the
+/// positions. A `numerus<d64>` index would scale-address storage — the
 /// bracket index boundary is integer-only.
 pub const DECIMAL_INDEX_SCALAR_MSG: &str = "decimal-width numerus cannot index; decimal widths are scaled values, not positions — use an integer width such as numerus<i32>";
 
@@ -1042,15 +1047,6 @@ impl NumericWidth {
             ),
             _ => (None, None),
         }
-    }
-
-    /// decimal-widths D3: the decimal conversio matrix admits exactly the
-    /// widening arm (`d32 → d64`, identity included); the reverse (`d64 → d32`)
-    /// is a narrowing with no `↦` arm — decimals never narrow through
-    /// conversio, unlike integer widths where explicit narrowing is a row.
-    #[must_use]
-    pub fn is_decimal_narrowing_conversio(from: Self, to: Self) -> bool {
-        from.is_decimal() && to.is_decimal() && !Self::is_widening_assignable(from, to)
     }
 }
 

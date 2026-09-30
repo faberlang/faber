@@ -421,14 +421,14 @@ fn width_sub_table(width: NumericWidth) -> (SizedNumericOutcome, SizedNumericOut
             SizedNumericOutcome::PhysicalScalar,
         ),
         // decimal-widths D1: decimals have no MIR scalar arm until D4/D5.
-        NumericWidth::D32 | NumericWidth::D64 => (
+        NumericWidth::D64 => (
             SizedNumericOutcome::LoudError,
             SizedNumericOutcome::LoudError,
         ),
     }
 }
 
-fn all_numeric_widths() -> [NumericWidth; 14] {
+fn all_numeric_widths() -> [NumericWidth; 13] {
     [
         NumericWidth::I8,
         NumericWidth::I16,
@@ -442,7 +442,6 @@ fn all_numeric_widths() -> [NumericWidth; 14] {
         NumericWidth::BF16,
         NumericWidth::F32,
         NumericWidth::F64,
-        NumericWidth::D32,
         NumericWidth::D64,
     ]
 }

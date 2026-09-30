@@ -2294,7 +2294,7 @@ category = "iteration"
 
 [[files]]
 path = "decimal/arithmetic.fab"
-term = "numerus<d32>"
+term = "numerus<d64>"
 kind = "operator-group"
 category = "arithmetic"
 
@@ -2305,10 +2305,10 @@ kind = "operator-group"
 category = "conversion"
 
 [[files]]
-path = "decimal/narrowing-decline.fab"
+path = "decimal/d32-removed.fab"
 term = "d32"
 kind = "reject"
-category = "conversion"
+category = "type"
 
 [[files]]
 path = "defectus/defectus.fab"

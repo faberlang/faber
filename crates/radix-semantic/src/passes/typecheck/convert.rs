@@ -69,9 +69,6 @@ const ISSUE_BITS_PAIR_WIDTH_MISMATCH: &str = "bits_pair_width_mismatch";
 const ISSUE_DECIMAL_RADIX_HINT_REJECTED: &str = "decimal_radix_hint_rejected";
 const ISSUE_DECIMAL_ENDIAN_HINT_REJECTED: &str = "decimal_endianness_hint_rejected";
 const ISSUE_DECIMAL_BITS_HINT_REJECTED: &str = "decimal_bits_hint_rejected";
-// decimal-widths D3: the decimal conversio matrix admits exactly the d32→d64
-// widening arm; the reverse (d64→d32) is a narrowing with no `↦` row.
-const ISSUE_DECIMAL_NARROWING_REJECTED: &str = "decimal_width_narrowing_rejected";
 const ISSUE_BITS_HINT_CONFLICT: &str = "conversio_bits_format_hint_conflict";
 const ISSUE_OCTETI_TO_BIVALENS_UNSUPPORTED: &str = "octeti_to_bivalens_unsupported";
 const ISSUE_PROMISSUM_TARGET_BOUNDARY: &str = "promissum_target_boundary";
@@ -248,7 +245,7 @@ enum NumericFactFamily {
     SaturatingSigned { rank: u8 },
     SaturatingUnsigned { rank: u8 },
     Float { rank: Option<u8> },
-    Decimal { rank: u8 },
+    Decimal,
 }
 
 impl NumericFactFamily {
@@ -282,8 +279,10 @@ impl NumericFactFamily {
             | (Self::UnsignedInt { rank: a }, Self::UnsignedInt { rank: b })
             | (Self::Modular { rank: a }, Self::Modular { rank: b })
             | (Self::SaturatingSigned { rank: a }, Self::SaturatingSigned { rank: b })
-            | (Self::SaturatingUnsigned { rank: a }, Self::SaturatingUnsigned { rank: b })
-            | (Self::Decimal { rank: a }, Self::Decimal { rank: b }) => a <= b,
+            | (Self::SaturatingUnsigned { rank: a }, Self::SaturatingUnsigned { rank: b }) => {
+                a <= b
+            }
+            (Self::Decimal, Self::Decimal) => true,
             (Self::Float { rank: a }, Self::Float { rank: b }) => {
                 matches!((a, b), (Some(x), Some(y)) if x <= y)
             }
@@ -321,14 +320,6 @@ fn float_width_rank(width: NumericWidth) -> Option<u8> {
     }
 }
 
-fn decimal_width_rank(width: NumericWidth) -> Option<u8> {
-    match width {
-        NumericWidth::D32 => Some(0),
-        NumericWidth::D64 => Some(1),
-        _ => None,
-    }
-}
-
 /// A scalar numeric type as F3 sees it: widening family plus the carrier
 /// width for the literal-holds clause.
 struct NumericFact {
@@ -351,8 +342,8 @@ fn numeric_fact(ty: &Type) -> Option<NumericFact> {
                 NumericFactFamily::SignedInt { rank }
             } else if let Some(rank) = unsigned_width_rank(*width) {
                 NumericFactFamily::UnsignedInt { rank }
-            } else if let Some(rank) = decimal_width_rank(*width) {
-                NumericFactFamily::Decimal { rank }
+            } else if width.is_decimal() {
+                NumericFactFamily::Decimal
             } else {
                 float_width_rank(*width)
                     .map(|rank| NumericFactFamily::Float { rank: Some(rank) })?
@@ -1349,23 +1340,6 @@ impl TypeChecker<'_> {
         params: &[Symbol],
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
-        // decimal-widths D3: within the decimal family, `↦` admits only the
-        // d32→d64 widening arm. The reverse (d64→d32) is a narrowing with no
-        // conversio row — decimals never narrow through `↦`, unlike integer
-        // widths where explicit narrowing is an established law.
-        if let (PrimitiveConversioFamily::Numerus, PrimitiveConversioFamily::Numerus) = (
-            self.primitive_conversio_family(source_ty),
-            self.primitive_conversio_family(target_resolved),
-        ) {
-            let from = crate::numeric_width::effective_width(self.types, source_ty);
-            let to = crate::numeric_width::effective_width(self.types, target_resolved);
-            if let (Some(from), Some(to)) = (from, to)
-                && NumericWidth::is_decimal_narrowing_conversio(from, to)
-            {
-                self.invalid_conversion(ISSUE_DECIMAL_NARROWING_REJECTED, span);
-                return Some(self.error_type);
-            }
-        }
         let issue = match (
             self.primitive_conversio_family(source_ty),
             self.primitive_conversio_family(target_resolved),
@@ -1454,8 +1428,8 @@ impl TypeChecker<'_> {
     }
 
     /// decimal-widths D2 (wildcard audit): named reject for conversio slot-2
-    /// hints aimed at a decimal numerus target — `textus ↦ numerus<d32, Hex>`,
-    /// `octeti ↦ numerus<d32, Be>`, and every other hint spelling.
+    /// hints aimed at a decimal numerus target — `textus ↦ numerus<d64, Hex>`,
+    /// `octeti ↦ numerus<d64, Be>`, and every other hint spelling.
     fn decimal_target_hint_issue(
         &self,
         target_resolved: TypeId,
@@ -2649,10 +2623,9 @@ impl TypeChecker<'_> {
                         truncated >= lo as f64 && truncated <= hi as f64
                     }))
             }
-            NumericFactFamily::Decimal { rank } => {
-                // d32 integer parts fit i32; d64 integer parts fit i64.
-                let safe_rank = if rank == 0 { 2 } else { 3 };
-                !matches!(to.family, NumericFactFamily::SignedInt { rank: t } if t >= safe_rank)
+            NumericFactFamily::Decimal => {
+                // d64 integer parts fit i64.
+                !matches!(to.family, NumericFactFamily::SignedInt { rank: t } if t >= 3)
             }
             NumericFactFamily::SignedInt { .. }
             | NumericFactFamily::UnsignedInt { .. }

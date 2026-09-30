@@ -95,7 +95,7 @@ fn cross_family_comparison_is_accepted() {
         ("numerus<d64>", "fractus<f64>"),
         ("numerus<d64>", "numerus"),
         ("fractus<f32>", "numerus<i64>"),
-        ("fractus<f64>", "numerus<d32>"),
+        ("fractus<f64>", "numerus<d64>"),
     ] {
         for glyph in ["<", ">", "≤", "≥", "≅", "≇", "≈", "≉"] {
             assert_accepts(&format!(

@@ -32,7 +32,7 @@ locale = "en"
 #     Ordering and value equality compare across families with no `↦`, and
 #     compare exactly (`9007199254740993 ≅ 9007199254740992.0` is falsum).
 #   • Expecting decimal `≅`/`≈` to stay carrier-blind — the d64-scale join
-#     (GT-1) makes 4.2 d32 ≅ 4.2 d64 verum; decimal × fractus never compares
+#     (GT-1) makes two 4.2 d64 values ≅ verum; decimal × fractus never compares
 #     (GT-2), on either the ordering or the equality tier.
 #   • Expecting `est` to compare values — it is a type test (D23.1); the
 #     value right-hand side that used to sit in this table names `≡` instead.
@@ -52,7 +52,7 @@ locale = "en"
 # P4 int×f32           R-eq  J     J     J     J     J     J    R-fam    J
 # P5 int×f64           R-eq  J     J     J     J     J     J    R-fam    J
 # P6 f32×f64           R-eq  J     J     J     J     J     J     J       J
-# P7 d32×d64           R-eq  J     J     J     J     J     J     J     J / R-narr
+# P7 d64×d64           J     J     J     J     J     J     J     J       J
 # P8 decimal×integer   R-eq  J     J     J     J     J     J    R-fam    J
 # P9 decimal×fractus   R-eq  R-eq²  R-eq²  R-ord R-ord R-ord R-ord R-fam    J
 #
@@ -65,12 +65,11 @@ locale = "en"
 # R-ord   SEM011:mixed_decimal_fractus_ordering
 # R-eq²   SEM011:mixed_decimal_fractus_equality (GT-2 — the ≅/≈ equality tiers
 #         now mirror the ordering gate; decimal/fractus never compares)
-# R-narr  SEM016:decimal_width_narrowing_rejected (d64 → d32 only)
 #
 # Closed findings (GT-1..GT-4, pinned by the executed rows below):
-#   GT-1  the d32/d64 ≅ and ≈ cells join at the d64 scale in MIR (conversion
-#         temps, mirroring the ordering join) — 4.2 d32 ≅ 4.2 d64 verdicts
-#         verum. Previously the runner compared raw scaled carriers.
+#   GT-1  the decimal ≅ and ≈ cells join at the d64 scale in MIR (conversion
+#         temps, mirroring the ordering join). `d32` was removed (D11.7), so
+#         P7 is the identical d64×d64 pair.
 #   GT-3  the signed×unsigned ↦ cell joins for non-negative values; a
 #         negative value into an unsigned target fails closed at runtime
 #         (conversion never wraps — DEFER-116 boundary contract), recovered
@@ -110,18 +109,19 @@ main {
     const float boundary ← 9007199254740992.0
 
     # -------------------------------------------------------------- decimals
-    const int<d32> d32v ← 4.2
     const int<d64> d64v ← 4.2
+    const int<d64> d64w ← 4.2
     const int five ← 5
 
     # ----------------------------------------------------------- conversio
     const int<u64> five_u ← 5
 
     # ----------------------------------------------------- ≡ / ≠ (P1 join)
-    # P1 identical ints join exactly; every other family pair is
-    # SEM010:equality_exact_types_required.
+    # Identical types join exactly (P1 ints, P7 decimals); every other family
+    # pair is SEM010:equality_exact_types_required.
     print a ≡ b
     print a ≠ 8
+    print d64v ≡ d64w
 
     # --------------------------------------------------- ≅ / ≇ (all joins)
     # Exact value equality across widths and families: nothing is rounded
@@ -134,11 +134,11 @@ main {
     print above ≅ boundary
     print above ≅ below
     print single ≅ double
-    print d32v ≅ five
-    print d32v ≅ d64v
+    print d64v ≅ five
+    print d64v ≅ d64w
     # decimal × fractus ≅ rejects (SEM011:mixed_decimal_fractus_equality,
     # GT-2) — the ordering gate rejects the same family pair.
-    # print d32v ≅ four_two
+    # print d64v ≅ four_two
 
     # --------------------------------------------------- ≈ / ≉ (all joins)
     # Tolerance equality at the float operand's precision (OQ3 isclose
@@ -151,11 +151,11 @@ main {
     print above ≈ boundary
     print above ≈ below
     print single ≈ double
-    print d32v ≈ five
-    print d32v ≈ d64v
+    print d64v ≈ five
+    print d64v ≈ d64w
     # decimal × fractus ≈ rejects (SEM011:mixed_decimal_fractus_equality,
     # GT-2) — the ordering gate rejects the same family pair.
-    # print d32v ≈ four_two
+    # print d64v ≈ four_two
 
     # -------------------------------------------------------- < (P1–P8)
     # Ordering compares the true mathematical values, across families too: an
@@ -169,8 +169,8 @@ main {
     print large ≺ single
     print half ≺ large
     print single ≺ double
-    print d32v ≺ d64v
-    print d32v ≺ five
+    print d64v ≺ d64w
+    print d64v ≺ five
 
     # -------------------------------------------------------- ≤ (P1–P8)
     print a ≤ b
@@ -179,8 +179,8 @@ main {
     print large ≤ single
     print half ≤ large
     print single ≤ double
-    print d32v ≤ d64v
-    print d32v ≤ five
+    print d64v ≤ d64w
+    print d64v ≤ five
 
     # -------------------------------------------------------- > (P1–P8)
     print a ≻ b
@@ -190,8 +190,8 @@ main {
     print large ≻ single
     print large ≻ half
     print single ≻ double
-    print d32v ≻ d64v
-    print d32v ≻ five
+    print d64v ≻ d64w
+    print d64v ≻ five
 
     # -------------------------------------------------------- ≥ (P1–P8)
     print a ≥ b
@@ -200,8 +200,8 @@ main {
     print large ≥ single
     print half ≥ large
     print single ≥ double
-    print d32v ≥ d64v
-    print d32v ≥ five
+    print d64v ≥ d64w
+    print d64v ≥ five
     # ------------------------------------------------------- arith (P1)
     # Same-family arithmetic is exact and range-checked where it is stored.
     # Crossing families is SEM011:numeric_family_crossing_requires_conversio
@@ -215,12 +215,10 @@ main {
     print narrow + narrow
     print single + single
     print four_two + four_two
-    print d32v + d32v
-    print d64v + d64v
+    print d64w + d64w
 
     # ------------------------------------------------------- ↦ (all joins)
-    # Conversio is directional. Every family direction admits except the
-    # decimal narrowing d64 → d32 (SEM016:decimal_width_narrowing_rejected).
+    # Conversio is directional. Every family direction admits.
     print narrow ↦ int<u16>
     print a ↦ int<u8>
     print five_u ↦ int
@@ -235,11 +233,10 @@ main {
     print four_two ↦ int
     print single ↦ f64
     print double ↦ f32
-    print d32v ↦ int<d64>
-    print d32v ↦ int
-    print five ↦ int<d32>
+    print d64v ↦ int<d64>
+    print d64v ↦ int
     print five ↦ int<d64>
-    print d32v ↦ float
+    print d64v ↦ float
     print four_two ↦ int<d64>
 
     # ----------------------------------------------------- est (type test)

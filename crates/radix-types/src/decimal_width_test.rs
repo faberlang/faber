@@ -1,14 +1,15 @@
-//! decimal-widths D1: d32/d64 marker law, decimal widening lattice, and the
-//! exact-text scaled parser that backs the literal carrier.
+//! decimal-widths D1: d64 marker law (`d32` removed, D11.7), the decimal
+//! lattice, and the exact-text scaled parser that backs the literal carrier.
 
 use crate::numeric_width::decimal_text_to_scaled;
 use crate::{NumericWidth, Primitive, WidthError};
 
 #[test]
 fn d_markers_parse_on_numerus_only() {
+    // `d32` was removed (D11.7): a dedicated error, never a width.
     assert_eq!(
         NumericWidth::from_marker("d32", Primitive::Numerus),
-        Ok(NumericWidth::D32)
+        Err(WidthError::RemovedDecimal)
     );
     assert_eq!(
         NumericWidth::from_marker("d64", Primitive::Numerus),
@@ -31,18 +32,10 @@ fn d_markers_parse_on_numerus_only() {
 }
 
 #[test]
-fn decimal_lattice_grows_d32_to_d64_only() {
+fn decimal_lattice_has_one_width() {
     assert!(NumericWidth::is_widening_assignable(
-        NumericWidth::D32,
-        NumericWidth::D64
-    ));
-    assert!(NumericWidth::is_widening_assignable(
-        NumericWidth::D32,
-        NumericWidth::D32
-    ));
-    assert!(!NumericWidth::is_widening_assignable(
         NumericWidth::D64,
-        NumericWidth::D32
+        NumericWidth::D64
     ));
     // decimals never cross into the integer or fractus lattices
     for other in [
@@ -52,14 +45,6 @@ fn decimal_lattice_grows_d32_to_d64_only() {
         NumericWidth::F64,
     ] {
         assert!(!NumericWidth::is_widening_assignable(
-            NumericWidth::D32,
-            other
-        ));
-        assert!(!NumericWidth::is_widening_assignable(
-            other,
-            NumericWidth::D32
-        ));
-        assert!(!NumericWidth::is_widening_assignable(
             NumericWidth::D64,
             other
         ));
@@ -68,10 +53,9 @@ fn decimal_lattice_grows_d32_to_d64_only() {
             NumericWidth::D64
         ));
     }
-    assert!(!NumericWidth::D32.is_float());
-    assert!(!NumericWidth::D32.is_signed_int());
+    assert!(!NumericWidth::D64.is_float());
+    assert!(!NumericWidth::D64.is_signed_int());
     assert!(!NumericWidth::D64.is_unsigned_int());
-    assert_eq!(NumericWidth::D32.decimal_scale(), Some(7));
     assert_eq!(NumericWidth::D64.decimal_scale(), Some(9));
     assert_eq!(NumericWidth::F64.decimal_scale(), None);
 }
@@ -96,13 +80,11 @@ fn decimal_text_to_scaled_is_exact() {
 fn decimal_widths_reject_as_index_scalars() {
     use crate::{TypeTable, is_decimal_index_scalar, is_integer_index_scalar};
     let mut types = TypeTable::new();
-    let d32 = types.sized_numeric(Primitive::Numerus, NumericWidth::D32);
     let d64 = types.sized_numeric(Primitive::Numerus, NumericWidth::D64);
     let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
-    assert!(!is_integer_index_scalar(&types, d32));
     assert!(!is_integer_index_scalar(&types, d64));
     assert!(is_integer_index_scalar(&types, i32));
-    assert!(is_decimal_index_scalar(&types, d32));
+    assert!(is_decimal_index_scalar(&types, d64));
     assert!(!is_decimal_index_scalar(&types, i32));
 }
 
@@ -110,45 +92,10 @@ fn decimal_widths_reject_as_index_scalars() {
 fn tensor_media_width_rejects_decimal_elements() {
     use crate::{TypeTable, tensor_media_width};
     let mut types = TypeTable::new();
-    let d32 = types.sized_numeric(Primitive::Numerus, NumericWidth::D32);
+    let d64 = types.sized_numeric(Primitive::Numerus, NumericWidth::D64);
     let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
     let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
-    assert_eq!(tensor_media_width(&types, d32), None);
+    assert_eq!(tensor_media_width(&types, d64), None);
     assert_eq!(tensor_media_width(&types, i32), Some(NumericWidth::F64));
     assert_eq!(tensor_media_width(&types, f32), Some(NumericWidth::F32));
-}
-
-// --- D3 conversio matrix (explicit `↦` arms) ---
-
-#[test]
-fn decimal_conversio_admits_widening_arm_only() {
-    // The conversio matrix within the decimal family is exactly the widening
-    // arm: d32→d64 (identity included). The reverse d64→d32 is a narrowing
-    // with no `↦` row — decimals never narrow through conversio, unlike
-    // integer widths where explicit narrowing is an established law.
-    assert!(!NumericWidth::is_decimal_narrowing_conversio(
-        NumericWidth::D32,
-        NumericWidth::D64
-    ));
-    assert!(!NumericWidth::is_decimal_narrowing_conversio(
-        NumericWidth::D32,
-        NumericWidth::D32
-    ));
-    assert!(NumericWidth::is_decimal_narrowing_conversio(
-        NumericWidth::D64,
-        NumericWidth::D32
-    ));
-    assert!(!NumericWidth::is_decimal_narrowing_conversio(
-        NumericWidth::D64,
-        NumericWidth::D64
-    ));
-    // Non-decimal pairs never trip the decimal narrowing arm.
-    assert!(!NumericWidth::is_decimal_narrowing_conversio(
-        NumericWidth::I64,
-        NumericWidth::I32
-    ));
-    assert!(!NumericWidth::is_decimal_narrowing_conversio(
-        NumericWidth::F64,
-        NumericWidth::F32
-    ));
 }

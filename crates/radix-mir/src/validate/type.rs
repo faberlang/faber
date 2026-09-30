@@ -922,7 +922,6 @@ fn numerus_width_range(width: NumericWidth) -> (i128, i128) {
             (i128::from(i64::MIN), i128::from(i64::MAX))
         }
         // decimal-widths D1: scaled-integer carriers fit the i64 domain.
-        NumericWidth::D32 => (i128::from(i32::MIN), i128::from(i32::MAX)),
         NumericWidth::D64 => (i128::from(i64::MIN), i128::from(i64::MAX)),
     }
 }

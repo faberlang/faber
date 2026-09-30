@@ -2788,7 +2788,7 @@ impl<'a> FunctionBuilder<'a> {
         if matches!(op, HirBinOp::FuzzyEq | HirBinOp::FuzzyNotEq) {
             // GT-1: fuzzy equality joins decimal operands at the d64 scale
             // like every other comparison tier; raw scaled carriers would
-            // compare 4.2 d32 as 42000000 against 4200000000 d64.
+            // compare a d64 carrier against a peer at another scale.
             let (lhs, rhs) = self.lower_decimal_join_operands(lhs, rhs)?;
             let ty = self.expr_ty(expr)?;
             return Some(self.runtime_call_value(

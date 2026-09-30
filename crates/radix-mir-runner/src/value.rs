@@ -862,8 +862,7 @@ pub fn int_width_range(width: NumericWidth) -> (i128, i128) {
             (i64::MIN as i128, i64::MAX as i128)
         }
         // decimal-widths D1: scaled-integer carriers fit their integer domain
-        // (d32 = i32×10⁻⁷, d64 = i64×10⁻⁹); D4 owns runner arithmetic.
-        NumericWidth::D32 => (i32::MIN as i128, i32::MAX as i128),
+        // (d64 = i64×10⁻⁹); D4 owns runner arithmetic.
         NumericWidth::D64 => (i64::MIN as i128, i64::MAX as i128),
     }
 }
@@ -904,7 +903,6 @@ pub fn float_to_numerus_width(value: f64, width: NumericWidth) -> Value {
         | NumericWidth::BF16
         | NumericWidth::F32
         | NumericWidth::F64
-        | NumericWidth::D32
         | NumericWidth::D64 => Value::Int(value as i64),
     }
 }

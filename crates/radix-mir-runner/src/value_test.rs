@@ -148,8 +148,8 @@ fn mixed_integer_float_ordering_joins_at_float_carrier() {
 
 #[test]
 fn scaled_decimal_join_carriers_compare_by_value() {
-    // The lowerer widens d32 to d64 and scales integer peers before this
-    // helper sees them. These are the resulting d64 carriers, not raw d32
+    // The lowerer scales integer peers to the d64 carrier before this
+    // helper sees them. These are the resulting d64 carriers, not raw integer
     // units, so comparison stays numeric rather than carrier-blind.
     let span = Span::default();
     assert_eq!(

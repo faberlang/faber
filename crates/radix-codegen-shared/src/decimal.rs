@@ -1,7 +1,7 @@
 //! Shared decimal-carrier math for codegen tiers (decimal-widths D5).
 //!
-//! Decimal widths ride the tier's signed-integer carrier (`d32` = `i32`×10⁻⁷,
-//! `d64` = `i64`×10⁻⁹) with round-half-even rescale. These pure helpers keep
+//! Decimal widths ride the tier's signed-integer carrier (`d64` =
+//! `i64`×10⁻⁹) with round-half-even rescale. These pure helpers keep
 //! every emit tier on the same carrier math as the MIR runner without
 //! re-importing runner internals.
 
@@ -13,7 +13,7 @@ use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
 #[path = "decimal_test.rs"]
 mod tests;
 
-/// Decimal scale as an integer factor (`d32` = 10^7, `d64` = 10^9).
+/// Decimal scale as an integer factor (`d64` = 10^9).
 #[must_use]
 pub fn decimal_scale_factor(width: NumericWidth) -> Option<i128> {
     width
@@ -23,11 +23,10 @@ pub fn decimal_scale_factor(width: NumericWidth) -> Option<i128> {
 
 /// Carrier integer type spelling for a decimal width.
 ///
-/// d32 rides `i32`, d64 rides `i64`; other widths return `None`.
+/// d64 rides `i64`; other widths return `None`.
 #[must_use]
 pub fn decimal_carrier_rust_type(width: NumericWidth) -> Option<&'static str> {
     match width {
-        NumericWidth::D32 => Some("i32"),
         NumericWidth::D64 => Some("i64"),
         _ => None,
     }
@@ -79,7 +78,7 @@ pub fn decimal_literal_payload(
 
 /// Resolve a decimal source width, recovering a path binding's declared type.
 #[must_use]
-pub fn decimal_flow_source_width<F>(
+pub fn decimal_source_width<F>(
     expr: &HirExpression,
     types: &TypeTable,
     binding_type: F,
@@ -96,19 +95,6 @@ where
         Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal() => Some(*width),
         _ => None,
     }
-}
-
-/// Alias for call sites that describe the source rather than a flow node.
-#[must_use]
-pub fn decimal_source_width<F>(
-    source: &HirExpression,
-    types: &TypeTable,
-    binding_type: F,
-) -> Option<NumericWidth>
-where
-    F: Fn(DefId) -> Option<TypeId>,
-{
-    decimal_flow_source_width(source, types, binding_type)
 }
 
 /// Pure round-half-even quotient for values whose intermediate arithmetic has
@@ -178,7 +164,6 @@ pub fn decimal_text_to_carrier(text: &str, width: NumericWidth) -> Option<i64> {
 #[must_use]
 pub fn carrier_in_width(carrier: i128, width: NumericWidth) -> Option<i64> {
     let (lo, hi) = match width {
-        NumericWidth::D32 => (i128::from(i32::MIN), i128::from(i32::MAX)),
         NumericWidth::D64 => (i128::from(i64::MIN), i128::from(i64::MAX)),
         _ => return None,
     };

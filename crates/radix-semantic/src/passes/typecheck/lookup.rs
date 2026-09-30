@@ -557,7 +557,7 @@ impl TypeChecker<'_> {
                 .expected_fractus_literal_type(expected)
                 .unwrap_or_else(|| self.fractus_type()),
             // decimal-widths D1: annotated decimals carry exact digit text to
-            // typing; `numerus<d32>`/`numerus<d64>` accept the literal at the
+            // typing; `numerus<d64>` accept the literal at the
             // declared width while every other expectation keeps fractus law.
             HirLiteral::FloatText { text, value } => {
                 if let Some(ty) = self.expected_decimal_literal_type(expected, *text, span) {
@@ -624,7 +624,7 @@ impl TypeChecker<'_> {
         match self.types.get(expected) {
             Type::Primitive(Primitive::Numerus) => Some(expected),
             Type::SizedNumeric(Primitive::Numerus, width) if !width.is_decimal() => Some(expected),
-            Type::SizedNumeric(Primitive::Numerus, NumericWidth::D32 | NumericWidth::D64) => {
+            Type::SizedNumeric(Primitive::Numerus, NumericWidth::D64) => {
                 // Decimal carriers scale decimal literals only. An integer
                 // literal has its own numerus type and must opt into that
                 // cross-family flow with an explicit `↦` conversion.
@@ -636,7 +636,7 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// Annotated decimal literal meeting a `numerus<d32>` / `numerus<d64>`
+    /// Annotated decimal literal meeting a `numerus<d64>`
     /// expectation (decimal-widths D1). Returns the expected type when the
     /// digit text scales exactly into the width's carrier.
     fn expected_decimal_literal_type(
@@ -675,7 +675,6 @@ impl TypeChecker<'_> {
         }
         let factor = i128::from(10u32).checked_pow(shift.cast_unsigned());
         let carrier_max: i128 = match width {
-            NumericWidth::D32 => i128::from(i32::MAX),
             NumericWidth::D64 => i128::from(i64::MAX),
             _ => unreachable!("decimal width checked above"),
         };

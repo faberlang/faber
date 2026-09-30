@@ -1869,7 +1869,10 @@ fn resolve_named_generic_arg_ident(
         return;
     }
     let Some(def_id) = resolver.lookup(ident.name) else {
-        errors.push(undefined_type_error(ISSUE_UNKNOWN_TYPE, ident.span));
+        errors.push(unknown_type_name_error(
+            interner.resolve(ident.name),
+            ident.span,
+        ));
         return;
     };
     let Some(symbol) = resolver.get_symbol(def_id) else {
@@ -2080,6 +2083,16 @@ fn validate_width_marker_param(
     }
 }
 
+/// Unresolved type name: the removed `d32` spelling gets its own issue.
+fn unknown_type_name_error(name: &str, span: radix_lexer::Span) -> SemanticError {
+    let issue = if name == crate::numeric_width::REMOVED_D32_MARKER {
+        WidthLowerIssue::REMOVED_DECIMAL_WIDTH
+    } else {
+        ISSUE_UNKNOWN_TYPE
+    };
+    undefined_type_error(issue, span)
+}
+
 fn undefined_type_error(issue: &'static str, span: radix_lexer::Span) -> SemanticError {
     SemanticError::structured(SemanticErrorKind::TypeUndefined, span).with_arg("issue", issue)
 }
@@ -2097,6 +2110,7 @@ fn instans_precision_marker_error(
 
 fn width_marker_error(err: WidthError, prim: Primitive, span: radix_lexer::Span) -> SemanticError {
     let issue = match err {
+        WidthError::RemovedDecimal => WidthLowerIssue::REMOVED_DECIMAL_WIDTH,
         WidthError::UnrecognizedMarker => match prim {
             Primitive::Numerus => ISSUE_INVALID_NUMERUS_WIDTH_MARKER,
             Primitive::Fractus => ISSUE_INVALID_FRACTUS_WIDTH_MARKER,
@@ -2195,7 +2209,10 @@ fn resolve_type_ident(
             // use of the import, like a namespace named by a qualified path.
             resolver.mark_namespace_used(ident.name);
         } else {
-            errors.push(undefined_type_error(ISSUE_UNKNOWN_TYPE, ident.span));
+            errors.push(unknown_type_name_error(
+                interner.resolve(ident.name),
+                ident.span,
+            ));
         }
         return;
     };

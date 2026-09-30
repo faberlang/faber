@@ -361,7 +361,7 @@ impl Parser {
                 }
             } else {
                 if path.len() == 1 {
-                    if radix_types::numeric_width::standalone_width_type(&name_str).is_some() {
+                    if radix_types::numeric_width::is_standalone_width_name(&name_str) {
                         form = TypeFormLevel::SHORT;
                     }
                     TypeExprKind::Named(name, Vec::new())

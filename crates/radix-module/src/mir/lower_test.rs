@@ -37,18 +37,18 @@ fn dump_source(source: &str) -> String {
 }
 
 #[test]
-fn lowers_decimal_ordering_through_a_common_scaled_carrier() {
+fn lowers_decimal_ordering_on_the_shared_scaled_carrier() {
     let dump = dump_source(
         r"
-functio maior(numerus<d32> a, numerus<d64> b) → bivalens {
+functio maior(numerus<d64> a, numerus<d64> b) → bivalens {
     redde a > b
 }
 ",
     );
     assert_eq!(
         dump.matches("runtime convert runtime").count(),
-        1,
-        "d32 must widen once to the d64 comparison carrier:\n{dump}"
+        0,
+        "same-width decimals compare with no conversion:\n{dump}"
     );
     assert!(
         dump.contains(" > "),
@@ -60,7 +60,7 @@ functio maior(numerus<d32> a, numerus<d64> b) → bivalens {
 fn lowers_decimal_integer_ordering_at_the_d64_scaled_carrier() {
     let dump = dump_source(
         r"
-functio maior(numerus<d32> a, numerus n) → bivalens {
+functio maior(numerus<d64> a, numerus n) → bivalens {
     redde a > n
 }
 ",
@@ -79,18 +79,18 @@ functio maior(numerus<d32> a, numerus n) → bivalens {
 }
 
 #[test]
-fn lowers_decimal_equality_through_a_common_scaled_carrier() {
+fn lowers_decimal_equality_on_the_shared_scaled_carrier() {
     let dump = dump_source(
         r"
-functio aequalis(numerus<d32> a, numerus<d64> b) → bivalens {
+functio aequalis(numerus<d64> a, numerus<d64> b) → bivalens {
     redde a ≅ b
 }
 ",
     );
     assert_eq!(
         dump.matches("runtime convert runtime").count(),
-        1,
-        "d32 must widen once to the d64 comparison carrier:\n{dump}"
+        0,
+        "same-width decimals compare with no conversion:\n{dump}"
     );
     assert!(
         dump.contains(" =="),
@@ -161,18 +161,18 @@ fn decimal_literal_switch_matches_at_the_exact_carrier() {
 }
 
 #[test]
-fn lowers_decimal_fuzzy_equality_through_the_d64_scaled_carrier() {
+fn lowers_decimal_fuzzy_equality_on_the_d64_scaled_carrier() {
     let dump = dump_source(
         r"
-functio aequalis(numerus<d32> a, numerus<d64> b) → bivalens {
+functio aequalis(numerus<d64> a, numerus<d64> b) → bivalens {
     redde a ≈ b
 }
 ",
     );
     assert_eq!(
         dump.matches("runtime convert runtime").count(),
-        1,
-        "fuzzy equality must widen d32 to the d64 carrier:\n{dump}"
+        0,
+        "same-width fuzzy equality needs no conversion:\n{dump}"
     );
 }
 

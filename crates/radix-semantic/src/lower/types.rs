@@ -686,7 +686,7 @@ impl Lowerer<'_> {
             return self.lower_byte_word_type(params);
         }
 
-        if crate::numeric_width::standalone_width_type(name_str).is_some() {
+        if crate::numeric_width::is_standalone_width_name(name_str) {
             let Some(type_params) = generic_type_exprs(params) else {
                 self.error("generic_size_argument_in_type_position");
                 return self.types.intern(Type::Error);

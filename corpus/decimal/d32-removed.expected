@@ -1,0 +1,3 @@
+# Reject oracle for the removed d32 decimal width.
+# Tokens: stable diagnostic identities (faber check output); one per line.
+SEM002:removed_decimal_width_d32

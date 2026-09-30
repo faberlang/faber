@@ -952,6 +952,10 @@ help = "declare the type or import it"
 message = "unknown width marker for this family"
 help = "declare the type or import it"
 
+[diagnostics.SEM002.issues.removed_decimal_width_d32]
+message = "d32 non est typus"
+help = "d32 remotus est; utere d64, sola latitudine decimali (numerus<d64>)"
+
 [diagnostics.SEM002.issues.name_not_type]
 message = "name does not refer to a type"
 help = "declare the type or import it"
@@ -1347,6 +1351,10 @@ help = "fix the AST construct for lowering"
 [diagnostics.SEM008.issues.invalid_precision_marker]
 message = "instans accepts only ms, us, or ns as a precision marker"
 help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.removed_decimal_width_d32]
+message = "d32 non est typus"
+help = "d32 remotus est; utere d64, sola latitudine decimali (numerus<d64>)"
 
 [diagnostics.SEM008.issues.invalid_width_marker]
 message = "unknown width marker for this family"

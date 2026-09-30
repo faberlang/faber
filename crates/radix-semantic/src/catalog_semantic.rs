@@ -298,6 +298,9 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
         SemanticErrorKind::AirPurityViolation => semantic_air_purity_help(args),
         SemanticErrorKind::ConflictingVisibility => semantic_conflicting_visibility_help(args),
         SemanticErrorKind::ConversionInvalid => semantic_invalid_conversion_help(args),
+        SemanticErrorKind::TypeUndefined | SemanticErrorKind::LoweringError => {
+            semantic_removed_width_help(args)
+        }
         SemanticErrorKind::AnnotationInvalid => semantic_invalid_annotation_help(args),
         SemanticErrorKind::OperandTypesInvalid => semantic_invalid_operand_types_help(args),
         SemanticErrorKind::TypeAnnotationAbsent => semantic_missing_type_annotation_help(args),
@@ -395,6 +398,17 @@ fn semantic_not_callable_help(args: &[DiagnosticArg]) -> Option<String> {
 }
 
 // CONVERSION AND OPERAND TYPES
+
+/// Help for the removed `d32` decimal width (D11.7). Other type-lowering
+/// issues keep the per-code default help.
+fn semantic_removed_width_help(args: &[DiagnosticArg]) -> Option<String> {
+    match arg_value(args, "issue")? {
+        "removed_decimal_width_d32" => {
+            Some("d32 was removed; use d64, the only decimal width (numerus<d64>)".to_owned())
+        }
+        _ => None,
+    }
+}
 
 fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {

@@ -352,7 +352,6 @@ impl PackedStorageLayout {
             | NumericWidth::U32
             | NumericWidth::U64
             | NumericWidth::F64
-            | NumericWidth::D32
             | NumericWidth::D64 => None,
         }
     }

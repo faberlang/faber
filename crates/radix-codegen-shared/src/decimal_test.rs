@@ -7,7 +7,6 @@ use radix_types::NumericWidth;
 
 #[test]
 fn decimal_scale_factors_match_the_cto_ruling() {
-    assert_eq!(decimal_scale_factor(NumericWidth::D32), Some(10_000_000));
     assert_eq!(decimal_scale_factor(NumericWidth::D64), Some(1_000_000_000));
     assert_eq!(decimal_scale_factor(NumericWidth::I32), None);
 }
@@ -24,37 +23,32 @@ fn round_half_even_quotient_pins() {
 
 #[test]
 fn decimal_text_to_carrier_rounds_half_even_at_the_width_scale() {
-    // d32 scale = 7 fractional digits: 2.50000005 → 25000000 (even tie down),
-    // 2.50000015 → 25000002 (odd tie up).
+    // d64 scale = 9 fractional digits: 2.0000000005 → 2000000000 (even tie
+    // down), 2.0000000015 → 2000000002 (odd tie up).
     assert_eq!(
-        decimal_text_to_carrier("2.50000005", NumericWidth::D32),
-        Some(25_000_000)
+        decimal_text_to_carrier("2.0000000005", NumericWidth::D64),
+        Some(2_000_000_000)
     );
     assert_eq!(
-        decimal_text_to_carrier("2.50000015", NumericWidth::D32),
-        Some(25_000_002)
-    );
-    assert_eq!(
-        decimal_text_to_carrier("4.2", NumericWidth::D32),
-        Some(42_000_000)
+        decimal_text_to_carrier("2.0000000015", NumericWidth::D64),
+        Some(2_000_000_002)
     );
     assert_eq!(
         decimal_text_to_carrier("4.2", NumericWidth::D64),
         Some(4_200_000_000)
     );
     assert_eq!(
-        decimal_text_to_carrier("42", NumericWidth::D32),
-        Some(420_000_000)
+        decimal_text_to_carrier("42", NumericWidth::D64),
+        Some(42_000_000_000)
     );
 }
 
 #[test]
 fn carrier_in_width_rejects_out_of_range_values() {
     assert_eq!(
-        carrier_in_width(2_147_483_647, NumericWidth::D32),
-        Some(2_147_483_647)
+        carrier_in_width(i128::from(i64::MAX) + 1, NumericWidth::D64),
+        None
     );
-    assert_eq!(carrier_in_width(2_147_483_648, NumericWidth::D32), None);
     assert_eq!(
         carrier_in_width(i128::from(i64::MAX), NumericWidth::D64),
         Some(i64::MAX)

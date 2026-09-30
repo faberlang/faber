@@ -45,7 +45,7 @@ locale = "en"
 #   falsum
 
 # DECLARED DELTA (OX P1): decimal ordering joins scaled carriers before
-# comparing. d32/d64 uses the d64 scale; decimal/integer scales the integer
+# comparing. decimal/decimal compares at the d64 scale; decimal/integer scales the integer
 # peer exactly. Decimal/fractus remains rejected by the cross-family gate.
 
 main {
@@ -61,7 +61,7 @@ main {
     print exact_lt
     const bool exact_gt ← above ≻ boundary
     print exact_gt
-    const int<d32> narrow_decimal ← 4.2
+    const int<d64> narrow_decimal ← 4.2
     const int<d64> wide_decimal ← 1.0
     const bool decimal_width_gt ← narrow_decimal ≻ wide_decimal
     print decimal_width_gt

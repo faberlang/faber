@@ -1,17 +1,7 @@
 //! decimal-widths D1 probes: annotated decimal literals carry exact digit
-//! text through typing, and the d32/d64 marker law holds at the surface.
+//! text through typing, and the d64 marker law holds at the surface.
 
 use crate::test_support::{self, analyze_source};
-
-#[test]
-fn annotated_d32_literal_typechecks() {
-    let fixture = analyze_source("incipit { fixum numerus<d32> a ← 4.2 }");
-    assert!(
-        fixture.success(),
-        "numerus<d32> a ← 4.2 must typecheck; diagnostics: {:?}",
-        fixture.diagnostics
-    );
-}
 
 #[test]
 fn annotated_d64_literal_typechecks() {
@@ -22,7 +12,7 @@ fn annotated_d64_literal_typechecks() {
 #[test]
 fn decimal_addition_rejects_integer_literal() {
     test_support::assert_rejects_with_issue(
-        "functio add(numerus<d32> a) → numerus<d32> { redde a + 1 }",
+        "functio add(numerus<d64> a) → numerus<d64> { redde a + 1 }",
         "decimal_integer_literal_rejected",
     );
 }
@@ -30,15 +20,7 @@ fn decimal_addition_rejects_integer_literal() {
 #[test]
 fn decimal_division_rejects_integer_literal() {
     test_support::assert_rejects_with_issue(
-        "functio dividi(numerus<d32> a) → numerus<d32> { redde a / 2 }",
-        "decimal_integer_literal_rejected",
-    );
-}
-
-#[test]
-fn decimal_binding_rejects_integer_literal() {
-    test_support::assert_rejects_with_issue(
-        "incipit { fixum numerus<d32> e ← 5 }",
+        "functio dividi(numerus<d64> a) → numerus<d64> { redde a / 2 }",
         "decimal_integer_literal_rejected",
     );
 }
@@ -53,14 +35,14 @@ fn d64_binding_rejects_integer_literal() {
 
 #[test]
 fn explicit_integer_to_decimal_conversion_still_accepts() {
-    test_support::assert_accepts("incipit { fixum numerus<d32> e ← 5 ↦ numerus<d32> }");
+    test_support::assert_accepts("incipit { fixum numerus<d64> e ← 5 ↦ numerus<d64> }");
 }
 
 #[test]
-fn d32_literal_out_of_range_rejects() {
-    // i32×10⁻⁷ carrier cannot hold 1e20.
-    let fixture = analyze_source("incipit { fixum numerus<d32> a ← 1e20 }");
-    assert!(fixture.is_err(), "1e20 exceeds the d32 scaled carrier");
+fn d64_literal_out_of_range_rejects() {
+    // The i64 scaled carrier cannot hold 1e20.
+    let fixture = analyze_source("incipit { fixum numerus<d64> a ← 1e20 }");
+    assert!(fixture.is_err(), "1e20 exceeds the d64 scaled carrier");
 }
 
 #[test]
@@ -72,7 +54,7 @@ fn bare_decimal_stays_fractus() {
 
 #[test]
 fn d_marker_on_fractus_rejects() {
-    let fixture = analyze_source("incipit { fixum fractus<d32> a ← 4.2 }");
+    let fixture = analyze_source("incipit { fixum fractus<d64> a ← 4.2 }");
     assert!(fixture.is_err(), "d-markers are numerus-only");
 }
 
@@ -80,4 +62,29 @@ fn d_marker_on_fractus_rejects() {
 fn f_marker_on_numerus_still_rejects() {
     let fixture = analyze_source("incipit { fixum numerus<f32> a ← 1 }");
     assert!(fixture.is_err(), "FloatOnNumerus stays rejected");
+}
+
+// --- d32 was removed (D11.7): a dedicated diagnostic points at d64 ---
+
+#[test]
+fn numerus_d32_marker_is_removed() {
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum numerus<d32> a ← 4.2 }",
+        "removed_decimal_width_d32",
+    );
+}
+
+#[test]
+fn bare_d32_type_is_removed() {
+    test_support::assert_rejects_with_issue(
+        "functio f(d32 a) → d32 { redde a }",
+        "removed_decimal_width_d32",
+    );
+}
+
+#[test]
+fn removed_d32_help_points_at_d64() {
+    let fixture = analyze_source("incipit { fixum numerus<d32> a ← 4.2 }");
+    let text = format!("{:?}", fixture.diagnostics);
+    assert!(text.contains("removed_decimal_width_d32"), "{text}");
 }

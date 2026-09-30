@@ -259,7 +259,8 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         let source_width = decimal_source_width(self.types, source_ty);
         let result = match value {
             Value::Int(value) => match source_width {
-                Some(source_width) => decimal_widen_carrier(value, source_width, target_width),
+                // d64 is the only decimal width: decimal → decimal is identity.
+                Some(source_width) => decimal_carrier_from_raw(i128::from(value), source_width),
                 None => decimal_integer_to_carrier(i128::from(value), target_width),
             },
             Value::UInt(value) => decimal_integer_to_carrier(i128::from(value), target_width),
@@ -283,9 +284,6 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             }
             Err(DecimalTextError::OutOfRange) => {
                 self.recover_or_fail(recovery, span, "textus to numerus conversion out of range")
-            }
-            Err(DecimalTextError::Narrowing) => {
-                Err(decimal_text_error(DecimalTextError::Narrowing, span))
             }
         }
     }
@@ -1178,7 +1176,6 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
 enum DecimalTextError {
     Invalid,
     OutOfRange,
-    Narrowing,
 }
 
 fn decimal_source_width(types: &TypeTable, ty: TypeId) -> Option<NumericWidth> {
@@ -1186,17 +1183,13 @@ fn decimal_source_width(types: &TypeTable, ty: TypeId) -> Option<NumericWidth> {
 }
 
 fn decimal_text_error(error: DecimalTextError, span: Span) -> RunnerError {
-    // WHY: only the parse/width failures are recoverable conversion failures
-    // (SA-002); the narrowing rejection is an internal policy error.
+    // WHY: parse/width failures are recoverable conversion failures (SA-002).
     match error {
         DecimalTextError::Invalid => {
             RunnerError::conversion(span, "textus to numerus conversion failed")
         }
         DecimalTextError::OutOfRange => {
             RunnerError::conversion(span, "textus to numerus conversion out of range")
-        }
-        DecimalTextError::Narrowing => {
-            RunnerError::internal(span, "decimal width narrowing rejected")
         }
     }
 }
@@ -1227,24 +1220,6 @@ fn decimal_integer_to_carrier(value: i128, width: NumericWidth) -> Result<i64, D
         .checked_mul(scale)
         .ok_or(DecimalTextError::OutOfRange)?;
     decimal_carrier_from_raw(value, width)
-}
-
-fn decimal_widen_carrier(
-    value: i64,
-    source_width: NumericWidth,
-    target_width: NumericWidth,
-) -> Result<i64, DecimalTextError> {
-    let value = decimal_carrier_from_raw(i128::from(value), source_width)?;
-    if source_width == target_width {
-        return Ok(value);
-    }
-    if source_width == NumericWidth::D32 && target_width == NumericWidth::D64 {
-        return i128::from(value)
-            .checked_mul(100)
-            .ok_or(DecimalTextError::OutOfRange)
-            .and_then(|value| decimal_carrier_from_raw(value, target_width));
-    }
-    Err(DecimalTextError::Narrowing)
 }
 
 fn decimal_text_to_carrier(text: &str, width: NumericWidth) -> Result<i64, DecimalTextError> {

@@ -123,7 +123,7 @@ pub enum FormatSubject {
     Text,
     /// `instans` of any precision.
     Instans,
-    /// Decimal `numerus<d32|d64>`: display policy is held (fork F4).
+    /// Decimal `numerus<d64>`: display policy is held (fork F4).
     Decimal,
     /// Anything else; user types format through an ordinary function.
     Unsupported,

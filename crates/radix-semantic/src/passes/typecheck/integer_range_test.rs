@@ -161,7 +161,7 @@ fn float_and_decimal_widths_join_by_the_lattice() {
         "functio f(fractus<f32> x, fractus<f64> y) → fractus<f64> {\n    redde x + y\n}\n",
     );
     test_support::assert_analysis_accepts(
-        "functio f(numerus<d32> x, numerus<d64> y) → numerus<d64> {\n    redde x + y\n}\n",
+        "functio f(numerus<d64> x, numerus<d64> y) → numerus<d64> {\n    redde x + y\n}\n",
     );
 }
 

@@ -990,7 +990,6 @@ fn int_layout(width: NumericWidth) -> LayoutResolution {
         | NumericWidth::F32
         | NumericWidth::F64
         // decimal-widths D1: decimals have no integer layout arm until D4/D5.
-        | NumericWidth::D32
         | NumericWidth::D64 => {
             return LayoutResolution::MissingFact(format!(
                 "modulus<{}> has no named layout arm",

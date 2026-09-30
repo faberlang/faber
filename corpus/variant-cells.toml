@@ -848,13 +848,14 @@ required = true
 note = "N2 ruling 4; bounded patterns must precede the unbounded family catch-all"
 
 # decimal-width cells (decimal-widths goal D1-D4 surface; landed 2026-08-26).
-# All six rows are required (new grammar surface): markers D32/D64, annotated
-# decimal literals, scaled-carrier arithmetic, and the D3 conversio rows.
+# All rows are required (new grammar surface): the D64 marker (D32 was
+# removed, D11.7), annotated decimal literals, scaled-carrier arithmetic, the
+# D3 conversio rows, and the removed-D32 decline.
 
 [[cells]]
 id = "cast.decimal-literal"
 family = "casts"
-cell = "annotated decimal literal numerus<d32>/<d64> ← 4.2 (exact digit text)"
+cell = "annotated decimal literal numerus<d64> ← 4.2 (exact digit text)"
 status = "direct"
 exemplum = "decimal/arithmetic.fab"
 expected = true
@@ -869,7 +870,7 @@ status = "direct"
 exemplum = "decimal/arithmetic.fab"
 expected = true
 required = true
-note = "D4 runner: Value::Int carriers d32=10⁷ / d64=10⁹, checked i128, round-half-even; .expected pins raw scaled carriers"
+note = "D4 runner: Value::Int carriers d64=10⁹, checked i128, round-half-even; .expected pins raw scaled carriers"
 
 [[cells]]
 id = "cast.decimal-integer-conversio"
@@ -879,7 +880,7 @@ status = "direct"
 exemplum = "decimal/conversio.fab"
 expected = true
 required = true
-note = "D3 row: 4.2 ↦ i64 = 4; 5 ↦ d32 = 5×10⁷; 2.5 ↦ i64 = 2, 3.5 ↦ i64 = 4; never truncates"
+note = "D3 row: 4.2 ↦ i64 = 4; 5 ↦ d64 = 5×10⁹; 2.5 ↦ i64 = 2, 3.5 ↦ i64 = 4; never truncates"
 
 [[cells]]
 id = "cast.decimal-fractus-conversio"
@@ -889,28 +890,18 @@ status = "direct"
 exemplum = "decimal/conversio.fab"
 expected = true
 required = true
-note = "D3 row: 4.2 ↦ fractus = 4.2; 1.5 ↦ d32 = 1.5×10⁷ exact"
+note = "D3 row: 4.2 ↦ fractus = 4.2; 1.5 ↦ d64 = 1.5×10⁹ exact"
 
 [[cells]]
-id = "cast.decimal-widen-d32-d64"
+id = "cast.decimal-d32-removed"
 family = "casts"
-cell = "d32 → d64 widening-only (admit)"
+cell = "REJECT: removed d32 width (SEM002 removed_decimal_width_d32)"
 status = "direct"
-exemplum = "decimal/conversio.fab"
-expected = true
-required = true
-note = "D3 row: the only widening in the decimal family; 4.2 ↦ d64 = 42×10⁸ at scale 10⁹"
-
-[[cells]]
-id = "cast.decimal-narrow-d64-d32"
-family = "casts"
-cell = "REJECT: d64 → d32 narrowing (SEM016 decimal_width_narrowing_rejected)"
-status = "direct"
-exemplum = "decimal/narrowing-decline.fab"
+exemplum = "decimal/d32-removed.fab"
 expected = true
 required = true
 decline = true
-note = "D3 row: narrowing has no ↦ arm; fails closed with a teaching diagnostic"
+note = "D11.7: d32 was removed; numerus<d32> and bare d32 fail closed with a diagnostic whose help names d64"
 
 # =============================================================================
 # closures (31 cells: 31 direct / 0 bare)

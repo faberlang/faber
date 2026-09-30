@@ -7,22 +7,9 @@ use crate::test_support;
 // --- family lattice (assignment-level) ---
 
 #[test]
-fn d32_widens_to_d64_at_assignment() {
-    test_support::assert_accepts("functio w(numerus<d32> a) → numerus<d64> { redde a }");
-}
-
-#[test]
-fn d64_narrowing_to_d32_rejects_at_assignment() {
-    test_support::assert_rejects_with_issue(
-        "functio n(numerus<d64> a) → numerus<d32> { redde a }",
-        "return_type_mismatch",
-    );
-}
-
-#[test]
 fn decimal_to_integer_cross_family_rejects_at_assignment() {
     test_support::assert_rejects_with_issue(
-        "functio c(numerus<d32> a) → numerus<i64> { redde a }",
+        "functio c(numerus<d64> a) → numerus<i64> { redde a }",
         "return_type_mismatch",
     );
 }
@@ -30,7 +17,7 @@ fn decimal_to_integer_cross_family_rejects_at_assignment() {
 #[test]
 fn integer_to_decimal_cross_family_rejects_at_assignment() {
     test_support::assert_rejects_with_issue(
-        "functio c(numerus<i64> a) → numerus<d32> { redde a }",
+        "functio c(numerus<i64> a) → numerus<d64> { redde a }",
         "return_type_mismatch",
     );
 }
@@ -39,7 +26,7 @@ fn integer_to_decimal_cross_family_rejects_at_assignment() {
 fn decimal_to_fractus_cross_family_rejects_at_assignment() {
     // D3 owns the explicit-↦ conversio row; bare flow must reject today.
     test_support::assert_rejects_with_issue(
-        "functio c(numerus<d32> a) → fractus<f64> { redde a }",
+        "functio c(numerus<d64> a) → fractus<f64> { redde a }",
         "return_type_mismatch",
     );
 }
@@ -49,7 +36,7 @@ fn decimal_to_fractus_cross_family_rejects_at_assignment() {
 #[test]
 fn decimal_scalar_bracket_index_rejects_with_teaching_issue() {
     test_support::assert_rejects_with_issue(
-        r"functio pick(tf32[16] input, numerus<d32> id) → f32 {
+        r"functio pick(tf32[16] input, numerus<d64> id) → f32 {
     redde input[id] vel 0.0
 }",
         "tensor_bracket_index_decimal_rejected",
@@ -71,7 +58,7 @@ fn integer_scalar_bracket_index_still_accepts() {
 fn tensor_media_over_decimal_element_rejects_with_teaching_issue() {
     test_support::assert_rejects_with_issue(
         r"incipit {
-  fixum tensor<numerus<d32>, [3]> grid ← vacua
+  fixum tensor<numerus<d64>, [3]> grid ← vacua
   fixum f64 mean ← grid.media()
   nota mean
 }",
@@ -95,7 +82,7 @@ fn tensor_media_over_integer_numerus_still_returns_f64() {
 #[test]
 fn radix_text_parse_into_decimal_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio p(textus s) → numerus<d32> { redde s ↦ numerus<d32, Hex> }",
+        "functio p(textus s) → numerus<d64> { redde s ↦ numerus<d64, Hex> }",
         "decimal_radix_hint_rejected",
     );
 }
@@ -110,7 +97,7 @@ fn radix_text_parse_into_integer_still_accepts() {
 #[test]
 fn ascii_format_pack_from_decimal_source_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio p(numerus<d32> n) → ascii<8> { redde n ↦ ascii<8, Hex> }",
+        "functio p(numerus<d64> n) → ascii<8> { redde n ↦ ascii<8, Hex> }",
         "decimal_radix_hint_rejected",
     );
 }
@@ -125,7 +112,7 @@ fn ascii_format_pack_from_integer_source_still_accepts() {
 #[test]
 fn endian_unpack_into_decimal_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio win(octeti corpus) → numerus<d32> { redde corpus[0‥4] ↦ numerus<d32, Be> }",
+        "functio win(octeti corpus) → numerus<d64> { redde corpus[0‥4] ↦ numerus<d64, Be> }",
         "decimal_endianness_hint_rejected",
     );
 }
@@ -142,7 +129,7 @@ fn endian_unpack_into_integer_still_accepts() {
 #[test]
 fn bits_bitcast_from_decimal_source_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio bits(numerus<d32> n) → fractus<f32> { redde n ↦ fractus<f32, Bits> }",
+        "functio bits(numerus<d64> n) → fractus<f32> { redde n ↦ fractus<f32, Bits> }",
         "decimal_bits_hint_rejected",
     );
 }
@@ -150,7 +137,7 @@ fn bits_bitcast_from_decimal_source_rejects() {
 #[test]
 fn bits_bitcast_into_decimal_target_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio bits(fractus<f32> x) → numerus<d32> { redde x ↦ numerus<d32, Bits> }",
+        "functio bits(fractus<f32> x) → numerus<d64> { redde x ↦ numerus<d64, Bits> }",
         "decimal_bits_hint_rejected",
     );
 }

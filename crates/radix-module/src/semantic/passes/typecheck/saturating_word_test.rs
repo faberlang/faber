@@ -63,7 +63,7 @@ functio add(saturatus<{width}> x, saturatus<{width}> y) → saturatus<{width}> {
 
 #[test]
 fn saturating_word_rejects_float_decimal_and_missing_widths() {
-    for width in ["f32", "f64", "d32"] {
+    for width in ["f32", "f64", "d64"] {
         analysis_rejects_with_issue(
             &format!(
                 r"

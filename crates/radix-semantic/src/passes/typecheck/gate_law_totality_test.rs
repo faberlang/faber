@@ -5,7 +5,7 @@
 //! every cell pinned to exactly one defined join (probe analyzes clean) or
 //! one named SEM rejection (probe fails with that issue). Two tests back the
 //! table: a static completeness walk (a new operator or carrier family leaves
-//! a visible hole and breaks the 81-cell / 62-join / 19-reject tallies) and a
+//! a visible hole and breaks the 81-cell / 69-join / 12-reject tallies) and a
 //! live reprobe of every cell against the current gate arms.
 //!
 //! `est` / `non est` is not a table column: DECISIONS D23.1 made it a type
@@ -14,9 +14,9 @@
 //! Closed findings (GT-1..GT-4, 2026-08-26): every contested cell is now a
 //! defined join or a named rejection, pinned by the corpus exemplum and this
 //! audit:
-//!   GT-1  ≅/≇ and ≈/≉ × d32/d64 join at the d64 scale in MIR (conversion
-//!         temps, mirroring the ordering join) — 4.2 d32 ≅ 4.2 d64 verdicts
-//!         verum on every surface.
+//!   GT-1  ≅/≇ and ≈/≉ × decimal pairs join at the d64 scale in MIR
+//!         (conversion temps, mirroring the ordering join). With `d32`
+//!         removed (D11.7) the P7 column is the identical `d64 × d64` pair.
 //!   GT-2  ≅/≇ and ≈/≉ × decimal/fractus now REJECT with
 //!         `mixed_decimal_fractus_equality`, mirroring the ordering gate
 //!         (the pair was admitted but carrier-blind before).
@@ -33,7 +33,6 @@ use crate::test_support;
 const EXACT_EQ: &str = "equality_exact_types_required";
 const ARITH_U64_SIGNED: &str = "u64_signed_arithmetic_requires_conversion";
 const ARITH_FAMILY_CROSSING: &str = "numeric_family_crossing_requires_conversio";
-const DECIMAL_NARROWING: &str = "decimal_width_narrowing_rejected";
 
 const fn join() -> Pin {
     Pin::Join
@@ -57,7 +56,7 @@ enum Family {
     P4IntF32,
     P5IntF64,
     P6F32F64,
-    P7D32D64,
+    P7D64Identical,
     P8DecimalInteger,
     P9DecimalFractus,
 }
@@ -69,7 +68,7 @@ const FAMILIES: [Family; 9] = [
     Family::P4IntF32,
     Family::P5IntF64,
     Family::P6F32F64,
-    Family::P7D32D64,
+    Family::P7D64Identical,
     Family::P8DecimalInteger,
     Family::P9DecimalFractus,
 ];
@@ -109,7 +108,7 @@ const TABLE: [[Pin; 9]; 9] = [
         reject(EXACT_EQ),
         reject(EXACT_EQ),
         reject(EXACT_EQ),
-        reject(EXACT_EQ),
+        join(), // d64 × d64 is an identical type pair
         reject(EXACT_EQ),
         reject(EXACT_EQ),
     ],
@@ -121,7 +120,7 @@ const TABLE: [[Pin; 9]; 9] = [
         join(),
         join(),
         join(),
-        join(), // GT-1 closed: d32/d64 join at the d64 scale in MIR
+        join(), // GT-1 closed: decimals join at the d64 scale in MIR
         join(),
         join(), // ruling 22: cross-family comparison admitted
     ],
@@ -133,7 +132,7 @@ const TABLE: [[Pin; 9]; 9] = [
         join(),
         join(),
         join(),
-        join(), // GT-1 closed: d32/d64 join at the d64 scale in MIR
+        join(), // GT-1 closed: decimals join at the d64 scale in MIR
         join(),
         join(), // ruling 22: cross-family comparison admitted
     ],
@@ -199,8 +198,7 @@ const TABLE: [[Pin; 9]; 9] = [
         reject(ARITH_FAMILY_CROSSING),
         reject(ARITH_FAMILY_CROSSING),
     ],
-    // ↦ — conversio is directional; every family direction admits except the
-    // d64 → d32 decimal narrowing (pinned by the reverse-probe test below).
+    // ↦ — conversio is directional; every family direction admits.
     // GT-3 closed: the pair stays admitted; a negative value into an unsigned
     // target fails closed at runtime (conversion never wraps), so the join
     // verdict holds for every value that converts.
@@ -225,9 +223,9 @@ fn pair_types(family: Family) -> (&'static str, &'static str) {
         Family::P4IntF32 => ("numerus<i64>", "fractus<f32>"),
         Family::P5IntF64 => ("numerus", "fractus"),
         Family::P6F32F64 => ("fractus<f32>", "fractus<f64>"),
-        Family::P7D32D64 => ("numerus<d32>", "numerus<d64>"),
-        Family::P8DecimalInteger => ("numerus<d32>", "numerus"),
-        Family::P9DecimalFractus => ("numerus<d32>", "fractus"),
+        Family::P7D64Identical => ("numerus<d64>", "numerus<d64>"),
+        Family::P8DecimalInteger => ("numerus<d64>", "numerus"),
+        Family::P9DecimalFractus => ("numerus<d64>", "fractus"),
     }
 }
 
@@ -254,9 +252,9 @@ fn probe(op: Op, family: Family) -> String {
             Family::P4IntF32 => ("numerus<i64>", "fractus<f32>"),
             Family::P5IntF64 => ("numerus", "fractus"),
             Family::P6F32F64 => ("fractus<f32>", "fractus<f64>"),
-            Family::P7D32D64 => ("numerus<d32>", "numerus<d64>"),
-            Family::P8DecimalInteger => ("numerus<d32>", "numerus"),
-            Family::P9DecimalFractus => ("numerus<d32>", "fractus"),
+            Family::P7D64Identical => ("numerus<d64>", "numerus<d64>"),
+            Family::P8DecimalInteger => ("numerus<d64>", "numerus"),
+            Family::P9DecimalFractus => ("numerus<d64>", "fractus"),
         };
         return format!("functio p({src} a) → {tgt} {{ redde a ↦ {tgt} }}");
     }
@@ -273,7 +271,7 @@ fn probe(op: Op, family: Family) -> String {
 
 /// Static completeness: the table is closed over the enumerated product, the
 /// reject pins name real issues, and the tallies match the corpus table
-/// (81 cells = 68 joins + 13 rejections; ruling 22 moved the six
+/// (81 cells = 69 joins + 12 rejections; ruling 22 moved the six
 /// decimal/fractus comparison cells to joins; GT-2 moved the two decimal/fractus
 /// equality cells from joins to named rejections; D23.1 removed the `est`
 /// row, which is a type test rather than an equality gate).
@@ -297,7 +295,7 @@ fn gate_law_table_is_total() {
             }
         }
     }
-    assert_eq!((joins, rejects), (68, 13));
+    assert_eq!((joins, rejects), (69, 12));
 }
 
 /// Live reprobe: every cell's probe must meet its pin against the current
@@ -315,17 +313,4 @@ fn gate_law_cells_reprobe_live_gate() {
             }
         }
     }
-}
-
-/// The conversio row's directional pin: d32 → d64 widening admits, the
-/// reverse narrowing d64 → d32 rejects with the teaching diagnostic.
-#[test]
-fn conversio_decimal_narrowing_reverse_pinned() {
-    test_support::assert_accepts(
-        "functio p(numerus<d32> a) → numerus<d64> { redde a ↦ numerus<d64> }",
-    );
-    test_support::assert_rejects_with_issue(
-        "functio p(numerus<d64> a) → numerus<d32> { redde a ↦ numerus<d32> }",
-        DECIMAL_NARROWING,
-    );
 }

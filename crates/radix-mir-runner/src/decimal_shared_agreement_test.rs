@@ -52,27 +52,26 @@ fn run_text_to_decimal(text: &str, width: NumericWidth) -> Result<Value, RunnerE
 #[test]
 fn runner_text_to_decimal_agrees_with_shared_decimal_on_boundary_texts() {
     let cases: &[(&str, NumericWidth)] = &[
-        // Round-half-even midpoints at both width scales.
-        ("2.50000005", NumericWidth::D32),
-        ("2.50000015", NumericWidth::D32),
-        ("-2.50000015", NumericWidth::D32),
+        // Round-half-even midpoints at the d64 scale.
+        ("2.0000000005", NumericWidth::D64),
+        ("2.0000000015", NumericWidth::D64),
+        ("-2.0000000015", NumericWidth::D64),
         ("0.0000000005", NumericWidth::D64),
         ("0.00000000015", NumericWidth::D64),
-        // Plain carriers at both scales.
-        ("4.2", NumericWidth::D32),
+        // Plain carriers.
         ("4.2", NumericWidth::D64),
-        ("1e-3", NumericWidth::D32),
+        ("1e-3", NumericWidth::D64),
         // Width-scale overflow: the shared tier's `None` is the runner's
         // explicit conversion error.
-        ("1e40", NumericWidth::D32),
+        ("1e40", NumericWidth::D64),
         ("2e29", NumericWidth::D64),
         // The >=39-digit parse wrap (S07-1b sibling boundary): a mantissa
         // beyond i128 is an explicit failure on both tiers.
-        ("340282366920938463463374607431768211456", NumericWidth::D32),
+        ("340282366920938463463374607431768211456", NumericWidth::D64),
         // A beyond-i128 divisor rounds to the shared tier's reasoned zero.
-        ("1e-100", NumericWidth::D32),
+        ("1e-100", NumericWidth::D64),
         // Malformed text fails on both tiers.
-        ("4.2eX", NumericWidth::D32),
+        ("4.2eX", NumericWidth::D64),
     ];
 
     for (text, width) in cases {
@@ -96,7 +95,7 @@ fn runner_decimal_helper_symbols_agree_with_the_shared_crate() {
     // `crate::value` re-exports the shared symbols (S07-12); the runner-visible
     // helpers and the shared crate agree on every boundary input, including
     // the checked-overflow `None`s.
-    for width in [NumericWidth::D32, NumericWidth::D64, NumericWidth::I32] {
+    for width in [NumericWidth::D64, NumericWidth::I32] {
         assert_eq!(
             decimal_scale_factor(width),
             radix_codegen_shared::decimal::decimal_scale_factor(width),

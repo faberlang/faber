@@ -1,3 +1,0 @@
-# Reject oracle for the decimal-width narrowing decline.
-# Tokens: stable diagnostic identities (faber check output); one per line.
-SEM016:decimal_width_narrowing_rejected
