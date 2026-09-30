@@ -252,6 +252,29 @@ enum NumericFactFamily {
 }
 
 impl NumericFactFamily {
+    /// Whether every value of the integer-like family `self` converts into
+    /// the trapping integer family `other` without a range check failing.
+    fn integer_flows_into(self, other: Self) -> bool {
+        let (signed_from, rank_from) = match self {
+            Self::SignedInt { rank } | Self::SaturatingSigned { rank } => (true, rank),
+            Self::UnsignedInt { rank }
+            | Self::Modular { rank }
+            | Self::SaturatingUnsigned { rank } => (false, rank),
+            _ => return false,
+        };
+        match other {
+            Self::SignedInt { rank } => {
+                if signed_from {
+                    rank_from <= rank
+                } else {
+                    rank_from < rank
+                }
+            }
+            Self::UnsignedInt { rank } => !signed_from && rank_from <= rank,
+            _ => false,
+        }
+    }
+
     /// Whether a value of `self` flows into `other` unchanged.
     fn admits(self, other: Self) -> bool {
         match (self, other) {
@@ -836,6 +859,9 @@ impl TypeChecker<'_> {
             self.note_conversio_recovery_checked(recovery, target_resolved);
         } else {
             self.check_conversio_propagation_channel(source_ty, target_resolved, span);
+            if self.numeric_conversio_can_fail(source, source_ty, target_resolved) {
+                self.check_text_failure_channel(span);
+            }
         }
         target_resolved
     }
@@ -2588,6 +2614,78 @@ impl TypeChecker<'_> {
             ],
         );
         false
+    }
+
+    /// Whether a bare numeric `↦` into a trapping integer type can fail at run
+    /// time: integer narrowing or signedness change, float -> integer, and
+    /// decimal -> integer. Widening and a literal proven to fit cannot fail.
+    /// Policy-word targets (`wrapping`/`saturating`) never reach here.
+    fn numeric_conversio_can_fail(
+        &self,
+        source: &HirExpression,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+    ) -> bool {
+        let source_ty = self.peel_alias_chain(self.resolve_inferred_type(source_ty));
+        let target_ty = self.peel_alias_chain(target_resolved);
+        let (Some(from), Some(to)) = (
+            numeric_fact(self.types.get(source_ty)),
+            numeric_fact(self.types.get(target_ty)),
+        ) else {
+            return false;
+        };
+        let Some(target_width) = self.trapping_integer_width(target_ty, &to) else {
+            return false;
+        };
+        let target_range = integer_width_range(target_width);
+        match from.family {
+            NumericFactFamily::Float { .. } => {
+                let Some(value) = static_float_magnitude(source) else {
+                    return true;
+                };
+                !(value.is_finite()
+                    && target_range.is_some_and(|(lo, hi)| {
+                        let truncated = value.trunc();
+                        truncated >= lo as f64 && truncated <= hi as f64
+                    }))
+            }
+            NumericFactFamily::Decimal { rank } => {
+                // d32 integer parts fit i32; d64 integer parts fit i64.
+                let safe_rank = if rank == 0 { 2 } else { 3 };
+                !matches!(to.family, NumericFactFamily::SignedInt { rank: t } if t >= safe_rank)
+            }
+            NumericFactFamily::SignedInt { .. }
+            | NumericFactFamily::UnsignedInt { .. }
+            | NumericFactFamily::Modular { .. }
+            | NumericFactFamily::SaturatingSigned { .. }
+            | NumericFactFamily::SaturatingUnsigned { .. } => {
+                if from.family.integer_flows_into(to.family) {
+                    return false;
+                }
+                let fits = static_integer_magnitude(source)
+                    .zip(target_range)
+                    .is_some_and(|(value, (lo, hi))| (lo..=hi).contains(&value));
+                !fits
+            }
+        }
+    }
+
+    /// Carrier width of a trapping (non-policy, non-decimal) integer target.
+    fn trapping_integer_width(
+        &self,
+        target_ty: TypeId,
+        fact: &NumericFact,
+    ) -> Option<NumericWidth> {
+        match (self.types.get(target_ty), fact.family) {
+            (Type::Primitive(Primitive::Numerus), NumericFactFamily::SignedInt { .. }) => {
+                Some(NumericWidth::I64)
+            }
+            (
+                Type::SizedNumeric(Primitive::Numerus, width),
+                NumericFactFamily::SignedInt { .. } | NumericFactFamily::UnsignedInt { .. },
+            ) => Some(*width),
+            _ => None,
+        }
     }
 
     fn conversio_can_propagate_failure(&self, source_ty: TypeId, target_resolved: TypeId) -> bool {

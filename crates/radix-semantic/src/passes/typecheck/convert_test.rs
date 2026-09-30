@@ -2215,3 +2215,82 @@ fn policy_word_conversio_rejects_float_and_text_sources() {
         );
     }
 }
+
+#[test]
+fn numeric_narrowing_conversio_requires_textus_alternate_exit() {
+    test_support::assert_rejects_with_issue(
+        r"
+functio narrow(numerus n) → numerus<u8> ⇥ numerus {
+    redde n ↦ numerus<u8>
+}
+",
+        "conversio_failure_channel_textus_required",
+    );
+}
+
+#[test]
+fn float_to_integer_conversio_requires_textus_alternate_exit() {
+    test_support::assert_rejects_with_issue(
+        r"
+functio trunc(fractus x) → numerus ⇥ numerus {
+    redde x ↦ numerus
+}
+",
+        "conversio_failure_channel_textus_required",
+    );
+}
+
+#[test]
+fn numeric_narrowing_conversio_accepts_textus_alternate_exit() {
+    test_support::assert_accepts(
+        r"
+functio narrow(numerus n) → numerus<u8> ⇥ textus {
+    redde n ↦ numerus<u8>
+}
+",
+    );
+}
+
+#[test]
+fn numeric_narrowing_conversio_with_recovery_accepts_non_textus_exit() {
+    test_support::assert_accepts(
+        r"
+functio narrow(numerus n) → numerus<u8> ⇥ numerus {
+    redde n ↦ numerus<u8> ⊥ 0
+}
+",
+    );
+}
+
+#[test]
+fn wrapping_conversio_accepts_non_textus_alternate_exit() {
+    test_support::assert_accepts(
+        r"
+functio wrap(numerus n) → modulus<u8> ⇥ numerus {
+    redde n ↦ modulus<u8>
+}
+",
+    );
+}
+
+#[test]
+fn numeric_widening_conversio_accepts_non_textus_alternate_exit() {
+    test_support::assert_accepts(
+        r"
+functio widen(numerus<u8> n) → numerus ⇥ numerus {
+    redde n ↦ numerus
+}
+",
+    );
+}
+
+#[test]
+fn constant_fitting_conversio_accepts_non_textus_alternate_exit() {
+    test_support::assert_accepts(
+        r"
+functio konst() → numerus<u8> ⇥ numerus {
+    redde 200 ↦ numerus<u8>
+}
+",
+    );
+}
