@@ -769,8 +769,10 @@ impl<'a> BorrowChecker<'a> {
     /// Record a bind that aliases a `de` place (D12.1: unmarked binds alias).
     ///
     /// Only reference-model types alias (genus, contract, collections,
-    /// tensors); scalar and register-class value types copy. Exclusive
-    /// (`own`/`copy`) destinations are handled by their own bind rules.
+    /// tensors, register-class `vector`/`matrix` per al2 / advisor ruling
+    /// 2026-09-30 Q1, each also through `T ∪ nihil`); scalars and text copy.
+    /// Exclusive (`own`/`copy`) destinations are handled by their own bind
+    /// rules.
     fn note_de_alias(&mut self, local: DefId, ty: Option<TypeId>, init: &HirExpression) {
         let Some(ty) = ty else { return };
         if self.types.is_exclusive_value(ty) || !self.is_aliasing_type(ty) {
@@ -790,7 +792,7 @@ impl<'a> BorrowChecker<'a> {
 
     fn is_aliasing_type(&self, ty: TypeId) -> bool {
         let (_, inner) = self.types.peel_access_marker(ty);
-        if self.types.is_aliasing_container(inner) {
+        if self.types.is_aliasing_container_through_option(inner) {
             return true;
         }
         match self.types.get(inner) {

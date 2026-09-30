@@ -661,8 +661,15 @@ impl TypeTable {
     /// containers alias. Aliases peel; access markers do not (a marked bind
     /// takes its own acquisition path). Genus and contract instances alias as
     /// well but are decided by each consumer (the Rust emitter carves out
-    /// `dyn Trait` carriers), and scalars, text, and register-class
-    /// `vector`/`matrix` values are not containers here.
+    /// `dyn Trait` carriers), and scalars and text are not containers here.
+    ///
+    /// Register-class `vector`/`matrix` values ALIAS like every other aggregate
+    /// (al2, advisor ruling 2026-09-30 Q1: R1 has no register-class
+    /// carve-out). Targets whose by-value carrier cannot yet observe the
+    /// difference keep it as their own explicit carve-out (the Rust emitter's
+    /// `rust_copies_register_class`), never by narrowing this predicate.
+    /// An optional container aliases through the option
+    /// ([`Self::is_aliasing_container_through_option`]).
     #[must_use]
     pub fn is_aliasing_container(&self, ty: TypeId) -> bool {
         match self.get(ty) {
@@ -677,9 +684,22 @@ impl TypeTable {
             | Type::Set(_)
             | Type::Tensor(..)
             | Type::Sparsa(..)
+            | Type::Vector(..)
+            | Type::Matrix(..)
             | Type::BoundedOcteti { .. } => true,
             _ => false,
         }
+    }
+
+    /// [`Self::is_aliasing_container`] peeled through `T ∪ nihil` (al2,
+    /// advisor ruling 2026-09-30 Q2): an unmarked bind of an optional
+    /// container aliases the container place through the option.
+    #[must_use]
+    pub fn is_aliasing_container_through_option(&self, ty: TypeId) -> bool {
+        self.is_aliasing_container(ty)
+            || self
+                .nullable_inner(ty)
+                .is_some_and(|inner| self.is_aliasing_container_through_option(inner))
     }
 
     /// Scalar numerics and `bivalens` reject `ref`/`mut`/`own`/`copy` markers.
@@ -2538,3 +2558,7 @@ pub enum MarkerFamily {
 #[cfg(test)]
 #[path = "types_test.rs"]
 mod types_test;
+
+#[cfg(test)]
+#[path = "aliasing_container_test.rs"]
+mod aliasing_container_test;
