@@ -2499,3 +2499,44 @@ fn run_accepts_a_fitting_constant_argument_for_a_narrow_parameter() {
     assert!(ok, "run failed: {stderr}");
     assert_eq!(stdout.trim(), "200");
 }
+
+#[test]
+fn run_panic_prints_abort_reason_to_stderr_and_exits_one() {
+    // `faber run` surfaces a runner abort the way the runner's own
+    // `StdioHost::abort` does: `abort: <message>` on stderr, exit 1, with
+    // stdout written before the trap still flushed.
+    let file = write_single_file(
+        "run-panic-abort",
+        "main {\n    print \"before\"\n    panic \"boom\"\n}\n",
+    );
+
+    let (stdout, stderr, status) =
+        run_faber_status(&["run", file.to_str().expect("utf8 source path")]);
+
+    assert_eq!(status.code(), Some(1), "panic must exit 1:\n{stderr}");
+    assert_eq!(stdout, "before\n");
+    // ALLOW_DIAGNOSTIC_RENDER_TEXT: runtime abort reason is the stderr contract.
+    assert!(
+        stderr.contains("abort: boom"),
+        "expected abort reason on stderr:\n{stderr}"
+    );
+}
+
+#[test]
+fn run_negative_integer_exponent_trap_prints_reason_to_stderr() {
+    let file = write_single_file(
+        "run-negative-exponent-abort",
+        "main {\n    const int b ← 2\n    const int e ← -1\n    print \"before\"\n    print b.power(e)\n    print \"after\"\n}\n",
+    );
+
+    let (stdout, stderr, status) =
+        run_faber_status(&["run", file.to_str().expect("utf8 source path")]);
+
+    assert_eq!(status.code(), Some(1), "trap must exit 1:\n{stderr}");
+    assert_eq!(stdout, "before\n");
+    // ALLOW_DIAGNOSTIC_RENDER_TEXT: runtime abort reason is the stderr contract.
+    assert!(
+        stderr.contains("abort: numerus potentia failed: negative exponent"),
+        "expected trap reason on stderr:\n{stderr}"
+    );
+}

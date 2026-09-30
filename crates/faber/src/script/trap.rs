@@ -31,6 +31,13 @@ impl Host for TrapHost<'_> {
     }
 
     fn abort(&mut self, reason: &str) -> ! {
+        // WHY: the trap unwinds before the inner host's own `abort` can print,
+        // so report the reason on the host's stderr channel (`Mone`) here,
+        // matching `StdioHost::abort`'s `abort: {reason}` convention.
+        // A failed stderr write cannot change the abort, so it is dropped.
+        self.inner
+            .scribe(MirDiagnosticKind::Mone, &format!("abort: {reason}"))
+            .ok();
         panic_trap(HostTrap::Abort(reason.to_owned()));
     }
 
