@@ -23,7 +23,7 @@ pub enum NumericWidth {
     BF16,
     F32,
     F64,
-    /// Decimal-encoded numerus width (scaled integer, d64 = i64×10⁻⁹).
+    /// Decimal-encoded numerus width (scaled integer, d64 = i64×10⁻⁸, D11.7).
     D64,
 }
 
@@ -269,11 +269,11 @@ impl NumericWidth {
 
     /// Decimal-digit scale exponent of the scaled-integer carrier.
     ///
-    /// d64 = i64×10⁻⁹ (scale rescale to 8 is separate work, N5).
+    /// d64 = i64×10⁻⁸ (D11.7): 8 fraction digits, range ±92,233,720,368.54775807.
     #[must_use]
     pub fn decimal_scale(self) -> Option<u32> {
         match self {
-            Self::D64 => Some(9),
+            Self::D64 => Some(8),
             _ => None,
         }
     }

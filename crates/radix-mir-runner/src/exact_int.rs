@@ -190,7 +190,8 @@ pub(crate) fn cmp_numeric(left: &Value, right: &Value) -> Option<std::cmp::Order
 }
 
 /// Exact three-way comparison of a decimal (`scaled / scale`, `scale` a power
-/// of ten up to 10^9) with a float (ruling 22). `None` when the float is NaN.
+/// of ten within the 128-bit carrier) with a float (ruling 22). `None` when
+/// the float is NaN.
 pub(crate) fn cmp_scaled_float(
     scaled: i128,
     scale: i128,
@@ -200,14 +201,21 @@ pub(crate) fn cmp_scaled_float(
     if float.is_nan() {
         return None;
     }
-    // A decimal carrier is below 2^64 in magnitude, so a float past 2^100
-    // dominates whatever the scale is.
-    const HUGE: f64 = 1_267_650_600_228_229_401_496_703_205_376.0;
+    // A decimal's magnitude is below 2^127 whatever its scale, so a float
+    // past that dominates.
+    const HUGE: f64 = 170_141_183_460_469_231_731_687_303_715_884_105_728.0;
     if float >= HUGE {
         return Some(Ordering::Less);
     }
     if float <= -HUGE {
         return Some(Ordering::Greater);
+    }
+    // `float - floor` is exact only for a non-negative float, so a negative
+    // comparison runs mirrored.
+    if float < 0.0
+        && let Some(negated) = scaled.checked_neg()
+    {
+        return cmp_scaled_float(negated, scale, -float).map(std::cmp::Ordering::reverse);
     }
     let floor = float.floor();
     let fraction = float - floor; // exact, in [0, 1)
@@ -232,17 +240,51 @@ pub(crate) fn cmp_scaled_float(
     let bits = fraction.to_bits();
     let exponent = i32::try_from((bits >> 52) & 0x7ff).unwrap_or(0);
     let (mantissa, shift) = if exponent == 0 {
-        ((bits & ((1 << 52) - 1)) as i128, 1074)
+        (u128::from(bits & ((1 << 52) - 1)), 1074_u32)
     } else {
         (
-            ((bits & ((1 << 52) - 1)) | (1 << 52)) as i128,
-            1075 - exponent,
+            u128::from((bits & ((1 << 52) - 1)) | (1 << 52)),
+            u32::try_from(1075 - exponent).unwrap_or(0),
         )
     };
-    // remainder * 2^shift against mantissa * scale; the left side is at least
-    // 2^91 once shift > 90, while the right side is below 2^83.
-    if shift > 90 {
+    // remainder * 2^shift against mantissa * scale, both positive.
+    let remainder = remainder.unsigned_abs();
+    let scale = scale.unsigned_abs();
+    let left_bits = (128 - remainder.leading_zeros()) + shift;
+    let right_bits = (128 - mantissa.leading_zeros()) + (128 - scale.leading_zeros());
+    // The product has `right_bits` or `right_bits - 1` bits.
+    if left_bits > right_bits {
         return Some(Ordering::Greater);
     }
-    Some((remainder << shift).cmp(&(mantissa * scale)))
+    if left_bits + 1 < right_bits {
+        return Some(Ordering::Less);
+    }
+    // Within one bit of each other, both fit 256 bits.
+    Some(wide_shl(remainder, shift).cmp(&wide_mul(mantissa, scale)))
+}
+
+/// `value << shift` as a 256-bit `(high, low)` pair; the caller guarantees the
+/// result fits.
+fn wide_shl(value: u128, shift: u32) -> (u128, u128) {
+    match shift {
+        0 => (0, value),
+        1..=127 => (value >> (128 - shift), value << shift),
+        128 => (value, 0),
+        _ => (value << (shift - 128), 0),
+    }
+}
+
+/// `a * b` as a 256-bit `(high, low)` pair.
+fn wide_mul(a: u128, b: u128) -> (u128, u128) {
+    const MASK: u128 = u64::MAX as u128;
+    let (a_hi, a_lo) = (a >> 64, a & MASK);
+    let (b_hi, b_lo) = (b >> 64, b & MASK);
+    let low = a_lo * b_lo;
+    let mid1 = a_hi * b_lo;
+    let mid2 = a_lo * b_hi;
+    let high = a_hi * b_hi;
+    let (mid, carry) = mid1.overflowing_add(mid2);
+    let (low_sum, carry_low) = low.overflowing_add(mid << 64);
+    let high = high + (mid >> 64) + (u128::from(carry) << 64) + u128::from(carry_low);
+    (high, low_sum)
 }

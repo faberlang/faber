@@ -165,6 +165,7 @@ impl TypeChecker<'_> {
                 .store_narrowing_target(ty, slot_ty)
                 .or_else(|| self.capped_store_target(expr, ty, slot_ty))
                 .or_else(|| self.saturating_store_target(expr, ty, slot_ty))
+                .or_else(|| self.decimal_store_target(expr, ty, slot_ty))
             {
                 return self.wrap_implicit_store(expr, ty, target, site);
             }
@@ -187,6 +188,7 @@ impl TypeChecker<'_> {
             .store_narrowing_target(ty, slot_ty)
             .or_else(|| self.capped_store_target(expr, ty, slot_ty))
             .or_else(|| self.saturating_store_target(expr, ty, slot_ty))
+            .or_else(|| self.decimal_store_target(expr, ty, slot_ty))
         {
             Some(target) => self.wrap_implicit_store(expr, ty, target, site),
             None => self.unify_expected(ty, slot_ty, expr.span),
@@ -261,6 +263,66 @@ impl TypeChecker<'_> {
         false
     }
 
+    /// Whether `expr` (of type `ty`) is decimal arithmetic: its value is
+    /// computed exactly (D11.7), so a slot must round and range-check it.
+    fn is_decimal_arithmetic(&self, expr: &HirExpression, ty: TypeId) -> bool {
+        let arithmetic = matches!(
+            expr.kind,
+            HirExpressionKind::Binary(
+                radix_hir::HirBinOp::Add
+                    | radix_hir::HirBinOp::Sub
+                    | radix_hir::HirBinOp::Mul
+                    | radix_hir::HirBinOp::Div
+                    | radix_hir::HirBinOp::Mod,
+                ..
+            ) | HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, _)
+        );
+        arithmetic && self.decimal_slot_type(ty).is_some()
+    }
+
+    /// The `d64` type of a concrete slot type (aliases and access markers
+    /// peeled), or of the single decimal member of an optional or union.
+    fn decimal_slot_type(&self, ty: TypeId) -> Option<TypeId> {
+        let direct = |ty: TypeId| {
+            let mut ty = self.resolve_inferred_type(ty);
+            ty = self.types.peel_access_marker(ty).1;
+            while let Type::Alias(_, inner) = self.types.get(ty) {
+                ty = self.resolve_inferred_type(*inner);
+            }
+            matches!(
+                self.types.get(ty),
+                Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal()
+            )
+            .then_some(ty)
+        };
+        if let Some(found) = direct(ty) {
+            return Some(found);
+        }
+        let resolved = self.resolve_inferred_type(ty);
+        let members: Vec<TypeId> = match self.types.get(self.types.peel_access_marker(resolved).1) {
+            Type::Union(members) => members.clone(),
+            Type::Option(inner) => vec![*inner],
+            _ => return None,
+        };
+        let mut numeric = members.into_iter().filter_map(direct);
+        let only = numeric.next()?;
+        numeric.next().is_none().then_some(only)
+    }
+
+    /// The `d64` slot a computed decimal lands in (D11.7): the slot rounds the
+    /// exact value half-even to scale 8 and traps outside the carrier range.
+    fn decimal_store_target(
+        &self,
+        expr: &HirExpression,
+        ty: TypeId,
+        slot_ty: TypeId,
+    ) -> Option<TypeId> {
+        if !self.is_decimal_arithmetic(expr, ty) {
+            return None;
+        }
+        self.decimal_slot_type(slot_ty)
+    }
+
     /// The `saturating` slot an exactly computed `saturating` expression lands
     /// in: its plain integer type is clamped into the slot at the store.
     fn saturating_store_target(
@@ -287,6 +349,11 @@ impl TypeChecker<'_> {
         ty: TypeId,
         site: StoreSite,
     ) -> TypeId {
+        // A decimal computed exactly lands in the inferred `d64` slot rounded
+        // at the store (D11.7): the slot's type is the expression's type.
+        if self.is_decimal_arithmetic(init, ty) {
+            return self.wrap_implicit_store(init, ty, ty, site);
+        }
         let is_arithmetic = matches!(
             init.kind,
             HirExpressionKind::Binary(..) | HirExpressionKind::Unary(..)

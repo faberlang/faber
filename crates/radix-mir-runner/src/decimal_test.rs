@@ -59,44 +59,60 @@ fn fractus(width: NumericWidth) -> Type {
 }
 
 #[test]
-fn decimal_arithmetic_uses_scaled_carriers_and_checked_rounding() {
+fn decimal_arithmetic_is_exact_until_the_store() {
     let span = Span::default();
-    let scale = 1_000_000_000_i64;
+    let scale = 100_000_000_i64;
+    let binop = |l: Value, r: Value, op: MirBinOp| {
+        decimal_numeric_binop(l, r, op, NumericWidth::D64, span).expect("d64 binop")
+    };
+    // Stored-shaped results stay stored carriers.
     assert_eq!(
-        decimal_numeric_binop(
+        binop(
             Value::Int(42 * scale / 10),
             Value::Int(scale / 10),
-            MirBinOp::Add,
-            NumericWidth::D64,
-            span,
-        )
-        .expect("d64 add"),
+            MirBinOp::Add
+        ),
         Value::Int(43 * scale / 10),
     );
     assert_eq!(
-        decimal_numeric_binop(
-            Value::Int(42 * scale),
-            Value::Int(2 * scale),
-            MirBinOp::Mul,
-            NumericWidth::D64,
-            span,
-        )
-        .expect("d64 multiply"),
+        binop(Value::Int(42 * scale), Value::Int(2 * scale), MirBinOp::Mul),
         Value::Int(84 * scale),
     );
-    // 1.000000001 × 0.5 lands exactly at an odd/even midpoint in carrier
-    // units; the even result is selected rather than truncating toward zero.
-    assert_eq!(
-        decimal_numeric_binop(
-            Value::Int(1_000_000_001),
-            Value::Int(500_000_000),
-            MirBinOp::Mul,
-            NumericWidth::D64,
-            span,
-        )
-        .expect("d64 midpoint multiply"),
-        Value::Int(500_000_000),
+    // 1.00000001 x 0.5 = 0.500000005 exactly: the product keeps its scale
+    // (9 after dropping zeros) and only the store rounds it, half-even, to
+    // 0.50000000.
+    let midpoint = binop(
+        Value::Int(100_000_001),
+        Value::Int(50_000_000),
+        MirBinOp::Mul,
     );
+    assert_eq!(midpoint, Value::Dec(500_000_005, 9));
+    assert_eq!(
+        crate::decimal::store_carrier(500_000_005, 9),
+        Some(50_000_000)
+    );
+    // The odd side of the tie rounds up to the even carrier.
+    assert_eq!(
+        crate::decimal::store_carrier(500_000_015, 9),
+        Some(50_000_002)
+    );
+    // Scales grow through `*` and compare exactly.
+    let p = Value::Int(1_999_000_000); // 19.99
+    let r = Value::Int(7_250_000); // 0.0725
+    let pr = binop(p.clone(), r.clone(), MirBinOp::Mul);
+    assert_eq!(pr, Value::Int(144_927_500)); // 1.449275
+    let prr = binop(pr, r, MirBinOp::Mul);
+    assert_eq!(prr, Value::Dec(1_050_724_375, 10)); // 0.1050724375
+    assert_eq!(crate::decimal::format(1_050_724_375, 10), "0.1050724375");
+    assert_eq!(
+        crate::decimal::store_carrier(1_050_724_375, 10),
+        Some(10_507_244)
+    );
+    // `/` rounds half-even to the larger operand scale.
+    let third = binop(Value::Int(scale), Value::Int(3 * scale), MirBinOp::Div);
+    assert_eq!(third, Value::Int(33_333_333));
+    let wide = binop(Value::Dec(10, 16), Value::Int(3 * scale), MirBinOp::Div);
+    assert_eq!(wide, Value::Dec(3, 16));
     assert_eq!(round_half_even_quotient(5, 2), Some(2));
     assert_eq!(round_half_even_quotient(7, 2), Some(4));
     assert_eq!(round_half_even_quotient(-5, 2), Some(-2));
@@ -137,7 +153,7 @@ fn decimal_runtime_binop_normalizes_float_constants() {
             Span::default(),
         )
         .expect("4.2 + 0.1 d64");
-    assert_eq!(result, Value::Int(4_300_000_000));
+    assert_eq!(result, Value::Int(430_000_000));
 }
 
 #[test]
@@ -151,48 +167,48 @@ fn decimal_conversio_matrix_rounds() {
         run_conversion(
             Type::Primitive(Primitive::Textus),
             d64.clone(),
-            Value::Str("2.0000000005".to_owned()),
+            Value::Str("2.000000005".to_owned()),
         )
         .expect("textus to d64 midpoint"),
-        Value::Int(2_000_000_000),
+        Value::Int(200_000_000),
     );
     assert_eq!(
         run_conversion(
             Type::Primitive(Primitive::Textus),
             d64.clone(),
-            Value::Str("2.0000000015".to_owned()),
+            Value::Str("2.000000015".to_owned()),
         )
         .expect("textus to d64 odd midpoint"),
-        Value::Int(2_000_000_002),
+        Value::Int(200_000_002),
     );
     assert_eq!(
         run_conversion(i64.clone(), d64.clone(), Value::Int(42),).expect("integer to d64"),
-        Value::Int(42_000_000_000),
+        Value::Int(4_200_000_000),
     );
     assert_eq!(
         run_conversion(fractus(NumericWidth::F64), d64.clone(), Value::Float(4.2),)
             .expect("fractus to d64"),
-        Value::Int(4_200_000_000),
+        Value::Int(420_000_000),
     );
     assert_eq!(
-        run_conversion(d64.clone(), i64.clone(), Value::Int(4_500_000_000),)
+        run_conversion(d64.clone(), i64.clone(), Value::Int(450_000_000),)
             .expect("4.5 to integer uses even tie"),
         Value::Int(4),
     );
     assert_eq!(
-        run_conversion(d64.clone(), u32, Value::Int(3_500_000_000),)
+        run_conversion(d64.clone(), u32, Value::Int(350_000_000),)
             .expect("3.5 to unsigned integer uses even tie"),
         Value::UInt(4),
     );
     assert_eq!(
-        run_conversion(d64.clone(), f64, Value::Int(4_200_000_000)).expect("d64 to fractus"),
+        run_conversion(d64.clone(), f64, Value::Int(420_000_000)).expect("d64 to fractus"),
         Value::Float(4.2),
     );
     assert_eq!(
         run_conversion(
             d64,
             Type::Primitive(Primitive::Textus),
-            Value::Int(4_200_000_000),
+            Value::Int(420_000_000),
         )
         .expect("d64 to textus display"),
         Value::Str("4.2".to_owned()),
@@ -200,15 +216,30 @@ fn decimal_conversio_matrix_rounds() {
 }
 
 #[test]
-fn decimal_overflow_is_checked_at_the_declared_carrier_width() {
-    let error = decimal_numeric_binop(
+fn decimal_overflow_traps_at_the_128_bit_bound_and_the_store() {
+    // Past the d64 range an intermediate is still exact; only the store traps.
+    let sum = decimal_numeric_binop(
         Value::Int(i64::MAX),
         Value::Int(2),
         MirBinOp::Add,
         NumericWidth::D64,
         Span::default(),
     )
-    .expect_err("d64 carrier overflow");
+    .expect("exact sum beyond the d64 range");
+    assert_eq!(sum, Value::Dec(i128::from(i64::MAX) + 2, 8));
+    assert_eq!(
+        crate::decimal::store_carrier(i128::from(i64::MAX) + 2, 8),
+        None
+    );
+    // The intermediate itself is bounded by the 128-bit carrier.
+    let error = decimal_numeric_binop(
+        Value::Dec(i128::MAX, 0),
+        Value::Int(2),
+        MirBinOp::Mul,
+        NumericWidth::D64,
+        Span::default(),
+    )
+    .expect_err("i128 carrier overflow");
     assert_eq!(error.issue, "runner_numerus_overflow");
 }
 

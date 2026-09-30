@@ -1,7 +1,7 @@
 //! Shared decimal-carrier math for codegen tiers (decimal-widths D5).
 //!
 //! Decimal widths ride the tier's signed-integer carrier (`d64` =
-//! `i64`×10⁻⁹) with round-half-even rescale. These pure helpers keep
+//! `i64`×10⁻⁸) with round-half-even rescale. These pure helpers keep
 //! every emit tier on the same carrier math as the MIR runner without
 //! re-importing runner internals.
 
@@ -13,7 +13,7 @@ use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
 #[path = "decimal_test.rs"]
 mod tests;
 
-/// Decimal scale as an integer factor (`d64` = 10^9).
+/// Decimal scale as an integer factor (`d64` = 10^8).
 #[must_use]
 pub fn decimal_scale_factor(width: NumericWidth) -> Option<i128> {
     width

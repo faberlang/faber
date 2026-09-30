@@ -52,6 +52,9 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         span: Span,
     ) -> Result<Value, RunnerError> {
         if let Some(width) = decimal_source_width(self.types, source_ty) {
+            if let Value::Dec(carrier, scale) = value {
+                return Ok(Value::Str(crate::decimal::format(carrier, scale)));
+            }
             let carrier = match value {
                 Value::Int(value) => decimal_carrier_value(value, width, span)?,
                 Value::Float(value) => decimal_text_to_carrier(&value.to_string(), width)
@@ -264,6 +267,10 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 None => decimal_integer_to_carrier(i128::from(value), target_width),
             },
             Value::UInt(value) => decimal_integer_to_carrier(i128::from(value), target_width),
+            // An exact intermediate lands at scale 8: half-even, range-checked.
+            Value::Dec(carrier, scale) => {
+                crate::decimal::store_carrier(carrier, scale).ok_or(DecimalTextError::OutOfRange)
+            }
             Value::Float(value) => decimal_text_to_carrier(&value.to_string(), target_width),
             Value::Str(text) => decimal_text_to_carrier(&text, target_width),
             Value::Sermo(sermo) => {
@@ -296,6 +303,11 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         source_width: NumericWidth,
         span: Span,
     ) -> Result<i128, RunnerError> {
+        if let Value::Dec(carrier, scale) = value {
+            return crate::decimal::round_to_integer(carrier, scale).ok_or_else(|| {
+                RunnerError::conversion(span, "decimal to numerus conversion failed")
+            });
+        }
         let raw = match value {
             Value::Int(value) => decimal_carrier_value(value, source_width, span),
             Value::Float(value) => decimal_text_to_carrier(&value.to_string(), source_width)
@@ -536,10 +548,34 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             if self.has_bits_hint(params) {
                 return self.recover_or_fail(recovery, span, "bits pair width mismatch");
             }
-            let carrier = match value {
-                Value::Int(value) => decimal_carrier_value(value, source_width, span)?,
-                Value::Float(value) => decimal_text_to_carrier(&value.to_string(), source_width)
-                    .map_err(|error| decimal_text_error(error, span))?,
+            let (carrier, scale) = match value {
+                Value::Int(value) => {
+                    let scale = decimal_scale_factor(source_width).ok_or_else(|| {
+                        RunnerError::internal(span, "decimal conversion requires decimal width")
+                    })?;
+                    (
+                        i128::from(decimal_carrier_value(value, source_width, span)?),
+                        scale,
+                    )
+                }
+                Value::Dec(carrier, scale) => (
+                    carrier,
+                    crate::decimal::pow10(scale).ok_or_else(|| {
+                        RunnerError::internal(span, "decimal conversion scale out of range")
+                    })?,
+                ),
+                Value::Float(value) => {
+                    let scale = decimal_scale_factor(source_width).ok_or_else(|| {
+                        RunnerError::internal(span, "decimal conversion requires decimal width")
+                    })?;
+                    (
+                        i128::from(
+                            decimal_text_to_carrier(&value.to_string(), source_width)
+                                .map_err(|error| decimal_text_error(error, span))?,
+                        ),
+                        scale,
+                    )
+                }
                 other => {
                     return Err(RunnerError::internal(
                         span,
@@ -547,9 +583,6 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     ));
                 }
             };
-            let scale = decimal_scale_factor(source_width).ok_or_else(|| {
-                RunnerError::internal(span, "decimal conversion requires decimal width")
-            })?;
             let value = (carrier as f64) / (scale as f64);
             let value = if matches!(width, NumericWidth::F64) {
                 value
@@ -850,6 +883,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             | Value::Bool(_)
             | Value::Int(_)
             | Value::UInt(_)
+            | Value::Dec(..)
             | Value::Str(_)
             | Value::Ascii(_)
             | Value::Char(_)
@@ -905,6 +939,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Value::Bool(v) => if *v { "true" } else { "false" }.to_owned(),
             Value::Int(v) => v.to_string(),
             Value::UInt(v) => v.to_string(),
+            Value::Dec(carrier, scale) => crate::decimal::format(*carrier, *scale),
             Value::Float(v) => render_json_fractus(*v),
             Value::Str(v) => render_json_string(v),
             Value::Ascii(b) => {

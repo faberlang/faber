@@ -152,3 +152,33 @@ fn integer_float_comparison_is_exact_above_2_pow_53() {
         Value::Bool(false)
     );
 }
+
+/// D11.7: an exact decimal intermediate at a wide scale compares exactly with a
+/// float (the decimal 0.1 is below the double nearest 0.1).
+#[test]
+fn wide_scale_decimal_compares_exactly_with_a_float() {
+    use crate::exact_int::cmp_scaled_float;
+    use std::cmp::Ordering::{Equal, Greater, Less};
+    assert_eq!(
+        cmp_scaled_float(10_i128.pow(15), 10_i128.pow(16), 0.1),
+        Some(Less)
+    );
+    assert_eq!(
+        cmp_scaled_float(10_i128.pow(29), 10_i128.pow(30), 0.1),
+        Some(Less)
+    );
+    assert_eq!(
+        cmp_scaled_float(5 * 10_i128.pow(29), 10_i128.pow(30), 0.5),
+        Some(Equal)
+    );
+    assert_eq!(
+        cmp_scaled_float(5 * 10_i128.pow(29) + 1, 10_i128.pow(30), 0.5),
+        Some(Greater)
+    );
+    assert_eq!(
+        cmp_scaled_float(-(10_i128.pow(29)), 10_i128.pow(30), -0.1),
+        Some(Greater)
+    );
+    assert_eq!(cmp_scaled_float(1, 10_i128.pow(30), 1e-300), Some(Greater));
+    assert_eq!(cmp_scaled_float(1, 1, f64::NAN), None);
+}

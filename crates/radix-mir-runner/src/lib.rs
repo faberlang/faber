@@ -9,6 +9,7 @@
 pub mod capability;
 mod conversio;
 mod cursor;
+mod decimal;
 mod exact_int;
 mod host;
 pub mod kernel;
@@ -1960,6 +1961,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         };
         let modular = self.modular_word_width(result_ty);
         match op {
+            MirUnOp::Neg if matches!(value, Value::Dec(..)) => decimal::neg(&value, span),
             MirUnOp::Neg => {
                 if let Some(width) = modular {
                     modular_word_neg(value, width, span)
@@ -2116,54 +2118,24 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    /// Exact decimal-versus-float comparison (ruling 22): the decimal carrier
-    /// is a scaled integer, so the float side compares against its true value.
-    fn decimal_float_comparison(
-        &self,
-        op: MirBinOp,
-        lhs: &MirOperand,
-        rhs: &MirOperand,
-        left: &Value,
-        right: &Value,
-    ) -> Option<bool> {
-        if !matches!(
-            op,
-            MirBinOp::Lt
-                | MirBinOp::Gt
-                | MirBinOp::LtEq
-                | MirBinOp::GtEq
-                | MirBinOp::Eq
-                | MirBinOp::NotEq
-        ) {
-            return None;
+    /// A decimal operand as `(carrier, scale digits)`: an exact intermediate
+    /// carries its own scale, a stored carrier is scale 8 when the operand's
+    /// static type is decimal.
+    fn decimal_side(&self, operand: &MirOperand, value: &Value) -> Option<(i128, u32)> {
+        match value {
+            Value::Dec(carrier, scale) => Some((*carrier, *scale)),
+            Value::Int(carrier) => self
+                .operand_decimal_width(operand)
+                .and_then(|width| width.decimal_scale())
+                .map(|scale| (i128::from(*carrier), scale)),
+            _ => None,
         }
-        let (scaled, operand, float, reversed) = match (left, right) {
-            (Value::Int(v), Value::Float(f)) => (i128::from(*v), lhs, *f, false),
-            (Value::Float(f), Value::Int(v)) => (i128::from(*v), rhs, *f, true),
-            _ => return None,
-        };
-        let scale = decimal_scale_factor(self.operand_decimal_width(operand)?)?;
-        let ordering = exact_int::cmp_scaled_float(scaled, scale, float);
-        let ordering = if reversed {
-            ordering.map(std::cmp::Ordering::reverse)
-        } else {
-            ordering
-        };
-        Some(match op {
-            MirBinOp::Lt => ordering.is_some_and(std::cmp::Ordering::is_lt),
-            MirBinOp::Gt => ordering.is_some_and(std::cmp::Ordering::is_gt),
-            MirBinOp::LtEq => ordering.is_some_and(std::cmp::Ordering::is_le),
-            MirBinOp::GtEq => ordering.is_some_and(std::cmp::Ordering::is_ge),
-            MirBinOp::Eq => ordering.is_some_and(std::cmp::Ordering::is_eq),
-            _ => ordering.is_none_or(std::cmp::Ordering::is_ne),
-        })
     }
 
-    /// Exact decimal-versus-integer comparison (ruling 22): the decimal
-    /// carrier is a scaled integer and the integer side is scaled up to meet
-    /// it, so no conversion can leave the decimal range. Both operands carry
-    /// the integer representation; the static types tell them apart.
-    fn decimal_integer_comparison(
+    /// Exact comparison of a decimal with a float, an integer or another
+    /// decimal (ruling 22). Two stored carriers compare as plain integers, so
+    /// that pair returns `None` and takes the ordinary path.
+    fn decimal_comparison(
         &self,
         op: MirBinOp,
         lhs: &MirOperand,
@@ -2187,35 +2159,33 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             Value::UInt(v) => Some(i128::from(*v)),
             _ => None,
         };
-        let (left_scale, right_scale) = (
-            self.operand_decimal_width(lhs)
-                .and_then(decimal_scale_factor),
-            self.operand_decimal_width(rhs)
-                .and_then(decimal_scale_factor),
-        );
-        let (scaled, integer, scale, reversed) = match (left_scale, right_scale) {
-            (Some(scale), None) => (as_i128(left)?, as_i128(right)?, scale, false),
-            (None, Some(scale)) => (as_i128(right)?, as_i128(left)?, scale, true),
-            _ => return None,
+        let (l, r) = (self.decimal_side(lhs, left), self.decimal_side(rhs, right));
+        let ordering = match (l, r) {
+            (Some(a), Some(b)) => {
+                if !matches!(left, Value::Dec(..)) && !matches!(right, Value::Dec(..)) {
+                    return None;
+                }
+                Some(decimal::compare(a, b))
+            }
+            (Some((scaled, scale)), None) => match right {
+                Value::Float(f) => exact_int::cmp_scaled_float(scaled, decimal::pow10(scale)?, *f),
+                other => Some(decimal::compare((scaled, scale), (as_i128(other)?, 0))),
+            },
+            (None, Some((scaled, scale))) => match left {
+                Value::Float(f) => exact_int::cmp_scaled_float(scaled, decimal::pow10(scale)?, *f)
+                    .map(std::cmp::Ordering::reverse),
+                other => Some(decimal::compare((as_i128(other)?, 0), (scaled, scale))),
+            },
+            (None, None) => return None,
         };
-        // An integer too large to scale is beyond every decimal carrier.
-        let ordering = match integer.checked_mul(scale) {
-            Some(scaled_integer) => scaled.cmp(&scaled_integer),
-            None if integer < 0 => std::cmp::Ordering::Greater,
-            None => std::cmp::Ordering::Less,
-        };
-        let ordering = if reversed {
-            ordering.reverse()
-        } else {
-            ordering
-        };
+        // A NaN float compares unequal to everything and orders nowhere.
         Some(match op {
-            MirBinOp::Lt => ordering.is_lt(),
-            MirBinOp::Gt => ordering.is_gt(),
-            MirBinOp::LtEq => ordering.is_le(),
-            MirBinOp::GtEq => ordering.is_ge(),
-            MirBinOp::Eq => ordering.is_eq(),
-            _ => ordering.is_ne(),
+            MirBinOp::Lt => ordering.is_some_and(std::cmp::Ordering::is_lt),
+            MirBinOp::Gt => ordering.is_some_and(std::cmp::Ordering::is_gt),
+            MirBinOp::LtEq => ordering.is_some_and(std::cmp::Ordering::is_le),
+            MirBinOp::GtEq => ordering.is_some_and(std::cmp::Ordering::is_ge),
+            MirBinOp::Eq => ordering.is_some_and(std::cmp::Ordering::is_eq),
+            _ => ordering.is_none_or(std::cmp::Ordering::is_ne),
         })
     }
 
@@ -2238,10 +2208,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         } else {
             (left, right)
         };
-        if let Some(compared) = self.decimal_float_comparison(op, lhs, rhs, &left, &right) {
-            return Ok(Value::Bool(compared));
-        }
-        if let Some(compared) = self.decimal_integer_comparison(op, lhs, rhs, &left, &right) {
+        if let Some(compared) = self.decimal_comparison(op, lhs, rhs, &left, &right) {
             return Ok(Value::Bool(compared));
         }
         if let Some(modular) = self.modular_word_width(result_ty) {

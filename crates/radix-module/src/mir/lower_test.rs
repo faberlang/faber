@@ -101,12 +101,12 @@ functio aequalis(numerus<d64> a, numerus<d64> b) → bivalens {
 #[test]
 fn lowers_decimal_literal_text_to_the_exact_carrier_across_mir() {
     // need: the original digit text — not the f64 re-derivation —
-    // must decide the MIR constant. 9223372036.854775807 × 10⁹ is exactly
+    // must decide the MIR constant. 92233720368.54775807 × 10⁸ is exactly
     // i64::MAX; a carrier derived from the rounded f64 leaves the width.
     let dump = dump_source(
         r"
 functio exacta() → numerus<d64> {
-    fixum numerus<d64> x ← 9223372036.854775807
+    fixum numerus<d64> x ← 92233720368.54775807
     redde x
 }
 ",
@@ -130,7 +130,7 @@ fn decimal_literal_executes_at_the_exact_scaled_carrier() {
         &Session::new(Config::default().with_target(Target::HirTypeScript)),
         "decimal-exact-carrier.fab",
         r"incipit {
-    fixum numerus<d64> x ← 9223372036.854775807
+    fixum numerus<d64> x ← 92233720368.54775807
     nota x
 }",
         &mut host,
@@ -6778,5 +6778,131 @@ fn copia_mappata_fails_closed_before_set_mir_lowering() {
             .any(|err| err.issue.starts_with("unsupported_mir_lowering")),
         "expected an unsupported-MIR issue, got: {:?}",
         errors.iter().map(|err| &err.issue).collect::<Vec<_>>()
+    );
+}
+
+/// Run `body` as an `incipit` block and return its printed lines.
+fn run_lines(body: &str) -> Result<Vec<String>, String> {
+    let mut host = crate::mir::BufferHost::default();
+    let source = format!("incipit {{\n{body}\n}}");
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "decimal-exact-until-store.fab",
+        &source,
+        &mut host,
+    )
+    .map_err(|error| format!("{error:?}"))?;
+    Ok(host.stdout_lines)
+}
+
+#[test]
+fn decimal_sum_is_exact_and_stores_at_scale_eight() {
+    // 0.1 + 0.2 = 0.3: carrier 30_000_000 at scale 8.
+    let lines =
+        run_lines("fixum numerus<d64> a ← 0.1\nfixum numerus<d64> b ← 0.2\nfixum numerus<d64> c ← a + b\nnota c")
+            .expect("runs");
+    assert_eq!(lines, ["30000000"]);
+}
+
+#[test]
+fn decimal_product_keeps_its_exact_scale_until_a_slot_stores_it() {
+    // 19.99 * 0.0725 = 1.449275 exactly (no rounding: 6 fraction digits).
+    // 19.99 * 0.0725 * 0.0725 = 0.1050724375 (scale 10) prints exactly and
+    // stores half-even at scale 8 as 0.10507244.
+    let lines = run_lines(
+        "fixum numerus<d64> p ← 19.99\nfixum numerus<d64> r ← 0.0725\n\
+         fixum numerus<d64> t ← p * r\nnota t\nnota p * r * r\n\
+         fixum numerus<d64> s ← p * r * r\nnota s",
+    )
+    .expect("runs");
+    assert_eq!(lines, ["144927500", "0.1050724375", "10507244"]);
+}
+
+#[test]
+fn decimal_expression_rounds_once_at_the_store_not_per_operation() {
+    // 1.5 * 0.00000001 = 0.000000015 (a tie at scale 8); * 100.0 gives
+    // 0.0000015 exactly. Rounding after `*` would give 0.00000002 * 100.0.
+    let lines = run_lines(
+        "fixum numerus<d64> a ← 1.5\nfixum numerus<d64> r ← 0.00000001\n\
+         fixum numerus<d64> h ← 100.0\nfixum numerus<d64> t ← a * r * h\nnota t",
+    )
+    .expect("runs");
+    assert_eq!(lines, ["150"]);
+}
+
+#[test]
+fn decimal_division_rounds_half_even_to_the_larger_scale() {
+    // 1.0 / 3.0 at scale 8 is 0.33333333; 2.0 / 3.0 is 0.66666667.
+    let lines = run_lines(
+        "fixum numerus<d64> one ← 1.0\nfixum numerus<d64> two ← 2.0\nfixum numerus<d64> three ← 3.0\n\
+         fixum numerus<d64> q ← one / three\nnota q\nfixum numerus<d64> w ← two / three\nnota w",
+    )
+    .expect("runs");
+    assert_eq!(lines, ["33333333", "66666667"]);
+}
+
+#[test]
+fn decimal_intermediate_may_leave_the_range_until_the_store() {
+    // big + 1.0 - 1.0 passes through 92233720369.0, past the d64 range, and
+    // lands back inside it; big * 2.0 lands outside and traps at the store.
+    let lines = run_lines(
+        "fixum numerus<d64> big ← 92233720368.0\nfixum numerus<d64> one ← 1.0\n\
+         fixum numerus<d64> ok ← big + one - one\nnota ok",
+    )
+    .expect("runs");
+    assert_eq!(lines, ["9223372036800000000"]);
+    let trap = run_lines(
+        "fixum numerus<d64> big ← 92233720368.0\nfixum numerus<d64> two ← 2.0\n\
+         fixum numerus<d64> boom ← big * two\nnota boom",
+    )
+    .expect_err("out of range store traps");
+    assert!(trap.contains("implicit_store_out_of_range"), "{trap}");
+    assert!(trap.contains("184467440736"), "{trap}");
+}
+
+#[test]
+fn decimal_comparison_of_intermediates_is_exact() {
+    let lines = run_lines(
+        "fixum numerus<d64> p ← 19.99\nfixum numerus<d64> r ← 0.0725\n\
+         nota p * r * r > p * r\nnota p * r * r < p * r\nnota p * r * r ≅ p * r * r",
+    )
+    .expect("runs");
+    assert_eq!(lines, ["falsum", "verum", "verum"]);
+}
+
+#[test]
+fn decimal_store_positions_all_round_at_the_slot() {
+    // 0.0725^3 = 0.000381078125 (scale 12) stores as 0.00038108 (38108):
+    // through a return, an argument, an assignment, an inferred slot and a
+    // list element. Unstored, it prints exactly.
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "decimal-store-positions.fab",
+        r"functio cubus(numerus<d64> x) → numerus<d64> {
+    redde x * x * x
+}
+functio idem(numerus<d64> x) → numerus<d64> {
+    redde x
+}
+incipit {
+    fixum numerus<d64> r ← 0.0725
+    nota cubus(r)
+    nota idem(r * r * r)
+    varia numerus<d64> v ← 1.0
+    v ← r * r * r
+    nota v
+    fixum _ w ← r * r * r
+    nota w
+    fixum lista<numerus<d64>> xs ← [r * r * r]
+    nota xs[0]
+    nota r * r * r
+}",
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("store positions must run: {error:?}"));
+    assert_eq!(
+        host.stdout_lines,
+        ["38108", "38108", "38108", "38108", "38108", "0.000381078125"]
     );
 }

@@ -88,3 +88,27 @@ fn removed_d32_help_points_at_d64() {
     let text = format!("{:?}", fixture.diagnostics);
     assert!(text.contains("removed_decimal_width_d32"), "{text}");
 }
+
+// --- D11.7: scale 8; a written literal is never rounded (ruling 20) ---
+
+#[test]
+fn d64_literal_accepts_eight_fraction_digits_and_the_range_edge() {
+    test_support::assert_accepts("incipit { fixum numerus<d64> a ← 0.12345678 }");
+    test_support::assert_accepts("incipit { fixum numerus<d64> a ← 92233720368.54775807 }");
+}
+
+#[test]
+fn d64_literal_with_nine_fraction_digits_rejects() {
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum numerus<d64> a ← 0.123456789 }",
+        "decimal_literal_out_of_range",
+    );
+}
+
+#[test]
+fn d64_literal_past_the_range_edge_rejects() {
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum numerus<d64> a ← 92233720368.54775808 }",
+        "decimal_literal_out_of_range",
+    );
+}

@@ -108,6 +108,10 @@ fn value_to_json(value: &Value, span: Span) -> Result<serde_json::Value, RunnerE
         Value::Bool(value) => Ok(serde_json::Value::Bool(*value)),
         Value::Int(value) => Ok(serde_json::Value::Number((*value).into())),
         Value::UInt(value) => Ok(serde_json::Value::Number((*value).into())),
+        Value::Dec(..) => Err(RunnerError::internal(
+            span,
+            "decimal intermediate reached JSON before a store",
+        )),
         Value::Float(value) => {
             let Some(number) = serde_json::Number::from_f64(*value) else {
                 return Err(RunnerError::internal(

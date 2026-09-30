@@ -880,7 +880,7 @@ status = "direct"
 exemplum = "decimal/conversio.fab"
 expected = true
 required = true
-note = "D3 row: 4.2 ↦ i64 = 4; 5 ↦ d64 = 5×10⁹; 2.5 ↦ i64 = 2, 3.5 ↦ i64 = 4; never truncates"
+note = "D3 row: 4.2 ↦ i64 = 4; 5 ↦ d64 = 5×10⁸; 2.5 ↦ i64 = 2, 3.5 ↦ i64 = 4; never truncates"
 
 [[cells]]
 id = "cast.decimal-fractus-conversio"
@@ -890,7 +890,7 @@ status = "direct"
 exemplum = "decimal/conversio.fab"
 expected = true
 required = true
-note = "D3 row: 4.2 ↦ fractus = 4.2; 1.5 ↦ d64 = 1.5×10⁹ exact"
+note = "D3 row: 4.2 ↦ fractus = 4.2; 1.5 ↦ d64 = 1.5×10⁸ exact"
 
 [[cells]]
 id = "cast.decimal-d32-removed"

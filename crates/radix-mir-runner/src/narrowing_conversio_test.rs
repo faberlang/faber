@@ -206,12 +206,12 @@ fn conversion_into_saturating_clamps_the_exact_value() {
 
 #[test]
 fn decimal_source_rounds_like_numerus_narrowing_then_applies_the_policy() {
-    // d64 carriers are scaled by 10^9: 300.7 -> 301, -1.5 -> -2 (half-even).
+    // d64 carriers are scaled by 10^8: 300.7 -> 301, -1.5 -> -2 (half-even).
     let d64 = integer(NumericWidth::D64);
     let wrapped = run_conversion(
         d64.clone(),
         wrapping(NumericWidth::U8),
-        Value::Int(300_700_000_000),
+        Value::Int(30_070_000_000),
         None,
     )
     .expect("cannot fail");
@@ -219,7 +219,7 @@ fn decimal_source_rounds_like_numerus_narrowing_then_applies_the_policy() {
     let wrapped_neg = run_conversion(
         d64.clone(),
         wrapping(NumericWidth::U8),
-        Value::Int(-1_500_000_000),
+        Value::Int(-150_000_000),
         None,
     )
     .expect("cannot fail");
@@ -227,7 +227,7 @@ fn decimal_source_rounds_like_numerus_narrowing_then_applies_the_policy() {
     let clamped = run_conversion(
         d64,
         saturating(NumericWidth::U8),
-        Value::Int(-1_500_000_000),
+        Value::Int(-150_000_000),
         None,
     )
     .expect("cannot fail");

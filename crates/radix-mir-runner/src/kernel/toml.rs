@@ -192,6 +192,10 @@ fn value_to_toml(value: &Value, span: Span) -> Result<toml::Value, RunnerError> 
             .map_err(|_| {
                 RunnerError::internal(span, format!("uint outside toml i64 range: {value}"))
             }),
+        Value::Dec(..) => Err(RunnerError::internal(
+            span,
+            "decimal intermediate reached TOML before a store",
+        )),
         Value::Float(value) => Ok(toml::Value::Float(*value)),
         Value::Str(value) => Ok(toml::Value::String(value.clone())),
         Value::Ascii(b) => Ok(toml::Value::String(char::from(*b).to_string())),

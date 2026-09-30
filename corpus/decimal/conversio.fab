@@ -17,17 +17,17 @@ locale = "en"
 #   • decimal → integer — `a ↦ numerus<i64>` rounds half-even; it never
 #     truncates. 4.2 → 4, 2.5 → 2, 3.5 → 4.
 #   • integer → decimal — `n ↦ numerus<d64>` scales the integer to the
-#     carrier: 5 → 5000000000 (5 × 10⁹ at the d64 scale).
+#     carrier: 5 → 500000000 (5 × 10⁸ at the d64 scale).
 #   • fractus → decimal — `g ↦ numerus<d64>` uses the string round-trip,
-#     so 1.5 → 1500000000 exactly.
+#     so 1.5 → 150000000 exactly.
 #   • decimal → fractus — `a ↦ fractus` is a defined rounding; 4.2 keeps
 #     its value through the float carrier.
 #   • `d64` is the only decimal width — there is no decimal-to-decimal
 #     width conversion (`d32` was removed; see d32-removed.fab).
 #
 # Common mistakes:
-#   • reading a printed carrier as a formatted decimal — `5000000000` IS 5
-#     at the d64 scale, not five billion
+#   • reading a printed carrier as a formatted decimal — `500000000` IS 5
+#     at the d64 scale, not five hundred million
 #
 # See also: ↦, numerus, d64, fractus
 # =============================================================================
@@ -35,7 +35,7 @@ locale = "en"
 # decimal — the conversio rows at the runner
 #
 # WHY: pins the D3 conversio matrix end-to-end. The printed values are the
-# actual runner carriers (d64 scale 10⁹).
+# actual runner carriers (d64 scale 10⁸).
 #
 # EXPECTED OUTPUT:
 #   decimal-conversio.expected — one raw value per print, in order.

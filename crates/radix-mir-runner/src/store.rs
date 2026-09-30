@@ -39,14 +39,18 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         value: &Value,
         span: Span,
     ) -> Option<Result<Value, RunnerError>> {
+        if let Some(width) = self.decimal_slot(target) {
+            return self.eval_decimal_store(site, width, value, span);
+        }
         let (policy, width) = self.integer_slot(target)?;
         let exact = int_value(value)?;
         let (lo, hi) = width.integer_range()?;
         Some(match policy {
             SlotPolicy::Trapping => match (lo..=hi).contains(&exact) {
-                true => exact_carrier(exact, width)
-                    .ok_or_else(|| self.store_trap(site, exact, width, span)),
-                false => Err(self.store_trap(site, exact, width, span)),
+                true => exact_carrier(exact, width).ok_or_else(|| {
+                    self.store_trap(site, exact.to_string(), exact < 0, width, span)
+                }),
+                false => Err(self.store_trap(site, exact.to_string(), exact < 0, width, span)),
             },
             SlotPolicy::Wrapping => {
                 let reduced = (exact & i128::from(modular_word_mask(width))) as u64;
@@ -74,6 +78,42 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             .unwrap_or(Ok(value))
     }
 
+    /// The decimal width of a `d64` slot.
+    fn decimal_slot(&self, target: TypeId) -> Option<NumericWidth> {
+        let mut target = target;
+        while let Type::Alias(_, inner) = self.types.get(target) {
+            target = *inner;
+        }
+        match self.types.get(target) {
+            Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal() => Some(*width),
+            _ => None,
+        }
+    }
+
+    /// A decimal value lands in a `d64` slot (D11.7): the exact value is
+    /// rounded half-even to scale 8, and a value outside the carrier range
+    /// traps with the store identity. `None` for a non-decimal value, so the
+    /// caller falls through to the ordinary conversion.
+    fn eval_decimal_store(
+        &self,
+        site: &HirStoreSite,
+        width: NumericWidth,
+        value: &Value,
+        span: Span,
+    ) -> Option<Result<Value, RunnerError>> {
+        let (carrier, scale) = crate::decimal::parts(value)?;
+        Some(match crate::decimal::store_carrier(carrier, scale) {
+            Some(stored) => Ok(Value::Int(stored)),
+            None => Err(self.store_trap(
+                site,
+                crate::decimal::format(carrier, scale),
+                carrier < 0,
+                width,
+                span,
+            )),
+        })
+    }
+
     fn integer_slot(&self, target: TypeId) -> Option<(SlotPolicy, NumericWidth)> {
         let mut target = target;
         while let Type::Alias(_, inner) = self.types.get(target) {
@@ -93,7 +133,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     fn store_trap(
         &self,
         site: &HirStoreSite,
-        value: i128,
+        value: String,
+        negative: bool,
         width: NumericWidth,
         span: Span,
     ) -> RunnerError {
@@ -109,7 +150,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
         let mut message = format!("{value} does not fit in `{ty}` ({position})");
         let mut args = vec![
-            ("value".to_owned(), value.to_string()),
+            ("value".to_owned(), value),
             ("type".to_owned(), ty.to_owned()),
             ("store".to_owned(), store_kind_phrase(site.kind).to_owned()),
         ];
@@ -130,7 +171,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 format!("{}..{}", from.start, from.end),
             ));
         }
-        if value < 0 && width.is_unsigned_int() {
+        if negative && width.is_unsigned_int() {
             message.push_str(" (a negative value cannot be stored in an unsigned slot)");
         }
         RunnerError {

@@ -17,8 +17,8 @@
 //! link the public `faber` crate and call `faber::Valor`, `faber::Instans`, etc. at
 //! runtime. Those are text emissions, not build-time imports.
 
-/// Decimal carrier scale for `d64`: values are `i64 × 10⁻⁹`.
-pub const D64_SCALE: i64 = 1_000_000_000;
+/// Decimal carrier scale for `d64`: values are `i64 × 10⁻⁸` (D11.7).
+pub const D64_SCALE: i64 = 100_000_000;
 
 pub mod display;
 pub mod frame;

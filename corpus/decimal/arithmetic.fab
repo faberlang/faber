@@ -16,18 +16,22 @@ locale = "en"
 # What this teaches:
 #   • Annotated decimal literals — `numerus<d64> a ← 4.2` carries the exact
 #     digit text to typing; 4.2 is 42×10⁻¹, not a float approximation.
-#   • Scaled-integer execution — arithmetic runs on `Value::Int` carriers
-#     (d64 = 10⁹; `d64` is the only decimal width) with checked 128-bit
-#     intermediates and round-half-even reductions, so 4.2 + 0.1 = 4.3
-#     exactly.
-#   • The runner prints the RAW scaled carrier — 4.2 prints as `4200000000`
-#     (42 × 10⁸ at the d64 scale), and 4.2 + 0.1 prints `4300000000`
-#     (43 × 10⁸). Exactness is visible in the carrier, not in a formatted
+#   • Scaled-integer execution — a stored `d64` is an `i64` carrier at
+#     scale 8 (D11.7: 8 fraction digits, range ±92,233,720,368.54775807;
+#     `d64` is the only decimal width). Arithmetic is exact until the
+#     store: `+ -` are exact, `*` is exact with the scale growing (scale 8
+#     × scale 8 is scale 16), and `/` rounds half-even to the larger operand
+#     scale, all in a 128-bit intermediate. The slot that receives the value
+#     rounds half-even to scale 8 and traps past the range. So 4.2 + 0.1 =
+#     4.3 exactly, and `a * b * c` rounds once, when it is stored.
+#   • The runner prints the RAW scaled carrier — 4.2 prints as `420000000`
+#     (42 × 10⁷ at the d64 scale), and 4.2 + 0.1 prints `430000000`
+#     (43 × 10⁷). Exactness is visible in the carrier, not in a formatted
 #     decimal string.
 #
 # Common mistakes:
-#   • reading a printed carrier as a formatted decimal — `4300000000` IS 4.3
-#     at the d64 scale, not forty-three million
+#   • reading a printed carrier as a formatted decimal — `430000000` IS 4.3
+#     at the d64 scale, not four hundred thirty million
 #   • assuming decimal arithmetic degrades to float error — the scaled
 #     integer carrier keeps 4.2 + 0.1 = 4.3 exact where f64 rounds
 #   • treating integer literals as decimal literals — `a + 1`, `a / 2`, and

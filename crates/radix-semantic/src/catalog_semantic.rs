@@ -542,6 +542,10 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             "write a decimal literal such as `5.0`, or convert an integer explicitly with `↦`"
                 .to_owned(),
         ),
+        "decimal_literal_out_of_range" => Some(
+            "a d64 literal has at most 8 fraction digits and lies within ±92233720368.54775807; a written literal is never rounded"
+                .to_owned(),
+        ),
         "modular_word_width_required" => {
             Some("write the modular word type as modulus<u8>, modulus<u16>, modulus<u32>, or modulus<u64>".to_owned())
         }

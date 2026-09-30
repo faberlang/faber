@@ -56,7 +56,7 @@ fn decimal_lattice_has_one_width() {
     assert!(!NumericWidth::D64.is_float());
     assert!(!NumericWidth::D64.is_signed_int());
     assert!(!NumericWidth::D64.is_unsigned_int());
-    assert_eq!(NumericWidth::D64.decimal_scale(), Some(9));
+    assert_eq!(NumericWidth::D64.decimal_scale(), Some(8));
     assert_eq!(NumericWidth::F64.decimal_scale(), None);
 }
 

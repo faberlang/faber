@@ -50,6 +50,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let Some(width) = effective_width(self.types, ty).filter(|width| width.is_decimal()) else {
             return Ok(value);
         };
+        // An exact intermediate stays exact until a slot stores it (D11.7).
+        if matches!(value, Value::Dec(..)) {
+            return Ok(value);
+        }
         self.convert_to_numerus_from(value, ty, &[], width, None, span)
     }
 
