@@ -211,17 +211,16 @@ fn conversion_arm_call_runs_once_only_on_propagate_error_path() {
     assert_eq!(host.stdout_lines, ["conversion-arm-ran"]);
 }
 
-/// `↦` (Runtime) and `∷` (Cast) both cast with Rust `as` semantics at the
-/// DECLARED width, matching the `as W` codegen emits for either glyph
-/// (`300.0 ↦ numerus<i8>` and `300.0 ∷ numerus<i8>` are both `300.0 as i8`).
+/// `∷` (Cast) casts with Rust `as` semantics at the DECLARED width, matching
+/// the `as W` codegen emits (`300.0 ∷ numerus<i8>` is `300.0 as i8`). `↦`
+/// (Runtime) is a check (D1.11, D11.8): see
+/// `float_to_numerus_runtime_conversion_is_a_check`.
 ///
 /// Pins the values want reported as silently wrong: the runner used to
-/// saturate at the width-agnostic i64 carrier, so `300.0 ↦ numerus<i8>` printed
-/// 300, `-1.9 ↦ numerus<u64>` printed -1, and a `∷` ascription executed the raw
-/// float. FORK-2 (mail 2fb79900 / memo) keeps casts saturating while
-/// integer arithmetic errors.
+/// saturate at the width-agnostic i64 carrier, so `-1.9 ∷ numerus<u64>` printed
+/// -1 and a `∷` ascription executed the raw float.
 #[test]
-fn numerus_casts_saturate_at_the_declared_width() {
+fn numerus_ascription_casts_saturate_at_the_declared_width() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;
     use radix_mir::{MirConstant, MirConversion, MirConversionFlavor, MirOperand, MirProgram};
@@ -274,8 +273,6 @@ fn numerus_casts_saturate_at_the_declared_width() {
     let i8_cast = conversion(MirConversionFlavor::Cast, fractus, i8_ty);
     assert_eq!(cast(&mut runner, &i8_cast, 300.0), Value::Int(127));
     assert_eq!(cast(&mut runner, &i8_cast, -300.0), Value::Int(-128));
-    let i8_widen = conversion(MirConversionFlavor::Runtime, fractus, i8_ty);
-    assert_eq!(cast(&mut runner, &i8_widen, 300.0), Value::Int(127));
 
     // Unsigned target: negative floats saturate at zero, and the carrier is
     // unsigned so `u64::MAX` stays exact.
@@ -285,11 +282,95 @@ fn numerus_casts_saturate_at_the_declared_width() {
         cast(&mut runner, &u64_cast, 18446744073709551615.0),
         Value::UInt(u64::MAX)
     );
-    let u64_widen = conversion(MirConversionFlavor::Runtime, fractus, u64_ty);
-    assert_eq!(cast(&mut runner, &u64_widen, -1.9), Value::UInt(0));
 
     // Bare numerus keeps the width-agnostic carrier, and NaN casts to zero.
     let i64_cast = conversion(MirConversionFlavor::Cast, fractus, numerus);
     assert_eq!(cast(&mut runner, &i64_cast, 1e300), Value::Int(i64::MAX));
     assert_eq!(cast(&mut runner, &i64_cast, f64::NAN), Value::Int(0));
+}
+
+/// D1.11 / D11.8: `fractus ↦ numerus<W>` truncates toward zero but is a check:
+/// a truncation outside `W`, NaN, or an infinity fails (or takes the `⊥`
+/// default) instead of saturating.
+#[test]
+fn float_to_numerus_runtime_conversion_is_a_check() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{MirConstant, MirConversion, MirConversionFlavor, MirOperand, MirProgram};
+    use radix_types::{NumericWidth, Primitive, TypeTable};
+
+    let mut types = TypeTable::new();
+    let fractus = types.primitive(Primitive::Fractus);
+    let numerus = types.primitive(Primitive::Numerus);
+    let u8_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::U8);
+    let u64_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::U64);
+
+    let program = MirProgram {
+        functions: vec![function(
+            0,
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            vec![block(0, Vec::new(), MirTerminatorKind::Return(None))],
+            radix_mir::MirType::semantic(numerus),
+            None,
+        )],
+    };
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&types);
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+
+    let conversion = |target, recovery| MirConversion {
+        store: None,
+        flavor: MirConversionFlavor::Runtime,
+        source_ty: radix_mir::MirType::semantic(fractus),
+        target_ty: radix_mir::MirType::semantic(target),
+        params: Vec::new(),
+        recovery,
+        struct_defaults: Vec::new(),
+    };
+    let run = |runner: &mut Runner<'_, BufferHost>, conversion: &MirConversion, value: f64| {
+        runner.eval_convert(
+            conversion,
+            &[MirOperand::Constant(MirConstant::Float(value))],
+            span(),
+        )
+    };
+
+    let to_u8 = conversion(u8_ty, None);
+    let to_i64 = conversion(numerus, None);
+    let to_u64 = conversion(u64_ty, None);
+    // The fraction truncates toward zero.
+    assert_eq!(run(&mut runner, &to_u8, 3.7).unwrap(), Value::UInt(3));
+    assert_eq!(run(&mut runner, &to_i64, -3.7).unwrap(), Value::Int(-3));
+    assert_eq!(run(&mut runner, &to_u8, -0.9).unwrap(), Value::UInt(0));
+    assert_eq!(run(&mut runner, &to_u8, 255.9).unwrap(), Value::UInt(255));
+    assert_eq!(
+        run(&mut runner, &to_u64, 9.3e18).unwrap(),
+        Value::UInt(9_300_000_000_000_000_000)
+    );
+    // Out of range, negative into unsigned, NaN and infinities fail.
+    for bad in [
+        300.0,
+        -1.0,
+        1e30,
+        f64::NAN,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+    ] {
+        assert!(run(&mut runner, &to_u8, bad).is_err(), "{bad} into u8");
+    }
+    assert!(run(&mut runner, &to_i64, 1e30).is_err());
+    assert!(run(&mut runner, &to_i64, f64::NAN).is_err());
+    assert!(run(&mut runner, &to_u64, 1.9e19).is_err());
+    // `⊥` supplies the default when the check fails.
+    let recovering = conversion(u8_ty, Some(MirOperand::Constant(MirConstant::Int(7))));
+    assert_eq!(run(&mut runner, &recovering, 300.0).unwrap(), Value::Int(7));
+    assert_eq!(
+        run(&mut runner, &recovering, f64::NAN).unwrap(),
+        Value::Int(7)
+    );
+    assert_eq!(run(&mut runner, &recovering, 3.7).unwrap(), Value::UInt(3));
 }

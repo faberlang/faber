@@ -868,6 +868,20 @@ pub fn int_width_range(width: NumericWidth) -> (i128, i128) {
     }
 }
 
+/// True when `value` is finite and its truncation toward zero lies in the
+/// integer range of `width` (`↦` float-to-integer is a check, D1.11).
+#[must_use]
+pub fn float_truncation_fits_width(value: f64, width: NumericWidth) -> bool {
+    if !value.is_finite() {
+        return false;
+    }
+    let (lo, hi) = int_width_range(width);
+    // f64 -> i128 `as` is exact for |v| < 2^127 and saturates beyond it, which
+    // is far outside every integer width's range.
+    let truncated = value.trunc() as i128;
+    (lo..=hi).contains(&truncated)
+}
+
 /// Saturate a float carrier at the declared `numerus<W>` width, with Rust `as`
 /// cast semantics: truncate toward zero, clamp at the width's bounds, NaN to
 /// zero, negative-to-unsigned to zero, and the carrier follows the width's

@@ -184,7 +184,15 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     self.recover_or_fail(recovery, span, "textus to numerus conversion failed")
                 }
             },
-            Value::Float(v) => Ok(float_to_numerus_width(v, width)),
+            // D1.11 / D11.8: `fractus ↦ numerus<W>` is a check. The fraction
+            // truncates toward zero; a NaN, an infinity, or a truncation
+            // outside `W`'s range fails the conversion (never saturates).
+            Value::Float(v) if float_truncation_fits_width(v, width) => {
+                Ok(float_to_numerus_width(v, width))
+            }
+            Value::Float(_) => {
+                self.recover_or_fail(recovery, span, "fractus to numerus conversion out of range")
+            }
             Value::Bool(v) => Ok(Value::Int(if v { 1 } else { 0 })),
             Value::Int(v) => {
                 // GT-3 / D1.11: conversion never wraps (DEFER-116 boundary

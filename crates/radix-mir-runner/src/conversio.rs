@@ -7,8 +7,8 @@
 
 use super::value::{
     MapKey, SermoValue, TensorValue, Value, decimal_scale_factor, float_to_numerus_width,
-    int_width_range, modular_word_mask, modular_word_result, round_half_even_division,
-    saturating_word_result,
+    float_truncation_fits_width, int_width_range, modular_word_mask, modular_word_result,
+    round_half_even_division, saturating_word_result,
 };
 use super::{Runner, RunnerError, runtime_regex_pattern};
 use radix_lexer::{Span, Symbol};
