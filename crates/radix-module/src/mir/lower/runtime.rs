@@ -2298,7 +2298,8 @@ impl FunctionBuilder<'_> {
     }
 
     /// A call argument. An integer constant carries the type its HIR literal
-    /// was given (`f(200)` into a `u8` parameter is a `u8`), not the untyped
+    /// was given (`f(200)` into a `u8` parameter is a `u8`, `f(3.0)` into a
+    /// `d64` parameter is a `d64` carrier), not the untyped
     /// `numerus` of the bare MIR constant, so the callee sees the argument at
     /// the parameter's type without a validator exemption (d11-6 ruling 12a).
     pub(super) fn lower_call_arg_value(&mut self, arg: &HirExpression) -> Option<MirOperand> {
@@ -2310,7 +2311,9 @@ impl FunctionBuilder<'_> {
             return Some(value);
         };
         let sized = match self.normalized_type(self.types.peel_access_marker(ty).1) {
-            Type::SizedNumeric(Primitive::Numerus, width) => width.integer_range().is_some(),
+            // A decimal literal is its scaled carrier: a bare `Int` constant
+            // would read as plain `numerus` at the call (F9 ruling 30).
+            Type::SizedNumeric(Primitive::Numerus, width) => width.integer_range().is_some() || width.is_decimal(),
             // A `wrapping` / `saturating` parameter takes the constant at its
             // own word type (ruling 12: a constant in a slot takes its type).
             Type::ModularWord(_) | Type::SaturatingWord(_) => true,

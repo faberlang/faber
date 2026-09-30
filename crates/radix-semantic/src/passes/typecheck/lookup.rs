@@ -523,8 +523,11 @@ impl TypeChecker<'_> {
                 if let Some(float_ty) = self.expected_float_slot_type(expected) {
                     return self.integer_constant_in_float_slot(*value, float_ty, span);
                 }
+                if let Some(decimal_ty) = self.expected_decimal_slot_type(expected) {
+                    return self.integer_constant_in_decimal_slot(*value, decimal_ty, span);
+                }
                 let literal_ty = self
-                    .expected_numerus_literal_type(expected, span)
+                    .expected_numerus_literal_type(expected)
                     .unwrap_or_else(|| self.numerus_type());
                 if let Type::ModularWord(width) = self.types.get(literal_ty) {
                     // Literal range follows the declared width: 0..=2^W-1
@@ -619,22 +622,45 @@ impl TypeChecker<'_> {
         }
     }
 
-    fn expected_numerus_literal_type(
+    /// The decimal type of an expected slot, when the expectation is `d64`.
+    pub(super) fn expected_decimal_slot_type(&self, expected: Option<TypeId>) -> Option<TypeId> {
+        let expected = self.resolve_inferred_type(expected?);
+        match self.types.get(expected) {
+            Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal() => Some(expected),
+            _ => None,
+        }
+    }
+
+    /// F9 ruling 30: an integer constant in a decimal slot is a decimal with no
+    /// fraction. It takes the slot's type when its scaled carrier fits the
+    /// width; otherwise it is `decimal_literal_out_of_range`.
+    fn integer_constant_in_decimal_slot(
         &mut self,
-        expected: Option<TypeId>,
+        value: u64,
+        decimal_ty: TypeId,
         span: radix_lexer::Span,
-    ) -> Option<TypeId> {
+    ) -> TypeId {
+        let fits = match self.types.get(decimal_ty) {
+            Type::SizedNumeric(_, width) => width.decimal_scale().is_some_and(|scale| {
+                10_i128
+                    .checked_pow(scale)
+                    .and_then(|factor| i128::from(value).checked_mul(factor))
+                    .is_some_and(|carrier| carrier <= i128::from(i64::MAX))
+            }),
+            _ => false,
+        };
+        if fits {
+            decimal_ty
+        } else {
+            self.decimal_literal_out_of_range(span)
+        }
+    }
+
+    fn expected_numerus_literal_type(&self, expected: Option<TypeId>) -> Option<TypeId> {
         let expected = self.resolve_inferred_type(expected?);
         match self.types.get(expected) {
             Type::Primitive(Primitive::Numerus) => Some(expected),
             Type::SizedNumeric(Primitive::Numerus, width) if !width.is_decimal() => Some(expected),
-            Type::SizedNumeric(Primitive::Numerus, NumericWidth::D64) => {
-                // Decimal carriers scale decimal literals only. An integer
-                // literal has its own numerus type and must opt into that
-                // cross-family flow with an explicit `↦` conversion.
-                self.invalid_operand_types(DECIMAL_INTEGER_LITERAL_REJECTED, span);
-                Some(self.error_type)
-            }
             Type::ModularWord(_) | Type::SaturatingWord(_) => Some(expected),
             _ => None,
         }
@@ -936,6 +962,5 @@ impl TypeChecker<'_> {
 
 const MODULAR_WORD_LITERAL_OUT_OF_RANGE: &str = "modular_word_literal_out_of_range";
 const NUMERUS_LITERAL_OUT_OF_RANGE: &str = "numerus_literal_out_of_range";
-const DECIMAL_INTEGER_LITERAL_REJECTED: &str = "decimal_integer_literal_rejected";
 const DECIMAL_LITERAL_UNPARSEABLE: &str = "decimal_literal_unparseable";
 const DECIMAL_LITERAL_OUT_OF_RANGE: &str = "decimal_literal_out_of_range";

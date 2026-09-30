@@ -27,6 +27,10 @@ locale = "en"
 #   • A decimal prints in its shortest form (D2.6) — trailing zeros are
 #     dropped and a whole number has no fractional part: 4.2 prints `4.2`,
 #     4.2 + 0.1 prints `4.3`, and 4.2 / 0.1 prints `42`, never `42.0`.
+#   • Untyped constants join by exact value — beside a `d64` or in a `d64`
+#     slot, a written constant is a decimal: `a + 1`, `a * 2`, `a * 2.0`,
+#     `a ≅ 4.2`, and `const int<d64> e ← 5` are exact (`a * 2` is 8.4). The
+#     constant may have at most 8 fractional digits and must fit the range.
 #   • A conditional, `discerne` or block that yields decimal arithmetic
 #     rounds at the slot like any other computed decimal: 0.00000005 * 0.5
 #     is 0.000000025 exactly and lands in a `d64` as `0.00000002`
@@ -37,9 +41,11 @@ locale = "en"
 #     `.0` would read as a float
 #   • assuming decimal arithmetic degrades to float error — the scaled
 #     integer carrier keeps 4.2 + 0.1 = 4.3 exact where f64 rounds
-#   • treating integer literals as decimal literals — `a + 1`, `a / 2`, and
-#     `numerus<d64> e ← 5` reject with `decimal_integer_literal_rejected`;
-#     write `1.0`, `2.0`, or `5.0`, or use explicit `↦` conversion
+#   • mixing a typed integer or float with a decimal — `a + n` with `n` an
+#     `int` or `f64` variable is `numeric_family_crossing_requires_conversio`;
+#     convert it with `↦`. A written constant needs no conversion, and a
+#     constant with more than 8 fractional digits is
+#     `decimal_literal_out_of_range`, never rounded
 #
 # See also: numerus, d64, ↦, fractus
 # =============================================================================
@@ -70,4 +76,11 @@ main {
     const int<d64> n ← -1.5
     print n
     print "§ and §"(a, n)
+    print a + 1
+    print a * 2
+    print a * 2.0
+    print a + 0.1
+    print a ≅ 4.2
+    const int<d64> e ← 5
+    print e
 }

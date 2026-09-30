@@ -1219,6 +1219,26 @@ impl TypeChecker<'_> {
         }
     }
 
+    /// F9 ruling 30: in a comparison an untyped constant beside a decimal
+    /// operand joins the decimal family by exact value, so `d ≅ 4.2` compares
+    /// decimal 4.2 and `d < 0.123456789` is `decimal_literal_out_of_range`.
+    /// `None` when `expr` is not a constant or `peer` is not a decimal; the
+    /// caller then checks `expr` as before.
+    pub(super) fn check_constant_beside_decimal(
+        &mut self,
+        expr: &mut HirExpression,
+        peer: TypeId,
+    ) -> Option<TypeId> {
+        if self.current_device_function
+            || !(is_numeric_literal(expr) || integer_range::const_int_value(expr).is_some())
+        {
+            return None;
+        }
+        let peer = self.resolve_inferred_type(peer);
+        self.expected_decimal_slot_type(Some(peer))?;
+        Some(self.check_expr_with_expected(expr, Some(peer)))
+    }
+
     pub(super) fn literal_numeric_expected(
         &self,
         expr: &HirExpression,
@@ -1227,7 +1247,7 @@ impl TypeChecker<'_> {
         let family = numeric_literal_family(expr)?;
         let expected = self.resolve_inferred_type(expected?);
         self.numeric_shape(expected)
-            .filter(|shape| shape.prim == family)
+            .filter(|shape| literal_joins_shape(expr, family, shape))
             .map(|_| self.numeric_expected_type(expected))
     }
 
@@ -1239,7 +1259,7 @@ impl TypeChecker<'_> {
         let family = numeric_literal_family(expr)?;
         let peer = self.resolve_inferred_type(peer);
         self.numeric_shape(peer)
-            .filter(|shape| shape.prim == family)
+            .filter(|shape| literal_joins_shape(expr, family, shape))
             .map(|_| self.numeric_expected_type(peer))
     }
 
@@ -1364,7 +1384,13 @@ impl TypeChecker<'_> {
             | HirBinOp::FuzzyEq
             | HirBinOp::FuzzyNotEq => {
                 let lhs_ty = self.check_expr(lhs);
-                let rhs_ty = self.check_expr(rhs);
+                let rhs_ty = match self.check_constant_beside_decimal(rhs, lhs_ty) {
+                    Some(ty) => ty,
+                    None => self.check_expr(rhs),
+                };
+                let lhs_ty = self
+                    .check_constant_beside_decimal(lhs, rhs_ty)
+                    .unwrap_or(lhs_ty);
                 if let Some(result) = self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty) {
                     return result;
                 }
@@ -1379,7 +1405,7 @@ impl TypeChecker<'_> {
             | HirBinOp::StrictNotEq
             | HirBinOp::Is
             | HirBinOp::IsNot => {
-                let (lhs_ty, rhs_ty) = self.check_littera_operands(lhs, rhs);
+                let (lhs_ty, rhs_ty) = self.check_littera_operands(lhs, rhs, false);
                 if !matches!(op, HirBinOp::Is | HirBinOp::IsNot)
                     && let Some(result) =
                         self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty)
@@ -1403,7 +1429,7 @@ impl TypeChecker<'_> {
                 self.bool_type()
             }
             HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq => {
-                let (lhs_ty, rhs_ty) = self.check_littera_operands(lhs, rhs);
+                let (lhs_ty, rhs_ty) = self.check_littera_operands(lhs, rhs, true);
                 if let Some(result) = self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty) {
                     return result;
                 }
@@ -2322,6 +2348,21 @@ fn lista_operator_spelling(op: HirBinOp) -> &'static str {
         HirBinOp::Mul => "*",
         HirBinOp::Div => "/",
         _ => unreachable!("non-list arithmetic operator"),
+    }
+}
+
+/// Whether a written literal of `family` takes a numeric slot or peer of
+/// `shape` (F9 ruling 30: digit text joins a decimal by exact value).
+fn literal_joins_shape(expr: &HirExpression, family: Primitive, shape: &NumericShape) -> bool {
+    shape.prim == family || (shape.width.is_decimal() && is_decimal_text_literal(expr))
+}
+
+/// A source-written fractional literal (`0.1`, `-2.5`): it carries its digits.
+fn is_decimal_text_literal(expr: &HirExpression) -> bool {
+    match &expr.kind {
+        HirExpressionKind::Literal(HirLiteral::FloatText { .. }) => true,
+        HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => is_decimal_text_literal(inner),
+        _ => false,
     }
 }
 

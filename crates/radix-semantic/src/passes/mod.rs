@@ -58,6 +58,7 @@ pub mod companion_predeclare;
 pub mod companion_signature;
 pub mod complexity;
 pub(crate) mod coverage;
+pub mod decimal_integer_literal;
 pub mod definite_assignment;
 pub mod exhaustive;
 pub mod fragment_definition;

@@ -541,10 +541,6 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
                 .to_owned(),
         ),
         "numeric_operands_required" => Some("use numeric operands for this operator".to_owned()),
-        "decimal_integer_literal_rejected" => Some(
-            "write a decimal literal such as `5.0`, or convert an integer explicitly with `↦`"
-                .to_owned(),
-        ),
         "decimal_literal_out_of_range" => Some(
             "a d64 literal has at most 8 fraction digits and lies within ±92233720368.54775807; a written literal is never rounded"
                 .to_owned(),

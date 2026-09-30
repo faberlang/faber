@@ -635,7 +635,7 @@ pub fn analyze_with_cli(
         Some(&mut lowered.presentation),
         Some(&radix_lanes),
     ) {
-        Ok(()) => {}
+        Ok(()) => passes::decimal_integer_literal::respell(&mut hir, &types, interner),
         Err(e) => diagnostics.extend(e),
     }
     // Top-level statics: legacy `fixum`/`varia` migration error (D5.7), then

@@ -10,30 +10,6 @@ fn annotated_d64_literal_typechecks() {
 }
 
 #[test]
-fn decimal_addition_rejects_integer_literal() {
-    test_support::assert_rejects_with_issue(
-        "functio add(numerus<d64> a) → numerus<d64> { redde a + 1 }",
-        "decimal_integer_literal_rejected",
-    );
-}
-
-#[test]
-fn decimal_division_rejects_integer_literal() {
-    test_support::assert_rejects_with_issue(
-        "functio dividi(numerus<d64> a) → numerus<d64> { redde a / 2 }",
-        "decimal_integer_literal_rejected",
-    );
-}
-
-#[test]
-fn d64_binding_rejects_integer_literal() {
-    test_support::assert_rejects_with_issue(
-        "incipit { fixum numerus<d64> e ← 5 }",
-        "decimal_integer_literal_rejected",
-    );
-}
-
-#[test]
 fn explicit_integer_to_decimal_conversion_still_accepts() {
     test_support::assert_accepts("incipit { fixum numerus<d64> e ← 5 ↦ numerus<d64> }");
 }

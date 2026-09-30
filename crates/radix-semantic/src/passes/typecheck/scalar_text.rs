@@ -175,18 +175,31 @@ impl TypeChecker<'_> {
     /// Check a comparison's operands so a one-letter literal facing a
     /// `littera` types as that scalar (D10.5 `ascii<1> → littera`): `c ≡ 'o'`
     /// and `'a' ≤ c` compare two `littera`s, and backends emit a character
-    /// literal. Any other operand pair is checked unchanged.
+    /// literal. With `decimal_constants` (ordering; F9 ruling 30) an untyped
+    /// constant beside a `d64` operand joins the decimal family; `≡` stays
+    /// exact-type and passes `false`. Any other operand pair is checked
+    /// unchanged.
     pub fn check_littera_operands(
         &mut self,
         lhs: &mut HirExpression,
         rhs: &mut HirExpression,
+        decimal_constants: bool,
     ) -> (TypeId, TypeId) {
         let lhs_ty = self.check_expr(lhs);
         let rhs_ty = if self.is_littera(lhs_ty) && is_ascii_literal(rhs) {
             self.check_expr_with_expected(rhs, Some(lhs_ty))
+        } else if let Some(ty) = decimal_constants
+            .then(|| self.check_constant_beside_decimal(rhs, lhs_ty))
+            .flatten()
+        {
+            ty
         } else {
             self.check_expr(rhs)
         };
+        let lhs_ty = decimal_constants
+            .then(|| self.check_constant_beside_decimal(lhs, rhs_ty))
+            .flatten()
+            .unwrap_or(lhs_ty);
         if self.is_littera(rhs_ty) && is_ascii_literal(lhs) && self.is_bounded_ascii_one(lhs_ty) {
             let lhs_ty = self.check_expr_with_expected(lhs, Some(rhs_ty));
             return (lhs_ty, rhs_ty);

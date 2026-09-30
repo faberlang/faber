@@ -237,6 +237,9 @@ mod conversio_function_tests;
 #[path = "copy_duplicate_test.rs"]
 mod copy_duplicate_tests;
 #[cfg(test)]
+#[path = "decimal_constant_join_test.rs"]
+mod decimal_constant_join_tests;
+#[cfg(test)]
 #[path = "decimal_projection_compare_test.rs"]
 mod decimal_projection_compare_tests;
 #[cfg(test)]
