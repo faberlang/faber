@@ -580,10 +580,11 @@ impl FunctionBuilder<'_> {
                 return None;
             }
         };
-        let accumulator = self.next_local_id();
-        self.locals
-            .push(MirLocalDecl { id: accumulator, name: None, ty: term_mir_ty, mutable: true, span: expr.span });
-        self.assign(MirPlace::local(accumulator), MirOperand::Constant(zero), term_mir_ty, expr.span);
+        // A temp, not a local: every writer is an exact op or copy, so the
+        // backends keep the running total exact and check only at the store
+        // that consumes the fold result.
+        let accumulator = FoldAccumulator::Temp(self.push_temp(term_mir_ty, expr.span));
+        self.assign(accumulator.place(), MirOperand::Constant(zero), term_mir_ty, expr.span);
         let previous_fold = self
             .summa_fold
             .replace(SummaFoldContext { accumulator, ty: term_mir_ty });
@@ -598,7 +599,7 @@ impl FunctionBuilder<'_> {
         });
         self.summa_fold = previous_fold;
         lowered?;
-        Some(MirOperand::Place(MirPlace::local(accumulator)))
+        Some(accumulator.operand())
     }
 
     /// Frozen filum lane width `W` (SFR-5 settled default: W=32 cyclic; tails
@@ -715,7 +716,7 @@ impl FunctionBuilder<'_> {
         });
         let previous_capture = self
             .filum_capture
-            .replace(SummaFoldContext { accumulator: term_result, ty: term_mir_ty });
+            .replace(SummaFoldContext { accumulator: FoldAccumulator::Local(term_result), ty: term_mir_ty });
         self.visit_block(body);
         self.filum_capture = previous_capture;
         self.breakables.pop();

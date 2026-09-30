@@ -68,7 +68,7 @@ impl HirVisitor for FunctionBuilder<'_> {
                     let Some(value) = self.lower_expr_value(expr) else {
                         return;
                     };
-                    self.assign(MirPlace::local(capture.accumulator), value, capture.ty, stmt.span);
+                    self.assign(capture.accumulator.place(), value, capture.ty, stmt.span);
                     match self
                         .breakables
                         .last()
@@ -90,14 +90,17 @@ impl HirVisitor for FunctionBuilder<'_> {
                     let Some(value) = self.lower_expr_value(expr) else {
                         return;
                     };
-                    let combined = self.binary_temp(
-                        MirBinOp::Add,
-                        MirOperand::Place(MirPlace::local(fold.accumulator)),
-                        value,
+                    // The add writes the accumulator temp directly, so its
+                    // only writers are exact ops (and the zero-copy init).
+                    let sum = self.new_value(
+                        MirValueKind::Binary { op: MirBinOp::Add, lhs: fold.accumulator.operand(), rhs: value },
                         fold.ty,
                         stmt.span,
                     );
-                    self.assign(MirPlace::local(fold.accumulator), combined, fold.ty, stmt.span);
+                    self.append_stmt(MirStatement {
+                        kind: MirStatementKind::Assign { place: fold.accumulator.place(), value: sum },
+                        span: stmt.span,
+                    });
                     match self
                         .breakables
                         .last()

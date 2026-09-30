@@ -1492,8 +1492,33 @@ struct BreakableContext {
 /// loop instead of returning from the enclosing function.
 #[derive(Debug, Clone, Copy)]
 struct SummaFoldContext {
-    accumulator: MirLocalId,
+    accumulator: FoldAccumulator,
     ty: MirType,
+}
+
+/// Where a fold keeps its running value. The sequential `summa` fold uses a
+/// temp so every writer is an exact integer operation or copy and backends
+/// keep the running total exact; the filum capture keeps a plain local.
+#[derive(Debug, Clone, Copy)]
+enum FoldAccumulator {
+    Local(MirLocalId),
+    Temp(MirTempId),
+}
+
+impl FoldAccumulator {
+    fn place(self) -> MirPlace {
+        match self {
+            Self::Local(id) => MirPlace::local(id),
+            Self::Temp(id) => MirPlace::temp(id),
+        }
+    }
+
+    fn operand(self) -> MirOperand {
+        match self {
+            Self::Local(id) => MirOperand::Place(MirPlace::local(id)),
+            Self::Temp(id) => MirOperand::Temp(id),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
