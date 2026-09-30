@@ -46,6 +46,7 @@ fn package_mir_rewrites_runtime_conversion_types_with_imported_types() {
             destination: None,
             call: MirRuntimeCall {
                 intrinsic: MirIntrinsic::Convert(MirConversion {
+                    store: None,
                     flavor: MirConversionFlavor::Runtime,
                     source_ty: MirType::semantic(TypeId(1)),
                     target_ty: MirType::semantic(TypeId(2)),

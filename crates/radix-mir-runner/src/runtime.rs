@@ -879,6 +879,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         {
             return self.eval_recovery(recovery, span);
         }
+        if let Some(site) = &conversion.store
+            && let Some(stored) =
+                self.eval_implicit_store(site, conversion.target_ty.semantic_id(), &value, span)
+        {
+            return stored;
+        }
         match conversion.flavor {
             MirConversionFlavor::Cast => self.eval_cast(value, &conversion.target_ty, span),
             MirConversionFlavor::Runtime => self.eval_runtime_convert(conversion, value, span),

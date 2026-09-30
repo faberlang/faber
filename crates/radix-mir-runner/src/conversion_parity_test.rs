@@ -252,6 +252,7 @@ fn numerus_casts_saturate_at_the_declared_width() {
 
     let conversion =
         |flavor: MirConversionFlavor, source: radix_types::TypeId, target| MirConversion {
+            store: None,
             flavor,
             source_ty: radix_mir::MirType::semantic(source),
             target_ty: radix_mir::MirType::semantic(target),

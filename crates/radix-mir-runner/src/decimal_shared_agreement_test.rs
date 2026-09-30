@@ -38,6 +38,7 @@ fn run_text_to_decimal(text: &str, width: NumericWidth) -> Result<Value, RunnerE
     let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
     runner.push_frame(MirFunctionId(0), MirBlockId(0));
     let conversion = MirConversion {
+        store: None,
         flavor: MirConversionFlavor::Runtime,
         source_ty: MirType::semantic(source_ty),
         target_ty: MirType::semantic(target_ty),

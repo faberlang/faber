@@ -1406,6 +1406,7 @@ fn rejects_runtime_intrinsic_argument_mismatch() {
                         destination: None,
                         call: MirRuntimeCall {
                             intrinsic: MirIntrinsic::Convert(MirConversion {
+                                store: None,
                                 flavor: MirConversionFlavor::Runtime,
                                 source_ty: vacuum,
                                 target_ty: vacuum,
@@ -1468,6 +1469,7 @@ fn rejects_lista_to_tensor_runtime_convert() {
                         destination: None,
                         call: MirRuntimeCall {
                             intrinsic: MirIntrinsic::Convert(MirConversion {
+                                store: None,
                                 flavor: MirConversionFlavor::Runtime,
                                 source_ty: lista_numerus,
                                 target_ty: tensor_numerus,

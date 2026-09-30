@@ -2086,8 +2086,8 @@ impl<'a> FunctionBuilder<'a> {
                     span,
                     init,
                 )?;
-            } else if local.await_store.is_some() {
-                self.lower_await_store(init, MirPlace::local(id), mir_ty, span)?;
+            } else if let Some(site) = local.await_store {
+                self.lower_await_store(init, MirPlace::local(id), mir_ty, site, span)?;
             } else if copy_bind {
                 // `copy` bind (D-6): deep-duplicate the initializer; the
                 // source stays live and shares nothing with the binding.
@@ -2145,8 +2145,8 @@ impl<'a> FunctionBuilder<'a> {
                     span,
                     init,
                 )?;
-            } else if local.await_store.is_some() {
-                self.lower_await_store(init, staging_place.clone(), mir_ty, span)?;
+            } else if let Some(site) = local.await_store {
+                self.lower_await_store(init, staging_place.clone(), mir_ty, site, span)?;
             } else {
                 self.lower_expr_to_destination(init, staging_place.clone(), mir_ty)?;
             }
@@ -2299,7 +2299,7 @@ impl<'a> FunctionBuilder<'a> {
         span: Span,
         expr: &HirExpression,
     ) -> Option<()> {
-        let converted = self.lower_conversio(source, ty.semantic_id(), &[], recovery, false, expr)?;
+        let converted = self.lower_conversio(source, ty.semantic_id(), &[], recovery, None, expr)?;
         self.assign(destination, converted, ty, span);
         Some(())
     }
@@ -2344,7 +2344,73 @@ impl<'a> FunctionBuilder<'a> {
         let lhs = MirOperand::Place(place.clone());
         let rhs = MirOperand::Constant(MirConstant::Int(1));
         let value = self.assign_temp(MirValueKind::Binary { op: bin_op, lhs, rhs }, ty, span);
+        // `place ↑` is a store (d11-6 row 4): the exact successor lands in the
+        // slot under the slot's policy, and a failure has the store identity.
+        let value = if !self.is_device_lowering() && self.is_integer_store_slot(ty) {
+            let slot = match &inc_dec.target.kind {
+                HirExpressionKind::Path(_) | HirExpressionKind::Field(..) => place
+                    .projections
+                    .iter()
+                    .rev()
+                    .find_map(|projection| match projection {
+                        MirProjection::Field(name) => Some(*name),
+                        _ => None,
+                    })
+                    .or_else(|| match place.base {
+                        MirPlaceBase::Local(id) => self
+                            .locals
+                            .iter()
+                            .find(|local| local.id == id)
+                            .and_then(|local| local.name),
+                        MirPlaceBase::Temp(_) => None,
+                    }),
+                _ => None,
+            };
+            let site = radix_hir::HirStoreSite { kind: radix_hir::HirStoreKind::Assignment, slot, inferred_from: None };
+            self.integer_store_convert(value, ty, site, span)
+        } else {
+            value
+        };
         self.assign(place, value, ty, span);
+    }
+
+    /// Whether `ty` is an integer slot whose policy a store applies: a
+    /// trapping `numerus`, a `wrapping` or a `saturating` word.
+    fn is_integer_store_slot(&self, ty: MirType) -> bool {
+        match self.normalized_type(self.types.peel_access_marker(ty.semantic_id()).1) {
+            // An `i64`/`u64` slot needs no node: the exact successor is stored
+            // and the runner guards a value past `i64::MAX` at the signed slot.
+            Type::ModularWord(_) | Type::SaturatingWord(_) => true,
+            Type::SizedNumeric(Primitive::Numerus, width) => {
+                width.integer_range().is_some() && *width != NumericWidth::I64
+            }
+            _ => false,
+        }
+    }
+
+    /// A checked `Convert` of an integer value into its own slot type: the
+    /// store node for a position whose HIR carries no `Conversio` (`x ↑`).
+    fn integer_store_convert(
+        &mut self,
+        value: MirOperand,
+        slot_ty: MirType,
+        site: radix_hir::HirStoreSite,
+        span: Span,
+    ) -> MirOperand {
+        self.runtime_call_value(
+            MirIntrinsic::Convert(MirConversion {
+                store: Some(site),
+                flavor: MirConversionFlavor::Runtime,
+                source_ty: slot_ty,
+                target_ty: slot_ty,
+                params: Vec::new(),
+                recovery: None,
+                struct_defaults: Vec::new(),
+            }),
+            vec![value],
+            slot_ty,
+            span,
+        )
     }
 
     fn lower_assignment_place_with_fallback(
@@ -2758,9 +2824,13 @@ impl<'a> FunctionBuilder<'a> {
         let rhs_ty = self.expr_ty(rhs)?;
         let is_integer = |this: &Self, ty: MirType| {
             let semantic = this.types.peel_access_marker(ty.semantic_id()).1;
+            // `wrapping` and `saturating` words are integers too (ruling 15).
             matches!(
                 this.normalized_type(semantic),
-                Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _)
+                Type::Primitive(Primitive::Numerus)
+                    | Type::SizedNumeric(Primitive::Numerus, _)
+                    | Type::ModularWord(_)
+                    | Type::SaturatingWord(_)
             ) && !matches!(
                 this.normalized_type(semantic),
                 Type::SizedNumeric(_, width) if width.is_decimal()
@@ -2777,6 +2847,7 @@ impl<'a> FunctionBuilder<'a> {
         let convert = |this: &mut Self, value: MirOperand, source_ty: MirType| {
             this.runtime_call_value(
                 MirIntrinsic::Convert(MirConversion {
+                    store: None,
                     flavor: MirConversionFlavor::Runtime,
                     source_ty,
                     target_ty: ty,
@@ -3423,11 +3494,33 @@ impl<'a> FunctionBuilder<'a> {
         rhs: &HirExpression,
     ) -> Option<(MirOperand, MirOperand)> {
         let Some((lhs_ty, rhs_ty, target_ty)) = self.decimal_join_target(lhs, rhs) else {
-            return Some((self.lower_expr_value(lhs)?, self.lower_expr_value(rhs)?));
+            let (l, r) = (self.lower_expr_value(lhs)?, self.lower_expr_value(rhs)?);
+            // A decimal beside a float compares by exact value (ruling 22); the
+            // runner reads the decimal's scale from the operand's static type,
+            // so a constant operand is materialized into a typed temp.
+            let l = self.typed_decimal_operand(lhs, l)?;
+            let r = self.typed_decimal_operand(rhs, r)?;
+            return Some((l, r));
         };
         let lhs = self.lower_join_operand(lhs, lhs_ty, target_ty)?;
         let rhs = self.lower_join_operand(rhs, rhs_ty, target_ty)?;
         Some((lhs, rhs))
+    }
+
+    fn typed_decimal_operand(&mut self, expr: &HirExpression, operand: MirOperand) -> Option<MirOperand> {
+        if !matches!(operand, MirOperand::Constant(_)) {
+            return Some(operand);
+        }
+        let ty = self.expr_ty(expr)?;
+        let decimal = matches!(
+            self.normalized_type(self.types.peel_access_marker(ty.semantic_id()).1),
+            Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal()
+        );
+        Some(if decimal {
+            self.assign_temp(MirValueKind::Operand(operand), ty, expr.span)
+        } else {
+            operand
+        })
     }
 
     fn decimal_join_target(&mut self, lhs: &HirExpression, rhs: &HirExpression) -> Option<(MirType, MirType, TypeId)> {
@@ -3490,6 +3583,7 @@ impl<'a> FunctionBuilder<'a> {
         let target_ty = MirType::semantic(target_ty);
         Some(self.runtime_call_value(
             MirIntrinsic::Convert(MirConversion {
+                store: None,
                 flavor: MirConversionFlavor::Runtime,
                 source_ty,
                 target_ty,

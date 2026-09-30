@@ -14,6 +14,7 @@ fn prim(types: &TypeTable, prim: Primitive) -> MirType {
 
 fn conversion(flavor: MirConversionFlavor, source: MirType, target: MirType) -> MirConversion {
     MirConversion {
+        store: None,
         flavor,
         source_ty: source,
         target_ty: target,
@@ -133,6 +134,7 @@ fn genus_record_extraction_is_c1() {
     let mut types = TypeTable::new();
     let genus = genus_ty(&mut types);
     let conv = MirConversion {
+        store: None,
         flavor: MirConversionFlavor::Runtime,
         source_ty: prim(&types, Primitive::Valor),
         target_ty: genus,

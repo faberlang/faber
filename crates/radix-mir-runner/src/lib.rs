@@ -9,12 +9,14 @@
 pub mod capability;
 mod conversio;
 mod cursor;
+mod exact_int;
 mod host;
 pub mod kernel;
 mod runtime;
 pub mod sermo;
 pub(crate) mod shuffle;
 pub mod stats;
+pub mod store;
 mod textus_literal;
 pub mod value;
 
@@ -39,12 +41,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Instant;
 use value::{
-    GradientStorage, add_values, compare_values, decimal_numeric_binop, int_bitwise_binop,
-    modular_word_bitnot, modular_word_bitwise_binop, modular_word_compare_values, modular_word_neg,
-    modular_word_numeric_binop, numeric_binop, round_float, saturating_word_neg,
-    saturating_word_numeric_binop, uint_width_checked_div, uint_width_checked_mul,
-    uint_width_checked_neg, uint_width_checked_rem, uint_width_checked_sub, values_equal,
-    width_checked_div, width_checked_mul, width_checked_neg, width_checked_rem, width_checked_sub,
+    GradientStorage, add_values, compare_values, decimal_numeric_binop, decimal_scale_factor,
+    int_bitwise_binop, modular_word_bitnot, modular_word_bitwise_binop,
+    modular_word_compare_values, modular_word_neg, modular_word_numeric_binop, numeric_binop,
+    round_float, saturating_word_neg, saturating_word_numeric_binop, values_equal,
 };
 
 pub(crate) const RUNNER_UNSUPPORTED_PREFIX: &str = "faberscript unsupported";
@@ -1180,6 +1180,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         match &statement.kind {
             MirStatementKind::Assign { place, value } => {
                 let evaluated = self.eval_value(value, statement.span)?;
+                self.guard_signed_local_store(place, &evaluated, statement.span)?;
                 self.write_place(place, evaluated, statement.span)?;
                 Ok(StatementOutcome::Continue)
             }
@@ -1940,11 +1941,12 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 } else if let Some(width) = modular {
                     modular_word_neg(value, width, span)
                 } else {
-                    match value {
-                        Value::Int(v) => width_checked_neg(v, width, span).map(Value::Int),
-                        Value::UInt(v) => uint_width_checked_neg(v, width, span).map(Value::UInt),
-                        Value::Float(v) => Ok(Value::Float(-v)),
-                        _ => Err(RunnerError::internal(span, "negation type mismatch")),
+                    match exact_int::exact_neg(&value, width, span) {
+                        Some(result) => result,
+                        None => match value {
+                            Value::Float(v) => Ok(Value::Float(-v)),
+                            _ => Err(RunnerError::internal(span, "negation type mismatch")),
+                        },
                     }
                 }
             }
@@ -1953,14 +1955,12 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 if let Some(width) = modular {
                     modular_word_bitnot(value, width, span)
                 } else {
-                    match value {
-                        Value::Int(v) => Ok(Value::Int(!v)),
-                        Value::UInt(v) => Ok(Value::UInt(!v)),
-                        _ => Err(RunnerError::internal(
+                    exact_int::exact_bitnot(&value, width, span).unwrap_or_else(|| {
+                        Err(RunnerError::internal(
                             span,
                             "bitnot requires numerus operand",
-                        )),
-                    }
+                        ))
+                    })
                 }
             }
             MirUnOp::IsNil => Ok(Value::Bool(matches!(value, Value::Nil))),
@@ -2093,6 +2093,49 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    /// Exact decimal-versus-float comparison (ruling 22): the decimal carrier
+    /// is a scaled integer, so the float side compares against its true value.
+    fn decimal_float_comparison(
+        &self,
+        op: MirBinOp,
+        lhs: &MirOperand,
+        rhs: &MirOperand,
+        left: &Value,
+        right: &Value,
+    ) -> Option<bool> {
+        if !matches!(
+            op,
+            MirBinOp::Lt
+                | MirBinOp::Gt
+                | MirBinOp::LtEq
+                | MirBinOp::GtEq
+                | MirBinOp::Eq
+                | MirBinOp::NotEq
+        ) {
+            return None;
+        }
+        let (scaled, operand, float, reversed) = match (left, right) {
+            (Value::Int(v), Value::Float(f)) => (i128::from(*v), lhs, *f, false),
+            (Value::Float(f), Value::Int(v)) => (i128::from(*v), rhs, *f, true),
+            _ => return None,
+        };
+        let scale = decimal_scale_factor(self.operand_decimal_width(operand)?)?;
+        let ordering = exact_int::cmp_scaled_float(scaled, scale, float);
+        let ordering = if reversed {
+            ordering.map(std::cmp::Ordering::reverse)
+        } else {
+            ordering
+        };
+        Some(match op {
+            MirBinOp::Lt => ordering.is_some_and(std::cmp::Ordering::is_lt),
+            MirBinOp::Gt => ordering.is_some_and(std::cmp::Ordering::is_gt),
+            MirBinOp::LtEq => ordering.is_some_and(std::cmp::Ordering::is_le),
+            MirBinOp::GtEq => ordering.is_some_and(std::cmp::Ordering::is_ge),
+            MirBinOp::Eq => ordering.is_some_and(std::cmp::Ordering::is_eq),
+            _ => ordering.is_none_or(std::cmp::Ordering::is_ne),
+        })
+    }
+
     fn eval_binop(
         &mut self,
         op: MirBinOp,
@@ -2112,6 +2155,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         } else {
             (left, right)
         };
+        if let Some(compared) = self.decimal_float_comparison(op, lhs, rhs, &left, &right) {
+            return Ok(Value::Bool(compared));
+        }
         if let Some(saturating) = self.saturating_word_width(result_ty)
             && matches!(
                 op,
@@ -2145,42 +2191,10 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 decimal_numeric_binop(left, right, op, width, span)
             }
             MirBinOp::Add => add_values(left, right, width, span),
-            MirBinOp::Sub => numeric_binop(
-                left,
-                right,
-                width_checked_sub,
-                uint_width_checked_sub,
-                |a, b| a - b,
-                width,
-                span,
-            ),
-            MirBinOp::Mul => numeric_binop(
-                left,
-                right,
-                width_checked_mul,
-                uint_width_checked_mul,
-                |a, b| a * b,
-                width,
-                span,
-            ),
-            MirBinOp::Div => numeric_binop(
-                left,
-                right,
-                width_checked_div,
-                uint_width_checked_div,
-                |a, b| a / b,
-                width,
-                span,
-            ),
-            MirBinOp::Mod => numeric_binop(
-                left,
-                right,
-                width_checked_rem,
-                uint_width_checked_rem,
-                |a, b| a % b,
-                width,
-                span,
-            ),
+            MirBinOp::Sub => numeric_binop(left, right, op, |a, b| a - b, width, span),
+            MirBinOp::Mul => numeric_binop(left, right, op, |a, b| a * b, width, span),
+            MirBinOp::Div => numeric_binop(left, right, op, |a, b| a / b, width, span),
+            MirBinOp::Mod => numeric_binop(left, right, op, |a, b| a % b, width, span),
             MirBinOp::Eq => Ok(Value::Bool(values_equal(&left, &right))),
             MirBinOp::NotEq => Ok(Value::Bool(!values_equal(&left, &right))),
             MirBinOp::Lt | MirBinOp::Gt | MirBinOp::LtEq | MirBinOp::GtEq => {
@@ -2202,7 +2216,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             | MirBinOp::BitOr
             | MirBinOp::BitXor
             | MirBinOp::Shl
-            | MirBinOp::Shr => int_bitwise_binop(left, right, op, span),
+            | MirBinOp::Shr => int_bitwise_binop(left, right, op, width, span),
         }
     }
 }
@@ -2435,3 +2449,6 @@ mod format_value_test;
 #[cfg(test)]
 #[path = "shuffle_test.rs"]
 mod shuffle_test;
+
+#[cfg(test)]
+mod exact_int_test;

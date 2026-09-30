@@ -275,6 +275,7 @@ fn sentinel_program(sym: &dyn Fn(usize) -> Symbol) -> MirProgram {
                 destination: Some(simple_place()),
                 call: MirRuntimeCall {
                     intrinsic: MirIntrinsic::Convert(MirConversion {
+                        store: None,
                         flavor: MirConversionFlavor::Cast,
                         source_ty: ty,
                         target_ty: ty,

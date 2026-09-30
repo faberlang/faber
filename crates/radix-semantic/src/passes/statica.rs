@@ -19,7 +19,9 @@
 //!
 //! Anything else is SEM060 `static_initializer_not_constant`. Integer
 //! arithmetic is checked (overflow and division by zero are compile errors),
-//! matching the runner's checked integer semantics; `/` and `%` truncate.
+//! matching the runner's exact integer semantics (d11-6 ruling 17a: every
+//! intermediate lies in [-2^63, 2^64 - 1], the declared type bounds only the
+//! static itself); `/` floors and `%` takes the divisor's sign.
 //! Decimal widths and modular words are not folded, so arithmetic on them
 //! is not constant.
 //!
@@ -78,7 +80,7 @@ pub fn fold(hir: &mut HirModule, types: &TypeTable, interner: &mut Interner) -> 
         if let HirItemKind::Constant(konst) = &item.kind
             && konst.statica.is_some()
         {
-            inits.insert(item.def_id, (konst.name, konst.value.clone()));
+            inits.insert(item.def_id, (konst.name, konst.value.clone(), konst.ty));
             order.push(item.def_id);
         }
     }
@@ -190,7 +192,7 @@ enum Class {
 
 struct Evaluator<'a> {
     types: &'a TypeTable,
-    inits: FxHashMap<DefId, (Symbol, HirExpression)>,
+    inits: FxHashMap<DefId, (Symbol, HirExpression, Option<TypeId>)>,
     state: FxHashMap<DefId, State>,
 }
 
@@ -202,10 +204,24 @@ impl Evaluator<'_> {
             Some(State::InProgress) => return Err(Fault::at(ISSUE_CYCLE, Span::new(0, 0))),
             None => self.inits[&def_id].1.clone(),
         };
+        let declared = self.inits.get(&def_id).and_then(|entry| entry.2);
         self.state.insert(def_id, State::InProgress);
-        let result = self.eval(&init, interner);
+        let result = self
+            .eval(&init, interner)
+            .and_then(|value| self.fit_slot(value, declared, init.span));
         self.state.insert(def_id, State::Done(result.clone()));
         result
+    }
+
+    /// The static's own store: the exact value must fit the declared type.
+    /// Intermediates are only bound by the 64-bit range (ruling 17a).
+    fn fit_slot(&self, value: Value, declared: Option<TypeId>, span: Span) -> Result<Value, Fault> {
+        match (&value, self.class(declared)) {
+            (Value::Int(v), Some(Class::Int(lo, hi))) if *v < lo || *v > hi => {
+                Err(Fault::at(ISSUE_OVERFLOW, span))
+            }
+            _ => Ok(value),
+        }
     }
 
     fn class(&self, ty: Option<TypeId>) -> Option<Class> {
@@ -245,6 +261,17 @@ impl Evaluator<'_> {
                     })?
             }
             HirExpressionKind::Praefixum(_) => return Err(Fault::at(ISSUE_DEFERRED, expr.span)),
+            // An implicit store node (a narrowing into the static's slot):
+            // the exact source value must fit the slot's type.
+            HirExpressionKind::Conversio {
+                source,
+                target: radix_hir::HirConversioTarget::Type(target),
+                implicit: Some(_),
+                ..
+            } => {
+                let value = self.eval(source, interner)?;
+                self.fit_slot(value, Some(*target), expr.span)?
+            }
             HirExpressionKind::Unary(op, operand) => {
                 let operand = self.eval(operand, interner)?;
                 unary(*op, operand).ok_or(Fault::at(ISSUE_NOT_CONSTANT, expr.span))?
@@ -319,8 +346,11 @@ impl Evaluator<'_> {
     /// to floats where the node is `fractus`, and range-check integers.
     fn fit(&self, value: Value, expr: &HirExpression) -> Result<Value, Fault> {
         match (value, self.class(expr.ty)) {
-            (Value::Int(v), Some(Class::Int(lo, hi))) => {
-                if v < lo || v > hi {
+            (Value::Int(v), Some(Class::Int(..))) => {
+                // d11-6 ruling 17a: an intermediate is exact and lies in the
+                // single 64-bit range whatever its node type says; the
+                // static's declared type is checked by `fit_slot`.
+                if v < i128::from(i64::MIN) || v > i128::from(u64::MAX) {
                     Err(Fault::at(ISSUE_OVERFLOW, expr.span))
                 } else {
                     Ok(Value::Int(v))
@@ -343,6 +373,7 @@ fn unary(op: HirUnOp, value: Value) -> Option<Value> {
         (HirUnOp::Neg, Value::Int(v)) => Some(Value::Int(-v)),
         (HirUnOp::Neg, Value::Float(v)) => Some(Value::Float(-v)),
         (HirUnOp::Not, Value::Bool(b)) => Some(Value::Bool(!b)),
+        // `¬x` is `-x - 1` (ruling 9), which is `!x` on two's complement.
         (HirUnOp::BitNot, Value::Int(v)) => Some(Value::Int(!v)),
         _ => None,
     }
@@ -372,34 +403,62 @@ fn binary(op: HirBinOp, lhs: Value, rhs: Value, span: Span) -> Result<Value, Fau
     }
 }
 
+fn floor_div(a: i128, b: i128) -> Option<i128> {
+    let quotient = a.checked_div(b)?;
+    Some(if a % b != 0 && ((a < 0) != (b < 0)) {
+        quotient - 1
+    } else {
+        quotient
+    })
+}
+
 fn int_binary(op: HirBinOp, a: i128, b: i128, span: Span) -> Result<Value, Fault> {
     let overflow = Fault::at(ISSUE_OVERFLOW, span);
-    let divide = |f: fn(i128, i128) -> Option<i128>| {
+    // Floor division (ruling 14): `%` takes the divisor's sign.
+    let divide = |remainder: bool| {
         if b == 0 {
-            Err(Fault::at(ISSUE_DIVISION_BY_ZERO, span))
-        } else {
-            f(a, b).map(Value::Int).ok_or(overflow)
+            return Err(Fault::at(ISSUE_DIVISION_BY_ZERO, span));
         }
+        let quotient = floor_div(a, b).ok_or(overflow)?;
+        Ok(Value::Int(if remainder {
+            a - b * quotient
+        } else {
+            quotient
+        }))
     };
-    let shift = |f: fn(i128, u32) -> Option<i128>| {
+    // Shifts are pure math (ruling 10): `a * 2^n` and `floor(a / 2^n)`, with
+    // no count masking; a negative count is an error.
+    let shift_left = || {
+        if a == 0 {
+            return Ok(Value::Int(0));
+        }
         u32::try_from(b)
             .ok()
-            .filter(|s| *s < 64)
-            .and_then(|s| f(a, s))
+            .filter(|n| *n <= 64)
+            .and_then(|n| a.checked_mul(1_i128 << n))
             .map(Value::Int)
             .ok_or(overflow)
+    };
+    let shift_right = || match u32::try_from(b) {
+        Ok(n) => Ok(Value::Int(if n >= 127 {
+            if a < 0 { -1 } else { 0 }
+        } else {
+            a >> n
+        })),
+        Err(_) if b > 0 => Ok(Value::Int(if a < 0 { -1 } else { 0 })),
+        Err(_) => Err(overflow),
     };
     match op {
         HirBinOp::Add => a.checked_add(b).map(Value::Int).ok_or(overflow),
         HirBinOp::Sub => a.checked_sub(b).map(Value::Int).ok_or(overflow),
         HirBinOp::Mul => a.checked_mul(b).map(Value::Int).ok_or(overflow),
-        HirBinOp::Div => divide(i128::checked_div),
-        HirBinOp::Mod => divide(i128::checked_rem),
+        HirBinOp::Div => divide(false),
+        HirBinOp::Mod => divide(true),
         HirBinOp::BitAnd => Ok(Value::Int(a & b)),
         HirBinOp::BitOr => Ok(Value::Int(a | b)),
         HirBinOp::BitXor => Ok(Value::Int(a ^ b)),
-        HirBinOp::Shl => shift(i128::checked_shl),
-        HirBinOp::Shr => shift(i128::checked_shr),
+        HirBinOp::Shl => shift_left(),
+        HirBinOp::Shr => shift_right(),
         HirBinOp::Eq | HirBinOp::StrictEq => Ok(Value::Bool(a == b)),
         HirBinOp::NotEq | HirBinOp::StrictNotEq => Ok(Value::Bool(a != b)),
         HirBinOp::Lt => Ok(Value::Bool(a < b)),
@@ -438,7 +497,9 @@ impl Rewriter<'_> {
             return false;
         };
         if value != Value::Opaque {
-            if is_literal_form(expr) {
+            // `i64::MIN` has no literal form the backends accept (its
+            // magnitude is above `i64::MAX`), so its expression stays.
+            if is_literal_form(expr) || value == Value::Int(i128::from(i64::MIN)) {
                 return false;
             }
             *expr = self.materialize(value, expr, interner);

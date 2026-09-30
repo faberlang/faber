@@ -326,10 +326,13 @@ impl TypeChecker<'_> {
         Some(self.width_type(range::smallest_width(result)))
     }
 
-    /// Result type of `÷` (d11-6 ruling 15): integer operands of any width,
-    /// including constants, convert to `f64` and divide, so the result is
-    /// `f64`. Float and decimal operands follow `/`'s family rules, and an
-    /// integer beside a float or decimal is rejected like `/` (ruling 16).
+    /// Result type of `÷` (d11-6 rulings 15 and 23): an integer `÷` yields the
+    /// smallest float that holds every value of both operand types exactly,
+    /// never below `f32` — `f32` when the widest integer operand is 8 or 16
+    /// bits, `f64` for 32 or 64. An untyped constant joins by value beside a
+    /// typed operand and defaults to `int` alone. Float and decimal operands
+    /// follow `/`'s family rules, and an integer beside a float or decimal is
+    /// rejected like `/` (ruling 16).
     pub(super) fn true_division_type(
         &mut self,
         lhs: &HirExpression,
@@ -338,15 +341,59 @@ impl TypeChecker<'_> {
         rhs_ty: TypeId,
         span: radix_lexer::Span,
     ) -> TypeId {
-        if self.range_operands(lhs, rhs, lhs_ty, rhs_ty).is_some() {
-            return self.fractus_type();
+        if let Some((l, r)) = self.range_operands(lhs, rhs, lhs_ty, rhs_ty) {
+            return self.division_float_type(&[l, r]);
         }
         let joined = self.numeric_arithmetic_bin(lhs_ty, rhs_ty, span);
         let resolved = self.resolve_inferred_type(joined);
         let integer = self
             .numeric_shape(resolved)
             .is_some_and(|shape| shape.prim == Primitive::Numerus && !shape.width.is_decimal());
-        if integer { self.fractus_type() } else { joined }
+        if !integer {
+            return joined;
+        }
+        // Words and device functions: the declared widths decide; a constant
+        // operand joins by value.
+        let operands: Vec<Operand> = [(lhs, lhs_ty), (rhs, rhs_ty)]
+            .iter()
+            .map(|(expr, ty)| match const_int_value(expr) {
+                Some(value) => Operand::Const(value),
+                None => self
+                    .numeric_shape(self.resolve_inferred_type(*ty))
+                    .map_or(Operand::Plain(NumericWidth::I64), |shape| {
+                        Operand::Plain(shape.width)
+                    }),
+            })
+            .collect();
+        self.division_float_type(&operands)
+    }
+
+    /// The float an integer `÷` produces from its operands (ruling 23).
+    fn division_float_type(&mut self, operands: &[Operand]) -> TypeId {
+        let narrow = |width: NumericWidth| {
+            matches!(
+                width,
+                NumericWidth::I8 | NumericWidth::U8 | NumericWidth::I16 | NumericWidth::U16
+            )
+        };
+        let typed: Vec<NumericWidth> = operands
+            .iter()
+            .filter_map(|operand| match operand {
+                Operand::Plain(width) => Some(*width),
+                _ => None,
+            })
+            .collect();
+        // Constants join by value: they widen the result only past 16 bits.
+        let constants_fit = operands.iter().all(|operand| match operand {
+            Operand::Const(value) => narrow(range::smallest_width((*value, *value))),
+            _ => true,
+        });
+        if !typed.is_empty() && typed.iter().all(|width| narrow(*width)) && constants_fit {
+            self.types
+                .sized_numeric(Primitive::Fractus, NumericWidth::F32)
+        } else {
+            self.fractus_type()
+        }
     }
 
     /// Range-typed result of `∧ ∨ ⊻ ⇐ ⇒` over trapping integers.

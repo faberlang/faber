@@ -364,6 +364,7 @@ impl FunctionBuilder<'_> {
             return None;
         }
         Some(MirConversion {
+            store: None,
             flavor: MirConversionFlavor::Cast,
             source_ty: MirType::semantic(source),
             target_ty: MirType::semantic(target),

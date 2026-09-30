@@ -1091,6 +1091,11 @@ pub enum MirDiagnosticKind {
 /// captures explicit inline recovery behavior as a normal MIR operand.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MirConversion {
+    /// `Some` when this conversion is an implicit store (d11-6 rulings 5 and
+    /// 17): the slot's policy applies at runtime and a failure traps, never
+    /// entering the `⇥` channel. The site names the slot in the trap message.
+    #[serde(default)]
+    pub store: Option<radix_hir::HirStoreSite>,
     pub flavor: MirConversionFlavor,
     pub source_ty: MirType,
     pub target_ty: MirType,

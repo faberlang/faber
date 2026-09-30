@@ -222,6 +222,9 @@ mod capability_tests;
 #[path = "commune_stepper_test.rs"]
 mod commune_stepper_tests;
 #[cfg(test)]
+#[path = "constant_fold_agreement_test.rs"]
+mod constant_fold_agreement_tests;
+#[cfg(test)]
 #[path = "conversio_function_test.rs"]
 mod conversio_function_tests;
 #[cfg(test)]
@@ -230,6 +233,9 @@ mod copy_duplicate_tests;
 #[cfg(test)]
 #[path = "device_test.rs"]
 mod device_tests;
+#[cfg(test)]
+#[path = "exact_integer_test.rs"]
+mod exact_integer_tests;
 #[cfg(test)]
 #[path = "implicit_store_test.rs"]
 mod implicit_store_tests;

@@ -519,48 +519,23 @@ fn display_tabula_struct(
     Ok(format!("{{{}}}", parts.join(", ")))
 }
 
+/// Exact `& | ^ ⇐ ⇒` on integer carriers (rulings 9, 10, 19b): infinite
+/// two's-complement bit operations and unmasked shifts. The result is checked
+/// against the exact 64-bit range only; the store applies the slot's policy.
 pub fn int_bitwise_binop(
     left: Value,
     right: Value,
     op: MirBinOp,
+    width: NumericWidth,
     span: Span,
 ) -> Result<Value, RunnerError> {
-    // Unsigned semantics whenever either side is `UInt`: a non-negative signed
-    // operand widens exactly. A negative signed operand in an unsigned context
-    // fails closed (typecheck rejects it upstream; carriers can still mix
-    // through conversions, so the boundary must not reinterpret sign bits).
-    let unsigned = match (&left, &right) {
-        (Value::UInt(a), Value::UInt(b)) => Some((*a, *b)),
-        (Value::UInt(a), Value::Int(b)) => u64::try_from(*b).ok().map(|b| (*a, b)),
-        (Value::Int(a), Value::UInt(b)) => u64::try_from(*a).ok().map(|a| (a, *b)),
-        _ => None,
-    };
-    if let Some((left, right)) = unsigned {
-        let shift = (right & 0x3f) as u32;
-        return Ok(Value::UInt(match op {
-            MirBinOp::BitAnd => left & right,
-            MirBinOp::BitOr => left | right,
-            MirBinOp::BitXor => left ^ right,
-            MirBinOp::Shl => left.wrapping_shl(shift),
-            MirBinOp::Shr => left.wrapping_shr(shift),
-            _ => return Err(RunnerError::internal(span, "invalid bitwise operator")),
-        }));
-    }
-    let (Value::Int(left), Value::Int(right)) = (left, right) else {
-        return Err(RunnerError::internal(
+    match crate::exact_int::exact_int_binop(&left, &right, op, width, span) {
+        Some(result) => result,
+        None => Err(RunnerError::internal(
             span,
             "bitwise operand requires numerus",
-        ));
-    };
-    let shift = |amount: i64| (amount & 0x3f) as u32;
-    Ok(Value::Int(match op {
-        MirBinOp::BitAnd => left & right,
-        MirBinOp::BitOr => left | right,
-        MirBinOp::BitXor => left ^ right,
-        MirBinOp::Shl => left.wrapping_shl(shift(right)),
-        MirBinOp::Shr => left.wrapping_shr(shift(right)),
-        _ => return Err(RunnerError::internal(span, "invalid bitwise operator")),
-    }))
+        )),
+    }
 }
 
 /// Width authority for modular execution: values are reduced modulo 2^W.
@@ -675,13 +650,18 @@ pub fn modular_word_bitwise_binop(
     let left = modular_operand(left, span, "modulus bitwise operand mismatch")?;
     let right = modular_operand(right, span, "modulus bitwise operand mismatch")?;
     let mask = modular_word_mask(width);
-    let shift = (right & u64::from(modular_word_bits(width) - 1)) as u32;
+    // Shifts are pure math (ruling 10): the count is not masked, and a count
+    // at or past the word's width shifts every bit out.
+    let bits = u64::from(modular_word_bits(width));
+    let count = u32::try_from(right)
+        .ok()
+        .filter(|count| u64::from(*count) < bits);
     let value = match op {
         MirBinOp::BitAnd => left & right,
         MirBinOp::BitOr => left | right,
         MirBinOp::BitXor => left ^ right,
-        MirBinOp::Shl => left.wrapping_shl(shift) & mask,
-        MirBinOp::Shr => (left & mask).wrapping_shr(shift),
+        MirBinOp::Shl => count.map_or(0, |count| left << count) & mask,
+        MirBinOp::Shr => count.map_or(0, |count| (left & mask) >> count),
         _ => {
             return Err(RunnerError::internal(
                 span,
@@ -775,8 +755,10 @@ pub fn saturating_word_numeric_binop(
         MirBinOp::Add => left + right,
         MirBinOp::Sub => left - right,
         MirBinOp::Mul => left * right,
-        MirBinOp::Div => left.checked_div(right).ok_or_else(division_failed)?,
-        MirBinOp::Mod => left.checked_rem(right).ok_or_else(division_failed)?,
+        MirBinOp::Div if right == 0 => return Err(division_failed()),
+        MirBinOp::Div => crate::exact_int::floor_div(left, right),
+        MirBinOp::Mod if right == 0 => return Err(division_failed()),
+        MirBinOp::Mod => crate::exact_int::floor_rem(left, right),
         _ => {
             return Err(RunnerError::internal(
                 span,
@@ -984,8 +966,9 @@ pub fn width_checked_mul(
     check_int_width(a as i128 * b as i128, width, span, "numerus overflow")
 }
 
-/// Division by zero and signed-min / -1 overflow both report `numerus division
-/// failed`, matching the prior i64 `checked_div` error text.
+/// Floor division (ruling 14). A zero divisor reports `numerus division
+/// failed`; `MIN / -1` is the exact quotient and is range-checked like any
+/// other result.
 pub fn width_checked_div(
     a: i64,
     b: i64,
@@ -996,7 +979,7 @@ pub fn width_checked_div(
         return Err(RunnerError::internal(span, "numerus division failed"));
     }
     check_int_width(
-        (a as i128) / (b as i128),
+        crate::exact_int::floor_div(a as i128, b as i128),
         width,
         span,
         "numerus division failed",
@@ -1013,7 +996,7 @@ pub fn width_checked_rem(
         return Err(RunnerError::internal(span, "numerus division failed"));
     }
     check_int_width(
-        (a as i128) % (b as i128),
+        crate::exact_int::floor_rem(a as i128, b as i128),
         width,
         span,
         "numerus division failed",
@@ -1131,30 +1114,22 @@ fn float_binop(
     round_float(float_op(left, right), width)
 }
 
-/// Numeric binary dispatch. The integer path delegates to a width-checked op so
-/// overflow honors `numerus<W>`; scalar float operands and results are rounded
-/// at the declared width before and after the operation.
+/// Numeric binary dispatch. Integer operands compute exactly (d11-6 ruling
+/// 17a): the result must lie in the single 64-bit range, and the store into a
+/// slot applies the slot's policy. Scalar float operands and results are
+/// rounded at the declared width before and after the operation.
 pub fn numeric_binop(
     left: Value,
     right: Value,
-    int_op: fn(i64, i64, NumericWidth, Span) -> Result<i64, RunnerError>,
-    uint_op: fn(u64, u64, NumericWidth, Span) -> Result<u64, RunnerError>,
+    op: MirBinOp,
     float_op: impl FnOnce(f64, f64) -> f64,
     width: NumericWidth,
     span: Span,
 ) -> Result<Value, RunnerError> {
+    if let Some(result) = crate::exact_int::exact_int_binop(&left, &right, op, width, span) {
+        return result;
+    }
     match (left, right) {
-        (Value::Int(a), Value::Int(b)) => int_op(a, b, width, span).map(Value::Int),
-        (Value::UInt(a), Value::UInt(b)) => uint_op(a, b, width, span).map(Value::UInt),
-        // Mixed signed/unsigned integer operands are accepted only when the
-        // signed side is non-negative and the result width is unsigned — there
-        // is no lossy reinterpretation either way.
-        (Value::UInt(a), Value::Int(b)) if width.is_unsigned_int() && b >= 0 => {
-            uint_op(a, b as u64, width, span).map(Value::UInt)
-        }
-        (Value::Int(a), Value::UInt(b)) if width.is_unsigned_int() && a >= 0 => {
-            uint_op(a as u64, b, width, span).map(Value::UInt)
-        }
         (Value::Float(a), Value::Float(b)) => Ok(Value::Float(float_binop(a, b, width, float_op))),
         (Value::Int(a), Value::Float(b)) => {
             Ok(Value::Float(float_binop(a as f64, b, width, float_op)))
@@ -1183,15 +1158,7 @@ pub fn add_values(
     }
     match (left, right) {
         (Value::Str(left), Value::Str(right)) => Ok(Value::Str(format!("{left}{right}"))),
-        (left, right) => numeric_binop(
-            left,
-            right,
-            width_checked_add,
-            uint_width_checked_add,
-            |a, b| a + b,
-            width,
-            span,
-        ),
+        (left, right) => numeric_binop(left, right, MirBinOp::Add, |a, b| a + b, width, span),
     }
 }
 
@@ -1286,26 +1253,12 @@ pub fn compare_values(
     // either side is NaN, and every ordered predicate is then false — NaN
     // flows through comparisons, it never traps.
     let ordering = match (&left, &right) {
-        (Value::Int(a), Value::Int(b)) => Some(a.cmp(b)),
-        (Value::UInt(a), Value::UInt(b)) => Some(a.cmp(b)),
-        (Value::UInt(a), Value::Int(b)) => Some(if *b < 0 {
-            std::cmp::Ordering::Greater
-        } else {
-            a.cmp(&(*b as u64))
-        }),
-        (Value::Int(a), Value::UInt(b)) => Some(if *a < 0 {
-            std::cmp::Ordering::Less
-        } else {
-            (*a as u64).cmp(b)
-        }),
-        (Value::Float(a), Value::Float(b)) => a.partial_cmp(b),
-        // Mixed integer/float ordering joins at the float carrier — the same
-        // promotion `numeric_binop` applies to `+ - * /`, so `a < b` accepts
-        // exactly the operand mixes `a + b` accepts (join-cast ruling).
-        (Value::Int(a), Value::Float(b)) => (*a as f64).partial_cmp(b),
-        (Value::UInt(a), Value::Float(b)) => (*a as f64).partial_cmp(b),
-        (Value::Float(a), Value::Int(b)) => a.partial_cmp(&(*b as f64)),
-        (Value::Float(a), Value::UInt(b)) => a.partial_cmp(&(*b as f64)),
+        // Integer and float operands compare their exact mathematical values
+        // (ruling 22): an integer above 2^53 is never rounded to a float.
+        (
+            Value::Int(_) | Value::UInt(_) | Value::Float(_),
+            Value::Int(_) | Value::UInt(_) | Value::Float(_),
+        ) => crate::exact_int::cmp_numeric(&left, &right),
         (Value::Str(a), Value::Str(b)) => Some(a.cmp(b)),
         (Value::Ascii(a), Value::Ascii(b)) => Some(a.cmp(b)),
         (Value::Char(a), Value::Char(b)) => Some(a.cmp(b)),
@@ -1338,25 +1291,14 @@ pub fn values_equal(left: &Value, right: &Value) -> bool {
         // `UInt` with the same magnitude are the same Faber integer. Equality
         // compares bit patterns per the modular contract; for non-negative
         // values the bit pattern is the magnitude.
-        (Value::Int(a), Value::UInt(b)) => u64::try_from(*a).is_ok_and(|a| a == *b),
-        (Value::UInt(a), Value::Int(b)) => u64::try_from(*b).is_ok_and(|b| *a == b),
-        // `≅` promotes mixed integer/float operands to the joined float type
-        // before exact comparison. Keep integer/unsigned comparison above
-        // lossless; only the promoted pair uses the target f64 carrier, matching
-        // generated Rust's numeric promotion. Fuzzy `≈` is a collection
-        // Approximate call and does not use this exact-value helper.
-        (Value::Int(a), Value::Float(b)) => (*a as f64)
-            .partial_cmp(b)
-            .is_some_and(std::cmp::Ordering::is_eq),
-        (Value::Float(a), Value::Int(b)) => a
-            .partial_cmp(&(*b as f64))
-            .is_some_and(std::cmp::Ordering::is_eq),
-        (Value::UInt(a), Value::Float(b)) => (*a as f64)
-            .partial_cmp(b)
-            .is_some_and(std::cmp::Ordering::is_eq),
-        (Value::Float(a), Value::UInt(b)) => a
-            .partial_cmp(&(*b as f64))
-            .is_some_and(std::cmp::Ordering::is_eq),
+        // Integer and float operands compare their exact values (ruling 22);
+        // NaN equals nothing. Fuzzy `≈` is a collection Approximate call and
+        // does not use this exact-value helper.
+        (Value::Int(_) | Value::UInt(_), Value::Int(_) | Value::UInt(_))
+        | (Value::Int(_) | Value::UInt(_), Value::Float(_))
+        | (Value::Float(_), Value::Int(_) | Value::UInt(_)) => {
+            crate::exact_int::cmp_numeric(left, right).is_some_and(std::cmp::Ordering::is_eq)
+        }
         // Scalar `s[i]`/`accipe` yields the one-byte `ascii<1>` carrier while
         // literals arrive as heap textus; the declared intrinsic return is
         // Textus, so equality joins the carriers by character value (a single

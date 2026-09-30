@@ -15,15 +15,44 @@ fn constant_true_division_is_f64() {
     );
 }
 
+// Ruling 23 amends ruling 15: the float width follows the operand widths.
 #[test]
-fn integer_true_division_is_f64_at_every_width() {
-    assert_accepts("functio p(numerus<u8> a, numerus<u8> b) → fractus<f64> { redde a ÷ b }");
+fn integer_true_division_width_follows_the_operands() {
+    // 8- and 16-bit operands: f32.
+    assert_accepts("functio p(numerus<u8> a, numerus<u8> b) → fractus<f32> { redde a ÷ b }");
+    assert_accepts("functio p(numerus<i16> a, numerus<u8> b) → fractus<f32> { redde a ÷ b }");
+    // 32/64-bit or default `int`: f64; mixed widths use the wider.
+    assert_accepts("functio p(numerus<i16> a, numerus<i32> b) → fractus<f64> { redde a ÷ b }");
     assert_accepts("functio p(numerus<i32> a, numerus<u16> b) → fractus<f64> { redde a ÷ b }");
     assert_accepts("functio p(numerus a) → fractus<f64> { redde a ÷ 3 }");
+    // A constant joins by value beside a typed operand, defaults to `int` alone.
+    assert_accepts("functio p(numerus<u8> a) → fractus<f32> { redde a ÷ 2 }");
+    assert_accepts("functio p(numerus<u8> a) → fractus<f32> { redde 1000 ÷ a }");
+    assert_accepts("functio p(numerus<u8> a) → fractus<f64> { redde a ÷ 100000 }");
+    assert_accepts("functio p() → fractus<f64> { redde 7 ÷ 2 }");
+    // A sub-expression keys on its range type: `u8 + u8` is `u16`.
+    assert_accepts(
+        "functio p(numerus<u8> a, numerus<u8> b, numerus<u8> c) → fractus<f32> { redde (a + b) ÷ c }",
+    );
+    assert_accepts(
+        "functio p(numerus<u8> a, numerus<u8> b, numerus<u8> c) → fractus<f64> { redde (a * b * c) ÷ c }",
+    );
     assert_rejects_with_issue(
         "functio p(numerus<u8> a, numerus<u8> b) → numerus<u8> { redde a ÷ b }",
         "return_type_mismatch",
     );
+    // The reverse: an `f64` quotient does not narrow into `f32`.
+    assert_rejects_with_issue(
+        "functio p(numerus a, numerus b) → fractus<f32> { redde a ÷ b }",
+        "return_type_mismatch",
+    );
+}
+
+#[test]
+fn word_true_division_follows_the_word_width() {
+    assert_accepts("functio p(modulus<u8> a, modulus<u8> b) → fractus<f32> { redde a ÷ b }");
+    assert_accepts("functio p(modulus<u32> a, modulus<u32> b) → fractus<f64> { redde a ÷ b }");
+    assert_accepts("functio p(saturatus<i16> a) → fractus<f32> { redde a ÷ 2 }");
 }
 
 #[test]

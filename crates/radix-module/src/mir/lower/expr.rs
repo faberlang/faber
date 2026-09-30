@@ -77,7 +77,7 @@ pub(super) trait HirExpressionLoweringVisitor {
                         return self.visit_interval_clamp(source, target, recovery.as_deref(), expr);
                     }
                 };
-                self.visit_conversio_expr(source, target_ty, params, recovery.as_deref(), implicit.is_some(), expr)
+                self.visit_conversio_expr(source, target_ty, params, recovery.as_deref(), *implicit, expr)
             }
             HirExpressionKind::Block(block) => self.visit_block_expr(block, expr),
             HirExpressionKind::Si { cond, then_block, then_catch, else_block } => {
@@ -254,7 +254,7 @@ pub(super) trait HirExpressionLoweringVisitor {
         target: TypeId,
         params: &[Symbol],
         recovery: Option<&HirExpression>,
-        implicit: bool,
+        implicit: Option<radix_hir::HirStoreSite>,
         expr: &HirExpression,
     ) -> Option<MirOperand>;
     fn visit_conversio_route_expr(
@@ -587,7 +587,7 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         target: TypeId,
         params: &[Symbol],
         recovery: Option<&HirExpression>,
-        implicit: bool,
+        implicit: Option<radix_hir::HirStoreSite>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         self.lower_conversio(source, target, params, recovery, implicit, expr)

@@ -183,8 +183,8 @@ fn modular_width_vector_expected(vector: &ModularWidthVector) -> Vec<String> {
         max_minus_one.to_owned(), // max * 2 wraps
         max.to_owned(),           // -one wraps
         max.to_owned(),           // ¬zero
-        "1".to_owned(),           // one ⇐ W reduces count mod W
-        max.to_owned(),           // max ⇒ W reduces count mod W
+        "0".to_owned(),           // one ⇐ W: the count is not masked (ruling 10)
+        "0".to_owned(),           // max ⇒ W: every bit shifts out (ruling 10)
         vector.half.to_owned(),   // max / 2 unsigned
         "1".to_owned(),           // max % 2
         "verum".to_owned(),       // unsigned ordering
@@ -192,8 +192,8 @@ fn modular_width_vector_expected(vector: &ModularWidthVector) -> Vec<String> {
         max.to_owned(),           // decrement wraps
         "0".to_owned(),           // addita twin
         max_minus_one.to_owned(), // subtrahe twin
-        "1".to_owned(),           // sinistrata twin
-        max.to_owned(),           // dextrata twin
+        "0".to_owned(),           // sinistrata twin (ruling 10)
+        "0".to_owned(),           // dextrata twin (ruling 10)
         max.to_owned(),           // same-width conversion round trip
     ]
 }
@@ -329,7 +329,6 @@ incipit {
     nota big ∧ 255
     nota big ∨ 255
     nota big ⊻ 255
-    nota big ⇐ 1
     nota big ⇒ 1
 }
 ",
@@ -342,10 +341,27 @@ incipit {
             "200",
             "15165310421466868991",
             "15165310421466868791",
-            "11883876769224186256",
-            "7582655210733434468",
+            "7582655210733434468"
         ]
     );
+}
+
+#[test]
+fn unsigned_integer_runner_upper_half_left_shift_traps_past_the_range() {
+    // d11-6 ruling 10 supersedes the wrapping `⇐` of a trapping `numerus<u64>`:
+    // `x ⇐ 1` is `2x`, and 2x is past the 64-bit range (wrapping is `modulus`).
+    let mut host = BufferHost::default();
+    let errors = run_fixture_source(
+        r"
+incipit {
+    fixum numerus<u64> big ← 15165310421466868936
+    nota big ⇐ 1
+}
+",
+        &mut host,
+    )
+    .expect_err("2x exceeds 2^64 - 1");
+    assert_eq!(errors[0].issue, "runner_numerus_overflow");
 }
 
 #[test]
@@ -356,9 +372,9 @@ fn unsigned_integer_runner_upper_half_sha512_k_and_shift_pattern() {
     run_fixture_source(
         r"
 incipit {
-    fixum numerus<u64> k ← 15165310421466868936
-    fixum numerus<u64> w ← 7017280452245743616
-    fixum numerus<u64> masked ← (k ∧ 255) + (w ∧ 255)
+    fixum modulus<u64> k ← 15165310421466868936
+    fixum modulus<u64> w ← 7017280452245743616
+    fixum modulus<u64> masked ← (k ∧ 255) + (w ∧ 255)
     nota masked
     nota k ⇐ 1 ∨ k ⇒ 63
 }

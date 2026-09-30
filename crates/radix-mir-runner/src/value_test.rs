@@ -6,17 +6,20 @@ use radix_mir::MirBinOp;
 use radix_types::NumericWidth;
 
 #[test]
-fn bitwise_rejects_negative_signed_in_unsigned_context() {
-    // Defense in depth: typecheck forbids signed/unsigned mixing upstream,
-    // but the runner boundary must never reinterpret sign bits when
-    // carriers mix.
+fn bitwise_mixes_signed_and_unsigned_carriers_on_infinite_twos_complement() {
+    // d11-6 ruling 19b supersedes the earlier fail-closed pin: `&` is defined
+    // on infinite two's-complement integers, so `5 & -1` is `5` whichever
+    // carrier holds each operand.
     let span = Span::default();
-    let error = int_bitwise_binop(Value::UInt(5), Value::Int(-1), MirBinOp::BitAnd, span)
-        .expect_err("negative signed operand in unsigned bitwise context fails closed");
-    assert!(
-        format!("{error:?}").contains("bitwise operand requires numerus"),
-        "unexpected error: {error:?}"
-    );
+    let result = int_bitwise_binop(
+        Value::UInt(5),
+        Value::Int(-1),
+        MirBinOp::BitAnd,
+        NumericWidth::I64,
+        span,
+    )
+    .expect("mixed carriers are exact integers");
+    assert!(values_equal(&result, &Value::Int(5)));
 }
 
 #[test]

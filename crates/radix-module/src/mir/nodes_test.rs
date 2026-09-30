@@ -450,6 +450,7 @@ fn dump_program_renders_structured_runtime_intrinsics() {
                             destination: Some(MirPlace::local(MirLocalId(1))),
                             call: MirRuntimeCall {
                                 intrinsic: MirIntrinsic::Convert(MirConversion {
+                                    store: None,
                                     flavor: MirConversionFlavor::Runtime,
                                     source_ty: number,
                                     target_ty: number,

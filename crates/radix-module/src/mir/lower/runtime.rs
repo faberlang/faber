@@ -49,7 +49,7 @@ impl FunctionBuilder<'_> {
     pub(super) fn lower_hir_call_args(&mut self, args: &[HirCallArg]) -> Option<Vec<MirOperand>> {
         let mut lowered = Vec::with_capacity(args.len());
         for arg in args {
-            lowered.push(self.lower_expr_value(&arg.expr)?);
+            lowered.push(self.lower_call_arg_value(&arg.expr)?);
         }
         Some(lowered)
     }
@@ -2181,9 +2181,9 @@ impl FunctionBuilder<'_> {
             let mut lowered = Vec::with_capacity(params.len());
             for (index, (optional, default)) in params.iter().enumerate() {
                 if let Some(arg) = args.get(index) {
-                    lowered.push(self.lower_expr_value(&arg.expr)?);
+                    lowered.push(self.lower_call_arg_value(&arg.expr)?);
                 } else if let Some(default) = default {
-                    lowered.push(self.lower_expr_value(default)?);
+                    lowered.push(self.lower_call_arg_value(default)?);
                 } else if *optional {
                     lowered.push(self.omitted_optional_operand(span));
                 } else {
@@ -2199,7 +2199,7 @@ impl FunctionBuilder<'_> {
 
         let mut lowered = Vec::with_capacity(args.len());
         for arg in args {
-            lowered.push(self.lower_expr_value(&arg.expr)?);
+            lowered.push(self.lower_call_arg_value(&arg.expr)?);
         }
         Some(lowered)
     }
@@ -2350,10 +2350,33 @@ impl FunctionBuilder<'_> {
         self.lower_definition_call(*def_id, explicit_type_args, lowered_args, conversion, expr)
     }
 
+    /// A call argument. An integer constant carries the type its HIR literal
+    /// was given (`f(200)` into a `u8` parameter is a `u8`), not the untyped
+    /// `numerus` of the bare MIR constant, so the callee sees the argument at
+    /// the parameter's type without a validator exemption (d11-6 ruling 12a).
+    pub(super) fn lower_call_arg_value(&mut self, arg: &HirExpression) -> Option<MirOperand> {
+        let value = self.lower_expr_value(arg)?;
+        if !matches!(value, MirOperand::Constant(MirConstant::Int(_) | MirConstant::UInt(_))) {
+            return Some(value);
+        }
+        let Some(ty) = arg.ty else {
+            return Some(value);
+        };
+        let sized = matches!(
+            self.normalized_type(self.types.peel_access_marker(ty).1),
+            Type::SizedNumeric(Primitive::Numerus, width) if width.integer_range().is_some()
+        );
+        Some(if sized {
+            self.assign_temp(MirValueKind::Operand(value), MirType::semantic(ty), arg.span)
+        } else {
+            value
+        })
+    }
+
     pub(super) fn lower_positional_call_args(&mut self, args: &[HirCallArg]) -> Option<Vec<MirOperand>> {
         let mut lowered = Vec::with_capacity(args.len());
         for arg in args {
-            lowered.push(self.lower_expr_value(&arg.expr)?);
+            lowered.push(self.lower_call_arg_value(&arg.expr)?);
         }
         Some(lowered)
     }
@@ -2858,6 +2881,7 @@ impl FunctionBuilder<'_> {
             ),
             Type::Primitive(Primitive::Numerus) => self.runtime_call_value(
                 MirIntrinsic::Convert(MirConversion {
+                    store: None,
                     flavor: MirConversionFlavor::Runtime,
                     source_ty: ty,
                     target_ty: text_ty,
@@ -3007,10 +3031,12 @@ impl FunctionBuilder<'_> {
         target: TypeId,
         params: &[Symbol],
         recovery: Option<&HirExpression>,
-        implicit: bool,
+        implicit: Option<radix_hir::HirStoreSite>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
-        if implicit && let Some(folded) = self.fold_word_store_constant(source, target) {
+        if implicit.is_some()
+            && let Some(folded) = self.fold_word_store_constant(source, target)
+        {
             return Some(folded);
         }
         let source_ty = self.expr_ty(source)?;
@@ -3074,7 +3100,7 @@ impl FunctionBuilder<'_> {
         // An implicit store (d11-6 ruling 5) traps: it is never routed into an
         // enclosing `fac … cape` or `⇥` channel, only an authored `↦` is.
         if recovery.is_none()
-            && !implicit
+            && implicit.is_none()
             && let Some(handler) = self.handlers.last().cloned()
         {
             return Some(self.lower_handled_conversio(HandledConversio {
@@ -3089,6 +3115,7 @@ impl FunctionBuilder<'_> {
         }
         Some(self.runtime_call_value(
             MirIntrinsic::Convert(MirConversion {
+                store: implicit,
                 flavor: MirConversionFlavor::Runtime,
                 source_ty: conversion_source_ty,
                 target_ty: MirType::semantic(target),
@@ -3112,6 +3139,7 @@ impl FunctionBuilder<'_> {
         init: &HirExpression,
         destination: MirPlace,
         slot_ty: MirType,
+        site: radix_hir::HirStoreSite,
         span: Span,
     ) -> Option<()> {
         let init_ty = self.expr_ty(init)?.semantic_id();
@@ -3126,6 +3154,7 @@ impl FunctionBuilder<'_> {
         self.runtime_call_to_place(
             Some(destination),
             MirIntrinsic::Convert(MirConversion {
+                store: Some(site),
                 flavor: MirConversionFlavor::Runtime,
                 source_ty: MirType::semantic(awaited),
                 target_ty: slot_ty,
@@ -3259,6 +3288,7 @@ impl FunctionBuilder<'_> {
         let valor_ty = self.types.primitive(Primitive::Valor);
         let opener_valor = self.runtime_call_value(
             MirIntrinsic::Convert(MirConversion {
+                store: None,
                 flavor: MirConversionFlavor::Runtime,
                 source_ty: opener_ty,
                 target_ty: MirType::semantic(valor_ty),
@@ -3462,6 +3492,7 @@ impl FunctionBuilder<'_> {
                     let numerus = self.types.primitive(Primitive::Numerus);
                     let dim = self.runtime_call_value(
                         MirIntrinsic::Convert(MirConversion {
+                            store: None,
                             flavor: MirConversionFlavor::Runtime,
                             source_ty: MirType::semantic(self.types.primitive(Primitive::Fractus)),
                             target_ty: MirType::semantic(numerus),
@@ -3562,6 +3593,7 @@ impl FunctionBuilder<'_> {
         nested.runtime_call_to_place(
             Some(MirPlace::temp(destination)),
             MirIntrinsic::Convert(MirConversion {
+                store: None,
                 flavor: MirConversionFlavor::Runtime,
                 source_ty,
                 target_ty: MirType::semantic(target),

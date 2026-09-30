@@ -217,6 +217,7 @@ fn direct_conversion_runtime_call_counts_success_and_recovery() {
     let fallback = interner.intern("9");
     let context = MirValidationContext::new(&types);
     let conversion = |recovery| MirConversion {
+        store: None,
         flavor: MirConversionFlavor::Runtime,
         source_ty: MirType::semantic(textus),
         target_ty: MirType::semantic(numerus),

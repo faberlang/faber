@@ -51,6 +51,7 @@ fn param(id: u32, ty: MirType) -> MirParam {
 
 fn conversion(flavor: MirConversionFlavor, source: MirType, target: MirType) -> MirConversion {
     MirConversion {
+        store: None,
         flavor,
         source_ty: source,
         target_ty: target,

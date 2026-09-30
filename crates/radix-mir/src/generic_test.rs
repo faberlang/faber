@@ -854,6 +854,7 @@ fn tensor_from_flat_shape_size_uses_finalized_result_shape() {
                     }),
                     call: MirRuntimeCall {
                         intrinsic: MirIntrinsic::Convert(MirConversion {
+                            store: None,
                             flavor: MirConversionFlavor::Runtime,
                             source_ty: MirType::semantic(types.primitive(Primitive::Fractus)),
                             target_ty: numerus_ty,
@@ -875,6 +876,7 @@ fn tensor_from_flat_shape_size_uses_finalized_result_shape() {
                     }),
                     call: MirRuntimeCall {
                         intrinsic: MirIntrinsic::Convert(MirConversion {
+                            store: None,
                             flavor: MirConversionFlavor::Runtime,
                             source_ty: MirType::semantic(types.primitive(Primitive::Fractus)),
                             target_ty: numerus_ty,
