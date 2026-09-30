@@ -19,7 +19,8 @@ locale = "en"
 #   • `=` marks a value, so it is not `:`; text fields are quoted as in source.
 #   • A nested genus prints by the same rule; a list prints in its `[a, b]` form.
 #   • A discretio variant prints qualified: `Discretio.Variant { … }`.
-#   • A value with no fields prints as `Name {}`.
+#   • A genus with no fields prints as `Name {}`; a variant with no fields
+#     prints as `Discretio.Variant`, with no braces.
 #   • A bare text value at the top level stays unquoted.
 #
 # Common mistakes:

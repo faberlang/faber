@@ -521,17 +521,14 @@ impl<'a> LoweringContextMaps<'a> {
                 .iter()
                 .map(|field| (field.name, field.ty))
                 .collect::<Vec<_>>();
-            let carries_payload = !commune.is_empty() || variants.iter().any(|variant| !variant.fields.is_empty());
             for variant in &variants {
                 self.variant_parents.insert(variant.def_id, enum_def);
                 self.validation
                     .variant_parents
                     .insert(variant.def_id, enum_def);
-                if carries_payload {
-                    self.validation
-                        .display_names
-                        .insert(variant.def_id, format!("{enum_name}.{}", self.interner.resolve(variant.name)));
-                }
+                self.validation
+                    .display_names
+                    .insert(variant.def_id, format!("{enum_name}.{}", self.interner.resolve(variant.name)));
                 let field_names = commune
                     .iter()
                     .map(|(name, _)| *name)
@@ -710,28 +707,20 @@ impl<'a> LoweringContextMaps<'a> {
         }
         self.enum_variants.insert(enum_def_id, variants.clone());
         self.validation.enum_variants.insert(enum_def_id, variants);
-        // D2.8 names the variants of a `discretio`; a unit-only enum (`ordo`)
-        // is not ruled and keeps its unnamed display.
-        let carries_payload = !enum_item.commune_fields.is_empty()
-            || enum_item
-                .variants
-                .iter()
-                .any(|variant| !variant.fields.is_empty());
         for variant in &enum_item.variants {
             self.variant_parents.insert(variant.def_id, enum_def_id);
             self.validation
                 .variant_parents
                 .insert(variant.def_id, enum_def_id);
-            if carries_payload {
-                self.validation.display_names.insert(
-                    variant.def_id,
-                    format!(
-                        "{}.{}",
-                        self.interner.resolve(enum_item.name),
-                        self.interner.resolve(variant.name)
-                    ),
-                );
-            }
+            // D2.8: every enum member prints `Enum.Member`, payload or not.
+            self.validation.display_names.insert(
+                variant.def_id,
+                format!(
+                    "{}.{}",
+                    self.interner.resolve(enum_item.name),
+                    self.interner.resolve(variant.name)
+                ),
+            );
             let field_names = enum_item
                 .commune_fields
                 .iter()

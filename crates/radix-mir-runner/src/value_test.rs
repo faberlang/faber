@@ -510,18 +510,132 @@ fn discretio_variant_displays_qualified_with_declared_fields() {
         payload.display(&interner, order, Span::default()).unwrap(),
         r#"Nuntius.Pulsus { x = 1, y = "hello" }"#
     );
+    // D2.8 (pr3): a payload-free variant has no field list, so no braces.
     let unit = Value::EnumVariant(finis, field_map(&[]));
     assert_eq!(
         unit.display(&interner, order, Span::default()).unwrap(),
-        "Nuntius.Finis {}"
+        "Nuntius.Finis"
+    );
+}
+
+#[test]
+fn unit_only_enum_members_display_as_type_dot_member() {
+    // An all-unit `discretio` and an `ordo` print alike (pr3): the lowering
+    // registers a name for every enum variant, so neither needs a HIR flag.
+    let interner = radix_lexer::Interner::new();
+    let structs = StructFieldOrder::default();
+    let variants = StructFieldOrder::default();
+    let mut names = DisplayNames::default();
+    names.insert(radix_hir::DefId(6101), "Signum.Alpha".to_owned());
+    names.insert(radix_hir::DefId(6102), "Color.Red".to_owned());
+    let order = FieldOrder::new(&structs, &variants).with_names(&names);
+    for (def, shown) in [(6101, "Signum.Alpha"), (6102, "Color.Red")] {
+        let member = Value::EnumVariant(radix_hir::DefId(def), field_map(&[]));
+        assert_eq!(
+            member.display(&interner, order, Span::default()).unwrap(),
+            shown
+        );
+    }
+}
+
+#[test]
+fn composites_quote_text_chars_and_ascii_but_top_level_scalars_do_not() {
+    let fx = genus_fixture();
+    let variants = StructFieldOrder::default();
+    let order = FieldOrder::new(&fx.structs, &variants).with_names(&fx.names);
+    let show = |value: &Value| value.display(&fx.interner, order, Span::default()).unwrap();
+    let list = |items: Vec<Value>| Value::Array(std::rc::Rc::new(std::cell::RefCell::new(items)));
+    // Top level: a scalar prints its value.
+    assert_eq!(show(&text("hello")), "hello");
+    assert_eq!(show(&Value::Char('q')), "q");
+    // Inside a composite: text, char and ascii are quoted as in source.
+    assert_eq!(show(&list(vec![text("a"), text("b")])), r#"["a", "b"]"#);
+    assert_eq!(
+        show(&list(vec![Value::Char('x'), Value::Char('y')])),
+        "['x', 'y']"
+    );
+    assert_eq!(show(&list(vec![Value::Ascii(b'k')])), "['k']");
+    assert_eq!(
+        show(&list(vec![list(vec![text("n")]), list(Vec::new())])),
+        r#"[["n"], []]"#
+    );
+    assert_eq!(
+        show(&list(vec![Value::Bool(true), Value::Nil])),
+        "[verum, nihil]"
+    );
+}
+
+#[test]
+fn genus_fields_quote_chars_and_lists_and_show_options_bare() {
+    let mut interner = radix_lexer::Interner::new();
+    let (c, names_field, opt, ok) = (
+        interner.intern("c"),
+        interner.intern("names"),
+        interner.intern("opt"),
+        interner.intern("ok"),
+    );
+    let def = radix_hir::DefId(5101);
+    let mut structs = StructFieldOrder::default();
+    structs.insert(def, vec![ok, opt, c, names_field]);
+    let variants = StructFieldOrder::default();
+    let mut names = DisplayNames::default();
+    names.insert(def, "Rec".to_owned());
+    let order = FieldOrder::new(&structs, &variants).with_names(&names);
+    let names_list = Value::Array(std::rc::Rc::new(std::cell::RefCell::new(vec![
+        text("a"),
+        text("b"),
+    ])));
+    let present = Value::Struct(
+        def,
+        field_map(&[
+            (ok, Value::Bool(true)),
+            (opt, Value::Int(3)),
+            (c, Value::Char('q')),
+            (names_field, names_list),
+        ]),
+    );
+    assert_eq!(
+        present.display(&interner, order, Span::default()).unwrap(),
+        r#"Rec { ok = verum, opt = 3, c = 'q', names = ["a", "b"] }"#
+    );
+    let absent = Value::Struct(
+        def,
+        field_map(&[
+            (ok, Value::Bool(false)),
+            (opt, Value::Nil),
+            (c, Value::Char('q')),
+            (names_field, Value::Array(Default::default())),
+        ]),
+    );
+    assert_eq!(
+        absent.display(&interner, order, Span::default()).unwrap(),
+        "Rec { ok = falsum, opt = nihil, c = 'q', names = [] }"
+    );
+}
+
+#[test]
+fn dynamic_carrier_list_keeps_unquoted_elements() {
+    // A value shown through `valor`/`json` keeps its JSON-shaped display.
+    let fx = genus_fixture();
+    let variants = StructFieldOrder::default();
+    let order = FieldOrder::new(&fx.structs, &variants)
+        .with_names(&fx.names)
+        .with_dynamic(true);
+    let list = Value::Array(std::rc::Rc::new(std::cell::RefCell::new(vec![
+        text("a"),
+        text("b"),
+    ])));
+    assert_eq!(
+        list.display(&fx.interner, order, Span::default()).unwrap(),
+        "[a, b]"
     );
 }
 
 #[test]
 fn unnamed_variant_and_dynamic_struct_keep_json_shaped_display() {
-    // A unit-only enum (`ordo`) registers no construction-literal name, and a
-    // genus shown through a `valor` carrier is a dynamic object: neither is
-    // covered by D2.8.
+    // A variant with no registered construction-literal name (defensive
+    // fallback), and a genus shown through a `valor` carrier (a dynamic
+    // object), are not covered by D2.8.
     let fx = genus_fixture();
     let variants = StructFieldOrder::default();
     let order = FieldOrder::new(&fx.structs, &variants).with_names(&fx.names);

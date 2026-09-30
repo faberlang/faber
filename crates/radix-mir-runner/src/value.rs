@@ -455,9 +455,9 @@ impl Value {
             }
             Value::EnumVariant(def, fields) => {
                 let declared = order.variants.get(def).map_or(&[][..], Vec::as_slice);
-                // A variant without a construction-literal name (a unit-only
-                // enum, `ordo`) keeps the JSON-shaped display: D2.8 covers
-                // `discretio` variants only.
+                // A variant without a construction-literal name (defensive:
+                // lowering registers one for every `discretio` and `ordo`
+                // member) keeps the JSON-shaped display.
                 if order.dynamic || !order.names.contains_key(def) {
                     display_json_object(&fields.borrow(), declared, None, interner, order, span)?
                 } else {
@@ -466,6 +466,7 @@ impl Value {
                         &fields.borrow(),
                         declared,
                         None,
+                        true,
                         interner,
                         order,
                         span,
@@ -528,7 +529,7 @@ fn display_list(
 ) -> Result<String, RunnerError> {
     let parts = items
         .iter()
-        .map(|item| display_in_collection(item, interner, order, span, float_width))
+        .map(|item| display_element(item, interner, order, span, float_width))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(format!("[{}]", parts.join(", ")))
 }
@@ -633,6 +634,7 @@ fn display_tabula_struct(
         &fields.borrow(),
         declared,
         Some((def, float_width)),
+        false,
         interner,
         order,
         span,
@@ -688,14 +690,17 @@ fn display_json_object(
 }
 
 /// Render a `genus` value or `discretio` variant as its construction literal
-/// (D2.8): `Name { field = value, ... }` in declaration order, text fields
-/// quoted, `Name {}` when there are no fields. `owner` is the struct whose
+/// (D2.8): `Name { field = value, ... }` in declaration order, text, char and
+/// ascii values quoted. With no fields a genus prints `Name {}` and a variant
+/// (`variant`) prints its bare qualified name. `owner` is the struct whose
 /// per-field declared float width applies.
+#[expect(clippy::too_many_arguments)]
 fn display_construction(
     def: DefId,
     fields: &FxHashMap<Symbol, Value>,
     declared: &[Symbol],
     owner: Option<(DefId, Option<NumericWidth>)>,
+    variant: bool,
     interner: &Interner,
     order: FieldOrder<'_>,
     span: Span,
@@ -715,28 +720,43 @@ fn display_construction(
                 .copied()
                 .or(inherited)
         });
-        let val_str = display_field_value(value, interner, order, span, width)?;
+        let val_str = display_element(value, interner, order, span, width)?;
         parts.push(format!("{field} = {val_str}"));
     }
     if parts.is_empty() {
-        return Ok(format!("{name} {{}}"));
+        return Ok(if variant {
+            name
+        } else {
+            format!("{name} {{}}")
+        });
     }
     Ok(format!("{name} {{ {} }}", parts.join(", ")))
 }
 
-/// A field value inside a construction literal: text is quoted as in source,
-/// everything else renders as it does in a collection.
-fn display_field_value(
+/// A value inside a composite (list element or construction-literal field):
+/// text prints double-quoted and char / one-byte ascii single-quoted, as in
+/// source; everything else renders as it does in a collection. A value shown
+/// through a dynamic `valor`/`json` carrier keeps the unquoted JSON-shaped
+/// form.
+fn display_element(
     value: &Value,
     interner: &Interner,
     order: FieldOrder<'_>,
     span: Span,
     float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
+    if order.dynamic {
+        return display_in_collection(value, interner, order, span, float_width);
+    }
     match value {
         Value::Str(text) => Ok(format!("{text:?}")),
+        // A one-byte ascii value is the widened single-quoted literal (`'q'`),
+        // which is also how a `littera` literal reaches the runner (D10.5), so
+        // both print as the char literal; longer ascii text is a `Str`.
+        Value::Ascii(byte) => Ok(format!("{:?}", char::from(*byte))),
+        Value::Char(ch) => Ok(format!("{ch:?}")),
         Value::SharedCell(cell) => {
-            display_field_value(&cell.borrow(), interner, order, span, float_width)
+            display_element(&cell.borrow(), interner, order, span, float_width)
         }
         other => display_in_collection(other, interner, order, span, float_width),
     }

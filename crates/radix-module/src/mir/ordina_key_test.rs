@@ -37,7 +37,7 @@ incipit {{
 }}
 "
     ));
-    assert_eq!(lines, vec!["[a, d, c, b]", "[c, a, b, d]"]);
+    assert_eq!(lines, vec![r#"["a", "d", "c", "b"]"#, r#"["c", "a", "b", "d"]"#]);
 }
 
 #[test]
@@ -51,5 +51,5 @@ incipit {{
 }}
 "
     ));
-    assert_eq!(lines, vec!["[B, z, é]"]);
+    assert_eq!(lines, vec![r#"["B", "z", "é"]"#]);
 }

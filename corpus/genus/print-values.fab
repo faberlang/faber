@@ -1,0 +1,122 @@
++++
+term = "genus"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "discretio_decl", "variant", "variant_fields", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "fixum_decl", "typed_constructor", "finge_expr", "field_list", "field_init", "field_key", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A composite prints its construction literal; a scalar prints its value."
+syntax = "print <composite value>"
+related = ["genus", "discretio", "ordo", "lista", "nota"]
+locale = "en"
++++
+# =============================================================================
+# genus — Printing composites and scalars
+# =============================================================================
+#
+# What this teaches:
+#   • A composite prints its construction literal and a scalar prints its
+#     value: `print "hello"` shows `hello`, but a text inside a composite is
+#     quoted as in source (`["a", "b"]`, `names = ["a", "b"]`).
+#   • Chars and ascii texts are quoted inside a composite too: `c = 'q'`,
+#     `a = "abc"` (an ascii text prints like a textus); at the top level `print 'q'` shows `q`.
+#   • An absent optional field prints `nihil`; a present one prints its bare
+#     value (`opt = 3`); booleans print `verum` and `falsum`.
+#   • A `generis` static is not part of the construction literal.
+#   • A discretio variant prints `Type.Variant { … }`; a variant with no fields
+#     prints `Type.Variant` with no braces, as does every member of an all-unit
+#     discretio and of an `ordo`. A genus with no fields keeps `Name {}`.
+#   • Fields of a discretio print in declaration order: the shared region
+#     first, then the variant's own fields.
+#
+# Common mistakes:
+#   • Expecting `Some(3)` or `None` for an optional field — Faber has no `Some`.
+#   • Expecting braces on a unit variant — `Node.Finis` has no field list.
+#
+# See also: genus, discretio, ordo, lista, nota
+# =============================================================================
+
+# GRAMMAR:
+#   instance :← ident '{' fieldInit (',' fieldInit)* '}'
+#
+# EXPECTED OUTPUT:
+#   composites as construction literals, scalars as values.
+
+class Rec {
+    var bool ok
+    var int ∪ none opt
+    var char c
+    var ascii a
+    var list<string> names
+    var int<d64> price
+    var f32 ratio
+    static int LIMIT = 4
+}
+
+class Vacuus {
+}
+
+union Node {
+    Leaf {
+        int v
+    },
+    Finis
+}
+
+union Signum {
+    Alpha,
+    Beta
+}
+
+enum Color {
+    Red,
+    Green
+}
+
+union Shape {
+    @ shared
+    int kind
+
+    Dot,
+    Circle {
+        float r
+    }
+}
+
+main {
+    const Rec r ← Rec { ok = true, opt = 3, c = 'q', a = 'abc', names = ["a", "b"], price = 0.1, ratio = 0.1 }
+    print r
+
+    const Rec e ← Rec { ok = false, opt = nihil, c = 'z', a = 'xyz', names = [], price = 2.0, ratio = 0.25 }
+    print e
+
+    print Vacuus {}
+
+    const Node leaf ← variant Leaf { v = 1 } ∷ Node
+    print leaf
+    const Node end ← variant Finis ∷ Node
+    print end
+
+    const Signum s ← variant Alpha ∷ Signum
+    print s
+    const Color k ← Color.Red
+    print k
+
+    const Shape dot ← variant Dot { kind = 1 } ∷ Shape
+    print dot
+    const Shape circle ← variant Circle { kind = 2, r = 1.5 } ∷ Shape
+    print circle
+
+    const list<string> words ← ["a", "b"]
+    print words
+    const list<char> letters ← ['x', 'y']
+    print letters
+    const list<int> numbers ← [0, 1, 2]
+    print numbers
+    const list<bool> flags ← [true, false]
+    print flags
+
+    print "hello"
+    print 'q'
+    print 7
+    print true
+}
