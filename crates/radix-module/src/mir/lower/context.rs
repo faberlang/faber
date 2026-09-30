@@ -205,6 +205,7 @@ impl<'a> LoweringContextMaps<'a> {
                 external_function_identities: FxHashMap::default(),
                 package_product: None,
                 struct_fields: FxHashMap::default(),
+                struct_field_order: FxHashMap::default(),
                 struct_type_params: FxHashMap::default(),
                 enum_type_params: FxHashMap::default(),
                 optional_struct_fields: FxHashMap::default(),
@@ -438,6 +439,15 @@ impl<'a> LoweringContextMaps<'a> {
                 }
             }
         }
+        self.validation.struct_field_order.insert(
+            def_id,
+            strukt
+                .fields
+                .iter()
+                .filter(|field| !field.is_static())
+                .map(|field| field.name)
+                .collect(),
+        );
         self.validation.struct_fields.insert(def_id, fields);
         self.validation
             .optional_struct_fields
@@ -505,6 +515,9 @@ impl<'a> LoweringContextMaps<'a> {
             let mut optional_fields = FxHashSet::default();
             let mut nullable_fields = FxHashSet::default();
             let mut defaults = Vec::new();
+            self.validation
+                .struct_field_order
+                .insert(def_id, imported_fields.iter().map(|field| field.name).collect());
             for field in imported_fields {
                 fields.insert(field.name, MirType::semantic(field.ty));
                 if let Some(init) = field.init {

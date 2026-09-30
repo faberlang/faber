@@ -4294,7 +4294,7 @@ fn matrix_display_emits_nested_rows() {
 
     let interner = Interner::new();
     let text = matrix
-        .display(&interner, Span::default())
+        .display(&interner, &FxHashMap::default(), Span::default())
         .expect("matrix display must succeed");
     assert_eq!(text, "[[16.0, 25.0], [64.0, 100.0], [144.0, 225.0]]");
 }
@@ -4320,7 +4320,7 @@ fn matrix_display_rows_split_on_column_count() {
 
     let interner = Interner::new();
     let text = matrix
-        .display(&interner, Span::default())
+        .display(&interner, &FxHashMap::default(), Span::default())
         .expect("matrix display must succeed");
     assert_eq!(text, "[[1, 2, 3], [4, 5, 6]]");
 }

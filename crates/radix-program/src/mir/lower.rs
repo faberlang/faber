@@ -34,6 +34,7 @@ use radix_module::mir::{MirDeviceFunctionMetadataMap, MirFunctionSignature};
 #[derive(Clone, Default)]
 pub(super) struct RemappedValidation {
     struct_fields: HashMap<DefId, HashMap<Symbol, MirType>>,
+    struct_field_order: HashMap<DefId, Vec<Symbol>>,
     struct_type_params: HashMap<DefId, Vec<Symbol>>,
     optional_struct_fields: HashMap<DefId, HashSet<Symbol>>,
     nullable_struct_fields: HashMap<DefId, HashSet<Symbol>>,
@@ -58,6 +59,11 @@ impl RemappedValidation {
 
     fn merge(&mut self, other: &Self) {
         union_field_maps(&mut self.struct_fields, &other.struct_fields);
+        for (def, order) in &other.struct_field_order {
+            self.struct_field_order
+                .entry(*def)
+                .or_insert_with(|| order.clone());
+        }
         for (def, params) in &other.struct_type_params {
             self.struct_type_params
                 .entry(*def)
@@ -93,6 +99,9 @@ impl RemappedValidation {
             context
                 .struct_fields
                 .insert(*def, fields.iter().map(|(name, ty)| (*name, *ty)).collect());
+        }
+        for (def, order) in &self.struct_field_order {
+            context.struct_field_order.insert(*def, order.clone());
         }
         for (def, params) in &self.struct_type_params {
             context
@@ -490,6 +499,15 @@ fn collect_remapped_validation(
                 remap_metadata_type(*ty, type_rewrites),
             );
         }
+    }
+    for (def, order) in &source.struct_field_order {
+        out.struct_field_order.insert(
+            remap_nominal_def(*def),
+            order
+                .iter()
+                .map(|name| remap_metadata_symbol(*name, source_interner, entry_interner))
+                .collect(),
+        );
     }
     // Generic struct params must ride the same remap: field projections
     // through an `Applied` sibling/library struct (namespace-forwarded
@@ -2451,6 +2469,11 @@ fn remap_lowered_program_text_symbols<'a>(
             .into_iter()
             .map(|(name, ty)| (remap_metadata_symbol(name, source, target), ty))
             .collect();
+    }
+    for order in context.struct_field_order.values_mut() {
+        for name in order {
+            *name = remap_metadata_symbol(*name, source, target);
+        }
     }
     for params in context.struct_type_params.values_mut() {
         for param in params {

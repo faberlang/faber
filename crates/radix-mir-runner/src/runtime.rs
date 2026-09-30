@@ -112,7 +112,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 // 9007e12c3 follow-through: floats declared at a narrower
                 // width than f64 display at that width.
                 let float_width = self.operand_float_width(arg);
-                let text = value.display_typed(self.interner, span, float_width)?;
+                let text = value.display_typed(
+                    self.interner,
+                    &self.context.struct_field_order,
+                    span,
+                    float_width,
+                )?;
                 self.host.scribe(*kind, &text)?;
                 Ok(Value::Unit)
             }
@@ -127,6 +132,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     template_text,
                     &args,
                     self.interner,
+                    &self.context.struct_field_order,
                     span,
                 )?))
             }
@@ -185,9 +191,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let [route] = args else {
             return Err(RunnerError::internal(span, "sermo_open runtime arity"));
         };
-        let route = self
-            .eval_operand(route, span)?
-            .display(self.interner, span)?;
+        let route = self.eval_operand(route, span)?.display(
+            self.interner,
+            &self.context.struct_field_order,
+            span,
+        )?;
         self.sermo_open(route, span)
     }
 
@@ -1016,7 +1024,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 .get(1)
                 .map(|arg| self.eval_operand(arg, span))
                 .transpose()?
-                .map(|value| value.display(self.interner, span))
+                .map(|value| value.display(self.interner, &self.context.struct_field_order, span))
                 .transpose()?
                 .unwrap_or_else(|| "assertion failed".to_owned());
             self.host.abort(&message);
@@ -1028,7 +1036,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let [arg] = args else {
             return Err(RunnerError::internal(span, "panic runtime arity"));
         };
-        let message = self.eval_operand(arg, span)?.display(self.interner, span)?;
+        let message = self.eval_operand(arg, span)?.display(
+            self.interner,
+            &self.context.struct_field_order,
+            span,
+        )?;
         self.host.abort(&message);
     }
 
@@ -4691,7 +4703,7 @@ fn format_value(
             let mut display_error = None;
             let text = render_float(*v, &layout, |magnitude| {
                 Value::Float(magnitude)
-                    .display_typed(interner, span, float_width)
+                    .display_typed(interner, &FxHashMap::default(), span, float_width)
                     .unwrap_or_else(|err| {
                         display_error = Some(err);
                         String::new()

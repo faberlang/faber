@@ -34,6 +34,10 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// Declaration order of each struct's instance fields, from MIR validation
+/// metadata; display renders struct fields in this order.
+pub type StructFieldOrder = FxHashMap<DefId, Vec<Symbol>>;
+
 /// Runtime value carried by the MIR runner.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -306,8 +310,13 @@ impl Value {
         }
     }
 
-    pub fn display(&self, interner: &Interner, span: Span) -> Result<String, RunnerError> {
-        self.display_typed(interner, span, None)
+    pub fn display(
+        &self,
+        interner: &Interner,
+        order: &StructFieldOrder,
+        span: Span,
+    ) -> Result<String, RunnerError> {
+        self.display_typed(interner, order, span, None)
     }
 
     /// Width-aware display: f32-declared floats render at f32 precision
@@ -316,6 +325,7 @@ impl Value {
     pub fn display_typed(
         &self,
         interner: &Interner,
+        order: &StructFieldOrder,
         span: Span,
         float_width: Option<NumericWidth>,
     ) -> Result<String, RunnerError> {
@@ -363,17 +373,28 @@ impl Value {
                 format!("closure f{} env{}", id.0, environment.0)
             }
             Value::ClosureEnvironment(id, _) => format!("closure env{}", id.0),
-            Value::SharedCell(cell) => cell.borrow().display_typed(interner, span, float_width)?,
-            Value::Array(items) => display_list(&items.borrow(), interner, span, float_width)?,
+            Value::SharedCell(cell) => {
+                cell.borrow()
+                    .display_typed(interner, order, span, float_width)?
+            }
+            Value::Array(items) => {
+                display_list(&items.borrow(), interner, order, span, float_width)?
+            }
             Value::Tensor(tensor) => {
-                display_list(&tensor.borrow().data, interner, span, float_width)?
+                display_list(&tensor.borrow().data, interner, order, span, float_width)?
             }
-            Value::Vector(lanes) => display_list(&lanes.borrow(), interner, span, float_width)?,
-            Value::Matrix(matrix) => display_matrix(&matrix.borrow(), interner, span, float_width)?,
+            Value::Vector(lanes) => {
+                display_list(&lanes.borrow(), interner, order, span, float_width)?
+            }
+            Value::Matrix(matrix) => {
+                display_matrix(&matrix.borrow(), interner, order, span, float_width)?
+            }
             Value::Map(entries) => {
-                display_tabula_map(&entries.borrow(), interner, span, float_width)?
+                display_tabula_map(&entries.borrow(), interner, order, span, float_width)?
             }
-            Value::Struct(_, fields) => display_tabula_struct(fields, interner, span, float_width)?,
+            Value::Struct(def, fields) => {
+                display_tabula_struct(*def, fields, interner, order, span, float_width)?
+            }
             Value::Set(_) | Value::Record(_) | Value::EnumVariant(_, _) | Value::Tuple(_) => {
                 format!("{self:?}")
             }
@@ -426,12 +447,13 @@ impl Value {
 fn display_list(
     items: &[Value],
     interner: &Interner,
+    order: &StructFieldOrder,
     span: Span,
     float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
     let parts = items
         .iter()
-        .map(|item| display_in_collection(item, interner, span, float_width))
+        .map(|item| display_in_collection(item, interner, order, span, float_width))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(format!("[{}]", parts.join(", ")))
 }
@@ -441,6 +463,7 @@ fn display_list(
 fn display_matrix(
     matrix: &MatrixValue,
     interner: &Interner,
+    order: &StructFieldOrder,
     span: Span,
     float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
@@ -453,6 +476,7 @@ fn display_matrix(
             display_list(
                 matrix.data.get(start..end).unwrap_or(&[]),
                 interner,
+                order,
                 span,
                 float_width,
             )
@@ -464,22 +488,28 @@ fn display_matrix(
 fn display_in_collection(
     value: &Value,
     interner: &Interner,
+    order: &StructFieldOrder,
     span: Span,
     float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
     Ok(match value {
         Value::Int(v) => v.to_string(),
         Value::UInt(v) => v.to_string(),
-        Value::Array(items) => display_list(&items.borrow(), interner, span, float_width)?,
-        Value::Map(entries) => display_tabula_map(&entries.borrow(), interner, span, float_width)?,
-        Value::Struct(_, fields) => display_tabula_struct(fields, interner, span, float_width)?,
-        other => other.display_typed(interner, span, float_width)?,
+        Value::Array(items) => display_list(&items.borrow(), interner, order, span, float_width)?,
+        Value::Map(entries) => {
+            display_tabula_map(&entries.borrow(), interner, order, span, float_width)?
+        }
+        Value::Struct(def, fields) => {
+            display_tabula_struct(*def, fields, interner, order, span, float_width)?
+        }
+        other => other.display_typed(interner, order, span, float_width)?,
     })
 }
 
 fn display_tabula_map(
     entries: &FxHashMap<MapKey, Value>,
     interner: &Interner,
+    order: &StructFieldOrder,
     span: Span,
     float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
@@ -498,22 +528,38 @@ fn display_tabula_map(
             MapKey::Unit => "nihil".to_owned(),
             MapKey::Tuple(_) => key.document_key(),
         };
-        let val_str = display_in_collection(value, interner, span, float_width)?;
+        let val_str = display_in_collection(value, interner, order, span, float_width)?;
         parts.push(format!("{key_str}: {val_str}"));
     }
     Ok(format!("{{{}}}", parts.join(", ")))
 }
 
 fn display_tabula_struct(
+    def: DefId,
     fields: &RefCell<FxHashMap<Symbol, Value>>,
     interner: &Interner,
+    order: &StructFieldOrder,
     span: Span,
     float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
+    // Declaration order from the struct metadata; any field the metadata does
+    // not list (unknown def) follows in name order so output stays stable.
+    let fields = fields.borrow();
+    let declared = order.get(&def).map_or(&[][..], Vec::as_slice);
+    let mut rows: Vec<(&Symbol, &Value)> = declared
+        .iter()
+        .filter_map(|symbol| fields.get_key_value(symbol))
+        .collect();
+    let mut rest: Vec<(&Symbol, &Value)> = fields
+        .iter()
+        .filter(|(symbol, _)| !declared.contains(symbol))
+        .collect();
+    rest.sort_by(|a, b| interner.resolve(*a.0).cmp(interner.resolve(*b.0)));
+    rows.extend(rest);
     let mut parts = Vec::new();
-    for (symbol, value) in fields.borrow().iter() {
+    for (symbol, value) in rows {
         let name = interner.resolve(*symbol);
-        let val_str = display_in_collection(value, interner, span, float_width)?;
+        let val_str = display_in_collection(value, interner, order, span, float_width)?;
         parts.push(format!("\"{name}\": {val_str}"));
     }
     Ok(format!("{{{}}}", parts.join(", ")))
@@ -1340,6 +1386,7 @@ pub fn format_template(
     template: &str,
     args: &[Value],
     interner: &Interner,
+    order: &StructFieldOrder,
     span: Span,
 ) -> Result<String, RunnerError> {
     let mut out = String::with_capacity(template.len());
@@ -1366,7 +1413,7 @@ pub fn format_template(
         };
         let rendered = args
             .get(arg_index)
-            .map(|arg| arg.display(interner, span))
+            .map(|arg| arg.display(interner, order, span))
             .transpose()?
             .unwrap_or_else(|| format!("§{index}"));
         out.push_str(&rendered);
