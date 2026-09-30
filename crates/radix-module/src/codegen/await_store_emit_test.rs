@@ -30,21 +30,29 @@ fn emit(target: Target, source: &str) -> String {
 #[test]
 fn rust_checks_the_awaited_value_after_the_await() {
     let code = emit(Target::HirRust, NARROWING);
-    assert!(code.contains("<u8 as TryFrom<i64>>::try_from(fetch().await).expect("), "{code}");
+    assert!(
+        code.contains("__faber_store::<u8>(fetch().await as i128, \"await-binding `v`\""),
+        "{code}"
+    );
 }
 
 #[test]
 fn go_checks_the_awaited_value() {
     let code = emit(Target::HirGo, NARROWING);
-    assert!(code.contains("var v int = fetch()"), "{code}");
-    assert!(code.contains("v < 0 || v > 255"), "{code}");
+    assert!(
+        code.contains("v := uint8(faberXStoreU(faberXI(int64(fetch())), 255, \"u8\", \"await-binding `v`\""),
+        "{code}"
+    );
 }
 
 #[test]
 fn typescript_checks_the_value_after_await() {
     let code = emit(Target::HirTypeScript, NARROWING);
-    assert!(code.contains("(await fetch())"), "{code}");
-    assert!(code.contains("__v < 0 || __v > 255"), "{code}");
+    assert!(
+        code.contains("__faberXStore(await fetch(), 0, 255, \"u8\", \"await-binding `v`\""),
+        "{code}"
+    );
+    assert!(code.contains("if (v < lo || v > hi)"), "{code}");
 }
 
 #[test]

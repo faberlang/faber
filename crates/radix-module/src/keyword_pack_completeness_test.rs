@@ -17,7 +17,14 @@ const CONTEXTUAL_SUMMA_KEYWORDS: &[&str] = &["summa", "filum"];
 /// reader surface. The registry retains `conversion` as an identity alias so
 /// other packs and tooling can name the family, but these two installed packs
 /// must not declare that alias as source syntax.
-const SEALED_CONVERSIO_ALIAS_OMISSIONS: &[(&str, &str)] = &[("en", "conversion"), ("la", "conversion")];
+///
+/// `la:nihil` is the same shape (D23.2, closed by c5b349bff): the registry
+/// keeps `nihil` as a transitional `Alias { canonical: "nulla" }` row for the
+/// public-grammar vocabulary triple, but the Latin pack dropped its
+/// `[keywords] nihil` alias so `nihil` resolves only as the permanent `[types]`
+/// null-type word and the value literal is `nulla`.
+const SEALED_CONVERSIO_ALIAS_OMISSIONS: &[(&str, &str)] =
+    &[("en", "conversion"), ("la", "conversion"), ("la", "nihil")];
 
 fn is_sealed_conversio_alias_omission(locale: &str, key: &str) -> bool {
     SEALED_CONVERSIO_ALIAS_OMISSIONS

@@ -423,30 +423,17 @@ functio toModulus(numerus<u32> value) → modulus<u32> {
 
 #[cfg(all(feature = "hir-go", feature = "mir-llvm", feature = "mir-wasm"))]
 #[test]
-fn unsupported_targets_reject_modular_words_before_emit() {
+fn go_llvm_and_wasm_accept_modular_words_at_emit() {
     let source = r"
 functio add(modulus<u32> x, modulus<u32> y) → modulus<u32> {
     redde x + y
 }
 ";
-    // TypeScript was de-gated in the S7-U6 sweep (TS4-1, matrix cell S) and
-    // no longer belongs in the reject loop; Go still gates modulus<W> (R).
-    const REJECTING_TARGETS: [Target; 1] = [Target::HirGo];
-    for target in REJECTING_TARGETS {
-        let result = test_support::compile_for_target_and_get_result(source, target);
-        assert!(!result.success(), "{target:?} unexpectedly accepted modular words");
-        assert!(
-            result.diagnostics.iter().any(|diagnostic| diagnostic
-                .args
-                .iter()
-                .any(|arg| arg.name == "issue" && arg.value == "modular_word_target_unsupported")),
-            "{target:?} diagnostics: {:?}",
-            result.diagnostics
-        );
-    }
-    // LLVM text and Wasm text lift the modular-word gate at their emit
-    // boundaries: `modulus<W>` lowers as an unsigned integral family there.
-    for target in [Target::MirLlvm, Target::MirWasm] {
+    // TypeScript was de-gated in the S7-U6 sweep (TS4-1) and Go lifted its
+    // wrapping gate in U6g (0d498f28c). LLVM text and Wasm text lift the
+    // modular-word gate at their emit boundaries: `modulus<W>` lowers as an
+    // unsigned integral family there.
+    for target in [Target::HirGo, Target::MirLlvm, Target::MirWasm] {
         let result = test_support::compile_for_target_and_get_result(source, target);
         assert!(result.success(), "{target:?} now emits modular words: {:?}", result.diagnostics);
     }
@@ -477,30 +464,12 @@ functio wordAdd(modulus<u32> value) → modulus<u32> {
 
 #[cfg(all(feature = "hir-go", feature = "mir-llvm", feature = "mir-wasm"))]
 #[test]
-fn unsupported_targets_reject_every_modular_width_with_stable_issue() {
+fn go_wasm_and_llvm_accept_every_modular_width() {
     const WIDTHS: [&str; 4] = ["u8", "u16", "u32", "u64"];
-    // TS4-1 lifted the TypeScript gate (matrix cell S); Go is the only
-    // remaining rejecting target, so this list is Go-only (cell R).
-    const REJECTING_TARGETS: [Target; 1] = [Target::HirGo];
-    for width in WIDTHS {
-        let source =
-            format!("functio add(modulus<{width}> x, modulus<{width}> y) → modulus<{width}> {{\n    redde x + y\n}}\n");
-        for target in REJECTING_TARGETS {
-            let result = test_support::compile_for_target_and_get_result(&source, target);
-            assert!(!result.success(), "{target:?} unexpectedly accepted modulus<{width}>");
-            assert!(
-                result.diagnostics.iter().any(|diagnostic| diagnostic
-                    .args
-                    .iter()
-                    .any(|arg| arg.name == "issue" && arg.value == "modular_word_target_unsupported")),
-                "{target:?} modulus<{width}> diagnostics: {:?}",
-                result.diagnostics
-            );
-        }
-    }
-    // Wasm text and LLVM text lower the whole modular-word family (Stage 3B
-    // B1 / llvm-host-parity emit boundary) as unsigned integral scalars.
-    for target in [Target::MirWasm, Target::MirLlvm] {
+    // Go lifted its gate in U6g (0d498f28c); Wasm text and LLVM text lower the
+    // whole modular-word family (Stage 3B B1 / llvm-host-parity emit boundary)
+    // as unsigned integral scalars.
+    for target in [Target::HirGo, Target::MirWasm, Target::MirLlvm] {
         for width in WIDTHS {
             let source = format!(
                 "functio add(modulus<{width}> x, modulus<{width}> y) → modulus<{width}> {{\n    redde x + y\n}}\n"
@@ -561,8 +530,9 @@ fn sexp_rejects_every_modular_width_and_names_the_width() {
     }
 }
 
+#[cfg(feature = "hir-go")]
 #[test]
-fn go_rejects_local_modular_words_before_emit() {
+fn go_accepts_local_modular_words_before_emit() {
     let source = r"
 incipit {
     fixum modulus<u32> max ← 4294967295
@@ -570,23 +540,10 @@ incipit {
     nota max + one
 }
 ";
-    // Go still gates modulus<W> before emit (matrix cell R); TypeScript was
-    // de-gated by TS4-1 and is covered by the accepting sibling below.
-    const REJECTING_TARGETS: [Target; 1] = [Target::HirGo];
-    for target in REJECTING_TARGETS {
-        let result = test_support::compile_for_target_and_get_result(source, target);
-        assert!(!result.success(), "{target:?} unexpectedly accepted modular words");
-        assert!(
-            result.diagnostics.iter().any(|diagnostic| {
-                diagnostic
-                    .args
-                    .iter()
-                    .any(|arg| arg.name == "issue" && arg.value == "modular_word_target_unsupported")
-            }),
-            "{target:?} diagnostics: {:?}",
-            result.diagnostics
-        );
-    }
+    // U6g (0d498f28c) lifted the Go gate; the same local modular-word program
+    // must now emit there, as it does for TypeScript below.
+    let result = test_support::compile_for_target_and_get_result(source, Target::HirGo);
+    assert!(result.success(), "Go diagnostics: {:?}", result.diagnostics);
 }
 
 #[cfg(feature = "hir-ts")]

@@ -103,7 +103,7 @@ incipit {{
     nota secundum?.data
     fixum status clausum ← t.fini()
     fixum scrinium<numerus> ∪ nihil post ← t.accipe()
-    nota post ≡ nihil
+    nota post ≡ nulla
 }}
 "#
     );
