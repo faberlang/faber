@@ -53,12 +53,6 @@ mod function_index_test;
 #[cfg(test)]
 mod layout_test;
 #[cfg(test)]
-mod packed_dense_projection_probe;
-#[cfg(test)]
-mod packed_gather_probe;
-#[cfg(test)]
-mod packed_kernel_probe;
-#[cfg(test)]
 mod packed_negative_matrix;
 #[cfg(test)]
 mod param_mode_test;

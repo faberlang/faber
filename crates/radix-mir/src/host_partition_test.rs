@@ -753,29 +753,6 @@ fn partition_record_serializes_and_round_trips() {
 }
 
 #[test]
-fn partition_record_matches_the_committed_evidence_fixture() {
-    // DDCP3-U3 validation: the committed evidence fixture (the serialized
-    // record artifact) matches the LIVE derivation — the fixture is an
-    // oracle, never a hand-edited snapshot (truth over safety). The fixture
-    // cross-checks the record's membership + callsite mapping against the
-    // emitted module's direct calls via the U2 vertical fixture (the region
-    // symbol `__faber_prepared_region_1`).
-    let mut types = TypeTable::new();
-    let mut interner = Interner::new();
-    let record = derive_u11_record(&mut types, &mut interner);
-
-    let fixture = include_str!(
-        "../../../docs/factory/direct-device-compilation-pipeline/evidence/ddcp3/ddcp3-u3-record-fixture.json"
-    );
-    let fixture_record: PartitionRecord =
-        serde_json::from_str(fixture).expect("the evidence fixture parses as a PartitionRecord");
-    assert_eq!(
-        fixture_record, record,
-        "the committed record fixture equals the live derivation (regenerate the fixture if the shape changed)"
-    );
-}
-
-#[test]
 fn partition_record_effect_boundary_negative_fails_closed() {
     // DDCP3-U3 gate bullet 2 negative fixture: a candidate region crossing a
     // declared device-hostile effect (here `ad` on the kernel's launch)

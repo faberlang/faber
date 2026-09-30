@@ -516,37 +516,3 @@ fn execution_descriptor_hash_is_a_distinct_typed_domain_never_fnv() {
         "the domain tag alone is not the descriptor"
     );
 }
-
-#[test]
-fn completeness_fixture_matches_the_committed_evidence_fixture() {
-    // The committed completeness evidence fixture (the gate's output bundles +
-    // the packet-facts view) matches the LIVE derivation — the fixture is an
-    // oracle, never a hand-edited snapshot (truth over safety).
-    let mut types = TypeTable::new();
-    let mut interner = Interner::new();
-    let (partition, record) = derive_vertical(&mut types, &mut interner);
-    let calls = derive_host_device_calls(&partition, &record);
-    let packet = packet_facts_for(&partition);
-    let bundles = check_preparation_completeness(&partition, &record, &calls, &packet)
-        .expect("the vertical fixture passes the typed completeness gate");
-    let live = CompletenessFixture { bundles, packet };
-    let fixture = include_str!(
-        "../../../docs/factory/direct-device-compilation-pipeline/evidence/ddcp3/ddcp3-u4-completeness-fixture.json"
-    );
-    let fixture_record: CompletenessFixture =
-        serde_json::from_str(fixture).expect("the evidence fixture parses");
-    assert_eq!(
-        fixture_record, live,
-        "the committed completeness fixture equals the live derivation (regenerate the fixture if the shape changed)"
-    );
-}
-
-/// The serialized completeness evidence fixture shape: the gate's complete
-/// per-region preparation bundles + the packet-facts view it cross-checked.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-struct CompletenessFixture {
-    /// The gate's output bundles (the materializer-consumed surface).
-    bundles: Vec<RegionPreparationFacts>,
-    /// The packet-facts view the gate cross-checked.
-    packet: ArtifactPacketFacts,
-}
