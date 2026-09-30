@@ -1698,6 +1698,20 @@ pub struct HirStoreSite {
     pub inferred_text: Option<Box<str>>,
 }
 
+impl HirStoreSite {
+    /// How a trap message names the inferring expression: its quoted source
+    /// text, else its byte range; `None` when the slot was not inferred.
+    /// Shared so every backend words the note like the runner.
+    #[must_use]
+    pub fn inferred_origin(&self) -> Option<String> {
+        let from = self.inferred_from?;
+        Some(self.inferred_text.as_deref().map_or_else(
+            || format!("the expression at bytes {}..{}", from.start, from.end),
+            |text| format!("`{text}`"),
+        ))
+    }
+}
+
 /// Conversion row resolved by typecheck for one `↦` site.
 ///
 /// Carried on the expression so every backend lowers the same decision; the
