@@ -389,63 +389,141 @@ impl TypeChecker<'_> {
         self.width_type(range::smallest_width(range))
     }
 
-    /// Whether an integer expression sits at the 64-bit cap with a range that
-    /// reaches past `i64::MAX` (`i64 + i64`, `-i64`, `i64 ⇐ n`, a `summa`). Its type is
-    /// `i64` but its value is not bounded by it, so a store into an `i64`
-    /// slot is a real check (ruling 17b) and cannot be omitted.
+    /// Whether an integer expression sits at the 64-bit cap with a value that
+    /// can reach past `i64::MAX` (`i64 + i64`, `-i64`, `i64 ⇐ n`, a `summa`,
+    /// or any of them nested or yielded by a conditional). Its type is `i64`
+    /// but its value is not bounded by it, so a store into an `i64` slot is a
+    /// real check (ruling 17b) and cannot be omitted.
     pub(super) fn exceeds_i64(&self, expr: &HirExpression, ty: TypeId) -> bool {
         if self.current_device_function || const_int_value(expr).is_some() {
             return false;
         }
-        let operand_range = |e: &HirExpression| {
-            let ty = e.ty?;
-            Self::operand_range(self.classify_operand(e, ty))
-        };
-        let result = match &expr.kind {
-            // A `summa` sits at the cap by ruling 21 (the element count is
-            // unbounded): a signed sum typed `i64` can exceed `i64::MAX`.
-            HirExpressionKind::Summa { .. } => {
-                return self.plain_int_width(ty) == Some(NumericWidth::I64);
-            }
-            HirExpressionKind::Binary(op, lhs, rhs) => operand_range(lhs)
-                .zip(operand_range(rhs))
-                .and_then(|(a, b)| Self::scalar_binary_range(*op, a, b)),
+        self.value_range(expr, Some(ty))
+            .is_some_and(|(_, hi)| hi > i128::from(i64::MAX))
+    }
+
+    /// The exact interval an integer expression can evaluate to. At the 64-bit
+    /// cap the expression's *type* is `i64` while its exact value is not
+    /// bounded by it (ruling 13), so the interval is computed from the value
+    /// ranges of the operands, recursively: only a leaf (a binding, field,
+    /// element, call result or converted value, each already checked at the
+    /// store that produced it) is bounded by its declared type. `None` when
+    /// the expression is not range-typed integer arithmetic.
+    fn value_range(&self, expr: &HirExpression, ty: Option<TypeId>) -> Option<IntRange> {
+        if let Some(value) = const_int_value(expr) {
+            return Some((value, value));
+        }
+        let ty = ty.or(expr.ty)?;
+        let leaf = || Self::operand_range(self.classify_operand(expr, ty));
+        match &expr.kind {
+            HirExpressionKind::Summa { .. } => Some(self.cap_or_declared(ty)),
+            HirExpressionKind::Binary(op, lhs, rhs) => Self::binary_value_range(
+                *op,
+                self.value_range(lhs, None)?,
+                self.value_range(rhs, None)?,
+            ),
             HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, operand) => {
-                operand_range(operand).map(range::neg)
+                self.value_range(operand, None).map(range::neg)
             }
-            // A signed `potentia` with a variable exponent sits at the cap.
-            HirExpressionKind::MethodCall(receiver, name, _, args, _) => {
-                // The `.summa()` method on a list or tensor is typed like the
-                // construct (ruling 21): at the cap, so the store checks.
-                let is_sum = args.is_empty()
-                    && self
-                        .interner
-                        .is_some_and(|interner| interner.resolve(*name) == "summa")
-                    && receiver.ty.is_some_and(|rty| {
-                        let peeled = self
-                            .types
-                            .peel_access_marker(self.resolve_inferred_type(rty))
-                            .1;
-                        matches!(self.types.get(peeled), Type::Array(_) | Type::Tensor(..))
-                    });
-                if is_sum {
-                    return self.plain_int_width(ty) == Some(NumericWidth::I64);
-                }
-                let is_power = self
-                    .interner
-                    .is_some_and(|interner| interner.resolve(*name) == "potentia");
-                if !is_power
-                    || args.len() != 1
-                    || const_int_value(&args[0].expr).is_some()
-                    || self.plain_int_width(ty) != Some(NumericWidth::I64)
-                {
-                    return false;
-                }
-                operand_range(receiver).map(range::pow_unbounded)
+            HirExpressionKind::Unary(radix_hir::HirUnOp::BitNot, operand) => {
+                self.value_range(operand, None).map(range::bit_not)
             }
+            HirExpressionKind::MethodCall(receiver, name, _, args, _) => self
+                .method_value_range(receiver, *name, args, ty)
+                .or_else(leaf),
+            HirExpressionKind::Block(block) => self.block_value_range(block).or_else(leaf),
+            HirExpressionKind::Si {
+                then_block,
+                else_block,
+                ..
+            } => {
+                let branches = std::iter::once(then_block).chain(else_block.as_ref());
+                self.hull_of(branches.map(|block| self.block_value_range(block)))
+                    .or_else(leaf)
+            }
+            HirExpressionKind::Discerne { arms, .. } => self
+                .hull_of(arms.iter().map(|arm| self.value_range(&arm.body, None)))
+                .or_else(leaf),
+            _ => leaf(),
+        }
+    }
+
+    /// The hull of the branch intervals; `None` as soon as one branch has no
+    /// integer interval (the caller then judges the whole by its declared type).
+    fn hull_of(&self, branches: impl Iterator<Item = Option<IntRange>>) -> Option<IntRange> {
+        let mut hull: Option<IntRange> = None;
+        for branch in branches {
+            let branch = branch?;
+            hull = Some(hull.map_or(branch, |seen| range::hull(seen, branch)));
+        }
+        hull
+    }
+
+    fn block_value_range(&self, block: &radix_hir::HirBlock) -> Option<IntRange> {
+        self.value_range(block.expr.as_deref()?, None)
+    }
+
+    /// An expression at the 64-bit cap whose exact bound is not known (a
+    /// `summa`, or `potentia` with a variable exponent): a signed `i64` reaches
+    /// anywhere in the single 64-bit range; any other width keeps its own.
+    fn cap_or_declared(&self, ty: TypeId) -> IntRange {
+        let anywhere = (i128::from(i64::MIN), i128::from(u64::MAX));
+        match self.plain_int_width(ty) {
+            Some(NumericWidth::I64) | None => anywhere,
+            Some(width) => width.integer_range().unwrap_or(anywhere),
+        }
+    }
+
+    /// Interval of a binary operator over operand intervals. `& | ^ >>` never
+    /// leave the 64-bit range when their operands sit inside it; an operand
+    /// beyond it lets the result go anywhere in the single 64-bit range.
+    fn binary_value_range(op: HirBinOp, a: IntRange, b: IntRange) -> Option<IntRange> {
+        if let Some(result) = Self::scalar_binary_range(op, a, b) {
+            return Some(result);
+        }
+        let signed = (i128::from(i64::MIN), i128::from(i64::MAX));
+        let within = |r: IntRange| signed.0 <= r.0 && r.1 <= signed.1;
+        let anywhere = (i128::from(i64::MIN), i128::from(u64::MAX));
+        match op {
+            HirBinOp::BitAnd => Some(range::bit_and(a, b)),
+            HirBinOp::BitOr | HirBinOp::BitXor => Some(if within(a) && within(b) {
+                signed
+            } else {
+                anywhere
+            }),
+            HirBinOp::Shr => Some((a.0.min(0), a.1.max(0))),
             _ => None,
-        };
-        result.is_some_and(|(_, hi)| hi > i128::from(i64::MAX))
+        }
+    }
+
+    /// Interval of the receiver methods whose result is not bounded by their
+    /// declared type: `summa` over a list or tensor (ruling 21) and `potentia`.
+    fn method_value_range(
+        &self,
+        receiver: &HirExpression,
+        name: Symbol,
+        args: &[radix_hir::HirCallArg],
+        ty: TypeId,
+    ) -> Option<IntRange> {
+        let name = self.interner?.resolve(name);
+        if name == "summa" && args.is_empty() {
+            let peeled = self
+                .types
+                .peel_access_marker(self.resolve_inferred_type(receiver.ty?))
+                .1;
+            return matches!(self.types.get(peeled), Type::Array(_) | Type::Tensor(..))
+                .then(|| self.cap_or_declared(ty));
+        }
+        if name != "potentia" || args.len() != 1 || self.plain_int_width(ty)? != NumericWidth::I64 {
+            return None;
+        }
+        let base = self.value_range(receiver, None)?;
+        Some(match const_int_value(&args[0].expr) {
+            Some(exponent) if (0..=range::MAX_CONST_EXPONENT).contains(&exponent) => {
+                range::pow_const(base, exponent)
+            }
+            _ => range::pow_unbounded(base),
+        })
     }
 
     /// Result type of `÷` (d11-6 rulings 15 and 23): an integer `÷` yields the

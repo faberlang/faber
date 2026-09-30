@@ -139,6 +139,9 @@ impl TypeChecker<'_> {
             if self.is_infer(slot_ty) && self.is_decimal_arithmetic(expr, ty) {
                 return self.wrap_implicit_store(expr, ty, ty, site);
             }
+            if self.is_infer(slot_ty) {
+                return self.capped_inferred_slot(expr, ty, site);
+            }
             return ty;
         }
         if let Some(ty) = self.constant_store(expr, slot_ty, site) {
@@ -391,7 +394,21 @@ impl TypeChecker<'_> {
             .is_some_and(|(_, slot)| slot.family == IntFamily::Plain);
         match self.saturating_origin(init) {
             Some(word) if is_arithmetic && plain => self.wrap_implicit_store(init, ty, word, site),
-            _ => ty,
+            _ => self.capped_inferred_slot(init, ty, site),
+        }
+    }
+
+    /// An inferred slot takes an `i64`-typed value at the 64-bit cap as `i64`,
+    /// so the declaration is the store that checks it (ruling 17b, ss6).
+    fn capped_inferred_slot(
+        &mut self,
+        init: &mut HirExpression,
+        ty: TypeId,
+        site: StoreSite,
+    ) -> TypeId {
+        match self.capped_store_target(init, ty, ty) {
+            Some(target) => self.wrap_implicit_store(init, ty, target, site),
+            None => ty,
         }
     }
 

@@ -222,6 +222,9 @@ mod ai_workbench_stage5_tests;
 #[path = "capability_test.rs"]
 mod capability_tests;
 #[cfg(test)]
+#[path = "capped_store_test.rs"]
+mod capped_store_tests;
+#[cfg(test)]
 #[path = "commune_stepper_test.rs"]
 mod commune_stepper_tests;
 #[cfg(test)]
