@@ -180,7 +180,15 @@ impl TypeChecker<'_> {
             return self.check_const_operand(expr);
         }
         let hint = self.numeric_expected_type(resolved);
-        self.check_expr_with_expected(expr, Some(hint))
+        // A constant beside a `saturating` peer is an exact number, not a
+        // value of the word: only the store clamps (ruling 3).
+        let saturating = self
+            .numeric_shape(resolved)
+            .is_some_and(|shape| shape.family == IntFamily::Saturating);
+        let saved = std::mem::replace(&mut self.saturating_exact_operand, saturating);
+        let ty = self.check_expr_with_expected(expr, Some(hint));
+        self.saturating_exact_operand = saved;
+        ty
     }
 
     fn classify_operand(&self, expr: &HirExpression, ty: TypeId) -> Operand {

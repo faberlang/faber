@@ -117,6 +117,23 @@ incipit {{
 }
 
 #[test]
+fn saturating_word_operand_constant_is_exact_and_only_the_store_clamps() {
+    // d11-6 ruling 3: `low - 300 + 100` is exact (-190) and clamps once, so a
+    // constant beside a saturating operand may exceed the word's range.
+    analysis_accepts(
+        r"
+incipit {
+    fixum saturatus<u8> low ← 10
+    fixum saturatus<u8> a ← low - 300 + 100
+    fixum saturatus<u8> b ← low + 300
+    nota a
+    nota b
+}
+",
+    );
+}
+
+#[test]
 fn saturating_word_signed_negative_literal_adapts() {
     analysis_accepts(
         r"
@@ -227,6 +244,34 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn saturating_word_rust_codegen_clamps_with_saturating_methods() {
+    // A single operation over in-range leaves clamps through the native
+    // method; its exact result and its clamp are the same value.
+    let result = Compiler::new(Config::default().with_target(Target::HirRust)).compile_str(
+        "test.fab",
+        r"
+functio add(saturatus<i16> x, saturatus<i16> y) → saturatus<i16> {
+    redde x + y
+}
+functio neg(saturatus<i16> x) → saturatus<i16> {
+    redde -x
+}
+",
+    );
+    assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
+    let Some(crate::Output::Rust(output)) = result.output else {
+        panic!("expected Rust output")
+    };
+    for needle in ["i16::saturating_add", "i16::saturating_neg"] {
+        assert!(output.code.contains(needle), "missing {needle}:\n{}", output.code);
+    }
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn saturating_word_rust_codegen_clamps_a_chain_once_at_its_root() {
+    // d11-6 ruling 3 (U9): a chain is exact `i128` arithmetic with one clamp,
+    // never a saturating method per step. This replaces the pre-U9 pin of
+    // `i16::saturating_{add,sub,mul,neg}` on `-((x + y) - (x * y))`.
     let result = Compiler::new(Config::default().with_target(Target::HirRust)).compile_str(
         "test.fab",
         r"
@@ -239,12 +284,18 @@ functio mix(saturatus<i16> x, saturatus<i16> y) → saturatus<i16> {
     let Some(crate::Output::Rust(output)) = result.output else {
         panic!("expected Rust output")
     };
-    for needle in [
-        "i16::saturating_add",
-        "i16::saturating_sub",
-        "i16::saturating_mul",
-        "i16::saturating_neg",
-    ] {
-        assert!(output.code.contains(needle), "missing {needle}:\n{}", output.code);
+    assert!(
+        output
+            .code
+            .contains(".clamp(i128::from(i16::MIN), i128::from(i16::MAX))"),
+        "missing the single store clamp:\n{}",
+        output.code
+    );
+    for per_step in ["saturating_add", "saturating_sub", "saturating_mul", "saturating_neg"] {
+        assert!(
+            !output.code.contains(per_step),
+            "per-step {per_step} must not appear:\n{}",
+            output.code
+        );
     }
 }

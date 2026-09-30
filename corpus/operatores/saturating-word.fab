@@ -17,7 +17,10 @@ locale = "en"
 #   • Clamp contract — `saturating<W>` never traps or wraps on overflow; a result
 #     past either end of `W` stays at that end (pixels, audio, levels).
 #   • Signed or unsigned — `saturating<i16>` clamps at −32768 and 32767.
-#   • Literals adapt to the saturating width; a literal outside it is an error.
+#   • Clamp once, at the store — a chain is computed exactly and clamps where the
+#     value lands: `high + 200 - 100` is 255 (exact 350), not 155.
+#   • A constant beside a saturating operand is an exact number, so
+#     `low - 300 + 100` is 0 (exact −190); only the store clamps.
 #
 # Common mistakes:
 #   • Mixing families — `saturating<u8> + int<u8>` is an error; convert with `↦`.
@@ -53,4 +56,19 @@ main {
     print fromInt
     print back
     print high ≻ low
+    # Chains clamp once, at the store.
+    const saturating<u8> chainUp ← high + 200 - 100
+    const saturating<u8> chainDown ← low - 300 + 100
+    const saturating<u8> chainExact ← high * 2 / 4
+    const saturating<u8> wide ← 200
+    const saturating<u8> chainFits ← wide * 2 / 4
+    const saturating<u8> chainRound ← low - wide - wide + wide + wide
+    print chainUp
+    print chainDown
+    print chainExact
+    print chainFits
+    print chainRound
+    var saturating<u8> acc ← 200
+    acc ← acc + 100 - 50
+    print acc
 }

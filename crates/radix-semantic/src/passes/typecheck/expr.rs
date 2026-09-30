@@ -204,6 +204,7 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         let saved_pending_conversion = self.pending_conversion.take();
         let store = self.pending_store.take();
+        let saturating_source = std::mem::take(&mut self.saturating_root_source);
         let ty = match &mut expr.kind {
             HirExpressionKind::Path(def_id) => self.check_path(*def_id, expr.span),
             HirExpressionKind::Literal(lit) => {
@@ -441,7 +442,9 @@ impl TypeChecker<'_> {
                 implicit: Some(_),
                 ..
             } => {
+                self.saturating_root_source = self.is_saturating_arithmetic(source, *slot);
                 self.check_expr(source);
+                self.saturating_root_source = false;
                 *slot
             }
             HirExpressionKind::Conversio {
@@ -632,6 +635,7 @@ impl TypeChecker<'_> {
             }
         };
 
+        let ty = self.saturating_arithmetic_root(expr, ty, saturating_source);
         let ty = match (expected, store) {
             // Ruling 16: an integer quotient cannot land in a float slot; the
             // help points at `÷`, which divides integers into an `f64`.

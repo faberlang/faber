@@ -81,6 +81,51 @@ incipit {
 }
 
 #[test]
+fn saturating_chain_clamps_once_at_the_store() {
+    // d11-6 ruling 3: computed exactly, clamped when the value lands. Per-step
+    // clamping (the pre-U9 behaviour) gave 155, 100, 63.
+    let lines = run_lines(
+        r"
+incipit {
+    fixum saturatus<u8> x ← 250
+    fixum saturatus<u8> small ← 10
+    fixum saturatus<u8> wide ← 200
+    fixum saturatus<u8> up ← x + 200 - 100
+    fixum saturatus<u8> down ← small - 300 + 100
+    fixum saturatus<u8> quotient ← wide * 2 / 4
+    fixum saturatus<u8> fits ← x + x - x
+    fixum saturatus<u8> long ← small - wide - wide + wide + wide
+    nota up
+    nota down
+    nota quotient
+    nota fits
+    nota long
+}
+",
+    );
+    assert_eq!(lines, vec!["255", "0", "100", "250", "10"]);
+}
+
+#[test]
+fn saturating_chain_in_a_reassignment_and_signed_width_clamps_once() {
+    let lines = run_lines(
+        r"
+incipit {
+    varia saturatus<u8> level ← 200
+    level ← level + 100 - 50
+    nota level
+    fixum saturatus<i8> low ← -100
+    fixum saturatus<i8> same ← low - 100 + 100
+    fixum saturatus<i8> top ← -low * 3 / 2
+    nota same
+    nota top
+}
+",
+    );
+    assert_eq!(lines, vec!["250", "-100", "127"]);
+}
+
+#[test]
 fn saturating_64_bit_widths_clamp_exactly() {
     let lines = run_lines(
         r"

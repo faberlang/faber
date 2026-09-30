@@ -542,8 +542,9 @@ impl TypeChecker<'_> {
                 } else if let Type::SaturatingWord(width) = self.types.get(literal_ty) {
                     // D11.1: a literal adapts to the saturating width and must
                     // fit it; clamping applies to arithmetic, never to spelling.
-                    let in_range = crate::numeric_width::integer_width_max(*width)
-                        .is_some_and(|max| *value <= max);
+                    let in_range = self.saturating_exact_operand
+                        || crate::numeric_width::integer_width_max(*width)
+                            .is_some_and(|max| *value <= max);
                     if !in_range {
                         self.error_issue(
                             SemanticErrorKind::TypeMismatch,

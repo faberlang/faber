@@ -311,7 +311,7 @@ impl TypeChecker<'_> {
     }
 
     /// Replace `expr` by an implicit store node targeting `target`.
-    fn wrap_implicit_store(
+    pub(super) fn wrap_implicit_store(
         &mut self,
         expr: &mut HirExpression,
         source_ty: TypeId,
@@ -339,5 +339,128 @@ impl TypeChecker<'_> {
         };
         expr.ty = Some(target);
         target
+    }
+}
+
+/// Whether an expression is a `saturating` arithmetic operator node.
+fn is_arithmetic_node(expr: &HirExpression) -> bool {
+    match &expr.kind {
+        HirExpressionKind::Binary(op, ..) => matches!(
+            op,
+            radix_hir::HirBinOp::Add
+                | radix_hir::HirBinOp::Sub
+                | radix_hir::HirBinOp::Mul
+                | radix_hir::HirBinOp::Div
+                | radix_hir::HirBinOp::Mod
+        ),
+        HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, _) => true,
+        _ => false,
+    }
+}
+
+impl TypeChecker<'_> {
+    /// Whether `slot` is a `saturating` word and `source` an arithmetic node:
+    /// the shape of a saturating root store node.
+    pub(super) fn is_saturating_arithmetic(&self, source: &HirExpression, slot: TypeId) -> bool {
+        is_arithmetic_node(source)
+            && self
+                .store_int_slot(slot)
+                .is_some_and(|(_, slot)| slot.family == IntFamily::Saturating)
+    }
+
+    /// Whether `expr` is a `saturating` arithmetic node (bare, or already
+    /// wrapped in its root store node).
+    fn is_saturating_tree(&self, expr: &HirExpression) -> bool {
+        let node = match &expr.kind {
+            HirExpressionKind::Conversio {
+                source,
+                implicit: Some(_),
+                ..
+            } => source,
+            _ => expr,
+        };
+        is_arithmetic_node(node)
+            && expr
+                .ty
+                .and_then(|ty| self.store_int_slot(ty))
+                .is_some_and(|(_, slot)| slot.family == IntFamily::Saturating)
+    }
+
+    /// d11-6 ruling 3: a `saturating<W>` expression is computed exactly and
+    /// clamped once, where the value lands. A tree of arithmetic nodes (or a
+    /// node with a constant outside `W`) is retyped `int` (exact, ruling 17)
+    /// and its root is wrapped in one implicit store node into
+    /// `saturating<W>`, which clamps. A wrapped child is unwrapped again when
+    /// its parent is also saturating arithmetic, so a chain clamps once, at
+    /// its root. A single operation over in-range leaves is already exact
+    /// until its own clamp and stays as it is.
+    ///
+    /// `source` is set when `expr` is already the source of such a node (a
+    /// re-check): its children are unwrapped and it stays `int`.
+    pub(super) fn saturating_arithmetic_root(
+        &mut self,
+        expr: &mut HirExpression,
+        ty: TypeId,
+        source: bool,
+    ) -> TypeId {
+        if self.current_device_function || !is_arithmetic_node(expr) {
+            return ty;
+        }
+        let Some((word, slot)) = self.store_int_slot(ty) else {
+            return ty;
+        };
+        if slot.family != IntFamily::Saturating {
+            return ty;
+        }
+        let children: Vec<&HirExpression> = match &expr.kind {
+            HirExpressionKind::Binary(_, lhs, rhs) => vec![lhs, rhs],
+            HirExpressionKind::Unary(_, operand) => vec![operand],
+            _ => Vec::new(),
+        };
+        let exact_operands = children.iter().any(|child| {
+            self.is_saturating_tree(child)
+                || const_int_value(child).is_some_and(|value| !slot.holds(value))
+        });
+        if !exact_operands && !source {
+            return ty;
+        }
+        let exact = self.numerus_type();
+        match &mut expr.kind {
+            HirExpressionKind::Binary(_, lhs, rhs) => {
+                self.unwrap_saturating_tree(lhs, exact);
+                self.unwrap_saturating_tree(rhs, exact);
+            }
+            HirExpressionKind::Unary(_, operand) => self.unwrap_saturating_tree(operand, exact),
+            _ => {}
+        }
+        if source {
+            return exact;
+        }
+        let site = StoreSite::new(HirStoreKind::Declaration);
+        self.wrap_implicit_store(expr, exact, word, site)
+    }
+
+    /// Turn a saturating child into its exact arithmetic: a root store node is
+    /// replaced by the node it wraps, and a bare node is retyped `int`.
+    fn unwrap_saturating_tree(&self, expr: &mut HirExpression, exact: TypeId) {
+        if !self.is_saturating_tree(expr) {
+            return;
+        }
+        if let HirExpressionKind::Conversio {
+            source,
+            implicit: Some(_),
+            ..
+        } = &mut expr.kind
+        {
+            let placeholder = HirExpression {
+                id: source.id,
+                kind: HirExpressionKind::Error,
+                ty: None,
+                span: source.span,
+            };
+            let inner = std::mem::replace(&mut **source, placeholder);
+            *expr = inner;
+        }
+        expr.ty = Some(exact);
     }
 }

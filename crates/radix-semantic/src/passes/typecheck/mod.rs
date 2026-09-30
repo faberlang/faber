@@ -323,6 +323,12 @@ pub(crate) struct TypeChecker<'a> {
     /// consumed by the next `check_expr_with_expected` so only that node, not
     /// its operands, is treated as landing in the slot.
     pending_store: Option<store::StoreSite>,
+    /// The next checked expression is the source of a saturating root store
+    /// node the checker itself built (re-check must not wrap it again).
+    saturating_root_source: bool,
+    /// A constant operand beside a `saturating` peer is an exact number: its
+    /// range is not the word's (d11-6 ruling 3).
+    saturating_exact_operand: bool,
 
     /// For a local whose type was inferred (`_`): the span of the expression
     /// the type came from, named by an implicit store's trap (ruling 19(i)).
@@ -592,6 +598,8 @@ impl<'a> TypeChecker<'a> {
             current_generic_bounds: FxHashMap::default(),
             next_hir_id: u32::MAX / 2,
             pending_store: None,
+            saturating_root_source: false,
+            saturating_exact_operand: false,
             inferred_slot_sources: FxHashMap::default(),
             compile_time_locals: FxHashSet::default(),
             alias_type_params: FxHashMap::default(),
