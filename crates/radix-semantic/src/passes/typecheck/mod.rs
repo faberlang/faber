@@ -103,6 +103,9 @@ mod field_modifier_write_test;
 #[cfg(test)]
 #[path = "fieldless_type_access_test.rs"]
 mod fieldless_type_access_test;
+#[cfg(test)]
+#[path = "mutating_intrinsic_test.rs"]
+mod mutating_intrinsic_test;
 
 mod closing;
 #[cfg(test)]

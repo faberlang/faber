@@ -47,7 +47,7 @@ main {
 
     # the ex binder receives each value, never the key — collect then sort,
     # since tabula order is unspecified (D19.2)
-    const list<int> valores ← empty
+    var list<int> valores ← empty
     for from puncta const v {
         valores.append(v)
     }

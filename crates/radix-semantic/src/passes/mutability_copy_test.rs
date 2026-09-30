@@ -12,7 +12,7 @@ fn copy_bind_is_independent_and_source_stays_live() {
         r"
 incipit {
     fixum lista<numerus> source ← [1, 2, 3]
-    fixum copy lista<numerus> copied ← source
+    varia copy lista<numerus> copied ← source
     copied.appende(4)
     nota source.longitudo()
 }
@@ -39,7 +39,8 @@ fn copy_parameter_entry_leaves_caller_source_live() {
     let _ = analyze_ok(
         r"
 functio append(copy lista<numerus> xs) → vacuum {
-    xs.appende(4)
+    varia copy lista<numerus> local ← xs
+    local.appende(4)
 }
 incipit {
     fixum own lista<numerus> source ← [1, 2, 3]

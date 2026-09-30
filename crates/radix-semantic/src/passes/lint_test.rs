@@ -390,11 +390,11 @@ fn numerus(types: &mut TypeTable) -> TypeId {
     types.primitive(Primitive::Numerus)
 }
 
-// D16.4(2): WARN013 means "never reassigned". `fixum` is shallow
-// (mutability-engine D-1), so a list that is only appended to could be `fixum`.
+// A mutating intrinsic (`appende`) rewrites the list in place and typecheck
+// rejects it on an immutable binding receiver, so the `varia` stays necessary.
 #[test]
-fn warns_on_varia_list_only_appended() {
-    assert!(varia_local_warns_after_method_call(
+fn does_not_warn_on_varia_list_only_appended() {
+    assert!(!varia_local_warns_after_method_call(
         "appende",
         lista_numerus
     ));

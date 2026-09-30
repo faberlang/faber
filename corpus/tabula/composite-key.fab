@@ -45,7 +45,7 @@ main {
     print sales[[east, 2024]]
     print sales[["west", 2024]]
     print sales.length()
-    const list<string> rows ← empty
+    var list<string> rows ← empty
     for from sales at [region, year] const total {
         rows.append("§/§=§"(region, year, total))
     }

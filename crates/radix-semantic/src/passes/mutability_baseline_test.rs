@@ -1,20 +1,23 @@
 //! MU-1 unmarked-semantics invariant pins (D-1, D-8).
 //!
-//! These tests lock today's behavior: shallow const, alias-on-bind,
-//! const→mut mutation, and unmarked-param mutation. Every later mutability
-//! unit keeps these green.
+//! These tests lock the unmarked laws: alias-on-bind, const→mut mutation, and
+//! param mutation through `in`. The tcs1 language decision narrows D-1's
+//! shallow law for the binding form: an in-place mutating intrinsic on an
+//! immutable binding is a reassignment-class error, so the old shallow-const
+//! pin now asserts the rejection.
 
-use crate::test_support::analyze_ok;
+use crate::test_support::{analyze_ok, assert_rejects_with_issue};
 
 #[test]
-fn baseline_shallow_const_list_append_is_legal() {
-    let _ = analyze_ok(
+fn baseline_const_list_in_place_append_requires_varia() {
+    assert_rejects_with_issue(
         r"
 incipit {
     fixum lista<numerus> xs ← vacua
     xs.appende(4)
 }
 ",
+        "imperativus_operator_method_requires_varia_receiver",
     );
 }
 
@@ -23,8 +26,8 @@ fn baseline_alias_on_bind_is_legal() {
     let _ = analyze_ok(
         r"
 incipit {
-    fixum lista<numerus> a ← [1, 2, 3]
-    fixum lista<numerus> b ← a
+    varia lista<numerus> a ← [1, 2, 3]
+    varia lista<numerus> b ← a
     b.appende(4)
     nota a.longitudo()
 }
@@ -49,18 +52,17 @@ incipit {
 }
 
 #[test]
-fn baseline_unmarked_param_mutation_is_legal() {
-    let _ = analyze_ok(
+fn baseline_unmarked_param_in_place_mutation_requires_in_mode() {
+    // An unmarked parameter is a write-once binding, so its in-place mutation
+    // is rejected like any immutable binding; `in` mode alone carries the
+    // mutation right (no access marker needed).
+    assert_rejects_with_issue(
         r"
 functio poke(lista<numerus> xs) → vacuum {
     xs.appende(4)
 }
-incipit {
-    fixum lista<numerus> a ← [1, 2, 3]
-    poke(a)
-    nota a.longitudo()
-}
 ",
+        "imperativus_operator_method_requires_varia_receiver",
     );
 }
 

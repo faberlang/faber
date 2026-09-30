@@ -64,8 +64,9 @@ class Tabula {
 }
 
 main {
-    # A construction literal may set private fields
-    var Tabula t ← Tabula { summa = 0, numerus = 0, nomen = "gradus" }
+    # A construction literal may set private fields; the binding stays const
+    # because `adde` mutates fields through the shallow call law
+    const Tabula t ← Tabula { summa = 0, numerus = 0, nomen = "gradus" }
     t.adde(4)
     t.adde(8)
     print t.totum()

@@ -233,8 +233,8 @@ fn unmarked_alias_on_bind_stays_legal() {
     let _ = analyze_ok(
         r"
 incipit {
-    fixum lista<numerus> a ← [1, 2, 3]
-    fixum lista<numerus> b ← a
+    varia lista<numerus> a ← [1, 2, 3]
+    varia lista<numerus> b ← a
     b.appende(4)
     nota a.longitudo()
 }

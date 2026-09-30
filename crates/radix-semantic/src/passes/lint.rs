@@ -34,9 +34,7 @@ use radix_hir::{
     HirBinOp, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirImport, HirItem,
     HirItemKind, HirLiteral, HirLocal, HirModule, HirParam, HirStatement, HirStatementKind,
 };
-use radix_intrinsics::{
-    IntrinsicReturnKind, is_numeric_imperativus_operator, lookup_method_for_type,
-};
+use radix_intrinsics::{is_mutating_receiver, lookup_method_for_type};
 use radix_lexer::{Interner, Span};
 use rustc_hash::FxHashSet;
 
@@ -436,21 +434,17 @@ impl<'a> LintContext<'a> {
     }
 
     /// D16.4(2): WARN013 means "never reassigned". `fixum` is shallow
-    /// (mutability-engine D-1), so a mutating method on the receiver — a list
-    /// `appende`, a user method writing `ego` — is legal on a `fixum` local and
-    /// does not count. The one method form that rewrites the binding's own
-    /// value is a `Vacuum`-returning numeric imperativus (`n.adde(1)`), which
-    /// typecheck rejects on a `fixum` receiver.
+    /// (mutability-engine D-1), so a user method writing `ego` is legal on a
+    /// `fixum` local and does not count. A mutating intrinsic
+    /// (`is_mutating_receiver`) rewrites the receiver's contents in place and
+    /// typecheck rejects it on an immutable binding receiver, so it counts as
+    /// a reassignment (`n.adde(1)`, `xs.appende(3)`, `xs.ordina()`).
     fn mark_receiver_reassigned_if_needed(
         &mut self,
         receiver: &HirExpression,
         method: radix_lexer::Symbol,
         arg_count: usize,
     ) {
-        let method_name = self.interner.resolve(method);
-        if !is_numeric_imperativus_operator(method_name) {
-            return;
-        }
         let Some(def_id) = root_place_def_id(receiver) else {
             return;
         };
@@ -458,13 +452,13 @@ impl<'a> LintContext<'a> {
             return;
         }
 
-        // Unknown receiver type or intrinsic: stay conservative and treat the
-        // imperativus name as a reassignment, so WARN013 never suggests a
-        // `fixum` that typecheck would reject.
+        // Keyed on the same registry predicate typecheck rejects with, so the
+        // lint never suggests a `fixum` the typechecker would refuse.
+        let method_name = self.interner.resolve(method);
         let reassigns = receiver
             .ty
             .and_then(|ty| lookup_method_for_type(self.types.get(ty), method_name, arg_count))
-            .is_none_or(|intrinsic| intrinsic.return_kind == IntrinsicReturnKind::Vacuum);
+            .is_some_and(is_mutating_receiver);
         if reassigns {
             self.mutated.insert(def_id);
         }
