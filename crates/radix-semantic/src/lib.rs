@@ -660,8 +660,9 @@ pub fn analyze_with_cli(
     // Kernel legality (gpu-reset rule 12) reads the typed HIR before any AIR
     // rewrite reshapes it, and only when typecheck left types it can trust.
     if !diagnostics.iter().any(SemanticError::is_error) {
-        diagnostics
-            .extend(passes::kernel_legality::check(&hir, &resolver, &types, interner).errors);
+        let legality = passes::kernel_legality::check(&hir, &resolver, &types, interner);
+        diagnostics.extend(legality.errors);
+        diagnostics.extend(legality.warnings);
     }
     // Concrete generic AIR instances must exist before named unroll: symbolic
     // templates remain source/FHIR facts, while their reachable concrete clones

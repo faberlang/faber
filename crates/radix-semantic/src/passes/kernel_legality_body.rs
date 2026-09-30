@@ -8,11 +8,12 @@
 
 use super::fragment_definition::struct_def_from_type;
 use super::kernel_legality::{
-    Env, ISSUE_ASYNC, ISSUE_HOST_CALL, ISSUE_HOST_EFFECT, ISSUE_HOST_TYPE, ISSUE_PRIVATE_HOST_CALL,
-    ISSUE_RAW_LANE_ID, ISSUE_RECOVERY, ISSUE_WORKGROUP, Sink,
+    Env, ISSUE_ASYNC, ISSUE_HOST_CALL, ISSUE_HOST_EFFECT, ISSUE_HOST_TYPE,
+    ISSUE_POSITIONAL_LANE_PARAM, ISSUE_PRIVATE_HOST_CALL, ISSUE_RAW_LANE_ID,
+    ISSUE_RAW_LANE_ID_PARAM, ISSUE_RECOVERY, ISSUE_WORKGROUP, Sink,
 };
 use super::kernel_legality_types::{FAMILY_ATOMIC, host_only_family};
-use crate::{SymbolKind, Type, TypeId};
+use crate::{NumericWidth, Primitive, SymbolKind, Type, TypeId, WarningKind};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local};
 use radix_hir::{
     DefId, HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirLocal,
@@ -20,6 +21,7 @@ use radix_hir::{
 };
 use radix_lexer::{Span, Symbol};
 use radix_syntax::ClosureModifier;
+use radix_types::MirKernelBuiltin;
 
 /// Check one `@ nucleum` definition. Returns the kernels it calls, for the
 /// recursion facts.
@@ -98,6 +100,48 @@ impl KernelWalk<'_, '_> {
         }
         if let Some(ret) = function.ret_ty {
             self.check_type(ret, self.function_span, "return");
+        }
+        self.check_lane_parameters(function);
+    }
+
+    /// Lane-id plumbing in the signature (gpu-reset rule 12.5). A parameter
+    /// named after a thread-id builtin is the raw lane id under another
+    /// spelling and is rejected. A positional trailing `u32` of any other name
+    /// is still the compiler-bound lane (the `[inputs.., output, index]` ABI in
+    /// `radix-mir`): it warns until `filum` replaces the positional form.
+    fn check_lane_parameters(&mut self, function: &HirFunction) {
+        for param in &function.params {
+            let name = self.env.interner.resolve(param.name);
+            if let Some(builtin) = MirKernelBuiltin::from_spelling(name) {
+                self.sink.report(
+                    ISSUE_RAW_LANE_ID_PARAM,
+                    param.span,
+                    &[("builtin", builtin.spelling()), ("parameter", name)],
+                );
+            }
+        }
+        let returns_value = function.ret_ty.is_some_and(|ty| {
+            !matches!(self.env.types.get(ty), Type::Primitive(Primitive::Vacuum))
+        });
+        if returns_value || function.params.len() < 3 {
+            return;
+        }
+        let Some(last) = function.params.last() else {
+            return;
+        };
+        let name = self.env.interner.resolve(last.name);
+        let is_u32 = matches!(
+            self.env.types.get(last.ty),
+            Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32)
+        );
+        if is_u32 && MirKernelBuiltin::from_spelling(name).is_none() {
+            let kernel = self.env.interner.resolve(function.name);
+            self.sink.warn(
+                WarningKind::PositionalLaneParam,
+                ISSUE_POSITIONAL_LANE_PARAM,
+                last.span,
+                &[("kernel", kernel), ("parameter", name)],
+            );
         }
     }
 

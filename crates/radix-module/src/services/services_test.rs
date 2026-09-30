@@ -1249,40 +1249,35 @@ functio copy(tf32[4] input, tf32[4] output, u32 id) → vacuum {
 }
 
 #[test]
-fn gpu_builtin_emit_reflection_json_serializes_compiler_bound_builtins() {
-    // The builtins are bound by the compiler from trailing parameters; no user
-    // call is written (a thread-id call is a raw lane id, gpu-reset rule 12.5),
-    // so nothing is reported as a called builtin.
+fn gpu_builtin_named_parameters_are_rejected_as_raw_lane_ids() {
+    // A trailing parameter named after a thread-id builtin is a raw lane id
+    // under another spelling (gpu-reset rule 12.5). The compiler still binds
+    // its own builtin inputs, but only for legal parameter names.
     let source = r"
 @ nucleum
 @ publica
 functio copy(tensor<u32, [4]> input, tensor<u32, [4]> output, u32 global_invocation_x, u32 workgroup_id_y) → vacuum {
-    output[global_invocation_x] ← input[global_invocation_x] + workgroup_id_y
+    output[global_invocation_x] ← input[global_invocation_x]
 }
 ";
     let result = compile_cli_source("main.fab", source, crate::codegen::Target::MirWgsl);
 
-    assert!(result.success(), "{:?}", result.diagnostics);
-    let output = result.output.expect("wgsl output");
-    let json = output_reflection_json(&output)
-        .expect("serialize GPU reflection JSON")
-        .expect("GPU reflection JSON");
-
-    assert!(json.contains(r#""called_builtins""#), "{json}");
-    let reflection: serde_json::Value = serde_json::from_str(&json).expect("reflection JSON");
-    let kernel = &reflection["kernels"][0];
-    assert_eq!(kernel["builtin_inputs"][0]["builtin"], serde_json::json!("global_invocation_x"));
-    assert_eq!(kernel["builtin_inputs"][1]["builtin"], serde_json::json!("workgroup_id_y"));
-    assert_eq!(kernel["called_builtins"], serde_json::json!([]));
-    assert_eq!(
-        kernel["launch"]["builtin_inputs"][0]["builtin"],
-        serde_json::json!("global_invocation_x")
-    );
-    assert_eq!(
-        kernel["launch"]["required_builtins"],
-        serde_json::json!(["global_invocation_x", "workgroup_id_y"])
-    );
-    assert_eq!(kernel["launch"]["called_builtins"], serde_json::json!([]));
+    assert!(!result.success(), "{:?}", result.diagnostics);
+    for parameter in ["global_invocation_x", "workgroup_id_y"] {
+        assert!(
+            result.diagnostics.iter().any(|diagnostic| {
+                diagnostic.issue() == Some("nucleum_raw_lane_id_param")
+                    && diagnostic
+                        .args
+                        .contains(&crate::diagnostics::DiagnosticArg::new("parameter", parameter))
+                    && diagnostic
+                        .args
+                        .contains(&crate::diagnostics::DiagnosticArg::new("builtin", parameter))
+            }),
+            "{parameter}: {:?}",
+            result.diagnostics
+        );
+    }
 }
 
 #[test]

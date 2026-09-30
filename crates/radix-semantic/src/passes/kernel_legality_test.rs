@@ -599,6 +599,118 @@ fn no_user_code_accepts_a_thread_id_builtin() {
     }
 }
 
+const RAW_LANE_ID_PARAM: &str = "nucleum_raw_lane_id_param";
+const POSITIONAL_LANE_PARAM: &str = "positional_lane_param";
+
+fn lane_warnings(source: &str) -> Vec<SemanticError> {
+    analyze_source(source)
+        .diagnostics
+        .iter()
+        .filter(|err| !err.is_error() && err.issue() == Some(POSITIONAL_LANE_PARAM))
+        .cloned()
+        .collect()
+}
+
+#[test]
+fn a_kernel_parameter_named_after_every_thread_id_builtin_is_rejected() {
+    for builtin in radix_types::MirKernelBuiltin::ALL {
+        let ty = if builtin.returns_vector() {
+            "vector<u32, 3>"
+        } else {
+            "u32"
+        };
+        let source = format!(
+            "@ nucleum\n@ publica\nfunctio k(tensor<u32, [4]> input, tensor<u32, [4]> output, {ty} {}) → vacuum {{\n}}\n",
+            builtin.spelling()
+        );
+        let err = expect_kernel_error(
+            &source,
+            RAW_LANE_ID_PARAM,
+            &[
+                ("builtin", builtin.spelling()),
+                ("parameter", builtin.spelling()),
+            ],
+        );
+        assert_eq!(err.kind, SemanticErrorKind::LoweringError);
+    }
+}
+
+#[test]
+fn a_builtin_named_parameter_anywhere_in_the_list_is_rejected() {
+    expect_kernel_error(
+        r"
+@ nucleum
+@ publica
+functio k(tensor<u32, [4]> input, u32 workgroup_id_y, tensor<u32, [4]> output) → vacuum {
+}
+",
+        RAW_LANE_ID_PARAM,
+        &[
+            ("builtin", "workgroup_id_y"),
+            ("parameter", "workgroup_id_y"),
+        ],
+    );
+}
+
+#[test]
+fn a_builtin_named_parameter_is_not_also_warned_as_positional() {
+    let source = r"
+@ nucleum
+@ publica
+functio k(tensor<u32, [4]> input, tensor<u32, [4]> output, u32 global_invocation_x) → vacuum {
+}
+";
+    assert!(lane_warnings(source).is_empty());
+}
+
+#[test]
+fn a_positional_trailing_u32_lane_parameter_of_any_name_warns() {
+    for name in ["id", "i", "lane", "anything_at_all"] {
+        let source = format!(
+            "@ nucleum\n@ publica\nfunctio copy(tensor<u32, [4]> input, tensor<u32, [4]> output, u32 {name}) → vacuum {{\n    output[{name}] ← input[{name}]\n}}\n"
+        );
+        let warnings = lane_warnings(&source);
+        assert_eq!(warnings.len(), 1, "{name}: {warnings:?}");
+        assert_eq!(arg(&warnings[0], "parameter"), Some(name));
+        assert_eq!(arg(&warnings[0], "kernel"), Some("copy"));
+        assert_eq!(
+            warnings[0].kind,
+            SemanticErrorKind::Warning(crate::WarningKind::PositionalLaneParam)
+        );
+        // A warning never fails the analysis.
+        assert!(analyze_source(&source).is_ok(), "{name}");
+    }
+}
+
+#[test]
+fn a_trailing_u32_that_is_not_a_lane_does_not_warn() {
+    // A value-returning kernel takes its trailing `u32` as an ordinary input.
+    let returning = r"
+@ nucleum
+@ publica
+functio scale(tensor<u32, [4]> input, tensor<u32, [4]> other, u32 n) → u32 {
+    redde n
+}
+";
+    assert!(lane_warnings(returning).is_empty());
+    // Two parameters cannot be `inputs.., output, index`.
+    let short = r"
+@ nucleum
+@ publica
+functio bump(tensor<u32, [4]> output, u32 n) → vacuum {
+}
+";
+    assert!(lane_warnings(short).is_empty());
+    // A non-`u32` trailing parameter is not a lane.
+    let wide = r"
+@ nucleum
+@ publica
+functio k(tensor<u32, [4]> input, tensor<u32, [4]> output, i32 n) → vacuum {
+}
+";
+    assert!(lane_warnings(wide).is_empty());
+}
+
 #[test]
 fn a_compiler_bound_lane_parameter_is_unaffected() {
     // The lane parameter is how the compiler itself binds a builtin input: no

@@ -260,6 +260,11 @@ pub enum WarningKind {
     /// cycles never reach their last reference, so the value never
     /// auto-closes (D8.3). Warn-only.
     ClosableInCycle,
+    /// A kernel's trailing `u32` parameter is bound by the compiler as its
+    /// lane id, whatever it is named (gpu-reset rule 12.5). The positional
+    /// lane ABI is retiring in favor of a `filum` loop. Warn-only until
+    /// `filum` ships on the runner.
+    PositionalLaneParam,
 }
 
 /// Semantic diagnostic categories used by passes and command policy.

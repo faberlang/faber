@@ -16,7 +16,7 @@
 use super::kernel_legality_body::{
     check_fragment_lane_ids, check_host_block, check_host_function, check_kernel_function,
 };
-use crate::{Resolver, SemanticError, SemanticErrorKind, TypeId, TypeTable};
+use crate::{Resolver, SemanticError, SemanticErrorKind, TypeId, TypeTable, WarningKind};
 use radix_hir::{DefId, HirAnnotation, HirFunction, HirItemKind, HirModule, NucleumRole};
 use radix_lexer::{Interner, Span, Symbol};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -40,12 +40,22 @@ pub const ISSUE_RECOVERY: &str = "nucleum_recovery";
 /// siblings). They are raw lane ids, a compiler-internal lowering surface
 /// (gpu-reset rule 12.5); the parallel pattern is a `filum` loop.
 pub const ISSUE_RAW_LANE_ID: &str = "nucleum_raw_lane_id";
+/// A kernel parameter is named after a thread-id builtin. The name alone
+/// selects the builtin in the device ABI, so it is the raw lane id under
+/// another spelling (gpu-reset rule 12.5).
+pub const ISSUE_RAW_LANE_ID_PARAM: &str = "nucleum_raw_lane_id_param";
+/// Warning issue: a kernel's trailing `u32` parameter is the compiler-bound
+/// lane id, whatever its name. The positional lane ABI retires in favor of
+/// `filum`.
+pub const ISSUE_POSITIONAL_LANE_PARAM: &str = "positional_lane_param";
 
 /// Outcome of the legality pass.
 #[derive(Debug, Clone, Default)]
 pub struct KernelLegalityReport {
     /// One structured diagnostic per violation.
     pub errors: Vec<SemanticError>,
+    /// Non-fatal findings (the positional lane parameter).
+    pub warnings: Vec<SemanticError>,
     /// Kernels on a call cycle (directly or mutually recursive). Recursion is
     /// language-legal; whether a target may run it is a capability fact for
     /// the requirement inference, which reads this set.
@@ -82,10 +92,27 @@ pub(super) struct Env<'a> {
 #[derive(Debug, Default)]
 pub(super) struct Sink {
     pub errors: Vec<SemanticError>,
+    pub warnings: Vec<SemanticError>,
     seen: FxHashSet<(&'static str, u32, u32, String)>,
 }
 
 impl Sink {
+    /// Record a non-fatal finding of warning `kind` with structured `issue`.
+    pub fn warn(
+        &mut self,
+        kind: WarningKind,
+        issue: &'static str,
+        span: Span,
+        args: &[(&'static str, &str)],
+    ) {
+        let mut warning = SemanticError::structured(SemanticErrorKind::Warning(kind), span)
+            .with_arg("issue", issue);
+        for (name, value) in args {
+            warning = warning.with_arg(name, *value);
+        }
+        self.warnings.push(warning);
+    }
+
     pub fn report(&mut self, issue: &'static str, span: Span, args: &[(&'static str, &str)]) {
         let key = (
             issue,
@@ -160,6 +187,7 @@ pub fn check(
 
     KernelLegalityReport {
         errors: sink.errors,
+        warnings: sink.warnings,
         recursive_kernels: kernels_on_cycles(&edges),
     }
 }

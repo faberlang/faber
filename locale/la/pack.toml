@@ -1483,6 +1483,10 @@ help = "nucleum publicum fac ut lanceri possit, vel ex alio nucleo voca"
 message = "'{builtin}' est index lineae crudus; nucleum lineam suam numquam nominat"
 help = "coordinatam iterationis per `{apud}` in ansa `{filum}` liga: `{itera} {ex} t {apud} [i, j] {filum} f {fixum} v`"
 
+[diagnostics.SEM008.issues.nucleum_raw_lane_id_param]
+message = "parametrus '{parameter}' ex indice fili '{builtin}' nominatur; nucleum lineam suam numquam nominat"
+help = "parametrum omitte et coordinatam iterationis per `{apud}` in ansa `{filum}` liga: `{itera} {ex} t {apud} [i, j] {filum} f {fixum} v`"
+
 [diagnostics.SEM008.issues.nucleum_recovery]
 message = "corpus nuclei tractatorem localem ('{construct}') ponere non potest"
 help = "errorem ad vocationem lancientem perveniat, ubi hospes eum tractat"
@@ -3906,6 +3910,14 @@ help = "call `close()` explicitly, or break the reference cycle"
 [diagnostics.WARN031.issues.closable_in_cycle]
 message = "`{type}.{field}` can hold a closable value inside a reference cycle; a cycle never reaches its last reference, so the value never closes automatically"
 help = "call `close()` explicitly, or break the reference cycle"
+
+[diagnostics.WARN032]
+message = "parametrus `u32` ultimus nuclei ut index lineae ligatur; forma lineae positionalis cedit"
+help = "coordinatam iterationis per `{apud}` in ansa `{filum}` liga: `{itera} {ex} t {apud} [i, j] {filum} f {fixum} v`"
+
+[diagnostics.WARN032.issues.positional_lane_param]
+message = "`{parameter}` index lineae nuclei `{kernel}` est solum quia `u32` ultimus est; forma lineae positionalis pro `{filum}` cedit"
+help = "coordinatam iterationis per `{apud}` in ansa `{filum}` liga: `{itera} {ex} t {apud} [i, j] {filum} f {fixum} v`"
 
 [llm]
 system_prompt_snippet = "Emit canonical Latin Faber source using the registered Latin keywords, canonical type spellings, and invariant glyph syntax."

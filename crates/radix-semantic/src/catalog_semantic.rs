@@ -86,6 +86,7 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::CoverageUnchecked,
     WarningKind::LeadingUnderscore,
     WarningKind::ClosableInCycle,
+    WarningKind::PositionalLaneParam,
 ];
 
 // STABLE CODES
@@ -1243,6 +1244,12 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::ClosableInCycle => DiagnosticSpec {
             code: "WARN031",
             help: Some("call `close()` explicitly, or break the reference cycle"),
+        },
+        WarningKind::PositionalLaneParam => DiagnosticSpec {
+            code: "WARN032",
+            help: Some(
+                "bind the iteration coordinate with `apud` on a `filum` loop: `itera ex t apud [i, j] filum f fixum v`",
+            ),
         },
     }
 }

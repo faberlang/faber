@@ -1702,6 +1702,10 @@ help = "mark the kernel public to make it launchable, or call it from another ke
 message = "'{builtin}' is a raw lane id; a kernel never names its lane"
 help = "bind the iteration coordinate with `{apud}` on a `{filum}` loop: `{itera} {ex} t {apud} [i, j] {filum} f {fixum} v`"
 
+[diagnostics.SEM008.issues.nucleum_raw_lane_id_param]
+message = "parameter '{parameter}' is named after the thread-id builtin '{builtin}'; a kernel never names its lane"
+help = "drop the parameter and bind the iteration coordinate with `{apud}` on a `{filum}` loop: `{itera} {ex} t {apud} [i, j] {filum} f {fixum} v`"
+
 [diagnostics.SEM008.issues.nucleum_recovery]
 message = "a kernel body cannot install a local handler ('{construct}')"
 help = "let the error reach the launching call, where the host handles it"
@@ -4117,6 +4121,14 @@ help = "call `close()` explicitly, or break the reference cycle"
 [diagnostics.WARN031.issues.closable_in_cycle]
 message = "`{type}.{field}` can hold a closable value inside a reference cycle; a cycle never reaches its last reference, so the value never closes automatically"
 help = "call `close()` explicitly, or break the reference cycle"
+
+[diagnostics.WARN032]
+message = "a trailing `u32` kernel parameter is bound as the lane id; the positional lane form is retiring"
+help = "bind the iteration coordinate with `{apud}` on a `{filum}` loop: `{itera} {ex} t {apud} [i, j] {filum} f {fixum} v`"
+
+[diagnostics.WARN032.issues.positional_lane_param]
+message = "`{parameter}` is the lane id of kernel `{kernel}` only because it is the trailing `u32`; the positional lane form is retiring in favor of `{filum}`"
+help = "bind the iteration coordinate with `{apud}` on a `{filum}` loop: `{itera} {ex} t {apud} [i, j] {filum} f {fixum} v`"
 
 
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
