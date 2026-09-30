@@ -65,10 +65,16 @@ functio maior(numerus<d32> a, numerus n) → bivalens {
 }
 ",
     );
+    // Ruling 22: a decimal beside a non-constant integer compares by exact
+    // value; neither operand is converted (a conversion could trap).
     assert_eq!(
         dump.matches("runtime convert runtime").count(),
-        2,
-        "both decimal and integer operands must join at d64:\n{dump}"
+        0,
+        "decimal and integer operands must not be joined:\n{dump}"
+    );
+    assert!(
+        dump.contains(" > "),
+        "comparison must stay a primitive MIR ordering op:\n{dump}"
     );
 }
 
@@ -861,7 +867,8 @@ fn lowers_iace_to_return_error() {
     assert!(dump.contains("function f0 -> ty#1 ⇥ ty#0 {\n"));
     assert!(dump.contains("branch %0 bb1 bb2"));
     assert!(dump.contains("return_error %1"));
-    assert!(dump.contains("return %2"));
+    // The quotient is a checked return store: `i64::MIN / -1` does not fit.
+    assert!(dump.contains("return %3"), "{dump}");
 }
 
 #[test]

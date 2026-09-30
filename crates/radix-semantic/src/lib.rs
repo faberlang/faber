@@ -324,6 +324,10 @@ pub struct PassConfig {
     /// Build-time embed files the driver resolved for `insere` initializers
     /// (DECISIONS D8.10). Empty outside a driver file context.
     pub insere_files: crate::insere::InsereFiles,
+    /// The analyzed source text, so a diagnostic or runtime trap can quote
+    /// the expression a span covers (ruling 19(i)). `None` outside a driver
+    /// file context.
+    pub source_text: Option<std::sync::Arc<str>>,
 }
 
 impl PassConfig {
@@ -348,6 +352,7 @@ impl PassConfig {
             complexity_budget: None,
             kernel_complexity_budget: None,
             insere_files: crate::insere::InsereFiles::default(),
+            source_text: None,
         }
     }
 
@@ -627,6 +632,7 @@ pub fn analyze_with_cli(
         config,
         Some(&companion_signatures),
         Some(&mut lowered.presentation),
+        Some(&radix_lanes),
     ) {
         Ok(()) => {}
         Err(e) => diagnostics.extend(e),

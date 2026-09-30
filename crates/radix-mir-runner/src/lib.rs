@@ -2136,6 +2136,66 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         })
     }
 
+    /// Exact decimal-versus-integer comparison (ruling 22): the decimal
+    /// carrier is a scaled integer and the integer side is scaled up to meet
+    /// it, so no conversion can leave the decimal range. Both operands carry
+    /// the integer representation; the static types tell them apart.
+    fn decimal_integer_comparison(
+        &self,
+        op: MirBinOp,
+        lhs: &MirOperand,
+        rhs: &MirOperand,
+        left: &Value,
+        right: &Value,
+    ) -> Option<bool> {
+        if !matches!(
+            op,
+            MirBinOp::Lt
+                | MirBinOp::Gt
+                | MirBinOp::LtEq
+                | MirBinOp::GtEq
+                | MirBinOp::Eq
+                | MirBinOp::NotEq
+        ) {
+            return None;
+        }
+        let as_i128 = |value: &Value| match value {
+            Value::Int(v) => Some(i128::from(*v)),
+            Value::UInt(v) => Some(i128::from(*v)),
+            _ => None,
+        };
+        let (left_scale, right_scale) = (
+            self.operand_decimal_width(lhs)
+                .and_then(decimal_scale_factor),
+            self.operand_decimal_width(rhs)
+                .and_then(decimal_scale_factor),
+        );
+        let (scaled, integer, scale, reversed) = match (left_scale, right_scale) {
+            (Some(scale), None) => (as_i128(left)?, as_i128(right)?, scale, false),
+            (None, Some(scale)) => (as_i128(right)?, as_i128(left)?, scale, true),
+            _ => return None,
+        };
+        // An integer too large to scale is beyond every decimal carrier.
+        let ordering = match integer.checked_mul(scale) {
+            Some(scaled_integer) => scaled.cmp(&scaled_integer),
+            None if integer < 0 => std::cmp::Ordering::Greater,
+            None => std::cmp::Ordering::Less,
+        };
+        let ordering = if reversed {
+            ordering.reverse()
+        } else {
+            ordering
+        };
+        Some(match op {
+            MirBinOp::Lt => ordering.is_lt(),
+            MirBinOp::Gt => ordering.is_gt(),
+            MirBinOp::LtEq => ordering.is_le(),
+            MirBinOp::GtEq => ordering.is_ge(),
+            MirBinOp::Eq => ordering.is_eq(),
+            _ => ordering.is_ne(),
+        })
+    }
+
     fn eval_binop(
         &mut self,
         op: MirBinOp,
@@ -2156,6 +2216,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             (left, right)
         };
         if let Some(compared) = self.decimal_float_comparison(op, lhs, rhs, &left, &right) {
+            return Ok(Value::Bool(compared));
+        }
+        if let Some(compared) = self.decimal_integer_comparison(op, lhs, rhs, &left, &right) {
             return Ok(Value::Bool(compared));
         }
         if let Some(saturating) = self.saturating_word_width(result_ty)

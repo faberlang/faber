@@ -76,6 +76,8 @@ fn inferred_slot_trap_names_the_source_expression() {
     // ruling 19(i): the message points at the inferring expression.
     let (_, _, message) = trap("varia numerus<u8> a ← 200\nvaria _ total ← a + 1\ntotal ← total + 100000");
     assert!(message.contains("inferred"), "{message}");
+    assert!(message.contains("from `a + 1`"), "{message}");
+    assert!(!message.contains("bytes"), "{message}");
 }
 
 #[test]
@@ -277,5 +279,89 @@ fn saturating_u64_chain_past_the_exact_range_traps_and_a_single_op_clamps() {
     assert_eq!(
         ok(&format!("{top}fixum saturatus<u64> r ← top + 1\nnota r")),
         ["18446744073709551615"]
+    );
+}
+
+const CAP_MAX: &str = "varia numerus a ← 9223372036854775807\nvaria numerus b ← 9223372036854775807\n";
+
+#[test]
+fn cap_typed_sum_is_checked_at_argument_and_return_stores() {
+    // f1 (ruling 17b): the sum is a legal intermediate but does not fit `i64`.
+    let (out, issue, _) = trap(&format!("{CAP_MAX}nota \"a\"\nfixum numerus c ← a + b\nnota c"));
+    assert_eq!(out, ["a"]);
+    assert_eq!(issue, "implicit_store_out_of_range");
+    // No slot, no store: the legal intermediate prints.
+    assert_eq!(ok(&format!("{CAP_MAX}nota a + b")), ["18446744073709551614"]);
+    let id =
+        "functio id(numerus x) → numerus { redde x }\nfunctio add(numerus x, numerus y) → numerus { redde x + y }\n";
+    let run_module = |main: &str| {
+        let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+        let source = format!("{id}incipit {{\n{CAP_MAX}nota \"a\"\n{main}\n}}\n");
+        let mut host = BufferHost::default();
+        match run_source(&session, "cap.fab", &source, &mut host) {
+            Err(RunSourceError::Stepper(errors)) => (
+                host.stdout_lines,
+                errors
+                    .into_iter()
+                    .map(|e| (e.issue, e.message))
+                    .collect::<Vec<_>>(),
+            ),
+            other => panic!("{main}: {other:?}"),
+        }
+    };
+    let (out, errors) = run_module("nota id(a + b)");
+    assert_eq!(out, ["a"]);
+    assert_eq!(errors[0].0, "implicit_store_out_of_range");
+    assert!(errors[0].1.contains("(argument"), "{}", errors[0].1);
+    let (out, errors) = run_module("nota add(a, b)");
+    assert_eq!(out, ["a"]);
+    assert_eq!(errors[0].0, "implicit_store_out_of_range");
+    assert!(errors[0].1.contains("(return)"), "{}", errors[0].1);
+    // A sum that fits still flows through every store.
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let source = format!("{id}incipit {{\nnota add(40, 2)\n}}\n");
+    let mut host = BufferHost::default();
+    run_source(&session, "cap.fab", &source, &mut host).expect("a fitting sum runs");
+    assert_eq!(host.stdout_lines, ["42"]);
+}
+
+#[test]
+fn bitnot_of_u64_stores_into_int_as_a_checked_narrowing() {
+    // f2 (rulings 9, 19a): `¬u` keeps its sign at the cap, so `int` takes it.
+    assert_eq!(ok("varia numerus<u64> u ← 5\nfixum numerus y ← ¬u\nnota y"), ["-6"]);
+    let (out, issue, _) = trap("varia numerus<u64> u ← 18446744073709551615\nnota \"a\"\nfixum numerus y ← ¬u\nnota y");
+    assert_eq!(out, ["a"]);
+    assert_eq!(issue, "runner_numerus_overflow");
+}
+
+#[test]
+fn decimal_beside_a_nonconstant_integer_compares_exactly() {
+    // f3 (ruling 22): no `d64` conversion, so a huge integer does not trap.
+    assert_eq!(
+        ok("varia d64 d ← 0.5\nvaria numerus i ← 9223372036854775807\nnota d < i\nnota i > d\nnota d ≅ i\nnota i ≇ d"),
+        ["verum", "verum", "falsum", "verum"]
+    );
+    assert_eq!(
+        ok("varia d64 d ← 2.0\nvaria numerus i ← 2\nnota d ≅ i\nnota d ≤ i\nnota d ≺ i\nnota i ≻ d"),
+        ["verum", "verum", "falsum", "falsum"]
+    );
+    assert_eq!(
+        ok("varia d64 d ← -0.5\nvaria numerus<u64> u ← 18446744073709551615\nnota d < u\nnota u < d"),
+        ["verum", "falsum"]
+    );
+}
+
+#[test]
+fn approximate_equality_unscales_a_decimal_operand() {
+    // f4 (ruling 22): `≈` computes in the float operand's width on true values.
+    assert_eq!(
+        ok(
+            "varia d64 d ← 3.0\nvaria fractus f ← 3.0000000001\nvaria numerus i ← 3\nnota d ≈ f\nnota d ≈ i\nnota i ≈ f\nnota d ≉ f"
+        ),
+        ["verum", "verum", "verum", "falsum"]
+    );
+    assert_eq!(
+        ok("varia d64 d ← 3.5\nvaria numerus i ← 3\nnota d ≈ i\nnota d ≉ i"),
+        ["falsum", "verum"]
     );
 }

@@ -105,7 +105,9 @@ impl TypeChecker<'_> {
                     self.insert_binding_with_scalar(local.def_id, *ty, false, local.mutable);
                 }
                 let inferred_slot = self.is_infer(self.resolve_inferred_type(*ty));
-                let site = StoreSite::new(HirStoreKind::Declaration).named(local.name);
+                let site = StoreSite::new(HirStoreKind::Declaration)
+                    .named(local.name)
+                    .local_slot();
                 // `fixum T x = e` states a compile-time fact (an `=` position).
                 let site = if self.compile_time_locals.contains(&local.def_id) {
                     site.compile_time()
@@ -189,11 +191,7 @@ impl TypeChecker<'_> {
             // await; the store rides the local (the awaited value has no node).
             if self.store_narrowing_target(awaited, ty).is_some() {
                 let site = StoreSite::new(HirStoreKind::AwaitBinding).named(local.name);
-                local.await_store = Some(HirStoreSite {
-                    kind: site.kind,
-                    slot: site.slot,
-                    inferred_from: site.inferred_from,
-                });
+                local.await_store = Some(self.hir_store_site(site));
                 ty
             } else {
                 self.unify_assign_issue(

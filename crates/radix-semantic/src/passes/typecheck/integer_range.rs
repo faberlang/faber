@@ -323,15 +323,48 @@ impl TypeChecker<'_> {
             return Some(self.error_type);
         }
         let (a, b) = (Self::operand_range(l)?, Self::operand_range(r)?);
-        let result = match op {
+        let result = Self::scalar_binary_range(op, a, b)?;
+        Some(self.width_type(range::smallest_width(result)))
+    }
+
+    /// Exact range of `+ - * / %` over operand ranges (ruling 19a).
+    fn scalar_binary_range(op: HirBinOp, a: IntRange, b: IntRange) -> Option<IntRange> {
+        Some(match op {
             HirBinOp::Add => range::add(a, b),
             HirBinOp::Sub => range::sub(a, b),
             HirBinOp::Mul => range::mul(a, b),
             HirBinOp::Div => range::floor_div(a, b),
             HirBinOp::Mod => range::floor_rem(a, b),
+            HirBinOp::Shl => range::shl(a, b),
             _ => return None,
+        })
+    }
+
+    /// Whether an integer expression sits at the 64-bit cap with a range that
+    /// reaches past `i64::MAX` (`i64 + i64`, `-i64`, `i64 ⇐ n`). Its type is
+    /// `i64` but its value is not bounded by it, so a store into an `i64`
+    /// slot is a real check (ruling 17b) and cannot be omitted.
+    pub(super) fn exceeds_i64(&self, expr: &HirExpression) -> bool {
+        if self.current_device_function
+            || self.current_air_function
+            || const_int_value(expr).is_some()
+        {
+            return false;
+        }
+        let operand_range = |e: &HirExpression| {
+            let ty = e.ty?;
+            Self::operand_range(self.classify_operand(e, ty))
         };
-        Some(self.width_type(range::smallest_width(result)))
+        let result = match &expr.kind {
+            HirExpressionKind::Binary(op, lhs, rhs) => operand_range(lhs)
+                .zip(operand_range(rhs))
+                .and_then(|(a, b)| Self::scalar_binary_range(*op, a, b)),
+            HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, operand) => {
+                operand_range(operand).map(range::neg)
+            }
+            _ => None,
+        };
+        result.is_some_and(|(_, hi)| hi > i128::from(i64::MAX))
     }
 
     /// Result type of `÷` (d11-6 rulings 15 and 23): an integer `÷` yields the
@@ -585,7 +618,14 @@ impl TypeChecker<'_> {
         if self.current_device_function || const_int_value(operand).is_some() {
             return expected;
         }
-        expected.filter(|ty| !self.is_infer(self.resolve_inferred_type(*ty)))
+        // A non-constant operand keeps its own type, so a plain integer slot
+        // is not handed to it as an expected type: `¬u` (u: `u64`) into an
+        // `int` slot is a checked narrowing of the range-typed result, not a
+        // mismatch of the operand (ruling 19a).
+        expected.filter(|ty| {
+            let resolved = self.resolve_inferred_type(*ty);
+            !self.is_infer(resolved) && self.plain_int_width(resolved).is_none()
+        })
     }
 
     /// Expected type handed to the branches of a value conditional. An open

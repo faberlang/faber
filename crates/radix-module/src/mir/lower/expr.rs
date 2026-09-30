@@ -77,7 +77,7 @@ pub(super) trait HirExpressionLoweringVisitor {
                         return self.visit_interval_clamp(source, target, recovery.as_deref(), expr);
                     }
                 };
-                self.visit_conversio_expr(source, target_ty, params, recovery.as_deref(), *implicit, expr)
+                self.visit_conversio_expr(source, target_ty, params, recovery.as_deref(), implicit.clone(), expr)
             }
             HirExpressionKind::Block(block) => self.visit_block_expr(block, expr),
             HirExpressionKind::Si { cond, then_block, then_catch, else_block } => {

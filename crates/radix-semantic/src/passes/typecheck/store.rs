@@ -43,6 +43,9 @@ pub(super) struct StoreSite {
     pub(super) inferred_from: Option<radix_lexer::Span>,
     /// An `=` position states a compile-time fact: a constant must fit.
     pub(super) compile_time: bool,
+    /// A store into a plain local: the backends already check the value at
+    /// the local's assignment, so a capped `i64` needs no separate node.
+    pub(super) local_slot: bool,
 }
 
 impl StoreSite {
@@ -52,7 +55,14 @@ impl StoreSite {
             slot: None,
             inferred_from: None,
             compile_time: false,
+            local_slot: false,
         }
+    }
+
+    /// Mark a store into a plain local binding.
+    pub(super) fn local_slot(mut self) -> Self {
+        self.local_slot = true;
+        self
     }
 
     pub(super) fn named(mut self, slot: Symbol) -> Self {
@@ -149,7 +159,10 @@ impl TypeChecker<'_> {
                 return ty;
             }
             let ty = self.check_expr(expr);
-            if let Some(target) = self.store_narrowing_target(ty, slot_ty) {
+            if let Some(target) = self
+                .store_narrowing_target(ty, slot_ty)
+                .or_else(|| self.capped_store_target(expr, ty, slot_ty, site))
+            {
                 return self.wrap_implicit_store(expr, ty, target, site);
             }
             return ty;
@@ -167,10 +180,31 @@ impl TypeChecker<'_> {
         slot_ty: TypeId,
         site: StoreSite,
     ) -> TypeId {
-        match self.store_narrowing_target(ty, slot_ty) {
+        match self
+            .store_narrowing_target(ty, slot_ty)
+            .or_else(|| self.capped_store_target(expr, ty, slot_ty, site))
+        {
             Some(target) => self.wrap_implicit_store(expr, ty, target, site),
             None => self.unify_expected(ty, slot_ty, expr.span),
         }
+    }
+
+    /// An `i64`-typed expression at the 64-bit cap (`i64 + i64`) stored into an
+    /// `i64` slot: the types agree but the value may not fit, so the store
+    /// still needs its check (ruling 17b). `None` when the expression is
+    /// proven to fit or the slot is not a plain `i64`.
+    fn capped_store_target(
+        &self,
+        expr: &HirExpression,
+        ty: TypeId,
+        slot_ty: TypeId,
+        site: StoreSite,
+    ) -> Option<TypeId> {
+        let (_, src) = self.store_int_slot(ty)?;
+        let (dst_ty, dst) = self.store_int_target(slot_ty)?;
+        let plain_i64 = |s: IntSlot| s.family == IntFamily::Plain && s.width == NumericWidth::I64;
+        (!site.local_slot && plain_i64(src) && plain_i64(dst) && self.exceeds_i64(expr))
+            .then_some(dst_ty)
     }
 
     /// Whether a slot type is declared (no open inference variable at the top).
@@ -310,6 +344,30 @@ impl TypeChecker<'_> {
         Some(slot_ty)
     }
 
+    /// The HIR record of a store position, quoting the inferring expression
+    /// when the analysis has the source text (ruling 19(i)).
+    pub(super) fn hir_store_site(&self, site: StoreSite) -> HirStoreSite {
+        let inferred_text = site.inferred_from.and_then(|from| {
+            let text = self
+                .source_text
+                .as_deref()?
+                .get(from.start as usize..from.end as usize)?;
+            let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+            let text = if text.chars().count() > 80 {
+                format!("{}…", text.chars().take(79).collect::<String>())
+            } else {
+                text
+            };
+            Some(text.into_boxed_str())
+        });
+        HirStoreSite {
+            kind: site.kind,
+            slot: site.slot,
+            inferred_from: site.inferred_from,
+            inferred_text,
+        }
+    }
+
     /// Replace `expr` by an implicit store node targeting `target`.
     pub(super) fn wrap_implicit_store(
         &mut self,
@@ -331,11 +389,7 @@ impl TypeChecker<'_> {
             params: Vec::new(),
             recovery: None,
             route: None,
-            implicit: Some(HirStoreSite {
-                kind: site.kind,
-                slot: site.slot,
-                inferred_from: site.inferred_from,
-            }),
+            implicit: Some(self.hir_store_site(site)),
         };
         expr.ty = Some(target);
         target

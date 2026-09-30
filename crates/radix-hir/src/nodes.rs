@@ -1076,7 +1076,7 @@ impl HirLocal {
     /// keyed on an id matches them.
     #[must_use]
     pub fn await_store_init(&self, types: &radix_types::TypeTable) -> Option<HirExpression> {
-        let site = self.await_store?;
+        let site = self.await_store.clone()?;
         let init = self.init.as_ref()?;
         let slot = self.ty?;
         let future = init.ty?;
@@ -1689,11 +1689,13 @@ pub enum HirStoreKind {
 /// Where an implicit store lands: the position kind, the slot's name when it
 /// has one, and — for a slot whose type was inferred (`_`) — the span of the
 /// expression the type was inferred from (ruling 19(i)).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HirStoreSite {
     pub kind: HirStoreKind,
     pub slot: Option<Symbol>,
     pub inferred_from: Option<Span>,
+    /// The source text of that expression, when the analysis had the source.
+    pub inferred_text: Option<Box<str>>,
 }
 
 /// Conversion row resolved by typecheck for one `↦` site.

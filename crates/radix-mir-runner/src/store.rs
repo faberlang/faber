@@ -108,6 +108,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             kind: HirStoreKind::Assignment,
             slot: local.1,
             inferred_from: None,
+            inferred_text: None,
         };
         Err(self.store_trap(&site, i128::from(*magnitude), NumericWidth::I64, span))
     }
@@ -156,9 +157,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
         if let Some(from) = site.inferred_from {
             let name = slot.as_deref().unwrap_or("the slot");
+            let origin = site.inferred_text.as_deref().map_or_else(
+                || format!("the expression at bytes {}..{}", from.start, from.end),
+                |text| format!("`{text}`"),
+            );
             message.push_str(&format!(
-                "; `{name}` was inferred as `{ty}` from the expression at bytes {}..{}, declare its type",
-                from.start, from.end
+                "; `{name}` was inferred as `{ty}` from {origin}, declare its type"
             ));
             args.push((
                 "inferred_from".to_owned(),

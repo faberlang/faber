@@ -2091,8 +2091,8 @@ impl<'a> FunctionBuilder<'a> {
                     span,
                     init,
                 )?;
-            } else if let Some(site) = local.await_store {
-                self.lower_await_store(init, MirPlace::local(id), mir_ty, site, span)?;
+            } else if let Some(site) = &local.await_store {
+                self.lower_await_store(init, MirPlace::local(id), mir_ty, site.clone(), span)?;
             } else if copy_bind {
                 // `copy` bind (D-6): deep-duplicate the initializer; the
                 // source stays live and shares nothing with the binding.
@@ -2150,8 +2150,8 @@ impl<'a> FunctionBuilder<'a> {
                     span,
                     init,
                 )?;
-            } else if let Some(site) = local.await_store {
-                self.lower_await_store(init, staging_place.clone(), mir_ty, site, span)?;
+            } else if let Some(site) = &local.await_store {
+                self.lower_await_store(init, staging_place.clone(), mir_ty, site.clone(), span)?;
             } else {
                 self.lower_expr_to_destination(init, staging_place.clone(), mir_ty)?;
             }
@@ -2371,7 +2371,12 @@ impl<'a> FunctionBuilder<'a> {
                     }),
                 _ => None,
             };
-            let site = radix_hir::HirStoreSite { kind: radix_hir::HirStoreKind::Assignment, slot, inferred_from: None };
+            let site = radix_hir::HirStoreSite {
+                kind: radix_hir::HirStoreKind::Assignment,
+                slot,
+                inferred_from: None,
+                inferred_text: None,
+            };
             self.integer_store_convert(value, ty, site, span)
         } else {
             value
@@ -3576,6 +3581,22 @@ impl<'a> FunctionBuilder<'a> {
             _ => None,
         };
         if lhs_width.is_none() && rhs_width.is_none() {
+            return None;
+        }
+        // Ruling 22: a decimal beside a non-constant integer compares by exact
+        // value; joining the integer at `d64` would trap for a large one. The
+        // runner reads both static types (a constant integer still joins).
+        let plain_integer = |expr: &HirExpression, semantic: TypeId| {
+            crate::semantic::passes::const_int_value(expr).is_none()
+                && match self.normalized_type(semantic) {
+                    Type::Primitive(Primitive::Numerus) => true,
+                    Type::SizedNumeric(Primitive::Numerus, width) => width.integer_range().is_some(),
+                    _ => false,
+                }
+        };
+        if (lhs_width.is_some() && rhs_width.is_none() && plain_integer(rhs, rhs_semantic))
+            || (rhs_width.is_some() && lhs_width.is_none() && plain_integer(lhs, lhs_semantic))
+        {
             return None;
         }
         if matches!(

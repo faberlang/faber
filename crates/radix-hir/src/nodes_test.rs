@@ -92,6 +92,7 @@ fn walking_an_implicit_store_reaches_its_source() {
                 kind: HirStoreKind::Declaration,
                 slot: None,
                 inferred_from: None,
+                inferred_text: None,
             }),
         },
         ty: None,

@@ -28,7 +28,7 @@ impl HirVisitor for Probe {
             ..
         } = &expr.kind
         {
-            self.stores.push(*site);
+            self.stores.push(site.clone());
         }
         if let (HirExpressionKind::Literal(HirLiteral::Int(v)), Some(ty)) = (&expr.kind, expr.ty) {
             self.literals.push((*v, ty));

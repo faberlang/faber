@@ -2095,12 +2095,14 @@ fn transplant_expr(
                 )?)),
                 None => None,
             };
-            let implicit = implicit.map(|site| radix_module::hir::HirStoreSite {
-                slot: site
-                    .slot
-                    .map(|slot| remap_symbol(slot, source_interner, entry_interner)),
-                ..site
-            });
+            let implicit = implicit
+                .clone()
+                .map(|site| radix_module::hir::HirStoreSite {
+                    slot: site
+                        .slot
+                        .map(|slot| remap_symbol(slot, source_interner, entry_interner)),
+                    ..site
+                });
             HirExpressionKind::Conversio {
                 route: None,
                 source,

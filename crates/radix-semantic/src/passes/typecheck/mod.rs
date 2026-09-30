@@ -333,6 +333,12 @@ pub(crate) struct TypeChecker<'a> {
     /// For a local whose type was inferred (`_`): the span of the expression
     /// the type came from, named by an implicit store's trap (ruling 19(i)).
     inferred_slot_sources: FxHashMap<DefId, radix_lexer::Span>,
+    /// Analyzed source text, for quoting an inferring expression in a trap.
+    pub(crate) source_text: Option<std::sync::Arc<str>>,
+    /// `@ radix lane "air"` functions; the AIR subset admits no store node.
+    pub(crate) air_lane_defs: FxHashSet<DefId>,
+    /// Whether the function being checked is an AIR-lane function.
+    pub(crate) current_air_function: bool,
     /// Locals declared `fixum T x = e` (D5.10): their initializer is an `=`
     /// position, a compile-time store.
     compile_time_locals: FxHashSet<DefId>,
@@ -523,7 +529,7 @@ pub(crate) fn typecheck_with_interner(
     interner: Option<&Interner>,
 ) -> Result<(), Vec<SemanticError>> {
     let config = crate::PassConfig::for_target(Target::HirRust);
-    typecheck_with_config(hir, resolver, types, interner, &config, None, None)
+    typecheck_with_config(hir, resolver, types, interner, &config, None, None, None)
 }
 
 /// Typecheck HIR with a caller-supplied [`PassConfig`].
@@ -539,9 +545,18 @@ pub(crate) fn typecheck_with_config(
     config: &crate::PassConfig,
     companion_signatures: Option<&crate::passes::companion_signature::CompanionSignatures>,
     presentation: Option<&mut HirPresentation>,
+    lanes: Option<&crate::RadixLaneMetadata>,
 ) -> Result<(), Vec<SemanticError>> {
     let mut checker = TypeChecker::new(resolver, types, interner, config.target);
     checker.locale_pack = config.locale_pack.as_ref();
+    checker.source_text.clone_from(&config.source_text);
+    if let Some(lanes) = lanes {
+        checker.air_lane_defs = lanes
+            .iter()
+            .filter(|(_, lane)| *lane == crate::RadixLane::Air)
+            .map(|(def_id, _)| def_id)
+            .collect();
+    }
     checker.collect_imported_file_structs();
     checker.collect_imported_enum_variants();
     checker.collect_imported_file_interfaces();
@@ -601,6 +616,9 @@ impl<'a> TypeChecker<'a> {
             saturating_root_source: false,
             saturating_exact_operand: false,
             inferred_slot_sources: FxHashMap::default(),
+            source_text: None,
+            air_lane_defs: FxHashSet::default(),
+            current_air_function: false,
             compile_time_locals: FxHashSet::default(),
             alias_type_params: FxHashMap::default(),
             import_receivers: FxHashSet::default(),

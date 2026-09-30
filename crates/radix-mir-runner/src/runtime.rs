@@ -3750,8 +3750,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             [receiver, other, rel_tol, abs_tol, negated] => {
                 let width = self.fuzzy_comparison_width(receiver, other, span);
-                let receiver = numeric_as_f64(&self.eval_operand(receiver, span)?, span)?;
-                let other = numeric_as_f64(&self.eval_operand(other, span)?, span)?;
+                let receiver = self.fuzzy_operand(receiver, span)?;
+                let other = self.fuzzy_operand(other, span)?;
                 let rel_tol = numeric_as_f64(&self.eval_operand(rel_tol, span)?, span)?;
                 let abs_tol = numeric_as_f64(&self.eval_operand(abs_tol, span)?, span)?;
                 let receiver = self.fuzzy_value(receiver, width);
@@ -3765,6 +3765,20 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             _ => Err(RunnerError::internal(span, "approximate comparison arity")),
         }
+    }
+
+    /// One `≈` operand as the float it stands for: a decimal carrier is a
+    /// scaled integer, so it is unscaled by its static type (ruling 22).
+    fn fuzzy_operand(&mut self, operand: &MirOperand, span: Span) -> Result<f64, RunnerError> {
+        let value = self.eval_operand(operand, span)?;
+        if let Value::Int(scaled) = value
+            && let Some(scale) = self
+                .operand_decimal_width(operand)
+                .and_then(crate::decimal_scale_factor)
+        {
+            return Ok(scaled as f64 / scale as f64);
+        }
+        numeric_as_f64(&value, span)
     }
 
     fn fuzzy_value(&self, value: f64, width: NumericWidth) -> f64 {

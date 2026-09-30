@@ -33,7 +33,7 @@ impl HirVisitor for Collector {
         } = &expr.kind
         {
             self.stores.push(Store {
-                site: *site,
+                site: site.clone(),
                 target: *target,
             });
         }
@@ -118,7 +118,7 @@ struct AwaitStores(Vec<Option<HirStoreSite>>);
 impl HirVisitor for AwaitStores {
     fn visit_local(&mut self, local: &radix_hir::HirLocal) {
         if local.is_await {
-            self.0.push(local.await_store);
+            self.0.push(local.await_store.clone());
         }
         radix_hir::visit::walk_local(self, local);
     }
@@ -137,7 +137,7 @@ fn row_02_narrowing_await_bind_is_marked() {
                   functio caller() fiet → vacuum {\n    fixum numerus<u8> v ↢ fetch()\n    nota v\n}\n";
     let stores = await_stores(source);
     assert_eq!(stores.len(), 1);
-    let site = stores[0].expect("narrowing await-bind is marked");
+    let site = stores[0].clone().expect("narrowing await-bind is marked");
     assert_eq!(site.kind, HirStoreKind::AwaitBinding);
     assert!(site.slot.is_some());
 }
@@ -155,7 +155,10 @@ fn row_02_figendum_form_is_marked() {
                   functio caller() fiet → vacuum {\n    figendum numerus<u8> v ← fetch()\n    nota v\n}\n";
     let stores = await_stores(source);
     assert_eq!(stores.len(), 1);
-    assert_eq!(stores[0].expect("marked").kind, HirStoreKind::AwaitBinding);
+    assert_eq!(
+        stores[0].clone().expect("marked").kind,
+        HirStoreKind::AwaitBinding
+    );
 }
 
 #[test]
@@ -510,4 +513,36 @@ fn an_open_inference_slot_binds_instead_of_narrowing() {
     let source = "functio duo<T>(T a, T b) → T {\n    redde a\n}\n\
                   incipit {\nfixum numerus<u8> a ← 1\nfixum numerus<i16> b ← 2\nnota duo(a, b)\n}\n";
     assert_rejected(source);
+}
+
+// ---------------------------------------------------------------------------
+// The 64-bit cap (rulings 17b, 19a)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cap_typed_sum_into_int_is_checked_at_argument_and_return_stores() {
+    // `i64 + i64` is typed `i64` but its value reaches 2^64 - 2: the store
+    // into an `i64` slot is a real check and carries a node. A plain local
+    // (`c`) is checked at its own assignment and gets no separate node.
+    let source = "functio id(numerus v) → numerus { redde v }\n\
+                  functio add(numerus a, numerus b) → numerus { redde a + b }\n\
+                  incipit {\nvaria numerus a ← 1\nfixum numerus c ← a + a\nnota id(a + a)\n}\n";
+    let mut found = kinds(source);
+    found.sort_by_key(|kind| format!("{kind:?}"));
+    assert_eq!(found, vec![HirStoreKind::Argument, HirStoreKind::Return]);
+}
+
+#[test]
+fn provably_fitting_int_stores_carry_no_node() {
+    // `i32 * i32` fits `i64`; a bare `int` copy and a literal need no check.
+    let source = "incipit {\nvaria numerus<i32> p ← 3\nvaria numerus a ← 1\n\
+                  fixum numerus q ← p * p\nfixum numerus r ← a\nfixum numerus s ← 7\n}\n";
+    assert!(kinds(source).is_empty());
+}
+
+#[test]
+fn bitnot_of_u64_is_accepted_into_an_int_slot() {
+    // `¬u` keeps its sign at the cap, so it is `i64` and stores into `int`.
+    let source = "incipit {\nvaria numerus<u64> u ← 5\nfixum numerus y ← ¬u\n}\n";
+    test_support::analyze_ok(source);
 }

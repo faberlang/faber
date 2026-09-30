@@ -870,7 +870,9 @@ impl TypeChecker<'_> {
         let site = StoreSite::new(radix_hir::HirStoreKind::Assignment);
         match &target.kind {
             HirExpressionKind::Path(def_id) => {
-                let site = site.inferred_from(self.inferred_slot_sources.get(def_id).copied());
+                let site = site
+                    .inferred_from(self.inferred_slot_sources.get(def_id).copied())
+                    .local_slot();
                 match self.binding_names.get(def_id) {
                     Some(name) => site.named(*name),
                     None => site,
