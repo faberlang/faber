@@ -293,6 +293,34 @@ fn unbounded_collections_and_text_are_rejected_as_parameters() {
 }
 
 #[test]
+fn a_u32_index_vector_parameter_feeding_gather_is_a_legal_buffer() {
+    assert_accepts(
+        r"
+@ nucleum
+@ publica
+functio pick(tf32[8, 4] table, lista<u32> ids) → tf32[1, 4] {
+    redde table.gather(ids)
+}
+",
+    );
+}
+
+#[test]
+fn an_index_vector_parameter_not_feeding_gather_is_still_rejected() {
+    expect_kernel_error(
+        r"
+@ nucleum
+@ publica
+functio pick(tf32[8, 4] table, lista<u32> ids) → tf32[8, 4] {
+    redde table
+}
+",
+        HOST_TYPE,
+        &[("family", "lista"), ("site", "parameter")],
+    );
+}
+
+#[test]
 fn a_host_typed_local_is_rejected() {
     expect_kernel_error(
         r"

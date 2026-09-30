@@ -12,7 +12,7 @@ use super::kernel_legality::{
     ISSUE_RECOVERY, ISSUE_WORKGROUP, Sink,
 };
 use super::kernel_legality_types::{FAMILY_ATOMIC, host_only_family};
-use crate::{SymbolKind, Type, TypeId};
+use crate::{NumericWidth, Primitive, SymbolKind, Type, TypeId};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local};
 use radix_hir::{
     DefId, HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirLocal,
@@ -85,12 +85,39 @@ impl KernelWalk<'_, '_> {
                 &[("construct", "generator_function")],
             );
         }
+        let gather_ids = self.gather_id_params(function);
         for param in &function.params {
+            if gather_ids.contains(&param.def_id) {
+                continue;
+            }
             self.check_type(param.ty, param.span, "parameter");
         }
         if let Some(ret) = function.ret_ty {
             self.check_type(ret, self.function_span, "return");
         }
+    }
+
+    /// Parameters that are the row-gather index vector: a `lista<numerus<u32>>`
+    /// parameter passed straight to `tensor.gather(..)`. The intrinsic's index
+    /// slot is a `lista`, and the device lane binds it as the gather's input
+    /// buffer (the single typed array admission in `radix-mir` device safety),
+    /// so it is a buffer parameter, not a host-only collection.
+    fn gather_id_params(&self, function: &HirFunction) -> Vec<DefId> {
+        let Some(body) = &function.body else {
+            return Vec::new();
+        };
+        let mut scan = GatherIds {
+            env: self.env,
+            params: function
+                .params
+                .iter()
+                .filter(|param| is_gather_ids_type(param.ty, self.env))
+                .map(|param| param.def_id)
+                .collect(),
+            found: Vec::new(),
+        };
+        scan.visit_block(body);
+        scan.found
     }
 
     fn check_type(&mut self, ty: TypeId, span: Span, site: &str) {
@@ -312,6 +339,37 @@ impl KernelWalk<'_, '_> {
         for arg in args {
             self.visit_expr(&arg.expr);
         }
+    }
+}
+
+fn is_gather_ids_type(ty: TypeId, env: &Env<'_>) -> bool {
+    matches!(
+        env.types.get(ty),
+        Type::Array(element)
+            if matches!(
+                env.types.get(*element),
+                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32)
+            )
+    )
+}
+
+/// Collects the candidate parameters used as the argument of a `gather` call.
+struct GatherIds<'a, 'e> {
+    env: &'a Env<'e>,
+    params: Vec<DefId>,
+    found: Vec<DefId>,
+}
+
+impl HirVisitor for GatherIds<'_, '_> {
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        if let HirExpressionKind::MethodCall(_, method, _, args, _) = &expr.kind
+            && self.env.interner.resolve(*method) == "gather"
+            && let Some(HirExpressionKind::Path(def_id)) = args.first().map(|arg| &arg.expr.kind)
+            && self.params.contains(def_id)
+        {
+            self.found.push(*def_id);
+        }
+        walk_expr(self, expr);
     }
 }
 
