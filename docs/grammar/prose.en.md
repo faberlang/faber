@@ -131,6 +131,8 @@ top-level-only scope. It is the only top-level value declaration; declaring
 one inside a block is a parse error (`static_not_top_level`), the same
 enforcement shape as `functio`/`genus`/`ordo`/`discretio` at non-top level.
 
+A static's declared type cannot be a hole: `generis _ X = …` and `generis ∪ X = …` are parse errors (the same holds for an annotation field's type value and the `@ radix typus` domain list, which take a `concrete_type`).
+
 Statics are **immutable and initialized with `=` only** (D5.9), never `←`; a
 missing initializer or an initializer spelled with `←` is a named parse
 error. The initializer must be evaluable at compile time: literals;
@@ -148,6 +150,8 @@ compile errors), matching the runner's checked runtime semantics.
 
 ### Functions
 
+- Generic parameter lists put type parameters first and `magnitudo` (en `size`) parameters after them (`<T, U, magnitudo N>`); a type parameter after a size parameter is `type_param_after_magnitudo`. Once one parameter has a default (`= numerus`, `magnitudo N = 3`), every later parameter needs one (`generic_default_not_trailing`).
+- The `exitus` function modifier takes an identifier or a non-negative integer literal; the entry-point `exitus` (below) takes an expression.
 
 ### Capture-free closures
 
@@ -369,6 +373,12 @@ auto-composed into a chain, and a missing row fails closed.
 ### Tagged Unions
 
 
+Shared fields come first, before every variant. The first shared field must open
+with an annotation — `@ commune` (en `@ shared`) in practice — and the fields
+after it join the same region with or without one; a bare `T name` before any
+annotation reads as a variant. A variant may not redeclare a shared field
+(`union_variant_redeclares_shared_field`).
+
 Variant lists are an item list: comma required between variants, forbidden
 after the last. Payload fields inside a variant are a declaration block
 (genus-style, no commas).
@@ -389,7 +399,7 @@ heading for database results. It names only the columns the application reads;
 extra source columns stay invisible. Each `columna` row takes a type (use
 `T ∪ nihil` for a nullable column) and a name, with an optional
 `: sourceName` alias mapping the public column to a source column (absent means
-identity). Column rows are a declaration block (no commas). A schema has no
+identity). Column rows are a declaration block (no commas), and each row starts on its own line (a second `columna` on the same line is `schema_nested_column`). A schema has no
 methods (`schema_method`), no `implet`
 (`schema_inheritance`), and no nested columns (`schema_nested_column`); each is
 rejected at parse time.
@@ -452,6 +462,8 @@ importa ex "./types" publica User
 importa ex "norma:consolum" fixum dic ut output
 ```
 
+A record import needs its `ex = "…"` source (`missing_import_source`), and `omnia` cannot be combined with `nomen` or `ut` (`mixed_wildcard_and_named_import`).
+
 The `privata` import marker was removed (VM-U3); an import without a marker
 does not re-export, and `publica` is the re-export marker. Missing named binding
 defaults to the
@@ -487,7 +499,7 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 - `iuncta` element slots admit `_` (monomorphic hole, solved element-wise from the single position witness) and reject `∪`. A wanted union element is declared with binary cup (`iuncta<f32, textus ∪ nihil>`). `lista<∪>` / `tabula<K, ∪>` keep heterogeneous-union behavior. Labels compose with holes (`iuncta<loss: _, T>`).
 - `ratio` type arguments require a label for every element, labels are unique, `_` is admitted as a monomorphic element hole, and `∪` is rejected in an element slot. A `ratio` has no positional or bracket access, and it has no structural equivalence with another ratio or a genus; fields are accessed by label only.
 - Arrays are written `lista<T>` (unbounded, shipped). Postfix `T[]` is not accepted. `lista<T, N>` is the shipped bounded form; see Generic Collections.
-- `de`/`in` mark ownership (borrow/mut-borrow) on the immediately following union member. Parenthesize when grouping must be explicit.
+- `de`/`in`/`own`/`copy` mark ownership on the type they prefix: one union member, or a standalone `∪` hole. There is no grouping parenthesis in type position — `(` opens a function type and nothing else, so `(A ∪ B)` is a parse error (`PARSE001`); write the marker on the member (`de A ∪ B`).
 - Two hole kinds share the `holeType` production. `_` is the monomorphic hole ("infer exactly one inhabitant type"); the standalone `∪` is the union hole ("infer a finite multi-member union"). Both are legal wherever a base type is: bindings, returns, params, fields, and type arguments (`lista<∪>`, `tabula<K, ∪>`, `→ ∪`).
 - **Lone-`∪` rule:** a `∪` hole consumes the whole type expression — any following `∪` is a parse error (`A ∪ ∪`, `∪ B` rejected, issue `unexpected_cup_after_union_hole`). `_` keeps today's behavior and may still appear as a binary-cup member (`_ ∪ B`).
 - **Binary-cup disambiguation:** `∪` between two non-hole types remains the inline value-union operator (`A ∪ B`, nullable `T ∪ nihil`); the hole reading applies only when `∪` stands alone in a base-type position.
@@ -521,8 +533,9 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | `littera`  | en `char`; one Unicode scalar value (D10.1–10.2): a 4-byte value that never allocates (Rust `char`, Go `rune`). Element of `textus` / `ascii` iteration and of `textus[i]` / `ascii[i]` indexing. Grapheme clusters are norma library work, not this type. |
 | `forma`    | captured template + params |
 | `numerus`  | integer (default `i64`) |
-| `modulus<W>` | en `wrapping<W>`; unsigned modular word; a store reduces modulo 2^W |
+| `modulus<W>` | en `wrapping<W>`; modular word, signed or unsigned (N7e); a store reduces modulo 2^W |
 | `saturatus<W>` | en `saturating<W>`; saturating integer; a store clamps at both ends of W |
+| `exactus<W>` | en `trapping<W>`; the trapping policy spelled out (D11.8, N7a): the same type as `numerus<W>`, and a store traps when the value does not fit |
 | `fractus`  | float (default `f64`) |
 | `bivalens` | boolean |
 | `nihil`    | null |
@@ -563,8 +576,9 @@ Sized primitives accept one optional **width marker** (not a user type parameter
 | ------ | ------- | --------------- |
 | `numerus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `d64` | `numerus<f32>` → use `fractus<f32>` |
 | `fractus<W>` | `f16`, `bf16`, `f32`, `f64` | `fractus<i32>` → use `numerus<i32>` |
-| `modulus<W>` | `u8`, `u16`, `u32`, `u64` | `modulus<i32>` → signed widths are not modular words |
-| `saturatus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64` | `saturatus<f32>` → use `fractus<f32>` |
+| `modulus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64` | `modulus<f32>` or `modulus<d64>` → a modular word takes an integer width |
+| `saturatus<W>` | the same eight integer widths | `saturatus<f32>` → use `fractus<f32>` |
+| `exactus<W>` | the eight integer widths and `d64` | `exactus<f32>` → the trapping float cell is not built (`trapping_float_not_implemented`) |
 
 Bare `numerus` / `fractus` remain shorthand for `numerus<i64>` / `fractus<f64>`.
 
@@ -640,16 +654,22 @@ family a store into a narrower width applies the slot's policy
 slot's certain trap is a compile error); a constant in an `=` position
 (`generis`, field default, enum member, `fixum T x = e`) must fit `W` whatever
 the policy. Literals in `modulus<W>` and `saturatus<W>` slots must fit `W`.
-The unbounded integer is the bare marker `inf`; a policy word on it is legal
-and has no effect.
+The unbounded integer `inf` (D11.5) is admitted, not shipped: `inf` is not yet a
+type (`unknown_type`), so every intermediate still obeys the 64-bit range above.
 
 The D11.8 naming frame puts the policy outside and the representation inside:
 en `trapping<W>`, `wrapping<W>`, `saturating<W>`; la `exactus<W>`, `modulus<W>`,
 `saturatus<W>`. A bare marker takes its domain's default policy (`u8` is
-`trapping<u8>`; integers and `d64` trap, floats follow IEEE), and the long forms
-`numerus<W>`/`fractus<W>` retire. That respelling, signed `wrapping<W>`, and the
-float cells are ruled but not yet the accepted surface: this document keeps the
-`numerus<W>`/`modulus<W>`/`saturatus<W>` spellings the compiler accepts today.
+`trapping<u8>`; integers and `d64` trap, floats follow IEEE).
+
+**Shipped (N7a, N7e):** the trapping policy word (`exactus<W>` / en
+`trapping<W>`, integer widths and `d64`), bare markers in every type position,
+and signed widths on `modulus<W>` — `wrapping<i8>` reduces into the signed
+range, so `100 + 100` stored into it is −56. **Admitted, not shipped:** the
+float cells (`exactus<f32>` is rejected as `trapping_float_not_implemented`;
+`modulus` and `saturatus` take no float width) and the retirement of the long
+forms (N7c/N7d): `numerus<W>`/`fractus<W>` (en `int<W>`/`float<W>`) stay
+accepted beside the policy words, and this document writes them.
 
 **Implicit and explicit failure differ.** A failed implicit store is a trap of
 its own identity: it never enters the `⇥` channel, even inside `fac … cape`,
@@ -821,8 +841,9 @@ For non-width element types (e.g. `tensor<textus, [3]>`), use the full form.
 Sugar is reserved in type syntax only — value identifiers named `tf32`, `lf32`,
 etc. are unchanged.
 
-`modulus<W>` and `saturatus<W>` have no sugar; write `modulus<u32>` /
-`saturatus<i16>` in full.
+`modulus<W>`, `saturatus<W>` and `exactus<W>` have no sugar; write
+`modulus<u32>` / `saturatus<i16>` / `exactus<u8>` in full (the bare marker `u8`
+already is the trapping `u8`).
 
 **Spelling preference (author convention, not grammar):** general Faber code
 tends toward long form for readability; numeric/tensor-primary modules may
@@ -835,7 +856,9 @@ prefer sugar. Choose per module or file.
 ### Conditionals
 
 
-- `si` = if, `sin` = else-if, `secus` = else
+- `si` = if, `sin` = else-if, `secus` = else. `sin` takes its condition
+  directly (`si a { … } sin b { … } secus { … }`); `sin si b` and `secus si b`
+  are parse errors.
 - `c ✓ a ✗ b` is the one value conditional: `a` when `c` holds, else `b`.
   `✓` (U+2713 CHECK MARK) and `✗` (U+2717 BALLOT X) are the same in every
   locale and have no word twin. It is one level only: a `✓ ✗` inside the
@@ -885,7 +908,12 @@ variants of an `ordo` or `discretio`, the members of a union, and `bivalens`
 as the closed set `{verum, falsum}`. A match over several scrutinees is
 checked over their product, so `discerne a, b` over two `bivalens` values
 needs all four combinations or a `ceterum`. A missing variant or combination is
-an error that names one uncovered case. Open types (`numerus`, `textus`, …)
+an error that names one uncovered case. The multi-subject form parses today —
+subjects are comma-separated, and an arm's patterns are separated by `,` or
+`et` (`casu verum et falsum`) — and its coverage is checked over the product,
+but its lowering is **admitted, not shipped** (D22.4, the `dms` unit): the Rust
+emitter lowers it, while the MIR runner, TypeScript, Go and Haskell reject it (for example `unsupported MIR lowering: multi-subject discerne before
+switch MIR lowering`). Open types (`numerus`, `textus`, …)
 are complete only with a catch-all arm. When coverage cannot be computed for a
 pattern kind, the compiler warns that it was not checked; it is never silent.
 `elige` keeps its switch meaning: over an open domain, a missing `ceterum` is
@@ -967,6 +995,8 @@ suffix is consumed before the selection suffix. `⊤` remains unspent.
 **Hadamard divide (`⊘`):** `a ⊘ b` is element-wise division, the divide
 companion of `⊙`. It binds at the multiplicative tier with `*` and the other
 glyph products, left-associative.
+
+**Tensor lifting (FLD K4, K5):** the scalar operators lift to tensors elementwise with no grammar change. Shipped: `+` and `-` (binary and unary) against a scalar or an equal-shape tensor, `*` by a scalar, `/` and `%` by a scalar, `÷` on any shape (with the per-element result widths of the [Numeric model](#numeric-model)), `⤒`/`⤓` tensor against tensor, the comparisons `≺ ≻ ≤ ≥ ≡ ≠ ≅ ≇` (each yields a `tensor<bivalens>`), the logic words `et` / `aut` / `non` on `tensor<bivalens>`, the `✓ ✗` select with a `tensor<bivalens>` condition, and `vel` when the elements are nullable (`tensor_coalesce_element_nullable_required` otherwise). The math methods `abs sqrt exp ln log10 sin cos tan` (Latin `absolutum radix exponentia logarithmus logarithmus_decimalis sinus cosinus tangens`) lift the same way; the float functions need float elements, and a user function is never lifted (`tensor_function_not_lifted`). Tensor `≈`/`≉` are deferred (`tensor_approx_comparison_deferred`), and `tensor * tensor` is still rejected (`numeric_operands_required`; its ruling is FLD K10, not shipped). Lifting runs on the MIR runner (the math methods also lower on Rust); every other emitter fails closed (`tensor_lift_unsupported_on_target`).
 
 **Division (`/` and `÷`):** both bind at the multiplicative tier with `*`,
 left-associative. `/` floors on integers and `%` takes the divisor's sign; `÷`
@@ -1115,6 +1145,8 @@ target's range fails — it never wraps and never relabels. The failure takes th
 error channel, or the `⊥` default when one is written. Into `modulus<W>` and
 `saturatus<W>` targets `↦` reduces or clamps and cannot fail. Use `modulus<W>`
 for wrapping arithmetic.
+
+**Interval clamp (`↦ lo‥hi`).** When the target of `↦` is a range instead of a type, the conversion clamps a number into that interval: `15 ↦ 0‥10` is 9 (the half-open `‥` excludes its end), `15 ↦ 0…10` is 10 (`…` includes it), `wide ↦ 10…50` clamps one `intervallum` value into another range, and a stored `intervallum` value is a legal target too (`x ↦ fines`). The grammar production is `conversio_expr := '↦' (type_annotation | interval_target) via_clause? inline_default?` with `interval_target := range_expr`. The parser reads the operand as an interval, not a type, when it opens with a number literal or a non-type identifier; a capitalized name, a known type word, or a qualified `ns.Type` stays a type. A clamp is total, so it takes no `via` hint (`conversio_via_target_takes_no_hint`), no `⊥` default (`intervallum_clamp_recovery_unsupported`) and no `per` step (`intervallum_value_step_unsupported`); these are semantic rejections of a shape the grammar still admits.
 
 **Default channel (`⊥`):** `⊥` (U+22A5 UP TACK) supplies a value when a
 conversion or a failable call fails: `fixum numerus n ← "abc" ↦ numerus ⊥ 0`,
@@ -1367,6 +1399,8 @@ head and never shares the reduce/scan `fixum`/`varia` binder tail.
 by `(`; elsewhere the spelling stays an ordinary identifier. An optional
 `apud` coordinate clause binds per-axis indices as in `itera ex`.
 
+`summa ex source apud [i] fixum s { redde term }` is the sequential sum-reduce over a shaped source: one term per element (`redde` inside the body yields it) folded into a `+` accumulator seeded at zero. `maxima ex source [apud [i]] [vel identity]` and `minima ex …` (en `max from` / `min from`, with `coalesce` for `vel`) are the extrema reductions: no binder and no body, and the optional `vel` tail states the caller's identity for an empty source (a statically non-empty source needs none). Each head is claimed only in expression-head position immediately followed by `ex`; elsewhere the spelling stays an ordinary identifier, so `maxima(a, b)` remains a call. The distributed `filum` clause of `summa` is admitted only inside `@ nucleum` kernels today. A general `reducta via Op` reduction that would retire `summa ex` and `max from` / `min from` is admitted, not shipped (FLD K3).
+
 `scriptum` and `lege`/`lineam` are builtin claims that resolve to a user binding
 when the surface spelling is bound in scope (parameter, local, function, or any
 in-scope definition); otherwise they are the builtin. The same binding-wins rule
@@ -1376,7 +1410,7 @@ marker: builtin claims are defaults, not reservations.
 `finge` variant construction accepts a qualified variant path
 (`finge pkg.Bonum { … }`), so an imported union's variants construct through
 the import alias, and the `∷` cast is a full type annotation
-(`∷ pkg.Exitus`) exactly as the general postfix ascription (uvf-u3).
+(`∷ pkg.Exitus`) exactly as the general postfix ascription (uvf-u3). A `{` right after a `finge` path always opens its field list (empty braces are legal), so a `finge` condition or scrutinee cannot be directly followed by a block: `si finge A { … }` is a parse error, and `si (finge A) { … }` is the parenthesized form.
 
 `∷` remains the general postfix ascription in `cast`. Rendered text templates
 (`STRING '(' argumentList ')'`) and captured `forma` templates
@@ -1436,7 +1470,8 @@ comment.
 when its body escapes through the error channel, and a case that completes
 cleanly fails (strict expected-failure). The other modifiers are `omitte`,
 `futurum`, `solum`, `solum_in`, `tag`, `temporis`, `metior`, `repete`, and
-`fragilis`.
+`fragilis`. The counts of `temporis`, `repete` and `fragilis` are non-negative
+integer literals; a float is `test_modifier_integer`.
 
 ---
 
@@ -1530,6 +1565,7 @@ Faber code answer a route. `@ ad 'prefix:name'` (en `@ call`) on a top-level,
 non-generic, bodied `functio` serves that route.
 
 - Routes are exact: `prefix:name` or `prefix/name`. Pattern routes are deferred.
+- The annotation must be followed — directly, or after further stacked annotations — by a `functio`; before any other declaration it is a parse error (`ad_annotation_requires_functio`), and it is never a `genus` member, `discretio` field or `implendum` method annotation.
 - The handler takes zero or one parameter; the one parameter is the opener
   value of the calling `ad`.
 - A handler serves one route. Reserved prefixes (such as `runtime:`) and
@@ -1611,6 +1647,26 @@ map key is `tabula_key_not_hashable`; a non-hashable set element is
 - `fac { ... }` is the explicit `do` block and executes its body once.
 - `fac { ... } dum condition` is the post-test loop form; postfix `dum` attaches only to `fac`, not arbitrary preceding blocks.
 - `cape` is an attachment shared by several structured forms, not a semantic mode owned by `fac`. A plain `fac` is often used when an otherwise unattached block needs a local handler: `fac { ... } cape err { ... }`.
+
+---
+
+## Admitted, Not Shipped
+
+These are ruled or admitted for the language and are **not** accepted by the
+compiler today. None of them is a production of the grammar above, and the live
+parser rejects each one.
+
+| Construct | State |
+| --------- | ----- |
+| `fac omnia { … } cape e { … }` (en `do all`) | admitted (FLD K1); `fac omnia` is `PARSE001` |
+| `itera ex t apud [i, j] filum f fixum v { … }` | admitted (FLD K2); a `filum` clause on `itera` is rejected (`filum` exists only in `summa ex` inside kernels) |
+| `reducta via Op ex source …` (en `reduce via Op from …`) | admitted (FLD K3), with `Op` a closed set `Sum Product Max Min Argmax Argmin All Any Count`; it would retire `summa ex` and `max from` / `min from`, all of which stay shipped meanwhile |
+| Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
+| The unbounded integer `inf` | ruled (D11.5); not yet a type |
+| `trapping`/`saturating`/`wrapping` float cells; retiring `numerus<W>`/`fractus<W>` | ruled (D11.8); N7c/N7d pending |
+| Multi-subject `discerne` lowering | parses and is coverage-checked; lowered only by the Rust emitter |
+| Run-time capacities and extents (`[H, W]`, `_`) | admitted (FLD K14); today every extent and capacity is a compile-time value |
+| Slash-delimited regex literals | pending; use `"…" ↦ regex` |
 
 ---
 

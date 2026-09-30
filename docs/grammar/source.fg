@@ -41,6 +41,7 @@ role_table = [
   "string_delimiter",
   "template_hole",
   "tensor_product",
+  "transfer",
   "transpose",
   "type_ascription",
   "type_intersection",
@@ -61,6 +62,13 @@ codepoint = "U+0025"
 unicode_name = "PERCENT SIGN"
 role = "arithmetic"
 claiming_slots = ["multiplicative_expr"]
+
+[[glyphs]]
+glyph = "*"
+codepoint = "U+002A"
+unicode_name = "ASTERISK"
+role = "arithmetic"
+claiming_slots = ["multiplicative_expr", "wildcard_import"]
 
 [[glyphs]]
 glyph = "+"
@@ -231,6 +239,13 @@ role = "conversion"
 claiming_slots = ["conversio_expr"]
 
 [[glyphs]]
+glyph = "⇇"
+codepoint = "U+21C7"
+unicode_name = "LEFTWARDS PAIRED ARROWS"
+role = "transfer"
+claiming_slots = ["transfer"]
+
+[[glyphs]]
 glyph = "⇐"
 codepoint = "U+21D0"
 unicode_name = "LEFTWARDS DOUBLE ARROW"
@@ -319,7 +334,7 @@ glyph = "∪"
 codepoint = "U+222A"
 unicode_name = "UNION"
 role = "type_union"
-claiming_slots = ["hole_type", "type_annotation"]
+claiming_slots = ["type_annotation", "union_hole_type"]
 
 [[glyphs]]
 glyph = "∴"
@@ -674,6 +689,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Declarations | `nomen` | import binding name |
 # | Declarations | `ordo` | enum |
 # | Declarations | `publica` | public visibility |
+# | Declarations | `regio` | file module name (contextual) |
 # | Declarations | `schema` | relational heading (experimental; census-types) |
 # | Declarations | `columna` | relational column (experimental; census-types) |
 # | Declarations | `sit` | inferred immutable local |
@@ -724,6 +740,8 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Boolean | `non` | not |
 # | Boolean | `vel` | nullable default |
 # | Boolean | `verum` | true |
+# | Expression | `maxima` | maximum reduction (en `max from`) |
+# | Expression | `minima` | minimum reduction (en `min from`) |
 # | Objects | `clausura` | legacy closure |
 # | Objects | `libera` | capture-free closure modifier |
 # | Objects | `ego` | self |
@@ -733,6 +751,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Objects | `praefixum` | prefix expression |
 # | Grammar | `primus_quem` | first-match selection head |
 # | Grammar | `ubi` | first-match predicate tail |
+# | Conversion | `via` | convert-hint clause after a `↦` target (contextual) |
 # | Type | `copy` | copy ownership |
 # | Type | `de` | borrow / for-in keys |
 # | Type | `in` | ownership in |
@@ -770,6 +789,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Annotation | `nucleum` | kernel annotation; kernel closure modifier |
 # | Annotation | `radix` | compiler-reserved annotation family |
 # | Annotation | `lane` | `@ radix` compiler-lane directive |
+# | Annotation | `contract` | `@ radix` contract-role mark |
 # | Annotation | `backward` | `@ radix` gradient-companion directive |
 # | Testing | `erratur` | expect failure |
 # | Testing | `fragilis` | flaky |
@@ -802,7 +822,7 @@ IDENTIFIER ::=
 @status capture-pending
 NUMBER ::=
 
-# not a distinct lexer token; type-position TokenKind::Integer used as magnitudo capacity (no fraction/exponent)
+# not a distinct lexer token; TokenKind::Integer used as magnitudo capacity in type position, as the count of a `proba` modifier (`temporis`, `repete`, `fragilis`; a float is `test_modifier_integer`), and as a function's `exitus` code (no fraction/exponent)
 @status capture-pending
 NATURAL ::=
 
@@ -826,7 +846,7 @@ OCTETI_STRING ::=
 @status capture-pending
 NEWLINE ::=
 
-# parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64 and decimal d64 (numerus only), f16/bf16/f32/f64 (fractus only); u8/u16/u32/u64 (modulus), i8/i16/i32/i64/u8/u16/u32/u64 (saturatus); not a lexer token
+# parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64 and decimal d64 (numerus and exactus), f16/bf16/f32/f64 (fractus only); every integer width i8…u64 (modulus and saturatus; no d64, no float); integer widths and d64 (exactus; a float width is `trapping_float_not_implemented`); not a lexer token
 @status capture-pending
 WIDTH_MARKER ::=
 
@@ -894,7 +914,13 @@ program       := regio_decl? statement*
 # follows). Two imports that would default to the same name are a compile
 # error; alias one with `ut`.
 regio_decl    := 'regio' IDENTIFIER
-statement     := annotation* statement_core
+statement     := annotation* statement_core | ad_handler_decl
+# An `@ ad '<route>'` annotation must be followed — directly, or after further
+# stacked annotations — by a `functio` (`ad_annotation_requires_functio`); it
+# attaches to no other declaration and to no `genus` member, `discretio` field
+# or `implendum` method, so `annotation` below leaves it out. Top-level
+# placement, handler shape and reserved routes are semantic.
+ad_handler_decl := annotation* ad_annotation annotation* functio_decl
 statement_core := importa_decl | binding_decl | functio_decl | genus_decl | implendum_decl
                | typus_decl | ordo_decl | discretio_decl | schema_decl | static_decl
                | si_stmt | dum_stmt | itera_stmt
@@ -911,7 +937,7 @@ block_stmt     := '{' statement* '}'
 # inside a `block_stmt` is parsed by this same production and rejected with
 # `static_not_top_level`, the same enforcement shape as `functio_decl` /
 # `genus_decl` / `ordo_decl` / `discretio_decl` (`declaration_not_top_level`).
-static_decl    := 'generis' type_annotation IDENTIFIER '=' static_init
+static_decl    := 'generis' concrete_type IDENTIFIER '=' static_init
 # `static_init` (D8.10): a `generis` initializer is either the build-time
 # file embed or an ordinary expression (`praefixum { … }` included, D8.4-D8.6).
 # `insere_expr` is legal only here and in a `field_decl` initializer that
@@ -941,9 +967,14 @@ object_destruct := ('fixum' | 'varia') object_pattern '←' expression
 
 functio_decl     := 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 param_list    := (parameter (',' parameter)*)?
-generic_params := '<' generic_param (',' generic_param)* '>'
-generic_param  := IDENTIFIER generic_bound? generic_type_default? | 'magnitudo' IDENTIFIER generic_size_default?
-# defaults are declaration-time facts; once one parameter defaults, every following parameter must default
+generic_params := '<' (type_param_list (',' size_param_list)? | size_param_list) '>'
+# Type parameters come first and `magnitudo` size parameters after them: a type
+# parameter following a size parameter is `type_param_after_magnitudo`.
+type_param_list := generic_param (',' generic_param)*
+size_param_list := size_param (',' size_param)*
+generic_param  := IDENTIFIER generic_bound? generic_type_default?
+size_param     := 'magnitudo' IDENTIFIER generic_size_default?
+# defaults are declaration-time facts; once one parameter defaults, every following parameter must default (`generic_default_not_trailing`)
 # `generic_bound` (D1.1-D1.3, C1): a type parameter may name the contracts its
 # witnesses must declare. Inside `<…>` the comma separates parameters, so
 # several bounds on one parameter join with `∩` only — a comma there would
@@ -965,7 +996,7 @@ generic_type_default := '=' type_annotation
 generic_size_default := '=' NATURAL
 call_type_args  := '<' type_annotation (',' type_annotation)* '>'
 parameter    := 'ceteri'? type_annotation IDENTIFIER 'sponte'? ('ut' IDENTIFIER)? ('vel' expression)?
-func_modifier := 'argumenta' IDENTIFIER | 'errata' IDENTIFIER | 'exitus' (IDENTIFIER | NUMBER) | 'immutata' | 'iacit' | 'optiones' IDENTIFIER
+func_modifier := 'argumenta' IDENTIFIER | 'errata' IDENTIFIER | 'exitus' (IDENTIFIER | NATURAL) | 'immutata' | 'iacit' | 'optiones' IDENTIFIER
 callable_posture := 'fiet' | 'fiunt' | 'fient'
 return_clause := '→' type_annotation
 alternate_exit_clause := '⇥' type_annotation
@@ -981,11 +1012,12 @@ clausura_params := clausura_param (',' clausura_param)*
 clausura_param  := type_annotation IDENTIFIER
 
 genus_decl    := 'genus' IDENTIFIER generic_params? ('implet' contract_ref ((',' | '∩') contract_ref)*)? '{' genus_member* '}'
-genus_member  := annotation* (field_decl | functio_method_decl)
-# `field_decl` (D16.1-D16.3, D5c): every `genus` field declares exactly one of
-# `fixum` / `varia` / `generis` — there is no default, and an unmarked genus
+genus_member  := annotation* (genus_field_decl | functio_method_decl)
+# `genus_field_decl` (D16.1-D16.3, D5c): every `genus` field declares exactly one
+# of `fixum` / `varia` / `generis` — there is no default, and an unmarked genus
 # field is PARSE010 `field_modifier_missing`. The unmarked form survives only
-# in the `discretio` shared-field position (`union_member`, fork F7 held).
+# in the `discretio` shared-field position (`union_member` → `field_decl`, fork
+# F7 held).
 # `fixum T x`: set only in a construction literal (`Genus { … }`), never
 # reassigned (`SEM020 assignment_to_fixum_field`); `Genus { … } ex p` copies
 # it unchanged. `varia T x`: reassignable per instance. `generis T X = …`: one
@@ -994,14 +1026,17 @@ genus_member  := annotation* (field_decl | functio_method_decl)
 # also open with the build-time `insere_expr`; `fixum`/`varia` fields only
 # ever take the `expression` alternative — `insere` there parses as an
 # ordinary identifier, not the build-time embed.
+genus_field_decl := ('fixum' | 'varia' | 'generis') type_annotation IDENTIFIER 'sponte'? ('=' static_init)?
+# `field_decl` is the `discretio` shared-field form, where the modifier stays
+# optional (F7 held); `genus_field_decl` above is the `genus` form.
 field_decl    := ('fixum' | 'varia' | 'generis')? type_annotation IDENTIFIER 'sponte'? ('=' static_init)?
 functio_method_decl   := 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 
-annotation            := nucleum_annotation | radix_annotation | ad_annotation | braced_annotation | annotation_sugar
+annotation            := nucleum_annotation | radix_annotation | braced_annotation | annotation_sugar
 annotation_name        := ANNOTATION_NAME
 braced_annotation      := '@' annotation_name '{' annotation_field_list? '}'
 annotation_field_list   := annotation_field (',' annotation_field)*
-annotation_field       := ANNOTATION_FIELD_NAME '=' (expression | type_annotation)
+annotation_field       := ANNOTATION_FIELD_NAME '=' (expression | concrete_type)
 annotation_sugar       := '@' annotation_name NON_NEWLINE_TOKEN* NEWLINE
 nucleum_annotation     := nucleum_sugar | nucleum_braced
 nucleum_sugar          := '@' 'nucleum' nucleum_modifier? NEWLINE
@@ -1022,7 +1057,7 @@ nucleum_field          := 'fragment' '=' ('verum' | 'falsum')
 # `implendum_decl`; the compiler finds the contract by the mark, never by its
 # name. `"ordering"` is the only recognized role today.
 radix_annotation       := '@' 'radix' radix_directive NEWLINE
-radix_directive        := 'lane' STRING | 'backward' STRING | 'contract' STRING | 'typus' IDENTIFIER 'in' type_annotation+
+radix_directive        := 'lane' STRING | 'backward' STRING | 'contract' STRING | 'typus' IDENTIFIER 'in' concrete_type+
 # `@ ad '<route>'` (en `@ call`) registers a top-level `functio` as the handler
 # for one exact route. Pattern routes (`@ ad sed "…"`) are deferred.
 ad_annotation          := '@' 'ad' ASCII_STRING NEWLINE
@@ -1035,19 +1070,31 @@ typus_decl := 'typus' IDENTIFIER generic_params? '=' type_annotation
 ordo_decl   := 'ordo' IDENTIFIER '{' enum_member (',' enum_member)* '}'
 enum_member := IDENTIFIER ('=' ('-'? NUMBER | STRING))?
 
-discretio_decl := 'discretio' IDENTIFIER generic_params? '{' union_member* variant (',' variant)* '}'
+discretio_decl := 'discretio' IDENTIFIER generic_params? '{' union_fields? variant (',' variant)* '}'
+# Shared fields come first, before every variant. The first shared field must
+# open with an annotation — `@ commune` (en `@ shared`) in practice — and the
+# fields after it join the same region with or without one; a bare `T name`
+# before any annotation reads as a variant. A variant may not redeclare a
+# shared field (`union_variant_redeclares_shared_field`).
+union_fields  := annotation+ field_decl union_member*
 union_member  := annotation* field_decl
 variant       := IDENTIFIER ('{' variant_fields '}')?
 variant_fields := (type_annotation IDENTIFIER)*
 
 # Experimental (owned by the census-types goal): a relational heading naming
-# only the columns the application reads. Columns take no separator; the
+# only the columns the application reads. Columns take no separator but each row
+# starts on its own line (a same-line `columna` after a row is
+# `schema_nested_column`); the
 # optional `: source` row maps the public column name to a source column.
-schema_decl   := 'schema' IDENTIFIER '{' schema_column* '}'
+schema_decl   := 'schema' IDENTIFIER '{' (schema_column (NEWLINE schema_column)*)? '}'
 schema_column := 'columna' type_annotation IDENTIFIER (':' IDENTIFIER)?
 
 importa_decl     := importa_record | importa_sugar
-importa_record   := 'importa' '{' import_field_list? '}'
+importa_record   := 'importa' '{' import_field_list '}'
+# A record needs its `ex = STRING` source (`missing_import_source`); `omnia`
+# cannot be combined with `nomen` or `ut` (`mixed_wildcard_and_named_import`),
+# `visibilitas` takes only `publica`, and an unknown field is
+# `unknown_import_field`.
 import_field_list := import_field (',' import_field)*
 import_field    := ex_field | visibilitas_field | nomen_field
                 | ut_field | omnia_field
@@ -1068,13 +1115,34 @@ wildcard_import := '*' 'ut' IDENTIFIER
 selective_import := 'fixum' import_value_binding (',' import_value_binding)*
 import_value_binding := IDENTIFIER ('ut' IDENTIFIER)?
 
-type_annotation := intersection_type ('∪' intersection_type)*
+type_annotation := union_hole_type | concrete_type
+# `concrete_type` is every type expression except the standalone `∪` hole. The
+# slots that cannot take a hole take this form: a static's declared type, an
+# annotation field's type value and the `@ radix typus` domain list. (The
+# monomorphic hole `_` is also rejected in a static's type slot; it stays a
+# legal member of a union elsewhere.)
+concrete_type   := intersection_type ('∪' intersection_type)*
+# The standalone union hole `∪` is a complete type expression: it consumes the
+# whole type, so a following `∪` or `∩` (`∪ ∪ A`, `∪ ∩ A`) is a parse error
+# (`unexpected_cup_after_union_hole`), and it is never a member of a union or
+# intersection. The monomorphic hole `_` (`hole_type`) has no such rule.
+union_hole_type := ('de' | 'in' | 'own' | 'copy')? '∪'
 # `∩` binds tighter than `∪`: the cup tail parses at intersection level.
 intersection_type := owned_type ('∩' owned_type)*
 owned_type      := ('de' | 'in' | 'own' | 'copy')? base_type
-base_type       := hole_type | function_type | width_type_sugar | ratio_type | qualified_type type_arguments? | '(' type_annotation ')'
+# There is no grouping parenthesis in type position: `(` opens a function type
+# only, so `(A ∪ B)` is a parse error. A union member that needs its own access
+# marker is written on the member (`de A ∪ B`).
+base_type       := hole_type | function_type | width_type_sugar | ratio_type | failable_promissum_type | qualified_type type_arguments?
+# `promissum<T ⇥ E>` is the failable promise: the only applied type whose
+# argument list carries an alternate-exit clause. The head must be the
+# `promissum` type name (a keyword-free type spelling, so it is an IDENTIFIER
+# here); any other head, and the comma form `promissum<T, E>`, is a parse error
+# (`promissum_alternate_uses_exit_arrow`). `promissum<T>` with no `⇥` is an
+# ordinary `qualified_type type_arguments`.
+failable_promissum_type := IDENTIFIER '<' type_annotation alternate_exit_clause '>'
 ratio_type      := 'ratio' '<' labeled_type_argument (',' labeled_type_argument)* '>'
-hole_type       := '_' | '∪'
+hole_type       := '_'
 qualified_type  := IDENTIFIER ('.' IDENTIFIER)*
 type_arguments  := '<' type_argument (',' type_argument)* '>'
 type_argument   := labeled_type_argument | type_annotation | NATURAL | '[' figura_list? ']'
@@ -1088,7 +1156,11 @@ figura_list     := figura (',' figura)*
 function_type   := '(' type_list? ')' '→' type_annotation alternate_exit_clause?
 type_list       := type_annotation (',' type_annotation)*
 
-si_stmt     := 'si' expression arm ('sin' si_stmt | secus_clause)?
+si_stmt     := 'si' si_tail
+# `sin` is the else-if word and is followed directly by the next condition,
+# not by another `si`: `si a { … } sin b { … } secus { … }`. Both `sin si b`
+# and `secus si b` are parse errors. Each branch arm may carry its own `cape`.
+si_tail     := expression arm ('sin' si_tail | secus_clause)?
 secus_clause := 'secus' else_arm
 arm        := (block_stmt | ergo_joint statement) cape_clause?
 else_arm    := (block_stmt | ergo_joint statement) cape_clause?
@@ -1244,7 +1316,19 @@ cast_expr       := gradient_expr ('∷' type_annotation | conversio_expr)* inlin
 # argument (`numerus<W, Hex>`, `littera<Code>`) and as a bracketed tail
 # (`octeti<16><Le>`) — are parse errors (`conversio_hint_type_argument`,
 # `conversio_hint_tail_argument`), not productions of this grammar.
-conversio_expr        := '↦' type_annotation via_clause? inline_default?
+conversio_expr        := '↦' (type_annotation | interval_target) via_clause? inline_default?
+# `interval_target` is the interval clamp: `15 ↦ 0‥10` clamps the value into the
+# half-open range (9), `15 ↦ 0…10` into the closed one (10), and `x ↦ fines`
+# clamps into a stored `intervallum` value; a range-typed source clamps into the
+# target range (`wide ↦ 10…50`). The parser reads the target as an interval
+# operand — instead of a type — when it opens with a number literal or a
+# non-type identifier (a capitalized name, a known type word or a qualified
+# `ns.Type` stays a type). A clamp takes no `via` hint
+# (`conversio_via_target_takes_no_hint`), no `⊥` default
+# (`intervallum_clamp_recovery_unsupported`) and no `per` step
+# (`intervallum_value_step_unsupported`); those are semantic rejections of a
+# shape this grammar still admits.
+interval_target       := range_expr
 # `via` is contextual: it is claimed only on the conversion's own line,
 # immediately after the target type; everywhere else it is an ordinary
 # identifier. The hint is a compile-time identifier (`Hex`, `Bin`, `Oct`,
@@ -1275,6 +1359,7 @@ primary := IDENTIFIER | literal | 'ego'
          | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr
          | first_match_expr
          | summa_expr
+         | extrema_expr
          | capta_expr
          | '(' expression ')'
 ad_expr    := 'ad' ASCII_STRING ad_opener?
@@ -1308,7 +1393,7 @@ json_string := STRING
 # Numerus when no decimal point or exponent is present; otherwise Fractus.
 json_number := NUMBER
 
-finge_expr     := 'finge' qualified_ident ('{' field_list '}')? ('∷' type_annotation)?
+finge_expr     := 'finge' qualified_ident ('{' field_list? '}')? ('∷' type_annotation)?
 qualified_ident := IDENTIFIER ('.' IDENTIFIER)*
 # `praefixum` (D8.4-D8.6, D9): the compile-time initializer for a static. The
 # retired parenthesized form (`'praefixum' '(' expression ')'`) is gone; a
@@ -1342,6 +1427,16 @@ first_match_expr := 'primus_quem' '(' expression apud_clause? ',' 'ubi' IDENTIFI
 # `filum` is claimed by exact spelling only inside this production.
 summa_expr  := 'summa' 'ex' expression apud_clause? filum_clause? ('fixum' | 'varia') IDENTIFIER block_stmt
 filum_clause := 'filum' IDENTIFIER
+# The extrema reductions `maxima ex` / `minima ex` (en `max from` / `min from`):
+# the maximum or minimum over a shaped source, with the same optional `apud`
+# coordinate clause as `summa`. The optional `vel` tail states the caller's
+# identity for an empty source (`max from v coalesce 0.0` in the English reader);
+# a statically non-empty source needs none. Each head is claimed only in the
+# expression-head position immediately followed by `ex`; anywhere else the
+# spelling stays an ordinary identifier, so `maxima(a, b)` remains a call.
+# Unlike `summa`, there is no `fixum`/`varia` binder and no term body.
+extrema_expr := ('maxima' | 'minima') 'ex' expression apud_clause? extrema_identity?
+extrema_identity := 'vel' expression
 # Capture boundary: `capta` claims its spelling only in expression-primary
 # position directly followed by `{`; the block's trailing expression is the
 # success value and the error channel is reified into a value union.
@@ -1362,7 +1457,7 @@ probandum_decl := 'probandum' STRING proba_modifier* '{' probandum_body '}'
 probandum_body := (praepara_block | probandum_decl | proba_stmt)*
 proba_stmt     := 'proba' STRING proba_modifier* block_stmt
 proba_modifier := 'erratur' | 'omitte' STRING | 'futurum' STRING | 'solum' | 'tag' STRING
-              | 'temporis' NUMBER | 'metior' | 'repete' NUMBER | 'fragilis' NUMBER
+              | 'temporis' NATURAL | 'metior' | 'repete' NATURAL | 'fragilis' NATURAL
               | 'solum_in' STRING
 praepara_block := ('praepara' | 'praeparabit' | 'postpara' | 'postparabit') 'omnia'? block_stmt
 
