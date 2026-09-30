@@ -192,30 +192,53 @@ fn format_test_gate_matches_reemit_pipeline_for_salve() {
     );
 }
 
+/// The freshly built `faber` binary that CLI-spawning tests run.
+///
+/// Integration-test targets get `CARGO_BIN_EXE_faber` from cargo, which builds
+/// the binary before they run. Unit tests (lib and bin targets) do not, and a
+/// plain `cargo test` never rebuilds `target/<profile>/faber` for them, so a
+/// stale artifact would green or red these tests without testing the code
+/// under change. Build it once per test process instead; a failed build fails
+/// the test loudly, it never falls back to whatever binary is on disk.
 pub(crate) fn faber_binary() -> PathBuf {
     if let Ok(path) = std::env::var("CARGO_BIN_EXE_faber") {
         return PathBuf::from(path);
     }
-    // Shared-target layouts place the binary under CARGO_TARGET_DIR, not
-    // <manifest>/target/debug. Prefer current_exe's parent (cargo test sets
-    // CARGO_BIN_EXE when available; fallback walks from the test binary).
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(parent) = exe.parent() {
-            if parent.file_name().and_then(|n| n.to_str()) == Some("deps") {
-                if let Some(debug_dir) = parent.parent() {
-                    let candidate = debug_dir.join("faber");
-                    if candidate.is_file() {
-                        return candidate;
-                    }
-                }
-            }
-            let sibling = parent.join("faber");
-            if sibling.is_file() {
-                return sibling;
-            }
-        }
+    static BUILT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+    BUILT.get_or_init(build_faber_binary).clone()
+}
+
+fn build_faber_binary() -> PathBuf {
+    let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+    let mut build = Command::new(cargo);
+    build
+        .args(["build", "--quiet", "-p", "faber", "--bin", "faber"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"));
+    if !cfg!(debug_assertions) {
+        build.arg("--release");
     }
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/debug/faber")
+    let status = build
+        .status()
+        .expect("spawn `cargo build -p faber --bin faber`");
+    assert!(
+        status.success(),
+        "`cargo build -p faber --bin faber` failed; CLI-spawning tests need a fresh binary"
+    );
+
+    // The binary sits beside `deps/` of the running test executable (this
+    // honors CARGO_TARGET_DIR and shared-target layouts).
+    let exe = std::env::current_exe().expect("current test executable");
+    let profile_dir = exe
+        .parent()
+        .and_then(|deps| deps.parent())
+        .expect("test executable lives under <target>/<profile>/deps");
+    let binary = profile_dir.join(if cfg!(windows) { "faber.exe" } else { "faber" });
+    assert!(
+        binary.is_file(),
+        "built faber binary not found at {}",
+        binary.display()
+    );
+    binary
 }
 
 pub(crate) fn run_faber_format_stdout(path: &Path) -> String {

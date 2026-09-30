@@ -4406,6 +4406,19 @@ main {
     assert!(!output.code.contains("nomen_longum"));
 }
 
+/// `rust_field_names = "snake_case"` renames the generated Rust identifiers, but
+/// a genus and a discretio variant print their construction literal (D2.8,
+/// rd4a/pr3), so the source spelling legitimately survives inside the `Debug`
+/// `write!` format string. Any other occurrence is an un-renamed identifier.
+fn assert_source_field_name_only_in_print_literal(code: &str, source_name: &str) {
+    for line in code.lines().filter(|line| line.contains(source_name)) {
+        assert!(
+            line.contains("write!(f, \""),
+            "source field name {source_name:?} survived outside the D2.8 print literal: {line}"
+        );
+    }
+}
+
 #[test]
 fn rust_field_names_snake_case_manifest_policy_renames_generated_fields() {
     let dir = test_temp_dir("rust-field-names-snake-case");
@@ -4460,7 +4473,7 @@ main {
     assert!(output.code.contains("p.nomen_longum"));
     assert!(!output.code.contains("pub nomenLongum"));
     assert!(!output.code.contains("p.nomenLongum"));
-    assert!(!output.code.contains("nomenLongum"));
+    assert_source_field_name_only_in_print_literal(&output.code, "nomenLongum");
 }
 
 #[test]
@@ -4569,7 +4582,7 @@ main {
 
     assert!(output.code.contains("nomen_longum: String"));
     assert!(output.code.contains("nomen_longum: captum"));
-    assert!(!output.code.contains("nomenLongum"));
+    assert_source_field_name_only_in_print_literal(&output.code, "nomenLongum");
 }
 
 #[test]
@@ -5320,6 +5333,19 @@ main {
     assert!(!output.code.contains("crate::norma::hal::console"));
 }
 
+/// Output sinks must not lower through `format!`. The one legitimate source of
+/// `format!(` in a package build is the generated `Debug` impl of a genus,
+/// which prints its construction literal (D2.8, rd4a/pr3) — imported norma
+/// genera such as `scrinium` carry one, with `format!` for optional fields.
+fn assert_format_macro_only_in_print_literals(code: &str) {
+    for line in code.lines().filter(|line| line.contains("format!(")) {
+        assert!(
+            line.contains("write!(f, \""),
+            "format! outside a D2.8 construction-literal Debug impl: {line}"
+        );
+    }
+}
+
 #[test]
 fn consolum_eot4_native_output_sinks_canonical() {
     let dir = test_temp_dir("consolum-eot4-canonical");
@@ -5394,7 +5420,7 @@ main {
         output.code
     );
     assert!(!output.code.contains("println!"));
-    assert!(!output.code.contains("format!("));
+    assert_format_macro_only_in_print_literals(&output.code);
 }
 
 #[test]
@@ -5473,7 +5499,7 @@ incipit {
         output.code
     );
     assert!(!output.code.contains("println!"));
-    assert!(!output.code.contains("format!("));
+    assert_format_macro_only_in_print_literals(&output.code);
 }
 
 #[test]
@@ -5963,7 +5989,7 @@ async_main {
     await_const _ responsum ← http.get("http://127.0.0.1:9/test")
     print responsum.status
     const _ caput ← responsum.header("x-faber-test")
-    if caput is null { print "header:missing" } else { print "header:present" }
+    if caput ≡ null { print "header:missing" } else { print "header:present" }
     print responsum.body
 }
 "#,
@@ -14200,7 +14226,7 @@ functio nil() → vacuum {
 @ publica
 @ radix lane "air"
 @ radix backward "ghost"
-functio simple_add(numerus a, numerus b) → numerus {
+functio simple_add(numerus<i32> a, numerus<i32> b) → numerus {
     redde a + b
 }
 "#,

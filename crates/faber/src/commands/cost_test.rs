@@ -386,17 +386,7 @@ fn report_over_fixture_package_pins_dominant_classes_and_buckets() {
 }
 
 fn cost_faber_binary() -> std::path::PathBuf {
-    let helper = super::format_test::faber_binary();
-    if helper.is_file() {
-        return helper;
-    }
-    if let Ok(dir) = std::env::var("CARGO_TARGET_DIR") {
-        let candidate = std::path::PathBuf::from(dir).join("debug/faber");
-        if candidate.is_file() {
-            return candidate;
-        }
-    }
-    helper
+    super::format_test::faber_binary()
 }
 
 #[test]

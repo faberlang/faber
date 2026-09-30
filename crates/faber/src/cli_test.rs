@@ -1119,9 +1119,10 @@ fn check_library_long_help_states_v1_library_home_rule() {
 /// ALA-3 fixture: every verdict kind — annotated ADMISSIBLE (kernel entry),
 /// unannotated ADMISSIBLE (unroll note), WOULD-REJECT own-body, WOULD-REJECT
 /// via callee closure, NOT-A-TARGET. Latin surface: file mode uses the
-/// canonical Latin reader.
+/// canonical Latin reader. The kernel entry takes a `numerus<i32>` operand so
+/// its `+ 1` store is proven to fit (ruling 25, air1).
 const ALL_FOUR_VERDICTS: &str = r#"@ radix lane "air"
-functio computus_purus(numerus x) → numerus {
+functio computus_purus(numerus<i32> x) → numerus {
     redde x + 1
 }
 

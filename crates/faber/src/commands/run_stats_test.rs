@@ -480,7 +480,10 @@ fn named_consumer_proof_discovers_hot_function_conversion_and_cursor_rows() {
         .iter()
         .find(|row| row.name == "convert")
         .expect("conversion row from the runtime textus→int convert-assign");
-    assert_eq!(convert.calls, 1);
+    // Since N4 U5 (1f2ecc1a1) every checked integer store is a `Convert` node
+    // and meters under the same `convert` row: 13 `n + 1` returns in `bump`
+    // + 12 `i ← i + 1` stores + the one runtime `↤` = 26.
+    assert_eq!(convert.calls, 13 + 12 + 1);
     let cursor = artifact
         .intrinsics
         .iter()

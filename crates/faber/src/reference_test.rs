@@ -194,7 +194,8 @@ fn load_from_repo_root_lists_canonical_terms() {
     // arena: D8.2; nexum: D16.2; sic: D4.7), two arrived (✓: D4.5; insere:
     // D8.10's missing registry row added).
     assert_eq!(pack.term_count(), 197);
-    assert_eq!(pack.legacy_redirects().len(), 14);
+    // 14 → 13: the `nulla` redirect retired with D23.4 (8c5cc3de4).
+    assert_eq!(pack.legacy_redirects().len(), 13);
     assert!(pack.resolve_exempla_path("functio/functio.fab").is_file());
 }
 
@@ -260,10 +261,10 @@ fn missing_root_reports_actionable_error() {
 fn build_registry_loads_canonical_and_legacy_entries() {
     let pack = ReferencePack::load_from(repo_exempla_root()).expect("load pack");
     let registry = pack.build_registry().expect("build registry");
-    // 216 → 210 → 211: the registry follows the canonical term count (202 →
-    // 196 → 197, D8.10 `insere` gained its missing registry row; see
-    // reference_test for the seven retired terms and the two arrivals).
-    assert_eq!(registry.entries().len(), 211);
+    // 216 → 210 → 211 → 210: the registry follows the canonical term count
+    // (197) plus the legacy redirects (13). The `nulla` redirect retired with
+    // D23.4 (8c5cc3de4), so 197 + 13 = 210; see reference_test for history.
+    assert_eq!(registry.entries().len(), 210);
     assert!(registry.reference_root().is_some());
     assert!(registry.lookup("functio").is_some());
     assert!(matches!(registry.lookup("=="), Some(Lookup::Legacy { .. })));
@@ -339,10 +340,10 @@ fn load_from_disk_builds_explain_registry() {
     env_remove(REFERENCE_ROOT_ENV);
 
     let registry = Registry::load_from_disk().expect("disk registry");
-    // 216 → 210 → 211: the registry follows the canonical term count (202 →
-    // 196 → 197, D8.10 `insere` gained its missing registry row; see
-    // reference_test for the seven retired terms and the two arrivals).
-    assert_eq!(registry.entries().len(), 211);
+    // 216 → 210 → 211 → 210: the registry follows the canonical term count
+    // (197) plus the legacy redirects (13). The `nulla` redirect retired with
+    // D23.4 (8c5cc3de4), so 197 + 13 = 210; see reference_test for history.
+    assert_eq!(registry.entries().len(), 210);
     let list = render_list(&registry);
     assert!(list.contains("reference:"));
 
