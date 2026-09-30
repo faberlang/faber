@@ -2293,7 +2293,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             MirBinOp::Sub => numeric_binop(left, right, op, |a, b| a - b, width, span),
             MirBinOp::Mul => numeric_binop(left, right, op, |a, b| a * b, width, span),
             MirBinOp::Div => numeric_binop(left, right, op, |a, b| a / b, width, span),
-            MirBinOp::Mod => numeric_binop(left, right, op, |a, b| a % b, width, span),
+            MirBinOp::Mod => {
+                numeric_binop(left, right, op, exact_int::float_floor_rem, width, span)
+            }
             MirBinOp::Eq => Ok(Value::Bool(values_equal(&left, &right))),
             MirBinOp::NotEq => Ok(Value::Bool(!values_equal(&left, &right))),
             MirBinOp::Lt | MirBinOp::Gt | MirBinOp::LtEq | MirBinOp::GtEq => {
@@ -2556,6 +2558,8 @@ mod shuffle_test;
 #[cfg(test)]
 mod exact_int_test;
 
+#[path = "remainder_floor_test.rs"]
+mod remainder_floor_test;
 #[cfg(test)]
 #[path = "tensor_lift_test.rs"]
 mod tensor_lift_test;

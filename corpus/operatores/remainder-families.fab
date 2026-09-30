@@ -1,0 +1,70 @@
++++
+term = "remainder-families"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "additive_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "`%` is the floor remainder on every number family: integers, d64 and floats take the sign of the divisor."
+syntax = "<number> % <number>"
+related = ["%", "/", "numerus", "d64", "fractus"]
+locale = "en"
++++
+# =============================================================================
+# remainder-families — `%` is one operator on integers, d64 and floats
+# =============================================================================
+#
+# What this teaches:
+#   • `a % b` is `a - b * floor(a / b)` on every number family, so the result
+#     takes the sign of the divisor: `-7 % 2` is 1 and `7 % -2` is -1.
+#   • `d64` computes it exactly on the scaled carriers: `-7.5 % 2.0` is 0.5,
+#     not -1.5.
+#   • Floats compute C's `fmod` and add the divisor once when the signs
+#     disagree (Python's definition): `-7.5 % 2.0` is 0.5 for `f64` and `f32`.
+#   • An infinite dividend, a NaN operand and a float zero divisor give NaN.
+#
+# Common mistakes:
+#   • Expecting the sign of the dividend (the hardware `%`): `-7.5 % 2.0` is
+#     0.5, never -1.5.
+#   • Expecting floats to differ from integers: one rule, one sign convention.
+#
+# See also: %, /, numerus, d64, fractus
+# =============================================================================
+
+# operatores/remainder-families — the same remainder on three families
+#
+# WHY: pins ruling 29 end to end. Each family prints the four sign mixes of
+# 7.5 and 2.0; integers print the two mixes of 7 and 2.
+#
+# EXPECTED OUTPUT:
+#   remainder-families.expected — one remainder per print.
+
+main {
+    # 1. Integers floor: the remainder follows the divisor.
+    print -7 % 2
+    print 7 % -2
+
+    # 2. d64 is exact on the carriers.
+    const int<d64> dec_neg75 ← -7.5
+    const int<d64> dec_pos2 ← 2.0
+    const int<d64> dec_pos75 ← 7.5
+    const int<d64> dec_neg2 ← -2.0
+    print dec_neg75 % dec_pos2
+    print dec_pos75 % dec_neg2
+    print dec_neg75 % dec_neg2
+    print dec_pos75 % dec_pos2
+
+    # 3. Floats: fmod, then the divisor once when the signs disagree.
+    const float flt_neg75 ← -7.5
+    const float flt_pos2 ← 2.0
+    const float flt_pos75 ← 7.5
+    const float flt_neg2 ← -2.0
+    print flt_neg75 % flt_pos2
+    print flt_pos75 % flt_neg2
+    print flt_neg75 % flt_neg2
+    print flt_pos75 % flt_pos2
+
+    # 4. f32 follows the same rule.
+    const float<f32> f32_neg75 ← -7.5
+    const float<f32> f32_pos2 ← 2.0
+    print f32_neg75 % f32_pos2
+}

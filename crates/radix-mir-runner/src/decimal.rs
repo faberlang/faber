@@ -114,7 +114,7 @@ pub(crate) fn binop(
             if y == 0 {
                 return Err(RunnerError::internal(span, DIVISION));
             }
-            (x.checked_rem(y).ok_or_else(overflow)?, scale)
+            (crate::exact_int::floor_rem_checked(x, y), scale)
         }
         _ => {
             return Err(RunnerError::internal(

@@ -60,6 +60,31 @@ pub(crate) fn floor_rem(a: i128, b: i128) -> i128 {
     a - b * floor_div(a, b)
 }
 
+/// Floor remainder without the `b * floor_div` product: safe for any `i128`
+/// operands (`MIN % -1` is `0`). `b` must be nonzero.
+pub(crate) fn floor_rem_checked(a: i128, b: i128) -> i128 {
+    let r = a.checked_rem(b).unwrap_or(0);
+    if r != 0 && ((r < 0) != (b < 0)) {
+        r + b
+    } else {
+        r
+    }
+}
+
+/// Float `%` (F9 ruling 29): `fmod`, then the divisor once when the signs
+/// disagree (Python's definition). An exact multiple is a zero with the
+/// divisor's sign; NaN and infinity classes are `fmod`'s.
+pub(crate) fn float_floor_rem(a: f64, b: f64) -> f64 {
+    let r = a % b;
+    if r == 0.0 {
+        0.0_f64.copysign(b)
+    } else if (r < 0.0) != (b < 0.0) {
+        r + b
+    } else {
+        r
+    }
+}
+
 /// `2^count` times `value`, or `None` past the exact range.
 fn shift_left(value: i128, count: i128) -> Option<i128> {
     if value == 0 {
