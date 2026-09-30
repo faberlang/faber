@@ -687,8 +687,8 @@ fn generate_output(
         Target::MirWgsl => Err(unavailable_target_spanned(Target::MirWgsl)),
         #[cfg(feature = "mir-sexp")]
         Target::MirSexp => {
-            reject_modular_word_target(analysis, "S-expression")?;
-            reject_saturating_word_target(analysis, "S-expression")?;
+            // D11.6 ss5: Racket integers are exact; word results reduce or
+            // clamp at the operation and the store, so the word gates are lifted.
             generate_sexp_output(analysis, no_fuse)
         }
         #[cfg(not(feature = "mir-sexp"))]
