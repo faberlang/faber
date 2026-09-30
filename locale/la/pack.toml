@@ -1231,6 +1231,14 @@ help = "utere signo latitudinis nudo, ut u8 aut i64"
 message = "exactus cum latitudine fractionis nondum efficitur"
 help = "scribe latitudinem fractionis nudam (f16, bf16, f32 aut f64) pro arithmetica IEEE; fracta exacta nondum efficiuntur"
 
+[diagnostics.SEM008.issues.callable_posture_conflict]
+message = "habitus annotationis functionis '{annotation_posture}' cum habitu scripto '{written_posture}' pugnat"
+help = "emenda structuram AST ad demittendum"
+
+[diagnostics.SEM008.issues.comment_without_owner]
+message = "commentarium enuntiatum vel articulum demissum cui adhaereat non habet"
+help = "emenda structuram AST ad demittendum"
+
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia requires one type parameter"
 help = "fix the AST construct for lowering"

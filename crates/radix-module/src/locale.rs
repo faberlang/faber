@@ -17,3 +17,7 @@ mod completeness_tests;
 #[cfg(test)]
 #[path = "keyword_pack_completeness_test.rs"]
 mod keyword_completeness_tests;
+
+#[cfg(test)]
+#[path = "diagnostic_pack_completeness_test.rs"]
+mod diagnostic_completeness_tests;

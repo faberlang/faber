@@ -1,0 +1,284 @@
+//! Completeness gate for issue keys selected by the syntax and semantic
+//! diagnostic catalogs.
+//!
+//! The catalog renderers use exhaustive matches over issue strings rather
+//! than a separate issue registry. This test reads those match patterns and
+//! checks that the English and Latin packs own each selected issue key. The
+//! source catalogs are included so adding a new match arm without a pack row
+//! fails the gate.
+
+use super::LocalePack;
+use std::collections::BTreeSet;
+
+const SEMANTIC_CATALOG: &str = include_str!("../../radix-semantic/src/catalog_semantic.rs");
+const SYNTAX_CATALOG: &str = include_str!("../../radix-semantic/src/catalog_syntax.rs");
+
+/// 47 issue keys already selected by the semantic catalog but absent from the
+/// en and la packs. These are known gaps, tracked by pk1; adding one to this
+/// list is the only way to accept catalog debt, so a new missing key fails.
+const KNOWN_MISSING_CATALOG_ISSUES: &[&str] = &[
+    "annotatio_duplicate_field",
+    "annotatio_duplicate_marker",
+    "annotatio_invalid_attachment",
+    "annotatio_invalid_field_type",
+    "annotatio_invalid_marker",
+    "annotatio_invalid_payload",
+    "annotatio_method_unsupported",
+    "annotatio_misplaced",
+    "annotatio_missing_field",
+    "annotatio_not_a_contract",
+    "annotatio_unknown_contract",
+    "annotatio_unknown_field",
+    "annotatio_unknown_target",
+    "bivalens_recovery_unsupported",
+    "bounded_capacity_unsolved",
+    "decimal_literal_out_of_range",
+    "explicit_union_type_arg_unsupported",
+    "glyph_cross_width_mismatch",
+    "glyph_cross_width_three_required",
+    "glyph_element_type_mismatch",
+    "glyph_hadamard_shapes_mismatch",
+    "glyph_inner_dim_mismatch",
+    "glyph_op_numeric_element_required",
+    "glyph_operands_unsupported",
+    "glyph_static_shape_required",
+    "glyph_transpose_operands_unsupported",
+    "glyph_transpose_rank1_no_row_column_distinction",
+    "glyph_transpose_static_rank_required",
+    "glyph_transpose_suffix_takes_no_arguments",
+    "intervallum_helper_bound_unsupported",
+    "marker_width_unsolved",
+    "modular_word_family_mismatch",
+    "modular_word_unsigned_width_required",
+    "modular_word_width_required",
+    "modular_word_width_shape",
+    "namespace_missing_export",
+    "nucleum_fragment_context",
+    "nucleum_fragment_cycle",
+    "nucleum_fragment_effect",
+    "nucleum_fragment_expansion",
+    "nucleum_fragment_type",
+    "regex_pattern_too_long",
+    "summa_expression_unsupported",
+    "textus_literal_too_long",
+    "unsupported_modular_word_width",
+    "unsupported_saturating_word_width",
+    "unsupported_trapping_word_width",
+];
+
+const INSTALLED_LOCALES: &[&str] = &["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"];
+const SEM008_ISSUES: &[&str] = &["callable_posture_conflict", "comment_without_owner"];
+
+fn owned_installed_pack(locale: &str) -> LocalePack {
+    let path = crate::locale::workspace_locale_pack_path(locale);
+    let source = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read installed {locale} pack: {err:?}"));
+    LocalePack::from_toml_str(&source)
+        .unwrap_or_else(|err| panic!("installed {locale} pack should parse owned rows: {err:?}"))
+}
+
+fn starts_issue_match(line: &str) -> bool {
+    line.contains("match arg_value(args, \"issue\")")
+        || line.contains("match issue {")
+        || line.contains("match issue? {")
+}
+
+fn brace_delta_outside_strings_and_comments(line: &str) -> isize {
+    let mut delta = 0;
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut chars = line.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+        if ch == '/' && chars.peek() == Some(&'/') {
+            break;
+        }
+        match ch {
+            '"' => in_string = true,
+            '{' => delta += 1,
+            '}' => delta -= 1,
+            _ => {}
+        }
+    }
+    delta
+}
+
+fn arm_pattern_before_arrow(line: &str) -> Option<&str> {
+    let bytes = line.as_bytes();
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut i = 0;
+    while i + 1 < bytes.len() {
+        let byte = bytes[i];
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_string = false;
+            }
+        } else if byte == b'/' && bytes[i + 1] == b'/' {
+            return None;
+        } else if byte == b'"' {
+            in_string = true;
+        } else if byte == b'=' && bytes[i + 1] == b'>' {
+            return Some(&line[..i]);
+        }
+        i += 1;
+    }
+    None
+}
+
+fn identifier_literals(pattern: &str) -> impl Iterator<Item = String> + '_ {
+    let bytes = pattern.as_bytes();
+    let mut values = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] != b'"' {
+            i += 1;
+            continue;
+        }
+        i += 1;
+        let start = i;
+        let mut escaped = false;
+        while i < bytes.len() {
+            if escaped {
+                escaped = false;
+            } else if bytes[i] == b'\\' {
+                escaped = true;
+            } else if bytes[i] == b'"' {
+                let value = &pattern[start..i];
+                if !value.is_empty()
+                    && value
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+                {
+                    values.push(value.to_owned());
+                }
+                i += 1;
+                break;
+            }
+            i += 1;
+        }
+    }
+    values.into_iter()
+}
+
+fn catalog_issue_keys(source: &str) -> BTreeSet<String> {
+    let mut issues = BTreeSet::new();
+    let mut in_issue_match = false;
+    let mut depth = 0isize;
+
+    for line in source.lines() {
+        if !in_issue_match && starts_issue_match(line) {
+            in_issue_match = true;
+            depth = 0;
+        }
+        if !in_issue_match {
+            continue;
+        }
+
+        if depth == 1 {
+            if let Some(pattern) = arm_pattern_before_arrow(line) {
+                issues.extend(identifier_literals(pattern));
+            }
+        }
+
+        depth += brace_delta_outside_strings_and_comments(line);
+        if depth <= 0 {
+            in_issue_match = false;
+            depth = 0;
+        }
+    }
+
+    issues
+}
+
+fn issue_families(pack: &LocalePack, issue: &str) -> BTreeSet<String> {
+    pack.diagnostics
+        .iter()
+        .filter(|(_, family)| family.issues.contains_key(issue))
+        .map(|(code, _)| code.clone())
+        .collect()
+}
+
+fn all_pack_issue_keys(pack: &LocalePack) -> BTreeSet<String> {
+    pack.diagnostics
+        .values()
+        .flat_map(|family| family.issues.keys().cloned())
+        .collect()
+}
+
+fn installed_issue_row_has_message_and_help(locale: &str, issue: &str) -> bool {
+    let path = crate::locale::workspace_locale_pack_path(locale);
+    let source = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read installed {locale} pack: {err:?}"));
+    let pack: toml::Value =
+        toml::from_str(&source).unwrap_or_else(|err| panic!("installed {locale} pack should be valid TOML: {err:?}"));
+    pack.get("diagnostics")
+        .and_then(|diagnostics| diagnostics.get("SEM008"))
+        .and_then(|family| family.get("issues"))
+        .and_then(|issues| issues.get(issue))
+        .is_some_and(|row| row.get("message").is_some() && row.get("help").is_some())
+}
+
+#[test]
+fn en_and_la_cover_catalog_issue_keys_except_the_pinned_gap_list() {
+    assert_eq!(KNOWN_MISSING_CATALOG_ISSUES.len(), 47);
+
+    let mut catalog_issues = catalog_issue_keys(SEMANTIC_CATALOG);
+    catalog_issues.extend(catalog_issue_keys(SYNTAX_CATALOG));
+    catalog_issues.insert(radix_lexer::HOMOGLYPH_ISSUE.to_owned());
+    catalog_issues.extend(SEM008_ISSUES.iter().map(|issue| (*issue).to_owned()));
+
+    let known_missing: BTreeSet<String> = KNOWN_MISSING_CATALOG_ISSUES
+        .iter()
+        .map(|issue| (*issue).to_owned())
+        .collect();
+
+    let en = owned_installed_pack("en");
+    let la = owned_installed_pack("la");
+    for (locale, pack) in [("en", &en), ("la", &la)] {
+        let present = all_pack_issue_keys(pack);
+        let missing: BTreeSet<String> = catalog_issues
+            .iter()
+            .filter(|issue| !present.contains(*issue))
+            .cloned()
+            .collect();
+        assert_eq!(
+            missing, known_missing,
+            "{locale} catalog issue gaps changed; new gaps fail until a pack row is added, and closed gaps must be removed from the known list"
+        );
+    }
+
+    for issue in catalog_issues.difference(&known_missing) {
+        assert_eq!(
+            issue_families(&en, issue),
+            issue_families(&la, issue),
+            "en and la must keep {issue} under the same diagnostic code"
+        );
+    }
+}
+
+#[test]
+fn sem008_comment_and_callable_posture_rows_exist_in_every_installed_pack() {
+    for &locale in INSTALLED_LOCALES {
+        let pack = owned_installed_pack(locale);
+        let sem008 = pack.diagnostics.get("SEM008").expect("SEM008 family row");
+        for &issue in SEM008_ISSUES {
+            assert!(sem008.issues.contains_key(issue), "{locale} is missing SEM008.{issue}");
+            assert!(
+                installed_issue_row_has_message_and_help(locale, issue),
+                "{locale} SEM008.{issue} needs message and help fields"
+            );
+        }
+    }
+}

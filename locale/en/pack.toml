@@ -1450,6 +1450,14 @@ help = "use a bare width marker such as u8 or i64"
 message = "trapping floats are not implemented yet"
 help = "write the bare float width (f16, bf16, f32, or f64) for IEEE arithmetic; trapping floats are not implemented yet"
 
+[diagnostics.SEM008.issues.callable_posture_conflict]
+message = "callable annotation posture '{annotation_posture}' conflicts with written posture '{written_posture}'"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.comment_without_owner]
+message = "comment has no lowered statement or item to attach to"
+help = "fix the AST construct for lowering"
+
 [diagnostics.SEM008.issues.copia_arity]
 message = "set requires one type parameter"
 help = "fix the AST construct for lowering"

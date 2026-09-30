@@ -988,6 +988,14 @@ help = "use a bare width marker such as u8 or i64"
 message = "trapping floats are not implemented yet"
 help = "write the bare float width (f16, bf16, f32, or f64) for IEEE arithmetic; trapping floats are not implemented yet"
 
+[diagnostics.SEM008.issues.callable_posture_conflict]
+message = "tư thế callable trong chú giải '{annotation_posture}' xung đột với tư thế đã viết '{written_posture}'"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.comment_without_owner]
+message = "chú thích không có câu lệnh hoặc mục đã hạ mức để gắn vào"
+help = "sửa cấu trúc AST để hạ mức"
+
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia yêu cầu một tham số kiểu"
 help = "sửa cấu trúc AST để hạ mức"
