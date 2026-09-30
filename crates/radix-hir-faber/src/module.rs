@@ -82,6 +82,8 @@ pub struct FaberCodegen<'a> {
     pub(crate) destructure_bindings: FxHashMap<radix_hir::HirId, radix_hir::HirDestructureBinding>,
     /// Definitions whose awaited initializer used the `↢` spelling.
     pub(crate) await_assignment_bindings: FxHashSet<DefId>,
+    /// Locals authored `fixum T x = e` (D5.10), printed with `=`.
+    pub(crate) compile_time_locals: FxHashSet<DefId>,
     /// Authored `ordo` enumerations by enum def id: emission re-sugars these
     /// with the `ordo` vocabulary and member discriminants.
     pub(crate) ordo_enums: FxHashMap<DefId, Vec<radix_hir::HirOrdoMember>>,
@@ -141,6 +143,7 @@ impl<'a> FaberCodegen<'a> {
             discard_bindings: FxHashMap::default(),
             destructure_bindings: FxHashMap::default(),
             await_assignment_bindings: FxHashSet::default(),
+            compile_time_locals: FxHashSet::default(),
             ordo_enums: FxHashMap::default(),
             authored_type_forms: FxHashMap::default(),
             tuple_label_accesses: FxHashMap::default(),
@@ -202,6 +205,7 @@ pub fn empty_presentation() -> HirPresentation {
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
+        compile_time_locals: Vec::new(),
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
@@ -249,6 +253,7 @@ impl FaberCodegen<'_> {
             .iter()
             .copied()
             .collect();
+        self.compile_time_locals = presentation.compile_time_locals.iter().copied().collect();
         self.ordo_enums = presentation
             .ordo_enums
             .iter()

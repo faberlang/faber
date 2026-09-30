@@ -66,6 +66,7 @@ pub mod leading_underscore;
 pub mod libera;
 pub mod lint;
 pub mod live_tuus_cursor_escape;
+pub mod local_constants;
 pub mod praefixum;
 pub mod resolve;
 pub mod return_path;
@@ -223,6 +224,9 @@ mod ratio_test;
 #[path = "typecheck/ratio_hole_test.rs"]
 mod ratio_hole_test;
 
+#[cfg(test)]
+#[path = "local_constants_test.rs"]
+mod local_constants_test;
 #[cfg(test)]
 #[path = "praefixum_test.rs"]
 mod praefixum_test;

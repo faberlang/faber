@@ -2107,6 +2107,14 @@ pub struct HirPresentation {
     #[serde(default)]
     pub await_assignment_bindings: Vec<DefId>,
 
+    /// Locals declared as compile-time constants (`fixum T x = e`, DECISIONS
+    /// D5.10). They are ordinary immutable locals in the HIR; this list marks
+    /// the ones whose initializer is a compile-time fact so typecheck applies
+    /// the `=` store rule, the constant pass evaluates them, and Faber
+    /// re-emission prints `=` rather than `←`.
+    #[serde(default)]
+    pub compile_time_locals: Vec<DefId>,
+
     /// Authored `ordo` enumerations, keyed by the enum's def id. Emission
     /// re-sugars exactly these with the `ordo` vocabulary and member
     /// discriminants; authored `discretio` unions are unaffected.

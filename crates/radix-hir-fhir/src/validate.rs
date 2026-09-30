@@ -2978,6 +2978,9 @@ pub(crate) fn validate_referential_integrity(
                 });
             }
         }
+        for def_id in &presentation.compile_time_locals {
+            checks.check_def(*def_id)?;
+        }
         // Every attachment anchor must name a registered owner, each owner
         // may carry at most one attachment, and comment Symbols must resolve
         // in the interner table.

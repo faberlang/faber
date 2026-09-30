@@ -671,6 +671,9 @@ impl Lowerer<'_> {
                 ) {
                     self.presentation.await_assignment_bindings.push(def_id);
                 }
+                if decl.compile_time {
+                    self.presentation.compile_time_locals.push(def_id);
+                }
                 if let Some(ty) = &decl.ty {
                     crate::tuple_labels::record_from_type_expr(
                         self.resolver,

@@ -1541,6 +1541,10 @@ mod region_decl_test;
 mod static_decl_test;
 
 #[cfg(test)]
+#[path = "compile_time_local_test.rs"]
+mod compile_time_local_test;
+
+#[cfg(test)]
 #[path = "field_modifier_test.rs"]
 mod field_modifier_test;
 

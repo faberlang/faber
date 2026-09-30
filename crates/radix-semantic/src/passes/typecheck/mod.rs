@@ -327,6 +327,9 @@ pub(crate) struct TypeChecker<'a> {
     /// For a local whose type was inferred (`_`): the span of the expression
     /// the type came from, named by an implicit store's trap (ruling 19(i)).
     inferred_slot_sources: FxHashMap<DefId, radix_lexer::Span>,
+    /// Locals declared `fixum T x = e` (D5.10): their initializer is an `=`
+    /// position, a compile-time store.
+    compile_time_locals: FxHashSet<DefId>,
 
     /// Type-alias declaration parameter names keyed by alias def-id, in
     /// declaration order. Populated from HIR items so applied alias types
@@ -541,6 +544,9 @@ pub(crate) fn typecheck_with_config(
     }
     checker.collect_items(hir);
     if let Some(presentation) = presentation.as_deref() {
+        checker
+            .compile_time_locals
+            .extend(presentation.compile_time_locals.iter().copied());
         checker.collect_ordo_members(hir, presentation);
     }
     checker.check_program(hir);
@@ -587,6 +593,7 @@ impl<'a> TypeChecker<'a> {
             next_hir_id: u32::MAX / 2,
             pending_store: None,
             inferred_slot_sources: FxHashMap::default(),
+            compile_time_locals: FxHashSet::default(),
             alias_type_params: FxHashMap::default(),
             import_receivers: FxHashSet::default(),
             target,

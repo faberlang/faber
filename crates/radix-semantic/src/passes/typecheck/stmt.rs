@@ -106,6 +106,12 @@ impl TypeChecker<'_> {
                 }
                 let inferred_slot = self.is_infer(self.resolve_inferred_type(*ty));
                 let site = StoreSite::new(HirStoreKind::Declaration).named(local.name);
+                // `fixum T x = e` states a compile-time fact (an `=` position).
+                let site = if self.compile_time_locals.contains(&local.def_id) {
+                    site.compile_time()
+                } else {
+                    site
+                };
                 let init_ty = self.check_store_expr(init, *ty, site);
                 if inferred_slot {
                     self.inferred_slot_sources.insert(local.def_id, init.span);

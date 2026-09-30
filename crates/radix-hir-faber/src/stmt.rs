@@ -744,7 +744,14 @@ impl super::FaberCodegen<'_> {
                     self.write_expr_prec(recovery, 12, names, surface, writer);
                 }
             } else {
-                writer.write(if await_assignment { " ↢ " } else { " ← " });
+                let glyph = if self.compile_time_locals.contains(&local.def_id) {
+                    " = "
+                } else if await_assignment {
+                    " ↢ "
+                } else {
+                    " ← "
+                };
+                writer.write(glyph);
                 self.write_expr(init, names, surface, writer);
             }
         }

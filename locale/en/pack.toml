@@ -762,6 +762,14 @@ help = "write `{generis} T NAME = value`; a static is a compile-time fact"
 message = "a {generis} static needs an initializer"
 help = "write `{generis} T NAME = value`"
 
+[diagnostics.PARSE010.issues.varia_compile_time_initializer]
+message = "a {varia} binding cannot be a compile-time constant; `=` states a compile-time fact and `←` stores at runtime"
+help = "write `{varia} T name ← value` for a mutable binding, or `{fixum} T name = value` for a constant"
+
+[diagnostics.PARSE010.issues.compile_time_requires_name]
+message = "a compile-time constant binds one name; `=` cannot initialize a destructuring pattern"
+help = "write `{fixum} T name = value`, or destructure with `←`"
+
 [diagnostics.PARSE010.issues.field_modifier_repeated]
 message = "a field takes exactly one of {fixum}, {varia} or {generis}"
 help = "keep one modifier; a {generis} field is already immutable"
@@ -3668,6 +3676,18 @@ help = "use a wider type or a smaller value"
 
 [diagnostics.SEM060.issues.static_division_by_zero]
 message = "the initializer of static `{name}` divides by zero"
+help = "fix the divisor"
+
+[diagnostics.SEM060.issues.local_constant_not_constant]
+message = "the initializer of constant `{name}` is not a compile-time constant"
+help = "`=` states a compile-time fact: use literals, arithmetic, and other constants; for a value computed at runtime write `{fixum} T name ← value`"
+
+[diagnostics.SEM060.issues.local_constant_overflow]
+message = "the initializer of constant `{name}` does not fit its type"
+help = "a `=` constant must fit its type whatever the overflow policy; use a wider type or a smaller value"
+
+[diagnostics.SEM060.issues.local_constant_division_by_zero]
+message = "the initializer of constant `{name}` divides by zero"
 help = "fix the divisor"
 
 [diagnostics.SEM061]

@@ -1,0 +1,71 @@
++++
+term = "fixum ="
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "binding"
+canonical = false
+summary = "fixum T x = e declares a typed local compile-time constant; the value is a compile-time fact that must fit T."
+syntax = "fixum <type|_> <name> = <expression>"
+aliases = ["const T x = e", "local constant"]
+related = ["fixum", "varia", "generis", "←", "praefixum"]
+locale = "en"
++++
+# =============================================================================
+# fixum T x = e — a typed local compile-time constant
+# =============================================================================
+#
+# What this teaches:
+#   • `=` states a compile-time fact; `←` stores at runtime (the glyph law).
+#     `const T x = e` is a local constant: the compiler evaluates `e` while
+#     compiling, so it can only use literals, arithmetic, other constants
+#     (`static` items and earlier `const … =` locals).
+#   • The value must fit `T` exactly, whatever `T`'s overflow policy —
+#     `const u8 d = 300` is a compile error, even for `saturating<u8>`.
+#   • The constant is an ordinary immutable local of type `T`: it works in
+#     arithmetic like any other `T` value.
+#   • `const _ x = 10` infers `int` for an integer constant.
+#
+# Common mistakes:
+#   • `const int k = p + 1` where `p` is a parameter — SEM060
+#     `local_constant_not_constant`; a runtime value is stored with `←`.
+#   • `var int n = 3` — `var` is a runtime binding, so `=` is a parse error
+#     (`varia_compile_time_initializer`); write `var int n ← 3`.
+#   • `const u8 d = 300` — the constant does not fit `u8`
+#     (`store_constant_out_of_range`).
+#
+# See also: fixum, varia, generis, ←
+# =============================================================================
+
+# fixum = — local compile-time constants
+#
+# GRAMMAR:
+#   varDecl := 'fixum' typeAnnotation IDENTIFIER '=' expression
+#
+# EXPECTED OUTPUT:
+#   fixum-constans.expected (11 / 27 / 200)
+
+static int BASE_UNIT = 10
+
+fn total(int width) → int {
+    const int edge = 3
+    const int cells = edge * edge
+    const _ margin = 2
+    return width * cells + margin
+}
+
+fn ceiling() → int {
+    const int shifted = BASE_UNIT * 2 + 7
+    return shifted
+}
+
+test "local constants combine in arithmetic" {
+    assert total(1) ≡ 11
+    assert ceiling() ≡ 27
+}
+
+main {
+    print total(1)
+    print ceiling()
+    const u8 top = 200
+    print top
+}

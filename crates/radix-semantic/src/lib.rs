@@ -637,6 +637,15 @@ pub fn analyze_with_cli(
     diagnostics.extend(passes::statica::reject_top_level_bindings(&hir, interner));
     if !diagnostics.iter().any(SemanticError::is_error) {
         diagnostics.extend(passes::statica::fold(&mut hir, &types, interner));
+        // Local `fixum T x = e` constants (D5.10) reuse the statics' evaluator.
+        if !diagnostics.iter().any(SemanticError::is_error) {
+            diagnostics.extend(passes::local_constants::check(
+                &hir,
+                &lowered.presentation,
+                &types,
+                interner,
+            ));
+        }
         // `praefixum` bodies: transitive purity and static cycles (D8.6);
         // the driver evaluates them on the MIR runner afterwards.
         diagnostics.extend(passes::praefixum::check(&hir, &types, interner));
@@ -845,6 +854,7 @@ pub(crate) fn empty_presentation() -> HirPresentation {
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
+        compile_time_locals: Vec::new(),
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),

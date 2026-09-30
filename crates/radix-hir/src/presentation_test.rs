@@ -79,6 +79,7 @@ fn sample_presentation() -> HirPresentation {
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
+        compile_time_locals: Vec::new(),
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),

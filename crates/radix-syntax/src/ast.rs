@@ -189,6 +189,12 @@ pub struct VarDecl {
     /// immutable, compile-time-evaluated value. Always `Immutable`, never
     /// awaited, and initialized with `=`.
     pub is_static: bool,
+
+    /// Local compile-time constant (`fixum T x = e`, DECISIONS D5.10): an
+    /// immutable local whose initializer is a compile-time fact, spelled with
+    /// `=` rather than `←`. Never set together with `is_static` or an await
+    /// form.
+    pub compile_time: bool,
 }
 
 impl VarDecl {

@@ -164,6 +164,9 @@ impl Parser {
     ///
     /// GRAMMAR:
     ///   var-decl := (`fixum` | `varia`) type pattern ['←' expr | '↤' expr | '↢' expr]
+    ///             | `fixum` type ident '=' expr
+    ///
+    /// The `=` form is a local compile-time constant (DECISIONS D5.10).
     ///
     /// Simple bindings carry an explicit type slot, including `_` for inference.
     /// Destructuring keeps its historical untyped shape because the binding
@@ -191,8 +194,12 @@ impl Parser {
 
         let binding = self.parse_binding_pattern()?;
 
+        let mut compile_time = false;
         let (init, await_form) = if self.eat(&TokenKind::Assign) {
             (Some(Box::new(self.parse_expression()?)), None)
+        } else if self.check(&TokenKind::Eq) {
+            compile_time = true;
+            self.parse_compile_time_initializer(mutability, &binding)?
         } else if self.check(&TokenKind::ConversioAssign) {
             (
                 Some(Box::new(
@@ -222,7 +229,36 @@ impl Parser {
             binding,
             init,
             is_static: false,
+            compile_time,
         }))
+    }
+
+    /// Parse the `= expr` initializer of a local compile-time constant
+    /// (DECISIONS D5.10). The current token is `=`.
+    ///
+    /// `=` states a compile-time fact, so only an immutable named binding may
+    /// use it: `varia` is a runtime store and destructuring has no single
+    /// constant to name. Both are named errors that point at `←`.
+    fn parse_compile_time_initializer(
+        &mut self,
+        mutability: AstMutability,
+        binding: &BindingPattern,
+    ) -> Result<(Option<Box<Expr>>, Option<AwaitBindingForm>), ParseError> {
+        let span = self.current_span();
+        if mutability == AstMutability::Mutable {
+            return Err(
+                ParseError::structured(ParseErrorKind::DeclarationInvalid, span)
+                    .with_arg("issue", "varia_compile_time_initializer"),
+            );
+        }
+        if !matches!(binding, BindingPattern::Ident(_)) {
+            return Err(
+                ParseError::structured(ParseErrorKind::DeclarationInvalid, span)
+                    .with_arg("issue", "compile_time_requires_name"),
+            );
+        }
+        self.advance();
+        Ok((Some(Box::new(self.parse_expression()?)), None))
     }
 
     /// Whether the current `generis` word starts a static declaration: the
@@ -274,6 +310,7 @@ impl Parser {
             binding: BindingPattern::Ident(field.name),
             init: Some(init),
             is_static: true,
+            compile_time: false,
         }))
     }
 
@@ -361,6 +398,7 @@ impl Parser {
             binding,
             init,
             is_static: false,
+            compile_time: false,
         }))
     }
 
@@ -456,6 +494,7 @@ impl Parser {
             binding,
             init,
             is_static: false,
+            compile_time: false,
         }))
     }
 
