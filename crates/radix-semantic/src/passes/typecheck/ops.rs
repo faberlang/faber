@@ -825,14 +825,6 @@ impl TypeChecker<'_> {
             self.invalid_operand_types(POSTFIX_INC_DEC_NUMERUS_OPERAND, span);
             return;
         }
-        if self
-            .numeric_shape(self.resolve_inferred_type(target_ty))
-            .is_some_and(|shape| shape.family == IntFamily::Saturating)
-        {
-            // Fail closed until every backend carries a clamping `↑`/`↓`;
-            // `x ← x + 1` is the clamping spelling today.
-            self.invalid_operand_types(SATURATING_WORD_OPERATOR_UNSUPPORTED, span);
-        }
     }
 
     /// Check simple assignment and constrain the value from the target context.
@@ -1122,7 +1114,9 @@ impl TypeChecker<'_> {
                     self.invalid_operand_types(INTEGER_OPERAND_REQUIRED, operand.span);
                     return self.error_type;
                 };
-                if shape.family == IntFamily::Saturating {
+                if shape.family == IntFamily::Saturating
+                    || self.saturating_origin(operand).is_some()
+                {
                     self.invalid_operand_types(SATURATING_WORD_OPERATOR_UNSUPPORTED, operand.span);
                     return self.error_type;
                 }
@@ -1351,6 +1345,7 @@ impl TypeChecker<'_> {
                 );
                 if !(lhs_is_nil || rhs_is_nil)
                     && !self.equality_constant_exempt(lhs, lhs_ty, rhs, rhs_ty)
+                    && !self.saturating_pair(lhs, rhs)
                 {
                     self.exact_equality_types_for_operands(lhs, lhs_ty, rhs, rhs_ty, lhs.span);
                 }
@@ -1369,6 +1364,9 @@ impl TypeChecker<'_> {
                     // D1.6: whole-string `textus` order is Unicode code-point order.
                 } else if self.scalar_ordered_text_bin(lhs, rhs, lhs_ty, rhs_ty, lhs.span) {
                     // Single-scalar Unicode order (Seam B); not lexicographic cord compare.
+                } else if self.saturating_pair(lhs, rhs) {
+                    // Both sides are values of one `saturating` word, computed
+                    // exactly: they compare by value.
                 } else {
                     self.numeric_ordering_bin(lhs_ty, rhs_ty, lhs.span);
                 }
@@ -2129,11 +2127,13 @@ fn is_numeric_literal(expr: &HirExpression) -> bool {
 }
 
 const NUMERIC_OPERANDS_REQUIRED: &str = "numeric_operands_required";
-const NUMERIC_ARITHMETIC_OPERANDS_IDENTICAL: &str = "numeric_arithmetic_operands_identical";
+pub(super) const NUMERIC_ARITHMETIC_OPERANDS_IDENTICAL: &str =
+    "numeric_arithmetic_operands_identical";
 const MODULAR_WORD_FAMILY_MISMATCH: &str = "modular_word_family_mismatch";
-const SATURATING_WORD_FAMILY_MISMATCH: &str = "saturating_word_family_mismatch";
+pub(super) const SATURATING_WORD_FAMILY_MISMATCH: &str = "saturating_word_family_mismatch";
 /// D11.1: bitwise, shift, and unsigned-negation operators on `saturatus`.
-const SATURATING_WORD_OPERATOR_UNSUPPORTED: &str = "saturating_word_operator_unsupported";
+pub(super) const SATURATING_WORD_OPERATOR_UNSUPPORTED: &str =
+    "saturating_word_operator_unsupported";
 
 /// Mixed integer families name the saturating family when it is involved,
 /// otherwise the modular family (both require an explicit `↦`).

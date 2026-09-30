@@ -131,6 +131,18 @@ impl TypeChecker<'_> {
         // Only a reassignment reaches a `_` slot after its type is settled.
         let open_slot = self.is_infer(slot_ty) || self.infer_union_var_of(slot_ty).is_some();
         if open_slot && site.kind != HirStoreKind::Assignment {
+            // Arithmetic over a `saturating` word fills an open slot with the
+            // word, not with the exact type the range rule gave the value.
+            if self.is_infer(slot_ty)
+                && matches!(
+                    expr.kind,
+                    HirExpressionKind::Binary(..) | HirExpressionKind::Unary(..)
+                )
+            {
+                let ty = self.check_expr(expr);
+                let ty = self.saturating_inferred_slot(expr, ty, site);
+                return self.unify_expected(ty, slot_ty, expr.span);
+            }
             return self.check_expr_with_expected(expr, Some(slot_ty));
         }
         if let Some(ty) = self.constant_store(expr, slot_ty, site) {
@@ -162,6 +174,7 @@ impl TypeChecker<'_> {
             if let Some(target) = self
                 .store_narrowing_target(ty, slot_ty)
                 .or_else(|| self.capped_store_target(expr, ty, slot_ty, site))
+                .or_else(|| self.saturating_store_target(expr, ty, slot_ty))
             {
                 return self.wrap_implicit_store(expr, ty, target, site);
             }
@@ -183,9 +196,107 @@ impl TypeChecker<'_> {
         match self
             .store_narrowing_target(ty, slot_ty)
             .or_else(|| self.capped_store_target(expr, ty, slot_ty, site))
+            .or_else(|| self.saturating_store_target(expr, ty, slot_ty))
         {
             Some(target) => self.wrap_implicit_store(expr, ty, target, site),
             None => self.unify_expected(ty, slot_ty, expr.span),
+        }
+    }
+
+    /// The `saturating` word whose arithmetic `expr` is, if any: the first
+    /// `saturating` leaf of a `+ - * / %` / unary `-` tree. Such an expression
+    /// computes exactly, so its type is the range rule's plain integer type;
+    /// the word is what a store or an inferred slot clamps it back into
+    /// (d11-6 ruling 3: no per-operation clamp).
+    pub(super) fn saturating_origin(&self, expr: &HirExpression) -> Option<TypeId> {
+        if let Some((word, slot)) = expr.ty.and_then(|ty| self.store_int_slot(ty))
+            && slot.family == IntFamily::Saturating
+        {
+            return Some(word);
+        }
+        match &expr.kind {
+            HirExpressionKind::Binary(
+                radix_hir::HirBinOp::Add
+                | radix_hir::HirBinOp::Sub
+                | radix_hir::HirBinOp::Mul
+                | radix_hir::HirBinOp::Div
+                | radix_hir::HirBinOp::Mod,
+                lhs,
+                rhs,
+            ) => self
+                .saturating_origin(lhs)
+                .or_else(|| self.saturating_origin(rhs)),
+            HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, operand) => {
+                self.saturating_origin(operand)
+            }
+            _ => None,
+        }
+    }
+
+    /// Both operands come from the same `saturating` word (a leaf or exact
+    /// arithmetic over it), so a comparison joins them by value.
+    pub(super) fn saturating_pair(&self, lhs: &HirExpression, rhs: &HirExpression) -> bool {
+        matches!(
+            (self.saturating_origin(lhs), self.saturating_origin(rhs)),
+            (Some(a), Some(b)) if a == b
+        )
+    }
+
+    /// Both operands of an arithmetic operator agree on the `saturating`
+    /// family: all `saturating` operands are one word, and a `saturating`
+    /// operand never meets a trapping integer variable. Reports and returns
+    /// `false` otherwise.
+    pub(super) fn saturating_operands_agree(
+        &mut self,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+        span: radix_lexer::Span,
+    ) -> bool {
+        let issue = match (self.saturating_origin(lhs), self.saturating_origin(rhs)) {
+            (Some(a), Some(b)) if a != b => super::ops::NUMERIC_ARITHMETIC_OPERANDS_IDENTICAL,
+            (Some(_), None) | (None, Some(_)) => super::ops::SATURATING_WORD_FAMILY_MISMATCH,
+            _ => return true,
+        };
+        self.invalid_operand_types(issue, span);
+        false
+    }
+
+    /// The `saturating` slot an exactly computed `saturating` expression lands
+    /// in: its plain integer type is clamped into the slot at the store.
+    fn saturating_store_target(
+        &self,
+        expr: &HirExpression,
+        ty: TypeId,
+        slot_ty: TypeId,
+    ) -> Option<TypeId> {
+        let (_, src) = self.store_int_slot(ty)?;
+        let (dst_ty, dst) = self.store_int_target(slot_ty)?;
+        (src.family == IntFamily::Plain
+            && dst.family == IntFamily::Saturating
+            && self.saturating_origin(expr).is_some())
+        .then_some(dst_ty)
+    }
+
+    /// An inferred slot (`_`, or no annotation) initialised from `saturating`
+    /// arithmetic keeps the word: the slot is `saturating<W>` and the exact
+    /// value clamps at the declaration (ruling 12, "saturating keeps its
+    /// width"). Any other initialiser keeps its own type.
+    pub(super) fn saturating_inferred_slot(
+        &mut self,
+        init: &mut HirExpression,
+        ty: TypeId,
+        site: StoreSite,
+    ) -> TypeId {
+        let is_arithmetic = matches!(
+            init.kind,
+            HirExpressionKind::Binary(..) | HirExpressionKind::Unary(..)
+        );
+        let plain = self
+            .store_int_slot(ty)
+            .is_some_and(|(_, slot)| slot.family == IntFamily::Plain);
+        match self.saturating_origin(init) {
+            Some(word) if is_arithmetic && plain => self.wrap_implicit_store(init, ty, word, site),
+            _ => ty,
         }
     }
 
@@ -420,128 +531,5 @@ impl TypeChecker<'_> {
         };
         expr.ty = Some(target);
         target
-    }
-}
-
-/// Whether an expression is a `saturating` arithmetic operator node.
-fn is_arithmetic_node(expr: &HirExpression) -> bool {
-    match &expr.kind {
-        HirExpressionKind::Binary(op, ..) => matches!(
-            op,
-            radix_hir::HirBinOp::Add
-                | radix_hir::HirBinOp::Sub
-                | radix_hir::HirBinOp::Mul
-                | radix_hir::HirBinOp::Div
-                | radix_hir::HirBinOp::Mod
-        ),
-        HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, _) => true,
-        _ => false,
-    }
-}
-
-impl TypeChecker<'_> {
-    /// Whether `slot` is a `saturating` word and `source` an arithmetic node:
-    /// the shape of a saturating root store node.
-    pub(super) fn is_saturating_arithmetic(&self, source: &HirExpression, slot: TypeId) -> bool {
-        is_arithmetic_node(source)
-            && self
-                .store_int_slot(slot)
-                .is_some_and(|(_, slot)| slot.family == IntFamily::Saturating)
-    }
-
-    /// Whether `expr` is a `saturating` arithmetic node (bare, or already
-    /// wrapped in its root store node).
-    fn is_saturating_tree(&self, expr: &HirExpression) -> bool {
-        let node = match &expr.kind {
-            HirExpressionKind::Conversio {
-                source,
-                implicit: Some(_),
-                ..
-            } => source,
-            _ => expr,
-        };
-        is_arithmetic_node(node)
-            && expr
-                .ty
-                .and_then(|ty| self.store_int_slot(ty))
-                .is_some_and(|(_, slot)| slot.family == IntFamily::Saturating)
-    }
-
-    /// d11-6 ruling 3: a `saturating<W>` expression is computed exactly and
-    /// clamped once, where the value lands. A tree of arithmetic nodes (or a
-    /// node with a constant outside `W`) is retyped `int` (exact, ruling 17)
-    /// and its root is wrapped in one implicit store node into
-    /// `saturating<W>`, which clamps. A wrapped child is unwrapped again when
-    /// its parent is also saturating arithmetic, so a chain clamps once, at
-    /// its root. A single operation over in-range leaves is already exact
-    /// until its own clamp and stays as it is.
-    ///
-    /// `source` is set when `expr` is already the source of such a node (a
-    /// re-check): its children are unwrapped and it stays `int`.
-    pub(super) fn saturating_arithmetic_root(
-        &mut self,
-        expr: &mut HirExpression,
-        ty: TypeId,
-        source: bool,
-    ) -> TypeId {
-        if self.current_device_function || !is_arithmetic_node(expr) {
-            return ty;
-        }
-        let Some((word, slot)) = self.store_int_slot(ty) else {
-            return ty;
-        };
-        if slot.family != IntFamily::Saturating {
-            return ty;
-        }
-        let children: Vec<&HirExpression> = match &expr.kind {
-            HirExpressionKind::Binary(_, lhs, rhs) => vec![lhs, rhs],
-            HirExpressionKind::Unary(_, operand) => vec![operand],
-            _ => Vec::new(),
-        };
-        let exact_operands = children.iter().any(|child| {
-            self.is_saturating_tree(child)
-                || const_int_value(child).is_some_and(|value| !slot.holds(value))
-        });
-        if !exact_operands && !source {
-            return ty;
-        }
-        let exact = self.numerus_type();
-        match &mut expr.kind {
-            HirExpressionKind::Binary(_, lhs, rhs) => {
-                self.unwrap_saturating_tree(lhs, exact);
-                self.unwrap_saturating_tree(rhs, exact);
-            }
-            HirExpressionKind::Unary(_, operand) => self.unwrap_saturating_tree(operand, exact),
-            _ => {}
-        }
-        if source {
-            return exact;
-        }
-        let site = StoreSite::new(HirStoreKind::Declaration);
-        self.wrap_implicit_store(expr, exact, word, site)
-    }
-
-    /// Turn a saturating child into its exact arithmetic: a root store node is
-    /// replaced by the node it wraps, and a bare node is retyped `int`.
-    fn unwrap_saturating_tree(&self, expr: &mut HirExpression, exact: TypeId) {
-        if !self.is_saturating_tree(expr) {
-            return;
-        }
-        if let HirExpressionKind::Conversio {
-            source,
-            implicit: Some(_),
-            ..
-        } = &mut expr.kind
-        {
-            let placeholder = HirExpression {
-                id: source.id,
-                kind: HirExpressionKind::Error,
-                ty: None,
-                span: source.span,
-            };
-            let inner = std::mem::replace(&mut **source, placeholder);
-            *expr = inner;
-        }
-        expr.ty = Some(exact);
     }
 }

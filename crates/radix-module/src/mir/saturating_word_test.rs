@@ -1,6 +1,8 @@
-//! D11.1 runner contract for `saturatus<W>`: add, sub, mul, and div clamp at
-//! both ends of the width, signed and unsigned, including the 64-bit edges;
-//! division by zero still fails, and `↦` into a saturating width clamps to the
+//! D11.1 runner contract for `saturatus<W>` under d11-6 ruling 3: `+ - * / %`
+//! over saturating operands is exact like every integer expression, and only a
+//! store into a saturating slot clamps, at both ends of the width, signed and
+//! unsigned, including the 64-bit edges; division by zero is an ordinary
+//! integer division failure, and `↦` into a saturating width clamps to the
 //! range and never fails (ruling 24).
 
 use super::*;
@@ -28,7 +30,7 @@ fn run_lines(source: &str) -> Vec<String> {
 }
 
 #[test]
-fn saturating_unsigned_add_sub_mul_clamp_at_both_ends() {
+fn saturating_unsigned_arithmetic_is_exact_and_the_store_clamps_at_both_ends() {
     let lines = run_lines(
         r"
 incipit {
@@ -39,14 +41,20 @@ incipit {
     nota high * 2
     nota high + 5
     nota low - 5
+    fixum saturatus<u8> up ← high + 10
+    fixum saturatus<u8> down ← low - 10
+    fixum saturatus<u8> twice ← high * 2
+    nota up
+    nota down
+    nota twice
 }
 ",
     );
-    assert_eq!(lines, vec!["255", "0", "255", "255", "0"]);
+    assert_eq!(lines, vec!["260", "-5", "500", "255", "0", "255", "0", "255"]);
 }
 
 #[test]
-fn saturating_signed_add_sub_mul_clamp_at_both_ends() {
+fn saturating_signed_arithmetic_is_exact_and_the_store_clamps_at_both_ends() {
     let lines = run_lines(
         r"
 incipit {
@@ -57,14 +65,27 @@ incipit {
     nota big * 2
     nota big * -2
     nota small + 10000
+    fixum saturatus<i16> up ← big + 10000
+    fixum saturatus<i16> down ← small - 10000
+    fixum saturatus<i16> twice ← big * 2
+    fixum saturatus<i16> negTwice ← big * -2
+    nota up
+    nota down
+    nota twice
+    nota negTwice
 }
 ",
     );
-    assert_eq!(lines, vec!["32767", "-32768", "32767", "-32768", "-20000"]);
+    assert_eq!(
+        lines,
+        vec![
+            "40000", "-40000", "60000", "-60000", "-20000", "32767", "-32768", "32767", "-32768"
+        ]
+    );
 }
 
 #[test]
-fn saturating_signed_min_negation_and_division_clamp_to_max() {
+fn saturating_signed_min_negation_and_division_are_exact_until_stored() {
     let lines = run_lines(
         r"
 incipit {
@@ -74,10 +95,14 @@ incipit {
     nota -floor
     nota floor / -1
     nota floor % -1
+    fixum saturatus<i8> negated ← -floor
+    fixum saturatus<i8> quotient ← floor / -1
+    nota negated
+    nota quotient
 }
 ",
     );
-    assert_eq!(lines, vec!["-128", "127", "127", "0"]);
+    assert_eq!(lines, vec!["-128", "128", "128", "0", "127", "127"]);
 }
 
 #[test]
@@ -127,50 +152,61 @@ incipit {
 
 #[test]
 fn saturating_64_bit_widths_clamp_exactly() {
+    // The exact value must lie in [-2^63, 2^64 - 1] (ruling 17); inside it the
+    // store clamps to the word at the 64-bit edges.
     let lines = run_lines(
         r"
 incipit {
-    fixum saturatus<u64> top ← 18446744073709551615
+    fixum saturatus<u64> zero ← 0
     fixum saturatus<i64> high ← 9223372036854775807
     fixum saturatus<i64> low ← -9223372036854775807
-    nota top + 1
-    nota top * 2
     nota high + 1
-    nota low - 2
+    nota low - 1
+    fixum saturatus<i64> up ← high + 1
+    fixum saturatus<i64> down ← low - 1
+    fixum saturatus<u64> floor ← zero - 5
+    fixum saturatus<u64> lifted ← zero + 18446744073709551615
+    nota up
+    nota down
+    nota floor
+    nota lifted
 }
 ",
     );
     assert_eq!(
         lines,
         vec![
-            "18446744073709551615",
-            "18446744073709551615",
+            "9223372036854775808",
+            "-9223372036854775808",
             "9223372036854775807",
             "-9223372036854775808",
+            "0",
+            "18446744073709551615",
         ]
     );
 }
 
 #[test]
-fn saturating_division_by_zero_still_fails() {
-    let mut host = BufferHost::default();
-    let errors = run_fixture_source(
-        r"
-incipit {
+fn saturating_division_by_zero_is_an_integer_division_failure() {
+    for body in ["nota level / zero", "nota level % zero", "nota level + 1 / zero"] {
+        let mut host = BufferHost::default();
+        let source = format!(
+            r"
+incipit {{
     fixum saturatus<u8> level ← 9
     fixum saturatus<u8> zero ← 0
-    nota level / zero
-}
-",
-        &mut host,
-    )
-    .expect_err("saturating division by zero fails");
-    assert!(
-        errors
-            .iter()
-            .any(|error| error.issue == "saturating_division_by_zero"),
-        "{errors:?}"
-    );
+    {body}
+}}
+"
+        );
+        let errors = run_fixture_source(&source, &mut host).expect_err("saturating division by zero fails");
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.message == "numerus division failed"),
+            "{body}: {errors:?}"
+        );
+    }
 }
 
 #[test]
@@ -193,6 +229,6 @@ incipit {
 }
 ",
         ),
-        vec!["255", "200", "255", "0", "-128"]
+        vec!["300", "200", "255", "0", "-128"]
     );
 }

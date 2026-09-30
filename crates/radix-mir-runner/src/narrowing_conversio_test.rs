@@ -234,18 +234,16 @@ fn decimal_source_rounds_like_numerus_narrowing_then_applies_the_policy() {
     assert_eq!(clamped, Value::Int(0));
 }
 
-/// `u64::MAX * u64::MAX` exceeds `i128`; the saturating product must clamp
-/// instead of overflowing.
+/// A value at the top of `i128` (far past every width) clamps at the store
+/// instead of overflowing; only the store clamps (d11-6 ruling 3).
 #[test]
-fn saturating_multiplication_past_i128_clamps() {
-    let max = Value::UInt(u64::MAX);
-    let product = crate::value::saturating_word_numeric_binop(
-        max.clone(),
-        max,
-        radix_mir::MirBinOp::Mul,
-        NumericWidth::U64,
-        Span::default(),
-    )
-    .expect("clamps");
-    assert_eq!(product, Value::UInt(u64::MAX));
+fn saturating_store_of_huge_value_clamps() {
+    assert_eq!(
+        crate::value::saturating_word_result(i128::MAX, NumericWidth::U64),
+        Value::UInt(u64::MAX)
+    );
+    assert_eq!(
+        crate::value::saturating_word_result(i128::MIN, NumericWidth::I16),
+        Value::Int(-32_768)
+    );
 }

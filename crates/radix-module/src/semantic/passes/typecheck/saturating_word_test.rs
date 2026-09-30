@@ -1,7 +1,7 @@
 //! D11.1 `saturatus<W>` (en `saturating<W>`) typing contract: every integer
 //! width is admitted, literals adapt to the width and must fit it, the family
 //! never mixes with `numerus` or `modulus` without `↦`, and bit-pattern
-//! operators fail closed. Rust codegen clamps through `saturating_*`.
+//! operators fail closed. Arithmetic is exact (ruling 3); a store clamps.
 
 use crate::Compiler;
 use crate::driver::AnalyzeRequest;
@@ -250,7 +250,7 @@ functio bits(saturatus<u8> x) → saturatus<u8> {{
 }
 
 #[test]
-fn saturating_word_rejects_unsigned_negation_and_inc_dec() {
+fn saturating_word_rejects_unsigned_negation_and_accepts_inc_dec() {
     analysis_rejects_with_issue(
         r"
 functio flip(saturatus<u8> x) → saturatus<u8> {
@@ -259,31 +259,61 @@ functio flip(saturatus<u8> x) → saturatus<u8> {
 ",
         "saturating_word_operator_unsupported",
     );
-    analysis_rejects_with_issue(
+    // `level ↑` is `level ← level + 1`: a store into the slot, which clamps.
+    analysis_accepts(
         r"
 incipit {
     varia saturatus<u8> level ← 1
     level ↑
+    level ↓
     nota level
 }
 ",
-        "saturating_word_operator_unsupported",
+    );
+}
+
+#[test]
+fn saturating_word_expression_is_exact_and_an_inferred_slot_keeps_the_word() {
+    // Ruling 3: `s + 10` is an exact integer, stored into an integer slot
+    // as-is; an inferred slot keeps `saturating<W>` (ruling 12).
+    analysis_accepts(
+        r"
+incipit {
+    fixum saturatus<u8> s ← 250
+    fixum numerus wide ← s + 10
+    fixum _ inferred ← s + 10
+    fixum saturatus<u8> same ← inferred
+    nota wide
+    nota same
+}
+",
+    );
+    analysis_rejects_with_issue(
+        r"
+incipit {
+    fixum saturatus<u8> s ← 250
+    fixum numerus<u8> narrow ← s + 10
+    fixum saturatus<u16> other ← narrow
+    nota other
+}
+",
+        "expression_type_mismatch",
     );
 }
 
 #[cfg(feature = "hir-rust")]
 #[test]
-fn saturating_word_rust_codegen_clamps_with_saturating_methods() {
-    // A single operation over in-range leaves clamps through the native
-    // method; its exact result and its clamp are the same value.
+fn saturating_word_rust_codegen_computes_a_single_operation_exactly() {
+    // Ruling 3: even one operation is exact `i128` arithmetic; the return
+    // store is the only clamp. No native `saturating_*` method is emitted.
     let result = Compiler::new(Config::default().with_target(Target::HirRust)).compile_str(
         "test.fab",
         r"
 functio add(saturatus<i16> x, saturatus<i16> y) → saturatus<i16> {
     redde x + y
 }
-functio neg(saturatus<i16> x) → saturatus<i16> {
-    redde -x
+functio wide(saturatus<i16> x, saturatus<i16> y) → numerus {
+    redde x + y
 }
 ",
     );
@@ -291,8 +321,19 @@ functio neg(saturatus<i16> x) → saturatus<i16> {
     let Some(crate::Output::Rust(output)) = result.output else {
         panic!("expected Rust output")
     };
-    for needle in ["i16::saturating_add", "i16::saturating_neg"] {
-        assert!(output.code.contains(needle), "missing {needle}:\n{}", output.code);
+    assert!(
+        output
+            .code
+            .contains(".clamp(i128::from(i16::MIN), i128::from(i16::MAX))"),
+        "missing the store clamp:\n{}",
+        output.code
+    );
+    for per_step in ["saturating_add", "saturating_sub", "saturating_mul"] {
+        assert!(
+            !output.code.contains(per_step),
+            "per-operation {per_step} must not appear:\n{}",
+            output.code
+        );
     }
 }
 

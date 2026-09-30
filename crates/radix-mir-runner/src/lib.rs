@@ -44,7 +44,7 @@ use value::{
     GradientStorage, add_values, compare_values, decimal_numeric_binop, decimal_scale_factor,
     int_bitwise_binop, modular_word_bitnot, modular_word_bitwise_binop,
     modular_word_compare_values, modular_word_neg, modular_word_numeric_binop, numeric_binop,
-    round_float, saturating_word_neg, saturating_word_numeric_binop, values_equal,
+    round_float, values_equal,
 };
 
 pub(crate) const RUNNER_UNSUPPORTED_PREFIX: &str = "faberscript unsupported";
@@ -1901,13 +1901,6 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         effective_width(self.types, ty.semantic_id()).unwrap_or(NumericWidth::I64)
     }
 
-    fn saturating_word_width(&self, ty: radix_mir::MirType) -> Option<NumericWidth> {
-        match self.types.get(ty.semantic_id()) {
-            Type::SaturatingWord(width) => Some(*width),
-            _ => None,
-        }
-    }
-
     fn modular_word_width(&self, ty: radix_mir::MirType) -> Option<NumericWidth> {
         match self.types.get(ty.semantic_id()) {
             Type::ModularWord(width) => Some(*width),
@@ -1936,9 +1929,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         let modular = self.modular_word_width(result_ty);
         match op {
             MirUnOp::Neg => {
-                if let Some(width) = self.saturating_word_width(result_ty) {
-                    saturating_word_neg(value, width, span)
-                } else if let Some(width) = modular {
+                if let Some(width) = modular {
                     modular_word_neg(value, width, span)
                 } else {
                     match exact_int::exact_neg(&value, width, span) {
@@ -2220,14 +2211,6 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
         if let Some(compared) = self.decimal_integer_comparison(op, lhs, rhs, &left, &right) {
             return Ok(Value::Bool(compared));
-        }
-        if let Some(saturating) = self.saturating_word_width(result_ty)
-            && matches!(
-                op,
-                MirBinOp::Add | MirBinOp::Sub | MirBinOp::Mul | MirBinOp::Div | MirBinOp::Mod
-            )
-        {
-            return saturating_word_numeric_binop(left, right, op, saturating, span);
         }
         if let Some(modular) = self.modular_word_width(result_ty) {
             return match op {

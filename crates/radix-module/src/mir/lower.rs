@@ -1713,10 +1713,6 @@ struct FunctionBuilder<'a> {
     /// kernel's inline flow.
     filum_capture: Option<SummaFoldContext>,
     handlers: Vec<HandlerContext>,
-    /// The `saturating<W>` slot type while lowering the exact arithmetic tree
-    /// that clamps into it (d11-6 ruling 3): an inner `/` or `%` by zero in
-    /// the chain reports the saturating division-by-zero identity.
-    saturating_chain: Option<MirType>,
     /// Active `capta` trap boundaries (UT); see [`TrapContext`].
     traps: Vec<TrapContext>,
     /// Monotonic DFS order shared by handler and trap pushes, so
@@ -1788,7 +1784,6 @@ impl<'a> FunctionBuilder<'a> {
             summa_fold: None,
             filum_capture: None,
             handlers: Vec::new(),
-            saturating_chain: None,
             traps: Vec::new(),
             capture_depth: 0,
             materializing_consts: FxHashSet::default(),
@@ -2826,23 +2821,6 @@ impl<'a> FunctionBuilder<'a> {
             (self.lower_expr_value(lhs)?, self.lower_expr_value(rhs)?)
         };
         let ty = self.expr_ty(expr)?;
-        // d11-6 ruling 3: an exact `/` or `%` inside a saturating chain is
-        // still the saturating expression's division. A discarded saturating
-        // `1 / divisor` gives a zero divisor the same failure identity as a
-        // top-level saturating division (the `÷` zero guard uses this shape).
-        if matches!(op, HirBinOp::Div | HirBinOp::Mod)
-            && let Some(word_ty) = self.saturating_chain
-            && word_ty != ty
-            && matches!(self.normalized_type(ty.semantic_id()), Type::Primitive(Primitive::Numerus))
-        {
-            self.binary_temp(
-                MirBinOp::Div,
-                MirOperand::Constant(MirConstant::Int(1)),
-                rhs.clone(),
-                word_ty,
-                expr.span,
-            );
-        }
 
         Some(self.assign_temp(MirValueKind::Binary { op: mir_op, lhs, rhs }, ty, expr.span))
     }

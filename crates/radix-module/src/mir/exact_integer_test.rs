@@ -253,32 +253,39 @@ fn true_division_word_operand_with_a_literal_converts_from_the_constant_type() {
     assert_eq!(ok("varia saturatus<u8> s ← 250\nnota s ÷ 4"), ["62.5"]);
     assert_eq!(
         ok("varia saturatus<u8> s ← 250\nfixum fractus q ← (s + 10) ÷ 2\nnota q"),
-        ["127.5"]
+        ["130.0"]
     );
 }
 
 #[test]
-fn saturating_chain_division_by_zero_reports_the_saturating_identity() {
-    // u9b (ruling 3): the chain is the saturating expression's own arithmetic.
+fn saturating_chain_division_by_zero_is_an_ordinary_integer_failure() {
+    // Ruling 3: saturating arithmetic is exact integer arithmetic, so a zero
+    // divisor anywhere in the chain is the integer division failure.
     for body in [
         "varia saturatus<u8> x ← 250\nvaria saturatus<u8> z ← 0\nfixum saturatus<u8> r ← x + 10 / z\nnota r",
         "varia saturatus<u8> x ← 250\nvaria saturatus<u8> z ← 0\nfixum saturatus<u8> r ← x + x % z\nnota r",
         "varia saturatus<u8> x ← 250\nvaria saturatus<u8> z ← 0\nfixum saturatus<u8> r ← (x + 10) / (z + 0)\nnota r",
+        "varia saturatus<u8> x ← 250\nvaria saturatus<u8> z ← 0\nnota x / z",
     ] {
         let (_, issue, _) = trap(body);
-        assert_eq!(issue, "saturating_division_by_zero", "{body}");
+        assert_eq!(issue, "runner_numerus_division_failed", "{body}");
     }
 }
 
 #[test]
-fn saturating_u64_chain_past_the_exact_range_traps_and_a_single_op_clamps() {
-    // u9a / ruling 17: the exact intermediate must lie in [-2^63, 2^64 - 1].
+fn saturating_u64_intermediates_must_lie_in_the_exact_range() {
+    // u9a / ruling 17: every exact value lies in [-2^63, 2^64 - 1], so a
+    // chain through 2^64 traps; a chain that stays inside clamps at the store.
     let top = "varia saturatus<u64> top ← 18446744073709551615\n";
     let (_, issue, _) = trap(&format!("{top}fixum saturatus<u64> r ← top + 1 - 5\nnota r"));
     assert_eq!(issue, "runner_numerus_overflow");
     assert_eq!(
-        ok(&format!("{top}fixum saturatus<u64> r ← top + 1\nnota r")),
-        ["18446744073709551615"]
+        ok(&format!("{top}fixum saturatus<u64> r ← top - 5 + 3\nnota r")),
+        ["18446744073709551613"]
+    );
+    assert_eq!(
+        ok("varia saturatus<u64> z ← 0\nfixum saturatus<u64> r ← z - 5 + 3\nnota r"),
+        ["0"]
     );
 }
 

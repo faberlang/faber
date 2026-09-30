@@ -1,5 +1,7 @@
-//! Emission pins for the Rust, Swift and Go backends: signed saturating `/`
-//! and `%` floor and trap with the runner's text (ruling 14), `≈` unscales a
+//! Emission pins for the Rust, Swift and Go backends: `/` and `%` over
+//! `saturating` operands are exact floor division that traps on a zero divisor
+//! with the integer text (rulings 3, 14; only a store into a `saturating`
+//! slot clamps), `≈` unscales a
 //! decimal operand (ruling 22), and `xs[i]↑` is a single-evaluation checked
 //! element store. The corpus goldens prove the behavior; these name the shape.
 
@@ -53,28 +55,28 @@ fn emit(target: Target, source: &str) -> String {
 }
 
 #[test]
-fn rust_saturating_division_floors_and_traps_with_runner_text() {
+fn rust_saturating_division_is_exact_floor_division() {
     let code = emit(Target::HirRust, SATURATING);
-    assert!(code.contains("panic!(\"saturatus division failed\")"), "{code}");
-    assert!(code.contains("let q = l / r; let m = l % r;"), "{code}");
-    assert!(code.contains("{ m + r }"), "{code}");
+    assert!(code.contains("__faber_div(a as i128, two as i128)"), "{code}");
+    assert!(code.contains("__faber_rem(a as i128, two as i128)"), "{code}");
+    assert!(code.contains("panic!(\"numerus division failed\")"), "{code}");
+    assert!(!code.contains("saturatus division failed"), "{code}");
 }
 
 #[test]
-fn swift_saturating_division_floors() {
+fn swift_saturating_division_is_exact_floor_division() {
     let code = emit(Target::HirSwift, SATURATING);
-    assert!(code.contains("var q = l / r; let m = l % r;"), "{code}");
-    assert!(code.contains("m += r"), "{code}");
+    assert!(code.contains("print(faberXDiv(Int128(a), Int128(two)))"), "{code}");
+    assert!(code.contains("print(faberXMod(Int128(a), Int128(two)))"), "{code}");
     assert!(!code.contains("dividedReportingOverflow"), "{code}");
 }
 
 #[test]
-fn go_saturating_division_by_zero_uses_runner_text() {
+fn go_saturating_division_by_zero_uses_the_integer_text() {
     let code = emit(Target::HirGo, SATURATING);
-    assert!(
-        code.contains("if right == 0 { panic(\"saturatus division failed\") }"),
-        "{code}"
-    );
+    assert!(code.contains("faberXDiv(faberXI(int64(a)), faberXI(int64(two)))"), "{code}");
+    assert!(code.contains("panic(\"numerus division failed\")"), "{code}");
+    assert!(!code.contains("saturatus division failed"), "{code}");
 }
 
 #[test]

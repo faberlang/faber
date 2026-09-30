@@ -109,6 +109,17 @@ impl TypeChecker<'_> {
         radix_types::numeric_width::numerus_integer_width(&self.types, resolved)
     }
 
+    /// Declared width of an integer that takes part in the range rule: a
+    /// trapping integer, or a `saturating` word (which computes exactly like
+    /// its width and clamps only where a value is stored into a slot).
+    fn range_int_width(&self, ty: TypeId) -> Option<NumericWidth> {
+        self.plain_int_width(ty).or_else(|| {
+            let shape = self.numeric_shape(self.resolve_inferred_type(ty))?;
+            (shape.family == IntFamily::Saturating && shape.prim == Primitive::Numerus)
+                .then_some(shape.width)
+        })
+    }
+
     pub(super) fn width_type(&mut self, width: NumericWidth) -> TypeId {
         if width == NumericWidth::I64 {
             self.numerus_type()
@@ -174,28 +185,20 @@ impl TypeChecker<'_> {
             return self.check_expr_with_expected(expr, hint);
         }
         if resolved == self.error_type
-            || self.plain_int_width(resolved).is_some()
+            || self.range_int_width(resolved).is_some()
             || self.numeric_shape(resolved).is_none()
         {
             return self.check_const_operand(expr);
         }
         let hint = self.numeric_expected_type(resolved);
-        // A constant beside a `saturating` peer is an exact number, not a
-        // value of the word: only the store clamps (ruling 3).
-        let saturating = self
-            .numeric_shape(resolved)
-            .is_some_and(|shape| shape.family == IntFamily::Saturating);
-        let saved = std::mem::replace(&mut self.saturating_exact_operand, saturating);
-        let ty = self.check_expr_with_expected(expr, Some(hint));
-        self.saturating_exact_operand = saved;
-        ty
+        self.check_expr_with_expected(expr, Some(hint))
     }
 
     fn classify_operand(&self, expr: &HirExpression, ty: TypeId) -> Operand {
         if let Some(value) = const_int_value(expr) {
             return Operand::Const(value);
         }
-        self.plain_int_width(ty)
+        self.range_int_width(ty)
             .map_or(Operand::Other, Operand::Plain)
     }
 
@@ -314,6 +317,11 @@ impl TypeChecker<'_> {
         let (l, r) = self.range_operands(lhs, rhs, lhs_ty, rhs_ty)?;
         if let (Operand::Const(a), Operand::Const(b)) = (l, r) {
             return self.constant_expression_type(fold_const_binary(op, a, b), expected, span);
+        }
+        if matches!((l, r), (Operand::Plain(_), Operand::Plain(_)))
+            && !self.saturating_operands_agree(lhs, rhs, span)
+        {
+            return Some(self.error_type);
         }
         if let (Operand::Plain(a), Operand::Plain(b)) = (l, r)
             && ((a == NumericWidth::U64 && b.is_signed_int())
@@ -454,6 +462,12 @@ impl TypeChecker<'_> {
         expected: Option<TypeId>,
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
+        if self.saturating_origin(lhs).is_some() || self.saturating_origin(rhs).is_some() {
+            // Clamping has no bit-pattern meaning; bitwise and shift
+            // operators stay closed to `saturating` (D11.1).
+            self.invalid_operand_types(super::ops::SATURATING_WORD_OPERATOR_UNSUPPORTED, span);
+            return Some(self.error_type);
+        }
         let (l, r) = self.range_operands(lhs, rhs, lhs_ty, rhs_ty)?;
         if let (Operand::Const(a), Operand::Const(b)) = (l, r) {
             return self.constant_expression_type(fold_const_binary(op, a, b), expected, span);
@@ -519,7 +533,7 @@ impl TypeChecker<'_> {
         if self.current_device_function || const_int_value(operand).is_some() {
             return None;
         }
-        let width = self.plain_int_width(operand_ty)?;
+        let width = self.range_int_width(operand_ty)?;
         let a = width.integer_range()?;
         let result = match op {
             radix_hir::HirUnOp::Neg => range::neg(a),
@@ -629,7 +643,7 @@ impl TypeChecker<'_> {
         // mismatch of the operand (ruling 19a).
         expected.filter(|ty| {
             let resolved = self.resolve_inferred_type(*ty);
-            !self.is_infer(resolved) && self.plain_int_width(resolved).is_none()
+            !self.is_infer(resolved) && self.range_int_width(resolved).is_none()
         })
     }
 
