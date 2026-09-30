@@ -7,6 +7,7 @@ license = "MIT"
 publish = false
 
 [dependencies]
+handroll = { path = "../handroll" }
 radix-lexer = { path = "../radix-lexer" }
 radix-syntax = { path = "../radix-syntax" }
 rustc-hash = "2"

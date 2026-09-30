@@ -613,10 +613,7 @@ impl TypeChecker<'_> {
             if shape.prim != Primitive::Numerus || shape.width.is_decimal() {
                 return None;
             }
-            Some((
-                shape.family,
-                super::integer_range::const_int_value(expr).is_some(),
-            ))
+            Some((shape.family, super::integer_range::is_const_int(expr)))
         };
         let (Some((lf, lc)), Some((rf, rc))) =
             (word_or_plain(lhs, lhs_ty), word_or_plain(rhs, rhs_ty))
@@ -854,10 +851,6 @@ impl TypeChecker<'_> {
         let target_ty = self.check_lvalue(target);
         if !self.is_integer(target_ty) {
             self.invalid_operand_types(POSTFIX_INC_DEC_NUMERUS_OPERAND, span);
-            return;
-        }
-        if self.is_inf_type(target_ty) {
-            self.invalid_operand_types(super::inf_gate::ISSUE_INF_ARITHMETIC_UNSUPPORTED, span);
         }
     }
 
@@ -1062,34 +1055,6 @@ impl TypeChecker<'_> {
         operand: &mut HirExpression,
         expected: Option<TypeId>,
     ) -> TypeId {
-        let result = self.check_unary_unguarded(op, operand, expected);
-        if matches!(op, radix_hir::HirUnOp::Neg | radix_hir::HirUnOp::BitNot)
-            && !Self::is_negated_fitting_literal(op, operand)
-            && self.reject_inf_arithmetic(&[&*operand], result, operand.span)
-        {
-            return self.error_type;
-        }
-        result
-    }
-
-    /// `-<literal>` into an `inf` slot is a constant, not arithmetic, while
-    /// its value fits the 64-bit carriers; `-2^63` and below need the exact
-    /// constant folding of inf track U3.
-    fn is_negated_fitting_literal(op: radix_hir::HirUnOp, operand: &HirExpression) -> bool {
-        matches!(op, radix_hir::HirUnOp::Neg)
-            && integer_range::const_int_value(operand).is_some_and(|value| {
-                value
-                    .checked_neg()
-                    .is_some_and(|neg| neg >= i128::from(i64::MIN))
-            })
-    }
-
-    fn check_unary_unguarded(
-        &mut self,
-        op: radix_hir::HirUnOp,
-        operand: &mut HirExpression,
-        expected: Option<TypeId>,
-    ) -> TypeId {
         match op {
             radix_hir::HirUnOp::Neg => {
                 // `-9223372036854775808` is an exact constant that fits `int`;
@@ -1191,8 +1156,8 @@ impl TypeChecker<'_> {
             return self.check_arithmetic_operands_legacy(lhs, rhs, expected);
         }
         match (
-            integer_range::const_int_value(lhs).is_some(),
-            integer_range::const_int_value(rhs).is_some(),
+            integer_range::is_const_int(lhs),
+            integer_range::is_const_int(rhs),
         ) {
             (true, true) if self.const_pair_is_legacy(expected) => {
                 self.check_arithmetic_operands_legacy(lhs, rhs, expected)
@@ -1261,7 +1226,7 @@ impl TypeChecker<'_> {
         peer: TypeId,
     ) -> Option<TypeId> {
         if self.current_device_function
-            || !(is_numeric_literal(expr) || integer_range::const_int_value(expr).is_some())
+            || !(is_numeric_literal(expr) || integer_range::is_const_int(expr))
         {
             return None;
         }
@@ -1308,22 +1273,6 @@ impl TypeChecker<'_> {
     /// text `+` requires both operands to be `textus`, and coalescing encodes the local
     /// optional/`nihil` result contract.
     pub fn check_binary(
-        &mut self,
-        op: HirBinOp,
-        lhs: &mut HirExpression,
-        rhs: &mut HirExpression,
-        expected: Option<TypeId>,
-    ) -> TypeId {
-        let result = self.check_binary_unguarded(op, lhs, rhs, expected);
-        if super::inf_gate::is_value_computing_op(op)
-            && self.reject_inf_arithmetic(&[&*lhs, &*rhs], result, lhs.span)
-        {
-            return self.error_type;
-        }
-        result
-    }
-
-    fn check_binary_unguarded(
         &mut self,
         op: HirBinOp,
         lhs: &mut HirExpression,
@@ -2193,8 +2142,8 @@ impl TypeChecker<'_> {
     ) -> (TypeId, TypeId) {
         if !self.current_device_function {
             match (
-                integer_range::const_int_value(lhs).is_some(),
-                integer_range::const_int_value(rhs).is_some(),
+                integer_range::is_const_int(lhs),
+                integer_range::is_const_int(rhs),
             ) {
                 (true, true) if !self.const_pair_is_legacy(expected) => {
                     return (self.check_const_operand(lhs), self.check_const_operand(rhs));
@@ -2287,7 +2236,10 @@ impl TypeChecker<'_> {
 fn is_numeric_literal(expr: &HirExpression) -> bool {
     match &expr.kind {
         HirExpressionKind::Literal(
-            HirLiteral::Int(_) | HirLiteral::Float(_) | HirLiteral::FloatText { .. },
+            HirLiteral::Int(_)
+            | HirLiteral::BigInt(_)
+            | HirLiteral::Float(_)
+            | HirLiteral::FloatText { .. },
         ) => true,
         // A negated literal (`-1.0`) is still a literal for propagation purposes.
         HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => is_numeric_literal(inner),
@@ -2415,7 +2367,9 @@ fn is_decimal_text_literal(expr: &HirExpression) -> bool {
 
 fn numeric_literal_family(expr: &HirExpression) -> Option<Primitive> {
     match &expr.kind {
-        HirExpressionKind::Literal(HirLiteral::Int(_)) => Some(Primitive::Numerus),
+        HirExpressionKind::Literal(HirLiteral::Int(_) | HirLiteral::BigInt(_)) => {
+            Some(Primitive::Numerus)
+        }
         HirExpressionKind::Literal(HirLiteral::Float(_) | HirLiteral::FloatText { .. }) => {
             Some(Primitive::Fractus)
         }

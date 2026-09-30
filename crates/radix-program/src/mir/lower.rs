@@ -2219,6 +2219,8 @@ fn transplant_literal(
                 .map(|flags| remap_symbol(*flags, source_interner, entry_interner)),
         ),
         HirLiteral::Int(value) => HirLiteral::Int(*value),
+        // inf track U3: the canonical decimal digits carry no symbol to remap.
+        HirLiteral::BigInt(digits) => HirLiteral::BigInt(digits.clone()),
         // decimal-widths D1 successor: the digit text crosses
         // the boundary remapped, so the entry unit's MIR lowering still
         // derives the exact scaled carrier; the f64 field alone cannot.

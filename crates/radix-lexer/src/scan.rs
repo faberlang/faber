@@ -472,10 +472,23 @@ impl<'a> Lexer<'a> {
 
         if let Ok(n) = u64::from_str_radix(&clean, radix) {
             self.emit_token(TokenKind::Integer(n), start);
+        } else if !clean.is_empty() {
+            // inf track (ruling 34): a digit string beyond `u64` is a big
+            // literal; the digits were validated by the radix predicate. The
+            // spelling keeps its radix prefix so consumers re-parse exactly.
+            let prefix = self.cursor.slice(start, start + 2).to_ascii_lowercase();
+            self.emit_big_integer(&format!("{prefix}{clean}"), start);
         } else {
             self.emit_issue_error(LexErrorKind::NumberInvalid, start, issue);
             self.emit_token(TokenKind::Error, start);
         }
+    }
+
+    /// Emit an integer literal too large for `u64` as [`TokenKind::BigInteger`]
+    /// carrying its cleaned digit text (decimal, or `0x`/`0o`/`0b` prefixed).
+    fn emit_big_integer(&mut self, text: &str, start: u32) {
+        let text = self.interner.intern_raw(text);
+        self.emit_token(TokenKind::BigInteger(text), start);
     }
 
     /// Intern a delimited literal payload after the closing delimiter is found or recovery ends.
@@ -944,6 +957,9 @@ impl<'a> Lexer<'a> {
             }
         } else if let Ok(n) = clean.parse::<u64>() {
             self.emit_token(TokenKind::Integer(n), start);
+        } else if !clean.is_empty() && clean.bytes().all(|b| b.is_ascii_digit()) {
+            // A decimal digit string beyond `u64` (inf track, ruling 34).
+            self.emit_big_integer(&clean, start);
         } else {
             self.emit_issue_error(LexErrorKind::NumberInvalid, start, "invalid_integer");
             self.emit_token(TokenKind::Error, start);

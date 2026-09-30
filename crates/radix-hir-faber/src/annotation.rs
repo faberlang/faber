@@ -218,6 +218,7 @@ impl super::FaberCodegen<'_> {
                 self.write_textus_literal(*sym, writer);
             }
             TokenKind::Integer(value) => writer.write(&value.to_string()),
+            TokenKind::BigInteger(text) => writer.write(self.interner.resolve(*text)),
             // decimal-widths D1: emit paths stay byte-identical (f64 spelling).
             TokenKind::Float(value) | TokenKind::FloatText { value, .. } => {
                 writer.write(&value.to_string());

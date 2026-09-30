@@ -185,7 +185,7 @@ impl TypeChecker<'_> {
         rhs: &mut HirExpression,
         decimal_constants: bool,
     ) -> (TypeId, TypeId) {
-        let lhs_ty = self.check_expr(lhs);
+        let lhs_ty = self.check_comparison_operand(lhs);
         let rhs_ty = if self.is_littera(lhs_ty) && is_ascii_literal(rhs) {
             self.check_expr_with_expected(rhs, Some(lhs_ty))
         } else if let Some(ty) = decimal_constants
@@ -194,7 +194,7 @@ impl TypeChecker<'_> {
         {
             ty
         } else {
-            self.check_expr(rhs)
+            self.check_comparison_operand(rhs)
         };
         let lhs_ty = decimal_constants
             .then(|| self.check_constant_beside_decimal(lhs, rhs_ty))

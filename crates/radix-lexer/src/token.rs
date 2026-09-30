@@ -84,6 +84,10 @@ pub enum TokenKind {
     /// remain unary negation over this magnitude; signed consumers (JSON,
     /// enum values, CLI, annotations) convert with explicit checked bounds.
     Integer(u64),
+    /// An integer literal beyond `u64` (inf track, ruling 34): the cleaned
+    /// digit text, decimal or `0x`/`0o`/`0b` prefixed. Its value is judged
+    /// where it lands — any `inf` slot holds it, every bounded slot rejects it.
+    BigInteger(Symbol),
     Float(f64),
     /// Decimal literal preserving exact digit text (decimal-widths D1, R0 fix).
     /// `value` is the f64 re-derivation used by the fractus path — identical to

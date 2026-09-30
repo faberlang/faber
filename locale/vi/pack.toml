@@ -1614,7 +1614,7 @@ help = "write a value the slot holds"
 
 [diagnostics.SEM010.issues.numerus_literal_out_of_range]
 message = "integer literal is outside the numerus range"
-help = "write a value from -9223372036854775808 to 9223372036854775807, or store a larger non-negative value in a `u64` slot"
+help = "write a value from -9223372036854775808 to 9223372036854775807, store a larger non-negative value in a `u64` slot, or declare the slot `inf` to hold any integer"
 
 [diagnostics.SEM010.issues.integer_to_float_requires_conversio]
 message = "integer cannot convert to a float implicitly"
@@ -1906,7 +1906,7 @@ help = "chuyển đổi rõ ràng các toán hạng trước khi áp dụng toá
 
 [diagnostics.SEM011.issues.u64_signed_arithmetic_requires_conversion]
 message = "u64 and a signed integer have no lossless join in arithmetic"
-help = "convert one side with `↦` so both operands are u64 or both are signed"
+help = "convert one side with `↦` so both operands are u64 or both are signed (`a ↦ i64`), or join them exactly with `a ↦ inf`"
 
 [diagnostics.SEM011.issues.saturating_word_family_mismatch]
 message = "saturating integers cannot mix with other integer families in arithmetic"

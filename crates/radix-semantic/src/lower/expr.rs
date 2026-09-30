@@ -269,7 +269,7 @@ fn lower_call_default(
 fn lower_literal(lowerer: &mut Lowerer, lit: &Literal) -> HirExpressionKind {
     match lit {
         Literal::Forma(template) => lowerer.lower_forma_capture(*template, Vec::new()),
-        _ => match super::literal::literal_to_hir(lit) {
+        _ => match super::literal::literal_to_hir(lit, lowerer.interner) {
             Ok(literal) => HirExpressionKind::Literal(literal),
             Err(message) => {
                 lowerer.error_from_message(message);
@@ -1832,8 +1832,13 @@ fn via_target_takes_hint(lowerer: &Lowerer<'_>, target: &HirConversioTarget) -> 
     loop {
         match lowerer.types.get(ty) {
             crate::Type::Option(inner) | crate::Type::Ref(_, inner) => ty = *inner,
+            // `Octeti` takes `Be`/`Le` for the `inf` encode row (ruling 40).
             crate::Type::Primitive(
-                Primitive::Numerus | Primitive::Fractus | Primitive::Ascii | Primitive::Littera,
+                Primitive::Numerus
+                | Primitive::Fractus
+                | Primitive::Ascii
+                | Primitive::Littera
+                | Primitive::Octeti,
             )
             | crate::Type::SizedNumeric(..)
             | crate::Type::ModularWord(_)

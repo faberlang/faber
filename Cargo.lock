@@ -945,6 +945,7 @@ version = "0.84.0"
 name = "radix-types"
 version = "0.84.0"
 dependencies = [
+ "handroll",
  "radix-lexer",
  "radix-syntax",
  "rand 0.8.8",

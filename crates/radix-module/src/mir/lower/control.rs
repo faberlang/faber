@@ -1401,6 +1401,10 @@ impl FunctionBuilder<'_> {
             HirLiteral::Ascii(symbol) => Some(MirConstant::Ascii(*symbol)),
             HirLiteral::Bool(value) => Some(MirConstant::Bool(*value)),
             HirLiteral::Nil => Some(MirConstant::Nil),
+            HirLiteral::BigInt(_) => {
+                self.reject_inf_literal(span);
+                None
+            }
             HirLiteral::Octeti(_) | HirLiteral::JsonValor(_) | HirLiteral::Regex(_, _) => {
                 self.errors
                     .push(MirError::unsupported(span, "literal pattern before switch MIR lowering"));

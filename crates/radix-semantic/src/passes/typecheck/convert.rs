@@ -239,20 +239,42 @@ fn static_float_magnitude(source: &HirExpression) -> Option<f64> {
 /// rankless: no exactness proof without soft-float arithmetic.
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum NumericFactFamily {
-    SignedInt { rank: u8 },
-    UnsignedInt { rank: u8 },
-    Modular { rank: u8 },
-    ModularSigned { rank: u8 },
-    SaturatingSigned { rank: u8 },
-    SaturatingUnsigned { rank: u8 },
-    Float { rank: Option<u8> },
+    SignedInt {
+        rank: u8,
+    },
+    UnsignedInt {
+        rank: u8,
+    },
+    Modular {
+        rank: u8,
+    },
+    ModularSigned {
+        rank: u8,
+    },
+    SaturatingSigned {
+        rank: u8,
+    },
+    SaturatingUnsigned {
+        rank: u8,
+    },
+    Float {
+        rank: Option<u8>,
+    },
     Decimal,
+    /// The unbounded `inf` (ruling 40): no rank, no range. Every bounded
+    /// trapping width flows into it; it flows into nothing bounded.
+    Unbounded,
 }
 
 impl NumericFactFamily {
     /// Whether every value of the integer-like family `self` converts into
     /// the trapping integer family `other` without a range check failing.
     fn integer_flows_into(self, other: Self) -> bool {
+        // Ruling 40: every integer family, words included, converts into `inf`
+        // exactly; `inf` converts into `inf` unchanged.
+        if other == Self::Unbounded {
+            return !matches!(self, Self::Float { .. } | Self::Decimal);
+        }
         let (signed_from, rank_from) = match self {
             Self::SignedInt { rank }
             | Self::ModularSigned { rank }
@@ -286,7 +308,10 @@ impl NumericFactFamily {
             | (Self::SaturatingUnsigned { rank: a }, Self::SaturatingUnsigned { rank: b }) => {
                 a <= b
             }
-            (Self::Decimal, Self::Decimal) => true,
+            (Self::Decimal, Self::Decimal) | (Self::Unbounded, Self::Unbounded) => true,
+            // The lattice edge of ruling 35: every bounded trapping width
+            // (`u64` included) widens into `inf`.
+            (Self::SignedInt { .. } | Self::UnsignedInt { .. }, Self::Unbounded) => true,
             (Self::Float { rank: a }, Self::Float { rank: b }) => {
                 matches!((a, b), (Some(x), Some(y)) if x <= y)
             }
@@ -342,7 +367,9 @@ fn numeric_fact(ty: &Type) -> Option<NumericFact> {
             Some(fact(NumericFactFamily::Float { rank: Some(2) }))
         }
         Type::SizedNumeric(_, width) => {
-            let family = if let Some(rank) = signed_width_rank(*width) {
+            let family = if width.is_unbounded() {
+                NumericFactFamily::Unbounded
+            } else if let Some(rank) = signed_width_rank(*width) {
                 NumericFactFamily::SignedInt { rank }
             } else if let Some(rank) = unsigned_width_rank(*width) {
                 NumericFactFamily::UnsignedInt { rank }
@@ -542,7 +569,14 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
     ) -> TypeId {
         *route = None;
-        let source_ty = self.check_expr(source);
+        // Ruling 34: an integer constant is untyped and exact, so a constant
+        // beyond every 64-bit type is the source of the conversion as an `inf`.
+        let source_ty =
+            if !self.current_device_function && super::integer_range::is_const_int(source) {
+                self.check_const_operand(source)
+            } else {
+                self.check_expr(source)
+            };
         if let HirConversioTarget::Intervallum(operand) = target {
             if recovery.is_some() {
                 self.invalid_conversion(ISSUE_INTERVALLUM_CLAMP_RECOVERY, span);
@@ -554,9 +588,9 @@ impl TypeChecker<'_> {
             return self.error_type;
         };
         let target_resolved = self.resolve_inferred_type(*target);
-        // inf track U2: conversions out of `inf` (and into it from non-integers)
-        // wait for their typing rows (ruling 40, unit U3); fail closed by name.
-        if self.reject_inf_conversio(source_ty, target_resolved, span) {
+        // Ruling 20 for constants of any size: a constant beyond the float's
+        // finite range is a compile error, never infinity.
+        if !self.check_float_conversion_constant(source, target_resolved, span) {
             return self.error_type;
         }
         // decimal-widths D2 (wildcard audit): any conversio `via` hint aimed
@@ -1375,7 +1409,12 @@ impl TypeChecker<'_> {
                 | PrimitiveConversioFamily::Fractus
                 | PrimitiveConversioFamily::Bivalens,
                 PrimitiveConversioFamily::Octeti,
-            ) => Some(ISSUE_NUMERIC_TO_OCTETI_UNSPECIFIED),
+            ) => {
+                // Ruling 40: `inf ↦ octeti via Be|Le` is the one integer row
+                // with a total byte form (minimal two's complement).
+                (!(self.is_inf_type(source_ty) && self.conversio_has_endian_hint(params)))
+                    .then_some(ISSUE_NUMERIC_TO_OCTETI_UNSPECIFIED)
+            }
             (PrimitiveConversioFamily::Octeti, PrimitiveConversioFamily::Numerus) => {
                 self.octeti_to_numerus_issue(source, target_resolved, params)
             }
@@ -1413,6 +1452,11 @@ impl TypeChecker<'_> {
     ) -> Option<&'static str> {
         if !self.conversio_has_endian_hint(params) {
             return Some(ISSUE_OCTETI_TO_NUMERUS_UNSPECIFIED);
+        }
+        // Ruling 40: `octeti ↦ inf via Be|Le` decodes any length (the exact
+        // inverse of the minimal two's-complement encode); no window width.
+        if self.is_inf_type(target_resolved) {
+            return None;
         }
         let Some(need) = endian_read_width_bytes(self.types.get(target_resolved)) else {
             return Some(ISSUE_OCTETI_TO_NUMERUS_UNSPECIFIED);
@@ -1501,6 +1545,9 @@ impl TypeChecker<'_> {
         {
             return Some(ISSUE_DECIMAL_BITS_HINT_REJECTED);
         }
+        // Ruling 40: `inf` has no fixed width, so no `Bits` pair holds it; it
+        // falls through to the width-mismatch answer below (`inf` is neither
+        // `u16`, `u32` nor `u64`).
         let exact_pair = matches!(
             (source, target),
             (
@@ -2665,6 +2712,25 @@ impl TypeChecker<'_> {
         ) else {
             return false;
         };
+        // Ruling 40, into `inf`: an integer of any family converts exactly; a
+        // float fails only at NaN and ±∞ (a finite constant is proven); a
+        // decimal truncates into it.
+        if to.family == NumericFactFamily::Unbounded {
+            return match from.family {
+                NumericFactFamily::Float { .. } => {
+                    static_float_magnitude(source).is_none_or(|value| !value.is_finite())
+                }
+                _ => false,
+            };
+        }
+        // Ruling 40, out of `inf` into `d64`: checked into the carrier range
+        // (integer part at most 92,233,720,368), so failable unless a constant
+        // proves it fits. Every other decimal target keeps the row below.
+        if from.family == NumericFactFamily::Unbounded && to.family == NumericFactFamily::Decimal {
+            const D64_INTEGER_PART_MAX: i128 = 92_233_720_368;
+            return static_integer_magnitude(source)
+                .is_none_or(|value| value.abs() > D64_INTEGER_PART_MAX);
+        }
         let Some(target_width) = self.trapping_integer_width(target_ty, &to) else {
             return false;
         };
@@ -2680,7 +2746,10 @@ impl TypeChecker<'_> {
                 // d64 integer parts fit i64.
                 !matches!(to.family, NumericFactFamily::SignedInt { rank: t } if t >= 3)
             }
-            NumericFactFamily::SignedInt { .. }
+            // `inf` into a bounded trapping integer is the magnitude-checked
+            // narrowing: failable unless a constant proves it fits.
+            NumericFactFamily::Unbounded
+            | NumericFactFamily::SignedInt { .. }
             | NumericFactFamily::UnsignedInt { .. }
             | NumericFactFamily::Modular { .. }
             | NumericFactFamily::ModularSigned { .. }
@@ -3133,10 +3202,12 @@ impl TypeChecker<'_> {
         // value; int↔float and int→decimal stay conversions (decimal law:
         // integer literals keep their own family).
         if let Some(value) = static_integer_magnitude(source) {
-            let holds = target_fact
-                .width
-                .and_then(integer_width_range)
-                .is_some_and(|(min, max)| value >= min && value <= max);
+            // `inf` holds every integer constant (ruling 34).
+            let holds = target_fact.family == NumericFactFamily::Unbounded
+                || target_fact
+                    .width
+                    .and_then(integer_width_range)
+                    .is_some_and(|(min, max)| value >= min && value <= max);
             if !holds {
                 self.invalid_conversion(ISSUE_NUMERIC_ASCRIPTION_REQUIRES_CONVERSION, span);
             }

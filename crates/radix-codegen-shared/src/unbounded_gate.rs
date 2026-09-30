@@ -22,6 +22,25 @@ fn target_admits_inf(target: Target) -> bool {
     matches!(target, Target::HirFaber | Target::HirFhir)
 }
 
+/// The error for a big integer literal (beyond `u64`, ruling 34) reaching a
+/// backend that has no bignum carrier. [`reject_unbounded_integer`] refuses
+/// such a module first (a big literal can only type as `inf`), so this arm is
+/// the named fail-closed backstop, never a silent wrong emit.
+#[must_use]
+pub fn big_literal_unsupported(target: &str) -> CodegenError {
+    CodegenError {
+        message: format!(
+            "an integer literal beyond u64 needs the unbounded integer `inf`, which has no bignum \
+             carrier on the {target} target yet"
+        ),
+        args: vec![
+            DiagnosticArg::new("issue", ISSUE),
+            DiagnosticArg::new("type", "inf"),
+            DiagnosticArg::new("target", target),
+        ],
+    }
+}
+
 /// # Errors
 ///
 /// Returns a [`CodegenError`] (`inf_target_unsupported`) when the module's

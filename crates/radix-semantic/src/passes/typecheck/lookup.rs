@@ -560,6 +560,7 @@ impl TypeChecker<'_> {
                     literal_ty
                 }
             }
+            HirLiteral::BigInt(digits) => self.big_integer_literal_type(digits, span, expected),
             HirLiteral::Float(_) => self
                 .expected_fractus_literal_type(expected)
                 .unwrap_or_else(|| self.fractus_type()),
@@ -589,6 +590,39 @@ impl TypeChecker<'_> {
             HirLiteral::Bool(_) => self.bool_type(),
             HirLiteral::Nil => self.nil_type(),
         }
+    }
+
+    /// Ruling 34: an integer literal beyond `u64` is an untyped exact
+    /// constant that lands only where its exact value fits: an `inf` slot
+    /// always, a float slot when exactly representable (ruling 20), nothing
+    /// else — a bounded slot, a decimal slot and the lone `int` default are
+    /// `numerus_literal_out_of_range`.
+    fn big_integer_literal_type(
+        &mut self,
+        digits: &str,
+        span: radix_lexer::Span,
+        expected: Option<TypeId>,
+    ) -> TypeId {
+        if let Some(slot) = self.expected_numerus_literal_type(expected)
+            && self.is_inf_type(slot)
+        {
+            return slot;
+        }
+        if let Some(float_ty) = self.expected_float_slot_type(expected)
+            && let Some(value) = radix_types::big_literal::parse_big_literal(digits)
+        {
+            return if self.check_float_exact_constant(float_ty, &value, span) {
+                float_ty
+            } else {
+                self.error_type
+            };
+        }
+        if let Some(decimal_ty) = self.expected_decimal_slot_type(expected) {
+            let _ = decimal_ty;
+            return self.decimal_literal_out_of_range(span);
+        }
+        self.numerus_literal_out_of_range(span);
+        self.error_type
     }
 
     fn expected_fractus_literal_type(&self, expected: Option<TypeId>) -> Option<TypeId> {
@@ -735,7 +769,7 @@ impl TypeChecker<'_> {
         match self.types.get(resolved) {
             Type::Primitive(Primitive::Numerus) => value > i64::MAX as u64,
             // `u64` and the unbounded `inf` hold every magnitude the u64 lexer
-            // carrier can spell; literals beyond u64 wait for inf track U3.
+            // carrier can spell; literals beyond u64 are `BigInt` (only `inf`).
             Type::SizedNumeric(Primitive::Numerus, width) => {
                 !matches!(width, NumericWidth::U64 | NumericWidth::Inf) && value > i64::MAX as u64
             }

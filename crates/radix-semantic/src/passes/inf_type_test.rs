@@ -2,8 +2,8 @@
 //!
 //! `inf` is `numerus<inf>`: accepted as a local, parameter, return, field and
 //! list element, one type under all four spellings, and rejected by name where
-//! it cannot live (tensor-family elements, kernels, the AIR lane). Operations
-//! that would compute or convert an `inf` value are named errors until U3.
+//! it cannot live (tensor-family elements, kernels, the AIR lane). Its
+//! arithmetic, literals and conversions are typed by U3 (`inf_typing_test.rs`).
 //! Every rejection asserts the structured `kind` and `issue`, never prose.
 
 use crate::test_support::{analyze_source, assert_accepts, assert_rejects_with_issue};
@@ -152,16 +152,18 @@ functio amplia({width} x) → inf {{
     }
 }
 
+/// Ruling 38 (inf track U3): `inf` widens into no bounded integer, but a
+/// store of an `inf` into a bounded trapping slot is the implicit checked
+/// narrowing (a trap, never `⇥`), so the slot accepts it.
 #[test]
-fn inf_widens_into_no_bounded_integer_implicitly() {
-    assert_rejects_with_issue(
+fn an_inf_into_a_bounded_slot_is_the_implicit_checked_narrowing() {
+    assert_accepts(
         r"
 functio contrahe(inf x) → i64 {
     fixum i64 y ← x
     redde y
 }
 ",
-        "initializer_annotation_mismatch",
     );
 }
 
@@ -309,84 +311,4 @@ functio pura(inf n) → inf {
         })
         .count();
     assert!(rejected >= 2, "parameter and return sites: {rejected}");
-}
-
-// ---------------------------------------------------------------------------
-// Named errors until U3 (arithmetic and conversions)
-// ---------------------------------------------------------------------------
-
-#[test]
-fn arithmetic_on_inf_is_a_named_error() {
-    for op in ["+", "-", "*", "/", "%", "∧", "∨", "⊻", "⇐", "⇒"] {
-        expect_issue(
-            &format!("functio f(inf a, inf b) → inf {{ redde a {op} b }}\n"),
-            SemanticErrorKind::OperandTypesInvalid,
-            "inf_arithmetic_unsupported",
-        );
-    }
-}
-
-#[test]
-fn unary_arithmetic_on_an_inf_variable_is_a_named_error() {
-    for op in ["-", "¬"] {
-        expect_issue(
-            &format!("functio f(inf a) → inf {{ redde {op}a }}\n"),
-            SemanticErrorKind::OperandTypesInvalid,
-            "inf_arithmetic_unsupported",
-        );
-    }
-}
-
-#[test]
-fn a_constant_expression_into_an_inf_slot_is_a_named_error() {
-    expect_issue(
-        "incipit { fixum inf x ← 1 + 2\n nota x }\n",
-        SemanticErrorKind::OperandTypesInvalid,
-        "inf_arithmetic_unsupported",
-    );
-}
-
-#[test]
-fn increment_of_an_inf_variable_is_a_named_error() {
-    expect_issue(
-        "incipit { varia inf x ← 1\n x ↑\n nota x }\n",
-        SemanticErrorKind::OperandTypesInvalid,
-        "inf_arithmetic_unsupported",
-    );
-}
-
-#[test]
-fn numeric_methods_on_inf_are_named_errors() {
-    for method in ["absolutum()", "potentia(2)", "signum()"] {
-        expect_issue(
-            &format!("functio f(inf a) → inf {{ redde a.{method} }}\n"),
-            SemanticErrorKind::OperandTypesInvalid,
-            "inf_arithmetic_unsupported",
-        );
-    }
-}
-
-#[test]
-fn a_conversion_out_of_inf_is_a_named_error() {
-    for target in ["i32", "f64", "textus"] {
-        expect_issue(
-            &format!("functio f(inf a) → {target} {{ redde a ↦ {target} ⊥ 0 }}\n"),
-            SemanticErrorKind::ConversionInvalid,
-            "inf_conversio_unsupported",
-        );
-    }
-}
-
-#[test]
-fn a_bounded_integer_converts_into_inf() {
-    assert_accepts("functio f(i32 a) → inf { redde a ↦ inf }\n");
-}
-
-#[test]
-fn a_text_conversion_into_inf_is_a_named_error() {
-    expect_issue(
-        "functio f(textus a) → inf { redde a ↦ inf ⊥ 0 }\n",
-        SemanticErrorKind::ConversionInvalid,
-        "inf_conversio_unsupported",
-    );
 }

@@ -113,6 +113,8 @@ impl super::FaberCodegen<'_> {
     ) {
         match lit {
             HirLiteral::Int(value) => writer.write(&value.to_string()),
+            // The exact value as canonical decimal digits.
+            HirLiteral::BigInt(digits) => writer.write(digits),
             // D8.9: the authored digit text is what typing reads for decimal
             // widths, so re-emit it verbatim; an f64 re-spelling could round
             // a `decimal` literal or rewrite `1e-5` as `0.00001`.

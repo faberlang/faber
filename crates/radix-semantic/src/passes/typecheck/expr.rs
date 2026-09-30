@@ -235,13 +235,22 @@ impl TypeChecker<'_> {
     /// becomes a float constant, so lowering and codegen never see an integer
     /// literal carrying a `fractus` type.
     fn retype_integer_constant_as_float(&self, lit: &mut HirLiteral, ty: TypeId) {
-        if let HirLiteral::Int(value) = lit
-            && matches!(
-                self.types.get(ty),
-                Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
-            )
-        {
-            *lit = HirLiteral::Float(*value as f64);
+        if !matches!(
+            self.types.get(ty),
+            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+        ) {
+            return;
+        }
+        match lit {
+            HirLiteral::Int(value) => *lit = HirLiteral::Float(*value as f64),
+            // A big literal in a float slot (ruling 34) rounds to nearest;
+            // `literal_type` already proved it inside the float's range.
+            HirLiteral::BigInt(digits) => {
+                if let Some(value) = radix_types::big_literal::parse_big_literal(digits) {
+                    *lit = HirLiteral::Float(value.to_f64());
+                }
+            }
+            _ => {}
         }
     }
 

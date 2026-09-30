@@ -8,6 +8,7 @@
 //!
 //! This crate must not depend on HIR nodes, semantic passes, parser, or codegen.
 
+pub mod big_literal;
 mod capability;
 mod def_id;
 mod filtrum;
@@ -23,6 +24,7 @@ pub mod type_graph;
 mod types;
 pub mod vocabulary;
 pub mod width_pattern;
+pub use big_literal::Magnus;
 pub use width_pattern::{
     WidthFamily, WidthPattern, is_family_catchall, literal_length_guard, width_pattern,
     width_pattern_applies, width_pattern_covers,

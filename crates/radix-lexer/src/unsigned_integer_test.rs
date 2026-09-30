@@ -83,13 +83,74 @@ fn unsigned_integer_scans_signed_range_boundary_unchanged() {
     assert_eq!(first_integer_value(source), 9_223_372_036_854_775_807);
 }
 
-#[test]
-fn unsigned_integer_rejects_above_u64_max() {
-    let result = lex("18446744073709551616");
+/// The spelling of the single `BigInteger` token `source` lexes to.
+fn big_integer_text(source: &str) -> String {
+    let result = lex(source);
+    assert!(result.errors.is_empty(), "{source}: {:?}", result.errors);
+    let big: Vec<_> = result
+        .tokens
+        .iter()
+        .filter_map(|token| match token.kind {
+            TokenKind::BigInteger(text) => Some(result.interner.resolve(text).to_owned()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(big.len(), 1, "{source}: expected one BigInteger token");
     assert!(
-        !result.errors.is_empty(),
-        "u64::MAX + 1 must remain a lexer error after the u64 carrier lands"
+        !result
+            .tokens
+            .iter()
+            .any(|token| matches!(token.kind, TokenKind::Integer(_))),
+        "{source}: no Integer token expected"
     );
+    big.into_iter().next().unwrap_or_default()
+}
+
+/// inf track (ruling 34): a literal beyond `u64` is no longer a lexer error;
+/// it is a `BigInteger` token carrying its cleaned digit text.
+#[test]
+fn an_integer_beyond_u64_max_is_a_big_integer_token() {
+    assert_eq!(
+        big_integer_text("18446744073709551616"),
+        "18446744073709551616"
+    );
+    assert_eq!(
+        big_integer_text("1_8446_7440_7370_9551_616"),
+        "18446744073709551616"
+    );
+    let long = "9".repeat(400);
+    assert_eq!(big_integer_text(&long), long);
+}
+
+#[test]
+fn a_radix_prefixed_integer_beyond_u64_max_keeps_its_prefix_lowercased() {
+    assert_eq!(
+        big_integer_text("0x10000000000000000"),
+        "0x10000000000000000"
+    );
+    assert_eq!(
+        big_integer_text("0X1_0000_0000_0000_0000"),
+        "0x10000000000000000"
+    );
+    assert_eq!(
+        big_integer_text("0o2000000000000000000000"),
+        "0o2000000000000000000000"
+    );
+    let binary = format!("0b1{}", "0".repeat(64));
+    assert_eq!(big_integer_text(&binary), binary);
+}
+
+#[test]
+fn u64_max_stays_an_integer_token_and_one_more_is_big() {
+    assert_eq!(integer_token_count("18446744073709551615"), (1, 0));
+    assert_eq!(integer_token_count("18446744073709551616"), (0, 0));
+}
+
+#[test]
+fn a_malformed_radix_literal_is_still_a_lexer_error() {
+    for source in ["0x", "0b12", "0o8"] {
+        assert!(!lex(source).errors.is_empty(), "{source}");
+    }
 }
 
 #[test]

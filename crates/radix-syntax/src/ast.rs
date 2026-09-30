@@ -1292,6 +1292,9 @@ pub enum Literal {
     /// negative expressions are unary negation over this magnitude. Signed
     /// consumers convert at their own checked boundaries.
     Int(u64),
+    /// Integer literal beyond `u64` (inf track, ruling 34): the cleaned digit
+    /// text, decimal or `0x`/`0o`/`0b` prefixed. Parsed exactly where it lands.
+    BigInt(Symbol),
     Float(f64),
     /// Decimal literal carrying exact digit text (decimal-widths D1).
     /// `value` re-derives f64 exactly as the `Float` path always did.

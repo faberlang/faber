@@ -133,11 +133,61 @@ fn rejections_carry_their_catalog_code_and_issue() {
     let sugar = latin("functio f(linf x) → numerus { redde 0 }\n");
     expect(&sugar, "SEM002", "unknown_type");
 
-    let arithmetic = latin("functio f(inf a, inf b) → inf { redde a + b }\n");
-    expect(&arithmetic, "SEM011", "inf_arithmetic_unsupported");
+    // inf track U3: arithmetic and conversions are typed, not rejected.
+    assert_accepts(&latin("functio f(inf a, inf b) → inf { redde a + b }\n"));
+    assert_accepts(&latin("functio f(inf a) → i32 { redde a ↦ i32 ⊥ 0 }\n"));
+    let failable = latin("functio f(inf a) → i32 { redde a ↦ i32 }\n");
+    expect(&failable, "SEM011", "failable_conversio_requires_handler");
+    let literal = latin("incipit { fixum numerus x ← 18446744073709551616\n nota x }\n");
+    expect(&literal, "SEM010", "numerus_literal_out_of_range");
+}
 
-    let conversion = latin("functio f(inf a) → i32 { redde a ↦ i32 ⊥ 0 }\n");
-    expect(&conversion, "SEM016", "inf_conversio_unsupported");
+const INF_ARITHMETIC: &str = "incipit {\n fixum inf x ← 5\n fixum inf y ← x * x\n nota y\n}\n";
+const INF_BIG_LITERAL: &str = "incipit {\n fixum inf x ← 18446744073709551616\n nota x\n}\n";
+
+/// inf track U3, before the exact runner (U4): an `inf` operation that would
+/// reach MIR fails closed with a named issue on every MIR-backed target
+/// instead of computing on a 64-bit carrier.
+#[test]
+fn inf_operations_fail_closed_in_mir_with_a_named_issue() {
+    for (source, issue) in [
+        (INF_ARITHMETIC, "inf_mir_unsupported_arithmetic"),
+        (INF_BIG_LITERAL, "inf_mir_unsupported_literal_beyond_u64"),
+        (
+            "functio f(inf a) → i32 { redde a ↦ i32 ⊥ 0 }\nincipit { nota f(3) }\n",
+            "inf_mir_unsupported_conversion",
+        ),
+        (
+            "functio f(inf a) → inf { redde -a }\nincipit { nota f(3) }\n",
+            "inf_mir_unsupported_unary_arithmetic",
+        ),
+        (
+            "functio f(inf a) → inf { redde a.potentia(2) }\nincipit { nota f(3) }\n",
+            "inf_mir_unsupported_numeric_method",
+        ),
+    ] {
+        let result = compile_for_target_and_get_result(source, Target::MirSexp);
+        let named = result
+            .diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.is_error())
+            .any(|diagnostic| issue_of(diagnostic) == Some(issue));
+        assert!(named, "{issue} for {source}: {:?}", result.diagnostics);
+    }
+}
+
+/// Value flow never changes a value, so it keeps lowering.
+#[test]
+fn inf_value_flow_still_lowers_to_mir() {
+    let result = compile_for_target_and_get_result(INF_FILE, Target::MirSexp);
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|diagnostic| issue_of(diagnostic).is_some_and(|issue| issue.starts_with("inf_mir_unsupported"))),
+        "{:?}",
+        result.diagnostics
+    );
 }
 
 /// Every HIR backend rejects a module that names `inf`, by one named issue

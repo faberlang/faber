@@ -937,6 +937,7 @@ impl Parser {
             TokenKind::Ident(_)
                 | TokenKind::Underscore(_)
                 | TokenKind::Integer(_)
+                | TokenKind::BigInteger(_)
                 | TokenKind::Float(_)
                 | TokenKind::FloatText { .. }
                 | TokenKind::String(_)
@@ -1658,3 +1659,7 @@ mod praefixum_test;
 #[cfg(test)]
 #[path = "via_hint_test.rs"]
 mod via_hint_test;
+
+#[cfg(test)]
+#[path = "big_integer_literal_test.rs"]
+mod big_integer_literal_test;

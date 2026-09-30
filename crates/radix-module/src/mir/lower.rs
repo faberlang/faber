@@ -74,6 +74,7 @@ mod expr;
 #[path = "lower/first_match_test.rs"]
 mod first_match_tests;
 mod fractus_potentia;
+mod inf_gate;
 mod item;
 mod monomorphize;
 mod package_instantiate;
@@ -2365,6 +2366,9 @@ impl<'a> FunctionBuilder<'a> {
     }
 
     fn lower_inc_dec_stmt(&mut self, span: Span, inc_dec: &crate::hir::HirIncDec) {
+        if self.reject_inf_inc_dec(inc_dec.target.ty, span) {
+            return;
+        }
         let Some(fallback_ty) = self.expr_ty(&inc_dec.target) else {
             return;
         };
@@ -2592,6 +2596,12 @@ impl<'a> FunctionBuilder<'a> {
                     span,
                     "unsigned integer literal above i64::MAX requires an unsigned target",
                 ));
+                None
+            }
+            // inf track U3: a literal beyond `u64` can only type as `inf`, which
+            // has no MIR carrier until U4; fail closed by name, never truncate.
+            HirLiteral::BigInt(_) => {
+                self.reject_inf_literal(span);
                 None
             }
             // decimal-widths D1 successor: a decimal-typed

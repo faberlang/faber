@@ -1614,7 +1614,7 @@ help = "write a value the slot holds"
 
 [diagnostics.SEM010.issues.numerus_literal_out_of_range]
 message = "整数字面量超出 numerus 的范围"
-help = "写 -9223372036854775808 到 9223372036854775807 之间的值，或把更大的非负值存入 `u64` 槽"
+help = "写 -9223372036854775808 到 9223372036854775807 之间的值，或把更大的非负值存入 `u64` 槽，或将槽声明为 `inf`"
 
 [diagnostics.SEM010.issues.integer_to_float_requires_conversio]
 message = "整数不能隐式转换为浮点数"
@@ -1906,7 +1906,7 @@ help = "在应用此 numeric 运算符之前显式转换 operands"
 
 [diagnostics.SEM011.issues.u64_signed_arithmetic_requires_conversion]
 message = "u64 and a signed integer have no lossless join in arithmetic"
-help = "convert one side with `↦` so both operands are u64 or both are signed"
+help = "convert one side with `↦` so both operands are u64 or both are signed (`a ↦ i64`), or join them exactly with `a ↦ inf`"
 
 [diagnostics.SEM011.issues.saturating_word_family_mismatch]
 message = "saturating 整数在算术中不能与其他整数族混用"

@@ -385,6 +385,9 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
     }
 
     fn visit_unary_expr(&mut self, op: HirUnOp, operand: &HirExpression, expr: &HirExpression) -> Option<MirOperand> {
+        if self.reject_inf_unary(op, operand, expr) {
+            return None;
+        }
         self.lower_unary(op, operand, expr)
     }
 
@@ -395,6 +398,9 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         rhs: &HirExpression,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        if self.reject_inf_binary(op, lhs, rhs, expr) {
+            return None;
+        }
         self.lower_binary(op, lhs, rhs, expr)
     }
 
@@ -455,6 +461,9 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         conversion: Option<DefId>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        if self.reject_inf_method(receiver, method, expr) {
+            return None;
+        }
         self.lower_method_call(receiver, method, generic_args, args, conversion, expr)
     }
 
@@ -590,6 +599,9 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         implicit: Option<radix_hir::HirStoreSite>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        if self.reject_inf_conversio(source, target, expr) {
+            return None;
+        }
         self.lower_conversio(source, target, params, recovery, implicit, expr)
     }
 
@@ -768,6 +780,9 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         body: &HirBlock,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        if self.reject_inf_summa(expr) {
+            return None;
+        }
         self.lower_summa_expr(source, coordinates, filum, binding, body, expr)
     }
 

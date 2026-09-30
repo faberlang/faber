@@ -415,10 +415,6 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {
         "intervallum_clamp_recovery_unsupported" => Some("remove the recovery arm from this range clamp".to_owned()),
         "intervallum_target_not_range" => Some("convert to a range or intervallum value".to_owned()),
-        "inf_conversio_unsupported" => Some(
-            "only a bounded integer converts into `inf` (and widens into it implicitly) until the other conversion rows land"
-                .to_owned(),
-        ),
         "intervallum_clamp_bound_mismatch"
         | "intervallum_materialize_lista_element_mismatch"
         | "intervallum_materialize_tensor_element_mismatch" => {
@@ -561,12 +557,9 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "numeric_arithmetic_operands_identical" => {
             Some("convert operands explicitly before applying this numeric operator".to_owned())
         }
-        "inf_arithmetic_unsupported" => Some(
-            "keep `inf` values to storing, passing, returning, and comparing until its arithmetic lands"
-                .to_owned(),
-        ),
         "u64_signed_arithmetic_requires_conversion" => Some(
-            "convert one side with `↦` so both operands are u64 or both are signed".to_owned(),
+            "convert one side with `↦` so both operands are u64 or both are signed (`a ↦ i64`), or join them exactly with `a ↦ inf`"
+                .to_owned(),
         ),
         "numeric_family_crossing_requires_conversio" => Some(
             "convert one operand explicitly with `↦`; a written constant may stand beside any number"

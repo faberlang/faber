@@ -23,7 +23,7 @@
 //! - A union slot with several numeric members takes no implicit narrowing;
 //!   with exactly one it narrows into that member.
 
-use super::integer_range::const_int_value;
+use super::integer_range::const_int_exact;
 use super::ops::IntFamily;
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
@@ -447,8 +447,9 @@ impl TypeChecker<'_> {
             return None;
         }
         // Deliberate: the unbounded `inf` has no range, so it is not a checked
-        // integer slot. A store into it is total (nothing to fit) and a store
-        // out of it is not assignable; U3 adds the checked narrowing row.
+        // integer slot. A store into it is total (nothing to fit, ruling 38);
+        // a store out of it is the checked narrowing of
+        // `store_narrowing_target`, which answers it before this lookup.
         let range = shape.width.integer_range()?;
         Some((
             ty,
@@ -481,6 +482,13 @@ impl TypeChecker<'_> {
     /// The type a narrowing store lands in, when a value of type `ty` needs an
     /// implicit store node to reach `slot_ty`.
     pub(super) fn store_narrowing_target(&self, ty: TypeId, slot_ty: TypeId) -> Option<TypeId> {
+        if self.is_inf_type(ty) {
+            // Ruling 38: an `inf` value into a bounded trapping slot is the
+            // implicit checked narrowing (a trap, never `⇥`). An `inf` slot
+            // is total (no node), and a word slot needs an authored `↦`.
+            let (dst_ty, dst) = self.store_int_target(slot_ty)?;
+            return (dst.family == IntFamily::Plain).then_some(dst_ty);
+        }
         let (src_ty, src) = self.store_int_slot(ty)?;
         let (dst_ty, dst) = self.store_int_target(slot_ty)?;
         let slot_ty = self
@@ -504,9 +512,23 @@ impl TypeChecker<'_> {
         slot_ty: TypeId,
         site: StoreSite,
     ) -> Option<TypeId> {
-        let value = const_int_value(expr)?;
+        let exact = const_int_exact(expr)?;
         let (slot_int_ty, slot) = self.store_int_target(slot_ty)?;
-        if slot.holds(value) {
+        let big_literal =
+            |e: &HirExpression| matches!(e.kind, HirExpressionKind::Literal(HirLiteral::BigInt(_)));
+        let literal_shaped = big_literal(expr)
+            || matches!(
+                &expr.kind,
+                HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) if big_literal(inner)
+            );
+        if literal_shaped {
+            // Ruling 34: a (negated) literal beyond `u64` fits no bounded
+            // slot; the literal rule reports it (`numerus_literal_out_of_range`).
+            return None;
+        }
+        if let Some(value) = exact.to_i128()
+            && slot.holds(value)
+        {
             return self.fold_word_slot_constant(expr, value, slot_int_ty, slot);
         }
         if site.compile_time || slot.family == IntFamily::Plain {
@@ -514,26 +536,40 @@ impl TypeChecker<'_> {
             self.errors.push(
                 SemanticError::structured(SemanticErrorKind::TypeMismatch, expr.span)
                     .with_arg("issue", STORE_CONSTANT_OUT_OF_RANGE)
-                    .with_arg("value", value.to_string())
+                    .with_arg("value", exact.to_string())
                     .with_arg("slot", slot.spelling()),
             );
             expr.ty = Some(slot_int_ty);
             return Some(slot_int_ty);
         }
         // `←` into a `wrapping` or `saturating` slot: the constant follows the
-        // slot's policy. A value below `i64::MIN` has no 64-bit carrier to
+        // slot's policy. A value outside every 64-bit carrier has nothing to
         // convert from, so the policy is applied here, exactly (ruling 21).
-        if value < i128::from(i64::MIN) {
-            let (lo, hi) = slot.range;
-            let applied = match slot.family {
-                IntFamily::Saturating => value.clamp(lo, hi),
-                _ => lo + (value - lo).rem_euclid(hi - lo + 1),
-            };
+        if !exact
+            .to_i128()
+            .is_some_and(|v| radix_types::numeric_range::fits_container((v, v)))
+        {
+            let applied = Self::apply_slot_policy(&exact, slot);
             return self.rewrite_as_slot_literal(expr, applied, slot_int_ty);
         }
         // It is checked as a plain `int` and wrapped.
         let ty = self.check_const_operand(expr);
         Some(self.wrap_implicit_store(expr, ty, slot_int_ty, site))
+    }
+
+    /// The exact value a `wrapping` slot reduces to, or a `saturating` slot
+    /// clamps to, for a constant of any size.
+    fn apply_slot_policy(value: &radix_types::Magnus, slot: IntSlot) -> i128 {
+        use radix_types::Magnus;
+        let (lo, hi) = slot.range;
+        let (lo_m, hi_m) = (Magnus::from_i128(lo), Magnus::from_i128(hi));
+        if slot.family == IntFamily::Saturating {
+            let clamped = value.clone().clamp(lo_m, hi_m);
+            return clamped.to_i128().unwrap_or(lo);
+        }
+        let span = Magnus::from_i128(hi - lo + 1);
+        let offset = (value - &lo_m).mod_floor(&span).unwrap_or_default();
+        lo + offset.to_i128().unwrap_or(0)
     }
 
     /// A constant-only expression that fits a `wrapping` or `saturating` slot

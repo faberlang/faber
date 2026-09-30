@@ -267,7 +267,7 @@ pub use ident::{
     output_resource_name, sanitize_ident, sanitize_rust_module_ident, unclaimed_name,
 };
 pub use tensor_lift_gate::reject_tensor_lift;
-pub use unbounded_gate::reject_unbounded_integer;
+pub use unbounded_gate::{big_literal_unsupported, reject_unbounded_integer};
 pub use validation::{find_error_expr_in_program, reject_hir_errors};
 
 #[cfg(test)]

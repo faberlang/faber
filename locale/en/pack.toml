@@ -2192,7 +2192,7 @@ help = "write a value the slot holds"
 
 [diagnostics.SEM010.issues.numerus_literal_out_of_range]
 message = "integer literal is outside the numerus range"
-help = "write a value from -9223372036854775808 to 9223372036854775807, or store a larger non-negative value in a `u64` slot"
+help = "write a value from -9223372036854775808 to 9223372036854775807, store a larger non-negative value in a `u64` slot, or declare the slot `inf` to hold any integer"
 
 [diagnostics.SEM010.issues.integer_to_float_requires_conversio]
 message = "integer cannot convert to a float implicitly"
@@ -2566,13 +2566,9 @@ help = "use numeric operands for this operator"
 message = "numeric arithmetic operands must have identical types; use ↦ to convert explicitly"
 help = "convert operands explicitly before applying this numeric operator"
 
-[diagnostics.SEM011.issues.inf_arithmetic_unsupported]
-message = "arithmetic on the unbounded integer `inf` is not supported yet"
-help = "keep `inf` values to storing, passing, returning, and comparing until its arithmetic lands"
-
 [diagnostics.SEM011.issues.u64_signed_arithmetic_requires_conversion]
 message = "u64 and a signed integer have no lossless join in arithmetic"
-help = "convert one side with `↦` so both operands are u64 or both are signed"
+help = "convert one side with `↦` so both operands are u64 or both are signed (`a ↦ i64`), or join them exactly with `a ↦ inf`"
 
 [diagnostics.SEM011.issues.saturating_word_family_mismatch]
 message = "saturating integers cannot mix with other integer families in arithmetic"
@@ -3021,10 +3017,6 @@ help = "use a valid conversion or provide an inline default with `⊥`"
 [diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
 message = "intervallum clamp conversio does not support a `⊥` default"
 help = "remove the recovery arm from this range clamp"
-
-[diagnostics.SEM016.issues.inf_conversio_unsupported]
-message = "this conversion out of or into the unbounded integer `inf` is not supported yet"
-help = "only a bounded integer converts into `inf` (and widens into it implicitly) until the other conversion rows land"
 
 [diagnostics.SEM016.issues.intervallum_target_not_range]
 message = "intervallum conversio target must be a range or intervallum value"

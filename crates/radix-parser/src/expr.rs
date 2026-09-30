@@ -799,6 +799,7 @@ impl Parser {
             TokenKind::Ident(_)
                 | TokenKind::Underscore(_)
                 | TokenKind::Integer(_)
+                | TokenKind::BigInteger(_)
                 | TokenKind::Float(_)
                 | TokenKind::FloatText { .. }
                 | TokenKind::String(_)
@@ -1449,7 +1450,10 @@ impl Parser {
     fn conversio_target_starts_inline_range(&self) -> bool {
         matches!(
             self.peek().kind,
-            TokenKind::Integer(_) | TokenKind::Float(_) | TokenKind::FloatText { .. }
+            TokenKind::Integer(_)
+                | TokenKind::BigInteger(_)
+                | TokenKind::Float(_)
+                | TokenKind::FloatText { .. }
         )
     }
 
@@ -1760,6 +1764,10 @@ impl Parser {
             TokenKind::Integer(n) => {
                 self.advance();
                 ExprKind::Literal(Literal::Int(n))
+            }
+            TokenKind::BigInteger(text) => {
+                self.advance();
+                ExprKind::Literal(Literal::BigInt(text))
             }
             TokenKind::Float(n) => {
                 self.advance();
@@ -2759,6 +2767,7 @@ impl Parser {
                     .map_err(|_| self.json_unexpected_error("json_integer_overflow"))?;
                 Ok(JsonValue::Numerus(n))
             }
+            TokenKind::BigInteger(_) => Err(self.json_unexpected_error("json_integer_overflow")),
             TokenKind::Float(n) => {
                 let n = *n;
                 self.advance();
@@ -2828,6 +2837,7 @@ impl Parser {
                     .map_err(|_| self.json_unexpected_error("json_integer_underflow"))?;
                 Ok(JsonValue::Numerus(-n))
             }
+            TokenKind::BigInteger(_) => Err(self.json_unexpected_error("json_integer_underflow")),
             TokenKind::Float(n) => {
                 let n = *n;
                 self.advance();

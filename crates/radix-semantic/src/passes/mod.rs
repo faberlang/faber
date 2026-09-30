@@ -78,7 +78,7 @@ pub mod resolve;
 pub mod return_path;
 pub mod statica;
 pub(crate) mod typecheck;
-pub use typecheck::integer_range::const_int_value;
+pub use typecheck::integer_range::{const_int_exact, const_int_value, is_const_int};
 pub mod visibility_annotation;
 
 #[cfg(test)]

@@ -111,7 +111,7 @@ pub mod format;
 pub mod generic;
 pub mod hashable;
 pub mod index_infer;
-mod inf_gate;
+mod inf;
 pub mod infer;
 pub mod integer_range;
 pub mod intervallum;
@@ -1187,6 +1187,10 @@ mod failable_conversio_handler_test;
 #[cfg(test)]
 #[path = "float_constant_conversio_bounds_test.rs"]
 mod float_constant_conversio_bounds_test;
+
+#[cfg(test)]
+#[path = "inf_typing_test.rs"]
+mod inf_typing_test;
 
 #[cfg(test)]
 #[path = "conversio_extra_width_argument_test.rs"]

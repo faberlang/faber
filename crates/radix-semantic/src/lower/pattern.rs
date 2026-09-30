@@ -462,7 +462,7 @@ pub fn lower_literal(lowerer: &mut Lowerer, lit: &Literal, span: Span) -> HirPat
             lowerer.error("nan_pattern");
             HirLiteral::Nil
         }
-        _ => match super::literal::literal_to_hir(lit) {
+        _ => match super::literal::literal_to_hir(lit, lowerer.interner) {
             Ok(literal) => literal,
             Err(message) => {
                 lowerer.error_from_message(message);
@@ -482,7 +482,10 @@ pub fn lower_literal(lowerer: &mut Lowerer, lit: &Literal, span: Span) -> HirPat
 pub fn lower_negated_literal(lowerer: &mut Lowerer, lit: &Literal, span: Span) -> HirPattern {
     match lower_literal(lowerer, lit, span) {
         HirPattern::Literal(
-            literal @ (HirLiteral::Int(_) | HirLiteral::Float(_) | HirLiteral::FloatText { .. }),
+            literal @ (HirLiteral::Int(_)
+            | HirLiteral::BigInt(_)
+            | HirLiteral::Float(_)
+            | HirLiteral::FloatText { .. }),
         ) => HirPattern::NegatedLiteral(literal),
         HirPattern::Literal(HirLiteral::Nil) => HirPattern::Literal(HirLiteral::Nil),
         _ => {

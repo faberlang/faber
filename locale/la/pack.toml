@@ -1973,7 +1973,7 @@ help = "write a value the slot holds"
 
 [diagnostics.SEM010.issues.numerus_literal_out_of_range]
 message = "numerus litteralis extra fines numeri est"
-help = "scribe valorem inter -9223372036854775808 et 9223372036854775807, aut valorem maiorem non negativum in receptaculo `u64` repone"
+help = "scribe valorem inter -9223372036854775808 et 9223372036854775807, valorem maiorem non negativum in receptaculo `u64` repone, aut receptaculum `inf` declara quod omnem integrum capit"
 
 [diagnostics.SEM010.issues.integer_to_float_requires_conversio]
 message = "integer cannot convert to a float implicitly"
@@ -2347,13 +2347,9 @@ help = "use numeric operands for this operator"
 message = "numeric arithmetic operands must have identical types; use ↦ to convert explicitly"
 help = "convert operands explicitly before applying this numeric operator"
 
-[diagnostics.SEM011.issues.inf_arithmetic_unsupported]
-message = "arithmetica in integro infinito `inf` nondum admittitur"
-help = "valores `inf` servare, transmittere, reddere et comparare tantum licet donec arithmetica eius perficiatur"
-
 [diagnostics.SEM011.issues.u64_signed_arithmetic_requires_conversion]
 message = "u64 and a signed integer have no lossless join in arithmetic"
-help = "convert one side with `↦` so both operands are u64 or both are signed"
+help = "convert one side with `↦` so both operands are u64 or both are signed (`a ↦ i64`), or join them exactly with `a ↦ inf`"
 
 [diagnostics.SEM011.issues.saturating_word_family_mismatch]
 message = "numeri saturatus cum aliis generibus integrorum in arithmetica misceri non possunt"
@@ -2802,10 +2798,6 @@ help = "use a valid conversion or provide an inline default with `⊥`"
 [diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
 message = "intervallum clamp conversio does not support a `⊥` default"
 help = "remove the recovery arm from this range clamp"
-
-[diagnostics.SEM016.issues.inf_conversio_unsupported]
-message = "haec conversio ex integro infinito `inf` vel in eum nondum admittitur"
-help = "integer terminatus tantum in `inf` convertitur (et sponte in eum latescit) donec ceterae conversiones perficiantur"
 
 [diagnostics.SEM016.issues.intervallum_target_not_range]
 message = "intervallum conversio target must be a range or intervallum value"

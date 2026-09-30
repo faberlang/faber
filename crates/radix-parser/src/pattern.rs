@@ -230,6 +230,7 @@ impl Parser {
         if self.check(&TokenKind::Minus) {
             let literal = match self.peek_at(1).kind {
                 TokenKind::Integer(n) => Literal::Int(n),
+                TokenKind::BigInteger(text) => Literal::BigInt(text),
                 TokenKind::Float(n) => Literal::Float(n),
                 TokenKind::FloatText { value, text } => Literal::FloatText { value, text },
                 _ => return None,
@@ -245,6 +246,11 @@ impl Parser {
                 let span = self.peek().span;
                 self.advance();
                 Some(Pattern::Literal(Literal::Int(n), span))
+            }
+            TokenKind::BigInteger(text) => {
+                let span = self.peek().span;
+                self.advance();
+                Some(Pattern::Literal(Literal::BigInt(text), span))
             }
             TokenKind::Float(n) => {
                 let span = self.peek().span;

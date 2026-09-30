@@ -2958,6 +2958,7 @@ impl Parser {
                 | TokenKind::Underscore(_)
                 | TokenKind::String(_)
                 | TokenKind::Integer(_)
+                | TokenKind::BigInteger(_)
                 | TokenKind::Float(_)
                 | TokenKind::FloatText { .. }
                 | TokenKind::Comma

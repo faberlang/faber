@@ -12,6 +12,8 @@ use super::ops::IntFamily;
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
+use radix_types::Magnus;
+use radix_types::big_literal::parse_big_literal;
 use radix_types::numeric_range::{self as range, IntRange};
 
 /// Ruling 8: `u64` with a signed typed operand has no lossless join.
@@ -23,28 +25,52 @@ pub(super) const NUMERIC_FAMILY_CROSSING_REQUIRES_CONVERSIO: &str =
 const FLOAT_CONSTANT_INEXACT: &str = "float_constant_inexact";
 const FLOAT_CONSTANT_OUT_OF_RANGE: &str = "float_constant_out_of_range";
 const SHIFT_COUNT_NEGATIVE: &str = "shift_count_negative";
+/// Ruling 34: an exact constant that cannot land where it is written.
+const NUMERUS_LITERAL_OUT_OF_RANGE: &str = "numerus_literal_out_of_range";
 const POTENTIA_EXPONENT_NEGATIVE: &str = "potentia_exponent_negative";
 
+/// Bit-length ceiling of a compile-time fold (ruling 45's implementation
+/// ceiling, applied to the compiler): a constant expression whose exact value
+/// would exceed it (`1 ⇐ 4000000000`) is not folded, so it is not a constant
+/// and the operation is left to run time.
+const FOLD_CEILING_BITS: u64 = 1 << 20;
+
 /// Exact value of an integer constant expression (literals and operators over
-/// literals), or `None` when the expression is not a pure integer constant.
+/// literals), at any size (inf track, ruling 34), or `None` when the
+/// expression is not a pure integer constant.
 ///
 /// Floor division and remainder follow ruling 14; every operator computes the
-/// exact value (ruling 17) and an overflowing intermediate is not folded.
+/// exact value (ruling 17). The fold runs on `i128` while both operands fit
+/// it and on the shared bignum otherwise, so it never gives up on size; it
+/// gives up only on a zero divisor, a negative shift count and the
+/// [`FOLD_CEILING_BITS`] ceiling.
 #[must_use]
-pub fn const_int_value(expr: &HirExpression) -> Option<i128> {
+pub fn const_int_exact(expr: &HirExpression) -> Option<Magnus> {
     match &expr.kind {
-        HirExpressionKind::Literal(HirLiteral::Int(value)) => Some(i128::from(*value)),
-        HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => {
-            const_int_value(inner)?.checked_neg()
-        }
+        HirExpressionKind::Literal(HirLiteral::Int(value)) => Some(Magnus::from_u64(*value)),
+        HirExpressionKind::Literal(HirLiteral::BigInt(digits)) => parse_big_literal(digits),
+        HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => Some(-const_int_exact(inner)?),
         HirExpressionKind::Unary(radix_hir::HirUnOp::BitNot, inner) => {
-            Some(!const_int_value(inner)?)
+            Some(const_int_exact(inner)?.bit_not())
         }
         HirExpressionKind::Binary(op, lhs, rhs) => {
-            fold_const_binary(*op, const_int_value(lhs)?, const_int_value(rhs)?)
+            fold_const_binary(*op, &const_int_exact(lhs)?, &const_int_exact(rhs)?)
         }
         _ => None,
     }
+}
+
+/// Exact value of an integer constant expression when it fits `i128`; `None`
+/// for a non-constant or a constant beyond `i128` (see [`const_int_exact`]).
+#[must_use]
+pub fn const_int_value(expr: &HirExpression) -> Option<i128> {
+    const_int_exact(expr)?.to_i128()
+}
+
+/// Whether `expr` is an integer constant expression of any size.
+#[must_use]
+pub fn is_const_int(expr: &HirExpression) -> bool {
+    const_int_exact(expr).is_some()
 }
 
 fn floor_div(a: i128, b: i128) -> Option<i128> {
@@ -56,7 +82,9 @@ fn floor_div(a: i128, b: i128) -> Option<i128> {
     })
 }
 
-fn fold_const_binary(op: HirBinOp, a: i128, b: i128) -> Option<i128> {
+/// The `i128` fast path of [`fold_const_binary`]: `None` when an operand or
+/// the result leaves `i128` (the caller then folds on the bignum).
+fn fold_const_i128(op: HirBinOp, a: i128, b: i128) -> Option<i128> {
     match op {
         HirBinOp::Add => a.checked_add(b),
         HirBinOp::Sub => a.checked_sub(b),
@@ -78,11 +106,35 @@ fn fold_const_binary(op: HirBinOp, a: i128, b: i128) -> Option<i128> {
     }
 }
 
+fn fold_const_binary(op: HirBinOp, a: &Magnus, b: &Magnus) -> Option<Magnus> {
+    if let (Some(x), Some(y)) = (a.to_i128(), b.to_i128())
+        && let Some(folded) = fold_const_i128(op, x, y)
+    {
+        return Some(Magnus::from_i128(folded));
+    }
+    let folded = match op {
+        HirBinOp::Add => a + b,
+        HirBinOp::Sub => a - b,
+        HirBinOp::Mul => a.mul_within(b, FOLD_CEILING_BITS).ok()?,
+        HirBinOp::Div => a.div_floor(b).ok()?,
+        HirBinOp::Mod => a.mod_floor(b).ok()?,
+        HirBinOp::BitAnd => a.bit_and(b),
+        HirBinOp::BitOr => a.bit_or(b),
+        HirBinOp::BitXor => a.bit_xor(b),
+        HirBinOp::Shl => a.shl_within(b.to_u64()?, FOLD_CEILING_BITS).ok()?,
+        HirBinOp::Shr => a.shr_by(b).ok()?,
+        _ => return None,
+    };
+    (!folded.exceeds_ceiling(FOLD_CEILING_BITS)).then_some(folded)
+}
+
 /// How a scalar operand takes part in the range rule.
 #[derive(Clone, Copy)]
 enum Operand {
     /// Untyped integer constant with its exact value.
     Const(i128),
+    /// Untyped integer constant beyond `i128` (only an `inf` can hold it).
+    Big,
     /// Trapping integer of a declared width.
     Plain(NumericWidth),
     /// Float, decimal, word, or non-numeric: not range-typed.
@@ -106,11 +158,9 @@ impl TypeChecker<'_> {
     /// decimals, floats and non-numerics.
     ///
     /// The unbounded `inf` is an integer width (ruling 32) whose
-    /// `integer_range()` is `None`, so every `integer_range()?` / `.and_then`
-    /// below reads it as "no interval" and leaves the operation to the family
-    /// rules. That is deliberate: inf track U2 rejects every operation that
-    /// would compute a new `inf` value before it reaches the range rule
-    /// (`inf_gate.rs`); U3 gives `inf` its own arms here.
+    /// `integer_range()` is `None`: it has no interval, so every range rule
+    /// below answers it before any interval arithmetic (ruling 35: a typed
+    /// `inf` operand makes the result `inf`).
     fn plain_int_width(&self, ty: TypeId) -> Option<NumericWidth> {
         let resolved = self.resolve_inferred_type(ty);
         let (_, resolved) = self.types.peel_access_marker(resolved);
@@ -171,6 +221,35 @@ impl TypeChecker<'_> {
                 .sized_numeric(Primitive::Numerus, NumericWidth::U64);
             return self.check_expr_with_expected(expr, Some(u64_ty));
         }
+        // Ruling 34: a constant is untyped and exact, so one beyond every
+        // 64-bit integer (`18446744073709551616`, `2 ⇐ 200`) is checked as an
+        // `inf` here and judged where it lands (`constant_expression_type`,
+        // the store and the range rule), never by its own literal.
+        // A (negated) `u64`-sized literal keeps the literal rule's own error.
+        let plain_literal = match &expr.kind {
+            HirExpressionKind::Literal(HirLiteral::Int(_)) => true,
+            HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => {
+                matches!(inner.kind, HirExpressionKind::Literal(HirLiteral::Int(_)))
+            }
+            _ => false,
+        };
+        if !plain_literal
+            && const_int_exact(expr).is_some_and(|value| !Self::fits_container_value(&value))
+        {
+            let inf = self.inf_type();
+            return self.check_expr_with_expected(expr, Some(inf));
+        }
+        self.check_expr(expr)
+    }
+
+    /// Check one operand of a comparison or equality: an integer constant is
+    /// untyped and exact (ruling 34), so a constant beyond every 64-bit type
+    /// compares by value as an `inf` operand instead of being judged as a
+    /// literal; every other operand is checked as usual.
+    pub(super) fn check_comparison_operand(&mut self, expr: &mut HirExpression) -> TypeId {
+        if !self.current_device_function && is_const_int(expr) {
+            return self.check_const_operand(expr);
+        }
         self.check_expr(expr)
     }
 
@@ -192,6 +271,11 @@ impl TypeChecker<'_> {
                 .or_else(|| self.literal_numeric_expected(expr, expected));
             return self.check_expr_with_expected(expr, hint);
         }
+        if self.is_inf_type(resolved) {
+            // Ruling 35: an untyped constant beside an `inf` joins by exact
+            // value, whatever its size.
+            return self.check_expr_with_expected(expr, Some(resolved));
+        }
         if resolved == self.error_type
             || self.range_int_width(resolved).is_some()
             || self.numeric_shape(resolved).is_none()
@@ -203,18 +287,56 @@ impl TypeChecker<'_> {
     }
 
     fn classify_operand(&self, expr: &HirExpression, ty: TypeId) -> Operand {
-        if let Some(value) = const_int_value(expr) {
-            return Operand::Const(value);
+        if let Some(value) = const_int_exact(expr) {
+            return value.to_i128().map_or(Operand::Big, Operand::Const);
         }
         self.range_int_width(ty)
             .map_or(Operand::Other, Operand::Plain)
+    }
+
+    /// Ruling 35: a typed `inf` operand makes the result `inf` for every
+    /// integer operator; an untyped constant beside it joins by exact value.
+    fn inf_join(&mut self, l: Operand, r: Operand) -> Option<TypeId> {
+        let is_inf = |operand: Operand| matches!(operand, Operand::Plain(NumericWidth::Inf));
+        (is_inf(l) || is_inf(r)).then(|| self.inf_type())
+    }
+
+    pub(super) fn inf_type(&mut self) -> TypeId {
+        self.width_type(NumericWidth::Inf)
+    }
+
+    /// Ruling 34: an untyped constant beside a bounded operand must fit a
+    /// 64-bit integer; one that fits none (a big literal, `2 ⇐ 200`) is
+    /// `numerus_literal_out_of_range`, never a value outside its own type.
+    /// Reports and returns `true` when a constant does not fit.
+    fn reject_unfit_constant(&mut self, sides: [(Operand, &HirExpression); 2]) -> bool {
+        for (operand, expr) in sides {
+            let fits = match operand {
+                Operand::Big => false,
+                Operand::Const(value) => range::fits_container((value, value)),
+                Operand::Plain(_) | Operand::Other => true,
+            };
+            if !fits {
+                self.numerus_literal_out_of_range(expr.span);
+                return true;
+            }
+        }
+        false
+    }
+
+    pub(super) fn numerus_literal_out_of_range(&mut self, span: radix_lexer::Span) {
+        self.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            NUMERUS_LITERAL_OUT_OF_RANGE,
+            span,
+        );
     }
 
     fn operand_range(operand: Operand) -> Option<IntRange> {
         match operand {
             Operand::Const(value) => Some((value, value)),
             Operand::Plain(width) => width.integer_range(),
-            Operand::Other => None,
+            Operand::Big | Operand::Other => None,
         }
     }
 
@@ -222,7 +344,7 @@ impl TypeChecker<'_> {
     /// slot's type after the exactness check, or `int`.
     fn constant_expression_type(
         &mut self,
-        value: Option<i128>,
+        value: Option<Magnus>,
         expected: Option<TypeId>,
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
@@ -230,13 +352,29 @@ impl TypeChecker<'_> {
             ConstSlot::Legacy => None,
             ConstSlot::Integer(ty) => Some(ty),
             ConstSlot::Float(ty) => {
-                if value.is_some_and(|v| !self.check_float_integer_constant(ty, v, span)) {
+                if value.is_some_and(|v| !self.check_float_exact_constant(ty, &v, span)) {
                     return Some(self.error_type);
                 }
                 Some(ty)
             }
-            ConstSlot::Default => Some(self.numerus_type()),
+            ConstSlot::Default => {
+                // Ruling 34: a lone constant defaults to `int`, so it must
+                // fit a 64-bit integer; only an `inf` slot holds more.
+                if value.is_some_and(|v| !Self::fits_container_value(&v)) {
+                    self.numerus_literal_out_of_range(span);
+                    return Some(self.error_type);
+                }
+                Some(self.numerus_type())
+            }
         }
+    }
+
+    /// Whether an exact value lies in the single 64-bit range
+    /// [-2^63, 2^64 - 1] some 64-bit integer holds (ruling 17).
+    pub(super) fn fits_container_value(value: &Magnus) -> bool {
+        value
+            .to_i128()
+            .is_some_and(|v| range::fits_container((v, v)))
     }
 
     /// Width of a float type, `f64` for the bare `fractus`.
@@ -267,6 +405,64 @@ impl TypeChecker<'_> {
         false
     }
 
+    /// [`Self::check_float_integer_constant`] for a constant of any size: one
+    /// beyond `i128` is out of range unless the float width holds it, and
+    /// exact only when it is a float's integral value.
+    pub(super) fn check_float_exact_constant(
+        &mut self,
+        float_ty: TypeId,
+        value: &Magnus,
+        span: radix_lexer::Span,
+    ) -> bool {
+        if let Some(small) = value.to_i128() {
+            return self.check_float_integer_constant(float_ty, small, span);
+        }
+        let width = self.float_slot_width(float_ty);
+        let approx = value.to_f64();
+        let issue = if Self::float_constant_overflows(width, approx) {
+            FLOAT_CONSTANT_OUT_OF_RANGE
+        } else if Magnus::from_f64(approx).ok().as_ref() != Some(value) {
+            FLOAT_CONSTANT_INEXACT
+        } else {
+            return true;
+        };
+        self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+        false
+    }
+
+    /// Ruling 20 on `↦`: an integer constant converted into a float type must
+    /// lie inside its finite range (rounding to nearest is the conversion's
+    /// job and is not checked). Reports and returns `false` when it does not.
+    pub(super) fn check_float_conversion_constant(
+        &mut self,
+        source: &HirExpression,
+        target: TypeId,
+        span: radix_lexer::Span,
+    ) -> bool {
+        let Some(float_ty) = self.expected_float_slot_type(Some(target)) else {
+            return true;
+        };
+        let Some(value) = const_int_exact(source) else {
+            return true;
+        };
+        let width = self.float_slot_width(float_ty);
+        if Self::float_constant_overflows(width, value.to_f64()) {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                FLOAT_CONSTANT_OUT_OF_RANGE,
+                span,
+            );
+            return false;
+        }
+        true
+    }
+
+    /// Whether an integer constant's nearest `f64` (infinite beyond `f64`'s own
+    /// range) lies outside the finite range of `width`.
+    fn float_constant_overflows(width: NumericWidth, approx: f64) -> bool {
+        approx.is_infinite() || radix_types::float_overflows(width, approx)
+    }
+
     /// Ruling 20(2): a written float that rounds to infinity in the float
     /// type is a compile error. Reports and returns `false` when it does.
     pub(super) fn check_float_literal_range(
@@ -295,7 +491,7 @@ impl TypeChecker<'_> {
         count: &HirExpression,
     ) -> bool {
         if !matches!(op, HirBinOp::Shl | HirBinOp::Shr)
-            || !const_int_value(count).is_some_and(|n| n < 0)
+            || !const_int_exact(count).is_some_and(|n| n.is_negative())
         {
             return false;
         }
@@ -325,7 +521,7 @@ impl TypeChecker<'_> {
         }
         let Some(exponent) = args
             .first()
-            .filter(|arg| const_int_value(&arg.expr).is_some_and(|n| n < 0))
+            .filter(|arg| const_int_exact(&arg.expr).is_some_and(|n| n.is_negative()))
         else {
             return false;
         };
@@ -353,12 +549,24 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
         let (l, r) = self.range_operands(lhs, rhs, lhs_ty, rhs_ty)?;
-        if let (Operand::Const(a), Operand::Const(b)) = (l, r) {
-            return self.constant_expression_type(fold_const_binary(op, a, b), expected, span);
-        }
+        // A `saturating` word never meets another integer family, `inf`
+        // included (it is a trapping type), so the family check comes first.
         if matches!((l, r), (Operand::Plain(_), Operand::Plain(_)))
             && !self.saturating_operands_agree(lhs, rhs, span)
         {
+            return Some(self.error_type);
+        }
+        if let Some(inf) = self.inf_join(l, r) {
+            return Some(inf);
+        }
+        if Self::both_constant(l, r) {
+            return self.constant_expression_type(
+                Self::fold_constants(op, lhs, rhs),
+                expected,
+                span,
+            );
+        }
+        if self.reject_unfit_constant([(l, lhs), (r, rhs)]) {
             return Some(self.error_type);
         }
         if let (Operand::Plain(a), Operand::Plain(b)) = (l, r)
@@ -371,6 +579,16 @@ impl TypeChecker<'_> {
         let (a, b) = (Self::operand_range(l)?, Self::operand_range(r)?);
         let result = Self::scalar_binary_range(op, a, b)?;
         Some(self.width_type(range::smallest_width(result)))
+    }
+
+    fn both_constant(l: Operand, r: Operand) -> bool {
+        matches!(l, Operand::Const(_) | Operand::Big)
+            && matches!(r, Operand::Const(_) | Operand::Big)
+    }
+
+    /// The exact fold of a constant-only binary expression, at any size.
+    fn fold_constants(op: HirBinOp, lhs: &HirExpression, rhs: &HirExpression) -> Option<Magnus> {
+        fold_const_binary(op, &const_int_exact(lhs)?, &const_int_exact(rhs)?)
     }
 
     /// Exact range of `+ - * / %` over operand ranges (ruling 19a).
@@ -465,7 +683,7 @@ impl TypeChecker<'_> {
     /// but its value is not bounded by it, so a store into an `i64` slot is a
     /// real check (ruling 17b) and cannot be omitted.
     pub(super) fn exceeds_i64(&self, expr: &HirExpression, ty: TypeId) -> bool {
-        if self.current_device_function || const_int_value(expr).is_some() {
+        if self.current_device_function || is_const_int(expr) {
             return false;
         }
         self.value_range(expr, Some(ty))
@@ -626,8 +844,8 @@ impl TypeChecker<'_> {
         // operand joins by value.
         let operands: Vec<Operand> = [(lhs, lhs_ty), (rhs, rhs_ty)]
             .iter()
-            .map(|(expr, ty)| match const_int_value(expr) {
-                Some(value) => Operand::Const(value),
+            .map(|(expr, ty)| match const_int_exact(expr) {
+                Some(value) => value.to_i128().map_or(Operand::Big, Operand::Const),
                 None => self
                     .numeric_shape(self.resolve_inferred_type(*ty))
                     .map_or(Operand::Plain(NumericWidth::I64), |shape| {
@@ -656,6 +874,7 @@ impl TypeChecker<'_> {
         // Constants join by value: they widen the result only past 16 bits.
         let constants_fit = operands.iter().all(|operand| match operand {
             Operand::Const(value) => narrow(range::smallest_width((*value, *value))),
+            Operand::Big => false,
             _ => true,
         });
         if !typed.is_empty() && typed.iter().all(|width| narrow(*width)) && constants_fit {
@@ -679,13 +898,23 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
         let (l, r) = self.range_operands(lhs, rhs, lhs_ty, rhs_ty)?;
-        if let (Operand::Const(a), Operand::Const(b)) = (l, r) {
-            return self.constant_expression_type(fold_const_binary(op, a, b), expected, span);
-        }
         if matches!((l, r), (Operand::Plain(_), Operand::Plain(_)))
             && !matches!(op, HirBinOp::Shl | HirBinOp::Shr)
             && !self.saturating_operands_agree(lhs, rhs, span)
         {
+            return Some(self.error_type);
+        }
+        if let Some(inf) = self.inf_join(l, r) {
+            return Some(inf);
+        }
+        if Self::both_constant(l, r) {
+            return self.constant_expression_type(
+                Self::fold_constants(op, lhs, rhs),
+                expected,
+                span,
+            );
+        }
+        if self.reject_unfit_constant([(l, lhs), (r, rhs)]) {
             return Some(self.error_type);
         }
         let (a, b) = (Self::operand_range(l)?, Self::operand_range(r)?);
@@ -746,10 +975,16 @@ impl TypeChecker<'_> {
         operand: &HirExpression,
         operand_ty: TypeId,
     ) -> Option<TypeId> {
-        if self.current_device_function || const_int_value(operand).is_some() {
+        if self.current_device_function || is_const_int(operand) {
             return None;
         }
         let width = self.range_int_width(operand_ty)?;
+        if width == NumericWidth::Inf {
+            return match op {
+                radix_hir::HirUnOp::Neg | radix_hir::HirUnOp::BitNot => Some(self.inf_type()),
+                radix_hir::HirUnOp::Not => None,
+            };
+        }
         let a = width.integer_range()?;
         let result = match op {
             radix_hir::HirUnOp::Neg => range::neg(a),
@@ -770,6 +1005,9 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
         let (wa, wb) = (self.plain_int_width(a)?, self.plain_int_width(b)?);
+        if wa == NumericWidth::Inf || wb == NumericWidth::Inf {
+            return Some(self.inf_type());
+        }
         let joined = range::hull(wa.integer_range()?, wb.integer_range()?);
         Some(self.join_range_type(joined, span))
     }
@@ -793,8 +1031,10 @@ impl TypeChecker<'_> {
             None => this.plain_int_width(ty)?.integer_range(),
         };
         // Both sides must be integers even where a constant supplies the range.
-        self.plain_int_width(a.0)?;
-        self.plain_int_width(b.0)?;
+        let (wa, wb) = (self.plain_int_width(a.0)?, self.plain_int_width(b.0)?);
+        if wa == NumericWidth::Inf || wb == NumericWidth::Inf {
+            return Some(self.inf_type());
+        }
         let joined = range::hull(range_of(self, a)?, range_of(self, b)?);
         Some(self.join_range_type(joined, span))
     }
@@ -837,6 +1077,10 @@ impl TypeChecker<'_> {
         else {
             return self.common_type(a.0, b.0, span);
         };
+        if width == NumericWidth::Inf {
+            // Ruling 35: a constant beside an `inf` joins by exact value.
+            return self.inf_type();
+        }
         if width != NumericWidth::U64 && konst.1 <= i128::from(i64::MAX) {
             return self.common_type(a.0, b.0, span);
         }
@@ -867,6 +1111,12 @@ impl TypeChecker<'_> {
         };
         let (start_width, start_const) = side(self, start)?;
         let (end_width, end_const) = side(self, end)?;
+        if start_const.is_none() || end_const.is_none() {
+            // Ruling 35/43: an `inf` endpoint makes the binder an `inf`.
+            if start_width == NumericWidth::Inf || end_width == NumericWidth::Inf {
+                return Some(self.inf_type());
+            }
+        }
         let range_of = |width: NumericWidth, konst: Option<i128>| {
             konst.map_or_else(|| width.integer_range(), |value| Some((value, value)))
         };
@@ -908,7 +1158,7 @@ impl TypeChecker<'_> {
         operand: &HirExpression,
         expected: Option<TypeId>,
     ) -> Option<TypeId> {
-        if self.current_device_function || const_int_value(operand).is_some() {
+        if self.current_device_function || is_const_int(operand) {
             return expected;
         }
         // A non-constant operand keeps its own type, so a plain integer slot
@@ -952,9 +1202,9 @@ impl TypeChecker<'_> {
         if self.current_device_function {
             return false;
         }
-        let other = match (const_int_value(lhs), const_int_value(rhs)) {
-            (Some(_), None) => rhs_ty,
-            (None, Some(_)) => lhs_ty,
+        let other = match (is_const_int(lhs), is_const_int(rhs)) {
+            (true, false) => rhs_ty,
+            (false, true) => lhs_ty,
             _ => return false,
         };
         self.plain_int_width(other).is_some()

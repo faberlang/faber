@@ -1808,6 +1808,12 @@ pub enum HirLiteral {
     /// AIR lower through explicit checked conversions until their own
     /// unsigned carriers land.
     Int(u64),
+    /// Integer literal beyond `u64` (inf track, ruling 34): its exact value as
+    /// canonical decimal digits (no sign, no separators, no radix prefix). An
+    /// untyped exact constant that only an `inf` slot (or a value-joining
+    /// `inf` operand) can hold. Self-contained so constant folding needs no
+    /// interner.
+    BigInt(Box<str>),
     Float(f64),
     /// Decimal literal carrying exact digit text (decimal-widths D1, R0 fix).
     /// `value` re-derives f64 exactly as the `Float` path always did; `text`
