@@ -612,6 +612,14 @@ help = "使用 ⊥；vel 仅用于 nullish coalescing"
 message = "`via` needs a convert hint after it"
 help = "name the hint right after via, as in `x ↦ u32 via Hex`; the hints are Hex, Bin, Oct, Be, Le, Bits, and Code"
 
+[diagnostics.PARSE030.issues.conversio_hint_type_argument]
+message = "a convert hint is not a type argument"
+help = "write the hint as a via clause after the target: `u32 via Bits`, `ascii<8> via Hex`, `littera via Code`"
+
+[diagnostics.PARSE030.issues.conversio_hint_tail_argument]
+message = "a convert hint does not follow the target in angle brackets"
+help = "write the hint as a via clause after the target: `octeti<16> via Le`"
+
 [diagnostics.PARSE030.issues.expected_expression]
 message = "需要表达式"
 help = "在此位置提供有效表达式"
@@ -2338,11 +2346,7 @@ help = "use one of Hex, Bin, Oct, Be, Le, Bits, or Code after via"
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "this conversion target takes no convert hint"
-help = "drop the via clause; only numeric, ascii, and littera targets take a hint"
-
-[diagnostics.SEM016.issues.conversio_via_and_type_argument_hint]
-message = "the convert hint is given twice, as a type argument and in a via clause"
-help = "keep only the via clause: write `u32 via Bits`, not `numerus<u32, Bits> via Bits`"
+help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
 
 [diagnostics.SEM016.issues.bits_pair_width_mismatch]
 message = "the Bits bitcast requires exact-width pairs: numerus<u32> ↔ fractus<f32> and numerus<u64> ↔ fractus<f64>"

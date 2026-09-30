@@ -38,19 +38,63 @@ fn via_clause_carries_its_hint_on_the_conversion() {
         let result = parse_ok(&format!("fixum _ n ← s ↦ u32 via {hint}"));
         let conversio = conversio(initializer(&result, 0));
         assert_eq!(via_name(&result, conversio).as_deref(), Some(hint));
-        assert!(conversio.type_params.is_empty());
         assert!(conversio.recovery.is_none());
     }
 }
 
 #[test]
 fn conversion_without_via_has_no_hint() {
-    let result = parse_ok("fixum _ n ← s ↦ numerus<u32, Hex>");
+    let result = parse_ok("fixum _ n ← s ↦ numerus<u32>");
     let conversio = conversio(initializer(&result, 0));
-    assert!(
-        conversio.via.is_none(),
-        "the legacy form is not a via clause"
-    );
+    assert!(conversio.via.is_none());
+}
+
+#[test]
+fn a_hint_as_a_further_type_argument_is_rejected() {
+    for source in [
+        "fixum _ n ← s ↦ numerus<u32, Hex>",
+        "fixum _ n ← s ↦ numerus<u32, Bits>",
+        "fixum _ n ← s ↦ numerus<u32, Be>",
+        "fixum _ n ← s ↦ fractus<f64, Bits>",
+        "fixum _ n ← s ↦ ascii<8, Hex>",
+        "fixum _ n ← s ↦ ascii<_, Bin>",
+        "fixum _ n ← s ↦ littera<Code>",
+        "fixum _ n ← s ↦ numerus<u32, Hex> ⊥ 0",
+    ] {
+        assert_parse_error_issue(source, "conversio_hint_type_argument");
+    }
+}
+
+#[test]
+fn a_bracketed_hint_tail_after_the_target_is_rejected() {
+    for source in [
+        "fixum _ n ← s ↦ octeti<16><Le>",
+        "fixum _ n ← s ↦ vector<numerus<u32>, 4><Be>",
+        "fixum _ n ← s ↦ numerus<u32><Le>",
+    ] {
+        assert_parse_error_issue(source, "conversio_hint_tail_argument");
+    }
+}
+
+#[test]
+fn a_hole_and_a_via_clause_stay_accepted() {
+    for source in [
+        "fixum _ n ← s ↦ numerus<u32, _>",
+        "fixum _ n ← s ↦ ascii<_> via Hex",
+        "fixum _ n ← s ↦ ascii<8> via Hex",
+        "fixum _ n ← s ↦ octeti<16> via Le",
+        "fixum _ n ← s ↦ vector<numerus<u32>, 4> via Be",
+    ] {
+        let _ = parse_ok(source);
+    }
+}
+
+#[test]
+fn a_user_type_named_like_a_hint_is_still_a_type_argument() {
+    // The retired-form check reads scalar heads only: `Code` and `Bits` are
+    // ordinary nominal types as arguments of a collection target.
+    let _ = parse_ok("fixum _ n ← s ↦ lista<Code>");
+    let _ = parse_ok("fixum _ n ← s ↦ tabula<textus, Bits>");
 }
 
 #[test]

@@ -953,53 +953,15 @@ impl super::FaberCodegen<'_> {
                         let mut target_str = self
                             .type_to_faber_at(&site, *ty, names, surface)
                             .unwrap_or_else(|error| self.record_type_emission_error(error));
-                        if let [hint] = params.as_slice() {
+                        if let Some(hint) = params.first() {
                             // D11.9: a convert hint is a `via` clause after
-                            // the target, never a type argument, so the
-                            // legacy `int<u32, Bits>` form rewrites to
-                            // `u32 via Bits` at the source's own locale.
+                            // the target, never a type argument. The parser
+                            // admits at most one hint per conversion, so one
+                            // clause carries the whole hint slot.
                             target_str.push(' ');
                             target_str.push_str(surface.keyword(TokenKind::Via));
                             target_str.push(' ');
                             target_str.push_str(&self.symbol_to_string(*hint));
-                        } else if !params.is_empty() {
-                            // More than one hint cannot ride a single `via`
-                            // clause (typecheck rejects the combination), so
-                            // it keeps the type-argument spelling.
-                            // Conversio markers (`Be` / `Le` / `Bits`) are extra
-                            // generic arguments on the target type
-                            // (`int<u32, Be>`); a trailing `<Be>` append is not
-                            // the source form and fails to re-parse.
-                            let markers = params
-                                .iter()
-                                .map(|param| self.symbol_to_string(*param))
-                                .collect::<Vec<_>>()
-                                .join(", ");
-                            if target_str.ends_with('>') {
-                                target_str.truncate(target_str.len() - 1);
-                                target_str.push_str(", ");
-                            } else if matches!(
-                                self.types.get(*ty),
-                                Type::Primitive(Primitive::Littera)
-                            ) {
-                                // D10.6 `n ↦ littera via Code`: the hint is the
-                                // only generic argument of the scalar head.
-                                target_str.push('<');
-                            } else {
-                                // Bare width marker target: the marker rides a
-                                // generic argument, so re-wrap the width in
-                                // the float-family head (`float<f32, Be>`).
-                                target_str = format!(
-                                    "{}<{}",
-                                    surface.type_surface(TypeBindingKind::Primitive(
-                                        Primitive::Fractus
-                                    )),
-                                    target_str
-                                );
-                                target_str.push_str(", ");
-                            }
-                            target_str.push_str(&markers);
-                            target_str.push('>');
                         }
                         writer.write(&target_str);
                     }

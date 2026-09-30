@@ -525,9 +525,6 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
                 ConversioTarget::Explicit(ty) => visitor.visit_type_expr(ty),
                 ConversioTarget::Intervallum(operand) => visitor.visit_expr(operand),
             }
-            for arg in &conversio.type_params {
-                walk_generic_arg_expr(visitor, arg);
-            }
             if let Some(recovery) = &conversio.recovery {
                 visitor.visit_expr(recovery);
             }

@@ -1614,11 +1614,10 @@ pub enum RangeKind {
 pub struct ConversioExpr {
     pub expr: Box<Expr>,
     pub target: ConversioTarget,
-    pub type_params: Vec<GenericArgExpr>,
     /// Convert hint of a `via` clause (`x ↦ u32 via Hex`, D11.9). The hint is
     /// a compile-time identifier that selects the conversion row; it is never
-    /// part of the target type. The pre-D11.9 second type argument
-    /// (`numerus<u32, Hex>`) stays accepted and lowers to the same hint.
+    /// part of the target type. The pre-D11.9 spellings (a second type
+    /// argument, a bracketed tail) are parse errors.
     pub via: Option<Ident>,
     pub recovery: Option<Box<Expr>>,
 }

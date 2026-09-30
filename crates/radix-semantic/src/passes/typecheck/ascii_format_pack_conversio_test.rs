@@ -54,8 +54,10 @@ fn float_source_rejects() {
     );
 }
 
+/// The hint rides a `via` clause; written as the capacity argument it is a
+/// capacity error (the second-argument form is a parse error, D11.9).
 #[test]
-fn hint_in_slot_one_rejects() {
+fn hint_as_the_capacity_argument_rejects() {
     test_support::assert_rejects_with_issue(
         "incipit { fixum _ hex ← 255 ↦ ascii<Hex> }",
         "ascii_format_hint_not_capacity",

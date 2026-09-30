@@ -92,31 +92,10 @@ fn f16_to_u32_bits_rejects() {
 }
 
 // OQ3 (settled by U2): `Bits` never co-occurs with `Hex`/`Bin`/`Oct` in one
-// hint list — one interpretation family per `↦`; the structured issue is
-// `conversio_bits_format_hint_conflict`.
-#[test]
-fn bits_with_hex_hint_rejects() {
-    test_support::assert_rejects_with_issue(
-        "functio bits(numerus<u32> n) → fractus<f32> { redde n ↦ fractus<f32, Bits, Hex> }",
-        "conversio_bits_format_hint_conflict",
-    );
-}
-
-#[test]
-fn bits_with_bin_hint_rejects() {
-    test_support::assert_rejects_with_issue(
-        "functio bits(numerus<u32> n) → fractus<f32> { redde n ↦ fractus<f32, Bits, Bin> }",
-        "conversio_bits_format_hint_conflict",
-    );
-}
-
-#[test]
-fn bits_with_oct_hint_rejects() {
-    test_support::assert_rejects_with_issue(
-        "functio bits(numerus<u32> n) → fractus<f32> { redde n ↦ fractus<f32, Bits, Oct> }",
-        "conversio_bits_format_hint_conflict",
-    );
-}
+// conversion — one interpretation family per `↦`. Since D11.9 a conversion
+// carries exactly one hint in its `via` clause, so the combination cannot be
+// written; the parser pins the multi-hint spellings as retired forms
+// (`radix-parser` `via_hint_test`).
 
 #[test]
 fn without_bits_value_conversion_stays() {

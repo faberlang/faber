@@ -504,28 +504,25 @@ fn policy(trapping<u8> a) → trapping<i64> {
     );
 }
 
-/// D11.9: a convert hint is a `via` clause. Old sources that spell the hint as
-/// a second type argument re-emit as the clause, in every locale's own word.
+/// D11.9: a convert hint is a `via` clause, in every locale's own word.
 const VIA_HINT_SOURCE: &str = r#"+++
 locale = "en"
 +++
 main {
     const bytes raw ← |3c 00 00 00|
     const char big ← 'A'
-    const int<u16> a ← raw[0‥2] ↦ int<u16, Le>
-    const f16 b ← a ↦ float<f16, Bits>
-    const int c ← "ff" ↦ int<i32, Hex> ⊥ 0
-    const int<u32> d ← big ↦ int<u32, Code>
-    const char e ← 65 ↦ char<Code> ⊥ '?'
-    const int<u16> f ← raw[0‥2] ↦ u16 via Le
-    const f16 g ← f ↦ f16 via Bits
+    const int<u16> a ← raw[0‥2] ↦ int<u16> via Le
+    const f16 b ← a ↦ f16 via Bits
+    const int c ← "ff" ↦ int<i32> via Hex ⊥ 0
+    const int<u32> d ← big ↦ int<u32> via Code
+    const char e ← 65 ↦ char via Code ⊥ '?'
     const int via ← c
     print via
 }
 "#;
 
 #[test]
-fn convert_rewrites_type_argument_hints_to_the_via_clause() {
+fn convert_keeps_hints_in_the_via_clause() {
     let fixture = std::env::temp_dir().join("faber-convert-via-hint-rewrite.fab");
     fs::write(&fixture, VIA_HINT_SOURCE).expect("write via fixture");
     let path = fixture.to_str().expect("utf8 fixture path");
@@ -534,14 +531,17 @@ fn convert_rewrites_type_argument_hints_to_the_via_clause() {
     let _ = fs::remove_file(&fixture);
 
     for (needle, what) in [
-        ("↦ int<u16> via Le", "int<u16, Le> rewrites to a clause"),
-        ("↦ f16 via Bits", "float<f16, Bits> rewrites to a clause"),
+        ("↦ int<u16> via Le", "the endian read keeps its clause"),
+        ("↦ f16 via Bits", "the bitcast keeps its clause"),
         (
             "↦ int<i32> via Hex ⊥ 0",
             "the clause binds before the default",
         ),
         ("↦ int<u32> via Code", "the code-point read"),
-        ("↦ char via Code ⊥ '?'", "char<Code> rewrites to a clause"),
+        (
+            "↦ char via Code ⊥ '?'",
+            "the code-point build keeps its clause",
+        ),
     ] {
         assert!(formatted.contains(needle), "{what}:\n{formatted}");
     }
@@ -560,7 +560,7 @@ fn convert_rewrites_type_argument_hints_to_the_via_clause() {
 }
 
 #[test]
-fn format_of_the_via_clause_is_a_fixpoint_for_both_spellings() {
+fn format_of_the_via_clause_is_a_fixpoint() {
     let fixture = std::env::temp_dir().join("faber-format-via-hint-fixpoint.fab");
     fs::write(&fixture, VIA_HINT_SOURCE).expect("write via fixture");
     let path = fixture.to_str().expect("utf8 fixture path");
@@ -600,6 +600,21 @@ fn convert_spells_the_via_clause_in_each_pack_and_reads_it_back() {
         assert_eq!(back, latin, "{locale} → la must round-trip the via clause");
     }
     let _ = fs::remove_file(&fixture);
+}
+
+#[test]
+fn convert_rejects_the_retired_type_argument_hint_pointing_at_the_clause() {
+    for source in [
+        "main {\n    const int c ← \"ff\" ↦ int<i32, Hex> ⊥ 0\n}\n",
+        "main {\n    const char e ← 65 ↦ char<Code> ⊥ '?'\n}\n",
+    ] {
+        let (stdout, stderr, success) = run_faber_convert_stdin("la", source);
+        assert!(!success, "the retired spelling must not convert:\n{stdout}");
+        assert!(
+            stderr.contains("conversio_hint_type_argument"),
+            "the rejection names the retired form:\n{stderr}"
+        );
+    }
 }
 
 #[test]

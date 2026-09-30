@@ -883,6 +883,10 @@ fn invalid_expression_message(args: &[DiagnosticArg]) -> Option<String> {
     match issue {
         "conversio_recovery_uses_vel" => Some("use ⊥ for a conversion default".to_owned()),
         "conversio_via_missing_hint" => Some("`via` needs a convert hint after it".to_owned()),
+        "conversio_hint_type_argument" => Some("a convert hint is not a type argument".to_owned()),
+        "conversio_hint_tail_argument" => {
+            Some("a convert hint does not follow the target in angle brackets".to_owned())
+        }
         "conditional_nested" => {
             Some("a '✓ ✗' conditional cannot appear inside another '✓ ✗'".to_owned())
         }
@@ -919,6 +923,12 @@ fn invalid_expression_help(args: &[DiagnosticArg]) -> Option<String> {
         "conversio_recovery_uses_vel" => Some("use ⊥; vel is nullish coalescing only".to_owned()),
         "conversio_via_missing_hint" => Some(
             "name the hint right after via, as in `x ↦ u32 via Hex`; the hints are Hex, Bin, Oct, Be, Le, Bits, and Code".to_owned(),
+        ),
+        "conversio_hint_type_argument" => Some(
+            "write the hint as a via clause after the target: `u32 via Bits`, `ascii<8> via Hex`, `littera via Code`".to_owned(),
+        ),
+        "conversio_hint_tail_argument" => Some(
+            "write the hint as a via clause after the target: `octeti<16> via Le`".to_owned(),
         ),
         "conditional_nested" => {
             Some("use 'si'/'sin', 'discerne', or a function that 'redde's each case".to_owned())

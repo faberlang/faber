@@ -1711,16 +1711,6 @@ fn resolve_type_expr(
                         [capacity] => {
                             validate_capacity_index_param(resolver, interner, capacity, errors)
                         }
-                        [capacity, hint]
-                            if prim == Primitive::Ascii
-                                && named_type_is_ascii_format_hint(hint, interner) =>
-                        {
-                            // Slot 2 Hex/Bin/Oct is a conversio format hint.
-                            // Type identity stays ascii<N>; peel happens in
-                            // conversio lowering. Type-position 2-arg ascii
-                            // still fails at lower_bounded_primitive.
-                            validate_capacity_index_param(resolver, interner, capacity, errors);
-                        }
                         _ => errors.push(lowering_error(ISSUE_PRIMITIVE_PARAMS, name.span)),
                     }
                     return;

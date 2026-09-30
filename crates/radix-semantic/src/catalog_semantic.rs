@@ -445,13 +445,7 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
             Some("use one of Hex, Bin, Oct, Be, Le, Bits, or Code after via".to_owned())
         }
         "conversio_via_target_takes_no_hint" => {
-            Some("drop the via clause; only numeric, ascii, and littera targets take a hint".to_owned())
-        }
-        "conversio_via_and_type_argument_hint" => Some(
-            "keep only the via clause: write `u32 via Bits`, not `numerus<u32, Bits> via Bits`".to_owned(),
-        ),
-        "conversio_bits_format_hint_conflict" => {
-            Some("drop the Hex/Bin/Oct hint or the Bits hint; one interpretation per conversio".to_owned())
+            Some("drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint".to_owned())
         }
         "ascii_format_hint_not_capacity" => {
             Some("write ascii<N> via Hex, ascii<N> via Bin, or ascii<N> via Oct with N as digit width".to_owned())

@@ -384,10 +384,10 @@ pub fn decimal_text_to_scaled(text: &str) -> Option<(i128, i32)> {
     }
 }
 
-/// Conversio slot-2 hints that follow an optional width marker.
+/// Conversio hints, spelled in the `via` clause after the target (D11.9).
 ///
 /// `Hex` / `Bin` / `Oct` are text-parse radices. `Be` / `Le` are endian
-/// unpack rules for `octeti` windows — same slot, not bases. `Bits` is an
+/// unpack rules for `octeti` windows — same clause, not bases. `Bits` is an
 /// exact-width bitcast (`u32↔f32`, `u64↔f64`) — reinterpretation, not a
 /// radix, and never legal in a `from_str_radix` base. `Code` (D10.6) reads a
 /// `littera` as its code point (`'A' ↦ u32 via Code`); it is not a
@@ -403,10 +403,10 @@ pub fn is_code_point_hint(marker: &str) -> bool {
     marker == "Code"
 }
 
-/// Ascii format-pack slot-2 hints: `n ↦ ascii<N> via Hex|Bin|Oct`.
+/// Ascii format-pack hints: `n ↦ ascii<N> via Hex|Bin|Oct`.
 ///
 /// Distinct from [`is_conversio_radix_hint`]: `Be` / `Le` are endian unpack
-/// rules, never ascii digit bases. Slot 1 of a bounded family stays capacity.
+/// rules, never ascii digit bases. The type argument of a bounded family stays capacity.
 #[must_use]
 pub fn is_ascii_format_hint(marker: &str) -> bool {
     matches!(marker, "Hex" | "Bin" | "Oct")

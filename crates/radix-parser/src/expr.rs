@@ -1260,11 +1260,9 @@ impl Parser {
     ) -> Result<Expr, ParseError> {
         self.advance();
         let target = self.parse_conversio_target()?;
-        let type_params = if matches!(target, ConversioTarget::Explicit(_)) {
-            self.try_parse_type_args()?
-        } else {
-            Vec::new()
-        };
+        if let ConversioTarget::Explicit(ty) = &target {
+            self.reject_retired_conversio_hint(ty)?;
+        }
         let via = self.parse_via_clause()?;
         if self.check(&TokenKind::ExitArrow) {
             return Err(self.invalid_expression_error("recovery_uses_exit_arrow"));
@@ -1280,11 +1278,80 @@ impl Parser {
             kind: ExprKind::Conversio(ConversioExpr {
                 expr: Box::new(operand),
                 target,
-                type_params,
                 via,
                 recovery,
             }),
             span,
+        })
+    }
+
+    /// Reject the retired hint spellings on an explicit `↦` target (D11.9).
+    ///
+    /// A convert hint is a `via` clause, never a type argument. Two pre-D11.9
+    /// spellings are retired and get a specific diagnostic pointing at the
+    /// clause: the hint as a further type argument of the scalar head
+    /// (`int<u32, Bits>`, `ascii<N, Hex>`, `littera<Code>`) and the hint as a
+    /// bracketed tail after the target (`octeti<16><Le>`). A hole
+    /// (`numerus<u32, _>`) is not a hint and stays accepted.
+    ///
+    /// WHY: only the scalar heads that ever took a hint are checked, so a
+    /// user type named `Code` or `Bits` stays a legal type argument
+    /// (`↦ lista<Code>`).
+    fn reject_retired_conversio_hint(&mut self, ty: &TypeExpr) -> Result<(), ParseError> {
+        if let Some(span) = self.retired_type_argument_hint(ty) {
+            return Err(
+                ParseError::structured(ParseErrorKind::ExpressionInvalid, span)
+                    .with_arg("issue", "conversio_hint_type_argument"),
+            );
+        }
+        if self.check(&TokenKind::LtAscii) {
+            let span = self.current_span();
+            let checkpoint = self.checkpoint();
+            self.advance();
+            let is_hint_tail = matches!(
+                self.peek().kind,
+                TokenKind::Ident(sym)
+                    if radix_types::numeric_width::is_conversio_radix_hint(
+                        self.interner.resolve(sym)
+                    )
+            ) && matches!(self.peek_at(1).kind, TokenKind::GtAscii);
+            if is_hint_tail {
+                return Err(
+                    ParseError::structured(ParseErrorKind::ExpressionInvalid, span)
+                        .with_arg("issue", "conversio_hint_tail_argument"),
+                );
+            }
+            self.restore(checkpoint);
+        }
+        Ok(())
+    }
+
+    /// Span of a hint spelled as a type argument of a scalar `↦` target head.
+    fn retired_type_argument_hint(&self, ty: &TypeExpr) -> Option<Span> {
+        let TypeExprKind::Named(head, args) = &ty.kind else {
+            return None;
+        };
+        // Slot 1 of the numeric and ascii heads is the width or capacity;
+        // `littera` has no other argument, so its slot 0 is the hint.
+        let first_hint_slot =
+            match radix_types::Primitive::from_name(self.interner.resolve(head.name))? {
+                radix_types::Primitive::Numerus
+                | radix_types::Primitive::Fractus
+                | radix_types::Primitive::Ascii => 1,
+                radix_types::Primitive::Littera => 0,
+                _ => return None,
+            };
+        args.iter().skip(first_hint_slot).find_map(|arg| {
+            let ident = match arg {
+                GenericArgExpr::Name(ident) => ident,
+                GenericArgExpr::Type(TypeExpr {
+                    kind: TypeExprKind::Named(ident, inner),
+                    ..
+                }) if inner.is_empty() => ident,
+                _ => return None,
+            };
+            radix_types::numeric_width::is_conversio_radix_hint(self.interner.resolve(ident.name))
+                .then_some(ident.span)
         })
     }
 
@@ -2797,13 +2864,6 @@ impl Parser {
         }
 
         Err(self.expected_expression_error("field_value_separator"))
-    }
-
-    fn try_parse_type_args(&mut self) -> Result<Vec<GenericArgExpr>, ParseError> {
-        if !self.eat(&TokenKind::LtAscii) {
-            return Ok(Vec::new());
-        }
-        self.finish_type_args_list()
     }
 
     /// Parse `< typeArgument (, typeArgument)* >` after the opening `<` has been consumed.

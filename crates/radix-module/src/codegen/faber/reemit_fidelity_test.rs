@@ -365,32 +365,40 @@ fn negated_type_check_uses_infix_non_est() {
 }
 
 #[test]
-fn conversio_markers_rewrite_to_the_via_clause() {
+fn conversio_via_clause_round_trips() {
     // D11.9: a convert hint is a `via` clause after the target, never a type
-    // argument. The legacy `↦ numerus<u32, Be>` spelling re-emits as the
-    // clause; a trailing `<Be>` append is not the source form.
+    // argument, and the canonical emitter keeps it there.
     //
     // D5.7 retired top-level `fixum`; this binding moves inside `incipit`
-    // (the marker spelling under test is unrelated to item vs. local scope).
-    let code = assert_idempotent("incipit {\n    fixum numerus<u32> le ← |de ad be ef|[0‥4] ↦ numerus<u32, Be>\n}\n");
+    // (the clause spelling under test is unrelated to item vs. local scope).
+    let code =
+        assert_idempotent("incipit {\n    fixum numerus<u32> le ← |de ad be ef|[0‥4] ↦ numerus<u32> via Be\n}\n");
     assert!(
         code.contains("↦ numerus<u32> via Be"),
-        "conversio marker must re-emit as a via clause:\n{code}"
+        "conversio hint must re-emit as a via clause:\n{code}"
     );
-    let clause =
-        assert_idempotent("incipit {\n    fixum numerus<u32> le ← |de ad be ef|[0‥4] ↦ numerus<u32> via Be\n}\n");
-    assert_eq!(code, clause, "both spellings re-emit to the same source");
 }
 
 #[test]
-fn littera_code_marker_rewrites_to_the_via_clause() {
-    // D10.6 `n ↦ littera<Code>` and D11.9 `n ↦ littera via Code` are one
-    // hint: the target stays the plain scalar head, never the float-family
-    // width wrap (`fractus<littera, Code>`).
-    let code = assert_idempotent("incipit {\n    fixum littera c ← 65 ↦ littera<Code> ⊥ '?'\n    scribe c\n}\n");
+fn littera_code_via_clause_round_trips() {
+    // D10.6 `n ↦ littera via Code`: the target stays the plain scalar head,
+    // never a float-family width wrap.
+    let code = assert_idempotent("incipit {\n    fixum littera c ← 65 ↦ littera via Code ⊥ '?'\n    scribe c\n}\n");
     assert!(
         code.contains("↦ littera via Code ⊥ '?'"),
         "the Code hint must re-emit as a via clause on the littera head:\n{code}"
+    );
+}
+
+#[test]
+fn register_target_via_clause_round_trips() {
+    // A register target keeps its hint in the clause, not as a bracketed tail.
+    let code = assert_idempotent(
+        "functio out(vector<numerus<u32>, 4> v) → octeti<16> {\n    redde v ↦ octeti<16> via Le\n}\n",
+    );
+    assert!(
+        code.contains("↦ octeti<16> via Le"),
+        "register hint must re-emit as a via clause:\n{code}"
     );
 }
 

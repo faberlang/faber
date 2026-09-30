@@ -1,10 +1,10 @@
 //! D11.9 `via` convert-hint clause: routing and diagnostics.
 //!
-//! Contract: `x ↦ u32 via Hex` and the pre-D11.9 second type argument
-//! (`numerus<u32, Hex>`) are two spellings of one hint. Every hint routes to
-//! exactly the conversion row it selected before, so the two spellings of each
-//! program compile to identical Rust. Misuse of the clause (unknown hint, a
-//! target that takes none, both spellings at once) is a structured error.
+//! Contract: a convert hint is a `via` clause after the `↦` target
+//! (`x ↦ u32 via Hex`). Every hint routes to its conversion row, the pre-D11.9
+//! spellings (a further type argument, a bracketed tail) are parse errors that
+//! point at the clause, and misuse of the clause itself (unknown hint, a target
+//! that takes none) is a structured error.
 
 use crate::driver::AnalyzeRequest;
 use crate::hir::{HirExpressionKind, HirStatementKind};
@@ -93,7 +93,7 @@ fn entry_conversions(source: &str) -> Vec<(String, Vec<String>)> {
     found
 }
 
-/// One hint row: the same program written with the legacy second type
+/// One hint row: the same program written with the retired second type
 /// argument and with the `via` clause. `{}` marks the conversion body.
 struct Row {
     name: &'static str,
@@ -203,50 +203,49 @@ fn splice(frame: &str, conversion: &str) -> String {
 }
 
 #[test]
-fn every_hint_row_routes_the_via_clause_exactly_as_the_type_argument() {
+fn every_hint_row_compiles_through_the_via_clause() {
     for row in ROWS {
-        let legacy = rust_code(latin_config(), &splice(row.frame, row.legacy));
-        let via = rust_code(latin_config(), &splice(row.frame, row.via));
-        assert_eq!(
-            legacy, via,
-            "row {}: the via clause must lower to the same Rust as the type argument",
-            row.name
+        let source = splice(row.frame, row.via);
+        let code = rust_code(latin_config(), &source);
+        assert!(!code.is_empty(), "row {}: {source}", row.name);
+    }
+}
+
+#[test]
+fn every_retired_type_argument_spelling_is_rejected_pointing_at_the_clause() {
+    for row in ROWS {
+        assert_issue(
+            &diagnostics_with(latin_config(), &splice(row.frame, row.legacy)),
+            "conversio_hint_type_argument",
         );
     }
 }
 
 #[test]
-fn every_hint_row_routes_identically_under_the_english_surface() {
-    let rows = [
-        (
-            "fn f(string s) → int<i32> { return s {} ⊥ 0 }",
-            "↦ int<i32, Hex>",
-            "↦ int<i32> via Hex",
-        ),
-        (
-            "fn f(int<u32> n) → float<f32> { return n {} }",
-            "↦ float<f32, Bits>",
-            "↦ f32 via Bits",
-        ),
-        ("fn f(char c) → int<u32> { return c {} }", "↦ int<u32, Code>", "↦ u32 via Code"),
-        ("main { const _ v ← |de ad be ef|[0‥4] {} }", "↦ int<u32, Be>", "↦ u32 via Be"),
-    ];
-    for (frame, legacy, via) in rows {
-        let legacy = rust_code(english_config(), &frame.replacen("{}", legacy, 1));
-        let via = rust_code(english_config(), &frame.replacen("{}", via, 1));
-        assert_eq!(legacy, via, "english frame {frame}");
+fn the_retired_type_argument_is_rejected_under_the_english_surface() {
+    for source in [
+        "fn f(string s) → int<i32> { return s ↦ int<i32, Hex> ⊥ 0 }",
+        "fn f(int<u32> n) → float<f32> { return n ↦ float<f32, Bits> }",
+        "fn f(char c) → int<u32> { return c ↦ int<u32, Code> }",
+    ] {
+        assert_issue(&diagnostics_with(english_config(), source), "conversio_hint_type_argument");
     }
 }
 
 #[test]
-fn the_conversion_node_carries_the_hint_from_either_spelling() {
-    let legacy = entry_conversions(
-        r#"incipit {
-    fixum _ a ← "ff" ↦ numerus<i32, Hex>
-    fixum littera big ← 'A'
-    fixum _ b ← big ↦ numerus<u32, Code>
-}"#,
-    );
+fn every_hint_routes_under_the_english_surface() {
+    for source in [
+        "fn f(string s) → int<i32> { return s ↦ int<i32> via Hex ⊥ 0 }",
+        "fn f(int<u32> n) → float<f32> { return n ↦ f32 via Bits }",
+        "fn f(char c) → int<u32> { return c ↦ u32 via Code }",
+        "main { const _ v ← |de ad be ef|[0‥4] ↦ u32 via Be }",
+    ] {
+        let _ = rust_code(english_config(), source);
+    }
+}
+
+#[test]
+fn the_conversion_node_carries_the_via_hint() {
     let via = entry_conversions(
         r#"incipit {
     fixum _ a ← "ff" ↦ numerus<i32> via Hex
@@ -254,19 +253,16 @@ fn the_conversion_node_carries_the_hint_from_either_spelling() {
     fixum _ b ← big ↦ u32 via Code
 }"#,
     );
-    let hints: Vec<_> = legacy.iter().map(|(_, hints)| hints.clone()).collect();
+    let hints: Vec<_> = via.iter().map(|(_, hints)| hints.clone()).collect();
     assert_eq!(hints, vec![vec!["Hex".to_owned()], vec!["Code".to_owned()]]);
-    assert_eq!(legacy, via, "same target types and hints from either spelling");
 }
 
 #[test]
-fn the_f16_bits_row_routes_the_same_from_either_spelling() {
-    // The Rust target has no half-float carrier, so this row is compared at
-    // the HIR conversion node instead of through generated code.
-    let legacy = entry_conversions("incipit { fixum numerus<u16> n ← 15360\n fixum _ x ← n ↦ fractus<f16, Bits> }");
+fn the_f16_bits_row_carries_its_hint() {
+    // The Rust target has no half-float carrier, so this row is read at the
+    // HIR conversion node instead of through generated code.
     let via = entry_conversions("incipit { fixum numerus<u16> n ← 15360\n fixum _ x ← n ↦ f16 via Bits }");
-    assert_eq!(legacy, via);
-    assert_eq!(legacy[0].1, vec!["Bits".to_owned()]);
+    assert_eq!(via[0].1, vec!["Bits".to_owned()]);
 }
 
 #[test]
@@ -278,15 +274,11 @@ fn a_plain_conversion_carries_no_hint() {
 
 #[test]
 fn the_default_binds_after_the_via_clause() {
-    let with_default = rust_code(
+    let code = rust_code(
         latin_config(),
         r#"functio f(textus s) → numerus<i32> { redde s ↦ numerus<i32> via Hex ⊥ 7 }"#,
     );
-    let legacy = rust_code(
-        latin_config(),
-        r#"functio f(textus s) → numerus<i32> { redde s ↦ numerus<i32, Hex> ⊥ 7 }"#,
-    );
-    assert_eq!(with_default, legacy);
+    assert!(code.contains('7'), "{code}");
 }
 
 #[test]
@@ -294,10 +286,6 @@ fn chained_conversions_carry_one_hint_per_hop() {
     let via = entry_conversions(
         "incipit { fixum octeti b ← |3c 00|\n fixum _ x ← b[0‥2] ↦ u16 via Le ↦ f16 via Bits ↦ f32 }",
     );
-    let legacy = entry_conversions(
-        "incipit { fixum octeti b ← |3c 00|\n fixum _ x ← b[0‥2] ↦ numerus<u16, Le> ↦ fractus<f16, Bits> ↦ f32 }",
-    );
-    assert_eq!(via, legacy);
     let hints: Vec<_> = via.iter().map(|(_, hints)| hints.clone()).collect();
     assert_eq!(
         hints,
@@ -347,14 +335,28 @@ fn via_on_a_target_that_takes_no_hint_is_a_structured_error() {
 }
 
 #[test]
-fn a_hint_given_both_as_type_argument_and_via_clause_is_an_error() {
-    assert_issue(
-        &diagnostics_with(
-            latin_config(),
-            "functio f(textus s) → numerus<i32> { redde s ↦ numerus<i32, Hex> via Hex }",
-        ),
-        "conversio_via_and_type_argument_hint",
-    );
+fn a_register_target_takes_a_via_hint() {
+    // The register windows carry `Be`/`Le` in the clause like any other target.
+    for source in [
+        "functio w(octeti c) → vector<numerus<u32>, 4> { redde c[0‥16] ↦ vector<numerus<u32>, 4> via Be }",
+        "functio o(vector<numerus<u32>, 4> v) → octeti<16> { redde v ↦ octeti<16> via Le }",
+    ] {
+        let diagnostics = diagnostics_with(latin_config(), source);
+        assert!(
+            !diagnostics.iter().any(crate::Diagnostic::is_error),
+            "{source}: {diagnostics:?}"
+        );
+    }
+}
+
+#[test]
+fn the_retired_register_tail_is_rejected_pointing_at_the_clause() {
+    for source in [
+        "functio w(octeti c) → vector<numerus<u32>, 4> { redde c[0‥16] ↦ vector<numerus<u32>, 4><Be> }",
+        "functio o(vector<numerus<u32>, 4> v) → octeti<16> { redde v ↦ octeti<16><Le> }",
+    ] {
+        assert_issue(&diagnostics_with(latin_config(), source), "conversio_hint_tail_argument");
+    }
 }
 
 #[test]

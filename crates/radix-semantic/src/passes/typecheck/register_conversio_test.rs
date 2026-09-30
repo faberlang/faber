@@ -10,7 +10,7 @@ use crate::test_support::{assert_accepts, assert_rejects_with_issue};
 fn octeti_window_16_to_vu32x4_be_accepts() {
     assert_accepts(
         "functio win(octeti corpus) → vector<numerus<u32>, 4> {
-    redde corpus[0‥16] ↦ vector<numerus<u32>, 4><Be>
+    redde corpus[0‥16] ↦ vector<numerus<u32>, 4> via Be
 }",
     );
 }
@@ -19,7 +19,7 @@ fn octeti_window_16_to_vu32x4_be_accepts() {
 fn octeti_window_16_to_vu16x8_le_accepts() {
     assert_accepts(
         "functio win(octeti corpus) → vector<numerus<u16>, 8> {
-    redde corpus[0‥16] ↦ vector<numerus<u16>, 8><Le>
+    redde corpus[0‥16] ↦ vector<numerus<u16>, 8> via Le
 }",
     );
 }
@@ -28,7 +28,7 @@ fn octeti_window_16_to_vu16x8_le_accepts() {
 fn octeti_window_8_to_vu32x2_be_accepts() {
     assert_accepts(
         "functio win(octeti corpus) → vector<numerus<u32>, 2> {
-    redde corpus[0‥8] ↦ vector<numerus<u32>, 2><Be>
+    redde corpus[0‥8] ↦ vector<numerus<u32>, 2> via Be
 }",
     );
 }
@@ -37,7 +37,7 @@ fn octeti_window_8_to_vu32x2_be_accepts() {
 fn octeti_literal_16_to_vu32x4_le_accepts() {
     assert_accepts(
         "incipit {
-    fixum _ v ← |de ad be ef fe dc ba 98 76 54 32 10 01 23 45 67| ↦ vector<numerus<u32>, 4><Le>
+    fixum _ v ← |de ad be ef fe dc ba 98 76 54 32 10 01 23 45 67| ↦ vector<numerus<u32>, 4> via Le
 }",
     );
 }
@@ -56,7 +56,7 @@ fn octeti_window_without_endian_rejects() {
 fn octeti_window_wrong_width_rejects() {
     assert_rejects_with_issue(
         "functio win(octeti corpus) → vector<numerus<u32>, 4> {
-    redde corpus[0‥12] ↦ vector<numerus<u32>, 4><Be>
+    redde corpus[0‥12] ↦ vector<numerus<u32>, 4> via Be
 }",
         "register_window_width_mismatch",
     );
@@ -66,7 +66,7 @@ fn octeti_window_wrong_width_rejects() {
 fn octeti_window_u8_element_rejects() {
     assert_rejects_with_issue(
         "functio win(octeti corpus) → vector<numerus<u8>, 16> {
-    redde corpus[0‥16] ↦ vector<numerus<u8>, 16><Be>
+    redde corpus[0‥16] ↦ vector<numerus<u8>, 16> via Be
 }",
         "register_window_width_mismatch",
     );
@@ -87,7 +87,7 @@ fn vector_u32x4_to_lista_accepts() {
 fn vector_u32x4_to_octeti_16_le_accepts() {
     assert_accepts(
         "functio out(vector<numerus<u32>, 4> v) → octeti<16> {
-    redde v ↦ octeti<16><Le>
+    redde v ↦ octeti<16> via Le
 }",
     );
 }
@@ -96,7 +96,7 @@ fn vector_u32x4_to_octeti_16_le_accepts() {
 fn vector_u32x4_to_octeti_16_be_accepts() {
     assert_accepts(
         "functio out(vector<numerus<u32>, 4> v) → octeti<16> {
-    redde v ↦ octeti<16><Be>
+    redde v ↦ octeti<16> via Be
 }",
     );
 }
@@ -115,7 +115,7 @@ fn vector_to_octeti_without_endian_rejects() {
 fn vector_to_octeti_wrong_capacity_rejects() {
     assert_rejects_with_issue(
         "functio out(vector<numerus<u32>, 4> v) → octeti<8> {
-    redde v ↦ octeti<8><Le>
+    redde v ↦ octeti<8> via Le
 }",
         "register_window_width_mismatch",
     );

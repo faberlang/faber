@@ -1352,12 +1352,6 @@ impl Lowerer<'_> {
                 HirConversioTarget::Intervallum(Box::new(lower_expr(self, expr)))
             }
         };
-        params.extend(
-            conversio
-                .type_params
-                .iter()
-                .filter_map(conversio_hint_symbol),
-        );
         if let Some(via) = &conversio.via {
             self.lower_via_hint(via, &target, &mut params);
         }
@@ -1388,11 +1382,10 @@ impl Lowerer<'_> {
 
     /// Fold a `via HINT` clause (D11.9) into the conversion's hint slot.
     ///
-    /// The clause and the pre-D11.9 second type argument are two spellings of
-    /// the same hint, so both land in `params` and route through the same
-    /// conversion rows. A clause carrying an unknown hint, sitting on a target
-    /// that takes none, or repeating a hint the target already spelled is
-    /// rejected (SEM016) and contributes no hint.
+    /// The clause lands in `params` and routes through the conversion rows
+    /// keyed by that hint symbol. A clause carrying an unknown hint or sitting
+    /// on a target that takes none is rejected (SEM016) and contributes no
+    /// hint.
     fn lower_via_hint(
         &mut self,
         via: &radix_syntax::Ident,
@@ -1404,8 +1397,6 @@ impl Lowerer<'_> {
             Some("conversio_via_unknown_hint")
         } else if !via_target_takes_hint(self, target) {
             Some("conversio_via_target_takes_no_hint")
-        } else if !params.is_empty() {
-            Some("conversio_via_and_type_argument_hint")
         } else {
             None
         };
@@ -1716,32 +1707,6 @@ fn lower_conversio_target_type(
         radix_syntax::TypeExprKind::Named(ident, target_params)
             if matches!(
                 Primitive::from_name(lowerer.interner.resolve(ident.name)),
-                Some(Primitive::Ascii)
-            ) && target_params.len() == 2
-                && !ascii_format_hints(&target_params[1..], lowerer.interner).is_empty() =>
-        {
-            // Slot 2 Hex/Bin/Oct is a conversio format hint, not type identity.
-            params.extend(ascii_format_hints(&target_params[1..], lowerer.interner));
-            let ty_id = lowerer.lower_bounded_ascii_capacity(&target_params[0]);
-            apply_type_target_wrappers(lowerer, ty, ty_id)
-        }
-        radix_syntax::TypeExprKind::Named(ident, target_params)
-            if matches!(
-                Primitive::from_name(lowerer.interner.resolve(ident.name)),
-                Some(Primitive::Littera)
-            ) && let [hint] = target_params.as_slice()
-                && let Some(symbol) = conversio_hint_symbol(hint)
-                && crate::numeric_width::is_code_point_hint(lowerer.interner.resolve(symbol)) =>
-        {
-            // D10.6 `n ↦ littera via Code`: the hint names the code-point row;
-            // type identity stays plain `littera`.
-            params.push(symbol);
-            let ty_id = lowerer.types.primitive(Primitive::Littera);
-            apply_type_target_wrappers(lowerer, ty, ty_id)
-        }
-        radix_syntax::TypeExprKind::Named(ident, target_params)
-            if matches!(
-                Primitive::from_name(lowerer.interner.resolve(ident.name)),
                 Some(Primitive::Ascii | Primitive::Octeti | Primitive::Textus)
             ) && !target_params.is_empty() =>
         {
@@ -1754,10 +1719,6 @@ fn lower_conversio_target_type(
             if let Some(prim) = Primitive::from_name(lowerer.interner.resolve(ident.name))
                 && matches!(prim, Primitive::Numerus | Primitive::Fractus) =>
         {
-            params.extend(conversio_radix_hints(
-                target_params.get(1..).unwrap_or(&[]),
-                lowerer.interner,
-            ));
             let Some(type_params) = generic_type_exprs(target_params) else {
                 lowerer.error("generic_size_argument_in_type_position");
                 return lowerer.types.intern(crate::Type::Error);
@@ -1863,7 +1824,8 @@ fn generic_type_exprs(args: &[GenericArgExpr]) -> Option<Vec<TypeExpr>> {
 }
 
 /// Whether a `↦` target can carry a convert hint: the numeric families, the
-/// ascii format pack, `littera` (`Code`), or a generic parameter that a caller
+/// ascii format pack, `littera` (`Code`), the register windows (`vector<T, N>`
+/// and `octeti<N>` take `Be`/`Le`), or a generic parameter that a caller
 /// instantiates. Typecheck still decides which (source, target, hint) rows
 /// exist; this only rejects targets no row can ever carry a hint for.
 fn via_target_takes_hint(lowerer: &Lowerer<'_>, target: &HirConversioTarget) -> bool {
@@ -1881,34 +1843,14 @@ fn via_target_takes_hint(lowerer: &Lowerer<'_>, target: &HirConversioTarget) -> 
             | crate::Type::ModularWord(_)
             | crate::Type::SaturatingWord(_)
             | crate::Type::BoundedAscii { .. }
+            | crate::Type::BoundedOcteti { .. }
+            | crate::Type::Vector(..)
             | crate::Type::Param(_)
             | crate::Type::Alias(..)
             | crate::Type::Error => return true,
             _ => return false,
         }
     }
-}
-
-fn conversio_radix_hints(
-    target_params: &[GenericArgExpr],
-    interner: &radix_lexer::Interner,
-) -> Vec<radix_lexer::Symbol> {
-    target_params
-        .iter()
-        .filter_map(conversio_hint_symbol)
-        .filter(|symbol| crate::numeric_width::is_conversio_radix_hint(interner.resolve(*symbol)))
-        .collect()
-}
-
-fn ascii_format_hints(
-    target_params: &[GenericArgExpr],
-    interner: &radix_lexer::Interner,
-) -> Vec<radix_lexer::Symbol> {
-    target_params
-        .iter()
-        .filter_map(conversio_hint_symbol)
-        .filter(|symbol| crate::numeric_width::is_ascii_format_hint(interner.resolve(*symbol)))
-        .collect()
 }
 
 /// Extract a user-written conversion hint from a type expression.

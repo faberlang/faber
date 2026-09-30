@@ -62,14 +62,13 @@ const ISSUE_ASCII_PACK_WIDTH_OVERFLOW: &str = "ascii_pack_width_overflow";
 const ISSUE_ASCII_PACK_NEGATIVE_SOURCE: &str = "ascii_pack_negative_source";
 const ISSUE_OCTETI_TO_FRACTUS_UNSPECIFIED: &str = "octeti_to_fractus_unspecified";
 const ISSUE_BITS_PAIR_WIDTH_MISMATCH: &str = "bits_pair_width_mismatch";
-// decimal-widths D2 (wildcard audit): the conversio slot-2 hints are
+// decimal-widths D2 (wildcard audit): the conversio `via` hints are
 // integer-family machinery. Radix text parse (Hex/Bin/Oct), endian unpack
 // (Be/Le), and the IEEE bitcast (Bits) all reject decimal targets/sources
 // with named teaching issues instead of a generic mismatch.
 const ISSUE_DECIMAL_RADIX_HINT_REJECTED: &str = "decimal_radix_hint_rejected";
 const ISSUE_DECIMAL_ENDIAN_HINT_REJECTED: &str = "decimal_endianness_hint_rejected";
 const ISSUE_DECIMAL_BITS_HINT_REJECTED: &str = "decimal_bits_hint_rejected";
-const ISSUE_BITS_HINT_CONFLICT: &str = "conversio_bits_format_hint_conflict";
 const ISSUE_OCTETI_TO_BIVALENS_UNSUPPORTED: &str = "octeti_to_bivalens_unsupported";
 const ISSUE_PROMISSUM_TARGET_BOUNDARY: &str = "promissum_target_boundary";
 const ISSUE_PROMISSUM_SOURCE_BOUNDARY: &str = "promissum_source_boundary";
@@ -545,7 +544,7 @@ impl TypeChecker<'_> {
             return self.error_type;
         };
         let target_resolved = self.resolve_inferred_type(*target);
-        // decimal-widths D2 (wildcard audit): any conversio slot-2 hint aimed
+        // decimal-widths D2 (wildcard audit): any conversio `via` hint aimed
         // at a decimal numerus target rejects here — radix text parse, endian
         // unpack, and the Bits bitcast are integer/IEEE-family only.
         if let Some(issue) = self.decimal_target_hint_issue(target_resolved, params) {
@@ -1437,7 +1436,7 @@ impl TypeChecker<'_> {
             .any(|param| matches!(interner.resolve(*param), "Be" | "Le"))
     }
 
-    /// decimal-widths D2 (wildcard audit): named reject for conversio slot-2
+    /// decimal-widths D2 (wildcard audit): named reject for conversio `via`
     /// hints aimed at a decimal numerus target — `textus ↦ d64 via Hex`,
     /// `octeti ↦ d64 via Be`, and every other hint spelling.
     fn decimal_target_hint_issue(
@@ -1475,9 +1474,6 @@ impl TypeChecker<'_> {
     ) -> Option<&'static str> {
         if !self.conversio_has_bits_hint(params) {
             return None;
-        }
-        if params.iter().any(|param| self.is_format_hint(*param)) {
-            return Some(ISSUE_BITS_HINT_CONFLICT);
         }
         let source = self.types.get(self.resolve_inferred_type(source_ty));
         let target = self.types.get(target_resolved);
@@ -1526,8 +1522,8 @@ impl TypeChecker<'_> {
             .any(|param| matches!(interner.resolve(*param), "Bits"))
     }
 
-    /// `n ↦ ascii<N> via Hex|Bin|Oct`: N is digit width; Hex/Bin/Oct are slot-2
-    /// format hints peeled into conversio params. Float sources reject; a
+    /// `n ↦ ascii<N> via Hex|Bin|Oct`: N is digit width; Hex/Bin/Oct are `via`
+    /// format hints carried in conversio params. Float sources reject; a
     /// const-foldable negative or overflowing source fail-closes at typecheck
     /// unless `⊥` default is present (runtime still fail-closes).
     fn check_ascii_format_pack_conversio(
@@ -1614,13 +1610,6 @@ impl TypeChecker<'_> {
         params
             .iter()
             .any(|param| crate::numeric_width::is_ascii_format_hint(interner.resolve(*param)))
-    }
-
-    fn is_format_hint(&self, param: Symbol) -> bool {
-        let Some(interner) = self.interner else {
-            return false;
-        };
-        matches!(interner.resolve(param), "Hex" | "Bin" | "Oct")
     }
 
     fn ascii_format_radix(&self, params: &[Symbol]) -> Option<u32> {

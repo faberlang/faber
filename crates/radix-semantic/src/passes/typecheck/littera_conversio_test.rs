@@ -174,9 +174,14 @@ fn code_hint_on_textus_to_littera_rejects() {
     );
 }
 
-/// `Code` is a conversio hint only: outside `↦` it is an unknown type name.
+/// `Code` is a `via` hint word only (D11.9): it names no type, so outside a
+/// `↦` conversion it is an unknown type name, bare or as a type argument.
 #[test]
-fn littera_code_is_not_a_declaration_type() {
+fn code_is_not_a_declaration_type() {
+    test_support::assert_rejects_with_issue(
+        "functio f(Code c) → vacuum { nota c }",
+        "unknown_type",
+    );
     test_support::assert_rejects_with_issue(
         "functio f(littera<Code> c) → vacuum { nota c }",
         "unknown_type",
