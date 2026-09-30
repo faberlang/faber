@@ -734,8 +734,10 @@ impl TypeChecker<'_> {
         let resolved = self.resolve_inferred_type(literal_ty);
         match self.types.get(resolved) {
             Type::Primitive(Primitive::Numerus) => value > i64::MAX as u64,
+            // `u64` and the unbounded `inf` hold every magnitude the u64 lexer
+            // carrier can spell; literals beyond u64 wait for inf track U3.
             Type::SizedNumeric(Primitive::Numerus, width) => {
-                !matches!(width, NumericWidth::U64) && value > i64::MAX as u64
+                !matches!(width, NumericWidth::U64 | NumericWidth::Inf) && value > i64::MAX as u64
             }
             _ => false,
         }

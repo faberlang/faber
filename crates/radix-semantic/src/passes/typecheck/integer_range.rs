@@ -104,6 +104,13 @@ enum ConstSlot {
 impl TypeChecker<'_> {
     /// Declared width of a trapping (plain) integer type; `None` for words,
     /// decimals, floats and non-numerics.
+    ///
+    /// The unbounded `inf` is an integer width (ruling 32) whose
+    /// `integer_range()` is `None`, so every `integer_range()?` / `.and_then`
+    /// below reads it as "no interval" and leaves the operation to the family
+    /// rules. That is deliberate: inf track U2 rejects every operation that
+    /// would compute a new `inf` value before it reaches the range rule
+    /// (`inf_gate.rs`); U3 gives `inf` its own arms here.
     fn plain_int_width(&self, ty: TypeId) -> Option<NumericWidth> {
         let resolved = self.resolve_inferred_type(ty);
         let (_, resolved) = self.types.peel_access_marker(resolved);

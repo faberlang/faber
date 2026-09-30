@@ -415,6 +415,10 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {
         "intervallum_clamp_recovery_unsupported" => Some("remove the recovery arm from this range clamp".to_owned()),
         "intervallum_target_not_range" => Some("convert to a range or intervallum value".to_owned()),
+        "inf_conversio_unsupported" => Some(
+            "only a bounded integer converts into `inf` (and widens into it implicitly) until the other conversion rows land"
+                .to_owned(),
+        ),
         "intervallum_clamp_bound_mismatch"
         | "intervallum_materialize_lista_element_mismatch"
         | "intervallum_materialize_tensor_element_mismatch" => {
@@ -557,6 +561,10 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "numeric_arithmetic_operands_identical" => {
             Some("convert operands explicitly before applying this numeric operator".to_owned())
         }
+        "inf_arithmetic_unsupported" => Some(
+            "keep `inf` values to storing, passing, returning, and comparing until its arithmetic lands"
+                .to_owned(),
+        ),
         "u64_signed_arithmetic_requires_conversion" => Some(
             "convert one side with `↦` so both operands are u64 or both are signed".to_owned(),
         ),
@@ -987,6 +995,9 @@ const AIR_PURITY_HELP: &str = "keep the v1 AIR subset pure: immutable locals, pu
 /// shared baseline help, while `None` leaves both at their fallthrough.
 fn air_purity_reason(args: &[DiagnosticArg]) -> Option<String> {
     Some(match arg_value(args, "issue")? {
+        "air_unbounded_integer" => {
+            "the unbounded integer `inf` has no AIR representation".to_owned()
+        }
         "async_function" => "async functions are outside the v1 AIR subset".to_owned(),
         "assignment_mutation" => "assignment is mutation outside the v1 AIR subset".to_owned(),
         "breakable_block" => "breakable blocks are outside the v1 AIR subset".to_owned(),

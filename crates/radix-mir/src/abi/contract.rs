@@ -352,7 +352,9 @@ impl PackedStorageLayout {
             | NumericWidth::U32
             | NumericWidth::U64
             | NumericWidth::F64
-            | NumericWidth::D64 => None,
+            | NumericWidth::D64
+            // `inf` has no native device layout (ruling 39(d)).
+            | NumericWidth::Inf => None,
         }
     }
 }

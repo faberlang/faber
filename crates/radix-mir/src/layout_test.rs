@@ -425,6 +425,11 @@ fn width_sub_table(width: NumericWidth) -> (SizedNumericOutcome, SizedNumericOut
             SizedNumericOutcome::LoudError,
             SizedNumericOutcome::LoudError,
         ),
+        // inf track U2: `inf` is a heap bignum with no MIR layout until U4.
+        NumericWidth::Inf => (
+            SizedNumericOutcome::LoudError,
+            SizedNumericOutcome::LoudError,
+        ),
     }
 }
 

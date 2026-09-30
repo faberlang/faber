@@ -781,6 +781,8 @@ pub fn generate_go_cli(
 
 #[cfg(feature = "hir-rust")]
 fn reject_rust_unsupported_types(types: &TypeTable) -> Result<(), CodegenError> {
+    // The binding-probe and CLI entries reach here without `generate_output`.
+    radix_codegen_shared::reject_unbounded_integer(types, Target::HirRust)?;
     for index in 0..types.type_count() {
         #[expect(
             clippy::cast_possible_truncation,

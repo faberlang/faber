@@ -926,5 +926,8 @@ fn numerus_width_range(width: NumericWidth) -> (i128, i128) {
         }
         // decimal-widths D1: scaled-integer carriers fit the i64 domain.
         NumericWidth::D64 => (i128::from(i64::MIN), i128::from(i64::MAX)),
+        // `inf` has no bound: every MIR constant (at most 64 bits today)
+        // range-checks. The Magnus carrier (inf track U4) replaces this.
+        NumericWidth::Inf => (i128::MIN, i128::MAX),
     }
 }

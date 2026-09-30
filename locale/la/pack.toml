@@ -1571,6 +1571,10 @@ help = "fix the AST construct for lowering"
 message = "series cannot accept parameters"
 help = "fix the AST construct for lowering"
 
+[diagnostics.SEM008.issues.tensor_element_unbounded]
+message = "elementum tensoris, vectoris, matricis vel sparsae integer infinitus `inf` esse non potest"
+help = "`lista<inf>` adhibe; elementum tensoris dispositionem in fabrica habere debet"
+
 [diagnostics.SEM008.issues.sparsa_element_non_numeric]
 message = "sparsa element type must be numeric in v1"
 help = "fix the AST construct for lowering"
@@ -2343,6 +2347,10 @@ help = "use numeric operands for this operator"
 message = "numeric arithmetic operands must have identical types; use ↦ to convert explicitly"
 help = "convert operands explicitly before applying this numeric operator"
 
+[diagnostics.SEM011.issues.inf_arithmetic_unsupported]
+message = "arithmetica in integro infinito `inf` nondum admittitur"
+help = "valores `inf` servare, transmittere, reddere et comparare tantum licet donec arithmetica eius perficiatur"
+
 [diagnostics.SEM011.issues.u64_signed_arithmetic_requires_conversion]
 message = "u64 and a signed integer have no lossless join in arithmetic"
 help = "convert one side with `↦` so both operands are u64 or both are signed"
@@ -2794,6 +2802,10 @@ help = "use a valid conversion or provide an inline default with `⊥`"
 [diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
 message = "intervallum clamp conversio does not support a `⊥` default"
 help = "remove the recovery arm from this range clamp"
+
+[diagnostics.SEM016.issues.inf_conversio_unsupported]
+message = "haec conversio ex integro infinito `inf` vel in eum nondum admittitur"
+help = "integer terminatus tantum in `inf` convertitur (et sponte in eum latescit) donec ceterae conversiones perficiantur"
 
 [diagnostics.SEM016.issues.intervallum_target_not_range]
 message = "intervallum conversio target must be a range or intervallum value"
@@ -3418,6 +3430,10 @@ help = "keep `@ radix lane \"air\"` functions in the accepted pure subset"
 [diagnostics.SEM059.issues.air_integer_range_unproven]
 message = "@ radix lane \"{lane}\" respuit hanc operationem integram: exitus exactus fortasse extra [-2^63, 2^64 - 1] exit, et AIR nullam captionem habet"
 help = "operandum ad minorem integrum typum coarcta ut regula intervalli exitum capere probet, vel arithmeticam muta"
+
+[diagnostics.SEM059.issues.air_unbounded_integer]
+message = "@ radix lane \"{lane}\" integrum infinitum `inf` respuit: AIR integrum in acervo repraesentare non potest"
+help = "in functionibus AIR integrum terminatum adhibe, vel valorem `inf` extra viam move"
 
 [diagnostics.SEM059.issues.air_store_not_proven]
 message = "@ radix lane \"{lane}\" respuit hoc integrum repositum: regula intervalli probare non potest valorem in locum capi, et AIR nullam captionem ad probationem currentem habet"

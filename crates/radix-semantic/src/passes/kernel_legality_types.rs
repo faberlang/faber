@@ -15,6 +15,9 @@ use rustc_hash::FxHashSet;
 /// host-only value.
 pub(super) const FAMILY_ATOMIC: &str = "atomic";
 
+/// Family label of the unbounded integer `inf`: host-only (ruling 39(b)).
+pub(super) const FAMILY_INF: &str = "inf";
+
 /// First host-only family found inside `ty`, or `None` when the whole type is
 /// legal in a kernel.
 pub(super) fn host_only_family(
@@ -74,6 +77,11 @@ impl Walk<'_> {
                     radix_types::AppliedArg::Size(_) => None,
                 })
             }),
+            // Ruling 39(b): the unbounded integer is a heap value with no
+            // device layout, so it is host-only, named by its marker. Every
+            // other width stays legal here (per-target requirement inference
+            // owns the width questions).
+            Type::SizedNumeric(_, width) if width.is_unbounded() => Some(FAMILY_INF),
             Type::Union(members) | Type::Intersection(members) | Type::Tuple(members) => {
                 members.iter().find_map(|member| self.family(*member))
             }

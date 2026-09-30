@@ -3292,6 +3292,16 @@ fn type_lower_error_from_message(message: &str) -> TypeLowerError {
     TypeLowerError::Issue(issue)
 }
 
+/// Ruling 39(a): `inf` is never a tensor-family element; it has no device layout.
+fn reject_unbounded_element(types: &TypeTable, elem_ty: TypeId) -> Result<(), TypeLowerError> {
+    if crate::numeric_width::is_unbounded_integer_type(types, elem_ty) {
+        return Err(TypeLowerError::Issue(
+            crate::numeric_width::TENSOR_ELEMENT_UNBOUNDED_ISSUE,
+        ));
+    }
+    Ok(())
+}
+
 fn lower_tensor_type_expr(
     elem: &TypeExpr,
     figura: &radix_syntax::FiguraExpr,
@@ -3300,6 +3310,7 @@ fn lower_tensor_type_expr(
     types: &mut TypeTable,
 ) -> Result<TypeId, TypeLowerError> {
     let elem_ty = lower_type_expr(elem, resolver, interner, types)?;
+    reject_unbounded_element(types, elem_ty)?;
     let shape =
         crate::lower_figura_expr(figura, resolver, types).map_err(type_lower_error_from_message)?;
     Ok(types.tensor_with_shape(elem_ty, shape))
@@ -3313,6 +3324,7 @@ fn lower_vector_type_expr(
     types: &mut TypeTable,
 ) -> Result<TypeId, TypeLowerError> {
     let elem_ty = lower_type_expr(elem, resolver, interner, types)?;
+    reject_unbounded_element(types, elem_ty)?;
     let width_id = crate::lower_vector_width_expr(width, resolver, types)
         .map_err(|error| TypeLowerError::Issue(error.issue))?;
     Ok(types.vector_with_width(elem_ty, width_id))
@@ -3326,6 +3338,7 @@ fn lower_matrix_type_expr(
     types: &mut TypeTable,
 ) -> Result<TypeId, TypeLowerError> {
     let elem_ty = lower_type_expr(elem, resolver, interner, types)?;
+    reject_unbounded_element(types, elem_ty)?;
     let shape_id = crate::lower_matrix_shape_expr(shape, resolver, types)
         .map_err(type_lower_error_from_message)?;
     Ok(types.matrix_with_shape(elem_ty, shape_id))
@@ -3339,6 +3352,7 @@ fn lower_sparsa_type_expr(
     types: &mut TypeTable,
 ) -> Result<TypeId, TypeLowerError> {
     let elem_ty = lower_type_expr(elem, resolver, interner, types)?;
+    reject_unbounded_element(types, elem_ty)?;
     if !crate::numeric_width::is_tensor_numeric_element(types, elem_ty) {
         return Err(TypeLowerError::Issue(ISSUE_SPARSA_ELEMENT_NON_NUMERIC));
     }

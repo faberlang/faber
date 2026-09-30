@@ -37,6 +37,7 @@ pub mod ident;
 pub mod names;
 pub mod tensor_lift_gate;
 pub mod text_literal;
+pub mod unbounded_gate;
 pub mod unsupported;
 pub use text_literal::unescape_faber_text;
 pub mod validation;
@@ -266,6 +267,7 @@ pub use ident::{
     output_resource_name, sanitize_ident, sanitize_rust_module_ident, unclaimed_name,
 };
 pub use tensor_lift_gate::reject_tensor_lift;
+pub use unbounded_gate::reject_unbounded_integer;
 pub use validation::{find_error_expr_in_program, reject_hir_errors};
 
 #[cfg(test)]

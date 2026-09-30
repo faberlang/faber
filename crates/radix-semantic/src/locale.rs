@@ -216,6 +216,11 @@ impl LocalePack {
     /// Suggestion results are unchanged for inputs that remain eligible.
     #[must_use]
     pub fn keyword_suggestion(&self, text: &str) -> Option<String> {
+        // `inf` is a reserved, locale-invariant width marker (the unbounded
+        // integer), one edit from the English `if`; it is never a typo.
+        if text == radix_types::NumericWidth::Inf.faber_marker() {
+            return None;
+        }
         let folded = suggestion_key(text);
 
         // Phase 1: exact accent/width match against precomputed folded keys.

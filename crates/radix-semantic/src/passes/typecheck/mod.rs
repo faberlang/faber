@@ -111,6 +111,7 @@ pub mod format;
 pub mod generic;
 pub mod hashable;
 pub mod index_infer;
+mod inf_gate;
 pub mod infer;
 pub mod integer_range;
 pub mod intervallum;

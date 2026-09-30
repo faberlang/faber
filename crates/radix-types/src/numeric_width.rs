@@ -25,6 +25,11 @@ pub enum NumericWidth {
     F64,
     /// Decimal-encoded numerus width (scaled integer, d64 = i64×10⁻⁸, D11.7).
     D64,
+    /// Opt-in unbounded integer (`inf`, inf-delivery ruling 32): every
+    /// integer, no range, no ∞. A trapping-family integer width whose
+    /// `integer_range()` is `None` by design. Appended last so the serialized
+    /// indices of the existing widths never move.
+    Inf,
 }
 
 /// The removed `d32` marker spelling (D11.7): diagnosed, never parsed.
@@ -188,15 +193,18 @@ impl NumericWidth {
             // FloatOnNumerus relaxation — f-markers still reject). `d64` is
             // the only decimal width; `d32` was removed (D11.7).
             ("d64", Primitive::Numerus) => Ok(Self::D64),
+            // Locale-invariant ASCII marker like `d64` (ruling 33); no pack row.
+            ("inf", Primitive::Numerus) => Ok(Self::Inf),
             (REMOVED_D32_MARKER, Primitive::Numerus) => Err(WidthError::RemovedDecimal),
             ("f16" | "f32" | "f64" | "bf16", Primitive::Numerus) => Err(WidthError::FloatOnNumerus),
             ("f16", Primitive::Fractus) => Ok(Self::F16),
             ("bf16", Primitive::Fractus) => Ok(Self::BF16),
             ("f32", Primitive::Fractus) => Ok(Self::F32),
             ("f64", Primitive::Fractus) => Ok(Self::F64),
-            ("i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64", Primitive::Fractus) => {
-                Err(WidthError::IntOnFractus)
-            }
+            (
+                "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "inf",
+                Primitive::Fractus,
+            ) => Err(WidthError::IntOnFractus),
             _ => Err(WidthError::UnrecognizedMarker),
         }
     }
@@ -228,7 +236,17 @@ impl NumericWidth {
         matches!(self, Self::F16 | Self::BF16 | Self::F32 | Self::F64)
     }
 
+    /// Whether the width has no value bound (`inf`).
+    #[must_use]
+    pub fn is_unbounded(self) -> bool {
+        self == Self::Inf
+    }
+
     /// Rust primitive spelling for codegen.
+    ///
+    /// `inf` has no Rust primitive: the marker spelling is returned for
+    /// diagnostics and pretty-printing only; the Rust backend carries it as a
+    /// bignum and fails closed until that carrier lands (inf track U6r).
     #[must_use]
     pub fn rust_type(self) -> &'static str {
         match self {
@@ -245,6 +263,7 @@ impl NumericWidth {
             Self::F32 => "f32",
             Self::F64 => "f64",
             Self::D64 => "d64",
+            Self::Inf => "inf",
         }
     }
 
@@ -308,6 +327,11 @@ impl NumericWidth {
     pub fn is_widening_assignable(from: Self, to: Self) -> bool {
         if from == to {
             return true;
+        }
+        // Ruling 35: `inf` is the implicit lossless target of every integer
+        // width (including `u64`) and widens into nothing.
+        if to == Self::Inf {
+            return from.is_signed_int() || from.is_unsigned_int();
         }
         if let (Some(a), Some(b)) = (from.signed_rank(), to.signed_rank()) {
             return a <= b;
@@ -475,8 +499,14 @@ pub fn lista_sugar_width_marker(name: &str) -> Option<&str> {
     width_prefixed_sugar_marker(name, 'l')
 }
 
+/// The `inf` marker is never prefixed sugar (ruling 32): `linf`, `sinf`, …
+/// stay ordinary identifiers (`sinf` is C sine, `linf` the L∞ norm), and
+/// `tinf`/`vinf`/`minf` would name device shapes ruling 39 rejects anyway.
 fn width_prefixed_sugar_marker(name: &str, prefix: char) -> Option<&str> {
     let marker = name.strip_prefix(prefix)?;
+    if marker == NumericWidth::Inf.faber_marker() {
+        return None;
+    }
     standalone_width_type(marker).map(|_| marker)
 }
 
@@ -574,6 +604,9 @@ pub fn lower_modular_word(
         Ok(width) if width.is_unsigned_int() || width.is_signed_int() => {
             types.intern(Type::ModularWord(width))
         }
+        // Ruling 32: `wrapping<inf>` names the unbounded integer, which has
+        // nothing to wrap; it is the same type as bare `inf`.
+        Ok(NumericWidth::Inf) => types.sized_numeric(Primitive::Numerus, NumericWidth::Inf),
         Ok(_) => {
             report(WidthLowerIssue::ModularWordUnsupported);
             types.intern(Type::Error)
@@ -617,6 +650,8 @@ pub fn lower_saturating_word(
         Ok(width) if width.is_signed_int() || width.is_unsigned_int() => {
             types.intern(Type::SaturatingWord(width))
         }
+        // Ruling 32: `saturating<inf>` is bare `inf` (no bound to clamp at).
+        Ok(NumericWidth::Inf) => types.sized_numeric(Primitive::Numerus, NumericWidth::Inf),
         _ => {
             report(WidthLowerIssue::SaturatingWordUnsupported);
             types.intern(Type::Error)
@@ -745,12 +780,16 @@ pub fn effective_width(types: &TypeTable, ty: TypeId) -> Option<NumericWidth> {
 }
 
 /// Integer width of a `numerus` type (bare `numerus` is `i64`); `None` for
-/// fractus, decimal, modular, and non-numeric types.
+/// fractus, decimal, modular, and non-numeric types. `inf` is an integer
+/// width (ruling 32) whose `integer_range()` is `None`: callers that need a
+/// range must branch on `is_unbounded()` first.
 #[must_use]
 pub fn numerus_integer_width(types: &TypeTable, ty: TypeId) -> Option<NumericWidth> {
     match types.get(ty) {
         Type::Primitive(Primitive::Numerus) => Some(NumericWidth::I64),
-        Type::SizedNumeric(Primitive::Numerus, width) if width.integer_range().is_some() => {
+        Type::SizedNumeric(Primitive::Numerus, width)
+            if width.integer_range().is_some() || width.is_unbounded() =>
+        {
             Some(*width)
         }
         Type::Alias(_, inner) => numerus_integer_width(types, *inner),
@@ -883,8 +922,9 @@ pub fn is_integer_index_vector(types: &TypeTable, ty: TypeId) -> bool {
 pub fn is_integer_index_scalar(types: &TypeTable, ty: TypeId) -> bool {
     match types.get(ty) {
         Type::Primitive(Primitive::Numerus) => true,
+        // `u64` and `inf` do not fit the `i64` index boundary.
         Type::SizedNumeric(Primitive::Numerus, width) => {
-            *width != NumericWidth::U64 && !width.is_decimal()
+            *width != NumericWidth::U64 && !width.is_decimal() && !width.is_unbounded()
         }
         Type::Alias(_, inner) => is_integer_index_scalar(types, *inner),
         _ => false,
@@ -926,6 +966,8 @@ pub fn tensor_media_width(types: &TypeTable, elem: TypeId) -> Option<NumericWidt
 #[allow(clippy::match_same_arms)]
 pub fn is_tensor_numeric_element(types: &TypeTable, ty: TypeId) -> bool {
     match types.get(ty) {
+        // Ruling 39: `inf` has no device layout and is never a tensor element.
+        Type::SizedNumeric(_, width) if width.is_unbounded() => false,
         Type::Primitive(Primitive::Numerus | Primitive::Fractus) => true,
         Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _) => true,
         Type::Alias(_, inner) => is_tensor_numeric_element(types, *inner),
@@ -943,6 +985,22 @@ pub fn is_tensor_float_element(types: &TypeTable, ty: TypeId) -> bool {
     match types.get(ty) {
         Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => true,
         Type::Alias(_, inner) => is_tensor_float_element(types, *inner),
+        _ => false,
+    }
+}
+
+/// Issue name of a tensor-family element that is the unbounded `inf`
+/// (ruling 39(a)): a tensor element must have a device layout.
+pub const TENSOR_ELEMENT_UNBOUNDED_ISSUE: &str = "tensor_element_unbounded";
+
+/// Whether `ty` is the unbounded integer `inf` (through aliases). The
+/// tensor/sparsa/vector/matrix lowerers reject it by name before the general
+/// numeric-element gate.
+#[must_use]
+pub fn is_unbounded_integer_type(types: &TypeTable, ty: TypeId) -> bool {
+    match types.get(ty) {
+        Type::SizedNumeric(Primitive::Numerus, width) => width.is_unbounded(),
+        Type::Alias(_, inner) => is_unbounded_integer_type(types, *inner),
         _ => false,
     }
 }
@@ -1127,3 +1185,7 @@ mod tests;
 #[cfg(test)]
 #[path = "decimal_width_test.rs"]
 mod decimal_width_test;
+
+#[cfg(test)]
+#[path = "inf_width_test.rs"]
+mod inf_width_test;

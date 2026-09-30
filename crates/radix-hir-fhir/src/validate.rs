@@ -587,11 +587,15 @@ fn validate_type_form(
                 .get(form.ty.0 as usize)
                 .ok_or_else(|| type_presentation_issue("type_witness_missing", site))?;
             match ty {
-                radix_types::Type::SizedNumeric(prim, _) => {
+                radix_types::Type::SizedNumeric(prim, width) => {
                     // Level 2 is the explicit policy word (`trapping<u8>`);
                     // it only spells integer and `d64` widths, never floats.
+                    // Levels 3 and 4 (`wrapping<inf>`, `saturating<inf>`) spell
+                    // a policy word over the one unbounded integer type only.
                     let policy_ok = level.0 != 2 || *prim == radix_types::Primitive::Numerus;
-                    if level.0 > 2 || !policy_ok || !form.args.is_empty() {
+                    let inf_word_ok = !matches!(level.0, 3 | 4)
+                        || (*prim == radix_types::Primitive::Numerus && width.is_unbounded());
+                    if level.0 > 4 || !policy_ok || !inf_word_ok || !form.args.is_empty() {
                         return Err(type_presentation_issue("numeric_level_or_arity", site));
                     }
                 }

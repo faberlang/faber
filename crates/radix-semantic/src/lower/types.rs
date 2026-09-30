@@ -1299,8 +1299,21 @@ impl Lowerer<'_> {
         self.types.intern(Type::Error)
     }
 
+    /// Ruling 39(a): `inf` is never a tensor-family element; it has no device
+    /// layout. Reports `tensor_element_unbounded` and returns `true` on a hit.
+    fn reject_unbounded_element(&mut self, elem_ty: TypeId) -> bool {
+        if !crate::numeric_width::is_unbounded_integer_type(self.types, elem_ty) {
+            return false;
+        }
+        self.error(crate::numeric_width::TENSOR_ELEMENT_UNBOUNDED_ISSUE);
+        true
+    }
+
     fn lower_tensor_type(&mut self, elem: &TypeExpr, figura: &FiguraExpr) -> TypeId {
         let elem_ty = self.lower_nested_type(elem);
+        if self.reject_unbounded_element(elem_ty) {
+            return self.types.intern(Type::Error);
+        }
         match self.lower_figura_expr(figura) {
             Ok(shape) => {
                 if let Some(frame) = self.form_frames.last_mut() {
@@ -1317,6 +1330,9 @@ impl Lowerer<'_> {
 
     fn lower_vector_type(&mut self, elem: &TypeExpr, width: &FiguraExpr) -> TypeId {
         let elem_ty = self.lower_nested_type(elem);
+        if self.reject_unbounded_element(elem_ty) {
+            return self.types.intern(Type::Error);
+        }
         match self.lower_vector_width_expr(width) {
             Ok(width_id) => self.types.vector_with_width(elem_ty, width_id),
             Err(message) => {
@@ -1328,6 +1344,9 @@ impl Lowerer<'_> {
 
     fn lower_matrix_type(&mut self, elem: &TypeExpr, shape: &FiguraExpr) -> TypeId {
         let elem_ty = self.lower_nested_type(elem);
+        if self.reject_unbounded_element(elem_ty) {
+            return self.types.intern(Type::Error);
+        }
         match self.lower_matrix_shape_expr(shape) {
             Ok(shape_id) => self.types.matrix_with_shape(elem_ty, shape_id),
             Err(message) => {
@@ -1339,6 +1358,9 @@ impl Lowerer<'_> {
 
     fn lower_sparsa_type(&mut self, elem: &TypeExpr, figura: &FiguraExpr) -> TypeId {
         let elem_ty = self.lower_nested_type(elem);
+        if self.reject_unbounded_element(elem_ty) {
+            return self.types.intern(Type::Error);
+        }
         if !crate::numeric_width::is_tensor_numeric_element(self.types, elem_ty) {
             self.error("sparsa_element_non_numeric");
             return self.types.intern(Type::Error);

@@ -378,6 +378,18 @@ impl Parser {
         {
             form = TypeFormLevel::POLICY;
         }
+        // `wrapping<inf>` / `saturating<inf>` denote bare `inf` (ruling 32);
+        // the level keeps which policy word the author wrote (ruling 49).
+        if let TypeExprKind::Named(head, args) = &kind
+            && let [arg] = args.as_slice()
+            && self.generic_arg_is_inf_marker(arg)
+        {
+            match self.interner.resolve(head.name) {
+                "modulus" => form = TypeFormLevel::WRAPPING_INF,
+                "saturatus" => form = TypeFormLevel::SATURATING_INF,
+                _ => {}
+            }
+        }
 
         let span = start.merge(self.previous_span());
         let core = TypeExpr {
@@ -425,6 +437,19 @@ impl Parser {
             form: TypeFormLevel::LONG,
             iuncta_label: None,
         })
+    }
+
+    /// Whether a generic argument is the bare `inf` width marker.
+    fn generic_arg_is_inf_marker(&self, arg: &GenericArgExpr) -> bool {
+        let ident = match arg {
+            GenericArgExpr::Name(ident) => ident,
+            GenericArgExpr::Type(TypeExpr {
+                kind: TypeExprKind::Named(ident, nested),
+                ..
+            }) if nested.is_empty() => ident,
+            _ => return false,
+        };
+        self.interner.resolve(ident.name) == radix_types::NumericWidth::Inf.faber_marker()
     }
 
     /// Consume a trailing union chain after a core type.

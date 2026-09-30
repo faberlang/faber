@@ -233,6 +233,7 @@ impl Evaluator<'_> {
                     return Some(Class::Int(i128::from(i64::MIN), i128::from(i64::MAX)));
                 }
                 Type::SizedNumeric(Primitive::Numerus, width) => {
+                    // Deliberate: `inf` has no range and no constant class yet.
                     let (lo, hi) = width.integer_range()?;
                     return Some(Class::Int(lo, hi));
                 }

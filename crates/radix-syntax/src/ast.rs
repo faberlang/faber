@@ -1725,6 +1725,12 @@ impl TypeFormLevel {
     /// author spelled out the policy word that the bare marker (`u8`) implies.
     /// The type is identical either way; the level only keeps the spelling.
     pub const POLICY: Self = Self(2);
+    /// Explicit `wrapping<inf>` / la `modulus<inf>` head. The type is bare `inf`
+    /// (nothing to wrap, inf-delivery ruling 32), so the presentation alone
+    /// keeps which policy word the author wrote (ruling 49).
+    pub const WRAPPING_INF: Self = Self(3);
+    /// Explicit `saturating<inf>` / la `saturatus<inf>` head (see [`Self::WRAPPING_INF`]).
+    pub const SATURATING_INF: Self = Self(4);
 
     #[must_use]
     pub fn is_short(self) -> bool {

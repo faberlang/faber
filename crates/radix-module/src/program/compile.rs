@@ -2013,6 +2013,8 @@ fn interface_type_from_type_expr(
                     "f16" => Some(InterfaceTypeSnapshot::SizedNumeric(Primitive::Fractus, NumericWidth::F16)),
                     "f32" => Some(InterfaceTypeSnapshot::SizedNumeric(Primitive::Fractus, NumericWidth::F32)),
                     "f64" => Some(InterfaceTypeSnapshot::SizedNumeric(Primitive::Fractus, NumericWidth::F64)),
+                    // The unbounded integer is a bare width marker, never a nominal.
+                    "inf" => Some(InterfaceTypeSnapshot::SizedNumeric(Primitive::Numerus, NumericWidth::Inf)),
                     name => Some(nominal_snapshot(name, nominal_kinds, ctx.module_identity.as_ref())),
                 };
             }

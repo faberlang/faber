@@ -1790,6 +1790,10 @@ help = "fix the AST construct for lowering"
 message = "series cannot accept parameters"
 help = "fix the AST construct for lowering"
 
+[diagnostics.SEM008.issues.tensor_element_unbounded]
+message = "a tensor, vector, matrix, or sparsa element cannot be the unbounded integer `inf`"
+help = "use `lista<inf>`; a tensor element must have a device layout"
+
 [diagnostics.SEM008.issues.sparsa_element_non_numeric]
 message = "sparsa element type must be numeric in v1"
 help = "fix the AST construct for lowering"
@@ -2562,6 +2566,10 @@ help = "use numeric operands for this operator"
 message = "numeric arithmetic operands must have identical types; use ↦ to convert explicitly"
 help = "convert operands explicitly before applying this numeric operator"
 
+[diagnostics.SEM011.issues.inf_arithmetic_unsupported]
+message = "arithmetic on the unbounded integer `inf` is not supported yet"
+help = "keep `inf` values to storing, passing, returning, and comparing until its arithmetic lands"
+
 [diagnostics.SEM011.issues.u64_signed_arithmetic_requires_conversion]
 message = "u64 and a signed integer have no lossless join in arithmetic"
 help = "convert one side with `↦` so both operands are u64 or both are signed"
@@ -3013,6 +3021,10 @@ help = "use a valid conversion or provide an inline default with `⊥`"
 [diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
 message = "intervallum clamp conversio does not support a `⊥` default"
 help = "remove the recovery arm from this range clamp"
+
+[diagnostics.SEM016.issues.inf_conversio_unsupported]
+message = "this conversion out of or into the unbounded integer `inf` is not supported yet"
+help = "only a bounded integer converts into `inf` (and widens into it implicitly) until the other conversion rows land"
 
 [diagnostics.SEM016.issues.intervallum_target_not_range]
 message = "intervallum conversio target must be a range or intervallum value"
@@ -3637,6 +3649,10 @@ help = "keep `@ radix lane \"air\"` functions in the accepted pure subset"
 [diagnostics.SEM059.issues.air_integer_range_unproven]
 message = "@ radix lane \"{lane}\" rejects this integer operation: its exact result may leave the range [-2^63, 2^64 - 1] and AIR has no trap"
 help = "narrow an operand to a smaller integer type so the range rule proves the result fits, or restructure the arithmetic"
+
+[diagnostics.SEM059.issues.air_unbounded_integer]
+message = "@ radix lane \"{lane}\" rejects the unbounded integer `inf`: AIR has no representation for a heap integer"
+help = "use a bounded integer type in AIR-lane functions, or move the `inf` value out of the lane"
 
 [diagnostics.SEM059.issues.air_store_not_proven]
 message = "@ radix lane \"{lane}\" rejects this integer store: the range rule cannot prove the value fits the slot, and AIR has no trap for a runtime check"

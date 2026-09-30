@@ -446,6 +446,9 @@ impl TypeChecker<'_> {
         if shape.prim != Primitive::Numerus {
             return None;
         }
+        // Deliberate: the unbounded `inf` has no range, so it is not a checked
+        // integer slot. A store into it is total (nothing to fit) and a store
+        // out of it is not assignable; U3 adds the checked narrowing row.
         let range = shape.width.integer_range()?;
         Some((
             ty,

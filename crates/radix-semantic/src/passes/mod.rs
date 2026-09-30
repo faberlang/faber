@@ -100,6 +100,10 @@ mod air_tensor_intrinsics_test;
 mod air_purity_test;
 
 #[cfg(test)]
+#[path = "inf_type_test.rs"]
+mod inf_type_test;
+
+#[cfg(test)]
 #[path = "air_unroll_test.rs"]
 mod air_unroll_test;
 

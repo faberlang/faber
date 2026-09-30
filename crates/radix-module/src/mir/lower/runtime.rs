@@ -2343,6 +2343,7 @@ impl FunctionBuilder<'_> {
         let sized = match self.normalized_type(self.types.peel_access_marker(ty).1) {
             // A decimal literal is its scaled carrier: a bare `Int` constant
             // would read as plain `numerus` at the call (F9 ruling 30).
+            // Deliberate: `inf` is not a sized scalar constant slot (heap bignum, U4).
             Type::SizedNumeric(Primitive::Numerus, width) => width.integer_range().is_some() || width.is_decimal(),
             // A `wrapping` / `saturating` parameter takes the constant at its
             // own word type (ruling 12: a constant in a slot takes its type).

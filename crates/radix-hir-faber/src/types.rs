@@ -454,6 +454,10 @@ impl super::FaberCodegen<'_> {
             0 => self.semantic_long_form_to_faber(form, names, surface),
             1 => self.semantic_short_form_to_faber(form),
             2 => self.semantic_policy_form_to_faber(form, surface),
+            3 => self.semantic_inf_word_form_to_faber(form, TypeBindingKind::ModularWord, surface),
+            4 => {
+                self.semantic_inf_word_form_to_faber(form, TypeBindingKind::SaturatingWord, surface)
+            }
             _ => Err(malformed_type_form(format!(
                 "authored type form carries unsupported level {}",
                 level.0
@@ -481,6 +485,31 @@ impl super::FaberCodegen<'_> {
             }
             _ => Err(malformed_type_form(
                 "authored POLICY level is illegal for this constructor".to_owned(),
+            )),
+        }
+    }
+
+    /// `wrapping<inf>` / `saturating<inf>` spelling (ruling 49): the witness is
+    /// bare `inf` (the words have nothing to wrap or clamp on an unbounded
+    /// integer), so only the level remembers which policy word was written.
+    fn semantic_inf_word_form_to_faber(
+        &self,
+        form: &HirTypeForm,
+        word: TypeBindingKind,
+        surface: &impl KeywordSurface,
+    ) -> Result<String, CodegenError> {
+        match self.types.get(form.ty) {
+            Type::Error => Ok("<error>".to_owned()),
+            Type::SizedNumeric(Primitive::Numerus, width) if width.is_unbounded() => {
+                Self::expect_no_form_args(form)?;
+                let head = match word {
+                    TypeBindingKind::ModularWord => surface.contextual_keyword("modulus"),
+                    _ => surface.type_surface(word),
+                };
+                Ok(format!("{head}<{}>", width.faber_marker()))
+            }
+            _ => Err(malformed_type_form(
+                "authored wrapping/saturating-inf level is illegal for this constructor".to_owned(),
             )),
         }
     }

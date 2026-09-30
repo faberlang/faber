@@ -856,6 +856,9 @@ impl TypeChecker<'_> {
             self.invalid_operand_types(POSTFIX_INC_DEC_NUMERUS_OPERAND, span);
             return;
         }
+        if self.is_inf_type(target_ty) {
+            self.invalid_operand_types(super::inf_gate::ISSUE_INF_ARITHMETIC_UNSUPPORTED, span);
+        }
     }
 
     /// Check simple assignment and constrain the value from the target context.
@@ -1054,6 +1057,34 @@ impl TypeChecker<'_> {
     /// (e.g., `-1.0` in an `f32` context). `Not` returns `bivalens` regardless
     /// of context, so its operand is checked without an expected type.
     pub fn check_unary(
+        &mut self,
+        op: radix_hir::HirUnOp,
+        operand: &mut HirExpression,
+        expected: Option<TypeId>,
+    ) -> TypeId {
+        let result = self.check_unary_unguarded(op, operand, expected);
+        if matches!(op, radix_hir::HirUnOp::Neg | radix_hir::HirUnOp::BitNot)
+            && !Self::is_negated_fitting_literal(op, operand)
+            && self.reject_inf_arithmetic(&[&*operand], result, operand.span)
+        {
+            return self.error_type;
+        }
+        result
+    }
+
+    /// `-<literal>` into an `inf` slot is a constant, not arithmetic, while
+    /// its value fits the 64-bit carriers; `-2^63` and below need the exact
+    /// constant folding of inf track U3.
+    fn is_negated_fitting_literal(op: radix_hir::HirUnOp, operand: &HirExpression) -> bool {
+        matches!(op, radix_hir::HirUnOp::Neg)
+            && integer_range::const_int_value(operand).is_some_and(|value| {
+                value
+                    .checked_neg()
+                    .is_some_and(|neg| neg >= i128::from(i64::MIN))
+            })
+    }
+
+    fn check_unary_unguarded(
         &mut self,
         op: radix_hir::HirUnOp,
         operand: &mut HirExpression,
@@ -1277,6 +1308,22 @@ impl TypeChecker<'_> {
     /// text `+` requires both operands to be `textus`, and coalescing encodes the local
     /// optional/`nihil` result contract.
     pub fn check_binary(
+        &mut self,
+        op: HirBinOp,
+        lhs: &mut HirExpression,
+        rhs: &mut HirExpression,
+        expected: Option<TypeId>,
+    ) -> TypeId {
+        let result = self.check_binary_unguarded(op, lhs, rhs, expected);
+        if super::inf_gate::is_value_computing_op(op)
+            && self.reject_inf_arithmetic(&[&*lhs, &*rhs], result, lhs.span)
+        {
+            return self.error_type;
+        }
+        result
+    }
+
+    fn check_binary_unguarded(
         &mut self,
         op: HirBinOp,
         lhs: &mut HirExpression,

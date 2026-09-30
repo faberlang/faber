@@ -1187,3 +1187,7 @@ fn content_hash(bytes: &[u8]) -> String {
 #[cfg(test)]
 #[path = "package_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "package_inf_test.rs"]
+mod inf_tests;

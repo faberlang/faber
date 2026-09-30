@@ -58,3 +58,7 @@ mod via_hint_test;
 #[cfg(test)]
 #[path = "nary_range_test.rs"]
 mod nary_range_test;
+
+#[cfg(test)]
+#[path = "inf_type_test.rs"]
+mod inf_type_test;

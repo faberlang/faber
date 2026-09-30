@@ -1,0 +1,392 @@
+//! inf track U2: the unbounded integer `inf` as a declared value type.
+//!
+//! `inf` is `numerus<inf>`: accepted as a local, parameter, return, field and
+//! list element, one type under all four spellings, and rejected by name where
+//! it cannot live (tensor-family elements, kernels, the AIR lane). Operations
+//! that would compute or convert an `inf` value are named errors until U3.
+//! Every rejection asserts the structured `kind` and `issue`, never prose.
+
+use crate::test_support::{analyze_source, assert_accepts, assert_rejects_with_issue};
+use crate::{SemanticError, SemanticErrorKind};
+
+fn errors(source: &str) -> Vec<SemanticError> {
+    analyze_source(source)
+        .diagnostics
+        .iter()
+        .filter(|err| err.is_error())
+        .cloned()
+        .collect()
+}
+
+fn expect_issue(source: &str, kind: SemanticErrorKind, issue: &str) -> SemanticError {
+    let errors = errors(source);
+    errors
+        .iter()
+        .find(|err| err.kind == kind && err.issue() == Some(issue))
+        .cloned()
+        .unwrap_or_else(|| panic!("missing {kind:?} {issue} in {errors:?}"))
+}
+
+fn arg<'a>(err: &'a SemanticError, name: &str) -> Option<&'a str> {
+    err.args
+        .iter()
+        .find(|arg| arg.name == name)
+        .map(|arg| arg.value.as_str())
+}
+
+// ---------------------------------------------------------------------------
+// Value flow
+// ---------------------------------------------------------------------------
+
+#[test]
+fn inf_is_a_type_for_locals_params_returns_fields_and_list_elements() {
+    assert_accepts(
+        r"
+genus Capsa {
+    fixum inf a
+    varia inf b
+}
+
+functio transmitte(inf x) → inf {
+    redde x
+}
+
+incipit {
+    fixum inf x ← 0
+    fixum inf y ← transmitte(x)
+    fixum Capsa c ← Capsa { a = y, b = x }
+    fixum lista<inf> xs ← [x, y]
+    fixum inf z ← xs[0]
+    nota c.a
+    nota z
+}
+",
+    );
+}
+
+#[test]
+fn the_four_spellings_are_one_type() {
+    assert_accepts(
+        r"
+functio tere(inf a, exactus<inf> b, modulus<inf> c, saturatus<inf> d) → inf {
+    fixum exactus<inf> e ← a
+    fixum modulus<inf> f ← b
+    fixum saturatus<inf> g ← c
+    fixum inf h ← d
+    redde h
+}
+",
+    );
+}
+
+#[test]
+fn numerus_inf_is_the_same_type_as_bare_inf() {
+    assert_accepts(
+        r"
+functio tere(numerus<inf> a) → inf {
+    redde a
+}
+",
+    );
+}
+
+#[test]
+fn a_constant_lands_in_an_inf_slot() {
+    assert_accepts(
+        r"
+incipit {
+    fixum inf x ← 0
+    fixum inf y ← -5
+    nota x
+    nota y
+}
+",
+    );
+}
+
+#[test]
+fn a_u64_sized_literal_lands_in_an_inf_slot_but_not_a_signed_one() {
+    assert_accepts(
+        r"
+incipit {
+    fixum inf x ← 18446744073709551615
+    nota x
+}
+",
+    );
+    assert_rejects_with_issue(
+        "incipit { fixum i64 x ← 18446744073709551615\n nota x }\n",
+        "store_constant_out_of_range",
+    );
+}
+
+#[test]
+fn inf_values_join_in_lists_and_branches() {
+    assert_accepts(
+        r"
+functio elige(bivalens b, inf x, inf y) → inf {
+    redde b ✓ x ✗ y
+}
+
+incipit {
+    fixum inf x ← 1
+    fixum lista<inf> xs ← [x, 2, -3]
+    nota elige(verum, x, 4)
+    nota xs
+}
+",
+    );
+}
+
+#[test]
+fn every_bounded_integer_width_widens_into_inf() {
+    for width in ["i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64"] {
+        assert_accepts(&format!(
+            r"
+functio amplia({width} x) → inf {{
+    fixum inf y ← x
+    redde y
+}}
+"
+        ));
+    }
+}
+
+#[test]
+fn inf_widens_into_no_bounded_integer_implicitly() {
+    assert_rejects_with_issue(
+        r"
+functio contrahe(inf x) → i64 {
+    fixum i64 y ← x
+    redde y
+}
+",
+        "initializer_annotation_mismatch",
+    );
+}
+
+#[test]
+fn inf_compares_and_is_still_an_ordinary_identifier() {
+    assert_accepts(
+        r"
+functio minor(inf a, inf b) → bivalens {
+    redde a ≺ b
+}
+
+incipit {
+    fixum numerus inf ← 3
+    nota inf
+}
+",
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Spelling: no prefixed sugar, no float `inf`
+// ---------------------------------------------------------------------------
+
+#[test]
+fn prefixed_inf_spellings_are_not_types() {
+    for sugar in ["linf", "tinf", "vinf", "minf", "sinf"] {
+        let err = expect_issue(
+            &format!("functio f({sugar} x) → inf {{ redde 0 }}\n"),
+            SemanticErrorKind::TypeUndefined,
+            "unknown_type",
+        );
+        assert!(err.args.iter().any(|arg| arg.name == "issue"));
+    }
+}
+
+#[test]
+fn a_prefixed_inf_name_is_an_ordinary_identifier() {
+    assert_accepts(
+        r"
+incipit {
+    fixum numerus linf ← 1
+    fixum numerus sinf ← 2
+    nota linf + sinf
+}
+",
+    );
+}
+
+#[test]
+fn fractus_inf_is_an_integer_marker_on_a_float_family() {
+    expect_issue(
+        "functio f(fractus<inf> x) → inf { redde 0 }\n",
+        SemanticErrorKind::TypeUndefined,
+        "integer_width_on_fractus",
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Rejections by name (ruling 39)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_tensor_family_element_cannot_be_inf() {
+    for (ty, what) in [
+        ("tensor<inf, [2]>", "tensor"),
+        ("vector<inf, 4>", "vector"),
+        ("matrix<inf, [2, 2]>", "matrix"),
+        ("sparsa<inf, [2]>", "sparsa"),
+    ] {
+        let err = expect_issue(
+            &format!("functio f({ty} t) → numerus {{ redde 0 }}\n"),
+            SemanticErrorKind::LoweringError,
+            "tensor_element_unbounded",
+        );
+        assert!(
+            err.args.iter().any(|arg| arg.name == "issue"),
+            "{what} must carry the structured issue"
+        );
+    }
+}
+
+#[test]
+fn a_kernel_inf_parameter_is_host_only() {
+    let err = expect_issue(
+        r"
+@ nucleum
+@ publica
+functio k(inf x) → u32 {
+    redde 1
+}
+",
+        SemanticErrorKind::LoweringError,
+        "nucleum_host_type",
+    );
+    assert_eq!(arg(&err, "family"), Some("inf"));
+    assert_eq!(arg(&err, "site"), Some("parameter"));
+}
+
+#[test]
+fn a_kernel_inf_local_is_host_only() {
+    let err = expect_issue(
+        r"
+@ nucleum
+@ publica
+functio k(u32 x) → u32 {
+    fixum inf y ← 1
+    redde x
+}
+",
+        SemanticErrorKind::LoweringError,
+        "nucleum_host_type",
+    );
+    assert_eq!(arg(&err, "family"), Some("inf"));
+}
+
+#[test]
+fn an_air_lane_inf_local_is_rejected() {
+    let err = expect_issue(
+        r#"
+@ radix lane "air"
+functio pura(numerus<i32> n) → numerus<i32> {
+    fixum inf x ← 1
+    redde n
+}
+"#,
+        SemanticErrorKind::AirPurityViolation,
+        "air_unbounded_integer",
+    );
+    assert_eq!(arg(&err, "lane"), Some("air"));
+}
+
+#[test]
+fn an_air_lane_inf_parameter_and_return_are_rejected() {
+    let source = r#"
+@ radix lane "air"
+functio pura(inf n) → inf {
+    redde n
+}
+"#;
+    let rejected = errors(source)
+        .iter()
+        .filter(|err| {
+            err.kind == SemanticErrorKind::AirPurityViolation
+                && err.issue() == Some("air_unbounded_integer")
+        })
+        .count();
+    assert!(rejected >= 2, "parameter and return sites: {rejected}");
+}
+
+// ---------------------------------------------------------------------------
+// Named errors until U3 (arithmetic and conversions)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn arithmetic_on_inf_is_a_named_error() {
+    for op in ["+", "-", "*", "/", "%", "∧", "∨", "⊻", "⇐", "⇒"] {
+        expect_issue(
+            &format!("functio f(inf a, inf b) → inf {{ redde a {op} b }}\n"),
+            SemanticErrorKind::OperandTypesInvalid,
+            "inf_arithmetic_unsupported",
+        );
+    }
+}
+
+#[test]
+fn unary_arithmetic_on_an_inf_variable_is_a_named_error() {
+    for op in ["-", "¬"] {
+        expect_issue(
+            &format!("functio f(inf a) → inf {{ redde {op}a }}\n"),
+            SemanticErrorKind::OperandTypesInvalid,
+            "inf_arithmetic_unsupported",
+        );
+    }
+}
+
+#[test]
+fn a_constant_expression_into_an_inf_slot_is_a_named_error() {
+    expect_issue(
+        "incipit { fixum inf x ← 1 + 2\n nota x }\n",
+        SemanticErrorKind::OperandTypesInvalid,
+        "inf_arithmetic_unsupported",
+    );
+}
+
+#[test]
+fn increment_of_an_inf_variable_is_a_named_error() {
+    expect_issue(
+        "incipit { varia inf x ← 1\n x ↑\n nota x }\n",
+        SemanticErrorKind::OperandTypesInvalid,
+        "inf_arithmetic_unsupported",
+    );
+}
+
+#[test]
+fn numeric_methods_on_inf_are_named_errors() {
+    for method in ["absolutum()", "potentia(2)", "signum()"] {
+        expect_issue(
+            &format!("functio f(inf a) → inf {{ redde a.{method} }}\n"),
+            SemanticErrorKind::OperandTypesInvalid,
+            "inf_arithmetic_unsupported",
+        );
+    }
+}
+
+#[test]
+fn a_conversion_out_of_inf_is_a_named_error() {
+    for target in ["i32", "f64", "textus"] {
+        expect_issue(
+            &format!("functio f(inf a) → {target} {{ redde a ↦ {target} ⊥ 0 }}\n"),
+            SemanticErrorKind::ConversionInvalid,
+            "inf_conversio_unsupported",
+        );
+    }
+}
+
+#[test]
+fn a_bounded_integer_converts_into_inf() {
+    assert_accepts("functio f(i32 a) → inf { redde a ↦ inf }\n");
+}
+
+#[test]
+fn a_text_conversion_into_inf_is_a_named_error() {
+    expect_issue(
+        "functio f(textus a) → inf { redde a ↦ inf ⊥ 0 }\n",
+        SemanticErrorKind::ConversionInvalid,
+        "inf_conversio_unsupported",
+    );
+}

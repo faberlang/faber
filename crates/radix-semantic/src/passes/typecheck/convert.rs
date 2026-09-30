@@ -554,6 +554,11 @@ impl TypeChecker<'_> {
             return self.error_type;
         };
         let target_resolved = self.resolve_inferred_type(*target);
+        // inf track U2: conversions out of `inf` (and into it from non-integers)
+        // wait for their typing rows (ruling 40, unit U3); fail closed by name.
+        if self.reject_inf_conversio(source_ty, target_resolved, span) {
+            return self.error_type;
+        }
         // decimal-widths D2 (wildcard audit): any conversio `via` hint aimed
         // at a decimal numerus target rejects here — radix text parse, endian
         // unpack, and the Bits bitcast are integer/IEEE-family only.

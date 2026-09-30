@@ -856,7 +856,8 @@ pub fn int_bitwise_binop(
 /// on exact `i128` representatives and every result reduces into the ring.
 /// Results surface as `UInt` at `u64` and as `Int` for every other width.
 fn modular_word_range(width: NumericWidth) -> (i128, i128) {
-    // Total on admitted widths; the fallback keeps the helper panic-free.
+    // Total on admitted widths (words never name `inf`: `wrapping<inf>` is bare
+    // `inf`); the fallback keeps the helper panic-free.
     width.integer_range().unwrap_or((0, i128::from(u64::MAX)))
 }
 
@@ -1065,6 +1066,10 @@ pub fn int_width_range(width: NumericWidth) -> (i128, i128) {
         // decimal-widths D1: scaled-integer carriers fit their integer domain
         // (d64 = i64×10⁻⁸); D4 owns runner arithmetic.
         NumericWidth::D64 => (i64::MIN as i128, i64::MAX as i128),
+        // `inf` has no bound. MIR layout of `numerus<inf>` fails closed with a
+        // named missing fact before any runner arithmetic reaches this row;
+        // the Magnus carrier (inf track U4) replaces it with exact semantics.
+        NumericWidth::Inf => (i128::MIN, i128::MAX),
     }
 }
 
@@ -1104,7 +1109,10 @@ pub fn float_to_numerus_width(value: f64, width: NumericWidth) -> Value {
         | NumericWidth::BF16
         | NumericWidth::F32
         | NumericWidth::F64
-        | NumericWidth::D64 => Value::Int(value as i64),
+        | NumericWidth::D64
+        // Unreachable for `inf`: float -> `inf` typechecks only after U3, and
+        // layout fails closed first; kept on the width-agnostic carrier.
+        | NumericWidth::Inf => Value::Int(value as i64),
     }
 }
 

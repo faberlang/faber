@@ -1,0 +1,187 @@
+//! inf track U2, driver level: the catalog `code` and `issue` of every `inf`
+//! rejection, the English spellings, and the fail-closed emit of every
+//! backend (none carries a bignum yet, so none may print a wrong program).
+
+use super::test_support::compile_for_target_and_get_result;
+use crate::codegen::Target;
+use crate::diagnostics::Diagnostic;
+use crate::driver::AnalyzeRequest;
+use crate::{Config, Target as ConfigTarget};
+
+fn pack(id: &str) -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path(id))
+        .unwrap_or_else(|err| panic!("installed {id} pack should load: {err:?}"))
+}
+
+fn diagnostics_with(config: Config, source: &str) -> Vec<Diagnostic> {
+    let session = crate::driver::Session::new(config);
+    match crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()) {
+        Ok(unit) => unit.diagnostics,
+        Err(diagnostics) => diagnostics,
+    }
+}
+
+fn latin(source: &str) -> Vec<Diagnostic> {
+    diagnostics_with(Config::default().with_target(ConfigTarget::HirRust), source)
+}
+
+fn english(source: &str) -> Vec<Diagnostic> {
+    diagnostics_with(Config::new().with_locale_pack(pack("en")), source)
+}
+
+fn issue_of(diagnostic: &Diagnostic) -> Option<&str> {
+    diagnostic
+        .args
+        .iter()
+        .find(|arg| arg.name == "issue")
+        .map(|arg| arg.value.as_str())
+}
+
+fn arg_of<'a>(diagnostic: &'a Diagnostic, name: &str) -> Option<&'a str> {
+    diagnostic
+        .args
+        .iter()
+        .find(|arg| arg.name == name)
+        .map(|arg| arg.value.as_str())
+}
+
+fn assert_accepts(diagnostics: &[Diagnostic]) {
+    assert!(!diagnostics.iter().any(Diagnostic::is_error), "diagnostics: {diagnostics:?}");
+}
+
+fn expect<'a>(diagnostics: &'a [Diagnostic], code: &str, issue: &str) -> &'a Diagnostic {
+    diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic.is_error() && diagnostic.code == Some(code) && issue_of(diagnostic) == Some(issue)
+        })
+        .unwrap_or_else(|| panic!("expected {code}.{issue}, got: {diagnostics:?}"))
+}
+
+const INF_FILE: &str = r"
+genus Capsa {
+    fixum inf a
+    fixum exactus<inf> b
+    fixum modulus<inf> c
+    fixum saturatus<inf> d
+}
+
+functio transmitte(inf x) → inf {
+    redde x
+}
+
+incipit {
+    fixum inf x ← 0
+    fixum inf y ← transmitte(x)
+    fixum Capsa c ← Capsa { a = y, b = x, c = y, d = x }
+    fixum lista<inf> xs ← [x, y]
+    nota c.a
+    nota xs
+}
+";
+
+const AIR_INF_LOCAL: &str = r#"
+@ radix lane "air"
+functio p(numerus<i32> n) → numerus<i32> {
+    fixum inf x ← 1
+    redde n
+}
+"#;
+
+#[test]
+fn a_file_declaring_the_four_spellings_checks_clean() {
+    assert_accepts(&latin(INF_FILE));
+}
+
+#[test]
+fn the_english_spellings_check_clean() {
+    assert_accepts(&english(
+        r"
+class Box {
+    const inf a
+    const trapping<inf> b
+    const wrapping<inf> c
+    const saturating<inf> d
+}
+
+fn carry(inf x) → saturating<inf> {
+    return x
+}
+
+main {
+    const trapping<inf> t ← 1
+    const wrapping<inf> w ← carry(t)
+    print w
+}
+",
+    ));
+}
+
+#[test]
+fn rejections_carry_their_catalog_code_and_issue() {
+    let tensor = latin("functio f(tensor<inf, [2]> t) → numerus { redde 0 }\n");
+    expect(&tensor, "SEM008", "tensor_element_unbounded");
+
+    let kernel = latin("@ nucleum\n@ publica\nfunctio k(inf x) → u32 { redde 1 }\n");
+    let host = expect(&kernel, "SEM008", "nucleum_host_type");
+    assert_eq!(arg_of(host, "family"), Some("inf"));
+
+    let air = latin(AIR_INF_LOCAL);
+    let air = expect(&air, "SEM059", "air_unbounded_integer");
+    assert_eq!(arg_of(air, "lane"), Some("air"));
+
+    let sugar = latin("functio f(linf x) → numerus { redde 0 }\n");
+    expect(&sugar, "SEM002", "unknown_type");
+
+    let arithmetic = latin("functio f(inf a, inf b) → inf { redde a + b }\n");
+    expect(&arithmetic, "SEM011", "inf_arithmetic_unsupported");
+
+    let conversion = latin("functio f(inf a) → i32 { redde a ↦ i32 ⊥ 0 }\n");
+    expect(&conversion, "SEM016", "inf_conversio_unsupported");
+}
+
+/// Every HIR backend rejects a module that names `inf`, by one named issue
+/// carrying the type and the target.
+#[test]
+fn every_hir_backend_fails_closed_with_a_named_diagnostic() {
+    for (target, name) in [
+        (Target::HirRust, "HirRust"),
+        (Target::HirTypeScript, "HirTypeScript"),
+        (Target::HirGo, "HirGo"),
+        (Target::HirSwift, "HirSwift"),
+        (Target::HirPython, "HirPython"),
+        (Target::HirHaskell, "HirHaskell"),
+    ] {
+        let result = compile_for_target_and_get_result(INF_FILE, target);
+        let diagnostic = expect(&result.diagnostics, "CODEGEN001", "inf_target_unsupported");
+        assert_eq!(arg_of(diagnostic, "type"), Some("inf"), "{name}");
+        assert_eq!(arg_of(diagnostic, "target"), Some(name), "{name}");
+    }
+}
+
+/// The Faber re-emitter carries `inf` (it only re-spells types).
+#[test]
+fn the_faber_reemitter_keeps_inf() {
+    let result = compile_for_target_and_get_result(INF_FILE, Target::HirFaber);
+    assert_accepts(&result.diagnostics);
+}
+
+/// MIR-backed targets fail closed at their own layer: LLVM, Wasm and sexp
+/// each reject `numerus<inf>` by their unsupported-shape diagnostic.
+#[test]
+fn every_mir_backend_fails_closed() {
+    for target in [Target::MirLlvm, Target::MirWasm, Target::MirSexp] {
+        let result = compile_for_target_and_get_result(INF_FILE, target);
+        let code = result
+            .diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.is_error())
+            .filter_map(|diagnostic| diagnostic.code)
+            .collect::<Vec<_>>();
+        assert!(
+            code.contains(&"CODEGEN001"),
+            "{target:?} must reject inf, got: {:?}",
+            result.diagnostics
+        );
+    }
+}

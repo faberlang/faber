@@ -960,6 +960,13 @@ fn sized_numeric_layout(prim: Primitive, width: NumericWidth) -> LayoutResolutio
         (Primitive::Fractus, NumericWidth::BF16) => MirScalarLayout::Bf16,
         (Primitive::Fractus, NumericWidth::F32) => MirScalarLayout::F32,
         (Primitive::Fractus, NumericWidth::F64) => MirScalarLayout::F64,
+        // Ruling 46: `inf` is a heap-resident bignum (`Magnus`), not a scalar.
+        // No layout kind exists until the carrier lands (inf track U4), so the
+        // named fact below fails closed in every consumer instead of falling
+        // through as an integer.
+        (Primitive::Numerus, NumericWidth::Inf) => {
+            return LayoutResolution::MissingFact(INF_LAYOUT_PENDING.to_owned());
+        }
         (prim, width) => {
             let family = match prim {
                 Primitive::Numerus => "numerus",
@@ -974,6 +981,11 @@ fn sized_numeric_layout(prim: Primitive, width: NumericWidth) -> LayoutResolutio
     };
     LayoutResolution::Resolved(MirLayoutKind::Scalar(scalar))
 }
+
+/// Named missing fact for the unbounded integer `inf` (ruling 46): the MIR
+/// has no `Magnus` layout yet, so every MIR consumer fails closed on this text.
+const INF_LAYOUT_PENDING: &str =
+    "numerus<inf> has no MIR layout: the Magnus bignum carrier is not implemented";
 
 fn int_layout(width: NumericWidth) -> LayoutResolution {
     let scalar = match width {
@@ -996,6 +1008,9 @@ fn int_layout(width: NumericWidth) -> LayoutResolution {
                 width.faber_marker()
             ));
         }
+        // A word over `inf` is the bare `inf` type (ruling 32) and never
+        // reaches a word layout; fail closed on the same fact if it does.
+        NumericWidth::Inf => return LayoutResolution::MissingFact(INF_LAYOUT_PENDING.to_owned()),
     };
     LayoutResolution::Resolved(MirLayoutKind::Scalar(scalar))
 }

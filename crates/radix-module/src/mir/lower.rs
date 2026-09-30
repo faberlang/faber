@@ -2421,6 +2421,8 @@ impl<'a> FunctionBuilder<'a> {
             // (`i64::MAX + 1`) is a value the carrier holds, so only the store
             // check keeps it out of an `i64` slot (ruling 17).
             Type::ModularWord(_) | Type::SaturatingWord(_) | Type::Primitive(Primitive::Numerus) => true,
+            // Deliberate: a store into `inf` is total (nothing to fit), so it
+            // takes no store node; `integer_range()` is `None` for `inf`.
             Type::SizedNumeric(Primitive::Numerus, width) => width.integer_range().is_some(),
             _ => false,
         }
@@ -3635,6 +3637,7 @@ impl<'a> FunctionBuilder<'a> {
             crate::semantic::passes::const_int_value(expr).is_none()
                 && match self.normalized_type(semantic) {
                     Type::Primitive(Primitive::Numerus) => true,
+                    // Deliberate: `inf` has no range to keep a constant out of.
                     Type::SizedNumeric(Primitive::Numerus, width) => width.integer_range().is_some(),
                     _ => false,
                 }

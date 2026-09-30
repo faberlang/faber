@@ -161,3 +161,7 @@ fn convert_single_doc(
 #[cfg(test)]
 #[path = "convert_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "convert_inf_test.rs"]
+mod inf_tests;

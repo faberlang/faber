@@ -44,6 +44,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
         let (policy, width) = self.integer_slot(target)?;
         let exact = int_value(value)?;
+        // `integer_slot` never yields `inf` (no range), so this is always `Some`.
         let (lo, hi) = width.integer_range()?;
         Some(match policy {
             SlotPolicy::Trapping => match (lo..=hi).contains(&exact) {
@@ -118,6 +119,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
         match self.types.get(target) {
             Type::Primitive(Primitive::Numerus) => Some((SlotPolicy::Trapping, NumericWidth::I64)),
+            // Deliberate: no store slot for `inf` (total store, nothing to check).
             Type::SizedNumeric(Primitive::Numerus, width) if width.integer_range().is_some() => {
                 Some((SlotPolicy::Trapping, *width))
             }

@@ -39,6 +39,7 @@ pub fn check(
         types,
         errors: Vec::new(),
         handler_regions: Vec::new(),
+        unbounded_sites: Vec::new(),
     };
     checker.check_program(hir);
     errors.extend(checker.errors);
@@ -60,7 +61,12 @@ struct AirPurityChecker<'a> {
     /// throw source); in `Catch` it is a rethrow (Tier 2, declined); with no
     /// region it keeps the unhandled `iace` decline.
     handler_regions: Vec<HandlerRegion>,
+    /// Spans already reported as `air_unbounded_integer` (one report per site).
+    unbounded_sites: Vec<Span>,
 }
+
+/// Ruling 39(c): an `inf` type anywhere in an AIR-lane function.
+const ISSUE_AIR_UNBOUNDED_INTEGER: &str = "air_unbounded_integer";
 
 #[derive(Clone, Copy)]
 enum HandlerRegion {
@@ -115,7 +121,9 @@ impl AirPurityChecker<'_> {
             if param.default.is_some() {
                 self.reject(param.span, "defaulted_parameter");
             }
+            self.check_unbounded_type(Some(param.ty), param.span);
         }
+        self.check_unbounded_type(function.ret_ty, span);
 
         let Some(body) = &function.body else {
             self.reject(span, "missing_body");
@@ -181,6 +189,7 @@ impl AirPurityChecker<'_> {
         if local.runtime_provided {
             self.reject(span, "runtime_provided_binding");
         }
+        self.check_unbounded_type(local.ty, span);
         match &local.init {
             Some(init) => self.check_expr(init),
             None => self.reject(span, "deferred_local_init"),
@@ -188,6 +197,7 @@ impl AirPurityChecker<'_> {
     }
 
     fn check_expr(&mut self, expr: &HirExpression) {
+        self.check_unbounded_type(expr.ty, expr.span);
         match &expr.kind {
             HirExpressionKind::Path(_)
             | HirExpressionKind::Literal(_)
@@ -712,10 +722,40 @@ impl AirPurityChecker<'_> {
         }
         match self.types.get(ty) {
             Type::Primitive(Primitive::Numerus) => NumericWidth::I64.integer_range(),
+            // `inf` has no range; AIR rejects it by type (`air_unbounded_integer`).
             Type::SizedNumeric(Primitive::Numerus, width) | Type::SaturatingWord(width) => {
                 width.integer_range()
             }
             _ => None,
+        }
+    }
+
+    /// Ruling 39(c): AIR has no representation for a heap integer, so an
+    /// `inf` value (or a container of one) never enters the AIR lane. One
+    /// diagnostic per site, however many nested nodes share it.
+    fn check_unbounded_type(&mut self, ty: Option<TypeId>, span: Span) {
+        let Some(ty) = ty else { return };
+        // A nested node inside an already-reported site (a local's own
+        // initializer) adds no information.
+        let covered = self
+            .unbounded_sites
+            .iter()
+            .any(|site| site.start <= span.start && span.end <= site.end);
+        if covered || !self.mentions_unbounded(ty) {
+            return;
+        }
+        self.unbounded_sites.push(span);
+        self.reject(span, ISSUE_AIR_UNBOUNDED_INTEGER);
+    }
+
+    fn mentions_unbounded(&self, ty: TypeId) -> bool {
+        let ty = self.types.peel_access_marker(ty).1;
+        match self.types.get(ty) {
+            Type::Alias(_, inner) | Type::Option(inner) | Type::Array(inner) => {
+                self.mentions_unbounded(*inner)
+            }
+            Type::SizedNumeric(Primitive::Numerus, width) => width.is_unbounded(),
+            _ => false,
         }
     }
 
