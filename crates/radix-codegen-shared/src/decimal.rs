@@ -5,7 +5,7 @@
 //! every emit tier on the same carrier math as the MIR runner without
 //! re-importing runner internals.
 
-use radix_hir::{DefId, HirBinOp, HirExpression, HirExpressionKind, HirLiteral};
+use radix_hir::{DefId, HirBinOp, HirExpression, HirExpressionKind, HirLiteral, HirUnOp};
 use radix_lexer::Symbol;
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
 
@@ -172,4 +172,56 @@ pub fn carrier_in_width(carrier: i128, width: NumericWidth) -> Option<i64> {
     } else {
         None
     }
+}
+
+/// Fraction digits of a stored `d64` (the scale every store node rounds to).
+pub const STORED_SCALE: u32 = 8;
+
+/// How an emit tier reads a decimal-typed expression (D11.7, ruling 19).
+///
+/// Decimal arithmetic is exact until the value lands in a slot, so an emit
+/// tier evaluates a computation as an exact `(carrier, scale)` pair and only
+/// rounds at the store. A leaf (path, literal, call, field, an already
+/// stored value) is a stored `d64` carrier at scale 8, or an integer at
+/// scale 0 when it joins decimal arithmetic.
+pub enum ExactDecimal<'a> {
+    /// `lhs op rhs` with `op` one of `+ - * / %`.
+    Binary(HirBinOp, &'a HirExpression, &'a HirExpression),
+    /// `-operand`.
+    Neg(&'a HirExpression),
+    /// Any other expression: a stored carrier (or an integer operand).
+    Leaf(&'a HirExpression),
+}
+
+/// Classify `expr` for exact decimal evaluation.
+#[must_use]
+pub fn exact_decimal<'a>(expr: &'a HirExpression, types: &TypeTable) -> ExactDecimal<'a> {
+    if decimal_expr_width(expr, types).is_some() {
+        match &expr.kind {
+            HirExpressionKind::Binary(
+                op
+                @ (HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div | HirBinOp::Mod),
+                lhs,
+                rhs,
+            ) => return ExactDecimal::Binary(*op, lhs, rhs),
+            HirExpressionKind::Unary(HirUnOp::Neg, operand) => return ExactDecimal::Neg(operand),
+            _ => {}
+        }
+    }
+    ExactDecimal::Leaf(expr)
+}
+
+/// Whether `expr` is decimal arithmetic whose exact value has not been stored.
+#[must_use]
+pub fn is_decimal_computation(expr: &HirExpression, types: &TypeTable) -> bool {
+    !matches!(exact_decimal(expr, types), ExactDecimal::Leaf(_))
+}
+
+/// Scale of a leaf operand of decimal arithmetic: a decimal is stored at
+/// scale 8, anything else (an integer operand) is scale 0.
+#[must_use]
+pub fn decimal_leaf_scale(expr: &HirExpression, types: &TypeTable) -> u32 {
+    decimal_expr_width(expr, types)
+        .and_then(NumericWidth::decimal_scale)
+        .unwrap_or(0)
 }
