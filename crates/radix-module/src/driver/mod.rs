@@ -368,9 +368,6 @@ fn compile_cli_program(
                     }
                 }
                 Target::HirGo => {
-                    if let Err(err) = reject_modular_word_target(&analysis, "Go") {
-                        return compile_codegen_error(analysis, name, source, err.into());
-                    }
                     match codegen::generate_go_cli(&analysis.hir, &analysis.types, &analysis.interner, cli_program) {
                         Ok(output) => {
                             CompileResult { output: Some(crate::Output::Go(output)), diagnostics: analysis.diagnostics }
@@ -742,17 +739,19 @@ fn generate_output(
         // S7-U5: Swift's fixed-width carriers and wrapping operators lifted its
         // modular-word gate. S7-U6: TS's per-width wrapping and passing fixtures
         // lifted its stale gate. Both targets now share the forwarding path.
-        Target::HirRust | Target::HirFaber | Target::HirSwift | Target::HirHaskell | Target::HirTypeScript => {
+        // D11.6 U6go: Go's exact-integer helpers and typed wrapping carriers
+        // lifted its modular-word gate as well.
+        Target::HirRust
+        | Target::HirFaber
+        | Target::HirSwift
+        | Target::HirHaskell
+        | Target::HirTypeScript
+        | Target::HirGo => {
             codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
                 .map_err(std::convert::Into::into)
         }
         Target::HirPython => {
             reject_saturating_word_target(analysis, "Python")?;
-            codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
-                .map_err(std::convert::Into::into)
-        }
-        Target::HirGo => {
-            reject_modular_word_target(analysis, "Go")?;
             codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
                 .map_err(std::convert::Into::into)
         }

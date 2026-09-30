@@ -487,9 +487,9 @@ fn go_target_policy_runs_for_programs_without_cli() {
 }
 
 #[test]
-fn go_cli_program_rejects_modular_word_before_codegen() {
-    // F-048: the CLI-program path must gate modular-word targets before
-    // codegen, just like the non-CLI path via generate_output.
+fn go_cli_program_accepts_modular_word() {
+    // D11.6 U6go: the Go modular-word gate is lifted on the CLI-program path
+    // as on the ordinary path; `modulus<W>` reaches codegen.
     let session = test_session(Target::HirGo);
     let source = r#"
 @ cli "tool"
@@ -500,15 +500,24 @@ incipit argumenta args {
 "#;
     let result = compile(&session, "cli.fab", source, ModuleCompileRequest::default());
 
-    assert!(!result.success(), "Go CLI with modulus must fail");
+    assert!(result.success(), "Go CLI with modulus must compile: {:?}", result.diagnostics);
     assert!(
-        result
+        !result
             .diagnostics
             .iter()
             .any(|d| d.issue() == Some("modular_word_target_unsupported")),
-        "expected modular_word_target_unsupported, got: {:?}",
+        "modular_word_target_unsupported must not fire on Go: {:?}",
         result.diagnostics
     );
+}
+
+#[test]
+fn go_program_accepts_modular_word() {
+    let session = test_session(Target::HirGo);
+    let source = "incipit {\n  varia modulus<u8> x ← 250\n  nota x + 10\n}\n";
+    let result = compile(&session, "wrap.fab", source, ModuleCompileRequest::default());
+
+    assert!(result.success(), "Go with modulus must compile: {:?}", result.diagnostics);
 }
 
 #[test]
