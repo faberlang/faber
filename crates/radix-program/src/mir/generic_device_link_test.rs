@@ -33,6 +33,7 @@ fn step_2x2(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]
     return kadd(a, b)
 }
 
+@ kernel
 @ public
 fn helper_4(tensor<f32, [4]> a, tensor<f32, [4]> b) → tensor<f32, [4]> {
     return khelper(a, b)
@@ -388,7 +389,10 @@ fn khelper<size M>(tensor<f32, [M]> a, tensor<f32, [M]> b) → tensor<f32, [M]> 
 }
 
 # Same-unit caller keeps the generic entry non-orphaned (ADM001), mirroring
-# the library fixture's `helper_4`.
+# the library fixture's `helper_4`. It is a kernel: rule 12.7 forbids a host
+# call into a private kernel, so the private helper is only ever composed by
+# another kernel.
+@ kernel
 @ internal
 fn helper_4(tensor<f32, [4]> a, tensor<f32, [4]> b) → tensor<f32, [4]> {
     return khelper(a, b)
@@ -400,11 +404,19 @@ locale = "en"
 +++
 import from "./helpers" helpers
 
+# The sibling's `@ internal` kernel is private (rule 12.7), so it is imported
+# by a kernel; the host reaches it only through this public wrapper.
+@ kernel
+@ public
+fn probe_helper(tensor<f32, [4]> a, tensor<f32, [4]> b) → tensor<f32, [4]> {
+    return helpers.khelper(a, b)
+}
+
 main {
     const tensor<f32, []> seed ← empty
     const tensor<f32, [4]> v ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [4])
     const tensor<f32, [4]> w ← seed.from_flat([4.0, 3.0, 2.0, 1.0], [4])
-    const _ rh ← helpers.khelper(v, w)
+    const _ rh ← probe_helper(v, w)
     print "ok"
 }
 "#;

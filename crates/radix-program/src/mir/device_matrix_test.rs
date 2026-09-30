@@ -50,6 +50,8 @@ fn twin_hidden<size M>(tensor<f32, [M]> a, tensor<f32, [M]> b) → tensor<f32, [
     return a + b
 }
 
+@ kernel
+@ public
 fn hidden_4(tensor<f32, [4]> a, tensor<f32, [4]> b) → tensor<f32, [4]> {
     return twin_hidden(a, b)
 }

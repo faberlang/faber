@@ -62,11 +62,19 @@ fn solo_helper(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2,
     return math.add(a, b)
 }
 
+# Rule 12.7: host code may not call the private `solo_helper`, so the host
+# reaches it through this public kernel wrapper.
+@ kernel
+@ public
+fn solo_entry(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]> {
+    return solo_helper(a, b)
+}
+
 fn main() → void {
     const tensor<f32, []> seed ← empty
     const _ a ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [2, 2])
     const _ b ← seed.from_flat([10.0, 20.0, 30.0, 40.0], [2, 2])
-    const _ r ← solo_helper(a, b)
+    const _ r ← solo_entry(a, b)
     print "ok"
 }
 "#;
@@ -494,10 +502,12 @@ fn sibling_import_composes_consumer_local_kernel_caller() {
 }
 
 /// done_when (b): a consumer-local private kernel helper's imported call
-/// composes at the seam while producing no launch row — the helper stays a
-/// host-referenced program symbol (no launch ABI), its imported-instance
-/// call is composed away, and only the imported public Kernel registers
-/// launchable.
+/// composes at the seam while producing no launch row. Rule 12.7 forbids a
+/// host call into a private kernel, so the helper is reached through a public
+/// kernel wrapper (`solo_entry`): the imported-instance call and the private
+/// helper both splice into the wrapper, the helper keeps no launch ABI (it is
+/// not even a surviving program symbol), and only the imported public Kernel
+/// registers launchable.
 #[test]
 fn private_kernel_helper_composes_without_launch_row() {
     let dir = crate::test_support::test_temp_dir("cdc-private-helper");
@@ -518,48 +528,44 @@ fn private_kernel_helper_composes_without_launch_row() {
                 "only the imported public Kernel instance is launchable: {facts:?}"
             );
 
-            // The helper stays a program symbol (its host caller keeps it)
-            // and its imported-instance call composed away at the seam.
-            let helper = function_by_name(lowered, "solo_helper");
-            assert_eq!(
-                call_site_count(helper),
-                0,
-                "the private helper's imported call must compose at the seam: {helper:#?}"
+            // The private helper composed into its kernel caller and left no
+            // program symbol behind (no launch ABI, no host reference).
+            assert!(
+                !lowered
+                    .validated
+                    .program()
+                    .functions
+                    .iter()
+                    .any(|function| {
+                        function
+                            .name
+                            .is_some_and(|symbol| lowered.interner.resolve(symbol) == "solo_helper")
+                    }),
+                "the private helper must compose away, not survive as a symbol"
             );
 
-            // CDC-3: the private helper's composed body is single-block
-            // with its original Return terminator — same splice, no launch
-            // row.
+            // The imported-instance call (and the helper call) composed away
+            // at the seam: no call site survives in the wrapper.
+            let wrapper = function_by_name(lowered, "solo_entry");
             assert_eq!(
-                helper.blocks.len(),
+                call_site_count(wrapper),
+                0,
+                "the private helper's imported call must compose at the seam: {wrapper:#?}"
+            );
+
+            // CDC-3: the composed body is single-block with its original
+            // Return terminator — same splice, no launch row.
+            assert_eq!(
+                wrapper.blocks.len(),
                 1,
-                "the composed private helper must be single-block: {helper:#?}"
+                "the composed private helper must be single-block: {wrapper:#?}"
             );
             assert!(
                 matches!(
-                    helper.blocks[0].terminator.kind,
+                    wrapper.blocks[0].terminator.kind,
                     MirTerminatorKind::Return(_)
                 ),
-                "the helper's original Return terminator must survive the splice: {helper:#?}"
-            );
-
-            // The host call site still targets the helper — composition
-            // never crosses the launch boundary.
-            let main = function_by_name(lowered, "main");
-            let host_call = main.blocks.iter().any(|block| {
-                block.statements.iter().any(|statement| {
-                    matches!(
-                        &statement.kind,
-                        MirStatementKind::Call {
-                            callee: MirCallee::Function(id),
-                            ..
-                        } if *id == helper.id
-                    )
-                })
-            });
-            assert!(
-                host_call,
-                "the host caller's helper call must survive composition untouched"
+                "the original Return terminator must survive the splice: {wrapper:#?}"
             );
         },
     )
