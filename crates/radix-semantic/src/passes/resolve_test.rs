@@ -2218,6 +2218,101 @@ incipit {
 }
 
 #[test]
+fn function_named_like_the_marker_does_not_shadow_bare_vacua() {
+    // em1: a FUNCTION named `vacua` does not shadow the bare marker; the
+    // marker is the empty list and `vacua()` still calls the function. No
+    // SEM010 type mismatch and no WARN021 on the declaration.
+    let result = compile_ok(
+        r#"
+functio vacua() → lista<numerus> {
+  redde [1]
+}
+incipit {
+  fixum lista<numerus> xs ← vacua
+  fixum lista<numerus> ys ← vacua()
+  nota xs
+  nota ys
+}
+"#,
+    );
+    assert!(
+        result.is_ok(),
+        "marker beside a same-named function must check: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        !has_issue(&result, "WARN021", "empty_marker_shadowing"),
+        "a function declaration must not warn: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn en_function_named_like_the_marker_does_not_shadow_bare_empty() {
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
+    let pack = crate::locale::LocalePack::from_toml_path(&pack_path)
+        .expect("installed en pack should load");
+    let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
+    config.locale_pack = Some(pack);
+    let result = crate::test_support::analyze_source_with_config(
+        r#"
+fn empty() → list<int> {
+    return [1]
+}
+fn probe() → list<int> {
+    const list<int> xs ← empty
+    const list<int> ys ← empty()
+    return xs + ys
+}
+"#,
+        config,
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|d| d.issue() == Some("empty_marker_shadowing")
+                || d.issue().is_some_and(|i| i.contains("mismatch"))),
+        "fn empty must neither warn nor shadow the marker: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn param_named_like_the_marker_still_shadows_and_warns() {
+    // em1 pin: only FUNCTIONS are exempt. A parameter named like the marker
+    // still wins the name and still gets WARN021.
+    let result = compile_ok(
+        r#"
+functio f(lista<numerus> vacua) → lista<numerus> {
+  redde vacua
+}
+"#,
+    );
+    assert!(
+        has_issue(&result, "WARN021", "empty_marker_shadowing"),
+        "marker-named param should warn: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn const_named_like_the_marker_still_shadows_and_warns() {
+    // em1 pin: a top-level constant named like the marker still shadows and warns.
+    let result = compile_ok(
+        r#"
+generis lista<numerus> vacua = [1]
+functio g() → lista<numerus> { redde vacua }
+"#,
+    );
+    assert!(
+        has_issue(&result, "WARN021", "empty_marker_shadowing"),
+        "marker-named const should warn: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
 fn unshadowed_lege_stays_the_builtin() {
     let result = compile_ok(
         r"

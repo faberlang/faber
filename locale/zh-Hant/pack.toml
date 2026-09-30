@@ -880,6 +880,14 @@ help = "檢查接收者型別與方法名稱"
 message = "未知結構欄位"
 help = "檢查結構欄位名稱"
 
+[diagnostics.SEM004.issues.length_is_method]
+message = "`length` 是方法，不是欄位"
+help = "以方法呼叫：`.length()`"
+
+[diagnostics.SEM004.issues.type_has_no_field]
+message = "型別 '{type}' 沒有欄位 '{member}'"
+help = "內建型別提供方法而非欄位；檢查接收者型別與成員名稱"
+
 [diagnostics.SEM004.issues.unknown_variant_field]
 message = "未知變體欄位"
 help = "檢查變體欄位名稱"

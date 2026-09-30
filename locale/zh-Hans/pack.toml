@@ -880,6 +880,14 @@ help = "检查 receiver 类型和 method 名称"
 message = "未知 struct field"
 help = "检查 struct field 名称"
 
+[diagnostics.SEM004.issues.length_is_method]
+message = "`length` 是 method，不是 field"
+help = "以 method 方式调用：`.length()`"
+
+[diagnostics.SEM004.issues.type_has_no_field]
+message = "类型 '{type}' 没有 field '{member}'"
+help = "内置类型提供 method 而非 field；检查 receiver 类型和成员名称"
+
 [diagnostics.SEM004.issues.unknown_variant_field]
 message = "未知 variant field"
 help = "检查 variant field 名称"

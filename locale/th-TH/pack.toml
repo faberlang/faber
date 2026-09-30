@@ -884,6 +884,14 @@ help = "ตรวจชนิด receiver และชื่อเมธอด"
 message = "ฟิลด์ struct ไม่รู้จัก"
 help = "ตรวจชื่อฟิลด์ struct"
 
+[diagnostics.SEM004.issues.length_is_method]
+message = "`length` เป็นเมธอด ไม่ใช่ฟิลด์"
+help = "เรียกเป็นเมธอด: `.length()`"
+
+[diagnostics.SEM004.issues.type_has_no_field]
+message = "ชนิด '{type}' ไม่มีฟิลด์ '{member}'"
+help = "ชนิดในตัวมีเมธอด ไม่ใช่ฟิลด์ ตรวจชนิด receiver และชื่อสมาชิก"
+
 [diagnostics.SEM004.issues.unknown_variant_field]
 message = "ฟิลด์ variant ไม่รู้จัก"
 help = "ตรวจชื่อฟิลด์ variant"

@@ -1157,7 +1157,15 @@ fn resolve_expr(
             // marker is only a fallback when no same-named value binding is
             // live, so resolving it here keeps calls consistent with every
             // other position (`arg`, receiver, index base, and chain base).
-            resolve_expr(resolver, interner, &expr.callee, errors);
+            //
+            // em1: a call position is the one place a function named like the
+            // marker still wins — `vacua()` calls the function, while the
+            // bare `vacua` beside it stays the marker.
+            if let ExprKind::Vacua(ident) = &expr.callee.kind {
+                record_shadowed_builtin(resolver, expr.callee.id, ident.name);
+            } else {
+                resolve_expr(resolver, interner, &expr.callee, errors);
+            }
             for arg in &expr.args {
                 resolve_expr(resolver, interner, &arg.value, errors);
             }
@@ -1421,7 +1429,9 @@ fn resolve_expr(
         // but the marker is only the fallback when no same-named value binding
         // is live. This makes binding lookup win uniformly in expression
         // position while preserving the marker when the name is unbound.
-        ExprKind::Vacua(ident) => record_shadowed_builtin(resolver, expr.id, ident.name),
+        // A *function* named like the marker does not shadow it (em1): the bare
+        // marker stays the marker, and the function stays callable as `f()`.
+        ExprKind::Vacua(ident) => record_shadowed_marker(resolver, expr.id, ident.name),
         // A `praefixum` body is a function body: `redde` yields the static's
         // value (D8.4).
         ExprKind::Praefixum(expr) => {
@@ -1478,6 +1488,26 @@ fn record_shadowed_builtin(
     if resolver
         .get_symbol(def_id)
         .is_some_and(|symbol| !symbol.kind.is_value_name())
+    {
+        return;
+    }
+    resolver.record_shadowed_builtin(node, def_id);
+}
+
+/// Like [`record_shadowed_builtin`] for the empty-collection marker, except a
+/// function (declared or imported) never shadows the bare marker: only locals,
+/// params, constants and other non-function value bindings do.
+fn record_shadowed_marker(
+    resolver: &mut Resolver,
+    node: radix_syntax::NodeId,
+    name: radix_lexer::Symbol,
+) {
+    let Some(def_id) = resolver.lookup(name) else {
+        return;
+    };
+    if resolver
+        .get_symbol(def_id)
+        .is_some_and(|symbol| !symbol.kind.is_value_name() || symbol.kind == SymbolKind::Function)
     {
         return;
     }

@@ -880,6 +880,14 @@ help = "kiểm tra kiểu receiver và tên phương thức"
 message = "trường struct không xác định"
 help = "kiểm tra tên trường struct"
 
+[diagnostics.SEM004.issues.length_is_method]
+message = "`length` là phương thức, không phải trường"
+help = "gọi như phương thức: `.length()`"
+
+[diagnostics.SEM004.issues.type_has_no_field]
+message = "kiểu '{type}' không có trường '{member}'"
+help = "kiểu dựng sẵn cung cấp phương thức, không phải trường; kiểm tra kiểu receiver và tên thành viên"
+
 [diagnostics.SEM004.issues.unknown_variant_field]
 message = "trường variant không xác định"
 help = "kiểm tra tên trường variant"

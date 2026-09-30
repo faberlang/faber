@@ -962,6 +962,11 @@ fn semantic_undefined_member_help(args: &[DiagnosticArg]) -> Option<String> {
             Some("use a label declared on the iuncta annotation, or index by position".to_owned())
         }
         "unknown_variant_field" => Some("check the variant field name".to_owned()),
+        "length_is_method" => Some("call it as a method: `.length()`".to_owned()),
+        "type_has_no_field" => Some(
+            "built-in types expose methods, not fields; check the receiver type and member name"
+                .to_owned(),
+        ),
         "unknown_union_field" => Some("check the union's `@ commune` field name".to_owned()),
         "union_member_not_common" => Some(
             "narrow the receiver (`est M` branch, `discerne`) to recover per-member access"

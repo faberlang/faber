@@ -499,7 +499,57 @@ impl TypeChecker<'_> {
         if let Some(members) = self.union_members_of(object_ty) {
             return self.check_union_field_from_type(&members, name, span);
         }
+        self.report_fieldless_type_access(object_ty, name, span);
         self.error_type
+    }
+
+    /// Named diagnostic for a field access on a type that has no such field.
+    ///
+    /// This is the final fall-through of [`Self::field_type_from_type`]: the
+    /// receiver is a built-in or otherwise fieldless type (`1.nonsense`,
+    /// `"a".length`, `xs.length`). Built-in types expose methods, not fields.
+    /// Two exceptions are hard-coded earlier in the function and never reach
+    /// here: `.nuntius` on `textus`/`ignotum` and dot-key lookup on map types.
+    /// A receiver that is already an error, an unsolved hole, or an unsubstituted
+    /// parameter stays silent so the first error is not cascaded.
+    fn report_fieldless_type_access(
+        &mut self,
+        object_ty: TypeId,
+        name: Symbol,
+        span: radix_lexer::Span,
+    ) {
+        let resolved = self.resolve_inferred_type(object_ty);
+        let receiver = self.types.get(resolved).clone();
+        if matches!(
+            receiver,
+            Type::Error
+                | Type::Infer(_)
+                | Type::InferUnion(_)
+                | Type::MarkerHole { .. }
+                | Type::Param(_)
+        ) {
+            return;
+        }
+        let member = self.member_display_name(name);
+        let is_length = matches!(member.as_str(), "length" | "longitudo");
+        let sequence_receiver = matches!(
+            receiver,
+            Type::Primitive(Primitive::Textus | Primitive::Ascii)
+                | Type::BoundedTextus { .. }
+                | Type::BoundedAscii { .. }
+                | Type::Array(_)
+                | Type::BoundedArray { .. }
+        );
+        if is_length && sequence_receiver {
+            self.undefined_member_with_args("length_is_method", span, &[]);
+            return;
+        }
+        let type_name = self.display_union_constituent(resolved);
+        self.undefined_member_with_args(
+            "type_has_no_field",
+            span,
+            &[("member", member), ("type", type_name)],
+        );
     }
 
     /// Overlap field access on a `∪` receiver (U1R, D9.2).

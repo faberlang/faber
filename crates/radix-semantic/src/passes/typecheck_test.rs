@@ -178,11 +178,11 @@ fn struct_field_default_provides_context_for_vacua() {
 }
 
 #[test]
-fn same_named_fn_wins_over_bare_vacua_marker_and_typechecks_loudly() {
-    // F1: a live same-named function wins over the parser's Vacua claim in
-    // every expression position. The collection-typed field and initializer
-    // therefore report ordinary type errors, while `vacua()` remains callable.
-    test_support::assert_rejects_with_issue(
+fn same_named_fn_does_not_shadow_bare_vacua_marker() {
+    // em1: a function named like the marker does not shadow the bare marker.
+    // The collection-typed field and initializer use the marker, while
+    // `vacua()` still calls the function.
+    test_support::assert_accepts(
         r#"
 genus Header { varia textus name = "" }
 genus Headers { varia lista<Header> entries = vacua }
@@ -193,15 +193,14 @@ functio probe() → lista<Header> {
 }
 functio use_call() → Headers { redde vacua() }
 "#,
-        "field_default_type_mismatch",
     );
 }
 
 #[test]
-fn same_named_en_empty_fn_wins_over_bare_marker_and_typechecks_loudly() {
-    // The English reader pack claims `empty` as the marker, but the live
-    // `fn empty() → Headers` binding wins and makes collection positions type
-    // check against Headers instead of silently using Vec::new().
+fn same_named_en_empty_fn_does_not_shadow_bare_marker() {
+    // em1: the English reader pack claims `empty` as the marker; a live
+    // `fn empty() → Headers` does not shadow it, so collection positions use
+    // the marker and `empty()` still calls the function.
     let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path)
         .expect("installed en pack should load");
@@ -229,16 +228,8 @@ fn use_call() → Headers {
         config,
     );
     assert!(
-        !result.is_ok(),
-        "binding-wins marker collisions must typecheck loudly: {:?}",
-        result.diagnostics
-    );
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.issue() == Some("field_default_type_mismatch")),
-        "expected the field default collision to be diagnosed: {:?}",
+        result.is_ok(),
+        "a function named like the marker must not shadow it: {:?}",
         result.diagnostics
     );
 }

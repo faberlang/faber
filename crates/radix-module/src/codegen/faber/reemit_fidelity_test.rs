@@ -325,7 +325,9 @@ fn canonical_revalidation_rejects_analysis_errors() {
 fn cli_function_keeps_argumenta_binding() {
     // GRAMMAR: `functio f() argumenta args` — the CLI bundle param rides the
     // postfix sugar slot, not the parameter list.
-    let code = assert_idempotent("functio greet(textus nomen) argumenta args → vacuum {\n    scribe args.nomen\n}\n");
+    // The bundle is only a binding here (no CLI program, so it is `ignotum`);
+    // it is printed whole because `ignotum` has no fields to project.
+    let code = assert_idempotent("functio greet(textus nomen) argumenta args → vacuum {\n    scribe args\n}\n");
     assert!(
         code.contains("functio greet(textus nomen) argumenta args → vacuum"),
         "argumenta binding must survive re-emission:\n{code}"

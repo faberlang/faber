@@ -1290,6 +1290,14 @@ help = "use a label declared on the iuncta annotation, or index by position"
 message = "unknown variant field"
 help = "check the variant field name"
 
+[diagnostics.SEM004.issues.length_is_method]
+message = "`length` is a method, not a field"
+help = "call it as a method: `.length()`"
+
+[diagnostics.SEM004.issues.type_has_no_field]
+message = "type '{type}' has no field '{member}'"
+help = "built-in types expose methods, not fields; check the receiver type and member name"
+
 [diagnostics.SEM004.issues.unknown_union_field]
 message = "unknown union field"
 help = "check the union's `@ commune` field name"

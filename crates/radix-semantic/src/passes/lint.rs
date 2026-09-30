@@ -233,7 +233,8 @@ impl<'a> LintContext<'a> {
     fn check_item(&mut self, item: &HirItem) {
         match &item.kind {
             HirItemKind::Function(func) => {
-                self.warn_on_empty_marker_shadowing(func.name, item.span);
+                // em1: a function named like the marker does not shadow it, so
+                // the declaration no longer warns; params, locals and consts do.
                 self.check_function(func);
             }
             HirItemKind::Struct(strukt) => {

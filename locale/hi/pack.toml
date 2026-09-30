@@ -884,6 +884,14 @@ help = "receiver प्रकार और method नाम जांचें"
 message = "अज्ञात struct field"
 help = "struct field नाम जांचें"
 
+[diagnostics.SEM004.issues.length_is_method]
+message = "`length` एक method है, field नहीं"
+help = "इसे method की तरह बुलाएँ: `.length()`"
+
+[diagnostics.SEM004.issues.type_has_no_field]
+message = "प्रकार '{type}' में field '{member}' नहीं है"
+help = "अंतर्निहित प्रकार methods देते हैं, fields नहीं; receiver प्रकार और सदस्य नाम जांचें"
+
 [diagnostics.SEM004.issues.unknown_variant_field]
 message = "अज्ञात variant field"
 help = "variant field नाम जांचें"

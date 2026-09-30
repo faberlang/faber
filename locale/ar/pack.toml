@@ -880,6 +880,14 @@ help = "تحقق من نوع receiver واسم method"
 message = "struct field غير معروف"
 help = "تحقق من اسم struct field"
 
+[diagnostics.SEM004.issues.length_is_method]
+message = "`length` هو method وليس field"
+help = "استدعه كـ method: `.length()`"
+
+[diagnostics.SEM004.issues.type_has_no_field]
+message = "النوع '{type}' ليس له field باسم '{member}'"
+help = "الأنواع المدمجة توفر methods وليس fields؛ تحقق من نوع receiver واسم العضو"
+
 [diagnostics.SEM004.issues.unknown_variant_field]
 message = "variant field غير معروف"
 help = "تحقق من اسم variant field"
