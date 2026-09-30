@@ -445,8 +445,8 @@ fn en_surface_mutating_imperative_scheme_sort_sorted() {
 // LPT — lista `omnia`/`quilibet` reader-pack surface (all eight packs).
 //
 // Row ownership: LPT-1 owns the en rows (`all`/`any`); the six translated
-// packs (ar, hi, th-TH, vi, zh-Hans, zh-Hant) own the explicit identity rows
-// `omnia`/`quilibet`; la owns no row and proves the twins through
+// packs (ar, hi, th-TH, vi, zh-Hans, zh-Hant) own their own translated rows
+// for `omnia`/`quilibet`; la owns no row and proves the twins through
 // registry-direct lookup. The reverse cache is explicit-row-only, so
 // ownership is asserted with `intrinsic_canonical`; `intrinsic_surface`
 // falls back to the canonical spelling and cannot distinguish a row from
@@ -466,31 +466,43 @@ const TWIN_LA_SOURCE: &str = "functio sonda() → bivalens {\n    fixum lista<nu
 
 /// (locale, real localized source) for the six translated packs. Each source
 /// is composed from that pack's own `[keywords]`/`[types]` rows; the twin
-/// surfaces are the explicit identity rows the pack owns.
-const TWIN_TRANSLATED_SOURCES: &[(&str, &str)] = &[
+/// surfaces are the pack's own `[intrinsics]` rows (all, any).
+const TWIN_TRANSLATED_SOURCES: &[(&str, &str, &str, &str)] = &[
     (
         "ar",
-        "دالة sonda() → منطقي {\n    ثابت قائمة<عدد> xs ← فارغ\n    أعد xs.omnia(عدد d ∴ d ≥ 0)\n}\n\nدالة aliud() → منطقي {\n    ثابت قائمة<عدد> ys ← فارغ\n    أعد ys.quilibet(عدد d ∴ d < 0)\n}\n",
+        "الكل",
+        "أي",
+        "دالة sonda() → منطقي {\n    ثابت قائمة<عدد> xs ← فارغ\n    أعد xs.الكل(عدد d ∴ d ≥ 0)\n}\n\nدالة aliud() → منطقي {\n    ثابت قائمة<عدد> ys ← فارغ\n    أعد ys.أي(عدد d ∴ d < 0)\n}\n",
     ),
     (
         "hi",
-        "फलन sonda() → तार्किक {\n    स्थिर सूची<संख्या> xs ← खाली\n    लौटाओ xs.omnia(संख्या d ∴ d ≥ 0)\n}\n\nफलन aliud() → तार्किक {\n    स्थिर सूची<संख्या> ys ← खाली\n    लौटाओ ys.quilibet(संख्या d ∴ d < 0)\n}\n",
+        "सभी",
+        "कोई",
+        "फलन sonda() → तार्किक {\n    स्थिर सूची<संख्या> xs ← खाली\n    लौटाओ xs.सभी(संख्या d ∴ d ≥ 0)\n}\n\nफलन aliud() → तार्किक {\n    स्थिर सूची<संख्या> ys ← खाली\n    लौटाओ ys.कोई(संख्या d ∴ d < 0)\n}\n",
     ),
     (
         "th-TH",
-        "ฟังก์ชัน sonda() → ตรรกะ {\n    คงที่ รายการ<จำนวน> xs ← เซตว่าง\n    คืน xs.omnia(จำนวน d ∴ d ≥ 0)\n}\n\nฟังก์ชัน aliud() → ตรรกะ {\n    คงที่ รายการ<จำนวน> ys ← เซตว่าง\n    คืน ys.quilibet(จำนวน d ∴ d < 0)\n}\n",
+        "ทั้งหมด",
+        "ใดก็ได้",
+        "ฟังก์ชัน sonda() → ตรรกะ {\n    คงที่ รายการ<จำนวน> xs ← เซตว่าง\n    คืน xs.ทั้งหมด(จำนวน d ∴ d ≥ 0)\n}\n\nฟังก์ชัน aliud() → ตรรกะ {\n    คงที่ รายการ<จำนวน> ys ← เซตว่าง\n    คืน ys.ใดก็ได้(จำนวน d ∴ d < 0)\n}\n",
     ),
     (
         "vi",
-        "hàm sonda() → logic {\n    hằng danh_sách<số> xs ← tập_rỗng\n    trả xs.omnia(số d ∴ d ≥ 0)\n}\n\nhàm aliud() → logic {\n    hằng danh_sách<số> ys ← tập_rỗng\n    trả ys.quilibet(số d ∴ d < 0)\n}\n",
+        "tất_cả",
+        "bất_kỳ",
+        "hàm sonda() → logic {\n    hằng danh_sách<số> xs ← tập_rỗng\n    trả xs.tất_cả(số d ∴ d ≥ 0)\n}\n\nhàm aliud() → logic {\n    hằng danh_sách<số> ys ← tập_rỗng\n    trả ys.bất_kỳ(số d ∴ d < 0)\n}\n",
     ),
     (
         "zh-Hans",
-        "函数 sonda() → 布尔 {\n    常量 列表<整数> xs ← 空集\n    返回 xs.omnia(整数 d ∴ d ≥ 0)\n}\n\n函数 aliud() → 布尔 {\n    常量 列表<整数> ys ← 空集\n    返回 ys.quilibet(整数 d ∴ d < 0)\n}\n",
+        "全部",
+        "任一",
+        "函数 sonda() → 布尔 {\n    常量 列表<整数> xs ← 空集\n    返回 xs.全部(整数 d ∴ d ≥ 0)\n}\n\n函数 aliud() → 布尔 {\n    常量 列表<整数> ys ← 空集\n    返回 ys.任一(整数 d ∴ d < 0)\n}\n",
     ),
     (
         "zh-Hant",
-        "函式 sonda() → 布林 {\n    定值 列表<整數> xs ← 空集\n    傳回 xs.omnia(整數 d ∴ d ≥ 0)\n}\n\n函式 aliud() → 布林 {\n    定值 列表<整數> ys ← 空集\n    傳回 ys.quilibet(整數 d ∴ d < 0)\n}\n",
+        "全部",
+        "任一",
+        "函式 sonda() → 布林 {\n    定值 列表<整數> xs ← 空集\n    傳回 xs.全部(整數 d ∴ d ≥ 0)\n}\n\n函式 aliud() → 布林 {\n    定值 列表<整數> ys ← 空集\n    傳回 ys.任一(整數 d ∴ d < 0)\n}\n",
     ),
 ];
 
@@ -517,31 +529,36 @@ fn en_twin_surfaces_resolve_to_canonical_omnia_and_quilibet() {
     );
 }
 
-/// done-when: each translated pack owns the explicit identity rows — proven on
-/// the reverse cache (`intrinsic_canonical`), not on the fallback-prone
-/// `intrinsic_surface` output — and both twins resolve on a real localized
-/// Lista call while keeping the canonical HIR spelling.
+/// done-when: each translated pack owns its own rows for the twins — proven on
+/// the reverse cache (`intrinsic_canonical`) — and both twins resolve on a real
+/// localized Lista call while keeping the canonical HIR spelling. The Latin
+/// canonical spelling is a miss under a translated pack, as under en.
 #[test]
-fn translated_pack_identity_rows_resolve_both_twins_on_lista() {
-    for (locale, source) in TWIN_TRANSLATED_SOURCES {
+fn translated_pack_rows_resolve_both_twins_on_lista() {
+    for (locale, all_surface, any_surface, source) in TWIN_TRANSLATED_SOURCES {
         let pack = pack(locale);
         assert_eq!(
-            pack.intrinsic_canonical(IntrinsicReceiver::Lista, "omnia"),
+            pack.intrinsic_canonical(IntrinsicReceiver::Lista, all_surface),
             Some("omnia"),
-            "{locale}: `omnia` must be an explicit row in the reverse cache"
+            "{locale}: `{all_surface}` must be the pack's own row for `omnia`"
         );
         assert_eq!(
-            pack.intrinsic_canonical(IntrinsicReceiver::Lista, "quilibet"),
+            pack.intrinsic_canonical(IntrinsicReceiver::Lista, any_surface),
             Some("quilibet"),
-            "{locale}: `quilibet` must be an explicit row in the reverse cache"
+            "{locale}: `{any_surface}` must be the pack's own row for `quilibet`"
+        );
+        assert_eq!(
+            pack.intrinsic_canonical(IntrinsicReceiver::Lista, "omnia"),
+            None,
+            "{locale}: the Latin spelling must not be a declared surface"
         );
         let unit = analyze(source, Some(pack)).unwrap_or_else(|diagnostics| {
-            panic!("{locale}: identity `omnia`/`quilibet` calls must typecheck: {diagnostics:?}")
+            panic!("{locale}: localized `omnia`/`quilibet` calls must typecheck: {diagnostics:?}")
         });
         assert_eq!(
             method_call_spellings(&unit.hir, &unit.interner),
             vec!["omnia".to_owned(), "quilibet".to_owned()],
-            "{locale}: the identity surfaces must keep the canonical HIR spelling"
+            "{locale}: the localized surfaces must rewrite to the canonical HIR spelling"
         );
     }
 }

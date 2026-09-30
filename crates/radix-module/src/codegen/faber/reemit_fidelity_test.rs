@@ -916,3 +916,56 @@ fn mixed_bare_and_qualified_variant_references_stay_provable() {
     let source = "discretio Fons {\n    Mala {\n        textus detail\n    }\n}\n\nfunctio fac_malam() → Fons {\n    redde finge Mala { detail = \"x\" }\n}\n\nfunctio lege(Fons fons) → textus {\n    discerne fons {\n        casu Fons.Mala fixum detail {\n            redde detail\n        }\n    }\n}\n";
     assert_idempotent(source);
 }
+
+const FLOAT_SLOT_INTEGER_SOURCE: &str = "genus Intervallum {\n    fixum fractus imum\n    fixum fractus summum\n    functio medium() → fractus {\n        redde (ego.imum + ego.summum) ÷ 2\n    }\n}\n\nfunctio cubus() → Intervallum {\n    redde Intervallum { imum = 0, summum = 255 }\n}\n";
+
+/// web3: an integer literal in a `fractus` slot is retyped to a float constant
+/// by typecheck; its re-emitted `2.0` text re-parses as literal text. Both are
+/// the same float, so conversion must succeed in every locale.
+#[test]
+fn integer_literal_in_float_slot_converts_to_every_locale() {
+    let session = Session::new(Config::default().with_dev_locale_root());
+    for id in ["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
+        let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path(id))
+            .unwrap_or_else(|error| panic!("installed {id} pack should load: {error:?}"));
+        let result = reemit_faber(&session, &pack, "float-slot.fab", FLOAT_SLOT_INTEGER_SOURCE);
+        assert!(
+            result.success(),
+            "{id}: integer literal in a float slot must convert: {:?}",
+            result
+                .diagnostics
+                .iter()
+                .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
+                .collect::<Vec<_>>()
+        );
+        let code = result.output.expect("converted output").code;
+        assert!(code.contains("2.0") && code.contains("255.0"), "{id}: {code}");
+    }
+}
+
+/// The float-literal normalization compares values, not spellings: a
+/// different float value in the emitted text is still refused.
+#[test]
+fn float_literal_normalization_still_refuses_a_different_value() {
+    let latin = crate::locale::latin_locale_pack();
+    let session = Session::new(Config::default().with_locale_pack(latin.clone()));
+    let prepared = prepare_program_module_for_name("float.fab", FLOAT_SLOT_INTEGER_SOURCE, &session)
+        .expect("prepare float source");
+    let analysis = analyze_source(
+        &prepared.session,
+        "float.fab",
+        FLOAT_SLOT_INTEGER_SOURCE,
+        AnalyzeRequest { cli_program: None, contract: prepared.contract },
+    )
+    .expect("analyze float source");
+    let faithful = emit_once(FLOAT_SLOT_INTEGER_SOURCE);
+    super::compile::revalidate_emitted_output(&session, "float.fab", &faithful, &analysis, &latin)
+        .expect("the faithful re-emission is the same program");
+    for (from, to) in [("255.0", "254.0"), ("÷ 2.0", "÷ 3.0")] {
+        assert!(faithful.contains(from), "{faithful}");
+        let changed = faithful.replace(from, to);
+        let diagnostic = super::compile::revalidate_emitted_output(&session, "float.fab", &changed, &analysis, &latin)
+            .expect_err("a different float value changes meaning");
+        assert_eq!(diagnostic.issue(), Some("hir_meaning_diverged"), "{from}");
+    }
+}

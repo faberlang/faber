@@ -20,7 +20,8 @@
 
 use crate::driver::AnalyzedModule;
 use radix_hir::visit::{HirVisitorMut, walk_expr_mut};
-use radix_hir::{HirExpression, HirExpressionKind};
+use radix_hir::{HirExpression, HirExpressionKind, HirLiteral};
+use radix_types::{Primitive, Type, TypeId, TypeTable};
 use rustc_hash::FxHashMap;
 
 /// Renumbered id families. Each family gets its own first-occurrence counter.
@@ -66,6 +67,7 @@ pub(crate) struct MeaningDifference {
 pub(crate) fn meaning_fingerprint(analysis: &AnalyzedModule) -> Vec<MeaningSegment> {
     let mut hir = analysis.hir.clone();
     HandledBodyFlattener.visit_program_mut(&mut hir);
+    BinaryFloatLiteralSpelling { types: &analysis.types }.visit_program_mut(&mut hir);
     let mut canon = Canonicalizer::new(analysis);
     let mut segments = Vec::with_capacity(hir.items.len() + 2);
     for (index, item) in hir.items.iter().enumerate() {
@@ -101,6 +103,42 @@ impl HirVisitorMut for HandledBodyFlattener {
                 HirExpressionKind::Block(inner) => *body = inner,
                 kind => body.expr = Some(Box::new(HirExpression { kind, ..*tail })),
             }
+        }
+    }
+}
+
+/// Binary-float literal spelling is not meaning.
+///
+/// Typecheck retypes an integer constant in a `fractus` slot to
+/// `Float(value)`; the emitter spells it `2.0`, which re-parses as
+/// `FloatText { value, text: "2.0" }`. For a binary float the `text` carries
+/// nothing the `value` does not (only decimal widths scale from the digits),
+/// so both shapes render as `Float(value)`. The value still compares, so a
+/// different number is still a different program; decimal-typed literals keep
+/// their text.
+struct BinaryFloatLiteralSpelling<'a> {
+    types: &'a TypeTable,
+}
+
+impl BinaryFloatLiteralSpelling<'_> {
+    fn is_binary_float(&self, mut ty: TypeId) -> bool {
+        loop {
+            match self.types.get(ty) {
+                Type::Alias(_, inner) => ty = *inner,
+                Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => return true,
+                _ => return false,
+            }
+        }
+    }
+}
+
+impl HirVisitorMut for BinaryFloatLiteralSpelling<'_> {
+    fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
+        walk_expr_mut(self, expr);
+        if let HirExpressionKind::Literal(HirLiteral::FloatText { value, .. }) = &expr.kind
+            && expr.ty.is_some_and(|ty| self.is_binary_float(ty))
+        {
+            expr.kind = HirExpressionKind::Literal(HirLiteral::Float(*value));
         }
     }
 }
