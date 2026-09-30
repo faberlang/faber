@@ -1358,6 +1358,9 @@ impl Lowerer<'_> {
                 .iter()
                 .filter_map(conversio_hint_symbol),
         );
+        if let Some(via) = &conversio.via {
+            self.lower_via_hint(via, &target, &mut params);
+        }
         // Fold constant literal sources to `HirLiteral::Regex` so regex values
         // share one HIR shape with future slash literals (Part B). Guard on the
         // absence of recovery: typecheck rejects `↦ regex ⊥ …`, but lowering
@@ -1380,6 +1383,42 @@ impl Lowerer<'_> {
             params,
             recovery,
             implicit: None,
+        }
+    }
+
+    /// Fold a `via HINT` clause (D11.9) into the conversion's hint slot.
+    ///
+    /// The clause and the pre-D11.9 second type argument are two spellings of
+    /// the same hint, so both land in `params` and route through the same
+    /// conversion rows. A clause carrying an unknown hint, sitting on a target
+    /// that takes none, or repeating a hint the target already spelled is
+    /// rejected (SEM016) and contributes no hint.
+    fn lower_via_hint(
+        &mut self,
+        via: &radix_syntax::Ident,
+        target: &HirConversioTarget,
+        params: &mut Vec<radix_lexer::Symbol>,
+    ) {
+        let hint = self.interner.resolve(via.name).to_owned();
+        let issue = if !crate::numeric_width::is_conversio_radix_hint(&hint) {
+            Some("conversio_via_unknown_hint")
+        } else if !via_target_takes_hint(self, target) {
+            Some("conversio_via_target_takes_no_hint")
+        } else if !params.is_empty() {
+            Some("conversio_via_and_type_argument_hint")
+        } else {
+            None
+        };
+        match issue {
+            Some(issue) => self.push_error(
+                SemanticErrorKind::ConversionInvalid,
+                vec![
+                    DiagnosticArg::new("issue", issue),
+                    DiagnosticArg::new("hint", hint),
+                ],
+                via.span,
+            ),
+            None => params.push(via.name),
         }
     }
 
@@ -1821,6 +1860,33 @@ fn generic_type_expr(arg: &GenericArgExpr) -> Option<TypeExpr> {
 
 fn generic_type_exprs(args: &[GenericArgExpr]) -> Option<Vec<TypeExpr>> {
     args.iter().map(generic_type_expr).collect()
+}
+
+/// Whether a `↦` target can carry a convert hint: the numeric families, the
+/// ascii format pack, `littera` (`Code`), or a generic parameter that a caller
+/// instantiates. Typecheck still decides which (source, target, hint) rows
+/// exist; this only rejects targets no row can ever carry a hint for.
+fn via_target_takes_hint(lowerer: &Lowerer<'_>, target: &HirConversioTarget) -> bool {
+    let HirConversioTarget::Type(ty) = target else {
+        return false;
+    };
+    let mut ty = *ty;
+    loop {
+        match lowerer.types.get(ty) {
+            crate::Type::Option(inner) | crate::Type::Ref(_, inner) => ty = *inner,
+            crate::Type::Primitive(
+                Primitive::Numerus | Primitive::Fractus | Primitive::Ascii | Primitive::Littera,
+            )
+            | crate::Type::SizedNumeric(..)
+            | crate::Type::ModularWord(_)
+            | crate::Type::SaturatingWord(_)
+            | crate::Type::BoundedAscii { .. }
+            | crate::Type::Param(_)
+            | crate::Type::Alias(..)
+            | crate::Type::Error => return true,
+            _ => return false,
+        }
+    }
 }
 
 fn conversio_radix_hints(

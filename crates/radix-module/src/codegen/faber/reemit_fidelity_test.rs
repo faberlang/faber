@@ -365,27 +365,32 @@ fn negated_type_check_uses_infix_non_est() {
 }
 
 #[test]
-fn conversio_markers_ride_target_generic_arguments() {
-    // `↦ numerus<u32, Be>` — markers are extra generic arguments; a trailing
-    // `<Be>` append is not the source form.
+fn conversio_markers_rewrite_to_the_via_clause() {
+    // D11.9: a convert hint is a `via` clause after the target, never a type
+    // argument. The legacy `↦ numerus<u32, Be>` spelling re-emits as the
+    // clause; a trailing `<Be>` append is not the source form.
     //
     // D5.7 retired top-level `fixum`; this binding moves inside `incipit`
     // (the marker spelling under test is unrelated to item vs. local scope).
     let code = assert_idempotent("incipit {\n    fixum numerus<u32> le ← |de ad be ef|[0‥4] ↦ numerus<u32, Be>\n}\n");
     assert!(
-        code.contains("↦ numerus<u32, Be>"),
-        "conversio marker must fold into the target generics:\n{code}"
+        code.contains("↦ numerus<u32> via Be"),
+        "conversio marker must re-emit as a via clause:\n{code}"
     );
+    let clause =
+        assert_idempotent("incipit {\n    fixum numerus<u32> le ← |de ad be ef|[0‥4] ↦ numerus<u32> via Be\n}\n");
+    assert_eq!(code, clause, "both spellings re-emit to the same source");
 }
 
 #[test]
-fn littera_code_marker_rides_the_scalar_head() {
-    // D10.6 `n ↦ littera<Code>`: the hint is the scalar head's only generic
-    // argument, never the float-family width wrap (`fractus<littera, Code>`).
+fn littera_code_marker_rewrites_to_the_via_clause() {
+    // D10.6 `n ↦ littera<Code>` and D11.9 `n ↦ littera via Code` are one
+    // hint: the target stays the plain scalar head, never the float-family
+    // width wrap (`fractus<littera, Code>`).
     let code = assert_idempotent("incipit {\n    fixum littera c ← 65 ↦ littera<Code> ⊥ '?'\n    scribe c\n}\n");
     assert!(
-        code.contains("↦ littera<Code>"),
-        "the Code hint must stay on the littera head:\n{code}"
+        code.contains("↦ littera via Code ⊥ '?'"),
+        "the Code hint must re-emit as a via clause on the littera head:\n{code}"
     );
 }
 

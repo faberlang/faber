@@ -231,6 +231,8 @@ pub enum TokenKind {
     Scriptum,
     Sparge,
     Ut,
+    /// Convert-hint clause opener after a `↦` target (`x ↦ u32 via Hex`, D11.9).
+    Via,
     // === Keywords: Ranges ===
     Ab,
     Ante,
@@ -472,6 +474,7 @@ impl TokenKind {
                 | Scriptum
                 | Sparge
                 | Ut
+                | Via
                 | Ante
                 | Inter
                 | Intra

@@ -184,6 +184,9 @@ pub enum KeywordOwner {
 
     /// Head of a `generis` static initializer (`insere "path"`, D8.10).
     StaticInitializer,
+
+    /// Convert-hint clause after a `↦` target type (`u32 via Hex`, D11.9).
+    ConversionHint,
 }
 
 /// Keyword grouping used by diagnostics, explain data, and registry consumers.
@@ -339,6 +342,7 @@ const DECLARATION_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::DeclarationIntro
 const CONTROL_FLOW: &[KeywordOwner] = &[KeywordOwner::ControlFlow];
 const EXPRESSION_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::ExpressionIntroducer];
 const STATIC_INITIALIZER: &[KeywordOwner] = &[KeywordOwner::StaticInitializer];
+const CONVERSION_HINT: &[KeywordOwner] = &[KeywordOwner::ConversionHint];
 const RANGE_OPERATOR: &[KeywordOwner] = &[KeywordOwner::RangeOperator];
 const STATEMENT_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::StatementIntroducer];
 const DECLARATION_MARKER: &[KeywordOwner] = &[KeywordOwner::DeclarationMarker];
@@ -1096,6 +1100,15 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(ALIAS_MARKER),
         category: KeywordKind::Misc,
     },
+    // `via` (D11.9) opens the convert-hint clause right after a `↦` target
+    // type on the same line (`x ↦ u32 via Hex`). Everywhere else the spelling
+    // stays an ordinary identifier; it is never reserved.
+    KeywordSpec {
+        text: "via",
+        token_kind: Some(TokenKind::Via),
+        scope: KeywordScope::Contextual(CONVERSION_HINT),
+        category: KeywordKind::Misc,
+    },
     // === Keywords: Ranges ===
     KeywordSpec {
         text: "ante",
@@ -1528,7 +1541,8 @@ fn keyword_owner_is_identifier_like(owner: KeywordOwner) -> bool {
         | KeywordOwner::StatementIntroducer
         | KeywordOwner::DeclarationMarker
         | KeywordOwner::RouteExpression
-        | KeywordOwner::StaticInitializer => false,
+        | KeywordOwner::StaticInitializer
+        | KeywordOwner::ConversionHint => false,
     }
 }
 

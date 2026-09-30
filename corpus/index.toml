@@ -2215,6 +2215,12 @@ kind = "operator-group"
 category = "conversion"
 
 [[files]]
+path = "conversio/via-hint.fab"
+term = "via"
+kind = "conversio"
+category = "conversion"
+
+[[files]]
 path = "cuda/addita-proof.fab"
 term = "cuda"
 kind = "kernel"

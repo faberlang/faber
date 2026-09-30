@@ -1654,3 +1654,7 @@ mod insere_test;
 #[cfg(test)]
 #[path = "praefixum_test.rs"]
 mod praefixum_test;
+
+#[cfg(test)]
+#[path = "via_hint_test.rs"]
+mod via_hint_test;

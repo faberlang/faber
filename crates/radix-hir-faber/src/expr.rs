@@ -953,7 +953,19 @@ impl super::FaberCodegen<'_> {
                         let mut target_str = self
                             .type_to_faber_at(&site, *ty, names, surface)
                             .unwrap_or_else(|error| self.record_type_emission_error(error));
-                        if !params.is_empty() {
+                        if let [hint] = params.as_slice() {
+                            // D11.9: a convert hint is a `via` clause after
+                            // the target, never a type argument, so the
+                            // legacy `int<u32, Bits>` form rewrites to
+                            // `u32 via Bits` at the source's own locale.
+                            target_str.push(' ');
+                            target_str.push_str(surface.keyword(TokenKind::Via));
+                            target_str.push(' ');
+                            target_str.push_str(&self.symbol_to_string(*hint));
+                        } else if !params.is_empty() {
+                            // More than one hint cannot ride a single `via`
+                            // clause (typecheck rejects the combination), so
+                            // it keeps the type-argument spelling.
                             // Conversio markers (`Be` / `Le` / `Bits`) are extra
                             // generic arguments on the target type
                             // (`int<u32, Be>`); a trailing `<Be>` append is not

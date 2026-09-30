@@ -1,0 +1,93 @@
++++
+term = "via"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_expr", "range_tail", "conversio_expr", "inline_default", "expression", "literal", "nota_stmt"]
+category = "conversion"
+summary = "A convert hint is a via clause on the conversion: `x ↦ u32 via Hex`. The clause binds tighter than the ⊥ default and chains."
+syntax = "<expr> ↦ <type> via Hex|Bin|Oct|Be|Le|Bits|Code [⊥ <default>]"
+aliases = ["via clause", "convert hint"]
+related = ["↦", "⊥", "Bits", "Code", "octeti"]
+locale = "en"
++++
+# =============================================================================
+# via — the convert-hint clause on ↦ (D11.9).
+# =============================================================================
+#
+# What this teaches:
+#   • A hint is a modifier of the conversion, not part of the target type —
+#     `↦ u32 via Le` reads the window little-endian, `↦ i32 via Hex` parses
+#     hexadecimal text, `↦ char via Code` builds a character from a code
+#     point.
+#   • The clause binds tighter than the `⊥` default — `x ↦ i32 via Hex ⊥ -1`
+#     is `(x ↦ i32 via Hex) ⊥ -1`, so the default catches a failed parse.
+#   • Conversions chain, each hop with its own clause —
+#     `"ff" ↦ u32 via Hex ↦ f64` parses hexadecimal text as an unsigned
+#     integer, then widens it to a float.
+#   • The hints are compile-time identifiers, spelled the same in every
+#     locale: Hex, Bin, Oct, Be, Le, Bits, Code. `via` itself is contextual;
+#     it stays an ordinary name everywhere a clause cannot start.
+#
+# Common mistakes:
+#   • writing the hint as a type argument — `int<u32, Bits>` is the retired
+#     form; write `u32 via Bits`
+#   • an unknown hint, or a hint on a target that takes none —
+#     `n ↦ string via Hex` is rejected
+#
+# See also: ↦, ⊥, Bits, Code, octeti
+# =============================================================================
+
+
+# conversio — via HINT clause
+#
+# <expr> ↦ <type> via HINT ⊥ <default>
+#
+# EXPECTED OUTPUT:
+#   60
+#   15360
+#   255.0
+#   255
+#   -1
+#   65
+#   A
+#   1.0
+#   7
+#
+# BACKEND:
+#   Every hint routes to the same conversion row it selected as a type
+#   argument; the clause is a spelling, not a new row.
+
+main {
+    const bytes raw ← |3c 00|
+
+    # Endian unpack of an exact-width window.
+    const int<u16> little ← raw[0‥2] ↦ u16 via Le
+    print little
+    const int<u16> big ← raw[0‥2] ↦ u16 via Be
+    print big
+
+    # A chain: parse hex text as u32, then widen the number to f64.
+    const f64 widened ← "ff" ↦ u32 via Hex ↦ f64
+    print widened
+
+    # Text parse at a radix; the clause is finished before the default.
+    const i32 parsed ← "ff" ↦ i32 via Hex
+    print parsed
+    const i32 rescued ← "zz" ↦ i32 via Hex ⊥ -1
+    print rescued
+
+    # Code points: read one from a char, build a char from one.
+    const char letter ← 'A'
+    const u32 code ← letter ↦ u32 via Code
+    print code
+    const char built ← 65 ↦ char via Code ⊥ '?'
+    print built
+
+    # Bit reinterpretation: the pattern 0x3f800000 is the float 1.0.
+    const u32 pattern ← 1065353216
+    const f32 one ← pattern ↦ f32 via Bits
+    print one
+
+    # `via` is an ordinary name outside the clause.
+    const int via ← 7
+    print via
+}

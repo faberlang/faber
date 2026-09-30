@@ -441,6 +441,15 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         "code_hint_pair_mismatch" => {
             Some("Code reads a code point as littera ↦ numerus<u32, Code> or builds one as numerus ↦ littera<Code>".to_owned())
         }
+        "conversio_via_unknown_hint" => {
+            Some("use one of Hex, Bin, Oct, Be, Le, Bits, or Code after via".to_owned())
+        }
+        "conversio_via_target_takes_no_hint" => {
+            Some("drop the via clause; only numeric, ascii, and littera targets take a hint".to_owned())
+        }
+        "conversio_via_and_type_argument_hint" => Some(
+            "keep only the via clause: write `u32 via Bits`, not `numerus<u32, Bits> via Bits`".to_owned(),
+        ),
         "conversio_bits_format_hint_conflict" => {
             Some("drop the Hex/Bin/Oct hint or the Bits hint; one interpretation per conversio".to_owned())
         }

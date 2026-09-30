@@ -52,5 +52,9 @@ mod saturating_word_test;
 mod trapping_word_test;
 
 #[cfg(test)]
+#[path = "via_hint_test.rs"]
+mod via_hint_test;
+
+#[cfg(test)]
 #[path = "nary_range_test.rs"]
 mod nary_range_test;

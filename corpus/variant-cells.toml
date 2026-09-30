@@ -810,6 +810,15 @@ exemplum = "conversio/ascii-format.fab"
 expected = true
 
 [[cells]]
+id = "cast.via-hint"
+family = "casts"
+cell = "via convert-hint clause (Le/Be/Bits/Hex/Code, chain, ⊥ default)"
+status = "direct"
+exemplum = "conversio/via-hint.fab"
+expected = true
+note = "D11.9 (qp1a): the hint is a via clause, additive beside the legacy second type argument until N7c/qp1c"
+
+[[cells]]
 id = "cast.convert-assign"
 family = "casts"
 cell = "↤ convert-assign"

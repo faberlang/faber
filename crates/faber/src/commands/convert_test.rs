@@ -504,6 +504,104 @@ fn policy(trapping<u8> a) → trapping<i64> {
     );
 }
 
+/// D11.9: a convert hint is a `via` clause. Old sources that spell the hint as
+/// a second type argument re-emit as the clause, in every locale's own word.
+const VIA_HINT_SOURCE: &str = r#"+++
+locale = "en"
++++
+main {
+    const bytes raw ← |3c 00 00 00|
+    const char big ← 'A'
+    const int<u16> a ← raw[0‥2] ↦ int<u16, Le>
+    const f16 b ← a ↦ float<f16, Bits>
+    const int c ← "ff" ↦ int<i32, Hex> ⊥ 0
+    const int<u32> d ← big ↦ int<u32, Code>
+    const char e ← 65 ↦ char<Code> ⊥ '?'
+    const int<u16> f ← raw[0‥2] ↦ u16 via Le
+    const f16 g ← f ↦ f16 via Bits
+    const int via ← c
+    print via
+}
+"#;
+
+#[test]
+fn convert_rewrites_type_argument_hints_to_the_via_clause() {
+    let fixture = std::env::temp_dir().join("faber-convert-via-hint-rewrite.fab");
+    fs::write(&fixture, VIA_HINT_SOURCE).expect("write via fixture");
+    let path = fixture.to_str().expect("utf8 fixture path");
+    let formatted = run_faber_convert_stdout_with_args(&["format", "--stdout", path]);
+    let latin = run_faber_convert_stdout_with_args(&["convert", "--to", "la", "--stdout", path]);
+    let _ = fs::remove_file(&fixture);
+
+    for (needle, what) in [
+        ("↦ int<u16> via Le", "int<u16, Le> rewrites to a clause"),
+        ("↦ f16 via Bits", "float<f16, Bits> rewrites to a clause"),
+        (
+            "↦ int<i32> via Hex ⊥ 0",
+            "the clause binds before the default",
+        ),
+        ("↦ int<u32> via Code", "the code-point read"),
+        ("↦ char via Code ⊥ '?'", "char<Code> rewrites to a clause"),
+    ] {
+        assert!(formatted.contains(needle), "{what}:\n{formatted}");
+    }
+    assert!(
+        !formatted.contains(", Le>")
+            && !formatted.contains(", Hex>")
+            && !formatted.contains("<Code>"),
+        "no hint stays a type argument:\n{formatted}"
+    );
+    assert!(
+        formatted.contains("const int via ← c") && formatted.contains("print via"),
+        "`via` stays an ordinary name:\n{formatted}"
+    );
+    assert!(latin.contains("↦ numerus<u16> via Le"), "{latin}");
+    assert!(latin.contains("↦ littera via Code ⊥ '?'"), "{latin}");
+}
+
+#[test]
+fn format_of_the_via_clause_is_a_fixpoint_for_both_spellings() {
+    let fixture = std::env::temp_dir().join("faber-format-via-hint-fixpoint.fab");
+    fs::write(&fixture, VIA_HINT_SOURCE).expect("write via fixture");
+    let path = fixture.to_str().expect("utf8 fixture path");
+    let once = run_faber_convert_stdout_with_args(&["format", "--stdout", path]);
+    fs::write(&fixture, &once).expect("rewrite formatted fixture");
+    let twice = run_faber_convert_stdout_with_args(&["format", "--stdout", path]);
+    let _ = fs::remove_file(&fixture);
+    assert_eq!(once, twice, "parse → emit → parse is a fixpoint");
+}
+
+#[test]
+fn convert_spells_the_via_clause_in_each_pack_and_reads_it_back() {
+    let fixture = std::env::temp_dir().join("faber-convert-via-hint-packs.fab");
+    fs::write(&fixture, VIA_HINT_SOURCE).expect("write via fixture");
+    let path = fixture.to_str().expect("utf8 fixture path");
+    let latin = run_faber_convert_stdout_with_args(&["convert", "--to", "la", "--stdout", path]);
+    for (locale, word) in [
+        ("en", "via"),
+        ("ar", "عبر"),
+        ("hi", "द्वारा"),
+        ("th-TH", "ผ่านทาง"),
+        ("vi", "thông_qua"),
+        ("zh-Hans", "经由"),
+        ("zh-Hant", "經由"),
+    ] {
+        let localized =
+            run_faber_convert_stdout_with_args(&["convert", "--to", locale, "--stdout", path]);
+        assert!(
+            localized.contains(&format!(" {word} Le"))
+                && localized.contains(&format!(" {word} Bits")),
+            "{locale} must spell the clause `{word}`:\n{localized}"
+        );
+        // Re-reading the localized source and converting back to Latin must
+        // give the original Latin output: the clause word round-trips.
+        fs::write(&fixture, &localized).expect("write localized fixture");
+        let back = run_faber_convert_stdout_with_args(&["convert", "--to", "la", "--stdout", path]);
+        assert_eq!(back, latin, "{locale} → la must round-trip the via clause");
+    }
+    let _ = fs::remove_file(&fixture);
+}
+
 #[test]
 fn convert_preserves_template_application_sugar() {
     // Reader-locale packs re-render the same semantic program with different

@@ -1265,6 +1265,7 @@ impl Parser {
         } else {
             Vec::new()
         };
+        let via = self.parse_via_clause()?;
         if self.check(&TokenKind::ExitArrow) {
             return Err(self.invalid_expression_error("recovery_uses_exit_arrow"));
         }
@@ -1280,10 +1281,41 @@ impl Parser {
                 expr: Box::new(operand),
                 target,
                 type_params,
+                via,
                 recovery,
             }),
             span,
         })
+    }
+
+    /// Parse the optional `via HINT` clause after a `↦` target (D11.9).
+    ///
+    /// GRAMMAR:
+    ///   `via_clause` := 'via' IDENTIFIER
+    ///
+    /// WHY: `via` is contextual (never reserved): real programs bind it as an
+    /// ordinary name. It is claimed only on the same line as the conversion
+    /// target, so a following statement that starts with the identifier `via`
+    /// stays a new statement. The clause binds tighter than the `⊥` default:
+    /// `x ↦ u32 via Hex ⊥ 0` is `(x ↦ u32 via Hex) ⊥ 0`. Whether the hint is
+    /// known, and whether the target takes one, is semantic (lowering).
+    fn parse_via_clause(&mut self) -> Result<Option<Ident>, ParseError> {
+        if !self.check_keyword_ident(TokenKind::Via) || self.raw_newline_before_next_word() {
+            return Ok(None);
+        }
+        let via_span = self.current_span();
+        self.advance();
+        if !self.raw_newline_before_next_word()
+            && let TokenKind::Ident(name) = self.peek().kind
+        {
+            let span = self.current_span();
+            self.advance();
+            return Ok(Some(Ident { name, span }));
+        }
+        Err(
+            ParseError::structured(ParseErrorKind::ExpressionInvalid, via_span)
+                .with_arg("issue", "conversio_via_missing_hint"),
+        )
     }
 
     /// Parse an optional `⊥ default` (D17.7) into the `recovery` slot.

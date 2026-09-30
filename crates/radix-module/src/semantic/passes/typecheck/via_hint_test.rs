@@ -1,0 +1,403 @@
+//! D11.9 `via` convert-hint clause: routing and diagnostics.
+//!
+//! Contract: `x ↦ u32 via Hex` and the pre-D11.9 second type argument
+//! (`numerus<u32, Hex>`) are two spellings of one hint. Every hint routes to
+//! exactly the conversion row it selected before, so the two spellings of each
+//! program compile to identical Rust. Misuse of the clause (unknown hint, a
+//! target that takes none, both spellings at once) is a structured error.
+
+use crate::driver::AnalyzeRequest;
+use crate::hir::{HirExpressionKind, HirStatementKind};
+use crate::{Compiler, Config, Output, Target};
+
+fn pack(id: &str) -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path(id))
+        .unwrap_or_else(|err| panic!("installed {id} pack should load: {err:?}"))
+}
+
+fn latin_config() -> Config {
+    Config::default().with_target(Target::HirRust)
+}
+
+fn english_config() -> Config {
+    Config::new().with_locale_pack(pack("en"))
+}
+
+/// Compile with `config`, asserting success, and return the generated Rust.
+fn rust_code(config: Config, source: &str) -> String {
+    let result = Compiler::new(config).compile_str("test.fab", source);
+    assert!(result.success(), "diagnostics for {source:?}: {:?}", result.diagnostics);
+    match result.output {
+        Some(Output::Rust(rust)) => rust.code,
+        _ => panic!("expected Rust output for {source:?}"),
+    }
+}
+
+fn diagnostics_with(config: Config, source: &str) -> Vec<crate::Diagnostic> {
+    let session = crate::driver::Session::new(config);
+    match crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()) {
+        Ok(unit) => unit.diagnostics,
+        Err(diagnostics) => diagnostics,
+    }
+}
+
+fn has_issue(diagnostics: &[crate::Diagnostic], issue: &str) -> bool {
+    diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.is_error() && diagnostic.issue() == Some(issue))
+}
+
+fn assert_issue(diagnostics: &[crate::Diagnostic], issue: &str) {
+    assert!(
+        has_issue(diagnostics, issue),
+        "expected error issue {issue:?}, got: {diagnostics:?}"
+    );
+}
+
+/// Target type and hint symbols of each conversion initializer of the entry
+/// block, in source order (a conversion chain reports outermost first).
+fn entry_conversions(source: &str) -> Vec<(String, Vec<String>)> {
+    let session = crate::driver::Session::new(latin_config());
+    let unit = crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()).expect("analyze");
+    assert!(
+        !unit
+            .diagnostics
+            .iter()
+            .any(radix_diagnostics::Diagnostic::is_error),
+        "diagnostics: {:?}",
+        unit.diagnostics
+    );
+    let entry = unit.hir.entry.as_ref().expect("incipit");
+    let mut found = Vec::new();
+    for stmt in &entry.statements {
+        let HirStatementKind::Local(local) = &stmt.kind else {
+            continue;
+        };
+        let mut node = local.init.as_ref();
+        while let Some(expr) = node {
+            let HirExpressionKind::Conversio { source, target, params, .. } = &expr.kind else {
+                break;
+            };
+            let target = match target {
+                crate::hir::HirConversioTarget::Type(ty) => format!("{:?}", unit.types.get(*ty)),
+                crate::hir::HirConversioTarget::Intervallum(_) => "intervallum".to_owned(),
+            };
+            let hints = params
+                .iter()
+                .map(|param| unit.interner.resolve(*param).to_owned())
+                .collect();
+            found.push((target, hints));
+            node = Some(source);
+        }
+    }
+    found
+}
+
+/// One hint row: the same program written with the legacy second type
+/// argument and with the `via` clause. `{}` marks the conversion body.
+struct Row {
+    name: &'static str,
+    frame: &'static str,
+    legacy: &'static str,
+    via: &'static str,
+}
+
+const ROWS: &[Row] = &[
+    Row {
+        name: "Hex",
+        frame: "functio f(textus s) → numerus<i32> {{ redde s {} ⊥ 0 }}",
+        legacy: "↦ numerus<i32, Hex>",
+        via: "↦ numerus<i32> via Hex",
+    },
+    Row {
+        name: "Bin",
+        frame: "functio f(textus s) → numerus<u8> {{ redde s {} ⊥ 0 }}",
+        legacy: "↦ numerus<u8, Bin>",
+        via: "↦ numerus<u8> via Bin",
+    },
+    Row {
+        name: "Oct",
+        frame: "functio f(textus s) → numerus<i32> {{ redde s {} ⊥ 0 }}",
+        legacy: "↦ numerus<i32, Oct>",
+        via: "↦ numerus<i32> via Oct",
+    },
+    Row {
+        name: "Be",
+        frame: "incipit {{ fixum _ v ← |de ad be ef|[0‥4] {} }}",
+        legacy: "↦ numerus<u32, Be>",
+        via: "↦ u32 via Be",
+    },
+    Row {
+        name: "Le",
+        frame: "incipit {{ fixum _ v ← |de ad be ef|[0‥4] {} }}",
+        legacy: "↦ numerus<u32, Le>",
+        via: "↦ u32 via Le",
+    },
+    Row {
+        name: "Be float",
+        frame: "incipit {{ fixum _ v ← |3f 80 00 00|[0‥4] {} }}",
+        legacy: "↦ fractus<f32, Be>",
+        via: "↦ f32 via Be",
+    },
+    Row {
+        name: "Le float",
+        frame: "incipit {{ fixum _ v ← |00 00 80 3f|[0‥4] {} }}",
+        legacy: "↦ fractus<f32, Le>",
+        via: "↦ f32 via Le",
+    },
+    Row {
+        name: "Bits u32 to f32",
+        frame: "functio f(numerus<u32> n) → fractus<f32> {{ redde n {} }}",
+        legacy: "↦ fractus<f32, Bits>",
+        via: "↦ f32 via Bits",
+    },
+    Row {
+        name: "Bits f64 to u64",
+        frame: "functio f(fractus<f64> x) → numerus<u64> {{ redde x {} }}",
+        legacy: "↦ numerus<u64, Bits>",
+        via: "↦ u64 via Bits",
+    },
+    Row {
+        name: "Code read",
+        frame: "functio f(littera c) → numerus<u32> {{ redde c {} }}",
+        legacy: "↦ numerus<u32, Code>",
+        via: "↦ u32 via Code",
+    },
+    Row {
+        name: "Code build",
+        frame: "functio f(numerus n) → littera {{ redde n {} ⊥ '?' }}",
+        legacy: "↦ littera<Code>",
+        via: "↦ littera via Code",
+    },
+    Row {
+        name: "ascii Hex",
+        frame: "functio f(numerus<u32> n) → ascii<8> {{ redde n {} ⊥ '--' }}",
+        legacy: "↦ ascii<8, Hex>",
+        via: "↦ ascii<8> via Hex",
+    },
+    Row {
+        name: "ascii Bin",
+        frame: "functio f(numerus<u8> n) → ascii<8> {{ redde n {} ⊥ '--' }}",
+        legacy: "↦ ascii<8, Bin>",
+        via: "↦ ascii<8> via Bin",
+    },
+    Row {
+        name: "ascii Oct",
+        frame: "functio f(numerus<u16> n) → ascii<8> {{ redde n {} ⊥ '--' }}",
+        legacy: "↦ ascii<8, Oct>",
+        via: "↦ ascii<8> via Oct",
+    },
+    Row {
+        name: "ascii solved hole",
+        frame: "incipit {{ fixum _ v ← 255 {} }}",
+        legacy: "↦ ascii<_, Hex>",
+        via: "↦ ascii<_> via Hex",
+    },
+];
+
+fn splice(frame: &str, conversion: &str) -> String {
+    frame
+        .replacen("{}", conversion, 1)
+        .replace("{{", "{")
+        .replace("}}", "}")
+}
+
+#[test]
+fn every_hint_row_routes_the_via_clause_exactly_as_the_type_argument() {
+    for row in ROWS {
+        let legacy = rust_code(latin_config(), &splice(row.frame, row.legacy));
+        let via = rust_code(latin_config(), &splice(row.frame, row.via));
+        assert_eq!(
+            legacy, via,
+            "row {}: the via clause must lower to the same Rust as the type argument",
+            row.name
+        );
+    }
+}
+
+#[test]
+fn every_hint_row_routes_identically_under_the_english_surface() {
+    let rows = [
+        (
+            "fn f(string s) → int<i32> { return s {} ⊥ 0 }",
+            "↦ int<i32, Hex>",
+            "↦ int<i32> via Hex",
+        ),
+        (
+            "fn f(int<u32> n) → float<f32> { return n {} }",
+            "↦ float<f32, Bits>",
+            "↦ f32 via Bits",
+        ),
+        ("fn f(char c) → int<u32> { return c {} }", "↦ int<u32, Code>", "↦ u32 via Code"),
+        ("main { const _ v ← |de ad be ef|[0‥4] {} }", "↦ int<u32, Be>", "↦ u32 via Be"),
+    ];
+    for (frame, legacy, via) in rows {
+        let legacy = rust_code(english_config(), &frame.replacen("{}", legacy, 1));
+        let via = rust_code(english_config(), &frame.replacen("{}", via, 1));
+        assert_eq!(legacy, via, "english frame {frame}");
+    }
+}
+
+#[test]
+fn the_conversion_node_carries_the_hint_from_either_spelling() {
+    let legacy = entry_conversions(
+        r#"incipit {
+    fixum _ a ← "ff" ↦ numerus<i32, Hex>
+    fixum littera big ← 'A'
+    fixum _ b ← big ↦ numerus<u32, Code>
+}"#,
+    );
+    let via = entry_conversions(
+        r#"incipit {
+    fixum _ a ← "ff" ↦ numerus<i32> via Hex
+    fixum littera big ← 'A'
+    fixum _ b ← big ↦ u32 via Code
+}"#,
+    );
+    let hints: Vec<_> = legacy.iter().map(|(_, hints)| hints.clone()).collect();
+    assert_eq!(hints, vec![vec!["Hex".to_owned()], vec!["Code".to_owned()]]);
+    assert_eq!(legacy, via, "same target types and hints from either spelling");
+}
+
+#[test]
+fn the_f16_bits_row_routes_the_same_from_either_spelling() {
+    // The Rust target has no half-float carrier, so this row is compared at
+    // the HIR conversion node instead of through generated code.
+    let legacy = entry_conversions("incipit { fixum numerus<u16> n ← 15360\n fixum _ x ← n ↦ fractus<f16, Bits> }");
+    let via = entry_conversions("incipit { fixum numerus<u16> n ← 15360\n fixum _ x ← n ↦ f16 via Bits }");
+    assert_eq!(legacy, via);
+    assert_eq!(legacy[0].1, vec!["Bits".to_owned()]);
+}
+
+#[test]
+fn a_plain_conversion_carries_no_hint() {
+    let hints = entry_conversions(r#"incipit { fixum _ a ← "22" ↦ numerus }"#);
+    assert_eq!(hints.len(), 1);
+    assert!(hints[0].1.is_empty());
+}
+
+#[test]
+fn the_default_binds_after_the_via_clause() {
+    let with_default = rust_code(
+        latin_config(),
+        r#"functio f(textus s) → numerus<i32> { redde s ↦ numerus<i32> via Hex ⊥ 7 }"#,
+    );
+    let legacy = rust_code(
+        latin_config(),
+        r#"functio f(textus s) → numerus<i32> { redde s ↦ numerus<i32, Hex> ⊥ 7 }"#,
+    );
+    assert_eq!(with_default, legacy);
+}
+
+#[test]
+fn chained_conversions_carry_one_hint_per_hop() {
+    let via = entry_conversions(
+        "incipit { fixum octeti b ← |3c 00|\n fixum _ x ← b[0‥2] ↦ u16 via Le ↦ f16 via Bits ↦ f32 }",
+    );
+    let legacy = entry_conversions(
+        "incipit { fixum octeti b ← |3c 00|\n fixum _ x ← b[0‥2] ↦ numerus<u16, Le> ↦ fractus<f16, Bits> ↦ f32 }",
+    );
+    assert_eq!(via, legacy);
+    let hints: Vec<_> = via.iter().map(|(_, hints)| hints.clone()).collect();
+    assert_eq!(
+        hints,
+        vec![Vec::<String>::new(), vec!["Bits".to_owned()], vec!["Le".to_owned()]],
+        "outermost hop first: the last hop has no hint"
+    );
+}
+
+#[test]
+fn existing_pair_rules_still_reject_through_the_via_clause() {
+    // The clause changes the spelling, not the rows: a wrong pair fails with
+    // the same structured issue it failed with as a type argument.
+    assert_issue(
+        &diagnostics_with(
+            latin_config(),
+            "functio f(numerus<u16> n) → fractus<f32> { redde n ↦ f32 via Bits }",
+        ),
+        "bits_pair_width_mismatch",
+    );
+    assert_issue(
+        &diagnostics_with(latin_config(), "functio f(textus s) → numerus<u32> { redde s ↦ u32 via Code }"),
+        "code_hint_pair_mismatch",
+    );
+}
+
+#[test]
+fn an_unknown_hint_after_via_is_a_structured_error() {
+    assert_issue(
+        &diagnostics_with(
+            latin_config(),
+            "functio f(textus s) → numerus<i32> { redde s ↦ numerus<i32> via Hexx }",
+        ),
+        "conversio_via_unknown_hint",
+    );
+}
+
+#[test]
+fn via_on_a_target_that_takes_no_hint_is_a_structured_error() {
+    for source in [
+        "functio f(numerus n) → textus { redde n ↦ textus via Hex }",
+        "functio f(numerus n) → bivalens { redde n ↦ bivalens via Bits }",
+        "functio f(numerus n) → lista<numerus> { redde n ↦ lista<numerus> via Hex }",
+        "functio f(numerus n) → numerus { redde n ↦ 0‥10 via Hex }",
+    ] {
+        assert_issue(&diagnostics_with(latin_config(), source), "conversio_via_target_takes_no_hint");
+    }
+}
+
+#[test]
+fn a_hint_given_both_as_type_argument_and_via_clause_is_an_error() {
+    assert_issue(
+        &diagnostics_with(
+            latin_config(),
+            "functio f(textus s) → numerus<i32> { redde s ↦ numerus<i32, Hex> via Hex }",
+        ),
+        "conversio_via_and_type_argument_hint",
+    );
+}
+
+#[test]
+fn via_without_a_hint_is_a_parse_error_issue() {
+    assert_issue(
+        &diagnostics_with(
+            latin_config(),
+            "functio f(textus s) → numerus<i32> { redde s ↦ numerus<i32> via }",
+        ),
+        "conversio_via_missing_hint",
+    );
+}
+
+#[test]
+fn via_stays_an_ordinary_name_in_a_program_that_also_uses_the_clause() {
+    let code = rust_code(
+        latin_config(),
+        r#"functio f(textus via) → numerus<i32> {
+    fixum _ n ← via ↦ numerus<i32> via Hex ⊥ 0
+    redde n
+}"#,
+    );
+    assert!(code.contains("via"), "{code}");
+}
+
+#[test]
+fn every_installed_pack_spells_the_clause_word() {
+    // The clause word is a keyword row in each installed pack. The six
+    // translated packs carry unreviewed proposals (pack-owner work); the row
+    // itself is gated by the pack-completeness tests.
+    for (id, word) in [
+        ("en", "via"),
+        ("la", "via"),
+        ("ar", "عبر"),
+        ("hi", "द्वारा"),
+        ("th-TH", "ผ่านทาง"),
+        ("vi", "thông_qua"),
+        ("zh-Hans", "经由"),
+        ("zh-Hant", "經由"),
+    ] {
+        let pack = pack(id);
+        let spelling = radix_lexer::KeywordPack::keyword_spelling(&pack, "via")
+            .unwrap_or_else(|| panic!("{id} pack has no `via` keyword row"));
+        assert_eq!(spelling, word, "{id} clause word");
+    }
+}
