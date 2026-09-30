@@ -1367,8 +1367,7 @@ pub fn values_equal(left: &Value, right: &Value) -> bool {
         // Integer and float operands compare their exact values (ruling 22);
         // NaN equals nothing. Fuzzy `≈` is a collection Approximate call and
         // does not use this exact-value helper.
-        (Value::Int(_) | Value::UInt(_), Value::Int(_) | Value::UInt(_))
-        | (Value::Int(_) | Value::UInt(_), Value::Float(_))
+        (Value::Int(_) | Value::UInt(_), Value::Int(_) | Value::UInt(_) | Value::Float(_))
         | (Value::Float(_), Value::Int(_) | Value::UInt(_)) => {
             crate::exact_int::cmp_numeric(left, right).is_some_and(std::cmp::Ordering::is_eq)
         }

@@ -238,3 +238,21 @@ fn strict_equality_takes_an_integer_constant_by_value() {
         "equality_exact_types_required",
     );
 }
+
+#[test]
+fn range_endpoints_join_like_a_binary_pair() {
+    // An untyped constant joins the typed endpoint by value (ruling 12).
+    for source in [
+        "functio p(numerus<u8> x) {\n    itera ab 0‥(x + x - 398) fixum i {\n        nota i\n    }\n}\n",
+        "functio p(numerus<u8> x) {\n    itera ab 0‥x fixum i {\n        nota i\n    }\n}\n",
+        "functio p(numerus<u8> x) {\n    itera ab (x + x - 398)‥3 fixum i {\n        nota i\n    }\n}\n",
+        "functio p(numerus<u8> x) {\n    itera ab x‥(x + x) fixum i {\n        nota i\n    }\n}\n",
+    ] {
+        test_support::assert_analysis_accepts(source);
+    }
+    // A family crossing is still an error.
+    test_support::assert_analysis_rejects_with_issue(
+        "functio p(numerus<u8> x, fractus f) {\n    itera ab 0‥f fixum i {\n        nota i\n    }\n}\n",
+        "equality_exact_types_required",
+    );
+}

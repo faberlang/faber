@@ -4588,6 +4588,42 @@ fn tensor_sum_axis_partials_are_exact_and_the_result_is_stored() {
 }
 
 #[test]
+fn tensor_matmul_partials_are_exact_and_each_cell_is_stored() {
+    let matrix = |values: &[i64], shape: Vec<i64>| {
+        tensor_value(values.iter().copied().map(Value::Int).collect(), shape)
+    };
+    let run = |left: Value, right: Value| {
+        eval_tensor_op_typed(
+            MirCollectionOp::TensorMatMul,
+            i8_element(),
+            binary_operands(),
+            vec![(MirValueId(0), left), (MirValueId(1), right)],
+        )
+    };
+    // Partial 200 leaves i8, the finished cell 0 fits.
+    let ok = run(
+        matrix(&[100, 100, 100], vec![1, 3]),
+        matrix(&[1, 1, -2], vec![3, 1]),
+    )
+    .expect("finished cell fits");
+    let Value::Tensor(cell) = ok else {
+        panic!("expected tensor");
+    };
+    assert_eq!(cell.borrow().data, vec![Value::Int(0)]);
+    let err = run(
+        matrix(&[100, 100, 100], vec![1, 3]),
+        matrix(&[1, 1, 1], vec![3, 1]),
+    )
+    .expect_err("300 leaves i8");
+    assert_eq!(err.issue, crate::store::RUNNER_ISSUE_IMPLICIT_STORE_TRAP);
+    assert!(
+        err.message.contains("300 does not fit in `i8`"),
+        "{}",
+        err.message
+    );
+}
+
+#[test]
 #[ignore = "manual before/after bench; run with --ignored"]
 fn measure_tensor_matmul_128() {
     use std::time::Instant;

@@ -732,8 +732,7 @@ pub fn float_integer_conversio(
 ) -> Option<NumericWidth> {
     fn is_float(types: &TypeTable, ty: TypeId) -> bool {
         match types.get(ty) {
-            Type::Primitive(Primitive::Fractus) => true,
-            Type::SizedNumeric(Primitive::Fractus, _) => true,
+            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => true,
             Type::Alias(_, inner) => is_float(types, *inner),
             _ => false,
         }

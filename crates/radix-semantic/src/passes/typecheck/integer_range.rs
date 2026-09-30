@@ -674,6 +674,39 @@ impl TypeChecker<'_> {
         self.join_range_type(joined, span)
     }
 
+    /// Join of the two endpoints of an `intervallum` (ruling 12): an untyped
+    /// integer constant joins the other endpoint by value, and two trapping
+    /// integers of different widths join like any binary pair. `None` when the
+    /// pair is not a trapping-integer pair or is already two constants, so the
+    /// exact-type rule still applies (int against float stays an error).
+    pub(super) fn join_intervallum_bounds(
+        &mut self,
+        start: (&HirExpression, TypeId),
+        end: (&HirExpression, TypeId),
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        if self.current_device_function {
+            return None;
+        }
+        let side = |this: &Self, (expr, ty): (&HirExpression, TypeId)| {
+            let width = this.plain_int_width(ty)?;
+            Some((width, const_int_value(expr)))
+        };
+        let (start_width, start_const) = side(self, start)?;
+        let (end_width, end_const) = side(self, end)?;
+        let range_of = |width: NumericWidth, konst: Option<i128>| {
+            konst.map_or_else(|| width.integer_range(), |value| Some((value, value)))
+        };
+        if start_const.is_some() && end_const.is_some() {
+            return None;
+        }
+        let joined = range::hull(
+            range_of(start_width, start_const)?,
+            range_of(end_width, end_const)?,
+        );
+        Some(self.join_range_type(joined, span))
+    }
+
     /// Type of a `summa` reduction over integer terms: the element count is
     /// unbounded, so the sum sits at the 64-bit cap and keeps the term
     /// range's sign (ruling 21). Other term types keep their own type.

@@ -697,8 +697,9 @@ fn tensor_matmul_dot_products_are_exact_and_store_per_element() {
     let too_big = format!(
         "{setup}fixum tensor<numerus<i8>, [3, 1]> r ← seed.strue([1, 1, 1], [3, 1])\nfixum tensor<numerus<i8>, [1, 1]> p ← l.matmul(r)\nnota p.summa()"
     );
-    let (_, issue, _) = trap(&too_big);
-    assert_eq!(issue, "runner_numerus_overflow");
+    let (_, issue, message) = trap(&too_big);
+    assert_eq!(issue, "implicit_store_out_of_range");
+    assert!(message.contains("300 does not fit in `i8`"), "{message}");
 }
 
 #[test]

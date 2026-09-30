@@ -2565,15 +2565,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let [left, right] = args else {
             return Err(RunnerError::internal(span, "tensor matmul arity"));
         };
-        // Each finished cell is stored under the result element's width
-        // (ruling 19); the dot-product partials are exact.
-        let width = match self.types.get(return_ty.semantic_id()) {
-            Type::Tensor(element, _) | Type::Matrix(element, _) => {
-                effective_width(self.types, *element)
-            }
-            _ => None,
-        }
-        .unwrap_or(NumericWidth::I64);
+        // Each finished cell is stored under the result element type's slot
+        // policy (ruling 19); the dot-product partials are exact.
+        let element = self.tensor_element_type(return_ty);
         let left = self.tensor_arg(left, span)?;
         let right = self.tensor_arg(right, span)?;
         let borrow = left.borrow();
@@ -2603,42 +2597,58 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 (extract_f64s(&borrow.data), extract_f64s(&borrow_r.data))
             {
                 let cells = matmul_f64(&left_f, &right_f, m, k_left, n);
+                let cells = cells.into_iter().map(Value::Float).collect();
                 return Ok(tensor_value(
-                    cells.into_iter().map(Value::Float).collect(),
-                    output_shape.clone(),
+                    self.store_matmul_cells(element, cells, span)?,
+                    output_shape,
                 ));
             }
             if let (Some(left_i), Some(right_i)) =
                 (extract_i64s(&borrow.data), extract_i64s(&borrow_r.data))
             {
-                let cells = matmul_i64(&left_i, &right_i, m, k_left, n, width, span)?;
+                let cells = matmul_i64(&left_i, &right_i, m, k_left, n, span)?;
+                let cells = cells.into_iter().map(Value::Int).collect();
                 return Ok(tensor_value(
-                    cells.into_iter().map(Value::Int).collect(),
-                    output_shape.clone(),
+                    self.store_matmul_cells(element, cells, span)?,
+                    output_shape,
                 ));
             }
             if let (Some(left_u), Some(right_u)) =
                 (extract_u64s(&borrow.data), extract_u64s(&borrow_r.data))
             {
-                let cells = matmul_u64(&left_u, &right_u, m, k_left, n, width, span)?;
+                let cells = matmul_u64(&left_u, &right_u, m, k_left, n, span)?;
+                let cells = cells.into_iter().map(Value::UInt).collect();
                 return Ok(tensor_value(
-                    cells.into_iter().map(Value::UInt).collect(),
-                    output_shape.clone(),
+                    self.store_matmul_cells(element, cells, span)?,
+                    output_shape,
                 ));
             }
         }
+        let cells = matmul_values(
+            &borrow.data,
+            &borrow_r.data,
+            m,
+            k_left,
+            n,
+            NumericWidth::I64,
+            span,
+        )?;
         Ok(tensor_value(
-            matmul_values(
-                &borrow.data,
-                &borrow_r.data,
-                m,
-                k_left,
-                n,
-                NumericWidth::I64,
-                span,
-            )?,
+            self.store_matmul_cells(element, cells, span)?,
             output_shape,
         ))
+    }
+
+    fn store_matmul_cells(
+        &self,
+        element: Option<TypeId>,
+        cells: Vec<Value>,
+        span: Span,
+    ) -> Result<Vec<Value>, RunnerError> {
+        match element {
+            Some(element) => self.store_tensor_elements(element, cells, span),
+            None => Ok(cells),
+        }
     }
 
     /// Sum across a specified axis: `sum(x, axis)`.
@@ -4524,7 +4534,6 @@ fn matmul_i64(
     m: i64,
     k: i64,
     n: i64,
-    width: NumericWidth,
     span: Span,
 ) -> Result<Vec<i64>, RunnerError> {
     let wide = |values: &[i64]| values.iter().map(|v| i128::from(*v)).collect::<Vec<_>>();
@@ -4532,9 +4541,7 @@ fn matmul_i64(
     cells
         .into_iter()
         .map(|cell| {
-            let cell =
-                i64::try_from(cell).map_err(|_| RunnerError::internal(span, "numerus overflow"))?;
-            width_checked_add(cell, 0, width, span)
+            i64::try_from(cell).map_err(|_| RunnerError::internal(span, "numerus overflow"))
         })
         .collect()
 }
@@ -4545,7 +4552,6 @@ fn matmul_u64(
     m: i64,
     k: i64,
     n: i64,
-    width: NumericWidth,
     span: Span,
 ) -> Result<Vec<u64>, RunnerError> {
     let wide = |values: &[u64]| values.iter().map(|v| i128::from(*v)).collect::<Vec<_>>();
@@ -4553,9 +4559,7 @@ fn matmul_u64(
     cells
         .into_iter()
         .map(|cell| {
-            let cell =
-                u64::try_from(cell).map_err(|_| RunnerError::internal(span, "numerus overflow"))?;
-            uint_width_checked_add(cell, 0, width, span)
+            u64::try_from(cell).map_err(|_| RunnerError::internal(span, "numerus overflow"))
         })
         .collect()
 }

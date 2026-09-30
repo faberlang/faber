@@ -70,9 +70,13 @@ impl TypeChecker<'_> {
 
         self.require_intervallum_bound(start_ty, start.span);
         self.require_intervallum_bound(end_ty, end.span);
-        self.exact_equality_types(start_ty, end_ty, span);
-
-        let bound = self.resolve_inferred_type(start_ty);
+        let joined = self.join_intervallum_bounds((start, start_ty), (end, end_ty), span);
+        let bound = if let Some(joined) = joined {
+            joined
+        } else {
+            self.exact_equality_types(start_ty, end_ty, span);
+            self.resolve_inferred_type(start_ty)
+        };
         if bound == self.error_type {
             return self.error_type;
         }

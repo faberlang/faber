@@ -25,7 +25,7 @@ use super::store::StoreSite;
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
-use radix_hir::{HirStoreKind, HirStoreSite};
+use radix_hir::HirStoreKind;
 
 const ISSUE_IGNORED_EXPR_RESULT_INFER: &str = "ignored_expression_result_must_resolve";
 const ISSUE_INITIALIZER_ANNOTATION_MISMATCH: &str = "initializer_annotation_mismatch";
