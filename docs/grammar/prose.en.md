@@ -536,6 +536,7 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | `modulus<W>` | en `wrapping<W>`; modular word, signed or unsigned (N7e); a store reduces modulo 2^W |
 | `saturatus<W>` | en `saturating<W>`; saturating integer; a store clamps at both ends of W |
 | `exactus<W>` | en `trapping<W>`; the trapping policy spelled out (D11.8, N7a): the same type as `numerus<W>`, and a store traps when the value does not fit |
+| `inf` | the unbounded integer (D11.5): a width marker in the `numerus` family with no upper or lower bound, spelled `inf` in every locale (no keyword). `numerus<inf>`, `exactus<inf>`, `modulus<inf>` and `saturatus<inf>` (en `int<inf>`, `trapping<inf>`, `wrapping<inf>`, `saturating<inf>`) all name this one type. **Shipped:** the type, big literals, the join, store and conversion typing rules, and the host-only rejections. **Admitted, scheduled (inf track U4, U6\*), not shipped:** run-time arithmetic beyond a 64-bit carrier and the target backends; see The unbounded integer `inf`. |
 | `fractus`  | float (default `f64`) |
 | `bivalens` | boolean |
 | `nihil`    | null |
@@ -574,13 +575,17 @@ Sized primitives accept one optional **width marker** (not a user type parameter
 
 | Family | Markers | Invalid example |
 | ------ | ------- | --------------- |
-| `numerus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `d64` | `numerus<f32>` → use `fractus<f32>` |
+| `numerus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `d64`, `inf` | `numerus<f32>` → use `fractus<f32>` |
 | `fractus<W>` | `f16`, `bf16`, `f32`, `f64` | `fractus<i32>` → use `numerus<i32>` |
-| `modulus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64` | `modulus<f32>` or `modulus<d64>` → a modular word takes an integer width |
-| `saturatus<W>` | the same eight integer widths | `saturatus<f32>` → use `fractus<f32>` |
-| `exactus<W>` | the eight integer widths and `d64` | `exactus<f32>` → the trapping float cell is not built (`trapping_float_not_implemented`) |
+| `modulus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, and `inf` (the same type as `numerus<inf>`) | `modulus<f32>` or `modulus<d64>` → a modular word takes an integer width |
+| `saturatus<W>` | the same eight integer widths, and `inf` (the same type as `numerus<inf>`) | `saturatus<f32>` → use `fractus<f32>` |
+| `exactus<W>` | the eight integer widths, `d64`, and `inf` | `exactus<f32>` → the trapping float cell is not built (`trapping_float_not_implemented`) |
 
 Bare `numerus` / `fractus` remain shorthand for `numerus<i64>` / `fractus<f64>`.
+`inf` is the one marker with no range: `fractus<inf>` is rejected
+(`integer_width_on_fractus`), and an unbounded integer has no word to wrap or
+clamp at, so `modulus<inf>` and `saturatus<inf>` are accepted and change
+nothing.
 
 `numerus<d64>` is the one **decimal** width, for money and accounting
 (there is no narrower decimal width). A decimal literal in a decimal context (`numerus<d64> a ←
@@ -621,9 +626,11 @@ per element, with the device profile of ruling 18.
 
 **Exact values, checked stores.** Integer arithmetic computes the exact
 mathematical result; an expression is a number, not a container. Every
-intermediate must lie in one 64-bit range, [−2⁶³, 2⁶⁴ − 1] (it fits some
-64-bit integer, signed or unsigned); outside it the operation traps until the
-unbounded integer `inf` (D11.5) exists. Overflow is therefore observed only where a value **lands in a
+intermediate of bounded operands must lie in one 64-bit range, [−2⁶³, 2⁶⁴ − 1]
+(it fits some 64-bit integer, signed or unsigned); outside it the operation
+traps. The only way past that cap is an operand typed `inf`, the opt-in
+unbounded integer (see The unbounded integer `inf`). Overflow is therefore
+observed only where a value **lands in a
 typed slot**, and every such store applies the slot's policy: declaration,
 assignment, `↑`/`↓`, field, argument, `redde`, `cede`, collection element, and
 the other store positions of the spec (a `print`, a `§` hole, a `¶`, a
@@ -654,8 +661,9 @@ family a store into a narrower width applies the slot's policy
 slot's certain trap is a compile error); a constant in an `=` position
 (`generis`, field default, enum member, `fixum T x = e`) must fit `W` whatever
 the policy. Literals in `modulus<W>` and `saturatus<W>` slots must fit `W`.
-The unbounded integer `inf` (D11.5) is admitted, not shipped: `inf` is not yet a
-type (`unknown_type`), so every intermediate still obeys the 64-bit range above.
+The unbounded integer `inf` (D11.5) is a type (see its subsection below), so a
+bounded expression still obeys the 64-bit range above and an `inf` slot never
+applies a size policy.
 
 The D11.8 naming frame puts the policy outside and the representation inside:
 en `trapping<W>`, `wrapping<W>`, `saturating<W>`; la `exactus<W>`, `modulus<W>`,
@@ -685,26 +693,33 @@ from the destination. With `u8` operands `a + b` and `a * b` are `u16`, `a - b`,
 `u8`. Only trapping types grow; `modulus<W>` stays in its ring and
 `saturatus<W>` keeps `W`. Growth stops at the 64-bit containers: past them the
 type keeps the sign of the range (`i64` if it can be negative, else `u64`), so
-`u64 - u64` is `i64`. `_` slots take the expression's type (`fixum _ t ← a + b`
-with `u8` operands is `u16`); a collection literal with no declared element
-type, a `✓ ✗` conditional and `summa` take theirs from the same rule.
+`u64 - u64` is `i64` (operator ruling 2026-09-30: it does not become `inf`;
+write `a ↦ inf - b` for the exact difference). `_` slots take the expression's
+type (`fixum _ t ← a + b` with `u8` operands is `u16`); a collection literal
+with no declared element type, a `✓ ✗` conditional and `summa` take theirs from
+the same rule. The one exception to the growth cap is an operand typed `inf`:
+see The unbounded integer `inf`.
 
 **Untyped constants.** A literal, or an expression made only of literals, is
 an exact number with no type. Beside a typed operand its value joins that
 operand's range; in an annotated slot it takes the slot's type and must fit at
 compile time (`fixum u8 d ← 10 - 100` is a compile error); otherwise it
-defaults to `int`. Beside a float operand it is checked once: an integer
+defaults to `int`. A constant of any length is an
+exact number: an integer literal has no upper bound (see The unbounded integer
+`inf`), and where it may land is decided by the slot. Beside a float operand it is checked once: an integer
 constant must be exactly representable (`x + 1` with `x: f64` is legal, 2⁵³ + 1
 is a compile error), a constant beyond the float's finite range is a compile
 error, and a decimal literal rounds to the nearest float.
 
 **Implicit widening is lossless only.** Integer widenings that hold every value
-stay implicit (`u8 → i16`); `u64` has none and requires `↦`. Crossing number
+stay implicit (`u8 → i16`); `u64` has no bounded target and requires `↦`, and
+its one implicit target is `inf` (every integer width widens into `inf`, which
+widens into nothing). Crossing number
 families (integer, `d64`, float) always needs `↦`, in arithmetic and at stores:
 `fixum fractus f ← n` with `n: i32` needs `n ↦ f64`. `u64` with a typed signed
 operand is a compile error in every join (arithmetic, `✓ ✗` branches, `∧ ∨ ⊻`,
 collection literals, `summa`): `u64_signed_arithmetic_requires_conversion`,
-fixed with `↦`. Untyped constants are exempt (`x - 1` with `x: u64` is fine).
+fixed with `↦` (to `i64` or to `inf`). Untyped constants are exempt (`x - 1` with `x: u64` is fine).
 
 **Division.** `/` is the programmer's division and `÷` the mathematician's. On
 integers `a / b` is ⌊a / b⌋ and `a % b` is `a − b·⌊a / b⌋`, which takes the
@@ -743,8 +758,9 @@ works). Fixed-width complement is what `wrapping<W>` is for (`¬x` on
 `wrapping<u8>` 250 is 5). `x ⇐ n` is `x * 2ⁿ` and `x ⇒ n` is `⌊x / 2ⁿ⌋`. The
 count is not masked to a receiver width: `x ⇒ n` past the value's size is 0 (or
 −1 for a negative `x`) and never traps, `x ⇐ n` traps only past the 64-bit
-range, on `wrapping<W>` it wraps at the store, and a negative count is an error
-(a compile error for a constant). The count may be any integer type.
+range (never on an `inf` operand), on `wrapping<W>` it wraps at the store, and a
+negative count is an error (a compile error for a constant). The count may be
+any integer type.
 
 **Comparisons are exact across families.** `≺ ≻ ≤ ≥ ≅ ≇` accept operands from
 different number families with no `↦` and compare the true mathematical values
@@ -764,14 +780,112 @@ width, NaN converting to `0` (the cross-tier Rust `as` status quo); integer
 clamps. Overflow policy lives in the type. There are no per-operation checked,
 wrapping, or saturating method families. To ask "does this fit?" of untrusted
 input, convert it to the narrow type with `↦` and handle the failure through the
-error channel.
+error channel. The `inf` rows are in The unbounded integer `inf`.
 
 **AIR.** AIR (`@ radix lane "air"`) has no representation for a trap, so in an
 AIR-lane function an integer store is admitted only when the range rule proves
 it fits, and an operation whose exact intermediate could leave the 64-bit range
 is rejected the same way. A store that would need a runtime check is a compile
 error naming the store; declare a wider slot, or write `↦` with a `⊥` default.
-There is no exemption.
+There is no exemption. An `inf` type is rejected in an AIR-lane function
+outright (`air_unbounded_integer`): AIR has no representation for a heap value.
+
+**The unbounded integer `inf` (D11.5; F9 rulings 32–50, operator-ruled
+2026-09-30).** `inf` is the opt-in integer with no range: every integer is a
+value, ∞ and NaN are not (`numerus<inf>` has no upper bound; ∞ is not one of its
+values). It is never a default and is never inferred from bounded operands; an
+author writes `inf` in a slot or converts with `↦ inf`. Its rules in full:
+
+- **Spelling.** `inf` is a width marker in the `numerus` family, written the
+  same in every locale: it is not a keyword and has no glossary word, and, like
+  `u8`, it is reserved in type position only. `numerus<inf>`, `trapping<inf>`,
+  `wrapping<inf>` and `saturating<inf>` (la `exactus<inf>`, `modulus<inf>`,
+  `saturatus<inf>`) are one type; the policy words are accepted and never
+  produce a wrapping or saturating word. `faber format` keeps the author's
+  spelling among them. `∞` remains the IEEE float literal and is never an `inf`
+  value (`fixum inf x ← ∞` is a compile error); a float ∞ prints as `inf`, the
+  same three letters, by the long-standing float print rule.
+- **Literals.** An integer literal may have any number of digits in decimal,
+  `0x`, `0o` and `0b` forms. A literal, or an expression made only of literals,
+  is an exact untyped constant whatever its size, folded exactly. It lands
+  where its exact value fits: in an `inf` slot, or beside an `inf` operand,
+  always; in a bounded slot, beside a bounded operand, or as the default `int`,
+  only if it fits that range, else `numerus_literal_out_of_range` (so
+  `fixum _ x ← 18446744073709551616` is a compile error and
+  `fixum inf x ← 18446744073709551616` is legal). A `casu` constant pattern on
+  an `inf` subject takes a big literal. A position that names a size or a
+  code rather than a value (capacity, tensor extent, `exitus` code, `proba`
+  count, enum member value) keeps the `u64` range: a longer literal there is a
+  parse error.
+- **Join.** An operand typed `inf` makes the result `inf` for every integer
+  operator (`+ - * / % ⇐ ⇒ ∧ ∨ ⊻`, unary `-` `¬`, `potentia`, `summa`, `✓ ✗`
+  branches, collection literals). An untyped constant beside an `inf` operand
+  joins by exact value. Nothing else changes: bounded operands keep the 64-bit
+  cap, and `u64 - u64` stays `i64` (it does not become `inf`).
+- **Widening.** Every integer width, `u64` included, widens implicitly into
+  `inf` (`fixum inf x ← u` needs no `↦`); `inf` widens into nothing. Crossing
+  families (float, `d64`) still needs `↦`.
+- **Arithmetic.** Exact and never a size trap: `+ - *` do not trap; `/` is
+  floor and `%` the floor remainder; `∧ ∨ ⊻ ¬` act on infinite two's
+  complement; `x ⇐ n` is `x · 2ⁿ` and `x ⇒ n` is `⌊x / 2ⁿ⌋` with no cap;
+  `potentia` is exact; `÷` is true division in `f64`. The only failures are a
+  zero divisor, a negative shift count or exponent (the existing traps), and
+  exhaustion of memory, which is a resource fault: fatal, never the `⇥` channel,
+  never caught by `cape`. The language sets no upper bound; an implementation
+  may (the MIR runner has a configurable bit-length ceiling).
+- **Comparison and keys.** `≺ ≻ ≤ ≥ ≅ ≇` compare exact mathematical values
+  against any integer width, `d64` or float (±∞ order beyond every integer);
+  `≡ ≠` stay exact-type (`inf ≡ i64` is rejected). An `inf` value is hashable
+  and totally ordered, so it is a valid `tabula` key and `copia` element.
+- **Stores.** A store into an `inf` slot is total and emits no check. A store
+  from an `inf` value into a bounded trapping slot is an implicit checked
+  narrowing: it traps (`implicit_store_out_of_range`, never `⇥`), unless a
+  constant is proven to fit. `inf` is in the trapping family, so a store into a
+  `wrapping<W>` or `saturating<W>` slot needs `↦`, which reduces or clamps the
+  exact value and cannot fail. `saturating<u64> hi; hi ↑` at the bound still
+  traps; the clamp is written `((hi ↦ inf) + 1) ↦ saturating<u64>`.
+- **Conversion `↦`.** Any bounded integer, including a word, converts to `inf`
+  and never fails. `inf ↦` a trapping width is a magnitude-checked narrowing and
+  is failable (a handler is required except for a proven constant); into
+  `wrapping<W>` / `saturating<W>` it reduces / clamps and cannot fail. `inf ↦`
+  a float rounds to nearest-even and yields ±∞ beyond the float's finite range
+  (a constant beyond it is a compile error); a float `↦ inf` truncates toward
+  zero and fails only for NaN and ±∞. `inf ↦ d64` is range-checked and failable;
+  `d64 ↦ inf` truncates and cannot fail. `textus`/`ascii ↦ inf` accepts an
+  optional sign and digits of any length (failable on malformed input; `via
+  Hex|Bin|Oct` as for other integers); `inf ↦ textus` writes the decimal digits.
+  `inf ↔ octeti via Be|Le` is the minimal two's-complement encoding and its
+  exact inverse. `inf ↦ … via Bits` is rejected (no fixed width), and
+  `inf ↦ littera via Code` is not a row (write `x ↦ u32 ↦ littera via Code`).
+  `inf ↔ valor`/`json` carries the integer exactly.
+- **Host only.** `inf` has no device layout. `tensor`, `sparsa`, `vector` and
+  `matrix` reject an `inf` element (`tensor_element_unbounded`; use
+  `lista<inf>`), a kernel rejects an `inf` parameter, return, local or field
+  (`nucleum_host_type`), and an AIR-lane function rejects every `inf` type
+  (`air_unbounded_integer`).
+- **Collections and loops.** `lista<inf>`, `tabula<inf, V>`, `copia<inf>`,
+  tuples, `inf ∪ nihil`, genus fields, variant payloads and generic
+  instantiation at `inf` are ordinary. In `itera ab a‥b` the binder takes the
+  join of the bounds (an `inf` bound gives an `inf` binder).
+- **Display.** `print`, a `§` hole in a template and a composite print show the
+  decimal digits with a leading `-` for a negative, with no grouping or suffix;
+  the `¶` integer specs apply as for `int`.
+
+**What is shipped and what is not.** The compiler front end accepts and checks
+`inf`: the type in all four spellings, the host-only rejections, big literals
+and their slot rule, the join, widening, store and conversion typing rules, and
+comparisons. At run time only value flow is lowered today (declare, store, pass,
+return, collect, compare), exact for values within the 64-bit carrier; every
+operation that would compute or convert an `inf`, and every literal beyond `u64`,
+fails closed with a named `inf_mir_unsupported_<operation>` error. **Admitted,
+scheduled (inf track), not shipped:** exact run-time semantics for all of the
+rules above (U4, the MIR runner and its bignum), the `inf`-bounded `itera` binder
+(U9), `octeti`/`valor`/`json` rows (U8a), literal-only float folding on the same
+bignum (U7), and the target backends: Rust, TypeScript, Go, Python and the
+Racket (`sexp`) target are scheduled (U6r, U6t, U6g, U6p, U6x); LLVM, Wasm,
+Swift and Haskell are scheduled to fail closed with a named diagnostic (U6fc),
+and Metal, WGSL and AIR never carry `inf`. Until a unit lands, a program that
+needs its rule does not run.
 
 ### Generic Collections
 
@@ -819,7 +933,8 @@ canonical reference for sugar; the rest of the specification uses long form.
 
 Sugar combines a width marker with an optional one-letter family prefix. Width
 markers are `i8`/`i16`/`i32`/`i64` (signed), `u8`/`u16`/`u32`/`u64` (unsigned),
-and `f16`/`f32`/`f64` (float). A bare width marker (no prefix) sugars the scalar
+and `f16`/`f32`/`f64` (float); `inf` (the unbounded integer) is a bare marker
+only. A bare width marker (no prefix) sugars the scalar
 numeric type; a family prefix sugars a collection of that width. In the grammar,
 `WIDTH_MARKER` is a bare marker; `LISTA_WIDTH_SUGAR`, `TENSOR_WIDTH_SUGAR`,
 `SPARSA_WIDTH_SUGAR`, `VECTOR_WIDTH_SUGAR`, and `MATRIX_WIDTH_SUGAR` are that
@@ -839,7 +954,9 @@ the shape (`_`). Matrix requires exactly two dimensions. Sugar never uses `<>`.
 For non-width element types (e.g. `tensor<textus, [3]>`), use the full form.
 
 Sugar is reserved in type syntax only — value identifiers named `tf32`, `lf32`,
-etc. are unchanged.
+etc. are unchanged. `inf` takes no prefix: `linf`, `tinf`, `sinf`, `vinf` and
+`minf` are not sugar and stay ordinary identifiers (`sinf` and `linf` are
+common names, and a tensor, sparsa, vector or matrix element may not be `inf`).
 
 `modulus<W>`, `saturatus<W>` and `exactus<W>` have no sugar; write
 `modulus<u32>` / `saturatus<i16>` / `exactus<u8>` in full (the bare marker `u8`
@@ -1352,7 +1469,8 @@ the literal slot, so a following `(` keeps an ordinary `nan(...)` call. Their
 width follows a surrounding `f32` or `f64` context when present; bare `fractus`
 remains unsized, and neither form has a width suffix. A leading `-` is supplied
 by `unary_expr`, so `-∞` is unary negation of `∞`, not a separate token. A
-`numerus` context rejects both forms (fail-closed); neither maps to an integer.
+`numerus` context, `inf` included, rejects both forms (fail-closed); neither
+maps to an integer.
 
 **Capture boundary (`capta`):** `capta { … }` (en `trap`) is an expression
 that runs its block and reifies the error channel into a value. The block's
@@ -1662,7 +1780,7 @@ parser rejects each one.
 | `itera ex t apud [i, j] filum f fixum v { … }` | admitted (FLD K2); a `filum` clause on `itera` is rejected (`filum` exists only in `summa ex` inside kernels) |
 | `reducta via Op ex source …` (en `reduce via Op from …`) | admitted (FLD K3), with `Op` a closed set `Sum Product Max Min Argmax Argmin All Any Count`; it would retire `summa ex` and `max from` / `min from`, all of which stay shipped meanwhile |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
-| The unbounded integer `inf` | ruled (D11.5); not yet a type |
+| The unbounded integer `inf`: run-time arithmetic and the target backends | type, literals and the typing rules shipped; exact run-time semantics (U4), `itera` binder (U9), `octeti`/`valor`/`json` rows (U8a), literal-only float folding (U7) and the Rust, TypeScript, Go, Python and Racket backends (U6r/t/g/p/x) admitted, scheduled, not shipped; LLVM, Wasm, Swift and Haskell fail closed; `inf` never reaches Metal, WGSL or AIR |
 | `trapping`/`saturating`/`wrapping` float cells; retiring `numerus<W>`/`fractus<W>` | ruled (D11.8); N7c/N7d pending |
 | Multi-subject `discerne` lowering | parses and is coverage-checked; lowered only by the Rust emitter |
 | Run-time capacities and extents (`[H, W]`, `_`) | admitted (FLD K14); today every extent and capacity is a compile-time value |

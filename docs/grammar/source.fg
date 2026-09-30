@@ -818,11 +818,11 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 @status capture-pending
 IDENTIFIER ::=
 
-# scan.rs scan_number; decimal/hex/bin/oct integers and floats with '_' separators; TokenKind::Integer(u64) or Float(f64); scan.rs also lexes the glyph '∞' as Float(+inf)
+# scan.rs scan_number; decimal/hex/bin/oct integers and floats with '_' separators; TokenKind::Integer(u64) when the value fits u64, TokenKind::BigInteger(text) when an integer literal is longer (no upper bound on length; inf track, F9 ruling 34) or Float(f64); a BigInteger is legal only where an expression literal or a `casu` constant pattern stands (its value must then fit the receiving slot: always an `inf` slot, otherwise the slot's range) and is a parse error in a NATURAL or enum-member position; scan.rs also lexes the glyph '∞' as Float(+inf), never an `inf` value
 @status capture-pending
 NUMBER ::=
 
-# not a distinct lexer token; TokenKind::Integer used as magnitudo capacity in type position, as the count of a `proba` modifier (`temporis`, `repete`, `fragilis`; a float is `test_modifier_integer`), and as a function's `exitus` code (no fraction/exponent)
+# not a distinct lexer token; TokenKind::Integer (so at most u64::MAX; a BigInteger here is a parse error) used as magnitudo capacity in type position, as the count of a `proba` modifier (`temporis`, `repete`, `fragilis`; a float is `test_modifier_integer`), and as a function's `exitus` code (no fraction/exponent)
 @status capture-pending
 NATURAL ::=
 
@@ -846,7 +846,7 @@ OCTETI_STRING ::=
 @status capture-pending
 NEWLINE ::=
 
-# parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64 and decimal d64 (numerus and exactus), f16/bf16/f32/f64 (fractus only); every integer width i8…u64 (modulus and saturatus; no d64, no float); integer widths and d64 (exactus; a float width is `trapping_float_not_implemented`); not a lexer token
+# parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64 and decimal d64 (numerus and exactus), f16/bf16/f32/f64 (fractus only); every integer width i8…u64 (modulus and saturatus; no d64, no float); integer widths and d64 (exactus; a float width is `trapping_float_not_implemented`); the unbounded integer marker `inf` (numerus, exactus, modulus and saturatus all name the same type; locale-invariant, not a keyword; never prefixed sugar; not a float width; not a tensor, sparsa, vector or matrix element); not a lexer token
 @status capture-pending
 WIDTH_MARKER ::=
 
