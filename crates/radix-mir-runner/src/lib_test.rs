@@ -3812,11 +3812,8 @@ fn tensor_gather_selects_rows_and_fails_closed_on_bad_id() {
         ],
         vec![3, 2],
     );
-    let ids = Value::Array(Rc::new(RefCell::new(vec![
-        Value::Int(2),
-        Value::Int(0),
-        Value::Int(2),
-    ])));
+    // K7c: the ids are a rank-1 `tensor<u32, [n]>`, never a list.
+    let ids = tensor_value(vec![Value::Int(2), Value::Int(0), Value::Int(2)], vec![3]);
     let call = MirRuntimeCall {
         intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorGather),
         args: vec![
@@ -3839,7 +3836,7 @@ fn tensor_gather_selects_rows_and_fails_closed_on_bad_id() {
     assert_numeric_close(&out.data, &[5.0, 6.0, 1.0, 2.0, 5.0, 6.0], 1e-9);
 
     // Out-of-range id (>= table rows) fails closed.
-    let bad_ids = Value::Array(Rc::new(RefCell::new(vec![Value::Int(0), Value::Int(3)])));
+    let bad_ids = tensor_value(vec![Value::Int(0), Value::Int(3)], vec![2]);
     let bad_call = MirRuntimeCall {
         intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorGather),
         args: vec![
@@ -3850,10 +3847,31 @@ fn tensor_gather_selects_rows_and_fails_closed_on_bad_id() {
     };
     let err = evaluate_collection_call(
         &bad_call,
-        vec![(MirValueId(0), table), (MirValueId(1), bad_ids)],
+        vec![(MirValueId(0), table.clone()), (MirValueId(1), bad_ids)],
     )
     .expect_err("out-of-range id must fail closed");
     assert!(err.issue.contains("out_of_range"), "got: {err:?}");
+
+    // A list of ids (the retired operand form) and a rank-2 ids tensor fail
+    // closed: the ids are exactly a rank-1 tensor.
+    for bad in [
+        Value::Array(Rc::new(RefCell::new(vec![Value::Int(0), Value::Int(1)]))),
+        tensor_value(vec![Value::Int(0), Value::Int(1)], vec![2, 1]),
+    ] {
+        let call = MirRuntimeCall {
+            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorGather),
+            args: vec![
+                MirOperand::Value(MirValueId(0)),
+                MirOperand::Value(MirValueId(1)),
+            ],
+            return_ty: MirType::semantic(TypeId(0)),
+        };
+        evaluate_collection_call(
+            &call,
+            vec![(MirValueId(0), table.clone()), (MirValueId(1), bad)],
+        )
+        .expect_err("a non-rank-1-tensor ids operand must fail closed");
+    }
 }
 
 // ---------------------------------------------------------------------------

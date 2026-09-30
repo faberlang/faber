@@ -3426,16 +3426,17 @@ fn rope_function_for_op(
 
 /// A row-gather kernel: `t = gather(table, ids)` over the pinned `[960, 49152]`
 /// token-embedding table with 9 ids → `[9, 49152]` (the tied output head
-/// doubles as the embedding table). The ids vector is a `lista<numerus>`
-/// operand; the CCI-1 source contract validated its *literal* values only,
-/// so the plan resolves the count from the return-type dims while the
-/// emitted kernel body bounds-checks the runtime token against the table
-/// row count (SEC-G1).
+/// doubles as the embedding table). The ids vector is a `tensor<u32, [9]>`
+/// operand (K7c): its extent is the id count the plan cross-checks against
+/// the return-type dims, while the emitted kernel body bounds-checks the
+/// runtime token against the table row count (SEC-G1).
 fn gather_function(types: &mut TypeTable) -> MirFunction {
     let table = rank2_tensor_ty(types, [960, 49152]);
     let output = rank2_tensor_ty(types, [9, 49152]);
     let ids_element = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
-    let ids = MirType::semantic(types.array(ids_element));
+    let ids_extent = types.intern_index(IndexExpr::Literal(9));
+    let ids_shape = types.intern_index(IndexExpr::Tuple(vec![ids_extent]));
+    let ids = MirType::semantic(types.intern(Type::Tensor(ids_element, ids_shape)));
     MirFunction {
         id: MirFunctionId(0),
         source: None,

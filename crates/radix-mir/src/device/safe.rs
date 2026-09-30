@@ -27,10 +27,10 @@ use crate::visit::MirVisitor;
 use crate::{CapabilityGap, Lowerability};
 use crate::{
     MirAggregate, MirAggregateKind, MirCollectionOp, MirFunction, MirIntrinsic, MirLayoutKind,
-    MirLayoutTable, MirLocal, MirLocalId, MirOperand, MirParam, MirPlace, MirPlaceBase,
-    MirProjection, MirRuntimeCall, MirScalarLayout, MirStatement, MirStatementKind, MirTemp,
-    MirTensorLocusLayout, MirTensorStorageLayout, MirTerminator, MirTerminatorKind, MirType,
-    MirValidationContext, MirValue, MirValueKind, ValidatedMir,
+    MirLayoutTable, MirLocal, MirOperand, MirParam, MirPlace, MirPlaceBase, MirProjection,
+    MirRuntimeCall, MirScalarLayout, MirStatement, MirStatementKind, MirTemp, MirTensorLocusLayout,
+    MirTensorStorageLayout, MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
+    MirValue, MirValueKind, ValidatedMir,
 };
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
 
@@ -150,16 +150,6 @@ struct DeviceSafeClassifier<'a> {
     /// optional get carriers, and complete output coverage were proven by the
     /// shared MIR analysis.
     literal_indexed_access: Option<LiteralIndexedAccessPlan>,
-    /// GI3-1: the row-gather recipe's ids-vector slot of the function under
-    /// visit — the ONE array-typed local/param the gate admits. The fact is
-    /// resolved from the function's `TensorGather` statement (the frozen MIR
-    /// driver op): the ids operand the CCI-1 contract binds as the gather
-    /// signature's first extra input (binding 1) at the canonical
-    /// `numerus<u32>` kernel-index layout (gi3-contract.md §1.2). The
-    /// admission is typed — the slot is recorded ONLY when its type is
-    /// exactly `Array(numerus<u32>)`; a non-array ids operand or any
-    /// unrelated array stays fail-closed with the aggregate diagnostics.
-    gather_ids_slot: Option<MirLocalId>,
     gaps: Vec<CapabilityGap>,
 }
 
@@ -193,7 +183,6 @@ impl<'a> DeviceSafeClassifier<'a> {
             dead_fold_artifact_slots: FoldArtifactSlots::default(),
             dead_const_copy_slots: DeadConstCopySlots::default(),
             literal_indexed_access: None,
-            gather_ids_slot: None,
             gaps: Vec::new(),
         }
     }
@@ -639,11 +628,6 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 crate::kernel_decomposition::multi_output_result_aggregation_slots(
                     function, self.types,
                 );
-            // GI3-1: the row-gather ids slot of this function (its
-            // `TensorGather` statement's ids operand, recorded only when
-            // the type is the canonical `Array(numerus<u32>)` layout) —
-            // the ONE array-typed param/local the gate admits.
-            self.gather_ids_slot = gather_ids_slot(function, self.types);
             crate::visit::walk_function(self, function);
         }
 
@@ -651,7 +635,6 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
         self.dead_const_copy_slots = DeadConstCopySlots::default();
         self.literal_indexed_access = None;
         self.result_aggregation_slots = ResultAggregationSlots::default();
-        self.gather_ids_slot = None;
         self.in_device_function = was_in_device_function;
         self.allows_structured_return_branch = previous_allows_structured_return_branch;
         self.allows_structured_indexed_write_branch =
@@ -684,17 +667,13 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
     }
 
     fn visit_param(&mut self, param: &MirParam) {
-        // GI3-1: the row-gather ids vector (`Array(numerus<u32>)`) is the
-        // gather recipe's device input buffer — the ONE array-typed param
-        // the gate admits (recorded only for the gather ids slot, typed).
-        if self.in_device_function && self.gather_ids_slot != Some(param.local) {
+        if self.in_device_function {
             self.check_device_type(param.ty);
         }
     }
 
     fn visit_local(&mut self, local: &MirLocal) {
         if self.in_device_function
-            && self.gather_ids_slot != Some(local.id)
             && !self
                 .result_aggregation_slots
                 .contains(&MirPlaceBase::Local(local.id))
@@ -1159,50 +1138,6 @@ fn is_device_vector_element(element: MirScalarLayout) -> bool {
             | MirScalarLayout::U32
             | MirScalarLayout::F32
     )
-}
-
-/// The ids-vector slot of the function's row-gather statement (GI3-1): the
-/// `TensorGather` statement's second argument (`args[1]`) — the id vector
-/// the CCI-1 source contract binds as the gather signature's first extra
-/// input (binding 1) at the canonical `numerus<u32>` kernel-index layout
-/// (gi3-contract.md §1.2). The gate records the slot ONLY when its type is
-/// exactly `Array(numerus<u32>)` — the typed admission: a non-array ids
-/// operand, a temp-carried ids, or an unrelated array stays fail-closed
-/// with the aggregate diagnostics.
-fn gather_ids_slot(function: &MirFunction, types: &TypeTable) -> Option<MirLocalId> {
-    for block in &function.blocks {
-        for statement in &block.statements {
-            if crate::collection_ops::statement_collection_op(statement)
-                != Some(MirCollectionOp::TensorGather)
-            {
-                continue;
-            }
-            let MirStatementKind::RuntimeCall {
-                call: MirRuntimeCall { args, .. },
-                ..
-            } = &statement.kind
-            else {
-                continue;
-            };
-            let Some(MirOperand::Place(place)) = args.get(1) else {
-                return None;
-            };
-            let MirPlaceBase::Local(local) = place.base else {
-                return None;
-            };
-            let array_ty = crate::local_ty::local_ty(function, local)?;
-            let is_ids_layout = matches!(
-                types.get(array_ty.semantic_id()),
-                Type::Array(element)
-                    if matches!(
-                        types.get(*element),
-                        Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32)
-                    )
-            );
-            return is_ids_layout.then_some(local);
-        }
-    }
-    None
 }
 
 /// Whether a value is an admitted TENSOR unary assign (S6-P2): a

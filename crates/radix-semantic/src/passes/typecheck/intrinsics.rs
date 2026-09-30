@@ -718,6 +718,20 @@ fn resolve_param_kind(
             };
             checker.types.array(inner)
         }
+        IntrinsicParamKind::TensorIndexIds => {
+            // WHY: the gather ids are a rank-1 `tensor<u32, [n]>`. The extent
+            // `n` is a fresh hole unified with the argument's extent, so it
+            // travels with the value (rule 11) and is read back as the
+            // result's row count by the gather shape constraint.
+            let u32_ty = checker
+                .types
+                .sized_numeric(crate::Primitive::Numerus, crate::NumericWidth::U32);
+            let extent = checker.fresh_index_hole();
+            let shape = checker
+                .types
+                .intern_index(crate::IndexExpr::Tuple(vec![extent]));
+            checker.types.tensor_with_shape(u32_ty, shape)
+        }
         IntrinsicParamKind::Textus => checker.textus_type(),
         IntrinsicParamKind::SetInner => {
             let Some(inner) = ctx.inner else {

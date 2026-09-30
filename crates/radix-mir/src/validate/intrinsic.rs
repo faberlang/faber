@@ -7,7 +7,7 @@ use crate::{
     MirIntrinsic, MirLayoutKind, MirOperand, MirPlace, MirRuntimeCall, MirSermoOp, MirType,
 };
 use radix_lexer::Span;
-use radix_types::{IndexExpr, Primitive, Type};
+use radix_types::{IndexExpr, NumericWidth, Primitive, Type};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ElementwiseCollectionKind {
@@ -1682,13 +1682,24 @@ impl Validator<'_, '_> {
                     .get(1)
                     .and_then(|arg| self.validate_operand(scope, arg, span))
                 {
-                    // CCI-1: bounded `lista<numerus,N>` literals are legal ids
-                    // post-7562d0cf (exact list literal bounds).
-                    if !matches!(
+                    // K7c: the ids are a rank-1 `tensor<u32, [n]>`; the extent
+                    // travels with the value (rule 11), a `lista` is not a
+                    // device buffer (rule 12.3).
+                    let is_u32_ids = matches!(
                         self.type_kind(ids_ty),
-                        Type::Array(_) | Type::BoundedArray { .. }
-                    ) {
-                        self.error(span, "tensor gather ids is not a lista");
+                        Type::Tensor(element, _)
+                            if matches!(
+                                self.context.types.get(*element),
+                                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32)
+                            )
+                    );
+                    if !is_u32_ids {
+                        self.error(span, "tensor gather ids is not a tensor<u32, [n]>");
+                    } else if self
+                        .static_tensor_rank(ids_ty)
+                        .is_some_and(|rank| rank != 1)
+                    {
+                        self.error(span, "tensor gather ids must be a rank-1 tensor");
                     }
                 }
                 self.require_tensor_type(

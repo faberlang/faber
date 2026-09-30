@@ -3089,12 +3089,25 @@ fn rope_rejects_non_tensor_receiver() {
     );
 }
 
-#[test]
-fn gather_valid_ids_array_operand() {
-    let mut types = TypeTable::new();
-    let return_ty = tensor_mty(&mut types, &[2, 3]);
-    let program = cci_collection_program(
-        &mut types,
+/// K7c: the gather ids operand is a rank-1 `tensor<u32, [n]>`.
+fn gather_ids_mty(
+    types: &mut TypeTable,
+    element: radix_types::NumericWidth,
+    dims: &[u64],
+) -> MirType {
+    let element_ty = types.sized_numeric(Primitive::Numerus, element);
+    let dim_ids: Vec<_> = dims
+        .iter()
+        .map(|&d| types.intern_index(IndexExpr::Literal(d)))
+        .collect();
+    let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+    MirType::semantic(types.tensor_with_shape(element_ty, shape))
+}
+
+fn gather_program_with_ids(types: &mut TypeTable, ids_ty: MirType) -> MirProgram {
+    let return_ty = tensor_mty(types, &[2, 3]);
+    let mut program = cci_collection_program(
+        types,
         MirCollectionOp::TensorGather,
         vec![MirOperand::Place(MirPlace {
             base: MirPlaceBase::Local(MirLocalId(1)),
@@ -3102,16 +3115,62 @@ fn gather_valid_ids_array_operand() {
         })],
         return_ty,
     );
-    let mut program = program;
     program.functions[0].locals.push(MirLocal {
         id: MirLocalId(1),
-        ty: array_mty(&mut types),
+        ty: ids_ty,
         name: None,
         mutable: false,
         span: Span::default(),
     });
+    program
+}
+
+#[test]
+fn gather_valid_ids_tensor_operand() {
+    let mut types = TypeTable::new();
+    let ids = gather_ids_mty(&mut types, radix_types::NumericWidth::U32, &[2]);
+    let program = gather_program_with_ids(&mut types, ids);
     let errors = validate(&program, &types);
     assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+}
+
+#[test]
+fn gather_rejects_a_lista_ids_operand() {
+    let mut types = TypeTable::new();
+    let ids = array_mty(&mut types);
+    let program = gather_program_with_ids(&mut types, ids);
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("gather ids is not a tensor<u32, [n]>")),
+        "expected the gather ids tensor error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn gather_rejects_non_u32_or_non_rank_one_ids() {
+    let mut types = TypeTable::new();
+    let signed = gather_ids_mty(&mut types, radix_types::NumericWidth::I32, &[2]);
+    let program = gather_program_with_ids(&mut types, signed);
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("gather ids is not a tensor<u32, [n]>")),
+        "expected the gather ids element error, got: {errors:?}"
+    );
+
+    let mut types = TypeTable::new();
+    let rank2 = gather_ids_mty(&mut types, radix_types::NumericWidth::U32, &[2, 1]);
+    let program = gather_program_with_ids(&mut types, rank2);
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("gather ids must be a rank-1 tensor")),
+        "expected the gather ids rank error, got: {errors:?}"
+    );
 }
 
 // ── Rounding intrinsics: fractus-family receivers ──────────────────────

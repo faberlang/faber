@@ -244,51 +244,93 @@ fn rope_norm_typechecks_with_generic_dim_and_pos_argument() {
 }
 
 #[test]
-fn gather_typechecks_with_literal_and_bound_id_vectors() {
+fn gather_typechecks_with_a_tensor_u32_ids_parameter() {
     accepts(
-        r"functio select(tf32[4, 3] table) → tf32[4, 3] {
-    fixum lista<numerus> ids ← [3, 0, 2, 0]
+        r"functio select(tf32[4, 3] table, tensor<u32, [2]> ids) → tf32[2, 3] {
     redde table.gather(ids)
 }",
     );
+}
+
+#[test]
+fn gather_typechecks_with_ids_built_from_a_flat_list() {
     accepts(
         r"functio select(tf32[4, 3] table) → tf32[4, 3] {
-    redde table.gather([3, 0, 2, 0])
+    fixum tensor<u32, []> seed ← vacua
+    fixum tensor<u32, [4]> ids ← seed.strue([3, 0, 2, 0], [4])
+    redde table.gather(ids)
 }",
     );
 }
 
-/// The empty id vector is spellable inline — `table.gather([])` typechecks
-/// under the shared `NumerusArray` policy (the frozen contract's empty case).
+/// The empty id tensor is spellable: `tensor<u32, [0]>` gathers to `[0, D]`.
 #[test]
-fn gather_accepts_empty_literal() {
+fn gather_accepts_an_empty_ids_tensor() {
     accepts(
-        r"functio select(tf32[4, 3] table) → tf32[4, 3] {
-    redde table.gather([])
+        r"functio select(tf32[4, 3] table, tensor<u32, [0]> ids) → tf32[0, 3] {
+    redde table.gather(ids)
 }",
     );
 }
 
+/// The ids extent travels into the result: `[n, D]` with `n` read from the
+/// ids tensor, so a mismatched declared row count is a shape error.
 #[test]
-fn gather_result_shape_unifies_with_the_declared_t_by_d_result() {
-    // The [T, last-of-receiver] result shape admits assignment to a
-    // concrete [T, D] tensor at the type level; the static id-range contract
-    // is enforced at the HIR→AIR construction site.
+fn gather_result_rows_are_the_ids_extent() {
     accepts(
-        r"functio select(tf32[4, 3] table) → tf32[4, 3] {
-    fixum lista<numerus> ids ← [3, 0, 2, 0]
-    fixum tensor<f32, [4, 3]> out ← table.gather(ids)
+        r"functio select(tf32[4, 3] table, tensor<u32, [2]> ids) → tf32[2, 3] {
+    fixum tensor<f32, [2, 3]> out ← table.gather(ids)
     redde out
 }",
     );
+    rejects_with_issue(
+        r"functio select(tf32[4, 3] table, tensor<u32, [2]> ids) → tf32[3, 3] {
+    redde table.gather(ids)
+}",
+        "incompatible_tensor_index",
+    );
+}
+
+/// A `lista` of ids is no longer a gather operand (rule 12.3: an unbounded
+/// collection is not a kernel buffer).
+#[test]
+fn gather_rejects_list_id_arguments() {
+    rejects_with_issue(
+        r"functio select(tf32[4, 3] table, lista<u32> ids) → tf32[4, 3] {
+    redde table.gather(ids)
+}",
+        "argument_type_mismatch",
+    );
+    rejects_with_issue(
+        r"functio select(tf32[4, 3] table) → tf32[4, 3] {
+    redde table.gather([3, 0, 2, 0])
+}",
+        "argument_type_mismatch",
+    );
 }
 
 #[test]
-fn gather_rejects_non_list_id_argument() {
+fn gather_rejects_wrong_element_or_rank_ids() {
+    rejects_with_issue(
+        r"functio select(tf32[4, 3] table, tensor<i32, [2]> ids) → tf32[2, 3] {
+    redde table.gather(ids)
+}",
+        "argument_type_mismatch",
+    );
+    rejects_with_issue(
+        r"functio select(tf32[4, 3] table, tensor<u32, [2, 1]> ids) → tf32[2, 3] {
+    redde table.gather(ids)
+}",
+        "argument_type_mismatch",
+    );
+}
+
+#[test]
+fn gather_rejects_non_tensor_id_argument() {
     rejects_with_issue(
         r"functio select(tf32[4, 3] table, numerus id) → tf32[4, 3] {
     redde table.gather(id)
 }",
-        REJECT_ISSUE,
+        "argument_type_mismatch",
     );
 }

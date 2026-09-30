@@ -3271,47 +3271,30 @@ fn gather_id_count(
         .ok_or_else(|| PlanMappingError::mapping("row-gather return shape has no row dimension"))
 }
 
-/// The id vector's device element type (GI3-1): the ids are a
-/// `lista<numerus>` bound at the kernel `numerus<u32>` index layout (the
-/// ABI's index surface) — resolved read-only via
-/// [`radix_types::TypeTable::find_sized_numeric`] (the "GPU builtin registry
-/// interns numerus<u32>" precedent). The ids' values are runtime tokens; the
-/// emitted body bounds-checks each against the table row count (SEC-G1). A
-/// non-numerus ids element, or a table without the canonical index layout,
-/// stays fail-closed with a typed diagnostic.
+/// The id vector's device element type (GI3-1, K7c): the ids are a rank-1
+/// `tensor<u32, [n]>`, whose element is already the kernel `numerus<u32>`
+/// index layout (the ABI's index surface). The ids' values are runtime
+/// tokens; the emitted body bounds-checks each against the table row count
+/// (SEC-G1). Any other ids operand (a `lista`, another element type) stays
+/// fail-closed with a typed diagnostic.
 fn gather_ids_element_ty(
     ids_ty: MirType,
     validation: &MirValidationContext<'_>,
 ) -> Result<MirType, PlanMappingError> {
-    // CCI-1: literal ids may be unbounded `lista<numerus>` or, post-7562d0cf,
-    // a bounded `lista<numerus, N>` inferred from the literal — a literal with
-    // a known bound is still a provable literal ids vector.
-    let element = match validation.types.get(ids_ty.semantic_id()) {
-        Type::Array(element) => *element,
-        Type::BoundedArray { element, .. } => *element,
-        _ => {
-            return Err(PlanMappingError::mapping(
-                "row-gather ids operand must be a lista<numerus>",
-            ));
-        }
-    };
-    let (Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _)) =
-        validation.types.get(element)
-    else {
+    let Type::Tensor(element, _) = validation.types.get(ids_ty.semantic_id()) else {
         return Err(PlanMappingError::mapping(
-            "row-gather ids operand must be a lista<numerus>",
+            "row-gather ids operand must be a tensor<u32, [n]>",
         ));
     };
-    validation
-        .types
-        .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
-        .map(MirType::semantic)
-        .ok_or_else(|| {
-            PlanMappingError::mapping(
-                "row-gather ids buffer requires the numerus<u32> kernel index layout \
-                 in the type table",
-            )
-        })
+    if !matches!(
+        validation.types.get(*element),
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32)
+    ) {
+        return Err(PlanMappingError::mapping(
+            "row-gather ids operand must be a tensor<u32, [n]>",
+        ));
+    }
+    Ok(MirType::semantic(*element))
 }
 
 /// The ids operand local of the gather statement (the second argument — the

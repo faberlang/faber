@@ -47,6 +47,14 @@ fn rank1_tensor_ty(types: &mut TypeTable, count: u64) -> MirType {
     MirType::semantic(types.intern(Type::Tensor(f32, len)))
 }
 
+/// The gather ids operand (K7c): a rank-1 `tensor<u32, [count]>`.
+fn gather_ids_tensor_ty(types: &mut TypeTable, count: u64) -> MirType {
+    let ids_element = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let extent = types.intern_index(IndexExpr::Literal(count));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![extent]));
+    MirType::semantic(types.intern(Type::Tensor(ids_element, shape)))
+}
+
 fn collection_statement(
     op: MirCollectionOp,
     args: &[u32],
@@ -2643,8 +2651,7 @@ fn rope_decomposition_function(types: &mut TypeTable) -> MirFunction {
 fn gather_decomposition_function(types: &mut TypeTable) -> MirFunction {
     let table = rank2_tensor_ty(types, [960, 49_152]);
     let output = rank2_tensor_ty(types, [9, 49_152]);
-    let ids_element = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
-    let ids = MirType::semantic(types.array(ids_element));
+    let ids = gather_ids_tensor_ty(types, 9);
     device_function(
         &[(0, table), (1, ids)],
         vec![collection_statement_operands(
@@ -2884,8 +2891,7 @@ fn quantized_matmul_decomposition_function(
 fn packed_gather_decomposition_function(types: &mut TypeTable, ggml_type_id: i64) -> MirFunction {
     let table = rank2_tensor_ty(types, [960, 64]);
     let output = rank2_tensor_ty(types, [9, 64]);
-    let ids_element = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
-    let ids = MirType::semantic(types.array(ids_element));
+    let ids = gather_ids_tensor_ty(types, 9);
     device_function(
         &[(0, table), (1, ids)],
         vec![collection_statement_operands(

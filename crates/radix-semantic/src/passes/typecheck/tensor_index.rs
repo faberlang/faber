@@ -20,6 +20,7 @@ pub(super) const ISSUE_PROVABLY_OUT_OF_BOUNDS: &str = "index_provably_out_of_bou
 const TENSOR_STRUE: &str = "strue";
 const TENSOR_FORMA: &str = "forma";
 const TENSOR_CREA: &str = "crea";
+const TENSOR_GATHER: &str = "gather";
 const TENSOR_SECTIO: &str = "sectio";
 pub(super) const TENSOR_TRANSPONE: &str = "transpone";
 pub(super) const GLYPH_TRANSPOSE_METHOD: &str = "__faber_glyph_transpose";
@@ -200,6 +201,15 @@ pub(super) fn apply_tensor_intrinsic_shape_constraints(
                 return;
             };
             constrain_transpose_result_shape(checker, receiver_shape, result_shape, span);
+        }
+        TENSOR_GATHER if args.len() == 1 => {
+            // WHY: row gather `table[V, D]` + `ids[n]` → `[n, D]`. The row
+            // count is the ids tensor's own extent, so the extent travels with
+            // the value instead of being recovered from a literal.
+            let Some(ids_ty) = args[0].expr.ty else {
+                return;
+            };
+            constrain_gather_result_shape(checker, receiver_ty, ids_ty, result_shape, span);
         }
         _ => {}
     }
@@ -404,6 +414,41 @@ fn constrain_batched_matmul_result_shape(
     result_dims.push(receiver_rows);
     result_dims.push(argument_cols);
     let result = checker.types.intern_index(IndexExpr::Tuple(result_dims));
+    checker.constrain_index_equal(result_shape, result, span);
+}
+
+/// Constrain the `gather` result shape: table `[.., D]` and ids `[n]` give
+/// `[n, D]`. Shape holes on either operand leave the result unconstrained.
+fn constrain_gather_result_shape(
+    checker: &mut TypeChecker<'_>,
+    receiver_ty: TypeId,
+    ids_ty: TypeId,
+    result_shape: IndexId,
+    span: Span,
+) {
+    let Some(receiver_shape) = tensor_shape_id(checker, receiver_ty) else {
+        return;
+    };
+    let Some(ids_shape) = tensor_shape_id(checker, ids_ty) else {
+        return;
+    };
+    let resolved_receiver = checker.resolve_index(receiver_shape);
+    let resolved_ids = checker.resolve_index(ids_shape);
+    let IndexExpr::Tuple(receiver_dims) = checker.types.get_index(resolved_receiver).clone() else {
+        return;
+    };
+    let IndexExpr::Tuple(ids_dims) = checker.types.get_index(resolved_ids).clone() else {
+        return;
+    };
+    let [_, .., columns] = receiver_dims.as_slice() else {
+        return;
+    };
+    let [rows] = ids_dims.as_slice() else {
+        return;
+    };
+    let result = checker
+        .types
+        .intern_index(IndexExpr::Tuple(vec![*rows, *columns]));
     checker.constrain_index_equal(result_shape, result, span);
 }
 

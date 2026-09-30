@@ -1442,6 +1442,13 @@ fn gather_recipe_facts(
     if return_dims.len() != 2 || return_dims[1] != table_cols {
         return None;
     }
+    // K7c: the ids are a `tensor<u32, [n]>` whose own extent is the row
+    // count, so it must agree with the return rows (the extent travels with
+    // the value); a disagreeing pair fails closed.
+    let ids_dims = transformer_operand_dims(function, &args[1], validation)?;
+    if ids_dims != [return_dims[0]] {
+        return None;
+    }
     Some((table_rows, table_cols, return_dims[0]))
 }
 

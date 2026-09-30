@@ -332,7 +332,7 @@ fn cci1_common_case_intrinsic_rows_resolve_on_the_tensor_receiver() {
     let gather = lookup_method_for_type(tensor_ty, "gather", 1).expect("tensor gather");
     assert_eq!(gather.receiver, IntrinsicReceiver::Tensor);
     assert_eq!(gather.arg_count, 1);
-    assert_eq!(gather.params, &[crate::intrinsics::IntrinsicParamKind::NumerusArray]);
+    assert_eq!(gather.params, &[crate::intrinsics::IntrinsicParamKind::TensorIndexIds]);
     assert_eq!(gather.return_kind, crate::intrinsics::IntrinsicReturnKind::GatherShape);
     assert_eq!(mir_collection_op(gather), Some(MirCollectionOp::TensorGather));
 

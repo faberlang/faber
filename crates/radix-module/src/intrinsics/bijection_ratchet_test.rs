@@ -160,7 +160,7 @@ fn dtypes_for(receiver: IntrinsicReceiver) -> Vec<Dtype> {
                 "tf32[3]",
                 "varia tf32[3] r ← [0.5, 0.5, 0.5] ↦ tf32[3]",
                 "",
-                "fixum lista<f32> flat ← [0.5, 0.5, 0.5]\nfixum lista<numerus> ids ← [3, 0, 2, 0]",
+                "fixum lista<f32> flat ← [0.5, 0.5, 0.5]",
                 "0.5",
                 "fractus",
                 "[0]",
@@ -170,7 +170,7 @@ fn dtypes_for(receiver: IntrinsicReceiver) -> Vec<Dtype> {
                 "ti32[3]",
                 "varia ti32[3] r ← [1, 1, 1] ↦ ti32[3]",
                 "",
-                "fixum lista<i32> flat ← [1, 1, 1]\nfixum lista<numerus> ids ← [3, 0, 2, 0]",
+                "fixum lista<i32> flat ← [1, 1, 1]",
                 "1",
                 "numerus",
                 "[0]",
@@ -279,8 +279,8 @@ fn row_override(key: &str, dtype: &Dtype) -> Option<(Option<String>, Vec<String>
         // `strue` constructs from a rank-0 seed (corpus gather exemplar shape).
         "Tensor.strue/2" => (Some(format!("{sugar}[0] r")), vec!["flat".into(), "[3]".into()]),
         "Tensor.crea/2" => (None, vec![el.clone(), "[3]".into()]),
-        // Row gather selects rows of a `[rows, D]` table by bare integer ids.
-        "Tensor.gather/1" => (Some(format!("{sugar}[4, 3] r")), vec!["ids".into()]),
+        // Row gather selects rows of a `[rows, D]` table by a `tensor<u32, [n]>` id vector.
+        "Tensor.gather/1" => (Some(format!("{sugar}[4, 3] r, tensor<u32, [4]> ids")), vec!["ids".into()]),
         "Tensor.matmul/1" => (Some(format!("{sugar}[2, 3] r, {sugar}[3, 2] p")), vec!["p".into()]),
         "Tensor.rms_norm/3" => (None, vec!["0".into(), el.clone(), "r".into()]),
         "Tensor.rope_norm/2" => (Some(format!("{sugar}[2, 4, 3] r")), vec!["0".into(), "r".into()]),
@@ -320,6 +320,7 @@ fn arg_expr(kind: IntrinsicParamKind, dtype: &Dtype, receiver_expr: &str) -> Str
         }
         IntrinsicParamKind::NumerusArray => dtype.idx.clone(),
         IntrinsicParamKind::ElementArray => "flat".into(),
+        IntrinsicParamKind::TensorIndexIds => "ids".into(),
         IntrinsicParamKind::ReceiverSelf => receiver_expr.to_string(),
         IntrinsicParamKind::TensorPeer | IntrinsicParamKind::TensorMatmulPeer => receiver_expr.to_string(),
     }

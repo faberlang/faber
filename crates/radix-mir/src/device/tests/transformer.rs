@@ -361,8 +361,17 @@ fn tensor_ty_3d(types: &mut TypeTable, dims: [u64; 3]) -> MirType {
     MirType::semantic(types.intern(Type::Tensor(f32, shape)))
 }
 
-/// The `Array(numerus<u32>)` ids-vector type (the GI3-1 gather signature's
-/// first extra input at the u32 kernel-index layout).
+/// The `tensor<u32, [count]>` ids-vector type (the GI3-1 gather signature's
+/// first extra input at the u32 kernel-index layout, K7c: a rank-1 tensor
+/// whose extent is the id count).
+fn ids_tensor_ty(types: &mut TypeTable, count: u64) -> MirType {
+    let ids_element = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let extent = types.intern_index(IndexExpr::Literal(count));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![extent]));
+    MirType::semantic(types.intern(Type::Tensor(ids_element, shape)))
+}
+
+/// A `lista<u32>` param: never a device buffer (campaign rule 12.3).
 fn ids_array_ty(types: &mut TypeTable) -> MirType {
     let ids_element = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
     MirType::semantic(types.array(ids_element))
@@ -370,13 +379,12 @@ fn ids_array_ty(types: &mut TypeTable) -> MirType {
 
 /// The GI3-1 row-gather kernel shape (mirrors the faber `prefill_gather`
 /// and the `gather_kernel_program` CUDA probe): `out[T, D] = table[ids, :]`
-/// — a rank-2 `[V, D]` table, the ids vector as an
-/// `Array(numerus<u32>)` param/local, and the `TensorGather` recipe
-/// statement.
+/// — a rank-2 `[V, D]` table, the ids vector as a `tensor<u32, [T]>`
+/// param/local, and the `TensorGather` recipe statement.
 fn gi3_gather_kernel_function(types: &mut TypeTable, id: u32) -> MirFunction {
     let table = rank2_tensor_ty(types, [960, 49_152]);
     let output = rank2_tensor_ty(types, [9, 49_152]);
-    let ids = ids_array_ty(types);
+    let ids = ids_tensor_ty(types, 9);
     let span = test_span();
     MirFunction {
         id: MirFunctionId(id),
@@ -701,10 +709,10 @@ fn gi3_inference_recipes_and_gather_ids_pass_target_entry_gate() {
     // the `from_transformer_op`-sibling admission path
     // (`is_transformer_recipe_op`, device_program_plans.rs) and the
     // emitters lower the recipe bodies (the GI3-4 NVVM / GI3-3 Metal arms)
-    // — plus the row-gather's ids vector (`Array(numerus<u32>)`, the
+    // — plus the row-gather's ids vector (a `tensor<u32, [T]>`, the
     // gather signature's first extra input at the u32 kernel-index layout,
     // gi3-contract.md §1.2). Pre-fix this program failed at the first
-    // recipe runtime call / the ids array aggregate.
+    // recipe runtime call.
     let mut types = TypeTable::new();
     let program = crate::MirProgram {
         functions: vec![
@@ -735,11 +743,9 @@ fn gi3_inference_recipes_and_gather_ids_pass_target_entry_gate() {
 
 #[test]
 fn unrelated_array_param_still_fails_target_entry_gate() {
-    // The gather-ids admission is a TYPED, closed admission: a device
-    // function carrying an `Array(numerus<u32>)` param that is NOT the
-    // row-gather ids operand (an elementwise kernel here — no
-    // `TensorGather` statement) must still fail the gate with the
-    // aggregate diagnostic — never a general array allowance.
+    // There is no array allowance (rule 12.3): a device function carrying
+    // an `Array(numerus<u32>)` param — gather ids included, which are a
+    // tensor now — fails the gate with the aggregate diagnostic.
     let mut types = TypeTable::new();
     let tensor = rank2_tensor_ty(&mut types, [4, 4]);
     let ids = ids_array_ty(&mut types);

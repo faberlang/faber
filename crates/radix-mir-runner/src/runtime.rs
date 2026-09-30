@@ -3241,9 +3241,19 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let rows = shape[0];
         // Tensor dims are non-negative i64; clamp via try_from if ever negative.
         let cols = usize::try_from(shape[1]).unwrap_or(0);
-        let ids = self.array_arg(ids_arg, span)?;
+        // The ids are a rank-1 `tensor<u32, [n]>`; its flat data is the row
+        // id per output row, so the extent is the tensor's own length.
+        let ids_tensor = self.tensor_arg(ids_arg, span)?;
+        let ids_borrow = ids_tensor.borrow();
+        if ids_borrow.shape.len() != 1 {
+            return Err(RunnerError::internal(
+                span,
+                "tensor gather ids must be a rank-1 tensor",
+            ));
+        }
+        let ids = &ids_borrow.data;
         let mut indices = Vec::with_capacity(ids.len());
-        for value in &ids {
+        for value in ids {
             let Value::Int(id) = value else {
                 return Err(RunnerError::internal(
                     span,

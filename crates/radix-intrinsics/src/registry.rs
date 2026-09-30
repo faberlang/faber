@@ -57,6 +57,11 @@ pub enum IntrinsicParamKind {
     NumerusArray,
     /// `lista<T>` where `T` is the receiver element type (tensor flat data).
     ElementArray,
+    /// `tensor<u32, [n]>` row-id vector for `gather`: a rank-1 `u32` tensor
+    /// whose extent `n` travels with the value (campaign rule 11) and becomes
+    /// the result's row count. Never a `lista`: an unbounded collection is not
+    /// a kernel buffer (rule 12.3).
+    TensorIndexIds,
     /// Another value of the same receiver type (`intervallum` algebra operands).
     ReceiverSelf,
     /// `tensor<same element, fresh shape>` peer operand for broadcast elementwise
@@ -102,12 +107,11 @@ pub enum IntrinsicReturnKind {
     FractusFromElement,
     /// `tensor<same element, same shape>` for sparsa `densata` materialization.
     DenseFromSparsa,
-    /// `tensor<same element, [len(ids), last-of-receiver]>` row-gather result
-    /// (the CCI-1 `gather` source contract). Resolved to a fresh-shape tensor
-    /// in the typecheck path; the `[T, last-of-receiver]` shape fact is
-    /// carried by the HIR→AIR `validate_gather_contract` static validation and
-    /// the MIR `TensorGather` op (shape-transforming — not
-    /// `TensorGet`/`TensorSlice`).
+    /// `tensor<same element, [n, last-of-receiver]>` row-gather result, where
+    /// `n` is the extent of the `tensor<u32, [n]>` ids operand. Resolved to a
+    /// fresh-shape tensor in the typecheck path and pinned to
+    /// `[n, last-of-receiver]` by the tensor shape constraints; the MIR
+    /// `TensorGather` op is shape-transforming (not `TensorGet`/`TensorSlice`).
     GatherShape,
     MapperArray,
     /// `set<U>` where `U` is the mapper return type (`copia.mappata`).
@@ -831,7 +835,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         Tensor,
         "gather",
         1,
-        &[IntrinsicParamKind::NumerusArray],
+        &[IntrinsicParamKind::TensorIndexIds],
         GatherShape,
         collection TensorGather
     ),

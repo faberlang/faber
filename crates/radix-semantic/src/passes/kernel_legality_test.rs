@@ -293,12 +293,38 @@ fn unbounded_collections_and_text_are_rejected_as_parameters() {
 }
 
 #[test]
-fn a_u32_index_vector_parameter_feeding_gather_is_a_legal_buffer() {
-    assert_accepts(
+fn a_u32_index_vector_parameter_feeding_gather_is_rejected() {
+    // Rule 12.3 has no carve-out: an unbounded `lista<u32>` is a host
+    // collection even when it feeds `tensor.gather`.
+    // `gather` takes `tensor<u32, [n]>`, so the `lista<u32>` parameter is a
+    // type error at the call (the legality pass never sees an exemption to
+    // grant); the same parameter unused is SEM008 in the test below.
+    let result = analyze_source(
         r"
 @ nucleum
 @ publica
 functio pick(tf32[8, 4] table, lista<u32> ids) → tf32[1, 4] {
+    redde table.gather(ids)
+}
+",
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|err| err.is_error() && err.issue() == Some("argument_type_mismatch")),
+        "expected argument_type_mismatch on the lista gather ids, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn a_tensor_u32_ids_parameter_feeding_gather_is_a_legal_buffer() {
+    assert_accepts(
+        r"
+@ nucleum
+@ publica
+functio pick(tf32[8, 4] table, tensor<u32, [1]> ids) → tf32[1, 4] {
     redde table.gather(ids)
 }
 ",

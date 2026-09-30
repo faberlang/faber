@@ -5,50 +5,31 @@
 //! → MIR re-lowering) and the CPU runner, per the CTO row-6 acceptance proof
 //! (mail `4971fc90`) and
 //! `docs/archived/common-case-intrinsics/common-case-intrinsics-contract.md`:
-//! - a typed `[V,D]` + `[T]` gather call compiles and the runner produces
-//!   `[T,D]` matching row selection for **repeated and out-of-order** ids;
-//! - an **out-of-range** / negative / non-literal id vector fails closed with
-//!   the typed `invalid_gather_contract` diagnostic (no silent clamping);
+//! - a typed `[V,D]` + `tensor<u32,[T]>` gather call compiles and the runner
+//!   produces `[T,D]` matching row selection for **repeated and out-of-order**
+//!   ids (K7c: the ids are a `tensor<u32,[n]>`, never a `lista`);
+//! - an **out-of-range** id is a hard runner error (no silent clamping), and
+//!   the AIR lane's static literal-ids contract fails closed on a runtime
+//!   `tensor<u32,[n]>` ids operand with the typed `invalid_gather_contract`
+//!   diagnostic;
 //! - `TensorGet`/`TensorSlice` calls still compile and run unchanged
 //!   (additive proof — row gather is not a rename of the indexing ops);
-//! - an **empty id vector yields the empty `[0,D]` result** (the CTO-4 shape
-//!   proof, carried at the contract-designated layer: the MIR `TensorGather`
-//!   op + the runner). The empty case is spellable at the source level —
-//!   `table.gather([])` — since the DEFER-064 `NumerusArray` policy admits an
-//!   empty literal (its element type resolves to the slot's canonical
-//!   `numerus` from the index position); see the CCI-1 empty-literal repair
-//!. The lower-level MIR proof below drives the exact
-//!   `TensorGather` op with `T = 0` as an independent runner-layer check.
+//! - an **empty id tensor yields the empty `[0,D]` result** (the CTO-4 shape
+//!   proof, carried by the MIR `TensorGather` op + the runner). The empty case
+//!   is spellable at the source level as a `tensor<u32, [0]>`.
 
-use crate::air::{AirExpr, AirTensorOp, lower_program};
+use crate::air::lower_program;
 use crate::codegen::Target;
 use crate::driver::{AnalyzeRequest, Config, ModuleCompileRequest, Session, analyze_source, compile};
 use crate::mir::MirLoweringOptions;
 use crate::mir::{
-    BufferHost, MirAggregateFields, MirCollectionOp, MirIntrinsic, MirOperand, MirPlaceBase, MirRuntimeCall,
-    MirStatementKind, MirTempId, MirValidationContext, RunSourceError, ValidatedMir, run_entry, run_source,
-    validate_program,
+    BufferHost, MirCollectionOp, MirIntrinsic, MirRuntimeCall, MirStatementKind, RunSourceError, run_source,
 };
 use crate::semantic::{self, PassConfig};
 use crate::test_support::test_session;
 use radix_mir::device_program_plans::transformer_shape_signature;
 use radix_mir::kernel_plan::CollectionKernelPlan;
-use radix_types::{Type, TypeTable};
-
-/// Full frontend to an AIR program plus the semantic type table the program's
-/// `TypeId`s resolve against (mirrors `air/lower_test.rs`; the lane-annotated
-/// path owns the typed `invalid_gather_contract` static checks).
-fn lower_with_types(source: &str) -> (crate::air::AirProgram, TypeTable) {
-    let lex = crate::lexer::lex(source);
-    let mut parse = crate::parser::parse(lex);
-    let program = parse.program.expect("parse");
-    let config = PassConfig::for_target(Target::MirWasm);
-    let result = semantic::analyze(&program, &config, &mut parse.interner);
-    assert!(result.success(), "semantic analysis failed: {:?}", result.diagnostics);
-    let semantic::SemanticResult { hir, types, radix_lanes, .. } = result;
-    let air = lower_program(hir.as_ref().expect("hir"), &radix_lanes, &parse.interner, &types).expect("air lowering");
-    (air, types)
-}
+use radix_types::Type;
 
 /// The same frontend but expecting the HIR→AIR construction site to reject the
 /// source with the typed gather contract diagnostic.
@@ -74,67 +55,24 @@ fn runner_session() -> Session {
 
 /// Extract the `TensorGather` runtime call from a lowered MIR program.
 fn collection_runtime_call(mir: &crate::mir::MirProgram, op: MirCollectionOp) -> &MirRuntimeCall {
-    let statement = mir.functions[0]
-        .blocks
-        .first()
-        .and_then(|block| block.statements.last())
-        .expect("collection runtime call");
-    let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
-        panic!("expected tensor AIR binding to become MIR runtime call");
-    };
-    assert!(
-        matches!(call.intrinsic, MirIntrinsic::Collection(actual) if actual == op),
-        "expected {op:?}, got {:?}",
-        call.intrinsic
-    );
-    call
-}
-
-/// Empty the id-vector aggregate of every `TensorGather` call in a MIR
-/// program, returning how many constructs were emptied. The lowered ids array
-/// is a `Construct` (array of int constants) referenced by the gather call's
-/// trailing operand, so replacing its fields with the empty ordered list
-/// drives the exact op the frontend produced with `T = 0`.
-fn empty_tensor_gather_ids(program: &mut crate::mir::MirProgram) -> usize {
-    let mut emptied = 0;
-    for function in &mut program.functions {
-        for block in &mut function.blocks {
-            let ids_temps: Vec<MirTempId> = block
-                .statements
-                .iter()
-                .filter_map(|statement| match &statement.kind {
-                    MirStatementKind::RuntimeCall { call, .. }
-                        if call.intrinsic == MirIntrinsic::Collection(MirCollectionOp::TensorGather) =>
-                    {
-                        match call.args.get(1) {
-                            Some(MirOperand::Temp(id)) => Some(*id),
-                            Some(MirOperand::Place(place)) => match place.base {
-                                MirPlaceBase::Temp(id) => Some(id),
-                                MirPlaceBase::Local(_) => None,
-                            },
-                            _ => None,
-                        }
-                    }
-                    _ => None,
-                })
-                .collect();
-            for statement in &mut block.statements {
-                if let MirStatementKind::Construct { destination, aggregate } = &mut statement.kind
-                    && let MirPlaceBase::Temp(id) = destination.base
-                    && ids_temps.contains(&id)
-                {
-                    aggregate.fields = MirAggregateFields::Ordered(Vec::new());
-                    emptied += 1;
-                }
+    mir.functions
+        .iter()
+        .flat_map(|function| &function.blocks)
+        .flat_map(|block| &block.statements)
+        .find_map(|statement| match &statement.kind {
+            MirStatementKind::RuntimeCall { call, .. }
+                if matches!(call.intrinsic, MirIntrinsic::Collection(actual) if actual == op) =>
+            {
+                Some(call)
             }
-        }
-    }
-    emptied
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("expected a {op:?} runtime call in the lowered MIR"))
 }
 
-/// CCI-4: a typed `[V,D]` + `[T]` gather call (`T` = id-vector length) runs
-/// through the full frontend and the runner produces `[T,D]` matching row
-/// selection for **repeated and out-of-order** ids (CTO row 6).
+/// CCI-4 / K7c: a typed `[V,D]` + `tensor<u32,[T]>` gather call runs through
+/// the full frontend and the runner produces `[T,D]` matching row selection
+/// for **repeated and out-of-order** ids (CTO row 6).
 #[test]
 fn gather_selects_rows_for_repeated_and_out_of_order_ids() {
     // Table [4,3] with distinct rows; ids [3, 0, 2, 0] are out-of-order and
@@ -144,7 +82,10 @@ incipit {
     fixum lista<f32> flat ← [1.0, 2.0, 3.0, 10.0, 20.0, 30.0, 100.0, 200.0, 300.0, 1000.0, 2000.0, 3000.0]
     fixum tf32[] seed ← vacua
     fixum tf32[4, 3] table ← seed.strue(flat, [4, 3])
-    fixum tf32[4, 3] out ← table.gather([3, 0, 2, 0])
+    fixum lista<u32> rows ← [3, 0, 2, 0]
+    fixum tensor<u32, []> iseed ← vacua
+    fixum tensor<u32, [4]> ids ← iseed.strue(rows, [4])
+    fixum tf32[4, 3] out ← table.gather(ids)
     fixum f32 v00 ← out.accipe([0, 0]) vel 0.0
     fixum f32 e00 ← 1000.0
     adfirma v00 ≡ e00
@@ -202,53 +143,44 @@ incipit {
     );
 }
 
-/// CCI-4: an **out-of-range id fails closed** with the typed gather
-/// diagnostic at the HIR→AIR construction site (no silent clamping).
+/// K7c: an **out-of-range id is a hard runner error** (no silent clamping):
+/// the ids are runtime data, so the row bound is checked where they are read.
 #[test]
-fn gather_out_of_range_id_fails_closed_typed_diagnostic() {
-    let errors = air_lower_errors(
-        r#"
-@ radix lane "air"
-functio select(tf32[4, 3] table) → tf32[4, 3] {
-    redde table.gather([3, 0, 4])
+fn gather_out_of_range_id_is_a_hard_runner_error() {
+    let source = r"
+incipit {
+    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 10.0, 20.0, 30.0, 100.0, 200.0, 300.0, 1000.0, 2000.0, 3000.0]
+    fixum tf32[] seed ← vacua
+    fixum tf32[4, 3] table ← seed.strue(flat, [4, 3])
+    fixum lista<u32> rows ← [3, 0, 4]
+    fixum tensor<u32, []> iseed ← vacua
+    fixum tensor<u32, [3]> ids ← iseed.strue(rows, [3])
+    fixum tf32[3, 3] out ← table.gather(ids)
+    nota out.magnitudines()
 }
-"#,
-    );
-    assert!(
-        errors.iter().any(|error| {
-            error.issue.starts_with("invalid_gather_contract") && error.issue.contains("out_of_range")
-        }),
-        "expected typed gather range diagnostic, got {errors:?}"
-    );
+";
+    let mut host = BufferHost::default();
+    match run_source(&runner_session(), "gather_oob.fab", source, &mut host) {
+        Err(RunSourceError::Stepper(errors)) => {
+            let text = format!("{errors:?}");
+            assert!(
+                text.contains("tensor gather id 4 is out of range for table rows 4"),
+                "expected the out-of-range gather id error, got {text}"
+            );
+        }
+        other => panic!("an out-of-range gather id must be a hard runner error, got {other:?}"),
+    }
 }
 
-/// CCI-4: a negative id fails closed with the typed gather diagnostic.
+/// CCI-4 / K7c: the AIR lane proves gather ids statically, and a
+/// `tensor<u32,[n]>` operand is runtime data, so the call fails closed with
+/// the typed gather diagnostic (the MIR lane owns runtime ids).
 #[test]
-fn gather_negative_id_fails_closed_typed_diagnostic() {
+fn gather_runtime_tensor_ids_fail_closed_in_the_air_lane() {
     let errors = air_lower_errors(
         r#"
 @ radix lane "air"
-functio select(tf32[4, 3] table) → tf32[4, 3] {
-    redde table.gather([2, -1])
-}
-"#,
-    );
-    assert!(
-        errors
-            .iter()
-            .any(|error| { error.issue.starts_with("invalid_gather_contract") && error.issue.contains("negative") }),
-        "expected typed gather negativity diagnostic, got {errors:?}"
-    );
-}
-
-/// CCI-4: a non-literal id vector fails closed — the static contract cannot
-/// be proven, so the call is not admitted (v1 requires a literal ids vector).
-#[test]
-fn gather_non_literal_ids_fail_closed_typed_diagnostic() {
-    let errors = air_lower_errors(
-        r#"
-@ radix lane "air"
-functio select(tf32[4, 3] table, lista<numerus> ids) → tf32[4, 3] {
+functio select(tf32[4, 3] table, tensor<u32, [4]> ids) → tf32[4, 3] {
     redde table.gather(ids)
 }
 "#,
@@ -261,35 +193,24 @@ functio select(tf32[4, 3] table, lista<numerus> ids) → tf32[4, 3] {
     );
 }
 
-/// CCI-4: the typed `[V,D]`+`[T]` call compiles through the full frontend to
-/// AIR `Gather` (canonical args `[x, ids]`) and on to the MIR `TensorGather`
-/// runtime call (`[x, ids]` layout).
+/// CCI-4 / K7c: the typed `[V,D]`+`tensor<u32,[T]>` call compiles through the
+/// full frontend and MIR lowering to the `TensorGather` runtime call with
+/// the `[table, ids]` operand layout.
 #[test]
 fn gather_resolves_to_tensor_gather_through_the_full_frontend() {
-    let (air, types) = lower_with_types(
-        r#"
-@ radix lane "air"
-functio select(tf32[4, 3] table) → tf32[4, 3] {
-    redde table.gather([3, 0, 2, 0])
+    let source = r"
+functio select(tf32[4, 3] table, tensor<u32, [4]> ids) → tf32[4, 3] {
+    redde table.gather(ids)
 }
-"#,
-    );
-
-    let binding = air.functions[0]
-        .body
-        .bindings
-        .last()
-        .expect("gather binding");
-    let AirExpr::TensorOp { op, args } = &binding.expr else {
-        panic!("expected tensor op, got {:?}", binding.expr);
-    };
-    assert_eq!(*op, AirTensorOp::Gather);
-    assert_eq!(args.len(), 2, "canonical AIR args [x, ids]");
-
-    let mir = crate::air::to_mir_program(&air, &crate::air::AirToMirContext::new()).expect("AIR to MIR");
-    validate_program(&mir, &MirValidationContext::new(&types)).expect("AIR MIR validates");
-    let call = collection_runtime_call(&mir, MirCollectionOp::TensorGather);
-    assert_eq!(call.args.len(), 2, "MIR layout [x, ids]");
+incipit {
+    nota 1
+}
+";
+    let mut analysis =
+        analyze_source(&runner_session(), "gather_mir.fab", source, AnalyzeRequest::default()).expect("frontend");
+    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()).expect("lowering");
+    let call = collection_runtime_call(lowered.validated.program(), MirCollectionOp::TensorGather);
+    assert_eq!(call.args.len(), 2, "MIR layout [table, ids]");
 }
 
 /// Tier 2: a dynamic out-of-bounds read on an exact-shape tensor is a hard
@@ -462,63 +383,25 @@ incipit {
     );
 }
 
-/// CCI-4: an **empty id vector yields the empty `[0,D]` result** — the CTO-4
-/// shape proof for `T = 0` at the MIR/runner layer.
-///
-/// The source-level spelling (`table.gather([])`) is proved by the companion
-/// source-level test; this lower-layer test drives the exact `TensorGather`
-/// op with the id vector emptied independently, proving the runner owns the
-/// empty `[T,D]` shape fact for `T = 0`.
+/// CCI-4 / K7c: an **empty id tensor yields the empty `[0,D]` result** — the
+/// CTO-4 shape proof for `T = 0`, spelled at the source level as a
+/// `tensor<u32, [0]>` and run through the full frontend and the runner.
 #[test]
-fn gather_empty_id_vector_yields_empty_result() {
+fn gather_empty_ids_tensor_yields_empty_result() {
     let source = r"
 incipit {
     fixum lista<f32> flat ← [1.0, 2.0, 3.0, 10.0, 20.0, 30.0, 100.0, 200.0, 300.0, 1000.0, 2000.0, 3000.0]
     fixum tf32[] seed ← vacua
     fixum tf32[4, 3] table ← seed.strue(flat, [4, 3])
-    fixum tf32[4, 3] out ← table.gather([3, 0, 2, 0])
-    nota out.magnitudines()
-}
-";
-    let mut analysis =
-        analyze_source(&runner_session(), "gather_empty.fab", source, AnalyzeRequest::default()).expect("frontend");
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()).expect("lowering");
-
-    let mut empty_program = lowered.validated.program().clone();
-    let emptied = empty_tensor_gather_ids(&mut empty_program);
-    assert_eq!(emptied, 1, "the gather id-vector construct must be found and emptied");
-
-    let context = lowered.validated.validation().clone();
-    let empty_validated =
-        ValidatedMir::new(empty_program, context).expect("empty id vector still validates at the MIR gate");
-
-    let mut host = BufferHost::default();
-    run_entry(&empty_validated, &mut host).expect("runner runs the empty gather");
-    assert_eq!(
-        host.stdout_lines,
-        vec!["[0, 3]".to_owned()],
-        "empty ids must yield the empty [0, D] shape"
-    );
-}
-
-/// CCI-4: the empty id vector is spellable at the source level —
-/// `table.gather([])` runs through the full frontend (the DEFER-064
-/// `NumerusArray` policy admits the empty literal with its element type
-/// resolved to the slot's canonical `numerus`) and the runner produces the
-/// empty `[0, D]` result — the CTO-4 shape proof for `T = 0` end-to-end.
-#[test]
-fn gather_empty_literal_source_level_yields_empty_result() {
-    let source = r"
-incipit {
-    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 10.0, 20.0, 30.0, 100.0, 200.0, 300.0, 1000.0, 2000.0, 3000.0]
-    fixum tf32[] seed ← vacua
-    fixum tf32[4, 3] table ← seed.strue(flat, [4, 3])
-    fixum tf32[4, 3] out ← table.gather([])
+    fixum lista<u32> rows ← []
+    fixum tensor<u32, []> iseed ← vacua
+    fixum tensor<u32, [0]> ids ← iseed.strue(rows, [0])
+    fixum tf32[0, 3] out ← table.gather(ids)
     nota out.magnitudines()
 }
 ";
     let mut host = BufferHost::default();
-    match run_source(&runner_session(), "gather_empty_literal.fab", source, &mut host) {
+    match run_source(&runner_session(), "gather_empty_ids.fab", source, &mut host) {
         Ok(()) => {}
         Err(RunSourceError::Frontend(diagnostics)) => {
             panic!("frontend should analyze cleanly: {diagnostics:?}")
@@ -539,29 +422,56 @@ incipit {
 // CCI-5: recipe resolution — the source fixture resolves to the GI3-1 recipe
 // ---------------------------------------------------------------------------
 
-/// The pinned typed `[V,D]` + `[T]` gather source (table `[4,3]`, ids
-/// `[3, 0, 2, 0]`) — the CCI-4 pinned shape the plan facts resolve from.
+/// The pinned typed `[V,D]` + `tensor<u32,[T]>` gather source (table `[4,3]`,
+/// ids `[4]`) — the CCI-4 pinned shape the plan facts resolve from. It lowers
+/// on the MIR lane: the ids are runtime data, which the AIR lane's static
+/// literal-ids contract does not admit.
 const GATHER_PINNED_SOURCE: &str = r#"
-@ radix lane "air"
-functio select(tf32[4, 3] table) → tf32[4, 3] {
-    redde table.gather([3, 0, 2, 0])
+functio select(tf32[4, 3] table, tensor<u32, [4]> ids) → tf32[4, 3] {
+    redde table.gather(ids)
+}
+incipit {
+    nota 1
 }
 "#;
 
-/// CCI-5: the pinned `gather` source fixture lowers AIR→MIR and the MIR
+/// CCI-5: the pinned `gather` source fixture lowers to MIR and the MIR
 /// resolves through the GI3-1 seam to `CollectionKernelPlan::Gather` with
 /// the typed facts (table rows V = 4, table cols D = 3, id count T = 4).
 #[test]
 fn gather_fixture_resolves_gather_recipe() {
-    let (air, types) = lower_with_types(GATHER_PINNED_SOURCE);
-    crate::air::validate_program(&air).expect("AIR should validate");
-    let mir = crate::air::to_mir_program(&air, &crate::air::AirToMirContext::new()).expect("AIR to MIR");
-    let validation = MirValidationContext::new(&types);
-    let function = &mir.functions[0];
-    let signature = transformer_shape_signature(function, MirCollectionOp::TensorGather, &validation)
+    let mut analysis = analyze_source(
+        &runner_session(),
+        "gather_pinned.fab",
+        GATHER_PINNED_SOURCE,
+        AnalyzeRequest::default(),
+    )
+    .expect("frontend");
+    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()).expect("lowering");
+    let validation = lowered.validated.validation();
+    let function = lowered
+        .validated
+        .program()
+        .functions
+        .iter()
+        .find(|function| {
+            function
+                .blocks
+                .iter()
+                .flat_map(|block| &block.statements)
+                .any(|statement| {
+                    matches!(
+                        &statement.kind,
+                        MirStatementKind::RuntimeCall { call, .. }
+                            if call.intrinsic == MirIntrinsic::Collection(MirCollectionOp::TensorGather)
+                    )
+                })
+        })
+        .expect("the gather function");
+    let signature = transformer_shape_signature(function, MirCollectionOp::TensorGather, validation)
         .expect("the transformer-shaped signature resolves for gather");
     let plan =
-        CollectionKernelPlan::from_transformer_op(&signature, function, &validation, MirCollectionOp::TensorGather)
+        CollectionKernelPlan::from_transformer_op(&signature, function, validation, MirCollectionOp::TensorGather)
             .expect("the gather fixture resolves to a kernel plan");
     let CollectionKernelPlan::Gather(gather) = &plan else {
         panic!("expected Gather recipe, got {plan:?}");
