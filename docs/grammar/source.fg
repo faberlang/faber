@@ -1237,7 +1237,19 @@ gradient_place := expression  (* semantic analysis requires a direct call_expr a
 # general postfix operator. `f() ⊥ 0 ⊥ 1` (a second default) is the same
 # rejection: one default per expression.
 cast_expr       := gradient_expr ('∷' type_annotation | conversio_expr)* inline_default?
-conversio_expr        := '↦' type_annotation inline_default?
+# `via` (D11.9) is the convert-hint clause: a modifier of the conversion, not
+# part of the target type (`"ff" ↦ i32 via Hex`, `octeti[0‥2] ↦ u16 via Le`).
+# It binds tighter than the `⊥` default: `x ↦ u32 via Hex ⊥ 0` is
+# `(x ↦ u32 via Hex) ⊥ 0`. The second-type-argument spelling
+# (`numerus<W, Hex>`, `numerus<W, Be>`, `littera<Code>`) is the LEGACY form of
+# the same hint: still accepted until the qp1c lock step, then rejected.
+conversio_expr        := '↦' type_annotation via_clause? inline_default?
+# `via` is contextual: it is claimed only on the conversion's own line,
+# immediately after the target type; everywhere else it is an ordinary
+# identifier. The hint is a compile-time identifier (`Hex`, `Bin`, `Oct`,
+# `Be`, `Le`, `Bits`, `Code`) that selects the conversion row; whether the
+# hint is known, and whether the target takes one, is semantic.
+via_clause            := 'via' IDENTIFIER
 # `⊥` (U+22A5) is the default channel (D17.7): it binds looser than `↦ T`.
 # `⇥` only ever names an error type; it never carries a value.
 inline_default    := '⊥' unary_expr

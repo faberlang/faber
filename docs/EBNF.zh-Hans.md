@@ -353,148 +353,150 @@ gradient_place ::= expression
 # [171] cast_expr
 cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)* inline_default?
 # [172] conversio_expr
-conversio_expr ::= '↦' type_annotation inline_default?
-# [173] inline_default
+conversio_expr ::= '↦' type_annotation via_clause? inline_default?
+# [173] via_clause
+via_clause ::= '经由' IDENTIFIER
+# [174] inline_default
 inline_default ::= '⊥' unary_expr
-# [174] call_expr
+# [175] call_expr
 call_expr ::= primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
-# [175] call_suffix
+# [176] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
-# [176] member_suffix
+# [177] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
-# [177] transpose_suffix
+# [178] transpose_suffix
 transpose_suffix ::= 'ᵀ'
-# [178] optional_suffix
+# [179] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
-# [179] non_null_suffix
+# [180] non_null_suffix
 non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
-# [180] argument_list
+# [181] argument_list
 argument_list ::= (argument (',' argument)*)?
-# [181] argument
+# [182] argument
 argument ::= template_argument | '展开'? expression
-# [182] template_argument
+# [183] template_argument
 template_argument ::= '展开'? IDENTIFIER ':' expression
-# [183] literal
+# [184] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '真' | '假' | '皆无' | '∞' | 'nan'
-# [184] primary
+# [185] primary
 primary ::= IDENTIFIER | literal | '自身' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | summa_expr | capta_expr | '(' expression ')'
-# [185] ad_expr
+# [186] ad_expr
 ad_expr ::= '调用' ASCII_STRING ad_opener?
-# [186] ad_opener
+# [187] ad_opener
 ad_opener ::= '(' expression ')'
-# [187] array_literal
+# [188] array_literal
 array_literal ::= '[' argument_list? ']'
-# [188] iuncta_expr
+# [189] iuncta_expr
 iuncta_expr ::= '元组' type_arguments '[' argument_list? ']'
-# [189] json_literal
+# [190] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
-# [190] json_member
+# [191] json_member
 json_member ::= STRING ':' json_value
-# [191] typed_constructor
+# [192] typed_constructor
 typed_constructor ::= type_annotation '{' field_list? '}' construction_source?
-# [192] field_list
+# [193] field_list
 field_list ::= field_init (',' field_init)*
-# [193] field_init
+# [194] field_init
 field_init ::= (field_key '=' expression) | IDENTIFIER
-# [194] field_key
+# [195] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
-# [195] construction_source
+# [196] construction_source
 construction_source ::= '取自' call_expr
-# [196] json_value
+# [197] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
-# [197] json_object
+# [198] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
-# [198] json_array
+# [199] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
-# [199] json_string
+# [200] json_string
 json_string ::= STRING
-# [200] json_number
+# [201] json_number
 json_number ::= NUMBER
-# [201] finge_expr
+# [202] finge_expr
 finge_expr ::= '构造' qualified_ident ('{' field_list '}')? ('∷' type_annotation)?
-# [202] qualified_ident
+# [203] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
-# [203] praefixum_expr
+# [204] praefixum_expr
 praefixum_expr ::= '前缀' block_stmt
-# [204] scriptum_expr
+# [205] scriptum_expr
 scriptum_expr ::= '格式化' '(' STRING (',' expression)* ')'
-# [205] lege_expr
+# [206] lege_expr
 lege_expr ::= '读取' '行'?
-# [206] first_match_expr
+# [207] first_match_expr
 first_match_expr ::= '首个匹配' '(' expression apud_clause? ',' '其中' IDENTIFIER block_stmt ')'
-# [207] summa_expr
+# [208] summa_expr
 summa_expr ::= '求和' '取自' expression apud_clause? filum_clause? ('常量' | '变量') IDENTIFIER block_stmt
-# [208] filum_clause
+# [209] filum_clause
 filum_clause ::= '线程' IDENTIFIER
-# [209] capta_expr
+# [210] capta_expr
 capta_expr ::= '陷阱' block_stmt
-# [210] object_pattern
+# [211] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [211] pattern_property
+# [212] pattern_property
 pattern_property ::= '其余'? IDENTIFIER ('作为' IDENTIFIER)?
-# [212] array_pattern
+# [213] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [213] array_pattern_element
+# [214] array_pattern_element
 array_pattern_element ::= '_' | '其余'? IDENTIFIER
-# [214] nota_stmt
+# [215] nota_stmt
 nota_stmt ::= ('显示' | '查看' | '警告' | '写入') expression (',' expression)*
-# [215] entry_header
+# [216] entry_header
 entry_header ::= ('参数' IDENTIFIER)? ('退出' expression)?
-# [216] incipit_stmt
+# [217] incipit_stmt
 incipit_stmt ::= '入口' entry_header block_stmt
-# [217] incipiet_stmt
+# [218] incipiet_stmt
 incipiet_stmt ::= '异步入口' entry_header block_stmt
-# [218] probandum_decl
+# [219] probandum_decl
 probandum_decl ::= '验题' STRING proba_modifier* '{' probandum_body '}'
-# [219] probandum_body
+# [220] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [220] proba_stmt
+# [221] proba_stmt
 proba_stmt ::= '测试' STRING proba_modifier* block_stmt
-# [221] proba_modifier
+# [222] proba_modifier
 proba_modifier ::= '预期失败' | '跳过' STRING | '预期' STRING | '仅' | '标签' STRING | '时限' NUMBER | '计量' | '重复' NUMBER | '易碎' NUMBER | '仅于' STRING
-# [222] praepara_block
+# [223] praepara_block
 praepara_block ::= ('备置' | '异步备置' | '收尾' | '异步收尾') '全部'? block_stmt
-# [223] fac_stmt
+# [224] fac_stmt
 fac_stmt ::= '执行' block_stmt cape_clause? ('当' expression)?
-# [224] IDENTIFIER
+# [225] IDENTIFIER
 IDENTIFIER ::=
-# [225] NUMBER
+# [226] NUMBER
 NUMBER ::=
-# [226] NATURAL
+# [227] NATURAL
 NATURAL ::=
-# [227] STRING
+# [228] STRING
 STRING ::=
-# [228] ASCII_STRING
+# [229] ASCII_STRING
 ASCII_STRING ::=
-# [229] BACKTICK_STRING
+# [230] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [230] OCTETI_STRING
+# [231] OCTETI_STRING
 OCTETI_STRING ::=
-# [231] NEWLINE
+# [232] NEWLINE
 NEWLINE ::=
-# [232] WIDTH_MARKER
+# [233] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [233] LISTA_WIDTH_SUGAR
+# [234] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [234] TENSOR_WIDTH_SUGAR
+# [235] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [235] SPARSA_WIDTH_SUGAR
+# [236] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [236] VECTOR_WIDTH_SUGAR
+# [237] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [237] MATRIX_WIDTH_SUGAR
+# [238] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [238] FRONTMATTER_DELIMITER
+# [239] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [239] TOML_LINES
+# [240] TOML_LINES
 TOML_LINES ::=
-# [240] ANNOTATION_NAME
+# [241] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [241] ANNOTATION_FIELD_NAME
+# [242] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [242] NON_NEWLINE_TOKEN
+# [243] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [243] NO_NEWLINE
+# [244] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -694,6 +696,7 @@ NO_NEWLINE ::=
 | [`gradient_place`](#gradient-place) | `#gradient-place` | live |
 | [`cast_expr`](#cast-expr) | `#cast-expr` | live |
 | [`conversio_expr`](#conversio-expr) | `#conversio-expr` | live |
+| [`via_clause`](#via-clause) | `#经由-clause` | live |
 | [`inline_default`](#inline-default) | `#inline-default` | live |
 | [`call_expr`](#call-expr) | `#call-expr` | live |
 | [`call_suffix`](#call-suffix) | `#call-suffix` | live |
@@ -908,6 +911,7 @@ productions. It is not a second keyword authority.
 | Async | `等变` | await-bind mutable |
 | Boolean | `兜底` | nullable default |
 | Boolean | `真` | true |
+| Grammar | `经由` | keyword literal derived from the production |
 | Diagnostics | `查看` | debug |
 | Declarations | `visibilitas` | visibility field |
 
@@ -1394,7 +1398,7 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 
 - Declaration parameters (`genericParams`) and applied arguments (`typeArguments`) are distinct grammar categories. Applied arguments admit nested types and static `figura` values. `typeArguments` still admits `NATURAL`.
 - Applied `NATURAL` arguments are `维度` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, N>`, `queue<T, N>`, `stack<T, N>`, `textus<N>`, `ascii<N>`, `octeti<N>`. Width-marker families such as `numerus<i32>` stay the separate `widthTypeSugar` production below.
-- A second applied argument on a `↦` target (`numerus<W, Hex>`, `numerus<W, Be>`) is a convert-slot hint, not a type identity, not a width marker, and not a keyword. Live text-parse hints are `Hex` / `Bin` / `Oct`. `Be` / `Le` occupy that same Hex slot for endian unpack — both integer (`octeti[lo‥hi] ↦ numerus<W, Be|Le>`) and float windows (`octeti[lo‥hi] ↦ fractus<f32|f64, Be|Le>`, window 4/8, same fail rules as the integer rows). `Bits` occupies the same slot as an exact-width bitcast hint (reinterpretation, not value conversion; never a base). `typeArguments` is unchanged: these are ordinary `IDENTIFIER` arguments interpreted by conversio, not new `baseType` productions.
+- **Legacy spelling (retiring).** A second applied argument on a `↦` target (`numerus<W, Hex>`, `numerus<W, Be>`) is the legacy spelling of the convert hint; the canonical spelling is the `经由` clause (see Runtime conversion). The legacy form is still accepted until the qp1c lock step, then rejected; the canonical emitter now prints the clause. While it lives, it is a convert-slot hint, not a type identity, not a width marker, and not a keyword. Live text-parse hints are `Hex` / `Bin` / `Oct`. `Be` / `Le` occupy that same Hex slot for endian unpack — both integer (`octeti[lo‥hi] ↦ numerus<W, Be|Le>`) and float windows (`octeti[lo‥hi] ↦ fractus<f32|f64, Be|Le>`, window 4/8, same fail rules as the integer rows). `Bits` occupies the same slot as an exact-width bitcast hint (reinterpretation, not value conversion; never a base). `typeArguments` is unchanged: these are ordinary `IDENTIFIER` arguments interpreted by conversio, not new `baseType` productions.
 - Type arguments admit the hole forms: `lista<∪>` infers a heterogeneous element union and `tabula<K, ∪>` a heterogeneous value union; `lista<_>` keeps the monomorphic single-inhabitant hole.
 - Explicit generic call-site lists use the same `typeArguments` production: `id<_>(x)` is a type hole (equivalent to omitted `id(x)` for a one-param callee), and mixed lists such as `both<_, textus>(a, b)` are legal. Arity stays exact (`both<_>` is still one argument). `∪` in that list is rejected (`explicit_union_type_arg_unsupported`): a callee type param is a monomorphic witness slot.
 - `labeledTypeArgument` is the optional label prefix on `元组` type arguments only (`元组<gx: f32, T>`; mixed labeled/unlabeled legal). A label in a non-`元组` list (`f<gx: T>(x)`, `lista<gx: T>`) is a parse error. Absence is the only unlabeled form; there is no `_: T` spelling. Keyword spellings are legal labels under the contextual law (`元组<常量: A>`).
@@ -1998,7 +2002,16 @@ The `↦` glyph (U+21A6, "rightwards arrow from bar") is the runtime value conve
 - `n ↦ ascii<N, Hex|Bin|Oct>` — shipped; fixed-width lowercase digits, zero-padded to `N`, with overflow and negative sources rejected.
 - `n ↦ ascii<_, Hex|Bin|Oct>` — shipped for const-foldable numerus sources; the hole is solved to the source digit count. Runtime sources leave the hole unsolved and require explicit `N`.
 
-The second type argument of a `↦` target is the convert-hint slot. `Hex` / `Bin` / `Oct` / `Be` / `Le` / `Bits` are convert hints in that slot, not keywords and not new `baseType` productions. For ascii output, `Hex` / `Bin` / `Oct` select the lowercase fixed-width digit pack; the hint is not part of type identity. Target support is not a grammar production (see Target Support).
+**The `经由` clause (D11.9).** A convert hint is a clause on the conversion, not a type argument: `"ff" ↦ i32 经由 Hex`, `65 ↦ littera 经由 Code`, `octeti[0‥2] ↦ u16 经由 Le ↦ f16 经由 Bits ↦ f32`. The grammar is `conversio_expr := '↦' type_annotation via_clause? inline_default?` and `via_clause := '经由' IDENTIFIER`.
+
+- `经由` is contextual: it is claimed only on the conversion's own line, immediately after the target type. Everywhere else it is an ordinary identifier (radix corpora contain 186 real uses of `经由` as an identifier: gradus 129, examples 29, inferentia 26, norma 2).
+- The hint (`Hex`, `Bin`, `Oct`, `Be`, `Le`, `Bits`, `Code`) is a compile-time identifier that selects the conversion row. It is not part of the target type and it is not a keyword. The set is exactly those seven (there is no `Radix` hint). Hint spellings are the same short English identifiers in every locale; the word `经由` itself is per-locale (`经由` in en and la).
+- The clause binds tighter than the `⊥` default: `x ↦ u32 经由 Hex ⊥ 0` is `(x ↦ u32 经由 Hex) ⊥ 0`. Conversions chain, each hop with its own clause.
+- Whether a hint is known, and whether the target takes one, is semantic (lowering), not grammar.
+
+**Legacy spelling (retiring).** The rest of this section still writes hints as the second type argument of the `↦` target (`numerus<W, Hex>`). That is the legacy spelling of the same hints: accepted until the qp1c lock step, then rejected. The canonical spelling is the `经由` clause above (`"ff" ↦ numerus<i32, Hex>` is `"ff" ↦ i32 经由 Hex`).
+
+The second type argument of a `↦` target is the legacy convert-hint slot. `Hex` / `Bin` / `Oct` / `Be` / `Le` / `Bits` are convert hints in that slot, not keywords and not new `baseType` productions. For ascii output, `Hex` / `Bin` / `Oct` select the lowercase fixed-width digit pack; the hint is not part of type identity. Target support is not a grammar production (see Target Support).
 
 - `"ff" ↦ numerus<i32, Hex>` — shipped; text parse at radix 16 (`Bin` = 2, `Oct` = 8). Hex/Bin/Oct text parse is unchanged by endian hints.
 - `octeti[lo‥hi] ↦ numerus<W, Be>` / `… ↦ numerus<W, Le>` — endian unpack of an exact-width window (`W` is `i16` / `i32` / `i64` / `u16` / `u32` / `u64`; window length 2 / 4 / 8). Shipped on rust, the MIR runner, Go, and TypeScript. TypeScript `i64`/`u64` stay fail-closed (JS number is not exact). English `int<W, Be>` is the same form. `octeti` itself has no endian; `bytes ↦ numerus<u32>` without `Be`/`Le` stays rejected. A short window fails (no pad).
