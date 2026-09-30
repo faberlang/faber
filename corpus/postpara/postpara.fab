@@ -9,6 +9,7 @@ syntax = "postpara <block>"
 related = ["praepara", "omnia"]
 locale = "en"
 +++
+
 # =============================================================================
 # postpara — Registers an after-each test hook.
 # =============================================================================
@@ -35,6 +36,11 @@ locale = "en"
 #   declaration-only test hook (whitelist: postpara/postpara.fab).
 #
 
-test "sample" {
-    assert true
+describe "hooks" {
+    teardown {
+        print "after each"
+    }
+    test "sample" {
+        assert true
+    }
 }

@@ -9,6 +9,7 @@ syntax = "typus <name> = <type> ∪ <type>"
 related = ["typus", "discerne", "discretio"]
 locale = "en"
 +++
+
 # =============================================================================
 # ∪ — Inline value unions and discerne on discretio variants.
 # =============================================================================
@@ -40,33 +41,25 @@ locale = "en"
 #
 # BACKEND: Inline-union `discerne` enum lowering gap on Rust (whitelist: unio/unio.fab).
 
-type Valor = string ∪ int
+type Valor = int ∪ string
 
 union Forma {
-    Numerus {
-        int v
-    },
-    Textus {
-        string v
-    }
+    Numerus { int v },
+    Textus { string v }
 }
 
 fn describe(Forma f) → string {
     match f {
-        case Numerus const v {
-            return "n: §"(v)
-        }
-        case Textus const v {
-            return "t: §"(v)
-        }
+        case Numerus const v { return "n: §"(v) }
+        case Textus const v { return "t: §"(v) }
     }
 }
 
 main {
     # --- Ad-hoc inline union values ---
 
-    const string ∪ int a ← 42
-    const string ∪ int b ← "salve"
+    const Valor a ← 42
+    const Valor b ← "salve"
     print a
     print b
 

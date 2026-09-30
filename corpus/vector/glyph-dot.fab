@@ -9,6 +9,7 @@ syntax = "<expression> · <expression>"
 related = ["vector", "matrix", "tensor"]
 locale = "en"
 +++
+
 # =============================================================================
 # · — glyph inner product (dot / matvec / matmul by rank).
 # =============================================================================
@@ -39,8 +40,8 @@ locale = "en"
 #   32.0
 
 main {
-    const vector<f32, 3> a ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    const vector<f32, 3> b ← [4.0, 5.0, 6.0] ↦ vector<f32, 3>
+    const vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
+    const vf32[3] b ← [4.0, 5.0, 6.0] ↦ vf32[3]
     const f32 d ← a · b
     print d
 }

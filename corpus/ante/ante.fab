@@ -9,6 +9,8 @@ syntax = "<expression> ante <expression>"
 related = ["usque", "‥"]
 locale = "en"
 +++
+
+
 # =============================================================================
 # ante — Creates an exclusive range with a Latin keyword.
 # =============================================================================
@@ -37,7 +39,7 @@ locale = "en"
 
 main {
     # i = 0, 1, 2, 3 (stops before 4)
-    for range 0‥4 const i {
+    for range 0 before 4 const i {
         print i
     }
 }

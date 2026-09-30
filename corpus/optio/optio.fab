@@ -9,6 +9,7 @@ syntax = "@ optio <binding> [brevis \"x\"] [longum \"name\"] [typus <type>] [des
 related = ["operandus", "cli", "imperium", "ubique", "vel"]
 locale = "en"
 +++
+
 # =============================================================================
 # optio — Declares a CLI option annotation.
 # =============================================================================
@@ -35,8 +36,8 @@ locale = "en"
 #   declaration-only CLI metadata (whitelist: optio/optio.fab).
 #
 
-@ cli { name = "optio-smoke" }
-@ option { binding = verbose, short = "v", long = "verbose", type = bool, description = "Verbose mode" }
-@ option { binding = count, long = "count", type = int, description = "Repeat count" }
+@ cli "optio-smoke"
+@ option verbose short "v" long "verbose" type bool description "Verbose mode"
+@ option count long "count" type int description "Repeat count"
 main args args {
 }

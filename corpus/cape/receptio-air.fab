@@ -9,6 +9,7 @@ syntax = "@ radix lane \"air\"; si <cond> { iace } cape <err> { redde <outer val
 related = ["cape", "si", "secus", "sin", "fac", "elige", "iace", "conversio", "receptio-decline"]
 locale = "la"
 +++
+
 # =============================================================================
 # receptio (AIR lane) — locally-resolved handlers admit as branch dataflow.
 # =============================================================================
@@ -38,95 +39,71 @@ locale = "la"
 # =============================================================================
 
 # per-arm then — the throwing `si` arm is itself the recovery fork
-@ radix { lane = "air" }
+@ radix lane "air"
 functio bracchium(bivalens malum) → numerus {
-    si malum {
-        iace "x"
-    }
-    cape err {
-        redde 0
-    }
-    secus ergo redde 2
+    si malum { iace "x" } cape err { redde 0 } secus { redde 2 }
 }
 
 # per-arm secus — the handler wraps only the `secus` arm
-@ radix { lane = "air" }
+@ radix lane "air"
 functio bracchium_secus(bivalens malum) → numerus {
-    si malum ergo redde 1
-    secus ergo redde fac {
+    si malum {
+        redde 1
+    } secus {
         iace "x"
-    }
-    cape err {
+    } cape err {
         redde 3
     }
 }
 
 # per-arm sin — the else-if arm carries its own handler
-@ radix { lane = "air" }
+@ radix lane "air"
 functio bracchium_sin(bivalens primus, bivalens secundus) → numerus {
-    si primus ergo redde 1
-    secus ergo redde si secundus {
+    si primus {
+        redde 1
+    } sin secundus {
         iace "x"
-    }
-    cape err {
+    } cape err {
         redde 4
+    } secus {
+        redde 5
     }
-    secus ergo redde 5
 }
 
 # whole-construct fac — the guarded throw floats into an If whose taken
 # side is the recovery arm
-@ radix { lane = "air" }
+@ radix lane "air"
 functio conatus(bivalens malum) → numerus {
     fac {
-        si malum {
-            iace "x"
-        }
+        si malum { iace "x" }
         redde 1
-    }
-    cape err {
-        redde 0
-    }
+    } cape err { redde 0 }
 }
 
 # whole-construct elige — a throwing casu arm becomes the recovery arm of
 # the lowered Match
-@ radix { lane = "air" }
+@ radix lane "air"
 functio electio(bivalens malum) → numerus {
-    fac {
-        discerne malum {
-            casu verum {
-                iace "x"
-            }
-            casu _ {
-                redde 2
-            }
-        }
-    }
-    cape err {
-        redde 0
-    }
+    elige malum {
+        casu verum { iace "x" }
+        ceterum { redde 2 }
+    } cape err { redde 0 }
 }
 
 # recovery-arm conversion — the inline ⊥ default resolves the conversion
 # failure in its own expression
-@ radix { lane = "air" }
+@ radix lane "air"
 functio lectio(textus s) → numerus {
     fixum numerus v ← s ↦ numerus ⊥ 0
     redde v
 }
 
 # the same self-resolved conversion inside an admitted handler region
-@ radix { lane = "air" }
+@ radix lane "air"
 functio lectio_in_regione(textus s, bivalens malum) → numerus {
     fac {
-        si malum {
-            iace "x"
-        }
+        si malum { iace "x" }
         fixum numerus v ← s ↦ numerus ⊥ 0
         redde v
-    }
-    cape err {
-        redde 1
-    }
+    } cape err { redde 1 }
 }

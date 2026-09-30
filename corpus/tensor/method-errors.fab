@@ -9,6 +9,7 @@ syntax = "tensor.from_flat(flat, shape)"
 related = ["tensor", "structa"]
 locale = "en"
 +++
+
 # =============================================================================
 # tensor — Tensor method hard-error policy for structa count mismatch.
 # =============================================================================
@@ -32,7 +33,7 @@ locale = "en"
 #   tensor structa element count does not match shape
 
 main {
-    const tensor<f32, []> seed ← empty
-    const tensor<f32, [2, 2]> grid ← seed.from_flat([1.0, 2.0, 3.0], [2, 2])
+    const tf32[] seed ← empty
+    const tf32[2, 2] grid ← seed.from_flat([1.0, 2.0, 3.0], [2, 2])
     print grid.length()
 }

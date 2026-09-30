@@ -6,6 +6,7 @@ category = "register"
 summary = "vf32[4] width sugar in type position"
 locale = "en"
 +++
+
 # =============================================================================
 # vector — vf32[4] width sugar in type position.
 # =============================================================================
@@ -22,7 +23,7 @@ locale = "en"
 
 
 
-fn takes(vector<f32, 4> v) → int {
+fn takes(vf32[4] v) → int {
     return 0
 }
 

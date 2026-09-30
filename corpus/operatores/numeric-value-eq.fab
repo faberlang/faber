@@ -9,6 +9,7 @@ syntax = "<expression> ≅ <expression> | <expression> ≇ <expression>"
 related = ["≡", "≠", "↦", "adfirma"]
 locale = "en"
 +++
+
 # =============================================================================
 # ≅ — Numeric value equality after promotion join — not fuzzy float.
 # =============================================================================
@@ -33,27 +34,30 @@ locale = "en"
 main {
     const int<u8> port ← 42 ∷ int<u8>
     const int count ← 42
-    const bool same_width ← port ≅ count
+    const _ same_width ← port ≅ count
     print same_width
-    const bool int_float ← 1 ≅ 1.0
+
+    const _ int_float ← 1 ≅ 1.0
     print int_float
-    const bool not_fuzzy ← 42.145 ∷ f64 ≅ 42.0 ∷ f64
+
+    const _ not_fuzzy ← 42.145 ∷ float<f64> ≅ 42.0 ∷ float<f64>
     print not_fuzzy
-    const bool differs ← 1 ≇ 2
+
+    const _ differs ← 1 ≇ 2
     print differs
 
     # Sign-boundary pin: a negative signed value never wraps to u64::MAX.
     const int<i64> signed_negative ← -1
     const int<u64> unsigned_max ← 18446744073709551615
-    const bool sign_equal ← signed_negative ≅ unsigned_max
-    const bool sign_different ← signed_negative ≇ unsigned_max
+    const _ sign_equal ← signed_negative ≅ unsigned_max
+    const _ sign_different ← signed_negative ≇ unsigned_max
     print sign_equal
     print sign_different
 
     # Cross-width pin: the 2^53+1 integer remains distinct from 2^53.
     const int<i64> above_precision ← 9007199254740993
     const int<u64> below_precision ← 9007199254740992
-    const bool cross_width ← above_precision ≅ below_precision
+    const _ cross_width ← above_precision ≅ below_precision
     print cross_width
 
     # Exactness pin: 2^53+1 is not representable as f64, so it is not equal to

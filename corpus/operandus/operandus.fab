@@ -9,6 +9,7 @@ syntax = "@ operandus [ceteri] <type> <binding> [descriptio \"...\"] [ubique] [v
 related = ["optio", "cli", "imperium", "ceteri", "ubique"]
 locale = "en"
 +++
+
 # =============================================================================
 # operandus — Declares a CLI operand annotation.
 # =============================================================================
@@ -36,8 +37,8 @@ locale = "en"
 #   declaration-only CLI metadata (whitelist: operandus/operandus.fab).
 #
 
-@ cli { name = "operandus-smoke" }
-@ operand { type = string, binding = input, description = "Input path" }
-@ operand { rest = true, type = string, binding = files, description = "Extra files" }
+@ cli "operandus-smoke"
+@ operand string input description "Input path"
+@ operand rest string files description "Extra files"
 main args args {
 }

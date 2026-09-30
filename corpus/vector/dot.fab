@@ -6,6 +6,7 @@ category = "gpu"
 summary = "vector constructor and dot product lower for GPU text emit"
 locale = "en"
 +++
+
 # =============================================================================
 # vector — vector constructor and dot product lower for GPU text emit.
 # =============================================================================
@@ -22,11 +23,11 @@ locale = "en"
 
 
 
-@ kernel { }
-@ public { }
-fn productum(f32 x) → f32 {
-    const vector<f32, 4> a ← [x, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
-    const vector<f32, 4> b ← [1.0, 1.0, 1.0, 1.0] ↦ vector<f32, 4>
-    const f32 d ← a.dot(b)
+@ kernel
+@ public
+fn productum(float<f32> x) → float<f32> {
+    const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
+    const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
+    const float<f32> d ← a.dot(b)
     return d
 }

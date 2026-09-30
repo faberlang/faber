@@ -9,6 +9,7 @@ syntax = "functio <name>(...) errata <ident> → <type>"
 related = ["⇥", "cape", "iace"]
 locale = "en"
 +++
+
 # =============================================================================
 # errata — Marks a function parameter or binding as carrying an error value.
 # =============================================================================
@@ -35,6 +36,6 @@ locale = "en"
 #   declaration-only error channel (whitelist: errata/errata.fab).
 #
 
-fn parse(string raw) → int {
+fn parse(string raw) errors string → int {
     return 0
 }

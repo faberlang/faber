@@ -6,6 +6,7 @@ category = "gpu"
 summary = "nucleum kernel baseline for vector GPU emit"
 locale = "en"
 +++
+
 # =============================================================================
 # vector — nucleum kernel baseline for vector GPU emit.
 # =============================================================================
@@ -22,8 +23,8 @@ locale = "en"
 
 
 
-@ kernel { }
-@ public { }
-fn scala(f32 x) → f32 {
+@ kernel
+@ public
+fn scala(float<f32> x) → float<f32> {
     return x + 1.0
 }

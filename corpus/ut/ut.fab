@@ -10,6 +10,7 @@ aliases = ["as"]
 related = ["ex", "argumenta"]
 locale = "en"
 +++
+
 # =============================================================================
 # ut — Introduces an alias name.
 # =============================================================================
@@ -38,7 +39,7 @@ locale = "en"
 #   Cross-ref: destructura/, importa/, discerne/ (per-field ut).
 #
 
-fn greet(string loc) → string {
+fn greet(string location as loc) → string {
     return loc
 }
 

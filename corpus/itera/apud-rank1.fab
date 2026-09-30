@@ -9,6 +9,7 @@ syntax = "for from tensor at [i] const cell { }"
 related = ["apud", "itera", "ex", "tensor"]
 locale = "en"
 +++
+
 # =============================================================================
 # apud rank-1 — `at [i]` binds the single axis coordinate next to the element.
 # =============================================================================
@@ -38,8 +39,9 @@ locale = "en"
 
 main {
     const list<f32> flat ← [1.0, 2.0, 3.0]
-    const tensor<f32, []> seed ← empty
-    var tensor<f32, [3]> line ← seed.from_flat(flat, [3])
+    const tf32[] seed ← empty
+    var tf32[3] line ← seed.from_flat(flat, [3])
+
     for from line at [i] const cell {
         print i, cell
     }

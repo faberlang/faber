@@ -9,6 +9,7 @@ syntax = "for … const <binder> then <statement>"
 related = ["ergo", "si", "dum", "itera", "redde"]
 locale = "en"
 +++
+
 # =============================================================================
 # ergo-body — compact one-statement loop bodies via the ergo joint.
 # =============================================================================
@@ -41,10 +42,7 @@ locale = "en"
 #   ergo-body.expected — 0..3 from the range head, then the doubled values.
 
 main {
-    for range 0‥4 const i {
-        print i
-    }
-    for from [10, 20, 30] const x {
-        print x * 2
-    }
+    for range 0‥4 const i then print i
+
+    for from [10, 20, 30] const x then print x * 2
 }

@@ -9,6 +9,7 @@ syntax = "functio <name>(...) optiones <ident> → <type>"
 related = ["argumenta", "ad"]
 locale = "en"
 +++
+
 # =============================================================================
 # optiones — Binds CLI options metadata to a function declaration.
 # =============================================================================
@@ -35,6 +36,6 @@ locale = "en"
 #   declaration-only CLI binding (whitelist: optiones/optiones.fab).
 #
 
-fn mitte() → string {
+fn mitte() options Opts → string {
     return "ok"
 }

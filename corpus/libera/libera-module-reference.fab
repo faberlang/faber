@@ -24,6 +24,6 @@ fn duplica(int n) → int {
 }
 
 main {
-    const (int) → int double ← int x → int ∴ duplica(x)
+    const _ double ← int x free → int ∴ duplica(x)
     print double(21)
 }

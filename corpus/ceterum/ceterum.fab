@@ -10,6 +10,7 @@ aliases = ["default"]
 related = ["elige", "discerne"]
 locale = "en"
 +++
+
 # =============================================================================
 # ceterum — Starts the default branch of an elige or discerne statement.
 # =============================================================================
@@ -39,13 +40,9 @@ locale = "en"
 #
 
 main {
-    const string tag ← "z"
-    match tag {
-        case "a" {
-            print "a"
-        }
-        case _ {
-            print "default"
-        }
+    const _ tag ← "z"
+    switch tag {
+        case "a" { print "a" }
+        default { print "default" }
     }
 }

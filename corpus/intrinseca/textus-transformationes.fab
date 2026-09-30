@@ -41,13 +41,15 @@ locale = "en"
 #   Smoke asserts exit 0 only.
 
 main {
-    const string nuntius ← " Ave Roma "
-    const string secta ← nuntius.slice(1, 4)
-    const string magna ← nuntius.uppercase()
-    const string parva ← nuntius.lowercase()
-    const string rasa ← nuntius.trim()
-    const list<string> partes ← rasa.split(" ")
-    const string mutata ← rasa.replace("Roma", "Munde")
+    let nuntius ← " Ave Roma "
+
+    let secta ← nuntius.slice(1, 4)
+    let magna ← nuntius.uppercase()
+    let parva ← nuntius.lowercase()
+    let rasa ← nuntius.trim()
+    let partes ← rasa.split(" ")
+    let mutata ← rasa.replace("Roma", "Munde")
+
     print secta, magna, parva
     print rasa, partes, mutata
 }

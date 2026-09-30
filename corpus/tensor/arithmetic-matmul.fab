@@ -9,6 +9,7 @@ syntax = "tensor.matmul(other)"
 related = ["tensor", "fractus", "lista"]
 locale = "en"
 +++
+
 # =============================================================================
 # tensor — Tensor rank-2 matrix multiplication with static shape checking.
 # =============================================================================
@@ -48,10 +49,10 @@ locale = "en"
 main {
     const list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
     const list<f32> flat_b ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
-    const tensor<f32, []> seed ← empty
-    const tensor<f32, [2, 3]> a ← seed.from_flat(flat_a, [2, 3])
-    const tensor<f32, [3, 4]> b ← seed.from_flat(flat_b, [3, 4])
-    const tensor<f32, [2, 4]> c ← a.matmul(b)
+    const tf32[] seed ← empty
+    const tf32[2, 3] a ← seed.from_flat(flat_a, [2, 3])
+    const tf32[3, 4] b ← seed.from_flat(flat_b, [3, 4])
+    const tf32[2, 4] c ← a.matmul(b)
 
     # Print all elements of the 2x4 result in row-major order.
     const f32 r0c0 ← c.get([0, 0]) coalesce 0.0
@@ -62,6 +63,7 @@ main {
     const f32 r1c1 ← c.get([1, 1]) coalesce 0.0
     const f32 r1c2 ← c.get([1, 2]) coalesce 0.0
     const f32 r1c3 ← c.get([1, 3]) coalesce 0.0
+
     print r0c0
     print r0c1
     print r0c2

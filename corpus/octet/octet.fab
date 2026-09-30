@@ -36,7 +36,7 @@ fn firstByte(bytes buf) → byte {
 
 main {
     var bytes sig ← |de ad be ef|
-    const int<u8> b ← 128 ∷ int<u8>
+    const int<u8> b ← 0x80 ∷ int<u8>
     sig.append(b)
     print describe(sig)
     const byte first ← firstByte(sig)

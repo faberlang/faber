@@ -9,6 +9,7 @@ syntax = "functio <name>(<params>) → <type> | functio <name>(<params>) → <su
 related = ["⇥", "functio", "redde", "iace", "cape"]
 locale = "en"
 +++
+
 # =============================================================================
 # → — Success return type and recoverable alternate-exit type in function signatures.
 # =============================================================================
@@ -39,9 +40,7 @@ fn saluta() → string {
 }
 
 fn divide(int a, int b) → int ⇥ string {
-    if b ≡ 0 {
-        throw "division by zero"
-    }
+    if b ≡ 0 then throw "division by zero"
     return a / b
 }
 

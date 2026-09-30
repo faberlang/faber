@@ -9,6 +9,7 @@ syntax = "tensor[index] | tensor[index] ← value"
 related = ["tensor", "accipe", "ponde", "lista"]
 locale = "en"
 +++
+
 # =============================================================================
 # tensor — Tensor bracket access lowers to accipe and ponde.
 # =============================================================================
@@ -41,19 +42,22 @@ locale = "en"
 #   4.0
 
 main {
-    const tensor<f32, []> seed ← empty
-    var tensor<f32, [4]> input ← seed.create(0.0, [4])
-    var tensor<f32, [4]> output ← seed.create(0.0, [4])
-    const int<u32> index ← 1
+    const tf32[] seed ← empty
+    var tf32[4] input ← seed.create(0.0, [4])
+    var tf32[4] output ← seed.create(0.0, [4])
+
+    const u32 index ← 1
     input[index] ← 3.0
     const f32 old ← input[index] coalesce 0.0
     const f32 oldMethod ← input.get([index]) coalesce 0.0
     output[index] ← old + 1.0
     const f32 updated ← output[index] coalesce 0.0
-    var tensor<f32, [2, 2]> grid ← seed.create(0.0, [2, 2])
+
+    var tf32[2, 2] grid ← seed.create(0.0, [2, 2])
     grid[[1, 0]] ← updated
     const f32 elementum ← grid[[1, 0]] coalesce 0.0
     const f32 elementumMethod ← grid.get([1, 0]) coalesce 0.0
+
     print old
     print oldMethod
     print updated

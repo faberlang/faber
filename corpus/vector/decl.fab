@@ -7,6 +7,7 @@ summary = "vector type declarations: long form and vf32 sugar"
 syntax = "vector<T, N> | vf32[N]"
 locale = "en"
 +++
+
 # =============================================================================
 # vector — vector type declarations: long form and vf32 sugar.
 # =============================================================================
@@ -23,7 +24,7 @@ locale = "en"
 
 
 
-fn takes(vector<f32, 4> v, vector<f32, 4> w) → int {
+fn takes(vector<float<f32>, 4> v, vf32[4] w) → int {
     return 0
 }
 

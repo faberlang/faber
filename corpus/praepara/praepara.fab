@@ -9,6 +9,7 @@ syntax = "praepara <block>"
 related = ["postpara", "omnia"]
 locale = "en"
 +++
+
 # =============================================================================
 # praepara — Registers a before-each test hook.
 # =============================================================================
@@ -37,6 +38,11 @@ locale = "en"
 #   declaration-only test hook (whitelist: praepara/praepara.fab).
 #
 
-test "sample" {
-    assert true
+describe "hooks" {
+    setup {
+        print "before each"
+    }
+    test "sample" {
+        assert true
+    }
 }

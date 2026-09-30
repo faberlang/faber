@@ -9,6 +9,7 @@ syntax = "ex <expression> <fixum|varia> <field> [, ...] [ceteri <ident>]"
 related = ["de", "ut", "ceteri"]
 locale = "en"
 +++
+
 # =============================================================================
 # ex — Extracts fields from a value into local bindings.
 # =============================================================================
@@ -94,61 +95,63 @@ class Vestis {
 main {
     # --- Basic field extraction ---
 
-    const Persona persona ← Persona { nomen = "Marcus", aetas = 30, urbs = "Roma" }
-    const string nomen ← persona.nomen
-    const int aetas ← persona.aetas
+    const _ persona ← Persona { nomen = "Marcus", aetas = 30, urbs = "Roma" }
+    from persona const nomen, aetas
+
     print nomen
     print aetas
 
     # --- Extract with alias using 'ut' ---
 
-    const Civis civis ← Civis { nomen = "Julia", epistula = "julia@roma.com" }
-    const string cognomen ← civis.nomen
-    const string epistula2 ← civis.epistula
+    const _ civis ← Civis { nomen = "Julia", epistula = "julia@roma.com" }
+    from civis const nomen as cognomen, epistula as epistula2
+
     print cognomen
     print epistula2
 
     # --- Mutable destructuring with varia ---
 
-    const Datum datum ← Datum { numerus = 100, activus = true }
-    var int numerus ← datum.numerus
-    var bool activus ← datum.activus
+    const _ datum ← Datum { numerus = 100, activus = true }
+    from datum var numerus, activus
+
     print numerus
     print activus
+
     numerus ← 200
     activus ← false
+
     print numerus
     print activus
 
     # --- Mixed alias and regular fields ---
 
-    const Forma forma ← Forma { hospes = "localis", portus = 8080, tutus = true }
-    const string hospes ← forma.hospes
-    const int porta ← forma.portus
-    const bool tutus ← forma.tutus
+    const _ forma ← Forma { hospes = "localis", portus = 8080, tutus = true }
+    from forma const hospes, portus as porta, tutus
+
     print hospes
     print porta
     print tutus
 
     # --- Rest pattern with ceteri ---
 
-    const Plenus plenus ← Plenus { signum = 1, nomen = "Gaius", epistula = "g@roma.com", munus = "admin" }
-    const int signum ← plenus.signum
-    const Plenus reliqua ← plenus
+    const _ plenus ← Plenus { signum = 1, nomen = "Gaius", epistula = "g@roma.com", munus = "admin" }
+    from plenus const signum, rest reliqua
+
     print signum
     print reliqua
 
     # --- Destructura ex nested path ---
 
-    const Responsum responsum ← Responsum { datum = Relatus { civis = Sodalis { nomen = "Claudia", probatus = true } } }
-    const string internum ← responsum.datum.civis.nomen
-    const bool probatus ← responsum.datum.civis.probatus
+    const _ responsum ← Responsum { datum = Relatus { civis = Sodalis { nomen = "Claudia", probatus = true } } }
+    from responsum.datum.civis const nomen as internum, probatus
+
     print internum
     print probatus
 
     # --- Single field extraction ---
 
-    const Vestis vestis ← Vestis { modus = "nigrum", lingua = "la" }
-    const string modus ← vestis.modus
+    const _ vestis ← Vestis { modus = "nigrum", lingua = "la" }
+    from vestis const modus
+
     print modus
 }

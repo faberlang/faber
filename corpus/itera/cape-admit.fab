@@ -9,6 +9,7 @@ syntax = "for … { <body> } catch <err> { <recovery> }"
 related = ["cape", "fac", "iace", "receptio-decline"]
 locale = "en"
 +++
+
 # =============================================================================
 # cape-admit — whole-loop catch on itera (base lane admit).
 # =============================================================================
@@ -44,30 +45,22 @@ locale = "en"
 #   handler fires once.
 
 fn divisio(int a, int b) → int ⇥ string {
-    if b ≡ 0 {
-        throw "per nihil"
-    }
+    if b ≡ 0 then throw "per nihil"
     return a / b
 }
 
 main {
     # no throw: the loop runs to completion and the handler never fires
-    do {
-        for range 1‥4 const i {
-            print divisio(10, i)
-        }
-    }
-    catch err {
+    for range 1‥4 const i {
+        print divisio(10, i)
+    } catch err {
         print "captum: §"(err)
     }
 
     # the throw at i = 0 exits the whole loop; the handler fires once
-    do {
-        for range 0‥4 const i {
-            print divisio(10, i)
-        }
-    }
-    catch err {
+    for range 0‥4 const i {
+        print divisio(10, i)
+    } catch err {
         print "captum: §"(err)
     }
 }

@@ -9,6 +9,7 @@ syntax = "ex <expression> <fixum|varia> <field> [, ...] [ceteri <ident>]"
 related = ["de", "ut", "ceteri"]
 locale = "en"
 +++
+
 # =============================================================================
 # ex — Extracts fields from a value into local bindings.
 # =============================================================================
@@ -41,9 +42,8 @@ class Persona {
 }
 
 main {
-    const Persona p ← Persona { nomen = "Marcus", aetas = 30 }
-    const string nomen ← p.nomen
-    const int aetas ← p.aetas
+    const _ p ← Persona { nomen = "Marcus", aetas = 30 }
+    from p const nomen, aetas
     print nomen
     print aetas
 }

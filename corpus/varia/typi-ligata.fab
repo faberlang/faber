@@ -9,6 +9,7 @@ syntax = "varia <type> <name> ← <expr> | fixum <type> <name> ← <expr>"
 related = ["varia", "fixum", "←"]
 locale = "en"
 +++
+
 # =============================================================================
 # varia — Type-first fixum and varia bindings with explicit types.
 # =============================================================================
@@ -43,6 +44,7 @@ main {
     const int aetas ← 30
     const string nomen ← "Marcus"
     const bool viget ← true
+
     print aetas
     print nomen
     print viget
@@ -52,6 +54,7 @@ main {
     var int numeratio ← 0
     var string condicio ← "pendens"
     var bool currit ← false
+
     print numeratio
     print condicio
     print currit
@@ -60,6 +63,7 @@ main {
     numeratio ← 100
     condicio ← "perfectum"
     currit ← true
+
     print numeratio
     print condicio
     print currit
@@ -68,8 +72,10 @@ main {
 
     const float pi ← 3.14159
     var float ratio ← 0.05
+
     print pi
     print ratio
-    ratio ← 0.1
+
+    ratio ← 0.10
     print ratio
 }

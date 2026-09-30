@@ -42,9 +42,8 @@ locale = "en"
 
 fn validata(string input) → string ⇥ string {
     # Guard: throw if input is empty
-    if input.length() ≡ 0 {
-        throw "empty input"
-    }
+    throw "empty input" if input.length() ≡ 0
+
     return "valid: §"(input)
 }
 
@@ -69,9 +68,7 @@ main {
 
     # iace with si on same line
     do {
-        if true {
-            throw "force throw"
-        }
+        throw "force throw" if true
         print "should not reach"
     }
     catch err {

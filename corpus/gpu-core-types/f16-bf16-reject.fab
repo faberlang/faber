@@ -43,6 +43,6 @@ fn keep_bf16(bf16 x) → bf16 {
     return x
 }
 
-fn keep_bf16_long(bf16 x) → bf16 {
+fn keep_bf16_long(float<bf16> x) → float<bf16> {
     return x
 }

@@ -41,18 +41,18 @@ locale = "en"
 
 main {
     # ↦ converts textus → numerus
-    const int n1 ← "42" ↦ int
+    let n1 ← "42" ↦ int
     # ⊥ supplies a default on failure
-    const int n2 ← "invalid" ↦ int ⊥ 0
-    const int<i32> n3 ← "255" ↦ int<i32>
-    const float f1 ← "3.14159" ↦ float
-    const float f2 ← "invalid" ↦ float ⊥ 0.0
-    const string s1 ← 42 ↦ string
-    const string s2 ← 3.14 ↦ string
-    const string s3 ← true ↦ string
+    let n2 ← "invalid" ↦ int ⊥ 0
+    let n3 ← "255" ↦ int<i32>
+    let f1 ← "3.14159" ↦ float
+    let f2 ← "invalid" ↦ float ⊥ 0.0
+    let s1 ← 42 ↦ string
+    let s2 ← 3.14 ↦ string
+    let s3 ← true ↦ string
 
     # chained ↦ left-to-right
-    const string roundtrip ← ("42" ↦ int) ↦ string
+    let roundtrip ← ("42" ↦ int) ↦ string
     print n1
     print n2
     print n3

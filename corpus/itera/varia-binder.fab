@@ -9,6 +9,7 @@ syntax = "for from <collection> var <binder> { <body> }"
 related = ["ex", "fixum", "de"]
 locale = "en"
 +++
+
 # =============================================================================
 # itera varia — the mutable loop binder
 # =============================================================================
@@ -41,7 +42,8 @@ locale = "en"
 
 main {
     const list<int> valores ← [1, 2, 3]
-    for from valores const v {
+
+    for from valores var v {
         v ← v * 10
         print v
     }

@@ -8,6 +8,7 @@ syntax = "max from <tensor> [at [i]] [coalesce <identity>]"
 related = ["summa", "tensor", "nihil"]
 locale = "en"
 +++
+
 # =============================================================================
 # max/min — shaped tensor extrema with caller-stated empty identity
 # =============================================================================
@@ -30,18 +31,18 @@ locale = "en"
 # See also: summa, tensor, null, coalesce
 # =============================================================================
 
-fn max_static(tensor<f32, [4]> values) → f32 {
+fn max_static(tf32[4] values) → f32 {
     const f32 result ← max from values
     return result
 }
 
 # The `at`-binder is for bodies that use the index.
-fn max_scaled(tensor<f32, [4]> row, tensor<f32, [4]> scale) → f32 {
+fn max_scaled(tf32[4] row, tf32[4] scale) → f32 {
     const f32 result ← max from (row ⊙ scale) coalesce 0.0
     return result
 }
 
-fn min_with_identity(tensor<f32, [4]> values, f32 floor) → f32 {
+fn min_with_identity(tf32[4] values, f32 floor) → f32 {
     const f32 result ← min from values at [i] coalesce floor
     return result
 }
@@ -52,7 +53,7 @@ fn max_dynamic<size Figura>(tensor<f32, Figura> values, f32 fallback) → f32 {
 }
 
 fn max_empty() → f32 {
-    const tensor<f32, [0]> values ← empty
+    const tf32[0] values ← empty
     const f32 result ← max from values at [i] coalesce -∞
     return result
 }
@@ -65,9 +66,10 @@ fn max_empty() → f32 {
 
 main {
     const list<f32> flat ← [4.0, 1.0, 3.0, 2.0]
-    const tensor<f32, []> seed ← empty
-    const tensor<f32, [4]> values ← seed.from_flat(flat, [4])
-    const tensor<f32, [4]> scale ← seed.from_flat([1.0, 1.0, 1.0, 1.0], [4])
+    const tf32[] seed ← empty
+    const tf32[4] values ← seed.from_flat(flat, [4])
+    const tf32[4] scale ← seed.from_flat([1.0, 1.0, 1.0, 1.0], [4])
+
     print max_static(values)
     print min_with_identity(values, 99.0)
     print max_scaled(values, scale)

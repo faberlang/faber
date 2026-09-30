@@ -10,6 +10,8 @@ aliases = ["reject"]
 related = ["requirit", "adfirma", "iace", "cape", "⇥"]
 locale = "en"
 +++
+
+
 # =============================================================================
 # reice — Reject a condition or throw a recoverable error.
 # =============================================================================
@@ -40,26 +42,12 @@ locale = "en"
 #   empty — success-path main only (reice.expected)
 
 union GuardError {
-    Invalid {
-        string causa
-    }
+    Invalid { string causa }
 }
 
 fn guarded(int value) → int ⇥ GuardError {
-    if value ≺ 0 {
-        throw variant Invalid { causa = "value must not be negative" }
-    }
+    reject value < 0 throw variant Invalid { causa = "value must not be negative" }
     return value
-}
-
-test "true path is recoverable" {
-    do {
-        const int dropped ← guarded(-1)
-        assert false panic "true path must throw"
-    }
-    catch err {
-        # recovered — reject entered ⇥ and catch intercepted it
-    }
 }
 
 main {
@@ -69,5 +57,15 @@ main {
     }
     catch err {
         assert false panic "success path must not throw"
+    }
+}
+
+test "true path is recoverable" {
+    do {
+        const int dropped ← guarded(-1)
+        assert false panic "true path must throw"
+    }
+    catch err {
+        # recovered — reject entered ⇥ and catch intercepted it
     }
 }

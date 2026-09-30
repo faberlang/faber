@@ -8,6 +8,7 @@ syntax = "max from <tensor> | min from <tensor>"
 related = ["summa", "max", "min", "tensor"]
 locale = "en"
 +++
+
 # =============================================================================
 # extrema without coalesce — non-empty max/min reductions
 # =============================================================================
@@ -21,7 +22,7 @@ locale = "en"
 #   • treating `coalesce` as mandatory — a non-empty static tensor needs no
 #     identity tail.
 
-fn extrema(tensor<f32, [4]> values) → list<f32> {
+fn extrema(tf32[4] values) → list<f32> {
     const f32 hi ← max from values
     const f32 lo ← min from values
     return [hi, lo]
@@ -29,7 +30,7 @@ fn extrema(tensor<f32, [4]> values) → list<f32> {
 
 main {
     const list<f32> flat ← [4.0, 1.0, 3.0, 2.0]
-    const tensor<f32, []> seed ← empty
-    const tensor<f32, [4]> values ← seed.from_flat(flat, [4])
+    const tf32[] seed ← empty
+    const tf32[4] values ← seed.from_flat(flat, [4])
     print extrema(values)
 }

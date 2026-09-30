@@ -318,21 +318,48 @@ impl FaberCodegen<'_> {
         self.imported_variant_union_path_ids = self.imported_variants_needing_union_path(hir);
 
         let mut rendered_any_item = self.write_region(presentation, hir, surface, &mut writer);
+        // Test items are flattened by lowering: each carries its enclosing
+        // `describe` chain as `suite_path`. Re-open that chain around runs of
+        // consecutive tests so suite names survive re-emission.
+        let mut open_suites: Vec<Symbol> = Vec::new();
         for (idx, item) in hir.items.iter().enumerate() {
             if is_compiler_injected_item(item) {
                 continue;
             }
+            let path = item_suite_path(item);
+            let keep = shared_prefix_len(&open_suites, path);
+            self.close_suites(&mut open_suites, keep, &hir.items[idx..], &mut writer);
+            // An item that opens suites owns the leading trivia of the source
+            // statement that opened them, so the trivia precedes the outermost
+            // new `describe` header.
             self.write_item_trivia(item, !rendered_any_item, &mut writer);
             rendered_any_item = true;
+            for suite in &path[keep..] {
+                writer.write(surface.keyword(TokenKind::Probandum));
+                writer.write(" ");
+                self.write_quoted_text(self.interner.resolve(*suite), &mut writer);
+                writer.writeln(" {");
+                writer.indent();
+                open_suites.push(*suite);
+            }
             self.generate_item(item, &names, surface, &mut writer);
             // Canonical blank separator between items. When the following slot
             // carries leading trivia, the trivia run owns the boundary: this
             // separator would otherwise double the line break the run already
-            // reproduces (boundary-newline normalization / idempotency).
-            if !self.following_slot_has_trivia(&hir.items[idx + 1..]) {
+            // reproduces (boundary-newline normalization / idempotency). A
+            // following item that leaves the open suites closes them first, so
+            // no blank line precedes the closing brace.
+            let rest = &hir.items[idx + 1..];
+            let next_path = rest
+                .iter()
+                .find(|next| !is_compiler_injected_item(next))
+                .map_or(&[][..], item_suite_path);
+            let leaves_suite = shared_prefix_len(&open_suites, next_path) < open_suites.len();
+            if !leaves_suite && !self.following_slot_has_trivia(rest) {
                 writer.newline();
             }
         }
+        self.close_suites(&mut open_suites, 0, &[], &mut writer);
 
         self.write_entry_trivia(
             !rendered_any_item,
@@ -350,6 +377,7 @@ impl FaberCodegen<'_> {
                 || presentation.entry_start_anchor.is_some()
                 || hir.entry_is_async
                 || hir.entry_args_name.is_some()
+                || entry.expr.is_some()
                 || !hir.entry_annotations.is_empty();
             if explicit_entry {
                 writer.write(if hir.entry_is_async {
@@ -363,9 +391,18 @@ impl FaberCodegen<'_> {
                     writer.write(" ");
                     writer.write(&self.symbol_to_string(args));
                 }
+                // The entry block's tail expression is the authored `exitus`
+                // value (lowering stores it there). It re-emits in the header,
+                // never as a trailing body statement.
+                if let Some(exit) = &entry.expr {
+                    writer.write(" ");
+                    writer.write(surface.keyword(TokenKind::Exitus));
+                    writer.write(" ");
+                    self.write_expr(exit, &names, surface, &mut writer);
+                }
                 writer.writeln(" {");
                 writer.indented(|writer| {
-                    self.write_block(entry, &names, surface, writer);
+                    self.write_stmts(&entry.statements, &names, surface, writer);
                     self.write_block_end_trivia(entry, writer);
                 });
                 writer.writeln("}");
@@ -476,6 +513,27 @@ impl FaberCodegen<'_> {
         self.trivia.entry_trivia().is_some() || self.trivia.program_end_trivia().is_some()
     }
 
+    /// Close open `describe` blocks down to `keep`, innermost first.
+    ///
+    /// `remaining` starts at the item about to render (empty at end of items)
+    /// and decides whether the last closing brace owes a blank separator.
+    fn close_suites(
+        &self,
+        open: &mut Vec<Symbol>,
+        keep: usize,
+        remaining: &[HirItem],
+        writer: &mut CodeWriter,
+    ) {
+        while open.len() > keep {
+            open.pop();
+            writer.dedent();
+            writer.writeln("}");
+            if open.len() == keep && !self.following_slot_has_trivia(remaining) {
+                writer.newline();
+            }
+        }
+    }
+
     /// Emit entry (`incipit`) leading trivia before the entry keyword.
     fn write_entry_trivia(&self, file_start: bool, has_annotations: bool, writer: &mut CodeWriter) {
         let Some(trivia) = self.trivia.entry_trivia() else {
@@ -515,6 +573,18 @@ impl FaberCodegen<'_> {
 /// builtin allocated through the standard mechanism, regardless of its name.
 fn is_compiler_injected_item(item: &HirItem) -> bool {
     item.def_id.is_builtin()
+}
+
+/// The `describe` chain lowering recorded for a test item (empty otherwise).
+fn item_suite_path(item: &HirItem) -> &[Symbol] {
+    match &item.kind {
+        HirItemKind::Function(func) => func.test.as_ref().map_or(&[][..], |test| &test.suite_path),
+        _ => &[],
+    }
+}
+
+fn shared_prefix_len(open: &[Symbol], path: &[Symbol]) -> usize {
+    open.iter().zip(path).take_while(|(a, b)| a == b).count()
 }
 
 /// Whether `generate_item` will re-emit the item's annotation sequence.

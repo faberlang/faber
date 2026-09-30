@@ -9,6 +9,7 @@ syntax = "praeparabit <block>"
 related = ["praepara", "postparabit"]
 locale = "en"
 +++
+
 # =============================================================================
 # praeparabit — Registers an async before-each test hook.
 # =============================================================================
@@ -37,6 +38,11 @@ locale = "en"
 #   declaration-only test hook (whitelist: praeparabit/praeparabit.fab).
 #
 
-test "sample" {
-    assert true
+describe "async hooks" {
+    async_setup {
+        print "before each async"
+    }
+    test "sample" {
+        assert true
+    }
 }

@@ -9,6 +9,7 @@ syntax = "<expression> ⊗ <expression>"
 related = ["vector", "matrix"]
 locale = "en"
 +++
+
 # =============================================================================
 # ⊗ — glyph outer product (vector ⊗ vector → matrix).
 # =============================================================================
@@ -40,8 +41,8 @@ locale = "en"
 #   [[4.0, 5.0], [8.0, 10.0], [12.0, 15.0]]
 
 main {
-    const vector<f32, 3> a ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    const vector<f32, 2> b ← [4.0, 5.0] ↦ vector<f32, 2>
+    const vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
+    const vf32[2] b ← [4.0, 5.0] ↦ vf32[2]
     const matrix<f32, [3, 2]> o ← a ⊗ b
     print o
 }

@@ -42,9 +42,7 @@ locale = "en"
 #   try_call with a function-level return_error edge.
 
 fn divide(int a, int b) → int ⇥ string {
-    if b ≡ 0 {
-        throw "division by zero"
-    }
+    if b ≡ 0 then throw "division by zero"
     return a / b
 }
 

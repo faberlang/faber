@@ -35,6 +35,6 @@ locale = "en"
 #   declaration-only function modifier (whitelist: immutata/immutata.fab).
 #
 
-fn inspecta() → int {
+fn inspecta() readonly → int {
     return 0
 }

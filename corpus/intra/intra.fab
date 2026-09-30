@@ -37,6 +37,21 @@ locale = "en"
 
 static int aetas = 25
 
+# Basic intra with ‥ operator (exclusive end)
+if aetas within 0‥100 {
+    print "aetas intra fines est"
+}
+
+# intra with … (inclusive end)
+if aetas within 18…65 {
+    print "aetas laboris"
+}
+
+# intra with ante (explicit exclusive)
+if aetas within 0 before 18 {
+    print "minor"
+}
+
 main {
     print "exempla intra"
 }

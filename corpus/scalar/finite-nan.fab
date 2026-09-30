@@ -9,6 +9,7 @@ syntax = "x ↦ u32 via Bits field reads: (bits ⇒ 23) ∧ 255 and bits ∧ 838
 related = ["↦", "fractus", "functio"]
 locale = "en"
 +++
+
 # =============================================================================
 # ↦ — finite()/NaN detection through the Bits field-read gate.
 # =============================================================================
@@ -92,5 +93,5 @@ main {
     # touches non-canonical spellings — see the header note).
     const _ back ← quiet_nan ↦ u32 via Bits
     print back
-    print back ≡ 2143289344 ∷ int<u32>
+    print back ≡ (2143289344 ∷ int<u32>)
 }

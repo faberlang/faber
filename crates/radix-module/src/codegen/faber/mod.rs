@@ -27,8 +27,14 @@ mod cape_roundtrip_test;
 mod compile_time_local_roundtrip_test;
 
 #[cfg(test)]
+#[path = "corpus_reemit_gate_test.rs"]
+mod corpus_reemit_gate_test;
+#[cfg(test)]
 #[path = "field_modifier_roundtrip_test.rs"]
 mod field_modifier_roundtrip_test;
+#[cfg(test)]
+#[path = "lossless_reemit_test.rs"]
+mod lossless_reemit_test;
 #[cfg(test)]
 #[path = "member_visibility_roundtrip_test.rs"]
 mod member_visibility_roundtrip_test;

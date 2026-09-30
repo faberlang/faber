@@ -9,6 +9,7 @@ syntax = "tensor.get(lista<i64-fit integer>) | tensor.set(lista<i64-fit integer>
 related = ["tensor", "lista", "accipe", "ponde"]
 locale = "en"
 +++
+
 # =============================================================================
 # tensor — Tensor index intrinsics accept integer-width index lists.
 # =============================================================================
@@ -47,26 +48,27 @@ locale = "en"
 #   index-width.fab stdout contract (u32 thread-id index, rank-2 u32 origin).
 
 main {
-    const tensor<f32, []> seed ← empty
-    var tensor<f32, [4]> input ← seed.create(0.0, [4])
+    const tf32[] seed ← empty
+    var tf32[4] input ← seed.create(0.0, [4])
 
     # u32 thread id flowing directly into accipe — no bare-numerus detour.
-    const int<u32> index ← 1
+    const u32 index ← 1
     const f32 first ← input.get([index]) coalesce 0.0
     input.set([index], 9.0)
     const f32 updated ← input.get([index]) coalesce 0.0
 
     # A bound lu32 index vector also typechecks (lista width sugar).
-    const list<int<u32>> idx ← [index]
+    const lu32 idx ← [index]
     const f32 bound ← input.get(idx) coalesce 0.0
 
     # Rank-2 grid with a lista<u32> origin index.
-    var tensor<f32, [4, 4]> grid ← seed.create(0.0, [4, 4])
-    const int<u32> r ← 2
-    const int<u32> c ← 3
-    const list<int<u32>> origin ← [r, c]
+    var tf32[4, 4] grid ← seed.create(0.0, [4, 4])
+    const u32 r ← 2
+    const u32 c ← 3
+    const list<u32> origin ← [r, c]
     grid.set(origin, 7.0)
     const f32 elementum ← grid.get(origin) coalesce 0.0
+
     print first
     print updated
     print bound

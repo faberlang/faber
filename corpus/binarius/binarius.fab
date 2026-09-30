@@ -55,11 +55,11 @@ main {
     print summa
     const int differentia ← 10 - 5
     print differentia
-    const int productum ← 10 * 5
+    let productum ← 10 * 5
     print productum
-    const int quotiens ← 10 / 5
+    let quotiens ← 10 / 5
     print quotiens
-    const int reliquum ← 10 % 3
+    let reliquum ← 10 % 3
     print reliquum
 
     # Assignatio explicita (compound glyphs removed)
@@ -71,60 +71,60 @@ main {
     print index
 
     # Comparationes
-    const bool aequalis ← 10 ≡ 10
+    let aequalis ← 10 ≡ 10
     print aequalis
-    const bool diversus ← 10 ≠ 5
+    let diversus ← 10 ≠ 5
     print diversus
-    const bool minor ← 5 ≺ 10
+    let minor ← 5 ≺ 10
     print minor
-    const bool maior ← 10 ≻ 5
+    let maior ← 10 ≻ 5
     print maior
-    const bool medius ← 0 ≺ 5 and 5 ≺ 10
+    let medius ← 0 ≺ 5 and 5 ≺ 10
     print medius
 
     # Logica
-    const bool ambo ← true and true
+    let ambo ← true and true
     print ambo
-    const bool alterutrum ← false or true
+    let alterutrum ← false or true
     print alterutrum
-    const bool neutrum ← false and false
+    let neutrum ← false and false
     print neutrum
-    const bool short ← false and carum()
+    let short ← false and carum()
     print short
 
     # vel
     const string ∪ none nomen ← null
-    const string solutum ← nomen coalesce "defectum"
+    let solutum ← nomen coalesce "defectum"
     print solutum
     const string ∪ none primum ← null
     const string ∪ none secundum ← null
     const string tertium ← "inventum"
-    const string inventum ← (primum coalesce secundum) coalesce tertium
+    let inventum ← (primum coalesce secundum) coalesce tertium
     print inventum
 
     # ✓ ✗ — value conditional, one level only
-    const int aetas ← 25
-    const string condicio ← aetas ≥ 18 ✓ "adultus" ✗ "minor"
+    let aetas ← 25
+    let condicio ← aetas ≥ 18 ✓ "adultus" ✗ "minor"
     print condicio
-    const int puncta ← 85
-    const string gradus ← puncta ≥ 80 ✓ "B" ✗ "F"
+    let puncta ← 85
+    let gradus ← puncta ≥ 80 ✓ "B" ✗ "F"
     print gradus
 
     # Bit per bit
-    const int vexilla ← 10
-    const int persona ← 12
-    const int coniuncta ← vexilla ∧ persona
+    let vexilla ← 0b1010
+    let persona ← 0b1100
+    let coniuncta ← vexilla ∧ persona
     print coniuncta
-    const int velata ← vexilla ∨ persona
+    let velata ← vexilla ∨ persona
     print velata
-    const int diversa ← vexilla ⊻ persona
+    let diversa ← vexilla ⊻ persona
     print diversa
 
     # Motus bit
-    const int sinistra ← 1 ⇐ 4
+    let sinistra ← 1 ⇐ 4
     print sinistra
-    const int dextra ← 16 ⇒ 2
+    let dextra ← 16 ⇒ 2
     print dextra
-    const bool persona_vacua ← vexilla ∧ persona ≡ 0
+    let persona_vacua ← vexilla ∧ persona ≡ 0
     print persona_vacua
 }

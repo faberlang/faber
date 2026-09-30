@@ -9,6 +9,7 @@ syntax = "<expression> × <expression>"
 related = ["vector"]
 locale = "en"
 +++
+
 # =============================================================================
 # × — glyph cross product (width-3 vectors).
 # =============================================================================
@@ -39,8 +40,8 @@ locale = "en"
 #   [-3.0, 6.0, -3.0]
 
 main {
-    const vector<f32, 3> a ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    const vector<f32, 3> b ← [4.0, 5.0, 6.0] ↦ vector<f32, 3>
-    const vector<f32, 3> c ← a × b
+    const vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
+    const vf32[3] b ← [4.0, 5.0, 6.0] ↦ vf32[3]
+    const vf32[3] c ← a × b
     print c
 }

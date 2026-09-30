@@ -52,13 +52,14 @@ main {
     const _ prima ← [1, 2]
     const _ secunda ← [3, 4]
     const _ omnes ← [0, spread prima, spread secunda, 5]
-    const _ initium ← omnes[0]
-    const _ alterum ← omnes[1]
-    const _ tertium ← omnes[2]
+
+    const [initium, alterum, tertium] ← omnes
     print "caput: § § §"(initium, alterum, tertium)
+
     const _ paria ← omnes.filter(int n ∴ n % 2 ≡ 0)
     const _ aucta ← paria.map(int n → int ∴ do {
         return n + 10
     })
+
     print summa(aucta)
 }

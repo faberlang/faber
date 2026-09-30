@@ -9,6 +9,7 @@ syntax = "casu <value> ergo redde <expression>"
 related = ["elige", "ergo", "redde"]
 locale = "en"
 +++
+
 # =============================================================================
 # elige — Compact casu and ceterum branches with ergo redde.
 # =============================================================================
@@ -36,61 +37,35 @@ locale = "en"
 #   Status codes, type ids, and mixed-case handler output.
 
 fn nuntius(int codex) → string {
-    match codex {
-        case 1 {
-            return "paratum"
-        }
-        case 2 {
-            return "missum"
-        }
-        case 3 {
-            return "fractum"
-        }
-        case 4 {
-            return "absens"
-        }
-        case _ {
-            return "ignotum"
-        }
+    switch codex {
+        case 1 then return "paratum"
+        case 2 then return "missum"
+        case 3 then return "fractum"
+        case 4 then return "absens"
+        default then return "ignotum"
     }
 }
 
 fn qualis(string nomen) → int {
-    match nomen {
-        case "textus" {
-            return 1
-        }
-        case "numerus" {
-            return 2
-        }
-        case "fractus" {
-            return 3
-        }
-        case "bivalens" {
-            return 4
-        }
-        case _ {
-            return 0
-        }
+    switch nomen {
+        case "textus" then return 1
+        case "numerus" then return 2
+        case "fractus" then return 3
+        case "bivalens" then return 4
+        default then return 0
     }
 }
 
 # casu 2 uses a block body instead of ergo redde (side effect + return)
 fn tracta(int codex) → string {
-    match codex {
-        case 1 {
-            return "simplex"
-        }
+    switch codex {
+        case 1 then return "simplex"
         case 2 {
             print "codex 2 tractatur..."
             return "compositus"
         }
-        case 3 {
-            return "iterum simplex"
-        }
-        case _ {
-            return "defectum"
-        }
+        case 3 then return "iterum simplex"
+        default then return "defectum"
     }
 }
 
@@ -98,8 +73,10 @@ main {
     print nuntius(1)
     print nuntius(4)
     print nuntius(9)
+
     print qualis("textus")
     print qualis("ignotum")
+
     print tracta(1)
     print tracta(2)
 }

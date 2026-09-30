@@ -10,6 +10,7 @@ aliases = ["legacy libera"]
 related = ["libera", "clausura", "∴"]
 locale = "en"
 +++
+
 # =============================================================================
 # libera — capture-free modifier on the legacy lambda head
 # =============================================================================
@@ -41,8 +42,8 @@ locale = "en"
 #   legacy-libera.expected — the doubled and summed values.
 
 main {
-    const (int) → int f ← int x ∴ x * 2
+    const _ f ← lambda int x free: x * 2
     print f(5)
-    const (int, int) → int g ← (int x, int y) ∴ x + y
+    const _ g ← lambda int x, int y free: x + y
     print g(2, 3)
 }

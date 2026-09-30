@@ -9,6 +9,7 @@ syntax = "summa ex <source> fixum <binder> { redde <term> }"
 related = ["summa", "apud", "tensor"]
 locale = "la"
 +++
+
 # =============================================================================
 # summa no-apud — the plain rank-1 fold without coordinate binding
 # =============================================================================
@@ -30,14 +31,12 @@ locale = "la"
 # =============================================================================
 
 functio total(tensor<f32, [8]> a) → f32 {
-    redde summa ex a fixum s {
-        redde s
-    }
+    redde summa ex a fixum s { redde s }
 }
 
 incipit {
     fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
-    fixum tensor<f32, []> seed ← vacua
-    fixum tensor<f32, [8]> a ← seed.strue(flat, [8])
+    fixum tf32[] seed ← vacua
+    fixum tf32[8] a ← seed.strue(flat, [8])
     nota total(a)
 }

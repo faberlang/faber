@@ -10,6 +10,7 @@ aliases = []
 related = ["fixum", "varia", "←"]
 locale = "en"
 +++
+
 # =============================================================================
 # sit — Declares an inferred immutable local.
 # =============================================================================
@@ -47,13 +48,16 @@ locale = "en"
 #   sit.expected
 
 main {
-    const string salve ← "Salve"
-    const string nomen ← "Marcus"
-    const string nuntius ← "§, §!"(salve, nomen)
+    let salve ← "Salve"
+    let nomen ← "Marcus"
+    let nuntius ← "§, §!"(salve, nomen)
+
     print nuntius
-    const string label
+
+    let label
     label ← "deferred"
     print label
-    const string idem ← nuntius
+
+    const _ idem ← nuntius
     print idem
 }

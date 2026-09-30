@@ -29,8 +29,6 @@ locale = "en"
 # The canonical record spells the source field and lets visibility/name defaults
 # materialize the same ImportDecl as `importa ex "norma:text"`.
 
-import from "norma:text" text
+import { ex = "norma:text" }
 
-main {
-    print "importa-braced"
-}
+print "importa-braced"

@@ -39,9 +39,11 @@ locale = "en"
 main {
     const float a ← 42.145
     const float b ← 42.0
+
     const bool near ← a.approx(b, 0.2)
     const bool fuzzy ← a ≈ b
     const bool exact_promo ← a ≅ b
+
     print near
     print fuzzy
     print exact_promo
@@ -49,14 +51,15 @@ main {
     # Cross-width and int↔float honesty rows follow the joined f64 formula.
     const int<i64> above_precision ← 9007199254740993
     const int<u64> below_precision ← 9007199254740992
-    const f64 float_boundary ← 9007199254740992.0
+    const float<f64> float_boundary ← 9007199254740992.0
     const bool fuzzy_cross_width ← above_precision ≈ below_precision
     const bool fuzzy_int_float ← above_precision ≈ float_boundary
 
     # Own-precision pin: both values round to 1.0 as f32 before isclose.
-    const f32 f32a ← 1.00000001 ∷ f32
-    const f32 f32b ← 1.0 ∷ f32
+    const float<f32> f32a ← 1.00000001 ∷ float<f32>
+    const float<f32> f32b ← 1.0 ∷ float<f32>
     const bool fuzzy_f32 ← f32a ≈ f32b
+
     print fuzzy_cross_width
     print fuzzy_int_float
     print fuzzy_f32

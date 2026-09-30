@@ -9,6 +9,7 @@ syntax = "<expression> ⊙ <expression>"
 related = ["tensor", "vector", "matrix"]
 locale = "en"
 +++
+
 # =============================================================================
 # ⊙ — glyph Hadamard (identical-shape elementwise product).
 # =============================================================================
@@ -43,20 +44,23 @@ locale = "en"
 #   [1.0, 4.0, 9.0, 16.0]
 
 main {
-    const vector<f32, 3> a ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    const vector<f32, 3> b ← [4.0, 5.0, 6.0] ↦ vector<f32, 3>
-    const vector<f32, 2> q ← [4.0, 5.0] ↦ vector<f32, 2>
+    const vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
+    const vf32[3] b ← [4.0, 5.0, 6.0] ↦ vf32[3]
+    const vf32[2] q ← [4.0, 5.0] ↦ vf32[2]
     const matrix<f32, [3, 2]> o ← a ⊗ q
-    const vector<f32, 3> v ← a ⊙ b
+
+    const vf32[3] v ← a ⊙ b
     print v
+
     const matrix<f32, [3, 2]> m ← o ⊙ o
     print m
+
     const list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
     const list<f32> flat_b ← [1.0, 2.0, 3.0, 4.0]
-    const tensor<f32, []> seed ← empty
-    var tensor<f32, [2, 2]> ta ← seed.from_flat(flat_a, [2, 2])
-    var tensor<f32, [2, 2]> tb ← seed.from_flat(flat_b, [2, 2])
-    const tensor<f32, [2, 2]> t ← ta ⊙ tb
+    const tf32[] seed ← empty
+    var tf32[2, 2] ta ← seed.from_flat(flat_a, [2, 2])
+    var tf32[2, 2] tb ← seed.from_flat(flat_b, [2, 2])
+    const tf32[2, 2] t ← ta ⊙ tb
     const list<f32> out ← t.flatten()
     print out
 }
