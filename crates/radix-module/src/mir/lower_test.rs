@@ -955,10 +955,12 @@ function f0 -> ty#1 {
     var _0: ty#1
   temps:
     %0: ty#1
+    %1: ty#1
   bb0:
     _0 = const int 1: ty#1
     %0 = _0 + const int 2: ty#1
-    _0 = %0: ty#1
+    %1 = runtime convert runtime ty#1 -> ty#1(%0) -> ty#1
+    _0 = %1: ty#1
     return _0
 }
 "
@@ -1484,6 +1486,8 @@ function f0 -> ty#1 {
     %0: ty#3
     %1: ty#1
     %2: ty#1
+    %3: ty#1
+    %4: ty#1
   bb0:
     _1 = const int 0: ty#1
     _2 = const int 0: ty#1
@@ -1493,9 +1497,11 @@ function f0 -> ty#1 {
     branch %0 bb2 bb3
   bb2:
     %1 = _2 + _1: ty#1
-    _2 = %1: ty#1
-    %2 = _1 + const int 1: ty#1
-    _1 = %2: ty#1
+    %2 = runtime convert runtime ty#1 -> ty#1(%1) -> ty#1
+    _2 = %2: ty#1
+    %3 = _1 + const int 1: ty#1
+    %4 = runtime convert runtime ty#1 -> ty#1(%3) -> ty#1
+    _1 = %4: ty#1
     goto bb1
   bb3:
     return _2
@@ -1567,7 +1573,8 @@ function f0 -> ty#1 {
   temps:
     %0: ty#3
     %1: ty#1
-    %2: ty#3
+    %2: ty#1
+    %3: ty#3
   bb0:
     _1 = const int 0: ty#1
     goto bb1
@@ -1576,9 +1583,10 @@ function f0 -> ty#1 {
     branch %0 bb2 bb3
   bb2:
     %1 = _1 + const int 1: ty#1
-    _1 = %1: ty#1
-    %2 = _1 < const int 3: ty#3
-    branch %2 bb4 bb5
+    %2 = runtime convert runtime ty#1 -> ty#1(%1) -> ty#1
+    _1 = %2: ty#1
+    %3 = _1 < const int 3: ty#3
+    branch %3 bb4 bb5
   bb3:
     return _1
   bb4:
@@ -1644,6 +1652,7 @@ function f0 -> ty#1 {
   temps:
     %0: ty#3
     %1: ty#1
+    %2: ty#1
   bb0:
     _1 = _0: ty#1
     %0 = _1 > const int 0: ty#3
@@ -1652,7 +1661,8 @@ function f0 -> ty#1 {
     return _1
   bb2:
     %1 = _1 + const int 1: ty#1
-    _1 = %1: ty#1
+    %2 = runtime convert runtime ty#1 -> ty#1(%1) -> ty#1
+    _1 = %2: ty#1
     goto bb3
   bb3:
     return _1

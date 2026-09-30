@@ -862,9 +862,7 @@ impl TypeChecker<'_> {
         let site = StoreSite::new(radix_hir::HirStoreKind::Assignment);
         match &target.kind {
             HirExpressionKind::Path(def_id) => {
-                let site = site
-                    .inferred_from(self.inferred_slot_sources.get(def_id).copied())
-                    .local_slot();
+                let site = site.inferred_from(self.inferred_slot_sources.get(def_id).copied());
                 match self.binding_names.get(def_id) {
                     Some(name) => site.named(*name),
                     None => site,
@@ -1059,17 +1057,6 @@ impl TypeChecker<'_> {
                 if !self.is_numeric(operand_ty) {
                     self.invalid_operand_types(NUMERIC_OPERAND_REQUIRED, operand.span);
                 }
-                if self
-                    .numeric_shape(self.resolve_inferred_type(operand_ty))
-                    .is_some_and(|shape| {
-                        shape.family == IntFamily::Saturating && !shape.width.is_signed_int()
-                    })
-                {
-                    // An unsigned saturating word has no negative values to
-                    // clamp toward; negation is rejected rather than zeroed.
-                    self.invalid_operand_types(SATURATING_WORD_OPERATOR_UNSUPPORTED, operand.span);
-                    return self.error_type;
-                }
                 self.unary_range_type(op, operand, operand_ty)
                     .unwrap_or(operand_ty)
             }
@@ -1110,14 +1097,8 @@ impl TypeChecker<'_> {
                     );
                     return self.numerus_type();
                 }
-                let Some(shape) = self.integer_shape(operand_resolved) else {
+                if self.integer_shape(operand_resolved).is_none() {
                     self.invalid_operand_types(INTEGER_OPERAND_REQUIRED, operand.span);
-                    return self.error_type;
-                };
-                if shape.family == IntFamily::Saturating
-                    || self.saturating_origin(operand).is_some()
-                {
-                    self.invalid_operand_types(SATURATING_WORD_OPERATOR_UNSUPPORTED, operand.span);
                     return self.error_type;
                 }
                 self.unary_range_type(op, operand, operand_resolved)

@@ -1180,7 +1180,6 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         match &statement.kind {
             MirStatementKind::Assign { place, value } => {
                 let evaluated = self.eval_value(value, statement.span)?;
-                self.guard_signed_local_store(place, &evaluated, statement.span)?;
                 self.write_place(place, evaluated, statement.span)?;
                 Ok(StatementOutcome::Continue)
             }

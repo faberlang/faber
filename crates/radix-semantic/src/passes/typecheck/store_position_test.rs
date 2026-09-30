@@ -520,16 +520,23 @@ fn an_open_inference_slot_binds_instead_of_narrowing() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn cap_typed_sum_into_int_is_checked_at_argument_and_return_stores() {
+fn cap_typed_sum_into_int_is_checked_at_every_store_position() {
     // `i64 + i64` is typed `i64` but its value reaches 2^64 - 2: the store
-    // into an `i64` slot is a real check and carries a node. A plain local
-    // (`c`) is checked at its own assignment and gets no separate node.
+    // into an `i64` slot is a real check and carries a node at every store
+    // position, a plain local (`c`) included.
     let source = "functio id(numerus v) → numerus { redde v }\n\
                   functio add(numerus a, numerus b) → numerus { redde a + b }\n\
                   incipit {\nvaria numerus a ← 1\nfixum numerus c ← a + a\nnota id(a + a)\n}\n";
     let mut found = kinds(source);
     found.sort_by_key(|kind| format!("{kind:?}"));
-    assert_eq!(found, vec![HirStoreKind::Argument, HirStoreKind::Return]);
+    assert_eq!(
+        found,
+        vec![
+            HirStoreKind::Argument,
+            HirStoreKind::Declaration,
+            HirStoreKind::Return
+        ]
+    );
 }
 
 #[test]

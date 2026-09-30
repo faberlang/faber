@@ -105,9 +105,7 @@ impl TypeChecker<'_> {
                     self.insert_binding_with_scalar(local.def_id, *ty, false, local.mutable);
                 }
                 let inferred_slot = self.is_infer(self.resolve_inferred_type(*ty));
-                let site = StoreSite::new(HirStoreKind::Declaration)
-                    .named(local.name)
-                    .local_slot();
+                let site = StoreSite::new(HirStoreKind::Declaration).named(local.name);
                 // `fixum T x = e` states a compile-time fact (an `=` position).
                 let site = if self.compile_time_locals.contains(&local.def_id) {
                     site.compile_time()
@@ -139,9 +137,7 @@ impl TypeChecker<'_> {
             }
             (None, Some(init)) => {
                 let inferred = self.check_expr(init);
-                let site = StoreSite::new(HirStoreKind::Declaration)
-                    .named(local.name)
-                    .local_slot();
+                let site = StoreSite::new(HirStoreKind::Declaration).named(local.name);
                 let inferred = self.saturating_inferred_slot(init, inferred, site);
                 self.inferred_slot_sources.insert(local.def_id, init.span);
                 super::tensor_index::record_shape_witness_from_init(self, local.def_id, init);

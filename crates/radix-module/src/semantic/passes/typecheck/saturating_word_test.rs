@@ -234,30 +234,42 @@ functio round(numerus x) → numerus {
 }
 
 #[test]
-fn saturating_word_rejects_bit_pattern_operators() {
-    for body in ["x ∧ x", "x ⊻ x", "x ⇐ 1", "¬x"] {
-        analysis_rejects_with_issue(
-            &format!(
-                r"
-functio bits(saturatus<u8> x) → saturatus<u8> {{
-    redde {body}
-}}
-"
-            ),
-            "saturating_word_operator_unsupported",
-        );
-    }
+fn saturating_word_bit_pattern_operators_are_exact() {
+    // Ruling 19: `∧ ∨ ⊻ ¬ ⇐ ⇒` are exact over integers; the store clamps.
+    analysis_accepts(
+        r"
+incipit {
+    varia saturatus<u8> x ← 200
+    fixum saturatus<u8> a ← x ∧ x
+    fixum saturatus<u8> b ← x ∨ 256
+    fixum saturatus<u8> c ← x ⊻ x
+    fixum saturatus<u8> d ← ¬x
+    fixum saturatus<u8> e ← x ⇐ 1
+    fixum saturatus<u8> f ← x ⇒ 1
+    nota a + b + c + d + e + f
+}
+",
+    );
+    // A `saturating` operand never meets a trapping integer variable.
+    analysis_rejects_with_issue(
+        r"
+functio bits(saturatus<u8> x, numerus n) → numerus {
+    redde x ∧ n
+}
+",
+        "saturating_word_family_mismatch",
+    );
 }
 
 #[test]
-fn saturating_word_rejects_unsigned_negation_and_accepts_inc_dec() {
-    analysis_rejects_with_issue(
+fn saturating_word_unsigned_negation_is_exact_and_inc_dec_clamps() {
+    // Ruling 3/19: `-x` is exact (a negative value); the store clamps it.
+    analysis_accepts(
         r"
 functio flip(saturatus<u8> x) → saturatus<u8> {
     redde -x
 }
 ",
-        "saturating_word_operator_unsupported",
     );
     // `level ↑` is `level ← level + 1`: a store into the slot, which clamps.
     analysis_accepts(

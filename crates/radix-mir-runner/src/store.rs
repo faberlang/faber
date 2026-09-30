@@ -56,63 +56,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         })
     }
 
-    /// A value above `i64::MAX` can sit in an `i64`-typed expression at the
-    /// 64-bit cap (`i64::MIN / -1`, `i64 + i64`), where the type does not
-    /// bound the value and the typechecker omits the store node. The store
-    /// into a signed local is the check (ruling 17b).
-    pub(crate) fn guard_signed_local_store(
-        &self,
-        place: &radix_mir::MirPlace,
-        value: &Value,
-        span: Span,
-    ) -> Result<(), RunnerError> {
-        let Value::UInt(magnitude) = value else {
-            return Ok(());
-        };
-        if i64::try_from(*magnitude).is_ok() || !place.projections.is_empty() {
-            return Ok(());
-        }
-        let radix_mir::MirPlaceBase::Local(id) = place.base else {
-            return Ok(());
-        };
-        let Some(frame) = self.frames.last() else {
-            return Ok(());
-        };
-        let Ok(function) = self.function_by_id(frame.function, span) else {
-            return Ok(());
-        };
-        let Some(local) = function
-            .locals
-            .iter()
-            .find(|local| local.id == id)
-            .map(|local| (local.ty, local.name))
-            .or_else(|| {
-                function
-                    .params
-                    .iter()
-                    .find(|p| p.local == id)
-                    .map(|p| (p.ty, None))
-            })
-        else {
-            return Ok(());
-        };
-        let signed = match self.types.get(local.0.semantic_id()) {
-            Type::Primitive(Primitive::Numerus) => true,
-            Type::SizedNumeric(Primitive::Numerus, width) => width.is_signed_int(),
-            _ => false,
-        };
-        if !signed {
-            return Ok(());
-        }
-        let site = HirStoreSite {
-            kind: HirStoreKind::Assignment,
-            slot: local.1,
-            inferred_from: None,
-            inferred_text: None,
-        };
-        Err(self.store_trap(&site, i128::from(*magnitude), NumericWidth::I64, span))
-    }
-
     fn integer_slot(&self, target: TypeId) -> Option<(SlotPolicy, NumericWidth)> {
         let mut target = target;
         while let Type::Alias(_, inner) = self.types.get(target) {

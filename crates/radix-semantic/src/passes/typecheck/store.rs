@@ -43,9 +43,6 @@ pub(super) struct StoreSite {
     pub(super) inferred_from: Option<radix_lexer::Span>,
     /// An `=` position states a compile-time fact: a constant must fit.
     pub(super) compile_time: bool,
-    /// A store into a plain local: the backends already check the value at
-    /// the local's assignment, so a capped `i64` needs no separate node.
-    pub(super) local_slot: bool,
 }
 
 impl StoreSite {
@@ -55,14 +52,7 @@ impl StoreSite {
             slot: None,
             inferred_from: None,
             compile_time: false,
-            local_slot: false,
         }
-    }
-
-    /// Mark a store into a plain local binding.
-    pub(super) fn local_slot(mut self) -> Self {
-        self.local_slot = true;
-        self
     }
 
     pub(super) fn named(mut self, slot: Symbol) -> Self {
@@ -173,7 +163,7 @@ impl TypeChecker<'_> {
             let ty = self.check_expr(expr);
             if let Some(target) = self
                 .store_narrowing_target(ty, slot_ty)
-                .or_else(|| self.capped_store_target(expr, ty, slot_ty, site))
+                .or_else(|| self.capped_store_target(expr, ty, slot_ty))
                 .or_else(|| self.saturating_store_target(expr, ty, slot_ty))
             {
                 return self.wrap_implicit_store(expr, ty, target, site);
@@ -195,7 +185,7 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         match self
             .store_narrowing_target(ty, slot_ty)
-            .or_else(|| self.capped_store_target(expr, ty, slot_ty, site))
+            .or_else(|| self.capped_store_target(expr, ty, slot_ty))
             .or_else(|| self.saturating_store_target(expr, ty, slot_ty))
         {
             Some(target) => self.wrap_implicit_store(expr, ty, target, site),
@@ -204,7 +194,7 @@ impl TypeChecker<'_> {
     }
 
     /// The `saturating` word whose arithmetic `expr` is, if any: the first
-    /// `saturating` leaf of a `+ - * / %` / unary `-` tree. Such an expression
+    /// `saturating` leaf of a `+ - * / % ∧ ∨ ⊻ ⇐ ⇒` / unary `-` `¬` tree. Such an expression
     /// computes exactly, so its type is the range rule's plain integer type;
     /// the word is what a store or an inferred slot clamps it back into
     /// (d11-6 ruling 3: no per-operation clamp).
@@ -220,15 +210,25 @@ impl TypeChecker<'_> {
                 | radix_hir::HirBinOp::Sub
                 | radix_hir::HirBinOp::Mul
                 | radix_hir::HirBinOp::Div
-                | radix_hir::HirBinOp::Mod,
+                | radix_hir::HirBinOp::Mod
+                | radix_hir::HirBinOp::BitAnd
+                | radix_hir::HirBinOp::BitOr
+                | radix_hir::HirBinOp::BitXor,
                 lhs,
                 rhs,
             ) => self
                 .saturating_origin(lhs)
                 .or_else(|| self.saturating_origin(rhs)),
-            HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, operand) => {
-                self.saturating_origin(operand)
-            }
+            // A shift count never gives the result its word.
+            HirExpressionKind::Binary(
+                radix_hir::HirBinOp::Shl | radix_hir::HirBinOp::Shr,
+                lhs,
+                _,
+            ) => self.saturating_origin(lhs),
+            HirExpressionKind::Unary(
+                radix_hir::HirUnOp::Neg | radix_hir::HirUnOp::BitNot,
+                operand,
+            ) => self.saturating_origin(operand),
             _ => None,
         }
     }
@@ -309,13 +309,11 @@ impl TypeChecker<'_> {
         expr: &HirExpression,
         ty: TypeId,
         slot_ty: TypeId,
-        site: StoreSite,
     ) -> Option<TypeId> {
         let (_, src) = self.store_int_slot(ty)?;
         let (dst_ty, dst) = self.store_int_target(slot_ty)?;
         let plain_i64 = |s: IntSlot| s.family == IntFamily::Plain && s.width == NumericWidth::I64;
-        (!site.local_slot && plain_i64(src) && plain_i64(dst) && self.exceeds_i64(expr, ty))
-            .then_some(dst_ty)
+        (plain_i64(src) && plain_i64(dst) && self.exceeds_i64(expr, ty)).then_some(dst_ty)
     }
 
     /// Whether a slot type is declared (no open inference variable at the top).

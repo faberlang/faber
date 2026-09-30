@@ -434,23 +434,72 @@ fn summa_at_the_cap_is_a_checked_store() {
     // f1s (ruling 21): a `summa` sits at the 64-bit cap, so returning it as
     // `int` checks the store; a small sum returns fine.
     let functions =
-        "functio total(tensor<numerus<i64>, [2]> a) → numerus {\n  redde summa ex a fixum s {\n    redde s\n  }\n}\n";
+        "functio total(tensor<numerus<i64>, [3]> a) → numerus {\n  redde summa ex a fixum s {\n    redde s\n  }\n}\n";
     let run_total = |values: &str| {
         let session = Session::new(Config::default().with_target(Target::HirTypeScript));
         let source = format!(
-            "{functions}incipit {{\nfixum lista<numerus<i64>> v ← [{values}]\nfixum tensor<numerus<i64>, []> seed ← vacua\nnota \"a\"\nnota total(seed.strue(v, [2]))\n}}\n"
+            "{functions}incipit {{\nfixum lista<numerus<i64>> v ← [{values}]\nfixum tensor<numerus<i64>, []> seed ← vacua\nnota \"a\"\nnota total(seed.strue(v, [3]))\n}}\n"
         );
         let mut host = BufferHost::default();
         let result = run_source(&session, "summa.fab", &source, &mut host);
         (host.stdout_lines, result)
     };
-    let (out, result) = run_total("1, 2");
+    let (out, result) = run_total("1, 2, 0");
     assert!(result.is_ok(), "{result:?}");
     assert_eq!(out, ["a", "3"]);
-    let (out, result) = run_total("9223372036854775807, 9223372036854775807");
+    let (out, result) = run_total("9223372036854775807, 9223372036854775807, 0");
     let Err(RunSourceError::Stepper(errors)) = result else {
         panic!("no trap: {result:?}");
     };
     assert_eq!(out, ["a"]);
     assert_eq!(errors[0].issue, "implicit_store_out_of_range");
+}
+
+#[test]
+fn summa_accumulates_exactly_and_checks_at_the_store() {
+    // sm1: the running total is exact (2^64 - 2 is inside the exact range);
+    // only the store of the result into its slot applies the slot policy.
+    let functions =
+        "functio total(tensor<numerus<i64>, [3]> a) → numerus {\n  redde summa ex a fixum s {\n    redde s\n  }\n}\n";
+    let run_total = |values: &str| {
+        let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+        let source = format!(
+            "{functions}incipit {{\nfixum lista<numerus<i64>> v ← [{values}]\nfixum tensor<numerus<i64>, []> seed ← vacua\nnota total(seed.strue(v, [3]))\n}}\n"
+        );
+        let mut host = BufferHost::default();
+        let result = run_source(&session, "summa.fab", &source, &mut host);
+        (host.stdout_lines, result)
+    };
+    let max = "9223372036854775807";
+    let (out, result) = run_total(&format!("{max}, {max}, -{max}"));
+    assert!(result.is_ok(), "{result:?}");
+    assert_eq!(out, [max]);
+    let (out, result) = run_total(&format!("{max}, {max}, {max}"));
+    let Err(RunSourceError::Stepper(errors)) = result else {
+        panic!("no trap: {out:?} {result:?}");
+    };
+    assert_eq!(errors[0].issue, "runner_numerus_overflow");
+}
+
+#[test]
+fn saturating_unary_negation_is_exact_and_clamps_at_the_store() {
+    // sx5 / ruling 3, 19: `-s` over an unsigned saturating leaf is exact.
+    let s = "varia saturatus<u8> s ← 5\n";
+    assert_eq!(ok(&format!("{s}nota -s")), ["-5"]);
+    assert_eq!(ok(&format!("{s}fixum saturatus<u8> t ← -s\nnota t")), ["0"]);
+}
+
+#[test]
+fn saturating_bitwise_operators_are_exact_and_clamp_at_the_store() {
+    // sx6 / ruling 19: `∧ ∨ ⊻ ¬ ⇐ ⇒` are exact over integers; only the store clamps.
+    let s = "varia saturatus<u8> s ← 200\n";
+    assert_eq!(ok(&format!("{s}nota ¬s")), ["-201"]);
+    assert_eq!(ok(&format!("{s}fixum saturatus<u8> t ← ¬s\nnota t")), ["0"]);
+    assert_eq!(ok(&format!("{s}nota s ∨ 0x100")), ["456"]);
+    assert_eq!(ok(&format!("{s}fixum saturatus<u8> t ← s ∨ 0x100\nnota t")), ["255"]);
+    assert_eq!(ok(&format!("{s}nota s ∧ 0x0f")), ["8"]);
+    assert_eq!(ok(&format!("{s}nota s ⊻ 0x0f")), ["199"]);
+    assert_eq!(ok(&format!("{s}nota s ⇐ 2")), ["800"]);
+    assert_eq!(ok(&format!("{s}fixum saturatus<u8> t ← s ⇐ 2\nnota t")), ["255"]);
+    assert_eq!(ok(&format!("{s}nota s ⇒ 2")), ["50"]);
 }

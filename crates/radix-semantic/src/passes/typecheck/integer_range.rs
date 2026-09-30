@@ -462,15 +462,15 @@ impl TypeChecker<'_> {
         expected: Option<TypeId>,
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
-        if self.saturating_origin(lhs).is_some() || self.saturating_origin(rhs).is_some() {
-            // Clamping has no bit-pattern meaning; bitwise and shift
-            // operators stay closed to `saturating` (D11.1).
-            self.invalid_operand_types(super::ops::SATURATING_WORD_OPERATOR_UNSUPPORTED, span);
-            return Some(self.error_type);
-        }
         let (l, r) = self.range_operands(lhs, rhs, lhs_ty, rhs_ty)?;
         if let (Operand::Const(a), Operand::Const(b)) = (l, r) {
             return self.constant_expression_type(fold_const_binary(op, a, b), expected, span);
+        }
+        if matches!((l, r), (Operand::Plain(_), Operand::Plain(_)))
+            && !matches!(op, HirBinOp::Shl | HirBinOp::Shr)
+            && !self.saturating_operands_agree(lhs, rhs, span)
+        {
+            return Some(self.error_type);
         }
         let (a, b) = (Self::operand_range(l)?, Self::operand_range(r)?);
         if let (Operand::Plain(x), Operand::Plain(y)) = (l, r)
