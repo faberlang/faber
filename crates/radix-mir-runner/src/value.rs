@@ -754,7 +754,9 @@ pub fn saturating_word_numeric_binop(
     let value = match op {
         MirBinOp::Add => left + right,
         MirBinOp::Sub => left - right,
-        MirBinOp::Mul => left * right,
+        // `u64::MAX * u64::MAX` exceeds `i128`; the saturating product still
+        // lands beyond every width, so the clamp is unchanged.
+        MirBinOp::Mul => left.saturating_mul(right),
         MirBinOp::Div if right == 0 => return Err(division_failed()),
         MirBinOp::Div => crate::exact_int::floor_div(left, right),
         MirBinOp::Mod if right == 0 => return Err(division_failed()),

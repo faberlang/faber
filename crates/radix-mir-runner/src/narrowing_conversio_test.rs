@@ -233,3 +233,19 @@ fn decimal_source_rounds_like_numerus_narrowing_then_applies_the_policy() {
     .expect("cannot fail");
     assert_eq!(clamped, Value::Int(0));
 }
+
+/// `u64::MAX * u64::MAX` exceeds `i128`; the saturating product must clamp
+/// instead of overflowing.
+#[test]
+fn saturating_multiplication_past_i128_clamps() {
+    let max = Value::UInt(u64::MAX);
+    let product = crate::value::saturating_word_numeric_binop(
+        max.clone(),
+        max,
+        radix_mir::MirBinOp::Mul,
+        NumericWidth::U64,
+        Span::default(),
+    )
+    .expect("clamps");
+    assert_eq!(product, Value::UInt(u64::MAX));
+}

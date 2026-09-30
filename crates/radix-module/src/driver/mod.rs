@@ -630,7 +630,6 @@ fn generate_output(
             // sized-numeric carrier policy (see radix-mir-wasm operand.rs
             // `scalar_ty`); the shared MIR layout classifies ModularWord with
             // `int_layout`. All other unsupported targets keep the gate.
-            reject_saturating_word_target(analysis, "Wasm text")?;
             generate_wasm_text_output(analysis, no_fuse)
         }
         #[cfg(not(feature = "mir-wasm"))]
@@ -641,7 +640,6 @@ fn generate_output(
             // the modular-word family (modulus<u8|u16|u32|u64>) as unsigned
             // integral scalars. All other unsupported targets keep the gate.
             // `llvm-host` is the product routing name for the SAME emitter.
-            reject_saturating_word_target(analysis, "LLVM text")?;
             generate_llvm_text_output(analysis, no_fuse, emit_nvvm_device_module)
         }
         #[cfg(not(feature = "mir-llvm"))]
