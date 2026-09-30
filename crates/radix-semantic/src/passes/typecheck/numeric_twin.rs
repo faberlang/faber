@@ -11,15 +11,29 @@
 //! receiver families the registry's `Numeric` rows serve). Tensor, vector and
 //! matrix receivers keep their own methods.
 
-use radix_hir::{HirBinOp, HirExpression, HirExpressionKind, HirUnOp};
+use radix_hir::{
+    DefId, HirBinOp, HirBlock, HirExpression, HirExpressionKind, HirLocal, HirStatement,
+    HirStatementKind, HirUnOp,
+};
 use radix_intrinsics::{IntrinsicReceiver, lookup_method_for_type};
 use radix_types::Type;
 
 use super::TypeChecker;
 
-/// An in-place twin through a place that is not a plain path, index or field
-/// chain would evaluate that place twice.
-const ISSUE_INPLACE_TWIN_PLACE_NOT_PURE: &str = "inplace_numeric_method_place_not_pure";
+/// How many effectful sub-expressions of one place can be pinned to locals.
+const PLACE_TEMPORARIES: usize = 16;
+
+fn place_temporary_name(ordinal: usize) -> String {
+    format!("__place{ordinal}")
+}
+
+/// Intern the names the place temporaries use, before typecheck (which holds
+/// the interner read-only). Each temporary of one place needs its own name.
+pub(crate) fn intern_place_temporaries(interner: &mut radix_lexer::Interner) {
+    for ordinal in 0..PLACE_TEMPORARIES {
+        interner.intern(&place_temporary_name(ordinal));
+    }
+}
 
 /// What a numeric twin method means.
 #[derive(Clone, Copy)]
@@ -92,6 +106,36 @@ fn is_pure_place(expr: &HirExpression) -> bool {
     }
 }
 
+/// How many sub-expressions of a place chain carry effects (and so need a
+/// temporary): impure indices and impure non-place bases.
+fn impure_parts(place: &HirExpression) -> usize {
+    let base_parts = |base: &HirExpression| {
+        if is_place_chain(base) {
+            impure_parts(base)
+        } else {
+            usize::from(!is_pure_place(base))
+        }
+    };
+    match &place.kind {
+        HirExpressionKind::Field(base, _) | HirExpressionKind::Deref(base) => base_parts(base),
+        HirExpressionKind::Index(base, index) => {
+            base_parts(base) + usize::from(!is_pure_place(index))
+        }
+        _ => 0,
+    }
+}
+
+/// A path, field, deref or index chain: an expression that can be stored to.
+fn is_place_chain(expr: &HirExpression) -> bool {
+    matches!(
+        expr.kind,
+        HirExpressionKind::Path(_)
+            | HirExpressionKind::Field(..)
+            | HirExpressionKind::Deref(_)
+            | HirExpressionKind::Index(..)
+    )
+}
+
 impl TypeChecker<'_> {
     /// The canonical Latin twin spelling of a method name under the active
     /// reader pack, or `None` when the spelling is not a declared surface.
@@ -107,14 +151,16 @@ impl TypeChecker<'_> {
 
     /// Rewrite a numeric twin method call into the operator or assignment it
     /// means. Leaves every other call (and every rejected twin, which the
-    /// intrinsic checker then reports) untouched.
-    pub(super) fn desugar_numeric_twin(&mut self, expr: &mut HirExpression) {
+    /// intrinsic checker then reports) untouched. Returns whether the call was
+    /// an in-place twin: those yield no value (`vacuum`), whatever the
+    /// desugared assignment is typed as.
+    pub(super) fn desugar_numeric_twin(&mut self, expr: &mut HirExpression) -> bool {
         let Some(twin) = self.numeric_twin_of(expr) else {
-            return;
+            return false;
         };
         let span = expr.span;
         let kind = std::mem::replace(&mut expr.kind, HirExpressionKind::Vacua);
-        let HirExpressionKind::MethodCall(receiver, _, _, mut args, _) = kind else {
+        let HirExpressionKind::MethodCall(mut receiver, _, _, mut args, _) = kind else {
             unreachable!("numeric_twin_of only accepts method calls");
         };
         let mut argument = || Box::new(args.remove(0).expr);
@@ -122,16 +168,101 @@ impl TypeChecker<'_> {
             Twin::Binary(op) => HirExpressionKind::Binary(op, receiver, argument()),
             Twin::Unary(op) => HirExpressionKind::Unary(op, receiver),
             Twin::InPlaceBinary(op) => {
+                let mut hoisted = Vec::new();
+                self.hoist_place_effects(&mut receiver, &mut hoisted);
                 let read = Box::new(self.clone_place(&receiver));
                 let value = self.synthesized(HirExpressionKind::Binary(op, read, argument()), span);
-                HirExpressionKind::Assign(receiver, Box::new(value))
+                self.store_after(hoisted, receiver, value, span)
             }
             Twin::InPlaceUnary(op) => {
+                let mut hoisted = Vec::new();
+                self.hoist_place_effects(&mut receiver, &mut hoisted);
                 let read = Box::new(self.clone_place(&receiver));
                 let value = self.synthesized(HirExpressionKind::Unary(op, read), span);
-                HirExpressionKind::Assign(receiver, Box::new(value))
+                self.store_after(hoisted, receiver, value, span)
             }
         };
+        matches!(twin, Twin::InPlaceBinary(_) | Twin::InPlaceUnary(_))
+    }
+
+    /// `place ← value`, preceded by the temporaries that pin the place's
+    /// effects so the read and the store see one evaluation of them.
+    fn store_after(
+        &mut self,
+        hoisted: Vec<HirStatement>,
+        place: Box<HirExpression>,
+        value: HirExpression,
+        span: radix_lexer::Span,
+    ) -> HirExpressionKind {
+        let assign = HirExpressionKind::Assign(place, Box::new(value));
+        if hoisted.is_empty() {
+            return assign;
+        }
+        let assign = self.synthesized(assign, span);
+        let mut statements = hoisted;
+        statements.push(HirStatement {
+            id: self.fresh_hir_id(),
+            kind: HirStatementKind::Expr(assign),
+            span,
+        });
+        HirExpressionKind::Block(HirBlock::simple(statements, None, span))
+    }
+
+    /// Bind every effectful sub-expression of `place` (index expressions and
+    /// call receivers) to a fresh local, replacing it with a read of that
+    /// local, so the place can be read and stored without evaluating it twice.
+    fn hoist_place_effects(&mut self, place: &mut HirExpression, hoisted: &mut Vec<HirStatement>) {
+        match &mut place.kind {
+            HirExpressionKind::Field(base, _) | HirExpressionKind::Deref(base) => {
+                self.hoist_place_base(base, hoisted);
+            }
+            HirExpressionKind::Index(base, index) => {
+                self.hoist_place_base(base, hoisted);
+                if !is_pure_place(index) {
+                    self.hoist_into_local(index, false, hoisted);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn hoist_place_base(&mut self, base: &mut HirExpression, hoisted: &mut Vec<HirStatement>) {
+        if is_place_chain(base) {
+            self.hoist_place_effects(base, hoisted);
+        } else if !is_pure_place(base) {
+            self.hoist_into_local(base, true, hoisted);
+        }
+    }
+
+    fn hoist_into_local(
+        &mut self,
+        expr: &mut HirExpression,
+        mutable: bool,
+        hoisted: &mut Vec<HirStatement>,
+    ) {
+        let name = self
+            .interner
+            .and_then(|interner| interner.lookup(&place_temporary_name(hoisted.len())))
+            .unwrap_or(radix_lexer::Symbol(0));
+        let def_id = DefId(self.next_synthetic_def);
+        self.next_synthetic_def += 1;
+        let span = expr.span;
+        let read = self.synthesized(HirExpressionKind::Path(def_id), span);
+        let init = std::mem::replace(expr, read);
+        hoisted.push(HirStatement {
+            id: self.fresh_hir_id(),
+            kind: HirStatementKind::Local(HirLocal {
+                def_id,
+                name,
+                ty: None,
+                init: Some(init),
+                mutable,
+                runtime_provided: false,
+                await_store: None,
+                is_await: false,
+            }),
+            span,
+        });
     }
 
     /// Decide whether `expr` is a numeric twin call on a scalar numeric
@@ -192,8 +323,9 @@ impl TypeChecker<'_> {
             {
                 return None;
             }
-            if !is_pure_place(receiver) {
-                self.invalid_operand_types(ISSUE_INPLACE_TWIN_PLACE_NOT_PURE, receiver.span);
+            // A call or other value is no place to store into; the intrinsic
+            // checker reports it.
+            if !is_place_chain(receiver) || impure_parts(receiver) > PLACE_TEMPORARIES {
                 return None;
             }
         }

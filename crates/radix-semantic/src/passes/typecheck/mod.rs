@@ -123,6 +123,7 @@ pub mod lockstep;
 pub mod lookup;
 mod member_privacy;
 mod numeric_twin;
+pub(crate) use numeric_twin::intern_place_temporaries;
 pub mod ops;
 mod ordering;
 mod store;
@@ -319,6 +320,9 @@ pub(crate) struct TypeChecker<'a> {
     /// Next id for expressions the checker synthesizes (D1.4 glyph
     /// rewrites); seeded above the module's largest id in `check_program`.
     next_hir_id: u32,
+    /// Next definition id for locals the checker synthesizes (ss1b place
+    /// temporaries); seeded above the module's largest id in `check_program`.
+    next_synthetic_def: u32,
 
     /// Store position (d11-6 ruling 21) of the expression about to be checked;
     /// consumed by the next `check_expr_with_expected` so only that node, not
@@ -607,6 +611,7 @@ impl<'a> TypeChecker<'a> {
             implemented_contracts: FxHashMap::default(),
             current_generic_bounds: FxHashMap::default(),
             next_hir_id: u32::MAX / 2,
+            next_synthetic_def: radix_types::HIR_SYNTHETIC_DEF_ID_BASE,
             pending_store: None,
             inferred_slot_sources: FxHashMap::default(),
             source_text: None,
@@ -764,6 +769,8 @@ impl<'a> TypeChecker<'a> {
 
     pub fn check_program(&mut self, hir: &mut HirModule) {
         self.next_hir_id = crate::passes::statica::max_hir_id(hir) + 1;
+        self.next_synthetic_def = (crate::passes::statica::max_def_id(hir) + 1)
+            .max(radix_types::HIR_SYNTHETIC_DEF_ID_BASE);
         self.reject_json_annotations_on_site(&hir.entry_annotations, "incipit");
         self.collect_ad_route_types(hir);
         for item in &mut hir.items {

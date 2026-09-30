@@ -582,3 +582,61 @@ fn potentia_is_exact_and_range_typed() {
         ["27"]
     );
 }
+
+fn run_module(source: &str) -> (Vec<String>, Vec<(String, String)>) {
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let mut host = BufferHost::default();
+    let errors = match run_source(&session, "place.fab", source, &mut host) {
+        Ok(()) => Vec::new(),
+        Err(RunSourceError::Stepper(errors)) => errors.into_iter().map(|e| (e.issue, e.message)).collect(),
+        Err(other) => panic!("{source}: {other:?}"),
+    };
+    (host.stdout_lines, errors)
+}
+
+const PLACE_HELPER: &str = "functio idx(numerus n) → numerus {\n    nota \"idx\"\n    redde n\n}\n";
+
+#[test]
+fn in_place_twin_evaluates_an_effectful_place_once() {
+    let source = format!(
+        "{PLACE_HELPER}incipit {{\nvaria _ xs ← [10, 20, 30] ∷ lista<numerus<i32>>\nxs[idx(1)].adde(1)\nnota xs[1]\n}}\n"
+    );
+    let (out, errors) = run_module(&source);
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(out, ["idx", "21"]);
+}
+
+#[test]
+fn in_place_twin_evaluates_each_effectful_index_once_in_order() {
+    let source = format!(
+        "{PLACE_HELPER}incipit {{\nvaria lista<lista<numerus>> g ← [[1, 2], [3, 4]]\ng[idx(1)][idx(0)].adde(10)\nnota g[1][0]\n}}\n"
+    );
+    let (out, errors) = run_module(&source);
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(out, ["idx", "idx", "13"]);
+}
+
+#[test]
+fn in_place_twin_on_an_effectful_place_traps_at_the_store() {
+    let source = format!(
+        "{PLACE_HELPER}incipit {{\nvaria _ xs ← [10, 20, 30] ∷ lista<numerus<u8>>\nxs[idx(1)].multiplica(1000)\nnota xs[1]\n}}\n"
+    );
+    let (out, errors) = run_module(&source);
+    assert_eq!(out, ["idx"]);
+    assert_eq!(errors[0].0, "implicit_store_out_of_range", "{errors:?}");
+}
+
+#[test]
+fn in_place_twin_yields_no_value() {
+    // ss1a: the imperative form mutates and returns nothing, so it is not an
+    // initializer.
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let source = "incipit {\nvaria numerus x ← 1\nfixum numerus y ← x.adde(1)\nnota y\n}\n";
+    let mut host = BufferHost::default();
+    let Err(RunSourceError::Frontend(diagnostics)) = run_source(&session, "value.fab", source, &mut host) else {
+        panic!("using an in-place twin as a value must not analyze");
+    };
+    let text = format!("{diagnostics:?}");
+    assert!(text.contains("expression_type_mismatch"), "{text}");
+    assert!(text.contains("initializer_annotation_mismatch"), "{text}");
+}

@@ -262,7 +262,7 @@ impl TypeChecker<'_> {
         let saved_pending_conversion = self.pending_conversion.take();
         let store = self.pending_store.take();
         // ss1: a numeric method twin means its operator; rewrite it first.
-        self.desugar_numeric_twin(expr);
+        let in_place_twin = self.desugar_numeric_twin(expr);
         let ty = match &mut expr.kind {
             HirExpressionKind::Path(def_id) => self.check_path(*def_id, expr.span),
             HirExpressionKind::Literal(lit) => {
@@ -695,6 +695,13 @@ impl TypeChecker<'_> {
             }
         };
 
+        // ss1a: an imperative twin mutates in place and yields no value, even
+        // though its desugared assignment is typed as the target.
+        let ty = if in_place_twin && ty != self.error_type {
+            self.vacuum_type()
+        } else {
+            ty
+        };
         let ty = match (expected, store) {
             // Ruling 16: an integer quotient cannot land in a float slot; the
             // help points at `÷`, which divides integers into an `f64`.

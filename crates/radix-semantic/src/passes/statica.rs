@@ -595,6 +595,21 @@ fn is_literal_form(expr: &HirExpression) -> bool {
     }
 }
 
+/// The largest non-companion definition id bound anywhere in the module.
+pub fn max_def_id(hir: &HirModule) -> u32 {
+    struct MaxDef(u32);
+    impl HirVisitor for MaxDef {
+        fn visit_def(&mut self, def_id: radix_hir::DefId, _name: radix_lexer::Symbol) {
+            if !def_id.is_companion() {
+                self.0 = self.0.max(def_id.0);
+            }
+        }
+    }
+    let mut max = MaxDef(0);
+    walk_program(&mut max, hir);
+    max.0
+}
+
 pub fn max_hir_id(hir: &HirModule) -> u32 {
     struct MaxId(u32);
     impl HirVisitor for MaxId {
