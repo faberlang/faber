@@ -353,10 +353,7 @@ impl TypeChecker<'_> {
     /// `i64` but its value is not bounded by it, so a store into an `i64`
     /// slot is a real check (ruling 17b) and cannot be omitted.
     pub(super) fn exceeds_i64(&self, expr: &HirExpression, ty: TypeId) -> bool {
-        if self.current_device_function
-            || self.current_air_function
-            || const_int_value(expr).is_some()
-        {
+        if self.current_device_function || const_int_value(expr).is_some() {
             return false;
         }
         let operand_range = |e: &HirExpression| {

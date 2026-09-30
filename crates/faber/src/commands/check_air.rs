@@ -372,6 +372,8 @@ fn reason_bucket(rule: &str) -> u8 {
         | "named_call_arg"
         | "spread_call_arg"
         | "runtime_conversion"
+        | "air_store_not_proven"
+        | "air_integer_range_unproven"
         | "reference_place_op"
         | "runtime_variant_check"
         | "mutable_varia"

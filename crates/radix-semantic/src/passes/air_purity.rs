@@ -6,13 +6,16 @@
 //! annotations, re-resolve names, or rebuild type facts.
 
 use super::air_tensor_intrinsics::is_allowed_tensor_intrinsic;
+use super::typecheck::integer_range::const_int_value;
 use crate::{RadixLane, RadixLaneMetadata, SemanticError, SemanticErrorKind, TypeTable};
+use radix_hir::HirBinOp;
 use radix_hir::{
     DefId, HirBlock, HirCallArg, HirCape, HirExpression, HirExpressionKind, HirFunction,
     HirItemKind, HirLocal, HirModule, HirObjectField, HirObjectKey, HirStatement, HirStatementKind,
 };
 use radix_lexer::{Interner, Span, Symbol};
-use radix_types::TypeId;
+use radix_types::numeric_range as range;
+use radix_types::{NumericWidth, Primitive, Type, TypeId};
 
 /// Check every `@ radix lane "air"` function against the accepted v1 pure subset.
 ///
@@ -189,7 +192,10 @@ impl AirPurityChecker<'_> {
             HirExpressionKind::Path(_)
             | HirExpressionKind::Literal(_)
             | HirExpressionKind::Vacua => {}
-            HirExpressionKind::Binary(_, lhs, rhs) => {
+            HirExpressionKind::Binary(op, lhs, rhs) => {
+                if self.integer_op_unproven(*op, lhs, rhs) {
+                    self.reject(expr.span, "air_integer_range_unproven");
+                }
                 self.check_expr(lhs);
                 self.check_expr(rhs);
             }
@@ -472,6 +478,7 @@ impl AirPurityChecker<'_> {
                 source,
                 target,
                 recovery,
+                implicit,
                 ..
             } => {
                 // ATH-3 (AIR Tier 0.5): an inline `⊥` default resolves the
@@ -481,8 +488,15 @@ impl AirPurityChecker<'_> {
                 // keeps the `runtime_conversion` decline everywhere in v1 —
                 // including inside admitted handler regions — with a cause
                 // distinct from every handler cause.
+                // Ruling 25: an implicit store conversion is a runtime check
+                // AIR has no node for; the range rule failed to prove it fits.
                 if recovery.is_none() {
-                    self.reject(expr.span, "runtime_conversion");
+                    let issue = if implicit.is_some() {
+                        "air_store_not_proven"
+                    } else {
+                        "runtime_conversion"
+                    };
+                    self.reject(expr.span, issue);
                 }
                 self.check_expr(source);
                 if let radix_hir::HirConversioTarget::Intervallum(operand) = target {
@@ -650,6 +664,44 @@ impl AirPurityChecker<'_> {
                 .iter()
                 .find_map(|arm| self.construct_exit_type(&arm.body)),
             _ => expr.ty,
+        }
+    }
+
+    /// Ruling 25: an integer `+ - * / % ⇐` whose exact result, computed from
+    /// the operands' declared ranges (constants by value), may leave the
+    /// single 64-bit range [-2^63, 2^64 - 1]. AIR has no trap for it.
+    fn integer_op_unproven(&self, op: HirBinOp, lhs: &HirExpression, rhs: &HirExpression) -> bool {
+        let (Some(a), Some(b)) = (self.operand_range(lhs), self.operand_range(rhs)) else {
+            return false;
+        };
+        let result = match op {
+            HirBinOp::Add => range::add(a, b),
+            HirBinOp::Sub => range::sub(a, b),
+            HirBinOp::Mul => range::mul(a, b),
+            HirBinOp::Div => range::floor_div(a, b),
+            HirBinOp::Mod => range::floor_rem(a, b),
+            HirBinOp::Shl => range::shl(a, b),
+            _ => return false,
+        };
+        !range::fits_container(result)
+    }
+
+    /// A constant's exact value, else the range of the operand's declared
+    /// plain or `saturating` integer type; `None` for non-integers.
+    fn operand_range(&self, expr: &HirExpression) -> Option<range::IntRange> {
+        if let Some(value) = const_int_value(expr) {
+            return Some((value, value));
+        }
+        let mut ty = self.types.peel_access_marker(expr.ty?).1;
+        while let Type::Alias(_, inner) = self.types.get(ty) {
+            ty = *inner;
+        }
+        match self.types.get(ty) {
+            Type::Primitive(Primitive::Numerus) => NumericWidth::I64.integer_range(),
+            Type::SizedNumeric(Primitive::Numerus, width) | Type::SaturatingWord(width) => {
+                width.integer_range()
+            }
+            _ => None,
         }
     }
 

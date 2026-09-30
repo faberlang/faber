@@ -48,7 +48,7 @@ fn accepts_pure_scalar_air_function() {
     let errors = air_errors(
         r#"
 @ radix lane "air"
-functio loss(numerus x, numerus y) → numerus {
+functio loss(numerus<i32> x, numerus<i32> y) → numerus {
     fixum numerus sum ← x + y
     si sum > 0 {
         redde sum
@@ -67,12 +67,12 @@ fn accepts_calls_to_other_air_lane_functions() {
     let errors = air_errors(
         r#"
 @ radix lane "air"
-functio square(numerus x) → numerus {
+functio square(numerus<i32> x) → numerus {
     redde x * x
 }
 
 @ radix lane "air"
-functio loss(numerus x) → numerus {
+functio loss(numerus<i32> x) → numerus {
     redde square(x)
 }
 "#,
@@ -136,7 +136,7 @@ fn rejects_mutation_and_deferred_init() {
 @ radix lane "air"
 functio loss(numerus x) → numerus {
     varia numerus total ← x
-    total ← total + 1
+    total ← 1
     redde total
 }
 "#,
@@ -850,11 +850,11 @@ fn ar2_dum_itera_cape_wrap_the_whole_loop_once() {
 functio h(numerus n) → numerus {
     fixum numerus total ← 0
     dum n > 0 {
-        total ← total + 1
+        total ← 1
     } cape err { redde 0 }
 
     itera ab 0‥4 fixum i {
-        total ← total + i
+        total ← i
     } cape err { redde 0 }
     redde total
 }
@@ -1036,7 +1036,7 @@ fn air_lane_declines_whole_loop_cape_under_loop_spectrum_causes() {
 functio d(numerus n) → numerus {
     fixum numerus total ← 0
     dum n > 0 {
-        total ← total + 1
+        total ← 1
     } cape err { redde 0 }
     redde total
 }
@@ -1050,7 +1050,7 @@ functio d(numerus n) → numerus {
 functio e(numerus n) → numerus {
     fixum numerus total ← 0
     itera ab 0‥4 fixum i {
-        total ← total + i
+        total ← i
     } cape err { redde 0 }
     redde total
 }
@@ -1266,7 +1266,7 @@ fn rejects_nary_range_product_loop_fail_closed() {
 functio grid(numerus m, numerus n) → numerus {
     varia numerus total ← 0
     itera ab 0‥m, 0‥n fixum i, j {
-        total ← total + i
+        total ← i
     }
     redde total
 }
@@ -1309,4 +1309,67 @@ functio pick(tf32[2, 2] x, bivalens flag) → fractus ∪ nihil {
             .any(|err| err.kind == SemanticErrorKind::AirPurityViolation),
         "purity gate must be skipped once typecheck failed: {errors:?}"
     );
+}
+
+// Ruling 25: an AIR-lane integer store must be proven to fit; there is no
+// exemption and no store node.
+
+#[test]
+fn air_accepts_integer_store_proven_by_the_range_rule() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio diff(numerus<u8> a, numerus<u8> b) → numerus<i16> {
+    redde a - b
+}
+"#,
+    );
+    assert!(errors.is_empty(), "unexpected AIR errors: {errors:?}");
+}
+
+#[test]
+fn air_rejects_unproven_integer_store_with_its_own_issue() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio sum(numerus a, numerus b) → numerus {
+    redde a + b
+}
+"#,
+    );
+    expect_air_issue(&errors, "air_store_not_proven");
+    expect_air_issue(&errors, "air_integer_range_unproven");
+    assert!(
+        !errors.iter().any(|err| err
+            .args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == "runtime_conversion")),
+        "an implicit store is not a runtime_conversion decline: {errors:?}"
+    );
+}
+
+#[test]
+fn air_rejects_narrowing_store_that_needs_a_check() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio narrow(numerus<i16> a, numerus<i16> b) → numerus<u8> {
+    redde a - b
+}
+"#,
+    );
+    expect_air_issue(&errors, "air_store_not_proven");
+}
+
+#[test]
+fn air_still_admits_conversion_with_bottom_default() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio narrow(numerus<i16> a) → numerus<u8> {
+    redde a ↦ numerus<u8> ⊥ 0
+}
+"#,
+    );
+    assert!(errors.is_empty(), "unexpected AIR errors: {errors:?}");
 }

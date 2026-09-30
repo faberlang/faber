@@ -3514,6 +3514,14 @@ help = "assign the binding before reading it, or declare the slot `sponte`"
 message = "AIR purity violation"
 help = "keep `@ radix lane \"air\"` functions in the accepted pure subset"
 
+[diagnostics.SEM059.issues.air_integer_range_unproven]
+message = "@ radix lane \"{lane}\" rejects this integer operation: its exact result may leave the range [-2^63, 2^64 - 1] and AIR has no trap"
+help = "narrow an operand to a smaller integer type so the range rule proves the result fits, or restructure the arithmetic"
+
+[diagnostics.SEM059.issues.air_store_not_proven]
+message = "@ radix lane \"{lane}\" rejects this integer store: the range rule cannot prove the value fits the slot, and AIR has no trap for a runtime check"
+help = "declare a wider slot, or convert with `↦` and a `⊥` default"
+
 [diagnostics.SEM059.issues.async_function]
 message = "@ radix lane \"{lane}\" rejects this function body: async functions are outside the v1 AIR subset"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"

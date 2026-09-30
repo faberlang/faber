@@ -591,6 +591,41 @@ impl TypeChecker<'_> {
         rhs_resolved
     }
 
+    /// A `wrapping` or `saturating` integer word beside an untyped integer
+    /// constant or a plain (trapping) integer: an ordering or `≅`/`≇`
+    /// comparison stores nothing and compares exact values (rulings 12, 22).
+    /// A wrapping operand is already a reduced value and a saturating operand a
+    /// plain value, so no join type is needed.
+    fn word_value_comparison(
+        &self,
+        lhs: &HirExpression,
+        lhs_ty: TypeId,
+        rhs: &HirExpression,
+        rhs_ty: TypeId,
+    ) -> bool {
+        if self.current_device_function {
+            return false;
+        }
+        let word_or_plain = |expr: &HirExpression, ty: TypeId| {
+            let shape = self.numeric_shape(self.resolve_inferred_type(ty))?;
+            if shape.prim != Primitive::Numerus || shape.width.is_decimal() {
+                return None;
+            }
+            Some((
+                shape.family,
+                super::integer_range::const_int_value(expr).is_some(),
+            ))
+        };
+        let (Some((lf, lc)), Some((rf, rc))) =
+            (word_or_plain(lhs, lhs_ty), word_or_plain(rhs, rhs_ty))
+        else {
+            return false;
+        };
+        let is_word = |f: IntFamily| f != IntFamily::Plain;
+        let other_ok = |f: IntFamily, c: bool| f == IntFamily::Plain || c;
+        (is_word(lf) && !lc && other_ok(rf, rc)) || (is_word(rf) && !rc && other_ok(lf, lc))
+    }
+
     /// Enforce the numeric-equality admission law for `≅`/`≇` and `≈`/`≉`.
     ///
     /// THE ≅/≈ ADMISSION LAW (contract record, E1 equality-tier-respelling)
@@ -1306,7 +1341,9 @@ impl TypeChecker<'_> {
             | HirBinOp::FuzzyNotEq => {
                 let lhs_ty = self.check_expr(lhs);
                 let rhs_ty = self.check_expr(rhs);
-                self.numeric_value_equality_types(lhs_ty, rhs_ty, lhs.span);
+                if !self.word_value_comparison(lhs, lhs_ty, rhs, rhs_ty) {
+                    self.numeric_value_equality_types(lhs_ty, rhs_ty, lhs.span);
+                }
                 self.bool_type()
             }
             HirBinOp::Eq
@@ -1348,6 +1385,9 @@ impl TypeChecker<'_> {
                 } else if self.saturating_pair(lhs, rhs) {
                     // Both sides are values of one `saturating` word, computed
                     // exactly: they compare by value.
+                } else if self.word_value_comparison(lhs, lhs_ty, rhs, rhs_ty) {
+                    // A `wrapping`/`saturating` word beside a constant or a
+                    // plain integer: exact values (rulings 12, 22).
                 } else {
                     self.numeric_ordering_bin(lhs_ty, rhs_ty, lhs.span);
                 }

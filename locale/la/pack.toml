@@ -3304,6 +3304,14 @@ help = "assign the binding before reading it, or declare the slot `sponte`"
 message = "AIR purity violation"
 help = "keep `@ radix lane \"air\"` functions in the accepted pure subset"
 
+[diagnostics.SEM059.issues.air_integer_range_unproven]
+message = "@ radix lane \"{lane}\" respuit hanc operationem integram: exitus exactus fortasse extra [-2^63, 2^64 - 1] exit, et AIR nullam captionem habet"
+help = "operandum ad minorem integrum typum coarcta ut regula intervalli exitum capere probet, vel arithmeticam muta"
+
+[diagnostics.SEM059.issues.air_store_not_proven]
+message = "@ radix lane \"{lane}\" respuit hoc integrum repositum: regula intervalli probare non potest valorem in locum capi, et AIR nullam captionem ad probationem currentem habet"
+help = "locum latiorem declara, vel per `↦` cum defalta `⊥` converte"
+
 [diagnostics.SEM059.issues.async_function]
 message = "@ radix lane \"{lane}\" rejects this function body: async functions are outside the v1 AIR subset"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"

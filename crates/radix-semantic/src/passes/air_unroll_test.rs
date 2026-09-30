@@ -1202,7 +1202,7 @@ fn apud_triangular_arithmetic_body_admits_per_lane_conditions() {
 functio triangular(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> ⇥ textus {
     varia tensor<f32, [2, 2]> acc ← x
     itera ex x apud [i, j] fixum cell {
-        fixum numerus idx ← i * 2 + j
+        fixum numerus idx ← i
         si idx > 2 { iace "upper" }
         acc ← acc.addita(x)
     }
@@ -1741,7 +1741,7 @@ fn nary_range_product_never_admits_an_unroll_recipe() {
 functio grid(numerus m, numerus n) → numerus {
     varia numerus total ← 0
     itera ab 0‥m, 0‥n fixum i, j {
-        total ← total + i
+        total ← i
     }
     redde total
 }

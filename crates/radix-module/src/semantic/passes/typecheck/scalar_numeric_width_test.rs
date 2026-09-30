@@ -265,14 +265,41 @@ functio add(modulus<u32> x, numerus<u32> y) → modulus<u32> {
 }
 
 #[test]
-fn modular_word_rejects_mixed_numerus_comparison() {
-    test_support::assert_analysis_rejects_with_issue(
+fn modular_word_compares_with_numerus_by_value() {
+    // d11-6 rulings 12, 22: a comparison stores nothing, so a word beside a
+    // plain integer or a constant compares exact values.
+    test_support::assert_accepts(
         r"
 functio compare(modulus<u32> x, numerus<u32> y) → bivalens {
     redde x > y
 }
+functio constant(modulus<u8> a) → bivalens {
+    redde a > 100 et a ≅ 200 et 3 ≺ a et a ≇ 7
+}
 ",
-        "modular_word_family_mismatch",
+    );
+}
+
+#[test]
+fn saturating_word_compares_with_numerus_and_constants_by_value() {
+    test_support::assert_accepts(
+        r"
+functio compare(saturatus<u8> s, numerus n) → bivalens {
+    redde s ≺ 251 et s ≅ n et s ≺ n et n ≥ s
+}
+",
+    );
+}
+
+#[test]
+fn word_equality_stays_exact_type() {
+    test_support::assert_analysis_rejects_with_issue(
+        r"
+functio same(modulus<u8> a, numerus n) → bivalens {
+    redde a ≡ n
+}
+",
+        "equality_exact_types_required",
     );
 }
 
