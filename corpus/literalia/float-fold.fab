@@ -1,0 +1,64 @@
++++
+term = "float-fold"
+kind = "literal"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "additive_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
+category = "literal"
+canonical = false
+summary = "An expression made only of float literals is one exact number, rounded once where it lands; typed operands stay IEEE per operation."
+syntax = "<float literal> <operator> <float literal>"
+related = ["fractus", "+", "*", "/", "float"]
+locale = "en"
++++
+# =============================================================================
+# float-fold — literal-only float expressions are exact, rounded once
+# =============================================================================
+#
+# What this teaches:
+#   • `0.1 + 0.2` is exactly 3/10, rounded once to the float where it lands:
+#     it prints 0.3. The compiler folds it to one literal on every target.
+#   • `a + b` with typed operands (variables) rounds per operation, like
+#     hardware: it prints 0.30000000000000004.
+#   • A float slot of a narrower width takes the exact value in one rounding,
+#     never a rounding through `f64` first.
+#
+# Common mistakes:
+#   • Expecting `0.1 + 0.2` and `a + b` (with `a` = 0.1, `b` = 0.2) to agree:
+#     the first is a constant expression, the second is arithmetic on values.
+#   • Expecting a method call on a literal to fold: `(0.1 + 0.2).potentia(2.0)`
+#     folds the parenthesised receiver and runs the call at run time.
+#
+# See also: fractus, float
+# =============================================================================
+
+# literalia/float-fold — constant and typed float arithmetic side by side
+#
+# WHY: pins ruling 31 end to end. Each constant line has a typed counterpart or
+# a contrasting digit pattern, so a per-operation evaluation cannot pass.
+#
+# EXPECTED OUTPUT:
+#   float-fold.expected — one value per print.
+
+main {
+    # 1. Literal-only expressions are exact, then rounded once.
+    print 0.1 + 0.2
+    print 0.7 + 0.1
+    print 0.3 - 0.1
+    print 0.1 * 3.0
+    print 1.0 / 3.0
+
+    # 2. The same digits as typed operands round per operation.
+    const float a ← 0.1
+    const float b ← 0.2
+    print a + b
+
+    # 3. The folded value lands in the slot it is stored in.
+    const float sum ← 0.1 + 0.2
+    print sum
+    const float<f32> narrow ← 0.1 + 0.2
+    print narrow
+
+    # 4. Narrow slots round once: this exact value sits just above the midpoint
+    #    of two f32 neighbours, so a rounding through f64 would choose 1.0.
+    const float<f32> above ← 1.00000005960464477539062501 + 0.0
+    print above
+}

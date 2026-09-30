@@ -328,9 +328,23 @@ pub struct PassConfig {
     /// the expression a span covers (ruling 19(i)). `None` outside a driver
     /// file context.
     pub source_text: Option<std::sync::Arc<str>>,
+    /// Fold literal-only float expressions to one literal (F9 ruling 31).
+    /// Turned off by callers that must keep the author's expression text
+    /// (the Faber re-emit behind `faber format` and `faber convert`); the
+    /// Faber and FHIR targets never fold either, see
+    /// [`PassConfig::folds_literal_floats`].
+    pub fold_literal_floats: bool,
 }
 
 impl PassConfig {
+    /// Whether analysis folds literal-only float expressions: on unless the
+    /// caller opted out or the target is a source-preserving one (Faber
+    /// re-emit, FHIR serialization), which keep the author's expression.
+    #[must_use]
+    pub fn folds_literal_floats(&self) -> bool {
+        self.fold_literal_floats && !matches!(self.target, Target::HirFaber | Target::HirFhir)
+    }
+
     /// Target-neutral base analysis configuration.
     ///
     /// Runs shared semantic passes without Rust-only borrow/lifetime checks.
@@ -353,6 +367,7 @@ impl PassConfig {
             kernel_complexity_budget: None,
             insere_files: crate::insere::InsereFiles::default(),
             source_text: None,
+            fold_literal_floats: true,
         }
     }
 
@@ -635,7 +650,12 @@ pub fn analyze_with_cli(
         Some(&mut lowered.presentation),
         Some(&radix_lanes),
     ) {
-        Ok(()) => passes::decimal_integer_literal::respell(&mut hir, &types, interner),
+        Ok(()) => {
+            passes::decimal_integer_literal::respell(&mut hir, &types, interner);
+            if config.folds_literal_floats() {
+                passes::float_literal_fold::fold(&mut hir, &types, interner);
+            }
+        }
         Err(e) => diagnostics.extend(e),
     }
     // Top-level statics: legacy `fixum`/`varia` migration error (D5.7), then

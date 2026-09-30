@@ -128,6 +128,12 @@ pub struct Config {
     /// entries. `None` uses the baked kernel default; warn-only, and never
     /// gates kernel admission (kernel-purity owns that).
     pub kernel_complexity_budget: Option<u32>,
+
+    /// Keep the author's constant expressions as written: analysis does not
+    /// fold literal-only float expressions to one literal (F9 ruling 31). Set
+    /// by the Faber re-emit behind `faber format` and `faber convert`, which
+    /// must print the author's text; every compile path leaves it `false`.
+    pub keep_authored_constants: bool,
 }
 
 impl Default for Config {
@@ -151,6 +157,7 @@ impl Default for Config {
             import_path_templates: None,
             complexity_budget: None,
             kernel_complexity_budget: None,
+            keep_authored_constants: false,
         }
     }
 }

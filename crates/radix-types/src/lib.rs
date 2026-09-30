@@ -11,6 +11,7 @@
 pub mod big_literal;
 mod capability;
 mod def_id;
+pub mod exact_rational;
 mod filtrum;
 pub mod format_spec;
 mod index;

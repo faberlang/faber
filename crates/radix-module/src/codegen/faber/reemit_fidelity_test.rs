@@ -971,3 +971,15 @@ fn float_literal_normalization_still_refuses_a_different_value() {
         assert_eq!(diagnostic.issue(), Some("hir_meaning_diverged"), "{from}");
     }
 }
+
+#[test]
+fn literal_only_float_expressions_keep_the_authors_text() {
+    // F9 ruling 31 folds them for every compile; format and convert print the
+    // author's expression, and the meaning re-validation still holds.
+    let source =
+        "incipit {\n    fixum fractus c ← 0.1 + 0.2\n    fixum fractus g ← (0.1 + 0.2) * 10.0\n    nota 1.0 / 3.0\n}\n";
+    let emitted = assert_idempotent(source);
+    for text in ["0.1 + 0.2", "(0.1 + 0.2) * 10.0", "1.0 / 3.0"] {
+        assert!(emitted.contains(text), "{text}: {emitted}");
+    }
+}

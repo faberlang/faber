@@ -55,7 +55,10 @@ pub fn reemit_faber(source_session: &Session, emit_pack: &LocalePack, name: &str
         Ok(prepared) => prepared,
         Err(diagnostic) => return FaberReemitResult { output: None, diagnostics: vec![*diagnostic] },
     };
-    let session = prepared.session;
+    let mut session = prepared.session;
+    // Re-emit prints the author's text: constant expressions stay unfolded
+    // (F9 ruling 31), here and in the revalidation session cloned from this one.
+    session.config.keep_authored_constants = true;
     let mut analysis = match analyze_source(
         &session,
         name,

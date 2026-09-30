@@ -61,6 +61,7 @@ pub(crate) mod coverage;
 pub mod decimal_integer_literal;
 pub mod definite_assignment;
 pub mod exhaustive;
+pub mod float_literal_fold;
 pub mod fragment_definition;
 pub mod import_path;
 pub mod import_seam;
