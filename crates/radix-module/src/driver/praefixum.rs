@@ -146,3 +146,7 @@ mod literal;
 #[cfg(test)]
 #[path = "praefixum_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "praefixum_module_constant_test.rs"]
+mod module_constant_tests;

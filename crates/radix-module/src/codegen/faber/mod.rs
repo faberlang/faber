@@ -27,6 +27,10 @@ mod cape_roundtrip_test;
 mod compile_time_local_roundtrip_test;
 
 #[cfg(test)]
+#[path = "module_constant_roundtrip_test.rs"]
+mod module_constant_roundtrip_test;
+
+#[cfg(test)]
 #[path = "corpus_reemit_gate_test.rs"]
 mod corpus_reemit_gate_test;
 #[cfg(test)]

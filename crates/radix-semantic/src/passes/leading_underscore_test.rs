@@ -92,7 +92,17 @@ fn parameter_warns() {
 
 #[test]
 fn static_warns() {
-    assert_single("generis numerus _LIMES = 4096", "_LIMES", "static");
+    assert_single("generis numerus _LIMES = 4096", "_LIMES", "constant");
+}
+
+#[test]
+fn top_level_const_warns_as_constant_and_local_const_as_local() {
+    assert_single("fixum numerus _LIMES = 4096", "_LIMES", "constant");
+    assert_single(
+        "incipit {\n    fixum numerus _n = 4\n    nota _n\n}",
+        "_n",
+        "local",
+    );
 }
 
 #[test]

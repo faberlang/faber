@@ -254,6 +254,11 @@ mod ratio_hole_test;
 #[cfg(test)]
 #[path = "local_constants_test.rs"]
 mod local_constants_test;
+
+#[cfg(test)]
+#[path = "module_constant_test.rs"]
+mod module_constant_test;
+
 #[cfg(test)]
 #[path = "praefixum_test.rs"]
 mod praefixum_test;

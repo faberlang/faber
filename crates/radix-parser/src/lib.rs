@@ -1542,6 +1542,10 @@ mod region_decl_test;
 mod static_decl_test;
 
 #[cfg(test)]
+#[path = "module_constant_test.rs"]
+mod module_constant_test;
+
+#[cfg(test)]
 #[path = "compile_time_local_test.rs"]
 mod compile_time_local_test;
 

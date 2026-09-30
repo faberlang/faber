@@ -189,8 +189,8 @@ fn faber_reemission_prints_the_embed_not_the_bytes() {
     let crate::Output::Faber(out) = result.output.expect("output") else {
         panic!("expected faber output");
     };
-    assert!(out.code.contains("generis textus S = insere \"x.txt\""), "{}", out.code);
-    assert!(out.code.contains("generis octeti B = insere \"x.bin\""), "{}", out.code);
+    assert!(out.code.contains("fixum textus S = insere \"x.txt\""), "{}", out.code);
+    assert!(out.code.contains("fixum octeti B = insere \"x.bin\""), "{}", out.code);
     assert!(out.code.contains("generis textus T = insere \"x.txt\""), "{}", out.code);
     assert!(!out.code.contains("salve"), "{}", out.code);
 }

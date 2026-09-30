@@ -3868,11 +3868,11 @@ help = "declare `textus` for UTF-8 text or `octeti` for raw bytes"
 
 [diagnostics.SEM062]
 message = "top-level binding"
-help = "use `{generis} T X = …` for a compile-time constant, or move the binding into a function"
+help = "a module-level value is a compile-time constant: `{fixum} T X = …`; a runtime value belongs in a function"
 
 [diagnostics.SEM062.issues.top_level_binding]
 message = "top-level `{name}`: module-level mutable state does not exist"
-help = "use `{generis} T X = …` for a compile-time constant, or move the binding into a function"
+help = "a module-level value is a compile-time constant: `{fixum} T X = …`; a runtime value belongs in a function"
 
 [diagnostics.SEM063]
 message = "member is not accessible here"

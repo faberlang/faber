@@ -206,6 +206,11 @@ pub enum Command {
     #[command(name = "field-modifier-codemod")]
     FieldModifierCodemod(FieldModifierCodemodArgs),
 
+    /// Swap every module-level `static`/`generis` declaration for `const`/`fixum`
+    /// (st1 migration; span-based, every other byte unchanged; `.fab` and `.proba`)
+    #[command(name = "const-codemod")]
+    ConstCodemod(ConstCodemodArgs),
+
     /// Script host introspection (kernel manifest)
     Host(crate::commands::host::HostArgs),
 
@@ -301,6 +306,24 @@ pub struct FieldModifierCodemodArgs {
     pub paths: Vec<PathBuf>,
 
     /// Dry run: report per-file insertion counts without writing; exit 1 if
+    /// any file would change
+    #[arg(long)]
+    pub check: bool,
+
+    /// Write the codemodded source to stdout instead of updating the file
+    /// (exactly one input file)
+    #[arg(long, conflicts_with = "check")]
+    pub stdout: bool,
+}
+
+/// Arguments for `faber const-codemod`.
+#[derive(clap::Args, Debug)]
+pub struct ConstCodemodArgs {
+    /// Files or directories to codemod (default: current directory)
+    #[arg(value_name = "PATH")]
+    pub paths: Vec<PathBuf>,
+
+    /// Dry run: report per-file conversion counts without writing; exit 1 if
     /// any file would change
     #[arg(long)]
     pub check: bool,

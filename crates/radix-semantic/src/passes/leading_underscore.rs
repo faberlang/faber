@@ -46,7 +46,7 @@ impl DeclarationKind {
             Self::Field => "field",
             Self::Local => "local",
             Self::Parameter => "parameter",
-            Self::Static => "static",
+            Self::Static => "constant",
         }
     }
 }
@@ -57,8 +57,10 @@ pub fn check(program: &Program, interner: &Interner) -> Vec<SemanticError> {
     let mut checker = Checker {
         interner,
         warnings: Vec::new(),
+        top_level_stmt: None,
     };
     for stmt in &program.statements {
+        checker.top_level_stmt = Some(stmt.id);
         checker.visit_stmt(stmt);
     }
     checker.warnings
@@ -72,6 +74,9 @@ fn has_leading_underscore(name: &str) -> bool {
 struct Checker<'a> {
     interner: &'a Interner,
     warnings: Vec<SemanticError>,
+    /// The top-level statement being walked; a `=` constant is a module
+    /// constant only when it is that statement, never a nested local.
+    top_level_stmt: Option<radix_syntax::NodeId>,
 }
 
 impl Checker<'_> {
@@ -179,7 +184,9 @@ impl Checker<'_> {
     fn declarations(&mut self, stmt: &Stmt) {
         match &stmt.kind {
             StmtKind::Var(decl) => {
-                let kind = if decl.is_static {
+                let module_constant =
+                    decl.is_static || (decl.compile_time && self.top_level_stmt == Some(stmt.id));
+                let kind = if module_constant {
                     DeclarationKind::Static
                 } else {
                     DeclarationKind::Local

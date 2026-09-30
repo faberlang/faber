@@ -58,7 +58,7 @@ fn authored_insere_paths(program: &Program, interner: &Interner) -> Vec<String> 
     };
     for stmt in &program.statements {
         match &stmt.kind {
-            StmtKind::Var(decl) if decl.is_static => {
+            StmtKind::Var(decl) if decl.is_static || decl.compile_time => {
                 if let Some(init) = &decl.init {
                     push(&init.kind);
                 }

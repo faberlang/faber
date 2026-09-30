@@ -433,8 +433,12 @@ impl Lowerer<'_> {
                 false,
             )
         });
+        // A top-level `=` constant (`const T X = e`) and the legacy module
+        // `static` are the same constant (st1 R1/R3): both carry the statica
+        // marker and lower through the compile-time initializer path.
+        let is_constant = decl.is_static || decl.compile_time;
         let value = if let Some(init) = &decl.init {
-            if decl.is_static {
+            if is_constant {
                 self.lower_static_initializer(init, ty)
             } else {
                 self.lower_expr(init)
@@ -454,9 +458,7 @@ impl Lowerer<'_> {
                 value,
                 mutable: decl.mutability == AstMutability::Mutable,
                 is_await: decl.is_await(),
-                statica: decl
-                    .is_static
-                    .then_some(radix_hir::HirStatic { authored: None }),
+                statica: is_constant.then_some(radix_hir::HirStatic { authored: None }),
             }),
             span: stmt.span,
         };

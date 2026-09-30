@@ -279,12 +279,12 @@ function f0 -> ty#5 {
 
 #[test]
 fn lowers_top_level_static_as_entry_prefix_local() {
-    // D5.7 retired top-level `fixum`; the top-level equivalent is `generis`
-    // (a static, D5.8-D5.9). `generis` requires an explicit type (no `_`
-    // inference hole), but MIR entry lowering (`mir/lower.rs::lower_entry`)
-    // still lowers every top-level `HirItemKind::Constant` item — `generis`
-    // included — as a local prefixed onto the entry function; there is no
-    // separate MIR-level static/global representation.
+    // The top-level constant is `generis` (a static, D5.8-D5.9) or, since
+    // st1, a top-level `fixum T X = e`; both spellings carry the same HIR
+    // constant. MIR entry lowering (`mir/lower.rs::lower_entry`) lowers every
+    // top-level `HirItemKind::Constant` item as a local prefixed onto the
+    // entry function; there is no separate MIR-level static/global
+    // representation.
     let dump = dump_source(
         r"
 generis numerus age = 25
@@ -299,6 +299,17 @@ incipit {
     assert!(dump.contains("_0 = const int 25: ty#1"));
     assert!(dump.contains("runtime diagnostic nota(_0)"));
     assert!(!dump.contains("top-level const"));
+}
+
+#[test]
+fn top_level_fixum_constant_lowers_like_the_static_including_the_hole() {
+    // st1 R1/R2: `fixum T X = e` and `fixum _ X = e` at top level are the
+    // same constant the `generis` spelling names; `_` infers the type.
+    let static_dump = dump_source("generis numerus age = 25\n\nincipit {\n    nota age\n}\n");
+    for spelling in ["fixum numerus age = 25", "fixum _ age = 25"] {
+        let dump = dump_source(&format!("{spelling}\n\nincipit {{\n    nota age\n}}\n"));
+        assert_eq!(dump, static_dump, "{spelling}");
+    }
 }
 
 #[test]

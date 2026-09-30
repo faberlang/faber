@@ -736,3 +736,7 @@ mod tests;
 #[cfg(test)]
 #[path = "file_interface_s0r1_test.rs"]
 mod file_interface_s0r1_test;
+
+#[cfg(test)]
+#[path = "file_interface_const_test.rs"]
+mod file_interface_const_test;

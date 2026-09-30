@@ -15,6 +15,7 @@ mod check_library_test;
 #[cfg(test)]
 #[path = "check_test.rs"]
 mod check_test;
+mod const_codemod;
 mod convert;
 mod cost;
 #[cfg(test)]
@@ -66,6 +67,7 @@ use faber_cli::package;
 use radix::services::{BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand};
 
 use check_library::cmd_check_library;
+use const_codemod::cmd_const_codemod;
 use convert::cmd_convert;
 use cost::cmd_cost;
 use doc::cmd_doc;
@@ -445,6 +447,13 @@ fn dispatch(command: Command) {
         }
         Command::FieldModifierCodemod(args) => {
             cmd_field_modifier_codemod(&field_modifier_codemod::FieldModifierCodemodCommand {
+                paths: args.paths,
+                check: args.check,
+                stdout: args.stdout,
+            });
+        }
+        Command::ConstCodemod(args) => {
+            cmd_const_codemod(&const_codemod::ConstCodemodCommand {
                 paths: args.paths,
                 check: args.check,
                 stdout: args.stdout,

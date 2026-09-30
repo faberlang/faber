@@ -109,7 +109,9 @@ impl super::FaberCodegen<'_> {
             HirItemKind::Constant(c) => {
                 let await_assignment = self.await_assignment_bindings.contains(&item.def_id);
                 if c.statica.is_some() {
-                    writer.write(surface.keyword(TokenKind::Generis));
+                    // A module-level constant is spelled `fixum` (st1 R15); the
+                    // `generis` word is only the genus field modifier.
+                    writer.write(surface.contextual_keyword("fixum"));
                 } else {
                     writer.write(surface.contextual_keyword(if c.mutable {
                         "varia"

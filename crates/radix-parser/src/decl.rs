@@ -258,6 +258,14 @@ impl Parser {
             );
         }
         self.advance();
+        // A module-level `=` constant is the same constant a `generis`
+        // declaration names (st1 R1), so it claims the build-time embed too.
+        // Block-level constants do not: the embed is not admitted there yet.
+        if self.nesting_depth == 0
+            && let Some(path) = self.insere_path_here()
+        {
+            return Ok((Some(Box::new(self.parse_insere_expr(path))), None));
+        }
         Ok((Some(Box::new(self.parse_expression()?)), None))
     }
 
@@ -973,8 +981,16 @@ impl Parser {
     /// F8: `insere` (en `embed`) is contextual. Only this slot claims it;
     /// every other use of the spelling stays an identifier.
     fn insere_initializer_path(&self, modifier: Option<FieldModifier>) -> Option<Symbol> {
-        if modifier != Some(FieldModifier::Generis) || !self.check_keyword_ident(TokenKind::Insere)
-        {
+        if modifier != Some(FieldModifier::Generis) {
+            return None;
+        }
+        self.insere_path_here()
+    }
+
+    /// The path literal when the current word is `insere` directly followed
+    /// by a string literal.
+    fn insere_path_here(&self) -> Option<Symbol> {
+        if !self.check_keyword_ident(TokenKind::Insere) {
             return None;
         }
         match self.peek_at(1).kind {
