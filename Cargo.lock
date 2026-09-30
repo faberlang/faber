@@ -185,6 +185,7 @@ dependencies = [
  "radix-diagnostics",
  "radix-hir",
  "radix-lexer",
+ "radix-target",
  "radix-types",
  "rustc-hash",
 ]
@@ -259,6 +260,10 @@ dependencies = [
  "radix-lexer",
  "serde",
 ]
+
+[[package]]
+name = "radix-target"
+version = "0.84.0"
 
 [[package]]
 name = "radix-types"
