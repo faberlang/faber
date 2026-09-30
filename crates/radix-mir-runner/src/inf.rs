@@ -23,6 +23,7 @@
 //!   ceiling; it is a runner limit like the step budget, not a language rule.
 
 use crate::RunnerError;
+use crate::exact_int::int_value;
 use crate::value::Value;
 use handroll::{Magnus, MagnusError};
 use radix_lexer::Span;
@@ -177,6 +178,22 @@ pub(crate) fn neg(value: &Magnus) -> Value {
 /// Exact `¬x`, that is `-x - 1`.
 pub(crate) fn bit_not(value: &Magnus) -> Value {
     from_magnus(value.bit_not())
+}
+
+/// Integer-family `≈` (inf-ap): the exact form of the relative `1e-9`
+/// tolerance, `10^9 · |a − b| ≤ max(|a|, |b|)`, in integers. It is the one
+/// rule for every integer carrier pair — bounded, `u64` and `inf` alike — so
+/// `i32 ≈ i64`, `i32 ≈ inf` and `inf ≈ inf` agree. `None` when either value
+/// is not an integer carrier.
+pub(crate) fn fuzzy_equal(a: &Value, b: &Value) -> Option<bool> {
+    const SCALE: i128 = 1_000_000_000;
+    if let (Some(x), Some(y)) = (int_value(a), int_value(b)) {
+        // |x - y| < 2^65 and SCALE < 2^30, so the product fits `i128`.
+        return Some(SCALE * (x - y).abs() <= x.abs().max(y.abs()));
+    }
+    let (x, y) = (to_magnus(a)?, to_magnus(b)?);
+    let scaled = (&(&x - &y).abs()) * Magnus::from_i128(SCALE);
+    Some(scaled <= x.abs().max(y.abs()))
 }
 
 /// Exact three-way comparison of an `inf` with a float (ruling 37): the

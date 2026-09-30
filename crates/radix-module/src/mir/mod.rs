@@ -255,6 +255,9 @@ mod implicit_store_tests;
 #[path = "inc_dec_store_test.rs"]
 mod inc_dec_store_tests;
 #[cfg(test)]
+#[path = "inf_approx_test.rs"]
+mod inf_approx_tests;
+#[cfg(test)]
 #[path = "inf_test.rs"]
 mod inf_tests;
 #[cfg(test)]

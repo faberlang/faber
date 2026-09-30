@@ -26,6 +26,9 @@ locale = "en"
 #     `x ∧ -1` is `x`.
 #   • Comparison is exact against every number family. `2^64 + 1` is not
 #     equal to the float `2^64`, even though the float rounds.
+#   • `≈` is tolerance equality, one rule for every integer (`inf` or
+#     bounded, any width): equal when `10^9 · |a − b| ≤ max(|a|, |b|)`,
+#     computed exactly. A difference of one is inside at 10^12, never at 5.
 #   • A bounded integer widens into `inf` without `↦`: the `u64` maximum, put
 #     in an `inf` slot, takes `+ 1` exactly instead of trapping.
 #   • Going back down is a checked narrowing: `x ↦ u64 ⊥ 9` yields 9 when the
@@ -103,6 +106,14 @@ main {
     print big + 1 ≅ flt
     print big + 1 ≻ flt
     print big ≻ dec
+
+    # 5b. `≈` is the tolerance tier, the same rule for `inf` and bounded
+    #     integers: one more than 2^64 is inside 1e-9, twice 2^64 is not.
+    const int near ← 1000000000000
+    const inf near_inf ← 1000000000001
+    print near ≈ near_inf
+    print big + 1 ≈ big
+    print big ≈ big + big
 
     # 6. A u64 widens into inf without `↦`; `+ 1` past u64::MAX is exact.
     const inf widened ← top

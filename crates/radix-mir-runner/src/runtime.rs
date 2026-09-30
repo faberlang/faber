@@ -3998,14 +3998,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 Ok(Value::Bool((receiver - other).abs() <= tolerance))
             }
             [receiver, other, rel_tol, abs_tol, negated] => {
-                let width = self.fuzzy_comparison_width(receiver, other, span);
-                // Ruling 37: `inf ≈ inf` and `inf ≈ int` are exact equality
-                // (an `inf` is exact, never fuzzy); `inf ≈ float` converts the
-                // `inf` side by ruling 40 and compares in the float's width.
-                if let Some(equal) = self.exact_inf_equality(receiver, other, span)? {
-                    let negated = matches!(self.eval_operand(negated, span)?, Value::Bool(true));
+                let negated = matches!(self.eval_operand(negated, span)?, Value::Bool(true));
+                // inf-ap: an integer pair (bounded, `u64`, `inf`) uses the one
+                // exact rule; a float or decimal operand computes in floats.
+                if let Some(equal) =
+                    self.integer_fuzzy_equality(receiver, other, rel_tol, abs_tol, span)?
+                {
                     return Ok(Value::Bool(equal != negated));
                 }
+                let width = self.fuzzy_comparison_width(receiver, other, span);
                 let receiver = self.fuzzy_operand(receiver, span)?;
                 let other = self.fuzzy_operand(other, span)?;
                 let rel_tol = numeric_as_f64(&self.eval_operand(rel_tol, span)?, span)?;
@@ -4014,7 +4015,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let other = self.fuzzy_value(other, width);
                 let rel_tol = self.fuzzy_value(rel_tol, width);
                 let abs_tol = self.fuzzy_value(abs_tol, width);
-                let negated = matches!(self.eval_operand(negated, span)?, Value::Bool(true));
                 let limit = (rel_tol * receiver.abs().max(other.abs())).max(abs_tol);
                 let equal = (receiver - other).abs() <= limit;
                 Ok(Value::Bool(if negated { !equal } else { equal }))
@@ -4023,26 +4023,28 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    /// `≈` between two integer operands at least one of which is an `inf`
-    /// (by static type, or by value beyond the 64-bit carriers): exact
-    /// equality. `None` when the pair is not such a pair.
-    fn exact_inf_equality(
+    /// `≈` between two integer operands (neither a decimal, by static type):
+    /// the exact relative-1e-9 rule of [`crate::inf::fuzzy_equal`], for the
+    /// tolerances the lowering emits (`1e-9`, `0`). `None` for any other pair.
+    fn integer_fuzzy_equality(
         &mut self,
         lhs: &MirOperand,
         rhs: &MirOperand,
+        rel_tol: &MirOperand,
+        abs_tol: &MirOperand,
         span: Span,
     ) -> Result<Option<bool>, RunnerError> {
+        let rel = numeric_as_f64(&self.eval_operand(rel_tol, span)?, span)?;
+        let abs = numeric_as_f64(&self.eval_operand(abs_tol, span)?, span)?;
+        if rel != 1e-9 || abs != 0.0 {
+            return Ok(None);
+        }
         let left = self.eval_operand(lhs, span)?;
         let right = self.eval_operand(rhs, span)?;
-        let (Some(a), Some(b)) = (crate::inf::to_magnus(&left), crate::inf::to_magnus(&right))
-        else {
+        if self.operand_decimal_width(lhs).is_some() || self.operand_decimal_width(rhs).is_some() {
             return Ok(None);
-        };
-        let involves_inf = matches!(left, Value::Magnus(_))
-            || matches!(right, Value::Magnus(_))
-            || self.operand_is_inf(lhs)
-            || self.operand_is_inf(rhs);
-        Ok(involves_inf.then_some(a == b))
+        }
+        Ok(crate::inf::fuzzy_equal(&left, &right))
     }
 
     /// One `≈` operand as the float it stands for: a decimal carrier is a

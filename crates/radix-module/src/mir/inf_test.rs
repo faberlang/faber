@@ -424,14 +424,16 @@ fn genus_fields_and_functions_carry_inf() {
 }
 
 #[test]
-fn fuzzy_equality_is_exact_between_inf_operands_and_float_width_against_a_float() {
-    // ruling 37: `inf ≈ inf` and `inf ≈ int` are exact equality; `inf ≈ float`
+fn fuzzy_equality_is_the_integer_tolerance_between_inf_operands_and_float_width_against_a_float() {
+    // ruling 37 as amended by inf-ap (2026-09-30): `inf ≈ inf` and `inf ≈ int`
+    // are the integer-family tolerance `10^9·|a − b| ≤ max(|a|, |b|)`, the same
+    // as `i32 ≈ i64` (`inf_approx_test.rs` pins the matrix); `inf ≈ float`
     // converts the `inf` side by ruling 40 and compares in the float.
     assert_eq!(
         ok(
             "fixum inf x ← 18446744073709551617\nfixum inf y ← 18446744073709551616\nnota x ≈ y\nnota x ≉ y\nnota x ≈ x"
         ),
-        ["falsum", "verum", "verum"]
+        ["verum", "falsum", "verum"]
     );
     assert_eq!(
         ok(
@@ -439,7 +441,8 @@ fn fuzzy_equality_is_exact_between_inf_operands_and_float_width_against_a_float(
         ),
         ["verum", "verum", "falsum"]
     );
-    assert_eq!(ok("fixum inf a ← 1000000001\nfixum inf b ← 1000000000\nnota a ≈ b"), ["falsum"]);
+    assert_eq!(ok("fixum inf a ← 1000000001\nfixum inf b ← 1000000000\nnota a ≈ b"), ["verum"]);
+    assert_eq!(ok("fixum inf a ← 2000000000\nfixum inf b ← 1000000000\nnota a ≈ b"), ["falsum"]);
 }
 
 #[test]
