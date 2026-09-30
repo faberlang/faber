@@ -108,3 +108,45 @@ fn contract_alias_of_mutable_local_still_mutates() {
         "functio f() → vacuum { varia Quadratum q ← Quadratum { latus = 1 }\n fixum Crescens c ← q\n c.cresce(1) }",
     );
 }
+
+#[test]
+fn lista_alias_of_de_param_rejects_mutating_method() {
+    assert_rejected(
+        "functio f(de lista<numerus> xs) → vacuum { varia lista<numerus> ys ← xs\n ys.appende(9) }",
+    );
+}
+
+#[test]
+fn lista_alias_of_de_param_rejects_element_write() {
+    assert_rejected(
+        "functio f(de lista<numerus> xs) → vacuum { varia lista<numerus> ys ← xs\n ys[0] ← 1 }",
+    );
+}
+
+#[test]
+fn tabula_alias_of_de_param_rejects_mutating_method() {
+    assert_rejected(
+        "functio f(de tabula<textus, numerus> m) → vacuum { varia tabula<textus, numerus> n ← m\n n.pone(\"a\", 1) }",
+    );
+}
+
+#[test]
+fn nested_collection_field_alias_of_de_param_rejects_mutating_method() {
+    assert_rejected(
+        "genus Cont { varia lista<numerus> items }\nfunctio f(de Cont q) → vacuum { varia lista<numerus> ls ← q.items\n ls.appende(1) }",
+    );
+}
+
+#[test]
+fn lista_alias_of_de_param_allows_reads() {
+    assert_accepted(
+        "functio f(de lista<numerus> xs) → numerus { varia lista<numerus> ys ← xs\n redde ys.longitudo() }",
+    );
+}
+
+#[test]
+fn lista_alias_of_mutable_local_still_mutates() {
+    assert_accepted(
+        "functio f() → vacuum { varia lista<numerus> xs ← [1]\n varia lista<numerus> ys ← xs\n ys.appende(9) }",
+    );
+}

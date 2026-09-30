@@ -246,7 +246,7 @@ struct BorrowChecker<'a> {
     copy_roots: FxHashSet<DefId>,
     /// Unmarked sources used as an own-bind RHS; a later use proves them live.
     unmarked_own_binds: FxHashMap<DefId, radix_lexer::Span>,
-    /// Unmarked genus/contract locals bound (D12.1 alias) from a `de`
+    /// Unmarked reference-model locals (genus, contract, collection, tensor) bound (D12.1 alias) from a `de`
     /// parameter or another such alias. The alias carries the source's
     /// read-only access, so mutation through it is rejected like direct
     /// mutation of the parameter.
@@ -768,7 +768,8 @@ impl<'a> BorrowChecker<'a> {
 
     /// Record a bind that aliases a `de` place (D12.1: unmarked binds alias).
     ///
-    /// Only genus/contract-typed locals alias; value types copy. Exclusive
+    /// Only reference-model types alias (genus, contract, collections,
+    /// tensors); scalar and register-class value types copy. Exclusive
     /// (`own`/`copy`) destinations are handled by their own bind rules.
     fn note_de_alias(&mut self, local: DefId, ty: Option<TypeId>, init: &HirExpression) {
         let Some(ty) = ty else { return };
@@ -789,7 +790,22 @@ impl<'a> BorrowChecker<'a> {
 
     fn is_aliasing_type(&self, ty: TypeId) -> bool {
         let (_, inner) = self.types.peel_access_marker(ty);
-        matches!(self.types.get(inner), Type::Struct(_) | Type::Interface(_))
+        match self.types.get(inner) {
+            Type::Struct(_)
+            | Type::Interface(_)
+            | Type::Array(_)
+            | Type::BoundedArray { .. }
+            | Type::Queue(_)
+            | Type::BoundedQueue { .. }
+            | Type::Stack(_)
+            | Type::BoundedStack { .. }
+            | Type::Map(..)
+            | Type::Set(_)
+            | Type::Tensor(..)
+            | Type::Sparsa(..) => true,
+            Type::Option(inner) | Type::Alias(_, inner) => self.is_aliasing_type(*inner),
+            _ => false,
+        }
     }
 
     fn note_own_root(&mut self, def_id: DefId, ty: TypeId) {
