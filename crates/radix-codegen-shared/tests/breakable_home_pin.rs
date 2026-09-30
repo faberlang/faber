@@ -8,11 +8,11 @@
 
 use std::path::{Path, PathBuf};
 
-fn collect_breakable_files(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
+fn collect_breakable_files(dir: &Path, out: &mut Vec<PathBuf>) -> std::io::Result<()> {
+    // An unreadable directory or entry must fail the walk, not read as empty:
+    // an IO error must not read as success (defect-audit P0-3).
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
         let path = entry.path();
         let name = path.file_name().and_then(|n| n.to_str());
         if path.is_dir() {
@@ -20,11 +20,12 @@ fn collect_breakable_files(dir: &Path, out: &mut Vec<PathBuf>) {
             if name == Some(".git") || name == Some("target") {
                 continue;
             }
-            collect_breakable_files(&path, out);
+            collect_breakable_files(&path, out)?;
         } else if name == Some("breakable.rs") {
             out.push(path);
         }
     }
+    Ok(())
 }
 
 #[test]
@@ -35,7 +36,8 @@ fn breakable_emission_has_one_home() {
         .and_then(Path::parent)
         .expect("workspace root above crates/");
     let mut found = Vec::new();
-    collect_breakable_files(workspace_root, &mut found);
+    collect_breakable_files(workspace_root, &mut found)
+        .expect("workspace walk must be readable; an IO error must not read as success");
     let home = manifest_dir.join("src").join("breakable.rs");
     let copies: Vec<&PathBuf> = found.iter().filter(|p| **p != home).collect();
     assert_eq!(
