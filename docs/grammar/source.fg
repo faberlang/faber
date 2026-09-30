@@ -1240,9 +1240,10 @@ cast_expr       := gradient_expr ('∷' type_annotation | conversio_expr)* inlin
 # `via` (D11.9) is the convert-hint clause: a modifier of the conversion, not
 # part of the target type (`"ff" ↦ i32 via Hex`, `octeti[0‥2] ↦ u16 via Le`).
 # It binds tighter than the `⊥` default: `x ↦ u32 via Hex ⊥ 0` is
-# `(x ↦ u32 via Hex) ⊥ 0`. The second-type-argument spelling
-# (`numerus<W, Hex>`, `numerus<W, Be>`, `littera<Code>`) is the LEGACY form of
-# the same hint: still accepted until the qp1c lock step, then rejected.
+# `(x ↦ u32 via Hex) ⊥ 0`. The retired spellings — the hint as a further type
+# argument (`numerus<W, Hex>`, `littera<Code>`) and as a bracketed tail
+# (`octeti<16><Le>`) — are parse errors (`conversio_hint_type_argument`,
+# `conversio_hint_tail_argument`), not productions of this grammar.
 conversio_expr        := '↦' type_annotation via_clause? inline_default?
 # `via` is contextual: it is claimed only on the conversion's own line,
 # immediately after the target type; everywhere else it is an ordinary

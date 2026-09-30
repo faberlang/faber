@@ -1155,6 +1155,8 @@ construction literal (`Genus { field = value }`).
 braced `جزء = صواب` / `خطأ`), not a fused annotation name and not the
 graphics `@ جزء` stage. Standalone `@ جزء` is unchanged.
 
+The `مسار` clause of the `نواة` annotation (`@ نواة مسار "x"`, braced `@ نواة { مسار = "x" }`) was removed (K7): the compiler rejects it with `nucleum_lane_removed`, and `جزء` is the only modifier or field. `@ radix مسار` is a different annotation and is unaffected.
+
 Braced annotation records (`@ futura { }`, `@ optio { binding = verbose, ... }`)
 are canonical and compression-safe. Unbraced annotations are line-sensitive,
 non-compression-safe sugar that consumes through `NEWLINE`; the newline is part
@@ -1398,7 +1400,7 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 
 - Declaration parameters (`genericParams`) and applied arguments (`typeArguments`) are distinct grammar categories. Applied arguments admit nested types and static `figura` values. `typeArguments` still admits `NATURAL`.
 - Applied `NATURAL` arguments are `حجم` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, N>`, `queue<T, N>`, `stack<T, N>`, `textus<N>`, `ascii<N>`, `octeti<N>`. Width-marker families such as `numerus<i32>` stay the separate `widthTypeSugar` production below.
-- **Legacy spelling (retiring).** A second applied argument on a `↦` target (`numerus<W, Hex>`, `numerus<W, Be>`) is the legacy spelling of the convert hint; the canonical spelling is the `عبر` clause (see Runtime conversion). The legacy form is still accepted until the qp1c lock step, then rejected; the canonical emitter now prints the clause. While it lives, it is a convert-slot hint, not a type identity, not a width marker, and not a keyword. Live text-parse hints are `Hex` / `Bin` / `Oct`. `Be` / `Le` occupy that same Hex slot for endian unpack — both integer (`octeti[lo‥hi] ↦ numerus<W, Be|Le>`) and float windows (`octeti[lo‥hi] ↦ fractus<f32|f64, Be|Le>`, window 4/8, same fail rules as the integer rows). `Bits` occupies the same slot as an exact-width bitcast hint (reinterpretation, not value conversion; never a base). `typeArguments` is unchanged: these are ordinary `IDENTIFIER` arguments interpreted by conversio, not new `baseType` productions.
+- **Convert hints are not type arguments (D11.9).** A hint (`Hex` / `Bin` / `Oct` / `Be` / `Le` / `Bits` / `Code`) is a `عبر` clause on the `↦` conversion, never a further argument of the target type (see Runtime conversion). The retired spellings are parse errors with a pointer at the clause: a hint as a further type argument of a scalar head (`numerus<W, Hex>`, `fractus<f64, Bits>`, `ascii<N, Hex>`, `littera<Code>`) is `conversio_hint_type_argument`, and a bracketed hint tail after the target (`octeti<16><Le>`, `vector<numerus<u32>, 4><Be>`) is `conversio_hint_tail_argument`. Only scalar heads are checked, so a user type named like a hint stays a legal argument of a collection target (`↦ lista<Code>`).
 - Type arguments admit the hole forms: `lista<∪>` infers a heterogeneous element union and `tabula<K, ∪>` a heterogeneous value union; `lista<_>` keeps the monomorphic single-inhabitant hole.
 - Explicit generic call-site lists use the same `typeArguments` production: `id<_>(x)` is a type hole (equivalent to omitted `id(x)` for a one-param callee), and mixed lists such as `both<_, textus>(a, b)` are legal. Arity stays exact (`both<_>` is still one argument). `∪` in that list is rejected (`explicit_union_type_arg_unsupported`): a callee type param is a monomorphic witness slot.
 - `labeledTypeArgument` is the optional label prefix on `توبل` type arguments only (`توبل<gx: f32, T>`; mixed labeled/unlabeled legal). A label in a non-`توبل` list (`f<gx: T>(x)`, `lista<gx: T>`) is a parse error. Absence is the only unlabeled form; there is no `_: T` spelling. Keyword spellings are legal labels under the contextual law (`توبل<ثابت: A>`).
@@ -1521,8 +1523,8 @@ no per-value scale.
 `numerus<_>`, `fractus<_>`, `modulus<_>`, `saturatus<_>`, and `instans<_>` are marker holes:
 the family stays identity and only the width/precision is inferred from a
 same-family witness (exact marker, no lattice widening). Unsolved `_` is an
-error, never the bare default. Convert-hint holes (`numerus<u32, _>`) are
-not this form.
+error, never the bare default. A convert hint is never a type argument, so
+there is no hint hole; hints are `عبر` clauses.
 
 ### Numeric model
 
@@ -1968,7 +1970,7 @@ only the parts that make sense: `[fill][align][sign][0][width][.precision][kind]
   strftime-style patterns (norma work, if ever).
 - **Left out on purpose:** thousands separators (country-aware, so library
   work, not this operator) and computed specs (D2.2).
-- **Split from `↦`:** `↦ ascii<N, Hex>` is exact conversion — fixed width,
+- **Split from `↦`:** `↦ ascii<N> عبر Hex` is exact conversion — fixed width,
   fails if the value does not fit; `¶` is display — width is a minimum that
   grows to fit, and never fails.
 - **No word twin:** `¶` is the same glyph in every locale, like `✓ ✗`.
@@ -1979,7 +1981,7 @@ only the parts that make sense: `[fill][align][sign][0][width][.precision][kind]
 
 **Edge-case outputs (D2.7):** `NaN` / `∞` / `-∞` print as `NaN`, `∞`, `-∞`
 (precision does not apply); a negative number in hex/bin/oct prints sign plus
-digits (`-42 ¶ "x"` = `-2a`), not two's complement (`↦ ascii<N, Hex>` stays
+digits (`-42 ¶ "x"` = `-2a`), not two's complement (`↦ ascii<N> عبر Hex` stays
 the strict tool and rejects negatives); `textus` width counts `littera`
 (characters), not screen columns (an emoji with a skin-tone modifier counts as
 2; screen-width alignment is library work); `instans` outside years 0–9999
@@ -2009,8 +2011,8 @@ The `↦` glyph (U+21A6, "rightwards arrow from bar") is the runtime value conve
 - `"22" ↦ numerus` → Rust: `"22".parse::<i64>().unwrap()`
 - `"bad" ↦ numerus ⊥ 0` → Rust: `"bad".parse::<i64>().unwrap_or(0)`
 - `42 ↦ textus` → Rust: `42.to_string()`
-- `n ↦ ascii<N, Hex|Bin|Oct>` — shipped; fixed-width lowercase digits, zero-padded to `N`, with overflow and negative sources rejected.
-- `n ↦ ascii<_, Hex|Bin|Oct>` — shipped for const-foldable numerus sources; the hole is solved to the source digit count. Runtime sources leave the hole unsolved and require explicit `N`.
+- `n ↦ ascii<N> عبر Hex|Bin|Oct` — shipped; fixed-width lowercase digits, zero-padded to `N`, with overflow and negative sources rejected.
+- `n ↦ ascii<_> عبر Hex|Bin|Oct` — shipped for const-foldable numerus sources; the hole is solved to the source digit count. Runtime sources leave the hole unsolved and require explicit `N`.
 
 **The `عبر` clause (D11.9).** A convert hint is a clause on the conversion, not a type argument: `"ff" ↦ i32 عبر Hex`, `65 ↦ littera عبر Code`, `octeti[0‥2] ↦ u16 عبر Le ↦ f16 عبر Bits ↦ f32`. The grammar is `conversio_expr := '↦' type_annotation via_clause? inline_default?` and `via_clause := 'عبر' IDENTIFIER`.
 
@@ -2019,21 +2021,21 @@ The `↦` glyph (U+21A6, "rightwards arrow from bar") is the runtime value conve
 - The clause binds tighter than the `⊥` default: `x ↦ u32 عبر Hex ⊥ 0` is `(x ↦ u32 عبر Hex) ⊥ 0`. Conversions chain, each hop with its own clause.
 - Whether a hint is known, and whether the target takes one, is semantic (lowering), not grammar.
 
-**Legacy spelling (retiring).** The rest of this section still writes hints as the second type argument of the `↦` target (`numerus<W, Hex>`). That is the legacy spelling of the same hints: accepted until the qp1c lock step, then rejected. The canonical spelling is the `عبر` clause above (`"ff" ↦ numerus<i32, Hex>` is `"ff" ↦ i32 عبر Hex`).
+**Retired spellings.** Before D11.9 a hint was written as the second type argument of the `↦` target (`numerus<W, Hex>`, `littera<Code>`) or as a bracketed tail (`octeti<16><Le>`). Both are rejected at parse time (`conversio_hint_type_argument`, `conversio_hint_tail_argument`); the `عبر` clause is the only spelling.
 
-The second type argument of a `↦` target is the legacy convert-hint slot. `Hex` / `Bin` / `Oct` / `Be` / `Le` / `Bits` are convert hints in that slot, not keywords and not new `baseType` productions. For ascii output, `Hex` / `Bin` / `Oct` select the lowercase fixed-width digit pack; the hint is not part of type identity. Target support is not a grammar production (see Target Support).
+The hint selects the conversion row. `Hex` / `Bin` / `Oct` / `Be` / `Le` / `Bits` / `Code` are convert hints in the `عبر` clause, not keywords and not new `baseType` productions. For ascii output, `Hex` / `Bin` / `Oct` select the lowercase fixed-width digit pack; the hint is not part of type identity. Target support is not a grammar production (see Target Support).
 
-- `"ff" ↦ numerus<i32, Hex>` — shipped; text parse at radix 16 (`Bin` = 2, `Oct` = 8). Hex/Bin/Oct text parse is unchanged by endian hints.
-- `octeti[lo‥hi] ↦ numerus<W, Be>` / `… ↦ numerus<W, Le>` — endian unpack of an exact-width window (`W` is `i16` / `i32` / `i64` / `u16` / `u32` / `u64`; window length 2 / 4 / 8). Shipped on rust, the MIR runner, Go, and TypeScript. TypeScript `i64`/`u64` stay fail-closed (JS number is not exact). English `int<W, Be>` is the same form. `octeti` itself has no endian; `bytes ↦ numerus<u32>` without `Be`/`Le` stays rejected. A short window fails (no pad).
-- `octeti[lo‥hi] ↦ fractus<f32, Be|Le>` / `… ↦ fractus<f64, Be|Le>` — shipped alongside the integer rows (float endian unpack of an exact-width window, 4 / 8 bytes; same fail rules: exact window required, a short window fails, `Be`/`Le` mandatory).
-- `n ↦ numerus<u32, Bits>` / `n ↦ numerus<u64, Bits>` / `n ↦ fractus<f32, Bits>` / `n ↦ fractus<f64, Bits>` / `n ↦ fractus<f16, Bits>` — shipped; the `Bits` hint reinterprets between exact-width integer/float pairs (u32↔f32, u64↔f64, u16↔f16, u16↔bf16) bit-identically. It is reinterpretation, not value conversion; wrong-pair rows reject with the structured issue, and `Bits` is never a base or an ascii format hint. `Bits` is a convert-slot hint in the same Hex slot, not a keyword and not a `baseType` production.
-- `n ↦ octeti<N, Be>` / `… ↦ octeti<N, Le>` — proposed (not shipped); write convert after `octeti<N>` (`N` ∈ {2, 4, 8}). `Be`/`Le` stay Hex-slot hints, not a second capacity.
-- `'A' ↦ numerus<u32, Code>` — shipped; the code point as a `u32` (`u32` holds every code point, as Rust's `char as u32`); the source must be `littera`. `65 ↦ littera<Code>` — shipped; builds the character for that code point, failing above U+10FFFF and on a surrogate. `Code` occupies the same convert-slot hint position as `Hex`/`Bits`; any other type argument, or a source/target type other than `littera`/`numerus<u32>`, is `SEM016` (`code_hint_pair_mismatch`).
+- `"ff" ↦ i32 عبر Hex` — shipped; text parse at radix 16 (`Bin` = 2, `Oct` = 8). Hex/Bin/Oct text parse is unchanged by endian hints.
+- `octeti[lo‥hi] ↦ W عبر Be` / `… ↦ W عبر Le` — endian unpack of an exact-width window (`W` is `i16` / `i32` / `i64` / `u16` / `u32` / `u64`; window length 2 / 4 / 8). Shipped on rust, the MIR runner, Go, and TypeScript. TypeScript `i64`/`u64` stay fail-closed (JS number is not exact). `int<W>` is the same target in the English reader. `octeti` itself has no endian; `bytes ↦ u32` without `عبر Be` / `عبر Le` stays rejected. A short window fails (no pad).
+- `octeti[lo‥hi] ↦ f32 عبر Be|Le` / `… ↦ f64 عبر Be|Le` — shipped alongside the integer rows (float endian unpack of an exact-width window, 4 / 8 bytes; same fail rules: exact window required, a short window fails, `عبر Be` / `عبر Le` mandatory).
+- `n ↦ u32 عبر Bits` / `n ↦ u64 عبر Bits` / `n ↦ f32 عبر Bits` / `n ↦ f64 عبر Bits` / `n ↦ f16 عبر Bits` — shipped; the `Bits` hint reinterprets between exact-width integer/float pairs (u32↔f32, u64↔f64, u16↔f16, u16↔bf16) bit-identically. It is reinterpretation, not value conversion; wrong-pair rows reject with the structured issue, and `Bits` is never a base or an ascii format hint. `Bits` is a `عبر` hint, not a keyword and not a `baseType` production.
+- `n ↦ octeti<N> عبر Be` / `… ↦ octeti<N> عبر Le` — proposed (not shipped) for a scalar source (`N` ∈ {2, 4, 8}); the hint is a `عبر` clause, not a second capacity. Register targets take the clause today: `v ↦ octeti<16> عبر Le`, `corpus[0‥16] ↦ vector<numerus<u32>, 4> عبر Be`.
+- `'A' ↦ u32 عبر Code` — shipped; the code point as a `u32` (`u32` holds every code point, as Rust's `char as u32`); the source must be `littera`. `65 ↦ littera عبر Code` — shipped; builds the character for that code point, failing above U+10FFFF and on a surrogate. `Code` is a `عبر` hint like `Hex`/`Bits`; any other hint on these targets, or a source/target type other than `littera`/`numerus<u32>`, is `SEM016` (`code_hint_pair_mismatch`).
 - `n ↦ textus` / `n ↦ ascii` / `n ↦ littera` — a number's digits (D10.6): `7 ↦ textus` = `"7"`, `7 ↦ ascii` = `"7"`, `7 ↦ littera` = `'7'`; `littera` fails outside 0–9 (`42 ↦ littera` fails, two letters).
 - `littera ↦ numerus` — parses the digit, failing otherwise (as `"22" ↦ numerus` parses).
 - `littera ↦ textus` — the one-letter string; never fails.
 - `textus ↦ littera` — the only letter; fails unless the text is exactly one letter.
-- `octeti ↦ textus` — UTF-8 decode; can fail. `octeti ↦ ascii` — checks every byte is below 128, same bytes; can fail. `octeti[i‥i+1] ↦ ascii` — one byte through a window (mirrors `octeti[lo‥hi] ↦ numerus<W, Be>`).
+- `octeti ↦ textus` — UTF-8 decode; can fail. `octeti ↦ ascii` — checks every byte is below 128, same bytes; can fail. `octeti[i‥i+1] ↦ ascii` — one byte through a window (mirrors `octeti[lo‥hi] ↦ W عبر Be`).
 
 Explicit integer narrowing is magnitude-checked on every backend:
 `n ↦ numerus<u8>` converts a value that fits unchanged, and a value out of the
@@ -2232,7 +2234,7 @@ Runtime out-of-bounds traps — the same trapping model as lista bracket access,
 not textus short-slice. Lista `[lo‥hi]` stays rejected.
 
 `octeti` is the endian host. Parse byte windows on the buffer
-(`buf[lo‥hi] ↦ numerus<W, Be|Le>`). Cross to a list once, for element work,
+(`buf[lo‥hi] ↦ W عبر Be|Le`). Cross to a list once, for element work,
 via `octeti ↦ lista<numerus<u8>>` (representation change only; other element
 types fail closed). The reverse `lista<numerus<u8>> ↦ octeti` is live. Do not
 detour through `valor`. Lists stay for element work, not endian windows.
