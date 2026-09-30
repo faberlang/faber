@@ -54,6 +54,10 @@ mod await_store_emit_test;
 mod indexed_apud_emit_test;
 
 #[cfg(test)]
+#[path = "saturating_fuzzy_incdec_emit_test.rs"]
+mod saturating_fuzzy_incdec_emit_test;
+
+#[cfg(test)]
 #[path = "statica_emit_test.rs"]
 mod statica_emit_test;
 
