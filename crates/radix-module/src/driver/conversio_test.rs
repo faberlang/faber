@@ -142,13 +142,24 @@ fn ascii_octeti_conversio_emits_correct_lowering() {
 // ── scalar conversio ──
 
 #[test]
-fn fractus_to_numerus_conversio_emits_truncate_cast() {
+fn fractus_to_numerus_conversio_emits_checked_truncation() {
+    // D1.11: float → integer `↦` truncates toward zero and fails when the value is
+    // NaN, ±Inf, or out of the target range — never a saturating `as` cast.
     let session = test_session(Target::HirRust);
     let source = "incipit { fixum _ n ← 3.7 ↦ numerus }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
-    assert!(code.contains(" as i64"), "expected truncate cast, got:\n{code}");
+    assert!(code.contains(".trunc()"), "expected truncation, got:\n{code}");
+    assert!(code.contains("is_finite()"), "expected NaN/Inf check, got:\n{code}");
+    assert!(
+        code.contains("TryFrom<i128>"),
+        "expected checked range conversion, got:\n{code}"
+    );
+    assert!(
+        code.contains("fractus to numerus conversion out of range"),
+        "expected the runner's failure text, got:\n{code}"
+    );
 }
 
 #[test]
