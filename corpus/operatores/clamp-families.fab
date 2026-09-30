@@ -1,0 +1,115 @@
++++
+term = "clamp-families"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "return_clause", "redde_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "typed_constructor", "field_list", "field_init", "field_key", "additive_expr", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "`⤒` and `⤓` pick the larger and the smaller of two numbers on every number family, and chain into a clamp inside methods."
+syntax = "<number> ⤒ <number> | <number> ⤓ <number>"
+related = ["⤒", "⤓", "maximus", "minimus", "numerus", "fractus"]
+locale = "en"
++++
+# =============================================================================
+# clamp-families — `⤒` and `⤓` on integers and floats
+# =============================================================================
+#
+# What this teaches:
+#   • `x ⤒ low ⤓ high` clamps `x` into `[low, high]`: `⤒` keeps the larger
+#     operand, `⤓` keeps the smaller one.
+#   • It is one operator on every number family: `numerus`, sized integers
+#     (`i32`, `u8`) and floats (`f64`, `f32`).
+#   • A class method reads its own fields: `x ⤒ self.low ⤓ self.high`.
+#   • Floats follow IEEE 754-2019 `maximum` / `minimum`: a NaN operand gives
+#     NaN, and `-0.0` orders below `+0.0`.
+#
+# Common mistakes:
+#   • Expecting a NaN operand to be skipped (the C `fmax` rule): `nan ⤒ 1.0`
+#     is NaN, never 1.0.
+#
+# See also: ⤒, ⤓, maximus, minimus, numerus, fractus
+# =============================================================================
+
+# operatores/clamp-families — the same clamp on integer and float families
+#
+# WHY: every target spells the extremum differently (a method, `math.Max`,
+# `max`, a helper). Pins the result of each family, the method form inside a
+# class, and the NaN and signed-zero cases of the float definition.
+#
+# EXPECTED OUTPUT:
+#   clamp-families.expected — one result per print.
+
+class Span {
+    const f64 low
+    const f64 high
+
+    fn center() → f64 {
+        return (self.low + self.high) ÷ 2.0
+    }
+
+    fn contains(f64 x) → bool {
+        return self.low ≤ x and x ≤ self.high
+    }
+
+    fn limit(f64 x) → f64 {
+        return x ⤒ self.low ⤓ self.high
+    }
+}
+
+fn clamp_num(numerus x, numerus low, numerus high) → numerus {
+    return x ⤒ low ⤓ high
+}
+
+fn clamp_i32(i32 x, i32 low, i32 high) → i32 {
+    return x ⤒ low ⤓ high
+}
+
+fn clamp_u8(u8 x, u8 low, u8 high) → u8 {
+    return x ⤒ low ⤓ high
+}
+
+fn clamp_f64(f64 x, f64 low, f64 high) → f64 {
+    return x ⤒ low ⤓ high
+}
+
+fn clamp_f32(f32 x, f32 low, f32 high) → f32 {
+    return x ⤒ low ⤓ high
+}
+
+main {
+    # 1. Integers: below, inside and above the range.
+    print clamp_num(-5, 0, 10)
+    print clamp_num(7, 0, 10)
+    print clamp_num(99, 0, 10)
+    print clamp_i32(-300, -100, 100)
+    print clamp_u8(250, 10, 200)
+
+    # 2. Floats.
+    print clamp_f64(-1.5, 0.0, 255.0)
+    print clamp_f64(300.25, 0.0, 255.0)
+    print clamp_f32(2.5, 0.5, 1.5)
+
+    # 3. A class method reads its own fields.
+    const Span span ← Span { low = 0.0, high = 255.0 }
+    print span.center()
+    print span.contains(3.0)
+    print span.limit(300.0)
+    print span.limit(-5.0)
+
+    # 4. IEEE 754-2019: NaN propagates from either side.
+    const f64 zero ← 0.0
+    const f64 not_a_number ← zero ÷ zero
+    # A result is NaN exactly when it differs from itself.
+    const f64 from_value ← clamp_f64(not_a_number, 0.0, 1.0)
+    const f64 from_low ← clamp_f64(0.5, not_a_number, 1.0)
+    const f64 from_high ← clamp_f64(0.5, 0.0, not_a_number)
+    print from_value ≠ from_value
+    print from_low ≠ from_low
+    print from_high ≠ from_high
+
+    # 5. IEEE 754-2019: -0.0 orders below +0.0.
+    const f64 pos_zero ← 0.0
+    const f64 neg_zero ← -1.0 * pos_zero
+    # The sign of a zero shows in the sign of its reciprocal.
+    print 1.0 ÷ (neg_zero ⤒ pos_zero) > 0.0
+    print 1.0 ÷ (pos_zero ⤓ neg_zero) > 0.0
+}
