@@ -2108,10 +2108,15 @@ fn resolve_conversio_target_type(
 ) {
     match &ty.kind {
         TypeExprKind::Named(name, params)
-            if Primitive::from_name(interner.resolve(name.name)).is_some() =>
+            if let Some(prim) = Primitive::from_name(interner.resolve(name.name)) =>
         {
             resolve_type_ident(resolver, interner, name, errors);
-            if !params.is_empty() {
+            // WHY: `numerus`/`fractus` arguments are width markers exactly as
+            // in a declaration, so they take the declaration's validation
+            // (an unexplained extra argument is `invalid_*_width_marker`).
+            // A convert hint is a `via` clause, never a type argument
+            // (D11.9), so no other primitive's arguments are skipped for that.
+            if !params.is_empty() && !matches!(prim, Primitive::Numerus | Primitive::Fractus) {
                 return;
             }
         }

@@ -403,6 +403,15 @@ fn integer_width_range(width: NumericWidth) -> Option<(i128, i128)> {
     }
 }
 
+/// Whether a float's truncation toward zero lies in `lo..=hi`, decided in the
+/// exact `i128` domain: `hi as f64` rounds up for the 64-bit widths (2^63,
+/// 2^64), so comparing in float space would accept the first float past them.
+/// NaN and infinities never fit. `f64 -> i128` saturates beyond 2^127, far
+/// outside every integer width, so a huge magnitude still compares correctly.
+fn float_truncation_fits(value: f64, (lo, hi): (i128, i128)) -> bool {
+    value.is_finite() && (lo..=hi).contains(&(value.trunc() as i128))
+}
+
 /// Whether a float width can hold the value after rounding. `f16`/`bf16` have
 /// no rounding proof without soft-float arithmetic, so they hold nothing here.
 fn float_width_holds(width: NumericWidth, value: f64) -> bool {
@@ -2660,11 +2669,7 @@ impl TypeChecker<'_> {
                 let Some(value) = static_float_magnitude(source) else {
                     return true;
                 };
-                !(value.is_finite()
-                    && target_range.is_some_and(|(lo, hi)| {
-                        let truncated = value.trunc();
-                        truncated >= lo as f64 && truncated <= hi as f64
-                    }))
+                !target_range.is_some_and(|range| float_truncation_fits(value, range))
             }
             NumericFactFamily::Decimal => {
                 // d64 integer parts fit i64.

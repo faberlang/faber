@@ -1723,14 +1723,10 @@ fn lower_conversio_target_type(
                 lowerer.error("generic_size_argument_in_type_position");
                 return lowerer.types.intern(crate::Type::Error);
             };
-            let width_params: &[radix_syntax::TypeExpr] = match type_params.first() {
-                Some(first) => std::slice::from_ref(first),
-                None => &[],
-            };
             let mut issues = Vec::new();
             let ty_id = crate::numeric_width::lower_sized_primitive(
                 prim,
-                width_params,
+                &type_params,
                 lowerer.interner,
                 lowerer.types,
                 &mut |issue| issues.push(issue),

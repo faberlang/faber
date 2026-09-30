@@ -1180,5 +1180,13 @@ mod format_test;
 mod failable_conversio_handler_test;
 
 #[cfg(test)]
+#[path = "float_constant_conversio_bounds_test.rs"]
+mod float_constant_conversio_bounds_test;
+
+#[cfg(test)]
+#[path = "conversio_extra_width_argument_test.rs"]
+mod conversio_extra_width_argument_test;
+
+#[cfg(test)]
 #[path = "sermo_route_typing_test.rs"]
 mod sermo_route_typing_test;
