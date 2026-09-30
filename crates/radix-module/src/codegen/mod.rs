@@ -84,6 +84,17 @@ mod haskell_emit_test;
     feature = "hir-rust",
     feature = "hir-go",
     feature = "hir-ts",
+    feature = "hir-swift",
+    feature = "hir-python"
+))]
+#[path = "float_integer_conversio_emit_test.rs"]
+mod float_integer_conversio_emit_test;
+
+#[cfg(all(
+    test,
+    feature = "hir-rust",
+    feature = "hir-go",
+    feature = "hir-ts",
     feature = "hir-swift"
 ))]
 #[path = "ordo_conversio_emit_test.rs"]

@@ -716,6 +716,45 @@ pub fn checked_integer_conversio(
         .then_some((from_width, to_width))
 }
 
+/// Failure text of a `fractus ↦ int<W>` conversion that fails its check; the
+/// MIR runner and every backend that aborts on it use this exact wording.
+pub const FLOAT_INTEGER_CONVERSIO_MESSAGE: &str = "fractus to numerus conversion out of range";
+
+/// D1.11 / D11.8: the integer target width of an explicit `↦` from a float
+/// (`fractus`, any float width) into a trapping integer type. Such a conversion
+/// truncates toward zero and fails (never saturates or wraps) on NaN, ±Inf, or a
+/// truncation outside the width's range. `None` for any other source/target pair.
+#[must_use]
+pub fn float_integer_conversio(
+    types: &TypeTable,
+    from: TypeId,
+    to: TypeId,
+) -> Option<NumericWidth> {
+    fn is_float(types: &TypeTable, ty: TypeId) -> bool {
+        match types.get(ty) {
+            Type::Primitive(Primitive::Fractus) => true,
+            Type::SizedNumeric(Primitive::Fractus, _) => true,
+            Type::Alias(_, inner) => is_float(types, *inner),
+            _ => false,
+        }
+    }
+    if !is_float(types, from) {
+        return None;
+    }
+    numerus_integer_width(types, to)
+}
+
+impl NumericWidth {
+    /// Decimal digits of the width's inclusive minimum and its exclusive
+    /// maximum (`max + 1`, a power of two exact in `f64`). A truncated float `t`
+    /// fits when `min <= t && t < max_exclusive`. `None` for non-integer widths.
+    #[must_use]
+    pub fn float_truncation_bounds(self) -> Option<(String, String)> {
+        let (lo, hi) = self.integer_range()?;
+        Some((lo.to_string(), (hi + 1).to_string()))
+    }
+}
+
 /// D11.1: the `(source, target)` integer widths of a `↦` into or out of a
 /// `saturatus<W>`, when both sides are integer widths. Such conversions are
 /// range-checked like `numerus` narrowing — a conversion never clamps.
