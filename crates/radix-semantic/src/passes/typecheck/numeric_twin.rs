@@ -14,23 +14,42 @@
 use radix_hir::{
     DefId, HirBinOp, HirBlock, HirExpression, HirExpressionKind, HirLocal, HirStatement,
     HirStatementKind, HirUnOp,
+    visit::{HirVisitor, walk_expr},
 };
 use radix_intrinsics::{IntrinsicReceiver, lookup_method_for_type};
 use radix_types::Type;
 
 use super::TypeChecker;
 
-/// How many effectful sub-expressions of one place can be pinned to locals.
-const PLACE_TEMPORARIES: usize = 16;
-
 fn place_temporary_name(ordinal: usize) -> String {
     format!("__place{ordinal}")
 }
 
+/// Finds the widest place an in-place method call could pin to temporaries.
+struct PlaceWidth(usize);
+
+impl HirVisitor for PlaceWidth {
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        if let HirExpressionKind::MethodCall(receiver, ..) = &expr.kind
+            && is_place_chain(receiver)
+        {
+            self.0 = self.0.max(impure_parts(receiver));
+        }
+        walk_expr(self, expr);
+    }
+}
+
 /// Intern the names the place temporaries use, before typecheck (which holds
-/// the interner read-only). Each temporary of one place needs its own name.
-pub(crate) fn intern_place_temporaries(interner: &mut radix_lexer::Interner) {
-    for ordinal in 0..PLACE_TEMPORARIES {
+/// the interner read-only). Each temporary of one place needs its own name, so
+/// intern as many as the widest place in the module can need (an upper bound:
+/// every method-call receiver that is a place chain is counted).
+pub(crate) fn intern_place_temporaries(
+    hir: &radix_hir::HirModule,
+    interner: &mut radix_lexer::Interner,
+) {
+    let mut width = PlaceWidth(0);
+    width.visit_program(hir);
+    for ordinal in 0..width.0 {
         interner.intern(&place_temporary_name(ordinal));
     }
 }
@@ -325,7 +344,7 @@ impl TypeChecker<'_> {
             }
             // A call or other value is no place to store into; the intrinsic
             // checker reports it.
-            if !is_place_chain(receiver) || impure_parts(receiver) > PLACE_TEMPORARIES {
+            if !is_place_chain(receiver) {
                 return None;
             }
         }

@@ -617,6 +617,22 @@ fn in_place_twin_evaluates_each_effectful_index_once_in_order() {
 }
 
 #[test]
+fn in_place_twin_evaluates_more_than_sixteen_effectful_indices_once() {
+    // ss1d: the temporaries are not a fixed pool; a place with 20 effectful
+    // indices desugars and evaluates each once.
+    let depth = 20;
+    let ty = format!("{}numerus{}", "lista<".repeat(depth), ">".repeat(depth));
+    let literal = format!("{}1{}", "[".repeat(depth), "]".repeat(depth));
+    let place = "[idx(0)]".repeat(depth);
+    let source = format!("{PLACE_HELPER}incipit {{\nvaria {ty} g ← {literal}\ng{place}.adde(1)\nnota g{place}\n}}\n");
+    let (out, errors) = run_module(&source);
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(out.len(), 2 * depth + 1, "{out:?}");
+    assert!(out[..2 * depth].iter().all(|line| line == "idx"), "{out:?}");
+    assert_eq!(out.last().map(String::as_str), Some("2"));
+}
+
+#[test]
 fn in_place_twin_on_an_effectful_place_traps_at_the_store() {
     let source = format!(
         "{PLACE_HELPER}incipit {{\nvaria _ xs ← [10, 20, 30] ∷ lista<numerus<u8>>\nxs[idx(1)].multiplica(1000)\nnota xs[1]\n}}\n"

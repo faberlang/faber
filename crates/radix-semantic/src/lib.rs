@@ -447,7 +447,6 @@ pub fn analyze_with_cli(
         config.locale_pack.as_ref(),
     );
     intern_catalog_generic_names(interner);
-    passes::typecheck::intern_place_temporaries(interner);
     if let Some(pack) = config.locale_pack.as_ref() {
         register_locale_pack_type_spellings(pack, &mut resolver, &mut types, interner);
     }
@@ -625,6 +624,7 @@ pub fn analyze_with_cli(
         interner,
     );
 
+    passes::typecheck::intern_place_temporaries(&hir, interner);
     match passes::typecheck::typecheck_with_config(
         &mut hir,
         &resolver,
