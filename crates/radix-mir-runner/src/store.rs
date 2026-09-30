@@ -56,6 +56,24 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         })
     }
 
+    /// Store one exactly computed tensor element under its element type's
+    /// slot policy (ruling 19). Non-integer elements pass through.
+    pub(crate) fn store_tensor_element(
+        &self,
+        element: TypeId,
+        value: Value,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let site = HirStoreSite {
+            kind: HirStoreKind::Element,
+            slot: None,
+            inferred_from: None,
+            inferred_text: None,
+        };
+        self.eval_implicit_store(&site, element, &value, span)
+            .unwrap_or(Ok(value))
+    }
+
     fn integer_slot(&self, target: TypeId) -> Option<(SlotPolicy, NumericWidth)> {
         let mut target = target;
         while let Type::Alias(_, inner) = self.types.get(target) {

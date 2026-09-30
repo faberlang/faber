@@ -2170,6 +2170,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
 
     /// Elementwise tensor op with scalar broadcast: if one arg is a scalar,
     /// broadcast it across all elements of the tensor arg.
+    ///
+    /// Each element is computed exactly (checked only at the 64-bit cap,
+    /// ruling 17) and then stored under the result element type's slot
+    /// policy (ruling 19).
     fn tensor_elementwise_or_scalar(
         &mut self,
         args: &[MirOperand],
@@ -2178,13 +2182,39 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         op: fn(&Value, &Value, NumericWidth, Span) -> Result<Value, RunnerError>,
         return_ty: MirType,
     ) -> Result<Value, RunnerError> {
+        let result = self.tensor_elementwise_exact(args, span, label, op)?;
+        if let (Value::Tensor(cell), Some(element)) = (&result, self.tensor_element_type(return_ty))
+        {
+            let mut tensor = cell.borrow_mut();
+            for slot in &mut tensor.data {
+                let value = std::mem::replace(slot, Value::Int(0));
+                *slot = self.store_tensor_element(element, value, span)?;
+            }
+        }
+        Ok(result)
+    }
+
+    /// The element type of a tensor or matrix result type.
+    fn tensor_element_type(&self, ty: MirType) -> Option<TypeId> {
+        match self.types.get(ty.semantic_id()) {
+            Type::Tensor(element, _) | Type::Matrix(element, _) => Some(*element),
+            _ => None,
+        }
+    }
+
+    fn tensor_elementwise_exact(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+        label: &'static str,
+        op: fn(&Value, &Value, NumericWidth, Span) -> Result<Value, RunnerError>,
+    ) -> Result<Value, RunnerError> {
         let [left, right] = args else {
             return Err(RunnerError::internal(span, format!("{label} arity")));
         };
         let left_val = self.eval_operand(left, span)?;
         let right_val = self.eval_operand(right, span)?;
-        let width =
-            effective_width(self.types, return_ty.semantic_id()).unwrap_or(NumericWidth::I64);
+        let width = NumericWidth::I64;
         match (&left_val, &right_val) {
             (Value::Tensor(l_cell), Value::Tensor(r_cell)) => {
                 let l = l_cell.borrow();
@@ -2626,8 +2656,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         if args.len() != 2 {
             return Err(RunnerError::internal(span, "tensor sum_axis arity"));
         }
-        let width =
-            effective_width(self.types, return_ty.semantic_id()).unwrap_or(NumericWidth::I64);
+        // Partial sums are exact; only the finished result element is stored
+        // under its type's slot policy (ruling 19).
+        let width = NumericWidth::I64;
+        let element = self
+            .tensor_element_type(return_ty)
+            .unwrap_or_else(|| return_ty.semantic_id());
         let axis = match &args[1] {
             MirOperand::Constant(MirConstant::Int(i)) => *i,
             other => {
@@ -2671,7 +2705,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     sum = numeric_add(&sum, item, width, span)?;
                 }
             }
-            return Ok(sum);
+            return self.store_tensor_element(element, sum, span);
         }
         // rank == 2
         let rows = shape[0] as usize;
@@ -2691,6 +2725,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     }
                 }
             }
+            let result = self.store_tensor_elements(element, result, span)?;
             Ok(tensor_value(result, vec![cols as i64]))
         } else {
             // axis == 1 (last axis) — sum across columns → result has shape [rows].
@@ -2709,8 +2744,21 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 }
                 result.push(sum);
             }
+            let result = self.store_tensor_elements(element, result, span)?;
             Ok(tensor_value(result, vec![rows as i64]))
         }
+    }
+
+    fn store_tensor_elements(
+        &self,
+        element: TypeId,
+        values: Vec<Value>,
+        span: Span,
+    ) -> Result<Vec<Value>, RunnerError> {
+        values
+            .into_iter()
+            .map(|value| self.store_tensor_element(element, value, span))
+            .collect()
     }
 
     /// Layer normalization with manual shape-loops.

@@ -700,3 +700,20 @@ fn tensor_matmul_dot_products_are_exact_and_store_per_element() {
     let (_, issue, _) = trap(&too_big);
     assert_eq!(issue, "runner_numerus_overflow");
 }
+
+#[test]
+fn tensor_elementwise_stores_each_element_under_the_element_type() {
+    // ts1 (rulings 17, 19): each element is exact and stored per element.
+    let setup = "fixum tensor<numerus<i8>, []> seed ← vacua\nfixum tensor<numerus<i8>, [3]> a ← seed.strue([100, 100, -100], [3])\n";
+    let sum = format!(
+        "{setup}fixum tensor<numerus<i8>, [3]> b ← seed.strue([100, 1, -100], [3])\nfixum tensor<numerus<i8>, [3]> s ← a + b\nnota s.summa()"
+    );
+    let (out, issue, message) = trap(&sum);
+    assert!(out.is_empty());
+    assert_eq!(issue, "implicit_store_out_of_range");
+    assert!(message.contains("200 does not fit in `i8`"), "{message}");
+    let prod = format!(
+        "{setup}fixum tensor<numerus<i8>, [3]> b ← seed.strue([1, 1, 1], [3])\nfixum tensor<numerus<i8>, [3]> s ← a ⊙ b\nnota s.summa()"
+    );
+    assert_eq!(ok(&prod), ["100"]);
+}

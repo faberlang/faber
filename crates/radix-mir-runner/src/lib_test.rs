@@ -2297,6 +2297,8 @@ fn f029_tensor_add_u8_overflow_rejected() {
     // Register numerus<u8> type so width checking applies.
     let mut type_table = TypeTable::new();
     let u8_ty = type_table.intern(Type::SizedNumeric(Primitive::Numerus, NumericWidth::U8));
+    let shape = type_table.rank0_shape();
+    let tensor_ty = type_table.tensor_with_shape(u8_ty, shape);
 
     // 200 + 100 = 300 > u8::MAX=255 → must overflow.
     let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
@@ -2337,7 +2339,7 @@ fn f029_tensor_add_u8_overflow_rejected() {
             MirOperand::Value(MirValueId(0)),
             MirOperand::Value(MirValueId(1)),
         ],
-        return_ty: MirType::semantic(u8_ty),
+        return_ty: MirType::semantic(tensor_ty),
     };
 
     let result = runner.eval_runtime_call(&call, Span::default());
@@ -2347,8 +2349,8 @@ fn f029_tensor_add_u8_overflow_rejected() {
     );
     let err = result.unwrap_err();
     assert!(
-        err.issue.contains("overflow") || err.issue.contains("numerus"),
-        "F-029: error must mention overflow/numerus, got: {}",
+        err.issue == crate::store::RUNNER_ISSUE_IMPLICIT_STORE_TRAP,
+        "F-029: the element store must trap, got: {}",
         err.issue
     );
 }
@@ -4433,6 +4435,156 @@ fn tensor_matmul_mixed_promotes_to_float() {
     let out = cell.borrow();
     assert_eq!(out.shape, vec![1, 1]);
     assert_numeric_close(&out.data, &[7.0], 1e-9);
+}
+
+/// Evaluate a tensor collection op whose result is `tensor<element, [n]>`.
+fn eval_tensor_op_typed(
+    op: MirCollectionOp,
+    element: radix_types::Type,
+    args: Vec<MirOperand>,
+    inputs: Vec<(MirValueId, Value)>,
+) -> Result<Value, RunnerError> {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    let mut host = BufferHost::default();
+    let mut type_table = TypeTable::default();
+    let element = type_table.intern(element);
+    let shape = type_table.rank0_shape();
+    let tensor = type_table.tensor_with_shape(element, shape);
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(make_function());
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    for (id, value) in inputs {
+        runner.frames.last_mut().unwrap().values.insert(id, value);
+    }
+    runner.eval_runtime_call(
+        &MirRuntimeCall {
+            intrinsic: MirIntrinsic::Collection(op),
+            args,
+            return_ty: MirType::semantic(tensor),
+        },
+        Span::default(),
+    )
+}
+
+fn i8_element() -> radix_types::Type {
+    radix_types::Type::SizedNumeric(
+        radix_types::Primitive::Numerus,
+        radix_types::NumericWidth::I8,
+    )
+}
+
+fn binary_operands() -> Vec<MirOperand> {
+    vec![
+        MirOperand::Value(MirValueId(0)),
+        MirOperand::Value(MirValueId(1)),
+    ]
+}
+
+fn ints(values: &[i64]) -> Value {
+    tensor_value(
+        values.iter().copied().map(Value::Int).collect(),
+        vec![values.len() as i64],
+    )
+}
+
+#[test]
+fn tensor_elementwise_stores_each_element_under_the_element_width() {
+    // ruling 19: 100 + 100 does not fit `i8`; the store traps.
+    let err = eval_tensor_op_typed(
+        MirCollectionOp::TensorAdd,
+        i8_element(),
+        binary_operands(),
+        vec![
+            (MirValueId(0), ints(&[100, 100, -100])),
+            (MirValueId(1), ints(&[100, 1, -100])),
+        ],
+    )
+    .expect_err("200 leaves i8");
+    assert_eq!(err.issue, crate::store::RUNNER_ISSUE_IMPLICIT_STORE_TRAP);
+    assert!(
+        err.message.contains("200 does not fit in `i8`"),
+        "{}",
+        err.message
+    );
+    // A product that fits stays; scalar broadcast is checked per element too.
+    let fits = eval_tensor_op_typed(
+        MirCollectionOp::TensorMul,
+        i8_element(),
+        binary_operands(),
+        vec![
+            (MirValueId(0), ints(&[100, 20, 3])),
+            (MirValueId(1), Value::Int(1)),
+        ],
+    )
+    .expect("fits");
+    let Value::Tensor(cell) = fits else {
+        panic!("expected tensor");
+    };
+    assert_eq!(
+        cell.borrow().data,
+        vec![Value::Int(100), Value::Int(20), Value::Int(3)]
+    );
+    let err = eval_tensor_op_typed(
+        MirCollectionOp::TensorAdd,
+        i8_element(),
+        binary_operands(),
+        vec![
+            (MirValueId(0), ints(&[100, 20])),
+            (MirValueId(1), Value::Int(50)),
+        ],
+    )
+    .expect_err("150 leaves i8");
+    assert!(
+        err.message.contains("150 does not fit in `i8`"),
+        "{}",
+        err.message
+    );
+}
+
+#[test]
+fn tensor_sum_axis_partials_are_exact_and_the_result_is_stored() {
+    let operands = || {
+        vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Constant(radix_mir::MirConstant::Int(1)),
+        ]
+    };
+    let rows = tensor_value(
+        vec![Value::Int(100), Value::Int(100), Value::Int(-100)],
+        vec![1, 3],
+    );
+    let out = eval_tensor_op_typed(
+        MirCollectionOp::TensorSumAxis,
+        i8_element(),
+        operands(),
+        vec![(MirValueId(0), rows)],
+    )
+    .expect("exact partial 200 is never stored");
+    let Value::Tensor(cell) = out else {
+        panic!("expected tensor");
+    };
+    assert_eq!(cell.borrow().data, vec![Value::Int(100)]);
+    let rows = tensor_value(vec![Value::Int(100), Value::Int(100)], vec![1, 2]);
+    let err = eval_tensor_op_typed(
+        MirCollectionOp::TensorSumAxis,
+        i8_element(),
+        operands(),
+        vec![(MirValueId(0), rows)],
+    )
+    .expect_err("200 leaves i8");
+    assert!(
+        err.message.contains("200 does not fit in `i8`"),
+        "{}",
+        err.message
+    );
 }
 
 #[test]
