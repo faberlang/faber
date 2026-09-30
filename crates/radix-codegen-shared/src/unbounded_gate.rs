@@ -17,12 +17,17 @@ const ISSUE: &str = "inf_target_unsupported";
 
 /// Targets whose emitters carry `inf` faithfully. The Faber re-emitter keeps
 /// the authored spelling; Rust carries it as the runtime bignum
-/// (`faber::Magnus`, unit U6r) and Python as its native unbounded `int` (unit
-/// U6p). Units U6t and U6g of the `inf` track add TypeScript and Go.
+/// (`faber::Magnus`, unit U6r), Python as its native unbounded `int` (unit
+/// U6p) and TypeScript as a native `bigint` (unit U6t). Go carries it as
+/// `*big.Int` (unit U6g) and has no gate call of its own.
 fn target_admits_inf(target: Target) -> bool {
     matches!(
         target,
-        Target::HirFaber | Target::HirFhir | Target::HirRust | Target::HirPython
+        Target::HirFaber
+            | Target::HirFhir
+            | Target::HirRust
+            | Target::HirPython
+            | Target::HirTypeScript
     )
 }
 

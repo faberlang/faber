@@ -1,6 +1,7 @@
 //! inf track U2, driver level: the catalog `code` and `issue` of every `inf`
 //! rejection, the English spellings, and the fail-closed emit of every
-//! backend (none carries a bignum yet, so none may print a wrong program).
+//! backend without a bignum carrier (TypeScript has one since U6t; the rest may
+//! not print a wrong program).
 
 use super::test_support::compile_for_target_and_get_result;
 use crate::codegen::Target;
@@ -184,8 +185,7 @@ fn inf_value_flow_still_lowers_to_mir() {
 #[test]
 fn every_hir_backend_fails_closed_with_a_named_diagnostic() {
     for (target, name) in [
-        (Target::HirTypeScript, "HirTypeScript"),
-        // HirGo carries `inf` as `*big.Int` (inf-U6g); it is no longer fail-closed.
+        // HirTypeScript, HirRust, HirGo and HirPython carry `inf` (U6t/U6r/U6g/U6p).
         (Target::HirSwift, "HirSwift"),
         // HirPython carries `inf` as its own `int` (inf-U6p).
         (Target::HirHaskell, "HirHaskell"),
@@ -221,6 +221,13 @@ fn the_python_backend_carries_inf() {
         let result = compile_for_target_and_get_result(source, Target::HirPython);
         assert_accepts(&result.diagnostics);
     }
+}
+
+/// TypeScript carries `inf` as native `bigint` (U6t): the module compiles.
+#[test]
+fn typescript_carries_inf_as_bigint() {
+    let result = compile_for_target_and_get_result(INF_FILE, Target::HirTypeScript);
+    assert_accepts(&result.diagnostics);
 }
 
 /// The Faber re-emitter carries `inf` (it only re-spells types).
