@@ -14527,3 +14527,114 @@ main {
         vec!["7.5".to_owned(), "[0.25, 0.5, 0.75, 1.0]".to_owned()]
     );
 }
+
+const WEB4_SPAN_SOURCE: &str = r"@ public
+class Span {
+    const int low
+    const int high
+    fn middle() → f64 { return (self.low + self.high) ÷ 2 }
+}
+";
+
+fn web4_library_package(label: &str) -> TestDir {
+    let pkg = test_temp_dir(label);
+    fs::create_dir_all(pkg.join("src")).expect("src");
+    fs::write(
+        pkg.join("faber.toml"),
+        r#"[package]
+name = "web4-lib"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "web4lib"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+
+[locale]
+locale = "en"
+"#,
+    )
+    .expect("manifest");
+    fs::write(pkg.join("src/span.fab"), WEB4_SPAN_SOURCE).expect("source");
+    pkg
+}
+
+/// Emit `entry` through the production plan + snapshot path and return the layout.
+fn web4_emit_crate(entry: &Path) -> (BuildLayout, super::RustRuntimePlan, String) {
+    let plan = runtime_plan_with_faber_seams(&Config::default(), entry).expect("runtime plan");
+    let code = compile_package_rust_code(entry);
+    let layout = discover_build_layout(entry).expect("layout");
+    let meta = layout
+        .manifest_path
+        .exists()
+        .then(|| read_manifest(&layout.manifest_path).expect("manifest"));
+    emit_generated_crate_with_runtime_plan(&layout, &code, meta.as_ref(), &plan).expect("emit");
+    (layout, plan, code)
+}
+
+#[test]
+fn web4_lib_kind_package_emits_a_library_crate() {
+    let pkg = web4_library_package("web4-lib-kind");
+    let (layout, plan, code) = web4_emit_crate(&pkg);
+    assert!(
+        plan.library_crate,
+        "build.kind = \"lib\" plans a library crate"
+    );
+    let src = layout.generated_crate_root.join("src");
+    assert!(src.join("lib.rs").is_file(), "library crate root is lib.rs");
+    assert!(!src.join("main.rs").exists(), "no bin root for a library");
+    assert!(!code.contains("fn main"), "a library crate carries no main");
+    let lib_rs = fs::read_to_string(src.join("lib.rs")).expect("lib.rs");
+    assert!(lib_rs.contains("pub struct Span"), "public item is exposed");
+    // Exact-integer helpers live in the package module that uses them.
+    assert!(
+        lib_rs.contains("fn __faber_int"),
+        "module carries its helper"
+    );
+}
+
+#[test]
+fn web4_manifestless_file_without_entry_point_emits_a_library_crate() {
+    let pkg = test_temp_dir("web4-no-main");
+    let file = pkg.join("span.fab");
+    fs::write(&file, WEB4_SPAN_SOURCE).expect("source");
+    let (layout, plan, _code) = web4_emit_crate(&file);
+    assert!(
+        plan.library_crate,
+        "a file with no entry point plans a library"
+    );
+    let src = layout.generated_crate_root.join("src");
+    assert!(src.join("lib.rs").is_file());
+    assert!(!src.join("main.rs").exists());
+}
+
+#[test]
+fn web4_file_with_entry_point_stays_a_binary_crate() {
+    let pkg = test_temp_dir("web4-with-main");
+    let file = pkg.join("hello.fab");
+    fs::write(&file, "main {\n    print \"hi\"\n}\n").expect("source");
+    let (layout, plan, _code) = web4_emit_crate(&file);
+    assert!(!plan.library_crate);
+    let src = layout.generated_crate_root.join("src");
+    assert!(src.join("main.rs").is_file());
+    assert!(!src.join("lib.rs").exists());
+}
+
+#[test]
+#[ignore = "builds generated Rust; run with ignored integration checks"]
+fn web4_lib_kind_package_cargo_builds_to_an_rlib() {
+    let pkg = web4_library_package("web4-lib-cargo");
+    let (layout, _plan, _code) = web4_emit_crate(&pkg);
+    let artifact = super::invoke_cargo_build_library(&layout, false).expect("cargo build lib");
+    assert!(artifact.is_file(), "missing {}", artifact.display());
+    assert_eq!(
+        artifact.file_name().and_then(|name| name.to_str()),
+        Some("libweb4_lib.rlib")
+    );
+}

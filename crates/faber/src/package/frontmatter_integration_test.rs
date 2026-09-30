@@ -573,9 +573,16 @@ test "vector3 builds" {
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust output");
     };
+    // The synthetic crate root is a library root (web4): no `main`; the package
+    // builder writes it as `src/lib.rs`.
     assert!(
-        output.code.contains("fn main() {}"),
-        "expected synthetic library harness entry:\n{}",
+        output.code.contains("Generated library package crate root"),
+        "expected synthetic library crate root:\n{}",
+        output.code
+    );
+    assert!(
+        !output.code.contains("fn main"),
+        "a library crate root carries no main:\n{}",
         output.code
     );
     assert!(

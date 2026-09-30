@@ -13,7 +13,8 @@ use std::path::{Path, PathBuf};
 use crate::input_shape::locale_without_package_error;
 
 use super::cargo::{
-    emit_generated_crate_with_runtime_plan, invoke_cargo_build, lock_generated_crate_build,
+    emit_generated_crate_with_runtime_plan, invoke_cargo_build, invoke_cargo_build_library,
+    lock_generated_crate_build,
 };
 #[cfg(feature = "hir-go")]
 use super::go_build::{GoBuildLayout, emit_go_module_with_postprocess, invoke_go_build};
@@ -561,7 +562,12 @@ fn emit_crate_and_build(
     if let Err(d) = emit_generated_crate_with_runtime_plan(layout, code, meta, plan) {
         fail_with_diagnostic(&d);
     }
-    match invoke_cargo_build(layout, release) {
+    let built = if plan.library_crate {
+        invoke_cargo_build_library(layout, release)
+    } else {
+        invoke_cargo_build(layout, release)
+    };
+    match built {
         Ok(path) => path,
         Err(d) => fail_with_diagnostic(&d),
     }
@@ -623,6 +629,8 @@ fn single_file_rust_runtime_plan(
         provider_manifests: Vec::new(),
         provider_error: None,
         library_path_deps: Vec::new(),
+        // A file with no entry point cannot be a binary crate: build a library.
+        library_crate: analysis.hir.entry.is_none(),
     })
 }
 

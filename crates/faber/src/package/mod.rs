@@ -69,7 +69,9 @@ pub(crate) use cargo::{
     RustRuntimePlan, package_host_selection_diagnostic, rust_runtime_plan_for_package,
 };
 #[cfg(test)]
-pub(crate) use cargo::{emit_generated_crate_with_runtime_plan, invoke_cargo_build};
+pub(crate) use cargo::{
+    emit_generated_crate_with_runtime_plan, invoke_cargo_build, invoke_cargo_build_library,
+};
 // S09-4 (register row, docs/audits/radix-defect-audit-2026-09-20): the
 // retired Cargo test executor stays exported for its deletion unit only —
 // `invoke_cargo_test` has no consumer in bin, lib, or tests (body retained,
