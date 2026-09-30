@@ -211,16 +211,12 @@ fn conversion_arm_call_runs_once_only_on_propagate_error_path() {
     assert_eq!(host.stdout_lines, ["conversion-arm-ran"]);
 }
 
-/// `∷` (Cast) casts with Rust `as` semantics at the DECLARED width, matching
-/// the `as W` codegen emits (`300.0 ∷ numerus<i8>` is `300.0 as i8`). `↦`
-/// (Runtime) is a check (D1.11, D11.8): see
-/// `float_to_numerus_runtime_conversion_is_a_check`.
-///
-/// Pins the values want reported as silently wrong: the runner used to
-/// saturate at the width-agnostic i64 carrier, so `-1.9 ∷ numerus<u64>` printed
-/// -1 and a `∷` ascription executed the raw float.
+/// D1.11: `∷` states only what the compiler can prove, so a float-to-integer
+/// ascription is a compile error (`SEM016`) and the runner's `Cast` arm carries
+/// no float path: an ascription cast of a float is an internal error, never a
+/// saturating conversion. `bivalens ∷ numerus` still casts to 0/1.
 #[test]
-fn numerus_ascription_casts_saturate_at_the_declared_width() {
+fn numerus_ascription_cast_has_no_float_path() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;
     use radix_mir::{MirConstant, MirConversion, MirConversionFlavor, MirOperand, MirProgram};
@@ -228,9 +224,9 @@ fn numerus_ascription_casts_saturate_at_the_declared_width() {
 
     let mut types = TypeTable::new();
     let fractus = types.primitive(Primitive::Fractus);
+    let bivalens = types.primitive(Primitive::Bivalens);
     let numerus = types.primitive(Primitive::Numerus);
     let i8_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::I8);
-    let u64_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::U64);
 
     let program = MirProgram {
         functions: vec![function(
@@ -249,44 +245,37 @@ fn numerus_ascription_casts_saturate_at_the_declared_width() {
     let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
     runner.push_frame(MirFunctionId(0), MirBlockId(0));
 
-    let conversion =
-        |flavor: MirConversionFlavor, source: radix_types::TypeId, target| MirConversion {
-            store: None,
-            flavor,
-            source_ty: radix_mir::MirType::semantic(source),
-            target_ty: radix_mir::MirType::semantic(target),
-            params: Vec::new(),
-            recovery: None,
-            struct_defaults: Vec::new(),
-        };
-    let cast = |runner: &mut Runner<'_, BufferHost>, conversion: &MirConversion, value: f64| {
+    let cast = |source, target| MirConversion {
+        store: None,
+        flavor: MirConversionFlavor::Cast,
+        source_ty: radix_mir::MirType::semantic(source),
+        target_ty: radix_mir::MirType::semantic(target),
+        params: Vec::new(),
+        recovery: None,
+        struct_defaults: Vec::new(),
+    };
+    let float_cast = cast(fractus, i8_ty);
+    assert!(
         runner
             .eval_convert(
-                conversion,
-                &[MirOperand::Constant(MirConstant::Float(value))],
+                &float_cast,
+                &[MirOperand::Constant(MirConstant::Float(300.0))],
                 span(),
             )
-            .expect("float to numerus cast")
-    };
-
-    // Sized signed target: saturate at the width, not at i64.
-    let i8_cast = conversion(MirConversionFlavor::Cast, fractus, i8_ty);
-    assert_eq!(cast(&mut runner, &i8_cast, 300.0), Value::Int(127));
-    assert_eq!(cast(&mut runner, &i8_cast, -300.0), Value::Int(-128));
-
-    // Unsigned target: negative floats saturate at zero, and the carrier is
-    // unsigned so `u64::MAX` stays exact.
-    let u64_cast = conversion(MirConversionFlavor::Cast, fractus, u64_ty);
-    assert_eq!(cast(&mut runner, &u64_cast, -1.9), Value::UInt(0));
-    assert_eq!(
-        cast(&mut runner, &u64_cast, 18446744073709551615.0),
-        Value::UInt(u64::MAX)
+            .is_err(),
+        "a float ascription cast must not saturate"
     );
-
-    // Bare numerus keeps the width-agnostic carrier, and NaN casts to zero.
-    let i64_cast = conversion(MirConversionFlavor::Cast, fractus, numerus);
-    assert_eq!(cast(&mut runner, &i64_cast, 1e300), Value::Int(i64::MAX));
-    assert_eq!(cast(&mut runner, &i64_cast, f64::NAN), Value::Int(0));
+    let bool_cast = cast(bivalens, numerus);
+    assert_eq!(
+        runner
+            .eval_convert(
+                &bool_cast,
+                &[MirOperand::Constant(MirConstant::Bool(true))],
+                span(),
+            )
+            .expect("bool to numerus cast"),
+        Value::Int(1)
+    );
 }
 
 /// D1.11 / D11.8: `fractus ↦ numerus<W>` truncates toward zero but is a check:

@@ -32,9 +32,9 @@
 use super::cursor::GeneratorCursor;
 use super::sermo::SermoView;
 use super::value::{
-    GradientStorage, MapKey, TensorValue, Value, float_to_numerus_width, format_template,
-    modular_operand, modular_word_mask, modular_word_result, uint_width_checked_add,
-    uint_width_checked_mul, values_equal, width_checked_add, width_checked_mul,
+    GradientStorage, MapKey, TensorValue, Value, format_template, modular_operand,
+    modular_word_mask, modular_word_result, uint_width_checked_add, uint_width_checked_mul,
+    values_equal, width_checked_add, width_checked_mul,
 };
 use super::{Runner, RunnerError, gelu_f64, host::provider_identity};
 use radix_hir::DefId;
@@ -921,15 +921,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 Value::Int(v),
                 Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _),
             ) => Ok(Value::Float(v as f64)),
-            // A cast into `numerus<W>` saturates at the declared width exactly
-            // as the `as W` cast codegen emits; the width-agnostic carrier
-            // (bare `numerus`) stays i64.
-            (Value::Float(v), Type::SizedNumeric(Primitive::Numerus, width)) => {
-                Ok(float_to_numerus_width(v, *width))
-            }
-            (Value::Float(v), Type::Primitive(Primitive::Numerus)) => {
-                Ok(float_to_numerus_width(v, NumericWidth::I64))
-            }
             (
                 Value::Bool(v),
                 Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _),

@@ -882,16 +882,10 @@ pub fn float_truncation_fits_width(value: f64, width: NumericWidth) -> bool {
     (lo..=hi).contains(&truncated)
 }
 
-/// Saturate a float carrier at the declared `numerus<W>` width, with Rust `as`
-/// cast semantics: truncate toward zero, clamp at the width's bounds, NaN to
-/// zero, negative-to-unsigned to zero, and the carrier follows the width's
-/// signedness (`u64::MAX` has no `Value::Int` carrier).
-///
-/// WHY: every codegen tier emits the declared-width `as` cast for both `↦` and
-/// `∷` (`300.0 ↦ numerus<i8>` is `300.0 as i8`), so a runner cast must saturate
-/// at `W` rather than at the width-agnostic i64 carrier it happens to hold.
-/// FORK-2 (mail 2fb79900 / memo) keeps casts saturating while integer
-/// arithmetic errors; this is the cast half of that split, not a change to it.
+/// Truncate a float carrier into the declared `numerus<W>` width, with Rust
+/// `as` semantics (clamping). Callers own the range check: `fractus ↦ numerus`
+/// only reaches this after `float_truncation_fits_width` (D1.11, D11.8); no
+/// `∷` path reaches it, since a float-to-integer ascription is a compile error.
 #[must_use]
 pub fn float_to_numerus_width(value: f64, width: NumericWidth) -> Value {
     match width {

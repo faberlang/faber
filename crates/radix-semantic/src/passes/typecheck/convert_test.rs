@@ -2089,6 +2089,38 @@ functio relabel(numerus n) → fractus {
 }
 
 #[test]
+fn verte_ascription_rejects_runtime_float_into_integer() {
+    // D1.11 (fi4): a run-time float cannot be proven to be an integer in
+    // range; the conversion is `x ↦ numerus`, which fails or takes `⊥`.
+    test_support::assert_rejects_with_issue(
+        r"
+functio truncate(fractus x) → numerus {
+    redde x ∷ numerus
+}
+",
+        "numeric_ascription_requires_conversion",
+    );
+    test_support::assert_rejects_with_issue(
+        r"
+functio truncate(fractus x) → numerus<u8> {
+    redde x ∷ numerus<u8>
+}
+",
+        "numeric_ascription_requires_conversion",
+    );
+}
+
+#[test]
+fn verte_ascription_rejects_float_literal_into_integer() {
+    // Ruling 20's constant rule: a float literal states a float, even when
+    // it is an exact integer; `3.0 ∷ numerus` is a conversion.
+    test_support::assert_rejects_with_issue(
+        r"incipit { fixum numerus n ← 3.0 ∷ numerus }",
+        "numeric_ascription_requires_conversion",
+    );
+}
+
+#[test]
 fn verte_ascription_accepts_float_literal_rounding_to_target_width() {
     test_support::assert_accepts(
         r"incipit {

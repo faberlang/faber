@@ -337,16 +337,13 @@ impl FunctionBuilder<'_> {
         }
     }
 
-    /// The `∷` ascription cast for a cross-family scalar pair, or `None` for
-    /// every other target.
+    /// The `∷` ascription cast for a `bivalens` source into a `numerus`
+    /// target, or `None` for every other pair.
     ///
-    /// WHY: an ascription states the target family, and every codegen tier
-    /// emits the declared conversion for it (`1.9 ∷ numerus<i64>` is
-    /// `1.9 as i64`), so the MIR has to carry the conversion too — otherwise
-    /// the runner stores a float carrier in a numerus slot and executes the
-    /// raw source value. Only the pairs the cast surfaces implement are
-    /// emitted; same-family ascriptions and aggregate targets stay operand
-    /// pass-through.
+    /// WHY: `∷` states only what the compiler can prove (D1.11), so typecheck
+    /// rejects every float-to-integer ascription (`SEM016`); the lossy
+    /// conversion is `↦`. A boolean is the one cross-family fact left, and the
+    /// runner must store it as the 0/1 integer rather than the raw bool.
     fn scalar_ascription_cast(&self, source: Option<TypeId>, target: TypeId) -> Option<MirConversion> {
         let source = source?;
         if !matches!(
@@ -355,12 +352,7 @@ impl FunctionBuilder<'_> {
         ) {
             return None;
         }
-        if !matches!(
-            self.normalized_type(source),
-            Type::Primitive(Primitive::Fractus)
-                | Type::SizedNumeric(Primitive::Fractus, _)
-                | Type::Primitive(Primitive::Bivalens)
-        ) {
+        if !matches!(self.normalized_type(source), Type::Primitive(Primitive::Bivalens)) {
             return None;
         }
         Some(MirConversion {

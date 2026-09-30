@@ -1,0 +1,74 @@
++++
+term = "conversio-narrowing-cape"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "alternate_exit_clause", "redde_stmt", "fac_stmt", "cape_clause", "fixum_decl", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "A bare failing numeric `↦` (integer narrowing, float to integer) enters the `⇥` channel and is caught by `fac`/`cape`."
+syntax = "<expression> ↦ <numeric-type>  inside  fac { … } cape err { … }"
+related = ["↦", "⇥", "fac", "cape"]
+locale = "en"
++++
+# =============================================================================
+# conversio-narrowing-cape — a bare failing numeric ↦ is recoverable
+# =============================================================================
+#
+# What this teaches:
+#   • `300 ↦ int<u8>`, `1e300 ↦ int` and a NaN `↦ int` fail without `⊥`; the
+#     failure is the recoverable `⇥` channel, so `fac { … } cape err { … }`
+#     catches it directly and a `⇥ string` function propagates it to its
+#     caller's `cape` (D1.11).
+#
+# See also: ↦, ⊥, ⇥, fac, cape
+# =============================================================================
+
+fn narrow(int n) → int<u8> ⇥ string {
+    return n ↦ int<u8>
+}
+
+fn truncate(float x) → int ⇥ string {
+    return x ↦ int
+}
+
+main {
+    const int big ← 300
+    const float huge ← 1e300
+    const float zero ← 0.0
+    const float nan ← zero / zero
+
+    do {
+        const int<u8> a ← big ↦ int<u8>
+        print a
+    }
+    catch err {
+        print "caught direct narrowing"
+    }
+    do {
+        const int<u8> b ← narrow(big)
+        print b
+    }
+    catch err {
+        print "caught propagated narrowing"
+    }
+    do {
+        const int c ← huge ↦ int
+        print c
+    }
+    catch err {
+        print "caught direct float overflow"
+    }
+    do {
+        const int d ← truncate(nan)
+        print d
+    }
+    catch err {
+        print "caught propagated NaN"
+    }
+    do {
+        const int e ← truncate(2.5)
+        print e
+    }
+    catch err {
+        print "unreachable"
+    }
+}
