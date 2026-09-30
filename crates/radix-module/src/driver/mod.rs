@@ -744,12 +744,9 @@ fn generate_output(
         | Target::HirSwift
         | Target::HirHaskell
         | Target::HirTypeScript
-        | Target::HirGo => {
-            codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
-                .map_err(std::convert::Into::into)
-        }
-        Target::HirPython => {
-            reject_saturating_word_target(analysis, "Python")?;
+        | Target::HirGo
+        // D11.6 py4: Python ints are exact; the clamp runs at the store.
+        | Target::HirPython => {
             codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
                 .map_err(std::convert::Into::into)
         }
