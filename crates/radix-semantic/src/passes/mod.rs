@@ -102,6 +102,10 @@ mod air_unroll_test;
 mod borrow_test;
 
 #[cfg(test)]
+#[path = "borrow_alias_test.rs"]
+mod borrow_alias_test;
+
+#[cfg(test)]
 #[path = "borrow_region_test.rs"]
 mod borrow_region_test;
 

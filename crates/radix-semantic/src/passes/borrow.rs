@@ -246,6 +246,11 @@ struct BorrowChecker<'a> {
     copy_roots: FxHashSet<DefId>,
     /// Unmarked sources used as an own-bind RHS; a later use proves them live.
     unmarked_own_binds: FxHashMap<DefId, radix_lexer::Span>,
+    /// Unmarked genus/contract locals bound (D12.1 alias) from a `de`
+    /// parameter or another such alias. The alias carries the source's
+    /// read-only access, so mutation through it is rejected like direct
+    /// mutation of the parameter.
+    de_aliases: FxHashSet<DefId>,
     /// Function param contracts keyed by callee `DefId` (named calls leave
     /// `callee.ty` unset; this index supplies own-param dest facts).
     func_params: FxHashMap<DefId, Vec<ParamType>>,
@@ -293,6 +298,7 @@ impl<'a> BorrowChecker<'a> {
             own_roots: FxHashSet::default(),
             copy_roots: FxHashSet::default(),
             unmarked_own_binds: FxHashMap::default(),
+            de_aliases: FxHashSet::default(),
             func_params: FxHashMap::default(),
             regions,
             stmt_node: None,
@@ -397,6 +403,7 @@ impl<'a> BorrowChecker<'a> {
         self.own_roots.clear();
         self.copy_roots.clear();
         self.unmarked_own_binds.clear();
+        self.de_aliases.clear();
         self.stmt_node = None;
     }
 
@@ -462,6 +469,7 @@ impl<'a> BorrowChecker<'a> {
                     } else {
                         self.check_expr(init);
                     }
+                    self.note_de_alias(local.def_id, local.ty, init);
                 }
             }
             HirStatementKind::Expr(expr) => self.check_expr(expr),
@@ -561,6 +569,19 @@ impl<'a> BorrowChecker<'a> {
                     );
                 }
             }
+            if let Some(arg_def_id) = Self::root_def_id(&arg.expr)
+                && self.de_aliases.contains(&arg_def_id)
+                && matches!(
+                    param.mode,
+                    SemanticParamMode::MutRef | SemanticParamMode::Move
+                )
+            {
+                self.error(
+                    SemanticErrorKind::ModeMismatch,
+                    ISSUE_DE_TO_IN_OR_EX_POSITION,
+                    arg.expr.span,
+                );
+            }
             if self.arg_is_ref_view(&arg.expr) && self.dest_is_mut_or_own(param) {
                 self.error(
                     SemanticErrorKind::ModeMismatch,
@@ -655,6 +676,16 @@ impl<'a> BorrowChecker<'a> {
                 target.span,
             );
         }
+        if Self::is_projection(target)
+            && let Some(def_id) = Self::root_def_id(target)
+            && self.de_aliases.contains(&def_id)
+        {
+            self.error(
+                SemanticErrorKind::AssignToImmutableBorrow,
+                ISSUE_ASSIGN_TO_DE_PARAMETER,
+                target.span,
+            );
+        }
         if let Some(def_id) = Self::root_def_id(target) {
             self.check_projection_inputs(target);
             self.write_use(def_id, target.span);
@@ -733,6 +764,32 @@ impl<'a> BorrowChecker<'a> {
         if self.types.is_copy_view(ty) {
             self.copy_roots.insert(def_id);
         }
+    }
+
+    /// Record a bind that aliases a `de` place (D12.1: unmarked binds alias).
+    ///
+    /// Only genus/contract-typed locals alias; value types copy. Exclusive
+    /// (`own`/`copy`) destinations are handled by their own bind rules.
+    fn note_de_alias(&mut self, local: DefId, ty: Option<TypeId>, init: &HirExpression) {
+        let Some(ty) = ty else { return };
+        if self.types.is_exclusive_value(ty) || !self.is_aliasing_type(ty) {
+            return;
+        }
+        let Some(source) = Self::root_def_id(init) else {
+            return;
+        };
+        let from_de_param = self
+            .param_usage
+            .get(&source)
+            .is_some_and(|usage| matches!(usage.mode, HirParamMode::De));
+        if from_de_param || self.de_aliases.contains(&source) {
+            self.de_aliases.insert(local);
+        }
+    }
+
+    fn is_aliasing_type(&self, ty: TypeId) -> bool {
+        let (_, inner) = self.types.peel_access_marker(ty);
+        matches!(self.types.get(inner), Type::Struct(_) | Type::Interface(_))
     }
 
     fn note_own_root(&mut self, def_id: DefId, ty: TypeId) {
@@ -1265,6 +1322,13 @@ impl HirVisitor for BorrowChecker<'_> {
                 if is_mutating {
                     if let Some(def_id) = Self::root_def_id(receiver) {
                         self.check_projection_inputs(receiver);
+                        if self.de_aliases.contains(&def_id) {
+                            self.error(
+                                SemanticErrorKind::AssignToImmutableBorrow,
+                                ISSUE_ASSIGN_TO_DE_PARAMETER,
+                                expr.span,
+                            );
+                        }
                         self.write_use(def_id, expr.span);
                     } else {
                         self.visit_expr(receiver);
