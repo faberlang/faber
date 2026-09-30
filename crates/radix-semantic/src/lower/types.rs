@@ -1047,7 +1047,7 @@ impl Lowerer<'_> {
         self.types.primitive(prim)
     }
 
-    /// Conversio `n ↦ ascii<N, Hex|Bin|Oct>` peels the format hint first, then
+    /// Conversio `n ↦ ascii<N> via Hex|Bin|Oct` peels the format hint first, then
     /// lowers capacity-only `ascii<N>` through this helper.
     pub(crate) fn lower_bounded_ascii_capacity(&mut self, capacity: &GenericArgExpr) -> TypeId {
         self.lower_bounded_primitive(Primitive::Ascii, std::slice::from_ref(capacity))

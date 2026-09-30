@@ -2341,8 +2341,8 @@ message = "octeti से fractus में रूपांतरण निर्
 help = "chorda या स्पष्ट byte conversion helpers का उपयोग करें"
 
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
-message = "the Code hint converts only littera ↦ numerus<u32, Code> (read a code point) and numerus ↦ littera<Code> (build one)"
-help = "use littera ↦ numerus<u32, Code> or numerus ↦ littera<Code>; without Code a number converts to its digits"
+message = "the Code hint converts only littera ↦ u32 via Code (read a code point) and numerus ↦ littera via Code (build one)"
+help = "use littera ↦ u32 via Code or numerus ↦ littera via Code; without Code a number converts to its digits"
 
 [diagnostics.SEM016.issues.conversio_via_unknown_hint]
 message = "`{hint}` is not a convert hint"

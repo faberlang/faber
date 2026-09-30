@@ -1448,7 +1448,7 @@ fn resolve_expr(
         ExprKind::Conversio(expr) => {
             resolve_expr(resolver, interner, &expr.expr, errors);
             // WHY: The runtime conversion target is a real type expression.
-            // Conversio parameters such as `Hex` in `↦ numerus<i32, Hex>` are
+            // Conversio parameters such as `Hex` in `↦ i32 via Hex` are
             // codegen hints, not normal type annotations that must resolve in scope.
             match &expr.target {
                 ConversioTarget::Explicit(ty) => {

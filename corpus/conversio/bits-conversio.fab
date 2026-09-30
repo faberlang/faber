@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "conversion"
 canonical = false
 summary = "Exact-width IEEE bitcast between int and float through the Bits hint, including the u16↔f16 row and the extended composition law."
-syntax = "int<u16|u32|u64> ↦ float<f16|f32|f64, Bits> and float<f16|f32|f64> ↦ int<u16|u32|u64, Bits>"
+syntax = "int<u16|u32|u64> ↦ f16|f32|f64 via Bits and float<f16|f32|f64> ↦ u16|u32|u64 via Bits"
 related = ["↦", "int", "float", "octeti"]
 locale = "en"
 +++
@@ -15,17 +15,17 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Both directions — `n ↦ float<f32, Bits>` and `x ↦ int<u32, Bits>` (plus the u16/f16 and u64/f64 twins).
+#   • Both directions — `n ↦ f32 via Bits` and `x ↦ u32 via Bits` (plus the u16/f16 and u64/f64 twins).
 #   • Exact pairs only — u16 pairs with f16, u32 with f32, u64 with f64; anything else rejects.
 #   • Bit-identical for the pinned payloads; the runner seam re-canonicalizes non-0x7E00 NaN spellings (0xFE00→0x7E00) — see the bits-f16 goal ledger residual.
-#   • The chain — `octeti[0‥2] ↦ int<u16, Le> ↦ float<f16, Bits> ↦ float<f32>` widens the f16 value exactly, with no intermediate binding.
-#   • Extended composition law, observable side — `octeti[0‥2] ↦ int<u16, Le> ↦ float<f16, Bits> ↦ float<f32>` equals the oracle f32 value. The direct `octeti[0‥2] ↦ float<f16, Le>` window row is unshipped (OQ1); the equivalence to it is the derived claim, not executed here.
-#   • Bits is reinterpretation, not value conversion — the same u16 window prints 15872.0 without the hint and 1.5 through `float<f16, Bits>`.
+#   • The chain — `octeti[0‥2] ↦ u16 via Le ↦ f16 via Bits ↦ float<f32>` widens the f16 value exactly, with no intermediate binding.
+#   • Extended composition law, observable side — `octeti[0‥2] ↦ u16 via Le ↦ f16 via Bits ↦ float<f32>` equals the oracle f32 value. The direct `octeti[0‥2] ↦ f16 via Le` window row is unshipped (OQ1); the equivalence to it is the derived claim, not executed here.
+#   • Bits is reinterpretation, not value conversion — the same u16 window prints 15872.0 without the hint and 1.5 through `f16 via Bits`.
 #
 # Common mistakes:
-#   • Wrong pair — `n ↦ float<f64, Bits>` from int<u32> rejects (bits_pair_width_mismatch).
+#   • Wrong pair — `n ↦ f64 via Bits` from int<u32> rejects (bits_pair_width_mismatch).
 #   • Missing width — unsized float sources reject; Bits needs both widths exact.
-#   • A float source is never a Bits row — `1.0 ↦ float<f64, Bits>` rejects; spell the u64 bit pattern with the typed-literal form (`4607182418800017408 ∷ int<u64>`).
+#   • A float source is never a Bits row — `1.0 ↦ f64 via Bits` rejects; spell the u64 bit pattern with the typed-literal form (`4607182418800017408 ∷ int<u64>`).
 #
 # See also: ↦, int, float, octeti
 # =============================================================================
@@ -53,43 +53,43 @@ locale = "en"
 
 main {
     # 0x7fc00000 is a quiet NaN payload; it must survive the round trip.
-    const _ nan_bits ← |00 00 c0 7f|[0‥4] ↦ int<u32, Le>
-    const _ nan ← nan_bits ↦ float<f32, Bits>
-    const _ back ← nan ↦ int<u32, Bits>
+    const _ nan_bits ← |00 00 c0 7f|[0‥4] ↦ u32 via Le
+    const _ nan ← nan_bits ↦ f32 via Bits
+    const _ back ← nan ↦ u32 via Bits
 
     # Composition algebra: endian read + bitcast ≡ direct float endian read.
-    const _ composed ← |00 00 c0 7f|[0‥4] ↦ int<u32, Le> ↦ float<f32, Bits>
-    const _ direct ← |00 00 c0 7f|[0‥4] ↦ float<f32, Le>
-    const _ composed_bits ← composed ↦ int<u32, Bits>
-    const _ direct_bits ← direct ↦ int<u32, Bits>
+    const _ composed ← |00 00 c0 7f|[0‥4] ↦ u32 via Le ↦ f32 via Bits
+    const _ direct ← |00 00 c0 7f|[0‥4] ↦ f32 via Le
+    const _ composed_bits ← composed ↦ u32 via Bits
+    const _ direct_bits ← direct ↦ u32 via Bits
 
     # u64/f64 twin: 1.0f64 is 0x3ff0000000000000.
-    const _ one_f64 ← 4607182418800017408 ∷ int<u64> ↦ float<f64, Bits>
-    const _ one_bits ← one_f64 ↦ int<u64, Bits>
-    const _ one_back ← one_bits ↦ float<f64, Bits>
-    const _ roundtrip_holds ← one_back ↦ int<u64, Bits> ≡ one_bits
+    const _ one_f64 ← 4607182418800017408 ∷ int<u64> ↦ f64 via Bits
+    const _ one_bits ← one_f64 ↦ u64 via Bits
+    const _ one_back ← one_bits ↦ f64 via Bits
+    const _ roundtrip_holds ← one_back ↦ u64 via Bits ≡ one_bits
 
     # u16/f16 twin: 0x3C00 is 1.0f16; the NaN / ±Inf / subnormal payloads
     # survive the round trip bit-identically.
-    const _ one_f16 ← 15360 ∷ int<u16> ↦ float<f16, Bits>
-    const _ one_bits16 ← one_f16 ↦ int<u16, Bits>
-    const _ nan_f16 ← 32256 ∷ int<u16> ↦ float<f16, Bits>
-    const _ nan_bits16 ← nan_f16 ↦ int<u16, Bits>
-    const _ inf_f16 ← 31744 ∷ int<u16> ↦ float<f16, Bits>
-    const _ inf_bits16 ← inf_f16 ↦ int<u16, Bits>
-    const _ sub_f16 ← 1 ∷ int<u16> ↦ float<f16, Bits>
-    const _ sub_bits16 ← sub_f16 ↦ int<u16, Bits>
+    const _ one_f16 ← 15360 ∷ int<u16> ↦ f16 via Bits
+    const _ one_bits16 ← one_f16 ↦ u16 via Bits
+    const _ nan_f16 ← 32256 ∷ int<u16> ↦ f16 via Bits
+    const _ nan_bits16 ← nan_f16 ↦ u16 via Bits
+    const _ inf_f16 ← 31744 ∷ int<u16> ↦ f16 via Bits
+    const _ inf_bits16 ← inf_f16 ↦ u16 via Bits
+    const _ sub_f16 ← 1 ∷ int<u16> ↦ f16 via Bits
+    const _ sub_bits16 ← sub_f16 ↦ u16 via Bits
 
     # Extended composition law, observable side: u16 Le window → Bits → widen
     # f32. `|00 3c|` is 0x3C00 = 1.0f16, so the fold equals the oracle f32
-    # value 1.0. The direct `float<f16, Le>` window row is unshipped (OQ1);
+    # value 1.0. The direct `f16 via Le` window row is unshipped (OQ1);
     # the equivalence to it is the derived claim, not executed here.
-    const _ folded ← |00 3c|[0‥2] ↦ int<u16, Le> ↦ float<f16, Bits> ↦ float<f32>
+    const _ folded ← |00 3c|[0‥2] ↦ u16 via Le ↦ f16 via Bits ↦ float<f32>
 
     # Bits is reinterpretation, not value conversion: the same 0x3E00 window
     # is 15872 as an integer value, 1.5 as f16 bits.
-    const _ value ← |00 3e|[0‥2] ↦ int<u16, Le> ↦ float<f32>
-    const _ reinterp ← |00 3e|[0‥2] ↦ int<u16, Le> ↦ float<f16, Bits> ↦ float<f32>
+    const _ value ← |00 3e|[0‥2] ↦ u16 via Le ↦ float<f32>
+    const _ reinterp ← |00 3e|[0‥2] ↦ u16 via Le ↦ f16 via Bits ↦ float<f32>
 
     print back
     print direct_bits

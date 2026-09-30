@@ -14,11 +14,11 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Radix-aware parsing — `textus ↦ numerus<i32, Hex|Bin|Oct>` parses integers with an explicit radix parameter in the target type.
-#   • Syntax parameterization — the target type carries both the width (`i32`) and radix (`Hex`), showing how type parameters control conversion behavior.
+#   • Radix-aware parsing — `textus ↦ i32 via Hex|Bin|Oct` parses integers with an explicit radix hint on the conversion.
+#   • The `via` clause — the target type carries the width (`i32`) and the clause carries the radix (`Hex`), showing how a hint selects the conversion row.
 #
 # Common mistakes:
-#   • Omitting the radix parameter when parsing non-decimal text — use `numerus<i32, Hex>` for hex, `numerus<i32, Bin>` for binary, or `numerus<i32, Oct>` for octal.
+#   • Omitting the radix hint when parsing non-decimal text — use `i32 via Hex` for hex, `i32 via Bin` for binary, or `i32 via Oct` for octal.
 #
 # See also: ↦, numerus, textus
 # =============================================================================
@@ -26,10 +26,10 @@ locale = "en"
 
 # conversio — radix-parameterized integer parsing
 #
-# <textus> ↦ numerus<i32, Hex|Bin|Oct>
+# <textus> ↦ i32 via Hex|Bin|Oct
 #
 # GRAMMAR:
-#   convertExpr :← expr '↦' type '<' typeArg (',' radix)? '>'
+#   convertExpr :← expr '↦' type ('via' radix)?
 #
 # EXPECTED OUTPUT:
 #   255
@@ -40,9 +40,9 @@ locale = "en"
 #   HIR-direct Rust and MIR-stepper routes must agree for radix parsing.
 
 main {
-    const int<i32> hex ← "ff" ↦ int<i32, Hex>
-    const int<i32> bin ← "1010" ↦ int<i32, Bin>
-    const int<i32> oct ← "755" ↦ int<i32, Oct>
+    const int<i32> hex ← "ff" ↦ i32 via Hex
+    const int<i32> bin ← "1010" ↦ i32 via Bin
+    const int<i32> oct ← "755" ↦ i32 via Oct
     print hex
     print bin
     print oct

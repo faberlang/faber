@@ -155,7 +155,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         span: Span,
     ) -> Result<Value, RunnerError> {
         if self.has_bits_hint(params) {
-            // `numerus<u16|u32|u64, Bits>` reinterprets float bits; exact pairs
+            // `u16|u32|u64 via Bits` reinterprets float bits; exact pairs
             // only, NaN payloads pass through bit-identical.
             if let Value::Float(value) = value {
                 return match width {
@@ -590,7 +590,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             return Ok(Value::Float(value));
         }
         if self.has_bits_hint(params) {
-            // `fractus<f16|f32|f64, Bits>` reinterprets integer bits; exact pairs
+            // `f16|f32|f64 via Bits` reinterprets integer bits; exact pairs
             // only, NaN payloads pass through bit-identical.
             return match (value, width) {
                 (Value::Int(value), NumericWidth::F16) => Ok(Value::Float(f64::from(
@@ -1304,7 +1304,7 @@ fn format_decimal_carrier(value: i64, width: NumericWidth) -> String {
 
 /// Encode the width-agnostic `Value::Float` (f64) carrier back to f16 bits via
 /// the runner's manual half seam. A NaN carrier re-canonicalizes to the seam's
-/// 0x7E00 payload, so the `u16 ↦ fractus<f16,Bits> ↦ numerus<u16,Bits>` round
+/// 0x7E00 payload, so the `u16 ↦ f16 via Bits ↦ u16 via Bits` round
 /// trip returns the original payload bits.
 #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
 fn f64_to_f16_bits(v: f64) -> u16 {

@@ -982,7 +982,7 @@ impl super::FaberCodegen<'_> {
                                 self.types.get(*ty),
                                 Type::Primitive(Primitive::Littera)
                             ) {
-                                // D10.6 `n ↦ littera<Code>`: the hint is the
+                                // D10.6 `n ↦ littera via Code`: the hint is the
                                 // only generic argument of the scalar head.
                                 target_str.push('<');
                             } else {

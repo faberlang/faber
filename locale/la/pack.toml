@@ -1476,8 +1476,8 @@ message = "precision marker must be a bare spelling such as ms or us"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.ascii_format_hint_not_capacity]
-message = "slot 1 of ascii is a capacity (NATURAL or `_`), never a format hint; write ascii<N, Hex|Bin|Oct>"
-help = "write ascii<N, Hex>, ascii<N, Bin>, or ascii<N, Oct> with N as digit width"
+message = "slot 1 of ascii is a capacity (NATURAL or `_`), never a format hint; write ascii<N> via Hex|Bin|Oct"
+help = "write ascii<N> via Hex, ascii<N> via Bin, or ascii<N> via Oct with N as digit width"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type cannot accept parameters"
@@ -2796,8 +2796,8 @@ message = "octeti endian conversion requires a window whose length matches the t
 help = "use a window of 2, 4, or 8 bytes matching i16/u16, i32/u32, or i64/u64"
 
 [diagnostics.SEM016.issues.ascii_format_hint_not_capacity]
-message = "slot 1 of ascii is a capacity (NATURAL or `_`), never a format hint; write ascii<N, Hex|Bin|Oct>"
-help = "write ascii<N, Hex>, ascii<N, Bin>, or ascii<N, Oct> with N as digit width"
+message = "slot 1 of ascii is a capacity (NATURAL or `_`), never a format hint; write ascii<N> via Hex|Bin|Oct"
+help = "write ascii<N> via Hex, ascii<N> via Bin, or ascii<N> via Oct with N as digit width"
 
 [diagnostics.SEM016.issues.ascii_pack_width_overflow]
 message = "ascii format pack needs more digits than the declared capacity N; widen N or narrow the source first"
@@ -2812,8 +2812,8 @@ message = "conversion from octeti to fractus is unspecified (IEEE width and endi
 help = "use chorda or explicit byte conversion helpers"
 
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
-message = "the Code hint converts only littera ↦ numerus<u32, Code> (read a code point) and numerus ↦ littera<Code> (build one)"
-help = "use littera ↦ numerus<u32, Code> or numerus ↦ littera<Code>; without Code a number converts to its digits"
+message = "the Code hint converts only littera ↦ u32 via Code (read a code point) and numerus ↦ littera via Code (build one)"
+help = "use littera ↦ u32 via Code or numerus ↦ littera via Code; without Code a number converts to its digits"
 
 [diagnostics.SEM016.issues.conversio_via_unknown_hint]
 message = "`{hint}` is not a convert hint"

@@ -390,20 +390,20 @@ pub fn decimal_text_to_scaled(text: &str) -> Option<(i128, i32)> {
 /// unpack rules for `octeti` windows — same slot, not bases. `Bits` is an
 /// exact-width bitcast (`u32↔f32`, `u64↔f64`) — reinterpretation, not a
 /// radix, and never legal in a `from_str_radix` base. `Code` (D10.6) reads a
-/// `littera` as its code point (`'A' ↦ numerus<u32, Code>`); it is not a
+/// `littera` as its code point (`'A' ↦ u32 via Code`); it is not a
 /// radix either.
 #[must_use]
 pub fn is_conversio_radix_hint(marker: &str) -> bool {
     matches!(marker, "Hex" | "Bin" | "Oct" | "Be" | "Le" | "Bits") || is_code_point_hint(marker)
 }
 
-/// D10.6 code-point hint: `'A' ↦ numerus<u32, Code>` and `65 ↦ littera<Code>`.
+/// D10.6 code-point hint: `'A' ↦ u32 via Code` and `65 ↦ littera via Code`.
 #[must_use]
 pub fn is_code_point_hint(marker: &str) -> bool {
     marker == "Code"
 }
 
-/// Ascii format-pack slot-2 hints: `n ↦ ascii<N, Hex|Bin|Oct>`.
+/// Ascii format-pack slot-2 hints: `n ↦ ascii<N> via Hex|Bin|Oct`.
 ///
 /// Distinct from [`is_conversio_radix_hint`]: `Be` / `Le` are endian unpack
 /// rules, never ascii digit bases. Slot 1 of a bounded family stays capacity.

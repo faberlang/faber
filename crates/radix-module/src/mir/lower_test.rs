@@ -3602,9 +3602,9 @@ fn lowers_ascii_format_hole_with_materialized_conversion_target() {
 locale = "en"
 +++
 main {
-    const _ inferred_hex ← 255 ↦ ascii<_, Hex>
-    const _ inferred_bin ← 255 ↦ ascii<_, Bin>
-    const _ inferred_oct ← 255 ↦ ascii<_, Oct>
+    const _ inferred_hex ← 255 ↦ ascii<_> via Hex
+    const _ inferred_bin ← 255 ↦ ascii<_> via Bin
+    const _ inferred_oct ← 255 ↦ ascii<_> via Oct
 }
 "#,
     );
@@ -3622,7 +3622,7 @@ fn lowers_format_conversion_collection_and_provider_runtime_intrinsics() {
     assert!(!format_dump.contains("format!"));
 
     let conversion_dump =
-        dump_source(r"functio parse(textus raw) → numerus<i32> { redde raw ↦ numerus<i32, Hex> ⊥ 0 ∷ numerus<i32> }");
+        dump_source(r"functio parse(textus raw) → numerus<i32> { redde raw ↦ i32 via Hex ⊥ 0 ∷ numerus<i32> }");
     assert!(conversion_dump.contains("runtime convert runtime ty#"));
     assert!(conversion_dump.contains(" -> ty#"));
     assert!(conversion_dump.contains("hints [sym#"));

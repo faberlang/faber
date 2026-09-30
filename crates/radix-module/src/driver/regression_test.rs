@@ -1417,7 +1417,7 @@ fn quidlibet_container_annotation_no_longer_reports_unknown_type() {
 fn conversio_type_params_no_longer_report_unknown_type() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
-  fixum _ n ← "ff" ↦ numerus<i32, Hex>
+  fixum _ n ← "ff" ↦ i32 via Hex
   nota n
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());

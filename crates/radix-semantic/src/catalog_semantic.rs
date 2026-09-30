@@ -439,7 +439,7 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
             Some("convert to the matching IEEE width first: u16 pairs with bf16 or f16, u32 with f32, or u64 with f64".to_owned())
         }
         "code_hint_pair_mismatch" => {
-            Some("Code reads a code point as littera ↦ numerus<u32, Code> or builds one as numerus ↦ littera<Code>".to_owned())
+            Some("Code reads a code point as littera ↦ u32 via Code or builds one as numerus ↦ littera via Code".to_owned())
         }
         "conversio_via_unknown_hint" => {
             Some("use one of Hex, Bin, Oct, Be, Le, Bits, or Code after via".to_owned())
@@ -454,7 +454,7 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
             Some("drop the Hex/Bin/Oct hint or the Bits hint; one interpretation per conversio".to_owned())
         }
         "ascii_format_hint_not_capacity" => {
-            Some("write ascii<N, Hex>, ascii<N, Bin>, or ascii<N, Oct> with N as digit width".to_owned())
+            Some("write ascii<N> via Hex, ascii<N> via Bin, or ascii<N> via Oct with N as digit width".to_owned())
         }
         "ascii_pack_width_overflow" => {
             Some("increase N or convert the source to a width whose digit count fits".to_owned())

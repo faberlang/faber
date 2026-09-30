@@ -3,8 +3,8 @@
 //! `littera` means a one-letter string. A number converts to its digits
 //! (`7 ↦ littera` = `'7'`, fails outside 0–9); a littera parses as its digit;
 //! a `textus` converts only when it holds exactly one scalar. The `Code` hint
-//! reads or builds the code point (`'A' ↦ numerus<u32, Code>` = 65,
-//! `65 ↦ littera<Code>` = `'A'`, failing above U+10FFFF and on surrogates).
+//! reads or builds the code point (`'A' ↦ u32 via Code` = 65,
+//! `65 ↦ littera via Code` = `'A'`, failing above U+10FFFF and on surrogates).
 //!
 //! A `littera` value reaches the runner as `Value::Char`, or as the
 //! `Value::Ascii` byte of a widened `ascii<1>` literal (D10.5).

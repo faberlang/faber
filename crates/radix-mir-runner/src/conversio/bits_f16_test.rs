@@ -67,11 +67,11 @@ fn eval_convert_with(
 }
 
 fn u16_to_f16(bits: u16) -> Value {
-    eval_convert(Value::UInt(u64::from(bits)), NumericWidth::F16).expect("u16 -> fractus<f16,Bits>")
+    eval_convert(Value::UInt(u64::from(bits)), NumericWidth::F16).expect("u16 -> f16 via Bits")
 }
 
 fn f16_to_u16(value: Value) -> u16 {
-    let result = eval_convert(value, NumericWidth::U16).expect("fractus<f16> -> numerus<u16,Bits>");
+    let result = eval_convert(value, NumericWidth::U16).expect("fractus<f16> -> u16 via Bits");
     let Value::UInt(bits) = result else {
         panic!("expected u16 bits carrier, got {result:?}");
     };
@@ -102,7 +102,7 @@ fn f16_nan_payload_survives_width_agnostic_float_carrier() {
 #[test]
 #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
 fn f16_bits_folded_chain_equals_direct_exact_widen() {
-    // Folded: u16 -> fractus<f16,Bits> -> fractus<f32>; the f16 value widened
+    // Folded: u16 -> f16 via Bits -> fractus<f32>; the f16 value widened
     // exactly to f32 (and f64 in between) must equal the direct exact widen.
     for bits in [0x3C00, 0x7C00, 0xFC00, 0x0001] {
         let folded = u16_to_f16(bits);

@@ -2329,8 +2329,8 @@ message = "從 octeti 轉換為 fractus 未指定（IEEE 寬度與位元組序�
 help = "使用 chorda 或明確的位元組轉換輔助工具"
 
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
-message = "the Code hint converts only littera ↦ numerus<u32, Code> (read a code point) and numerus ↦ littera<Code> (build one)"
-help = "use littera ↦ numerus<u32, Code> or numerus ↦ littera<Code>; without Code a number converts to its digits"
+message = "the Code hint converts only littera ↦ u32 via Code (read a code point) and numerus ↦ littera via Code (build one)"
+help = "use littera ↦ u32 via Code or numerus ↦ littera via Code; without Code a number converts to its digits"
 
 [diagnostics.SEM016.issues.conversio_via_unknown_hint]
 message = "`{hint}` is not a convert hint"

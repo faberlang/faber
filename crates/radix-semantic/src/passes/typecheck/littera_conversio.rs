@@ -11,8 +11,8 @@
 //!   left to the ordinary fallthrough.
 //!
 //! Code points are reached only through the `Code` hint in the conversio hint
-//! slot: `littera ↦ numerus<u32, Code>` (infallible) and
-//! `numerus ↦ littera<Code>` (failable above U+10FFFF and on surrogates). Any
+//! slot: `littera ↦ u32 via Code` (infallible) and
+//! `numerus ↦ littera via Code` (failable above U+10FFFF and on surrogates). Any
 //! other pair carrying `Code` rejects with `code_hint_pair_mismatch`.
 //!
 //! Integer sources only: a decimal width is not a digit count and a `fractus`

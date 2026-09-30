@@ -125,29 +125,27 @@ fn octeti_window_to_ascii_accepts() {
 
 #[test]
 fn littera_to_u32_code_accepts() {
-    test_support::assert_accepts(
-        "functio f(littera c) → numerus<u32> { redde c ↦ numerus<u32, Code> }",
-    );
+    test_support::assert_accepts("functio f(littera c) → numerus<u32> { redde c ↦ u32 via Code }");
 }
 
 #[test]
 fn littera_to_u32_code_is_infallible() {
     test_support::assert_accepts(
-        "functio f(littera c) → numerus<u32> ⇥ numerus { redde c ↦ numerus<u32, Code> }",
+        "functio f(littera c) → numerus<u32> ⇥ numerus { redde c ↦ u32 via Code }",
     );
 }
 
 #[test]
 fn numerus_to_littera_code_accepts_with_default() {
     test_support::assert_accepts(
-        "functio f(numerus n) → littera { redde n ↦ littera<Code> ⊥ '?' }",
+        "functio f(numerus n) → littera { redde n ↦ littera via Code ⊥ '?' }",
     );
 }
 
 #[test]
 fn numerus_to_littera_code_is_failable() {
     test_support::assert_rejects_with_issue(
-        "functio f(numerus n) → littera ⇥ numerus { redde n ↦ littera<Code> }",
+        "functio f(numerus n) → littera ⇥ numerus { redde n ↦ littera via Code }",
         CHANNEL_TEXTUS,
     );
 }
@@ -155,7 +153,7 @@ fn numerus_to_littera_code_is_failable() {
 #[test]
 fn code_hint_on_other_width_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio f(littera c) → numerus<i64> { redde c ↦ numerus<i64, Code> }",
+        "functio f(littera c) → numerus<i64> { redde c ↦ i64 via Code }",
         CODE_PAIR,
     );
 }
@@ -163,7 +161,7 @@ fn code_hint_on_other_width_rejects() {
 #[test]
 fn code_hint_on_text_source_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio f(textus s) → numerus<u32> { redde s ↦ numerus<u32, Code> ⊥ 0 }",
+        "functio f(textus s) → numerus<u32> { redde s ↦ u32 via Code ⊥ 0 }",
         CODE_PAIR,
     );
 }
@@ -171,7 +169,7 @@ fn code_hint_on_text_source_rejects() {
 #[test]
 fn code_hint_on_textus_to_littera_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio f(textus s) → littera { redde s ↦ littera<Code> ⊥ '?' }",
+        "functio f(textus s) → littera { redde s ↦ littera via Code ⊥ '?' }",
         CODE_PAIR,
     );
 }

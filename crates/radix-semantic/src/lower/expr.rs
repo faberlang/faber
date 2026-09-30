@@ -1733,7 +1733,7 @@ fn lower_conversio_target_type(
                 && let Some(symbol) = conversio_hint_symbol(hint)
                 && crate::numeric_width::is_code_point_hint(lowerer.interner.resolve(symbol)) =>
         {
-            // D10.6 `n ↦ littera<Code>`: the hint names the code-point row;
+            // D10.6 `n ↦ littera via Code`: the hint names the code-point row;
             // type identity stays plain `littera`.
             params.push(symbol);
             let ty_id = lowerer.types.primitive(Primitive::Littera);

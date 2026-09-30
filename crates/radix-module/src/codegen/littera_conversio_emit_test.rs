@@ -12,8 +12,8 @@ incipit {
     fixum numerus n ← d ↦ numerus ⊥ 0
     fixum textus t ← \"x\"
     fixum littera u ← t ↦ littera ⊥ '?'
-    fixum numerus<u32> c ← d ↦ numerus<u32, Code>
-    fixum littera b ← 65 ↦ littera<Code> ⊥ '?'
+    fixum numerus<u32> c ← d ↦ u32 via Code
+    fixum littera b ← 65 ↦ littera via Code ⊥ '?'
     fixum octeti raw ← |68 69|
     fixum ascii h ← raw[0‥1] ↦ ascii ⊥ 'nn'
     nota a

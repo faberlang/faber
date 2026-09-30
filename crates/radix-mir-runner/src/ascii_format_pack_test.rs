@@ -1,4 +1,4 @@
-//! Runner pins for `n ↦ ascii<N, Hex|Bin|Oct>`.
+//! Runner pins for `n ↦ ascii<N> via Hex|Bin|Oct`.
 
 use super::*;
 use radix_lexer::{Interner, Span};

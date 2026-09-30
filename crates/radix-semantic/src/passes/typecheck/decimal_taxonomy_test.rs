@@ -82,29 +82,27 @@ fn tensor_media_over_integer_numerus_still_returns_f64() {
 #[test]
 fn radix_text_parse_into_decimal_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio p(textus s) → numerus<d64> { redde s ↦ numerus<d64, Hex> }",
+        "functio p(textus s) → numerus<d64> { redde s ↦ d64 via Hex }",
         "decimal_radix_hint_rejected",
     );
 }
 
 #[test]
 fn radix_text_parse_into_integer_still_accepts() {
-    test_support::assert_accepts(
-        "functio p(textus s) → numerus<u32> { redde s ↦ numerus<u32, Hex> }",
-    );
+    test_support::assert_accepts("functio p(textus s) → numerus<u32> { redde s ↦ u32 via Hex }");
 }
 
 #[test]
 fn ascii_format_pack_from_decimal_source_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio p(numerus<d64> n) → ascii<8> { redde n ↦ ascii<8, Hex> }",
+        "functio p(numerus<d64> n) → ascii<8> { redde n ↦ ascii<8> via Hex }",
         "decimal_radix_hint_rejected",
     );
 }
 
 #[test]
 fn ascii_format_pack_from_integer_source_still_accepts() {
-    test_support::assert_accepts("incipit { fixum ascii<2> hex ← 255 ↦ ascii<2, Hex> }");
+    test_support::assert_accepts("incipit { fixum ascii<2> hex ← 255 ↦ ascii<2> via Hex }");
 }
 
 // --- wrong site class: endian hints (Be/Le) ---
@@ -112,7 +110,7 @@ fn ascii_format_pack_from_integer_source_still_accepts() {
 #[test]
 fn endian_unpack_into_decimal_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio win(octeti corpus) → numerus<d64> { redde corpus[0‥4] ↦ numerus<d64, Be> }",
+        "functio win(octeti corpus) → numerus<d64> { redde corpus[0‥4] ↦ d64 via Be }",
         "decimal_endianness_hint_rejected",
     );
 }
@@ -120,7 +118,7 @@ fn endian_unpack_into_decimal_rejects() {
 #[test]
 fn endian_unpack_into_integer_still_accepts() {
     test_support::assert_accepts(
-        "functio win(octeti corpus) → numerus<u32> { redde corpus[0‥4] ↦ numerus<u32, Be> }",
+        "functio win(octeti corpus) → numerus<u32> { redde corpus[0‥4] ↦ u32 via Be }",
     );
 }
 
@@ -129,7 +127,7 @@ fn endian_unpack_into_integer_still_accepts() {
 #[test]
 fn bits_bitcast_from_decimal_source_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio bits(numerus<d64> n) → fractus<f32> { redde n ↦ fractus<f32, Bits> }",
+        "functio bits(numerus<d64> n) → fractus<f32> { redde n ↦ f32 via Bits }",
         "decimal_bits_hint_rejected",
     );
 }
@@ -137,7 +135,7 @@ fn bits_bitcast_from_decimal_source_rejects() {
 #[test]
 fn bits_bitcast_into_decimal_target_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio bits(fractus<f32> x) → numerus<d64> { redde x ↦ numerus<d64, Bits> }",
+        "functio bits(fractus<f32> x) → numerus<d64> { redde x ↦ d64 via Bits }",
         "decimal_bits_hint_rejected",
     );
 }
@@ -145,6 +143,6 @@ fn bits_bitcast_into_decimal_target_rejects() {
 #[test]
 fn bits_bitcast_integer_pair_still_accepts() {
     test_support::assert_accepts(
-        "functio bits(numerus<u32> n) → fractus<f32> { redde n ↦ fractus<f32, Bits> }",
+        "functio bits(numerus<u32> n) → fractus<f32> { redde n ↦ f32 via Bits }",
     );
 }

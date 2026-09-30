@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "conversion"
 canonical = false
 summary = "Endian integer and float unpack from an octeti window."
-syntax = "<octeti>[lo‥hi] ↦ int|float<W, Be|Le>"
+syntax = "<octeti>[lo‥hi] ↦ W via Be|Le"
 related = ["↦", "octeti", "int", "float"]
 locale = "en"
 +++
@@ -14,9 +14,9 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Locked read form — `corpus[0‥4] ↦ int<u32, Be>` and `… ↦ int<u32, Le>`.
-#   • Float read form — `corpus[0‥4] ↦ float<f32, Be|Le>` and `corpus[0‥8] ↦ float<f64, Be|Le>`.
-#   • Hex-slot hints — `Be` / `Le` sit in the same second-argument slot as `Hex` / `Bin` / `Oct`.
+#   • Locked read form — `corpus[0‥4] ↦ u32 via Be` and `… ↦ u32 via Le`.
+#   • Float read form — `corpus[0‥4] ↦ f32 via Be|Le` and `corpus[0‥8] ↦ f64 via Be|Le`.
+#   • Convert hints — `Be` / `Le` are `via` hints, like `Hex` / `Bin` / `Oct`.
 #   • Exact width — the window length must match the integer or float width (2 / 4 / 8).
 #
 # Common mistakes:
@@ -27,10 +27,10 @@ locale = "en"
 # =============================================================================
 
 
-# conversio — octeti window ↦ int<W, Be|Le>
+# conversio — octeti window ↦ W via Be|Le
 #
 # GRAMMAR:
-#   convertExpr :← expr '↦' type '<' width ',' endian '>'
+#   convertExpr :← expr '↦' width 'via' endian
 #
 # EXPECTED OUTPUT:
 #   3735928559
@@ -44,12 +44,12 @@ locale = "en"
 #   HIR-direct Rust emits from_be_bytes / from_le_bytes. MIR-stepper agrees.
 
 main {
-    const _ be ← |de ad be ef|[0‥4] ↦ int<u32, Be>
-    const _ le ← |de ad be ef|[0‥4] ↦ int<u32, Le>
-    const _ f32_be ← |3f 80 00 00|[0‥4] ↦ float<f32, Be>
-    const _ f32_le ← |00 00 80 3f|[0‥4] ↦ float<f32, Le>
-    const _ f64_be ← |3f f0 00 00 00 00 00 00|[0‥8] ↦ float<f64, Be>
-    const _ f64_le ← |00 00 00 00 00 00 f0 3f|[0‥8] ↦ float<f64, Le>
+    const _ be ← |de ad be ef|[0‥4] ↦ u32 via Be
+    const _ le ← |de ad be ef|[0‥4] ↦ u32 via Le
+    const _ f32_be ← |3f 80 00 00|[0‥4] ↦ f32 via Be
+    const _ f32_le ← |00 00 80 3f|[0‥4] ↦ f32 via Le
+    const _ f64_be ← |3f f0 00 00 00 00 00 00|[0‥8] ↦ f64 via Be
+    const _ f64_le ← |00 00 00 00 00 00 f0 3f|[0‥8] ↦ f64 via Le
     print be
     print le
     print f32_be

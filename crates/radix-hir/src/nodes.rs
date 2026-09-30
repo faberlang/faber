@@ -1489,7 +1489,7 @@ pub enum HirExpressionKind {
         source: Box<HirExpression>,
         target: HirConversioTarget,
 
-        /// Codegen hint parameters (e.g., `i32`, `Hex` in `↦ numerus<i32, Hex>`).
+        /// Codegen hint parameters (e.g., `i32`, `Hex` in `↦ i32 via Hex`).
         /// Stored as raw symbols because these are target-specific hints, not Faber types.
         params: Vec<Symbol>,
         recovery: Option<Box<HirExpression>>,

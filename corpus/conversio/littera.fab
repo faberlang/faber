@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "conversion"
 canonical = false
 summary = "A char (littera) is a one-letter string: numbers convert to their digits, and code points use the Code hint."
-syntax = "<n> ↦ string | ascii | char, <char> ↦ int | string, <string> ↦ char, <char> ↦ int<u32, Code>, <n> ↦ char<Code>"
+syntax = "<n> ↦ string | ascii | char, <char> ↦ int | string, <string> ↦ char, <char> ↦ u32 via Code, <n> ↦ char via Code"
 related = ["↦", "char", "string", "ascii", "bytes", "Code"]
 locale = "en"
 +++
@@ -23,8 +23,8 @@ locale = "en"
 #   • `s ↦ char` is the only letter of s and fails unless s has exactly one.
 #   • `bytes ↦ string` decodes UTF-8 and can fail; `bytes ↦ ascii` checks every
 #     byte is below 128; one byte converts through a window `b[i‥i+1] ↦ ascii`.
-#   • Code points use the `Code` hint: `'A' ↦ int<u32, Code>` is 65 and
-#     `65 ↦ char<Code>` is 'A' (fails above U+10FFFF and on surrogates).
+#   • Code points use the `Code` hint: `'A' ↦ u32 via Code` is 65 and
+#     `65 ↦ char via Code` is 'A' (fails above U+10FFFF and on surrogates).
 #   • Every failable row takes a `⊥` default (or propagates through `⇥`).
 #     A one-letter literal is ascii<1>, so a bare ascii default needs two.
 #
@@ -79,12 +79,12 @@ main {
 
     # Code points use the Code hint.
     const char big ← 'A'
-    const int<u32> code ← big ↦ int<u32, Code>
+    const int<u32> code ← big ↦ u32 via Code
     print code
-    const char back ← 65 ↦ char<Code> ⊥ '?'
+    const char back ← 65 ↦ char via Code ⊥ '?'
     print back
-    const char surrogate ← 55296 ↦ char<Code> ⊥ '?'
+    const char surrogate ← 55296 ↦ char via Code ⊥ '?'
     print surrogate
-    const char beyond ← 1114112 ↦ char<Code> ⊥ '?'
+    const char beyond ← 1114112 ↦ char via Code ⊥ '?'
     print beyond
 }

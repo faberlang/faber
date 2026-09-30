@@ -1530,7 +1530,7 @@ fn representative_lowered_phase_3_to_7_mir_validates() {
         r"genus VacuumStruct {} functio empty_struct() → VacuumStruct { redde {} ∷ VacuumStruct }",
         r"discretio Status { Active } functio active() → Status { redde finge Active ∷ Status }",
         r"functio count(lista<numerus> xs) → numerus { redde xs.longitudo() }",
-        r"functio parse(textus raw) → numerus { redde raw ↦ numerus<i32, Hex> ⊥ 0 }",
+        r"functio parse(textus raw) → numerus { redde raw ↦ i32 via Hex ⊥ 0 }",
         r#"functio log(textus name) → vacuum { nota "salve" vide name mone "cave" }"#,
     ] {
         let mut unit = analyze(source);

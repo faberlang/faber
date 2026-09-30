@@ -1386,7 +1386,7 @@ impl TypeChecker<'_> {
         None
     }
 
-    /// `octeti ↦ numerus<W, Be|Le>` is allowed when width is 2/4/8 and a
+    /// `octeti ↦ W via Be|Le` is allowed when width is 2/4/8 and a
     /// static window matches. Without Be/Le, or on i8/u8/unsized numerus,
     /// the family reject stays.
     fn octeti_to_numerus_issue(
@@ -1407,7 +1407,7 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// `octeti ↦ fractus<W, Be|Le>` is allowed only for the exact IEEE width
+    /// `octeti ↦ W via Be|Le` is allowed only for the exact IEEE width
     /// and a static window that matches it. Without Be/Le, or on f16/unsized
     /// fractus, the family reject stays.
     fn octeti_to_fractus_issue(
@@ -1438,8 +1438,8 @@ impl TypeChecker<'_> {
     }
 
     /// decimal-widths D2 (wildcard audit): named reject for conversio slot-2
-    /// hints aimed at a decimal numerus target — `textus ↦ numerus<d64, Hex>`,
-    /// `octeti ↦ numerus<d64, Be>`, and every other hint spelling.
+    /// hints aimed at a decimal numerus target — `textus ↦ d64 via Hex`,
+    /// `octeti ↦ d64 via Be`, and every other hint spelling.
     fn decimal_target_hint_issue(
         &self,
         target_resolved: TypeId,
@@ -1526,7 +1526,7 @@ impl TypeChecker<'_> {
             .any(|param| matches!(interner.resolve(*param), "Bits"))
     }
 
-    /// `n ↦ ascii<N, Hex|Bin|Oct>`: N is digit width; Hex/Bin/Oct are slot-2
+    /// `n ↦ ascii<N> via Hex|Bin|Oct`: N is digit width; Hex/Bin/Oct are slot-2
     /// format hints peeled into conversio params. Float sources reject; a
     /// const-foldable negative or overflowing source fail-closes at typecheck
     /// unless `⊥` default is present (runtime still fail-closes).
@@ -1552,7 +1552,7 @@ impl TypeChecker<'_> {
                         return Some(self.error_type);
                     }
                 }
-                // decimal-widths D2 (wildcard audit): `n ↦ ascii<N, Hex>` is
+                // decimal-widths D2 (wildcard audit): `n ↦ ascii<N> via Hex` is
                 // integer digit packing; a scaled decimal has no radix digits.
                 if matches!(
                     self.types.get(self.resolve_inferred_type(source_ty)),

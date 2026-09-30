@@ -5,28 +5,28 @@ use crate::test_support;
 #[test]
 fn u32_to_f32_bits_accepts() {
     test_support::assert_accepts(
-        "functio bits(numerus<u32> n) → fractus<f32> { redde n ↦ fractus<f32, Bits> }",
+        "functio bits(numerus<u32> n) → fractus<f32> { redde n ↦ f32 via Bits }",
     );
 }
 
 #[test]
 fn f32_to_u32_bits_accepts() {
     test_support::assert_accepts(
-        "functio bits(fractus<f32> x) → numerus<u32> { redde x ↦ numerus<u32, Bits> }",
+        "functio bits(fractus<f32> x) → numerus<u32> { redde x ↦ u32 via Bits }",
     );
 }
 
 #[test]
 fn u64_to_f64_bits_accepts() {
     test_support::assert_accepts(
-        "functio bits(numerus<u64> n) → fractus<f64> { redde n ↦ fractus<f64, Bits> }",
+        "functio bits(numerus<u64> n) → fractus<f64> { redde n ↦ f64 via Bits }",
     );
 }
 
 #[test]
 fn f64_to_u64_bits_accepts() {
     test_support::assert_accepts(
-        "functio bits(fractus<f64> x) → numerus<u64> { redde x ↦ numerus<u64, Bits> }",
+        "functio bits(fractus<f64> x) → numerus<u64> { redde x ↦ u64 via Bits }",
     );
 }
 
@@ -40,21 +40,21 @@ fn f64_to_u64_bits_accepts() {
 #[test]
 fn u16_to_f16_bits_accepts() {
     test_support::assert_accepts(
-        "functio bits(numerus<u16> n) → fractus<f16> { redde n ↦ fractus<f16, Bits> }",
+        "functio bits(numerus<u16> n) → fractus<f16> { redde n ↦ f16 via Bits }",
     );
 }
 
 #[test]
 fn f16_to_u16_bits_accepts() {
     test_support::assert_accepts(
-        "functio bits(fractus<f16> x) → numerus<u16> { redde x ↦ numerus<u16, Bits> }",
+        "functio bits(fractus<f16> x) → numerus<u16> { redde x ↦ u16 via Bits }",
     );
 }
 
 #[test]
 fn u16_to_f32_bits_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio bits(numerus<u16> n) → fractus<f32> { redde n ↦ fractus<f32, Bits> }",
+        "functio bits(numerus<u16> n) → fractus<f32> { redde n ↦ f32 via Bits }",
         "bits_pair_width_mismatch",
     );
 }
@@ -62,7 +62,7 @@ fn u16_to_f32_bits_rejects() {
 #[test]
 fn u16_to_f64_bits_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio bits(numerus<u16> n) → fractus<f64> { redde n ↦ fractus<f64, Bits> }",
+        "functio bits(numerus<u16> n) → fractus<f64> { redde n ↦ f64 via Bits }",
         "bits_pair_width_mismatch",
     );
 }
@@ -70,7 +70,7 @@ fn u16_to_f64_bits_rejects() {
 #[test]
 fn unsized_fractus_to_u32_bits_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio bits(fractus x) → numerus<u32> { redde x ↦ numerus<u32, Bits> }",
+        "functio bits(fractus x) → numerus<u32> { redde x ↦ u32 via Bits }",
         "bits_pair_width_mismatch",
     );
 }
@@ -78,7 +78,7 @@ fn unsized_fractus_to_u32_bits_rejects() {
 #[test]
 fn u32_to_f64_bits_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio bits(numerus<u32> n) → fractus<f64> { redde n ↦ fractus<f64, Bits> }",
+        "functio bits(numerus<u32> n) → fractus<f64> { redde n ↦ f64 via Bits }",
         "bits_pair_width_mismatch",
     );
 }
@@ -86,7 +86,7 @@ fn u32_to_f64_bits_rejects() {
 #[test]
 fn f16_to_u32_bits_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio bits(fractus<f16> x) → numerus<u32> { redde x ↦ numerus<u32, Bits> }",
+        "functio bits(fractus<f16> x) → numerus<u32> { redde x ↦ u32 via Bits }",
         "bits_pair_width_mismatch",
     );
 }
@@ -127,7 +127,7 @@ fn without_bits_value_conversion_stays() {
 
 #[test]
 fn radix_hint_accept_row_stays_green() {
-    test_support::assert_accepts("incipit { fixum _ n ← \"ff\" ↦ numerus<u32, Hex> }");
+    test_support::assert_accepts("incipit { fixum _ n ← \"ff\" ↦ u32 via Hex }");
 }
 
 // U4 chain + derived-form pins (goal `bits-f16-pair`, unit U4): the
@@ -137,11 +137,11 @@ fn radix_hint_accept_row_stays_green() {
 
 #[test]
 fn u16_bits_chain_to_f32_types_as_exact_widen() {
-    // `dbits ↦ fractus<f16, Bits> ↦ fractus<f32>`: Bits hop then the exact
+    // `dbits ↦ f16 via Bits ↦ fractus<f32>`: Bits hop then the exact
     // f16 → f32 widen — the value-level "no intermediate binding" proof is
     // U5's runner exemplum; the type level pins the fold here.
     test_support::assert_accepts(
-        "functio fold(numerus<u16> dbits) → fractus<f32> { redde dbits ↦ fractus<f16, Bits> ↦ fractus<f32> }",
+        "functio fold(numerus<u16> dbits) → fractus<f32> { redde dbits ↦ f16 via Bits ↦ fractus<f32> }",
     );
 }
 
@@ -150,7 +150,7 @@ fn u16_bits_chain_to_f32_typed_destination_accepts() {
     // `df` names `fractus<f32>`; the chain must fold to exactly that type
     // (not `fractus<f16>`), or the declaration rejects.
     test_support::assert_accepts(
-        "incipit {\n  fixum numerus<u16> dbits ← 0x3E00\n  fixum fractus<f32> df ← dbits ↦ fractus<f16, Bits> ↦ fractus<f32>\n}",
+        "incipit {\n  fixum numerus<u16> dbits ← 0x3E00\n  fixum fractus<f32> df ← dbits ↦ f16 via Bits ↦ fractus<f32>\n}",
     );
 }
 
@@ -200,13 +200,13 @@ use radix_target::Target;
 #[test]
 fn bits_bitcast_bare_arrow_needs_no_recovery_in_failable_function() {
     test_support::assert_accepts(
-        "functio bits(numerus<u32> n) → fractus<f32> ⇥ textus { redde n ↦ fractus<f32, Bits> }",
+        "functio bits(numerus<u32> n) → fractus<f32> ⇥ textus { redde n ↦ f32 via Bits }",
     );
     test_support::assert_accepts(
-        "functio bits(numerus<u32> n) → fractus<f32> ⇥ numerus { redde n ↦ fractus<f32, Bits> }",
+        "functio bits(numerus<u32> n) → fractus<f32> ⇥ numerus { redde n ↦ f32 via Bits }",
     );
     test_support::assert_accepts(
-        "functio bits(numerus<u64> n) → fractus<f64> ⇥ textus { redde n ↦ fractus<f64, Bits> }",
+        "functio bits(numerus<u64> n) → fractus<f64> ⇥ textus { redde n ↦ f64 via Bits }",
     );
 }
 

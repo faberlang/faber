@@ -133,7 +133,7 @@ pub const COST_BASIS: &[CostBasisRow] = &[
         family: CostFamily::Cast,
         tag: CostTag::Class(CostClass::C0),
     },
-    // Fixed 2/4/8-byte `octeti` window unpack into `numerus<W, Be/Le>`.
+    // Fixed 2/4/8-byte `octeti` window unpack into `W via Be/Le`.
     CostBasisRow {
         family: CostFamily::OctetiWindowUnpack,
         tag: CostTag::Class(CostClass::C0),

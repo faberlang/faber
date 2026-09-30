@@ -60,25 +60,25 @@ incipit {
 #[test]
 fn u16_to_bf16_bits_accepts() {
     test_support::assert_accepts(
-        "functio bits(numerus<u16> n) → fractus<bf16> { redde n ↦ fractus<bf16, Bits> }",
+        "functio bits(numerus<u16> n) → fractus<bf16> { redde n ↦ bf16 via Bits }",
     );
 }
 
 #[test]
 fn bf16_to_u16_bits_accepts() {
     test_support::assert_accepts(
-        "functio bits(fractus<bf16> x) → numerus<u16> { redde x ↦ numerus<u16, Bits> }",
+        "functio bits(fractus<bf16> x) → numerus<u16> { redde x ↦ u16 via Bits }",
     );
 }
 
 #[test]
 fn bf16_and_f16_bits_are_not_a_pair() {
     test_support::assert_rejects_with_issue(
-        "functio bits(fractus<bf16> x) → fractus<f16> { redde x ↦ fractus<f16, Bits> }",
+        "functio bits(fractus<bf16> x) → fractus<f16> { redde x ↦ f16 via Bits }",
         "bits_pair_width_mismatch",
     );
     test_support::assert_rejects_with_issue(
-        "functio bits(fractus<f16> x) → fractus<bf16> { redde x ↦ fractus<bf16, Bits> }",
+        "functio bits(fractus<f16> x) → fractus<bf16> { redde x ↦ bf16 via Bits }",
         "bits_pair_width_mismatch",
     );
 }
