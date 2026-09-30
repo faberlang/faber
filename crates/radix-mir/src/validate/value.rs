@@ -481,6 +481,14 @@ impl Validator<'_, '_> {
         span: Span,
         message: impl Into<String>,
     ) {
+        if self.assignable(actual, expected)
+            && matches!(
+                self.context.types.as_table().get(expected.semantic_id()),
+                Type::Interface(_)
+            )
+        {
+            return;
+        }
         if crate::generic::bind_generic_type_witness_with_shapes(
             self.context.types.as_table(),
             expected,

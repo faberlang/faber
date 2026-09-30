@@ -168,6 +168,9 @@ pub struct MirValidationContext<'a> {
     /// first); `variant_fields` is unordered, display uses this order.
     pub variant_field_order: FxHashMap<DefId, Vec<Symbol>>,
     pub struct_type_params: FxHashMap<DefId, Vec<Symbol>>,
+    /// Struct → the contracts its `implet` clause names. A struct value is
+    /// assignable to a contract-typed slot exactly when the contract is listed.
+    pub struct_contracts: FxHashMap<DefId, FxHashSet<DefId>>,
     pub enum_type_params: FxHashMap<DefId, Vec<Symbol>>,
     pub optional_struct_fields: FxHashMap<DefId, FxHashSet<Symbol>>,
     pub nullable_struct_fields: FxHashMap<DefId, FxHashSet<Symbol>>,
@@ -203,6 +206,7 @@ impl<'a> MirValidationContext<'a> {
             struct_field_order: FxHashMap::default(),
             variant_field_order: FxHashMap::default(),
             struct_type_params: FxHashMap::default(),
+            struct_contracts: FxHashMap::default(),
             enum_type_params: FxHashMap::default(),
             optional_struct_fields: FxHashMap::default(),
             nullable_struct_fields: FxHashMap::default(),
@@ -310,6 +314,7 @@ impl<'a> MirValidationContext<'a> {
             struct_field_order,
             variant_field_order,
             struct_type_params,
+            struct_contracts,
             enum_type_params,
             optional_struct_fields,
             nullable_struct_fields,
@@ -336,6 +341,7 @@ impl<'a> MirValidationContext<'a> {
             struct_field_order,
             variant_field_order,
             struct_type_params,
+            struct_contracts,
             enum_type_params,
             optional_struct_fields,
             nullable_struct_fields,

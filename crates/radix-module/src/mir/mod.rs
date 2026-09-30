@@ -40,6 +40,9 @@ mod itera_destructure_tests;
 mod bounded_itera_test;
 
 #[cfg(test)]
+#[path = "interface_dispatch_test.rs"]
+mod interface_dispatch_test;
+#[cfg(test)]
 #[path = "queue_stack_test.rs"]
 mod queue_stack_test;
 #[cfg(test)]

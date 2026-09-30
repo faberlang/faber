@@ -44,6 +44,27 @@ impl FunctionBuilder<'_> {
             .collect()
     }
 
+    /// Implementing `genus` members for a method call through a contract-typed
+    /// receiver (`Bumpable b`), or `None` when the receiver is not a contract
+    /// with at least one local implementor. The chain is the same type-test
+    /// dispatch a union uses, over the closed set of `implet` declarers.
+    fn interface_dispatch_members(&self, ty: TypeId) -> Option<Vec<DispatchMember>> {
+        let mut payload = self.normalized_type(self.method_receiver_payload_id(ty));
+        if let Type::Applied(base, _) = payload {
+            payload = self.normalized_type(*base);
+        }
+        let Type::Interface(contract) = payload else {
+            return None;
+        };
+        let implementors = self.context.interface_implementors.get(contract)?;
+        Some(
+            implementors
+                .iter()
+                .map(|(def_id, ty)| DispatchMember { ty: *ty, def_id: *def_id })
+                .collect(),
+        )
+    }
+
     /// Run `arm` once per member inside a type-test chain over `receiver`.
     ///
     /// `arm` receives the member-narrowed temp place and returns the arm's
@@ -117,7 +138,9 @@ impl FunctionBuilder<'_> {
         expr: &HirExpression,
     ) -> Option<Option<MirOperand>> {
         let receiver_ty = receiver.ty?;
-        let members = self.nominal_union_dispatch_members(receiver_ty)?;
+        let members = self
+            .nominal_union_dispatch_members(receiver_ty)
+            .or_else(|| self.interface_dispatch_members(receiver_ty))?;
         let mut targets = Vec::with_capacity(members.len());
         for member in &members {
             targets.push(

@@ -68,6 +68,7 @@ struct FrozenMaps<'a> {
     provider_imports: Arc<FxHashMap<DefId, ProviderImport>>,
     imported_type_members: Arc<FxHashMap<(DefId, Symbol), MirType>>,
     method_targets: Arc<FxHashMap<(DefId, Symbol), MethodTarget>>,
+    interface_implementors: Arc<FxHashMap<DefId, Vec<(DefId, TypeId)>>>,
     imported_method_providers: Arc<FxHashMap<(DefId, Symbol), ImportedMethodProvider>>,
     gpu_builtins: Arc<FxHashMap<DefId, MirKernelBuiltin>>,
 }
@@ -121,6 +122,10 @@ pub(super) struct LoweringContextMaps<'a> {
     /// This file's canonical module segments (package-aware compiles only).
     package_module_segments: Vec<String>,
     method_targets: FxHashMap<(DefId, Symbol), MethodTarget>,
+    /// Contract → the local `genus` types whose `implet` clause names it, in
+    /// declaration order. A method call through a contract-typed value lowers
+    /// to a type-test chain over exactly these members.
+    interface_implementors: FxHashMap<DefId, Vec<(DefId, TypeId)>>,
     gpu_builtins: Vec<(DefId, crate::mir::MirKernelBuiltin)>,
     /// Frozen Arc-wrapped maps populated after the HIR visitor phase.
     frozen: FrozenMaps<'a>,
@@ -170,6 +175,7 @@ impl<'a> LoweringContextMaps<'a> {
             package_product: None,
             package_module_segments: Vec::new(),
             method_targets: FxHashMap::default(),
+            interface_implementors: FxHashMap::default(),
             gpu_builtins: unit.gpu_builtins.clone(),
             frozen: FrozenMaps {
                 function_errors: Arc::new(FxHashMap::default()),
@@ -186,6 +192,7 @@ impl<'a> LoweringContextMaps<'a> {
                 provider_imports: Arc::new(FxHashMap::default()),
                 imported_type_members: Arc::new(FxHashMap::default()),
                 method_targets: Arc::new(FxHashMap::default()),
+                interface_implementors: Arc::new(FxHashMap::default()),
                 imported_method_providers: Arc::new(FxHashMap::default()),
                 gpu_builtins: Arc::new(FxHashMap::default()),
             },
@@ -208,6 +215,7 @@ impl<'a> LoweringContextMaps<'a> {
                 struct_field_order: FxHashMap::default(),
                 variant_field_order: FxHashMap::default(),
                 struct_type_params: FxHashMap::default(),
+                struct_contracts: FxHashMap::default(),
                 enum_type_params: FxHashMap::default(),
                 optional_struct_fields: FxHashMap::default(),
                 nullable_struct_fields: FxHashMap::default(),
@@ -254,6 +262,7 @@ impl<'a> LoweringContextMaps<'a> {
             provider_imports: Arc::new(core::mem::take(&mut maps.provider_imports)),
             imported_type_members: Arc::new(core::mem::take(&mut maps.imported_type_members)),
             method_targets: Arc::new(core::mem::take(&mut maps.method_targets)),
+            interface_implementors: Arc::new(core::mem::take(&mut maps.interface_implementors)),
             imported_method_providers: Arc::new(core::mem::take(&mut maps.imported_method_providers)),
             gpu_builtins: Arc::new(
                 core::mem::take(&mut maps.gpu_builtins)
@@ -311,6 +320,7 @@ impl<'a> LoweringContextMaps<'a> {
             provider_imports: Arc::clone(&self.frozen.provider_imports),
             imported_type_members: Arc::clone(&self.frozen.imported_type_members),
             method_targets: Arc::clone(&self.frozen.method_targets),
+            interface_implementors: Arc::clone(&self.frozen.interface_implementors),
             imported_method_providers: Arc::clone(&self.frozen.imported_method_providers),
             gpu_builtins: Arc::clone(&self.frozen.gpu_builtins),
             cli_record_fields_by_local,
@@ -463,6 +473,17 @@ impl<'a> LoweringContextMaps<'a> {
         }
 
         if let Some(receiver_ty) = receiver_ty {
+            for contract in &strukt.implements {
+                self.validation
+                    .struct_contracts
+                    .entry(def_id)
+                    .or_default()
+                    .insert(contract.contract);
+                self.interface_implementors
+                    .entry(contract.contract)
+                    .or_default()
+                    .push((def_id, receiver_ty));
+            }
             for method in &strukt.methods {
                 self.record_method_item(def_id, receiver_ty, method);
             }

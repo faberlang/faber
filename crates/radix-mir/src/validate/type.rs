@@ -718,13 +718,26 @@ impl Validator<'_, '_> {
         span: Span,
         message: impl Into<String>,
     ) {
-        if !self
-            .context
-            .types
-            .is_assignable(from.semantic_id(), to.semantic_id())
-        {
+        if !self.assignable(from, to) {
             self.error(span, message);
         }
+    }
+
+    /// [`TypeTable::is_assignable`] plus contract conformance: a struct whose
+    /// `implet` clause names a contract flows into a slot of that contract's
+    /// type. Only the lowered unit knows the clause, so the check lives here.
+    pub(crate) fn assignable(&self, from: MirType, to: MirType) -> bool {
+        let types = self.context.types.as_table();
+        if let (Type::Struct(strukt), Type::Interface(contract)) =
+            (types.get(from.semantic_id()), types.get(to.semantic_id()))
+        {
+            return self
+                .context
+                .struct_contracts
+                .get(strukt)
+                .is_some_and(|contracts| contracts.contains(contract));
+        }
+        types.is_assignable(from.semantic_id(), to.semantic_id())
     }
 
     /// Like [`Self::require_assignable`], but accepts an integer literal
@@ -741,11 +754,7 @@ impl Validator<'_, '_> {
         span: Span,
         message: &'static str,
     ) {
-        if self
-            .context
-            .types
-            .is_assignable(found.semantic_id(), expected.semantic_id())
-        {
+        if self.assignable(found, expected) {
             return;
         }
         if self.integer_constant_fits(operand, expected)
