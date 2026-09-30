@@ -1695,9 +1695,12 @@ impl TypeChecker<'_> {
             _ => {}
         }
 
-        // D17.8 exempts only failable conversions in `main {}`; a failable
-        // call there stays an error until the targets lower an unhandled
-        // call as a real panic (fi6c).
+        // D17.8: an unhandled failure directly in `main {}` panics — every
+        // backend lowers the call as an implicit abort (fi6c). Helpers,
+        // closures and praefixum clear the main frame and stay errors.
+        if self.in_main_frame {
+            return false;
+        }
         self.invalid_operand_types(ISSUE_FAILABLE_CALL_REQUIRES_HANDLER, span);
         true
     }

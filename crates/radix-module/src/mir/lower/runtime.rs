@@ -2566,11 +2566,7 @@ impl FunctionBuilder<'_> {
         }
 
         let Some(destination_ty) = self.error_ty else {
-            self.errors.push(MirError::unsupported(
-                span,
-                "failable call without an active local cape handler",
-            ));
-            return None;
+            return self.lower_unhandled_call_panic(callee, lowered_args, ty, err_ty, span);
         };
         let conversion = self.declared_error_conversion(err_ty, destination_ty, conversion);
 
@@ -2613,6 +2609,51 @@ impl FunctionBuilder<'_> {
         self.terminate_current(MirTerminatorKind::ReturnError(propagated), span);
         self.switch_to(ok_block);
         Some(MirOperand::Temp(destination))
+    }
+
+    /// D17.8: a failable call with no trap, `cape` handler or declared `⇥`
+    /// channel is only legal directly in `main {}` (typecheck rejects it
+    /// everywhere else), where the failure is a panic. The error value is the
+    /// panic message, exactly as an unhandled failable conversion reports.
+    fn lower_unhandled_call_panic(
+        &mut self,
+        callee: MirCallee,
+        lowered_args: Vec<MirOperand>,
+        ty: MirType,
+        err_ty: MirType,
+        span: Span,
+    ) -> Option<MirOperand> {
+        let ok_block = self.fresh_block(span);
+        let error_block = self.fresh_block(span);
+        let error_temp = self.push_temp(err_ty, span);
+        let destination = (!self.is_vacuum(ty)).then(|| self.push_temp(ty, span));
+        self.terminate_current(
+            MirTerminatorKind::TryCall {
+                destination: destination.map(MirPlace::temp),
+                callee,
+                args: lowered_args,
+                ok_block,
+                error_place: MirPlace::temp(error_temp),
+                error_block,
+            },
+            span,
+        );
+        self.switch_to(error_block);
+        let numquam = MirType::semantic(self.types.primitive(Primitive::Numquam));
+        self.append_stmt(MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination: None,
+                call: MirRuntimeCall {
+                    intrinsic: MirIntrinsic::Panic,
+                    args: vec![MirOperand::Temp(error_temp)],
+                    return_ty: numquam,
+                },
+            },
+            span,
+        });
+        self.terminate_current(MirTerminatorKind::Unreachable, span);
+        self.switch_to(ok_block);
+        Some(destination.map_or(MirOperand::Constant(MirConstant::Unit), MirOperand::Temp))
     }
 
     /// Select the strict read carrier for a declared literal-bound receiver.

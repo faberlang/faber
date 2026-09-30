@@ -4,9 +4,9 @@
 //! or `capta`), or an enclosing function that declares `⇥ E`; otherwise it is
 //! `SEM011:failable_conversio_requires_handler`, the rule failable calls
 //! already meet. The `incipit` (main) body itself is exempt for conversions
-//! only (an unhandled failure there is a real panic on the runner, Rust and
-//! TS); a failable call in main stays an error until fi6c lowers it as a
-//! panic. Helpers called from main are never exempt. Conversions that
+//! and for failable calls (an unhandled failure directly there panics on
+//! every backend, fi6c). Helpers called from main, closures and
+//! `praefixum` are never exempt. Conversions that
 //! cannot fail (widening, constants proven to fit, `↦` into policy words) are
 //! never rejected. Assertions are structured (code, issue, args).
 
@@ -143,11 +143,29 @@ fn main_body_is_exempt_for_conversions() {
 }
 
 #[test]
-fn main_body_is_not_exempt_for_failable_calls() {
-    // The runner cannot lower an unhandled failable call in main and the TS
-    // target drops the Result, so the exemption covers conversions only.
+fn main_body_is_exempt_for_failable_calls() {
+    // D17.8: an unhandled failable call directly in main panics (fi6c), as a
+    // failable conversion there does.
+    assert_accepts(&format!(
+        "{FAILABLE_FN}incipit {{\n    fixum numerus n ← f(1)\n    nota n\n}}\n"
+    ));
+    assert_accepts(&format!("{FAILABLE_FN}incipit {{\n    nota f(1)\n}}\n"));
+}
+
+#[test]
+fn closures_in_main_do_not_inherit_the_call_exemption() {
     assert_rejects_with_issue(
-        &format!("{FAILABLE_FN}incipit {{\n    fixum numerus n ← f(1)\n    nota n\n}}\n"),
+        &format!("{FAILABLE_FN}incipit {{\n    fixum _ h ← numerus x ∴ f(x)\n    nota h(1)\n}}\n"),
+        CALL_ISSUE,
+    );
+}
+
+#[test]
+fn helper_called_from_main_is_not_exempt_for_failable_calls() {
+    assert_rejects_with_issue(
+        &format!(
+            "{FAILABLE_FN}functio g() → numerus {{\n    redde f(1)\n}}\n\nincipit {{\n    nota g()\n}}\n"
+        ),
         CALL_ISSUE,
     );
 }

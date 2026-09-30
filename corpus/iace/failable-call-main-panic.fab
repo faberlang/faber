@@ -1,0 +1,52 @@
++++
+term = "functio"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "type_annotation", "owned_type", "base_type", "si_stmt", "arm", "iace_stmt", "iace_expr", "comparison", "additive_expr", "redde_stmt", "incipit_stmt", "fixum_decl", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "function"
+canonical = false
+summary = "An unhandled failable call directly in main panics: exit code 1, the error value as the message."
+syntax = "<failable call>  (in main, outside fac/cape)"
+related = ["functio", "⇥", "fac", "cape", "iace"]
+locale = "en"
++++
+# =============================================================================
+# functio — An unhandled failure directly in main panics
+# =============================================================================
+#
+# What this teaches:
+#   • `main` is the top frame: a failable call there (`→ T ⇥ E`) needs no
+#     handler. If it fails, the program panics — exit code 1, the error value
+#     reported as the message — instead of being a compile error.
+#   • Output before the failing call is kept: `3` below prints, `99` never does.
+#   • Only `main` is exempt. A helper function calling a failable function still
+#     needs `fac { } cape err { }` or its own `⇥`: errors do not unwind through
+#     a frame that does not declare them.
+#
+# Common mistakes:
+#   • Expecting the panic to be recoverable with `fac … cape` around `main`.
+#   • Relying on this in a helper — the same call there is
+#     `failable_call_requires_handler`.
+#
+# See also: functio, ⇥, fac, cape, iace
+# =============================================================================
+
+# functio — unhandled failable call in main
+#
+# POLICY:
+#   The call below runs on the happy path first (`risky(1)` is 2, so the sum
+#   is 3), then `risky(-1)` throws "negative input" with no handler in sight:
+#   the program aborts with that message.
+
+fn risky(int n) → int ⇥ string {
+    if n ≺ 0 {
+        throw "negative input"
+    }
+    return n + 1
+}
+
+main {
+    print risky(1) + 1
+    const int x ← risky(-1)
+    print x
+    print 99
+}

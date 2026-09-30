@@ -171,7 +171,13 @@ where
             if let Some(trap) = trap_from_payload(payload.as_ref()) {
                 match trap {
                     HostTrap::Exit(code) => Ok(exit_code_from_i32(code)),
-                    HostTrap::Abort(_) => Ok(ExitCode::FAILURE),
+                    HostTrap::Abort(message) => {
+                        // A runtime panic (`mori`, `adfirma`, an unhandled
+                        // failure in `main`) reports its message the way an
+                        // unhandled conversion failure does.
+                        eprintln!("error: {message}");
+                        Ok(ExitCode::FAILURE)
+                    }
                 }
             } else {
                 Err(payload)

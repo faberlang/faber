@@ -568,6 +568,44 @@ fn run_reader_locale_accepts_direct_entry_file_input() {
 }
 
 #[test]
+fn run_unhandled_failable_call_in_main_panics_with_the_error_message() {
+    // D17.8 (fi6c): a failure directly in `main` is a panic: exit code 1, the
+    // output before it kept, and the error value reported on stderr.
+    let source = write_single_file(
+        "run-unhandled-failable-call-panics",
+        r#"
+fn risky(int n) → int ⇥ string {
+    if n ≺ 0 {
+        throw "negative input"
+    }
+    return n + 1
+}
+
+main {
+    print risky(1)
+    const int x ← risky(-1)
+    print x
+}
+"#,
+    );
+
+    let (stdout, stderr, status) =
+        run_faber_status(&["run", source.to_str().expect("utf8 source path")]);
+
+    assert_eq!(
+        status.code(),
+        Some(1),
+        "a panic exits with code 1:\n{stderr}"
+    );
+    assert_eq!(stdout, "2\n", "output before the panic is kept");
+    // ALLOW_DIAGNOSTIC_RENDER_TEXT: the runtime abort message is the CLI stderr contract.
+    assert!(
+        stderr.contains("negative input"),
+        "the panic message must reach stderr, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn run_reader_locale_accepts_manifest_file_input() {
     let package = write_basic_package(
         "run-reader-locale-manifest",
