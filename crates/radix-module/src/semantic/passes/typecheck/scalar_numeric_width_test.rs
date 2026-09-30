@@ -536,7 +536,9 @@ fn metal_and_wgsl_reject_every_modular_width_kernel_with_stable_issue() {
 
 #[cfg(feature = "mir-sexp")]
 #[test]
-fn sexp_rejects_every_modular_width_and_names_the_width() {
+fn sexp_accepts_every_modular_width() {
+    // ss5 (6a53b353e) lifted the sexp modular/saturating gate and implemented
+    // the words in radix-mir-sexp; every width must now emit.
     for (width, max) in [
         ("u8", "255"),
         ("u16", "65535"),
@@ -545,15 +547,7 @@ fn sexp_rejects_every_modular_width_and_names_the_width() {
     ] {
         let source = format!("incipit {{\n    fixum modulus<{width}> max ← {max}\n    nota max + 1\n}}\n");
         let result = test_support::compile_for_target_and_get_result(&source, Target::MirSexp);
-        assert!(!result.success(), "Sexp unexpectedly accepted modulus<{width}>");
-        assert!(
-            result.diagnostics.iter().any(|diagnostic| diagnostic
-                .args
-                .iter()
-                .any(|arg| arg.name == "issue" && arg.value == "modular_word_target_unsupported")),
-            "Sexp modulus<{width}> diagnostics: {:?}",
-            result.diagnostics
-        );
+        assert!(result.success(), "Sexp modulus<{width}> now emits: {:?}", result.diagnostics);
     }
 }
 
@@ -595,7 +589,7 @@ incipit {
 
 #[cfg(feature = "mir-sexp")]
 #[test]
-fn sexp_rejects_modular_words_before_emit() {
+fn sexp_accepts_modular_words_at_emit() {
     let result = test_support::compile_for_target_and_get_result(
         r"
 incipit {
@@ -605,15 +599,7 @@ incipit {
 ",
         Target::MirSexp,
     );
-    assert!(!result.success(), "Sexp unexpectedly accepted modular words");
-    assert!(
-        result.diagnostics.iter().any(|diagnostic| diagnostic
-            .args
-            .iter()
-            .any(|arg| arg.name == "issue" && arg.value == "modular_word_target_unsupported")),
-        "Sexp diagnostics: {:?}",
-        result.diagnostics
-    );
+    assert!(result.success(), "Sexp now emits modular words: {:?}", result.diagnostics);
 }
 
 #[test]
