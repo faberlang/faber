@@ -1441,9 +1441,9 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | Faber      | Meaning |
 | ---------- | ------- |
 | `textus`   | Unicode string |
-| `textus<N>` | shipped; bounded Unicode string; `N` is a `आकार` / `NATURAL` capacity, not a width marker. `textus<_>` is the capacity hole (infer `N`). |
+| `textus<N>` | shipped; bounded Unicode string; `N` is a `आकार` / `NATURAL` capacity, not a width marker. `textus<_>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `ascii`    | ASCII-only string |
-| `ascii<N>` | shipped; bounded ASCII string; `N` is a `आकार` / `NATURAL` capacity, not a width marker. `ascii<_>` is the capacity hole (infer `N`). |
+| `ascii<N>` | shipped; bounded ASCII string; `N` is a `आकार` / `NATURAL` capacity, not a width marker. `ascii<_>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `littera`  | en `char`; one Unicode scalar value (D10.1–10.2): a 4-byte value that never allocates (Rust `char`, Go `rune`). Element of `textus` / `ascii` iteration and of `textus[i]` / `ascii[i]` indexing. Grapheme clusters are norma library work, not this type. |
 | `forma`    | captured template + params |
 | `numerus`  | integer (default `i64`) |
@@ -1456,7 +1456,7 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | `numquam`  | never |
 | `ignotum`  | unknown |
 | `octeti`   | bytes |
-| `octeti<N>` | shipped; bounded byte buffer; `N` is a `आकार` / `NATURAL` capacity, not a width marker. `octeti<_>` is the capacity hole (infer `N`). |
+| `octeti<N>` | shipped; bounded byte buffer; `N` is a `आकार` / `NATURAL` capacity, not a width marker. `octeti<_>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `octetus`  | en `byte`; an exact alias of `numerus<u8>` (D10.4) — arithmetic and `0x0A` comparisons use it directly. Fixed-width; rejects applied parameters. |
 
 Bare `textus` / `ascii` / `octeti` remain the unbounded productions. The
@@ -1466,6 +1466,14 @@ width marker and not a language-wide default. `_` in that slot (`ascii<_>`,
 `textus<_>`, `octeti<_>`, `lista<T, _>`) is a capacity hole: the form stays
 bounded, and `N` is inferred from a same-family bounded witness. Bare
 `ascii` is not a hole.
+
+Capacities and extents are buffer bounds, so a capacity or extent value may arrive at compile time or at run time (`आकार` means one
+thing everywhere; gpu-reset rule 11). **Admitted, scheduled (FLD K14), not shipped:** today every capacity and extent must be a
+compile-time value or inferred from a witness. Under K14 the same syntax accepts a run-time-origin size, a `_` in a capacity or extent
+position means inferred if possible and otherwise bound at run time, and a size relation that cannot be proven statically is checked at
+the call boundary as a recoverable error, never a silent reshape. Type parameters, element types, numeric widths, tensor rank and
+layout, `vector` and `matrix` register shapes, and `atomic<T>` stay compile-time; a whole-shape `_` must still resolve its rank at
+compile time.
 
 **`octeti ≡ lista<octetus>` is a type-identity fact (D10.4), not mutual
 assignability**: the two names denote the same type for checking, `↦`, and
@@ -1676,22 +1684,24 @@ There is no exemption.
 | Faber          | Meaning  |
 | -------------- | -------- |
 | `lista<T>`     | array    |
-| `lista<T, N>`  | shipped; bounded array; `N` is a `आकार` / `NATURAL` capacity, not a width marker. `lista<T, _>` is the capacity hole (infer `N`). |
+| `lista<T, N>`  | shipped; bounded array; `N` is a `आकार` / `NATURAL` capacity, not a width marker. `lista<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `queue<T>`     | shipped; unbounded FIFO queue |
-| `queue<T, N>`  | shipped; bounded FIFO queue; `N` is a `आकार` / `NATURAL` capacity, not a width marker. `queue<T, _>` is the capacity hole (infer `N`). |
+| `queue<T, N>`  | shipped; bounded FIFO queue; `N` is a `आकार` / `NATURAL` capacity, not a width marker. `queue<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `stack<T>`     | shipped; unbounded LIFO stack |
-| `stack<T, N>`  | shipped; bounded LIFO stack; `N` is a `आकार` / `NATURAL` capacity, not a width marker. `stack<T, _>` is the capacity hole (infer `N`). |
+| `stack<T, N>`  | shipped; bounded LIFO stack; `N` is a `आकार` / `NATURAL` capacity, not a width marker. `stack<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `tabula<K,V>`  | map      |
 | `copia<T>`     | set      |
 | `promissum<T>` | promise  |
 | `cursor<T>`    | iterator |
-| `tensor<T, Figura>` | dense homogeneous buffer with static shape `Figura`; numeric methods require numeric element types |
+| `tensor<T, Figura>` | dense homogeneous buffer whose shape `Figura` is part of the type: element type and rank are static, and each extent is a size that is a compile-time value today (shipped) and may be bound at run time once K14 lands (admitted, scheduled, not shipped); numeric methods require numeric element types |
 | `vector<T, N>` | register-class numeric vector with static width `N` (single dimension, not buffer-backed) |
 | `matrix<T, [R, C]>` | register-class numeric matrix with exactly two static dimensions (not buffer-backed and not a tensor alias) |
 | `atomic<T>` | storage-sensitive atomic cell; v1 accepts `i32` / `u32` elements only and access must go through atomic methods |
-| `sparsa<T, Figura>` | sparse homogeneous buffer with static shape `Figura`; omitted coordinates equal zero; numeric methods require numeric element types |
+| `sparsa<T, Figura>` | sparse homogeneous buffer whose shape `Figura` is part of the type (element type and rank static; extents compile-time today, run-time-bindable once K14 lands — admitted, scheduled, not shipped); omitted coordinates equal zero; numeric methods require numeric element types |
 
 A `figura` is `_`, a natural number, a size identifier, or a bracketed list of nested figura values; empty `[]` is rank-0. Bare `tensor<T>` is incomplete — use `tensor<T, []>` for rank-0 or `tensor<T, _>` to infer shape.
+
+Extents follow the same binding-time rule as capacities (see the capacity paragraph above): shipped, every extent is a compile-time value and a `_` extent infers from a witness; admitted, scheduled (K14), not shipped: `[H, W]` accepts compile-time and run-time extents alike (one syntax, no separate run-time marker), and an unresolved `_` extent is bound at run time instead of being an error. Rank and layout stay static.
 
 `vacua` for `tensor<T, []>` produces a rank-0 tensor (one default-initialized element slot).
 `vacua` for `sparsa<T, Figura>` (any shape) produces an all-zero sparse tensor with no stored entries.
