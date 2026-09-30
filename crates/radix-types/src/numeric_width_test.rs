@@ -347,7 +347,7 @@ fn width_lowering_failures_report_typed_issues() {
     let params = [marker_expr("u8", &mut interner)];
     assert!(
         lower_standalone_width_type("f32", &params, &mut types, &mut |issue| {
-            reported.push(issue)
+            reported.push(issue);
         })
         .is_some()
     );
@@ -357,7 +357,7 @@ fn width_lowering_failures_report_typed_issues() {
     let mut reported = Vec::new();
     assert!(
         lower_standalone_width_type("f32", &[], &mut types, &mut |issue| {
-            reported.push(issue)
+            reported.push(issue);
         })
         .is_some()
     );
@@ -418,7 +418,7 @@ fn sized_primitive_lowering_reports_typed_issues() {
     for (prim, params, expected, issue_name) in cases {
         let mut reported = Vec::new();
         lower_sized_primitive(prim, &params, &interner, &mut types, &mut |issue| {
-            reported.push(issue)
+            reported.push(issue);
         });
         assert_eq!(reported, vec![expected], "issue name {issue_name}");
         assert_eq!(reported[0].issue(), issue_name);
@@ -432,7 +432,7 @@ fn modular_word_lowering_reports_typed_issues() {
 
     let mut reported = Vec::new();
     lower_modular_word(&[], &interner, &mut types, &mut |issue| {
-        reported.push(issue)
+        reported.push(issue);
     });
     assert_eq!(reported, vec![WidthLowerIssue::ModularWordRequired]);
     assert_eq!(reported[0].issue(), "modular_word_width_required");
@@ -440,7 +440,7 @@ fn modular_word_lowering_reports_typed_issues() {
     let mut reported = Vec::new();
     let params = [marker_expr("i32", &mut interner)];
     lower_modular_word(&params, &interner, &mut types, &mut |issue| {
-        reported.push(issue)
+        reported.push(issue);
     });
     assert_eq!(reported, vec![WidthLowerIssue::ModularWordUnsupported]);
     assert_eq!(reported[0].issue(), "unsupported_modular_word_width");
@@ -448,7 +448,7 @@ fn modular_word_lowering_reports_typed_issues() {
     let mut reported = Vec::new();
     let params = [marker_expr("f32", &mut interner)];
     lower_modular_word(&params, &interner, &mut types, &mut |issue| {
-        reported.push(issue)
+        reported.push(issue);
     });
     assert_eq!(reported, vec![WidthLowerIssue::ModularWordUnsignedRequired]);
     assert_eq!(reported[0].issue(), "modular_word_unsigned_width_required");
@@ -460,7 +460,7 @@ fn modular_word_lowering_reports_typed_issues() {
         &mut interner,
     )];
     lower_modular_word(&params, &interner, &mut types, &mut |issue| {
-        reported.push(issue)
+        reported.push(issue);
     });
     assert_eq!(reported, vec![WidthLowerIssue::ModularWordShape]);
     assert_eq!(reported[0].issue(), "modular_word_width_shape");
@@ -610,7 +610,7 @@ fn float_overflow_is_rounding_to_infinity() {
     assert!(!over(NumericWidth::F16, 65504.0));
     assert!(!over(NumericWidth::F16, 65519.0));
     assert!(over(NumericWidth::F16, 65520.0));
-    assert!(!over(NumericWidth::BF16, 3.3895313892515355e38));
+    assert!(!over(NumericWidth::BF16, 3.389_531_389_251_535_5e38));
     assert!(over(NumericWidth::BF16, 1e39));
     assert!(!over(NumericWidth::F64, f64::MAX));
 }

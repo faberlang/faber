@@ -656,6 +656,10 @@ pub fn float_overflows(width: NumericWidth, value: f64) -> bool {
 /// Whether an integer is exactly representable in a float width (ruling
 /// 20(1)): its significant bits fit the significand and it is finite there.
 #[must_use]
+// The cast only feeds an overflow-range check; rounding cannot move a
+// magnitude across a float format's finite bound in a way that matters
+// once the significand check above has passed.
+#[allow(clippy::cast_precision_loss)]
 pub fn float_holds_integer(width: NumericWidth, value: i128) -> bool {
     let Some((precision, _)) = float_format(width) else {
         return false;

@@ -1585,10 +1585,14 @@ incipit {
 
     assert!(result.success());
     let output = super::rust_output(result);
-    assert!(!output.code.contains("if ("));
-    assert!(!output.code.contains("while ("));
-    assert!(!output.code.contains("return (a + b);"));
-    assert!(!output.code.contains("sum((x * 2), (x + 1))"));
+    // The emitted integer-helper prelude legitimately parenthesizes a range
+    // before `.contains(..)` in a match guard; the guarantee is about the
+    // lowered user code, so check from the first user item onward.
+    let user_code = &output.code[output.code.find("fn sum").expect("user fn sum")..];
+    assert!(!user_code.contains("if ("), "{user_code}");
+    assert!(!user_code.contains("while ("));
+    assert!(!user_code.contains("return (a + b);"));
+    assert!(!user_code.contains("sum((x * 2), (x + 1))"));
 }
 
 #[test]

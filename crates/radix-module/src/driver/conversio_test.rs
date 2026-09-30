@@ -635,13 +635,13 @@ fn tensor_element_width_lattice_codegen_matrix() {
 fn verte_static_ascription_emits_as_cast() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum _ n ← 42
+  fixum f32 n ← 1.5
   fixum _ f ← n ∷ fractus
   nota f
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result.success());
+    assert!(result.success(), "{:?}", result.diagnostics);
     let output = super::rust_output(result);
     assert!(output.code.contains(" as f64"));
 }

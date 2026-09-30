@@ -592,7 +592,7 @@ fn require_nonempty(field: &'static str, value: &str) -> Result<(), HostExecutio
 
 fn require_nonzero<T>(field: &'static str, value: T) -> Result<(), HostExecutionWireError>
 where
-    T: PartialEq + From<u8>,
+    T: Copy + PartialEq + From<u8>,
 {
     if value == T::from(0) {
         Err(HostExecutionWireError::invalid(field, "must be nonzero"))

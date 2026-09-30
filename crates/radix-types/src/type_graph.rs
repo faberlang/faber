@@ -12,6 +12,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 /// not on any cycle gets its own index (it is cyclic only through a self
 /// edge, which callers read from their own edge lists).
 #[must_use]
+// The hasher is deliberately fixed to Fx: callers and the result use Fx
+// collections throughout, so generalizing over `BuildHasher` adds nothing.
+#[allow(clippy::implicit_hasher)]
 pub fn strongly_connected_components(
     nodes: &FxHashSet<DefId>,
     edges: &FxHashMap<DefId, Vec<DefId>>,
