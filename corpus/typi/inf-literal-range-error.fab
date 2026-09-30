@@ -1,0 +1,41 @@
++++
+term = "inf"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A literal too big for its slot is a compile error, however long it is; an `inf` slot is the opt-in that holds it."
+syntax = "const numerus x ← 18446744073709551616 — rejected; declare the slot `inf`"
+related = ["inf", "numerus", "u64"]
+locale = "en"
++++
+# =============================================================================
+# inf — a literal must fit its slot
+# =============================================================================
+#
+# What this teaches:
+#   • An integer literal of any length is a constant, and it lands only where
+#     its exact value fits. `18446744073709551616` is 2^64: one past `u64`,
+#     so it does not fit `numerus` (`numerus_literal_out_of_range`).
+#   • The fix is the opt-in `inf` slot: `const inf x ← 18446744073709551616`.
+#   • No literal quietly becomes an `inf`; the slot decides.
+#
+# Common mistakes:
+#   • leaving the slot unannotated — an unannotated big literal defaults to
+#     `numerus` and is rejected the same way.
+#
+# See also: inf, numerus, u64
+# =============================================================================
+
+# typi/inf-literal-range-error — a literal beyond the slot's range
+#
+# WHY: pins F9 rulings 34 and 47 at `faber check`: the lexer accepts the
+# long literal, the slot rule rejects it by issue name.
+#
+# EXPECTED OUTPUT:
+#   inf-literal-range-error.expected — the stable diagnostic identity.
+
+main {
+    const numerus too_big ← 18446744073709551616
+    print too_big
+}

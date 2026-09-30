@@ -1,0 +1,43 @@
++++
+term = "inf"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "incipit_stmt", "type_annotation", "owned_type", "base_type", "qualified_type", "expression", "literal", "nota_stmt"]
+category = "gpu"
+canonical = false
+summary = "`inf` is a host-only type: a kernel parameter of type `inf` is a named legality error."
+syntax = "@ kernel fn launch(inf lane) → void {} — rejected; narrow on the host first"
+related = ["inf", "nucleum", "publica"]
+locale = "en"
++++
+# =============================================================================
+# inf — host-only in kernels
+# =============================================================================
+#
+# What this teaches:
+#   • A kernel parameter, return, local or field must have a device layout.
+#     `inf` does not, so it is reported as a host-only type
+#     (`nucleum_host_type`) by `faber check`, before any device lowering.
+#   • Narrow on the host and pass the fixed-width result: `x ↦ u64 ⊥ 0`.
+#
+# Common mistakes:
+#   • passing an exact big value straight to a kernel — kernels work on
+#     fixed-width numbers.
+#
+# See also: inf, nucleum, publica
+# =============================================================================
+
+# kernel/inf-param-error — an `inf` kernel parameter
+#
+# WHY: pins F9 rulings 39(b) and 47 beside the other kernel legality rules.
+#
+# EXPECTED OUTPUT:
+#   inf-param-error.expected — the stable diagnostic identity.
+
+@ kernel
+@ public
+fn launch(inf lane) → void {
+}
+
+main {
+    print 1
+}

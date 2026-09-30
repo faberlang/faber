@@ -1,0 +1,157 @@
++++
+term = "inf"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "si_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "typed_constructor", "field_list", "field_init", "field_key", "additive_expr", "multiplicative_expr", "bitwise_and_expr", "shift_expr", "unary_expr", "conversio_expr", "inline_default", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "array_literal", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "`inf` is the opt-in unbounded integer: exact arithmetic with no size trap, exact comparison against every number family, and checked narrowing back."
+syntax = "inf | trapping<inf> | wrapping<inf> | saturating<inf>"
+related = ["numerus", "u64", "d64", "↦", "⊥", "⇐", "¶"]
+locale = "en"
++++
+# =============================================================================
+# inf — the opt-in unbounded integer
+# =============================================================================
+#
+# What this teaches:
+#   • `inf` is an integer with no bound. You opt in by declaring a slot `inf`;
+#     nothing becomes `inf` by default. `trapping<inf>`, `wrapping<inf>` and
+#     `saturating<inf>` are the same type: there is no bound to trap at, wrap
+#     at or clamp to.
+#   • A literal of any length is a constant. It is legal where its exact value
+#     fits, so `18446744073709551616` (2^64) needs an `inf` slot.
+#   • `+ - *`, `⇐` and recursion never overflow: 30! and 2^201 are exact.
+#   • `/` and `%` floor, as on every integer: `-7 / 2` is -4 and `-7 % 2` is 1.
+#   • `∧ ∨ ⊻ ¬` work on infinite two's complement: `¬x` is `-x - 1`, and
+#     `x ∧ -1` is `x`.
+#   • Comparison is exact against every number family. `2^64 + 1` is not
+#     equal to the float `2^64`, even though the float rounds.
+#   • A bounded integer widens into `inf` without `↦`: the `u64` maximum, put
+#     in an `inf` slot, takes `+ 1` exactly instead of trapping.
+#   • Going back down is a checked narrowing: `x ↦ u64 ⊥ 9` yields 9 when the
+#     value does not fit. `↦ float` rounds, and a value beyond the float
+#     range is `inf` or `-inf` (the printed spelling of float infinity; the
+#     integer type `inf` is unrelated to it). A float enters `inf` by
+#     truncation, a `d64` by half-even rounding; NaN and ∞ fail.
+#   • `↦` and `¶` work on `inf` like any integer: parse and render at a
+#     radix with `via Hex`, pad with a format spec, print a field.
+#
+# Common mistakes:
+#   • Writing a big literal into a bounded or unannotated slot — the value
+#     does not fit `numerus`; declare the slot `inf`.
+#   • Expecting `u64 - u64` to be `inf` — it stays `i64`. Opt in by widening
+#     an operand: `(a ↦ inf) - b`.
+#   • Using `inf` for a tensor element or in a kernel — both are host-only
+#     rejections (see typi/inf-tensor-error and kernel/inf-param-error).
+#   • Expecting `∞` to be an `inf` value — `∞` is the float infinity.
+#
+# See also: numerus, u64, d64, ↦, ⊥, ⇐, ¶
+# =============================================================================
+
+# operatores/inf — one exemplum for the whole unbounded-integer surface
+#
+# WHY: pins F9 rulings 34–38 and 40–42 on the MIR runner (the oracle).
+# Each numbered section prints one idea; sections 1–4 are arithmetic, 5–6
+# compare and widen, 7–10 convert, 11–12 render and collect.
+#
+# EXPECTED OUTPUT:
+#   inf.expected — one result per print.
+
+class Sample {
+    const inf v
+}
+
+fn factorial(inf n) → inf {
+    if n ≤ 1 {
+        return 1
+    }
+    return n * factorial(n - 1)
+}
+
+main {
+    # 1. Opt-in declaration and a literal beyond u64. The three policy
+    #    spellings are one type and add without any check.
+    const inf big ← 18446744073709551616
+    print big
+    const trapping<inf> five ← 5
+    const wrapping<inf> six ← 6
+    print five + six
+
+    # 2. No size trap: 30! and 2^201 are exact.
+    print factorial(30)
+    const inf pow ← 2 ⇐ 200
+    print pow
+
+    # 3. Floor division and remainder take the sign of the divisor.
+    const inf neg ← -7
+    print neg / 2
+    print neg % 2
+
+    # 4. Bitwise operators and shifts on infinite two's complement.
+    print ¬neg
+    print neg ∧ -1
+    print neg ⇒ 1
+
+    # 5. Exact comparison across families. The float 2^64 is exactly 2^64,
+    #    so one more is greater; a rounding comparison would call them equal.
+    const u64 top ← 18446744073709551615
+    const float flt ← 18446744073709551616.0
+    const int<d64> dec ← 1.5
+    print big ≻ top
+    print top ≺ big
+    print big ≅ flt
+    print big + 1 ≅ flt
+    print big + 1 ≻ flt
+    print big ≻ dec
+
+    # 6. A u64 widens into inf without `↦`; `+ 1` past u64::MAX is exact.
+    const inf widened ← top
+    print widened + 1
+
+    # 7. Checked narrowing: recovery when the value does not fit.
+    print big ↦ u64 ⊥ 9
+    const inf small ← 200
+    print small ↦ u8 ⊥ 9
+    const inf over ← small + 100
+    print over ↦ u8 ⊥ 255
+
+    # 8. Floats: finite, then beyond the float range.
+    print small ↦ float
+    print big ↦ float
+    const inf huge ← pow * pow * pow * pow * pow * pow * pow * pow * pow * pow
+    print huge ↦ float
+    const inf below ← 0 - huge
+    print below ↦ float
+
+    # 9. Into inf: a float truncates toward zero, a d64 rounds half-even
+    #    (the `d64 ↦ i64` rule), and only a NaN or infinite float fails.
+    const float frac ← 12.75
+    const float negfrac ← -12.75
+    const int<d64> half ← 12.5
+    const int<d64> threequarters ← 12.75
+    const float not_a_number ← 0.0 ÷ 0.0
+    const float float_infinity ← ∞
+    print frac ↦ inf
+    print negfrac ↦ inf
+    print half ↦ inf
+    print threequarters ↦ inf
+    print not_a_number ↦ inf ⊥ 5
+    print float_infinity ↦ inf ⊥ 6
+    const inf trillions ← 100000000000000000000
+    print trillions ↦ d64 ⊥ 0.5
+
+    # 10. Text: parse and render at a radix.
+    print "ff" ↦ inf via Hex
+    print big ↦ textus
+    print big ↦ ascii<17> via Hex
+
+    # 11. `¶` formats like any integer.
+    print big ¶ "x"
+    print big ¶ ".2"
+
+    # 12. A field prints its digits; a list sums exactly.
+    const Sample sample ← Sample { v = 18446744073709551616 }
+    print sample
+    const lista<inf> items ← [1, 18446744073709551616, 3]
+    print items.sum()
+}

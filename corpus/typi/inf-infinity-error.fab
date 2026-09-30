@@ -1,0 +1,41 @@
++++
+term = "inf"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "`∞` is the float infinity, not an `inf` value: it does not initialise an `inf` slot."
+syntax = "const inf x ← ∞ — rejected; ∞ is a float"
+related = ["inf", "fractus"]
+locale = "en"
++++
+# =============================================================================
+# inf — `∞` is a float
+# =============================================================================
+#
+# What this teaches:
+#   • `inf` is an integer type: every value is a finite integer. `∞` is the
+#     IEEE float infinity and has type `float`, so it does not fit an `inf`
+#     slot (`expression_type_mismatch`).
+#   • A float converts into `inf` only through `↦`, and only a finite float
+#     converts: `∞ ↦ inf` fails at run time.
+#
+# Common mistakes:
+#   • reading `inf` as "infinity" — it is "unbounded", and never infinite.
+#     A float infinity prints as `inf`, which is a separate thing.
+#
+# See also: inf, fractus
+# =============================================================================
+
+# typi/inf-infinity-error — `∞` into an `inf` slot
+#
+# WHY: pins F9 rulings 33 and 47: the type name and the float value share
+# only their spelling when printed.
+#
+# EXPECTED OUTPUT:
+#   inf-infinity-error.expected — the stable diagnostic identity.
+
+main {
+    const inf infinite ← ∞
+    print infinite
+}

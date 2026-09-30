@@ -1,0 +1,2 @@
+# Stable diagnostic identity; paths and rendered prose are not an oracle.
+error[SEM008:tensor_element_unbounded]

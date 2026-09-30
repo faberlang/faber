@@ -1,0 +1,42 @@
++++
+term = "inf"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "incipit_stmt", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "`inf` is not a tensor element: a tensor is device-shaped, and `inf` has no device layout."
+syntax = "tensor<inf, [2]> — rejected; use lista<inf>"
+related = ["inf", "tensor", "lista"]
+locale = "en"
++++
+# =============================================================================
+# inf — no tensor element
+# =============================================================================
+#
+# What this teaches:
+#   • A tensor element must have a device layout; `inf` is a heap value on
+#     the host, so `tensor<inf, [2]>` is rejected where the type is written
+#     (`tensor_element_unbounded`), not later at a use.
+#   • `lista<inf>` is the host collection of unbounded integers.
+#
+# Common mistakes:
+#   • reaching for a tensor to hold big integers — a tensor is for device
+#     work on fixed-width numbers.
+#
+# See also: inf, tensor, lista
+# =============================================================================
+
+# typi/inf-tensor-error — `inf` as a tensor element
+#
+# WHY: pins F9 rulings 39(a) and 47: the rejection is the same on every
+# machine, at the declaration.
+#
+# EXPECTED OUTPUT:
+#   inf-tensor-error.expected — the stable diagnostic identity.
+
+fn shaped(tensor<inf, [2]> values) → void {
+}
+
+main {
+    print 1
+}

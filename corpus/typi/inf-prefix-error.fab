@@ -1,0 +1,40 @@
++++
+term = "inf"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "`inf` takes no width-prefix sugar: `linf` is an ordinary name, so as a type it is unknown."
+syntax = "const linf x ← 1 — rejected; write `inf`"
+related = ["inf", "numerus"]
+locale = "en"
++++
+# =============================================================================
+# inf — no prefixed sugar
+# =============================================================================
+#
+# What this teaches:
+#   • Some width markers have prefixed sugar (`lf32` is a list of `f32`, `tf32`
+#     a tensor). `inf` has none: `linf`, `tinf`, `vinf`, `minf` and `sinf`
+#     stay ordinary identifiers, so `const linf x` names an unknown type
+#     (`unknown_type`).
+#   • Write the collection out: `lista<inf>`.
+#
+# Common mistakes:
+#   • expecting `linf` to be a list of `inf` — it is just a name.
+#
+# See also: inf, numerus
+# =============================================================================
+
+# typi/inf-prefix-error — `linf` is not a type
+#
+# WHY: pins F9 rulings 32 and 47: `sinf` (sine) and `linf` (the L-infinity
+# norm) are plausible identifiers, so `inf` joins no sugar family.
+#
+# EXPECTED OUTPUT:
+#   inf-prefix-error.expected — the stable diagnostic identity.
+
+main {
+    const linf prefixed ← 1
+    print prefixed
+}
