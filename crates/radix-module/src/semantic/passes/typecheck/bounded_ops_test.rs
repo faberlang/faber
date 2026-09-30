@@ -69,7 +69,8 @@ incipit {
 #[test]
 fn bounded_ops_appende_requires_alternate_exit() {
     assert_rejects_with_issue(
-        r"incipit {
+        // D17.8: `incipit` (main) is exempt; the rule applies in a helper.
+        r"functio grow() → vacuum {
     varia lista<numerus, 8> xs ← vacua
     xs.appende(1)
 }",

@@ -96,7 +96,7 @@ fn convert_shift_cast_operand_parenthesizes() {
     let source = r#"+++
 locale = "la"
 +++
-functio be4(numerus n) → lista<numerus<u8>> {
+functio be4(numerus n) → lista<numerus<u8>> ⇥ textus {
     varia lista<numerus<u8>> out ← []
     out.appende((n ⇒ 24) ↦ numerus<u8>)
     redde out

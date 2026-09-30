@@ -626,6 +626,10 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             "handle the call with fac/cape, capture it with capta, or declare a function ⇥"
                 .to_owned(),
         ),
+        "failable_conversio_requires_handler" => Some(
+            "add a '⊥' default, wrap it in fac/cape or capta, or declare a function ⇥; a conversion that cannot fail needs none"
+                .to_owned(),
+        ),
         "call_default_type_mismatch" => {
             Some("give a default of the type the call returns on success".to_owned())
         }

@@ -1695,6 +1695,9 @@ impl TypeChecker<'_> {
             _ => {}
         }
 
+        // D17.8 exempts only failable conversions in `main {}`; a failable
+        // call there stays an error until the targets lower an unhandled
+        // call as a real panic (fi6c).
         self.invalid_operand_types(ISSUE_FAILABLE_CALL_REQUIRES_HANDLER, span);
         true
     }

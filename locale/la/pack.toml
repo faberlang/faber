@@ -2411,6 +2411,10 @@ help = "remove the explicit type argument list"
 message = "failable call requires a ⇥ declaring context, a local handler, or a {capta} trap"
 help = "handle the call with {fac}/cape, capture it with {capta}, or declare a function ⇥"
 
+[diagnostics.SEM011.issues.failable_conversio_requires_handler]
+message = "failable conversion from {source} to {target} requires a '⊥' default, a ⇥ declaring context, a local handler, or a {capta} trap"
+help = "add a '⊥' default, handle it with {fac}/cape or {capta}, or declare a function ⇥; the {incipit} body is exempt"
+
 [diagnostics.SEM010.issues.call_default_type_mismatch]
 message = "'⊥' default does not match the call's success type"
 help = "give a default of the type the call returns on success"

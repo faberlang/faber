@@ -259,6 +259,7 @@ impl TypeChecker<'_> {
 
         let prev_return = self.current_return;
         let prev_error = self.current_error;
+        let prev_main_frame = std::mem::take(&mut self.in_main_frame);
         let prev_await_context = self.current_await_context;
         let prev_await_return_context = self.current_await_return_context;
         let prev_inferred = self.inferred_return;
@@ -291,6 +292,7 @@ impl TypeChecker<'_> {
 
         self.current_return = prev_return;
         self.current_error = prev_error;
+        self.in_main_frame = prev_main_frame;
         self.current_await_context = prev_await_context;
         self.current_await_return_context = prev_await_return_context;
         self.inferred_return = prev_inferred;

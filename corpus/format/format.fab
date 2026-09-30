@@ -83,12 +83,18 @@ fn strings() {
 
 # Instants: named presets only.
 fn instants() {
-    const instant t ← "1979-05-27T07:32:00Z" ↦ instant
-    print t ¶ "iso"
-    print t ¶ "date"
-    print t ¶ "time"
-    const instant<ms> stamp ← "1979-05-27T07:32:00.123Z" ↦ instant<ms>
-    print stamp ¶ "iso"
+    # Both literals are valid instants, so the handler never runs.
+    do {
+        const instant t ← "1979-05-27T07:32:00Z" ↦ instant
+        print t ¶ "iso"
+        print t ¶ "date"
+        print t ¶ "time"
+        const instant<ms> stamp ← "1979-05-27T07:32:00.123Z" ↦ instant<ms>
+        print stamp ¶ "iso"
+    }
+    catch err {
+        panic err
+    }
 }
 
 # Edges: sign plus digits in hex; NaN and infinities ignore precision.

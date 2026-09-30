@@ -81,6 +81,7 @@ impl TypeChecker<'_> {
 
         let prev_return = self.current_return;
         let prev_error = self.current_error;
+        let prev_main_frame = std::mem::take(&mut self.in_main_frame);
         let prev_device_function = self.current_device_function;
         let prev_air_function = self.current_air_function;
         let prev_nucleum_entry = self.current_nucleum_entry;
@@ -124,6 +125,7 @@ impl TypeChecker<'_> {
 
         self.current_return = prev_return;
         self.current_error = prev_error;
+        self.in_main_frame = prev_main_frame;
         self.current_device_function = prev_device_function;
         self.current_air_function = prev_air_function;
         self.current_nucleum_entry = prev_nucleum_entry;
@@ -200,6 +202,7 @@ impl TypeChecker<'_> {
         };
         let prev_return = self.current_return;
         let prev_error = self.current_error;
+        let prev_main_frame = std::mem::take(&mut self.in_main_frame);
         let prev_generator_function = self.current_generator_function;
         let prev_await_context = self.current_await_context;
         let prev_await_return_context = self.current_await_return_context;
@@ -218,6 +221,7 @@ impl TypeChecker<'_> {
         let inferred = self.inferred_return.take();
         self.current_return = prev_return;
         self.current_error = prev_error;
+        self.in_main_frame = prev_main_frame;
         self.current_generator_function = prev_generator_function;
         self.current_await_context = prev_await_context;
         self.current_await_return_context = prev_await_return_context;

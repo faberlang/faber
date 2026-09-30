@@ -337,12 +337,10 @@ fn valor_to_fractus_conversio_emits_from_valor_with_widen() {
 fn valor_to_octeti_conversio_emits_octeti_match() {
     let session = test_session(Target::HirRust);
     let source = r"
-functio request_body_bytes(valor body) → octeti {
-    redde body ↦ octeti
-}
-
 incipit {
-    nota request_body_bytes({} ↦ valor).longitudo()
+    fixum valor body ← {} ↦ valor
+    fixum octeti bytes ← body ↦ octeti
+    nota bytes.longitudo()
 }
 ";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());

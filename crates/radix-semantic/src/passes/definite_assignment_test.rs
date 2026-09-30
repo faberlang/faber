@@ -761,7 +761,7 @@ fn accepts_conversio_assign_single_fixum_late_init() {
     // may receive its single value through `↤` exactly as through `←`.
     let result = crate::test_support::analyze_source(
         r#"
-functio pick() → numerus {
+functio pick() → numerus ⇥ textus {
     fixum numerus value
     value ↤ "7"
     redde value

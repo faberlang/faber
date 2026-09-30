@@ -89,7 +89,9 @@ fn radix_text_parse_into_decimal_rejects() {
 
 #[test]
 fn radix_text_parse_into_integer_still_accepts() {
-    test_support::assert_accepts("functio p(textus s) → numerus<u32> { redde s ↦ u32 via Hex }");
+    test_support::assert_accepts(
+        "functio p(textus s) → numerus<u32> ⇥ textus { redde s ↦ u32 via Hex }",
+    );
 }
 
 #[test]

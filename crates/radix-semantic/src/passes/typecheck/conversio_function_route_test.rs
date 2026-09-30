@@ -97,12 +97,22 @@ fn failable_pair_propagates_through_the_declared_channel() {
 
 #[test]
 fn failable_pair_without_default_or_channel_is_rejected() {
+    // D17.8: one rule for every failable `↦`, so the issue is
+    // `failable_conversio_requires_handler`; `incipit` (main) is exempt, so
+    // the site lives in a helper.
     assert_rejects_with_issue(
         &format!(
-            "{FAILABLE}incipit {{\n    fixum Positiva p ← Mensura {{ valor = 1 }} ↦ Positiva\n    nota p.valor\n}}"
+            "{FAILABLE}functio lege(Mensura m) → Positiva {{\n    redde m ↦ Positiva\n}}\nincipit {{ nota 1 }}"
         ),
-        "failable_call_requires_handler",
+        "failable_conversio_requires_handler",
     );
+}
+
+#[test]
+fn failable_pair_in_main_is_exempt() {
+    let _ = analyze_ok(&format!(
+        "{FAILABLE}incipit {{\n    fixum Positiva p ← Mensura {{ valor = 1 }} ↦ Positiva\n    nota p.valor\n}}"
+    ));
 }
 
 #[test]

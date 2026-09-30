@@ -163,7 +163,7 @@ fn as_float(int n) → float {
     return n ↦ float
 }
 
-fn parse_int(string s) → int {
+fn parse_int(string s) → int ⇥ string {
     return s ↦ int
 }
 
@@ -171,7 +171,7 @@ fn compile_re(string s) → regex {
     return s ↦ regex
 }
 
-fn encode(value v) → json {
+fn encode(value v) → json ⇥ string {
     return v ↦ json
 }
 
@@ -179,7 +179,7 @@ fn as_flag(string s) → bool {
     return s ↦ bool
 }
 
-fn folded() → int {
+fn folded() → int ⇥ string {
     return "42" ↦ int
 }
 
@@ -194,20 +194,25 @@ fn hot_cast(int n) → float {
 }
 
 main {
-    const float a ← as_float(1)
-    const int b ← parse_int("7")
-    const regex r ← compile_re("x")
-    const json j ← encode({ "k": 1 } ↦ value)
-    const bool flag ← as_flag("x")
-    const int f ← folded()
-    const float h ← hot_cast(2)
-    print a
-    print b
-    print r
-    print j
-    print flag
-    print f
-    print h
+    do {
+        const float a ← as_float(1)
+        const int b ← parse_int("7")
+        const regex r ← compile_re("x")
+        const json j ← encode({ "k": 1 } ↦ value)
+        const bool flag ← as_flag("x")
+        const int f ← folded()
+        const float h ← hot_cast(2)
+        print a
+        print b
+        print r
+        print j
+        print flag
+        print f
+        print h
+    }
+    catch err {
+        print err
+    }
 }
 "#,
     )

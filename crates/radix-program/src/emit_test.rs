@@ -190,12 +190,10 @@ fn valor_octeti_body_extraction_emits_octeti_match() {
     fs::write(
         dir.join("main.fab"),
         r"
-fn request_body_bytes(value body) → bytes {
-    return body ↦ bytes
-}
-
 main {
-    print request_body_bytes({} ↦ value).length()
+    const value body ← {} ↦ value
+    const bytes payload ← body ↦ bytes
+    print payload.length()
 }
 ",
     )

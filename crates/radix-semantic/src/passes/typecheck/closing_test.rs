@@ -70,7 +70,8 @@ fn typed_sermo_close_propagates_textus() {
 #[test]
 fn sermo_close_needs_an_error_sink() {
     test_support::assert_rejects_with_issue(
-        "incipit {\n\
+        // D17.8: `incipit` (main) is exempt; the rule applies in a helper.
+        "functio g() → vacuum {\n\
          fixum sermo s ← ad 'runtime:echo' (\"x\")\n\
          fixum bivalens clausa ← s.close()\n\
          }\n",

@@ -89,6 +89,7 @@ const ISSUE_WORD_CONVERSIO_RECOVERY_UNSUPPORTED: &str = "word_conversio_recovery
 const ISSUE_REGEX_CONVERSION_OPERAND_TYPE_MISMATCH: &str = "regex_conversion_operand_type_mismatch";
 const ISSUE_CONVERSIO_FAILURE_CHANNEL_TEXTUS_REQUIRED: &str =
     "conversio_failure_channel_textus_required";
+const ISSUE_FAILABLE_CONVERSIO_REQUIRES_HANDLER: &str = "failable_conversio_requires_handler";
 const ISSUE_REGEX_OPERAND_UNSUPPORTED: &str = "regex_operand_unsupported";
 const ISSUE_REGEX_RECOVERY_UNSUPPORTED: &str = "regex_recovery_unsupported";
 const ISSUE_REGEX_PATTERN_TOO_LONG: &str = "regex_pattern_too_long";
@@ -828,11 +829,9 @@ impl TypeChecker<'_> {
                 if let Some(recovery) = recovery {
                     self.note_conversio_recovery_checked(recovery, target_resolved);
                 } else if self.current_error.is_none() {
-                    self.invalid_operand_types(
-                        super::call::ISSUE_FAILABLE_CALL_REQUIRES_HANDLER,
-                        span,
-                    );
-                    return self.error_type;
+                    if self.reject_unhandled_conversio(source_ty, target_resolved, span) {
+                        return self.error_type;
+                    }
                 } else {
                     self.check_registered_row_channel(channel, span);
                 }
@@ -859,8 +858,12 @@ impl TypeChecker<'_> {
             self.note_conversio_recovery_checked(recovery, target_resolved);
         } else {
             self.check_conversio_propagation_channel(source_ty, target_resolved, span);
-            if self.numeric_conversio_can_fail(source, source_ty, target_resolved) {
-                self.check_text_failure_channel(span);
+            // An exact-width `Bits` bitcast (validated by `bits_pair_issue`)
+            // reinterprets the same bits and cannot fail.
+            if !self.conversio_has_bits_hint(params)
+                && self.numeric_conversio_can_fail(source, source_ty, target_resolved)
+            {
+                self.check_text_failure_channel(source_ty, target_resolved, span);
             }
         }
         target_resolved
@@ -2500,20 +2503,61 @@ impl TypeChecker<'_> {
         if !self.conversio_can_propagate_failure(source_ty, target_resolved) {
             return;
         }
-        self.check_text_failure_channel(span);
+        self.check_text_failure_channel(source_ty, target_resolved, span);
+    }
+
+    /// D17.8: a failable `↦` with no `⊥` default and no enclosing handler
+    /// (`fac`/`cape`, `capta`, or a function declaring `⇥ E`) is a compile
+    /// error, the same rule failable calls meet. The `main {}` body is
+    /// exempt: an unhandled failure there panics. Returns `true` when the
+    /// conversion was rejected.
+    fn reject_unhandled_conversio(
+        &mut self,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+        span: radix_lexer::Span,
+    ) -> bool {
+        if self.in_main_frame {
+            return false;
+        }
+        let source = self.format_union_constituent_type(self.resolve_inferred_type(source_ty));
+        let target = self.format_union_constituent_type(target_resolved);
+        self.invalid_operand_types_with_args(
+            ISSUE_FAILABLE_CONVERSIO_REQUIRES_HANDLER,
+            span,
+            &[("source", source), ("target", target)],
+        );
+        true
     }
 
     /// A bare failable `↦` propagates its text failure payload through the
     /// active alternate-exit channel, which must accept `textus`.
-    pub(super) fn check_text_failure_channel(&mut self, span: radix_lexer::Span) {
+    pub(super) fn check_text_failure_channel(
+        &mut self,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+        span: radix_lexer::Span,
+    ) {
         let Some(error_ty) = self.current_error.map(|sink| match sink {
             ErrorSink::Function(ty) | ErrorSink::Local(ty) => ty,
-            // UT: a bare failable `↦` inside a trap accumulates its failure
-            // payload into the trap hole — same funnel.
             ErrorSink::Trap(var) => self.trap_sink_type(var),
         }) else {
+            self.reject_unhandled_conversio(source_ty, target_resolved, span);
             return;
         };
+        // UT: a bare failable `↦` inside a `capta` accumulates its text
+        // failure payload into the trap hole, exactly as a failable call's
+        // error type does (`reject_failable_call`).
+        if matches!(self.current_error, Some(ErrorSink::Trap(_))) {
+            let textus = self.textus_type();
+            self.unify_assign_issue(
+                textus,
+                error_ty,
+                span,
+                super::control::ISSUE_TRAP_MEMBER_TYPE_MISMATCH,
+            );
+            return;
+        }
         let error_ty = self.resolve_inferred_type(error_ty);
         if self.is_infer(error_ty) {
             let textus = self.textus_type();

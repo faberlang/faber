@@ -53,7 +53,9 @@ impl TypeChecker<'_> {
         };
         match (row, recovery) {
             (_, Some(recovery)) => self.note_conversio_recovery_checked(recovery, target_resolved),
-            (LitteraRow::Failable, None) => self.check_text_failure_channel(span),
+            (LitteraRow::Failable, None) => {
+                self.check_text_failure_channel(source, target_resolved, span);
+            }
             (LitteraRow::Infallible, None) => {}
         }
         Some(target_resolved)

@@ -47,7 +47,7 @@ fn decimal_to_integer_arrow_accepts() {
 #[test]
 fn decimal_to_unsigned_integer_arrow_accepts() {
     test_support::assert_accepts(
-        "functio c(numerus<d64> a) → numerus<u32> { redde a ↦ numerus<u32> }",
+        "functio c(numerus<d64> a) → numerus<u32> ⇥ textus { redde a ↦ numerus<u32> }",
     );
 }
 
@@ -96,7 +96,7 @@ fn integer_narrowing_arrow_still_accepts() {
     // The decimal narrowing arm must not disturb the established integer
     // explicit-narrowing law (i64 → i32 stays a `↦` row).
     test_support::assert_accepts(
-        "functio c(numerus<i64> a) → numerus<i32> { redde a ↦ numerus<i32> }",
+        "functio c(numerus<i64> a) → numerus<i32> ⇥ textus { redde a ↦ numerus<i32> }",
     );
 }
 
@@ -111,7 +111,9 @@ fn float_narrowing_arrow_still_accepts() {
 
 #[test]
 fn textus_to_d64_arrow_accepts() {
-    test_support::assert_accepts("functio c(textus s) → numerus<d64> { redde s ↦ numerus<d64> }");
+    test_support::assert_accepts(
+        "functio c(textus s) → numerus<d64> ⇥ textus { redde s ↦ numerus<d64> }",
+    );
 }
 
 // --- CTR-02: channel contract for the builtin decimal rows ---

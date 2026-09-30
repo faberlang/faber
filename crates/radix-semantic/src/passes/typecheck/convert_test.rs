@@ -102,7 +102,7 @@ functio parse(valor v, instans epoch) → instans ⇥ numerus {
 fn valor_to_sized_numerus_direct_extraction_typechecks() {
     test_support::assert_accepts(
         r"
-functio parse(valor v) → numerus<u8> {
+functio parse(valor v) → numerus<u8> ⇥ textus {
     redde v ↦ numerus<u8>
 }
 ",
@@ -1143,7 +1143,7 @@ fn symbolic_rank_two_lista_to_tensor_pin_typechecks() {
     // generic gathers its result through `↦` at its own symbolic sizes.
     test_support::assert_accepts(
         r"
-functio college<magnitudo V, magnitudo D, magnitudo T>(tensor<f32, [V, D]> mensa, lista<numerus> indices) → tensor<f32, [T, D]> {
+functio college<magnitudo V, magnitudo D, magnitudo T>(tensor<f32, [V, D]> mensa, lista<numerus> indices) → tensor<f32, [T, D]> ⇥ textus {
     redde (mensa ↦ lista<f32>) ↦ tensor<f32, [T, D]>
 }
 ",
@@ -1154,7 +1154,7 @@ functio college<magnitudo V, magnitudo D, magnitudo T>(tensor<f32, [V, D]> mensa
 fn symbolic_rank_one_lista_to_tensor_pin_typechecks() {
     test_support::assert_accepts(
         r"
-functio columna<magnitudo N>(lista<f32> plana) → tensor<f32, [N]> {
+functio columna<magnitudo N>(lista<f32> plana) → tensor<f32, [N]> ⇥ textus {
     redde plana ↦ tensor<f32, [N]>
 }
 ",
@@ -1335,7 +1335,7 @@ fn conversio_assign_accepts_field_place() {
     test_support::assert_accepts(
         r#"
 genus Persona { varia textus nomen varia numerus aetas }
-functio muta() → numerus {
+functio muta() → numerus ⇥ textus {
     varia Persona p ← Persona { nomen = "Ada", aetas = 36 }
     p.aetas ↤ "37"
     redde p.aetas
@@ -1349,7 +1349,7 @@ fn conversio_assign_accepts_indexed_place() {
     // Nontrivial place: an indexed element of a mutable list.
     test_support::assert_accepts(
         r#"
-functio muta() → numerus {
+functio muta() → numerus ⇥ textus {
     varia lista<numerus> xs ← [1, 2]
     xs[0] ↤ "5"
     redde xs[0]

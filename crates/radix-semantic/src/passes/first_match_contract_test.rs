@@ -67,7 +67,7 @@ fn first_match_total_evaluation_observes_post_match_predicate_error() {
     // RED today: typecheck declines the head (AFM-2 admits the parse only).
     let errors = base_errors(
         r"
-functio t(tf32[4] a) → fractus ∪ nihil {
+functio t(tf32[4] a) → fractus ∪ nihil ⇥ textus {
     redde primus_quem(a, ubi x { (x ↦ u8) > 0 })
 }
 ",
@@ -111,7 +111,7 @@ fn first_match_predicate_error_propagates_never_becomes_nihil() {
     // RED today: typecheck declines the head (AFM-2 admits the parse only).
     let errors = base_errors(
         r"
-functio t(tf32[4] a) → fractus ∪ nihil {
+functio t(tf32[4] a) → fractus ∪ nihil ⇥ textus {
     redde primus_quem(a, ubi x { (x ↦ u8) > 100 })
 }
 ",

@@ -3792,7 +3792,7 @@ fn lowers_cross_family_scalar_conversion_to_a_runtime_convert() {
     // keep no conversion.
     let dump = dump_source(
         r"
-functio ascriptiones() → numerus {
+functio ascriptiones() → numerus ⇥ textus {
   fixum numerus truncatum ← 1.9 ↦ numerus
   fixum numerus<i8> saturatum ← 300.0 ↦ numerus<i8>
   fixum numerus<i32> idem ← 7 ∷ numerus<i32>

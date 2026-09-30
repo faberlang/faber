@@ -15,7 +15,7 @@ use radix_module::mir::{
 use radix_module::semantic::{IndexExpr, Type};
 
 const PIN_UTIL: &str = r"@ public
-fn gather<size V, size D, size T>(tensor<f32, [V, D]> table, list<int> ids) → tensor<f32, [T, D]> {
+fn gather<size V, size D, size T>(tensor<f32, [V, D]> table, list<int> ids) → tensor<f32, [T, D]> ⇥ string {
     const list<f32> flat ← table ↦ list<f32>
     return flat ↦ tensor<f32, [T, D]>
 }
@@ -26,11 +26,16 @@ const PIN_MAIN: &str = r#"import from "./util" * as utilModule
 main {
     const tensor<f32, [3, 4]> t ← [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0]] ↦ tensor<f32, [3, 4]>
     const list<int> ids ← [0, 1, 2]
-    const tensor<f32, [3, 4]> r ← utilModule.gather<3, 4, 3>(t, ids)
-    const list<int> s ← r.shape()
-    print s.length()
-    print s[0]
-    print s[1]
+    do {
+        const tensor<f32, [3, 4]> r ← utilModule.gather<3, 4, 3>(t, ids)
+        const list<int> s ← r.shape()
+        print s.length()
+        print s[0]
+        print s[1]
+    }
+    catch err {
+        print "gather failed"
+    }
 }
 "#;
 
@@ -39,9 +44,14 @@ const PIN_MAIN_WRONG_COUNT: &str = r#"import from "./util" * as utilModule
 main {
     const tensor<f32, [3, 4]> t ← [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0]] ↦ tensor<f32, [3, 4]>
     const list<int> ids ← [0, 1]
-    const tensor<f32, [2, 4]> r ← utilModule.gather<3, 4, 2>(t, ids)
-    const list<int> s ← r.shape()
-    print s.length()
+    do {
+        const tensor<f32, [2, 4]> r ← utilModule.gather<3, 4, 2>(t, ids)
+        const list<int> s ← r.shape()
+        print s.length()
+    }
+    catch err {
+        print "gather failed"
+    }
 }
 "#;
 

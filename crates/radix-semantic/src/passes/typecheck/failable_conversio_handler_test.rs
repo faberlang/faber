@@ -1,0 +1,201 @@
+//! D17.8: a failable `↦` must be handled.
+//!
+//! A failable conversion needs a `⊥` default, an enclosing catch (`fac/cape`
+//! or `capta`), or an enclosing function that declares `⇥ E`; otherwise it is
+//! `SEM011:failable_conversio_requires_handler`, the rule failable calls
+//! already meet. The `incipit` (main) body itself is exempt for conversions
+//! only (an unhandled failure there is a real panic on the runner, Rust and
+//! TS); a failable call in main stays an error until fi6c lowers it as a
+//! panic. Helpers called from main are never exempt. Conversions that
+//! cannot fail (widening, constants proven to fit, `↦` into policy words) are
+//! never rejected. Assertions are structured (code, issue, args).
+
+use crate::test_support::{self, analyze_source, assert_accepts, assert_rejects_with_issue};
+
+const ISSUE: &str = "failable_conversio_requires_handler";
+const CALL_ISSUE: &str = "failable_call_requires_handler";
+const FAILABLE_FN: &str = "functio f(numerus x) → numerus ⇥ textus {\n    redde x\n}\n\n";
+
+fn arg<'a>(err: &'a crate::SemanticError, name: &str) -> Option<&'a str> {
+    err.args
+        .iter()
+        .find(|arg| arg.name == name)
+        .map(|arg| arg.value.as_str())
+}
+
+// --- the new error -------------------------------------------------------
+
+#[test]
+fn unhandled_narrowing_in_a_plain_function_is_rejected_with_structured_facts() {
+    let result =
+        analyze_source("functio g(numerus x) → numerus<u8> {\n    redde x ↦ numerus<u8>\n}\n");
+    let err = result
+        .diagnostics
+        .iter()
+        .find(|err| err.is_error() && test_support::issue(err) == Some(ISSUE))
+        .unwrap_or_else(|| panic!("expected {ISSUE}, got {:?}", result.diagnostics));
+    assert_eq!(err.kind, crate::SemanticErrorKind::OperandTypesInvalid); // SEM011
+    assert_eq!(arg(err, "source"), Some("numerus"));
+    assert_eq!(arg(err, "target"), Some("numerus<u8>"));
+    assert!(test_support::args_have_no_legacy_message(&err.args));
+}
+
+#[test]
+fn every_failable_conversio_kind_is_rejected_without_a_handler() {
+    for (param, target) in [
+        ("textus", "numerus"),
+        ("fractus", "numerus"),
+        ("numerus", "numerus<u8>"),
+        ("numerus<u16>", "numerus<u8>"),
+        ("d64", "numerus<i32>"),
+    ] {
+        assert_rejects_with_issue(
+            &format!("functio g({param} x) → {target} {{\n    redde x ↦ {target}\n}}\n"),
+            ISSUE,
+        );
+    }
+}
+
+#[test]
+fn registered_row_with_a_declared_channel_uses_the_same_rule() {
+    // The user-row path shares the funnel: unhandled in a plain function.
+    assert_rejects_with_issue(
+        concat!(
+            "genus Mensura { varia numerus valor }\n",
+            "genus Positiva { varia numerus valor }\n",
+            "@ conversio\n",
+            "functio adPositiva(Mensura m) → Positiva ⇥ textus { redde Positiva { valor = m.valor } }\n",
+            "functio g(Mensura m) → Positiva {\n    redde m ↦ Positiva\n}\n",
+        ),
+        ISSUE,
+    );
+}
+
+// --- the three covers ----------------------------------------------------
+
+#[test]
+fn default_covers_the_conversio() {
+    assert_accepts("functio g(numerus x) → numerus<u8> {\n    redde x ↦ numerus<u8> ⊥ 0\n}\n");
+    assert_accepts("functio g(textus s) → numerus {\n    redde s ↦ numerus ⊥ 0\n}\n");
+}
+
+#[test]
+fn fac_cape_covers_the_conversio() {
+    assert_accepts(concat!(
+        "functio g(numerus x) → numerus {\n",
+        "    fac {\n        redde x ↦ numerus<u8>\n    } cape err {\n        redde 0\n    }\n",
+        "}\n",
+    ));
+}
+
+#[test]
+fn capta_covers_the_conversio() {
+    assert_accepts(concat!(
+        "functio g(textus s) → vacuum {\n",
+        "    fixum _ r ← capta { s ↦ numerus<u8> }\n    nota r\n",
+        "}\n",
+    ));
+}
+
+#[test]
+fn enclosing_error_channel_covers_the_conversio() {
+    assert_accepts("functio g(numerus x) → numerus<u8> ⇥ textus {\n    redde x ↦ numerus<u8>\n}\n");
+}
+
+#[test]
+fn a_handler_does_not_leak_past_its_boundary() {
+    assert_rejects_with_issue(
+        concat!(
+            "functio g(textus s) → numerus {\n",
+            "    fixum _ r ← capta { s ↦ numerus<u8> }\n    nota r\n",
+            "    fixum numerus<u8> y ← s ↦ numerus<u8>\n    redde 0\n",
+            "}\n",
+        ),
+        ISSUE,
+    );
+}
+
+#[test]
+fn closures_do_not_inherit_the_enclosing_error_channel_or_main() {
+    // A closure is its own frame: errors do not unwind through it, so it
+    // needs its own handler even inside main or a `⇥` function.
+    assert_rejects_with_issue(
+        "incipit {\n    fixum _ h ← numerus x ∴ x ↦ numerus<u8>\n    nota h(1)\n}\n",
+        ISSUE,
+    );
+    assert_rejects_with_issue(
+        concat!(
+            "functio g() → vacuum ⇥ textus {\n",
+            "    fixum _ h ← numerus x ∴ x ↦ numerus<u8>\n    nota h(1)\n",
+            "}\n",
+        ),
+        ISSUE,
+    );
+}
+
+// --- main is exempt, helpers called from main are not --------------------
+
+#[test]
+fn main_body_is_exempt_for_conversions() {
+    assert_accepts(
+        "incipit {\n    fixum numerus<u8> n ← 300 ↦ numerus<u8>\n    fixum numerus m ← \"12\" ↦ numerus\n    nota n\n    nota m\n}\n",
+    );
+}
+
+#[test]
+fn main_body_is_not_exempt_for_failable_calls() {
+    // The runner cannot lower an unhandled failable call in main and the TS
+    // target drops the Result, so the exemption covers conversions only.
+    assert_rejects_with_issue(
+        &format!("{FAILABLE_FN}incipit {{\n    fixum numerus n ← f(1)\n    nota n\n}}\n"),
+        CALL_ISSUE,
+    );
+}
+
+#[test]
+fn helper_called_from_main_is_not_exempt() {
+    let source = "functio helper(numerus x) → numerus<u8> {\n    redde x ↦ numerus<u8>\n}\n\nincipit {\n    nota helper(300)\n}\n";
+    assert_rejects_with_issue(source, ISSUE);
+}
+
+#[test]
+fn a_failable_call_in_a_plain_function_still_needs_a_handler() {
+    assert_rejects_with_issue(
+        &format!("{FAILABLE_FN}functio g() → numerus {{\n    redde f(1)\n}}\n"),
+        CALL_ISSUE,
+    );
+}
+
+// --- conversions that cannot fail are never rejected ---------------------
+
+#[test]
+fn widening_is_exempt() {
+    assert_accepts("functio g(numerus<u8> x) → numerus {\n    redde x ↦ numerus\n}\n");
+}
+
+#[test]
+fn constant_proven_to_fit_is_exempt() {
+    assert_accepts("functio g() → numerus<u8> {\n    redde 200 ↦ numerus<u8>\n}\n");
+}
+
+#[test]
+fn policy_word_targets_are_exempt() {
+    assert_accepts(concat!(
+        "functio g(numerus x) → modulus<u8> {\n",
+        "    fixum saturatus<u8> s ← x ↦ saturatus<u8>\n",
+        "    redde x ↦ modulus<u8>\n",
+        "}\n",
+    ));
+}
+
+#[test]
+fn infallible_text_rows_are_exempt() {
+    assert_accepts("functio g(numerus n) → ascii {\n    redde n ↦ ascii\n}\n");
+}
+
+#[test]
+fn exact_width_bits_bitcast_is_exempt() {
+    assert_accepts(
+        "functio bits(fractus<f32> x) → numerus<u32> {\n    redde x ↦ u32 via Bits\n}\n",
+    );
+}

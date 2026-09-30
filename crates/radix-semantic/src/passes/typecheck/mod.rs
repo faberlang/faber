@@ -387,6 +387,15 @@ pub(crate) struct TypeChecker<'a> {
     /// Active alternate-exit target while checking `iace` or failable calls.
     pub current_error: Option<ErrorSink>,
 
+    /// Whether the innermost frame being checked is the `main {}` (`incipit`)
+    /// body itself (D17.8). `main` declares no `⇥` and is the one frame that
+    /// may leave a failable `↦` unhandled: the failure panics (runner, Rust
+    /// and TS all abort). A failable call in `main` is still an error until
+    /// the targets lower it as a panic (fi6c). Every function, closure, and
+    /// `praefixum` body clears it, since errors do not unwind through frames
+    /// that do not declare `⇥`.
+    pub in_main_frame: bool,
+
     /// Arm selected by the innermost checked failable call for function-level
     /// propagation. The expression dispatcher consumes and restores this slot
     /// so nested calls cannot leak their marker to an enclosing call.
@@ -634,6 +643,7 @@ impl<'a> TypeChecker<'a> {
             current_generic_param_kinds: FxHashMap::default(),
             current_return: None,
             current_error: None,
+            in_main_frame: false,
             pending_conversion: None,
             current_device_function: false,
             current_nucleum_entry: false,
@@ -788,7 +798,9 @@ impl<'a> TypeChecker<'a> {
             let prev_await_return_context = self.current_await_return_context;
             self.current_await_context = hir.entry_is_async;
             self.current_await_return_context = false;
+            self.in_main_frame = true;
             self.check_block(entry, None);
+            self.in_main_frame = false;
             self.current_await_context = prev_await_context;
             self.current_await_return_context = prev_await_return_context;
         }
@@ -1158,6 +1170,10 @@ mod named_type_defaults_test;
 #[cfg(test)]
 #[path = "format_test.rs"]
 mod format_test;
+
+#[cfg(test)]
+#[path = "failable_conversio_handler_test.rs"]
+mod failable_conversio_handler_test;
 
 #[cfg(test)]
 #[path = "sermo_route_typing_test.rs"]

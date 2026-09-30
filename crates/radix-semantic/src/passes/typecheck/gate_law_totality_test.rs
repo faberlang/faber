@@ -256,7 +256,7 @@ fn probe(op: Op, family: Family) -> String {
             Family::P8DecimalInteger => ("numerus<d64>", "numerus"),
             Family::P9DecimalFractus => ("numerus<d64>", "fractus"),
         };
-        return format!("functio p({src} a) → {tgt} {{ redde a ↦ {tgt} }}");
+        return format!("functio p({src} a) → {tgt} ⇥ textus {{ redde a ↦ {tgt} }}");
     }
     let (lhs, rhs) = pair_types(family);
     if op == Op::Arith {

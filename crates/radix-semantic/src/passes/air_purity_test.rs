@@ -656,7 +656,7 @@ fn rejects_conversio_assign_mutation_in_air_lane() {
     let errors = air_errors(
         r#"
 @ radix lane "air"
-functio loss(numerus x) → numerus {
+functio loss(numerus x) → numerus ⇥ textus {
     varia numerus total ← x
     total ↤ "5"
     redde total

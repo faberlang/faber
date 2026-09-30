@@ -112,8 +112,9 @@ fn bounded_cord_literal_indices_reject_provable_oob_and_negative() {
 
 #[test]
 fn bounded_lista_appende_requires_alternate_exit() {
+    // D17.8: `incipit` (main) is exempt; the rule applies in a helper.
     assert_rejects_with_issue(
-        r"incipit {
+        r"functio grow() → vacuum {
     varia lista<numerus, 8> xs ← vacua
     xs.appende(1)
 }",

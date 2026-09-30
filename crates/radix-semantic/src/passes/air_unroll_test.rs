@@ -823,7 +823,7 @@ fn bounded_lista_ex_inference_chain_preserves_fullness_fact() {
     let result = analyze(
         r#"
 @ radix lane "air"
-functio bounded_chain() → vacuum {
+functio bounded_chain() → vacuum ⇥ textus {
     fixum lista<f32> raw ← [1.0, 2.0, 3.0, 4.0]
     fixum lista<f32, 4> full ← raw ↦ lista<f32, 4>
     fixum lista<f32, 4> alias ← full
@@ -850,7 +850,7 @@ fn bounded_lista_ex_non_full_value_declines_not_concrete() {
     let errors = air_errors(
         r#"
 @ radix lane "air"
-functio bounded_partial() → vacuum {
+functio bounded_partial() → vacuum ⇥ textus {
     fixum lista<f32> raw ← [1.0, 2.0, 3.0]
     fixum lista<f32, 4> xs ← raw ↦ lista<f32, 4>
     itera ex xs fixum value { }

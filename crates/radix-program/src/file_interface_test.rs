@@ -50,8 +50,8 @@ fn imported_json_struct_keeps_conversion_opt_in() {
             &Session::new(Config::default().with_target(radix_module::codegen::Target::HirRust)),
             "consumer.fab",
             r#"importa ex "model:types" model
-functio encode(model.Data value) → json { redde value ↦ json }
-functio decode(json value) → model.Data { redde value ↦ model.Data }
+functio encode(model.Data value) → json ⇥ textus { redde value ↦ json }
+functio decode(json value) → model.Data ⇥ textus { redde value ↦ model.Data }
 "#,
             AnalyzeRequest {
                 cli_program: None,
