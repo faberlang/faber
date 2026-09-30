@@ -41,12 +41,11 @@ impl<const N: usize> PartialEq for AsciiN<N> {
 
 impl<const N: usize> Eq for AsciiN<N> {}
 
+/// `Debug` is the double-quoted text (`"abc"`), matching how every other Faber
+/// text prints inside a composite (pr4); never the representation or `N`.
 impl<const N: usize> std::fmt::Debug for AsciiN<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AsciiN")
-            .field("n", &N)
-            .field("payload", &self.as_str())
-            .finish()
+        std::fmt::Debug::fmt(self.as_str(), f)
     }
 }
 
@@ -323,7 +322,7 @@ mod tests {
         assert_eq!(a.get(1).map(|c| c.to_byte()), Some(Some(b'b')));
         assert_eq!(a.get(2), None);
         assert_eq!(a.get(7), None);
-        assert_eq!(format!("{a:?}"), r#"AsciiN { n: 8, payload: "ab" }"#);
+        assert_eq!(format!("{a:?}"), r#""ab""#);
     }
 
     #[test]

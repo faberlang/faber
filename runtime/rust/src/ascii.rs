@@ -23,9 +23,17 @@ enum Repr {
 /// fn needs_copy<T: Copy>() {}
 /// needs_copy::<faber::Ascii>();
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Ascii {
     repr: Repr,
+}
+
+/// `Debug` is the double-quoted text (`"abc"`), matching how every other Faber
+/// text prints inside a composite (pr4); never the representation.
+impl std::fmt::Debug for Ascii {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self.as_str(), f)
+    }
 }
 
 impl PartialEq for Ascii {
@@ -262,6 +270,9 @@ mod tests {
     fn display_roundtrips() {
         assert_eq!(Ascii::new("a").to_string(), "a");
         assert_eq!(format!("{}", Ascii::new("hi")), "hi");
+        // Debug is the quoted text, as inside a composite (pr4).
+        assert_eq!(format!("{:?}", Ascii::new("hi")), r#""hi""#);
+        assert_eq!(format!("{:?}", vec![Ascii::new("q")]), r#"["q"]"#);
     }
 
     #[test]
