@@ -98,11 +98,11 @@ mod enum_access_honesty_test;
 pub mod expr;
 pub mod extremum;
 #[cfg(test)]
-#[path = "fieldless_type_access_test.rs"]
-mod fieldless_type_access_test;
-#[cfg(test)]
 #[path = "field_modifier_write_test.rs"]
 mod field_modifier_write_test;
+#[cfg(test)]
+#[path = "fieldless_type_access_test.rs"]
+mod fieldless_type_access_test;
 
 mod closing;
 #[cfg(test)]
