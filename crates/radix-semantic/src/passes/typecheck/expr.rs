@@ -174,6 +174,63 @@ fn itera_apud_coordinates(
 }
 
 impl TypeChecker<'_> {
+    /// Ruling 25 (air2): inside an AIR function the variable of an `itera ab`
+    /// loop whose bounds are both constants lies between them, so it takes the
+    /// smallest integer type holding the hull of the two bounds (ruling 12).
+    /// The hull is sound for exclusive or inclusive ranges, either direction
+    /// and any step, because a loop never leaves the interval it walks.
+    fn constant_range_loop_type(&mut self, iter: &HirExpression, bound: TypeId) -> TypeId {
+        let HirExpressionKind::Intervallum { start, end, .. } = &iter.kind else {
+            return bound;
+        };
+        let (Some(a), Some(b)) = (
+            super::integer_range::const_int_value(start),
+            super::integer_range::const_int_value(end),
+        ) else {
+            return bound;
+        };
+        if !self.current_air_function || bound != self.numerus_type() {
+            return bound;
+        }
+        self.width_type(radix_types::numeric_range::smallest_width((
+            a.min(b),
+            a.max(b),
+        )))
+    }
+
+    /// Ruling 25 (air2): inside an AIR function an `apud` coordinate over a
+    /// tensor with constant dimensions is exactly `0 .. dim - 1`, so it takes
+    /// the smallest integer type holding that range (ruling 12) instead of
+    /// `numerus`. This is what lets bounded index arithmetic be proven.
+    fn narrow_apud_coordinates(&mut self, dispatch_ty: TypeId, coordinate_types: &mut [TypeId]) {
+        let Type::Tensor(_, shape) = self.types.get(dispatch_ty) else {
+            return;
+        };
+        let dims: Vec<u64> = match self.types.get_index(*shape) {
+            IndexExpr::Literal(n) => vec![*n],
+            IndexExpr::Tuple(parts) => {
+                let mut dims = Vec::with_capacity(parts.len());
+                for part in parts {
+                    let IndexExpr::Literal(n) = self.types.get_index(*part) else {
+                        return;
+                    };
+                    dims.push(*n);
+                }
+                dims
+            }
+            _ => return,
+        };
+        if dims.len() != coordinate_types.len() {
+            return;
+        }
+        for (slot, dim) in coordinate_types.iter_mut().zip(dims) {
+            let Some(last) = dim.checked_sub(1).and_then(|d| i128::try_from(d).ok()) else {
+                continue;
+            };
+            *slot = self.width_type(radix_types::numeric_range::smallest_width((0, last)));
+        }
+    }
+
     /// d11-6 ruling 20: an integer constant that typechecked into a float slot
     /// becomes a float constant, so lowering and codegen never see an integer
     /// literal carrying a `fractus` type.
@@ -334,9 +391,13 @@ impl TypeChecker<'_> {
                     }
                 }
 
+                if self.current_air_function {
+                    self.narrow_apud_coordinates(dispatch_ty, &mut coordinate_types);
+                }
+
                 let elem_ty = if matches!(mode, radix_hir::HirIteraMode::Ab) {
                     if let Some(bound) = self.intervallum_bound_type(iter_ty) {
-                        bound
+                        self.constant_range_loop_type(iter, bound)
                     } else {
                         self.error_issue(
                             SemanticErrorKind::TypeMismatch,

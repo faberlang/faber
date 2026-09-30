@@ -674,24 +674,38 @@ impl AirPurityChecker<'_> {
         let (Some(a), Some(b)) = (self.operand_range(lhs), self.operand_range(rhs)) else {
             return false;
         };
-        let result = match op {
-            HirBinOp::Add => range::add(a, b),
-            HirBinOp::Sub => range::sub(a, b),
-            HirBinOp::Mul => range::mul(a, b),
-            HirBinOp::Div => range::floor_div(a, b),
-            HirBinOp::Mod => range::floor_rem(a, b),
-            HirBinOp::Shl => range::shl(a, b),
-            _ => return false,
-        };
-        !range::fits_container(result)
+        binary_range(op, a, b).is_some_and(|result| !range::fits_container(result))
     }
 
-    /// A constant's exact value, else the range of the operand's declared
-    /// plain or `saturating` integer type; `None` for non-integers.
+    /// The range the operand is known to lie in: a constant's exact value;
+    /// for an integer `+ - * / % ⇐` the exact result range of its operands'
+    /// ranges (ruling 12: intermediates are exact, never rounded up to a
+    /// width), met with the declared plain or `saturating` integer type;
+    /// `None` for non-integers. Every fact is sound on all paths: constants,
+    /// declared types, and exact arithmetic over those.
     fn operand_range(&self, expr: &HirExpression) -> Option<range::IntRange> {
         if let Some(value) = const_int_value(expr) {
             return Some((value, value));
         }
+        let declared = self.declared_range(expr);
+        let HirExpressionKind::Binary(op, lhs, rhs) = &expr.kind else {
+            return declared;
+        };
+        let derived = declared.and(
+            self.operand_range(lhs)
+                .zip(self.operand_range(rhs))
+                .and_then(|(a, b)| binary_range(*op, a, b)),
+        );
+        match (declared, derived) {
+            (Some(d), Some(e)) => {
+                let (lo, hi) = (d.0.max(e.0), d.1.min(e.1));
+                Some(if lo <= hi { (lo, hi) } else { e })
+            }
+            (declared, _) => declared,
+        }
+    }
+
+    fn declared_range(&self, expr: &HirExpression) -> Option<range::IntRange> {
         let mut ty = self.types.peel_access_marker(expr.ty?).1;
         while let Type::Alias(_, inner) = self.types.get(ty) {
             ty = *inner;
@@ -754,4 +768,17 @@ fn is_control_expr_statement(expr: &HirExpression) -> bool {
             | HirExpressionKind::Trap(_)
             | HirExpressionKind::CallDefault { .. }
     )
+}
+
+/// Exact result range of the integer operators the range rule covers.
+fn binary_range(op: HirBinOp, a: range::IntRange, b: range::IntRange) -> Option<range::IntRange> {
+    Some(match op {
+        HirBinOp::Add => range::add(a, b),
+        HirBinOp::Sub => range::sub(a, b),
+        HirBinOp::Mul => range::mul(a, b),
+        HirBinOp::Div => range::floor_div(a, b),
+        HirBinOp::Mod => range::floor_rem(a, b),
+        HirBinOp::Shl => range::shl(a, b),
+        _ => return None,
+    })
 }

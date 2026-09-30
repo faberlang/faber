@@ -1373,3 +1373,141 @@ functio narrow(numerus<i16> a) → numerus<u8> {
     );
     assert!(errors.is_empty(), "unexpected AIR errors: {errors:?}");
 }
+
+// air2: range facts that hold on every path prove bounded index arithmetic.
+
+fn has_air_issue(errors: &[crate::SemanticError], issue: &str) -> bool {
+    errors.iter().any(|err| {
+        err.args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == issue)
+    })
+}
+
+#[test]
+fn air_admits_apud_coordinate_arithmetic_proven_by_tensor_dims() {
+    // `iace` in the body is an unrelated keep-out; the range facts must not add
+    // a range, store or loop-unroll decline.
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio pick(tensor<f32, [4, 4]> x) → tensor<f32, [4, 4]> ⇥ textus {
+    varia tensor<f32, [4, 4]> acc ← x
+    itera ex x apud [i, j] fixum cell {
+        fixum numerus idx ← i * 2 + j
+        si idx > 20 { iace "upper" }
+        acc ← acc.addita(x)
+    }
+    redde acc
+}
+"#,
+    );
+    for issue in [
+        "air_integer_range_unproven",
+        "air_store_not_proven",
+        "itera_loop",
+    ] {
+        assert!(!has_air_issue(&errors, issue), "{issue}: {errors:?}");
+    }
+}
+
+#[test]
+fn air_admits_range_loop_index_arithmetic_proven_by_constant_bounds() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio pick(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
+    varia tensor<f32, [2, 2]> acc ← x
+    itera ab 0‥16 fixum i {
+        fixum numerus k ← i * 2 + 1
+        acc ← acc.addita(x)
+    }
+    redde acc
+}
+"#,
+    );
+    assert!(errors.is_empty(), "unexpected AIR errors: {errors:?}");
+}
+
+#[test]
+fn air_rejects_index_arithmetic_over_unbounded_operands() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio pick(numerus a, numerus b) → numerus {
+    fixum numerus idx ← a * 2 + b
+    redde idx
+}
+"#,
+    );
+    expect_air_issue(&errors, "air_integer_range_unproven");
+}
+
+#[test]
+fn air_rejects_apud_arithmetic_over_symbolic_tensor_dims() {
+    // A non-constant dimension gives no range fact: the coordinate stays
+    // `numerus` and its arithmetic is unproven.
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio pick(numerus n, numerus m) → numerus {
+    itera ab 0‥n fixum i {
+        fixum numerus k ← i * 2 + m
+    }
+    redde 0
+}
+"#,
+    );
+    assert!(
+        has_air_issue(&errors, "air_integer_range_unproven")
+            || has_air_issue(&errors, "itera_loop"),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn air_admits_arithmetic_over_inferred_fixum_of_proven_index_expression() {
+    // `fixum _` keeps the range type of its proven initializer; a fact that
+    // holds on every path (immutable binding of a proven expression).
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio pick(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
+    varia tensor<f32, [2, 2]> acc ← x
+    itera ab 0‥16 fixum i {
+        fixum _ k ← i * 2 + 1
+        fixum _ m ← k * 2 + i
+        acc ← acc.addita(x)
+    }
+    redde acc
+}
+"#,
+    );
+    assert!(errors.is_empty(), "unexpected AIR errors: {errors:?}");
+}
+
+#[test]
+fn air_rejects_arithmetic_over_declared_numerus_binding_even_if_initializer_is_bounded() {
+    // A declared `numerus` slot has the whole i64 range (ruling 12): no fact
+    // survives the annotation.
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio pick(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
+    varia tensor<f32, [2, 2]> acc ← x
+    itera ab 0‥16 fixum i {
+        fixum numerus k ← i * 2 + 1
+        fixum numerus m ← k * k
+        acc ← acc.addita(x)
+    }
+    redde acc
+}
+"#,
+    );
+    // The unproven store inside the loop body makes the unroll decline it.
+    assert!(
+        has_air_issue(&errors, "itera_loop")
+            || has_air_issue(&errors, "air_integer_range_unproven"),
+        "{errors:?}"
+    );
+}

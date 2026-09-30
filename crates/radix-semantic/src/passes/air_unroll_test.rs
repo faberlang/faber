@@ -1202,7 +1202,7 @@ fn apud_triangular_arithmetic_body_admits_per_lane_conditions() {
 functio triangular(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> ⇥ textus {
     varia tensor<f32, [2, 2]> acc ← x
     itera ex x apud [i, j] fixum cell {
-        fixum numerus idx ← i
+        fixum numerus idx ← i * 2 + j
         si idx > 2 { iace "upper" }
         acc ← acc.addita(x)
     }
