@@ -1203,21 +1203,6 @@ surface = "exsequetur"
 provider = "norma"
 module_path = ["process"]
 kind = "function"
-canonical = "write_env"
-surface = "scribe"
-
-[[library_members]]
-provider = "package"
-package = "norma"
-module_path = ["process"]
-kind = "function"
-canonical = "write_env"
-surface = "scribe"
-
-[[library_members]]
-provider = "norma"
-module_path = ["process"]
-kind = "function"
 canonical = "chdir"
 surface = "muta"
 
