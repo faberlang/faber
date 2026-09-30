@@ -117,6 +117,36 @@ incipit {{
 }
 
 #[test]
+fn negated_minimum_constant_is_judged_by_its_exact_value() {
+    // lw2 (ruling 12): `-128` is one exact constant that fits `i8`, though the
+    // magnitude 128 alone does not. One below the minimum clamps in a
+    // saturating slot and is a compile error in a trapping slot.
+    for (width, min, min_minus_one) in [
+        ("i8", "-128", "-129"),
+        ("i16", "-32768", "-32769"),
+        ("i32", "-2147483648", "-2147483649"),
+        ("i64", "-9223372036854775808", "-9223372036854775809"),
+    ] {
+        for keyword in ["fixum", "varia"] {
+            analysis_accepts(&format!(
+                "incipit {{\n    {keyword} saturatus<{width}> low ← {min}\n    nota low\n}}\n"
+            ));
+        }
+        analysis_accepts(&format!(
+            "incipit {{\n    fixum numerus<{width}> low ← {min}\n    nota low\n}}\n"
+        ));
+        analysis_accepts(&format!(
+            "incipit {{\n    fixum saturatus<{width}> below ← {min_minus_one}\n    nota below\n}}\n"
+        ));
+        analysis_rejects_with_issue(
+            &format!("incipit {{\n    fixum numerus<{width}> below ← {min_minus_one}\n    nota below\n}}\n"),
+            "store_constant_out_of_range",
+        );
+    }
+    analysis_accepts("incipit {\n    fixum numerus low ← -9223372036854775808\n    nota low\n}\n");
+}
+
+#[test]
 fn saturating_word_operand_constant_is_exact_and_only_the_store_clamps() {
     // d11-6 ruling 3: `low - 300 + 100` is exact (-190) and clamps once, so a
     // constant beside a saturating operand may exceed the word's range.

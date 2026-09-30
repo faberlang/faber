@@ -400,3 +400,50 @@ fn word_parameter_takes_a_constant_argument() {
     run_source(&session, "exact.fab", &program, &mut host).expect("runs");
     assert_eq!(host.stdout_lines, ["18446744073709551615", "5"]);
 }
+
+#[test]
+fn negated_i64_min_constant_fits_every_64_bit_slot() {
+    // lw2 (rulings 12, 21): `-2^63` is an exact constant that fits `i64`; only
+    // the magnitude is out of range. One below it is a compile error in a
+    // trapping slot and follows the slot's policy in a saturating one.
+    assert_eq!(
+        ok(
+            "fixum saturatus<i64> x ← -9223372036854775808\nvaria saturatus<i64> y ← -9223372036854775808\nfixum numerus<i64> z ← -9223372036854775808\nfixum numerus w ← -9223372036854775808\nnota x\nnota y\nnota z\nnota w"
+        ),
+        ["-9223372036854775808"; 4]
+    );
+    assert_eq!(
+        ok("fixum saturatus<i64> x ← -9223372036854775809\nnota x"),
+        ["-9223372036854775808"]
+    );
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let source = "incipit {\nfixum numerus z ← -9223372036854775809\nnota z\n}\n";
+    let mut host = BufferHost::default();
+    assert!(run_source(&session, "exact.fab", source, &mut host).is_err());
+}
+
+#[test]
+fn summa_at_the_cap_is_a_checked_store() {
+    // f1s (ruling 21): a `summa` sits at the 64-bit cap, so returning it as
+    // `int` checks the store; a small sum returns fine.
+    let functions =
+        "functio total(tensor<numerus<i64>, [2]> a) → numerus {\n  redde summa ex a fixum s {\n    redde s\n  }\n}\n";
+    let run_total = |values: &str| {
+        let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+        let source = format!(
+            "{functions}incipit {{\nfixum lista<numerus<i64>> v ← [{values}]\nfixum tensor<numerus<i64>, []> seed ← vacua\nnota \"a\"\nnota total(seed.strue(v, [2]))\n}}\n"
+        );
+        let mut host = BufferHost::default();
+        let result = run_source(&session, "summa.fab", &source, &mut host);
+        (host.stdout_lines, result)
+    };
+    let (out, result) = run_total("1, 2");
+    assert!(result.is_ok(), "{result:?}");
+    assert_eq!(out, ["a", "3"]);
+    let (out, result) = run_total("9223372036854775807, 9223372036854775807");
+    let Err(RunSourceError::Stepper(errors)) = result else {
+        panic!("no trap: {result:?}");
+    };
+    assert_eq!(out, ["a"]);
+    assert_eq!(errors[0].issue, "implicit_store_out_of_range");
+}

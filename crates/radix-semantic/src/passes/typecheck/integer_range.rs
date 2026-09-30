@@ -341,10 +341,10 @@ impl TypeChecker<'_> {
     }
 
     /// Whether an integer expression sits at the 64-bit cap with a range that
-    /// reaches past `i64::MAX` (`i64 + i64`, `-i64`, `i64 ⇐ n`). Its type is
+    /// reaches past `i64::MAX` (`i64 + i64`, `-i64`, `i64 ⇐ n`, a `summa`). Its type is
     /// `i64` but its value is not bounded by it, so a store into an `i64`
     /// slot is a real check (ruling 17b) and cannot be omitted.
-    pub(super) fn exceeds_i64(&self, expr: &HirExpression) -> bool {
+    pub(super) fn exceeds_i64(&self, expr: &HirExpression, ty: TypeId) -> bool {
         if self.current_device_function
             || self.current_air_function
             || const_int_value(expr).is_some()
@@ -356,6 +356,11 @@ impl TypeChecker<'_> {
             Self::operand_range(self.classify_operand(e, ty))
         };
         let result = match &expr.kind {
+            // A `summa` sits at the cap by ruling 21 (the element count is
+            // unbounded): a signed sum typed `i64` can exceed `i64::MAX`.
+            HirExpressionKind::Summa { .. } => {
+                return self.plain_int_width(ty) == Some(NumericWidth::I64);
+            }
             HirExpressionKind::Binary(op, lhs, rhs) => operand_range(lhs)
                 .zip(operand_range(rhs))
                 .and_then(|(a, b)| Self::scalar_binary_range(*op, a, b)),

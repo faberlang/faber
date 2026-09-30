@@ -203,7 +203,7 @@ impl TypeChecker<'_> {
         let (_, src) = self.store_int_slot(ty)?;
         let (dst_ty, dst) = self.store_int_target(slot_ty)?;
         let plain_i64 = |s: IntSlot| s.family == IntFamily::Plain && s.width == NumericWidth::I64;
-        (!site.local_slot && plain_i64(src) && plain_i64(dst) && self.exceeds_i64(expr))
+        (!site.local_slot && plain_i64(src) && plain_i64(dst) && self.exceeds_i64(expr, ty))
             .then_some(dst_ty)
     }
 
@@ -297,7 +297,17 @@ impl TypeChecker<'_> {
             return Some(slot_int_ty);
         }
         // `←` into a `wrapping` or `saturating` slot: the constant follows the
-        // slot's policy. It is checked as a plain `int` and wrapped.
+        // slot's policy. A value below `i64::MIN` has no 64-bit carrier to
+        // convert from, so the policy is applied here, exactly (ruling 21).
+        if value < i128::from(i64::MIN) {
+            let (lo, hi) = slot.range;
+            let applied = match slot.family {
+                IntFamily::Saturating => value.clamp(lo, hi),
+                _ => lo + (value - lo).rem_euclid(hi - lo + 1),
+            };
+            return self.rewrite_as_slot_literal(expr, applied, slot_int_ty);
+        }
+        // It is checked as a plain `int` and wrapped.
         let ty = self.check_const_operand(expr);
         Some(self.wrap_implicit_store(expr, ty, slot_int_ty, site))
     }
@@ -305,7 +315,10 @@ impl TypeChecker<'_> {
     /// A constant-only expression that fits a `wrapping` or `saturating` slot
     /// is computed exactly first (ruling 12a); the slot then takes the value.
     /// It is folded to the literal of that value, typed as the slot. A bare
-    /// literal, a negated literal and any other slot follow the ordinary path.
+    /// literal, a negated literal whose magnitude fits the slot, and any other
+    /// slot follow the ordinary path. A negated literal whose magnitude does
+    /// not fit but whose value does (`-2⁶³` in `saturating<i64>`) is folded:
+    /// the value is exact (ruling 12), the magnitude alone is not the slot's.
     fn fold_word_slot_constant(
         &mut self,
         expr: &mut HirExpression,
@@ -315,14 +328,28 @@ impl TypeChecker<'_> {
     ) -> Option<TypeId> {
         let bare = match &expr.kind {
             HirExpressionKind::Literal(_) => true,
-            HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => {
-                matches!(inner.kind, HirExpressionKind::Literal(_))
-            }
+            HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => match inner.kind {
+                HirExpressionKind::Literal(HirLiteral::Int(magnitude)) => {
+                    slot.holds(i128::from(magnitude))
+                }
+                HirExpressionKind::Literal(_) => true,
+                _ => false,
+            },
             _ => false,
         };
         if slot.family == IntFamily::Plain || bare {
             return None;
         }
+        self.rewrite_as_slot_literal(expr, value, slot_ty)
+    }
+
+    /// Replace a constant expression by the literal of `value`, typed as the slot.
+    fn rewrite_as_slot_literal(
+        &mut self,
+        expr: &mut HirExpression,
+        value: i128,
+        slot_ty: TypeId,
+    ) -> Option<TypeId> {
         let magnitude = u64::try_from(value.unsigned_abs()).ok()?;
         let span = expr.span;
         let mut literal = HirExpression {

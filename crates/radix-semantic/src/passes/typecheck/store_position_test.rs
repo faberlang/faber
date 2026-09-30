@@ -533,6 +533,19 @@ fn cap_typed_sum_into_int_is_checked_at_argument_and_return_stores() {
 }
 
 #[test]
+fn summa_at_the_cap_is_checked_at_the_return_store() {
+    // f1s (ruling 21): `summa` over signed integers is typed `i64` at the
+    // cap, and its element count is unbounded, so returning it as `int` is a
+    // checked store. Unsigned terms give `u64`, which narrows into `int`.
+    for term in ["numerus<i64>", "numerus<i8>", "numerus<u8>"] {
+        let source = format!(
+            "functio total(tensor<{term}, [2]> a) → numerus {{\n  redde summa ex a fixum s {{\n    redde s\n  }}\n}}\n"
+        );
+        assert_eq!(kinds(&source), vec![HirStoreKind::Return], "{term}");
+    }
+}
+
+#[test]
 fn provably_fitting_int_stores_carry_no_node() {
     // `i32 * i32` fits `i64`; a bare `int` copy and a literal need no check.
     let source = "incipit {\nvaria numerus<i32> p ← 3\nvaria numerus a ← 1\n\
