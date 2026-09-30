@@ -463,6 +463,9 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         "bivalens_recovery_unsupported" => {
             Some("remove the recovery arm; use the truthiness result directly".to_owned())
         }
+        "word_conversio_recovery_unsupported" => Some(
+            "remove the `⊥` default; a conversion into wrapping or saturating cannot fail".to_owned(),
+        ),
         "regex_operand_unsupported" => Some("convert textus or ascii values to regex".to_owned()),
         "regex_pattern_too_long" => Some("shorten the literal pattern or build it dynamically".to_owned()),
         "record_conversion_requires_reconstruction" => {

@@ -276,27 +276,21 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    fn convert_decimal_to_integer(
+    /// Exact integer a decimal value reduces to (round-half-even): the shared
+    /// integer choice of `d64 ↦ numerus<W>` and `d64 ↦ wrapping/saturating<W>`.
+    fn decimal_integer_value(
         &mut self,
         value: Value,
         source_width: NumericWidth,
-        target_width: NumericWidth,
-        recovery: Option<&MirOperand>,
         span: Span,
-    ) -> Result<Value, RunnerError> {
+    ) -> Result<i128, RunnerError> {
         let raw = match value {
             Value::Int(value) => decimal_carrier_value(value, source_width, span),
             Value::Float(value) => decimal_text_to_carrier(&value.to_string(), source_width)
                 .map_err(|error| decimal_text_error(error, span)),
             Value::Sermo(sermo) => {
                 let value = self.sermo_first_item(&sermo, span)?;
-                return self.convert_decimal_to_integer(
-                    value,
-                    source_width,
-                    target_width,
-                    recovery,
-                    span,
-                );
+                return self.decimal_integer_value(value, source_width, span);
             }
             other => Err(RunnerError::internal(
                 span,
@@ -306,13 +300,24 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         let scale = decimal_scale_factor(source_width).ok_or_else(|| {
             RunnerError::internal(span, "decimal conversion requires decimal width")
         })?;
-        let rounded = round_half_even_division(
+        round_half_even_division(
             i128::from(raw),
             scale,
             span,
             "decimal to numerus conversion failed",
         )
-        .map_err(|error| RunnerError::conversion(span, error.message))?;
+        .map_err(|error| RunnerError::conversion(span, error.message))
+    }
+
+    fn convert_decimal_to_integer(
+        &mut self,
+        value: Value,
+        source_width: NumericWidth,
+        target_width: NumericWidth,
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let rounded = self.decimal_integer_value(value, source_width, span)?;
         let (lo, hi) = int_width_range(target_width);
         if !(lo..=hi).contains(&rounded) {
             return self.recover_or_fail(
@@ -409,75 +414,52 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         })
     }
 
-    pub(crate) fn convert_to_modular_word(
-        &self,
+    /// D11.6 ruling 24: the exact integer a `wrapping`/`saturating` conversion
+    /// applies its policy to. Integer sources of any family carry it directly;
+    /// a `d64` source reduces to an integer exactly as `d64 ↦ numerus<W>` does.
+    fn policy_word_source_value(
+        &mut self,
         value: Value,
-        width: NumericWidth,
+        source_ty: TypeId,
         span: Span,
-    ) -> Result<Value, RunnerError> {
-        // Narrowing range-checks against the declared width — never wraps or
-        // truncates. The u64 carrier surfaces as `UInt`; narrower widths stay
-        // signed `Int` since every value fits i64.
-        let raw: u64 = match value {
-            Value::Int(value) => u64::try_from(value).map_err(|_| {
-                RunnerError::internal(
-                    span,
-                    format!(
-                        "modulus conversion value is outside {} range",
-                        width.rust_type()
-                    ),
-                )
-            })?,
-            Value::UInt(value) => value,
-            _ => {
-                return Err(RunnerError::internal(
-                    span,
-                    "modulus conversion requires an integer value",
-                ));
-            }
-        };
-        let mask = modular_word_mask(width);
-        if raw > mask {
-            return Err(RunnerError::internal(
-                span,
-                format!(
-                    "modulus conversion value is outside {} range",
-                    width.rust_type()
-                ),
-            ));
+    ) -> Result<i128, RunnerError> {
+        if let Some(source_width) = decimal_source_width(self.types, source_ty) {
+            return self.decimal_integer_value(value, source_width, span);
         }
-        Ok(modular_word_result(raw, width))
+        match value {
+            Value::Int(value) => Ok(i128::from(value)),
+            Value::UInt(value) => Ok(i128::from(value)),
+            _ => Err(RunnerError::internal(
+                span,
+                "wrapping/saturating conversion requires an integer value",
+            )),
+        }
     }
 
-    /// D11.1: converting into `saturatus<W>` range-checks like `modulus` —
-    /// a conversion never clamps; only arithmetic does.
-    pub(crate) fn convert_to_saturating_word(
-        &self,
+    /// `↦ wrapping<W>` reduces the exact source value mod 2^W; it cannot fail.
+    pub(crate) fn convert_to_modular_word(
+        &mut self,
         value: Value,
+        source_ty: TypeId,
         width: NumericWidth,
         span: Span,
     ) -> Result<Value, RunnerError> {
-        let raw = match value {
-            Value::Int(value) => i128::from(value),
-            Value::UInt(value) => i128::from(value),
-            _ => {
-                return Err(RunnerError::internal(
-                    span,
-                    "saturatus conversion requires an integer value",
-                ));
-            }
-        };
-        let (lo, hi) = int_width_range(width);
-        if raw < lo || raw > hi {
-            return Err(RunnerError::internal(
-                span,
-                format!(
-                    "saturatus conversion value is outside {} range",
-                    width.rust_type()
-                ),
-            ));
-        }
-        Ok(saturating_word_result(raw, width))
+        let exact = self.policy_word_source_value(value, source_ty, span)?;
+        let reduced = exact & i128::from(modular_word_mask(width));
+        // The mask keeps 0..=u64::MAX, so the narrowing is lossless.
+        Ok(modular_word_result(reduced as u64, width))
+    }
+
+    /// `↦ saturating<W>` clamps the exact source value to W's range; it cannot fail.
+    pub(crate) fn convert_to_saturating_word(
+        &mut self,
+        value: Value,
+        source_ty: TypeId,
+        width: NumericWidth,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let exact = self.policy_word_source_value(value, source_ty, span)?;
+        Ok(saturating_word_result(exact, width))
     }
 
     pub(crate) fn convert_to_vacuum(

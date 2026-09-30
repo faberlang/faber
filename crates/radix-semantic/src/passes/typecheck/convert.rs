@@ -89,6 +89,7 @@ const ISSUE_CONVERSIO_FAILURE_CHANNEL_TYPE_MISMATCH: &str =
     "conversio_failure_channel_type_mismatch";
 const ISSUE_CONVERSIO_RECOVERY_TYPE_MISMATCH: &str = "conversio_recovery_type_mismatch";
 const ISSUE_BIVALENS_RECOVERY_UNSUPPORTED: &str = "bivalens_recovery_unsupported";
+const ISSUE_WORD_CONVERSIO_RECOVERY_UNSUPPORTED: &str = "word_conversio_recovery_unsupported";
 const ISSUE_REGEX_CONVERSION_OPERAND_TYPE_MISMATCH: &str = "regex_conversion_operand_type_mismatch";
 const ISSUE_CONVERSIO_FAILURE_CHANNEL_TEXTUS_REQUIRED: &str =
     "conversio_failure_channel_textus_required";
@@ -544,6 +545,20 @@ impl TypeChecker<'_> {
         {
             *route = ordo_route;
             return result_ty;
+        }
+
+        // D11.6 ruling 24: `↦` into `wrapping<W>` / `saturating<W>` applies the
+        // target's policy (reduce mod 2^W / clamp) and cannot fail: no `⊥`
+        // recovery, no failure channel.
+        if self.is_policy_word(target_resolved) {
+            if !self.is_policy_word_conversio_source(source_ty) {
+                self.invalid_conversion(ISSUE_UNSUPPORTED_CONVERSIO, span);
+                return self.error_type;
+            }
+            if recovery.is_some() {
+                self.invalid_conversion(ISSUE_WORD_CONVERSIO_RECOVERY_UNSUPPORTED, span);
+            }
+            return target_resolved;
         }
 
         // S0-G2: `↦` dispatch is value-transparent through applied aliases —
@@ -2412,6 +2427,24 @@ impl TypeChecker<'_> {
             ty = *inner;
         }
         ty
+    }
+
+    fn is_policy_word(&self, ty: TypeId) -> bool {
+        matches!(
+            self.types.get(self.peel_alias_chain(ty)),
+            Type::ModularWord(_) | Type::SaturatingWord(_)
+        )
+    }
+
+    /// Sources of a `wrapping`/`saturating` conversion (ruling 24): integers of
+    /// any policy family, and `d64`. Float and other sources are not admitted.
+    fn is_policy_word_conversio_source(&self, ty: TypeId) -> bool {
+        let ty = self.resolve_inferred_type(ty);
+        self.is_integer_conversio_operand(ty)
+            || matches!(
+                self.types.get(self.peel_alias_chain(ty)),
+                Type::SizedNumeric(Primitive::Numerus, width) if *width == NumericWidth::D64
+            )
     }
 
     fn is_saturating_word(&self, ty: TypeId) -> bool {

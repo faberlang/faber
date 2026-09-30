@@ -2137,3 +2137,49 @@ functio probe(modulus<u8> m) → modulus<u32> {
 ",
     );
 }
+
+// D11.6 ruling 24: `↦` into `wrapping`/`saturating` applies the policy and
+// cannot fail — no `⊥`, no failure channel, integer and `d64` sources only.
+
+#[test]
+fn policy_word_conversio_needs_no_recovery_or_channel() {
+    test_support::assert_accepts(
+        r"
+functio narrow(numerus x, d64 d) → modulus<u8> {
+    fixum modulus<u8> a ← x ↦ modulus<u8>
+    fixum saturatus<u8> b ← x ↦ saturatus<u8>
+    fixum modulus<u8> c ← b ↦ modulus<u8>
+    fixum saturatus<i8> e ← a ↦ saturatus<i8>
+    fixum modulus<u8> f ← d ↦ modulus<u8>
+    fixum saturatus<u8> g ← d ↦ saturatus<u8>
+    fixum modulus<u32> h ← 300 ↦ modulus<u32>
+    redde a
+}
+",
+    );
+}
+
+#[test]
+fn policy_word_conversio_rejects_recovery_slot() {
+    for target in ["modulus<u8>", "saturatus<u8>"] {
+        test_support::assert_rejects_with_issue(
+            &format!("incipit {{ fixum numerus x ← 300\nfixum _ b ← x ↦ {target} ⊥ 0 }}"),
+            "word_conversio_recovery_unsupported",
+        );
+    }
+}
+
+#[test]
+fn policy_word_conversio_rejects_float_and_text_sources() {
+    for (source, target) in [
+        ("1.5", "modulus<u8>"),
+        ("1.5", "saturatus<u8>"),
+        ("\"7\"", "modulus<u8>"),
+        ("\"7\"", "saturatus<u8>"),
+    ] {
+        test_support::assert_rejects_with_issue(
+            &format!("incipit {{ fixum _ b ← {source} ↦ {target} }}"),
+            "unsupported_conversio",
+        );
+    }
+}

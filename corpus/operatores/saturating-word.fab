@@ -24,7 +24,8 @@ locale = "en"
 #
 # Common mistakes:
 #   • Mixing families — `saturating<u8> + int<u8>` is an error; convert with `↦`.
-#   • Expecting `↦` to clamp — a conversion into `saturating<W>` range-checks.
+#   • Expecting `↦` to fail — a conversion into `saturating<W>` clamps and cannot
+#     fail, so it takes no `⊥` recovery (`wrapping<W>` reduces mod 2^W the same way).
 #
 # See also: numerus, modulus
 # =============================================================================
@@ -71,4 +72,13 @@ main {
     var saturating<u8> acc ← 200
     acc ← acc + 100 - 50
     print acc
+    # `↦` into saturating clamps the exact value; into wrapping it reduces mod 2^W.
+    const int over ← 300
+    const int under ← -5
+    const saturating<u8> clampedHigh ← over ↦ saturating<u8>
+    const saturating<u8> clampedLow ← under ↦ saturating<u8>
+    const wrapping<u8> wrapped ← over ↦ wrapping<u8>
+    print clampedHigh
+    print clampedLow
+    print wrapped
 }
