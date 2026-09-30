@@ -945,6 +945,14 @@ help = "使用 {lista}<T>；lista<T, N> 是已交付的有界形式"
 message = "tabula 需要两个 type parameters"
 help = "修正用于 lowering 的 AST construct"
 
+[diagnostics.SEM008.issues.saturating_word_width_required]
+message = "saturating 类型需要恰好一个整数宽度"
+help = "为 saturating 类型写一个整数宽度，如 saturating<u8> 或 saturating<i16>"
+
+[diagnostics.SEM008.issues.saturating_word_width_shape]
+message = "saturating 宽度必须是单独的整数宽度标记"
+help = "使用单独的整数宽度标记，如 u8 或 i16"
+
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia 需要一个 type parameter"
 help = "修正用于 lowering 的 AST construct"
@@ -1573,6 +1581,10 @@ help = "divide with `÷` to get a float quotient, or convert an operand explicit
 message = "constant {value} does not fit {slot}"
 help = "write a value the slot holds"
 
+[diagnostics.SEM010.issues.numerus_literal_out_of_range]
+message = "整数字面量超出 numerus 的范围"
+help = "写 -9223372036854775808 到 9223372036854775807 之间的值，或把更大的非负值存入 `u64` 槽"
+
 [diagnostics.SEM010.issues.integer_to_float_requires_conversio]
 message = "整数不能隐式转换为浮点数"
 help = "使用 `↦` 显式转换整数"
@@ -1864,6 +1876,10 @@ help = "在应用此 numeric 运算符之前显式转换 operands"
 [diagnostics.SEM011.issues.u64_signed_arithmetic_requires_conversion]
 message = "u64 and a signed integer have no lossless join in arithmetic"
 help = "convert one side with `↦` so both operands are u64 or both are signed"
+
+[diagnostics.SEM011.issues.saturating_word_family_mismatch]
+message = "saturating 整数在算术中不能与其他整数族混用"
+help = "用 `↦` 把另一个操作数转换为同一 saturating 宽度；saturating、wrapping 与 trapping 整数从不隐式混用"
 
 [diagnostics.SEM011.issues.numeric_family_crossing_requires_conversio]
 message = "integer, decimal and float operands cannot mix implicitly"
@@ -2348,6 +2364,10 @@ help = "把 alternate-exit channel 声明为 textus，或提供 inline recovery"
 [diagnostics.SEM016.issues.regex_operand_unsupported]
 message = "regex conversion 需要 textus 或 ascii operand"
 help = "把 textus 或 ascii values convert 到 regex"
+
+[diagnostics.SEM016.issues.word_conversio_recovery_unsupported]
+message = "转换为 wrapping 或 saturating 不会失败"
+help = "去掉 `⊥` 默认值；转换为 wrapping 或 saturating 不会失败"
 
 [diagnostics.SEM016.issues.regex_recovery_unsupported]
 message = "regex conversion 不支持 a `⊥` default"

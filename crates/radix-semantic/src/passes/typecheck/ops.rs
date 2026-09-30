@@ -772,12 +772,6 @@ impl TypeChecker<'_> {
             return self.error_type;
         };
 
-        if lhs_shape.family == IntFamily::Saturating || rhs_shape.family == IntFamily::Saturating {
-            // D11.1: clamping has no bit-pattern meaning; bitwise and shift
-            // operators stay on `numerus` and `modulus` (fail closed).
-            self.invalid_operand_types(SATURATING_WORD_OPERATOR_UNSUPPORTED, span);
-            return self.error_type;
-        }
         if lhs_shape.width != rhs_shape.width {
             self.invalid_operand_types(SAME_WIDTH_INTEGER_OPERANDS_REQUIRED, span);
             return self.error_type;
@@ -2152,9 +2146,6 @@ pub(super) const NUMERIC_ARITHMETIC_OPERANDS_IDENTICAL: &str =
     "numeric_arithmetic_operands_identical";
 const MODULAR_WORD_FAMILY_MISMATCH: &str = "modular_word_family_mismatch";
 pub(super) const SATURATING_WORD_FAMILY_MISMATCH: &str = "saturating_word_family_mismatch";
-/// D11.1: bitwise, shift, and unsigned-negation operators on `saturatus`.
-pub(super) const SATURATING_WORD_OPERATOR_UNSUPPORTED: &str =
-    "saturating_word_operator_unsupported";
 
 /// Mixed integer families name the saturating family when it is involved,
 /// otherwise the modular family (both require an explicit `↦`).

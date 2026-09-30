@@ -1188,6 +1188,14 @@ help = "use {lista}<T>; lista<T, N> is proposed, not yet shipped"
 message = "tabula requires two type parameters"
 help = "fix the AST construct for lowering"
 
+[diagnostics.SEM008.issues.saturating_word_width_required]
+message = "saturatus unam latitudinem integram requirit"
+help = "scribe saturatus cum una latitudine integra, ut saturatus<u8> aut saturatus<i16>"
+
+[diagnostics.SEM008.issues.saturating_word_width_shape]
+message = "latitudo saturati signum latitudinis integrae nudum esse debet"
+help = "utere signo latitudinis integrae nudo, ut u8 aut i16"
+
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia requires one type parameter"
 help = "fix the AST construct for lowering"
@@ -1884,6 +1892,10 @@ help = "divide with `÷` to get a float quotient, or convert an operand explicit
 message = "constant {value} does not fit {slot}"
 help = "write a value the slot holds"
 
+[diagnostics.SEM010.issues.numerus_literal_out_of_range]
+message = "numerus litteralis extra fines numeri est"
+help = "scribe valorem inter -9223372036854775808 et 9223372036854775807, aut valorem maiorem non negativum in receptaculo `u64` repone"
+
 [diagnostics.SEM010.issues.integer_to_float_requires_conversio]
 message = "integer cannot convert to a float implicitly"
 help = "convert the integer explicitly with `↦`"
@@ -2259,6 +2271,10 @@ help = "convert operands explicitly before applying this numeric operator"
 [diagnostics.SEM011.issues.u64_signed_arithmetic_requires_conversion]
 message = "u64 and a signed integer have no lossless join in arithmetic"
 help = "convert one side with `↦` so both operands are u64 or both are signed"
+
+[diagnostics.SEM011.issues.saturating_word_family_mismatch]
+message = "numeri saturatus cum aliis generibus integrorum in arithmetica misceri non possunt"
+help = "muta alterum operandum ad eandem latitudinem saturati per `↦`; integri saturatus, modulus et numerus numquam tacite miscentur"
 
 [diagnostics.SEM011.issues.numeric_family_crossing_requires_conversio]
 message = "integer, decimal and float operands cannot mix implicitly"
@@ -2823,6 +2839,10 @@ help = "declare the alternate-exit channel as textus or provide inline recovery"
 [diagnostics.SEM016.issues.regex_operand_unsupported]
 message = "regex conversion requires textus or ascii operand"
 help = "convert textus or ascii values to regex"
+
+[diagnostics.SEM016.issues.word_conversio_recovery_unsupported]
+message = "conversio in modulus aut saturatus deficere non potest"
+help = "remove praesumptum `⊥`; conversio in modulus aut saturatus deficere non potest"
 
 [diagnostics.SEM016.issues.record_conversion_requires_reconstruction]
 message = "record conversion requires reconstruction; write `Type { field = value, … }` instead of converting with `↦`"

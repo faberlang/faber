@@ -539,20 +539,6 @@ impl TypeChecker<'_> {
                         return self.error_type;
                     }
                     literal_ty
-                } else if let Type::SaturatingWord(width) = self.types.get(literal_ty) {
-                    // D11.1: a literal adapts to the saturating width and must
-                    // fit it; clamping applies to arithmetic, never to spelling.
-                    let in_range = crate::numeric_width::integer_width_max(*width)
-                        .is_some_and(|max| *value <= max);
-                    if !in_range {
-                        self.error_issue(
-                            SemanticErrorKind::TypeMismatch,
-                            SATURATING_WORD_LITERAL_OUT_OF_RANGE,
-                            span,
-                        );
-                        return self.error_type;
-                    }
-                    literal_ty
                 } else if self.literal_exceeds_signed_numerus_domain(literal_ty, *value) {
                     // The lexer now carries a u64 magnitude, so the signed
                     // numerus cap that used to be lexical lives here: magnitudes
@@ -946,7 +932,6 @@ impl TypeChecker<'_> {
 }
 
 const MODULAR_WORD_LITERAL_OUT_OF_RANGE: &str = "modular_word_literal_out_of_range";
-const SATURATING_WORD_LITERAL_OUT_OF_RANGE: &str = "saturating_word_literal_out_of_range";
 const NUMERUS_LITERAL_OUT_OF_RANGE: &str = "numerus_literal_out_of_range";
 const DECIMAL_INTEGER_LITERAL_REJECTED: &str = "decimal_integer_literal_rejected";
 const DECIMAL_LITERAL_UNPARSEABLE: &str = "decimal_literal_unparseable";

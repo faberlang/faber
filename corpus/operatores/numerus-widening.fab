@@ -1,0 +1,81 @@
++++
+term = "numerus"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "conversio_expr", "additive_expr", "multiplicative_expr", "comparison", "assignment", "place", "call_expr", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = true
+summary = "Integer arithmetic widens exactly; the slot that stores a value applies its policy."
+syntax = "<numerus> + <numerus>"
+related = ["+", "/", "%", "÷", "numerus"]
+locale = "en"
++++
+# =============================================================================
+# numerus — Integer arithmetic widens exactly; the slot that stores a value applies its policy.
+# =============================================================================
+#
+# What this teaches:
+#   • The range rule — `u8 + u8` is computed exactly (400), not in 8 bits.
+#   • Untyped constants take their range — `-100 - 100` needs no width.
+#   • Floor division — `/` floors and `%` takes the divisor's sign.
+#   • True division — `÷` yields a float (`f32` for 8/16-bit operands).
+#   • Store policies — a trapping slot traps, `wrapping` reduces, `saturating`
+#     clamps; each applies where the value lands, once.
+#   • Comparisons are exact across signedness.
+#
+# Common mistakes:
+#   • Expecting `u8 + u8` to wrap or trap at the `+`; the check is at the store.
+#   • Expecting `-7 / 2` to be -3 — it floors to -4.
+#   • Mixing `u64` with a signed operand: `u64 + i8` is a compile error, and so
+#     is storing an integer in a float slot without `↦` (use `÷` for a quotient).
+#
+# See also: numerus, /, %, ÷, wrapping, saturating
+# =============================================================================
+
+# numerus-widening — the numeric model in seven short sections
+
+fn ducenti() → int<u8> {
+    return 200
+}
+
+main {
+    const int<u8> a ← ducenti()
+    const int<u8> b ← ducenti()
+
+    # 1. Range rule: the sum is exact, and fits an i16 slot.
+    print a + b
+    const int<i16> wide ← a + b
+    print wide
+
+    # 2. Untyped constants take their range, so no operand needs a width.
+    print -100 - 100
+    const int<i8> low ← -100
+    print low - 100
+
+    # 3. Floor division; the remainder takes the divisor's sign.
+    print -7 / 2
+    print -7 % 2
+    print 7 % -2
+
+    # 4. True division: f64 by default, f32 for 8- and 16-bit operands.
+    print 7 ÷ 2
+    print a ÷ 3
+
+    # 5. Store policies for a value that does not fit u8.
+    const wrapping<u8> wrapped ← (a + b) ↦ wrapping<u8>
+    const saturating<u8> clamped ← (a + b) ↦ saturating<u8>
+    print wrapped
+    print clamped
+
+    # 6. `_` takes the range type; an exact value needs no narrowing.
+    const _ inferred ← a + b
+    print inferred
+
+    # 7. Comparisons are exact, including across signedness.
+    print a > -1
+
+    # A trapping slot aborts on a value it cannot hold; 400 does not fit in `u8`:
+    #   const int<u8> bad ← a + b
+    # u64 with a signed operand is a compile error; convert with `↦` first:
+    #   const int<u64> big ← 1
+    #   print big + low
+}

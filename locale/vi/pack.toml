@@ -945,6 +945,14 @@ help = "dùng {lista}<T>; lista<T, N> là dạng bounded đã phát hành"
 message = "tabula yêu cầu hai tham số kiểu"
 help = "sửa cấu trúc AST để hạ mức"
 
+[diagnostics.SEM008.issues.saturating_word_width_required]
+message = "saturating type requires exactly one integer width"
+help = "write the saturating type with one integer width, such as saturating<u8> or saturating<i16>"
+
+[diagnostics.SEM008.issues.saturating_word_width_shape]
+message = "saturating width must be a bare integer width marker"
+help = "use a bare integer width marker such as u8 or i16"
+
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia yêu cầu một tham số kiểu"
 help = "sửa cấu trúc AST để hạ mức"
@@ -1573,6 +1581,10 @@ help = "divide with `÷` to get a float quotient, or convert an operand explicit
 message = "constant {value} does not fit {slot}"
 help = "write a value the slot holds"
 
+[diagnostics.SEM010.issues.numerus_literal_out_of_range]
+message = "integer literal is outside the numerus range"
+help = "write a value from -9223372036854775808 to 9223372036854775807, or store a larger non-negative value in a `u64` slot"
+
 [diagnostics.SEM010.issues.integer_to_float_requires_conversio]
 message = "integer cannot convert to a float implicitly"
 help = "convert the integer explicitly with `↦`"
@@ -1864,6 +1876,10 @@ help = "chuyển đổi rõ ràng các toán hạng trước khi áp dụng toá
 [diagnostics.SEM011.issues.u64_signed_arithmetic_requires_conversion]
 message = "u64 and a signed integer have no lossless join in arithmetic"
 help = "convert one side with `↦` so both operands are u64 or both are signed"
+
+[diagnostics.SEM011.issues.saturating_word_family_mismatch]
+message = "saturating integers cannot mix with other integer families in arithmetic"
+help = "convert the other operand to the same saturating width with `↦`; saturating, wrapping, and trapping integers never mix implicitly"
 
 [diagnostics.SEM011.issues.numeric_family_crossing_requires_conversio]
 message = "integer, decimal and float operands cannot mix implicitly"
@@ -2348,6 +2364,10 @@ help = "khai báo kênh thoát thay thế là textus hoặc cung cấp khôi ph�
 [diagnostics.SEM016.issues.regex_operand_unsupported]
 message = "chuyển đổi regex yêu cầu toán hạng textus hoặc ascii"
 help = "chuyển đổi giá trị textus hoặc ascii sang regex"
+
+[diagnostics.SEM016.issues.word_conversio_recovery_unsupported]
+message = "a conversion into wrapping or saturating cannot fail"
+help = "remove the `⊥` default; a conversion into wrapping or saturating cannot fail"
 
 [diagnostics.SEM016.issues.regex_recovery_unsupported]
 message = "chuyển đổi regex không hỗ trợ khôi phục bằng `⊥`; regex không có dạng literal, nên không có giá trị theo kiểu đích để thay thế"

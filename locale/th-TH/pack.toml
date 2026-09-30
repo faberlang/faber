@@ -957,6 +957,14 @@ help = "ใช้ {lista}<T>; lista<T, N> เป็นรูปแบบคว�
 message = "tabula ต้องมีพารามิเตอร์ชนิดสองรายการ"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
+[diagnostics.SEM008.issues.saturating_word_width_required]
+message = "saturating type requires exactly one integer width"
+help = "write the saturating type with one integer width, such as saturating<u8> or saturating<i16>"
+
+[diagnostics.SEM008.issues.saturating_word_width_shape]
+message = "saturating width must be a bare integer width marker"
+help = "use a bare integer width marker such as u8 or i16"
+
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia ต้องมีพารามิเตอร์ชนิดหนึ่งรายการ"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
@@ -1585,6 +1593,10 @@ help = "divide with `÷` to get a float quotient, or convert an operand explicit
 message = "constant {value} does not fit {slot}"
 help = "write a value the slot holds"
 
+[diagnostics.SEM010.issues.numerus_literal_out_of_range]
+message = "integer literal is outside the numerus range"
+help = "write a value from -9223372036854775808 to 9223372036854775807, or store a larger non-negative value in a `u64` slot"
+
 [diagnostics.SEM010.issues.integer_to_float_requires_conversio]
 message = "integer cannot convert to a float implicitly"
 help = "convert the integer explicitly with `↦`"
@@ -1876,6 +1888,10 @@ help = "แปลงตัวถูกดำเนินการอย่าง
 [diagnostics.SEM011.issues.u64_signed_arithmetic_requires_conversion]
 message = "u64 and a signed integer have no lossless join in arithmetic"
 help = "convert one side with `↦` so both operands are u64 or both are signed"
+
+[diagnostics.SEM011.issues.saturating_word_family_mismatch]
+message = "saturating integers cannot mix with other integer families in arithmetic"
+help = "convert the other operand to the same saturating width with `↦`; saturating, wrapping, and trapping integers never mix implicitly"
 
 [diagnostics.SEM011.issues.numeric_family_crossing_requires_conversio]
 message = "integer, decimal and float operands cannot mix implicitly"
@@ -2360,6 +2376,10 @@ help = "ประกาศช่องทาง alternate-exit เป็น text
 [diagnostics.SEM016.issues.regex_operand_unsupported]
 message = "การแปลง regex ต้องการ operand เป็น textus หรือ ascii"
 help = "แปลงค่า textus หรือ ascii เป็น regex"
+
+[diagnostics.SEM016.issues.word_conversio_recovery_unsupported]
+message = "a conversion into wrapping or saturating cannot fail"
+help = "remove the `⊥` default; a conversion into wrapping or saturating cannot fail"
 
 [diagnostics.SEM016.issues.regex_recovery_unsupported]
 message = "การแปลง regex ไม่รองรับการกู้คืนด้วย `⊥`; regex ไม่มีรูปแบบ literal จึงไม่มีค่าที่มีชนิดตามเป้าหมายให้แทนที่"

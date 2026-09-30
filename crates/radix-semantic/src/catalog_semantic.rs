@@ -556,12 +556,6 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "saturating_word_family_mismatch" => Some(
             "convert the other operand to the same saturatus width with `↦`; saturating, wrapping, and trapping integers never mix implicitly".to_owned(),
         ),
-        "saturating_word_operator_unsupported" => Some(
-            "saturatus supports + - * / %, comparison, and signed negation; convert with `↦` for bitwise work, and write `x ← x + 1` instead of `↑`".to_owned(),
-        ),
-        "saturating_word_literal_out_of_range" => Some(
-            "write a literal inside the saturatus width; clamping applies to arithmetic, not to literals".to_owned(),
-        ),
         "modular_word_family_mismatch" => Some(
             "convert both operands to the same modulus width, or keep both operands in the numerus family".to_owned(),
         ),

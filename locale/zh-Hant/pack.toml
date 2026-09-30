@@ -945,6 +945,14 @@ help = "使用 {lista}<T>；lista<T, N> 是已交付的有界形式"
 message = "tabula 需要兩個型別參數"
 help = "修正用於降階的 AST 結構"
 
+[diagnostics.SEM008.issues.saturating_word_width_required]
+message = "saturating 型別需要恰好一個整數寬度"
+help = "為 saturating 型別寫一個整數寬度，如 saturating<u8> 或 saturating<i16>"
+
+[diagnostics.SEM008.issues.saturating_word_width_shape]
+message = "saturating 寬度必須是單獨的整數寬度標記"
+help = "使用單獨的整數寬度標記，如 u8 或 i16"
+
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia 需要一個型別參數"
 help = "修正用於降階的 AST 結構"
@@ -1573,6 +1581,10 @@ help = "divide with `÷` to get a float quotient, or convert an operand explicit
 message = "constant {value} does not fit {slot}"
 help = "write a value the slot holds"
 
+[diagnostics.SEM010.issues.numerus_literal_out_of_range]
+message = "整數字面量超出 numerus 的範圍"
+help = "寫 -9223372036854775808 到 9223372036854775807 之間的值，或把更大的非負值存入 `u64` 槽"
+
 [diagnostics.SEM010.issues.integer_to_float_requires_conversio]
 message = "整數不能隱式轉換為浮點數"
 help = "使用 `↦` 明確轉換整數"
@@ -1864,6 +1876,10 @@ help = "套用此數值運算子前，先明確轉換運算元"
 [diagnostics.SEM011.issues.u64_signed_arithmetic_requires_conversion]
 message = "u64 and a signed integer have no lossless join in arithmetic"
 help = "convert one side with `↦` so both operands are u64 or both are signed"
+
+[diagnostics.SEM011.issues.saturating_word_family_mismatch]
+message = "saturating 整數在算術中不能與其他整數族混用"
+help = "用 `↦` 把另一個運算元轉換為同一 saturating 寬度；saturating、wrapping 與 trapping 整數從不隱式混用"
 
 [diagnostics.SEM011.issues.numeric_family_crossing_requires_conversio]
 message = "integer, decimal and float operands cannot mix implicitly"
@@ -2348,6 +2364,10 @@ help = "將替代退出通道宣告為 textus，或提供內嵌復原"
 [diagnostics.SEM016.issues.regex_operand_unsupported]
 message = "regex 轉換需要 textus 或 ascii 運算元"
 help = "將 textus 或 ascii 值轉換為 regex"
+
+[diagnostics.SEM016.issues.word_conversio_recovery_unsupported]
+message = "轉換為 wrapping 或 saturating 不會失敗"
+help = "去掉 `⊥` 預設值；轉換為 wrapping 或 saturating 不會失敗"
 
 [diagnostics.SEM016.issues.regex_recovery_unsupported]
 message = "regex 轉換不支援 `⊥` 復原；regex 沒有字面形式，因此沒有可替代的目標型別值"
