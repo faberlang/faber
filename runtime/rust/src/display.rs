@@ -53,6 +53,7 @@ pub fn display_valor(value: &Valor) -> String {
         Valor::Nihil => "nihil".to_owned(),
         Valor::Bivalens(value) => display_bivalens(*value).to_owned(),
         Valor::Numerus(value) => value.to_string(),
+        Valor::Magnus(value) => value.to_string(),
         Valor::Fractus(value) => display_fractus(*value),
         Valor::Textus(value) | Valor::Instans(value) => value.clone(),
         Valor::Octeti(bytes) => format!("<{} bytes>", bytes.len()),

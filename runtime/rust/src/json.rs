@@ -153,7 +153,11 @@ fn validate_root(value: &Valor) -> Result<(), JsonError> {
 
 fn validate_value(value: &Valor, path: &str) -> Result<(), JsonError> {
     match value {
-        Valor::Nihil | Valor::Bivalens(_) | Valor::Numerus(_) | Valor::Textus(_) => Ok(()),
+        Valor::Nihil
+        | Valor::Bivalens(_)
+        | Valor::Numerus(_)
+        | Valor::Magnus(_)
+        | Valor::Textus(_) => Ok(()),
         Valor::Fractus(n) if n.is_finite() => Ok(()),
         Valor::Fractus(_) => Err(JsonError::new(path, JsonErrorKind::NonFiniteNumber)),
         Valor::Lista(items) => items
@@ -191,6 +195,7 @@ fn render_valor(value: &Valor) -> String {
         Valor::Bivalens(true) => "true".to_owned(),
         Valor::Bivalens(false) => "false".to_owned(),
         Valor::Numerus(value) => value.to_string(),
+        Valor::Magnus(value) => value.to_string(),
         Valor::Fractus(value) => render_fractus(*value),
         Valor::Textus(value) => render_string(value),
         Valor::Lista(items) => {
@@ -445,6 +450,8 @@ impl<'a> Parser<'a> {
                 ))
             }
         } else {
+            // WHY: beyond-`i64` tokens stay rejected until U8a/U8b gives the runner and every
+            // backend the same any-length parse; `Valor::Magnus` only renders (below).
             token
                 .parse::<i64>()
                 .map(Valor::Numerus)

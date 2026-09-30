@@ -1,6 +1,6 @@
 //! Canonical dynamic value carrier for Faber `valor` and `ignotum`.
 
-use crate::{Ascii, Instans, InstansPraecisio};
+use crate::{Ascii, Instans, InstansPraecisio, Magnus};
 use std::collections::{BTreeMap, HashMap};
 use std::hash::BuildHasher;
 
@@ -11,6 +11,9 @@ pub enum Valor {
     Nihil,
     Bivalens(bool),
     Numerus(i64),
+    /// An integer beyond `i64` (the unbounded `inf` width). Canonical: a value that fits
+    /// `i64` is always [`Valor::Numerus`]; build this through `Valor::from(Magnus)`.
+    Magnus(Magnus),
     Fractus(f64),
     Textus(String),
     Octeti(Vec<u8>),
@@ -61,6 +64,16 @@ impl FromValor for i64 {
     fn from_valor(v: &Valor) -> Option<Self> {
         match v {
             Valor::Numerus(n) => Some(*n),
+            _ => None,
+        }
+    }
+}
+
+impl FromValor for Magnus {
+    fn from_valor(v: &Valor) -> Option<Self> {
+        match v {
+            Valor::Numerus(n) => Some(Magnus::from_i64(*n)),
+            Valor::Magnus(m) => Some(m.clone()),
             _ => None,
         }
     }
@@ -157,6 +170,14 @@ impl From<bool> for Valor {
 impl From<i64> for Valor {
     fn from(value: i64) -> Self {
         Valor::Numerus(value)
+    }
+}
+
+impl From<Magnus> for Valor {
+    fn from(value: Magnus) -> Self {
+        value
+            .to_i64()
+            .map_or_else(|| Valor::Magnus(value), Valor::Numerus)
     }
 }
 
