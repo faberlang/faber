@@ -35,7 +35,7 @@ static_init ::= insere_expr | expression
 # [012] insere_expr
 insere_expr ::= 'ฝัง' STRING
 # [013] fixum_decl
-fixum_decl ::= ('คงที่' | 'แปร') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_default?) | ('↢' expression))?
+fixum_decl ::= ('คงที่' | 'แปร') type_annotation IDENTIFIER (('←' expression) | ('=' expression) | ('↤' assignment inline_default?) | ('↢' expression))?
 # [014] figendum_decl
 figendum_decl ::= ('รอคง' | 'รอแปร') type_annotation IDENTIFIER '←' expression
 # [015] sit_decl
@@ -335,7 +335,7 @@ range_tail ::= ('‥' | '…' | 'ก่อน' | 'จนถึง') additive_exp
 # [162] additive_expr
 additive_expr ::= multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
 # [163] multiplicative_expr
-multiplicative_expr ::= vel_expr (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
+multiplicative_expr ::= vel_expr (('*' | '/' | '÷' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
 # [164] vel_expr
 vel_expr ::= unary_expr ('หรือว่าง' vel_rhs)*
 # [165] vel_rhs
@@ -761,7 +761,7 @@ driver. `capture-pending` rows intentionally carry no invented token shape.
 | `BACKTICK_STRING` | `capture-pending` | scan.rs scan_backtick_string; backtick forma template; TokenKind::BacktickString |
 | `OCTETI_STRING` | `capture-pending` | scan.rs scan_octeti_string; pipe-delimited hex; TokenKind::OctetiString |
 | `NEWLINE` | `capture-pending` | scan.rs scan_line_break; LF or CRLF; TokenKind::Newline |
-| `WIDTH_MARKER` | `capture-pending` | parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64 and decimal d32/d64 (numerus only), f16/bf16/f32/f64 (fractus only); u8/u16/u32/u64 (modulus), i8/i16/i32/i64/u8/u16/u32/u64 (saturatus); not a lexer token |
+| `WIDTH_MARKER` | `capture-pending` | parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64 and decimal d64 (numerus only), f16/bf16/f32/f64 (fractus only); u8/u16/u32/u64 (modulus), i8/i16/i32/i64/u8/u16/u32/u64 (saturatus); not a lexer token |
 | `LISTA_WIDTH_SUGAR` | `capture-pending` | parser type-position l + WIDTH_MARKER; not a lexer token |
 | `TENSOR_WIDTH_SUGAR` | `capture-pending` | parser type-position t + WIDTH_MARKER; not a lexer token |
 | `SPARSA_WIDTH_SUGAR` | `capture-pending` | parser type-position s + WIDTH_MARKER; not a lexer token |
@@ -1030,6 +1030,14 @@ use a top-level function.
   the written type is the conversion destination, then the binding is
   initialized. `รอคง`/`รอแปร` keep `←`; `คงที่ _`, `อนุมานคงที่`, and untyped
   destructuring reject `↤` (no concrete destination type).
+- `คงที่ T x = e` (D5.10) declares a typed **local constant**. `=` states a
+  compile-time fact, so `e` is evaluated while compiling (literals, arithmetic
+  and the other operators on scalars, `ของชนิด` statics, earlier constants) and
+  must fit `T` whatever `T`'s overflow policy: `คงที่ u8 d = 300` is a compile
+  error even for `saturating<u8>`. `คงที่ _ x = 10` infers `int`. The result is
+  an ordinary immutable local of type `T`. `แปร` never takes `=`
+  (`varia_compile_time_initializer`), and a value that is not known at compile
+  time is stored with `←` (`local_constant_not_constant`, SEM060).
 - Deferred init: `คงที่ numerus x` or `อนุมานคงที่ x` declares an uninitialized immutable
   slot that must be assigned exactly once before any read; a second assignment is
   rejected. The definite-assignment pass (semantic Phase 3a) enforces this.
@@ -1208,6 +1216,8 @@ wire operation such as `json.pange(value ↦ json)`.
 - `@ cursor` marks a function as generator (legacy — prefer `สตรีม` posture word)
 - Callable posture words (`อะซิงก์`/`สตรีม`/`สตรีมอะซิงก์`) are recognized in the signature
   slot after modifiers and before `→`/`⇥`/body; bare means synchronous finite
+  (`สตรีม T` is a synchronous generator: a call to it has type `cursor<T>`, not
+  `lista<T>`; collect with `gen() ↦ lista<T>`)
 - `@ สาธารณะ` marks a declaration for the file's importable (export) surface; `@ interna` marks it package-internal (same-package importable only); `@ privata` is an explicit module-private marker. Unmarked top-level declarations are module-private by default; a declaration mixing distinct visibility tiers is rejected with `SEM019` (`conflicting_visibility`)
 - `@ protecta` is reserved and rejected with a semantic diagnostic; it has no package, subclass, or sibling-file visibility meaning
 - `@ doc` is not an annotation. Comments are the documentation: a line comment attaches forward to the declaration it precedes, and there is no doc marker.
@@ -1433,8 +1443,8 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | `littera`  | en `char`; one Unicode scalar value (D10.1–10.2): a 4-byte value that never allocates (Rust `char`, Go `rune`). Element of `textus` / `ascii` iteration and of `textus[i]` / `ascii[i]` indexing. Grapheme clusters are norma library work, not this type. |
 | `forma`    | captured template + params |
 | `numerus`  | integer (default `i64`) |
-| `modulus<W>` | en `wrapping<W>`; unsigned modular word; arithmetic wraps modulo 2^W |
-| `saturatus<W>` | en `saturating<W>`; saturating integer; arithmetic clamps at both ends of W |
+| `modulus<W>` | en `wrapping<W>`; unsigned modular word; a store reduces modulo 2^W |
+| `saturatus<W>` | en `saturating<W>`; saturating integer; a store clamps at both ends of W |
 | `fractus`  | float (default `f64`) |
 | `bivalens` | boolean |
 | `nihil`    | null |
@@ -1465,51 +1475,197 @@ Sized primitives accept one optional **width marker** (not a user type parameter
 
 | Family | Markers | Invalid example |
 | ------ | ------- | --------------- |
-| `numerus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `d32`, `d64` | `numerus<f32>` → use `fractus<f32>` |
+| `numerus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `d64` | `numerus<f32>` → use `fractus<f32>` |
 | `fractus<W>` | `f16`, `bf16`, `f32`, `f64` | `fractus<i32>` → use `numerus<i32>` |
 | `modulus<W>` | `u8`, `u16`, `u32`, `u64` | `modulus<i32>` → signed widths are not modular words |
 | `saturatus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64` | `saturatus<f32>` → use `fractus<f32>` |
 
 Bare `numerus` / `fractus` remain shorthand for `numerus<i64>` / `fractus<f64>`.
 
-`numerus<d32>` and `numerus<d64>` are exact **decimal** widths: a decimal
-literal in a decimal context (`numerus<d32> a ← 4.2`) keeps its digit text, and
-arithmetic runs on a scaled-integer carrier (`d32` scale 10⁷, `d64` scale 10⁹)
-with round-half-even reductions, so `4.2 + 0.1` is exactly `4.3`. The `d`
-markers are valid only on `numerus` (`fractus<d32>` is rejected). Integer
-literals in a decimal context are rejected (`decimal_integer_literal_rejected`);
-write `1.0` or convert explicitly with `↦`.
+`numerus<d64>` is the one **decimal** width, for money and accounting
+(there is no narrower decimal width). A decimal literal in a decimal context (`numerus<d64> a ←
+4.2`) keeps its digit text, and `d64` is the scaled integer `i64` × 10⁻⁸: eight
+fraction digits and a range of ±92,233,720,368.54775807, so `4.2 + 0.1` is
+exactly `4.3`. Arithmetic is exact until the store, the same model as integers:
+`+` and `-` are exact, `*` is exact and its scale grows (scale 8 × scale 8 is
+exact at scale 16), and `/` rounds half-even to the larger operand scale, all
+in a wide intermediate bounded by a 128-bit carrier at its scale (past it the
+operation traps). The `d64` slot applies its policy where the value lands: it
+rounds **half-even to scale 8** and traps when the value leaves the range, so
+`amount * rate * (1 + tax)` rounds once, at the store; per-step rounding is
+written as separate stores. `d64` takes only the trapping policy
+(`saturating<d64>` and `wrapping<d64>` are rejected: a clamped money amount is
+silently wrong). The `d` marker is valid only on `numerus` (`fractus<d64>` is
+rejected). Integer literals in a decimal context are rejected
+(`decimal_integer_literal_rejected`); write `1.0` or convert explicitly with
+`↦`, as for every crossing between number families. A decimal literal with more
+than eight fraction digits into `d64` is a compile error: a written literal is
+never silently changed, while a computed value is rounded by the slot. Display
+(D2.6): with a `¶` spec the value prints exactly as the spec says (`12.5 ¶
+".2"` is `12.50`, rounding half-even when the spec cuts digits); without one
+(`print`, `§` holes) it prints the shortest form with trailing zeros dropped,
+`12.5` and `12`, never `12.50` or `12.0`. A decimal stores its value only, with
+no per-value scale.
 `numerus<_>`, `fractus<_>`, `modulus<_>`, `saturatus<_>`, and `instans<_>` are marker holes:
 the family stays identity and only the width/precision is inferred from a
 same-family witness (exact marker, no lattice widening). Unsolved `_` is an
 error, never the bare default. Convert-hint holes (`numerus<u32, _>`) are
 not this form.
 
-`modulus<W>` is a distinct semantic family: arithmetic does not mix implicitly
-with `numerus<W>`, while explicit same-width conversion remains available.
-Literals must be in `0..=2^W-1` (for `modulus<u64>` up to
-`18446744073709551615`). Shift counts are themselves modular: `x ⇐ W` is a
-full wrap. Cross-width modular arithmetic is rejected.
+### Numeric model
 
-Conversion is the deliberate complement to the checked arithmetic policy:
-`fractus ↦ numerus<W>` saturates at the target width — NaN converts to `0`,
-and an out-of-range value clamps to the width's bounds (the cross-tier Rust
-`as` status quo). The `∷` ascription surface follows the same saturation when
-it crosses numeric families. Integer `numerus<W>` arithmetic errors on
-overflow while float→integer conversion clamps; `modulus<W>` stays the only
-wrapping family (FORK-2, operator mail 2fb79900). Runner cast-path alignment
-is tracked as want 34821b73.
+The numeric rules below are D11.1–D11.8 and the operator rulings of
+2026-09-29/30 (delivery spec `d11-6-widening-delivery.md` §3). They apply to
+scalars on the host; tensors and kernels follow the same store rule
+per element, with the device profile of ruling 18.
 
-Overflow policy lives in the type, read once at the declaration. There are no
-per-operation checked, wrapping, or saturating method families. To ask "does
-this fit?" of untrusted input, convert it to the narrow type with `↦` and
-handle the failure through the error channel.
+**Exact values, checked stores.** Integer arithmetic computes the exact
+mathematical result; an expression is a number, not a container. Every
+intermediate must lie in one 64-bit range, [−2⁶³, 2⁶⁴ − 1] (it fits some
+64-bit integer, signed or unsigned); outside it the operation traps until the
+unbounded integer `inf` (D11.5) exists. Overflow is therefore observed only where a value **lands in a
+typed slot**, and every such store applies the slot's policy: declaration,
+assignment, `↑`/`↓`, field, argument, `คืน`, `ให้`, collection element, and
+the other store positions of the spec (a `print`, a `§` hole, a `¶`, a
+comparison or a condition has no slot and never traps for size). `x * 3 / 2`
+with `x: u8 = 100` computes 150 and fits; with 200 it computes 300, which traps
+at the store, not at the multiply. A check is omitted only where the compiler
+proves the value fits. A value known at compile time is checked at compile
+time.
 
-`saturatus<W>` clamps: `+ - * / %` saturate at `W`'s bounds (`-MIN` and
-`MIN / -1` give MAX); division by zero traps. Literals adapt and must fit
-`W`. It never mixes with `numerus`/`modulus` without `↦`, and `↦` into or
-out of it is a range-checked narrowing between integer families only. Bitwise, shift, `¬`, unsigned negation, and
-`↑`/`↓` are rejected.
+**Slot policies.** The policy lives in the type, read once at the declaration:
+
+| Family | Policy at the store | Use |
+| ------ | ------------------- | --- |
+| `numerus<W>` (default) | **traps** if the value does not fit | counts, sizes, money, indices |
+| `modulus<W>` (en `wrapping<W>`) | **reduces** modulo 2^W | hashes, checksums |
+| `saturatus<W>` (en `saturating<W>`) | **clamps** to W's bounds, once, at the store | pixels, audio, levels |
+
+`saturating<u8>` with `x = 250` and `x + 200 - 100` stores 255, not the 155 that
+clamping each step would give; per-step clamping is written as separate stores
+into `saturating` slots. This departs from Rust `Saturating<T>` deliberately.
+For `modulus`, reducing once at the store equals reducing each step for
+`+ - * ⇐ ∧ ∨ ⊻ ¬`; before `⇒`, `/`, `%` and comparisons the operand is reduced
+first, so ported hash and crypto code keeps its results. Within one policy
+family a store into a narrower width applies the slot's policy
+(`wrapping<u32>` into `wrapping<u8>` reduces); crossing policy families needs
+`↦`. A constant stored with `←` follows the slot's policy
+(`saturating<u8> w ← 300` is 255, `wrapping<u8> w ← -1` is 255, and a trapping
+slot's certain trap is a compile error); a constant in an `=` position
+(`ของชนิด`, field default, enum member, `คงที่ T x = e`) must fit `W` whatever
+the policy. Literals in `modulus<W>` and `saturatus<W>` slots must fit `W`.
+The unbounded integer is the bare marker `inf`; a policy word on it is legal
+and has no effect.
+
+The D11.8 naming frame puts the policy outside and the representation inside:
+en `trapping<W>`, `wrapping<W>`, `saturating<W>`; la `exactus<W>`, `modulus<W>`,
+`saturatus<W>`. A bare marker takes its domain's default policy (`u8` is
+`trapping<u8>`; integers and `d64` trap, floats follow IEEE), and the long forms
+`numerus<W>`/`fractus<W>` retire. That respelling, signed `wrapping<W>`, and the
+float cells are ruled but not yet the accepted surface: this document keeps the
+`numerus<W>`/`modulus<W>`/`saturatus<W>` spellings the compiler accepts today.
+
+**Implicit and explicit failure differ.** A failed implicit store is a trap of
+its own identity: it never enters the `⇥` channel, even inside `ทำ … จับ`,
+and its message names the value, the destination type and the slot (for an
+inferred slot, the expression the type came from). Only an explicit `↦` is
+recoverable (`⇥`, `⊥`, `ดัก`). `⊥` never catches a trap.
+
+**Expression types: the range rule.** The type of a trapping integer
+expression is the smallest integer type that holds every possible result,
+computed by interval arithmetic from the operands' declared types and never
+from the destination. With `u8` operands `a + b` and `a * b` are `u16`, `a - b`,
+`-a` and `¬a` are `i16`, and `a / b`, `a % b`, `a ⇒ n`, `a ∧ b` and `a ∨ b` are
+`u8`. Only trapping types grow; `modulus<W>` stays in its ring and
+`saturatus<W>` keeps `W`. Growth stops at the 64-bit containers: past them the
+type keeps the sign of the range (`i64` if it can be negative, else `u64`), so
+`u64 - u64` is `i64`. `_` slots take the expression's type (`คงที่ _ t ← a + b`
+with `u8` operands is `u16`); a collection literal with no declared element
+type, a `✓ ✗` conditional and `ผลรวม` take theirs from the same rule.
+
+**Untyped constants.** A literal, or an expression made only of literals, is
+an exact number with no type. Beside a typed operand its value joins that
+operand's range; in an annotated slot it takes the slot's type and must fit at
+compile time (`คงที่ u8 d ← 10 - 100` is a compile error); otherwise it
+defaults to `int`. Beside a float operand it is checked once: an integer
+constant must be exactly representable (`x + 1` with `x: f64` is legal, 2⁵³ + 1
+is a compile error), a constant beyond the float's finite range is a compile
+error, and a decimal literal rounds to the nearest float.
+
+**Implicit widening is lossless only.** Integer widenings that hold every value
+stay implicit (`u8 → i16`); `u64` has none and requires `↦`. Crossing number
+families (integer, `d64`, float) always needs `↦`, in arithmetic and at stores:
+`คงที่ fractus f ← n` with `n: i32` needs `n ↦ f64`. `u64` with a typed signed
+operand is a compile error in every join (arithmetic, `✓ ✗` branches, `∧ ∨ ⊻`,
+collection literals, `ผลรวม`): `u64_signed_arithmetic_requires_conversion`,
+fixed with `↦`. Untyped constants are exempt (`x - 1` with `x: u64` is fine).
+
+**Division.** `/` is the programmer's division and `÷` the mathematician's. On
+integers `a / b` is ⌊a / b⌋ and `a % b` is `a − b·⌊a / b⌋`, which takes the
+**divisor's** sign: `7 / 2` is 3, `-7 / 2` is −4, `-7 % 2` is 1, `7 % -2` is
+−1. The only failure is a zero divisor. Floor is the mathematical division
+(`x % 2 ≡ 1` holds for every odd `x`, and `/` agrees with `⇒`); code ported from
+C, Java, Rust or Go changes its results on negative operands. `/` on floats is
+IEEE division. An operation's type is fixed by its operands, never by the
+destination: `คงที่ fractus avg ← a / b` with integer operands is a compile
+error (`integer_quotient_to_float_requires_true_division`) whose help points at
+`÷`.
+
+`a ÷ b` is real division and never yields an integer, including between
+constants. On floats and `d64` it equals `/`. On integers the result is the
+smallest float that represents every value of both operand types exactly,
+never below `f32`:
+
+| Widest integer operand | `÷` result |
+| ---------------------- | ---------- |
+| `i8`, `u8`, `i16`, `u16` | `f32` |
+| `i32`, `u32`, `i64`, `u64`, default `int` | `f64` |
+
+Mixed widths use the wider operand (`i8 ÷ i32` is `f64`). Operand types are the
+range-rule types (`(a + b) ÷ c` with `u8` operands keys on `u16`); an untyped
+constant joins by value (`u8 ÷ 2` is `f32`) or defaults to `int` alone (`7 ÷ 2`
+is `f64`, 3.5). `f16` is never chosen implicitly. `÷` has `/`'s precedence and
+associativity and the same glyph in every locale. It is not exact: `1 ÷ 3`
+rounds, and `i64`/`u64` values above 2⁵³ round even in `f64`. An integer zero
+divisor traps; float operands keep IEEE (`x ÷ 0.0` is ∞). It has no method
+twin. The same result type applies per element on tensors.
+
+**Bit operations and shifts are pure math.** `∧ ∨ ⊻ ¬` and unary `-` compute the
+exact value on infinite two's-complement integers, so `¬x` is `-x - 1` (`¬250`
+is −251, which traps when stored into an unsigned slot; `flags ∧ ¬mask` still
+works). Fixed-width complement is what `wrapping<W>` is for (`¬x` on
+`wrapping<u8>` 250 is 5). `x ⇐ n` is `x * 2ⁿ` and `x ⇒ n` is `⌊x / 2ⁿ⌋`. The
+count is not masked to a receiver width: `x ⇒ n` past the value's size is 0 (or
+−1 for a negative `x`) and never traps, `x ⇐ n` traps only past the 64-bit
+range, on `wrapping<W>` it wraps at the store, and a negative count is an error
+(a compile error for a constant). The count may be any integer type.
+
+**Comparisons are exact across families.** `≺ ≻ ≤ ≥ ≅ ≇` accept operands from
+different number families with no `↦` and compare the true mathematical values
+(`i64 ≺ f64` is exact even above 2⁵³; NaN compares false). `≈`/`≉` compute in
+the float operand's width. `≡`/`≠` stay structural and exact-type, so
+`1 ≡ 1.0` is rejected. A comparison stores nothing, so the family-crossing rule
+does not reach it.
+
+**Conversion.** `↦` is the checked, recoverable form (D1.11: `∷` states only
+what the compiler can prove, and `↦` is a check). Into a trapping integer type
+it is a magnitude-checked narrowing that fails through `⇥`, `⊥` or `ดัก`. Into
+a `wrapping<W>` type it reduces the exact source value modulo 2^W, and into a
+`saturating<W>` type it clamps it; neither can fail and neither takes a `⊥`
+(integer and `d64` sources). `fractus ↦ numerus<W>` saturates at the target
+width, NaN converting to `0` (the cross-tier Rust `as` status quo); integer
+`numerus<W>` arithmetic traps on overflow while float→integer conversion
+clamps. Overflow policy lives in the type. There are no per-operation checked,
+wrapping, or saturating method families. To ask "does this fit?" of untrusted
+input, convert it to the narrow type with `↦` and handle the failure through the
+error channel.
+
+**AIR.** AIR (`@ radix เลน "air"`) has no representation for a trap, so in an
+AIR-lane function an integer store is admitted only when the range rule proves
+it fits, and an operation whose exact intermediate could leave the 64-bit range
+is rejected the same way. A store that would need a runtime check is a compile
+error naming the store; declare a wider slot, or write `↦` with a `⊥` default.
+There is no exemption.
 
 ### Generic Collections
 
@@ -1724,6 +1880,11 @@ suffix is consumed before the selection suffix. `⊤` remains unspent.
 companion of `⊙`. It binds at the multiplicative tier with `*` and the other
 glyph products, left-associative.
 
+**Division (`/` and `÷`):** both bind at the multiplicative tier with `*`,
+left-associative. `/` floors on integers and `%` takes the divisor's sign; `÷`
+is true division and yields a float (`f32` for 8- and 16-bit integer operands,
+`f64` otherwise). See [Numeric model](#numeric-model).
+
 **Extrema (`⤒` / `⤓`):** `a ⤒ b` is the maximum and `a ⤓ b` the minimum of
 two values. They are pure arithmetic operators at the additive tier with `+`
 and `-`, left-associative: `a ⤒ b ⤓ c` is `(a ⤒ b) ⤓ c`.
@@ -1797,8 +1958,10 @@ only the parts that make sense: `[fill][align][sign][0][width][.precision][kind]
   fails if the value does not fit; `¶` is display — width is a minimum that
   grows to fit, and never fails.
 - **No word twin:** `¶` is the same glyph in every locale, like `✓ ✗`.
-- Decimal types (`d32`/`d64`) are not yet supported by `¶` (display pending a
-  scale-preserving representation; held).
+- `d64` decimals print as decimal numbers (D2.6): with a spec, exactly what the
+  spec says (`12.5 ¶ ".2"` is `12.50`, digits cut below the carrier's scale
+  round half-even); without one, the shortest form with trailing zeros dropped
+  (`12.5`, `12`).
 
 **Edge-case outputs (D2.7):** `NaN` / `∞` / `-∞` print as `NaN`, `∞`, `-∞`
 (precision does not apply); a negative number in hex/bin/oct prints sign plus
@@ -1852,8 +2015,9 @@ The second type argument of a `↦` target is the convert-hint slot. `Hex` / `Bi
 Explicit integer narrowing is magnitude-checked on every backend:
 `n ↦ numerus<u8>` converts a value that fits unchanged, and a value out of the
 target's range fails — it never wraps and never relabels. The failure takes the
-error channel, or the `⊥` default when one is written. Use `modulus<W>` for
-wrapping arithmetic.
+error channel, or the `⊥` default when one is written. Into `modulus<W>` and
+`saturatus<W>` targets `↦` reduces or clamps and cannot fail. Use `modulus<W>`
+for wrapping arithmetic.
 
 **Default channel (`⊥`):** `⊥` (U+22A5 UP TACK) supplies a value when a
 conversion or a failable call fails: `คงที่ numerus n ← "abc" ↦ numerus ⊥ 0`,
