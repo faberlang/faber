@@ -28,6 +28,9 @@ locale = "en"
 # WHY: `T ↦ valor` boxes typed values into the canonical dynamic carrier.
 # `octeti` composes as a list of numeric byte values; it must not lossy-decode
 # bytes as text.
+#
+# A valor object has no defined key order (DECISIONS D2.9), so the genus case
+# reads its fields back instead of printing the object text.
 
 class Punctum {
     var int x
@@ -49,7 +52,9 @@ main {
     print boxedMap
     const Punctum punctum ← Punctum { x = 3, y = 4 }
     const value boxedGenus ← punctum ↦ value
-    print boxedGenus
+    const Punctum unboxed ← boxedGenus ↦ Punctum
+    print unboxed.x
+    print unboxed.y
     const tensor<int, [2]> grid ← [5, 6] ↦ tensor<int, [2]>
     const value boxedTensor ← grid ↦ value
     print boxedTensor
