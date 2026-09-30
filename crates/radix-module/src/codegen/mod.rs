@@ -90,6 +90,10 @@ mod haskell_emit_test;
 #[path = "float_integer_conversio_emit_test.rs"]
 mod float_integer_conversio_emit_test;
 
+#[cfg(all(test, feature = "hir-swift"))]
+#[path = "swift_contract_call_label_test.rs"]
+mod swift_contract_call_label_test;
+
 #[cfg(all(
     test,
     feature = "hir-rust",
