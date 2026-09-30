@@ -795,8 +795,7 @@ pub fn meus_fini<T>(meus: &Meus<T>) -> FrameStatus {
 
 #[must_use]
 pub fn tuus_accipe<T>(tuus: &Tuus<T>) -> Option<Scrinium> {
-    let mut inner = lock_sermo(&tuus.inner);
-    recv_content_frame(&mut inner)
+    recv_content_frame_blocking(&tuus.inner)
 }
 
 /// Lazy inbound content-frame iterator; shares the queue with `tuus_accipe`.
@@ -810,7 +809,7 @@ impl<T> Iterator for TuusCursor<T> {
     type Item = Scrinium;
 
     fn next(&mut self) -> Option<Scrinium> {
-        recv_content_frame(&mut lock_sermo(&self.inner))
+        recv_content_frame_blocking(&self.inner)
     }
 }
 
@@ -946,12 +945,32 @@ fn push_response_frame(shared: &SermoShared, status: FrameStatus, data: Valor) {
     shared.incoming_changed.notify_all();
 }
 
+/// Receive the next content frame of a live inbound view. A view owns no
+/// separate dispatch: the first receive starts the route (tiers 2 and 3 start
+/// lazily, like `sermo_recv`), and the call waits until a frame or the
+/// producer terminal arrives. Without the start and the wait, `accipe` and the
+/// cursor on a builtin route saw an empty queue and ended at once.
+fn recv_content_frame_blocking(shared: &Arc<SermoShared>) -> Option<Scrinium> {
+    let mut inner = lock_sermo(shared);
+    if inner.detached || inner.incoming_drained {
+        return None;
+    }
+    if inner.incoming.is_empty() {
+        ensure_runtime_response_started(shared, &mut inner);
+    }
+    while inner.incoming.is_empty() && !inner.detached && !inner.incoming_drained {
+        inner = shared
+            .incoming_changed
+            .wait(inner)
+            .unwrap_or_else(PoisonError::into_inner);
+    }
+    recv_content_frame(&mut inner)
+}
+
 fn recv_content_frame(inner: &mut SermoInner) -> Option<Scrinium> {
     if inner.detached || inner.incoming_drained {
         return None;
     }
-    // Content cursors are nonblocking views. Route dispatch is started by the
-    // owning `Sermo` receive/materializer path.
     let frame = inner.incoming.pop_front()?;
     if frame.status.is_terminal() {
         record_incoming_terminal(inner, frame.status);
