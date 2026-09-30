@@ -360,6 +360,8 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             structs: &self.context.struct_field_order,
             variants: &self.context.variant_field_order,
             float_widths: &self.field_float_widths,
+            names: &self.context.display_names,
+            dynamic: false,
         }
     }
 }
@@ -381,6 +383,24 @@ fn element_display_width(ty: TypeId, types: &TypeTable, depth: u8) -> Option<Num
             element_display_width(*elem, types, depth + 1)
         }
         _ => None,
+    }
+}
+
+/// Whether `ty` is (or holds, through collections and options) a dynamic
+/// `valor`/`json` carrier: such a value displays as a JSON-shaped object even
+/// when the runner's representation is a typed `genus` value.
+fn dynamic_display_type(ty: TypeId, types: &TypeTable, depth: u8) -> bool {
+    if depth > 8 {
+        return false;
+    }
+    match types.get(ty) {
+        Type::Primitive(Primitive::Valor | Primitive::Json) => true,
+        Type::Map(_, elem) | Type::Option(elem) => dynamic_display_type(*elem, types, depth + 1),
+        Type::Queue(elem) | Type::Stack(elem) => dynamic_display_type(*elem, types, depth + 1),
+        Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
+            dynamic_display_type(*elem, types, depth + 1)
+        }
+        _ => false,
     }
 }
 
@@ -1536,6 +1556,19 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     /// renders at. Struct-field and element projections resolve through the
     /// field's declared type.
     fn operand_float_width(&self, operand: &MirOperand) -> Option<NumericWidth> {
+        Self::element_display_width(self.operand_static_type(operand)?, self.types, 0)
+    }
+
+    /// Whether a diagnostic operand's static type is (or holds) a dynamic
+    /// `valor`/`json` carrier, which displays as a JSON-shaped object.
+    fn operand_is_dynamic(&self, operand: &MirOperand) -> bool {
+        self.operand_static_type(operand)
+            .is_some_and(|ty| dynamic_display_type(ty, self.types, 0))
+    }
+
+    /// Static semantic type of an operand, resolving field and element
+    /// projections through declared types.
+    fn operand_static_type(&self, operand: &MirOperand) -> Option<TypeId> {
         let function = || {
             self.program
                 .indexed_function(&self.function_index, self.frames.last()?.function)
@@ -1572,7 +1605,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         _ => return None,
                     };
                 }
-                return Self::element_display_width(ty, self.types, 0);
+                return Some(ty);
             }
             MirOperand::Value(id) => self
                 .value_types
@@ -1580,7 +1613,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 .copied(),
             MirOperand::Constant(_) => None,
         }?;
-        Self::element_display_width(ty.semantic_id(), self.types, 0)
+        Some(ty.semantic_id())
     }
 
     fn element_display_width(ty: TypeId, types: &TypeTable, depth: u8) -> Option<NumericWidth> {

@@ -125,7 +125,8 @@ fn lower_and_run(unit: &AnalyzedModule, span: Span) -> Result<Value, SemanticErr
                     radix_mir_runner::FieldOrder::new(
                         &lowered.validated.validation().struct_field_order,
                         &lowered.validated.validation().variant_field_order,
-                    ),
+                    )
+                    .with_names(&lowered.validated.validation().display_names),
                     span,
                 )
                 .unwrap_or_else(|_| "error".to_owned());

@@ -42,17 +42,28 @@ pub type StructFieldOrder = FxHashMap<DefId, Vec<Symbol>>;
 /// non-f64 float fields (or collections of them) are listed.
 pub type FieldFloatWidths = FxHashMap<(DefId, Symbol), NumericWidth>;
 
+/// Construction-literal display name of each `genus` and `discretio` variant
+/// (`Pulsus`, `Nuntius.Pulsus`), from MIR validation metadata (D2.8).
+pub type DisplayNames = FxHashMap<DefId, String>;
+
 static NO_FLOAT_WIDTHS: std::sync::LazyLock<FieldFloatWidths> =
     std::sync::LazyLock::new(FxHashMap::default);
 
+static NO_DISPLAY_NAMES: std::sync::LazyLock<DisplayNames> =
+    std::sync::LazyLock::new(FxHashMap::default);
+
 /// Display metadata threaded through value rendering: declaration order of
-/// struct fields and of enum-variant payload fields, and declared float widths
-/// of struct fields.
+/// struct fields and of enum-variant payload fields, declared float widths
+/// of struct fields, and the construction-literal names of genus/variants.
 #[derive(Clone, Copy)]
 pub struct FieldOrder<'a> {
     pub structs: &'a StructFieldOrder,
     pub variants: &'a StructFieldOrder,
     pub float_widths: &'a FieldFloatWidths,
+    pub names: &'a DisplayNames,
+    /// The value is shown through a `valor`/`json` static type: a dynamic
+    /// carrier displays as a JSON-shaped object, not a construction literal.
+    pub dynamic: bool,
 }
 
 impl<'a> FieldOrder<'a> {
@@ -64,7 +75,21 @@ impl<'a> FieldOrder<'a> {
             structs,
             variants,
             float_widths: &NO_FLOAT_WIDTHS,
+            names: &NO_DISPLAY_NAMES,
+            dynamic: false,
         }
+    }
+
+    /// The same metadata with construction-literal names attached.
+    #[must_use]
+    pub fn with_names(self, names: &'a DisplayNames) -> Self {
+        Self { names, ..self }
+    }
+
+    /// The same metadata for a value whose static type is a dynamic carrier.
+    #[must_use]
+    pub fn with_dynamic(self, dynamic: bool) -> Self {
+        Self { dynamic, ..self }
     }
 }
 
@@ -426,11 +451,26 @@ impl Value {
                 display_tabula_struct(*def, fields, interner, order, span, float_width)?
             }
             Value::Record(fields, written) => {
-                display_ordered_fields(&fields.borrow(), written, None, interner, order, span)?
+                display_json_object(&fields.borrow(), written, None, interner, order, span)?
             }
             Value::EnumVariant(def, fields) => {
                 let declared = order.variants.get(def).map_or(&[][..], Vec::as_slice);
-                display_ordered_fields(&fields.borrow(), declared, None, interner, order, span)?
+                // A variant without a construction-literal name (a unit-only
+                // enum, `ordo`) keeps the JSON-shaped display: D2.8 covers
+                // `discretio` variants only.
+                if order.dynamic || !order.names.contains_key(def) {
+                    display_json_object(&fields.borrow(), declared, None, interner, order, span)?
+                } else {
+                    display_construction(
+                        *def,
+                        &fields.borrow(),
+                        declared,
+                        None,
+                        interner,
+                        order,
+                        span,
+                    )?
+                }
             }
             Value::Set(_) | Value::Tuple(_) => format!("{self:?}"),
             Value::GradientHandle(id) => format!("gradient-handle#{id}"),
@@ -578,7 +618,18 @@ fn display_tabula_struct(
     float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
     let declared = order.structs.get(&def).map_or(&[][..], Vec::as_slice);
-    display_ordered_fields(
+    if order.dynamic {
+        return display_json_object(
+            &fields.borrow(),
+            declared,
+            Some((def, float_width)),
+            interner,
+            order,
+            span,
+        );
+    }
+    display_construction(
+        def,
         &fields.borrow(),
         declared,
         Some((def, float_width)),
@@ -588,17 +639,13 @@ fn display_tabula_struct(
     )
 }
 
-/// Render named fields as `{"name": value, ...}` in `declared` order; any field
-/// the metadata does not list follows in name order so output stays stable.
-/// `owner` is the struct whose per-field declared float width applies.
-fn display_ordered_fields(
-    fields: &FxHashMap<Symbol, Value>,
+/// Named fields in `declared` order; any field the metadata does not list
+/// follows in name order so output stays stable.
+fn ordered_field_rows<'a>(
+    fields: &'a FxHashMap<Symbol, Value>,
     declared: &[Symbol],
-    owner: Option<(DefId, Option<NumericWidth>)>,
     interner: &Interner,
-    order: FieldOrder<'_>,
-    span: Span,
-) -> Result<String, RunnerError> {
+) -> Vec<(&'a Symbol, &'a Value)> {
     let mut rows: Vec<(&Symbol, &Value)> = declared
         .iter()
         .filter_map(|symbol| fields.get_key_value(symbol))
@@ -609,8 +656,23 @@ fn display_ordered_fields(
         .collect();
     rest.sort_by(|a, b| interner.resolve(*a.0).cmp(interner.resolve(*b.0)));
     rows.extend(rest);
+    rows
+}
+
+/// Render named fields as `{"name": value, ...}` in `declared` order: an
+/// anonymous record (which has no construction-literal name, so D2.8 does not
+/// apply) or any value shown through a dynamic `valor`/`json` carrier. `owner`
+/// is the struct whose per-field declared float width applies.
+fn display_json_object(
+    fields: &FxHashMap<Symbol, Value>,
+    declared: &[Symbol],
+    owner: Option<(DefId, Option<NumericWidth>)>,
+    interner: &Interner,
+    order: FieldOrder<'_>,
+    span: Span,
+) -> Result<String, RunnerError> {
     let mut parts = Vec::new();
-    for (symbol, value) in rows {
+    for (symbol, value) in ordered_field_rows(fields, declared, interner) {
         let name = interner.resolve(*symbol);
         let width = owner.and_then(|(def, inherited)| {
             order
@@ -623,6 +685,61 @@ fn display_ordered_fields(
         parts.push(format!("\"{name}\": {val_str}"));
     }
     Ok(format!("{{{}}}", parts.join(", ")))
+}
+
+/// Render a `genus` value or `discretio` variant as its construction literal
+/// (D2.8): `Name { field = value, ... }` in declaration order, text fields
+/// quoted, `Name {}` when there are no fields. `owner` is the struct whose
+/// per-field declared float width applies.
+fn display_construction(
+    def: DefId,
+    fields: &FxHashMap<Symbol, Value>,
+    declared: &[Symbol],
+    owner: Option<(DefId, Option<NumericWidth>)>,
+    interner: &Interner,
+    order: FieldOrder<'_>,
+    span: Span,
+) -> Result<String, RunnerError> {
+    let name = order
+        .names
+        .get(&def)
+        .cloned()
+        .unwrap_or_else(|| format!("def{}", def.0));
+    let mut parts = Vec::new();
+    for (symbol, value) in ordered_field_rows(fields, declared, interner) {
+        let field = interner.resolve(*symbol);
+        let width = owner.and_then(|(def, inherited)| {
+            order
+                .float_widths
+                .get(&(def, *symbol))
+                .copied()
+                .or(inherited)
+        });
+        let val_str = display_field_value(value, interner, order, span, width)?;
+        parts.push(format!("{field} = {val_str}"));
+    }
+    if parts.is_empty() {
+        return Ok(format!("{name} {{}}"));
+    }
+    Ok(format!("{name} {{ {} }}", parts.join(", ")))
+}
+
+/// A field value inside a construction literal: text is quoted as in source,
+/// everything else renders as it does in a collection.
+fn display_field_value(
+    value: &Value,
+    interner: &Interner,
+    order: FieldOrder<'_>,
+    span: Span,
+    float_width: Option<NumericWidth>,
+) -> Result<String, RunnerError> {
+    match value {
+        Value::Str(text) => Ok(format!("{text:?}")),
+        Value::SharedCell(cell) => {
+            display_field_value(&cell.borrow(), interner, order, span, float_width)
+        }
+        other => display_in_collection(other, interner, order, span, float_width),
+    }
 }
 
 /// Render an integer carrier at its declared width: a `d64` carrier prints as

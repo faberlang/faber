@@ -2495,6 +2495,21 @@ impl Resolver {
             .collect()
     }
 
+    /// Export name of each imported `genus` and `discretio` (the display
+    /// name `print` renders as a construction literal, D2.8).
+    #[must_use]
+    pub fn imported_file_nominal_names(&self) -> Vec<(DefId, LexSymbol)> {
+        self.file_interfaces
+            .values()
+            .flat_map(|interface| interface.exports.iter())
+            .filter_map(|(name, export)| match export {
+                ImportedFileExport::Struct(strukt) => Some((strukt.def_id, *name)),
+                ImportedFileExport::Type(ty) => ty.def_id.map(|def_id| (def_id, *name)),
+                ImportedFileExport::Function(_) => None,
+            })
+            .collect()
+    }
+
     /// Imported `genus` declarations reached through a cross-package
     /// namespace binding: their `@ interna` members are unreachable (D5.3).
     #[must_use]

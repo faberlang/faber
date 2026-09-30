@@ -1,0 +1,77 @@
++++
+term = "genus"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "discretio_decl", "variant", "variant_fields", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "fixum_decl", "typed_constructor", "finge_expr", "field_list", "field_init", "field_key", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Printing a genus or a discretio variant shows its construction literal."
+syntax = "print <genus value>"
+related = ["genus", "discretio", "nota"]
+locale = "en"
++++
+# =============================================================================
+# genus — Printing shows the construction literal
+# =============================================================================
+#
+# What this teaches:
+#   • `print` of a genus value shows the literal that would build it: the type
+#     name, then each field in declaration order as `name = value`.
+#   • `=` marks a value, so it is not `:`; text fields are quoted as in source.
+#   • A nested genus prints by the same rule; a list prints in its `[a, b]` form.
+#   • A discretio variant prints qualified: `Discretio.Variant { … }`.
+#   • A value with no fields prints as `Name {}`.
+#   • A bare text value at the top level stays unquoted.
+#
+# Common mistakes:
+#   • Expecting `:` between name and value — that is a label, not a value.
+#   • Expecting the fields in the order they were written in a literal —
+#     the order is always the declaration order.
+#
+# See also: genus, discretio, nota
+# =============================================================================
+
+# GRAMMAR:
+#   instance :← ident '{' fieldInit (',' fieldInit)* '}'
+#
+# EXPECTED OUTPUT:
+#   Punctum { x = 1, nomen = "hello" }, Vacuus {}, Involucrum { … }, Nuntius.Pulsus { … }
+
+class Punctum {
+    var int x
+    var string nomen
+}
+
+class Vacuus {
+}
+
+class Involucrum {
+    var Punctum p
+    var list<int> gradus
+    var string titulus
+}
+
+union Nuntius {
+    Pulsus {
+        int x
+        string y
+    },
+    Finis
+}
+
+main {
+    const Punctum p ← Punctum { x = 1, nomen = "hello" }
+    print p
+
+    print Vacuus {}
+
+    const Involucrum i ← Involucrum { p = p, gradus = [0, 1, 2], titulus = "t" }
+    print i
+
+    const Nuntius n ← variant Pulsus { x = 1, y = "hello" } ∷ Nuntius
+    print n
+
+    const Nuntius f ← variant Finis ∷ Nuntius
+    print f
+
+    print "hello"
+}

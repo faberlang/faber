@@ -167,6 +167,11 @@ pub struct MirValidationContext<'a> {
     /// Declaration order of each enum variant's payload fields (common fields
     /// first); `variant_fields` is unordered, display uses this order.
     pub variant_field_order: FxHashMap<DefId, Vec<Symbol>>,
+    /// Construction-literal display name of each `genus` (`Pulsus`) and each
+    /// `discretio` variant (`Nuntius.Pulsus`, D2.8); `print` renders values
+    /// as `<name> { field = value, ... }`. Resolved text, so the map needs no
+    /// interner remap when package units link.
+    pub display_names: FxHashMap<DefId, String>,
     pub struct_type_params: FxHashMap<DefId, Vec<Symbol>>,
     /// Struct → the contracts its `implet` clause names. A struct value is
     /// assignable to a contract-typed slot exactly when the contract is listed.
@@ -205,6 +210,7 @@ impl<'a> MirValidationContext<'a> {
             struct_fields: FxHashMap::default(),
             struct_field_order: FxHashMap::default(),
             variant_field_order: FxHashMap::default(),
+            display_names: FxHashMap::default(),
             struct_type_params: FxHashMap::default(),
             struct_contracts: FxHashMap::default(),
             enum_type_params: FxHashMap::default(),
@@ -262,6 +268,7 @@ impl<'a> MirValidationContext<'a> {
         context
             .variant_field_order
             .clone_from(&self.variant_field_order);
+        context.display_names.clone_from(&self.display_names);
         context
             .struct_type_params
             .clone_from(&self.struct_type_params);
@@ -313,6 +320,7 @@ impl<'a> MirValidationContext<'a> {
             struct_fields,
             struct_field_order,
             variant_field_order,
+            display_names,
             struct_type_params,
             struct_contracts,
             enum_type_params,
@@ -340,6 +348,7 @@ impl<'a> MirValidationContext<'a> {
             struct_fields,
             struct_field_order,
             variant_field_order,
+            display_names,
             struct_type_params,
             struct_contracts,
             enum_type_params,

@@ -214,6 +214,7 @@ impl<'a> LoweringContextMaps<'a> {
                 struct_fields: FxHashMap::default(),
                 struct_field_order: FxHashMap::default(),
                 variant_field_order: FxHashMap::default(),
+                display_names: FxHashMap::default(),
                 struct_type_params: FxHashMap::default(),
                 struct_contracts: FxHashMap::default(),
                 enum_type_params: FxHashMap::default(),
@@ -450,6 +451,9 @@ impl<'a> LoweringContextMaps<'a> {
                 }
             }
         }
+        self.validation
+            .display_names
+            .insert(def_id, self.interner.resolve(strukt.name).to_owned());
         self.validation.struct_field_order.insert(
             def_id,
             strukt
@@ -491,7 +495,19 @@ impl<'a> LoweringContextMaps<'a> {
     }
 
     fn record_imported_enum_items(&mut self, unit: &AnalyzedModule) {
+        let nominal_names = unit.resolver.imported_file_nominal_names();
+        for (def, name) in &nominal_names {
+            self.validation
+                .display_names
+                .insert(*def, self.interner.resolve(*name).to_owned());
+        }
         for (enum_def, _, variants) in unit.resolver.imported_file_enums() {
+            let enum_name = self
+                .validation
+                .display_names
+                .get(&enum_def)
+                .cloned()
+                .unwrap_or_default();
             let variant_defs = variants
                 .iter()
                 .map(|variant| variant.def_id)
@@ -504,11 +520,17 @@ impl<'a> LoweringContextMaps<'a> {
                 .iter()
                 .map(|field| (field.name, field.ty))
                 .collect::<Vec<_>>();
+            let carries_payload = !commune.is_empty() || variants.iter().any(|variant| !variant.fields.is_empty());
             for variant in &variants {
                 self.variant_parents.insert(variant.def_id, enum_def);
                 self.validation
                     .variant_parents
                     .insert(variant.def_id, enum_def);
+                if carries_payload {
+                    self.validation
+                        .display_names
+                        .insert(variant.def_id, format!("{enum_name}.{}", self.interner.resolve(variant.name)));
+                }
                 let field_names = commune
                     .iter()
                     .map(|(name, _)| *name)
@@ -687,11 +709,28 @@ impl<'a> LoweringContextMaps<'a> {
         }
         self.enum_variants.insert(enum_def_id, variants.clone());
         self.validation.enum_variants.insert(enum_def_id, variants);
+        // D2.8 names the variants of a `discretio`; a unit-only enum (`ordo`)
+        // is not ruled and keeps its unnamed display.
+        let carries_payload = !enum_item.commune_fields.is_empty()
+            || enum_item
+                .variants
+                .iter()
+                .any(|variant| !variant.fields.is_empty());
         for variant in &enum_item.variants {
             self.variant_parents.insert(variant.def_id, enum_def_id);
             self.validation
                 .variant_parents
                 .insert(variant.def_id, enum_def_id);
+            if carries_payload {
+                self.validation.display_names.insert(
+                    variant.def_id,
+                    format!(
+                        "{}.{}",
+                        self.interner.resolve(enum_item.name),
+                        self.interner.resolve(variant.name)
+                    ),
+                );
+            }
             let field_names = enum_item
                 .commune_fields
                 .iter()

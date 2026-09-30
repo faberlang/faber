@@ -357,14 +357,192 @@ fn enum_variant_displays_payload_in_declaration_order() {
     let structs = rustc_hash::FxHashMap::default();
     let mut variants = rustc_hash::FxHashMap::default();
     variants.insert(variant_def, vec![z, x, y]);
+    let mut names = DisplayNames::default();
+    names.insert(variant_def, "Nuntius.Pulsus".to_owned());
     let text = variant
         .display(
             &interner,
-            FieldOrder::new(&structs, &variants),
+            FieldOrder::new(&structs, &variants).with_names(&names),
             Span::default(),
         )
         .unwrap();
-    assert_eq!(text, r#"{"z": 3, "x": 1, "y": 2}"#);
+    assert_eq!(text, "Nuntius.Pulsus { z = 3, x = 1, y = 2 }");
+}
+
+/// Metadata for a genus `Involucrum { p: Punctum, gradus: lista, titulus }`.
+struct GenusFixture {
+    interner: radix_lexer::Interner,
+    structs: StructFieldOrder,
+    names: DisplayNames,
+    punctum: radix_hir::DefId,
+    involucrum: radix_hir::DefId,
+    vacuus: radix_hir::DefId,
+}
+
+fn genus_fixture() -> GenusFixture {
+    let mut interner = radix_lexer::Interner::new();
+    let (x, nomen, p, gradus, titulus) = (
+        interner.intern("x"),
+        interner.intern("nomen"),
+        interner.intern("p"),
+        interner.intern("gradus"),
+        interner.intern("titulus"),
+    );
+    let (punctum, involucrum, vacuus) = (
+        radix_hir::DefId(5001),
+        radix_hir::DefId(5002),
+        radix_hir::DefId(5003),
+    );
+    let mut structs = StructFieldOrder::default();
+    structs.insert(punctum, vec![x, nomen]);
+    structs.insert(involucrum, vec![p, gradus, titulus]);
+    structs.insert(vacuus, Vec::new());
+    let mut names = DisplayNames::default();
+    names.insert(punctum, "Punctum".to_owned());
+    names.insert(involucrum, "Involucrum".to_owned());
+    names.insert(vacuus, "Vacuus".to_owned());
+    GenusFixture {
+        interner,
+        structs,
+        names,
+        punctum,
+        involucrum,
+        vacuus,
+    }
+}
+
+fn text(value: &str) -> Value {
+    Value::Str(value.to_owned().into())
+}
+
+#[test]
+fn genus_displays_its_construction_literal() {
+    let fx = genus_fixture();
+    let variants = StructFieldOrder::default();
+    let order = FieldOrder::new(&fx.structs, &variants).with_names(&fx.names);
+    let sym = |name: &str| fx.interner.lookup(name).expect("interned");
+    // Inserted in scrambled order: display is declaration order, not hash order.
+    let punctum = Value::Struct(
+        fx.punctum,
+        field_map(&[(sym("nomen"), text("hello")), (sym("x"), Value::Int(1))]),
+    );
+    assert_eq!(
+        punctum
+            .display(&fx.interner, order, Span::default())
+            .unwrap(),
+        r#"Punctum { x = 1, nomen = "hello" }"#
+    );
+    let list = Value::Array(std::rc::Rc::new(std::cell::RefCell::new(vec![
+        Value::Int(0),
+        Value::Int(1),
+        Value::Int(2),
+    ])));
+    let involucrum = Value::Struct(
+        fx.involucrum,
+        field_map(&[
+            (sym("titulus"), text("t")),
+            (sym("gradus"), list),
+            (sym("p"), punctum),
+        ]),
+    );
+    assert_eq!(
+        involucrum
+            .display(&fx.interner, order, Span::default())
+            .unwrap(),
+        r#"Involucrum { p = Punctum { x = 1, nomen = "hello" }, gradus = [0, 1, 2], titulus = "t" }"#
+    );
+}
+
+#[test]
+fn genus_without_fields_displays_empty_braces() {
+    let fx = genus_fixture();
+    let variants = StructFieldOrder::default();
+    let order = FieldOrder::new(&fx.structs, &variants).with_names(&fx.names);
+    let vacuus = Value::Struct(fx.vacuus, field_map(&[]));
+    assert_eq!(
+        vacuus
+            .display(&fx.interner, order, Span::default())
+            .unwrap(),
+        "Vacuus {}"
+    );
+}
+
+#[test]
+fn bare_text_stays_unquoted_but_genus_text_fields_quote_escapes() {
+    let fx = genus_fixture();
+    let variants = StructFieldOrder::default();
+    let order = FieldOrder::new(&fx.structs, &variants).with_names(&fx.names);
+    assert_eq!(
+        text("hello")
+            .display(&fx.interner, order, Span::default())
+            .unwrap(),
+        "hello"
+    );
+    let nomen = fx.interner.lookup("nomen").expect("interned");
+    let x = fx.interner.lookup("x").expect("interned");
+    let punctum = Value::Struct(
+        fx.punctum,
+        field_map(&[(x, Value::Int(-3)), (nomen, text("a \"b\"\n"))]),
+    );
+    assert_eq!(
+        punctum
+            .display(&fx.interner, order, Span::default())
+            .unwrap(),
+        r#"Punctum { x = -3, nomen = "a \"b\"\n" }"#
+    );
+}
+
+#[test]
+fn discretio_variant_displays_qualified_with_declared_fields() {
+    let mut interner = radix_lexer::Interner::new();
+    let (x, y) = (interner.intern("x"), interner.intern("y"));
+    let (pulsus, finis) = (radix_hir::DefId(6001), radix_hir::DefId(6002));
+    let structs = StructFieldOrder::default();
+    let mut variants = StructFieldOrder::default();
+    variants.insert(pulsus, vec![x, y]);
+    variants.insert(finis, Vec::new());
+    let mut names = DisplayNames::default();
+    names.insert(pulsus, "Nuntius.Pulsus".to_owned());
+    names.insert(finis, "Nuntius.Finis".to_owned());
+    let order = FieldOrder::new(&structs, &variants).with_names(&names);
+    let payload = Value::EnumVariant(pulsus, field_map(&[(y, text("hello")), (x, Value::Int(1))]));
+    assert_eq!(
+        payload.display(&interner, order, Span::default()).unwrap(),
+        r#"Nuntius.Pulsus { x = 1, y = "hello" }"#
+    );
+    let unit = Value::EnumVariant(finis, field_map(&[]));
+    assert_eq!(
+        unit.display(&interner, order, Span::default()).unwrap(),
+        "Nuntius.Finis {}"
+    );
+}
+
+#[test]
+fn unnamed_variant_and_dynamic_struct_keep_json_shaped_display() {
+    // A unit-only enum (`ordo`) registers no construction-literal name, and a
+    // genus shown through a `valor` carrier is a dynamic object: neither is
+    // covered by D2.8.
+    let fx = genus_fixture();
+    let variants = StructFieldOrder::default();
+    let order = FieldOrder::new(&fx.structs, &variants).with_names(&fx.names);
+    let unnamed = Value::EnumVariant(radix_hir::DefId(7001), field_map(&[]));
+    assert_eq!(
+        unnamed
+            .display(&fx.interner, order, Span::default())
+            .unwrap(),
+        "{}"
+    );
+    let sym = |name: &str| fx.interner.lookup(name).expect("interned");
+    let punctum = Value::Struct(
+        fx.punctum,
+        field_map(&[(sym("nomen"), text("hello")), (sym("x"), Value::Int(1))]),
+    );
+    assert_eq!(
+        punctum
+            .display(&fx.interner, order.with_dynamic(true), Span::default())
+            .unwrap(),
+        r#"{"x": 1, "nomen": hello}"#
+    );
 }
 
 #[test]
@@ -404,16 +582,20 @@ fn f32_struct_field_and_list_display_at_declared_width() {
     let variants = rustc_hash::FxHashMap::default();
     let mut widths = FieldFloatWidths::default();
     widths.insert((def, field), NumericWidth::F32);
+    let mut names = DisplayNames::default();
+    names.insert(def, "Mensura".to_owned());
     let order = FieldOrder {
         structs: &structs,
         variants: &variants,
         float_widths: &widths,
+        names: &names,
+        dynamic: false,
     };
     let value = Value::Float(f64::from(200.0_f32 / 3.0_f32));
     let strukt = Value::Struct(def, field_map(&[(field, value.clone())]));
     assert_eq!(
         strukt.display(&interner, order, Span::default()).unwrap(),
-        r#"{"a": 66.666664}"#
+        "Mensura { a = 66.666664 }"
     );
     let list = Value::Array(std::rc::Rc::new(std::cell::RefCell::new(vec![value])));
     assert_eq!(
@@ -450,16 +632,20 @@ fn d64_display_threads_through_lists_fields_and_templates() {
     let variants = rustc_hash::FxHashMap::default();
     let mut widths = FieldFloatWidths::default();
     widths.insert((def, field), NumericWidth::D64);
+    let mut names = DisplayNames::default();
+    names.insert(def, "Pretium".to_owned());
     let order = FieldOrder {
         structs: &structs,
         variants: &variants,
         float_widths: &widths,
+        names: &names,
+        dynamic: false,
     };
     let carrier = Value::Int(420_000_000);
     let strukt = Value::Struct(def, field_map(&[(field, carrier.clone())]));
     assert_eq!(
         strukt.display(&interner, order, Span::default()).unwrap(),
-        r#"{"price": 4.2}"#
+        "Pretium { price = 4.2 }"
     );
     let list = Value::Array(std::rc::Rc::new(std::cell::RefCell::new(vec![
         carrier.clone(),

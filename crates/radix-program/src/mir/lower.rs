@@ -36,6 +36,7 @@ pub(super) struct RemappedValidation {
     struct_fields: HashMap<DefId, HashMap<Symbol, MirType>>,
     struct_field_order: HashMap<DefId, Vec<Symbol>>,
     variant_field_order: HashMap<DefId, Vec<Symbol>>,
+    display_names: HashMap<DefId, String>,
     struct_type_params: HashMap<DefId, Vec<Symbol>>,
     optional_struct_fields: HashMap<DefId, HashSet<Symbol>>,
     nullable_struct_fields: HashMap<DefId, HashSet<Symbol>>,
@@ -69,6 +70,11 @@ impl RemappedValidation {
             self.variant_field_order
                 .entry(*def)
                 .or_insert_with(|| order.clone());
+        }
+        for (def, name) in &other.display_names {
+            self.display_names
+                .entry(*def)
+                .or_insert_with(|| name.clone());
         }
         for (def, params) in &other.struct_type_params {
             self.struct_type_params
@@ -111,6 +117,9 @@ impl RemappedValidation {
         }
         for (def, order) in &self.variant_field_order {
             context.variant_field_order.insert(*def, order.clone());
+        }
+        for (def, name) in &self.display_names {
+            context.display_names.insert(*def, name.clone());
         }
         for (def, params) in &self.struct_type_params {
             context
@@ -526,6 +535,14 @@ fn collect_remapped_validation(
                 .map(|name| remap_metadata_symbol(*name, source_interner, entry_interner))
                 .collect(),
         );
+    }
+    for (def, name) in &source.display_names {
+        let dest = if source.variant_parents.contains_key(def) {
+            remap_variant_def(*def)
+        } else {
+            remap_nominal_def(*def)
+        };
+        out.display_names.insert(dest, name.clone());
     }
     // Generic struct params must ride the same remap: field projections
     // through an `Applied` sibling/library struct (namespace-forwarded
@@ -2357,6 +2374,15 @@ fn rewrite_validation_def_ids(
             .variant_field_order
             .entry(remap_variant(def))
             .or_insert(order);
+    }
+
+    for (def, name) in std::mem::take(&mut context.display_names) {
+        let dest = variant_remap
+            .get(&def)
+            .or_else(|| struct_remap.get(&def))
+            .copied()
+            .unwrap_or(def);
+        context.display_names.entry(dest).or_insert(name);
     }
 
     for (variant, parent) in std::mem::take(&mut context.variant_parents) {

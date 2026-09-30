@@ -112,8 +112,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 // 9007e12c3 follow-through: floats declared at a narrower
                 // width than f64 display at that width.
                 let float_width = self.operand_float_width(arg);
-                let text =
-                    value.display_typed(self.interner, self.field_order(), span, float_width)?;
+                let order = self
+                    .field_order()
+                    .with_dynamic(self.operand_is_dynamic(arg));
+                let text = value.display_typed(self.interner, order, span, float_width)?;
                 self.host.scribe(*kind, &text)?;
                 Ok(Value::Unit)
             }
