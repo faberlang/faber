@@ -450,6 +450,7 @@ fn intrinsic(value: &MirIntrinsic) -> String {
             op.coordinates.len()
         ),
         MirIntrinsic::Duplicate => "duplicate".to_owned(),
+        MirIntrinsic::TensorLift(op) => format!("tensor_lift {}", op.name()),
     }
 }
 

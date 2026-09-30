@@ -25,6 +25,8 @@ use super::store::StoreSite;
 // parent module provides shared imports for typechecking
 use super::*;
 
+mod tensor_lift;
+
 const INSTANS_ORDERING_OPERANDS_REQUIRED: &str = "instans_ordering_operands_required";
 const NUMERIC_VALUE_EQUALITY_OPERANDS_REQUIRED: &str = "numeric_value_equality_operands_required";
 const ISSUE_CONVERSIO_ASSIGN_ROUTE_UNSUPPORTED: &str = "conversio_assign_route_unsupported";
@@ -1083,6 +1085,9 @@ impl TypeChecker<'_> {
                         NUMERIC_OPERAND_REQUIRED,
                     );
                 }
+                if let Some(result) = self.check_tensor_lift_neg(operand, operand_ty) {
+                    return result;
+                }
                 if !self.is_numeric(operand_ty) {
                     self.invalid_operand_types(NUMERIC_OPERAND_REQUIRED, operand.span);
                 }
@@ -1093,6 +1098,9 @@ impl TypeChecker<'_> {
                 let operand_ty = self.check_expr(operand);
                 if self.is_error(operand_ty) {
                     return self.bool_type();
+                }
+                if let Some(result) = self.check_tensor_lift_not(operand, operand_ty) {
+                    return result;
                 }
                 if self.is_infer(self.resolve_inferred_type(operand_ty)) {
                     let bivalens = self.bool_type();
@@ -1161,11 +1169,13 @@ impl TypeChecker<'_> {
             (true, true) => (self.check_const_operand(lhs), self.check_const_operand(rhs)),
             (true, false) => {
                 let rhs_ty = self.check_expr(rhs);
-                (self.check_const_beside(lhs, rhs_ty, expected), rhs_ty)
+                let peer = self.scalar_peer_type(rhs_ty);
+                (self.check_const_beside(lhs, peer, expected), rhs_ty)
             }
             (false, true) => {
                 let lhs_ty = self.check_expr(lhs);
-                (lhs_ty, self.check_const_beside(rhs, lhs_ty, expected))
+                let peer = self.scalar_peer_type(lhs_ty);
+                (lhs_ty, self.check_const_beside(rhs, peer, expected))
             }
             (false, false) => self.check_arithmetic_operands_legacy(lhs, rhs, expected),
         }
@@ -1189,16 +1199,18 @@ impl TypeChecker<'_> {
             }
             (Some(_), None) => {
                 let rhs_ty = self.check_expr(rhs);
+                let peer = self.scalar_peer_type(rhs_ty);
                 let lhs_expected = self
-                    .literal_numeric_expected_from_peer(lhs, rhs_ty)
+                    .literal_numeric_expected_from_peer(lhs, peer)
                     .or_else(|| self.literal_numeric_expected(lhs, expected));
                 let lhs_ty = self.check_expr_with_expected(lhs, lhs_expected);
                 (lhs_ty, rhs_ty)
             }
             (None, Some(_)) => {
                 let lhs_ty = self.check_expr(lhs);
+                let peer = self.scalar_peer_type(lhs_ty);
                 let rhs_expected = self
-                    .literal_numeric_expected_from_peer(rhs, lhs_ty)
+                    .literal_numeric_expected_from_peer(rhs, peer)
                     .or_else(|| self.literal_numeric_expected(rhs, expected));
                 let rhs_ty = self.check_expr_with_expected(rhs, rhs_expected);
                 (lhs_ty, rhs_ty)
@@ -1285,6 +1297,10 @@ impl TypeChecker<'_> {
                 } else if let Some(result) = self.check_addita_plus(lhs_ty, rhs_ty, lhs.span) {
                     // Numeric tensor/vector/matrix `+` is the live `addita` / `.added()` op.
                     result
+                } else if let Some(result) =
+                    self.check_tensor_lift_arith(HirBinOp::Add, lhs, rhs, lhs_ty, rhs_ty)
+                {
+                    result
                 } else {
                     self.scalar_arithmetic(HirBinOp::Add, lhs, rhs, lhs_ty, rhs_ty, expected)
                 }
@@ -1303,6 +1319,10 @@ impl TypeChecker<'_> {
                     // Numeric tensor/vector/matrix `-` is the live `subtrahe` / `.subtract()` op.
                     // Same-shape / tensor-broadcast contract as `+` — no extra broadcast.
                     result
+                } else if let Some(result) =
+                    self.check_tensor_lift_arith(HirBinOp::Sub, lhs, rhs, lhs_ty, rhs_ty)
+                {
+                    result
                 } else {
                     self.scalar_arithmetic(HirBinOp::Sub, lhs, rhs, lhs_ty, rhs_ty, expected)
                 }
@@ -1317,16 +1337,26 @@ impl TypeChecker<'_> {
                     self.check_lista_arithmetic_bin(op, lhs_ty, rhs_ty, lhs.span)
                 {
                     result
+                } else if let Some(result) =
+                    self.check_tensor_lift_arith(op, lhs, rhs, lhs_ty, rhs_ty)
+                {
+                    result
                 } else {
                     self.scalar_arithmetic(op, lhs, rhs, lhs_ty, rhs_ty, expected)
                 }
             }
             HirBinOp::Mod => {
                 let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);
+                if let Some(result) = self.check_tensor_lift_arith(op, lhs, rhs, lhs_ty, rhs_ty) {
+                    return result;
+                }
                 self.scalar_arithmetic(op, lhs, rhs, lhs_ty, rhs_ty, expected)
             }
             HirBinOp::TrueDiv => {
                 let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);
+                if let Some(result) = self.check_tensor_lift_arith(op, lhs, rhs, lhs_ty, rhs_ty) {
+                    return result;
+                }
                 self.true_division_type(lhs, rhs, lhs_ty, rhs_ty, lhs.span)
             }
             HirBinOp::ApproxEq
@@ -1335,6 +1365,9 @@ impl TypeChecker<'_> {
             | HirBinOp::FuzzyNotEq => {
                 let lhs_ty = self.check_expr(lhs);
                 let rhs_ty = self.check_expr(rhs);
+                if let Some(result) = self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty) {
+                    return result;
+                }
                 if !self.word_value_comparison(lhs, lhs_ty, rhs, rhs_ty) {
                     self.numeric_value_equality_types(lhs_ty, rhs_ty, lhs.span);
                 }
@@ -1347,6 +1380,12 @@ impl TypeChecker<'_> {
             | HirBinOp::Is
             | HirBinOp::IsNot => {
                 let (lhs_ty, rhs_ty) = self.check_littera_operands(lhs, rhs);
+                if !matches!(op, HirBinOp::Is | HirBinOp::IsNot)
+                    && let Some(result) =
+                        self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty)
+                {
+                    return result;
+                }
                 let lhs_is_nil = matches!(
                     self.types.get(self.resolve_inferred_type(lhs_ty)),
                     Type::Primitive(Primitive::Nihil)
@@ -1365,6 +1404,9 @@ impl TypeChecker<'_> {
             }
             HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq => {
                 let (lhs_ty, rhs_ty) = self.check_littera_operands(lhs, rhs);
+                if let Some(result) = self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty) {
+                    return result;
+                }
                 if let Some(result) = self.check_contract_ordering(op, lhs, rhs, lhs_ty, rhs_ty) {
                     // D1.4: genus/parameter glyphs call `compare`; tuples
                     // order lexicographically.
@@ -1421,6 +1463,9 @@ impl TypeChecker<'_> {
             HirBinOp::And | HirBinOp::Or => {
                 let lhs_ty = self.check_expr(lhs);
                 let rhs_ty = self.check_expr(rhs);
+                if let Some(result) = self.check_tensor_lift_logic(lhs, lhs_ty, rhs_ty) {
+                    return result;
+                }
                 self.bool_bin(lhs_ty, rhs_ty, lhs.span)
             }
             HirBinOp::BitAnd
@@ -1734,11 +1779,13 @@ impl TypeChecker<'_> {
             self.invalid_operand_types(TENSOR_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED, span);
             return self.error_type;
         }
-        if !self.types.equals(lhs_elem, rhs_elem) {
-            self.invalid_operand_types(ARGUMENT_TYPE_MISMATCH, span);
+        // F9: the element is the join of the operand elements (identical
+        // elements stay); each result element is stored under it.
+        let elem = self.lift_join_element((lhs_elem, None), (rhs_elem, None), span);
+        if self.is_error(elem) {
             return self.error_type;
         }
-        let result = super::tensor_index::tensor_with_fresh_shape(self, lhs_elem);
+        let result = super::tensor_index::tensor_with_fresh_shape(self, elem);
         let result_shape = match self.types.get(result) {
             Type::Tensor(_, shape) => *shape,
             _ => fresh_tensor_result_missing_shape(),
@@ -1822,7 +1869,7 @@ impl TypeChecker<'_> {
                 )
             }
             (Type::Tensor(lhs_elem, lhs_shape), Type::Tensor(rhs_elem, rhs_shape)) => {
-                let Some(_) = self.glyph_numeric_element(op, lhs_elem, rhs_elem, lhs.span) else {
+                let Some(elem) = self.glyph_tensor_element(op, lhs_elem, rhs_elem, lhs.span) else {
                     return self.error_type;
                 };
                 // WHY: shape-generics Phase 2 — the tensor arm consumes the
@@ -1830,7 +1877,7 @@ impl TypeChecker<'_> {
                 // shapes. Symbolic tuple shapes and whole-shape params merge
                 // through `unify_broadcast`; shapes that cannot merge reject
                 // with the glyph mismatch diagnostic.
-                let result = super::tensor_index::tensor_with_fresh_shape(self, lhs_elem);
+                let result = super::tensor_index::tensor_with_fresh_shape(self, elem);
                 let result_shape = match self.types.get(result) {
                     Type::Tensor(_, shape) => *shape,
                     _ => fresh_tensor_result_missing_shape(),
@@ -1932,6 +1979,37 @@ impl TypeChecker<'_> {
             return None;
         }
         Some(lhs_elem)
+    }
+
+    /// Element of a tensor `⊙`/`⊘` (F9): numeric elements of one family join
+    /// (identical elements stay); a family crossing is the glyph's element
+    /// mismatch. Vector and matrix `⊙` keep the strict rule above.
+    fn glyph_tensor_element(
+        &mut self,
+        op: HirBinOp,
+        lhs_elem: TypeId,
+        rhs_elem: TypeId,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        if !crate::numeric_width::is_tensor_numeric_element(self.types, lhs_elem)
+            || !crate::numeric_width::is_tensor_numeric_element(self.types, rhs_elem)
+        {
+            self.glyph_invalid_operand(op, GLYPH_OP_NUMERIC_ELEMENT_REQUIRED, span);
+            return None;
+        }
+        if self.types.equals(lhs_elem, rhs_elem) {
+            return Some(lhs_elem);
+        }
+        let one_family = matches!(
+            (self.numeric_shape(lhs_elem), self.numeric_shape(rhs_elem)),
+            (Some(l), Some(r)) if l.prim == r.prim && l.width.is_decimal() == r.width.is_decimal()
+        );
+        if !one_family {
+            self.glyph_invalid_operand(op, GLYPH_ELEMENT_TYPE_MISMATCH, span);
+            return None;
+        }
+        let joined = self.lift_join_element((lhs_elem, None), (rhs_elem, None), span);
+        (!self.is_error(joined)).then_some(joined)
     }
 
     /// Both vector widths as literals; non-static widths fail closed.
@@ -2087,6 +2165,9 @@ impl TypeChecker<'_> {
 
     fn check_coalesce(&mut self, lhs: &mut HirExpression, rhs: &mut HirExpression) -> TypeId {
         let lhs_ty = self.check_expr(lhs);
+        if let Some(result) = self.check_tensor_coalesce(lhs_ty, lhs.span, rhs) {
+            return result;
+        }
         let lhs_kind = self.types.get(self.resolve_inferred_type(lhs_ty)).clone();
         match lhs_kind {
             Type::Option(inner) => {

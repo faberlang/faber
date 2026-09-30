@@ -277,6 +277,22 @@ impl Validator<'_, '_> {
                     self.validate_operand(scope, arg, span);
                 }
             }
+            // K4 elementwise lift: the operator's arity of operands (tensors
+            // or scalars, checked by the typechecker) and a tensor result.
+            MirIntrinsic::TensorLift(op) => {
+                self.require_arg_count(
+                    call.args.len(),
+                    op.arity(),
+                    span,
+                    "tensor lift runtime call",
+                );
+                for arg in &call.args {
+                    self.validate_operand(scope, arg, span);
+                }
+                if !matches!(self.type_kind(call.return_ty), Type::Tensor(..)) {
+                    self.error(span, "tensor lift runtime call does not return a tensor");
+                }
+            }
         }
     }
 
@@ -1283,6 +1299,30 @@ impl Validator<'_, '_> {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;
                 };
+                // K4: a tensor extremum takes a scalar element or a same-shape
+                // tensor peer; the result element is their join, so only the
+                // tensor shape of the result and peer is validated here.
+                if matches!(self.type_kind(receiver_ty), Type::Tensor(..)) {
+                    if !matches!(self.type_kind(call.return_ty), Type::Tensor(..)) {
+                        self.error(span, "numeric clamp result type mismatch");
+                    }
+                    let element_ty = match self.type_kind(receiver_ty) {
+                        Type::Tensor(element, _) => MirType::semantic(*element),
+                        _ => receiver_ty,
+                    };
+                    if let Some(arg) = call.args.get(1)
+                        && let Some(actual_ty) = self.validate_operand(scope, arg, span)
+                        && !matches!(self.type_kind(actual_ty), Type::Tensor(..))
+                    {
+                        self.require_assignable(
+                            actual_ty,
+                            element_ty,
+                            span,
+                            "numeric clamp argument type mismatch",
+                        );
+                    }
+                    return;
+                }
                 let arg_ty = match self.type_kind(receiver_ty) {
                     Type::Primitive(Primitive::Numerus | Primitive::Fractus)
                     | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _) => receiver_ty,

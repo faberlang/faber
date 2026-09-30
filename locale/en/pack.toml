@@ -2070,6 +2070,10 @@ help = "make the expression type match the expected type"
 message = "coalesce fallback type mismatch"
 help = "make the expression type match the expected type"
 
+[diagnostics.SEM010.issues.tensor_coalesce_element_nullable_required]
+message = "{vel} on a tensor needs elements that may be nihil"
+help = "use a tensor whose element type is T ∪ nihil, or drop the {vel}"
+
 [diagnostics.SEM010.issues.common_type_mismatch]
 message = "incompatible types"
 help = "make the expression type match the expected type"
@@ -2837,6 +2841,14 @@ help = "use an integer scalar or {lista} of integer indices"
 [diagnostics.SEM011.issues.tensor_arithmetic_numeric_element_required]
 message = "tensor arithmetic requires numeric element type"
 help = "use numeric tensor or sparsa element types"
+
+[diagnostics.SEM011.issues.tensor_approx_comparison_deferred]
+message = "{op} on tensors is not admitted yet"
+help = "compare with an ordering or exact comparison, or compare the elements in tooling"
+
+[diagnostics.SEM011.issues.tensor_lift_decimal_element_unsupported]
+message = "elementwise operators on tensors do not support decimal elements yet"
+help = "convert the elements to a float or integer type with a conversion first"
 
 [diagnostics.SEM011.issues.matrix_arithmetic_numeric_element_required]
 message = "matrix arithmetic requires numeric element types"

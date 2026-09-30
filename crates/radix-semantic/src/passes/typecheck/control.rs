@@ -333,6 +333,33 @@ impl TypeChecker<'_> {
         }
     }
 
+    /// [`Self::check_condition`] for a condition that may be a select mask: a
+    /// `tensor<_, S>` condition is returned checked and unreported, so the
+    /// caller can treat it as the mask of a `✓ ✗` select; any other condition
+    /// is checked as `bivalens` and yields `None`.
+    fn check_condition_or_mask(&mut self, cond: &mut HirExpression) -> Option<TypeId> {
+        // WHY: checked without the `bivalens` hint, because a hint mismatch
+        // replaces the checked type with the error type and the mask type
+        // would be lost. The hint only shapes still-open holes, which the
+        // unification below binds to `bivalens` all the same.
+        let cond_ty = self.check_expr(cond);
+        let resolved = self.resolve_inferred_type(cond_ty);
+        if resolved == self.error_type {
+            return None;
+        }
+        if self.is_bool(cond_ty) {
+            return None;
+        }
+        if matches!(self.types.get(resolved), Type::Tensor(..)) {
+            return Some(cond_ty);
+        }
+        // Same report as the hinted check: an open hole binds to `bivalens`,
+        // anything else is one expression mismatch (no follow-on error).
+        let bivalens = self.bool_type();
+        self.unify_assign_issue(cond_ty, bivalens, cond.span, "expression_type_mismatch");
+        None
+    }
+
     /// Check an `si` expression and compute its normal result type.
     ///
     /// A catch attached to the then-branch captures only alternate exits from
@@ -359,10 +386,16 @@ impl TypeChecker<'_> {
         // visible binding map.
         let incoming = self.snapshot_flow_state();
         self.remember_flow_bases(&incoming);
-        let (then_refine, else_refine) = {
-            self.check_condition(cond);
-            self.condition_refinement(cond)
-        };
+        // A `tensor<bivalens, S>` condition is the mask of the `✓ ✗` select
+        // (K4), not a branch condition: both branches are evaluated.
+        if let Some(mask_ty) = self.check_condition_or_mask(cond) {
+            if then_catch.is_some() {
+                self.invalid_operand_types("condition_must_be_bivalens", cond.span);
+                return self.error_type;
+            }
+            return self.check_tensor_select(cond, mask_ty, then_block, else_block, expected);
+        }
+        let (then_refine, else_refine) = self.condition_refinement(cond);
 
         let block_expected = self.branch_expected(expected);
         let then_const = then_block.expr.as_deref().and_then(Self::const_join_range);

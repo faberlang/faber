@@ -948,6 +948,87 @@ pub enum MirIntrinsic {
     /// or element storage is shared with the source, which stays live.
     /// Lowered at `copy` bind initialization and `copy` parameter entry.
     Duplicate,
+    /// A scalar operator applied per element over tensors (gpu-reset rule 15,
+    /// K4). Operands are tensors or scalars in the operator's own order (one
+    /// scalar broadcasts; two tensors have identical shapes); the result is a
+    /// tensor typed by `return_ty`. Each element is computed exactly as the
+    /// scalar operator would and stored under the result element type. Both
+    /// operands of `And`/`Or` and all three of `Select` are always evaluated.
+    /// The MIR runner is the reference; every other executor fails closed.
+    TensorLift(MirLiftOp),
+}
+
+/// The scalar operator a [`MirIntrinsic::TensorLift`] applies per element.
+///
+/// Arity: `Neg` and `Not` take one operand, `Select` takes three (mask,
+/// then-value, else-value), everything else takes two.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MirLiftOp {
+    Add,
+    Sub,
+    Mul,
+    /// Floor division on integers, IEEE on floats (`/`).
+    Div,
+    /// Floor remainder on integers (`%`).
+    Mod,
+    /// True division (`÷`): integers convert to the result float first.
+    TrueDiv,
+    Neg,
+    Not,
+    Eq,
+    NotEq,
+    Lt,
+    Gt,
+    LtEq,
+    GtEq,
+    And,
+    Or,
+    /// `vel`: the fallback where the element is `nihil`.
+    Coalesce,
+    /// `⤒`: the larger element (IEEE `maximum`).
+    Max,
+    /// `⤓`: the smaller element.
+    Min,
+    Select,
+}
+
+impl MirLiftOp {
+    /// Number of operands.
+    #[must_use]
+    pub fn arity(self) -> usize {
+        match self {
+            Self::Neg | Self::Not => 1,
+            Self::Select => 3,
+            _ => 2,
+        }
+    }
+
+    /// Stable lowercase name for dumps and diagnostics.
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Add => "add",
+            Self::Sub => "sub",
+            Self::Mul => "mul",
+            Self::Div => "div",
+            Self::Mod => "mod",
+            Self::TrueDiv => "true_div",
+            Self::Neg => "neg",
+            Self::Not => "not",
+            Self::Eq => "eq",
+            Self::NotEq => "not_eq",
+            Self::Lt => "lt",
+            Self::Gt => "gt",
+            Self::LtEq => "lt_eq",
+            Self::GtEq => "gt_eq",
+            Self::And => "and",
+            Self::Or => "or",
+            Self::Coalesce => "coalesce",
+            Self::Max => "max",
+            Self::Min => "min",
+            Self::Select => "select",
+        }
+    }
 }
 
 /// Filum declaration facts carried by [`MirIntrinsic::FilumSum`] (SFR-5):

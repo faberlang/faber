@@ -736,6 +736,31 @@ impl TypeChecker<'_> {
         Some(self.join_range_type(joined, span))
     }
 
+    /// Element join of two integer operands of an elementwise tensor operator
+    /// (F9, K4): the smallest type holding both operand ranges, an untyped
+    /// constant taking part by value. The operator stores each result per
+    /// element, so the join is the element type, not the widened range type
+    /// of a scalar expression. `None` unless both sides are trapping integers.
+    pub(super) fn integer_operand_join(
+        &mut self,
+        a: (TypeId, Option<i128>),
+        b: (TypeId, Option<i128>),
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        if self.current_device_function {
+            return None;
+        }
+        let range_of = |this: &Self, (ty, konst): (TypeId, Option<i128>)| match konst {
+            Some(value) => Some((value, value)),
+            None => this.plain_int_width(ty)?.integer_range(),
+        };
+        // Both sides must be integers even where a constant supplies the range.
+        self.plain_int_width(a.0)?;
+        self.plain_int_width(b.0)?;
+        let joined = range::hull(range_of(self, a)?, range_of(self, b)?);
+        Some(self.join_range_type(joined, span))
+    }
+
     /// The type of a joined range, or the ruling-8 error when it spans both
     /// negative values and values above `i64::MAX`.
     fn join_range_type(&mut self, joined: IntRange, span: radix_lexer::Span) -> TypeId {

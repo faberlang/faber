@@ -84,6 +84,7 @@ pub enum MirRuntimeAbiFamily {
     RuntimeTypeCheck,
     RuntimeFilumSum,
     RuntimeDuplicate,
+    RuntimeTensorLift,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -187,6 +188,13 @@ impl MirRuntimeAbi {
             // `copy` marker duplication is core value semantics.
             MirIntrinsic::Duplicate => (
                 MirRuntimeAbiFamily::RuntimeDuplicate,
+                MirRuntimeAbiKind::CoreSemantics,
+                false,
+            ),
+            // K4: elementwise operator lift over tensors; the runner is the
+            // reference, other lanes reject it.
+            MirIntrinsic::TensorLift(_) => (
+                MirRuntimeAbiFamily::RuntimeTensorLift,
                 MirRuntimeAbiKind::CoreSemantics,
                 false,
             ),

@@ -46,7 +46,7 @@ use crate::mir::{
     MirCaptureMode, MirClosureCallee, MirClosureCapture, MirClosureEnvironment, MirClosureEnvironmentId,
     MirClosureValue, MirConstant, MirConversion, MirConversionFlavor, MirDeviceRole, MirDiagnosticKind,
     MirFilumCoordinate, MirFilumSumOp, MirFunction, MirFunctionId, MirFunctionOrigin, MirFunctionVisibility,
-    MirGenericBindings, MirIntrinsic, MirKernelShaderStage, MirKeyValueOperand, MirLayoutTable,
+    MirGenericBindings, MirIntrinsic, MirKernelShaderStage, MirKeyValueOperand, MirLayoutTable, MirLiftOp,
     MirLocal as MirLocalDecl, MirLocalId, MirMonomorphization, MirNamedOperand, MirOperand, MirOptionChainLink,
     MirOptionOp, MirOptionUnwrapMode, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirProgram, MirProjection,
     MirProvider, MirProviderKind, MirRuntimeCall, MirStatement, MirStatementKind, MirStructFieldDefaults,
@@ -80,6 +80,7 @@ mod package_instantiate;
 mod place;
 mod runtime;
 mod stmt;
+mod tensor_lift;
 mod union_dispatch;
 
 use context::{LoweringContextMaps, function_param_map, struct_field_map};
@@ -2690,6 +2691,9 @@ impl<'a> FunctionBuilder<'a> {
     }
 
     fn lower_unary(&mut self, op: HirUnOp, operand: &HirExpression, expr: &HirExpression) -> Option<MirOperand> {
+        if let Some(lift) = self.tensor_lift_unary_op(op, operand) {
+            return self.lower_tensor_lift(lift, &[operand], expr);
+        }
         let Some(mir_op) = mir_un_op(op) else {
             self.errors
                 .push(MirError::unsupported(expr.span, "unary operator without a MIR primitive"));
@@ -2754,6 +2758,11 @@ impl<'a> FunctionBuilder<'a> {
         rhs: &HirExpression,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        // K4: a scalar operator over tensors is one elementwise lift; both
+        // operands are always evaluated, so it precedes the short-circuit.
+        if let Some(lift) = self.tensor_lift_binary_op(op, lhs, rhs) {
+            return self.lower_tensor_lift(lift, &[lhs, rhs], expr);
+        }
         if matches!(op, HirBinOp::And | HirBinOp::Or) {
             return self.lower_logical_short_circuit(op, lhs, rhs, expr);
         }
@@ -3225,6 +3234,10 @@ impl<'a> FunctionBuilder<'a> {
     /// eager evaluation is unobservable; any other fallback lowers behind a
     /// nil branch, mirroring `lower_logical_short_circuit`.
     fn lower_coalesce(&mut self, lhs: &HirExpression, rhs: &HirExpression, expr: &HirExpression) -> Option<MirOperand> {
+        // K4: `vel` over a tensor fills each `nihil` element; both operands are evaluated.
+        if let Some(lift) = self.tensor_lift_binary_op(HirBinOp::Coalesce, lhs, rhs) {
+            return self.lower_tensor_lift(lift, &[lhs, rhs], expr);
+        }
         if rhs.is_effect_free_operand() {
             let value = self.lower_expr_value(lhs)?;
             let fallback = self.lower_expr_value(rhs)?;

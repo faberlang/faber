@@ -1088,6 +1088,10 @@ mod index_param_value_test;
 mod tensor_lattice_matrix_test;
 
 #[cfg(test)]
+#[path = "tensor_lift_test.rs"]
+mod tensor_lift_test;
+
+#[cfg(test)]
 #[path = "tensor_minus_test.rs"]
 mod tensor_minus_test;
 

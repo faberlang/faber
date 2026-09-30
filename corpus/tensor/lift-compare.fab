@@ -1,0 +1,89 @@
++++
+term = "tensor"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "comparison", "equality", "et_expr", "aut_expr", "unary_expr", "ternary", "vel_expr", "expression", "literal", "nota_stmt"]
+category = "comparison"
+canonical = true
+summary = "Tensor comparisons and logic lift per element: comparisons give a bool tensor, and/or/not and the ✓ ✗ select evaluate both sides, and vel fills the none elements."
+syntax = "tensor > tensor | tensor ≤ scalar | mask and mask | not mask | mask ✓ a ✗ b | tensor coalesce fallback"
+related = ["tensor", "vel", "✓ ✗"]
+locale = "en"
++++
+# =============================================================================
+# tensor — Elementwise comparison, logic, select and vel.
+# =============================================================================
+#
+# What this teaches:
+#   • Comparisons — `< > ≤ ≥ ≡ ≠ ≅ ≇` on tensors give `tensor<bool, S>`, one verdict per element
+#   • Logic — `and`, `or`, `not` act per element on bool tensors and always evaluate both sides
+#   • Select — `mask ✓ a ✗ b` takes `a` where the mask is true and `b` elsewhere; both branches are evaluated
+#   • vel (spelled `coalesce` in English) — `t coalesce fallback` fills the `none` elements of a `T ∪ none` tensor
+#   • NaN compares false to everything, including itself
+#
+# Common mistakes:
+#   • using a tensor mask as an `if` condition — a mask is a tensor; select or reduce it
+#   • expecting `and` to skip its right side on a mask — both sides run
+#   • using `coalesce` on a tensor whose elements can never be none
+#
+# See also: tensor, vel, ✓ ✗
+# =============================================================================
+
+# tensor lift — comparisons, logic, select, vel
+#
+# WHY: a comparison is the scalar comparison per element, and its result is a
+# bool tensor of the same shape. Logic and select take such masks.
+#
+# EXPECTED stdout:
+#   [falsum, falsum, verum, verum]
+#   [verum, verum, falsum, falsum]
+#   [falsum, falsum, verum, verum]
+#   [verum, falsum, falsum, verum]
+#   [falsum, verum, falsum, falsum]
+#   [4.0, 3.0, 3.0, 4.0]
+#   [0.0, 0.0, 1.0, 1.0]
+#   [1, 0, 3, 0]
+#   [1, 20, 3, 40]
+
+main {
+    const list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
+    const list<f32> flat_b ← [4.0, 3.0, 2.0, 1.0]
+    const tensor<f32, []> seed ← empty
+    var tensor<f32, [2, 2]> a ← seed.from_flat(flat_a, [2, 2])
+    var tensor<f32, [2, 2]> b ← seed.from_flat(flat_b, [2, 2])
+
+    const tensor<bool, [2, 2]> greater ← a > b
+    const list<bool> greater_out ← greater.flatten()
+    print greater_out
+    const tensor<bool, [2, 2]> small ← a ≤ 2.0
+    const list<bool> small_out ← small.flatten()
+    print small_out
+    const tensor<bool, [2, 2]> not_small ← not small
+    const list<bool> not_small_out ← not_small.flatten()
+    print not_small_out
+    const tensor<bool, [2, 2]> outer ← (a < 2.0) or (a > 3.0)
+    const list<bool> outer_out ← outer.flatten()
+    print outer_out
+    const tensor<bool, [2, 2]> inner ← (a > 1.0) and small
+    const list<bool> inner_out ← inner.flatten()
+    print inner_out
+
+    const tensor<f32, [2, 2]> bigger ← greater ✓ a ✗ b
+    const list<f32> bigger_out ← bigger.flatten()
+    print bigger_out
+    const tensor<f32, [2, 2]> clipped ← (a > 2.5) ✓ 1.0 ✗ 0.0
+    const list<f32> clipped_out ← clipped.flatten()
+    print clipped_out
+
+    const list<int ∪ none> flat_h ← [1, nihil, 3, nihil]
+    const tensor<int ∪ none, []> hseed ← empty
+    var tensor<int ∪ none, [2, 2]> holes ← hseed.from_flat(flat_h, [2, 2])
+    const tensor<int, [2, 2]> zeroed ← holes coalesce 0
+    const list<int> zeroed_out ← zeroed.flatten()
+    print zeroed_out
+    const list<int> flat_d ← [10, 20, 30, 40]
+    const tensor<int, []> dseed ← empty
+    var tensor<int, [2, 2]> defaults ← dseed.from_flat(flat_d, [2, 2])
+    const tensor<int, [2, 2]> filled ← holes coalesce defaults
+    const list<int> filled_out ← filled.flatten()
+    print filled_out
+}

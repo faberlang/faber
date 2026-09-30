@@ -431,6 +431,14 @@ pub(super) fn check_intrinsic_method_call(
         return Some(check_vector_multiplica(checker, receiver_ty, args, span));
     }
 
+    // Tensor `maximus`/`minimus` (`⤒`/`⤓`): the elementwise extremum against a
+    // scalar of the element type or a same-shape tensor peer (K4 lift).
+    if matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Tensor)
+        && matches!(entry.faber_name, "maximus" | "minimus")
+    {
+        return Some(checker.check_tensor_extremum(receiver_ty, args, span));
+    }
+
     // Matrix `transpone`: [R, C] → [C, R] — the result shape is swapped, so
     // `SameAsReceiver` cannot publish it. The registry owns the zero-arity
     // contract; this helper only swaps the shape terms.

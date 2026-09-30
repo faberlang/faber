@@ -1,0 +1,95 @@
++++
+term = "tensor"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "additive_expr", "multiplicative_expr", "unary_expr", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = true
+summary = "Tensor arithmetic lifts over a scalar: + - * / % ÷ and unary minus apply per element; ⤒ ⤓ take the elementwise extremum of two tensors."
+syntax = "tensor + scalar | scalar - tensor | tensor * scalar | tensor / scalar | tensor % scalar | tensor ÷ scalar | -tensor | tensor ⤒ tensor"
+related = ["tensor", "⊙", "÷"]
+locale = "en"
++++
+# =============================================================================
+# tensor — Elementwise arithmetic lifted over a scalar.
+# =============================================================================
+#
+# What this teaches:
+#   • Lifting — a scalar operator applied per element: `a + 1.0`, `10.0 - a`, `a * 0.5`
+#   • `* / %` lift only against a scalar; a tensor times a tensor is `⊙` (elementwise) or `·` (contraction)
+#   • Division has two kinds — `/` floors on integers, `÷` is true division (16-bit and narrower integers give f32)
+#   • Extrema — `a ⤒ b` and `a ⤓ b` pick the larger or smaller element of two same-shape tensors
+#   • Widths follow the scalar rules: an untyped constant adopts the element type, a family crossing needs `↦`
+#
+# Common mistakes:
+#   • writing `a * b` for an elementwise product — use `a ⊙ b`
+#   • mixing a float scalar with an integer tensor (`n * 0.5`) — convert the tensor with `↦` first
+#   • expecting tensors of different shapes to stretch — shapes must be identical
+#
+# See also: tensor, ⊙, ÷
+# =============================================================================
+
+# tensor lift — arithmetic against a scalar
+#
+# WHY: each operator is the scalar operator applied to every element, so the
+# runner's answer for one element is the answer for the whole tensor. Results
+# are stored per element under the element type.
+#
+# EXPECTED stdout:
+#   [2.0, 3.0, 4.0, 5.0]
+#   [9.0, 8.0, 7.0, 6.0]
+#   [0.5, 1.0, 1.5, 2.0]
+#   [0.25, 0.5, 0.75, 1.0]
+#   [1.0, 2.0, 0.0, 1.0]
+#   [-1.0, -2.0, -3.0, -4.0]
+#   [0, 1, 1, 2]
+#   [1, 0, 1, 0]
+#   [0.5, 1.0, 1.5, 2.0]
+#   [4.0, 3.0, 3.0, 4.0]
+#   [1.0, 2.0, 2.0, 1.0]
+
+main {
+    const list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
+    const list<f32> flat_b ← [4.0, 3.0, 2.0, 1.0]
+    const tensor<f32, []> seed ← empty
+    var tensor<f32, [2, 2]> a ← seed.from_flat(flat_a, [2, 2])
+    var tensor<f32, [2, 2]> b ← seed.from_flat(flat_b, [2, 2])
+
+    const tensor<f32, [2, 2]> plus ← a + 1.0
+    const list<f32> plus_out ← plus.flatten()
+    print plus_out
+    const tensor<f32, [2, 2]> minus ← 10.0 - a
+    const list<f32> minus_out ← minus.flatten()
+    print minus_out
+    const tensor<f32, [2, 2]> times ← a * 0.5
+    const list<f32> times_out ← times.flatten()
+    print times_out
+    const tensor<f32, [2, 2]> divided ← a / 4.0
+    const list<f32> divided_out ← divided.flatten()
+    print divided_out
+    const tensor<f32, [2, 2]> rest ← a % 3.0
+    const list<f32> rest_out ← rest.flatten()
+    print rest_out
+    const tensor<f32, [2, 2]> negated ← -a
+    const list<f32> negated_out ← negated.flatten()
+    print negated_out
+
+    const list<int<i16>> flat_n ← [1, 2, 3, 4]
+    const tensor<int<i16>, []> nseed ← empty
+    var tensor<int<i16>, [4]> n ← nseed.from_flat(flat_n, [4])
+    const tensor<int<i16>, [4]> floored ← n / 2
+    const list<int<i16>> floored_out ← floored.flatten()
+    print floored_out
+    const tensor<int<i16>, [4]> odd ← n % 2
+    const list<int<i16>> odd_out ← odd.flatten()
+    print odd_out
+    const tensor<f32, [4]> true_half ← n ÷ 2
+    const list<f32> true_half_out ← true_half.flatten()
+    print true_half_out
+
+    const tensor<f32, [2, 2]> larger ← a ⤒ b
+    const list<f32> larger_out ← larger.flatten()
+    print larger_out
+    const tensor<f32, [2, 2]> smaller ← a ⤓ b
+    const list<f32> smaller_out ← smaller.flatten()
+    print smaller_out
+}

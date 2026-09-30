@@ -61,6 +61,10 @@ mod saturating_fuzzy_incdec_emit_test;
 #[path = "statica_emit_test.rs"]
 mod statica_emit_test;
 
+#[cfg(test)]
+#[path = "tensor_lift_gate_test.rs"]
+mod tensor_lift_gate_test;
+
 // The failable-facts conversion under test is gated to the non-rust backends
 // that call it, so its tests carry the same feature gate.
 #[cfg(all(

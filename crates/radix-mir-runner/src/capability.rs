@@ -83,7 +83,8 @@ pub fn runner_dispatch_status(family: MirRuntimeAbiFamily) -> RunnerDispatchStat
         | MirRuntimeAbiFamily::RuntimeSermo
         | MirRuntimeAbiFamily::RuntimeGradient
         | MirRuntimeAbiFamily::RuntimeTypeCheck
-        | MirRuntimeAbiFamily::RuntimeDuplicate => RunnerDispatchStatus::Implement,
+        | MirRuntimeAbiFamily::RuntimeDuplicate
+        | MirRuntimeAbiFamily::RuntimeTensorLift => RunnerDispatchStatus::Implement,
         MirRuntimeAbiFamily::RuntimeProvider => RunnerDispatchStatus::HostDelegate,
         // SFR-5: the filum sum declaration is device-lane only; the host
         // script runner rejects it by target policy.

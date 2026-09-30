@@ -18,6 +18,7 @@ pub mod sermo;
 pub(crate) mod shuffle;
 pub mod stats;
 pub mod store;
+mod tensor_lift;
 mod textus_literal;
 pub mod value;
 
@@ -2554,3 +2555,7 @@ mod shuffle_test;
 
 #[cfg(test)]
 mod exact_int_test;
+
+#[cfg(test)]
+#[path = "tensor_lift_test.rs"]
+mod tensor_lift_test;
