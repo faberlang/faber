@@ -1713,6 +1713,10 @@ struct FunctionBuilder<'a> {
     /// kernel's inline flow.
     filum_capture: Option<SummaFoldContext>,
     handlers: Vec<HandlerContext>,
+    /// The `saturating<W>` slot type while lowering the exact arithmetic tree
+    /// that clamps into it (d11-6 ruling 3): an inner `/` or `%` by zero in
+    /// the chain reports the saturating division-by-zero identity.
+    saturating_chain: Option<MirType>,
     /// Active `capta` trap boundaries (UT); see [`TrapContext`].
     traps: Vec<TrapContext>,
     /// Monotonic DFS order shared by handler and trap pushes, so
@@ -1784,6 +1788,7 @@ impl<'a> FunctionBuilder<'a> {
             summa_fold: None,
             filum_capture: None,
             handlers: Vec::new(),
+            saturating_chain: None,
             traps: Vec::new(),
             capture_depth: 0,
             materializing_consts: FxHashSet::default(),
@@ -2805,6 +2810,23 @@ impl<'a> FunctionBuilder<'a> {
             (self.lower_expr_value(lhs)?, self.lower_expr_value(rhs)?)
         };
         let ty = self.expr_ty(expr)?;
+        // d11-6 ruling 3: an exact `/` or `%` inside a saturating chain is
+        // still the saturating expression's division. A discarded saturating
+        // `1 / divisor` gives a zero divisor the same failure identity as a
+        // top-level saturating division (the `÷` zero guard uses this shape).
+        if matches!(op, HirBinOp::Div | HirBinOp::Mod)
+            && let Some(word_ty) = self.saturating_chain
+            && word_ty != ty
+            && matches!(self.normalized_type(ty.semantic_id()), Type::Primitive(Primitive::Numerus))
+        {
+            self.binary_temp(
+                MirBinOp::Div,
+                MirOperand::Constant(MirConstant::Int(1)),
+                rhs.clone(),
+                word_ty,
+                expr.span,
+            );
+        }
 
         Some(self.assign_temp(MirValueKind::Binary { op: mir_op, lhs, rhs }, ty, expr.span))
     }
@@ -2844,7 +2866,24 @@ impl<'a> FunctionBuilder<'a> {
         let rhs_value = self.lower_expr_value(rhs)?;
         let one = MirOperand::Constant(MirConstant::Int(1));
         self.binary_temp(MirBinOp::Div, one, rhs_value.clone(), rhs_ty, expr.span);
+        // An untyped constant operand joins the typed operand's range
+        // computation (ruling 12), so its HIR type can be a word type while
+        // the MIR constant is a plain integer: convert from the constant's
+        // own MIR type, which is what the validator checks the operand against.
         let convert = |this: &mut Self, value: MirOperand, source_ty: MirType| {
+            let source_ty = match &value {
+                MirOperand::Constant(MirConstant::Int(_)) => {
+                    MirType::semantic(this.types.primitive(Primitive::Numerus))
+                }
+                MirOperand::Constant(MirConstant::UInt(_)) => this
+                    .types
+                    .find_sized_numeric(Primitive::Numerus, NumericWidth::U64)
+                    .map_or_else(
+                        || MirType::semantic(this.types.primitive(Primitive::Numerus)),
+                        MirType::semantic,
+                    ),
+                _ => source_ty,
+            };
             this.runtime_call_value(
                 MirIntrinsic::Convert(MirConversion {
                     store: None,

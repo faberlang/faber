@@ -241,3 +241,41 @@ fn true_division_width_follows_the_operands() {
     let (out, _, _) = trap("varia numerus<u8> a ← 1\nvaria numerus<u8> b ← 0\nnota \"a\"\nnota a ÷ b");
     assert_eq!(out, ["a"]);
 }
+
+#[test]
+fn true_division_word_operand_with_a_literal_converts_from_the_constant_type() {
+    // w1: the literal beside a word operand carries the word's HIR type, but its
+    // MIR constant is a plain integer; the conversion source is the constant's.
+    assert_eq!(ok("varia modulus<u16> w ← 60000\nnota w ÷ 4"), ["15000.0"]);
+    assert_eq!(ok("varia modulus<u64> w ← 90\nnota w ÷ 3"), ["30.0"]);
+    assert_eq!(ok("varia saturatus<u8> s ← 250\nnota s ÷ 4"), ["62.5"]);
+    assert_eq!(
+        ok("varia saturatus<u8> s ← 250\nfixum fractus q ← (s + 10) ÷ 2\nnota q"),
+        ["127.5"]
+    );
+}
+
+#[test]
+fn saturating_chain_division_by_zero_reports_the_saturating_identity() {
+    // u9b (ruling 3): the chain is the saturating expression's own arithmetic.
+    for body in [
+        "varia saturatus<u8> x ← 250\nvaria saturatus<u8> z ← 0\nfixum saturatus<u8> r ← x + 10 / z\nnota r",
+        "varia saturatus<u8> x ← 250\nvaria saturatus<u8> z ← 0\nfixum saturatus<u8> r ← x + x % z\nnota r",
+        "varia saturatus<u8> x ← 250\nvaria saturatus<u8> z ← 0\nfixum saturatus<u8> r ← (x + 10) / (z + 0)\nnota r",
+    ] {
+        let (_, issue, _) = trap(body);
+        assert_eq!(issue, "saturating_division_by_zero", "{body}");
+    }
+}
+
+#[test]
+fn saturating_u64_chain_past_the_exact_range_traps_and_a_single_op_clamps() {
+    // u9a / ruling 17: the exact intermediate must lie in [-2^63, 2^64 - 1].
+    let top = "varia saturatus<u64> top ← 18446744073709551615\n";
+    let (_, issue, _) = trap(&format!("{top}fixum saturatus<u64> r ← top + 1 - 5\nnota r"));
+    assert_eq!(issue, "runner_numerus_overflow");
+    assert_eq!(
+        ok(&format!("{top}fixum saturatus<u64> r ← top + 1\nnota r")),
+        ["18446744073709551615"]
+    );
+}

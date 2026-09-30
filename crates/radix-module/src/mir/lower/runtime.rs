@@ -3091,7 +3091,15 @@ impl FunctionBuilder<'_> {
         }
 
         let conversion_source_ty = self.lowered_conversio_source_ty(source, source_type_id, target);
-        let source = self.lower_conversio_source(source, target)?;
+        let saturating_chain = (implicit.is_some()
+            && matches!(self.normalized_type(target), Type::SaturatingWord(_))
+            && matches!(source.kind, HirExpressionKind::Binary(..) | HirExpressionKind::Unary(..)))
+        .then(|| MirType::semantic(target));
+        let chain = saturating_chain.or(self.saturating_chain);
+        let outer_chain = std::mem::replace(&mut self.saturating_chain, chain);
+        let source = self.lower_conversio_source(source, target);
+        self.saturating_chain = outer_chain;
+        let source = source?;
         let struct_defaults = self.valor_genus_struct_defaults(source_type_id, target, expr.span)?;
         let recovery = match recovery {
             Some(recovery) => Some(self.lower_conversio_recovery(recovery, expr.span)?),
