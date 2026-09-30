@@ -10,38 +10,37 @@ related = ["≅", "comparatio", "fractus", "numerus"]
 locale = "en"
 +++
 # =============================================================================
-# mixed-ordering-join — numerus/fractus ordering at the widened join
+# mixed-ordering-join — numerus/fractus ordering compares exact values
 # =============================================================================
 #
 # What this teaches:
-#   • `numerus < fractus` and `numerus > fractus` join both operands at the
-#     float carrier before comparing — the same promotion `+ - * /` apply.
-#   • The join is exact only below 2^53; above it the integer side loses
-#     precision, so distinct integers can compare equal at the joined width.
+#   • `numerus ≺ fractus` and `numerus ≻ fractus` compare the true
+#     mathematical values of both operands; no `↦` is needed to cross the
+#     integer and float families in a comparison.
+#   • The comparison is exact above 2^53 too: the integer side is never
+#     rounded to a float first, so `9007199254740993` is greater than
+#     `9007199254740992.0`.
 #
 # Common mistakes:
-#   • Assuming mixed ordering compares exact integer values above 2^53 — the
-#     f64 join cannot represent them; the lossy joined result is by design.
+#   • Assuming the integer is converted to a float before comparing, so that
+#     distinct integers above 2^53 compare equal. They do not.
+#   • Expecting the same freedom in arithmetic: `int + float` still needs `↦`.
 #
 # See also: ≅, comparatio, fractus, numerus
 # =============================================================================
 
-# operatores/mixed-ordering-join — numerus < fractus >
+# operatores/mixed-ordering-join — numerus ≺ fractus ≻
 #
-# WHY: ordering joins at the widened float carrier (fractus wins), mirroring
-# the `≅` promotion join (numeric-value-eq) and arithmetic `+ - * /`.
-#
-# ACCEPTED PRECISION BOUND: integers above 2^53 (9007199254740992) are not
-# representable in the f64 join — `9007199254740993` rounds to `2^53` when
-# widened, so it compares equal to `9007199254740992.0`. Both orderings below
-# report the LOSSY joined result (falsum) exactly as the runner executes it;
-# the bound is accepted by design (intprecision.fab precedent).
+# WHY: a comparison stores nothing, so it crosses number families without a
+# conversion and answers with the true ordering. `9007199254740993` is not
+# representable as f64 (it would round to 2^53), yet `above ≻ boundary` is
+# verum and `above ≺ boundary` is falsum.
 #
 # EXPECTED OUTPUT:
 #   verum
 #   falsum
 #   falsum
-#   falsum
+#   verum
 #   verum
 #   falsum
 
@@ -58,10 +57,10 @@ main {
     print int_gt
     const int above ← 9007199254740993
     const float boundary ← 9007199254740992.0
-    const bool lossy_lt ← above ≺ boundary
-    print lossy_lt
-    const bool lossy_gt ← above ≻ boundary
-    print lossy_gt
+    const bool exact_lt ← above ≺ boundary
+    print exact_lt
+    const bool exact_gt ← above ≻ boundary
+    print exact_gt
     const int<d32> narrow_decimal ← 4.2
     const int<d64> wide_decimal ← 1.0
     const bool decimal_width_gt ← narrow_decimal ≻ wide_decimal

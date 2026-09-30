@@ -4,32 +4,45 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "additive_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
 category = "arithmetic"
 canonical = true
-summary = "Checked numerus arithmetic traps instead of wrapping on overflow."
+summary = "Numerus arithmetic is exact; a value that does not fit its slot traps at the store."
 syntax = "<numerus> + <numerus>"
 related = ["+", "numerus"]
 locale = "en"
 +++
 # =============================================================================
-# numerus — Checked numerus arithmetic traps instead of wrapping on overflow.
+# numerus — Numerus arithmetic is exact; a value that does not fit traps at the store.
 # =============================================================================
 #
 # What this teaches:
-#   • Overflow safety — `numerus` (i64) traps on arithmetic overflow rather than wrapping.
-#   • Policy distinction — Bare numerus follows checked semantics, unlike Rust's release-mode wrapping.
+#   • Exact intermediates — `max + 1` is 9223372036854775808, one past the
+#     largest `int`; an expression is a number, not a 64-bit container, so it
+#     prints exactly and `max + 1 - 1` comes back to `max`.
+#   • Trap at the store — `var int stored ← max + 1` fails because the exact
+#     value does not fit `int`; the program aborts with
+#     "9223372036854775808 does not fit in `i64`" and never wraps.
+#   • The exact range — intermediates may reach [−2⁶³, 2⁶⁴ − 1]; past it
+#     (`max * max`) the arithmetic itself traps with "numerus overflow".
 #
 # Common mistakes:
-#   • Assuming numerus wraps on overflow like modular word types.
+#   • Expecting `max + 1` to wrap to the minimum, or to trap where it is computed.
+#   • Expecting the store trap to be recoverable with `fac … cape` — an implicit
+#     store trap is not in the `⇥` channel; use `↦ … ⊥` for a recoverable check.
+#   • Expecting numerus to wrap like modular words — use `wrapping<W>` for that.
 #
-# See also: +, numerus
+# See also: +, numerus, wrapping
 # =============================================================================
 
-# numerus-overflow — checked scalar arithmetic failure
+# numerus-overflow — exact arithmetic, checked store
 #
 # POLICY:
-#   Bare `numerus` is i64. Integer arithmetic traps on overflow; it does not
-#   inherit Rust release wrapping.
+#   Bare `numerus` is i64. Integer arithmetic is exact. The policy of the
+#   destination slot is applied where a value lands in it, and a trapping slot
+#   aborts on a value that does not fit. No arithmetic wraps silently.
 
 main {
     const int max ← 9223372036854775807
     print max + 1
+    print max + 1 - 1
+    var int stored ← max + 1
+    print stored
 }

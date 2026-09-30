@@ -26,8 +26,11 @@ locale = "en"
 #
 # Common mistakes:
 #   • Expecting `≡` to join widths — it is fail-closed; widen with `↦` first.
-#   • Expecting `+` to promote mixed widths — arithmetic requires identical
-#     operands; only ordering and value equality join.
+#   • Expecting `+` to cross number families — integer widths join (`u8 + u16`
+#     is exact, and range-checked where the result is stored), but int with
+#     float or decimal, and `u64` with a signed integer, need `↦` first.
+#     Ordering and value equality compare across families with no `↦`, and
+#     compare exactly (`9007199254740993 ≅ 9007199254740992.0` is falsum).
 #   • Expecting decimal `≅`/`≈` to stay carrier-blind — the d64-scale join
 #     (GT-1) makes 4.2 d32 ≅ 4.2 d64 verum; decimal × fractus never compares
 #     (GT-2), on either the ordering or the equality tier.
@@ -44,17 +47,21 @@ locale = "en"
 #
 #                     ≡/≠   ≅/≇   ≈/≉    <     ≤     >     ≥    arith   ↦
 # P1 int identical     J     J     J     J     J     J     J     J       J
-# P2 int cross-width   R-eq  J     J     J     J     J     J     R-ai    J
-# P3 signed×unsigned   R-eq  J     J     J     J     J     J     R-ai    J
-# P4 int×f32           R-eq  J     J     J     J     J     J     R-ai    J
-# P5 int×f64           R-eq  J     J     J     J     J     J     R-ai    J
-# P6 f32×f64           R-eq  J     J     J     J     J     J     R-ai    J
-# P7 d32×d64           R-eq  J     J     J     J     J     J     R-ai  J / R-narr
-# P8 decimal×integer   R-eq  J     J     J     J     J     J     R-ai    J
-# P9 decimal×fractus   R-eq  R-eq²  R-eq²  R-ord R-ord R-ord R-ord  R-ai    J
+# P2 int cross-width   R-eq  J     J     J     J     J     J     J       J
+# P3 signed×unsigned   R-eq  J     J     J     J     J     J   R-u64³    J
+# P4 int×f32           R-eq  J     J     J     J     J     J    R-fam    J
+# P5 int×f64           R-eq  J     J     J     J     J     J    R-fam    J
+# P6 f32×f64           R-eq  J     J     J     J     J     J     J       J
+# P7 d32×d64           R-eq  J     J     J     J     J     J     J     J / R-narr
+# P8 decimal×integer   R-eq  J     J     J     J     J     J    R-fam    J
+# P9 decimal×fractus   R-eq  R-eq²  R-eq²  R-ord R-ord R-ord R-ord R-fam    J
 #
 # R-eq    SEM010:equality_exact_types_required
-# R-ai    SEM011:numeric_arithmetic_operands_identical
+# R-u64³  SEM011:u64_signed_arithmetic_requires_conversion (a `u64` beside a
+#         signed integer has no lossless join; convert one side with `↦`)
+# R-fam   SEM011:numeric_family_crossing_requires_conversio (integer, decimal
+#         and float never mix implicitly in arithmetic or at a store; an
+#         untyped constant beside a number takes its family)
 # R-ord   SEM011:mixed_decimal_fractus_ordering
 # R-eq²   SEM011:mixed_decimal_fractus_equality (GT-2 — the ≅/≈ equality tiers
 #         now mirror the ordering gate; decimal/fractus never compares)
@@ -117,7 +124,8 @@ main {
     print a ≠ 8
 
     # --------------------------------------------------- ≅ / ≇ (all joins)
-    # Promoted-exact value equality: widths join, then compare exactly.
+    # Exact value equality across widths and families: nothing is rounded
+    # first, so 2⁵³ + 1 ≅ 2⁵³ as a float is falsum.
     print a ≅ b
     print a ≇ 8
     print narrow ≅ wider
@@ -133,7 +141,8 @@ main {
     # print d32v ≅ four_two
 
     # --------------------------------------------------- ≈ / ≉ (all joins)
-    # Fuzzy equality at the joined precision (OQ3 isclose default).
+    # Tolerance equality at the float operand's precision (OQ3 isclose
+    # default). Unlike ≅ it is not exact: 2⁵³ + 1 ≈ 2⁵³ is verum.
     print a ≈ b
     print a ≉ 8
     print narrow ≈ wider
@@ -149,9 +158,10 @@ main {
     # print d32v ≈ four_two
 
     # -------------------------------------------------------- < (P1–P8)
-    # Ordering joins at the widened carrier: numerus for int pairs, f64 for
-    # float pairs, d64 for decimal pairs (mixed-ordering-join). P9
-    # decimal×fractus is SEM011:mixed_decimal_fractus_ordering.
+    # Ordering compares the true mathematical values, across families too: an
+    # integer joins with an integer, a float with a float, a decimal with a
+    # decimal, and int × float never rounds the integer. P9 decimal×fractus
+    # is the one rejection: SEM011:mixed_decimal_fractus_ordering.
     print a ≺ b
     print a ≺ 8
     print narrow ≺ wider
@@ -193,8 +203,10 @@ main {
     print d32v ≥ d64v
     print d32v ≥ five
     # ------------------------------------------------------- arith (P1)
-    # Arithmetic requires identical width and primitive
-    # (SEM011:numeric_arithmetic_operands_identical for every mixed pair).
+    # Same-family arithmetic is exact and range-checked where it is stored.
+    # Crossing families is SEM011:numeric_family_crossing_requires_conversio
+    # and u64 with a signed integer is SEM011:u64_signed_arithmetic_requires_
+    # conversion; neither is compiled here.
     print a + b
     print a - b
     print a * b

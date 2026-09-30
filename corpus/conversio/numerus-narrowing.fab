@@ -23,7 +23,9 @@ locale = "en"
 #
 # Common mistakes:
 #   • Expecting C-style truncation — narrowing without `⊥` aborts the program
-#     when the value does not fit. Use `modulus<W>` for wrapping arithmetic.
+#     when the value does not fit. Use `modulus<W>` for wrapping arithmetic;
+#     `n ↦ wrapping<W>` reduces mod 2^W and `n ↦ saturating<W>` clamps, and
+#     neither can fail.
 #
 # See also: ↦, ⊥, numerus
 # =============================================================================

@@ -4,33 +4,39 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "cast_expr", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "expression", "literal", "redde_stmt", "nota_stmt"]
 category = "arithmetic"
 canonical = true
-summary = "Checked numerus arithmetic traps at sized widths instead of wrapping."
+summary = "Sized numerus arithmetic is exact; storing a value past the declared width traps."
 syntax = "<numerus<i8>> + <numerus<i8>>"
-related = ["numerus", "+", "modulus<u8>"]
+related = ["numerus", "+", "wrapping"]
 locale = "en"
 +++
 # =============================================================================
-# numerus — Checked numerus arithmetic traps at sized widths instead of wrapping.
+# numerus — Sized numerus arithmetic is exact; storing past the declared width traps.
 # =============================================================================
 #
 # What this teaches:
-#   • Sized-width overflow — `int<i8>` arithmetic traps on overflow at the
-#     declared width rather than wrapping.
-#   • Policy distinction — every numerus width follows checked semantics
-#     (operator ruling 2fb79900); only `modulus<W>` wraps mod 2^W.
+#   • Exact intermediates — `int<i8>` arithmetic does not overflow at 8 bits:
+#     `127 + 1` is 128 as a number, and it prints as 128.
+#   • Trap at the store — `var int<i8> total ← max + uno()` fails because 128
+#     does not fit `int<i8>`; the program aborts with
+#     "128 does not fit in `i8`" and never wraps.
+#   • Policy distinction — every numerus width traps at its store; only
+#     `wrapping<W>` reduces mod 2^W and `saturating<W>` clamps.
 #
 # Common mistakes:
-#   • Assuming sized numerus wraps on overflow like modular word types.
+#   • Assuming sized numerus wraps at the declared width like `wrapping<W>` words.
+#   • Expecting the trap at the `+`: the width is a property of the slot, so an
+#     expression with no slot (`print max + uno()`) never traps for size.
 #
-# See also: +, numerus, modulus<u8>
+# See also: +, numerus, wrapping
 # =============================================================================
 
-# numerus-overflow-sizes — sized-width checked scalar arithmetic failure
+# numerus-overflow-sizes — sized-width exact arithmetic, checked store
 #
 # POLICY:
-#   `int<i8>` carries its declared width. Arithmetic traps on overflow at that
-#   width; it does not inherit the host's silent integer wrap. The rhs is a
-#   function call so the overflow stays a runtime fact on every target.
+#   `int<i8>` carries its declared width as the range of its slot. Arithmetic
+#   is computed exactly; the store applies the slot's policy and traps on a
+#   value outside -128..127. The rhs is a function call so the sum stays a
+#   runtime fact on every target.
 
 fn uno() → int<i8> {
     return 1
@@ -39,4 +45,6 @@ fn uno() → int<i8> {
 main {
     var int<i8> max ← 127 ∷ int<i8>
     print max + uno()
+    var int<i8> total ← max + uno()
+    print total
 }
