@@ -425,15 +425,16 @@ fn width_sub_table(width: NumericWidth) -> (SizedNumericOutcome, SizedNumericOut
             SizedNumericOutcome::LoudError,
             SizedNumericOutcome::LoudError,
         ),
-        // inf track U2: `inf` is a heap bignum with no MIR layout until U4.
+        // inf track U4: `numerus<inf>` is the unsized `Magnus` scalar layout
+        // (ruling 46); `fractus<inf>` is not a type and stays a loud error.
         NumericWidth::Inf => (
-            SizedNumericOutcome::LoudError,
+            SizedNumericOutcome::PhysicalScalar,
             SizedNumericOutcome::LoudError,
         ),
     }
 }
 
-fn all_numeric_widths() -> [NumericWidth; 13] {
+fn all_numeric_widths() -> [NumericWidth; 14] {
     [
         NumericWidth::I8,
         NumericWidth::I16,
@@ -448,6 +449,7 @@ fn all_numeric_widths() -> [NumericWidth; 13] {
         NumericWidth::F32,
         NumericWidth::F64,
         NumericWidth::D64,
+        NumericWidth::Inf,
     ]
 }
 

@@ -308,6 +308,8 @@ impl<'a> DeviceSafeClassifier<'a> {
                 )
                 | MirLayoutKind::Void
                 | MirLayoutKind::Never => {}
+                // Every other scalar is rejected by name — including `Magnus`
+                // (the unbounded `inf`, ruling 39(d)): "kernel scalar layout magnus".
                 MirLayoutKind::Scalar(scalar) => {
                     self.record_layout(format!("kernel scalar layout {}", scalar.spelling()));
                 }

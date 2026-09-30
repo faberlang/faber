@@ -28,6 +28,12 @@ pub enum MirScalarLayout {
     Bf16,
     F32,
     F64,
+    /// The unbounded `inf` integer (inf-delivery rulings 32, 46): an opaque,
+    /// heap-resident bignum with no fixed size or device layout. Appended so
+    /// the serde index of every earlier variant is unchanged. Every native
+    /// emitter fails closed on it (ruling 46) and every device gate rejects
+    /// it (ruling 39); only the MIR runner carries a value of this layout.
+    Magnus,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -423,6 +429,8 @@ impl MirLayoutTable {
 impl MirLayoutKind {
     fn size_bits(self) -> Option<u16> {
         match self {
+            // `Magnus` is an unsized heap carrier: no fixed bit size.
+            Self::Scalar(MirScalarLayout::Magnus) => None,
             Self::Scalar(scalar) => Some(scalar.size_bits()),
             Self::Atomic(atomic) => Some(atomic.element.size_bits()),
             Self::Aggregate(_)
@@ -438,6 +446,7 @@ impl MirLayoutKind {
 
     fn align_bits(self) -> Option<u16> {
         match self {
+            Self::Scalar(MirScalarLayout::Magnus) => None,
             Self::Scalar(scalar) => Some(scalar.align_bits()),
             Self::Atomic(atomic) => Some(atomic.element.align_bits()),
             Self::Aggregate(_)
@@ -470,6 +479,7 @@ impl MirScalarLayout {
             Self::Bf16 => "bf16",
             Self::F32 => "f32",
             Self::F64 => "f64",
+            Self::Magnus => "magnus",
         }
     }
 
@@ -482,6 +492,11 @@ impl MirScalarLayout {
             Self::I32 | Self::U32 | Self::F32 => 32,
             Self::I64 | Self::U64 | Self::F64 => 64,
             Self::I128 => 128,
+            // Unsized heap carrier: no fixed width. Reported as 0 so a device
+            // consumer can never mistake it for a sized element; every
+            // device and native gate rejects `Magnus` before reading this
+            // (ruling 39), and `MirLayoutKind::size_bits` is `None`.
+            Self::Magnus => 0,
         }
     }
 
@@ -521,7 +536,8 @@ impl MirScalarLayout {
             Self::I32 | Self::U32 => Some(32),
             Self::I64 | Self::U64 => Some(64),
             Self::I128 => Some(128),
-            Self::Bool | Self::F16 | Self::Bf16 | Self::F32 | Self::F64 => None,
+            // `Magnus` is an integer of no fixed width: not a sized integer.
+            Self::Bool | Self::F16 | Self::Bf16 | Self::F32 | Self::F64 | Self::Magnus => None,
         }
     }
 
@@ -960,13 +976,9 @@ fn sized_numeric_layout(prim: Primitive, width: NumericWidth) -> LayoutResolutio
         (Primitive::Fractus, NumericWidth::BF16) => MirScalarLayout::Bf16,
         (Primitive::Fractus, NumericWidth::F32) => MirScalarLayout::F32,
         (Primitive::Fractus, NumericWidth::F64) => MirScalarLayout::F64,
-        // Ruling 46: `inf` is a heap-resident bignum (`Magnus`), not a scalar.
-        // No layout kind exists until the carrier lands (inf track U4), so the
-        // named fact below fails closed in every consumer instead of falling
-        // through as an integer.
-        (Primitive::Numerus, NumericWidth::Inf) => {
-            return LayoutResolution::MissingFact(INF_LAYOUT_PENDING.to_owned());
-        }
+        // Ruling 46: `inf` is a heap-resident bignum (`Magnus`), an opaque
+        // scalar layout no native or device emitter may read as an integer.
+        (Primitive::Numerus, NumericWidth::Inf) => MirScalarLayout::Magnus,
         (prim, width) => {
             let family = match prim {
                 Primitive::Numerus => "numerus",
@@ -981,11 +993,6 @@ fn sized_numeric_layout(prim: Primitive, width: NumericWidth) -> LayoutResolutio
     };
     LayoutResolution::Resolved(MirLayoutKind::Scalar(scalar))
 }
-
-/// Named missing fact for the unbounded integer `inf` (ruling 46): the MIR
-/// has no `Magnus` layout yet, so every MIR consumer fails closed on this text.
-const INF_LAYOUT_PENDING: &str =
-    "numerus<inf> has no MIR layout: the Magnus bignum carrier is not implemented";
 
 fn int_layout(width: NumericWidth) -> LayoutResolution {
     let scalar = match width {
@@ -1008,9 +1015,9 @@ fn int_layout(width: NumericWidth) -> LayoutResolution {
                 width.faber_marker()
             ));
         }
-        // A word over `inf` is the bare `inf` type (ruling 32) and never
-        // reaches a word layout; fail closed on the same fact if it does.
-        NumericWidth::Inf => return LayoutResolution::MissingFact(INF_LAYOUT_PENDING.to_owned()),
+        // A word over `inf` is the bare `inf` type (ruling 32): the same
+        // `Magnus` layout, never a fixed-width word.
+        NumericWidth::Inf => MirScalarLayout::Magnus,
     };
     LayoutResolution::Resolved(MirLayoutKind::Scalar(scalar))
 }

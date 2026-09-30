@@ -60,6 +60,8 @@ struct RangeProductAxis {
     bound: MirLocalId,
     step: MirLocalId,
     kind: HirRangeKind,
+    /// The index/bound/step type (ruling 43): `inf` when a bound is, else `numerus`.
+    index_ty: MirType,
 }
 
 #[derive(Clone)]
@@ -1401,10 +1403,8 @@ impl FunctionBuilder<'_> {
             HirLiteral::Ascii(symbol) => Some(MirConstant::Ascii(*symbol)),
             HirLiteral::Bool(value) => Some(MirConstant::Bool(*value)),
             HirLiteral::Nil => Some(MirConstant::Nil),
-            HirLiteral::BigInt(_) => {
-                self.reject_inf_literal(span);
-                None
-            }
+            // A case on an `inf` subject beyond `u64` (ruling 43).
+            HirLiteral::BigInt(digits) => Some(super::inf_literal_constant(digits)),
             HirLiteral::Octeti(_) | HirLiteral::JsonValor(_) | HirLiteral::Regex(_, _) => {
                 self.errors
                     .push(MirError::unsupported(span, "literal pattern before switch MIR lowering"));
@@ -1422,6 +1422,10 @@ impl FunctionBuilder<'_> {
             MirConstant::Int(value) => value.checked_neg().map(MirConstant::Int),
             MirConstant::UInt(magnitude) => 0i64.checked_sub_unsigned(magnitude).map(MirConstant::Int),
             MirConstant::Float(value) => Some(MirConstant::Float(-value)),
+            // `casu -N` on an `inf` subject: negate exactly and re-canonicalize.
+            MirConstant::Magnus(digits) => handroll::Magnus::parse_decimal(&digits)
+                .ok()
+                .map(|value| super::inf_literal_constant(&(-value).to_string())),
             _ => None,
         };
         if negated.is_none() {
@@ -1763,29 +1767,29 @@ impl FunctionBuilder<'_> {
     }
 
     fn lower_range_itera(&mut self, range: RangeIteraLowering<'_>) -> Option<()> {
-        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let index_ty = self.range_index_ty(&[Some(range.start), Some(range.end), range.step]);
         let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
 
         let index = self.next_local_id();
         self.locals.push(MirLocalDecl {
             id: index,
             name: Some(range.name),
-            ty: numerus,
+            ty: index_ty,
             mutable: true,
             span: range.span,
         });
         self.bindings
-            .insert(range.binding, LocalBinding { local: index, ty: numerus });
+            .insert(range.binding, LocalBinding { local: index, ty: index_ty });
 
         let end_local = self.next_local_id();
         self.locals
-            .push(MirLocalDecl { id: end_local, name: None, ty: numerus, mutable: false, span: range.span });
+            .push(MirLocalDecl { id: end_local, name: None, ty: index_ty, mutable: false, span: range.span });
         let step_local = self.next_local_id();
         self.locals
-            .push(MirLocalDecl { id: step_local, name: None, ty: numerus, mutable: false, span: range.span });
+            .push(MirLocalDecl { id: step_local, name: None, ty: index_ty, mutable: false, span: range.span });
 
-        self.lower_expr_to_destination(range.start, MirPlace::local(index), numerus)?;
-        self.lower_expr_to_destination(range.end, MirPlace::local(end_local), numerus)?;
+        self.lower_expr_to_destination(range.start, MirPlace::local(index), index_ty)?;
+        self.lower_expr_to_destination(range.end, MirPlace::local(end_local), index_ty)?;
         if !self.current_is_open() {
             return None;
         }
@@ -1793,10 +1797,12 @@ impl FunctionBuilder<'_> {
         let cond_id = self.fresh_block(range.span);
         match range.step {
             Some(step) => {
-                self.lower_expr_to_destination(step, MirPlace::local(step_local), numerus)?;
+                self.lower_expr_to_destination(step, MirPlace::local(step_local), index_ty)?;
                 self.terminate_open_current(MirTerminatorKind::Goto(cond_id), range.span);
             }
-            None => self.lower_default_range_step(index, end_local, step_local, cond_id, bivalens, range.span),
+            None => {
+                self.lower_default_range_step(index, end_local, step_local, cond_id, bivalens, index_ty, range.span)
+            }
         }
 
         let positive_check_id = self.fresh_block(range.span);
@@ -1889,10 +1895,10 @@ impl FunctionBuilder<'_> {
             MirBinOp::Add,
             MirOperand::Place(MirPlace::local(index)),
             MirOperand::Place(MirPlace::local(step_local)),
-            numerus,
+            index_ty,
             range.span,
         );
-        self.assign(MirPlace::local(index), next, numerus, range.span);
+        self.assign(MirPlace::local(index), next, index_ty, range.span);
         self.terminate_current(MirTerminatorKind::Goto(cond_id), range.span);
 
         self.switch_to(after_id);
@@ -1930,7 +1936,6 @@ impl FunctionBuilder<'_> {
             ));
             return None;
         }
-        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
         let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         let span = expr.span;
 
@@ -1961,29 +1966,30 @@ impl FunctionBuilder<'_> {
 
         let mut axes = Vec::with_capacity(axis_count);
         for (position, ((start, end, step, kind), (binding, name))) in members.iter().zip(bindings).enumerate() {
+            let index_ty = self.range_index_ty(&[Some(*start), Some(*end), *step]);
             let index = self.next_local_id();
             self.locals
-                .push(MirLocalDecl { id: index, name: Some(*name), ty: numerus, mutable: true, span });
+                .push(MirLocalDecl { id: index, name: Some(*name), ty: index_ty, mutable: true, span });
             self.bindings
-                .insert(*binding, LocalBinding { local: index, ty: numerus });
+                .insert(*binding, LocalBinding { local: index, ty: index_ty });
             // The extent values are loop-invariant (no extent can reference
             // a binder), so each pass re-assigns the index from `start`
             // instead of re-evaluating the extent expressions.
             let start_local = self.next_local_id();
             self.locals
-                .push(MirLocalDecl { id: start_local, name: None, ty: numerus, mutable: false, span });
+                .push(MirLocalDecl { id: start_local, name: None, ty: index_ty, mutable: false, span });
             let bound = self.next_local_id();
             self.locals
-                .push(MirLocalDecl { id: bound, name: None, ty: numerus, mutable: false, span });
+                .push(MirLocalDecl { id: bound, name: None, ty: index_ty, mutable: false, span });
             let step_local = self.next_local_id();
             self.locals
-                .push(MirLocalDecl { id: step_local, name: None, ty: numerus, mutable: false, span });
+                .push(MirLocalDecl { id: step_local, name: None, ty: index_ty, mutable: false, span });
 
             if position > 0 {
                 self.switch_to(extent_entries[position]);
             }
-            self.lower_expr_to_destination(start, MirPlace::local(start_local), numerus)?;
-            self.lower_expr_to_destination(end, MirPlace::local(bound), numerus)?;
+            self.lower_expr_to_destination(start, MirPlace::local(start_local), index_ty)?;
+            self.lower_expr_to_destination(end, MirPlace::local(bound), index_ty)?;
             if !self.current_is_open() {
                 return None;
             }
@@ -1994,12 +2000,12 @@ impl FunctionBuilder<'_> {
             };
             match step {
                 Some(step) => {
-                    self.lower_expr_to_destination(step, MirPlace::local(step_local), numerus)?;
+                    self.lower_expr_to_destination(step, MirPlace::local(step_local), index_ty)?;
                     self.terminate_open_current(MirTerminatorKind::Goto(exit), span);
                 }
-                None => self.lower_default_range_step(start_local, bound, step_local, exit, bivalens, span),
+                None => self.lower_default_range_step(start_local, bound, step_local, exit, bivalens, index_ty, span),
             }
-            axes.push(RangeProductAxis { index, start: start_local, bound, step: step_local, kind: *kind });
+            axes.push(RangeProductAxis { index, start: start_local, bound, step: step_local, kind: *kind, index_ty });
         }
 
         let after_id = self.fresh_block(span);
@@ -2026,7 +2032,7 @@ impl FunctionBuilder<'_> {
     ) -> Option<()> {
         let axis = &axes[level];
         let innermost = level + 1 == axes.len();
-        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let numerus = axis.index_ty;
         let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
 
         let cond_id = self.fresh_block(span);
@@ -3332,6 +3338,23 @@ impl FunctionBuilder<'_> {
         }
     }
 
+    /// The index/bound/step type of a range walk (ruling 43): the binder is
+    /// typed by the join of the bounds, so an `inf` bound gives an `inf`
+    /// index (its `+ step` is exact, never the 64-bit trap) and bounded
+    /// bounds keep today's `numerus`.
+    fn range_index_ty(&self, bounds: &[Option<&HirExpression>]) -> MirType {
+        bounds
+            .iter()
+            .flatten()
+            .filter_map(|bound| bound.ty)
+            .map(|ty| self.types.peel_access_marker(ty).1)
+            .find(|&ty| radix_types::numeric_width::is_unbounded_integer_type(self.types, ty))
+            .map_or_else(
+                || MirType::semantic(self.types.primitive(Primitive::Numerus)),
+                MirType::semantic,
+            )
+    }
+
     fn lower_default_range_step(
         &mut self,
         index: MirLocalId,
@@ -3339,6 +3362,7 @@ impl FunctionBuilder<'_> {
         step: MirLocalId,
         cond_id: MirBlockId,
         bivalens: MirType,
+        index_ty: MirType,
         span: Span,
     ) {
         let positive_step_id = self.fresh_block(span);
@@ -3360,19 +3384,14 @@ impl FunctionBuilder<'_> {
         );
 
         self.switch_to(positive_step_id);
-        self.assign(
-            MirPlace::local(step),
-            MirOperand::Constant(MirConstant::Int(1)),
-            MirType::semantic(self.types.primitive(Primitive::Numerus)),
-            span,
-        );
+        self.assign(MirPlace::local(step), MirOperand::Constant(MirConstant::Int(1)), index_ty, span);
         self.terminate_current(MirTerminatorKind::Goto(cond_id), span);
 
         self.switch_to(negative_step_id);
         self.assign(
             MirPlace::local(step),
             MirOperand::Constant(MirConstant::Int(-1)),
-            MirType::semantic(self.types.primitive(Primitive::Numerus)),
+            index_ty,
             span,
         );
         self.terminate_current(MirTerminatorKind::Goto(cond_id), span);

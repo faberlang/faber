@@ -12,6 +12,7 @@ mod cursor;
 mod decimal;
 mod exact_int;
 mod host;
+pub mod inf;
 pub mod kernel;
 mod runtime;
 pub mod sermo;
@@ -25,6 +26,9 @@ pub mod value;
 pub use capability::{RunnerDispatchStatus, classify_runner_lowerability, runner_dispatch_status};
 
 pub use host::{BufferHost, Host, StdioHost};
+pub use inf::{
+    RUNNER_INF_BIT_CEILING, RUNNER_INF_MUL_WORK_CEILING, RUNNER_ISSUE_INF_SIZE_EXHAUSTED,
+};
 pub use kernel::reset_execution_state;
 pub use stats::{FunctionStats, IntrinsicStats, RunnerStats};
 pub use value::{FieldOrder, MapKey, Value};
@@ -1749,6 +1753,14 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             MirConstant::Unit => Value::Unit,
             MirConstant::Octeti(bytes) => Value::Octeti(bytes.clone()),
             MirConstant::Function(id) => Value::Function(*id),
+            // An exact `inf` literal (canonical decimal digits); read back
+            // through the canonical carrier.
+            MirConstant::Magnus(digits) => match handroll::Magnus::parse_decimal(digits) {
+                Ok(value) => inf::from_magnus(value),
+                Err(_) => {
+                    return Err(RunnerError::internal(span, "malformed bignum constant"));
+                }
+            },
             // A symbolic shape-size scalar has no concrete value until
             // Phase-4 substitution; evaluating it would be a silent guess.
             MirConstant::ShapeSize { .. } => {
@@ -2277,11 +2289,18 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             }
             (Some((scaled, scale)), None) => match right {
                 Value::Float(f) => exact_int::cmp_scaled_float(scaled, decimal::pow10(scale)?, *f),
+                // An `inf` beyond the 64-bit carriers compares exactly (ruling 37).
+                Value::Magnus(big) => {
+                    Some(inf::cmp_magnus_scaled(big, scaled, decimal::pow10(scale)?).reverse())
+                }
                 other => Some(decimal::compare((scaled, scale), (as_i128(other)?, 0))),
             },
             (None, Some((scaled, scale))) => match left {
                 Value::Float(f) => exact_int::cmp_scaled_float(scaled, decimal::pow10(scale)?, *f)
                     .map(std::cmp::Ordering::reverse),
+                Value::Magnus(big) => {
+                    Some(inf::cmp_magnus_scaled(big, scaled, decimal::pow10(scale)?))
+                }
                 other => Some(decimal::compare((as_i128(other)?, 0), (scaled, scale))),
             },
             (None, None) => return None,
@@ -2391,6 +2410,11 @@ fn constant_equals_value(constant: &MirConstant, value: &Value, interner: &Inter
         #[allow(clippy::float_cmp)]
         (MirConstant::Float(left), Value::Float(right)) => left == right,
         (MirConstant::Bool(left), Value::Bool(right)) => left == right,
+        // A switch case on an `inf` subject beyond the 64-bit carriers
+        // (canonical `Magnus` values never equal an `Int`/`UInt` constant).
+        (MirConstant::Magnus(digits), Value::Magnus(right)) => {
+            handroll::Magnus::parse_decimal(digits).is_ok_and(|left| left == **right)
+        }
         (MirConstant::String(symbol), Value::Str(right)) => {
             crate::textus_literal::decode_textus_literal(interner.resolve(*symbol)) == *right
         }
@@ -2579,6 +2603,10 @@ mod decimal_test;
 #[cfg(test)]
 #[path = "narrowing_conversio_test.rs"]
 mod narrowing_conversio_test;
+
+#[cfg(test)]
+#[path = "inf_test.rs"]
+mod inf_test;
 
 #[cfg(test)]
 #[path = "decimal_shared_agreement_test.rs"]

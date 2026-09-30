@@ -174,6 +174,16 @@ pub fn constant_ty_with_index(
         // A shape-size scalar is a float-sized compile-time value (the
         // symbolic companion divides by it at runtime).
         MirConstant::ShapeSize { .. } => Primitive::Fractus,
+        // An exact bignum constant is the unbounded integer; the sized type
+        // is interned whenever an `inf` is declared.
+        MirConstant::Magnus(_) => {
+            return Ok(types
+                .find_sized_numeric(Primitive::Numerus, NumericWidth::Inf)
+                .map_or_else(
+                    || MirType::semantic(types.primitive(Primitive::Numerus)),
+                    MirType::semantic,
+                ));
+        }
     };
     Ok(MirType::semantic(types.primitive(primitive)))
 }

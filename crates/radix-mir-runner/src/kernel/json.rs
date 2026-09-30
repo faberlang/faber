@@ -108,6 +108,13 @@ fn value_to_json(value: &Value, span: Span) -> Result<serde_json::Value, RunnerE
         Value::Bool(value) => Ok(serde_json::Value::Bool(*value)),
         Value::Int(value) => Ok(serde_json::Value::Number((*value).into())),
         Value::UInt(value) => Ok(serde_json::Value::Number((*value).into())),
+        // An `inf` beyond the 64-bit carriers has no serde_json number (the
+        // crate is built without `arbitrary_precision`); the any-length
+        // integer token is inf-delivery U8a (ruling 40, `valor`/`json` rows).
+        Value::Magnus(_) => Err(RunnerError::internal(
+            span,
+            "inf beyond 64 bits is not representable in a JSON kernel number (U8a)",
+        )),
         Value::Dec(..) => Err(RunnerError::internal(
             span,
             "decimal intermediate reached JSON before a store",

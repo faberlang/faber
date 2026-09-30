@@ -145,34 +145,23 @@ fn rejections_carry_their_catalog_code_and_issue() {
 const INF_ARITHMETIC: &str = "incipit {\n fixum inf x ← 5\n fixum inf y ← x * x\n nota y\n}\n";
 const INF_BIG_LITERAL: &str = "incipit {\n fixum inf x ← 18446744073709551616\n nota x\n}\n";
 
-/// inf track U3, before the exact runner (U4): an `inf` operation that would
-/// reach MIR fails closed with a named issue on every MIR-backed target
-/// instead of computing on a 64-bit carrier.
+/// inf track U4: the U3 fail-closed MIR gate (`inf_mir_unsupported_*`) is gone.
+/// Every `inf` operation lowers to MIR and validates, for the exact MIR runner
+/// to execute; the MIR-backed native targets fail closed at their own layer
+/// (`every_mir_backend_fails_closed`).
 #[test]
-fn inf_operations_fail_closed_in_mir_with_a_named_issue() {
-    for (source, issue) in [
-        (INF_ARITHMETIC, "inf_mir_unsupported_arithmetic"),
-        (INF_BIG_LITERAL, "inf_mir_unsupported_literal_beyond_u64"),
-        (
-            "functio f(inf a) → i32 { redde a ↦ i32 ⊥ 0 }\nincipit { nota f(3) }\n",
-            "inf_mir_unsupported_conversion",
-        ),
-        (
-            "functio f(inf a) → inf { redde -a }\nincipit { nota f(3) }\n",
-            "inf_mir_unsupported_unary_arithmetic",
-        ),
-        (
-            "functio f(inf a) → inf { redde a.potentia(2) }\nincipit { nota f(3) }\n",
-            "inf_mir_unsupported_numeric_method",
-        ),
+fn inf_operations_lower_to_mir_with_no_gate() {
+    for source in [
+        INF_ARITHMETIC,
+        INF_BIG_LITERAL,
+        "functio f(inf a) → i32 { redde a ↦ i32 ⊥ 0 }\nincipit { nota f(3) }\n",
+        "functio f(inf a) → inf { redde -a }\nincipit { nota f(3) }\n",
+        "functio f(inf a) → inf { redde a.potentia(2) }\nincipit { nota f(3) }\n",
     ] {
-        let result = compile_for_target_and_get_result(source, Target::MirSexp);
-        let named = result
-            .diagnostics
-            .iter()
-            .filter(|diagnostic| diagnostic.is_error())
-            .any(|diagnostic| issue_of(diagnostic) == Some(issue));
-        assert!(named, "{issue} for {source}: {:?}", result.diagnostics);
+        let session = crate::driver::Session::new(Config::default().with_target(ConfigTarget::MirSexp));
+        let unit = crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default())
+            .unwrap_or_else(|diagnostics| panic!("analysis of {source}: {diagnostics:?}"));
+        crate::mir::dump_analyzed_unit(&unit).unwrap_or_else(|errors| panic!("MIR lowering of {source}: {errors:?}"));
     }
 }
 

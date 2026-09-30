@@ -43,6 +43,18 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return self.eval_decimal_store(site, width, value, span);
         }
         let (policy, width) = self.integer_slot(target)?;
+        // Ruling 38: an `inf` beyond the 64-bit carriers fits no bounded
+        // slot. A trapping slot traps with the store identity (value, type,
+        // position); the policy words reduce/clamp the exact value.
+        if let Value::Magnus(big) = value {
+            return Some(match policy {
+                SlotPolicy::Trapping => {
+                    Err(self.store_trap(site, big.to_string(), big.is_negative(), width, span))
+                }
+                SlotPolicy::Wrapping => Ok(crate::inf::wrap_to_width(big, width)),
+                SlotPolicy::Saturating => Ok(crate::inf::clamp_to_width(big, width)),
+            });
+        }
         let exact = int_value(value)?;
         // `integer_slot` never yields `inf` (no range), so this is always `Some`.
         let (lo, hi) = width.integer_range()?;
@@ -119,7 +131,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
         match self.types.get(target) {
             Type::Primitive(Primitive::Numerus) => Some((SlotPolicy::Trapping, NumericWidth::I64)),
-            // Deliberate: no store slot for `inf` (total store, nothing to check).
+            // Deliberate: no store slot for `inf` (ruling 38: a store into an
+            // `inf` slot is total, nothing to check).
             Type::SizedNumeric(Primitive::Numerus, width) if width.integer_range().is_some() => {
                 Some((SlotPolicy::Trapping, *width))
             }
@@ -201,12 +214,10 @@ fn store_kind_phrase(kind: HirStoreKind) -> &'static str {
 }
 
 impl<H: super::Host + ?Sized> Runner<'_, H> {
-    /// Static decimal width of an operand, when its type is a decimal. Only
-    /// called on the rare mixed integer-carrier / float comparison.
-    pub(crate) fn operand_decimal_width(
-        &self,
-        operand: &radix_mir::MirOperand,
-    ) -> Option<NumericWidth> {
+    /// Static semantic type of an operand with a typed slot (temp, plain
+    /// place, value id), alias-peeled; `None` for constants and projections.
+    /// Only called on the rare mixed-carrier comparison paths.
+    pub(crate) fn operand_plain_type(&self, operand: &radix_mir::MirOperand) -> Option<TypeId> {
         use radix_mir::{MirOperand, MirPlaceBase};
         let function_id = self.frames.last()?.function;
         let function = self
@@ -230,7 +241,26 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         while let Type::Alias(_, inner) = self.types.get(ty) {
             ty = *inner;
         }
-        match self.types.get(ty) {
+        Some(ty)
+    }
+
+    /// Whether an operand's static type is the unbounded `inf`.
+    pub(crate) fn operand_is_inf(&self, operand: &radix_mir::MirOperand) -> bool {
+        self.operand_plain_type(operand).is_some_and(|ty| {
+            matches!(
+                self.types.get(ty),
+                Type::SizedNumeric(Primitive::Numerus, NumericWidth::Inf)
+            )
+        })
+    }
+
+    /// Static decimal width of an operand, when its type is a decimal. Only
+    /// called on the rare mixed integer-carrier / float comparison.
+    pub(crate) fn operand_decimal_width(
+        &self,
+        operand: &radix_mir::MirOperand,
+    ) -> Option<NumericWidth> {
+        match self.types.get(self.operand_plain_type(operand)?) {
             Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal() => Some(*width),
             _ => None,
         }

@@ -255,6 +255,9 @@ mod implicit_store_tests;
 #[path = "inc_dec_store_test.rs"]
 mod inc_dec_store_tests;
 #[cfg(test)]
+#[path = "inf_test.rs"]
+mod inf_tests;
+#[cfg(test)]
 #[path = "inference_blocker_matrix_test.rs"]
 mod inference_blocker_matrix_tests;
 #[cfg(test)]

@@ -313,3 +313,85 @@ fn instans_preset_table() {
         );
     }
 }
+
+// inf track U4 (ruling 42): `inf` is a signed integer subject that renders
+// through the exact digits of a `Magnus`.
+
+#[test]
+fn inf_is_a_signed_format_subject() {
+    let mut types = TypeTable::new();
+    let inf = types.sized_numeric(Primitive::Numerus, NumericWidth::Inf);
+    assert_eq!(format_subject(&types, inf), FormatSubject::Signed);
+    let u64_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::U64);
+    assert_eq!(format_subject(&types, u64_ty), FormatSubject::Unsigned);
+}
+
+#[test]
+fn render_magnus_matches_render_integer_inside_the_i128_range() {
+    let values: [i128; 9] = [
+        0,
+        7,
+        -7,
+        255,
+        -255,
+        1 << 70,
+        -(1 << 70),
+        i128::from(u64::MAX),
+        i128::from(i64::MIN),
+    ];
+    for text in [
+        "", "x", "b", "o", "5", "<8", ">12", "^9", "*>10", "+", "+08", "010", ".2", "e", ".3e",
+    ] {
+        let spec = layout(text);
+        for value in values {
+            assert_eq!(
+                render_magnus(&Magnus::from_i128(value), &spec),
+                render_integer(value, &spec),
+                "{value} ¶ {text:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn render_magnus_handles_values_beyond_every_machine_integer() {
+    let beyond = Magnus::parse_decimal("18446744073709551616").expect("2^64");
+    assert_eq!(render_magnus(&beyond, &layout("x")), "10000000000000000");
+    assert_eq!(
+        render_magnus(&-beyond.clone(), &layout("x")),
+        "-10000000000000000"
+    );
+    assert_eq!(render_magnus(&beyond, &layout("b")).len(), 65);
+    assert_eq!(
+        render_magnus(&beyond, &layout("o")),
+        "2000000000000000000000"
+    );
+    assert_eq!(
+        render_magnus(&beyond, &layout(".2")),
+        "18446744073709551616.00"
+    );
+    assert_eq!(
+        render_magnus(&beyond, &layout(">24")),
+        "    18446744073709551616"
+    );
+    assert_eq!(
+        render_magnus(&-beyond.clone(), &layout("024")),
+        "-00018446744073709551616"
+    );
+    assert_eq!(
+        render_magnus(&beyond, &layout("+")),
+        "+18446744073709551616"
+    );
+    // `e` on a value the f64 path holds agrees with the integer renderer.
+    assert_eq!(
+        render_magnus(&beyond, &layout("e")),
+        "1.8446744073709552e19"
+    );
+    // Past f64 range the coefficient comes from the exact digits.
+    let huge = Magnus::parse_decimal(&format!("1{}", "0".repeat(400))).expect("10^400");
+    assert_eq!(render_magnus(&huge, &layout("e")), "1e400");
+    assert_eq!(render_magnus(&huge, &layout(".2e")), "1.00e400");
+    let other = Magnus::parse_decimal(&format!("12345{}", "0".repeat(400))).expect("1.2345e404");
+    assert_eq!(render_magnus(&other, &layout("e")), "1.2345e404");
+    assert_eq!(render_magnus(&other, &layout(".1e")), "1.2e404");
+}

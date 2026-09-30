@@ -784,6 +784,14 @@ impl Validator<'_, '_> {
         let (signed, unsigned) = match constant {
             MirConstant::Int(v) => (Some(*v), None),
             MirConstant::UInt(v) => (None, Some(*v)),
+            // An exact bignum constant fits only the unbounded width (ruling
+            // 34: any other landing was a compile error before MIR).
+            MirConstant::Magnus(_) => {
+                return matches!(
+                    self.type_kind(expected),
+                    Type::SizedNumeric(Primitive::Numerus, NumericWidth::Inf)
+                );
+            }
             _ => return false,
         };
         match self.type_kind(expected) {
@@ -838,6 +846,14 @@ impl Validator<'_, '_> {
             // A shape-size scalar is a float-sized compile-time value (the
             // symbolic companion divides by it at runtime).
             MirConstant::ShapeSize { .. } => self.primitive(Primitive::Fractus),
+            // An exact bignum constant is the unbounded integer; the sized
+            // type is interned whenever an `inf` is declared, and the
+            // fallback keeps hand-built programs typing as a plain integer.
+            MirConstant::Magnus(_) => self
+                .context
+                .types
+                .find_sized_numeric(Primitive::Numerus, NumericWidth::Inf)
+                .map_or_else(|| self.primitive(Primitive::Numerus), MirType::semantic),
         }
     }
 
@@ -926,8 +942,9 @@ fn numerus_width_range(width: NumericWidth) -> (i128, i128) {
         }
         // decimal-widths D1: scaled-integer carriers fit the i64 domain.
         NumericWidth::D64 => (i128::from(i64::MIN), i128::from(i64::MAX)),
-        // `inf` has no bound: every MIR constant (at most 64 bits today)
-        // range-checks. The Magnus carrier (inf track U4) replaces this.
+        // `inf` has no bound: every `Int`/`UInt` constant range-checks (a
+        // `MirConstant::Magnus` is admitted by `integer_constant_fits`
+        // directly, never through this i128 window).
         NumericWidth::Inf => (i128::MIN, i128::MAX),
     }
 }

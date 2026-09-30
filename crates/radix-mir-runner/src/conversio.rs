@@ -25,6 +25,7 @@ use std::rc::Rc;
 mod aggregate;
 #[cfg(test)]
 mod bits_f16_test;
+mod inf;
 mod littera;
 #[cfg(test)]
 mod littera_test;
@@ -143,7 +144,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 self.convert_to_fractus_from(value, source_ty, params, width, recovery, span)
             }
             Type::Primitive(Primitive::Bivalens) => self.convert_to_bivalens(value, recovery, span),
-            Type::Primitive(Primitive::Octeti) => self.convert_to_octeti(value, span),
+            Type::Primitive(Primitive::Octeti) => {
+                self.convert_to_octeti_from(value, source_ty, params, span)
+            }
             Type::Primitive(Primitive::Ascii) => self.convert_to_ascii(value, recovery, span),
             Type::Primitive(Primitive::Littera) => {
                 self.convert_to_littera(value, params, recovery, span)

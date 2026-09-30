@@ -60,3 +60,7 @@ pub use schema::{
 #[cfg(test)]
 #[path = "device_payload_test.rs"]
 mod device_payload_test;
+
+#[cfg(test)]
+#[path = "inf_test.rs"]
+mod inf_test;

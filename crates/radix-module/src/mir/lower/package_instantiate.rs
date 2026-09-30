@@ -1187,6 +1187,14 @@ impl PackageInstantiate<'_> {
         use crate::mir::MirConstant;
         let primitive = match constant {
             MirConstant::Int(_) | MirConstant::UInt(_) => Primitive::Numerus,
+            // An exact bignum constant is the unbounded integer.
+            MirConstant::Magnus(_) => {
+                return Some(MirType::semantic(
+                    self.types
+                        .find_sized_numeric(Primitive::Numerus, crate::semantic::NumericWidth::Inf)
+                        .unwrap_or_else(|| self.types.primitive(Primitive::Numerus)),
+                ));
+            }
             MirConstant::Float(_) | MirConstant::ShapeSize { .. } => Primitive::Fractus,
             MirConstant::Bool(_) => Primitive::Bivalens,
             MirConstant::Unit => Primitive::Vacuum,

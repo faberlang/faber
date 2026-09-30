@@ -719,12 +719,14 @@ fn integer_payload_carrier(payload: MirScalarLayout) -> Option<(MirScalarLayout,
         MirScalarLayout::U32 => Some((MirScalarLayout::U64, INTEGER_PAYLOAD_U32_SENTINEL)),
         MirScalarLayout::I64 => Some((MirScalarLayout::I128, INTEGER_PAYLOAD_I64_SENTINEL)),
         MirScalarLayout::U64 => Some((MirScalarLayout::I128, INTEGER_PAYLOAD_U64_SENTINEL)),
+        // `Magnus` is unbounded: it has no fixed carrier to widen into.
         MirScalarLayout::Bool
         | MirScalarLayout::I128
         | MirScalarLayout::F16
         | MirScalarLayout::Bf16
         | MirScalarLayout::F32
-        | MirScalarLayout::F64 => None,
+        | MirScalarLayout::F64
+        | MirScalarLayout::Magnus => None,
     }
 }
 
@@ -756,12 +758,14 @@ fn integer_layout_bounds(layout: MirScalarLayout) -> Option<(i128, i128)> {
         MirScalarLayout::U16 => Some((0, i128::from(u16::MAX))),
         MirScalarLayout::U32 => Some((0, i128::from(u32::MAX))),
         MirScalarLayout::U64 => Some((0, i128::from(u64::MAX))),
+        // `Magnus` has no layout bounds (unbounded).
         MirScalarLayout::Bool
         | MirScalarLayout::I128
         | MirScalarLayout::F16
         | MirScalarLayout::Bf16
         | MirScalarLayout::F32
-        | MirScalarLayout::F64 => None,
+        | MirScalarLayout::F64
+        | MirScalarLayout::Magnus => None,
     }
 }
 

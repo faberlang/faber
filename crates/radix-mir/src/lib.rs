@@ -52,6 +52,8 @@ mod figura;
 #[cfg(test)]
 mod function_index_test;
 #[cfg(test)]
+mod inf_test;
+#[cfg(test)]
 mod layout_test;
 #[cfg(test)]
 mod packed_negative_matrix;

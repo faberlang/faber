@@ -2,9 +2,15 @@
 //!
 //! An integer expression computes the exact mathematical result. Every value,
 //! operands and intermediates alike, lies in the single 64-bit range
-//! `[-2^63, 2^64 - 1]` (ruling 17a): a value outside it traps, until
-//! `numerus<inf>` exists. The width of a trapping expression's type is not a
-//! second range check here — the store into a slot applies the slot's policy.
+//! `[-2^63, 2^64 - 1]` (ruling 17a): a value outside it traps. The width of a
+//! trapping expression's type is not a second range check here — the store
+//! into a slot applies the slot's policy.
+//!
+//! The one exception is the unbounded `inf` result kind (inf-delivery rulings
+//! 35, 36): an expression whose result width is `inf`, or any operand that is
+//! already a `Magnus`, computes on the bignum and never traps on size (only on
+//! the runner ceilings, `crate::inf`). Each entry point below routes there
+//! first.
 //!
 //! Division floors and `%` takes the divisor's sign (ruling 14). `¬x` is
 //! `-x - 1`, and shifts are `x * 2^n` and `floor(x / 2^n)` with no count
@@ -12,6 +18,7 @@
 //! on infinite two's-complement integers (ruling 19b), which `i128` embeds.
 
 use super::RunnerError;
+use crate::inf;
 use crate::value::Value;
 use radix_lexer::Span;
 use radix_mir::MirBinOp;
@@ -140,6 +147,16 @@ pub(crate) fn exact_int_binop(
     width: NumericWidth,
     span: Span,
 ) -> Option<Result<Value, RunnerError>> {
+    if width == NumericWidth::Inf
+        || matches!((left, right), (Value::Magnus(_), _) | (_, Value::Magnus(_)))
+    {
+        return Some(inf::binop(
+            op,
+            &inf::to_magnus(left)?,
+            &inf::to_magnus(right)?,
+            span,
+        ));
+    }
     let (a, b) = (int_value(left)?, int_value(right)?);
     Some(exact_op(op, a, b, span).and_then(|value| {
         value
@@ -154,6 +171,9 @@ pub(crate) fn exact_neg(
     width: NumericWidth,
     span: Span,
 ) -> Option<Result<Value, RunnerError>> {
+    if width == NumericWidth::Inf || matches!(value, Value::Magnus(_)) {
+        return Some(Ok(inf::neg(&inf::to_magnus(value)?)));
+    }
     let a = int_value(value)?;
     Some(exact_carrier(-a, width).ok_or_else(|| RunnerError::internal(span, OVERFLOW)))
 }
@@ -164,6 +184,9 @@ pub(crate) fn exact_bitnot(
     width: NumericWidth,
     span: Span,
 ) -> Option<Result<Value, RunnerError>> {
+    if width == NumericWidth::Inf || matches!(value, Value::Magnus(_)) {
+        return Some(Ok(inf::bit_not(&inf::to_magnus(value)?)));
+    }
     let a = int_value(value)?;
     Some(exact_carrier(-a - 1, width).ok_or_else(|| RunnerError::internal(span, OVERFLOW)))
 }
@@ -205,6 +228,15 @@ pub(crate) fn cmp_int_float(int: i128, float: f64) -> Option<std::cmp::Ordering>
 /// (integer or float); `None` for a NaN operand or non-numeric carriers.
 pub(crate) fn cmp_numeric(left: &Value, right: &Value) -> Option<std::cmp::Ordering> {
     match (left, right) {
+        // `inf` beyond the 64-bit carriers (ruling 37): exact against every
+        // integer, decimal-free float or other `inf`.
+        (Value::Magnus(a), Value::Float(b)) => inf::cmp_magnus_float(a, *b),
+        (Value::Float(a), Value::Magnus(b)) => {
+            inf::cmp_magnus_float(b, *a).map(std::cmp::Ordering::reverse)
+        }
+        (Value::Magnus(_), _) | (_, Value::Magnus(_)) => {
+            Some(inf::to_magnus(left)?.cmp(&inf::to_magnus(right)?))
+        }
         (Value::Float(a), Value::Float(b)) => a.partial_cmp(b),
         (Value::Float(a), other) => {
             cmp_int_float(int_value(other)?, *a).map(std::cmp::Ordering::reverse)

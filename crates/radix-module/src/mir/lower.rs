@@ -74,7 +74,6 @@ mod expr;
 #[path = "lower/first_match_test.rs"]
 mod first_match_tests;
 mod fractus_potentia;
-mod inf_gate;
 mod item;
 mod monomorphize;
 mod package_instantiate;
@@ -2366,9 +2365,6 @@ impl<'a> FunctionBuilder<'a> {
     }
 
     fn lower_inc_dec_stmt(&mut self, span: Span, inc_dec: &crate::hir::HirIncDec) {
-        if self.reject_inf_inc_dec(inc_dec.target.ty, span) {
-            return;
-        }
         let Some(fallback_ty) = self.expr_ty(&inc_dec.target) else {
             return;
         };
@@ -2589,6 +2585,10 @@ impl<'a> FunctionBuilder<'a> {
                 if let Ok(value) = i64::try_from(*value) {
                     return Some(MirOperand::Constant(MirConstant::Int(value)));
                 }
+                // An `inf` slot holds the upper half of u64 exactly as `UInt`.
+                if self.literal_ty_is_unbounded(ty) {
+                    return Some(MirOperand::Constant(MirConstant::UInt(*value)));
+                }
                 // Upper-half u64 magnitude may not be sign-encoded into
                 // `Int(i64)`; semantic analysis already rejected it for signed
                 // targets, so reaching here is a contract violation.
@@ -2598,12 +2598,9 @@ impl<'a> FunctionBuilder<'a> {
                 ));
                 None
             }
-            // inf track U3: a literal beyond `u64` can only type as `inf`, which
-            // has no MIR carrier until U4; fail closed by name, never truncate.
-            HirLiteral::BigInt(_) => {
-                self.reject_inf_literal(span);
-                None
-            }
+            // A literal beyond `u64` types only as `inf` (ruling 34): an exact
+            // bignum constant, never truncated.
+            HirLiteral::BigInt(digits) => Some(MirOperand::Constant(inf_literal_constant(digits))),
             // decimal-widths D1 successor: a decimal-typed
             // text literal lowers to its exact scaled carrier through the one
             // shared text→carrier conversion; the f64 field never intermediates.
@@ -2688,6 +2685,12 @@ impl<'a> FunctionBuilder<'a> {
                 _ => return false,
             }
         }
+    }
+
+    /// Whether a literal's type is the unbounded `inf` (an `inf` slot holds
+    /// any integer literal exactly, ruling 34).
+    fn literal_ty_is_unbounded(&self, ty: Option<TypeId>) -> bool {
+        ty.is_some_and(|ty| radix_types::numeric_width::is_unbounded_integer_type(self.types, ty))
     }
 
     fn lower_octeti_literal(&mut self, sym: Symbol, ty: Option<TypeId>, span: Span) -> Option<MirOperand> {
@@ -3644,10 +3647,16 @@ impl<'a> FunctionBuilder<'a> {
         // value; joining the integer at `d64` would trap for a large one. The
         // runner reads both static types (a constant integer still joins).
         let plain_integer = |expr: &HirExpression, semantic: TypeId| {
+            let ty = self.normalized_type(semantic);
+            // Ruling 37: `inf` beside a decimal is an exact cross-family
+            // comparison like any plain integer — constant or not (joining it
+            // at `d64` would trap for a large value).
+            if matches!(ty, Type::SizedNumeric(Primitive::Numerus, width) if width.is_unbounded()) {
+                return true;
+            }
             crate::semantic::passes::const_int_value(expr).is_none()
-                && match self.normalized_type(semantic) {
+                && match ty {
                     Type::Primitive(Primitive::Numerus) => true,
-                    // Deliberate: `inf` has no range to keep a constant out of.
                     Type::SizedNumeric(Primitive::Numerus, width) => width.integer_range().is_some(),
                     _ => false,
                 }
@@ -3757,6 +3766,24 @@ impl<'a> FunctionBuilder<'a> {
             },
             _ => None,
         }
+    }
+}
+
+/// The MIR constant of an `inf` literal (canonical decimal digits, ruling
+/// 34): the 64-bit constants when the value fits them, so arithmetic and
+/// equality see one spelling, and an exact `Magnus` constant beyond.
+pub(super) fn inf_literal_constant(digits: &str) -> MirConstant {
+    match handroll::Magnus::parse_decimal(digits) {
+        Ok(value) => {
+            if let Some(v) = value.to_i64() {
+                MirConstant::Int(v)
+            } else if let Some(v) = value.to_u64() {
+                MirConstant::UInt(v)
+            } else {
+                MirConstant::Magnus(value.to_string())
+            }
+        }
+        Err(_) => MirConstant::Magnus(digits.to_owned()),
     }
 }
 

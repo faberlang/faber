@@ -762,6 +762,14 @@ pub enum MirConstant {
         shape: IndexId,
         axis: Option<i64>,
     },
+    /// Exact integer literal of the unbounded `inf` width (inf-delivery
+    /// rulings 34, 46): the canonical decimal digits (`-` sign for negatives,
+    /// no leading zeros, no `+`, no separators). Appended so the positional
+    /// serde index of every earlier variant is unchanged (an FMIR image reads
+    /// back by position). Lowering emits it only for a value outside the
+    /// `i64`/`u64` constants (a value that fits those stays `Int`/`UInt`),
+    /// but every consumer must read it as an exact integer of any size.
+    Magnus(String),
 }
 
 impl Eq for MirConstant {}
@@ -788,6 +796,7 @@ impl std::hash::Hash for MirConstant {
                 shape.hash(state);
                 axis.hash(state);
             }
+            Self::Magnus(v) => v.hash(state),
         }
     }
 }

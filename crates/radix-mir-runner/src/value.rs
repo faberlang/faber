@@ -23,6 +23,7 @@
 )]
 
 use super::RunnerError;
+use handroll::Magnus;
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span, Symbol};
 use radix_mir::MirClosureEnvironmentId;
@@ -133,6 +134,12 @@ pub enum Value {
     Int(i64),
     /// Unsigned integer magnitude (`numerus<u64>`); never sign-encoded.
     UInt(u64),
+    /// Unbounded `inf` integer (inf-delivery rulings 44, 46): the oracle
+    /// carrier. **Canonical form**: a `Magnus` holds only a value outside
+    /// `[i64::MIN, u64::MAX]`; every value the 64-bit carriers can hold stays
+    /// `Int`/`UInt` (see `crate::inf::from_magnus`), so a map key, an equality
+    /// or a display never has two spellings of one integer.
+    Magnus(Rc<Magnus>),
     /// Exact decimal intermediate (D11.7): `carrier × 10^-scale`. A stored
     /// `d64` is `Int` at scale 8; only a value that is not one (a product of
     /// scale 16, an out-of-range sum) is `Dec`, until a slot stores it.
@@ -238,6 +245,9 @@ pub enum MapKey {
     /// Non-negative integers of either carrier, plus all unsigned magnitudes:
     /// same-value keys collide, upper-half magnitudes never sign-encode.
     UInt(u64),
+    /// An `inf` key beyond the 64-bit carriers (canonical: never a value
+    /// `Int`/`UInt` can hold, see [`Value::Magnus`]).
+    Magnus(Magnus),
     Bool(bool),
     Str(String),
     Unit,
@@ -252,6 +262,7 @@ impl MapKey {
         match self {
             MapKey::Int(v) => Value::Int(*v),
             MapKey::UInt(v) => Value::UInt(*v),
+            MapKey::Magnus(v) => Value::Magnus(Rc::new(v.clone())),
             MapKey::Bool(v) => Value::Bool(*v),
             MapKey::Str(v) => Value::Str(v.clone()),
             MapKey::Unit => Value::Unit,
@@ -267,6 +278,7 @@ impl MapKey {
             MapKey::Str(value) => value.clone(),
             MapKey::Int(value) => value.to_string(),
             MapKey::UInt(value) => value.to_string(),
+            MapKey::Magnus(value) => value.to_string(),
             MapKey::Bool(value) => value.to_string(),
             MapKey::Unit => String::new(),
             MapKey::Tuple(parts) => parts
@@ -436,6 +448,7 @@ impl Value {
         Ok(match self {
             Value::Int(v) => display_int_at_width(*v, float_width),
             Value::UInt(v) => v.to_string(),
+            Value::Magnus(v) => v.to_string(),
             Value::Dec(carrier, scale) => crate::decimal::format(*carrier, *scale),
             Value::Float(v) => display_float_at_width(*v, float_width),
             Value::Bool(v) => display_bivalens(*v).to_owned(),
@@ -522,6 +535,8 @@ impl Value {
             Value::Int(v) if *v >= 0 => Ok(MapKey::UInt(*v as u64)),
             Value::Int(v) => Ok(MapKey::Int(*v)),
             Value::UInt(v) => Ok(MapKey::UInt(*v)),
+            // Canonical `Magnus` is always beyond the 64-bit keys above.
+            Value::Magnus(v) => Ok(MapKey::Magnus((**v).clone())),
             Value::Bool(v) => Ok(MapKey::Bool(*v)),
             Value::Str(v) => Ok(MapKey::Str(v.clone())),
             Value::Ascii(b) => Ok(MapKey::Str(char::from(*b).to_string())),
@@ -605,6 +620,7 @@ fn display_in_collection(
     Ok(match value {
         Value::Int(v) => display_int_at_width(*v, float_width),
         Value::UInt(v) => v.to_string(),
+        Value::Magnus(v) => v.to_string(),
         Value::Array(items) => display_list(&items.borrow(), interner, order, span, float_width)?,
         Value::Map(entries) => {
             display_tabula_map(&entries.borrow(), interner, order, span, float_width)?
@@ -634,6 +650,7 @@ fn display_tabula_map(
             MapKey::Str(s) => format!("\"{s}\""),
             MapKey::Int(v) => v.to_string(),
             MapKey::UInt(v) => v.to_string(),
+            MapKey::Magnus(v) => v.to_string(),
             MapKey::Bool(v) => format!("{v}"),
             MapKey::Unit => "nihil".to_owned(),
             MapKey::Tuple(_) => key.document_key(),
@@ -1066,9 +1083,10 @@ pub fn int_width_range(width: NumericWidth) -> (i128, i128) {
         // decimal-widths D1: scaled-integer carriers fit their integer domain
         // (d64 = i64×10⁻⁸); D4 owns runner arithmetic.
         NumericWidth::D64 => (i64::MIN as i128, i64::MAX as i128),
-        // `inf` has no bound. MIR layout of `numerus<inf>` fails closed with a
-        // named missing fact before any runner arithmetic reaches this row;
-        // the Magnus carrier (inf track U4) replaces it with exact semantics.
+        // `inf` has no bound: an `inf` operation never range-checks through
+        // this i128 window (it computes on `Magnus`, `crate::inf`); the row
+        // only keeps this helper total for a caller that reaches it with an
+        // `inf`-typed 64-bit-carrier value.
         NumericWidth::Inf => (i128::MIN, i128::MAX),
     }
 }
@@ -1110,8 +1128,8 @@ pub fn float_to_numerus_width(value: f64, width: NumericWidth) -> Value {
         | NumericWidth::F32
         | NumericWidth::F64
         | NumericWidth::D64
-        // Unreachable for `inf`: float -> `inf` typechecks only after U3, and
-        // layout fails closed first; kept on the width-agnostic carrier.
+        // `float ↦ inf` never reaches this helper: `convert_to_inf` truncates
+        // through `Magnus` (NaN and ±∞ fail). Kept on the width-agnostic carrier.
         | NumericWidth::Inf => Value::Int(value as i64),
     }
 }
@@ -1400,6 +1418,11 @@ pub fn add_values(
 /// runner scalars (floats by IEEE 754 totalOrder).
 pub(crate) fn compare_sort_values(left: &Value, right: &Value) -> std::cmp::Ordering {
     match (left, right) {
+        // `inf` (ruling 37): exact order against any integer carrier.
+        (Value::Magnus(_), Value::Int(_) | Value::UInt(_) | Value::Magnus(_))
+        | (Value::Int(_) | Value::UInt(_), Value::Magnus(_)) => {
+            crate::exact_int::cmp_numeric(left, right).unwrap_or(std::cmp::Ordering::Equal)
+        }
         (Value::Int(a), Value::Int(b)) => a.cmp(b),
         (Value::UInt(a), Value::UInt(b)) => a.cmp(b),
         // Mixed carriers order by numeric value: a negative signed value
@@ -1436,7 +1459,10 @@ pub(crate) fn compare_sort_values(left: &Value, right: &Value) -> std::cmp::Orde
 /// witness calls its own `compare` and never reaches this helper.
 pub(crate) fn contract_compare_values(left: &Value, right: &Value) -> Option<std::cmp::Ordering> {
     match (left, right) {
-        (Value::Int(_) | Value::UInt(_), Value::Int(_) | Value::UInt(_))
+        (
+            Value::Int(_) | Value::UInt(_) | Value::Magnus(_),
+            Value::Int(_) | Value::UInt(_) | Value::Magnus(_),
+        )
         | (Value::Float(_), Value::Float(_))
         | (Value::Str(_), Value::Str(_)) => Some(compare_sort_values(left, right)),
         (Value::Instans(a), Value::Instans(b)) => a.partial_cmp_at_coarser(*b),
@@ -1490,8 +1516,8 @@ pub fn compare_values(
         // Integer and float operands compare their exact mathematical values
         // (ruling 22): an integer above 2^53 is never rounded to a float.
         (
-            Value::Int(_) | Value::UInt(_) | Value::Float(_),
-            Value::Int(_) | Value::UInt(_) | Value::Float(_),
+            Value::Int(_) | Value::UInt(_) | Value::Magnus(_) | Value::Float(_),
+            Value::Int(_) | Value::UInt(_) | Value::Magnus(_) | Value::Float(_),
         ) => crate::exact_int::cmp_numeric(&left, &right),
         (Value::Str(a), Value::Str(b)) => Some(a.cmp(b)),
         (Value::Ascii(a), Value::Ascii(b)) => Some(a.cmp(b)),
@@ -1528,8 +1554,11 @@ pub fn values_equal(left: &Value, right: &Value) -> bool {
         // Integer and float operands compare their exact values (ruling 22);
         // NaN equals nothing. Fuzzy `≈` is a collection Approximate call and
         // does not use this exact-value helper.
-        (Value::Int(_) | Value::UInt(_), Value::Int(_) | Value::UInt(_) | Value::Float(_))
-        | (Value::Float(_), Value::Int(_) | Value::UInt(_)) => {
+        (
+            Value::Int(_) | Value::UInt(_) | Value::Magnus(_),
+            Value::Int(_) | Value::UInt(_) | Value::Magnus(_) | Value::Float(_),
+        )
+        | (Value::Float(_), Value::Int(_) | Value::UInt(_) | Value::Magnus(_)) => {
             crate::exact_int::cmp_numeric(left, right).is_some_and(std::cmp::Ordering::is_eq)
         }
         // Scalar `s[i]`/`accipe` yields the one-byte `ascii<1>` carrier while

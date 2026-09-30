@@ -1021,6 +1021,16 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                         .unwrap_or_else(|| self.lowerer.types.primitive(Primitive::Numerus)),
                 ));
             }
+            // An exact bignum constant is the unbounded integer.
+            MirConstant::Magnus(_) => {
+                return Some(MirType::semantic(
+                    self.lowerer
+                        .unit
+                        .types
+                        .find_sized_numeric(Primitive::Numerus, crate::semantic::NumericWidth::Inf)
+                        .unwrap_or_else(|| self.lowerer.types.primitive(Primitive::Numerus)),
+                ));
+            }
             MirConstant::Float(_) => Primitive::Fractus,
             MirConstant::Bool(_) => Primitive::Bivalens,
             MirConstant::Unit => Primitive::Vacuum,

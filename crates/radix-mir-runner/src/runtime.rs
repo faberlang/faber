@@ -662,6 +662,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     (Value::Int(a), Value::Int(b)) => a > b,
                     (Value::UInt(a), Value::UInt(b)) => a > b,
                     (Value::Float(a), Value::Float(b)) => a > b,
+                    // `inf` bounds beyond the 64-bit carriers: exact order.
+                    (Value::Magnus(_), Value::Int(_) | Value::UInt(_) | Value::Magnus(_))
+                    | (Value::Int(_) | Value::UInt(_), Value::Magnus(_)) => {
+                        super::exact_int::cmp_numeric(&start, &end)
+                            .is_some_and(std::cmp::Ordering::is_gt)
+                    }
                     _ => false,
                 };
                 if reversed {
@@ -983,7 +989,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 (Value::Nil, Type::Primitive(Primitive::Nihil))
                     | (Value::Bool(_), Type::Primitive(Primitive::Bivalens))
                     | (
-                        Value::Int(_) | Value::UInt(_),
+                        Value::Int(_) | Value::UInt(_) | Value::Magnus(_),
                         Type::Primitive(Primitive::Numerus)
                             | Type::SizedNumeric(Primitive::Numerus, _)
                     )
@@ -1458,18 +1464,29 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 };
                 Ok(Value::Str(text.replace(&from, &to)))
             }
-            MirCollectionOp::Absolute => {
-                self.map_numeric(args, span, return_ty, f64::abs, i128::abs)
-            }
-            MirCollectionOp::Signum => {
-                self.map_numeric(args, span, return_ty, f64::signum, i128::signum)
-            }
+            MirCollectionOp::Absolute => self.map_numeric(
+                args,
+                span,
+                return_ty,
+                f64::abs,
+                i128::abs,
+                Some(handroll::Magnus::abs),
+            ),
+            MirCollectionOp::Signum => self.map_numeric(
+                args,
+                span,
+                return_ty,
+                f64::signum,
+                i128::signum,
+                Some(|value| handroll::Magnus::from_i64(i64::from(value.signum()))),
+            ),
             MirCollectionOp::Minimum => self.numeric_extremum(
                 args,
                 span,
                 return_ty,
                 numeric_min,
                 super::value::ieee_minimum,
+                false,
             ),
             MirCollectionOp::Maximum => self.numeric_extremum(
                 args,
@@ -1477,6 +1494,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 return_ty,
                 numeric_max,
                 super::value::ieee_maximum,
+                true,
             ),
             MirCollectionOp::Approximate => self.approximate_fractus(args, span),
             MirCollectionOp::Sum => self.sum_numeric_array(args, return_ty, span),
@@ -1559,18 +1577,38 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::TensorTranspose => self.tensor_transpose(args, span),
             MirCollectionOp::SparseGet => self.sparse_get(args, span),
             MirCollectionOp::SparseSet => self.sparse_set(args, span),
-            MirCollectionOp::Round => {
-                self.map_numeric(args, span, return_ty, f64::round, std::convert::identity)
-            }
-            MirCollectionOp::Floor => {
-                self.map_numeric(args, span, return_ty, f64::floor, std::convert::identity)
-            }
-            MirCollectionOp::Ceiling => {
-                self.map_numeric(args, span, return_ty, f64::ceil, std::convert::identity)
-            }
-            MirCollectionOp::Truncate => {
-                self.map_numeric(args, span, return_ty, f64::trunc, std::convert::identity)
-            }
+            MirCollectionOp::Round => self.map_numeric(
+                args,
+                span,
+                return_ty,
+                f64::round,
+                std::convert::identity,
+                None,
+            ),
+            MirCollectionOp::Floor => self.map_numeric(
+                args,
+                span,
+                return_ty,
+                f64::floor,
+                std::convert::identity,
+                None,
+            ),
+            MirCollectionOp::Ceiling => self.map_numeric(
+                args,
+                span,
+                return_ty,
+                f64::ceil,
+                std::convert::identity,
+                None,
+            ),
+            MirCollectionOp::Truncate => self.map_numeric(
+                args,
+                span,
+                return_ty,
+                f64::trunc,
+                std::convert::identity,
+                None,
+            ),
             MirCollectionOp::Keys => self.eval_map_snapshot(args, span, false),
             MirCollectionOp::Values => self.eval_map_snapshot(args, span, true),
             MirCollectionOp::Put => {
@@ -3701,11 +3739,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         return_ty: MirType,
         f: impl FnOnce(f64) -> f64,
         exact: impl FnOnce(i128) -> i128,
+        unbounded: Option<fn(&handroll::Magnus) -> handroll::Magnus>,
     ) -> Result<Value, RunnerError> {
         let [receiver] = args else {
             return Err(RunnerError::internal(span, "numeric collection arity"));
         };
         let value = self.eval_operand(receiver, span)?;
+        // An `inf` beyond the 64-bit carriers (`absolutum`, `signum`): exact.
+        if let (Value::Magnus(big), Some(unbounded)) = (&value, unbounded) {
+            return Ok(crate::inf::from_magnus(unbounded(big)));
+        }
         // Integer receivers compute the exact result: `|i64::MIN|` is 2^63,
         // and the result carries the declared result width's carrier.
         if let Some(exact_value) = super::exact_int::int_value(&value) {
@@ -3749,6 +3792,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         return_ty: MirType,
         op: fn(&Value, &Value, NumericWidth, Span) -> Result<Value, RunnerError>,
         scalar_op: fn(f64, f64) -> f64,
+        take_greater: bool,
     ) -> Result<Value, RunnerError> {
         let is_array = matches!(
             self.types.get(return_ty.semantic_id()),
@@ -3761,7 +3805,32 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         if is_tensor {
             return self.tensor_elementwise_or_scalar(args, span, "tensor extremum", op, return_ty);
         }
+        // `minimus`/`maximus` of two `inf` values is exact (ruling 37: an
+        // `inf` is totally ordered); the f64 path below would round.
+        if effective_width(self.types, return_ty.semantic_id()) == Some(NumericWidth::Inf) {
+            return self.inf_extremum(args, span, take_greater);
+        }
         self.map_numeric_pair(args, span, scalar_op)
+    }
+
+    fn inf_extremum(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+        take_greater: bool,
+    ) -> Result<Value, RunnerError> {
+        let [left, right] = args else {
+            return Err(RunnerError::internal(span, "numeric pair arity"));
+        };
+        let left = self.eval_operand(left, span)?;
+        let right = self.eval_operand(right, span)?;
+        let ordering = super::exact_int::cmp_numeric(&left, &right)
+            .ok_or_else(|| RunnerError::internal(span, "numeric pair type mismatch"))?;
+        Ok(if ordering.is_ge() == take_greater {
+            left
+        } else {
+            right
+        })
     }
 
     fn map_numeric_pair(
@@ -3818,6 +3887,23 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         // checked at its own width.
         let width =
             effective_width(self.types, return_ty.semantic_id()).unwrap_or(NumericWidth::I64);
+        // `summa` over `lista<inf>` (ruling 43) is exact and never a size
+        // trap; it runs on the bignum whenever the result is `inf` or an
+        // element already is a `Magnus`.
+        if (width == NumericWidth::Inf || values.iter().any(|v| matches!(v, Value::Magnus(_))))
+            && !values.iter().any(|v| matches!(v, Value::Float(_)))
+        {
+            let mut total = handroll::Magnus::zero();
+            for value in &values {
+                let term = crate::inf::to_magnus(value)
+                    .ok_or_else(|| RunnerError::internal(span, "sum element type mismatch"))?;
+                total = &total + &term;
+                if total.exceeds_ceiling(crate::inf::RUNNER_INF_BIT_CEILING) {
+                    return Err(crate::inf::exhausted(span, "summa"));
+                }
+            }
+            return Ok(crate::inf::from_magnus(total));
+        }
         if !values.iter().any(|v| matches!(v, Value::Float(_))) {
             let overflow = || RunnerError::internal(span, "numerus overflow");
             let mut total: i128 = 0;
@@ -3913,6 +3999,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             [receiver, other, rel_tol, abs_tol, negated] => {
                 let width = self.fuzzy_comparison_width(receiver, other, span);
+                // Ruling 37: `inf ≈ inf` and `inf ≈ int` are exact equality
+                // (an `inf` is exact, never fuzzy); `inf ≈ float` converts the
+                // `inf` side by ruling 40 and compares in the float's width.
+                if let Some(equal) = self.exact_inf_equality(receiver, other, span)? {
+                    let negated = matches!(self.eval_operand(negated, span)?, Value::Bool(true));
+                    return Ok(Value::Bool(equal != negated));
+                }
                 let receiver = self.fuzzy_operand(receiver, span)?;
                 let other = self.fuzzy_operand(other, span)?;
                 let rel_tol = numeric_as_f64(&self.eval_operand(rel_tol, span)?, span)?;
@@ -3930,10 +4023,38 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    /// `≈` between two integer operands at least one of which is an `inf`
+    /// (by static type, or by value beyond the 64-bit carriers): exact
+    /// equality. `None` when the pair is not such a pair.
+    fn exact_inf_equality(
+        &mut self,
+        lhs: &MirOperand,
+        rhs: &MirOperand,
+        span: Span,
+    ) -> Result<Option<bool>, RunnerError> {
+        let left = self.eval_operand(lhs, span)?;
+        let right = self.eval_operand(rhs, span)?;
+        let (Some(a), Some(b)) = (crate::inf::to_magnus(&left), crate::inf::to_magnus(&right))
+        else {
+            return Ok(None);
+        };
+        let involves_inf = matches!(left, Value::Magnus(_))
+            || matches!(right, Value::Magnus(_))
+            || self.operand_is_inf(lhs)
+            || self.operand_is_inf(rhs);
+        Ok(involves_inf.then_some(a == b))
+    }
+
     /// One `≈` operand as the float it stands for: a decimal carrier is a
-    /// scaled integer, so it is unscaled by its static type (ruling 22).
+    /// scaled integer, so it is unscaled by its static type (ruling 22); an
+    /// `inf` converts by ruling 40 (nearest-even, ±∞ beyond range).
     fn fuzzy_operand(&mut self, operand: &MirOperand, span: Span) -> Result<f64, RunnerError> {
         let value = self.eval_operand(operand, span)?;
+        if let Some(big) = crate::inf::to_magnus(&value)
+            && (matches!(value, Value::Magnus(_)) || self.operand_is_inf(operand))
+        {
+            return Ok(crate::inf::to_float(&big, NumericWidth::F64));
+        }
         if let Value::Int(scaled) = value
             && let Some(scale) = self
                 .operand_decimal_width(operand)
@@ -4866,6 +4987,11 @@ fn format_value(
     match (value, parsed) {
         (Value::Int(v), FormatSpec::Layout(layout)) => Ok(render_integer(i128::from(*v), &layout)),
         (Value::UInt(v), FormatSpec::Layout(layout)) => Ok(render_integer(i128::from(*v), &layout)),
+        // Ruling 42: an `inf` beyond the 64-bit carriers takes the integer
+        // specs over the exact digits.
+        (Value::Magnus(v), FormatSpec::Layout(layout)) => {
+            Ok(radix_types::format_spec::render_magnus(v, &layout))
+        }
         (Value::Float(v), FormatSpec::Layout(layout)) => {
             Ok(render_float(*v, &layout, |magnitude| {
                 crate::value::display_float_at_width(magnitude, float_width)

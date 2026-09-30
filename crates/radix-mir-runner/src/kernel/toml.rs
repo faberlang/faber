@@ -192,6 +192,11 @@ fn value_to_toml(value: &Value, span: Span) -> Result<toml::Value, RunnerError> 
             .map_err(|_| {
                 RunnerError::internal(span, format!("uint outside toml i64 range: {value}"))
             }),
+        // TOML integers are 64-bit: an `inf` beyond them has no TOML form.
+        Value::Magnus(value) => Err(RunnerError::internal(
+            span,
+            format!("inf outside toml i64 range: {value}"),
+        )),
         Value::Dec(..) => Err(RunnerError::internal(
             span,
             "decimal intermediate reached TOML before a store",

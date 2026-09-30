@@ -410,6 +410,7 @@ fn constant(value: &MirConstant) -> String {
         MirConstant::ShapeSize { shape, axis } => {
             format!("const shape_size shape#{} axis {axis:?}", shape.0)
         }
+        MirConstant::Magnus(digits) => format!("const magnus {digits}"),
     }
 }
 

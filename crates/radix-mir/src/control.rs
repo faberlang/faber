@@ -1445,6 +1445,8 @@ fn local_place_id(place: &MirPlace) -> Option<MirLocalId> {
     }
 }
 
+// Deliberate: `MirConstant::Magnus` (an `inf` beyond the 64-bit carriers) is
+// not a structured-kernel switch case: `inf` is host-only (ruling 39).
 fn is_switch_case_constant(constant: &MirConstant) -> bool {
     matches!(
         constant,

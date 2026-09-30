@@ -86,6 +86,8 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Value::Char(ch) => ch.to_string(),
             Value::Int(v) => v.to_string(),
             Value::UInt(v) => v.to_string(),
+            // `inf ↦ textus` (ruling 40): decimal digits, `-` sign.
+            Value::Magnus(v) => v.to_string(),
             Value::Float(v) => match Self::element_display_width(source_ty, self.types, 0) {
                 // Declared narrower float: same repr as `print`/interpolation.
                 Some(width) if width != NumericWidth::F64 => {
@@ -167,6 +169,11 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             }
             return self.recover_or_fail(recovery, span, "bits pair width mismatch");
         }
+        // Ruling 40: every source into `inf` is exact; the row table lives in
+        // `conversio/inf.rs`.
+        if width.is_unbounded() {
+            return self.convert_to_inf(value, source_ty, params, recovery, span);
+        }
         if width.is_decimal() {
             return self.convert_to_decimal(value, source_ty, width, recovery, span);
         }
@@ -174,6 +181,12 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             return self.convert_decimal_to_integer(value, source_width, width, recovery, span);
         }
         match value {
+            // `inf ↦ int<W>` (ruling 40): a `Magnus` is canonically beyond the
+            // 64-bit carriers, so it fits no bounded width — the failable
+            // magnitude-checked narrowing always fails.
+            Value::Magnus(_) => {
+                self.recover_or_fail(recovery, span, "numerus to numerus conversion out of range")
+            }
             Value::Str(text) => match self.parse_textus_numerus(&text, params) {
                 // SA-002: range-check against `W` so `textus ↦ numerus<u8>` of
                 // "300" fails here exactly as Rust codegen's `.parse::<u8>()`.
@@ -267,6 +280,9 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 None => decimal_integer_to_carrier(i128::from(value), target_width),
             },
             Value::UInt(value) => decimal_integer_to_carrier(i128::from(value), target_width),
+            // `inf ↦ d64` (ruling 40): beyond the 64-bit carriers is beyond
+            // the d64 range (±92,233,720,368.54775807).
+            Value::Magnus(_) => Err(DecimalTextError::OutOfRange),
             // An exact intermediate lands at scale 8: half-even, range-checked.
             Value::Dec(carrier, scale) => {
                 crate::decimal::store_carrier(carrier, scale).ok_or(DecimalTextError::OutOfRange)
@@ -297,7 +313,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
 
     /// Exact integer a decimal value reduces to (round-half-even): the shared
     /// integer choice of `d64 ↦ numerus<W>` and `d64 ↦ wrapping/saturating<W>`.
-    fn decimal_integer_value(
+    pub(super) fn decimal_integer_value(
         &mut self,
         value: Value,
         source_width: NumericWidth,
@@ -468,6 +484,10 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         width: NumericWidth,
         span: Span,
     ) -> Result<Value, RunnerError> {
+        // `inf ↦ wrapping<W>`: reduce the exact bignum mod 2^W (ruling 40).
+        if let Value::Magnus(big) = &value {
+            return Ok(crate::inf::wrap_to_width(big, width));
+        }
         let exact = self.policy_word_source_value(value, source_ty, span)?;
         Ok(modular_word_result(exact, width))
     }
@@ -480,6 +500,10 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         width: NumericWidth,
         span: Span,
     ) -> Result<Value, RunnerError> {
+        // `inf ↦ saturating<W>`: clamp the exact bignum to `W` (ruling 40).
+        if let Value::Magnus(big) = &value {
+            return Ok(crate::inf::clamp_to_width(big, width));
+        }
         let exact = self.policy_word_source_value(value, source_ty, span)?;
         Ok(saturating_word_result(exact, width))
     }
@@ -612,6 +636,15 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 _ => self.recover_or_fail(recovery, span, "bits pair width mismatch"),
             };
         }
+        // `inf ↦ f16/bf16/f32/f64` (ruling 40): nearest-even, ±∞ beyond the
+        // float's finite range. An `inf`-typed value the 64-bit carriers
+        // still hold takes the same path so `f16` overflows to ±∞ too.
+        let inf_source = matches!(value, Value::Magnus(_))
+            || (matches!(value, Value::Int(_) | Value::UInt(_))
+                && effective_width(self.types, source_ty) == Some(NumericWidth::Inf));
+        if inf_source && let Some(big) = crate::inf::to_magnus(&value) {
+            return Ok(Value::Float(crate::inf::to_float(&big, width)));
+        }
         let value = match value {
             Value::Octeti(bytes) => {
                 if self.endian_hint(params).is_some() {
@@ -696,6 +729,8 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             }
             Value::Int(v) => self.bivalens_from_scalar_truthiness(v != 0, recovery, span),
             Value::UInt(v) => self.bivalens_from_scalar_truthiness(v != 0, recovery, span),
+            // Canonical `Magnus` is never zero.
+            Value::Magnus(_) => self.bivalens_from_scalar_truthiness(true, recovery, span),
             Value::Float(v) => self.bivalens_from_scalar_truthiness(v != 0.0, recovery, span),
             Value::Bool(v) => Ok(Value::Bool(v)),
             other => Err(RunnerError::internal(
@@ -881,6 +916,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             | Value::Bool(_)
             | Value::Int(_)
             | Value::UInt(_)
+            | Value::Magnus(_)
             | Value::Dec(..)
             | Value::Str(_)
             | Value::Ascii(_)
@@ -937,6 +973,8 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Value::Bool(v) => if *v { "true" } else { "false" }.to_owned(),
             Value::Int(v) => v.to_string(),
             Value::UInt(v) => v.to_string(),
+            // An `inf` renders as its exact digits, a JSON number (ruling 40).
+            Value::Magnus(v) => v.to_string(),
             Value::Dec(carrier, scale) => crate::decimal::format(*carrier, *scale),
             Value::Float(v) => render_json_fractus(*v),
             Value::Str(v) => render_json_string(v),
@@ -1105,6 +1143,25 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Value::Int(v) => u128::try_from(v)
                 .map_err(|_| RunnerError::internal(span, "ascii_pack_negative_source"))?,
             Value::UInt(v) => u128::from(v),
+            // `inf ↦ ascii<N> via Hex/Bin/Oct` (ruling 40): the same fits-N
+            // check over the exact digits of any size.
+            Value::Magnus(big) => {
+                if big.is_negative() {
+                    return self.recover_or_fail(recovery, span, "ascii_pack_negative_source");
+                }
+                let digits = big.to_string_radix(match radix {
+                    16 => handroll::Radix::Hex,
+                    2 => handroll::Radix::Bin,
+                    _ => handroll::Radix::Oct,
+                });
+                return if digits.len() > width {
+                    self.recover_or_fail(recovery, span, "ascii_pack_width_overflow")
+                } else if width == 1 {
+                    Ok(Value::Ascii(digits.as_bytes()[0]))
+                } else {
+                    Ok(Value::Str(format!("{digits:0>width$}")))
+                };
+            }
             other => {
                 return Err(RunnerError::internal(
                     span,
@@ -1133,6 +1190,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             // D10.6 `n ↦ ascii`: the digits, which are always ASCII.
             Value::Int(n) => Ok(Value::Str(n.to_string())),
             Value::UInt(n) => Ok(Value::Str(n.to_string())),
+            Value::Magnus(n) => Ok(Value::Str(n.to_string())),
             Value::Str(text) => {
                 if text.is_ascii() {
                     Ok(Value::Str(text))

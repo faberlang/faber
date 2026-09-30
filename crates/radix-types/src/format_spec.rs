@@ -19,6 +19,7 @@
 
 use crate::numeric_width::NumericWidth;
 use crate::types::{Primitive, Type, TypeId, TypeTable};
+use handroll::{Magnus, Radix};
 
 /// Alignment inside the minimum width.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -317,8 +318,9 @@ pub fn format_subject(types: &TypeTable, ty: TypeId) -> FormatSubject {
     match types.get(payload) {
         Type::Alias(_, inner) | Type::Ref(_, inner) => format_subject(types, *inner),
         Type::Primitive(Primitive::Numerus) => FormatSubject::Signed,
-        Type::SizedNumeric(Primitive::Numerus, width) => numerus_subject(*width),
-        Type::ModularWord(width) => numerus_subject(*width),
+        Type::SizedNumeric(Primitive::Numerus, width) | Type::ModularWord(width) => {
+            numerus_subject(*width)
+        }
         Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
             FormatSubject::Float
         }
@@ -331,6 +333,11 @@ pub fn format_subject(types: &TypeTable, ty: TypeId) -> FormatSubject {
 fn numerus_subject(width: NumericWidth) -> FormatSubject {
     if width.is_decimal() {
         FormatSubject::Decimal
+    } else if width.is_unbounded() {
+        // Ruling 42: `inf` takes the signed integer specs exactly as `int`
+        // does (radix kinds, width, fill, sign, precision); it is a signed
+        // subject whose value renders through `render_magnus`.
+        FormatSubject::Signed
     } else if width.is_unsigned_int() {
         FormatSubject::Unsigned
     } else {
@@ -404,6 +411,66 @@ pub fn render_integer(value: i128, spec: &LayoutSpec) -> String {
         FormatAlign::Right,
         true,
     )
+}
+
+/// Render an unbounded integer (`inf`, ruling 42): the same layout rules as
+/// [`render_integer`] over a `Magnus` of any size. Radix kinds print sign plus
+/// magnitude digits (`-42 ¶ "x"` = `-2a`), and `e` renders the exact digits
+/// as a coefficient and exponent (a value the `f64` path can hold renders
+/// exactly as [`render_integer`] would).
+#[must_use]
+pub fn render_magnus(value: &Magnus, spec: &LayoutSpec) -> String {
+    let magnitude = value.abs();
+    let body = match spec.kind {
+        Some(FormatKind::Hex) => magnitude.to_string_radix(Radix::Hex),
+        Some(FormatKind::Binary) => magnitude.to_string_radix(Radix::Bin),
+        Some(FormatKind::Octal) => magnitude.to_string_radix(Radix::Oct),
+        Some(FormatKind::Scientific) => scientific_digits(&magnitude, spec.precision),
+        None => {
+            let digits = magnitude.to_string_radix(Radix::Dec);
+            match spec.precision {
+                Some(p) if p > 0 => format!("{digits}.{}", "0".repeat(p)),
+                _ => digits,
+            }
+        }
+    };
+    finish(
+        sign_of(value.is_negative(), spec.plus),
+        &body,
+        spec,
+        FormatAlign::Right,
+        true,
+    )
+}
+
+/// `d.ddde<exp>` from the exact decimal digits of a non-negative integer.
+fn scientific_digits(magnitude: &Magnus, precision: Option<usize>) -> String {
+    let float = magnitude.to_f64();
+    if float.is_finite() {
+        return scientific(float, precision);
+    }
+    let digits = magnitude.to_string_radix(Radix::Dec);
+    let exponent = digits.len() - 1;
+    let coefficient = if let Some(p) = precision {
+        // Truncate to `p` fractional digits (the value is far past f64, so
+        // the digit string is the exact source of truth).
+        let take = (p + 1).min(digits.len());
+        let mut shown = digits[..take].to_owned();
+        shown.push_str(&"0".repeat(p + 1 - take));
+        if p > 0 {
+            shown.insert(1, '.');
+        }
+        shown
+    } else {
+        let trimmed = digits.trim_end_matches('0');
+        let trimmed = if trimmed.is_empty() { "0" } else { trimmed };
+        if trimmed.len() > 1 {
+            format!("{}.{}", &trimmed[..1], &trimmed[1..])
+        } else {
+            trimmed.to_owned()
+        }
+    };
+    format!("{coefficient}e{exponent}")
 }
 
 fn scientific(magnitude: f64, precision: Option<usize>) -> String {

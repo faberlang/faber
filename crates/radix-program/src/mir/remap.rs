@@ -427,6 +427,8 @@ pub(super) fn remap_constant_text_symbols(
         | MirConstant::Unit
         | MirConstant::Octeti(_)
         | MirConstant::Function(_)
+        // Digits carry no symbols.
+        | MirConstant::Magnus(_)
         | MirConstant::ShapeSize { shape: _, axis: _ } => {}
     }
 }

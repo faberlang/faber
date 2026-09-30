@@ -68,6 +68,15 @@ impl<'u> LiteralBuilder<'u> {
             (Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _), Value::UInt(v)) => {
                 Ok(self.literal(HirLiteral::Int(*v), ty))
             }
+            // An `inf` beyond the 64-bit carriers is an exact big literal (ruling 34).
+            (Type::SizedNumeric(Primitive::Numerus, _), Value::Magnus(v)) => {
+                let magnitude = self.literal(HirLiteral::BigInt(v.abs().to_string().into()), ty);
+                Ok(if v.is_negative() {
+                    self.negated(magnitude, ty)
+                } else {
+                    magnitude
+                })
+            }
             (Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _), Value::Float(v))
                 if v.is_finite() =>
             {
@@ -180,7 +189,7 @@ impl<'u> LiteralBuilder<'u> {
 fn map_key_order(a: &MapKey, b: &MapKey) -> std::cmp::Ordering {
     fn rank(key: &MapKey) -> u8 {
         match key {
-            MapKey::Int(_) | MapKey::UInt(_) => 0,
+            MapKey::Int(_) | MapKey::UInt(_) | MapKey::Magnus(_) => 0,
             MapKey::Bool(_) => 1,
             MapKey::Str(_) => 2,
             MapKey::Unit => 3,
@@ -192,6 +201,22 @@ fn map_key_order(a: &MapKey, b: &MapKey) -> std::cmp::Ordering {
         (MapKey::Int(_), MapKey::UInt(_)) => std::cmp::Ordering::Less,
         (MapKey::UInt(_), MapKey::Int(_)) => std::cmp::Ordering::Greater,
         (MapKey::UInt(x), MapKey::UInt(y)) => x.cmp(y),
+        // `inf` keys beyond the 64-bit carriers: exact order by value.
+        (MapKey::Magnus(x), MapKey::Magnus(y)) => x.cmp(y),
+        (MapKey::Magnus(x), MapKey::Int(_) | MapKey::UInt(_)) => {
+            if x.is_negative() {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Greater
+            }
+        }
+        (MapKey::Int(_) | MapKey::UInt(_), MapKey::Magnus(y)) => {
+            if y.is_negative() {
+                std::cmp::Ordering::Greater
+            } else {
+                std::cmp::Ordering::Less
+            }
+        }
         (MapKey::Bool(x), MapKey::Bool(y)) => x.cmp(y),
         (MapKey::Str(x), MapKey::Str(y)) => x.cmp(y),
         (MapKey::Tuple(x), MapKey::Tuple(y)) => x
