@@ -363,7 +363,7 @@ incipit {
 fn modular_word_rejects_unsupported_widths() {
     test_support::assert_analysis_rejects_with_issue(
         r"
-functio keep(modulus<i16> x) → modulus<i16> {
+functio keep(modulus<d64> x) → modulus<d64> {
     redde x
 }
 ",

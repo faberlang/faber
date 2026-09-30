@@ -33,7 +33,7 @@ use super::cursor::GeneratorCursor;
 use super::sermo::SermoView;
 use super::value::{
     GradientStorage, MapKey, TensorValue, Value, format_template, modular_operand,
-    modular_word_mask, modular_word_result, uint_width_checked_add, values_equal,
+    modular_word_reduce, modular_word_result, uint_width_checked_add, values_equal,
     width_checked_add,
 };
 use super::{Runner, RunnerError, gelu_f64, host::provider_identity};
@@ -3721,11 +3721,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         // Modular-word sum: fold with wrapping_add and mask to the declared
         // width so the result respects 2^W wraparound.
         if let Some(width) = self.modular_word_width_of(return_ty) {
-            let mask = modular_word_mask(width);
-            let mut acc: u64 = 0;
+            let mut acc: i128 = 0;
             for value in &values {
                 let v = modular_operand(value.clone(), span, "modular sum element type mismatch")?;
-                acc = acc.wrapping_add(v) & mask;
+                acc = modular_word_reduce(acc + v, width);
             }
             return Ok(modular_word_result(acc, width));
         }

@@ -242,6 +242,7 @@ enum NumericFactFamily {
     SignedInt { rank: u8 },
     UnsignedInt { rank: u8 },
     Modular { rank: u8 },
+    ModularSigned { rank: u8 },
     SaturatingSigned { rank: u8 },
     SaturatingUnsigned { rank: u8 },
     Float { rank: Option<u8> },
@@ -253,7 +254,9 @@ impl NumericFactFamily {
     /// the trapping integer family `other` without a range check failing.
     fn integer_flows_into(self, other: Self) -> bool {
         let (signed_from, rank_from) = match self {
-            Self::SignedInt { rank } | Self::SaturatingSigned { rank } => (true, rank),
+            Self::SignedInt { rank }
+            | Self::ModularSigned { rank }
+            | Self::SaturatingSigned { rank } => (true, rank),
             Self::UnsignedInt { rank }
             | Self::Modular { rank }
             | Self::SaturatingUnsigned { rank } => (false, rank),
@@ -278,6 +281,7 @@ impl NumericFactFamily {
             (Self::SignedInt { rank: a }, Self::SignedInt { rank: b })
             | (Self::UnsignedInt { rank: a }, Self::UnsignedInt { rank: b })
             | (Self::Modular { rank: a }, Self::Modular { rank: b })
+            | (Self::ModularSigned { rank: a }, Self::ModularSigned { rank: b })
             | (Self::SaturatingSigned { rank: a }, Self::SaturatingSigned { rank: b })
             | (Self::SaturatingUnsigned { rank: a }, Self::SaturatingUnsigned { rank: b }) => {
                 a <= b
@@ -354,9 +358,15 @@ fn numeric_fact(ty: &Type) -> Option<NumericFact> {
             })
         }
         Type::ModularWord(width) => {
-            let rank = unsigned_width_rank(*width)?;
+            let family = if let Some(rank) = signed_width_rank(*width) {
+                NumericFactFamily::ModularSigned { rank }
+            } else {
+                NumericFactFamily::Modular {
+                    rank: unsigned_width_rank(*width)?,
+                }
+            };
             Some(NumericFact {
-                family: NumericFactFamily::Modular { rank },
+                family,
                 width: Some(*width),
             })
         }
@@ -2630,6 +2640,7 @@ impl TypeChecker<'_> {
             NumericFactFamily::SignedInt { .. }
             | NumericFactFamily::UnsignedInt { .. }
             | NumericFactFamily::Modular { .. }
+            | NumericFactFamily::ModularSigned { .. }
             | NumericFactFamily::SaturatingSigned { .. }
             | NumericFactFamily::SaturatingUnsigned { .. } => {
                 if from.family.integer_flows_into(to.family) {

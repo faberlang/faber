@@ -1,0 +1,64 @@
++++
+term = "modulus<i32>"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "cast_expr", "conversio_expr", "shift_expr", "unary_expr", "additive_expr", "multiplicative_expr", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = true
+summary = "Signed wrapping integers: the ring of 2^W values with signed representatives, as in a Java hash."
+syntax = "wrapping<i32>"
+related = ["numerus", "modulus<u32>", "¬", "⇒"]
+locale = "en"
++++
+# =============================================================================
+# modulus<i32> — Signed wrapping integers: the ring of 2^W values with signed representatives.
+# =============================================================================
+#
+# What this teaches:
+#   • Signed ring — `wrapping<i8>` holds -128..127 and wraps at both ends:
+#     127 + 1 is -128, and `-128 / -1` is -128 again.
+#   • Floor division — `/` and `%` floor on the representatives: -7 / 2 is -4
+#     and -7 % 2 is 1.
+#   • Arithmetic shift and complement — `⇒` keeps the sign (-8 ⇒ 1 is -4) and
+#     `¬` is the complement inside the ring (¬-8 is 7).
+#   • Reduction on entry — `↦ wrapping<i8>` and a constant stored with `←`
+#     reduce into the ring: 300 becomes 44, and 200 becomes -56.
+#   • A real port — Java's `String.hashCode` is `h = 31 * h + c` over a signed
+#     32-bit word; "hello" hashes to 99162322.
+#
+# Common mistakes:
+#   • Expecting a trap on overflow — `wrapping` reduces, it never traps. Only a
+#     zero divisor fails.
+#   • Mixing families — `wrapping<i8> + int<i8>` is an error; convert with `↦`.
+#
+# See also: numerus, modulus, ¬, ⇒
+# =============================================================================
+
+fn javaHash(list<int> codes) → wrapping<i32> {
+    var wrapping<i32> h ← 0
+    for from codes const c {
+        const wrapping<i32> code ← c ↦ wrapping<i32>
+        h ← 31 * h + code
+    }
+    return h
+}
+
+main {
+    var wrapping<i8> a ← 127
+    a ← a + 1
+    print a
+    const wrapping<i8> m ← -128
+    print m / -1
+    const wrapping<i8> n ← -7
+    print n / 2
+    print n % 2
+    const wrapping<i8> s ← -8
+    print s ⇒ 1
+    print ¬s
+    const int wide ← 300
+    print wide ↦ wrapping<i8>
+    const int over ← 200
+    print over ↦ wrapping<i8>
+    const wrapping<i8> c ← 200
+    print c
+    print javaHash([104, 101, 108, 108, 111])
+}

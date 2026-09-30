@@ -787,15 +787,9 @@ impl Validator<'_, '_> {
             _ => return false,
         };
         match self.type_kind(expected) {
-            Type::ModularWord(width) => {
-                let max = width.unsigned_max().unwrap_or(u64::MAX);
-                match (signed, unsigned) {
-                    (Some(v), _) => u64::try_from(v).is_ok_and(|vu| vu <= max),
-                    (_, Some(v)) => v <= max,
-                    (None, None) => false,
-                }
-            }
-            Type::SizedNumeric(Primitive::Numerus, width) | Type::SaturatingWord(width) => {
+            Type::SizedNumeric(Primitive::Numerus, width)
+            | Type::ModularWord(width)
+            | Type::SaturatingWord(width) => {
                 let (lo, hi) = numerus_width_range(*width);
                 match (signed, unsigned) {
                     (Some(v), _) => (lo..=hi).contains(&i128::from(v)),

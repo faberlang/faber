@@ -438,7 +438,7 @@ fn modular_word_lowering_reports_typed_issues() {
     assert_eq!(reported[0].issue(), "modular_word_width_required");
 
     let mut reported = Vec::new();
-    let params = [marker_expr("i32", &mut interner)];
+    let params = [marker_expr("d64", &mut interner)];
     lower_modular_word(&params, &interner, &mut types, &mut |issue| {
         reported.push(issue);
     });

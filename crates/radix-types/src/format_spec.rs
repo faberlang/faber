@@ -318,7 +318,7 @@ pub fn format_subject(types: &TypeTable, ty: TypeId) -> FormatSubject {
         Type::Alias(_, inner) | Type::Ref(_, inner) => format_subject(types, *inner),
         Type::Primitive(Primitive::Numerus) => FormatSubject::Signed,
         Type::SizedNumeric(Primitive::Numerus, width) => numerus_subject(*width),
-        Type::ModularWord(_) => FormatSubject::Unsigned,
+        Type::ModularWord(width) => numerus_subject(*width),
         Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
             FormatSubject::Float
         }

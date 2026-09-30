@@ -469,9 +469,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         span: Span,
     ) -> Result<Value, RunnerError> {
         let exact = self.policy_word_source_value(value, source_ty, span)?;
-        let reduced = exact & i128::from(modular_word_mask(width));
-        // The mask keeps 0..=u64::MAX, so the narrowing is lossless.
-        Ok(modular_word_result(reduced as u64, width))
+        Ok(modular_word_result(exact, width))
     }
 
     /// `↦ saturating<W>` clamps the exact source value to W's range; it cannot fail.

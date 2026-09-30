@@ -527,9 +527,13 @@ impl TypeChecker<'_> {
                     .expected_numerus_literal_type(expected, span)
                     .unwrap_or_else(|| self.numerus_type());
                 if let Type::ModularWord(width) = self.types.get(literal_ty) {
-                    // Literal range follows the declared width: 0..=2^W-1.
+                    // Literal range follows the declared width: 0..=2^W-1
+                    // (unsigned) or 0..=2^(W-1)-1 (signed; a negative literal
+                    // is a unary minus over its magnitude).
                     // (u64 max+1 cannot be spelled under the u64 lexer carrier.)
-                    let in_range = width.unsigned_max().is_some_and(|max| *value <= max);
+                    let in_range = width
+                        .integer_range()
+                        .is_some_and(|(_, hi)| i128::from(*value) <= hi);
                     if !in_range {
                         self.error_issue(
                             SemanticErrorKind::TypeMismatch,

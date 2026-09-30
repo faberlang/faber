@@ -114,11 +114,11 @@ functio add(modulus<{w}> x, modulus<{w}> y) → modulus<{w}> {{
 }
 
 #[test]
-fn modular_word_width_rows_reject_signed_and_float_widths() {
+fn modular_word_width_rows_reject_decimal_and_float_widths() {
     // These rows are the isolation floor and must stay green in every stage.
     analysis_rejects_with_issue(
         r"
-functio keep(modulus<i32> x) → modulus<i32> {
+functio keep(modulus<d64> x) → modulus<d64> {
     redde x
 }
 ",
@@ -255,4 +255,62 @@ functio add(modulus<{left}> x, modulus<{right}> y) → modulus<{left}> {{
             "modulus<{left}> + modulus<{right}> must reject: {diagnostics:?}"
         );
     }
+}
+
+#[test]
+fn modular_word_admits_every_signed_width() {
+    // D11.8: signed wrapping is the ring Z/2^W with signed representatives.
+    for width in ["i8", "i16", "i32", "i64"] {
+        let source = format!(
+            r"
+functio step(modulus<{width}> x, modulus<{width}> y) → modulus<{width}> {{
+    redde -x / y + x % y - (x ⇒ 1) + ¬y
+}}
+"
+        );
+        analysis_accepts(&source);
+    }
+}
+
+#[test]
+fn signed_modular_word_stores_reduce_constants_and_conversions() {
+    analysis_accepts(
+        r"
+incipit {
+    fixum modulus<i8> wrapped ← 200
+    fixum modulus<i8> low ← -128
+    fixum numerus wide ← 300
+    fixum modulus<i8> converted ← wide ↦ modulus<i8>
+    nota wrapped + low + converted
+}
+",
+    );
+}
+
+#[test]
+fn signed_modular_word_keeps_family_and_width_isolation() {
+    let diagnostics = analyze_diagnostics(
+        r"
+functio bad(modulus<i8> x, numerus<i8> y) → modulus<i8> {
+    redde x + y
+}
+",
+    );
+    assert!(
+        diagnostics
+            .iter()
+            .any(radix_diagnostics::Diagnostic::is_error)
+    );
+    let diagnostics = analyze_diagnostics(
+        r"
+functio bad(modulus<i8> x, modulus<u8> y) → modulus<i8> {
+    redde x + y
+}
+",
+    );
+    assert!(
+        diagnostics
+            .iter()
+            .any(radix_diagnostics::Diagnostic::is_error)
+    );
 }

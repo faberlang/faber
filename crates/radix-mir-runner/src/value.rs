@@ -675,45 +675,64 @@ pub fn int_bitwise_binop(
     }
 }
 
-/// Width authority for modular execution: values are reduced modulo 2^W.
-/// The carrier is u64 internally; results surface as `Int` below u64 and as
-/// `UInt` at u64 so upper-half magnitudes never sign-encode.
-///
-/// `Type::ModularWord` widths are unsigned by semantic admission, so
-/// `unsigned_max` is total in practice; the fallback keeps the helper
-/// panic-free without encoding that invariant as a panic budget cost.
-pub(crate) fn modular_word_mask(width: NumericWidth) -> u64 {
-    width.unsigned_max().unwrap_or(u64::MAX)
+/// Width authority for `wrapping<W>` execution (D11.8): the ring Z/2^W whose
+/// representatives are `[lo, hi]` of the width, so unsigned words hold
+/// `0..=2^W-1` and signed words hold `-2^(W-1)..=2^(W-1)-1`. Arithmetic runs
+/// on exact `i128` representatives and every result reduces into the ring.
+/// Results surface as `UInt` at `u64` and as `Int` for every other width.
+fn modular_word_range(width: NumericWidth) -> (i128, i128) {
+    // Total on admitted widths; the fallback keeps the helper panic-free.
+    width.integer_range().unwrap_or((0, i128::from(u64::MAX)))
 }
 
+/// Bit count of the word.
 fn modular_word_bits(width: NumericWidth) -> u32 {
-    // 2^W - 1 has exactly W significant bits.
-    64 - modular_word_mask(width).leading_zeros()
+    let (lo, hi) = modular_word_range(width);
+    (hi - lo + 1).trailing_zeros()
 }
 
-pub(crate) fn modular_word_result(value: u64, width: NumericWidth) -> Value {
+/// Reduce an exact integer into the representatives of `width`.
+pub(crate) fn modular_word_reduce(value: i128, width: NumericWidth) -> i128 {
+    let (lo, hi) = modular_word_range(width);
+    lo + (value - lo).rem_euclid(hi - lo + 1)
+}
+
+/// Reduce `value` into the ring and surface it in the width's carrier.
+pub(crate) fn modular_word_result(value: i128, width: NumericWidth) -> Value {
+    let reduced = modular_word_reduce(value, width);
     if width == NumericWidth::U64 {
-        Value::UInt(value)
+        Value::UInt(u64::try_from(reduced).unwrap_or(0))
     } else {
-        Value::Int(value as i64)
+        Value::Int(i64::try_from(reduced).unwrap_or(0))
     }
 }
 
+/// The exact representative a wrapping word carries.
 pub(crate) fn modular_operand(
     value: Value,
     span: Span,
     error: &'static str,
-) -> Result<u64, RunnerError> {
+) -> Result<i128, RunnerError> {
     match value {
-        Value::Int(value) if value >= 0 => {
-            u64::try_from(value).map_err(|_| RunnerError::internal(span, error))
-        }
-        Value::UInt(value) => Ok(value),
+        Value::Int(value) => Ok(i128::from(value)),
+        Value::UInt(value) => Ok(i128::from(value)),
         _ => Err(RunnerError::internal(span, error)),
     }
 }
 
-/// Execute one `modulus<W>` arithmetic operation. Conversion at this boundary
+/// Floor quotient and remainder of representatives (`/` and `%` floor); `None`
+/// on a zero divisor.
+fn floor_div_rem(left: i128, right: i128) -> Option<(i128, i128)> {
+    let quotient = left.checked_div(right)?;
+    let remainder = left - quotient * right;
+    if remainder != 0 && ((remainder < 0) != (right < 0)) {
+        Some((quotient - 1, remainder + right))
+    } else {
+        Some((quotient, remainder))
+    }
+}
+
+/// Execute one `wrapping<W>` arithmetic operation. Conversion at this boundary
 /// keeps modular wraparound separate from checked `numerus` math.
 pub fn modular_word_numeric_binop(
     left: Value,
@@ -724,25 +743,21 @@ pub fn modular_word_numeric_binop(
 ) -> Result<Value, RunnerError> {
     let left = modular_operand(left, span, "modulus operand mismatch")?;
     let right = modular_operand(right, span, "modulus operand mismatch")?;
-    let mask = modular_word_mask(width);
+    let by_zero = || {
+        RunnerError::internal_with_issue(
+            span,
+            "modulus division failed",
+            "modular_division_by_zero",
+        )
+    };
     let value = match op {
-        MirBinOp::Add => left.wrapping_add(right) & mask,
-        MirBinOp::Sub => left.wrapping_sub(right) & mask,
-        MirBinOp::Mul => left.wrapping_mul(right) & mask,
-        MirBinOp::Div => left.checked_div(right).ok_or_else(|| {
-            RunnerError::internal_with_issue(
-                span,
-                "modulus division failed",
-                "modular_division_by_zero",
-            )
-        })?,
-        MirBinOp::Mod => left.checked_rem(right).ok_or_else(|| {
-            RunnerError::internal_with_issue(
-                span,
-                "modulus division failed",
-                "modular_division_by_zero",
-            )
-        })?,
+        // Representatives fit 64 bits, so sums and products fit i128 exactly
+        // and reduction is exact.
+        MirBinOp::Add => left + right,
+        MirBinOp::Sub => left - right,
+        MirBinOp::Mul => left.wrapping_mul(right),
+        MirBinOp::Div => floor_div_rem(left, right).ok_or_else(by_zero)?.0,
+        MirBinOp::Mod => floor_div_rem(left, right).ok_or_else(by_zero)?.1,
         _ => {
             return Err(RunnerError::internal(
                 span,
@@ -759,10 +774,7 @@ pub fn modular_word_neg(
     span: Span,
 ) -> Result<Value, RunnerError> {
     let value = modular_operand(value, span, "modulus negation operand mismatch")?;
-    Ok(modular_word_result(
-        value.wrapping_neg() & modular_word_mask(width),
-        width,
-    ))
+    Ok(modular_word_result(-value, width))
 }
 
 pub fn modular_word_bitnot(
@@ -771,10 +783,7 @@ pub fn modular_word_bitnot(
     span: Span,
 ) -> Result<Value, RunnerError> {
     let value = modular_operand(value, span, "modulus bitnot operand mismatch")?;
-    Ok(modular_word_result(
-        !value & modular_word_mask(width),
-        width,
-    ))
+    Ok(modular_word_result(!value, width))
 }
 
 pub fn modular_word_bitwise_binop(
@@ -786,19 +795,21 @@ pub fn modular_word_bitwise_binop(
 ) -> Result<Value, RunnerError> {
     let left = modular_operand(left, span, "modulus bitwise operand mismatch")?;
     let right = modular_operand(right, span, "modulus bitwise operand mismatch")?;
-    let mask = modular_word_mask(width);
-    // Shifts are pure math (ruling 10): the count is not masked, and a count
-    // at or past the word's width shifts every bit out.
-    let bits = u64::from(modular_word_bits(width));
-    let count = u32::try_from(right)
-        .ok()
-        .filter(|count| u64::from(*count) < bits);
+    // Shifts are pure math (ruling 10): the count is not masked. A left shift
+    // by the word's width or more shifts every bit out; a right shift is
+    // arithmetic on the representative (`⇒` floors), so it saturates at the
+    // sign bit.
+    let bits = modular_word_bits(width);
+    let count = u32::try_from(right).ok();
     let value = match op {
         MirBinOp::BitAnd => left & right,
         MirBinOp::BitOr => left | right,
         MirBinOp::BitXor => left ^ right,
-        MirBinOp::Shl => count.map_or(0, |count| left << count) & mask,
-        MirBinOp::Shr => count.map_or(0, |count| (left & mask) >> count),
+        MirBinOp::Shl => match count {
+            Some(count) if count < bits => left << count,
+            _ => 0,
+        },
+        MirBinOp::Shr => left >> count.map_or(bits, |count| count.min(bits)),
         _ => {
             return Err(RunnerError::internal(
                 span,

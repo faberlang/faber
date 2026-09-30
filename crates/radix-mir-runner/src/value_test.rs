@@ -483,3 +483,116 @@ fn d64_display_threads_through_lists_fields_and_templates() {
         "4.2 / 0.000000025"
     );
 }
+
+fn wrap(op: MirBinOp, left: i64, right: i64, width: NumericWidth) -> Value {
+    modular_word_numeric_binop(
+        Value::Int(left),
+        Value::Int(right),
+        op,
+        width,
+        Span::default(),
+    )
+    .expect("wrapping arithmetic")
+}
+
+#[test]
+fn signed_wrapping_words_are_the_ring_with_signed_representatives() {
+    // D11.8: wrapping<i8> is Z/2^8 with representatives in [-128, 127].
+    assert!(values_equal(
+        &wrap(MirBinOp::Add, 127, 1, NumericWidth::I8),
+        &Value::Int(-128)
+    ));
+    assert!(values_equal(
+        &wrap(MirBinOp::Sub, -128, 1, NumericWidth::I8),
+        &Value::Int(127)
+    ));
+    assert!(values_equal(
+        &wrap(MirBinOp::Mul, 100, 3, NumericWidth::I8),
+        &Value::Int(44)
+    ));
+    // MIN / -1 wraps to MIN; `/` and `%` floor on the representatives.
+    assert!(values_equal(
+        &wrap(MirBinOp::Div, -128, -1, NumericWidth::I8),
+        &Value::Int(-128)
+    ));
+    assert!(values_equal(
+        &wrap(MirBinOp::Div, -7, 2, NumericWidth::I8),
+        &Value::Int(-4)
+    ));
+    assert!(values_equal(
+        &wrap(MirBinOp::Mod, -7, 2, NumericWidth::I8),
+        &Value::Int(1)
+    ));
+    assert!(values_equal(
+        &wrap(MirBinOp::Div, -7, -2, NumericWidth::I8),
+        &Value::Int(3)
+    ));
+    assert!(values_equal(
+        &wrap(MirBinOp::Mod, -7, -2, NumericWidth::I8),
+        &Value::Int(-1)
+    ));
+    assert!(values_equal(
+        &wrap(MirBinOp::Div, i64::MIN, -1, NumericWidth::I64),
+        &Value::Int(i64::MIN)
+    ));
+    let zero = modular_word_numeric_binop(
+        Value::Int(1),
+        Value::Int(0),
+        MirBinOp::Div,
+        NumericWidth::I32,
+        Span::default(),
+    );
+    assert!(zero.is_err(), "division by zero traps");
+}
+
+#[test]
+fn signed_wrapping_shifts_complement_and_negation_stay_in_the_ring() {
+    let span = Span::default();
+    let shift = |value: i64, count: i64, op: MirBinOp| {
+        modular_word_bitwise_binop(
+            Value::Int(value),
+            Value::Int(count),
+            op,
+            NumericWidth::I8,
+            span,
+        )
+        .expect("shift")
+    };
+    assert!(values_equal(&shift(-8, 1, MirBinOp::Shr), &Value::Int(-4)));
+    assert!(values_equal(&shift(-8, 40, MirBinOp::Shr), &Value::Int(-1)));
+    assert!(values_equal(
+        &shift(65, 1, MirBinOp::Shl),
+        &Value::Int(-126)
+    ));
+    let not = modular_word_bitnot(Value::Int(-8), NumericWidth::I8, span).expect("complement");
+    assert!(values_equal(&not, &Value::Int(7)));
+    let neg = modular_word_neg(Value::Int(-128), NumericWidth::I8, span).expect("negation");
+    assert!(values_equal(&neg, &Value::Int(-128)));
+    let less = modular_word_compare_values(Value::Int(-1), Value::Int(1), MirBinOp::Lt, span)
+        .expect("comparison on representatives");
+    assert!(values_equal(&less, &Value::Bool(true)));
+}
+
+#[test]
+fn signed_wrapping_reduction_maps_out_of_range_values_into_the_ring() {
+    assert!(values_equal(
+        &modular_word_result(300, NumericWidth::I8),
+        &Value::Int(44)
+    ));
+    assert!(values_equal(
+        &modular_word_result(200, NumericWidth::I8),
+        &Value::Int(-56)
+    ));
+    assert!(values_equal(
+        &modular_word_result(-129, NumericWidth::I8),
+        &Value::Int(127)
+    ));
+    assert!(values_equal(
+        &modular_word_result(i128::from(i64::MAX) + 1, NumericWidth::I64),
+        &Value::Int(i64::MIN)
+    ));
+    assert!(values_equal(
+        &modular_word_result(-1, NumericWidth::U8),
+        &Value::Int(255)
+    ));
+}

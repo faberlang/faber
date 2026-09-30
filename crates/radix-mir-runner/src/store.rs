@@ -10,7 +10,7 @@
 
 use super::{Runner, RunnerError};
 use crate::exact_int::{exact_carrier, int_value};
-use crate::value::{Value, modular_word_mask, modular_word_result, saturating_word_result};
+use crate::value::{Value, modular_word_result, saturating_word_result};
 use radix_hir::{HirStoreKind, HirStoreSite};
 use radix_lexer::Span;
 use radix_types::{NumericWidth, Primitive, Type, TypeId};
@@ -52,10 +52,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 }),
                 false => Err(self.store_trap(site, exact.to_string(), exact < 0, width, span)),
             },
-            SlotPolicy::Wrapping => {
-                let reduced = (exact & i128::from(modular_word_mask(width))) as u64;
-                Ok(modular_word_result(reduced, width))
-            }
+            SlotPolicy::Wrapping => Ok(modular_word_result(exact, width)),
             SlotPolicy::Saturating => Ok(saturating_word_result(exact, width)),
         })
     }

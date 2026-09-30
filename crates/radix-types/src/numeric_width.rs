@@ -546,8 +546,9 @@ pub fn lower_sized_primitive(
 
 /// Lower the compiler-owned modular word family.
 ///
-/// Admits exactly the unsigned integer widths u8/u16/u32/u64; signed and
-/// float markers reject with their own structured issues.
+/// Admits the integer widths i8…i64 and u8…u64 (D11.8: signed wrapping is the
+/// ring Z/2^W with signed representatives); float and decimal markers reject
+/// with their own structured issues.
 #[allow(clippy::match_same_arms)]
 pub fn lower_modular_word(
     params: &[radix_syntax::TypeExpr],
@@ -570,7 +571,9 @@ pub fn lower_modular_word(
         return types.intern(Type::Error);
     };
     match NumericWidth::from_marker(marker, Primitive::Numerus) {
-        Ok(width) if width.is_unsigned_int() => types.intern(Type::ModularWord(width)),
+        Ok(width) if width.is_unsigned_int() || width.is_signed_int() => {
+            types.intern(Type::ModularWord(width))
+        }
         Ok(_) => {
             report(WidthLowerIssue::ModularWordUnsupported);
             types.intern(Type::Error)
