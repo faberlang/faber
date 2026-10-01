@@ -211,6 +211,7 @@ impl FragmentDefinitionChecker<'_> {
             | HirExpressionKind::Insere(_)
             | HirExpressionKind::Vacua
             | HirExpressionKind::Error => {}
+            HirExpressionKind::Widen { operand, .. } => self.check_expr(operand),
             HirExpressionKind::Binary(_, lhs, rhs) => {
                 self.check_expr(lhs);
                 self.check_expr(rhs);

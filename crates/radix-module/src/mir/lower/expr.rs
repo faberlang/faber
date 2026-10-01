@@ -79,6 +79,11 @@ pub(super) trait HirExpressionLoweringVisitor {
                 };
                 self.visit_conversio_expr(source, target_ty, params, recovery.as_deref(), implicit.clone(), expr)
             }
+            // inf-wn: the implicit bounded → `inf` widening is the authored
+            // `↦ inf` row (ruling 40, row 1): total, canonical carrier unchanged.
+            HirExpressionKind::Widen { operand, to, .. } => {
+                self.visit_conversio_expr(operand, *to, &[], None, None, expr)
+            }
             HirExpressionKind::Block(block) => self.visit_block_expr(block, expr),
             HirExpressionKind::Si { cond, then_block, then_catch, else_block } => {
                 self.visit_si_expr(cond, then_block, then_catch.as_deref(), else_block.as_ref(), expr)

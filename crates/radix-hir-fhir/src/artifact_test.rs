@@ -120,7 +120,8 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // Schema 23 (D5.3) carries member visibility on `StructFieldSnapshot`.
     // Schema 24 adds `HirPresentation::function_modifier_bindings`.
     // Schema 25 adds `HirExpressionKind::Insere` (st1 U4).
-    assert_eq!(SCHEMA_VERSION, 25);
+    // Schema 26 adds `HirExpressionKind::Widen` (inf-wn).
+    assert_eq!(SCHEMA_VERSION, 26);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────

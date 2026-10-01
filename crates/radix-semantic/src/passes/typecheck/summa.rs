@@ -287,6 +287,7 @@ impl SummaBodyState {
             | HirExpressionKind::Insere(_)
             | HirExpressionKind::Vacua
             | HirExpressionKind::Error => {}
+            HirExpressionKind::Widen { operand, .. } => self.walk_expr(checker, operand),
             HirExpressionKind::Binary(_, lhs, rhs) => {
                 self.walk_expr(checker, lhs);
                 self.walk_expr(checker, rhs);

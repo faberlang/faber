@@ -534,8 +534,11 @@ pub struct FunctionProvenanceTableWire {
 /// schema-v23 artifacts fail closed. Version 25 adds
 /// `HirExpressionKind::Insere` (a build-time embed in any `=` position, st1
 /// U4), shifting the serde ordinal of the variants after `Praefixum`;
-/// schema-v24 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 25;
+/// schema-v24 artifacts fail closed. Version 26 adds
+/// `HirExpressionKind::Widen` (the implicit lossless bounded-integer → `inf`
+/// widening typecheck inserts, inf-wn), shifting the serde ordinal of the
+/// variants after `Conversio`; schema-v25 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 26;
 
 /// Serializable snapshot of one analyzed provider unit carried for HIR
 /// emission (ARCH-U4 carriage).

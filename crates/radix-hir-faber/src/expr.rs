@@ -154,6 +154,11 @@ impl super::FaberCodegen<'_> {
             self.write_expr_prec(source, parent_prec, names, surface, writer);
             return;
         }
+        // The implicit bounded → `inf` widening is the checker's too (inf-wn).
+        if let HirExpressionKind::Widen { operand, .. } = &expr.kind {
+            self.write_expr_prec(operand, parent_prec, names, surface, writer);
+            return;
+        }
         let expr_prec = self.expr_precedence(expr);
         let needs_parens = expr_prec <= parent_prec && parent_prec != 0;
         if needs_parens {
@@ -181,6 +186,10 @@ impl super::FaberCodegen<'_> {
                 self.write_insere(*path, surface, writer);
             }
             HirExpressionKind::Insere(path) => self.write_insere(*path, surface, writer),
+            // Handled before the match (transparent); kept total.
+            HirExpressionKind::Widen { operand, .. } => {
+                self.write_expr_prec(operand, parent_prec, names, surface, writer);
+            }
             HirExpressionKind::Literal(lit) => self.write_literal(lit, surface, writer),
             HirExpressionKind::ReadLine(_) => writer.write(surface.contextual_keyword("lege")),
             HirExpressionKind::Binary(op, lhs, rhs) => {

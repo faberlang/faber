@@ -237,6 +237,23 @@ fn the_faber_reemitter_keeps_inf() {
     assert_accepts(&result.diagnostics);
 }
 
+/// inf-wn: the widening node is the checker's, not the author's, so the Faber
+/// re-emitter prints the authored operand and no `↦ inf`.
+#[test]
+fn the_faber_reemitter_prints_nothing_for_an_implicit_widening() {
+    let source = "fixum numerus<u64> u ← 5\nfixum inf w ← u\nnota w\n";
+    let result = compile_for_target_and_get_result(
+        &format!("incipit {{\n{source}}}\n"),
+        Target::HirFaber,
+    );
+    assert_accepts(&result.diagnostics);
+    let Some(crate::Output::Faber(output)) = result.output else {
+        panic!("expected Faber output: {:?}", result.diagnostics);
+    };
+    assert!(output.code.contains("inf w ← u"), "{}", output.code);
+    assert!(!output.code.contains('↦'), "{}", output.code);
+}
+
 /// MIR-backed targets without an `inf` carrier fail closed at their own layer:
 /// LLVM and Wasm reject `numerus<inf>` by their unsupported-shape diagnostic
 /// (sexp carries `inf` since inf-U6x).

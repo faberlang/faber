@@ -691,6 +691,11 @@ impl TypeChecker<'_> {
                 self.warn_dead_type_test(operand_ty, *ty, expr.span);
                 self.bool_type()
             }
+            HirExpressionKind::Widen { operand, to, .. } => {
+                // Typecheck inserts this node itself; a re-check keeps it.
+                self.check_expr(operand);
+                *to
+            }
             HirExpressionKind::Praefixum(inner) => self.check_praefixum(inner, expected),
             HirExpressionKind::Insere(path) => {
                 super::insere::check_insere(self, *path, expected, expr.span)
@@ -715,6 +720,7 @@ impl TypeChecker<'_> {
             ty
         };
         self.last_synthesized_type = Some(ty);
+        let synthesized = ty;
         let ty = match (expected, store) {
             // Ruling 16: an integer quotient cannot land in a float slot; the
             // help points at `÷`, which divides integers into an `f64`.
@@ -734,6 +740,14 @@ impl TypeChecker<'_> {
             (None, _) => ty,
         };
         self.pending_conversion = saved_pending_conversion;
+        // inf-wn: a bounded integer that landed in an `inf` slot keeps its own
+        // type under an explicit widening node instead of being repainted.
+        if let Some(slot) = expected
+            && ty != self.error_type
+            && let Some(widened) = self.widen_into_inf(expr, synthesized, slot)
+        {
+            return widened;
+        }
         expr.ty = Some(self.resolve_inferred_type(ty));
         ty
     }

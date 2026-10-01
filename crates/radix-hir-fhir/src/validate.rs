@@ -1565,6 +1565,7 @@ fn collect_expr_defs(
                 collect_expr_defs(r, registry);
             }
         }
+        HirExpressionKind::Widen { operand, .. } => collect_expr_defs(operand, registry),
         HirExpressionKind::Ad { opener, .. } => {
             if let Some(o) = opener {
                 collect_expr_defs(o, registry);
@@ -1885,6 +1886,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                     collect_expr(r, registry);
                 }
             }
+            HirExpressionKind::Widen { operand, .. } => collect_expr(operand, registry),
             HirExpressionKind::Ad { opener, .. } => {
                 if let Some(o) = opener {
                     collect_expr(o, registry);
@@ -2836,6 +2838,11 @@ pub(crate) fn validate_referential_integrity(
                 if let Some(r) = recovery {
                     validate_expr(r, checks)?;
                 }
+            }
+            HirExpressionKind::Widen { operand, from, to } => {
+                validate_expr(operand, checks)?;
+                checks.check_type(*from)?;
+                checks.check_type(*to)?;
             }
             HirExpressionKind::Ad { route, opener } => {
                 checks.check_symbol(*route)?;

@@ -320,6 +320,7 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
             }
         }
         HirExpressionKind::Unary(_, operand)
+        | HirExpressionKind::Widen { operand, .. }
         | HirExpressionKind::Cede(operand)
         | HirExpressionKind::Reddet(operand)
         | HirExpressionKind::Tacebit(operand)
@@ -914,6 +915,7 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
             }
         }
         HirExpressionKind::Unary(_, operand)
+        | HirExpressionKind::Widen { operand, .. }
         | HirExpressionKind::Cede(operand)
         | HirExpressionKind::Reddet(operand)
         | HirExpressionKind::Tacebit(operand)

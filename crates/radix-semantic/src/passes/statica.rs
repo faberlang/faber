@@ -273,6 +273,9 @@ impl Evaluator<'_> {
                 let value = self.eval(source, interner)?;
                 self.fit_slot(value, Some(*target), expr.span)?
             }
+            // inf-wn: the widening is lossless; the `inf` node has no constant
+            // class, so `fit` leaves the exact operand value opaque.
+            HirExpressionKind::Widen { operand, .. } => self.eval(operand, interner)?,
             HirExpressionKind::Unary(op, operand) => {
                 let operand = self.eval(operand, interner)?;
                 unary(*op, operand).ok_or(Fault::at(ISSUE_NOT_CONSTANT, expr.span))?

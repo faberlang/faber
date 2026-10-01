@@ -3878,6 +3878,7 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::ReadLine(_) => "lege before input MIR lowering",
         HirExpressionKind::Praefixum(_) => "praefixum before compile-time MIR lowering",
         HirExpressionKind::Insere(_) => "insere before the post-typecheck embed fold",
+        HirExpressionKind::Widen { .. } => "bounded-to-inf widening before conversion MIR lowering",
         HirExpressionKind::Adfirma(_, _) => "adfirma before assert intrinsic MIR lowering",
         HirExpressionKind::Panic(_) => "mori fatal flow",
         HirExpressionKind::Throw(_) => "iace error-flow",

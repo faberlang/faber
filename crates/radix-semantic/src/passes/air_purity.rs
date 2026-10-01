@@ -203,6 +203,7 @@ impl AirPurityChecker<'_> {
             | HirExpressionKind::Literal(_)
             | HirExpressionKind::Insere(_)
             | HirExpressionKind::Vacua => {}
+            HirExpressionKind::Widen { operand, .. } => self.check_expr(operand),
             HirExpressionKind::Binary(op, lhs, rhs) => {
                 if self.integer_op_unproven(*op, lhs, rhs) {
                     self.reject(expr.span, "air_integer_range_unproven");

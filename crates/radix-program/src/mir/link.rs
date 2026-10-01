@@ -2167,6 +2167,17 @@ pub(super) fn rewrite_expr(
                 );
             }
         }
+        HirExpressionKind::Widen { operand, .. } => {
+            rewrite_expr(
+                unit_path,
+                operand,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
+        }
         HirExpressionKind::Ad { opener, .. } => {
             if let Some(opener) = opener {
                 rewrite_expr(

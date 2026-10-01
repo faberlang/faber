@@ -142,6 +142,36 @@ fn a_bounded_operand_widens_into_an_inf_expression() {
 }
 
 #[test]
+fn a_bounded_value_widens_into_every_inf_slot_exactly() {
+    // inf-wn: the widening node is the identity on the runner's canonical
+    // carrier, so a `u64` beyond `i64` keeps its value at every site.
+    let items = "functio take(inf x) → inf {\n redde x\n}\n\
+                 functio give(numerus<u64> v) → inf {\n redde v\n}\n\
+                 genus Capsa {\n fixum inf f\n}";
+    let (out, errors) = run_items(
+        items,
+        "fixum numerus<u64> u ← 18446744073709551615\nvaria inf w ← 0\nw ← u\nnota w + 1\n\
+         nota take(u) + 1\nnota give(u) + 1\nfixum Capsa c ← Capsa { f = u }\nnota c.f + 1\n\
+         fixum lista<inf> xs ← [u, w]\nnota xs[0] + 1",
+    );
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(out, ["18446744073709551616"; 5]);
+}
+
+#[test]
+fn bounded_arithmetic_stored_into_an_inf_slot_keeps_the_64_bit_cap() {
+    // Ruling 35: an expression over bounded operands keeps ruling 13's cap, so
+    // `u + 1` at `u64::MAX` traps; the store into the `inf` slot only widens
+    // the (in-range) result. `(u ↦ inf) + 1` is the opt-in exact form.
+    let (_, issue, message) = trap("fixum numerus<u64> u ← 18446744073709551615\nfixum inf w ← u + 1\nnota w");
+    assert_eq!(issue, "runner_numerus_overflow", "{message}");
+    assert_eq!(
+        ok("fixum numerus<u64> u ← 18446744073709551615\nfixum inf w ← (u ↦ inf) + 1\nnota w"),
+        ["18446744073709551616"]
+    );
+}
+
+#[test]
 fn potentia_is_exact_and_a_negative_exponent_traps() {
     // rulings 28, 36.
     assert_eq!(

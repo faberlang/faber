@@ -85,7 +85,7 @@ pub(super) fn argument_site(name: Option<Symbol>) -> StoreSite {
 /// An integer slot: policy family, declared width and its exact range.
 #[derive(Clone, Copy)]
 pub(super) struct IntSlot {
-    family: IntFamily,
+    pub(super) family: IntFamily,
     width: NumericWidth,
     range: IntRange,
 }
@@ -170,6 +170,9 @@ impl TypeChecker<'_> {
                 return ty;
             }
             let ty = self.check_expr(expr);
+            if let Some(widened) = self.widen_into_inf(expr, ty, slot_ty) {
+                return widened;
+            }
             if let Some(target) = self
                 .store_narrowing_target(ty, slot_ty)
                 .or_else(|| self.capped_store_target(expr, ty, slot_ty))

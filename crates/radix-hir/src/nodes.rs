@@ -1518,6 +1518,22 @@ pub enum HirExpressionKind {
         implicit: Option<HirStoreSite>,
     },
 
+    /// Implicit lossless widening of a bounded integer into the unbounded
+    /// `inf` (inf-delivery ruling 40, row 1), inserted by typecheck at every
+    /// position where a bounded-integer expression lands in an `inf`-typed
+    /// slot or is joined to an `inf` operand. Never authored: the Faber
+    /// re-emitter prints only the operand.
+    ///
+    /// `operand` keeps its REAL bounded type (`operand.ty == Some(from)`);
+    /// the node itself is typed `to` (`inf`). Backends convert from `from`
+    /// without guessing the operand's carrier from side tables. Total: it
+    /// never fails and never traps.
+    Widen {
+        operand: Box<HirExpression>,
+        from: TypeId,
+        to: TypeId,
+    },
+
     /// Expression-form stream `ad` (blockless, evaluates to `sermo`).
     Ad {
         route: Symbol,

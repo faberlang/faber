@@ -1203,6 +1203,10 @@ mod float_constant_conversio_bounds_test;
 mod inf_typing_test;
 
 #[cfg(test)]
+#[path = "inf_widen_test.rs"]
+mod inf_widen_test;
+
+#[cfg(test)]
 #[path = "conversio_extra_width_argument_test.rs"]
 mod conversio_extra_width_argument_test;
 
