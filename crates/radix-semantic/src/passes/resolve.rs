@@ -1163,6 +1163,9 @@ fn resolve_expr(
             // bare `vacua` beside it stays the marker.
             if let ExprKind::Vacua(ident) = &expr.callee.kind {
                 record_shadowed_builtin(resolver, expr.callee.id, ident.name);
+            } else if let ExprKind::Member(callee) = &expr.callee.kind {
+                // A call through a type name (`Tab.f()`) is not a static read.
+                resolve_member_expr(resolver, interner, callee, false, errors);
             } else {
                 resolve_expr(resolver, interner, &expr.callee, errors);
             }
@@ -1170,33 +1173,7 @@ fn resolve_expr(
                 resolve_expr(resolver, interner, &arg.value, errors);
             }
         }
-        ExprKind::Member(expr) => {
-            // Enum-variant paths (e.g. `Color.rubrum`) must be accepted in
-            // expression position even though the bare enum name is not a
-            // value. Mirror the HIR `lower_membrum` logic.
-            if let ExprKind::Ident(base) = &expr.object.kind
-                && resolve_enum_variant_member(resolver, base, &expr.member, errors)
-            {
-                return;
-            }
-            resolve_expr(resolver, interner, &expr.object, errors);
-            // Strict library-pack surfaces are total for the library they
-            // define: only the listed surface spellings resolve at the source
-            // boundary. Post-HIR canonical lookups could resolve the installed
-            // member, so reject the non-listed spelling here (SEM010).
-            if let ExprKind::Ident(base) = &expr.object.kind
-                && let Some(def_id) = resolver.lookup(base.name)
-                && let Some(symbol) = resolver.get_symbol(def_id)
-                && symbol.kind == SymbolKind::Module
-                && !resolver.namespace_member_surface_valid(symbol.name, expr.member.name)
-            {
-                errors.push(
-                    SemanticError::structured(SemanticErrorKind::MemberUndefined, expr.member.span)
-                        .with_arg("issue", ISSUE_NAMESPACE_MISSING_EXPORT)
-                        .with_arg("member", interner.resolve(expr.member.name).to_owned()),
-                );
-            }
-        }
+        ExprKind::Member(expr) => resolve_member_expr(resolver, interner, expr, true, errors),
         ExprKind::Index(expr) => {
             resolve_expr(resolver, interner, &expr.object, errors);
             resolve_expr(resolver, interner, &expr.index, errors);
@@ -2272,6 +2249,55 @@ fn resolve_qualified_type_path(
         ISSUE_UNKNOWN_QUALIFIED_TYPE,
         type_name.span,
     ));
+}
+
+/// Resolve a member expression.
+///
+/// `allow_struct_base` lets a genus name stand as the base of a read
+/// (`Tab.Z`): the resolver keeps no field table, so typecheck decides from the
+/// field's modifier whether the member is a static field and names the misuse
+/// otherwise. A call callee passes `false` and keeps `name_not_value`.
+fn resolve_member_expr(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    expr: &radix_syntax::MemberExpr,
+    allow_struct_base: bool,
+    errors: &mut Vec<SemanticError>,
+) {
+    // Enum-variant paths (e.g. `Color.rubrum`) must be accepted in
+    // expression position even though the bare enum name is not a
+    // value. Mirror the HIR `lower_membrum` logic.
+    if let ExprKind::Ident(base) = &expr.object.kind
+        && resolve_enum_variant_member(resolver, base, &expr.member, errors)
+    {
+        return;
+    }
+    if allow_struct_base
+        && let ExprKind::Ident(base) = &expr.object.kind
+        && let Some(def_id) = resolver.lookup(base.name)
+        && resolver
+            .get_symbol(def_id)
+            .is_some_and(|symbol| symbol.kind == SymbolKind::Struct)
+    {
+        return;
+    }
+    resolve_expr(resolver, interner, &expr.object, errors);
+    // Strict library-pack surfaces are total for the library they
+    // define: only the listed surface spellings resolve at the source
+    // boundary. Post-HIR canonical lookups could resolve the installed
+    // member, so reject the non-listed spelling here (SEM010).
+    if let ExprKind::Ident(base) = &expr.object.kind
+        && let Some(def_id) = resolver.lookup(base.name)
+        && let Some(symbol) = resolver.get_symbol(def_id)
+        && symbol.kind == SymbolKind::Module
+        && !resolver.namespace_member_surface_valid(symbol.name, expr.member.name)
+    {
+        errors.push(
+            SemanticError::structured(SemanticErrorKind::MemberUndefined, expr.member.span)
+                .with_arg("issue", ISSUE_NAMESPACE_MISSING_EXPORT)
+                .with_arg("member", interner.resolve(expr.member.name).to_owned()),
+        );
+    }
 }
 
 fn resolve_enum_variant_member(

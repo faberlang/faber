@@ -464,6 +464,19 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
     }
 
     fn visit_field_expr(&mut self, object: &HirExpression, name: Symbol, expr: &HirExpression) -> Option<MirOperand> {
+        // A static (`generis`) field read through the type name (`Tab.Z`) is the
+        // field's folded initializer: statics are not instance storage, so no
+        // projection exists to lower.
+        if let HirExpressionKind::Path(def_id) = &object.kind
+            && let Some(field) = self.context.static_fields.get(&(*def_id, name)).copied()
+        {
+            let Some(init) = field.init.as_ref() else {
+                self.errors
+                    .push(MirError::unsupported(expr.span, "static field read without an initializer"));
+                return None;
+            };
+            return self.lower_expr_value(init);
+        }
         self.lower_field(object, name, expr)
     }
 
@@ -817,3 +830,7 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         None
     }
 }
+
+#[cfg(test)]
+#[path = "expr_test.rs"]
+mod tests;

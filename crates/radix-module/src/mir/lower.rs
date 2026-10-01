@@ -1626,6 +1626,9 @@ struct FunctionBuilderContext<'a> {
     scrinium_def: Option<DefId>,
     scrinium_data_field: Option<Symbol>,
     top_level_consts: Arc<FxHashMap<DefId, &'a HirConst>>,
+    /// Static (`generis`) genus fields by `(struct, field)`: a read through the
+    /// type name inlines the field's initializer.
+    static_fields: Arc<FxHashMap<(DefId, Symbol), &'a HirField>>,
     provider_imports: Arc<FxHashMap<DefId, ProviderImport>>,
     imported_type_members: Arc<FxHashMap<(DefId, Symbol), MirType>>,
     method_targets: Arc<FxHashMap<(DefId, Symbol), MethodTarget>>,
@@ -1689,6 +1692,7 @@ impl<'a> FunctionBuilderContext<'a> {
             scrinium_def: None,
             scrinium_data_field: None,
             top_level_consts: Arc::new(FxHashMap::default()),
+            static_fields: Arc::new(FxHashMap::default()),
             provider_imports: Arc::new(FxHashMap::default()),
             imported_type_members: Arc::new(FxHashMap::default()),
             method_targets: Arc::new(FxHashMap::default()),

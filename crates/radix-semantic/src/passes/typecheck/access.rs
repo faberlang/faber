@@ -1109,15 +1109,78 @@ impl TypeChecker<'_> {
                 return ty;
             }
         }
+        // WHY: `ego` also lowers to `Path(genus)`, so inside the genus's own
+        // members the path is ambiguous between the type name and the receiver
+        // and keeps the receiver reading; everywhere else it is the type name.
+        let type_name_def = match &object.kind {
+            HirExpressionKind::Path(def)
+                if self
+                    .resolver
+                    .get_symbol(*def)
+                    .is_some_and(|symbol| symbol.kind == crate::SymbolKind::Struct) =>
+            {
+                Some(*def)
+            }
+            _ => None,
+        };
+        if !write
+            && let Some(type_def) = type_name_def
+            && self.current_member_owner != Some(type_def)
+        {
+            return self.check_static_field_read(object, type_def, name);
+        }
         self.place_write = write && matches!(object.kind, HirExpressionKind::Field(..));
         let obj_ty = self.check_expr(object);
         self.place_write = false;
+        if !write
+            && type_name_def.is_none()
+            && self.declared_field_modifier(obj_ty, name)
+                == Some(radix_syntax::FieldModifier::Generis)
+        {
+            self.undefined_member_with_args(
+                "static_field_read_through_instance",
+                object.span,
+                &[("field", self.member_display_name(name))],
+            );
+            return self.error_type;
+        }
         let access = if write {
             MemberAccess::Write
         } else {
             MemberAccess::Read
         };
         self.check_field_access_from_type(obj_ty, name, object.span, access)
+    }
+
+    /// Type a read through a genus name (`Tab.Z`): only a `generis` field is
+    /// readable there, and its type is the declared field type.
+    fn check_static_field_read(
+        &mut self,
+        object: &mut HirExpression,
+        type_def: DefId,
+        name: Symbol,
+    ) -> TypeId {
+        let object_ty = self.check_expr(object);
+        let span = object.span;
+        let Some(field) = self
+            .structs
+            .get(&type_def)
+            .and_then(|info| info.fields.get(&name))
+            .copied()
+        else {
+            self.undefined_member("unknown_struct_field", span);
+            return self.error_type;
+        };
+        if field.modifier != Some(radix_syntax::FieldModifier::Generis) {
+            self.undefined_member_with_args(
+                "instance_field_read_through_type",
+                span,
+                &[("field", self.member_display_name(name))],
+            );
+            return self.error_type;
+        }
+        self.check_field_visibility(object_ty, name, MemberAccess::Read, span);
+        field.ty
     }
 
     fn scrinium_payload_field_type(
@@ -1241,3 +1304,7 @@ fn static_octeti_index_window(index: &HirExpression) -> Option<(usize, usize)> {
         _ => None,
     }
 }
+
+#[cfg(test)]
+#[path = "static_field_read_test.rs"]
+mod static_field_read_test;

@@ -1075,6 +1075,14 @@ help = "call it as a method: `.longitudo()`"
 message = "type '{type}' has no field '{member}'"
 help = "built-in types expose methods, not fields; check the receiver type and member name"
 
+[diagnostics.SEM004.issues.static_field_read_through_instance]
+message = "static field '{field}' is read through the type name, not an instance"
+help = "read a `generis` field through the type name (`Type.field`), not an instance"
+
+[diagnostics.SEM004.issues.instance_field_read_through_type]
+message = "field '{field}' is an instance field and cannot be read through the type name"
+help = "read an instance field through an instance; only a `generis` field reads through the type name"
+
 [diagnostics.SEM004.issues.unknown_union_field]
 message = "unknown union field"
 help = "check the union's `@ commune` field name"
