@@ -6,6 +6,7 @@
 //! that raises it.
 
 use super::catalog::{DiagnosticSpec, arg_value};
+use crate::numeric_width::WidthLowerIssue;
 use crate::{SemanticErrorKind, WarningKind};
 use radix_diagnostics::DiagnosticArg;
 
@@ -403,7 +404,7 @@ fn semantic_not_callable_help(args: &[DiagnosticArg]) -> Option<String> {
 /// issues keep the per-code default help.
 fn semantic_removed_width_help(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {
-        "removed_decimal_width_d32" => {
+        WidthLowerIssue::REMOVED_DECIMAL_WIDTH => {
             Some("d32 was removed; use d64, the only decimal width".to_owned())
         }
         _ => None,
@@ -545,14 +546,14 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             "a d64 literal has at most 8 fraction digits and lies within ±92233720368.54775807; a written literal is never rounded"
                 .to_owned(),
         ),
-        "modular_word_width_required" => {
+        WidthLowerIssue::MODULAR_WORD_WIDTH_REQUIRED => {
             Some("write the modular word type as modulus<u8>, modulus<u16>, modulus<u32>, or modulus<u64>".to_owned())
         }
-        "modular_word_width_shape" => Some("use a bare unsigned width marker such as u32".to_owned()),
-        "unsupported_modular_word_width" => Some(
+        WidthLowerIssue::MODULAR_WORD_WIDTH_SHAPE => Some("use a bare unsigned width marker such as u32".to_owned()),
+        WidthLowerIssue::UNSUPPORTED_MODULAR_WORD_WIDTH => Some(
             "use an unsigned modular word width: modulus<u8>, modulus<u16>, modulus<u32>, or modulus<u64>".to_owned(),
         ),
-        "modular_word_unsigned_width_required" => Some("use an unsigned integer width marker such as u32".to_owned()),
+        WidthLowerIssue::MODULAR_WORD_UNSIGNED_WIDTH_REQUIRED => Some("use an unsigned integer width marker such as u32".to_owned()),
         "numeric_arithmetic_operands_identical" => {
             Some("convert operands explicitly before applying this numeric operator".to_owned())
         }
@@ -564,21 +565,21 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             "convert one operand explicitly with `↦`; a written constant may stand beside any number"
                 .to_owned(),
         ),
-        "saturating_word_width_required" => Some(
+        WidthLowerIssue::SATURATING_WORD_WIDTH_REQUIRED => Some(
             "write the saturating type with one integer width, such as saturatus<u8> or saturatus<i16>".to_owned(),
         ),
-        "saturating_word_width_shape" => Some("use a bare integer width marker such as u8 or i16".to_owned()),
-        "unsupported_saturating_word_width" => Some(
+        WidthLowerIssue::SATURATING_WORD_WIDTH_SHAPE => Some("use a bare integer width marker such as u8 or i16".to_owned()),
+        WidthLowerIssue::UNSUPPORTED_SATURATING_WORD_WIDTH => Some(
             "use an integer width for saturatus: i8, i16, i32, i64, u8, u16, u32, or u64".to_owned(),
         ),
-        "trapping_word_width_required" => Some(
+        WidthLowerIssue::TRAPPING_WORD_WIDTH_REQUIRED => Some(
             "write the trapping type with one width, such as exactus<u8> or exactus<i64>".to_owned(),
         ),
-        "trapping_word_width_shape" => Some("use a bare width marker such as u8 or i64".to_owned()),
-        "unsupported_trapping_word_width" => Some(
+        WidthLowerIssue::TRAPPING_WORD_WIDTH_SHAPE => Some("use a bare width marker such as u8 or i64".to_owned()),
+        WidthLowerIssue::UNSUPPORTED_TRAPPING_WORD_WIDTH => Some(
             "use an integer width or d64 for exactus: i8, i16, i32, i64, u8, u16, u32, u64, or d64".to_owned(),
         ),
-        "trapping_float_not_implemented" => Some(
+        WidthLowerIssue::TRAPPING_FLOAT_NOT_IMPLEMENTED => Some(
             "write the bare float width (f16, bf16, f32, or f64) for IEEE arithmetic; trapping floats are not implemented yet".to_owned(),
         ),
         "saturating_word_family_mismatch" => Some(

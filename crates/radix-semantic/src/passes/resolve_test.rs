@@ -2750,3 +2750,110 @@ main {
         result.diagnostics
     );
 }
+
+// WIDTH ISSUE IDENTITY PIN
+//
+// `WidthLowerIssue` is the one authority for width issue names. A production
+// file in this crate that quotes one of those names re-declares the identity
+// and can drift from the mapping; it must name the associated const instead.
+
+/// Every `pub const X: &str = "name";` issue name declared in `impl WidthLowerIssue`.
+fn width_issue_names(numeric_width_src: &str) -> Vec<String> {
+    let impl_start = numeric_width_src
+        .find("impl WidthLowerIssue {")
+        .expect("numeric_width.rs must declare impl WidthLowerIssue");
+    numeric_width_src[impl_start..]
+        .lines()
+        .filter_map(|line| {
+            let rest = line.trim().strip_prefix("pub const ")?;
+            let (_, value) = rest.split_once(": &str = \"")?;
+            Some(value.strip_suffix("\";")?.to_owned())
+        })
+        .collect()
+}
+
+/// Paths (from the `(path, text)` inputs) that contain a quoted literal of any issue name.
+fn width_issue_literal_offenders(names: &[String], files: &[(String, String)]) -> Vec<String> {
+    files
+        .iter()
+        .filter(|(_, text)| {
+            names
+                .iter()
+                .any(|name| text.contains(&format!("\"{name}\"")))
+        })
+        .map(|(path, _)| path.clone())
+        .collect()
+}
+
+fn production_sources(dir: &std::path::Path, out: &mut Vec<(String, String)>) {
+    for entry in std::fs::read_dir(dir)
+        .expect("read radix-semantic src dir")
+        .flatten()
+    {
+        let path = entry.path();
+        if path.is_dir() {
+            production_sources(&path, out);
+        } else if path.extension().is_some_and(|ext| ext == "rs")
+            && !path
+                .file_name()
+                .is_some_and(|name| name.to_string_lossy().ends_with("_test.rs"))
+        {
+            let text = std::fs::read_to_string(&path).expect("read production source");
+            out.push((path.display().to_string(), text));
+        }
+    }
+}
+
+#[test]
+fn width_issue_pin_reports_synthetic_duplicate() {
+    let names = vec!["float_width_on_numerus".to_owned()];
+    let files = vec![
+        (
+            "clean.rs".to_owned(),
+            "let a = WidthLowerIssue::X;".to_owned(),
+        ),
+        (
+            "dup.rs".to_owned(),
+            "let a = \"float_width_on_numerus\";".to_owned(),
+        ),
+    ];
+    assert_eq!(
+        width_issue_literal_offenders(&names, &files),
+        vec!["dup.rs".to_owned()]
+    );
+}
+
+#[test]
+fn width_issue_names_are_read_from_the_enum_mapping() {
+    let src = include_str!("../../../radix-types/src/numeric_width.rs");
+    let names = width_issue_names(src);
+    assert!(
+        names.len() >= 22,
+        "expected the full issue name set: {names:?}"
+    );
+    assert!(names.contains(&"float_width_on_numerus".to_owned()));
+    assert!(names.contains(&"trapping_float_not_implemented".to_owned()));
+}
+
+#[test]
+fn width_issue_literals_are_not_duplicated_in_semantic_production_sources() {
+    let numeric_width = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../radix-types/src/numeric_width.rs");
+    let names = width_issue_names(
+        &std::fs::read_to_string(&numeric_width).expect("read radix-types numeric_width.rs"),
+    );
+    let mut files = Vec::new();
+    production_sources(
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
+        &mut files,
+    );
+    assert!(
+        files.len() > 50,
+        "expected the radix-semantic production tree"
+    );
+    let offenders = width_issue_literal_offenders(&names, &files);
+    assert!(
+        offenders.is_empty(),
+        "width issue names must be consumed from WidthLowerIssue consts, not quoted: {offenders:?}"
+    );
+}

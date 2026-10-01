@@ -2076,8 +2076,8 @@ fn width_marker_error(err: WidthError, prim: Primitive, span: radix_lexer::Span)
             Primitive::Fractus => ISSUE_INVALID_FRACTUS_WIDTH_MARKER,
             _ => ISSUE_INVALID_WIDTH_MARKER,
         },
-        WidthError::FloatOnNumerus => "float_width_on_numerus",
-        WidthError::IntOnFractus => "integer_width_on_fractus",
+        WidthError::FloatOnNumerus => WidthLowerIssue::FLOAT_WIDTH_ON_NUMERUS,
+        WidthError::IntOnFractus => WidthLowerIssue::INTEGER_WIDTH_ON_FRACTUS,
         WidthError::TooManyParams => ISSUE_WIDTH_MARKER_PARAMS,
     };
     undefined_type_error(issue, span).with_arg("primitive", primitive_name(prim))
