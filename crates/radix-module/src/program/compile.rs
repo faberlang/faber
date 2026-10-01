@@ -9,11 +9,12 @@ use super::export_surface::{import_binding, program_declaration_surface, program
 use crate::file_interface::{
     FileExport, FileExportKind, FileInterface, InterfaceAliasExport, InterfaceAnnotationContract,
     InterfaceAnnotationContractField, InterfaceBodyChannel, InterfaceCallable, InterfaceCallableParam,
-    InterfaceDeviceContract, InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceEnumVariant,
+    InterfaceConstValue, InterfaceDeviceContract, InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceEnumVariant,
     InterfaceGenericParam, InterfaceGenericParamDefault, InterfaceIndexSnapshot, InterfaceLibraryIdentity,
     InterfaceMethodExport, InterfaceNominalExport, InterfaceNominalKind, InterfaceNominalType, InterfaceParam,
     InterfaceStructExport, InterfaceStructField, InterfaceTypeParamConstraint, InterfaceTypeSnapshot,
 };
+use crate::hir::HirItemKind;
 use crate::semantic::passes::visibility_annotation::{VisibilityTier, member_visibility};
 use crate::semantic::{ContractFieldType, InstansPrecision, NumericWidth, Primitive, SemanticParamMode};
 use crate::syntax::{
@@ -767,15 +768,58 @@ fn cached_import_target(
     // contract discovery for the target's own imports — a provider import
     // cycle must hit the memo instead of recursing.
     let provider_unit = provider_unit_for_target(session, &target_path, &target_source);
+    // ST2-1: the AST-built interface carries constant types only; the folded
+    // values come from the analyzed provider unit, so a consumer's `=`
+    // initializer folds `module.NAME` from this run's source, never a stale one.
+    let const_values = provider_const_values(&provider_unit);
+    let mut interface = cached.interface.clone();
+    apply_const_values(&mut interface, &const_values);
     {
         let mut cache = session.memos.import_targets.borrow_mut();
         for key in std::iter::once(raw_key).chain(canonical_key) {
             if let Some(CachedImportTargetEntry::Parsed(entry)) = cache.get_mut(&key) {
                 entry.provider_unit = Some(provider_unit.clone());
+                entry.interface = interface.clone();
             }
         }
     }
-    ImportTargetLookup::Parsed(Box::new(CachedImportTarget { provider_unit: Some(provider_unit), ..cached }))
+    ImportTargetLookup::Parsed(Box::new(CachedImportTarget {
+        provider_unit: Some(provider_unit),
+        interface,
+        ..cached
+    }))
+}
+
+/// Folded values of the provider unit's module constants, by export name.
+/// A failed provider carries none, so its constants stay value-less.
+fn provider_const_values(provider: &crate::driver::CarriedProviderUnit) -> Vec<(String, InterfaceConstValue)> {
+    let Some(unit) = provider.lock_unit() else {
+        return Vec::new();
+    };
+    unit.hir
+        .items
+        .iter()
+        .filter_map(|item| {
+            let HirItemKind::Constant(konst) = &item.kind else {
+                return None;
+            };
+            let value = crate::semantic::passes::statica::export_value(
+                &konst.value,
+                konst.ty.or(konst.value.ty),
+                &unit.types,
+                &unit.interner,
+            )?;
+            Some((unit.interner.resolve(konst.name).to_owned(), value))
+        })
+        .collect()
+}
+
+fn apply_const_values(interface: &mut FileInterface, values: &[(String, InterfaceConstValue)]) {
+    for (name, value) in values {
+        if let Some(FileExport { kind: FileExportKind::Const(_, slot), .. }) = interface.exports.get_mut(name) {
+            *slot = Some(value.clone());
+        }
+    }
 }
 
 /// Analyze one parsed import target under the contract codegen needs
@@ -1935,13 +1979,10 @@ fn file_export_from_stmt(
             let no_params = BTreeSet::new();
             Some(FileExport {
                 name,
-                kind: FileExportKind::Const(interface_type_from_type_expr(
-                    var.ty.as_ref()?,
-                    interner,
-                    &no_params,
-                    nominal_kinds,
-                    ctx,
-                )?),
+                kind: FileExportKind::Const(
+                    interface_type_from_type_expr(var.ty.as_ref()?, interner, &no_params, nominal_kinds, ctx)?,
+                    None,
+                ),
             })
         }
         _ => None,

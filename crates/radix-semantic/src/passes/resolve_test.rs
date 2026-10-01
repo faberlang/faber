@@ -789,7 +789,7 @@ fn projects_localized_library_members_by_identity_and_rejects_unmapped_canonical
     });
     interface.insert(FileExport {
         name: "PI".to_owned(),
-        kind: FileExportKind::Const(InterfaceTypeSnapshot::Primitive(Primitive::Fractus)),
+        kind: FileExportKind::Const(InterfaceTypeSnapshot::Primitive(Primitive::Fractus), None),
     });
 
     let pack = crate::locale::LocalePack::from_toml_str(

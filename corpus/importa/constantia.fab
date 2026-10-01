@@ -1,0 +1,37 @@
++++
+term = "importa"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_sugar", "annotation_name", "fixum_decl", "type_annotation", "owned_type", "base_type", "literal", "incipit_stmt", "nota_stmt", "expression"]
+category = "package"
+canonical = false
+summary = "Sibling module whose exported constant folds into an importer's constant initializer."
+syntax = "@ public const <type> <name> = <expression>"
+related = ["importa", "fixum", "publica"]
+locale = "en"
++++
+# =============================================================================
+# importa — Sibling module exporting a compile-time constant
+# =============================================================================
+#
+# What this teaches:
+#   • An exported `const` carries its folded value through the file interface,
+#     so an importing module can use `module.NAME` in its own `=` initializers.
+#
+# See also: importa, fixum, publica
+# =============================================================================
+
+# importa constantia — sibling module for importa/imported-constant.fab
+#
+# `BASE` is exported with `@ public`; the importer folds `constantia.BASE * 2` at
+# compile time. Editing `BASE` here changes the importer's constant on the next
+# check, run or build (no stale interface).
+#
+# EXPECTED OUTPUT:
+#   5 when run standalone.
+
+@ public
+const int BASE = 5
+
+main {
+    print BASE
+}

@@ -48,7 +48,7 @@ fn pass_config_file_interfaces_hook_defaults_empty_and_accepts_contracts() {
     let mut interface = FileInterface::new();
     interface.insert(FileExport {
         name: "nomen".to_owned(),
-        kind: FileExportKind::Const(InterfaceTypeSnapshot::Primitive(Primitive::Textus)),
+        kind: FileExportKind::Const(InterfaceTypeSnapshot::Primitive(Primitive::Textus), None),
     });
     config.file_interfaces.insert("path".to_owned(), interface);
 

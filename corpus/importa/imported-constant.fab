@@ -1,0 +1,46 @@
++++
+term = "importa"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "named_import", "fixum_decl", "type_annotation", "owned_type", "base_type", "multiplicative_expr", "member_suffix", "incipit_stmt", "nota_stmt", "expression", "literal"]
+category = "package"
+canonical = false
+summary = "An imported constant folds in a module constant initializer: const int D = constantia.BASE * 2."
+syntax = "const <type> <name> = <namespace>.<CONST> <op> <expression>"
+related = ["importa", "fixum", "publica"]
+locale = "en"
++++
+# =============================================================================
+# importa — an imported constant folds in a `=` initializer
+# =============================================================================
+#
+# What this teaches:
+#   • `module.NAME` of an exported constant is a compile-time fact in this
+#     module's own `const T X = e` initializer.
+#   • An imported function call (`constantia.f()`) is still not constant
+#     (`constant_initializer_not_constant`).
+#
+# Common mistakes:
+#   • Folding a call into an imported function — only the exported constant's
+#     value crosses the file interface, not function bodies.
+#
+# See also: importa, fixum, publica
+# =============================================================================
+
+# importa imported-constant — module constant from an imported constant
+#
+# GRAMMAR:
+#   const int D = constantia.BASE * 2
+#
+# Requires module layout: imported-constant.fab imports
+# constantia.fab (package or module mode).
+#
+# EXPECTED OUTPUT:
+#   imported-constant.expected (10)
+
+import from "./constantia" constantia
+
+const int D = constantia.BASE * 2
+
+main {
+    print D
+}

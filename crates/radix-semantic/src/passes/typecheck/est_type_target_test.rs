@@ -51,7 +51,7 @@ fn aux_interface() -> FileInterface {
     interface.insert(genus("Canis"));
     interface.insert(FileExport {
         name: "NOMEN".to_owned(),
-        kind: FileExportKind::Const(InterfaceTypeSnapshot::Primitive(Primitive::Textus)),
+        kind: FileExportKind::Const(InterfaceTypeSnapshot::Primitive(Primitive::Textus), None),
     });
     interface
 }

@@ -31,7 +31,7 @@
 
 use super::types::{FuncSig, Type, TypeId, TypeTable};
 use crate::file_interface::{
-    FileExportKind, FileInterface, FileInterfaceError, InterfaceGenericParam,
+    FileExportKind, FileInterface, FileInterfaceError, InterfaceConstValue, InterfaceGenericParam,
     InterfaceLibraryIdentity, InterfaceMemberKind, InterfaceMethodExport, InterfaceNominalExport,
     InterfaceNominalKind, InterfaceStructExport, import_interface_callable_with_resolver,
     import_interface_type_with_resolver,
@@ -269,6 +269,10 @@ pub struct ImportedFileInterface {
     /// consts are first-class value references (`module.CONST`), resolved by
     /// [`Resolver::namespace_file_const`].
     const_members: FxHashSet<LexSymbol>,
+    /// Folded values of const members whose exporter folded them (ST2-1),
+    /// keyed like `const_members`. A const without an entry is not constant
+    /// in a consumer's `=` initializer.
+    const_values: FxHashMap<LexSymbol, InterfaceConstValue>,
 }
 
 /// Remapped contract for a single imported file export.
@@ -447,7 +451,7 @@ fn exported_member_kind(export: &FileExportKind) -> InterfaceMemberKind {
         | FileExportKind::Struct(_)
         | FileExportKind::Enum(_)
         | FileExportKind::Interface(_) => InterfaceMemberKind::Type,
-        FileExportKind::Const(_) => InterfaceMemberKind::Const,
+        FileExportKind::Const(..) => InterfaceMemberKind::Const,
     }
 }
 
@@ -1126,7 +1130,7 @@ impl Resolver {
                         imported
                     }
                     FileExportKind::TypeAlias(_)
-                    | FileExportKind::Const(_)
+                    | FileExportKind::Const(..)
                     | FileExportKind::Function(_) => continue,
                 };
                 for projected_member in projected_members {
@@ -1141,6 +1145,7 @@ impl Resolver {
                     strict_members,
                     identity,
                     const_members: FxHashSet::default(),
+                    const_values: FxHashMap::default(),
                 },
             );
         }
@@ -1182,13 +1187,13 @@ impl Resolver {
                 // `ImportedFileExport::Type`; record the const members so the
                 // typechecker can resolve `module.CONST` value references
                 // without exposing type exports as value references.
-                let is_const = matches!(&export.kind, FileExportKind::Const(_));
+                let is_const = matches!(&export.kind, FileExportKind::Const(..));
                 let (snapshot, decl_param_kinds) = match &export.kind {
                     FileExportKind::TypeAlias(alias) => (
                         &alias.body,
                         crate::file_interface::InterfaceGenericParam::kinds(&alias.params),
                     ),
-                    FileExportKind::Const(snapshot) => (snapshot, Vec::new()),
+                    FileExportKind::Const(snapshot, _) => (snapshot, Vec::new()),
                     _ => continue,
                 };
                 match import_interface_type_with_resolver(snapshot, types, interner, self) {
@@ -1203,6 +1208,9 @@ impl Resolver {
                             let member_sym = interner.intern(&projected_member);
                             if is_const {
                                 imported.const_members.insert(member_sym);
+                                if let FileExportKind::Const(_, Some(value)) = &export.kind {
+                                    imported.const_values.insert(member_sym, value.clone());
+                                }
                             }
                             imported.exports.insert(member_sym, exported.clone());
                         }
@@ -2214,6 +2222,20 @@ impl Resolver {
             ImportedFileExport::Type(ty) => Some(ty.ty),
             ImportedFileExport::Struct(_) | ImportedFileExport::Function(_) => None,
         }
+    }
+
+    /// Folded compile-time value of a post-HIR canonical file-interface CONST
+    /// member, when its exporter folded one (ST2-1). `None` for a const whose
+    /// initializer did not fold, and for every non-const member.
+    #[must_use]
+    pub fn namespace_file_const_value_canonical(
+        &self,
+        namespace: LexSymbol,
+        canonical: LexSymbol,
+    ) -> Option<&InterfaceConstValue> {
+        let interface = self.file_interfaces.get(&namespace)?;
+        let member = self.file_interface_export_key_for_canonical(interface, canonical)?;
+        interface.const_values.get(&member)
     }
 
     /// Return qualified source spellings for every imported nominal export,
@@ -3761,6 +3783,7 @@ impl Resolver {
                         strict_members: false,
                         identity: None,
                         const_members: FxHashSet::default(),
+                        const_values: FxHashMap::default(),
                     },
                 )
             })

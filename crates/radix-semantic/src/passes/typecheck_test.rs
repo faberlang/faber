@@ -2628,7 +2628,7 @@ fn eot_selective_test_interface() -> crate::file_interface::FileInterface {
     });
     interface.insert(FileExport {
         name: "PI".to_owned(),
-        kind: FileExportKind::Const(InterfaceTypeSnapshot::Primitive(Primitive::Fractus)),
+        kind: FileExportKind::Const(InterfaceTypeSnapshot::Primitive(Primitive::Fractus), None),
     });
     interface.insert(FileExport {
         name: "Vector".to_owned(),

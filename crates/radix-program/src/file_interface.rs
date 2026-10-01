@@ -155,13 +155,18 @@ pub fn extract_file_interface_with_identity(
                 .map(|role| role.as_str().to_owned());
                 FileExportKind::Interface(nominal)
             }
-            HirItemKind::Constant(konst) => FileExportKind::Const(snapshot_const(
-                konst,
-                analysis,
-                file_label,
-                &name,
-                export_identity,
-            )?),
+            HirItemKind::Constant(konst) => {
+                let ty = snapshot_const(konst, analysis, file_label, &name, export_identity)?;
+                // The exporter's fold ran before extraction, so a foldable
+                // initializer is already its literal (ST2-1).
+                let value = radix_module::semantic::passes::statica::export_value(
+                    &konst.value,
+                    konst.ty.or(konst.value.ty),
+                    &analysis.types,
+                    &analysis.interner,
+                );
+                FileExportKind::Const(ty, value)
+            }
             HirItemKind::Schema(_) => continue,
             HirItemKind::Import(_) => continue,
         };
