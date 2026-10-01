@@ -46,6 +46,9 @@ pub mod ts;
 mod coherence_test;
 
 #[cfg(test)]
+mod coverage_test;
+
+#[cfg(test)]
 #[path = "await_store_emit_test.rs"]
 mod await_store_emit_test;
 
