@@ -158,3 +158,7 @@ fn kind_name(kind: &StmtKind) -> &'static str {
         StmtKind::Tacebit(_) => "tacebit",
     }
 }
+
+#[cfg(test)]
+#[path = "source_inventory_test.rs"]
+mod tests;
