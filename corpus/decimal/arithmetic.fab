@@ -35,6 +35,13 @@ locale = "en"
 #     rounds at the slot like any other computed decimal: 0.00000005 * 0.5
 #     is 0.000000025 exactly and lands in a `d64` as `0.00000002`
 #     (half-even to scale 8).
+#   • A conditional that is an operand of decimal arithmetic keeps its
+#     branch tails exact: `(c ✓ a * b ✗ a) * 100.0` multiplies the exact
+#     0.000000025 by 100 and stores `0.0000025`, not the 0.00000002 that
+#     rounding the branch first would give (that would store `0.000002`).
+#     Rounding happens once, at the slot, on every target. `discerne` is a
+#     statement and a block is not an operand in source, so the conditional
+#     is the operand form this surface can write.
 #
 # Common mistakes:
 #   • expecting a trailing zero or `.0` — `4.2 / 0.1` prints `42`, since a
@@ -83,4 +90,16 @@ main {
     print a ≅ 4.2
     const d64 e ← 5
     print e
+    const bool t ← true
+    const bool f ← false
+    const d64 on ← (t ✓ tiny * half ✗ tiny) * 100.0
+    print on
+    const d64 lead ← 100.0 * (t ✓ tiny * half ✗ tiny)
+    print lead
+    const d64 off ← (f ✓ tiny ✗ tiny * half) * 100.0
+    print off
+    const d64 sum ← (t ✓ tiny * half ✗ tiny) + (f ✓ tiny ✗ tiny * half)
+    print sum
+    const d64 quot ← (t ✓ tiny * half ✗ tiny) / 2.0
+    print quot
 }
