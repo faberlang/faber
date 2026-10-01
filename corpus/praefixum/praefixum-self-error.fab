@@ -1,0 +1,52 @@
++++
+term = "praefixum receiver"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "fixum_decl", "const_init", "praefixum_expr", "block_stmt", "genus_decl", "genus_member", "genus_field_decl", "field_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "functio_decl", "redde_stmt", "expression", "literal", "member_suffix", "incipit_stmt", "nota_stmt"]
+category = "comptime"
+canonical = false
+summary = "A comptime body runs at build time, so inside a method it may not read the receiver."
+syntax = "class C { fn m() { const int k = comptime { return self.n … } } } — rejected"
+related = ["praefixum", "fixum"]
+locale = "en"
++++
+# =============================================================================
+# praefixum — a body may not read the receiver
+# =============================================================================
+#
+# What this teaches:
+#   • A `comptime { … }` body is evaluated once, at build time, before any
+#     instance exists. Inside a method, `self` is a run-time value, so a body
+#     that reads it is `praefixum_captures_local` — the same error as reading
+#     a parameter or a local of the enclosing body.
+#   • A body that leaves `self` out is fine inside a method; read the field
+#     after the constant, at run time.
+#
+# Common mistakes:
+#   • reading `self.n` inside the body — compute from constants in the body,
+#     then combine with `self.n` outside it.
+#
+# See also: praefixum, fixum
+# =============================================================================
+
+# praefixum-self-error — a comptime body reads the method's receiver
+#
+# WHY: pins st1 R8 at `faber check`: a body stands alone, and the receiver is
+# an enclosing binding like any parameter.
+#
+# EXPECTED OUTPUT:
+#   praefixum-self-error.expected — the stable diagnostic identity.
+
+class Cista {
+    var int n
+
+    fn ter() → int {
+        const int k = comptime {
+            return self.n
+        }
+        return k
+    }
+}
+
+main {
+    print 1
+}

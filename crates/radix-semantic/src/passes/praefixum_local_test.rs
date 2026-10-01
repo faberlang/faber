@@ -6,7 +6,7 @@
 //!   block-level constant inside any body; a runtime `←` store stays
 //!   SEM064 `praefixum_outside_constant`;
 //! - the body stands alone: reading an enclosing parameter or local —
-//!   including an earlier compile-time local — is SEM064
+//!   including an earlier compile-time local, or a method's `ego` — is SEM064
 //!   `praefixum_captures_local`, a type parameter of the enclosing function or
 //!   genus is SEM064 `praefixum_type_parameter`;
 //! - module constants and the body's own bindings are free to read;
@@ -117,6 +117,32 @@ fn reading_an_earlier_compile_time_local_is_a_capture() {
         "praefixum_captures_local",
     );
     assert_eq!(arg(&err, "captured"), Some("a"));
+}
+
+#[test]
+fn reading_the_receiver_is_a_capture() {
+    let err = rejection(
+        "genus Cista {\n    varia numerus n\n    functio ter() → numerus {\n        fixum numerus c = praefixum {\n            redde ego.n\n        }\n        redde c\n    }\n}\n",
+        "praefixum_captures_local",
+    );
+    assert_eq!(arg(&err, "name"), Some("c"));
+    assert_eq!(arg(&err, "captured"), Some("ego"));
+}
+
+#[test]
+fn a_method_body_that_ignores_the_receiver_is_accepted() {
+    assert_clean(
+        "genus Cista {\n    varia numerus n\n    functio ter() → numerus {\n        fixum numerus c = praefixum {\n            redde 3\n        }\n        redde ego.n * c\n    }\n}\n",
+    );
+}
+
+#[test]
+fn a_parameter_is_named_before_the_receiver() {
+    let err = rejection(
+        "genus Cista {\n    varia numerus n\n    functio ter(numerus p) → numerus {\n        fixum numerus c = praefixum {\n            redde ego.n + p\n        }\n        redde c\n    }\n}\n",
+        "praefixum_captures_local",
+    );
+    assert_eq!(arg(&err, "captured"), Some("p"));
 }
 
 #[test]

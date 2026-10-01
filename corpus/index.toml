@@ -4093,6 +4093,12 @@ kind = "operator-group"
 category = "comptime"
 
 [[files]]
+path = "praefixum/praefixum-self-error.fab"
+term = "praefixum receiver"
+kind = "reject"
+category = "comptime"
+
+[[files]]
 path = "praefixum/praefixum-type-parameter-error.fab"
 term = "praefixum type parameter"
 kind = "reject"

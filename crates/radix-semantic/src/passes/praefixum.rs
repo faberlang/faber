@@ -46,6 +46,9 @@ use std::borrow::Cow;
 const ISSUE_FORBIDDEN: &str = "praefixum_forbidden";
 const ISSUE_CYCLE: &str = "constant_cycle";
 const ISSUE_CAPTURES_LOCAL: &str = "praefixum_captures_local";
+/// Canonical spelling of the receiver in a capture issue, as other fixed
+/// keyword arguments here (`effect`) are canonical.
+const RECEIVER_NAME: &str = "ego";
 const ISSUE_TYPE_PARAMETER: &str = "praefixum_type_parameter";
 
 /// Where a `praefixum { … }` initializer sits.
@@ -126,6 +129,9 @@ struct Root {
     bindings: FxHashMap<DefId, Symbol>,
     /// Type parameters of the enclosing declaration(s).
     type_params: Vec<Symbol>,
+    /// The owning genus of a method root. A genus has no static methods, so
+    /// inside its method a path to the genus itself is the receiver (`ego`).
+    receiver: Option<DefId>,
 }
 
 struct LocalSite {
@@ -171,7 +177,12 @@ impl HirVisitor for RootWalk {
 }
 
 impl LocalScan {
-    fn add_root(&mut self, type_params: Vec<Symbol>, walk: impl FnOnce(&mut RootWalk)) {
+    fn add_root(
+        &mut self,
+        type_params: Vec<Symbol>,
+        receiver: Option<DefId>,
+        walk: impl FnOnce(&mut RootWalk),
+    ) {
         let mut root_walk = RootWalk {
             bindings: FxHashMap::default(),
             found: Vec::new(),
@@ -184,6 +195,7 @@ impl LocalScan {
         self.roots.push(Root {
             bindings: root_walk.bindings,
             type_params,
+            receiver,
         });
         for (site, init) in root_walk.found {
             self.sites.push(LocalSite { site, init, root });
@@ -201,7 +213,7 @@ fn scan_locals(hir: &HirModule) -> LocalScan {
                     .iter()
                     .map(|param| param.name)
                     .collect();
-                scan.add_root(params, |walk| walk.visit_function(function));
+                scan.add_root(params, None, |walk| walk.visit_function(function));
             }
             HirItemKind::Struct(strukt) => {
                 let owner: Vec<Symbol> =
@@ -209,22 +221,24 @@ fn scan_locals(hir: &HirModule) -> LocalScan {
                 for method in &strukt.methods {
                     let mut params = owner.clone();
                     params.extend(method.func.type_params.iter().map(|param| param.name));
-                    scan.add_root(params, |walk| walk.visit_function(&method.func));
+                    scan.add_root(params, Some(item.def_id), |walk| {
+                        walk.visit_function(&method.func);
+                    });
                 }
                 for field in &strukt.fields {
                     if let Some(init) = &field.init {
-                        scan.add_root(owner.clone(), |walk| walk.visit_expr(init));
+                        scan.add_root(owner.clone(), None, |walk| walk.visit_expr(init));
                     }
                 }
             }
             HirItemKind::Constant(konst) => {
-                scan.add_root(Vec::new(), |walk| walk.visit_expr(&konst.value));
+                scan.add_root(Vec::new(), None, |walk| walk.visit_expr(&konst.value));
             }
             _ => {}
         }
     }
     if let Some(entry) = &hir.entry {
-        scan.add_root(Vec::new(), |walk| walk.visit_block(entry));
+        scan.add_root(Vec::new(), None, |walk| walk.visit_block(entry));
     }
     scan
 }
@@ -362,16 +376,13 @@ fn standalone_errors(
         walk.visit_expr(init);
         let name = interner.resolve(site.name);
         if let Some(root) = root
-            && let Some(captured) = walk
-                .paths
-                .iter()
-                .find(|def| root.bindings.contains_key(def) && !walk.declared.contains(def))
+            && let Some(captured) = captured_name(&walk, root, interner)
         {
             errors.push(
                 SemanticError::structured(SemanticErrorKind::PraefixumInvalid, init.span)
                     .with_arg("issue", ISSUE_CAPTURES_LOCAL)
                     .with_arg("name", name)
-                    .with_arg("captured", interner.resolve(root.bindings[captured])),
+                    .with_arg("captured", captured),
             );
         }
         if let Some(param) = walk.param {
@@ -411,6 +422,22 @@ fn standalone_errors(
         }
     }
     errors
+}
+
+/// What the body reads from the enclosing body: a parameter or local by its
+/// name, else the method's receiver as the canonical `ego`.
+fn captured_name(walk: &BodyWalk<'_>, root: &Root, interner: &Interner) -> Option<String> {
+    let local = walk
+        .paths
+        .iter()
+        .find(|def| root.bindings.contains_key(def) && !walk.declared.contains(def));
+    if let Some(local) = local {
+        return Some(interner.resolve(root.bindings[local]).to_owned());
+    }
+    let owner = root.receiver?;
+    walk.paths
+        .contains(&owner)
+        .then(|| RECEIVER_NAME.to_owned())
 }
 
 /// The first of `params` that `ty` mentions, looking through every
