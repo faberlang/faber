@@ -213,7 +213,7 @@ fn perge_sites(statements: &[HirStatement], tail: Option<&HirExpression>) -> Vec
                 expr.kind,
                 HirExpressionKind::Loop(_)
                     | HirExpressionKind::Dum(..)
-                    | HirExpressionKind::Itera(..)
+                    | HirExpressionKind::Itera { .. }
                     | HirExpressionKind::IteraLockstep { .. }
                     | HirExpressionKind::IteraRange { .. }
                     | HirExpressionKind::Summa { .. }

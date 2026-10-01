@@ -1824,7 +1824,11 @@ pub(super) fn rewrite_expr(
                 diagnostics,
             );
         }
-        HirExpressionKind::Itera(_, _, _, _, iterable, block) => {
+        HirExpressionKind::Itera {
+            iter: iterable,
+            body: block,
+            ..
+        } => {
             rewrite_expr(
                 unit_path,
                 iterable,

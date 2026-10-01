@@ -91,7 +91,7 @@ fn if_eq_literals(hir: &HirModule) -> Vec<u64> {
 struct FindItera(bool);
 impl HirVisitor for FindItera {
     fn visit_expr(&mut self, expr: &HirExpression) {
-        if matches!(expr.kind, HirExpressionKind::Itera(..)) {
+        if matches!(expr.kind, HirExpressionKind::Itera { .. }) {
             self.0 = true;
         }
         walk_expr(self, expr);
@@ -1314,7 +1314,7 @@ functio mixed(tensor<f32, [40]> x) → f32 {
 struct CountIteras(usize);
 impl HirVisitor for CountIteras {
     fn visit_expr(&mut self, expr: &HirExpression) {
-        if matches!(expr.kind, HirExpressionKind::Itera(..)) {
+        if matches!(expr.kind, HirExpressionKind::Itera { .. }) {
             self.0 += 1;
         }
         walk_expr(self, expr);

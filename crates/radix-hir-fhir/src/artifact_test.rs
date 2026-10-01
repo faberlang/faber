@@ -123,7 +123,9 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // Schema 26 adds `HirExpressionKind::Widen` (inf-wn).
     // Schema 29 (N7E-1) adds `Type::PolicyFloat`, shifting the serde ordinal of
     // the `Type` variants after `SaturatingWord`.
-    assert_eq!(SCHEMA_VERSION, 29);
+    // Schema 30 (IB-1) converts `HirExpressionKind::Itera` to named fields and
+    // adds the loop-binder `mutable` flag to the four loop nodes.
+    assert_eq!(SCHEMA_VERSION, 30);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────

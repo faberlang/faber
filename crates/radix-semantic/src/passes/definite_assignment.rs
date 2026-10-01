@@ -469,7 +469,12 @@ impl HirVisitor for DefiniteAssignmentChecker<'_> {
                     checker.check_casu_arm(&arms[index]);
                 });
             }
-            HirExpressionKind::Itera(_, _, binding, _, iter, block) => {
+            HirExpressionKind::Itera {
+                binding,
+                iter,
+                body: block,
+                ..
+            } => {
                 self.track_binding(*binding);
                 self.visit_expr(iter);
                 self.mark_assigned(*binding);

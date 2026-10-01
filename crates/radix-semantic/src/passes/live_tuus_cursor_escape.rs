@@ -269,7 +269,13 @@ impl HirVisitor for LiveTuusCursorEscapeChecker<'_> {
                     });
                 }
             }
-            HirExpressionKind::Itera(_, _, def_id, name, iter, block) => {
+            HirExpressionKind::Itera {
+                binding: def_id,
+                binding_name: name,
+                iter,
+                body: block,
+                ..
+            } => {
                 self.visit_def(*def_id, *name);
                 self.with_context(EscapeContext::IteraSource, |checker| {
                     checker.visit_expr(iter)

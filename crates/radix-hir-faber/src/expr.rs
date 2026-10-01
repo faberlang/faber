@@ -525,7 +525,14 @@ impl super::FaberCodegen<'_> {
                 });
                 writer.write("}");
             }
-            HirExpressionKind::Itera(mode, coordinates, _binding, binding_name, iter, block) => {
+            HirExpressionKind::Itera {
+                mode,
+                coordinates,
+                binding_name,
+                iter,
+                body: block,
+                ..
+            } => {
                 writer.write(surface.keyword(TokenKind::Itera));
                 writer.write(" ");
                 writer.write(match mode {
@@ -582,6 +589,7 @@ impl super::FaberCodegen<'_> {
                 coordinates,
                 bindings,
                 body,
+                ..
             } => {
                 // Lockstep series: `itera ex s1, s2 [apud [i]] fixum b1, b2`.
                 // One shared coordinate at most; the series binder names keep
@@ -628,6 +636,7 @@ impl super::FaberCodegen<'_> {
                 ranges,
                 bindings,
                 body,
+                ..
             } => {
                 writer.write(surface.keyword(TokenKind::Itera));
                 writer.write(" ");
@@ -1106,6 +1115,7 @@ impl super::FaberCodegen<'_> {
                 filum,
                 binding,
                 body,
+                ..
             } => {
                 // `summa ex src apud [i] filum f fixum s { … }` — the SFR-2
                 // source shape; every clause head is surface-projected.
@@ -1509,7 +1519,7 @@ impl super::FaberCodegen<'_> {
         match &expr.kind {
             HirExpressionKind::Discerne { .. } => self.elige_expr_ids.contains(&expr.id),
             HirExpressionKind::Dum(..)
-            | HirExpressionKind::Itera(..)
+            | HirExpressionKind::Itera { .. }
             | HirExpressionKind::IteraRange { .. }
             | HirExpressionKind::IteraLockstep { .. } => true,
             _ => false,

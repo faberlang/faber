@@ -190,6 +190,10 @@ mod import_path_test;
 mod itera_binder_test;
 
 #[cfg(test)]
+#[path = "itera_binder_mutability_test.rs"]
+mod itera_binder_mutability_test;
+
+#[cfg(test)]
 #[path = "typecheck/iuncta_hole_test.rs"]
 mod iuncta_hole_test;
 

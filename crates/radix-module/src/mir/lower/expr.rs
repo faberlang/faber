@@ -91,16 +91,16 @@ pub(super) trait HirExpressionLoweringVisitor {
             HirExpressionKind::Discerne { scrutinees, arms, .. } => self.visit_discerne_expr(scrutinees, arms, expr),
             HirExpressionKind::Loop(block) => self.visit_loop_expr(block, expr),
             HirExpressionKind::Dum(cond, block) => self.visit_dum_expr(cond, block, expr),
-            HirExpressionKind::Itera(mode, coordinates, binding, name, iter, block) => {
+            HirExpressionKind::Itera { mode, coordinates, binding, binding_name: name, iter, body: block, .. } => {
                 self.visit_itera_expr(*mode, coordinates, *binding, *name, iter, block, expr)
             }
-            HirExpressionKind::IteraLockstep { sources, coordinates, bindings, body } => {
+            HirExpressionKind::IteraLockstep { sources, coordinates, bindings, body, .. } => {
                 self.visit_itera_lockstep_expr(sources, coordinates, bindings, body, expr)
             }
-            HirExpressionKind::IteraRange { ranges, bindings, body } => {
+            HirExpressionKind::IteraRange { ranges, bindings, body, .. } => {
                 self.visit_itera_range_expr(ranges, bindings, body, expr)
             }
-            HirExpressionKind::Summa { source, coordinates, filum, binding, body } => {
+            HirExpressionKind::Summa { source, coordinates, filum, binding, body, .. } => {
                 self.visit_summa_expr(source, coordinates, filum.as_ref(), binding, body, expr)
             }
             HirExpressionKind::Extremum { op, source, coalesce, .. } => {

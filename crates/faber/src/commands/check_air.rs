@@ -491,7 +491,11 @@ impl HirVisitor for IteraAbFinder {
     }
 
     fn visit_expr(&mut self, expr: &HirExpression) {
-        if let HirExpressionKind::Itera(HirIteraMode::Ab, ..) = &expr.kind {
+        if let HirExpressionKind::Itera {
+            mode: HirIteraMode::Ab,
+            ..
+        } = &expr.kind
+        {
             self.0 = true;
         }
         walk_expr(self, expr);

@@ -1261,14 +1261,22 @@ pub enum HirExpressionKind {
     Dum(Box<HirExpression>, HirBlock),
 
     /// Iteration loop with coordinate and element bindings introduced by the loop head.
-    Itera(
-        HirIteraMode,
-        Vec<(DefId, Symbol)>,
-        DefId,
-        Symbol,
-        Box<HirExpression>,
-        HirBlock,
-    ),
+    Itera {
+        /// Iteration source mode.
+        mode: HirIteraMode,
+        /// Coordinate bindings from the optional `apud` clause.
+        coordinates: Vec<(DefId, Symbol)>,
+        /// Element binding definition.
+        binding: DefId,
+        /// Element binding name.
+        binding_name: Symbol,
+        /// Iterable expression.
+        iter: Box<HirExpression>,
+        /// Loop body.
+        body: HirBlock,
+        /// Whether the source declared the element binder `varia`.
+        mutable: bool,
+    },
 
     /// Lockstep `itera ex` walk over N >= 2 aligned collections.
     ///
@@ -1287,6 +1295,8 @@ pub enum HirExpressionKind {
         bindings: Vec<(DefId, Symbol)>,
         /// Body evaluated for each aligned element tuple.
         body: HirBlock,
+        /// Whether the source declared the element binders `varia`.
+        mutable: bool,
     },
 
     /// Cartesian `itera ab` range-product walk over N >= 2 declared domains.
@@ -1305,6 +1315,8 @@ pub enum HirExpressionKind {
         bindings: Vec<(DefId, Symbol)>,
         /// Body evaluated for every element of the Cartesian product.
         body: HirBlock,
+        /// Whether the source declared the range binders `varia`.
+        mutable: bool,
     },
 
     /// Contextual `summa ex` term-fold expression.
@@ -1322,6 +1334,8 @@ pub enum HirExpressionKind {
         binding: (DefId, Symbol),
         /// Term body evaluated for each source element.
         body: HirBlock,
+        /// Whether the source declared the term binder `varia`.
+        mutable: bool,
     },
 
     /// Sibling extrema reduction with a caller-stated optional identity.

@@ -342,7 +342,14 @@ impl TypeChecker<'_> {
                 self.check_loop_block(block);
                 self.vacuum_type()
             }
-            HirExpressionKind::Itera(mode, coordinate_bindings, binding, _, iter, block) => {
+            HirExpressionKind::Itera {
+                mode,
+                coordinates: coordinate_bindings,
+                binding,
+                iter,
+                body: block,
+                ..
+            } => {
                 let iter_ty = if matches!(mode, radix_hir::HirIteraMode::Ab) {
                     self.check_expr_allowing_direct_intervallum_step(iter)
                 } else {
@@ -434,6 +441,7 @@ impl TypeChecker<'_> {
                 coordinates,
                 bindings,
                 body,
+                ..
             } => super::lockstep::check_lockstep_expr(
                 self,
                 sources,
@@ -446,6 +454,7 @@ impl TypeChecker<'_> {
                 ranges,
                 bindings,
                 body,
+                ..
             } => super::range::check_range_product_expr(self, ranges, bindings, body, expr.span),
             HirExpressionKind::Summa {
                 source,
@@ -453,6 +462,7 @@ impl TypeChecker<'_> {
                 filum,
                 binding,
                 body,
+                ..
             } => super::summa::check_summa_expr(
                 self,
                 source,

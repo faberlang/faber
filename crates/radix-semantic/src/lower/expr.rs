@@ -180,6 +180,7 @@ fn lower_summa(lowerer: &mut Lowerer, summa: &radix_syntax::SummaExpr) -> HirExp
         filum,
         binding: (binding_def_id, summa.binding.name),
         body,
+        mutable: summa.mutability == radix_syntax::AstMutability::Mutable,
     }
 }
 

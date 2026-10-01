@@ -232,14 +232,15 @@ fn row_loops_count_one_each() {
         "Dum"
     );
     assert_eq!(
-        score(vec![expr(HirExpressionKind::Itera(
-            HirIteraMode::Ex,
-            Vec::new(),
-            DefId(1),
-            Symbol(1),
-            boxed(HirExpressionKind::Literal(HirLiteral::Nil)),
-            body_block.clone()
-        ))]),
+        score(vec![expr(HirExpressionKind::Itera {
+            mode: HirIteraMode::Ex,
+            coordinates: Vec::new(),
+            binding: DefId(1),
+            binding_name: Symbol(1),
+            iter: boxed(HirExpressionKind::Literal(HirLiteral::Nil)),
+            body: body_block.clone(),
+            mutable: false
+        })]),
         2,
         "Itera"
     );
@@ -249,6 +250,7 @@ fn row_loops_count_one_each() {
             coordinates: Vec::new(),
             bindings: vec![(DefId(1), Symbol(1)), (DefId(2), Symbol(2))],
             body: body_block.clone(),
+            mutable: false,
         })]),
         2,
         "IteraLockstep"
@@ -258,6 +260,7 @@ fn row_loops_count_one_each() {
             ranges: vec![lit(), lit()],
             bindings: vec![(DefId(1), Symbol(1)), (DefId(2), Symbol(2))],
             body: body_block.clone(),
+            mutable: false,
         })]),
         2,
         "IteraRange"
@@ -419,6 +422,7 @@ fn row_body_carrying_folds_count() {
             filum: None,
             binding: binding.clone(),
             body: block(vec![]),
+            mutable: false,
         })]),
         2,
         "Summa per-element body"

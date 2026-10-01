@@ -545,7 +545,7 @@ fn rewrite_nested_expr(
                 );
             }
         }
-        HirExpressionKind::Loop(block) | HirExpressionKind::Itera(_, _, _, _, _, block) => {
+        HirExpressionKind::Loop(block) | HirExpressionKind::Itera { body: block, .. } => {
             rewrite_block(
                 presentation,
                 block,
@@ -937,7 +937,15 @@ fn classify_itera_expr(
     // `IteraRange` product (like `IteraLockstep`) has no AIR recipe: it
     // returns `None` here and stays fail-closed — the product never
     // unrolls, whatever its body shape.
-    let HirExpressionKind::Itera(mode, coordinates, index_def, _, source, body) = &expr.kind else {
+    let HirExpressionKind::Itera {
+        mode,
+        coordinates,
+        binding: index_def,
+        iter: source,
+        body,
+        ..
+    } = &expr.kind
+    else {
         return None;
     };
     match mode {
@@ -1543,7 +1551,7 @@ fn collect_straight_assigns(block: &HirBlock, assigned: &mut FxHashSet<DefId>) {
             }
             // A nested unroll unit splices straight-line lanes into this
             // block, so its body's assigns are accumulator updates here too.
-            if let HirExpressionKind::Itera(_, _, _, _, _, body) = &expr.kind {
+            if let HirExpressionKind::Itera { body, .. } = &expr.kind {
                 collect_straight_assigns(body, assigned);
             }
         }
@@ -1654,8 +1662,8 @@ impl BodyDecline<'_> {
             // recipe, so they never reach this root exemption and walk
             // through the generic arm below like any other nested
             // expression.
-            HirExpressionKind::Itera(..) if self.at_loop_body_root && as_statement => {}
-            HirExpressionKind::Itera(..) => self.reject(CAUSA_UNSUPPORTED_CONTROL),
+            HirExpressionKind::Itera { .. } if self.at_loop_body_root && as_statement => {}
+            HirExpressionKind::Itera { .. } => self.reject(CAUSA_UNSUPPORTED_CONTROL),
             HirExpressionKind::Call(callee, _, args, _) => {
                 if !matches!(&callee.kind, HirExpressionKind::Path(def) if self.lanes.lane_for(*def) == Some(RadixLane::Air))
                 {
@@ -2331,7 +2339,7 @@ impl MaskCollector<'_> {
                 }
             }
             HirExpressionKind::Block(block) => self.scan_block(block),
-            HirExpressionKind::Loop(block) | HirExpressionKind::Itera(_, _, _, _, _, block) => {
+            HirExpressionKind::Loop(block) | HirExpressionKind::Itera { body: block, .. } => {
                 self.scan_block(block)
             }
             HirExpressionKind::Dum(cond, block) => {

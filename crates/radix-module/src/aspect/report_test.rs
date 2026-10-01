@@ -657,14 +657,15 @@ fn itera_expr(
 ) -> HirExpression {
     HirExpression {
         id: HirId(id),
-        kind: HirExpressionKind::Itera(
+        kind: HirExpressionKind::Itera {
             mode,
             coordinates,
-            DefId(50),
-            crate::lexer::Symbol(1),
-            Box::new(source),
-            HirBlock::default(),
-        ),
+            binding: DefId(50),
+            binding_name: crate::lexer::Symbol(1),
+            iter: Box::new(source),
+            body: HirBlock::default(),
+            mutable: false,
+        },
         ty: None,
         span: test_span_between(8, 20),
     }

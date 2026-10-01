@@ -752,7 +752,7 @@ fn ensure_itera_coordinate_array_types(hir: &crate::hir::HirModule, types: &mut 
     impl HirVisitor for IteraCoordinateCollector<'_> {
         fn visit_expr(&mut self, expr: &HirExpression) {
             match &expr.kind {
-                HirExpressionKind::Itera(_, coordinates, _, _, iter, _) if !coordinates.is_empty() => {
+                HirExpressionKind::Itera { coordinates, iter, .. } if !coordinates.is_empty() => {
                     self.collect_shaped_element(iter);
                 }
                 // The sequential `summa ex` fold rides the shaped itera arm
@@ -3861,7 +3861,7 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::Discerne { .. } => "discerne before switch MIR lowering",
         HirExpressionKind::Loop(_) => "loop before control-flow MIR lowering",
         HirExpressionKind::Dum(_, _) => "dum before control-flow MIR lowering",
-        HirExpressionKind::Itera(_, _, _, _, _, _) => "itera before iterator MIR lowering",
+        HirExpressionKind::Itera { .. } => "itera before iterator MIR lowering",
         HirExpressionKind::IteraLockstep { .. } => {
             "lockstep itera before aligned-walk MIR lowering"
         }

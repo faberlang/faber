@@ -1267,6 +1267,7 @@ fn collect_expr_defs(
             filum,
             binding,
             body,
+            ..
         } => {
             collect_expr_defs(source, registry);
             for (def_id, _) in coordinates {
@@ -1410,7 +1411,13 @@ fn collect_expr_defs(
             collect_expr_defs(cond, registry);
             collect_block_defs(body, registry);
         }
-        HirExpressionKind::Itera(_, coordinates, def_id, _, iterable, body) => {
+        HirExpressionKind::Itera {
+            coordinates,
+            binding: def_id,
+            iter: iterable,
+            body,
+            ..
+        } => {
             for (coordinate_def_id, _) in coordinates {
                 registry.insert(*coordinate_def_id);
             }
@@ -1423,6 +1430,7 @@ fn collect_expr_defs(
             coordinates,
             bindings,
             body,
+            ..
         } => {
             for (coordinate_def_id, _) in coordinates {
                 registry.insert(*coordinate_def_id);
@@ -1442,6 +1450,7 @@ fn collect_expr_defs(
             ranges,
             bindings,
             body,
+            ..
         } => {
             for (binding_def_id, _) in bindings {
                 registry.insert(*binding_def_id);
@@ -1765,7 +1774,11 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                 collect_expr(cond, registry);
                 collect_block(body, registry);
             }
-            HirExpressionKind::Itera(_, _, _, _, iterable, body) => {
+            HirExpressionKind::Itera {
+                iter: iterable,
+                body,
+                ..
+            } => {
                 collect_expr(iterable, registry);
                 collect_block(body, registry);
             }
@@ -2443,6 +2456,7 @@ pub(crate) fn validate_referential_integrity(
                 filum,
                 binding,
                 body,
+                ..
             } => {
                 validate_expr(source, checks)?;
                 for (def_id, name) in coordinates {
@@ -2632,7 +2646,14 @@ pub(crate) fn validate_referential_integrity(
                 validate_expr(cond, checks)?;
                 validate_block(body, checks)?;
             }
-            HirExpressionKind::Itera(_, coordinates, def_id, sym, iterable, body) => {
+            HirExpressionKind::Itera {
+                coordinates,
+                binding: def_id,
+                binding_name: sym,
+                iter: iterable,
+                body,
+                ..
+            } => {
                 for (coordinate_def_id, coordinate_name) in coordinates {
                     checks.check_def(*coordinate_def_id)?;
                     checks.check_symbol(*coordinate_name)?;
@@ -2647,6 +2668,7 @@ pub(crate) fn validate_referential_integrity(
                 coordinates,
                 bindings,
                 body,
+                ..
             } => {
                 for (coordinate_def_id, coordinate_name) in coordinates {
                     checks.check_def(*coordinate_def_id)?;
@@ -2668,6 +2690,7 @@ pub(crate) fn validate_referential_integrity(
                 ranges,
                 bindings,
                 body,
+                ..
             } => {
                 for (binding_def_id, binding_name) in bindings {
                     checks.check_def(*binding_def_id)?;

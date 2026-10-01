@@ -406,7 +406,14 @@ impl HirVisitor for LiberaChecker<'_> {
             HirExpressionKind::ConversioAssign { source, .. } => {
                 self.visit_in(KernelPosition::Other("assignment"), source);
             }
-            HirExpressionKind::Itera(_, coordinates, def_id, name, iter, block) => {
+            HirExpressionKind::Itera {
+                coordinates,
+                binding: def_id,
+                binding_name: name,
+                iter,
+                body: block,
+                ..
+            } => {
                 for (coordinate, coordinate_name) in coordinates {
                     self.visit_def(*coordinate, *coordinate_name);
                     if let Some(scope) = self.scopes.last_mut() {
@@ -499,7 +506,13 @@ impl HirVisitor for CaptureProbe {
                     self.captures.push((*def_id, expr.span));
                 }
             }
-            HirExpressionKind::Itera(_, coordinates, def_id, _, iter, block) => {
+            HirExpressionKind::Itera {
+                coordinates,
+                binding: def_id,
+                iter,
+                body: block,
+                ..
+            } => {
                 if let Some(scope) = self.scopes.last_mut() {
                     for (coordinate, _) in coordinates {
                         scope.insert(*coordinate);

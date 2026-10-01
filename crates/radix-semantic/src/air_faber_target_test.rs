@@ -30,7 +30,7 @@ functio too_wide(tensor<f32, [65]> x) → f32 {
 struct CountIteras(usize);
 impl HirVisitor for CountIteras {
     fn visit_expr(&mut self, expr: &HirExpression) {
-        if matches!(expr.kind, HirExpressionKind::Itera(..)) {
+        if matches!(expr.kind, HirExpressionKind::Itera { .. }) {
             self.0 += 1;
         }
         walk_expr(self, expr);
