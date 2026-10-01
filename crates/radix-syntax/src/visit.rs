@@ -574,6 +574,7 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
             visitor.visit_block(&first_match.body);
         }
         ExprKind::Vacua(_)
+        | ExprKind::KeywordLiteral(_)
         | ExprKind::Literal(_)
         | ExprKind::Lege(_)
         | ExprKind::Ego(_)

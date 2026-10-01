@@ -4015,6 +4015,10 @@ help = "choose a different binding name when the empty-collection marker is need
 message = "binding shadows the empty-collection marker"
 help = "choose a different binding name when the empty-collection marker is needed"
 
+[diagnostics.WARN021.issues.value_literal_shadowing]
+message = "binding shadows the value literal `{keyword}`"
+help = "choose a different binding name when the `{keyword}` literal is needed"
+
 [diagnostics.WARN022]
 message = "unbounded textus scalar index walks UTF-8 and traps on non-ASCII scalars"
 help = "convert to textus<N> for O(1) indexing or iterate scalars"

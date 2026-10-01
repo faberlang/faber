@@ -1861,10 +1861,10 @@ impl Parser {
                     } else {
                         Literal::Nil
                     };
-                    self.advance();
+                    let ident = self.parse_primary_ident()?;
                     return Ok(Expr {
                         id,
-                        kind: ExprKind::Literal(literal),
+                        kind: ExprKind::KeywordLiteral(KeywordLiteralExpr { literal, ident }),
                         span: start.merge(self.previous_span()),
                     });
                 }
@@ -1875,7 +1875,10 @@ impl Parser {
                 if self.keyword_claim_key(ident.name) == Some("nonnumerus")
                     && self.peek().kind != TokenKind::LParen
                 {
-                    ExprKind::Literal(Literal::Float(f64::NAN))
+                    ExprKind::KeywordLiteral(KeywordLiteralExpr {
+                        literal: Literal::Float(f64::NAN),
+                        ident,
+                    })
                 // Locale-aware `vacua` claim: the empty-collection marker
                 // claims only through the pack-authoritative surface gate.
                 // Under `la`/no-pack the registry-direct fallback lets the

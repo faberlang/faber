@@ -2703,7 +2703,10 @@ fn parses_requirit_statement() {
     assert!(
         matches!(
             require_stmt.cond.kind,
-            ExprKind::Literal(Literal::Bool(true))
+            ExprKind::KeywordLiteral(radix_syntax::KeywordLiteralExpr {
+                literal: Literal::Bool(true),
+                ..
+            })
         ),
         "cond should be the boolean literal verum"
     );
@@ -2719,6 +2722,30 @@ fn parses_requirit_statement() {
 }
 
 #[test]
+fn value_literal_keywords_keep_their_spelling() {
+    // The resolver needs the written spelling to let a same-named binding win.
+    for (source, keyword) in [
+        ("reice verum iace \"bad\"", "verum"),
+        ("reice falsum iace \"bad\"", "falsum"),
+        ("reice nulla iace \"bad\"", "nulla"),
+        ("reice nonnumerus iace \"bad\"", "nonnumerus"),
+    ] {
+        let result = parse_ok(source);
+        let program = result.program.as_ref().expect("program");
+        let StmtKind::Reject(reject_stmt) = &program.statements[0].kind else {
+            panic!("expected reice statement");
+        };
+        let ExprKind::KeywordLiteral(literal) = &reject_stmt.cond.kind else {
+            panic!(
+                "{keyword} should parse to a keyword literal: {:?}",
+                reject_stmt.cond.kind
+            );
+        };
+        assert_eq!(result.interner.resolve(literal.ident.name), keyword);
+    }
+}
+
+#[test]
 fn parses_reice_statement() {
     let result = parse_ok("reice verum iace \"bad\"");
     let program = result.program.as_ref().expect("program");
@@ -2729,7 +2756,10 @@ fn parses_reice_statement() {
     assert!(
         matches!(
             reject_stmt.cond.kind,
-            ExprKind::Literal(Literal::Bool(true))
+            ExprKind::KeywordLiteral(radix_syntax::KeywordLiteralExpr {
+                literal: Literal::Bool(true),
+                ..
+            })
         ),
         "cond should be the boolean literal verum"
     );

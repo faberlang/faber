@@ -1353,11 +1353,14 @@ impl Lowerer<'_> {
     ) -> HirPattern {
         match &value.kind {
             radix_syntax::ExprKind::Literal(lit) => pattern::lower_literal(self, lit, span),
+            radix_syntax::ExprKind::KeywordLiteral(keyword) => {
+                pattern::lower_literal(self, &keyword.literal, span)
+            }
             // D22.2: `casu -1` / `casu -∞` — a minus directly over a literal.
             // `lower_negated_literal` rejects a non-number operand.
             radix_syntax::ExprKind::Unary(unary)
                 if unary.op == radix_syntax::UnOp::Neg
-                    && let radix_syntax::ExprKind::Literal(lit) = &unary.operand.kind =>
+                    && let Some(lit) = unary.operand.kind.literal() =>
             {
                 pattern::lower_negated_literal(self, lit, span)
             }

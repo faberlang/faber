@@ -49,6 +49,11 @@ const ISSUE_UNUSED_BINDING: &str = "unused_binding";
 const ISSUE_UNUSED_FUNCTION: &str = "unused_function";
 const ISSUE_UNUSED_IMPORT: &str = "unused_import";
 const ISSUE_UNUSED_VARIABLE: &str = "unused_variable";
+const ISSUE_VALUE_LITERAL_SHADOWING: &str = "value_literal_shadowing";
+
+/// Latin registry keys of the value-literal keywords a binding may shadow.
+/// `nihil` is the transitional alias of the `nulla` null literal.
+const VALUE_LITERAL_KEYS: [&str; 5] = ["verum", "falsum", "nulla", "nihil", "nonnumerus"];
 
 /// Run the target-enabled semantic lint suite.
 ///
@@ -85,6 +90,37 @@ pub fn lint(
     errors
 }
 
+/// Spellings the active reader surface claims as value-literal keywords.
+///
+/// Mirrors the parser's keyword claim: with a pack, only spellings the pack
+/// declares for one of [`VALUE_LITERAL_KEYS`] claim; without one, the Latin
+/// registry spellings do (the `nihil` alias is a type row there, so it is out).
+fn value_literal_spellings(locale_pack: Option<&LocalePack>) -> FxHashSet<String> {
+    let Some(pack) = locale_pack else {
+        return ["verum", "falsum", "nulla", "nonnumerus"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect();
+    };
+    let mut spellings = FxHashSet::default();
+    for key in VALUE_LITERAL_KEYS {
+        let candidates = std::iter::once(pack.contextual_keyword_surface(key)).chain(
+            pack.contextual_keyword_aliases(key)
+                .iter()
+                .map(String::as_str),
+        );
+        for candidate in candidates {
+            if pack
+                .keyword_latin_key(candidate)
+                .is_some_and(|latin| VALUE_LITERAL_KEYS.contains(&latin))
+            {
+                spellings.insert(candidate.to_owned());
+            }
+        }
+    }
+    spellings
+}
+
 struct LintContext<'a> {
     resolver: &'a Resolver,
     /// Read-only semantic type facts for lints that need more than identity,
@@ -108,6 +144,8 @@ struct LintContext<'a> {
     def_names: rustc_hash::FxHashMap<radix_hir::DefId, radix_lexer::Symbol>,
     /// Active reader-locale spellings that claim the empty-collection marker.
     marker_spellings: FxHashSet<String>,
+    /// Active reader-locale spellings that claim a value-literal keyword.
+    value_literal_spellings: FxHashSet<String>,
     /// True while the visitor descends into the left operand of a `+`: that
     /// operand belongs to the enclosing `+` chain and must not evaluate the
     /// chain itself.
@@ -129,6 +167,7 @@ impl<'a> LintContext<'a> {
         } else {
             marker_spellings.insert("vacua".to_owned());
         }
+        let value_literal_spellings = value_literal_spellings(locale_pack);
         Self {
             resolver,
             types,
@@ -146,6 +185,7 @@ impl<'a> LintContext<'a> {
             scope: Vec::new(),
             def_names: rustc_hash::FxHashMap::default(),
             marker_spellings,
+            value_literal_spellings,
             inside_add_left_child: false,
             in_loop: false,
         }
@@ -253,7 +293,7 @@ impl<'a> LintContext<'a> {
                 }
             }
             HirItemKind::Constant(const_item) => {
-                self.warn_on_empty_marker_shadowing(const_item.name, item.span);
+                self.warn_on_shadowed_keyword(const_item.name, item.span);
                 self.check_expr(&const_item.value, false);
             }
             _ => {}
@@ -263,7 +303,7 @@ impl<'a> LintContext<'a> {
     fn check_function(&mut self, func: &HirFunction) {
         self.push_scope();
         for param in &func.params {
-            self.warn_on_empty_marker_shadowing(param.name, param.span);
+            self.warn_on_shadowed_keyword(param.name, param.span);
             self.def_names.insert(param.def_id, param.name);
             self.defs
                 .push((param.def_id, param.span, WarningKind::UnusedVariable));
@@ -361,7 +401,7 @@ impl<'a> LintContext<'a> {
     }
 
     fn check_local(&mut self, local: &HirLocal, span: Span) {
-        self.warn_on_empty_marker_shadowing(local.name, span);
+        self.warn_on_shadowed_keyword(local.name, span);
         self.def_names.insert(local.def_id, local.name);
         self.defs
             .push((local.def_id, span, WarningKind::UnusedVariable));
@@ -386,7 +426,7 @@ impl<'a> LintContext<'a> {
         self.in_loop = previous;
     }
 
-    fn warn_on_empty_marker_shadowing(&mut self, name: radix_lexer::Symbol, span: Span) {
+    fn warn_on_shadowed_keyword(&mut self, name: radix_lexer::Symbol, span: Span) {
         let Some(spelling) = self.interner.strings().get(name.0 as usize) else {
             return;
         };
@@ -397,6 +437,15 @@ impl<'a> LintContext<'a> {
                 span,
                 None,
             ));
+        } else if self.value_literal_spellings.contains(spelling) {
+            self.errors.push(
+                SemanticError::structured(
+                    SemanticErrorKind::Warning(WarningKind::EmptyMarkerShadowing),
+                    span,
+                )
+                .with_arg("issue", ISSUE_VALUE_LITERAL_SHADOWING)
+                .with_arg("keyword", spelling.clone()),
+            );
         }
     }
 
@@ -608,7 +657,7 @@ fn is_string_literal(expr: &HirExpression) -> bool {
 
 impl HirVisitor for LintContext<'_> {
     fn visit_param(&mut self, param: &HirParam) {
-        self.warn_on_empty_marker_shadowing(param.name, param.span);
+        self.warn_on_shadowed_keyword(param.name, param.span);
         if let Some(default) = &param.default {
             self.visit_expr(default);
         }

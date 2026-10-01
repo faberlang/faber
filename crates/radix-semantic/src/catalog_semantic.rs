@@ -319,9 +319,9 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
         SemanticErrorKind::Warning(WarningKind::UnionHoleSolvedMonomorphically) => {
             semantic_union_hole_solved_monomorphically_help(args)
         }
-        SemanticErrorKind::Warning(WarningKind::EmptyMarkerShadowing) => Some(
-            "choose a different binding name when the empty-collection marker is needed".to_owned(),
-        ),
+        SemanticErrorKind::Warning(WarningKind::EmptyMarkerShadowing) => {
+            semantic_keyword_shadowing_help(args)
+        }
         SemanticErrorKind::Warning(WarningKind::UnboundedTextusIndex) => {
             Some("convert to textus<N> for O(1) indexing or iterate scalars".to_owned())
         }
@@ -1276,6 +1276,18 @@ fn semantic_monomorphic_hole_solved_to_union_help(args: &[DiagnosticArg]) -> Opt
             Some("use an explicit union type or a `∪` hole if a sum was intended".to_owned())
         }
         _ => None,
+    }
+}
+
+fn semantic_keyword_shadowing_help(args: &[DiagnosticArg]) -> Option<String> {
+    match arg_value(args, "issue") {
+        Some("value_literal_shadowing") => Some(format!(
+            "choose a different binding name when the `{}` literal is needed",
+            arg_value(args, "keyword")?
+        )),
+        _ => Some(
+            "choose a different binding name when the empty-collection marker is needed".to_owned(),
+        ),
     }
 }
 
