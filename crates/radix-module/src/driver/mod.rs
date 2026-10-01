@@ -3428,7 +3428,8 @@ fn analyze_source_with_kernel_template_admissions_unadjusted(
     // D8.5: evaluate `praefixum` statics on the MIR runner so every backend
     // receives literals. Faber re-emission keeps the authored body.
     if session.config.target != Target::HirFaber
-        && let Err(praefixum_errors) = praefixum::evaluate(&mut unit, name, body)
+        && let Err(praefixum_errors) =
+            praefixum::evaluate(&mut unit, name, body, session.config.defer_imported_praefixum)
     {
         unit.diagnostics.extend(praefixum_errors);
         return Err(unit.diagnostics);

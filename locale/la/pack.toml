@@ -3879,6 +3879,10 @@ help = "return scalars, text, bytes, collections of those, tuples, or a non-gene
 message = "`{praefixum}` initializer of `{name}` cannot run at build time: {detail}"
 help = "use only constructs the build-time runner supports"
 
+[diagnostics.SEM064.issues.praefixum_import_unavailable]
+message = "`{praefixum}` initializer of `{name}` reaches `{callee}`, an import that build-time evaluation does not run in this analysis"
+help = "evaluation follows calls into other modules of a package: move the computation into this module, or analyze the package"
+
 [diagnostics.WARN001]
 message = "unused variable"
 help = "remove the variable or prefix it with '_'"

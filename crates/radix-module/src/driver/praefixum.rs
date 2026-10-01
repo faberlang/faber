@@ -23,7 +23,11 @@
 //! - no `redde` value: `praefixum_no_result`;
 //! - a value with no literal form on every backend (closure, handle, float
 //!   infinity, generic genus): `praefixum_result_not_literal`;
-//! - a construct the runner cannot lower: `praefixum_unsupported`.
+//! - a construct the runner cannot lower: `praefixum_unsupported`;
+//! - a body that reaches an import (`ns.f()`, `ns.K`, directly or through a
+//!   local helper): `praefixum_import_unavailable`, unless the session defers
+//!   such modules to the package layer (`Config::defer_imported_praefixum`),
+//!   in which case no site of the module evaluates here.
 //!
 //! Faber re-emission (`format`, `convert`) keeps the authored body and never
 //! evaluates.
@@ -35,7 +39,12 @@ use crate::driver::AnalyzedModule;
 /// Faber re-emission still work, and every codegen backend refuses an
 /// unevaluated `praefixum` (`praefixum_unevaluated`).
 #[cfg(not(feature = "runner"))]
-pub(crate) fn evaluate(_unit: &mut AnalyzedModule, _name: &str, _body: &str) -> Result<(), Vec<Diagnostic>> {
+pub(crate) fn evaluate(
+    _unit: &mut AnalyzedModule,
+    _name: &str,
+    _body: &str,
+    _defer_imported: bool,
+) -> Result<(), Vec<Diagnostic>> {
     Ok(())
 }
 
@@ -46,6 +55,7 @@ pub(crate) use evaluation::evaluate;
 mod evaluation {
     use super::{AnalyzedModule, Diagnostic};
     use crate::diagnostics::DiagnosticConvert;
+    use crate::semantic::passes::praefixum::{ImportedReference, ImportedReferenceKind, imported_references};
     use crate::semantic::{self, SemanticError, SemanticErrorKind};
     use radix_hir::visit::{HirVisitorMut, walk_local_mut};
     use radix_hir::{DefId, HirExpression, HirItemKind, HirLocal};
@@ -63,7 +73,16 @@ mod evaluation {
     ///
     /// Returns the diagnostics for every static that failed to evaluate; the
     /// unit must not reach codegen then.
-    pub(crate) fn evaluate(unit: &mut AnalyzedModule, name: &str, body: &str) -> Result<(), Vec<Diagnostic>> {
+    ///
+    /// A site that reaches an import never runs here. With `defer_imported`
+    /// the whole module is left unevaluated for the package layer; without
+    /// it each such site is refused and the rest evaluate.
+    pub(crate) fn evaluate(
+        unit: &mut AnalyzedModule,
+        name: &str,
+        body: &str,
+        defer_imported: bool,
+    ) -> Result<(), Vec<Diagnostic>> {
         let order = match semantic::passes::praefixum::evaluation_order(&unit.hir, &unit.types) {
             Ok(order) => order,
             // Analysis already reported the cycle.
@@ -72,9 +91,21 @@ mod evaluation {
         if order.is_empty() {
             return Ok(());
         }
+        let reached: Vec<Option<ImportedReference>> = order
+            .iter()
+            .map(|site| first_import_reached(unit, site.def_id))
+            .collect();
+        if defer_imported && reached.iter().any(Option::is_some) {
+            return Ok(());
+        }
         let mut errors = Vec::new();
-        for site in &order {
-            if let Err(error) = evaluate_site(unit, site.def_id, site.span) {
+        for (site, import) in order.iter().zip(&reached) {
+            let outcome = match import {
+                Some(reference) => Err(invalid("praefixum_import_unavailable", site.span)
+                    .with_arg("callee", spell_import(unit, reference))),
+                None => evaluate_site(unit, site.def_id, site.span),
+            };
+            if let Err(error) = outcome {
                 errors.push(error.with_arg("name", unit.interner.resolve(site.name)));
             }
         }
@@ -89,6 +120,32 @@ mod evaluation {
             .iter()
             .map(|error| Diagnostic::from_semantic_error(name, body, error))
             .collect())
+    }
+
+    /// The first import reference of a site that would need another
+    /// module's code: a call or a data member of an import namespace. A
+    /// method call never defers.
+    fn first_import_reached(unit: &AnalyzedModule, site: DefId) -> Option<ImportedReference> {
+        imported_references(&unit.hir, &unit.types, site)
+            .into_iter()
+            .find(|reference| reference.kind != ImportedReferenceKind::Method)
+    }
+
+    /// `<binding>.<member>` for an import reference.
+    fn spell_import(unit: &AnalyzedModule, reference: &ImportedReference) -> String {
+        let binding = unit.hir.items.iter().find_map(|item| match &item.kind {
+            HirItemKind::Import(import) if !import.selective => import
+                .items
+                .iter()
+                .find(|bound| bound.def_id == reference.namespace)
+                .map(|bound| bound.alias.unwrap_or(bound.name)),
+            _ => None,
+        });
+        let member = unit.interner.resolve(reference.member);
+        match binding {
+            Some(binding) => format!("{}.{member}", unit.interner.resolve(binding)),
+            None => member.to_owned(),
+        }
     }
 
     pub(crate) fn invalid(issue: &'static str, span: Span) -> SemanticError {

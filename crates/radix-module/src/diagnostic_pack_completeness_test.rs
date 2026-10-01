@@ -19,6 +19,8 @@ const SYNTAX_CATALOG: &str = include_str!("../../radix-semantic/src/catalog_synt
 
 const INSTALLED_LOCALES: &[&str] = &["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"];
 const SEM008_ISSUES: &[&str] = &["callable_posture_conflict", "comment_without_owner"];
+/// SEM064 issues raised by build-time evaluation, outside the catalog `match`.
+const SEM064_ISSUES: &[&str] = &["praefixum_import_unavailable"];
 
 fn owned_installed_pack(locale: &str) -> LocalePack {
     let path = crate::locale::workspace_locale_pack_path(locale);
@@ -187,6 +189,7 @@ fn en_and_la_cover_every_catalog_issue_key() {
     catalog_issues.extend(catalog_issue_keys(SYNTAX_CATALOG));
     catalog_issues.insert(radix_lexer::HOMOGLYPH_ISSUE.to_owned());
     catalog_issues.extend(SEM008_ISSUES.iter().map(|issue| (*issue).to_owned()));
+    catalog_issues.extend(SEM064_ISSUES.iter().map(|issue| (*issue).to_owned()));
 
     let en = owned_installed_pack("en");
     let la = owned_installed_pack("la");
