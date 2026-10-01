@@ -2703,10 +2703,6 @@ help = "the named presets format {instans} only"
 message = "'¶' does not format this type"
 help = "'¶' formats numbers, {textus}, and {instans}; write a function that returns {textus}"
 
-[diagnostics.SEM011.issues.format_decimal_unsupported]
-message = "'¶' on decimal numbers is not yet supported"
-help = "convert the decimal with ↦ {fractus} or ↦ {textus} until decimal display is settled"
-
 [diagnostics.SEM011.issues.octeti_index_must_be_numerus_or_range]
 message = "octeti index requirit numerus vel intervallum"
 help = "indica octeti per numerus vel intervallum integrum"

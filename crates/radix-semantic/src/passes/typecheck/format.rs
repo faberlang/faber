@@ -18,7 +18,6 @@ const ISSUE_FORMAT_SPEC_PART_INVALID: &str = "format_spec_part_invalid";
 const ISSUE_FORMAT_SPEC_PRESET_REQUIRED: &str = "format_spec_preset_required";
 const ISSUE_FORMAT_SPEC_PRESET_NOT_ALLOWED: &str = "format_spec_preset_not_allowed";
 const ISSUE_FORMAT_TYPE_UNSUPPORTED: &str = "format_type_unsupported";
-const ISSUE_FORMAT_DECIMAL_UNSUPPORTED: &str = "format_decimal_unsupported";
 
 /// Check `value ¶ "spec"` and produce `textus`.
 pub(super) fn check_format_expr(
@@ -35,11 +34,6 @@ pub(super) fn check_format_expr(
     }
     let subject = format_subject(checker.types, resolved);
     match subject {
-        FormatSubject::Decimal => {
-            // Fork F4: decimal display policy is held; do not guess one.
-            checker.invalid_operand_types(ISSUE_FORMAT_DECIMAL_UNSUPPORTED, span);
-            return textus;
-        }
         FormatSubject::Unsupported => {
             checker.invalid_operand_types(ISSUE_FORMAT_TYPE_UNSUPPORTED, span);
             return textus;

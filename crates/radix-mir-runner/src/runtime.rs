@@ -5005,19 +5005,33 @@ fn numeric_max(
 /// renderer. Typecheck already validated the spec against the value's type,
 /// so a spec that does not parse here, or a value family `¶` does not
 /// admit, is an internal error, never a user-facing failure (D2.4).
-fn format_value(
+pub(crate) fn format_value(
     value: &Value,
     spec: &str,
     float_width: Option<radix_types::NumericWidth>,
     span: Span,
 ) -> Result<String, RunnerError> {
     use radix_types::format_spec::{
-        FormatSpec, parse_format_spec, render_float, render_instans_preset, render_integer,
-        render_text,
+        FormatSpec, parse_format_spec, render_decimal, render_float, render_instans_preset,
+        render_integer, render_text,
     };
     let parsed = parse_format_spec(spec)
         .map_err(|_| RunnerError::internal(span, "format_value spec did not parse"))?;
     match (value, parsed) {
+        // A stored `d64` is a scale-8 carrier; only the operand's static type
+        // tells it from an integer. An unstored intermediate carries its scale.
+        (Value::Int(v), FormatSpec::Layout(layout))
+            if float_width.is_some_and(radix_types::NumericWidth::is_decimal) =>
+        {
+            Ok(render_decimal(
+                i128::from(*v),
+                crate::decimal::STORED_SCALE,
+                &layout,
+            ))
+        }
+        (Value::Dec(carrier, scale), FormatSpec::Layout(layout)) => {
+            Ok(render_decimal(*carrier, *scale, &layout))
+        }
         (Value::Int(v), FormatSpec::Layout(layout)) => Ok(render_integer(i128::from(*v), &layout)),
         (Value::UInt(v), FormatSpec::Layout(layout)) => Ok(render_integer(i128::from(*v), &layout)),
         // Ruling 42: an `inf` beyond the 64-bit carriers takes the integer

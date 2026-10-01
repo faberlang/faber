@@ -2,8 +2,8 @@
 //!
 //! The spec is checked against the left side's type: numbers take the full
 //! pattern, `textus` takes fill/align/width/truncate, `instans` takes only the
-//! named presets. `¶` is closed to built-in types; decimal display is held
-//! (fork F4) and rejected by name.
+//! named presets. `¶` is closed to built-in types; `d64` takes the float
+//! parts except the radix and scientific kinds (fork F4, ruled).
 
 use crate::test_support;
 use radix_diagnostics::DiagnosticArg;
@@ -111,9 +111,33 @@ fn bivalens_is_not_a_format_subject() {
 }
 
 #[test]
-fn decimal_display_is_not_yet_supported() {
-    test_support::assert_rejects_with_issue(
-        "functio f(d64 d) → textus { redde d ¶ \".2\" }",
-        "format_decimal_unsupported",
+fn decimal_takes_the_float_parts() {
+    test_support::assert_accepts(
+        "functio f(d64 d) → textus { redde (d ¶ \".2\") + (d ¶ \"*^+12.3\") + (d ¶ \"08\") + (d ¶ \"\") }",
+    );
+}
+
+#[test]
+fn decimal_rejects_every_kind_by_part() {
+    for kind in ["x", "b", "o", "e"] {
+        let source = format!("functio f(d64 d) → textus {{ redde d ¶ \"{kind}\" }}");
+        test_support::assert_rejects_with_args(
+            &source,
+            &[
+                DiagnosticArg::new("issue", "format_spec_part_invalid"),
+                DiagnosticArg::new("part", "kind"),
+            ],
+        );
+    }
+}
+
+#[test]
+fn decimal_zero_and_align_do_not_combine() {
+    test_support::assert_rejects_with_args(
+        "functio f(d64 d) → textus { redde d ¶ \"<05\" }",
+        &[
+            DiagnosticArg::new("issue", "format_spec_part_invalid"),
+            DiagnosticArg::new("part", "zero"),
+        ],
     );
 }

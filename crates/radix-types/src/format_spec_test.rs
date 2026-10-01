@@ -164,7 +164,7 @@ fn malformed_table() {
 fn validate_table() {
     use FormatSpecError::{PartNotAllowed, PresetNotAllowed, PresetRequired};
     use FormatSpecPart::{Kind, Precision, Sign, Zero};
-    use FormatSubject::{Float, Instans, Signed, Text, Unsigned};
+    use FormatSubject::{Decimal, Float, Instans, Signed, Text, Unsigned};
     let cases: &[(&str, FormatSubject, Result<(), FormatSpecError>)] = &[
         (".2", Signed, Ok(())),
         ("08x", Unsigned, Ok(())),
@@ -175,6 +175,12 @@ fn validate_table() {
         (".2", Float, Ok(())),
         ("+010.3e", Float, Ok(())),
         ("x", Float, Err(PartNotAllowed(Kind))),
+        (".2", Decimal, Ok(())),
+        ("*>+10.3", Decimal, Ok(())),
+        ("x", Decimal, Err(PartNotAllowed(Kind))),
+        ("e", Decimal, Err(PartNotAllowed(Kind))),
+        ("<05", Decimal, Err(PartNotAllowed(Zero))),
+        ("iso", Decimal, Err(PresetNotAllowed)),
         ("*<8.3", Text, Ok(())),
         ("+", Text, Err(PartNotAllowed(Sign))),
         ("05", Text, Err(PartNotAllowed(Zero))),
@@ -394,4 +400,63 @@ fn render_magnus_handles_values_beyond_every_machine_integer() {
     let other = Magnus::parse_decimal(&format!("12345{}", "0".repeat(400))).expect("1.2345e404");
     assert_eq!(render_magnus(&other, &layout("e")), "1.2345e404");
     assert_eq!(render_magnus(&other, &layout(".1e")), "1.2e404");
+}
+
+#[test]
+fn decimal_render_table() {
+    // (carrier, scale, spec, expected)
+    let cases: &[(i128, u32, &str, &str)] = &[
+        // Stored scale 8: 12.5, 0.25, 0.35, 3.375.
+        (1_250_000_000, 8, ".2", "12.50"),
+        (25_000_000, 8, ".1", "0.2"),
+        (35_000_000, 8, ".1", "0.4"),
+        (337_500_000, 8, ".2", "3.38"),
+        (1_250_000_000, 8, ">8", "    12.5"),
+        // Half-even ties: the even neighbour wins.
+        (25, 2, ".1", "0.2"),
+        (35, 2, ".1", "0.4"),
+        (15, 1, ".0", "2"),
+        (25, 1, ".0", "2"),
+        (-25, 1, ".0", "-2"),
+        // Above the half the value rounds up, below it down.
+        (26, 2, ".1", "0.3"),
+        (24, 2, ".1", "0.2"),
+        (251, 3, ".1", "0.3"),
+        (249, 3, ".1", "0.2"),
+        // A carry through the digits.
+        (995, 3, ".2", "1.00"),
+        (9_995, 3, ".2", "10.00"),
+        // No precision: the shortest form.
+        (1_250_000_000, 8, "", "12.5"),
+        (300_000_000, 8, "", "3"),
+        (0, 8, "", "0"),
+        (-1, 8, "", "-0.00000001"),
+        // Precision past the scale pads zeros.
+        (125, 1, ".3", "12.500"),
+        (5, 0, ".2", "5.00"),
+        // Sign, zero, fill and align.
+        (1_250_000_000, 8, "+", "+12.5"),
+        (-1_250_000_000, 8, "010.2", "-000012.50"),
+        (1_250_000_000, 8, "*^9.1", "**12.5***"),
+        (1_250_000_000, 8, "<8", "12.5    "),
+        // A negative value that rounds to zero keeps its sign.
+        (-4, 2, ".1", "-0.0"),
+        // Exact past f64 and past a scale-8 carrier.
+        (
+            123_456_789_012_345_678_901_234_567_890,
+            20,
+            ".3",
+            "1234567890.123",
+        ),
+        (1, 38, ".2", "0.00"),
+        (5, 39, ".0", "0"),
+        (i128::MIN, 0, "", "-170141183460469231731687303715884105728"),
+    ];
+    for (carrier, scale, text, expected) in cases {
+        assert_eq!(
+            render_decimal(*carrier, *scale, &layout(text)),
+            *expected,
+            "{carrier}e-{scale} with {text:?}"
+        );
+    }
 }
