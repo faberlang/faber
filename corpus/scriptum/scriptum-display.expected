@@ -1,0 +1,15 @@
+yes=verum
+no=falsum
+whole=2.0
+frac=2.5
+count=7
+word=hi
+computed=2.5
+negated=falsum
+literal=3.0
+verum
+falsum
+2.0
+2.5
+7
+hi

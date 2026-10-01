@@ -4297,6 +4297,18 @@ kind = "concept"
 category = "type"
 
 [[files]]
+path = "scriptum/scriptum-display-option.fab"
+term = "scriptum-display-option"
+kind = "concept"
+category = "format"
+
+[[files]]
+path = "scriptum/scriptum-display.fab"
+term = "scriptum-display"
+kind = "concept"
+category = "format"
+
+[[files]]
 path = "scriptum/scriptum.fab"
 term = "scriptum"
 kind = "keyword"

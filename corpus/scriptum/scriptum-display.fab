@@ -1,0 +1,63 @@
++++
+term = "scriptum-display"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "format"
+canonical = true
+summary = "A `§` slot shows each value exactly as `print` does: booleans as `verum`/`falsum`, a whole float with `.0`."
+syntax = "\"<template>\"(<args>...)"
+related = ["scriptum", "scribe"]
+locale = "en"
++++
+# =============================================================================
+# scriptum-display — a `§` slot and `print` show a value the same way
+# =============================================================================
+#
+# What this teaches:
+#   • A scalar placed in a `§` slot is displayed by the same rule as a bare
+#     `print` of it: a boolean as the language's own spelling (never the
+#     host language's), a whole float keeping its `.0`.
+#   • The text of a template and the text printed line by line agree on every
+#     backend.
+#
+# Common mistakes:
+#   • Expecting a whole float to lose its fraction in a template (`2` for
+#     `2.0`); it prints `2.0`.
+#
+# See also: scriptum, scribe
+# =============================================================================
+
+# scriptum-display — scalar spellings inside `§` slots
+#
+# EXPECTED OUTPUT:
+#   scriptum-display.expected — each template line, then the same values printed alone.
+
+fn half(float x) → float {
+    return x / 2.0
+}
+
+main {
+    const bool yes ← true
+    const bool no ← false
+    const float whole ← 2.0
+    const float frac ← 2.5
+    const int count ← 7
+    const string word ← "hi"
+
+    print "yes=§"(yes)
+    print "no=§"(no)
+    print "whole=§"(whole)
+    print "frac=§"(frac)
+    print "count=§"(count)
+    print "word=§"(word)
+    print "computed=§"(half(5.0))
+    print "negated=§"(1 ≻ 2)
+    print "literal=§"(3.0)
+
+    print yes
+    print no
+    print whole
+    print frac
+    print count
+    print word
+}

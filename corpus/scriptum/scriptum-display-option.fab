@@ -1,0 +1,41 @@
++++
+term = "scriptum-display-option"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "format"
+canonical = true
+summary = "A `§` slot shows an option exactly as `print` does: an absent option as `nihil`, a present one as its value."
+syntax = "\"<template>\"(<option>)"
+related = ["scriptum", "scriptum-display", "scribe"]
+locale = "en"
++++
+# =============================================================================
+# scriptum-display-option — an option in a `§` slot
+# =============================================================================
+#
+# What this teaches:
+#   • An absent option placed in a `§` slot reads `nihil`, exactly as a bare
+#     `print` of it does; a present option reads as the value it holds.
+#
+# Common mistakes:
+#   • Expecting the host language's spelling of an absent value (`null`,
+#     `nil`, `None`) in the template text.
+#
+# See also: scriptum, scriptum-display
+# =============================================================================
+
+# scriptum-display-option — absent and present options inside `§` slots
+#
+# EXPECTED OUTPUT:
+#   scriptum-display-option.expected — each template line, then the same values printed alone.
+
+main {
+    const int ∪ none absent ← null
+    const int ∪ none present ← 4
+
+    print "absent=§"(absent)
+    print "present=§"(present)
+
+    print absent
+    print present
+}
