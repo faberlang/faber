@@ -14,7 +14,7 @@ fn lege_corpus_still_checks() {
 }
 
 #[test]
-fn th_th_example_still_checks_with_locale002_advisories() {
+fn th_th_example_still_checks_without_locale002_advisories() {
     // Probe ancestors for the examples repo so lane packets under
     // `worktrees/<lane>/` (which lack a sibling `examples/`) still resolve.
     let example = ["reader-locale/th-TH/src/main.fab"]
@@ -50,10 +50,19 @@ fn th_th_example_still_checks_with_locale002_advisories() {
         .iter()
         .filter(|d| d.code == Some("LOCALE002"))
         .count();
+    // `ผ่าน` is a valid identifier that only edit distance ties to the keyword
+    // `อ่าน`; with no error at its span (D-2) it draws no advisory.
     assert_eq!(
-        locale002, 2,
-        "th-TH example must keep exactly two LOCALE002 advisories: {:?}",
+        locale002, 0,
+        "th-TH example must draw no LOCALE002 advisory on valid code: {:?}",
         result.diagnostics
+    );
+    // The accent/width match (phase 1) stays always on: the same keyword
+    // without its tone mark folds to the keyword and is still suggested.
+    assert_eq!(
+        pack.keyword_suggestion("อาน").as_deref(),
+        Some("อ่าน"),
+        "phase-1 accent match must still fire"
     );
 }
 
