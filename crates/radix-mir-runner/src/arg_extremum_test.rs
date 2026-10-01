@@ -235,3 +235,46 @@ fn argmin_mirrors_argmax_exactly() {
     assert_eq!(argmax(ints.clone()), Value::Int(3));
     assert_eq!(argmin(ints), Value::Int(1));
 }
+
+// ---------------------------------------------------------------------------
+// rn-amx — `lista<inf>`: exact by value, first index on ties
+// ---------------------------------------------------------------------------
+
+fn big(text: &str) -> Value {
+    crate::inf::from_magnus(handroll::Magnus::parse_decimal(text).expect("decimal"))
+}
+
+/// A `lista<inf>` mixes the canonical carriers (`Int`, `UInt`, `Magnus`); the
+/// winner is the exact greatest element, never an `f64` approximation, and
+/// the first index wins ties.
+#[test]
+fn argmax_argmin_over_inf_compare_exact_values() {
+    // 2^70 and 2^70 + 1 collapse to the same f64; the exact compare must not.
+    let low = big("1180591620717411303424");
+    let high = big("1180591620717411303425");
+    assert!(matches!(low, Value::Magnus(_)));
+    let xs = vec![
+        Value::Int(3),
+        low.clone(),
+        high.clone(),
+        Value::Int(-5),
+        high.clone(),
+        big("-1180591620717411303425"),
+    ];
+    assert_eq!(
+        argmax(xs.clone()),
+        Value::Int(2),
+        "exact max, first on ties"
+    );
+    assert_eq!(argmin(xs), Value::Int(5), "exact min is the big negative");
+
+    // Mixed `Int` / `UInt` carriers past i64::MAX compare by value.
+    let mixed = vec![Value::Int(-1), Value::UInt(u64::MAX), Value::Int(i64::MAX)];
+    assert_eq!(argmax(mixed.clone()), Value::Int(1));
+    assert_eq!(argmin(mixed), Value::Int(0));
+
+    // First index on ties, both twins.
+    let ties = vec![low.clone(), Value::Int(1), low];
+    assert_eq!(argmax(ties.clone()), Value::Int(0));
+    assert_eq!(argmin(ties), Value::Int(1));
+}

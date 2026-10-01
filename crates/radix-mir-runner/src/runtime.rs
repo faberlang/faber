@@ -4821,6 +4821,14 @@ fn arg_extremum_replaces(
     if let (Value::UInt(best), Value::UInt(value)) = (incumbent, candidate) {
         return Ok(if want_max { value > best } else { value < best });
     }
+    // Any other integer pair (a `lista<inf>` mixes `Int`, `UInt` and `Magnus`
+    // carriers) compares by exact value.
+    if let (Some(best), Some(value)) = (
+        crate::inf::to_magnus(incumbent),
+        crate::inf::to_magnus(candidate),
+    ) {
+        return Ok(if want_max { value > best } else { value < best });
+    }
     let best = numeric_as_f64(incumbent, span)?;
     let value = numeric_as_f64(candidate, span)?;
     if best.is_nan() {

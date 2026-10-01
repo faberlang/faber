@@ -2586,6 +2586,10 @@ mod octeti_lista_test;
 mod vector_lista_test;
 
 #[cfg(test)]
+#[path = "tabula_lista_test.rs"]
+mod tabula_lista_test;
+
+#[cfg(test)]
 #[path = "ascii1_index_test.rs"]
 mod ascii1_index_test;
 

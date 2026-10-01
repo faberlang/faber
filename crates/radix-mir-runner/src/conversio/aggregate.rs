@@ -120,7 +120,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 items
             }
             Value::Map(cell) => {
-                let mut items = self.map_to_array(&cell.borrow(), element, span)?;
+                let mut items = self.map_to_array(&cell.borrow(), source_ty, element, span)?;
                 crate::shuffle::shuffle_unordered(&mut items);
                 items
             }
@@ -361,25 +361,30 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    /// `tabula<K, V> ↦ lista<T>`: the target element type picks the
+    /// projection (`T` is `K` → keys, `T` is `V` → values), matching the Rust
+    /// and LLVM lowerings. When `K` and `V` are the same type the keys win.
     fn map_to_array(
         &self,
         map: &rustc_hash::FxHashMap<MapKey, Value>,
+        source_ty: radix_types::TypeId,
         element: radix_types::TypeId,
         span: Span,
     ) -> Result<Vec<Value>, RunnerError> {
-        let target = self.types.get(element);
-        if matches!(target, Type::Primitive(Primitive::Textus)) {
-            return Ok(map.keys().cloned().map(map_key_to_value).collect());
-        }
-        if matches!(
-            target,
-            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _)
-        ) {
-            return Ok(map.values().cloned().collect());
+        if let Type::Map(key_ty, value_ty) = self.types.get(source_ty) {
+            if self.types.equals(*key_ty, element) {
+                return Ok(map.keys().cloned().map(map_key_to_value).collect());
+            }
+            if self.types.equals(*value_ty, element) {
+                return Ok(map.values().cloned().collect());
+            }
         }
         Err(RunnerError::internal(
             span,
-            format!("unsupported tabula to lista element target {target:?}"),
+            format!(
+                "unsupported tabula to lista element target {:?}",
+                self.types.get(element)
+            ),
         ))
     }
 

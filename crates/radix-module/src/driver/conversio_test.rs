@@ -543,7 +543,7 @@ fn rectangular_lista_literal_to_tensor_conversio_emits_flat_structa() {
 }
 
 #[test]
-fn tabula_to_lista_keys_conversio_emits_into_keys() {
+fn tabula_to_lista_keys_conversio_emits_keys_cloned() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
   fixum tabula<textus, numerus> m ← { "a": 1, "b": 2 }
@@ -553,13 +553,13 @@ fn tabula_to_lista_keys_conversio_emits_into_keys() {
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
-        code.contains(".into_keys().collect::<Vec<_>>()"),
-        "expected into_keys projection, got:\n{code}"
+        code.contains(".keys().cloned().collect::<Vec<_>>()"),
+        "expected keys projection, got:\n{code}"
     );
 }
 
 #[test]
-fn tabula_to_lista_values_conversio_emits_into_values() {
+fn tabula_to_lista_values_conversio_emits_values_cloned() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
   fixum tabula<textus, numerus> m ← { "a": 1, "b": 2 }
@@ -569,8 +569,8 @@ fn tabula_to_lista_values_conversio_emits_into_values() {
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
-        code.contains(".into_values().collect::<Vec<_>>()"),
-        "expected into_values projection, got:\n{code}"
+        code.contains(".values().cloned().collect::<Vec<_>>()"),
+        "expected values projection, got:\n{code}"
     );
 }
 

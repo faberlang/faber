@@ -1,0 +1,58 @@
++++
+term = "↦"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal"]
+category = "conversion"
+canonical = false
+summary = "tabula ↦ lista projects keys or values by the target element type, for int-to-string and string-to-int maps."
+syntax = "<tabula> ↦ <lista-type>"
+related = ["↦", "lista", "tabula"]
+locale = "en"
++++
+# =============================================================================
+# ↦ — tabula ↦ lista projects keys or values by the target element type.
+# =============================================================================
+#
+# What this teaches:
+#   • `map<K, V> ↦ list<K>` is the keys; `map<K, V> ↦ list<V>` is the values.
+#     The target element type picks the projection — it is not guessed from
+#     the type's shape, so a `map<int, string>` and a `map<string, int>` both
+#     read the same way: name the side you want.
+#   • map order is unspecified, so the projected lists are sorted before they
+#     are printed.
+#
+# Common mistakes:
+#   • assuming `↦ list<int>` always means the values (true only when the
+#     values are the ints)
+#   • printing a projected list without sorting it first
+#
+# See also: ↦, lista, tabula
+# =============================================================================
+
+# EXPECTED OUTPUT:
+#   [5, 9]
+#   ["x", "y"]
+#   ["a", "b"]
+#   [1, 2]
+
+main {
+    var map<int, string> names ← empty
+    names[9] ← "y"
+    names[5] ← "x"
+    var list<int> nameKeys ← names ↦ list<int>
+    nameKeys.sort()
+    print nameKeys
+    var list<string> nameValues ← names ↦ list<string>
+    nameValues.sort()
+    print nameValues
+
+    var map<string, int> counts ← empty
+    counts["b"] ← 2
+    counts["a"] ← 1
+    var list<string> countKeys ← counts ↦ list<string>
+    countKeys.sort()
+    print countKeys
+    var list<int> countValues ← counts ↦ list<int>
+    countValues.sort()
+    print countValues
+}
