@@ -965,6 +965,61 @@ pub enum MirIntrinsic {
     /// operands of `And`/`Or` and all three of `Select` are always evaluated.
     /// The MIR runner is the reference; every other executor fails closed.
     TensorLift(MirLiftOp),
+    /// A vector method deferred past lowering. Templates carry it with
+    /// symbolic widths; one expander rewrites it into the unrolled lanes once
+    /// the width is a literal. No executor or backend ever sees it: a
+    /// `VectorOp` that survives to validation is rejected by name.
+    VectorOp(MirVectorOp),
+}
+
+/// The vector method a [`MirIntrinsic::VectorOp`] defers.
+///
+/// Arity: `Length`, `Normalized`, `Crea` and `Swizzle` take one operand (the
+/// receiver; `Crea` uses only its declared shape), everything else takes two
+/// (receiver, peer). `Swizzle` carries resolved lane indices, never a symbol,
+/// so symbol remapping needs no rewrite.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MirVectorOp {
+    /// Lane-wise binary operator (`+`, `-`, `*`, `/`, ...).
+    Elementwise(MirBinOp),
+    Dot,
+    Cross,
+    Length,
+    Normalized,
+    Crea,
+    /// Result lane `i` reads source lane `lanes[i]`.
+    Swizzle(Vec<u8>),
+}
+
+impl MirVectorOp {
+    /// Number of operands.
+    #[must_use]
+    pub fn arity(&self) -> usize {
+        match self {
+            Self::Length | Self::Normalized | Self::Crea | Self::Swizzle(_) => 1,
+            Self::Elementwise(_) | Self::Dot | Self::Cross => 2,
+        }
+    }
+
+    /// Stable lowercase name for dumps and diagnostics.
+    #[must_use]
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Elementwise(_) => "elementwise",
+            Self::Dot => "dot",
+            Self::Cross => "cross",
+            Self::Length => "length",
+            Self::Normalized => "normalized",
+            Self::Crea => "crea",
+            Self::Swizzle(_) => "swizzle",
+        }
+    }
+
+    /// `true` when the result is a vector rather than the element scalar.
+    #[must_use]
+    pub fn returns_vector(&self) -> bool {
+        !matches!(self, Self::Dot | Self::Length)
+    }
 }
 
 /// The scalar operator a [`MirIntrinsic::TensorLift`] applies per element.

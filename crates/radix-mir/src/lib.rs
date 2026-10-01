@@ -61,6 +61,8 @@ mod packed_negative_matrix;
 mod param_mode_test;
 /// Shared statement/value read analysis for device-program lowering.
 mod read_analysis;
+#[cfg(test)]
+mod vector_op_test;
 
 /// Shared lista→tensor shape helpers used by validation and the MIR runner.
 pub mod lista_tensor_conversio;
@@ -225,10 +227,10 @@ pub use ty::{
     option_payload_ty, place_base_ty,
 };
 pub use validate::{
-    INTEGER_PAYLOAD_I64_SENTINEL, INTEGER_PAYLOAD_U8_SENTINEL, INTEGER_PAYLOAD_U64_SENTINEL,
-    MirEnumRepresentation, MirFunctionSignature, MirInterner, MirParamSignature,
-    MirScalarValueDomain, MirTypeTable, MirValidationContext, MirValidationError, ValidatedMir,
-    validate_program, validate_program_with_device_roles,
+    DEFERRED_VECTOR_OP_SURVIVED, INTEGER_PAYLOAD_I64_SENTINEL, INTEGER_PAYLOAD_U8_SENTINEL,
+    INTEGER_PAYLOAD_U64_SENTINEL, MirEnumRepresentation, MirFunctionSignature, MirInterner,
+    MirParamSignature, MirScalarValueDomain, MirTypeTable, MirValidationContext,
+    MirValidationError, ValidatedMir, validate_program, validate_program_with_device_roles,
 };
 pub use visit::{
     terminator_successors, walk_operand, walk_place, walk_stmt, walk_terminator, walk_value,

@@ -279,6 +279,7 @@ pub(super) fn remap_runtime_call_text_symbols(
         | MirIntrinsic::Gradient(_)
         | MirIntrinsic::TypeCheck(_)
         | MirIntrinsic::TensorLift(_)
+        | MirIntrinsic::VectorOp(_)
         | MirIntrinsic::Duplicate => {}
     }
     for arg in &mut call.args {

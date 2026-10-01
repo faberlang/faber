@@ -1,6 +1,8 @@
 //! Runtime-call, intrinsic, gradient, sermo, collection, map, and atomic checks.
 
-use super::{FunctionScope, GenericTypeBindings, Validator};
+use super::{
+    DEFERRED_VECTOR_OP_SURVIVED, FunctionScope, GenericTypeBindings, MirValidationError, Validator,
+};
 use crate::lista_tensor_conversio::validate_lista_to_tensor_source;
 use crate::{
     MirAtomicOp, MirBinOp, MirCollectionOp, MirConstant, MirConversion, MirGradientOp,
@@ -292,6 +294,26 @@ impl Validator<'_, '_> {
                 if !matches!(self.type_kind(call.return_ty), Type::Tensor(..)) {
                     self.error(span, "tensor lift runtime call does not return a tensor");
                 }
+            }
+            // Deferred vector method: operand arity and result shape are
+            // checked, then the call is rejected by name. The expander
+            // rewrites every VectorOp once widths are literal, so a survivor
+            // here means an executable function skipped it.
+            MirIntrinsic::VectorOp(op) => {
+                self.require_arg_count(call.args.len(), op.arity(), span, "vector op runtime call");
+                for arg in &call.args {
+                    self.validate_operand(scope, arg, span);
+                }
+                if op.returns_vector()
+                    && !matches!(self.type_kind(call.return_ty), Type::Vector(..))
+                {
+                    self.error(span, "vector op runtime call does not return a vector");
+                }
+                self.errors.push(MirValidationError::with_issue(
+                    span,
+                    DEFERRED_VECTOR_OP_SURVIVED,
+                    "deferred vector op survives instantiation",
+                ));
             }
         }
     }
