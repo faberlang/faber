@@ -1,0 +1,73 @@
++++
+term = "valor"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "genus_decl", "genus_member", "field_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "typed_constructor", "field_list", "field_init", "field_key", "type_arguments", "type_argument", "shape_suffix", "array_literal", "json_literal", "json_object", "json_member", "json_value", "json_string", "json_number", "conversio_expr", "inline_default", "equality", "equality_tail", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal"]
+category = "conversion"
+canonical = false
+summary = "Tag tests on a valor: `valor is T` and `valor not is T` read the carrier's kind for a genus, a lista, a tabula and a tensor."
+syntax = "<valor> is <type> | <valor> not is <type>"
+related = ["valor", "est", "genus", "lista", "tabula", "tensor"]
+locale = "en"
++++
+# =============================================================================
+# valor-composita-tags — `valor is T` tag tests on a composite carrier
+# =============================================================================
+#
+# What this teaches:
+#   • `valor is T` reads the carrier's kind: a genus matches only its own type, a lista or tabula matches `is list<T>` or `is map<K, V>` with the element types erased, and a tensor matches no list.
+#
+# Common mistakes:
+#   • Reading `is list<int>` as a check of the elements — it only checks that the carrier is a list, so a list of text matches too.
+#
+# See also: valor, est, genus, lista, tabula, tensor, valor-composita-deep
+# =============================================================================
+
+# conversio/valor-composita-tags — the tag tests valor-composita-deep leaves out
+#
+# WHY: pins, on the runner (the oracle), which carrier kinds `valor is T`
+# accepts. Split out of valor-composita-deep so the lanes that decline the
+# `est` rows do not hide the recovery rows of that file.
+#
+# EXPECTED OUTPUT:
+#   valor-composita-tags.expected — one line per print.
+
+class Punctum {
+    var int x
+    var int y
+}
+
+class Linea {
+    var string nomen
+    var list<Punctum> puncta
+}
+
+main {
+    const Punctum punctum ← Punctum { x = 3, y = 4 }
+    const list<int> numeri ← [1, 2]
+    const value boxedNumeri ← numeri ↦ value
+    const list<Punctum> ordo ← [punctum]
+    const value boxedOrdo ← ordo ↦ value
+
+    # 1. Tag tests: a genus is only its own type.
+    const value boxedGenus ← punctum ↦ value
+    print boxedGenus is Punctum
+    print boxedGenus is Linea
+    print boxedGenus is int
+    print boxedGenus not is Linea
+
+    # 2. A lista matches any list type (elements erased) and no genus.
+    print boxedNumeri is list<int>
+    print boxedNumeri is list<string>
+    print boxedNumeri is Punctum
+    print boxedOrdo is list<Punctum>
+
+    # 3. A tabula matches a map type, a tensor matches no list.
+    const map<string, int> scores ← { "alpha": 10 }
+    const value boxedScores ← scores ↦ value
+    print boxedScores is map<string, int>
+    print boxedScores is list<int>
+    const tensor<f32, [2]> grid ← [1.5, 2.5] ↦ tensor<f32, [2]>
+    const value boxedGrid ← grid ↦ value
+    print boxedGrid is list<float>
+    print boxedGrid is tensor<f32, [2]>
+}
