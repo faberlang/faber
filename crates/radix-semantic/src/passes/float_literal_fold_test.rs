@@ -84,10 +84,7 @@ fn the_folded_expression_is_one_float_literal() {
 fn an_f32_slot_rounds_once_from_the_exact_value() {
     // 3/10 once into f32; an f64 sum narrowed would also give this here, so the
     // discriminating case below sits just above an f32 midpoint.
-    assert_eq!(
-        folded("fixum f32 x ← 0.1 + 0.2"),
-        f64::from(0.3_f32)
-    );
+    assert_eq!(folded("fixum f32 x ← 0.1 + 0.2"), f64::from(0.3_f32));
     let above = 1.0_f32 + f32::EPSILON;
     let value = folded("fixum f32 x ← 1.00000005960464477539062501 + 0.0");
     assert_eq!(value, f64::from(above));
@@ -103,10 +100,7 @@ fn f64_to_f32(value: f64) -> f32 {
 
 #[test]
 fn f16_and_bf16_slots_round_once_from_the_exact_value() {
-    assert_eq!(
-        folded("fixum f16 x ← 0.1 + 0.2"),
-        0.300_048_828_125
-    );
+    assert_eq!(folded("fixum f16 x ← 0.1 + 0.2"), 0.300_048_828_125);
     assert_eq!(folded("fixum bf16 x ← 0.1 + 0.2"), 0.300_781_25);
 }
 

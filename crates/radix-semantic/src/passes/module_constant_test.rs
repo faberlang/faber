@@ -81,10 +81,7 @@ fn fixum_constants_fold_to_their_values() {
     );
     let list = constant("fixum lista<numerus> XS = [1, 2, 3]\n", "XS");
     assert!(list.statica.is_some());
-    let narrow = constant(
-        "fixum u8 A = 200\nfixum u8 B = A + 50\n",
-        "B",
-    );
+    let narrow = constant("fixum u8 A = 200\nfixum u8 B = A + 50\n", "B");
     assert_eq!(int_value(&narrow), 250);
 }
 

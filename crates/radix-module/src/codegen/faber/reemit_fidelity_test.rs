@@ -66,13 +66,7 @@ fn retired_long_numeric_forms_re_emit_as_bare_markers() {
     ] {
         assert!(emitted.contains(expected), "missing `{expected}` in:\n{emitted}");
     }
-    for retired in [
-        "u8",
-        "f32",
-        "i32",
-        "d64",
-        "f64",
-    ] {
+    for retired in ["u8", "f32", "i32", "d64", "f64"] {
         assert!(!emitted.contains(retired), "retired `{retired}` survived:\n{emitted}");
     }
 }

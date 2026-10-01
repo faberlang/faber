@@ -190,16 +190,14 @@ fn a_bounded_value_into_a_bounded_or_open_slot_takes_no_node() {
 fn an_inf_operand_joins_a_bounded_one_with_each_keeping_its_own_type() {
     // `x + b` is typed `inf` by the join; the bounded operand is not stamped,
     // so no store happens and no node is needed.
-    let source =
-        "incipit {\nfixum inf x ← 3\nfixum u8 b ← 1\nfixum _ r ← x + b\nnota r\n}\n";
+    let source = "incipit {\nfixum inf x ← 3\nfixum u8 b ← 1\nfixum _ r ← x + b\nnota r\n}\n";
     assert!(widens_of(source).is_empty());
 }
 
 #[test]
 fn the_operand_keeps_its_declared_type_not_the_slot() {
-    let fixture = test_support::analyze_ok(
-        "incipit {\nfixum u64 u ← 5\nfixum inf w ← u\nnota w\n}\n",
-    );
+    let fixture =
+        test_support::analyze_ok("incipit {\nfixum u64 u ← 5\nfixum inf w ← u\nnota w\n}\n");
     let hir = fixture.hir.as_ref().expect("hir");
     let mut seen = None;
     struct Probe<'a>(&'a TypeTable, &'a mut Option<Type>);

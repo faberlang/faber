@@ -125,10 +125,7 @@ fn shifts_fold_as_pure_math() {
     let (big, _) = static_const("fixum numerus S = 5 ⇒ 200\n", "S");
     assert_eq!(int_value(&big.value), 0);
     // 2^64 is a constant in an `=` position: refused at the store.
-    assert_rejects_with_issue(
-        "fixum u64 S = 1 ⇐ 64\n",
-        "store_constant_out_of_range",
-    );
+    assert_rejects_with_issue("fixum u64 S = 1 ⇐ 64\n", "store_constant_out_of_range");
 }
 
 #[test]

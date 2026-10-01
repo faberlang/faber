@@ -13,7 +13,8 @@ use radix_types::NumericWidth::{self, I64, Inf, U64};
 use radix_types::numeric_width::numerus_integer_width;
 
 const INF: &str = "fixum inf x ← 3\nfixum inf y ← 4";
-const INF_AND_FRIENDS: &str = "fixum inf x ← 3\nfixum inf y ← 4\nfixum u64 u ← 5\nfixum i8 s ← 6\nfixum u8 b ← 7";
+const INF_AND_FRIENDS: &str =
+    "fixum inf x ← 3\nfixum inf y ← 4\nfixum u64 u ← 5\nfixum i8 s ← 6\nfixum u8 b ← 7";
 
 fn analyze(decls: &str, expr: &str) -> test_support::AnalyzedFixture {
     let source = format!("incipit {{\n{decls}\nfixum _ r ← {expr}\nnota r\n}}\n");
@@ -71,13 +72,7 @@ fn a_negated_big_literal_is_accepted_in_an_inf_slot() {
 
 #[test]
 fn a_literal_beyond_u64_is_out_of_range_everywhere_else() {
-    for slot in [
-        "_",
-        "numerus",
-        "u64",
-        "i64",
-        "u8",
-    ] {
+    for slot in ["_", "numerus", "u64", "i64", "u8"] {
         assert_rejects(
             &format!("incipit {{\nfixum {slot} x ← {TWO_TO_64}\nnota x\n}}\n"),
             "numerus_literal_out_of_range",
@@ -264,9 +259,7 @@ fn every_bounded_width_widens_into_inf_without_a_conversion() {
 #[test]
 fn inf_widens_into_nothing_implicitly_a_bounded_slot_takes_a_checked_narrowing() {
     // The implicit store of ruling 38: accepted, a trap at run time.
-    test_support::assert_accepts(
-        "functio f(inf a) → u8 {\nfixum u8 z ← a\nredde z\n}\n",
-    );
+    test_support::assert_accepts("functio f(inf a) → u8 {\nfixum u8 z ← a\nredde z\n}\n");
     test_support::assert_accepts("functio f(inf a) → numerus {\nredde a\n}\n");
     // Policy-word slots still need an authored conversion.
     for slot in ["modulus<u8>", "saturatus<u8>"] {
@@ -395,13 +388,7 @@ fn conversion(param: &str, target: &str, expr: &str) -> String {
 
 #[test]
 fn a_bounded_integer_converts_into_inf_and_never_fails() {
-    for source in [
-        "u8",
-        "i64",
-        "u64",
-        "modulus<u16>",
-        "saturatus<i32>",
-    ] {
+    for source in ["u8", "i64", "u64", "modulus<u16>", "saturatus<i32>"] {
         test_support::assert_accepts(&conversion(&format!("{source} a"), "inf", "a ↦ inf"));
     }
 }
