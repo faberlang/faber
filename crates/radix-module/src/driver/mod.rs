@@ -4474,10 +4474,6 @@ mod nvvm_device_emit_tests;
 mod locale_fanout_tests;
 
 #[cfg(test)]
-#[path = "source_inventory_test.rs"]
-mod source_inventory_tests;
-
-#[cfg(test)]
 #[cfg(feature = "device")]
 #[path = "backward_integration_test.rs"]
 mod backward_integration_tests;

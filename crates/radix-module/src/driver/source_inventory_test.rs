@@ -1,8 +1,8 @@
 //! Structure inventory: what is counted, and what counts as lost.
 
-use super::source_inventory::{Inventory, lost, parse_inventory};
-use super::{Config, Session};
+use super::{Inventory, lost, parse_inventory};
 use crate::codegen::Target;
+use crate::driver::{Config, Session};
 
 const SUITE: &str = "\
 describe \"outer\" {
