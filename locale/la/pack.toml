@@ -1591,6 +1591,10 @@ help = "fix the AST construct for lowering"
 message = "top-level variable requires an identifier binding"
 help = "fix the AST construct for lowering"
 
+[diagnostics.SEM008.issues.top_level_statement_beside_entry]
+message = "executable top-level statement beside the entry point is not run"
+help = "move it into the entry block, or remove the entry block to make the file a script"
+
 [diagnostics.SEM008.issues.type_name_not_type]
 message = "type name does not refer to a type"
 help = "fix the AST construct for lowering"
