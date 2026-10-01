@@ -769,7 +769,7 @@ message = "Figura 中的 index parameter 未知"
 help = "声明 type 或导入它"
 
 [diagnostics.SEM002.issues.float_width_on_numerus]
-message = "f16、f32 和 f64 是 fractus 宽度；请使用 f16、f32 或 f64"
+message = "f16、bf16、f32 和 f64 是 fractus 宽度；请使用 f16、bf16、f32 或 f64"
 help = "声明 type 或导入它"
 
 [diagnostics.SEM002.issues.integer_width_on_fractus]
@@ -781,7 +781,7 @@ message = "instans 只接受 ms、us 或 ns 作为 precision marker"
 help = "声明 type 或导入它"
 
 [diagnostics.SEM002.issues.invalid_fractus_width_marker]
-message = "fractus 只接受 f16、f32 或 f64"
+message = "fractus 只接受 f16、bf16、f32 或 f64"
 help = "声明 type 或导入它"
 
 [diagnostics.SEM002.issues.invalid_numerus_width_marker]
@@ -1077,7 +1077,7 @@ message = "Figura 中有未知 index 变量"
 help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.float_width_on_numerus]
-message = "f16、f32 和 f64 是 fractus 宽度；请使用 f16、f32 或 f64"
+message = "f16、bf16、f32 和 f64 是 fractus 宽度；请使用 f16、bf16、f32 或 f64"
 help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.forma_builtin_missing]
@@ -1133,7 +1133,7 @@ message = "atomic 需要一个 element type；请使用 atomic<T>"
 help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.invalid_fractus_width_marker]
-message = "fractus 只接受 f16、f32 或 f64"
+message = "fractus 只接受 f16、bf16、f32 或 f64"
 help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.invalid_lowered_expression]
@@ -2377,8 +2377,8 @@ message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
 
 [diagnostics.SEM016.issues.bits_pair_width_mismatch]
-message = "the Bits bitcast requires exact-width pairs: u32 ↔ f32 and u64 ↔ f64"
-help = "convert to the matching IEEE width first: u32 pairs with f32, u64 with f64"
+message = "the Bits bitcast requires exact-width pairs: u16 ↔ bf16 or f16, u32 ↔ f32 and u64 ↔ f64"
+help = "convert to the matching IEEE width first: u16 pairs with bf16 or f16, u32 with f32, or u64 with f64"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
 message = "从 octeti 到 bivalens 的 conversion 没有 default meaning"

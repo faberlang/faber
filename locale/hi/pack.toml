@@ -773,7 +773,7 @@ message = "Figura में अज्ञात index parameter"
 help = "प्रकार घोषित करें या उसे import करें"
 
 [diagnostics.SEM002.issues.float_width_on_numerus]
-message = "f16, f32 और f64 fractus widths हैं; f16, f32, या f64 उपयोग करें"
+message = "f16, bf16, f32 और f64 fractus widths हैं; f16, bf16, f32, या f64 उपयोग करें"
 help = "प्रकार घोषित करें या उसे import करें"
 
 [diagnostics.SEM002.issues.integer_width_on_fractus]
@@ -785,7 +785,7 @@ message = "instans precision marker के रूप में केवल ms, 
 help = "प्रकार घोषित करें या उसे import करें"
 
 [diagnostics.SEM002.issues.invalid_fractus_width_marker]
-message = "fractus केवल f16, f32, या f64 स्वीकार करता है"
+message = "fractus केवल f16, bf16, f32, या f64 स्वीकार करता है"
 help = "प्रकार घोषित करें या उसे import करें"
 
 [diagnostics.SEM002.issues.invalid_numerus_width_marker]
@@ -1089,7 +1089,7 @@ message = "Figura में अज्ञात index variable"
 help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.float_width_on_numerus]
-message = "f16, f32 और f64 fractus widths हैं; f16, f32 या f64 का उपयोग करें"
+message = "f16, bf16, f32 और f64 fractus widths हैं; f16, bf16, f32 या f64 का उपयोग करें"
 help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.forma_builtin_missing]
@@ -1145,7 +1145,7 @@ message = "atomic के लिए एक element type आवश्यक है
 help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.invalid_fractus_width_marker]
-message = "fractus केवल f16, f32 या f64 स्वीकार करता है"
+message = "fractus केवल f16, bf16, f32 या f64 स्वीकार करता है"
 help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.invalid_lowered_expression]
@@ -2389,8 +2389,8 @@ message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
 
 [diagnostics.SEM016.issues.bits_pair_width_mismatch]
-message = "the Bits bitcast requires exact-width pairs: u32 ↔ f32 and u64 ↔ f64"
-help = "convert to the matching IEEE width first: u32 pairs with f32, u64 with f64"
+message = "the Bits bitcast requires exact-width pairs: u16 ↔ bf16 or f16, u32 ↔ f32 and u64 ↔ f64"
+help = "convert to the matching IEEE width first: u16 pairs with bf16 or f16, u32 with f32, or u64 with f64"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
 message = "octeti से bivalens में रूपांतरण का कोई default अर्थ नहीं है; textus में decode करें या bytes की स्पष्ट तुलना करें"

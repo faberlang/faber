@@ -769,7 +769,7 @@ message = "Figura 中有未知的索引參數"
 help = "宣告型別或匯入型別"
 
 [diagnostics.SEM002.issues.float_width_on_numerus]
-message = "f16、f32 和 f64 是 fractus 寬度；請使用 f16、f32 或 f64"
+message = "f16、bf16、f32 和 f64 是 fractus 寬度；請使用 f16、bf16、f32 或 f64"
 help = "宣告型別或匯入型別"
 
 [diagnostics.SEM002.issues.integer_width_on_fractus]
@@ -781,7 +781,7 @@ message = "instans 只接受 ms、us 或 ns 作為精度標記"
 help = "宣告型別或匯入型別"
 
 [diagnostics.SEM002.issues.invalid_fractus_width_marker]
-message = "fractus 只接受 f16、f32 或 f64"
+message = "fractus 只接受 f16、bf16、f32 或 f64"
 help = "宣告型別或匯入型別"
 
 [diagnostics.SEM002.issues.invalid_numerus_width_marker]
@@ -1077,7 +1077,7 @@ message = "Figura 中有未知的索引變數"
 help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.float_width_on_numerus]
-message = "f16、f32 和 f64 是 fractus 寬度；請使用 f16、f32 或 f64"
+message = "f16、bf16、f32 和 f64 是 fractus 寬度；請使用 f16、bf16、f32 或 f64"
 help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.forma_builtin_missing]
@@ -1133,7 +1133,7 @@ message = "atomic 需要一個元素型別；請使用 atomic<T>"
 help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.invalid_fractus_width_marker]
-message = "fractus 僅接受 f16、f32 或 f64"
+message = "fractus 僅接受 f16、bf16、f32 或 f64"
 help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.invalid_lowered_expression]
@@ -2377,8 +2377,8 @@ message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
 
 [diagnostics.SEM016.issues.bits_pair_width_mismatch]
-message = "the Bits bitcast requires exact-width pairs: u32 ↔ f32 and u64 ↔ f64"
-help = "convert to the matching IEEE width first: u32 pairs with f32, u64 with f64"
+message = "the Bits bitcast requires exact-width pairs: u16 ↔ bf16 or f16, u32 ↔ f32 and u64 ↔ f64"
+help = "convert to the matching IEEE width first: u16 pairs with bf16 or f16, u32 with f32, or u64 with f64"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
 message = "從 octeti 轉換為 bivalens 沒有預設意義；請解碼為 textus，或明確比較位元組"

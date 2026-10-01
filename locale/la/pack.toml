@@ -932,7 +932,7 @@ message = "unknown index parameter in Figura"
 help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.float_width_on_numerus]
-message = "f16, f32, and f64 are fractus widths; use f16, f32, or f64"
+message = "f16, bf16, f32, and f64 are fractus widths; use f16, bf16, f32, or f64"
 help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.integer_width_on_fractus]
@@ -944,7 +944,7 @@ message = "instans accepts only ms, us, or ns as a precision marker"
 help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.invalid_fractus_width_marker]
-message = "fractus accepts only f16, f32, or f64"
+message = "fractus accepts only f16, bf16, f32, or f64"
 help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.invalid_numerus_width_marker]
@@ -1312,7 +1312,7 @@ message = "unknown index variable in Figura"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.float_width_on_numerus]
-message = "f16, f32, and f64 are fractus widths; use f16, f32, or f64"
+message = "f16, bf16, f32, and f64 are fractus widths; use f16, bf16, f32, or f64"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.forma_builtin_missing]
@@ -1368,7 +1368,7 @@ message = "atomic requires one element type; use atomic<T>"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.invalid_fractus_width_marker]
-message = "fractus accepts only f16, f32, or f64"
+message = "fractus accepts only f16, bf16, f32, or f64"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.invalid_lowered_expression]
@@ -2908,8 +2908,8 @@ message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
 
 [diagnostics.SEM016.issues.bits_pair_width_mismatch]
-message = "the Bits bitcast requires exact-width pairs: u32 ↔ f32 and u64 ↔ f64"
-help = "convert to the matching IEEE width first: u32 pairs with f32, u64 with f64"
+message = "the Bits bitcast requires exact-width pairs: u16 ↔ bf16 or f16, u32 ↔ f32 and u64 ↔ f64"
+help = "convert to the matching IEEE width first: u16 pairs with bf16 or f16, u32 with f32, or u64 with f64"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
 message = "conversion from octeti to bivalens has no default meaning; decode to textus or compare bytes explicitly"

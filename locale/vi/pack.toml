@@ -769,7 +769,7 @@ message = "tham số chỉ mục không xác định trong Figura"
 help = "khai báo kiểu hoặc import kiểu đó"
 
 [diagnostics.SEM002.issues.float_width_on_numerus]
-message = "f16, f32 và f64 là độ rộng fractus; dùng f16, f32 hoặc f64"
+message = "f16, bf16, f32 và f64 là độ rộng fractus; dùng f16, bf16, f32 hoặc f64"
 help = "khai báo kiểu hoặc import kiểu đó"
 
 [diagnostics.SEM002.issues.integer_width_on_fractus]
@@ -781,7 +781,7 @@ message = "instans chỉ chấp nhận ms, us hoặc ns làm ký hiệu độ ch
 help = "khai báo kiểu hoặc import kiểu đó"
 
 [diagnostics.SEM002.issues.invalid_fractus_width_marker]
-message = "fractus chỉ chấp nhận f16, f32 hoặc f64"
+message = "fractus chỉ chấp nhận f16, bf16, f32 hoặc f64"
 help = "khai báo kiểu hoặc import kiểu đó"
 
 [diagnostics.SEM002.issues.invalid_numerus_width_marker]
@@ -1077,7 +1077,7 @@ message = "biến chỉ mục không xác định trong Figura"
 help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.float_width_on_numerus]
-message = "f16, f32 và f64 là độ rộng fractus; dùng f16, f32 hoặc f64"
+message = "f16, bf16, f32 và f64 là độ rộng fractus; dùng f16, bf16, f32 hoặc f64"
 help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.forma_builtin_missing]
@@ -1133,7 +1133,7 @@ message = "atomic yêu cầu một kiểu phần tử; dùng atomic<T>"
 help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.invalid_fractus_width_marker]
-message = "fractus chỉ chấp nhận f16, f32 hoặc f64"
+message = "fractus chỉ chấp nhận f16, bf16, f32 hoặc f64"
 help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.invalid_lowered_expression]
@@ -2377,8 +2377,8 @@ message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
 
 [diagnostics.SEM016.issues.bits_pair_width_mismatch]
-message = "the Bits bitcast requires exact-width pairs: u32 ↔ f32 and u64 ↔ f64"
-help = "convert to the matching IEEE width first: u32 pairs with f32, u64 with f64"
+message = "the Bits bitcast requires exact-width pairs: u16 ↔ bf16 or f16, u32 ↔ f32 and u64 ↔ f64"
+help = "convert to the matching IEEE width first: u16 pairs with bf16 or f16, u32 with f32, or u64 with f64"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
 message = "chuyển đổi từ octeti sang bivalens không có ý nghĩa mặc định; giải mã sang textus hoặc so sánh byte một cách rõ ràng"

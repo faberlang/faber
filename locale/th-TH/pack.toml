@@ -773,7 +773,7 @@ message = "พารามิเตอร์ดัชนีใน Figura ไม�
 help = "ประกาศชนิดหรือนำเข้า"
 
 [diagnostics.SEM002.issues.float_width_on_numerus]
-message = "f16, f32 และ f64 เป็นความกว้างของ fractus; ใช้ f16, f32 หรือ f64"
+message = "f16, bf16, f32 และ f64 เป็นความกว้างของ fractus; ใช้ f16, bf16, f32 หรือ f64"
 help = "ประกาศชนิดหรือนำเข้า"
 
 [diagnostics.SEM002.issues.integer_width_on_fractus]
@@ -785,7 +785,7 @@ message = "instans รับเครื่องหมายความแม�
 help = "ประกาศชนิดหรือนำเข้า"
 
 [diagnostics.SEM002.issues.invalid_fractus_width_marker]
-message = "fractus รับเฉพาะ f16, f32 หรือ f64"
+message = "fractus รับเฉพาะ f16, bf16, f32 หรือ f64"
 help = "ประกาศชนิดหรือนำเข้า"
 
 [diagnostics.SEM002.issues.invalid_numerus_width_marker]
@@ -1089,7 +1089,7 @@ message = "ตัวแปรดัชนีที่ไม่รู้จัก
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.float_width_on_numerus]
-message = "f16, f32 และ f64 เป็นความกว้างของ fractus; ใช้ f16, f32 หรือ f64"
+message = "f16, bf16, f32 และ f64 เป็นความกว้างของ fractus; ใช้ f16, bf16, f32 หรือ f64"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.forma_builtin_missing]
@@ -1145,7 +1145,7 @@ message = "atomic ต้องมีชนิดสมาชิกหนึ่�
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.invalid_fractus_width_marker]
-message = "fractus รับได้เฉพาะ f16, f32 หรือ f64"
+message = "fractus รับได้เฉพาะ f16, bf16, f32 หรือ f64"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.invalid_lowered_expression]
@@ -2389,8 +2389,8 @@ message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
 
 [diagnostics.SEM016.issues.bits_pair_width_mismatch]
-message = "the Bits bitcast requires exact-width pairs: u32 ↔ f32 and u64 ↔ f64"
-help = "convert to the matching IEEE width first: u32 pairs with f32, u64 with f64"
+message = "the Bits bitcast requires exact-width pairs: u16 ↔ bf16 or f16, u32 ↔ f32 and u64 ↔ f64"
+help = "convert to the matching IEEE width first: u16 pairs with bf16 or f16, u32 with f32, or u64 with f64"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
 message = "การแปลงจาก octeti เป็น bivalens ไม่มีความหมายเริ่มต้น; ถอดรหัสเป็น textus หรือเปรียบเทียบไบต์อย่างชัดเจน"

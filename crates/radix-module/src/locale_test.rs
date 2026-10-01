@@ -100,30 +100,33 @@ fn assert_pack_keys_match(pack_id: &str, section: &str, mut expected: BTreeSet<S
     );
 }
 
-/// Installed type rows must carry the scaffold's **canonical**, not merely the
-/// same key set: the canonical is both the accepted source spelling
+/// Installed keyword and type rows must carry the scaffold's **canonical**, not
+/// merely the same key set: the canonical is both the accepted source spelling
 /// (`build_type_binding_by_spelling`) and the emitted surface
 /// (`build_type_surfaces` → `type_surface`), so a key-only comparison lets the
 /// generated and installed `la` definitions ship different spellings for one
-/// type (DEF S03-2 — `nihil`/`modulus` vs `nihil_t`/`modulus_t`).
+/// entry (DEF S03-2 — `nihil`/`modulus` vs `nihil_t`/`modulus_t`).
 ///
-/// Keyword rows stay key-compared: the scaffold's `own`/`copy` rows carry the
-/// registry's English text while the installed pack surfaces `penes`/`exemplum`,
-/// a divergence this gate does not settle.
-fn assert_pack_type_canonicals_match(pack_id: &str, scaffold: &LocalePack, installed: &LocalePack) {
-    let drifted: Vec<String> = scaffold
-        .types
-        .iter()
-        .filter_map(|(key, expected)| {
-            let actual = installed.types.get(key)?.canonical.as_str();
-            let scaffold_canonical = expected.canonical.as_str();
-            (actual != scaffold_canonical)
-                .then(|| format!("{key}: scaffold {scaffold_canonical:?}, installed {actual:?}"))
-        })
-        .collect();
+/// Keyword rows are compared the same way: the scaffold's `own`/`copy` rows
+/// carry the installed pack's `penes`/`exemplum` (ruling 2026-09-30), so a
+/// keyword that drifts from the installed spelling fails here.
+fn assert_pack_canonicals_match(pack_id: &str, scaffold: &LocalePack, installed: &LocalePack) {
+    let keyword_drift = scaffold.keywords.iter().filter_map(|(key, expected)| {
+        let actual = installed.keywords.get(key)?.canonical.as_str();
+        let scaffold_canonical = expected.canonical.as_str();
+        (actual != scaffold_canonical)
+            .then(|| format!("keyword {key}: scaffold {scaffold_canonical:?}, installed {actual:?}"))
+    });
+    let type_drift = scaffold.types.iter().filter_map(|(key, expected)| {
+        let actual = installed.types.get(key)?.canonical.as_str();
+        let scaffold_canonical = expected.canonical.as_str();
+        (actual != scaffold_canonical)
+            .then(|| format!("type {key}: scaffold {scaffold_canonical:?}, installed {actual:?}"))
+    });
+    let drifted: Vec<String> = keyword_drift.chain(type_drift).collect();
     assert!(
         drifted.is_empty(),
-        "installed {pack_id} type canonicals must match the generated reader-pack scaffold; drifted={drifted:?}"
+        "installed {pack_id} canonicals must match the generated reader-pack scaffold; drifted={drifted:?}"
     );
 }
 
@@ -166,7 +169,7 @@ fn locale_pack_completeness_la_matches_generated_scaffold() {
         pack_key_set(scaffold.types.keys()),
         pack_key_set(installed.types.keys()),
     );
-    assert_pack_type_canonicals_match("la", &scaffold, &installed);
+    assert_pack_canonicals_match("la", &scaffold, &installed);
     assert_pack_keys_match(
         "la",
         "diagnostic",

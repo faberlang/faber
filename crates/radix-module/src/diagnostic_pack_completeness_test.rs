@@ -8,6 +8,10 @@
 //! fails the gate.
 
 use super::LocalePack;
+use radix_diagnostics::DiagnosticArg;
+use radix_semantic::catalog_semantic::semantic_help;
+use radix_semantic::error::SemanticErrorKind;
+use radix_types::{NumericWidth, Primitive};
 use std::collections::BTreeSet;
 
 const SEMANTIC_CATALOG: &str = include_str!("../../radix-semantic/src/catalog_semantic.rs");
@@ -281,4 +285,93 @@ fn sem008_comment_and_callable_posture_rows_exist_in_every_installed_pack() {
             );
         }
     }
+}
+
+/// The six width cells per pack (diagnostic code, issue key, field) that
+/// enumerate float widths. Each must name every float marker the compiler
+/// accepts on `fractus`.
+const WIDTH_CELLS: &[(&str, &str, &str)] = &[
+    ("SEM002", "float_width_on_numerus", "message"),
+    ("SEM002", "invalid_fractus_width_marker", "message"),
+    ("SEM008", "float_width_on_numerus", "message"),
+    ("SEM008", "invalid_fractus_width_marker", "message"),
+    ("SEM016", "bits_pair_width_mismatch", "message"),
+    ("SEM016", "bits_pair_width_mismatch", "help"),
+];
+
+/// Float markers the compiler accepts on `fractus`. Probes a fixed candidate
+/// list of float-looking markers; a marker added to `NumericWidth::from_marker`
+/// that is not in the list below is not noticed, so extend the list with it.
+fn accepted_float_markers() -> Vec<&'static str> {
+    ["f8", "f16", "bf16", "tf32", "f32", "f64", "f80", "f128"]
+        .into_iter()
+        .filter(|marker| NumericWidth::from_marker(marker, Primitive::Fractus).is_ok())
+        .collect()
+}
+
+fn installed_cell(locale: &str, code: &str, issue: &str, field: &str) -> String {
+    let path = crate::locale::workspace_locale_pack_path(locale);
+    let source = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read installed {locale} pack: {err:?}"));
+    let pack: toml::Value =
+        toml::from_str(&source).unwrap_or_else(|err| panic!("installed {locale} pack should be valid TOML: {err:?}"));
+    pack.get("diagnostics")
+        .and_then(|diagnostics| diagnostics.get(code))
+        .and_then(|family| family.get("issues"))
+        .and_then(|issues| issues.get(issue))
+        .and_then(|row| row.get(field))
+        .and_then(toml::Value::as_str)
+        .unwrap_or_else(|| panic!("{locale} {code}.{issue}.{field} must be a string cell"))
+        .to_owned()
+}
+
+#[test]
+fn width_prose_in_every_installed_pack_names_every_accepted_float_marker() {
+    let markers = accepted_float_markers();
+    assert!(
+        ["f16", "bf16", "f32", "f64"]
+            .iter()
+            .all(|marker| markers.contains(marker)),
+        "the compiler must accept f16, bf16, f32 and f64 on fractus; got {markers:?}"
+    );
+
+    for &locale in INSTALLED_LOCALES {
+        for &(code, issue, field) in WIDTH_CELLS {
+            let text = installed_cell(locale, code, issue, field);
+            let tokens: BTreeSet<&str> = text
+                .split(|ch: char| !ch.is_ascii_alphanumeric())
+                .filter(|token| !token.is_empty())
+                .collect();
+            for marker in &markers {
+                assert!(
+                    tokens.contains(marker),
+                    "{locale} {code}.{issue}.{field} must name float marker {marker}: {text:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn no_installed_pack_string_uses_retired_width_generic_forms() {
+    for &locale in INSTALLED_LOCALES {
+        let path = crate::locale::workspace_locale_pack_path(locale);
+        let source =
+            std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read installed {locale} pack: {err:?}"));
+        for form in ["numerus<", "int<", "float<", "fractus<"] {
+            assert!(
+                !source.contains(form),
+                "{locale} pack must not contain the retired width form {form}"
+            );
+        }
+    }
+}
+
+#[test]
+fn en_bits_pair_width_mismatch_help_equals_the_catalog_help() {
+    let catalog = semantic_help(
+        SemanticErrorKind::ConversionInvalid,
+        &[DiagnosticArg::new("issue", "bits_pair_width_mismatch")],
+    )
+    .expect("catalog carries help for bits_pair_width_mismatch");
+    assert_eq!(installed_cell("en", "SEM016", "bits_pair_width_mismatch", "help"), catalog);
 }

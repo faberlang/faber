@@ -1255,14 +1255,24 @@ impl std::error::Error for LocalePackLoadError {
 /// Assemble the built-in Latin reader pack from the live compiler registries.
 #[must_use]
 pub fn latin_locale_pack() -> LocalePack {
+    // Registry keys whose Latin spelling differs from the registry text. The
+    // installed `la` pack is authoritative for these (ruling 2026-09-30): the
+    // registry keeps the English `own` / `copy` identity text while the Latin
+    // reader surface spells them `penes` / `exemplum`.
+    const LATIN_KEYWORD_SPELLINGS: &[(&str, &str)] = &[("own", "penes"), ("copy", "exemplum")];
+
     let keywords = keyword_specs()
         .iter()
         .map(|spec| {
+            let canonical = LATIN_KEYWORD_SPELLINGS
+                .iter()
+                .find_map(|&(key, latin)| (key == spec.text).then_some(latin))
+                .unwrap_or(spec.text);
             (
                 spec.text.to_string(),
                 KeywordBinding {
                     key: spec.text.to_string(),
-                    canonical: spec.text.to_string(),
+                    canonical: canonical.to_string(),
                     aliases: Vec::new(),
                 },
             )
