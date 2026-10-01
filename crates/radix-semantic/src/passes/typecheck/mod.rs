@@ -1095,6 +1095,10 @@ mod ordina_key_test;
 mod scalar_longitudo_test;
 
 #[cfg(test)]
+#[path = "scalar_unknown_method_test.rs"]
+mod scalar_unknown_method_test;
+
+#[cfg(test)]
 #[path = "scalar_order_test.rs"]
 mod scalar_order_test;
 
