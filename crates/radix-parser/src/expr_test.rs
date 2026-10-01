@@ -943,11 +943,11 @@ fn intervallum_materialize_conversio_parses_after_range() {
 }
 
 // bits-f16 U4 — a chained `↦` folds LEFT: `a ↦ T1 ↦ T2` parses as
-// `(a ↦ T1) ↦ T2`, so `dbits ↦ f16 via Bits ↦ fractus<f32>` applies
+// `(a ↦ T1) ↦ T2`, so `dbits ↦ f16 via Bits ↦ f32` applies
 // the widen hop to the Bits hop's result (no intermediate binding).
 #[test]
 fn conversio_chain_folds_left() {
-    let result = parse_ok("fixum _ df ← dbits ↦ f16 via Bits ↦ fractus<f32>");
+    let result = parse_ok("fixum _ df ← dbits ↦ f16 via Bits ↦ f32");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -956,15 +956,15 @@ fn conversio_chain_folds_left() {
     let ExprKind::Conversio(outer) = &expr.kind else {
         panic!("expected outer conversio, got {:?}", expr.kind);
     };
-    // Outer hop targets fractus<f32> — the fold's final type.
+    // Outer hop targets f32 — the fold's final type.
     let ConversioTarget::Explicit(outer_target) = &outer.target else {
         panic!("expected explicit outer target");
     };
     let TypeExprKind::Named(outer_name, outer_params) = &outer_target.kind else {
         panic!("expected named outer target, got {:?}", outer_target.kind);
     };
-    assert_eq!(result.interner.resolve(outer_name.name), "fractus");
-    assert_eq!(outer_params.len(), 1);
+    assert_eq!(result.interner.resolve(outer_name.name), "f32");
+    assert!(outer_params.is_empty());
     // Left fold: the outer source is itself a conversio, not a bare operand.
     let ExprKind::Conversio(inner) = &outer.expr.kind else {
         panic!(
@@ -1409,9 +1409,9 @@ fn exit_arrow_value_after_conversio_assign_is_a_migration_diagnostic() {
 
 #[test]
 fn up_tack_default_binds_looser_than_conversion_target() {
-    // D17.7 precedence: `x ↦ numerus<i32> ⊥ 0` is `(x ↦ numerus<i32>) ⊥ 0`;
-    // the type arguments stay on the target, the default is the literal.
-    let result = parse_ok(r"fixum _ n ← x ↦ numerus<i32> ⊥ 0");
+    // D17.7 precedence: `x ↦ i32 ⊥ 0` is `(x ↦ i32) ⊥ 0`; the default is the
+    // literal, not part of the target.
+    let result = parse_ok(r"fixum _ n ← x ↦ i32 ⊥ 0");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");

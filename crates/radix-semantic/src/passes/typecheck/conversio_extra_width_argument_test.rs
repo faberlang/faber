@@ -1,13 +1,11 @@
-//! cv1: a `numerus` / `fractus` conversion target takes exactly the type
-//! arguments a declaration of the same type takes.
+//! cv1: a `numerus` / `fractus` conversion target takes no type arguments.
 //!
 //! Lowering once kept only the first type argument of a conversion target, so
-//! `n ↦ numerus<u32, Foo>` passed while `numerus<u32, Foo>` in a declaration
-//! is `SEM002:invalid_numerus_width_marker`. An unexplained extra argument is
-//! now rejected with the declaration's diagnostic; a convert hint is a `via`
-//! clause (D11.9), so it stays accepted. The parser-level hole
-//! `numerus<u32, _>` (qp1c) still parses; it is now a semantic
-//! `numerus_width_params` error, as in a declaration.
+//! `n ↦ numerus<u32, Foo>` passed while the declaration was a semantic error.
+//! The wrapped numeric spelling is now retired whole (N7d): a declaration and
+//! a conversion target reject every wrapped form, extra arguments and holes
+//! included, with the same parse diagnostic `numeric_wrapper_retired`. A
+//! convert hint is a `via` clause (D11.9), and stays accepted.
 
 use crate::test_support::{assert_accepts, assert_rejects_with_issue};
 
@@ -20,26 +18,17 @@ fn declaration(target: &str) -> String {
 }
 
 #[test]
-fn an_unnamed_extra_argument_is_the_declarations_invalid_marker() {
-    for (target, issue) in [
-        ("numerus<u32, Foo>", "invalid_numerus_width_marker"),
-        ("numerus<u32, Foo, Bar>", "invalid_numerus_width_marker"),
-        ("fractus<f32, Foo>", "invalid_fractus_width_marker"),
+fn every_extra_argument_wrapper_is_the_retired_wrapper_in_both_positions() {
+    for target in [
+        "numerus<u32, Foo>",
+        "numerus<u32, Foo, Bar>",
+        "fractus<f32, Foo>",
+        "numerus<u32, u64>",
+        "numerus<u32, _>",
+        "fractus<f32, f64>",
     ] {
-        assert_rejects_with_issue(&declaration(target), issue);
-        assert_rejects_with_issue(&conversion(target), issue);
-    }
-}
-
-#[test]
-fn a_valid_looking_or_hole_extra_argument_is_the_declarations_params_error() {
-    for (target, issue) in [
-        ("numerus<u32, u64>", "numerus_width_params"),
-        ("numerus<u32, _>", "numerus_width_params"),
-        ("fractus<f32, f64>", "fractus_width_params"),
-    ] {
-        assert_rejects_with_issue(&declaration(target), issue);
-        assert_rejects_with_issue(&conversion(target), issue);
+        assert_rejects_with_issue(&declaration(target), "numeric_wrapper_retired");
+        assert_rejects_with_issue(&conversion(target), "numeric_wrapper_retired");
     }
 }
 

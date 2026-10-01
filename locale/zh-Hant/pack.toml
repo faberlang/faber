@@ -692,6 +692,10 @@ help = "使用 {sugar} 寬度糖括號寫入形狀"
 message = "索引字面值必須是自然數"
 help = "使用非負的形狀索引"
 
+[diagnostics.PARSE040.issues.numeric_wrapper_retired]
+message = "`{form}` 是已廢棄的數值型別寫法"
+help = "寫 `{bare}`，不要寫 `{form}`；寬度標記本身就是型別"
+
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
 help = "use the type spelling declared by this reader locale"

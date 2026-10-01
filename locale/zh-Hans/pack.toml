@@ -692,6 +692,10 @@ help = "用 {sugar} width sugar brackets 写 shape"
 message = "index 字面量必须是自然数"
 help = "使用非负 shape index"
 
+[diagnostics.PARSE040.issues.numeric_wrapper_retired]
+message = "`{form}` 是已废弃的数值类型写法"
+help = "写 `{bare}`，不要写 `{form}`；宽度标记本身就是类型"
+
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
 help = "use the type spelling declared by this reader locale"

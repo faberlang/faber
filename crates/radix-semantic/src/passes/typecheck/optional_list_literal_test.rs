@@ -24,10 +24,10 @@ fn list_literal_checks_against_optional_list_slot() {
 
 #[test]
 fn optional_list_slot_elements_are_stores_into_the_element_type() {
-    // The element is range-checked against `numerus<i8>` through the
+    // The element is range-checked against `i8` through the
     // optional slot, as it is for the plain slot.
-    let plain = "incipit { fixum lista<numerus<i8>> a ← [300] nota a }";
-    let optional = "incipit { fixum lista<numerus<i8>> ∪ nihil a ← [300] nota a }";
+    let plain = "incipit { fixum lista<i8> a ← [300] nota a }";
+    let optional = "incipit { fixum lista<i8> ∪ nihil a ← [300] nota a }";
     assert!(
         rejected(plain),
         "plain slot rejects an out-of-range element"
@@ -36,7 +36,7 @@ fn optional_list_slot_elements_are_stores_into_the_element_type() {
         rejected(optional),
         "optional slot rejects an out-of-range element"
     );
-    assert_accepts("incipit { fixum lista<numerus<i8>> ∪ nihil a ← [100] nota a }");
+    assert_accepts("incipit { fixum lista<i8> ∪ nihil a ← [100] nota a }");
 }
 
 #[test]
@@ -69,14 +69,14 @@ fn vacua_still_needs_exactly_one_collection_member() {
 fn tuple_constructor_stores_into_optional_tuple_slot() {
     // The constructor's own type arguments carry the element types, so an
     // optional slot needs no help from the slot: the element is still a store
-    // into `numerus<i8>`.
+    // into `i8`.
     assert_accepts(
         r"incipit {
-    fixum iuncta<numerus<i8>, numerus> ∪ nihil a ← iuncta<numerus<i8>, numerus> [100, 2]
+    fixum iuncta<i8, numerus> ∪ nihil a ← iuncta<i8, numerus> [100, 2]
     nota a
 }",
     );
     assert!(rejected(
-        "incipit { fixum iuncta<numerus<i8>, numerus> ∪ nihil a ← iuncta<numerus<i8>, numerus> [300, 2] nota a }"
+        "incipit { fixum iuncta<i8, numerus> ∪ nihil a ← iuncta<i8, numerus> [300, 2] nota a }"
     ));
 }

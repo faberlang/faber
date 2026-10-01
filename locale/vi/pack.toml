@@ -692,6 +692,10 @@ help = "viết hình dạng bằng ngoặc vuông độ rộng của đường t
 message = "literal chỉ mục phải là số tự nhiên"
 help = "dùng chỉ mục hình dạng không âm"
 
+[diagnostics.PARSE040.issues.numeric_wrapper_retired]
+message = "`{form}` là cách viết kiểu số đã bị loại bỏ"
+help = "viết `{bare}` thay vì `{form}`; dấu hiệu độ rộng tự nó là một kiểu"
+
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
 help = "use the type spelling declared by this reader locale"

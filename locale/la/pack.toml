@@ -835,6 +835,10 @@ help = "write the shape with {sugar} width sugar brackets"
 message = "index literal must be a natural number"
 help = "use a non-negative shape index"
 
+[diagnostics.PARSE040.issues.numeric_wrapper_retired]
+message = "`{form}` is a retired numeric type spelling"
+help = "write `{bare}`, not `{form}`; a width marker is its own type"
+
 [diagnostics.PARSE040.issues.iuncta_arity_exceeded]
 message = "iuncta arity {count} exceeds maximum of 16; use a genus instead"
 help = "reduce the iuncta arity to 16 or fewer, or declare a genus for more fields"

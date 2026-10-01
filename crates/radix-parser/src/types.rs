@@ -170,6 +170,9 @@ impl Parser {
         // carry SHORT; every other spelling is LONG. Child levels come from
         // each branch's own parse (width children are always bare widths).
         let mut form = TypeFormLevel::LONG;
+        // Authored spelling of the head word, kept for the retired-wrapper
+        // diagnostic (canonicalization below rewrites it to its latin identity).
+        let mut authored_word = String::new();
         let kind = if matches!(self.peek().kind, TokenKind::Underscore(_)) {
             self.advance();
             TypeExprKind::Infer
@@ -212,6 +215,7 @@ impl Parser {
                 self.keyword_ident("iuncta", span)
             } else {
                 let ident = self.parse_ident()?;
+                authored_word = self.interner.resolve(ident.name).to_owned();
                 // Canonicalize a type spelling to its latin identity only for
                 // a single-part type. A qualified prefix is an import binding
                 // (namespace) and must keep its authored spelling — a binding
@@ -260,6 +264,13 @@ impl Parser {
             {
                 form = TypeFormLevel::SHORT;
                 self.parse_sparsa_width_sugar(name, width)?
+            } else if path.len() == 1
+                && matches!(name_str.as_str(), "numerus" | "fractus")
+                && self.check(&TokenKind::LtAscii)
+            {
+                let (kind, level) = self.parse_retired_numeric_wrapper(name, &authored_word)?;
+                form = level;
+                kind
             } else if self.eat(&TokenKind::LtAscii) {
                 if name_str == "atomic" {
                     let elem = Box::new(self.parse_type()?);
@@ -598,6 +609,84 @@ impl Parser {
             FiguraExpr::Infer
         };
         Ok(TypeExprKind::Sparsa(Box::new(elem), shape))
+    }
+
+    /// Reject the retired wrapped numeric spelling `numerus<W>` / `fractus<W>`.
+    ///
+    /// A width marker is its own type (`i32`, `f32`, `d64`, `inf`); the wrapped
+    /// form, the marker holes (`numerus<_>`) and the wrong-family forms
+    /// (`numerus<f32>`) are all retired. The policy words (`saturatus<W>`,
+    /// `modulus<W>`, `exactus<W>`) keep their argument and never reach here.
+    ///
+    /// WHY: the whole wrapper is consumed and the error is recorded without
+    /// failing the parse, so the type recovers as the bare marker (or the bare
+    /// `numerus`/`fractus` word for a hole) and later diagnostics stay sensible.
+    fn parse_retired_numeric_wrapper(
+        &mut self,
+        name: Ident,
+        authored_word: &str,
+    ) -> Result<(TypeExprKind, TypeFormLevel), ParseError> {
+        self.expect(&TokenKind::LtAscii, "expected '<'")?;
+        let mut args = Vec::new();
+        loop {
+            args.push(self.parse_type_argument()?);
+            if !self.consume_item_separator(&TokenKind::GtAscii, "type_parameters")? {
+                break;
+            }
+        }
+        self.expect(&TokenKind::GtAscii, "expected '>'")?;
+        let span = name.span.merge(self.previous_span());
+
+        let rendered: Vec<String> = args
+            .iter()
+            .map(|arg| self.render_wrapper_arg(arg))
+            .collect();
+        let written = format!("{authored_word}<{}>", rendered.join(", "));
+        let marker = match rendered.as_slice() {
+            [only] if radix_types::numeric_width::standalone_width_type(only).is_some() => {
+                Some(only.clone())
+            }
+            _ => None,
+        };
+        let bare = marker.clone().unwrap_or_else(|| authored_word.to_owned());
+        let already_reported = self.errors.iter().any(|err| {
+            err.span == span
+                && err
+                    .args
+                    .iter()
+                    .any(|a| a.value == "numeric_wrapper_retired")
+        });
+        if !already_reported {
+            self.errors.push(
+                ParseError::structured(ParseErrorKind::TypeInvalid, span)
+                    .with_arg("issue", "numeric_wrapper_retired")
+                    .with_arg("form", written)
+                    .with_arg("bare", bare),
+            );
+        }
+        Ok(match marker {
+            Some(marker) => (
+                TypeExprKind::Named(self.keyword_ident(&marker, name.span), Vec::new()),
+                TypeFormLevel::SHORT,
+            ),
+            None => (TypeExprKind::Named(name, Vec::new()), TypeFormLevel::LONG),
+        })
+    }
+
+    /// Authored spelling of one wrapped-numeric argument, for the diagnostic.
+    fn render_wrapper_arg(&self, arg: &GenericArgExpr) -> String {
+        match arg {
+            GenericArgExpr::Name(ident) => self.interner.resolve(ident.name).to_owned(),
+            GenericArgExpr::Type(TypeExpr {
+                kind: TypeExprKind::Named(ident, nested),
+                ..
+            }) if nested.is_empty() => self.interner.resolve(ident.name).to_owned(),
+            GenericArgExpr::Type(TypeExpr {
+                kind: TypeExprKind::Infer,
+                ..
+            }) => "_".to_owned(),
+            _ => "…".to_owned(),
+        }
     }
 
     fn reject_type_sugar_angle_bracket(&mut self, sugar: &'static str) -> Result<(), ParseError> {

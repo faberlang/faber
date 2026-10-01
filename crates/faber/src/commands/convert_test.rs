@@ -601,14 +601,22 @@ fn convert_spells_the_via_clause_in_each_pack_and_reads_it_back() {
 
 #[test]
 fn convert_rejects_the_retired_type_argument_hint_pointing_at_the_clause() {
-    for source in [
-        "main {\n    const int c ← \"ff\" ↦ int<i32, Hex> ⊥ 0\n}\n",
-        "main {\n    const char e ← 65 ↦ char<Code> ⊥ '?'\n}\n",
+    // The wrapped numeric head is rejected whole (N7d), so its hint spelling
+    // is the wrapper diagnostic; the `char` head keeps the hint diagnostic.
+    for (source, issue) in [
+        (
+            "main {\n    const int c ← \"ff\" ↦ int<i32, Hex> ⊥ 0\n}\n",
+            "numeric_wrapper_retired",
+        ),
+        (
+            "main {\n    const char e ← 65 ↦ char<Code> ⊥ '?'\n}\n",
+            "conversio_hint_type_argument",
+        ),
     ] {
         let (stdout, stderr, success) = run_faber_convert_stdin("la", source);
         assert!(!success, "the retired spelling must not convert:\n{stdout}");
         assert!(
-            stderr.contains("conversio_hint_type_argument"),
+            stderr.contains(issue),
             "the rejection names the retired form:\n{stderr}"
         );
     }

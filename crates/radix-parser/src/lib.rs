@@ -1666,6 +1666,10 @@ mod insere_test;
 mod praefixum_test;
 
 #[cfg(test)]
+#[path = "numeric_wrapper_retired_test.rs"]
+mod numeric_wrapper_retired_test;
+
+#[cfg(test)]
 #[path = "via_hint_test.rs"]
 mod via_hint_test;
 

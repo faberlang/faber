@@ -50,13 +50,13 @@ fn access_marked_parameter_forms_keep_their_inner_type() {
     assert!(emitted.contains("de li32 compact"), "{emitted}");
 }
 
-/// N7c: the wrapped long numeric forms are retired; the canonical emitter
-/// re-spells them as the bare width marker (in every type position, including a
-/// `casu` type pattern), while bare `numerus` / `fractus` stay and the policy
-/// word keeps its own spelling.
+/// N7c/N7d: the bare width marker is the only numeric spelling (the parser
+/// rejects the wrapped forms), in every type position including a `casu` type
+/// pattern; bare `numerus` / `fractus` stay and the policy word keeps its own
+/// spelling.
 #[test]
-fn retired_long_numeric_forms_re_emit_as_bare_markers() {
-    let source = "functio f(numerus<u8> a, fractus<f32> b, numerus n, exactus<u16> c, lista<numerus<i32>> xs, numerus<u8> ∪ textus u) → fractus<f64> {\n    discerne u {\n        casu numerus<u8> fixum v { tacet }\n        casu textus { tacet }\n    }\n    fixum numerus<d64> d ← 1\n    redde b ↦ fractus<f64>\n}\n";
+fn bare_numeric_markers_re_emit_unchanged() {
+    let source = "functio f(u8 a, f32 b, numerus n, exactus<u16> c, lista<i32> xs, u8 ∪ textus u) → f64 {\n    discerne u {\n        casu u8 fixum v { tacet }\n        casu textus { tacet }\n    }\n    fixum d64 d ← 1\n    redde b ↦ f64\n}\n";
     let emitted = assert_idempotent(source);
     for expected in [
         "f(u8 a, f32 b, numerus n, exactus<u16> c, lista<i32> xs,",
@@ -65,15 +65,6 @@ fn retired_long_numeric_forms_re_emit_as_bare_markers() {
         "b ↦ f64",
     ] {
         assert!(emitted.contains(expected), "missing `{expected}` in:\n{emitted}");
-    }
-    for retired in [
-        "numerus<u8>",
-        "fractus<f32>",
-        "numerus<i32>",
-        "numerus<d64>",
-        "fractus<f64>",
-    ] {
-        assert!(!emitted.contains(retired), "retired `{retired}` survived:\n{emitted}");
     }
 }
 

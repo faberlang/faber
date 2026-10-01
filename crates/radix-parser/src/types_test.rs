@@ -246,7 +246,7 @@ fn union_type_preserves_member_modes_when_flattening() {
 
 #[test]
 fn parses_tensor_with_literal_and_infer_figura() {
-    let result = parse_ok("functio f(tensor<fractus<f32>, [2, 3]> value) → vacuum {}");
+    let result = parse_ok("functio f(tensor<f32, [2, 3]> value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -258,7 +258,7 @@ fn parses_tensor_with_literal_and_infer_figura() {
     let TypeExprKind::Named(elem_name, _) = &elem.kind else {
         panic!("expected element type");
     };
-    assert_eq!(result.interner.resolve(elem_name.name), "fractus");
+    assert_eq!(result.interner.resolve(elem_name.name), "f32");
     let FiguraExpr::Tuple(dims) = figura else {
         panic!("expected tuple figura");
     };
@@ -394,7 +394,7 @@ fn parses_qualified_type_path() {
 
 #[test]
 fn parses_tensor_with_infer_figura_hole() {
-    let result = parse_ok("functio f(tensor<fractus<f32>, _> value) → vacuum {}");
+    let result = parse_ok("functio f(tensor<f32, _> value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -408,7 +408,7 @@ fn parses_tensor_with_infer_figura_hole() {
 #[test]
 fn rejects_tensor_without_figura() {
     parse_errors_include_issue(
-        "functio f(tensor<fractus<f32>> value) → vacuum {}",
+        "functio f(tensor<f32> value) → vacuum {}",
         ParseErrorKind::Expected,
         "tensor_figura_after_element",
     );
@@ -416,7 +416,7 @@ fn rejects_tensor_without_figura() {
 
 #[test]
 fn tensor_without_figura_preserves_precise_message() {
-    let source = "functio f(tensor<fractus<f32>> value) → vacuum {}";
+    let source = "functio f(tensor<f32> value) → vacuum {}";
     expect_expected_issue(source, "tensor_figura_after_element");
 }
 
@@ -494,7 +494,7 @@ fn parses_tensor_sugar_with_bracket_figura() {
 
 #[test]
 fn parses_vector_long_form() {
-    let result = parse_ok("functio f(vector<fractus<f32>, 4> a) → vacuum {}");
+    let result = parse_ok("functio f(vector<f32, 4> a) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -505,11 +505,8 @@ fn parses_vector_long_form() {
     let TypeExprKind::Named(elem_name, elem_params) = &elem.kind else {
         panic!("expected element type");
     };
-    assert_eq!(result.interner.resolve(elem_name.name), "fractus");
-    let TypeExprKind::Named(width_elem, _) = &generic_arg_type(&elem_params[0]).kind else {
-        panic!("expected fractus width");
-    };
-    assert_eq!(result.interner.resolve(width_elem.name), "f32");
+    assert_eq!(result.interner.resolve(elem_name.name), "f32");
+    assert!(elem_params.is_empty());
     assert!(matches!(width, FiguraExpr::Literal(4)));
 }
 
@@ -535,7 +532,7 @@ fn parses_vector_sugar_bracket_form() {
 
 #[test]
 fn parses_matrix_long_form() {
-    let result = parse_ok("functio f(matrix<fractus<f32>, [4, 4]> a) → vacuum {}");
+    let result = parse_ok("functio f(matrix<f32, [4, 4]> a) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -546,11 +543,8 @@ fn parses_matrix_long_form() {
     let TypeExprKind::Named(elem_name, elem_params) = &elem.kind else {
         panic!("expected element type");
     };
-    assert_eq!(result.interner.resolve(elem_name.name), "fractus");
-    let TypeExprKind::Named(width_elem, _) = &generic_arg_type(&elem_params[0]).kind else {
-        panic!("expected fractus width");
-    };
-    assert_eq!(result.interner.resolve(width_elem.name), "f32");
+    assert_eq!(result.interner.resolve(elem_name.name), "f32");
+    assert!(elem_params.is_empty());
     let FiguraExpr::Tuple(dims) = shape else {
         panic!("expected matrix shape");
     };
@@ -764,7 +758,7 @@ fn rejects_lista_sugar_bracket_suffix() {
 
 #[test]
 fn parses_sparsa_with_literal_figura() {
-    let result = parse_ok("functio f(sparsa<fractus<f32>, [2, 3]> value) → vacuum {}");
+    let result = parse_ok("functio f(sparsa<f32, [2, 3]> value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -776,7 +770,7 @@ fn parses_sparsa_with_literal_figura() {
     let TypeExprKind::Named(elem_name, _) = &elem.kind else {
         panic!("expected element type");
     };
-    assert_eq!(result.interner.resolve(elem_name.name), "fractus");
+    assert_eq!(result.interner.resolve(elem_name.name), "f32");
     let FiguraExpr::Tuple(dims) = figura else {
         panic!("expected tuple figura");
     };
@@ -1033,9 +1027,8 @@ fn parses_iuncta_with_single_element() {
 
 #[test]
 fn parses_iuncta_with_nested_types() {
-    let result = parse_ok(
-        "functio f(iuncta<lista<textus>, iuncta<numerus, fractus<f32>>> nested) → vacuum {}",
-    );
+    let result =
+        parse_ok("functio f(iuncta<lista<textus>, iuncta<numerus, f32>> nested) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -1051,7 +1044,7 @@ fn parses_iuncta_with_nested_types() {
     };
     assert_eq!(result.interner.resolve(lista.name), "lista");
     assert_eq!(lista_params.len(), 1);
-    // Second param: iuncta<numerus, fractus<f32>>
+    // Second param: iuncta<numerus, f32>
     let TypeExprKind::Named(inner_iuncta, inner_params) = &generic_arg_type(&params[1]).kind else {
         panic!("expected inner iuncta type");
     };
@@ -1458,8 +1451,8 @@ fn type_form_levels_capture_sugar_roots_and_width_children() {
     let bare_width = binding_annotation("fixum u32 x ← 1");
     assert_eq!(bare_width.form, TypeFormLevel::SHORT);
 
-    // Long scalar head over a width marker: root LONG, width argument SHORT.
-    let long_scalar = binding_annotation("fixum numerus<u32> x ← 1");
+    // Long collection head over a width marker: root LONG, width argument SHORT.
+    let long_scalar = binding_annotation("fixum lista<u32> x ← vacua");
     assert_eq!(long_scalar.form, TypeFormLevel::LONG);
     assert_eq!(first_type_arg(&long_scalar).form, TypeFormLevel::SHORT);
 }

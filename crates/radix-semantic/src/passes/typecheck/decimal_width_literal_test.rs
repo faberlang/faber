@@ -30,23 +30,29 @@ fn bare_decimal_stays_fractus() {
 
 #[test]
 fn d_marker_on_fractus_rejects() {
-    let fixture = analyze_source("incipit { fixum fractus<d64> a ← 4.2 }");
-    assert!(fixture.is_err(), "d-markers are numerus-only");
+    // N7d: the wrapped spelling is retired whole, so a wrong-family wrapper is
+    // the wrapper diagnostic; the bare `d64` is its own (integer-family) type.
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum fractus<d64> a ← 4.2 }",
+        "numeric_wrapper_retired",
+    );
 }
 
 #[test]
 fn f_marker_on_numerus_still_rejects() {
-    let fixture = analyze_source("incipit { fixum numerus<f32> a ← 1 }");
-    assert!(fixture.is_err(), "FloatOnNumerus stays rejected");
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum numerus<f32> a ← 1 }",
+        "numeric_wrapper_retired",
+    );
 }
 
 // --- d32 was removed (D11.7): a dedicated diagnostic points at d64 ---
 
 #[test]
-fn numerus_d32_marker_is_removed() {
+fn wrapped_numerus_d32_is_the_retired_wrapper_not_the_d32_removal() {
     test_support::assert_rejects_with_issue(
         "incipit { fixum numerus<d32> a ← 4.2 }",
-        "removed_decimal_width_d32",
+        "numeric_wrapper_retired",
     );
 }
 
@@ -60,7 +66,7 @@ fn bare_d32_type_is_removed() {
 
 #[test]
 fn removed_d32_help_points_at_d64() {
-    let fixture = analyze_source("incipit { fixum numerus<d32> a ← 4.2 }");
+    let fixture = analyze_source("incipit { fixum d32 a ← 4.2 }");
     let text = format!("{:?}", fixture.diagnostics);
     assert!(text.contains("removed_decimal_width_d32"), "{text}");
 }

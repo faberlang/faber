@@ -67,14 +67,15 @@ functio keep(f16 x) → f16 {
 }
 
 #[test]
-fn numerus_f16_rejects_as_float_width() {
+fn wrapped_numerus_f16_is_the_retired_wrapper() {
+    // N7d: the wrapped spelling is rejected whole, a float marker included.
     test_support::assert_analysis_rejects_with_issue(
         r"
 functio bad(numerus<f16> x) → numerus<f16> {
     redde x
 }
 ",
-        "float_width_on_numerus",
+        "numeric_wrapper_retired",
     );
 }
 

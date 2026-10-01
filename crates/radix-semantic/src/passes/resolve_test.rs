@@ -605,34 +605,27 @@ fn reports_unknown_type_with_structured_event() {
     expect_structured_error(&errors, SemanticErrorKind::TypeUndefined, "unknown_type");
 }
 
+// NOTE: The AST is built by hand: the parser rejects the wrapped numeric
+// spelling `numerus<W>` / `fractus<W>` whole (`numeric_wrapper_retired`, N7d),
+// so the lowerer's own width-marker diagnostics are reachable only this way.
 #[test]
 fn reports_invalid_width_marker_with_structured_event() {
     let cases = [
-        (
-            "functio f(numerus<wat> value) → vacuum {}",
-            "invalid_numerus_width_marker",
-            "numerus",
-        ),
-        (
-            "functio f(fractus<wat> value) → vacuum {}",
-            "invalid_fractus_width_marker",
-            "fractus",
-        ),
+        ("numerus", "invalid_numerus_width_marker"),
+        ("fractus", "invalid_fractus_width_marker"),
     ];
 
-    for (source, issue, primitive) in cases {
-        let parsed = parse(lex(source));
-        assert!(
-            parsed.errors.is_empty(),
-            "parse errors: {:?}",
-            parsed.errors
-        );
+    for (primitive, issue) in cases {
+        let mut interner = Interner::new();
+        let head = ident(&mut interner, primitive);
+        let wat = named_type(ident(&mut interner, "wat"));
+        let program = func_with_param_type(&mut interner, named_type_with_params(head, vec![wat]));
+
         let mut resolver = Resolver::new();
         let mut types = TypeTable::new();
-        let program = parsed.program.as_ref().expect("program");
-        collect::collect(program, &mut resolver, &mut types).expect("collect");
+        collect::collect(&program, &mut resolver, &mut types).expect("collect");
 
-        let errors = resolve::resolve(program, &mut resolver, &parsed.interner, &mut types)
+        let errors = resolve::resolve(&program, &mut resolver, &interner, &mut types)
             .expect_err("resolve should fail");
         let err = expect_structured_error(&errors, SemanticErrorKind::TypeUndefined, issue);
 

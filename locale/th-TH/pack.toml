@@ -692,6 +692,10 @@ help = "เขียนรูปร่างด้วยวงเล็บ width
 message = "ลิเทอรัลดัชนีต้องเป็นจำนวนธรรมชาติ"
 help = "ใช้ดัชนีรูปร่างที่ไม่เป็นลบ"
 
+[diagnostics.PARSE040.issues.numeric_wrapper_retired]
+message = "`{form}` เป็นการเขียนชนิดตัวเลขที่เลิกใช้แล้ว"
+help = "เขียน `{bare}` แทน `{form}`; ตัวระบุความกว้างเป็นชนิดในตัวมันเอง"
+
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
 help = "use the type spelling declared by this reader locale"

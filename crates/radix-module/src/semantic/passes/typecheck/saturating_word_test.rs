@@ -132,14 +132,12 @@ fn negated_minimum_constant_is_judged_by_its_exact_value() {
                 "incipit {{\n    {keyword} saturatus<{width}> low ← {min}\n    nota low\n}}\n"
             ));
         }
-        analysis_accepts(&format!(
-            "incipit {{\n    fixum numerus<{width}> low ← {min}\n    nota low\n}}\n"
-        ));
+        analysis_accepts(&format!("incipit {{\n    fixum {width} low ← {min}\n    nota low\n}}\n"));
         analysis_accepts(&format!(
             "incipit {{\n    fixum saturatus<{width}> below ← {min_minus_one}\n    nota below\n}}\n"
         ));
         analysis_rejects_with_issue(
-            &format!("incipit {{\n    fixum numerus<{width}> below ← {min_minus_one}\n    nota below\n}}\n"),
+            &format!("incipit {{\n    fixum {width} below ← {min_minus_one}\n    nota below\n}}\n"),
             "store_constant_out_of_range",
         );
     }

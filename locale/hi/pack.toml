@@ -692,6 +692,10 @@ help = "shape को {sugar} width sugar brackets में लिखें"
 message = "index literal प्राकृतिक संख्या होना चाहिए"
 help = "गैर-ऋणात्मक shape index उपयोग करें"
 
+[diagnostics.PARSE040.issues.numeric_wrapper_retired]
+message = "`{form}` संख्यात्मक प्रकार की हटाई गई वर्तनी है"
+help = "`{form}` की जगह `{bare}` लिखें; width marker स्वयं एक प्रकार है"
+
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
 help = "use the type spelling declared by this reader locale"

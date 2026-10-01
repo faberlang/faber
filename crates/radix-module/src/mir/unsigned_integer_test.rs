@@ -163,7 +163,7 @@ incipit {{
     nota one.sinistrata({shift})
     nota max.dextrata({shift})
 
-    fixum modulus<{w}> roundTrip ← max ↦ numerus<{w}> ↦ modulus<{w}>
+    fixum modulus<{w}> roundTrip ← max ↦ {w} ↦ modulus<{w}>
     nota roundTrip
 }}
 "

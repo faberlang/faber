@@ -692,6 +692,10 @@ help = "اكتب shape باستخدام {sugar} width sugar brackets"
 message = "index literal يجب أن يكون عددا طبيعيا"
 help = "استخدم shape index غير سالب"
 
+[diagnostics.PARSE040.issues.numeric_wrapper_retired]
+message = "الصيغة المغلّفة `{form}` للنوع العددي ملغاة"
+help = "اكتب `{bare}` بدلا من `{form}`؛ علامة العرض هي نوع بحد ذاتها"
+
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
 help = "use the type spelling declared by this reader locale"

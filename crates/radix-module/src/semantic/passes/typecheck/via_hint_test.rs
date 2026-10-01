@@ -214,10 +214,14 @@ fn every_hint_row_compiles_through_the_via_clause() {
 #[test]
 fn every_retired_type_argument_spelling_is_rejected_pointing_at_the_clause() {
     for row in ROWS {
-        assert_issue(
-            &diagnostics_with(latin_config(), &splice(row.frame, row.legacy)),
-            "conversio_hint_type_argument",
-        );
+        // The wrapped numeric heads are rejected whole (N7d); the other scalar
+        // heads keep the hint diagnostic.
+        let issue = if row.legacy.starts_with("↦ numerus<") || row.legacy.starts_with("↦ fractus<") {
+            "numeric_wrapper_retired"
+        } else {
+            "conversio_hint_type_argument"
+        };
+        assert_issue(&diagnostics_with(latin_config(), &splice(row.frame, row.legacy)), issue);
     }
 }
 
@@ -228,8 +232,12 @@ fn the_retired_type_argument_is_rejected_under_the_english_surface() {
         "fn f(u32 n) → f32 { return n ↦ float<f32, Bits> }",
         "fn f(char c) → u32 { return c ↦ int<u32, Code> }",
     ] {
-        assert_issue(&diagnostics_with(english_config(), source), "conversio_hint_type_argument");
+        assert_issue(&diagnostics_with(english_config(), source), "numeric_wrapper_retired");
     }
+    assert_issue(
+        &diagnostics_with(english_config(), "fn f(char c) → char { return c ↦ char<Code> ⊥ '?' }"),
+        "conversio_hint_type_argument",
+    );
 }
 
 #[test]

@@ -44,7 +44,7 @@ fn via_clause_carries_its_hint_on_the_conversion() {
 
 #[test]
 fn conversion_without_via_has_no_hint() {
-    let result = parse_ok("fixum _ n ← s ↦ numerus<u32>");
+    let result = parse_ok("fixum _ n ← s ↦ u32");
     let conversio = conversio(initializer(&result, 0));
     assert!(conversio.via.is_none());
 }
@@ -52,16 +52,36 @@ fn conversion_without_via_has_no_hint() {
 #[test]
 fn a_hint_as_a_further_type_argument_is_rejected() {
     for source in [
-        "fixum _ n ← s ↦ numerus<u32, Hex>",
-        "fixum _ n ← s ↦ numerus<u32, Bits>",
-        "fixum _ n ← s ↦ numerus<u32, Be>",
-        "fixum _ n ← s ↦ fractus<f64, Bits>",
         "fixum _ n ← s ↦ ascii<8, Hex>",
         "fixum _ n ← s ↦ ascii<_, Bin>",
         "fixum _ n ← s ↦ littera<Code>",
-        "fixum _ n ← s ↦ numerus<u32, Hex> ⊥ 0",
+        "fixum _ n ← s ↦ ascii<8, Hex> ⊥ 0",
     ] {
         assert_parse_error_issue(source, "conversio_hint_type_argument");
+    }
+}
+
+#[test]
+fn a_wrapped_numeric_target_with_a_hint_is_rejected_as_the_wrapper() {
+    // N7d: the wrapped numeric spelling is retired whole, so the wrapper
+    // diagnostic fires first; no hint diagnostic follows on the recovered type.
+    for source in [
+        "fixum _ n ← s ↦ numerus<u32, Hex>",
+        "fixum _ n ← s ↦ numerus<u32, Bits>",
+        "fixum _ n ← s ↦ fractus<f64, Bits>",
+        "fixum _ n ← s ↦ numerus<u32, Hex> ⊥ 0",
+        "fixum _ n ← s ↦ numerus<u32, _>",
+    ] {
+        assert_parse_error_issue(source, "numeric_wrapper_retired");
+        let result = crate::test_support::parse_program(source);
+        assert!(
+            !result.errors.iter().any(|err| crate::test_support::has_arg(
+                err,
+                "issue",
+                "conversio_hint_type_argument"
+            )),
+            "{source}: wrapper rejection must not cascade into a hint error"
+        );
     }
 }
 
@@ -69,8 +89,8 @@ fn a_hint_as_a_further_type_argument_is_rejected() {
 fn a_bracketed_hint_tail_after_the_target_is_rejected() {
     for source in [
         "fixum _ n ← s ↦ octeti<16><Le>",
-        "fixum _ n ← s ↦ vector<numerus<u32>, 4><Be>",
-        "fixum _ n ← s ↦ numerus<u32><Le>",
+        "fixum _ n ← s ↦ vector<u32, 4><Be>",
+        "fixum _ n ← s ↦ ascii<8><Le>",
     ] {
         assert_parse_error_issue(source, "conversio_hint_tail_argument");
     }
@@ -79,11 +99,10 @@ fn a_bracketed_hint_tail_after_the_target_is_rejected() {
 #[test]
 fn a_hole_and_a_via_clause_stay_accepted() {
     for source in [
-        "fixum _ n ← s ↦ numerus<u32, _>",
         "fixum _ n ← s ↦ ascii<_> via Hex",
         "fixum _ n ← s ↦ ascii<8> via Hex",
         "fixum _ n ← s ↦ octeti<16> via Le",
-        "fixum _ n ← s ↦ vector<numerus<u32>, 4> via Be",
+        "fixum _ n ← s ↦ vector<u32, 4> via Be",
     ] {
         let _ = parse_ok(source);
     }

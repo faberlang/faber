@@ -1,4 +1,7 @@
-//! PH-2/PH-3 pins: `numerus<_>` and marker twins as family-preserving holes.
+//! PH-2/PH-3 pins: the policy-word and `instans` marker holes as
+//! family-preserving holes. The `numerus<_>` / `fractus<_>` holes retired with
+//! the wrapped numeric spelling (N7d); the checker harness tests below still
+//! drive the `Numerus` family through hand-built `MarkerHole` types.
 
 use super::*;
 use crate::passes::collect;
@@ -33,31 +36,6 @@ fn resolve_alias(source: &str) -> (TypeTable, crate::TypeId) {
 
 #[test]
 fn resolve_interns_marker_holes() {
-    let (types, ty) = resolve_alias("typus X = numerus<_>");
-    assert!(
-        matches!(
-            types.get(ty),
-            Type::MarkerHole {
-                family: MarkerFamily::Numerus,
-                ..
-            }
-        ),
-        "numerus<_> must intern MarkerHole, got {:?}",
-        types.get(ty)
-    );
-
-    let (types, ty) = resolve_alias("typus X = fractus<_>");
-    assert!(
-        matches!(
-            types.get(ty),
-            Type::MarkerHole {
-                family: MarkerFamily::Fractus,
-                ..
-            }
-        ),
-        "fractus<_>"
-    );
-
     let (types, ty) = resolve_alias("typus X = modulus<_>");
     assert!(
         matches!(
@@ -84,44 +62,14 @@ fn resolve_interns_marker_holes() {
 }
 
 #[test]
-fn resolve_rejects_convert_hint_hole() {
-    let parsed = parse(lex("typus X = numerus<u32, _>"));
-    assert!(
-        parsed.errors.is_empty(),
-        "parse errors: {:?}",
-        parsed.errors
-    );
-    let mut resolver = Resolver::new();
-    let mut types = TypeTable::new();
-    let program = parsed.program.as_ref().expect("program");
-    collect::collect(program, &mut resolver, &mut types).expect("collect");
-    let result = resolve(program, &mut resolver, &parsed.interner, &mut types);
-    assert!(
-        result.is_err(),
-        "numerus<u32, _> must not intern a marker hole"
-    );
-}
-
-#[test]
-fn numerus_hole_solves_exact_sized_witness() {
-    test_support::assert_accepts(
-        r"incipit {
-    fixum numerus<_> n ← 1 ∷ i32
-    fixum i32 m ← n
-    nota m
-}",
-    );
-}
-
-#[test]
-fn numerus_hole_materializes_bare_witness_to_i64() {
-    test_support::assert_accepts(
-        r"incipit {
-    fixum numerus<_> n ← 42
-    fixum i64 m ← n
-    nota m
-}",
-    );
+fn the_numeric_marker_holes_are_retired_with_the_wrapper() {
+    for source in [
+        "incipit {\n    fixum numerus<_> n ← 1\n    nota n\n}",
+        "incipit {\n    fixum fractus<_> x ← 1.0\n    nota x\n}",
+        "functio k() → numerus<_> {\n    tacet\n}",
+    ] {
+        test_support::assert_rejects_with_issue(source, "numeric_wrapper_retired");
+    }
 }
 
 #[test]
@@ -130,28 +78,6 @@ fn bare_numerus_still_accepts_i32_via_default_path() {
         r"incipit {
     fixum numerus n ← 1 ∷ i32
     nota n
-}",
-    );
-}
-
-#[test]
-fn numerus_hole_rejects_fractus_witness() {
-    test_support::assert_rejects_with_issue(
-        r"incipit {
-    fixum numerus<_> n ← 1.0 ∷ f32
-    nota n
-}",
-        "expression_type_mismatch",
-    );
-}
-
-#[test]
-fn fractus_hole_solves_exact_sized_witness() {
-    test_support::assert_accepts(
-        r"incipit {
-    fixum fractus<_> x ← 1.0 ∷ f32
-    fixum f32 y ← x
-    nota y
 }",
     );
 }
@@ -174,119 +100,6 @@ fn instans_hole_solves_exact_precision() {
     fixum instans<_> hole ← t
     redde hole
 }",
-    );
-}
-
-#[test]
-fn unsolved_numerus_hole_errors() {
-    test_support::assert_analysis_rejects_with_issue(
-        r"functio k() → numerus<_> {
-    tacet
-}",
-        "marker_width_unsolved",
-    );
-}
-
-#[test]
-fn numerus_hole_interns_sized_i32_not_i64() {
-    let unit = test_support::analyze_ok(
-        r"incipit {
-    fixum numerus<_> n ← 1 ∷ i32
-    nota n
-}",
-    );
-    let tys = test_support::entry_local_tys(&unit);
-    assert_eq!(tys.len(), 1);
-    assert!(
-        matches!(
-            unit.types.get(tys[0]),
-            Type::SizedNumeric(Primitive::Numerus, NumericWidth::I32)
-        ),
-        "numerus<_> ← i32 must intern sized i32, got {:?}",
-        unit.types.get(tys[0])
-    );
-}
-
-#[test]
-fn numerus_hole_and_bare_are_two_interned_types() {
-    let unit = test_support::analyze_ok(
-        r"incipit {
-    fixum numerus a ← 42
-    fixum numerus<_> b ← 42
-    nota a
-    nota b
-}",
-    );
-    let tys = test_support::entry_local_tys(&unit);
-    assert_eq!(tys.len(), 2);
-    assert!(
-        matches!(unit.types.get(tys[0]), Type::Primitive(Primitive::Numerus)),
-        "bare numerus stays Primitive, got {:?}",
-        unit.types.get(tys[0])
-    );
-    assert!(
-        matches!(
-            unit.types.get(tys[1]),
-            Type::SizedNumeric(Primitive::Numerus, NumericWidth::I64)
-        ),
-        "numerus<_> from 42 materializes sized i64, got {:?}",
-        unit.types.get(tys[1])
-    );
-    assert_ne!(tys[0], tys[1], "same width, two interned types");
-    assert!(
-        unit.types.equals(tys[0], tys[1]),
-        "bare numerus still equals sized i64"
-    );
-}
-
-#[test]
-fn fractus_hole_interns_sized_f32() {
-    let unit = test_support::analyze_ok(
-        r"incipit {
-    fixum fractus<_> x ← 1.0 ∷ f32
-    nota x
-}",
-    );
-    let tys = test_support::entry_local_tys(&unit);
-    assert_eq!(tys.len(), 1);
-    assert!(
-        matches!(
-            unit.types.get(tys[0]),
-            Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32)
-        ),
-        "got {:?}",
-        unit.types.get(tys[0])
-    );
-}
-
-#[test]
-fn fractus_hole_materializes_bare_witness_to_f64() {
-    let unit = test_support::analyze_ok(
-        r"incipit {
-    fixum fractus<_> x ← 1.0
-    nota x
-}",
-    );
-    let tys = test_support::entry_local_tys(&unit);
-    assert_eq!(tys.len(), 1);
-    assert!(
-        matches!(
-            unit.types.get(tys[0]),
-            Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64)
-        ),
-        "fractus<_> from 1.0 must materialize sized f64, got {:?}",
-        unit.types.get(tys[0])
-    );
-}
-
-#[test]
-fn fractus_hole_rejects_numerus_witness() {
-    test_support::assert_rejects_with_issue(
-        r"incipit {
-    fixum fractus<_> x ← 1 ∷ i32
-    nota x
-}",
-        "expression_type_mismatch",
     );
 }
 
@@ -379,40 +192,12 @@ fn instans_hole_from_bare_stays_seconds() {
 }
 
 #[test]
-fn unsolved_numerus_binding_errors() {
-    test_support::assert_analysis_rejects_with_issue(
-        r"functio k() → vacuum {
-    fixum numerus<_> n
-    tacet
-}",
-        "marker_width_unsolved",
-    );
-}
-
-#[test]
-fn unsolved_fractus_and_modulus_holes_error() {
-    test_support::assert_analysis_rejects_with_issue(
-        r"functio k() → fractus<_> {
-    tacet
-}",
-        "marker_width_unsolved",
-    );
+fn unsolved_modulus_hole_errors() {
     test_support::assert_analysis_rejects_with_issue(
         r"functio k() → modulus<_> {
     tacet
 }",
         "marker_width_unsolved",
-    );
-}
-
-#[test]
-fn convert_hint_hole_rejected_as_binding() {
-    test_support::assert_analysis_rejects_with_issue(
-        r"incipit {
-    fixum numerus<u32, _> n ← 1
-    nota n
-}",
-        "numerus_width_params",
     );
 }
 

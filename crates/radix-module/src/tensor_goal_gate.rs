@@ -2,7 +2,8 @@
 //!
 //! This module owns runnable assertions that prove the type system behaves
 //! correctly at the compiler level: numeric width assignability, tensor
-//! construction, sized conversio, and family-width mismatch detection.
+//! construction, sized conversio, and the retired wrapped numeric spelling's
+//! rejection.
 //! Callers invoke these gates from driver-level verification plans; the module
 //! has no phase position in the semantic pipeline.
 
@@ -75,16 +76,17 @@ pub fn run_convert_gate() {
     );
     assert!(
         family_err.is_err(),
-        "expected family error diagnostic from float_width_on_numerus case"
+        "expected the retired wrapped numeric spelling to be rejected"
     );
     if let Err(diags) = family_err {
         assert!(
             diags.iter().any(|d| d.args
                 == vec![
-                    DiagnosticArg::new("issue", "float_width_on_numerus"),
-                    DiagnosticArg::new("primitive", "numerus")
+                    DiagnosticArg::new("issue", "numeric_wrapper_retired"),
+                    DiagnosticArg::new("form", "numerus<f32>"),
+                    DiagnosticArg::new("bare", "f32")
                 ]),
-            "expected family diagnostic, got: {diags:?}"
+            "expected wrapper diagnostic, got: {diags:?}"
         );
     }
 }

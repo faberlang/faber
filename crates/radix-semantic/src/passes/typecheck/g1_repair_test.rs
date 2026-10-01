@@ -55,9 +55,9 @@ fn kinds(source: &str) -> Vec<HirStoreKind> {
 #[test]
 fn float_literal_beside_a_float_outside_the_finite_range_is_rejected() {
     for (ty, literal) in [("f32", "1e40"), ("f16", "70000.0"), ("bf16", "1e39")] {
-        let source = format!("incipit {{\nfixum fractus<{ty}> x ← 1.5\nnota x + {literal}\n}}\n");
+        let source = format!("incipit {{\nfixum {ty} x ← 1.5\nnota x + {literal}\n}}\n");
         assert_rejects_with_issue(&source, OUT_OF_RANGE);
-        let slot = format!("incipit {{\nfixum fractus<{ty}> y ← {literal}\nnota y\n}}\n");
+        let slot = format!("incipit {{\nfixum {ty} y ← {literal}\nnota y\n}}\n");
         assert_rejects_with_issue(&slot, OUT_OF_RANGE);
     }
 }

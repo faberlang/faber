@@ -843,6 +843,10 @@ fn invalid_type_message(args: &[DiagnosticArg]) -> Option<String> {
             Some(format!("{sugar} sugar uses bracket Figura"))
         }
         "invalid_figura_index" => Some("index literal must be a natural number".to_owned()),
+        "numeric_wrapper_retired" => {
+            let form = arg_value(args, "form")?;
+            Some(format!("`{form}` is a retired numeric type spelling"))
+        }
         _ => None,
     }
 }
@@ -875,6 +879,13 @@ fn invalid_type_help(args: &[DiagnosticArg]) -> Option<String> {
             Some(format!("write the shape with {sugar} width sugar brackets"))
         }
         "invalid_figura_index" => Some("use a non-negative shape index".to_owned()),
+        "numeric_wrapper_retired" => {
+            let form = arg_value(args, "form")?;
+            let bare = arg_value(args, "bare")?;
+            Some(format!(
+                "write `{bare}`, not `{form}`; a width marker is its own type"
+            ))
+        }
         _ => None,
     }
 }

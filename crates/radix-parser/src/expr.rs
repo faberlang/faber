@@ -1291,9 +1291,9 @@ impl Parser {
     /// A convert hint is a `via` clause, never a type argument. Two pre-D11.9
     /// spellings are retired and get a specific diagnostic pointing at the
     /// clause: the hint as a further type argument of the scalar head
-    /// (`int<u32, Bits>`, `ascii<N, Hex>`, `littera<Code>`) and the hint as a
-    /// bracketed tail after the target (`octeti<16><Le>`). A hole
-    /// (`numerus<u32, _>`) is not a hint and stays accepted.
+    /// (`ascii<N, Hex>`, `littera<Code>`) and the hint as a bracketed tail
+    /// after the target (`octeti<16><Le>`). The wrapped numeric spelling
+    /// (`int<u32, Bits>`) is rejected earlier, in type position, as a whole.
     ///
     /// WHY: only the scalar heads that ever took a hint are checked, so a
     /// user type named `Code` or `Bits` stays a legal type argument
@@ -1332,13 +1332,12 @@ impl Parser {
         let TypeExprKind::Named(head, args) = &ty.kind else {
             return None;
         };
-        // Slot 1 of the numeric and ascii heads is the width or capacity;
-        // `littera` has no other argument, so its slot 0 is the hint.
+        // Slot 1 of `ascii` is the capacity; `littera` has no other argument,
+        // so its slot 0 is the hint. The numeric heads never carry arguments
+        // here: the wrapped numeric spelling is rejected in type position.
         let first_hint_slot =
             match radix_types::Primitive::from_name(self.interner.resolve(head.name))? {
-                radix_types::Primitive::Numerus
-                | radix_types::Primitive::Fractus
-                | radix_types::Primitive::Ascii => 1,
+                radix_types::Primitive::Ascii => 1,
                 radix_types::Primitive::Littera => 0,
                 _ => return None,
             };
@@ -1418,7 +1417,7 @@ impl Parser {
             let name = self.interner.resolve(sym);
             // Resolve a localized type spelling to its latin identity before
             // the conversio-type list match (`int` → `numerus` under the en
-            // pack), so `↦ int<u32>` routes to an explicit type target.
+            // pack), so `↦ int` routes to an explicit type target.
             let latin = self
                 .reader_type_latin_keys
                 .get(name)

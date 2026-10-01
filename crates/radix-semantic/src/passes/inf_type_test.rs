@@ -213,11 +213,13 @@ incipit {
 }
 
 #[test]
-fn fractus_inf_is_an_integer_marker_on_a_float_family() {
+fn fractus_inf_is_a_retired_wrapper() {
+    // `inf` is an integer-family marker; the wrapped `fractus<inf>` is gone
+    // with the wrapped numeric spelling (N7d).
     expect_issue(
         "functio f(fractus<inf> x) → inf { redde 0 }\n",
-        SemanticErrorKind::TypeUndefined,
-        "integer_width_on_fractus",
+        SemanticErrorKind::LoweringError,
+        "numeric_wrapper_retired",
     );
 }
 
