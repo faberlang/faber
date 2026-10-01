@@ -21,6 +21,45 @@ fn report_locale_diagnostic(diagnostic: &radix::module::diagnostics::Diagnostic)
     std::process::exit(1);
 }
 
+/// Single-file `wgsl-text` emit: each imported library's `[target.wgsl-text]`
+/// bindings (read by Faber, opaque to the compiler) are merged and installed.
+/// A manifest that cannot be read is reported as an error diagnostic.
+fn compile_wgsl_with_library_bindings(
+    command: &EmitCommand,
+    code_pack: Option<&radix::module::locale::LocalePack>,
+) -> radix::CompileResult {
+    let target_spelling = command.target.to_string();
+    let load_errors = std::cell::RefCell::new(Vec::new());
+    let resolve = |roots: &std::collections::BTreeSet<std::path::PathBuf>| {
+        let mut merged = radix::module::driver::TargetBindings::default();
+        for root in roots {
+            match faber_cli::package::load_target_bindings(root, &target_spelling) {
+                Ok(bindings) => {
+                    merged.functions.extend(bindings.functions);
+                    merged.types.extend(bindings.types);
+                }
+                Err(diagnostics) => load_errors.borrow_mut().extend(diagnostics),
+            }
+        }
+        merged
+    };
+    let mut result = radix::services::compile_cli_input_with_library_bindings(
+        &command.input,
+        command.package,
+        command.target,
+        code_pack,
+        command.output_mode,
+        command.module_name.as_deref(),
+        &resolve,
+    );
+    let errors = load_errors.into_inner();
+    if !errors.is_empty() {
+        result.output = None;
+        result.diagnostics.extend(errors);
+    }
+    result
+}
+
 /// Emit a single-file target with Faber-owned reader-locale resolution.
 ///
 /// TypeScript remains on Radix's direct-file route, but it still needs the
@@ -56,14 +95,18 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
         None => code_pack.clone(),
     };
 
-    let result = radix::services::compile_cli_input_with_locale_pack(
-        &command.input,
-        command.package,
-        command.target,
-        code_pack.as_ref(),
-        command.output_mode,
-        command.module_name.as_deref(),
-    );
+    let result = if command.target == radix::module::codegen::Target::MirWgsl {
+        compile_wgsl_with_library_bindings(&command, code_pack.as_ref())
+    } else {
+        radix::services::compile_cli_input_with_locale_pack(
+            &command.input,
+            command.package,
+            command.target,
+            code_pack.as_ref(),
+            command.output_mode,
+            command.module_name.as_deref(),
+        )
+    };
 
     faber_cli::postprocess::print_diagnostics(
         &result.diagnostics,

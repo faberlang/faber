@@ -65,7 +65,7 @@ mod test_route;
 #[cfg(feature = "hir-rust")]
 #[cfg(test)]
 pub(crate) use binding::verify_library_binding_shapes;
-pub use binding::verify_library_bindings;
+pub use binding::{load_target_bindings, verify_library_bindings};
 pub(crate) use cargo::{
     RustRuntimePlan, package_host_selection_diagnostic, rust_runtime_plan_for_package,
 };

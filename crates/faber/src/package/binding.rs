@@ -50,6 +50,50 @@ pub fn verify_library_bindings(
     verify_library_bindings_with_probe_mode(package_root, target, BindingProbeMode::Cargo)
 }
 
+/// Read the route-to-spelling maps (functions and types) that the library at
+/// `package_root` declares for `target`, without verifying them.
+///
+/// A library with no `[target.<target>]` table or no `bindings` file yields
+/// empty maps. Keys and values are the manifest's opaque strings; the compiler
+/// names no library vocabulary.
+///
+/// # Errors
+/// Returns the manifest, member-path or binding-manifest diagnostics.
+pub fn load_target_bindings(
+    package_root: &Path,
+    target: &str,
+) -> Result<radix::module::driver::TargetBindings, Vec<Diagnostic>> {
+    let manifest_path = package_root.join(super::MANIFEST_FILE);
+    let manifest = match read_manifest(&manifest_path) {
+        Ok(manifest) => manifest,
+        Err(diag) => return Err(vec![*diag]),
+    };
+    let Some(bindings_path) = manifest
+        .target
+        .get(target)
+        .and_then(|config| config.bindings.as_deref())
+    else {
+        return Ok(radix::module::driver::TargetBindings::default());
+    };
+    let binding_path = match resolve_package_member(package_root, bindings_path, &manifest_path) {
+        Ok(path) => path,
+        Err(diagnostic) => return Err(vec![diagnostic]),
+    };
+    let binding_manifest = read_binding_manifest(&binding_path)?;
+    Ok(radix::module::driver::TargetBindings {
+        functions: binding_manifest
+            .functions
+            .into_iter()
+            .map(|(route, binding)| (route, binding.symbol))
+            .collect(),
+        types: binding_manifest
+            .types
+            .into_iter()
+            .map(|(route, binding)| (route, binding.symbol))
+            .collect(),
+    })
+}
+
 #[cfg(feature = "hir-rust")]
 pub fn verify_library_binding_shapes(
     package_root: &Path,

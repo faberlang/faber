@@ -14,7 +14,8 @@ pub mod module {
     #[cfg(feature = "device")]
     pub use radix_module::air;
     pub use radix_module::driver::{
-        AnalyzeRequest, AnalyzedModule, ModuleCompileRequest, ModuleImportContract, analyze_source,
+        AnalyzeRequest, AnalyzedModule, ModuleCompileRequest, ModuleImportContract, TargetBindings,
+        analyze_source,
     };
     #[cfg(feature = "mir-core")]
     pub use radix_module::mir;
@@ -64,9 +65,10 @@ pub mod program {
 /// Admitted typed services: values + diagnostics, no printing or process exit.
 pub mod services {
     pub use radix_module::program::{
-        compile_cli_input, compile_cli_input_with_locale_pack,
-        compile_cli_input_with_locale_pack_explicit, compile_cli_path,
-        compile_cli_path_with_locale_pack, resolve_package_mode, should_treat_as_package,
+        LibraryBindingsResolver, compile_cli_input, compile_cli_input_with_library_bindings,
+        compile_cli_input_with_locale_pack, compile_cli_input_with_locale_pack_explicit,
+        compile_cli_path, compile_cli_path_with_locale_pack, resolve_package_mode,
+        should_treat_as_package,
     };
     pub use radix_module::services::{
         BuildCommand, CheckCommand, CheckDiagnosticsResult, DiagnosticMode, EmitCommand,

@@ -171,6 +171,61 @@ pub fn compile_cli_input_with_locale_pack_explicit(
     compile_cli_input_with_locale_pack_inner(input, package, target, code_pack, output_mode, module_name, true)
 }
 
+/// Resolves the opaque route-to-spelling maps for the library package roots a
+/// single-file input imports. The caller (the `faber` layer) owns reading
+/// binding manifests; the compiler only transports the resulting maps.
+pub type LibraryBindingsResolver<'a> = &'a dyn Fn(&BTreeSet<PathBuf>) -> crate::driver::TargetBindings;
+
+/// Compile command input like [`compile_cli_input_with_locale_pack`], then hand
+/// the maps `library_bindings` returns for the input's imported library roots
+/// to the driver as `Config::target_bindings`. Package and stdin inputs take
+/// the existing route unchanged (stdin has no import closure).
+#[must_use]
+pub fn compile_cli_input_with_library_bindings(
+    input: &[String],
+    package: bool,
+    target: crate::codegen::Target,
+    code_pack: ReaderPackRef<'_>,
+    output_mode: crate::codegen::OutputMode,
+    module_name: Option<&str>,
+    library_bindings: LibraryBindingsResolver<'_>,
+) -> crate::CompileResult {
+    let Some(first) = input.first().filter(|first| first.as_str() != "-") else {
+        return compile_cli_input_with_locale_pack(input, package, target, code_pack, output_mode, module_name);
+    };
+    let path = PathBuf::from(first);
+    if resolve_package_mode(&path, package) {
+        return compile_cli_input_with_locale_pack(input, package, target, code_pack, output_mode, module_name);
+    }
+    let source = match std::fs::read_to_string(&path) {
+        Ok(source) => source,
+        Err(err) => {
+            return crate::CompileResult {
+                output: None,
+                diagnostics: vec![
+                    crate::Diagnostic::io_error(&path, &err)
+                        .with_code("IO001")
+                        .with_arg("issue", "source_read_failed"),
+                ],
+            };
+        }
+    };
+    let session = crate::driver::Session::new(config_for_target(target, code_pack, output_mode, module_name, false));
+    match prepare_program_module_with_bindings(&path, &source, &session, Some(library_bindings)) {
+        Ok(prepared) => crate::driver::compile(
+            &prepared.session,
+            &path.display().to_string(),
+            &source,
+            crate::driver::ModuleCompileRequest {
+                contract: prepared.contract,
+                package_identities: prepared.package_identities,
+                provider_units: prepared.provider_units,
+            },
+        ),
+        Err(diagnostic) => crate::CompileResult { output: None, diagnostics: vec![*diagnostic] },
+    }
+}
+
 fn compile_cli_input_with_locale_pack_inner(
     input: &[String],
     package: bool,
@@ -452,6 +507,17 @@ pub fn prepare_program_module(
     source: &str,
     session: &crate::driver::Session,
 ) -> Result<PreparedProgramModule, Box<crate::Diagnostic>> {
+    prepare_program_module_with_bindings(path, source, session, None)
+}
+
+/// [`prepare_program_module`] that also installs `Config::target_bindings` from
+/// the library package roots the module's imports resolved to.
+fn prepare_program_module_with_bindings(
+    path: &Path,
+    source: &str,
+    session: &crate::driver::Session,
+    library_bindings: Option<LibraryBindingsResolver<'_>>,
+) -> Result<PreparedProgramModule, Box<crate::Diagnostic>> {
     let templates = session.config.import_path_templates.as_ref();
     let mut pack = if session.config.locale_pack_explicit {
         session.config.locale_pack.clone()
@@ -489,6 +555,9 @@ pub fn prepare_program_module(
     let mut config = session.config.clone();
     if let Some(pack) = pack.as_ref() {
         config = config.with_resolved_locale_pack(pack.clone());
+    }
+    if let Some(resolve) = library_bindings {
+        config = config.with_target_bindings(resolve(&import.library_package_roots));
     }
     // Package identities key by binding: rewrite default-named imports to
     // their targets' declared names first (D7.7), as the driver will.
