@@ -1,0 +1,46 @@
++++
+term = "lista"
+kind = "existing-home"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "A list literal may name the same local more than once: each element reads the binding, which stays usable."
+syntax = "[<name>, <name>]"
+related = ["lista", "inf", "textus"]
+locale = "en"
++++
+# =============================================================================
+# lista — a list literal reuses a named local
+# =============================================================================
+#
+# What this teaches:
+#   • `[x, x]` reads `x` once per element; the binding is not consumed
+#   • this holds for heap-backed values (`inf`, `string`) as well as plain
+#     numbers: every element is an independent copy of the value
+#   • the local stays readable after the literal is built
+#
+# Common mistakes:
+#   • assuming a literal moves its named elements
+#
+# See also: lista, inf, textus
+# =============================================================================
+
+# EXPECTED OUTPUT:
+#   2
+#   5
+#   2
+#   hi
+#   3
+
+main {
+    const inf x ← 5
+    const list<inf> xs ← [x, x]
+    print xs.length()
+    print x
+
+    const string s ← "hi"
+    const list<string> ss ← [s, s, s]
+    print ss.length() - 1
+    print s
+    print ss.length()
+}
