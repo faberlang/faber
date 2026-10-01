@@ -46,7 +46,8 @@ class Tabula {
     static string TITULUS = embed "nuntius.txt"
 }
 
-# `embed` is contextual: outside a constant initializer it is an ordinary name.
+# `embed` is contextual: directly before a string literal it is the embed; any
+# other use of the name, like this call, is an ordinary identifier.
 fn embed(int n) → int {
     return n * 2
 }

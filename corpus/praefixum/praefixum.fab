@@ -24,7 +24,8 @@ locale = "en"
 #
 # Common mistakes:
 #   • Using `comptime` outside a constant initializer — it is legal only as
-#     `const T NAME = comptime { … }`.
+#     the whole initializer of `const T NAME = comptime { … }` (module level or
+#     block level) or of a class field default.
 #   • The retired `comptime(expr)` form — a plain expression needs no marker:
 #     `const int N = 4 * 1024` already folds at compile time.
 #   • Reaching I/O, `call`, or async code — the build rejects the constant and
