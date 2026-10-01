@@ -2434,7 +2434,14 @@ fn finalize_air_backward_instance(
             }
         }
     }
-    substitute_shape_size_constants(types, &mut function, bindings).then_some(function)
+    if !substitute_shape_size_constants(types, &mut function, bindings) {
+        return None;
+    }
+    // The instance is executable: expand its deferred vector ops now, and
+    // refuse an instance whose ops cannot expand.
+    let mut errors = Vec::new();
+    crate::mir::expand_deferred_vector_ops(types, &mut function, &mut errors);
+    errors.is_empty().then_some(function)
 }
 
 #[cfg(feature = "device")]

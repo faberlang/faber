@@ -115,6 +115,7 @@ pub(super) fn collect_runtime_call_requirement(
         | MirIntrinsic::TypeCheck(_)
         | MirIntrinsic::FilumSum(_)
         | MirIntrinsic::TensorLift(_)
+        | MirIntrinsic::VectorOp(_)
         | MirIntrinsic::Duplicate => {}
         MirIntrinsic::ReadLine => {
             requirements.insert("host:stdin".to_owned());

@@ -1297,10 +1297,15 @@ pub(super) fn finalize_monomorphized_shapes(
     // scalar means its instance's binding was missing, unresolved,
     // infer/unspecified, or out-of-range — all fail closed through this one
     // stable MIR validation diagnostic, before any backend can guess at it.
-    for function in functions {
+    for function in functions.iter_mut() {
         if function_contains_shape_size(function) {
             errors.push(MirError::validation(function.span, UNRESOLVED_SHAPE_SIZE_SURVIVOR));
         }
+    }
+    // Every function is now executable with literal widths: expand the
+    // deferred vector ops into lanes (instances and non-generic functions).
+    for function in functions.iter_mut() {
+        super::expand_deferred_vector_ops(types, function, &mut errors);
     }
     errors
 }

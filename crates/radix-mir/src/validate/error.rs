@@ -3,6 +3,11 @@
 use crate::MirType;
 use radix_lexer::Span;
 
+/// Stable validation issue for a [`crate::MirIntrinsic::VectorOp`] that reached
+/// validation: the expander must have rewritten it before the function became
+/// executable.
+pub const DEFERRED_VECTOR_OP_SURVIVED: &str = "deferred_vector_op_survived";
+
 /// Validation diagnostic for malformed MIR.
 ///
 /// Spans are carried from the offending MIR node so callers can tie structural

@@ -85,6 +85,7 @@ pub enum MirRuntimeAbiFamily {
     RuntimeFilumSum,
     RuntimeDuplicate,
     RuntimeTensorLift,
+    RuntimeVectorOp,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -195,6 +196,14 @@ impl MirRuntimeAbi {
             // reference, other lanes reject it.
             MirIntrinsic::TensorLift(_) => (
                 MirRuntimeAbiFamily::RuntimeTensorLift,
+                MirRuntimeAbiKind::CoreSemantics,
+                false,
+            ),
+            // A deferred vector op is expanded before any executor runs;
+            // validation rejects a survivor, so no lane dispatches this
+            // family.
+            MirIntrinsic::VectorOp(_) => (
+                MirRuntimeAbiFamily::RuntimeVectorOp,
                 MirRuntimeAbiKind::CoreSemantics,
                 false,
             ),
