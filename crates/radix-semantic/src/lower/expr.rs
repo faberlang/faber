@@ -41,6 +41,10 @@ use radix_syntax::{
 };
 use rustc_hash::FxHashSet;
 
+/// The parser's private method name for the source-only `ᵀ` suffix (the same
+/// spelling typecheck rewrites to the transpose intrinsic).
+const GLYPH_TRANSPOSE_MARKER: &str = "__faber_glyph_transpose";
+
 /// Lower one AST expression into the HIR expression contract.
 ///
 /// The entry point owns the cross-cutting guarantees for this file: assign a
@@ -62,7 +66,7 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Binary(bin) => lowerer.lower_binarius(bin),
         ExprKind::Unary(unary) => lowerer.lower_unarius(unary),
         ExprKind::Ternary(ternary) => lowerer.lower_ternary(ternary),
-        ExprKind::Call(call) => lowerer.lower_vocare(call),
+        ExprKind::Call(call) => lowerer.lower_vocare(call, id),
         ExprKind::Member(member) => lowerer.lower_membrum(member, id),
         ExprKind::Index(index) => lowerer.lower_index(index),
         ExprKind::Gradient(gradient) => lowerer.lower_gradient(gradient),
@@ -453,7 +457,15 @@ impl Lowerer<'_> {
     /// String literals in callee position are Faber template application, and
     /// member callees are kept as `MethodCall` so receiver typing can select the
     /// method later. Ordinary calls retain an explicit callee expression.
-    fn lower_vocare(&mut self, call: &radix_syntax::CallExpr) -> HirExpressionKind {
+    ///
+    /// `id` is the call expression's own `HirId`; a glyph transpose (`xᵀ`,
+    /// parsed as a call of the private marker method) records it as the
+    /// presentation anchor so Faber re-emission restores the glyph.
+    fn lower_vocare(
+        &mut self,
+        call: &radix_syntax::CallExpr,
+        id: radix_hir::HirId,
+    ) -> HirExpressionKind {
         let type_args: Vec<TypeId> = call
             .type_args
             .iter()
@@ -499,6 +511,9 @@ impl Lowerer<'_> {
             ExprKind::Member(member) => {
                 let (recv, name) = self.flatten_dotted_method_callee(member);
                 let name = self.canonicalize_namespace_member(&recv, name);
+                if self.interner.resolve(name) == GLYPH_TRANSPOSE_MARKER {
+                    self.presentation.glyph_transpose_ids.push(id);
+                }
                 let args = self.lower_call_args(&call.args);
                 HirExpressionKind::MethodCall(Box::new(recv), name, type_args, args, None)
             }

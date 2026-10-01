@@ -136,6 +136,7 @@ fn empty_presentation() -> HirPresentation {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
+        glyph_transpose_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -279,6 +280,7 @@ fn emits_statement_trivia_before_each_statement() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
+        glyph_transpose_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -333,6 +335,7 @@ fn emits_block_end_trivia_before_closing_brace() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
+        glyph_transpose_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -382,6 +385,7 @@ fn emits_program_end_trivia_before_eof() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
+        glyph_transpose_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -432,6 +436,7 @@ fn emits_item_trivia_before_item() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
+        glyph_transpose_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -469,6 +474,7 @@ fn emits_entry_trivia_before_incipit_keyword() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
+        glyph_transpose_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -571,6 +577,7 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
+        glyph_transpose_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -636,6 +643,7 @@ fn emits_trivia_before_annotation_sequence() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
+        glyph_transpose_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -715,6 +723,7 @@ fn comment_bearing_branch_stays_braced_not_ergo() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
+        glyph_transpose_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -827,6 +836,7 @@ fn comment_bearing_branch_prevents_sic_secus_compaction() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
+        glyph_transpose_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -951,6 +961,7 @@ fn boundary_newline_normalization_does_not_manufacture_blank_lines() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
+        glyph_transpose_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -1015,6 +1026,7 @@ fn file_start_trivia_keeps_no_leading_blank_lines() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
+        glyph_transpose_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -1076,6 +1088,7 @@ fn explicit_tacet_prints_implicit_ends_do_not() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
+        glyph_transpose_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -1143,6 +1156,7 @@ fn rendering_is_deterministic() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
+        glyph_transpose_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -1159,4 +1173,75 @@ fn rendering_is_deterministic() {
     let first = render(&hir, &presentation, &interner);
     let second = render(&hir, &presentation, &interner);
     assert_eq!(first, second, "same inputs must render deterministically");
+}
+
+/// Render `<receiver>.transpose()` as the printer sees it, optionally with
+/// the method-call node id recorded as an authored `ᵀ` glyph.
+fn render_transpose(receiver: HirExpressionKind, glyph: bool) -> String {
+    let types = TypeTable::new();
+    let mut interner = Interner::new();
+    let method = interner.intern("transpose");
+    let mut codegen = FaberCodegen::new(&types, &interner);
+    let node = HirId(100);
+    if glyph {
+        codegen.glyph_transpose_ids.insert(node);
+    }
+    let call = HirExpression {
+        id: node,
+        kind: HirExpressionKind::MethodCall(
+            Box::new(HirExpression {
+                id: HirId(101),
+                kind: receiver,
+                ty: None,
+                span: span(),
+            }),
+            method,
+            Vec::new(),
+            Vec::new(),
+            None,
+        ),
+        ty: None,
+        span: span(),
+    };
+    let mut writer = radix_codegen_shared::CodeWriter::new();
+    codegen.write_expr(
+        &call,
+        &rustc_hash::FxHashMap::default(),
+        &TestSurface,
+        &mut writer,
+    );
+    writer.finish()
+}
+
+fn sum_of_two_literals() -> HirExpressionKind {
+    let literal = |id: u32, value: u64| {
+        Box::new(HirExpression {
+            id: HirId(id),
+            kind: HirExpressionKind::Literal(HirLiteral::Int(value)),
+            ty: None,
+            span: span(),
+        })
+    };
+    HirExpressionKind::Binary(radix_hir::HirBinOp::Add, literal(102, 1), literal(103, 2))
+}
+
+#[test]
+fn glyph_transpose_prints_the_glyph_for_a_recorded_id() {
+    assert_eq!(
+        render_transpose(HirExpressionKind::Literal(HirLiteral::Int(1)), true),
+        "1ᵀ"
+    );
+}
+
+#[test]
+fn glyph_transpose_parenthesizes_a_compound_receiver() {
+    assert_eq!(render_transpose(sum_of_two_literals(), true), "(1 + 2)ᵀ");
+}
+
+#[test]
+fn transpose_without_a_recorded_glyph_stays_a_method_call() {
+    assert_eq!(
+        render_transpose(sum_of_two_literals(), false),
+        "(1 + 2).transpose()"
+    );
 }

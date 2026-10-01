@@ -899,3 +899,30 @@ fn format_control_file_unchanged() {
         CONTROL_SOURCE
     );
 }
+
+/// Need: `faber format` keeps the authored `ᵀ` glyph, including on
+/// a compound receiver (which re-emits parenthesized), and never rewrites it
+/// to the `.transpose()` method form.
+#[test]
+fn format_cli_keeps_the_transpose_glyph() {
+    let source = "+++\nlocale = \"en\"\n+++\nfn product_transposed(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]> {\n    return (a · b)ᵀ\n}\n\nfn flipped(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> {\n    return aᵀ\n}\n";
+    let fixture = std::env::temp_dir().join("faber-format-glyph-transpose-cli.fab");
+    fs::write(&fixture, source).expect("write glyph transpose fixture");
+
+    let formatted = run_faber_format_stdout(&fixture);
+    let _ = fs::remove_file(&fixture);
+
+    let body = radix::module::driver::split_frontmatter(&formatted)
+        .expect("split")
+        .body;
+    assert!(
+        body.contains("return (a · b)ᵀ") && body.contains("return aᵀ"),
+        "format must keep the transpose glyph:\n{formatted}"
+    );
+    assert!(
+        !body.contains("transpose("),
+        "format must not rewrite the glyph to a method call:\n{formatted}"
+    );
+    assert_canonical_reparses_with(body, "glyph transpose CLI --stdout", Some(&english_pack()))
+        .expect("reparse");
+}

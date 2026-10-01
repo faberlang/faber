@@ -230,6 +230,17 @@ impl super::FaberCodegen<'_> {
                     writer.write(")");
                 }
             }
+            HirExpressionKind::MethodCall(receiver, _, type_args, args, _)
+                if type_args.is_empty()
+                    && args.is_empty()
+                    && self.glyph_transpose_ids.contains(&expr.id) =>
+            {
+                // Authored `xᵀ`: typecheck rewrote the glyph marker to the
+                // transpose intrinsic and kept the node id; a compound
+                // receiver parenthesizes through the postfix precedence.
+                self.write_expr_prec(receiver, 13, names, surface, writer);
+                writer.write("ᵀ");
+            }
             HirExpressionKind::MethodCall(receiver, name, type_args, args, _) => {
                 // `base!.method(..)`: the receiver is the bare assertion, so
                 // the authored `!.` boundary is written in place of `.`.
