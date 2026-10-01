@@ -48,10 +48,6 @@ const KNOWN_MEANING_GAPS: &[(&str, &str)] = &[
         "operatores/modular-word-u8.fab",
         "en source uses a non-en intrinsic method spelling (LOCALE002); see intrinseca/numeric-operator-methods.fab",
     ),
-    (
-        "tensor/itera-ex-air-rank1.fab",
-        "`tf32[4]` shorthand and its canonical `tensor<f32, [4]>` emission analyze differently under the AIR lane (literal typing of the lowered loop)",
-    ),
 ];
 
 /// Files the structure check refuses (`CODEGEN006` / `ast_construct_dropped`): HIR keeps no
