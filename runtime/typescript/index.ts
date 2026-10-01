@@ -73,11 +73,25 @@ export function __faberDisplay(value: any, hint: FaberDisplayHint = "unknown"): 
     case "textus":
     case "ascii":
     case "instans":
-    case "numerus":
       return String(value);
+    case "numerus":
+      return __faberDisplayNumerus(value);
     default:
       return __faberDisplayValor(value);
   }
+}
+
+/**
+ * Render an integer carried as a JS number. Beyond 2^53 - 1 `String(value)`
+ * falls back to shortest round-trip digits padded with zeros (`-2^63` prints
+ * `-9223372036854776000`); `BigInt(value).toString()` prints the exact integer
+ * the number holds.
+ */
+export function __faberDisplayNumerus(value: any): string {
+  if (typeof value === "number" && Number.isInteger(value) && Math.abs(value) > Number.MAX_SAFE_INTEGER) {
+    return BigInt(value).toString();
+  }
+  return String(value);
 }
 
 /**

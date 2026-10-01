@@ -63,3 +63,12 @@ test("a tagged Fractus valor uses the fractus display", () => {
   const boxed = { __faberValorTag: "Fractus", __faberValorPayload: 18446744073709551616 };
   assert.equal(__faberDisplay(boxed, "valor"), "18446744073709551616.0");
 });
+
+test("a numerus beyond 2^53 displays its exact integer", () => {
+  assert.equal(__faberDisplay(-9223372036854775808, "numerus"), "-9223372036854775808");
+  assert.equal(__faberDisplay(18446744073709551616, "numerus"), "18446744073709551616");
+  assert.equal(__faberDisplay(9007199254740991, "numerus"), "9007199254740991");
+  assert.equal(__faberDisplay(-9007199254740991, "numerus"), "-9007199254740991");
+  assert.equal(__faberDisplay(42, "numerus"), "42");
+  assert.equal(__faberDisplay(-0, "numerus"), "0");
+});
