@@ -1498,6 +1498,7 @@ fn wgsl_vertex_source_error(shape: &'static str, issue: &'static str) -> crate::
         message: format!("MIR-to-WGSL unsupported: {shape}"),
         issue,
         shape: shape.to_owned(),
+        callee: None,
     }
 }
 
@@ -1507,6 +1508,7 @@ fn wgsl_vertex_abi_error(error: crate::mir::MirAbiError) -> crate::mir::MirWgslT
         message: format!("MIR-to-WGSL unsupported: {}", error.message),
         issue: error.issue,
         shape: error.message,
+        callee: None,
     }
 }
 
@@ -1531,6 +1533,7 @@ fn wgsl_vertex_source_error_with_detail(
         message: format!("MIR-to-WGSL unsupported: {shape}: {detail}"),
         issue,
         shape: format!("{shape}: {detail}"),
+        callee: None,
     }
 }
 

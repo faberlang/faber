@@ -608,7 +608,11 @@ fn load_target_bindings_rejects_an_unknown_target_table() {
     let err = super::load_target_bindings(root.path(), "wgsl-text")
         .expect_err("a [target.wgsl] table must be an error, not empty maps");
     assert!(has_issue(&err, "package_target_table_unknown"));
-    assert!(err.iter().any(|d| d.message.contains("wgsl")));
+    assert!(err.iter().any(|d| {
+        d.args
+            .iter()
+            .any(|arg| arg.name == "target" && arg.value == "wgsl")
+    }));
 }
 
 #[test]

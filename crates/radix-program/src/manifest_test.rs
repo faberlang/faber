@@ -314,7 +314,11 @@ fn target_tables_reject_unknown_key_naming_it_and_the_accepted_spellings() {
         .expect_err("an unknown [target.<key>] must fail validation");
     assert_eq!(err.code, Some("PKG001"));
     assert_eq!(err.issue(), Some("package_target_table_unknown"));
-    assert!(err.message.contains("[target.wgsl]"));
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "target" && arg.value == "wgsl")
+    );
     assert_eq!(
         err.args
             .iter()
