@@ -1,6 +1,7 @@
 //! A list literal stored into an optional or union slot takes its element
 //! type from the slot's single list member, exactly as it does for a plain
-//! `lista<T>` slot (opt-lit).
+//! `lista<T>` slot (opt-lit). The empty literal `vacua` and a typed tuple
+//! constructor land in an optional slot the same way.
 
 use crate::test_support::{analyze_source, assert_accepts};
 
@@ -36,4 +37,46 @@ fn optional_list_slot_elements_are_stores_into_the_element_type() {
         "optional slot rejects an out-of-range element"
     );
     assert_accepts("incipit { fixum lista<numerus<i8>> ∪ nihil a ← [100] nota a }");
+}
+
+#[test]
+fn vacua_stores_into_optional_collection_slots() {
+    assert_accepts(
+        r"incipit {
+    fixum lista<numerus> ∪ nihil a ← vacua
+    varia lista<numerus> ∪ nihil b ← nihil
+    b ← vacua
+    fixum tabula<textus, numerus> ∪ nihil c ← vacua
+    nota a
+    nota b
+    nota c
+}",
+    );
+}
+
+#[test]
+fn vacua_still_needs_exactly_one_collection_member() {
+    // No collection member, or two (the literal's shape is then ambiguous).
+    assert!(rejected(
+        "incipit { fixum numerus ∪ nihil a ← vacua nota a }"
+    ));
+    assert!(rejected(
+        "incipit { fixum lista<numerus> ∪ tabula<textus, numerus> a ← vacua nota a }"
+    ));
+}
+
+#[test]
+fn tuple_constructor_stores_into_optional_tuple_slot() {
+    // The constructor's own type arguments carry the element types, so an
+    // optional slot needs no help from the slot: the element is still a store
+    // into `numerus<i8>`.
+    assert_accepts(
+        r"incipit {
+    fixum iuncta<numerus<i8>, numerus> ∪ nihil a ← iuncta<numerus<i8>, numerus> [100, 2]
+    nota a
+}",
+    );
+    assert!(rejected(
+        "incipit { fixum iuncta<numerus<i8>, numerus> ∪ nihil a ← iuncta<numerus<i8>, numerus> [300, 2] nota a }"
+    ));
 }

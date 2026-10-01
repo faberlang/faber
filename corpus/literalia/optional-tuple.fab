@@ -1,0 +1,65 @@
++++
+term = "iuncta"
+kind = "existing-home"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "fixum_decl", "assignment", "expr_stmt", "si_stmt", "iuncta_expr", "call_expr", "call_suffix", "argument_list", "argument", "redde_stmt", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A typed tuple stored into a `tuple<..> ∪ none` slot: declaration, assignment, argument, and return."
+syntax = "tuple<A, B> ∪ none <name> ← tuple<A, B> [<elements>]"
+related = ["iuncta", "optionalis"]
+locale = "en"
++++
+# =============================================================================
+# iuncta — a typed tuple in an optional slot
+# =============================================================================
+#
+# What this teaches:
+#   • a typed tuple constructor stores into a `tuple<..> ∪ none` slot exactly
+#     as it stores into a plain `tuple<..>` slot: the optional slot holds the
+#     tuple itself
+#   • the same holds at every store site: declaration, reassignment, call
+#     argument, and return value
+#   • the constructor's own type arguments carry the element types
+#   • an optional slot may still hold `none`; test it with `not is none`
+#     before reading an element
+#
+# Common mistakes:
+#   • reading an element of an optional tuple without testing it first:
+#     `t[0]` needs the `t not is none` branch around it
+#
+# EXPECTED OUTPUT:
+#   The first element at each site, one per line: declaration, reassignment,
+#   argument, return value, and the empty slot (-1).
+#   7
+#   3
+#   9
+#   5
+#   -1
+
+fn first(tuple<int, int> ∪ none t) → int {
+    if t not is none {
+        return t[0]
+    }
+    return -1
+}
+
+fn make() → tuple<int, int> ∪ none {
+    return tuple<int, int> [5, 6]
+}
+
+main {
+    const tuple<int, int> ∪ none declared ← tuple<int, int> [7, 8]
+    print first(declared)
+
+    var tuple<int, int> ∪ none later ← null
+    later ← tuple<int, int> [3, 4]
+    print first(later)
+
+    print first(tuple<int, int> [9, 10])
+
+    const tuple<int, int> ∪ none returned ← make()
+    print first(returned)
+
+    const tuple<int, int> ∪ none absent ← null
+    print first(absent)
+}

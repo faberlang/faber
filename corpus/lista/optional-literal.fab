@@ -4,13 +4,13 @@ kind = "existing-home"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "fixum_decl", "assignment", "expr_stmt", "si_stmt", "array_literal", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "redde_stmt", "expression", "literal", "nota_stmt"]
 category = "collection"
 canonical = false
-summary = "A list literal stored into a `list<T> ∪ none` slot: declaration, assignment, argument, return, and field."
-syntax = "list<T> ∪ none <name> ← [<elements>]"
+summary = "A list literal, or the empty literal, stored into a `list<T> ∪ none` slot: declaration, assignment, argument, return, and field."
+syntax = "list<T> ∪ none <name> ← [<elements>] / empty"
 related = ["lista", "optionalis"]
 locale = "en"
 +++
 # =============================================================================
-# lista — a list literal in an optional slot
+# lista — a list literal (or `empty`) in an optional slot
 # =============================================================================
 #
 # What this teaches:
@@ -19,6 +19,8 @@ locale = "en"
 #   • the same holds at every store site: declaration, reassignment, call
 #     argument, return value, and class field
 #   • the literal's elements are checked against `T`, not against the optional
+#   • `empty` stores the same way: the optional slot holds an empty list, which
+#     is not `none`
 #   • an optional slot may still hold `none`; test it with `not is none`
 #     before calling a list method on it
 #
@@ -28,12 +30,19 @@ locale = "en"
 #
 # EXPECTED OUTPUT:
 #   The length of the list stored at each site, one per line: declaration,
-#   reassignment, argument, return value, field.
+#   reassignment, argument, return value, field. Then the same sites for
+#   `empty`, printing `held` (-1 only when the slot is `none`).
 #   2
 #   4
 #   2
 #   3
 #   1
+#   0
+#   0
+#   0
+#   0
+#   0
+#   -1
 
 class Bag {
     var list<int> ∪ none items
@@ -48,6 +57,17 @@ fn size(list<int> ∪ none xs) → int {
         return xs.length()
     }
     return 0
+}
+
+fn held(list<int> ∪ none xs) → int {
+    if xs not is none {
+        return xs.length()
+    }
+    return -1
+}
+
+fn make_empty() → list<int> ∪ none {
+    return empty
 }
 
 main {
@@ -65,4 +85,22 @@ main {
 
     const Bag bag ← Bag { items = [1] }
     print size(bag.items)
+
+    const list<int> ∪ none blank ← empty
+    print held(blank)
+
+    var list<int> ∪ none refilled ← [1, 2]
+    refilled ← empty
+    print held(refilled)
+
+    print held(empty)
+
+    const list<int> ∪ none made ← make_empty()
+    print held(made)
+
+    const Bag empty_bag ← Bag { items = empty }
+    print held(empty_bag.items)
+
+    const list<int> ∪ none absent ← null
+    print held(absent)
 }

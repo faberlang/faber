@@ -748,7 +748,17 @@ impl TypeChecker<'_> {
         {
             return widened;
         }
-        expr.ty = Some(self.resolve_inferred_type(ty));
+        let resolved = self.resolve_inferred_type(ty);
+        // `vacua` or a tuple literal landing in an optional / union slot is the
+        // slot's single collection / tuple member; the store widens it.
+        let resolved = match expr.kind {
+            HirExpressionKind::Vacua => self.vacua_collection_member(resolved).unwrap_or(resolved),
+            HirExpressionKind::Tuple(..) => self
+                .single_slot_member(resolved, |ty| matches!(ty, Type::Tuple(_)))
+                .unwrap_or(resolved),
+            _ => resolved,
+        };
+        expr.ty = Some(resolved);
         ty
     }
 
@@ -779,6 +789,48 @@ impl TypeChecker<'_> {
         }
     }
 
+    /// The single member of an optional or union slot type that `admits`, or
+    /// `None` when the slot is not optional/union or has zero or several such
+    /// members (several supply none, like the single-numeric-member rule of a
+    /// store). A literal that lands in `T ∪ none` is the `T` member; the
+    /// surrounding store widens it into the slot (opt-lit).
+    fn single_slot_member(&self, slot: TypeId, admits: fn(&Type) -> bool) -> Option<TypeId> {
+        let members: Vec<TypeId> = match self.types.get(slot) {
+            Type::Option(inner) => vec![*inner],
+            Type::Union(members) => members.clone(),
+            _ => return None,
+        };
+        let mut found = members.into_iter().filter_map(|member| {
+            let member = self
+                .types
+                .peel_access_marker(self.resolve_inferred_type(member))
+                .1;
+            let member = self.single_slot_member(member, admits).unwrap_or(member);
+            admits(self.types.get(member)).then_some(member)
+        });
+        let only = found.next()?;
+        found.next().is_none().then_some(only)
+    }
+
+    /// The collection member an empty literal (`vacua`) lands in.
+    fn vacua_collection_member(&self, slot: TypeId) -> Option<TypeId> {
+        self.single_slot_member(slot, |ty| {
+            matches!(
+                ty,
+                Type::Array(_)
+                    | Type::BoundedArray { .. }
+                    | Type::Queue(_)
+                    | Type::BoundedQueue { .. }
+                    | Type::Stack(_)
+                    | Type::BoundedStack { .. }
+                    | Type::Map(_, _)
+                    | Type::Set(_)
+                    | Type::Tensor(..)
+                    | Type::Sparsa(..)
+            )
+        })
+    }
+
     /// Checks the empty collection literal.
     ///
     /// `vacua` is deliberately expected-context driven: without an explicit
@@ -798,6 +850,9 @@ impl TypeChecker<'_> {
             self.missing_type_annotation("vacua_requires_declared_type", span);
             return self.error_type;
         }
+        // An optional / union slot (`list<T> ∪ none`) hands the literal its
+        // single collection member, as for a list literal (opt-lit).
+        let resolved = self.vacua_collection_member(resolved).unwrap_or(resolved);
 
         let tensor_shape = match self.types.get(resolved) {
             Type::Array(_)

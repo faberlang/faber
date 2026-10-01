@@ -8,6 +8,8 @@ use crate::driver::{Config, ModuleCompileRequest, Session};
 const SOURCE: &str = r"
 functio crea() → lista<numerus> ∪ nihil { redde [1, 2, 3] }
 
+functio vacat() → lista<numerus> ∪ nihil { redde vacua }
+
 incipit {
     fixum lista<numerus> ∪ nihil a ← [10, 20]
     nota a
@@ -37,4 +39,16 @@ fn go_wraps_an_optional_list_literal_as_a_typed_list() {
 fn rust_wraps_an_optional_list_literal_in_some() {
     let code = emit(Target::HirRust);
     assert!(code.contains("Some(vec![1, 2, 3])"), "{code}");
+}
+
+#[test]
+fn go_wraps_an_optional_vacua_as_a_typed_empty_list() {
+    let code = emit(Target::HirGo);
+    assert!(code.contains("v := make([]int, 0); return &v"), "{code}");
+}
+
+#[test]
+fn rust_wraps_an_optional_vacua_in_some() {
+    let code = emit(Target::HirRust);
+    assert!(code.contains("Some(Vec::new())"), "{code}");
 }
