@@ -2413,12 +2413,6 @@ kind = "keyword"
 category = "control-flow"
 
 [[files]]
-path = "discerne/negative-patterns.fab"
-term = "discerne negative patterns"
-kind = "feature"
-category = "control-flow"
-
-[[files]]
 path = "discerne/type-patterns.fab"
 term = "discerne type patterns"
 kind = "feature"
@@ -2476,6 +2470,12 @@ category = "control-flow"
 path = "elige/in-functione.fab"
 term = "elige"
 kind = "keyword"
+category = "control-flow"
+
+[[files]]
+path = "elige/negative-patterns.fab"
+term = "elige negative patterns"
+kind = "feature"
 category = "control-flow"
 
 [[files]]

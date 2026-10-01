@@ -1,7 +1,7 @@
 +++
 term = "type-hole-union"
 kind = "type"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "hole_type", "redde_stmt", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "ceterum_clause", "proba_stmt", "adfirma_stmt", "fixum_decl", "assignment", "place", "array_literal", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "hole_type", "redde_stmt", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "type_pattern", "pattern_binding", "ceterum_clause", "si_stmt", "ergo_joint", "member_suffix", "proba_stmt", "adfirma_stmt", "fixum_decl", "assignment", "place", "array_literal", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
 category = "types"
 canonical = true
 summary = "The `_` hole infers one inhabitant type; the `∪` hole infers a finite union; `T ∪ nihil` stays a single optional inhabitant."
@@ -39,20 +39,25 @@ locale = "en"
 # See also: unio, nihil
 # =============================================================================
 
-# `_` infers exactly one inhabitant type from the initializer.
+# `_` infers exactly one inhabitant type from the initializer: `n` is `int`.
 fn member_count(list<int ∪ string> xs) → int {
-    match xs {
-        case _ { return 1 }
-    }
+    const _ n ← xs.length()
+    if n > 0 then return 1
+    return 0
 }
 
-# `∪` accumulates a member per direct flow; `match` arms name the members.
+# `∪` accumulates a member per direct flow; `match` type arms name the
+# members, and an `if` inside an arm tests the value.
 fn consume(int ∪ string value) → int {
     match value {
-        case 7 { return 1 }
-        case "x" { return 2 }
-        default { return 0 }
+        case int const n {
+            if n ≡ 7 then return 1
+        }
+        case string const s {
+            if s ≡ "x" then return 2
+        }
     }
+    return 0
 }
 
 # `T ∪ null` is one optional inhabitant, so a `null` arm is the null case.
