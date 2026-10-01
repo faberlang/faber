@@ -1,7 +1,7 @@
 +++
 term = "insere"
 kind = "keyword"
-grammar = ["fab_file", "program", "statement", "statement_core", "fixum_decl", "static_init", "insere_expr", "genus_decl", "genus_member", "field_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "expression", "literal", "nota_stmt", "call_expr", "call_suffix", "member_suffix"]
+grammar = ["fab_file", "program", "statement", "statement_core", "fixum_decl", "const_init", "insere_expr", "genus_decl", "genus_member", "field_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "expression", "literal", "nota_stmt", "call_expr", "call_suffix", "member_suffix"]
 category = "comptime"
 canonical = true
 summary = "Embeds a package file into a module constant at build time."
@@ -31,8 +31,8 @@ locale = "en"
 # const <type> <name> = embed "<path>"
 #
 # GRAMMAR:
-#   fixum_decl  :← 'fixum' type_annotation IDENTIFIER '=' static_init
-#   static_init :← insere_expr | expression
+#   fixum_decl  :← 'fixum' type_annotation IDENTIFIER '=' const_init
+#   const_init  :← insere_expr | expression
 #   insere_expr :← 'insere' STRING
 #
 # EXPECTED OUTPUT:
