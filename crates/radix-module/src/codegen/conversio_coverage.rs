@@ -421,6 +421,10 @@ fn sexp_lowers_conversio(src: ConversioTypeFamily, tgt: ConversioTypeFamily) -> 
     if src == ConversioTypeFamily::Tabula && tgt == ConversioTypeFamily::Lista {
         return true;
     }
+    // `tensor ↦ lista` is the flat data as a list (`tensor_list.rs`).
+    if src == ConversioTypeFamily::Tensor && tgt == ConversioTypeFamily::Lista {
+        return true;
+    }
     let boxable = |family: ConversioTypeFamily| {
         matches!(
             family,
@@ -430,10 +434,24 @@ fn sexp_lowers_conversio(src: ConversioTypeFamily, tgt: ConversioTypeFamily) -> 
                 | ConversioTypeFamily::Textus
         )
     };
-    if tgt == ConversioTypeFamily::Valor && (boxable(src) || src == ConversioTypeFamily::Modulus) {
+    // A `lista`, `tabula` or `tensor` boxes behind a `valor` (a genus too, which
+    // has no family), and a `valor` extracts to a `lista` or `tabula`
+    // (`valor_carrier.rs`); `valor ↦ tensor` is the tensor row below.
+    let composite_source = matches!(
+        src,
+        ConversioTypeFamily::Lista | ConversioTypeFamily::Tabula | ConversioTypeFamily::Tensor
+    );
+    if tgt == ConversioTypeFamily::Valor && (boxable(src) || src == ConversioTypeFamily::Modulus || composite_source) {
         return true;
     }
-    if src == ConversioTypeFamily::Valor && boxable(tgt) {
+    // `valor ↦ valor` is the identity (a `{…}` object literal boxed).
+    if src == ConversioTypeFamily::Valor
+        && (boxable(tgt)
+            || matches!(
+                tgt,
+                ConversioTypeFamily::Valor | ConversioTypeFamily::Lista | ConversioTypeFamily::Tabula
+            ))
+    {
         return true;
     }
     if tgt == ConversioTypeFamily::Tensor {
