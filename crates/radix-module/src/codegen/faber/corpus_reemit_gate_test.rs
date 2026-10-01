@@ -54,8 +54,9 @@ const KNOWN_MEANING_GAPS: &[(&str, &str)] = &[
     ),
 ];
 
-/// Witness losses (strings, comments, annotation heads) the meaning fingerprint cannot see.
-const KNOWN_STRING_LOSS: &[(&str, &str)] = &[
+/// Files the structure check refuses (`CODEGEN006` / `ast_construct_dropped`): HIR keeps no
+/// representation for the construct, so a re-emit would silently delete it.
+const EXPECTED_STRUCTURE_REFUSALS: &[(&str, &str)] = &[
     (
         "postpara/postpara.fab",
         "`teardown`/`setup` hook blocks are not represented in HIR (lowering keeps only `omnia` hooks, spliced into test bodies)",
@@ -67,11 +68,13 @@ const KNOWN_STRING_LOSS: &[(&str, &str)] = &[
         "intra/intra.fab",
         "top-level statements beside an explicit `main` are dropped by lowering, so they cannot re-emit",
     ),
-    (
-        "literalia/named-holes.fab",
-        "named template holes (`§{name}`) lower to positional holes; the names are not retained",
-    ),
 ];
+
+/// Witness losses (strings, comments, annotation heads) the meaning fingerprint cannot see.
+const KNOWN_STRING_LOSS: &[(&str, &str)] = &[(
+    "literalia/named-holes.fab",
+    "named template holes (`§{name}`) lower to positional holes; the names are not retained",
+)];
 
 fn corpus_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus")
@@ -173,6 +176,7 @@ struct Survey {
     audited: usize,
     skipped_unanalyzable: usize,
     meaning_diverged: Vec<String>,
+    structure_refused: Vec<String>,
     string_lost: Vec<String>,
 }
 
@@ -204,6 +208,12 @@ fn survey_corpus() -> Survey {
                 .any(|d| d.issue() == Some("hir_meaning_diverged"))
             {
                 survey.meaning_diverged.push(key);
+            } else if result
+                .diagnostics
+                .iter()
+                .any(|d| d.issue() == Some("ast_construct_dropped"))
+            {
+                survey.structure_refused.push(key);
             } else {
                 survey.skipped_unanalyzable += 1;
             }
@@ -251,5 +261,6 @@ fn corpus_reemit_keeps_meaning_and_authored_witnesses() {
         survey.skipped_unanalyzable
     );
     assert_exact("meaning divergence", &survey.meaning_diverged, KNOWN_MEANING_GAPS);
+    assert_exact("structure refusal", &survey.structure_refused, EXPECTED_STRUCTURE_REFUSALS);
     assert_exact("witness loss", &survey.string_lost, KNOWN_STRING_LOSS);
 }

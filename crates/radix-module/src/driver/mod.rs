@@ -34,6 +34,7 @@ mod session;
 #[cfg(feature = "mir-core")]
 mod shader_contract;
 mod source;
+pub(crate) mod source_inventory;
 mod target_bindings;
 mod target_policy;
 
@@ -4431,6 +4432,10 @@ mod nvvm_device_emit_tests;
 #[cfg(feature = "hir-faber")]
 #[path = "locale_fanout_test.rs"]
 mod locale_fanout_tests;
+
+#[cfg(test)]
+#[path = "source_inventory_test.rs"]
+mod source_inventory_tests;
 
 #[cfg(test)]
 #[cfg(feature = "device")]

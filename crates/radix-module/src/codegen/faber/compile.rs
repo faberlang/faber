@@ -9,7 +9,10 @@
 //! produces Faber output. Does not own emit internals.
 
 use crate::codegen::{CodegenError, Target};
-use crate::driver::{AnalyzeRequest, AnalyzedModule, Session, analyze_source};
+use crate::driver::source_inventory::{LostConstruct, lost as lost_constructs, parse_inventory};
+use crate::driver::{
+    AnalyzeRequest, AnalyzedModule, Session, adjust_diagnostic_lines_for_body, analyze_source, peel_raw_source,
+};
 use crate::locale::{KeywordSurface, LocalePack, latin_locale_pack};
 use crate::program::compile::prepare_program_module_for_name;
 use crate::{Diagnostic, FaberOutput};
@@ -101,7 +104,12 @@ pub fn reemit_faber(source_session: &Session, emit_pack: &LocalePack, name: &str
     {
         Ok(output) => {
             let output = FaberOutput { code: output.code };
-            match revalidate_emitted_output(&session, name, &output.code, &analysis, emit_pack) {
+            // Structure comes after revalidation so the emitted text is known to
+            // parse; it stays out of `revalidate_emitted_output`, which compares
+            // analyzed facts and not statement structure.
+            let checked = revalidate_emitted_output(&session, name, &output.code, &analysis, emit_pack)
+                .and_then(|()| check_structure(&session, emit_pack, name, source, &output.code));
+            match checked {
                 Ok(()) => FaberReemitResult { output: Some(output), diagnostics: analysis.diagnostics },
                 Err(diagnostic) => {
                     let mut diagnostics = analysis.diagnostics;
@@ -117,6 +125,99 @@ pub fn reemit_faber(source_session: &Session, emit_pack: &LocalePack, name: &str
             FaberReemitResult { output: None, diagnostics: analysis.diagnostics }
         }
     }
+}
+
+/// Refuse output that drops a source construct HIR cannot represent.
+///
+/// Counts top-level statements and test-suite members in the source and in the
+/// emitted text and fails when any count shrinks. Both sides are parsed, never
+/// analyzed, so the check sees surface structure that HIR lowering discards.
+/// The source side uses the prepared session (source locale); the output side
+/// uses the emit pack, as revalidation does.
+///
+/// # Errors
+///
+/// Returns `CODEGEN006` / `ast_construct_dropped` naming the first lost
+/// construct and its first source line, or `CODEGEN006` / `structure_check_failed`
+/// when either side cannot be parsed (the check fails closed).
+fn check_structure(
+    session: &Session,
+    emit_pack: &LocalePack,
+    name: &str,
+    source: &str,
+    emitted: &str,
+) -> Result<(), Box<Diagnostic>> {
+    let unparsed = |side: &str, diagnostics: &[Diagnostic]| {
+        Box::new(
+            Diagnostic::error(format!(
+                "canonical Faber output failed structure check: {side} could not be parsed: {}",
+                diagnostics_summary(diagnostics)
+            ))
+            .with_phase(crate::diagnostics::DiagnosticPhase::Codegen)
+            .with_code("CODEGEN006")
+            .with_file(name.to_owned())
+            .with_arg("issue", "structure_check_failed"),
+        )
+    };
+    let expected = parse_inventory(session, name, source).map_err(|diagnostics| unparsed("source", &diagnostics))?;
+    let output_session = Session::new(
+        session
+            .config
+            .clone()
+            .with_resolved_locale_pack(emit_pack.clone()),
+    );
+    let actual =
+        parse_inventory(&output_session, name, emitted).map_err(|diagnostics| unparsed("output", &diagnostics))?;
+    let lost = lost_constructs(&expected, &actual);
+    let Some(first) = lost.first() else {
+        return Ok(());
+    };
+    Err(Box::new(structure_loss(name, source, first, &lost)))
+}
+
+/// `CODEGEN006` / `ast_construct_dropped`: the emitted text carries fewer of a
+/// construct than the source, so nothing is written.
+fn structure_loss(name: &str, source: &str, first: &LostConstruct, all: &[LostConstruct]) -> Diagnostic {
+    let location = if first.suite.is_empty() {
+        String::new()
+    } else {
+        format!(" in suite `{}`", first.suite)
+    };
+    let mut diagnostic = Diagnostic::error(String::new())
+        .with_phase(crate::diagnostics::DiagnosticPhase::Codegen)
+        .with_code("CODEGEN006")
+        .with_arg("issue", "ast_construct_dropped")
+        .with_arg("construct", first.construct.clone())
+        .with_arg("suite", first.suite.clone())
+        .with_arg("source_count", first.source_count.to_string())
+        .with_arg("output_count", first.output_count.to_string())
+        .with_arg(
+            "lost",
+            all.iter()
+                .map(|lost| {
+                    format!("{} {}", lost.suite, lost.construct)
+                        .trim()
+                        .to_owned()
+                })
+                .collect::<Vec<_>>()
+                .join(", "),
+        );
+    // Spans are relative to the peeled body; the line is shifted back onto the
+    // physical document.
+    if let Ok(peeled) = peel_raw_source(name, source) {
+        diagnostic = diagnostic.with_source_context(name, peeled.body, first.first_span);
+        adjust_diagnostic_lines_for_body(std::slice::from_mut(&mut diagnostic), source, peeled.body_byte_offset);
+    } else {
+        diagnostic = diagnostic.with_file(name.to_owned());
+    }
+    let line = diagnostic
+        .line
+        .map_or_else(String::new, |line| format!(" (first at line {line})"));
+    diagnostic.message = format!(
+        "canonical Faber output would drop source construct `{}`{location}{line}: the source has {}, the output {}; nothing was written",
+        first.construct, first.source_count, first.output_count
+    );
+    diagnostic
 }
 
 /// Re-analyze emitted Faber and compare the source facts that the emitter must

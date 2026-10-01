@@ -767,3 +767,104 @@ fn formatted_source_for_write_handles_no_frontmatter_with_empty_raw() {
     let result = formatted_source_for_write(path, "", "").expect("format source");
     assert_eq!(result, "");
 }
+
+// ── FD-1: format refuses to drop source constructs ────────────────────────
+
+/// A suite hook (`setup`) that HIR does not carry.
+pub(crate) const HOOK_SOURCE: &str = "+++\nlocale = \"en\"\n+++\ndescribe \"hooks\" {\n    setup {\n        print \"before each\"\n    }\n    test \"sample\" {\n        assert true\n    }\n}\n\nmain {}\n";
+
+/// A top-level statement beside an explicit `main`, which lowering drops.
+const BESIDE_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nconst int aetas = 25\n\nif aetas within 0‥100 {\n    print \"in range\"\n}\n\nmain {\n    print \"main\"\n}\n";
+
+/// The hook fixture without the hook: nothing is lost, so format succeeds.
+const CONTROL_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nconst int aetas = 25\n\ndescribe \"plain\" {\n    test \"sample\" {\n        assert true\n    }\n}\n\nmain {\n    print \"main\"\n}\n";
+
+pub(crate) fn run_faber_capture(args: &[&str], stdin: Option<&str>) -> std::process::Output {
+    let mut child = Command::new(faber_binary())
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn faber");
+    let mut pipe = child.stdin.take().expect("stdin");
+    if let Some(text) = stdin {
+        pipe.write_all(text.as_bytes()).expect("write stdin");
+    }
+    drop(pipe);
+    child.wait_with_output().expect("wait for faber")
+}
+
+/// Every format mode on a lossy file: non-zero exit, the loss named on stderr,
+/// empty stdout, and the file on disk untouched.
+fn assert_format_refuses(label: &str, source: &str, construct: &str) {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let path = dir.path().join("lossy.fab");
+    let path_arg = path.to_str().expect("utf8 path");
+    fs::write(&path, source).expect("write fixture");
+
+    let in_place = run_faber_capture(&["format", path_arg], None);
+    let stdout_mode = run_faber_capture(&["format", "--stdout", path_arg], None);
+    let stdin_mode = run_faber_capture(&["format", "--stdin"], Some(source));
+    let check_mode = run_faber_capture(&["format", "--check", path_arg], None);
+    for (mode, output) in [
+        ("in place", &in_place),
+        ("--stdout", &stdout_mode),
+        ("--stdin", &stdin_mode),
+        ("--check", &check_mode),
+    ] {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            !output.status.success(),
+            "{label}: format {mode} must exit non-zero:\n{stderr}"
+        );
+        assert!(
+            stderr.contains("CODEGEN006")
+                && stderr.contains("ast_construct_dropped")
+                && stderr.contains(construct),
+            "{label}: format {mode} must name the loss `{construct}`:\n{stderr}"
+        );
+        assert!(
+            output.stdout.is_empty(),
+            "{label}: format {mode} must print nothing to stdout"
+        );
+    }
+    assert_eq!(
+        fs::read_to_string(&path).expect("read back"),
+        source,
+        "{label}: the file must stay byte-identical"
+    );
+}
+
+#[test]
+fn format_refuses_hook_loss() {
+    assert_format_refuses("hook", HOOK_SOURCE, "hook:Praepara");
+}
+
+#[test]
+fn format_refuses_top_level_statement_loss() {
+    assert_format_refuses("beside", BESIDE_SOURCE, "top:si");
+}
+
+#[test]
+fn format_control_file_unchanged() {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let path = dir.path().join("control.fab");
+    let path_arg = path.to_str().expect("utf8 path");
+    fs::write(&path, CONTROL_SOURCE).expect("write fixture");
+
+    let stdout_mode = run_faber_capture(&["format", "--stdout", path_arg], None);
+    assert!(
+        stdout_mode.status.success(),
+        "control must format: {}",
+        String::from_utf8_lossy(&stdout_mode.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&stdout_mode.stdout), CONTROL_SOURCE);
+
+    let in_place = run_faber_capture(&["format", path_arg], None);
+    assert!(in_place.status.success(), "control must format in place");
+    assert_eq!(
+        fs::read_to_string(&path).expect("read back"),
+        CONTROL_SOURCE
+    );
+}
