@@ -102,6 +102,16 @@ mod swift_contract_call_label_test;
     test,
     feature = "hir-rust",
     feature = "hir-go",
+    feature = "hir-swift",
+    feature = "hir-python"
+))]
+#[path = "approx_integer_run_test.rs"]
+mod approx_integer_run_test;
+
+#[cfg(all(
+    test,
+    feature = "hir-rust",
+    feature = "hir-go",
     feature = "hir-ts",
     feature = "hir-swift"
 ))]

@@ -1,0 +1,91 @@
++++
+term = "≈"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "type_annotation", "owned_type", "base_type", "qualified_type", "comparison", "equality", "equality_tail", "et_expr", "call_expr", "call_suffix", "argument_list", "argument", "unary_expr", "expression", "literal", "nota_stmt"]
+category = "comparison"
+canonical = false
+summary = "`≈` between integers is exact tolerance equality: `10^9 · |a − b| ≤ max(|a|, |b|)` at every width, with no overflow in the difference, the magnitude or the scaled product."
+syntax = "<integer> ≈ <integer> | <integer> ≉ <integer>"
+related = ["≡", "≅", "inf"]
+locale = "en"
++++
+# =============================================================================
+# ≈ — exact tolerance equality between integers
+# =============================================================================
+#
+# What this teaches:
+#   • `a ≈ b` between integers holds when `10^9 · |a − b| ≤ max(|a|, |b|)`,
+#     decided exactly: the difference, the larger magnitude and the scaled
+#     product are never truncated, so no pair near a width limit changes
+#     its answer.
+#   • Numbers of opposite sign are never `≈` unless both are zero.
+#   • The smallest value of a signed width (`i64::MIN`, `i32::MIN`) has no
+#     positive twin in its own width; its magnitude is still compared exactly.
+#   • `a ≉ b` is the exact negation.
+#
+# Common mistakes:
+#   • Expecting `≈` to behave like float comparison above 2^53 — it does not
+#     round through a float; the rule is integer arithmetic.
+#
+# See also: ≡, ≅, inf
+# =============================================================================
+
+# operatores/approx-integers — the exact integer `≈` rule at its edges
+#
+# WHY: the rule is implemented by hand on every target; a truncating 64-bit
+# product, an `abs(MIN)` overflow or a float detour each changes one row below.
+#
+# EXPECTED OUTPUT:
+#   approx-integers.expected — one verum/falsum per print, in order.
+
+fn near64(i64 a, i64 b) → bool {
+    return a ≈ b
+}
+
+fn far64(i64 a, i64 b) → bool {
+    return a ≉ b
+}
+
+fn near32(i32 a, i32 b) → bool {
+    return a ≈ b
+}
+
+fn nearU(u64 a, u64 b) → bool {
+    return a ≈ b
+}
+
+main {
+    # 1. Opposite signs: never close, even for tiny or huge magnitudes.
+    print near64(5, -5)
+    print near64(-5, 5)
+    print near64(0, 0)
+    print near64(9223372036854775807, -9223372036854775807)
+    print near64(9223372036854775807, -9223372036854775808)
+    print near32(5, -5)
+    print near32(2147483647, -2147483648)
+
+    # 2. The smallest value of a signed width: its magnitude is 2^63 or 2^31.
+    print near64(-9223372036854775808, -9223372036854775807)
+    print near64(-9223372036854775808, -9223372036854775808)
+    print near64(-9223372036854775808, 0)
+    print near32(-2147483648, -2147483647)
+    print near32(-2147483648, -2147483638)
+
+    # 3. The tolerance edge: a difference of one is inside at 10^9 and
+    #    outside one below it.
+    print near64(1000000000, 999999999)
+    print near64(999999999, 999999998)
+    print near32(1000000000, 999999999)
+
+    # 4. Scaled product beyond 2^64: a 64-bit product wraps and flips the
+    #    verdict at the last three rows.
+    print nearU(18446744073709551615, 18446744073709550615)
+    print nearU(18446744073709551615, 18446744055262807542)
+    print nearU(18446744073709551615, 18446744055262807541)
+    print nearU(18446744073709551615, 18446744053709551615)
+    print nearU(18446744073709551615, 0)
+
+    # 5. `≉` is the exact negation.
+    print far64(5, -5)
+    print far64(-9223372036854775808, -9223372036854775807)
+}
