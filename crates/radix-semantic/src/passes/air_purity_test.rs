@@ -111,11 +111,13 @@ functio combine(fractus x, fractus y) → fractus {
 }
 
 #[test]
-fn rejects_tensor_intrinsic_method_names_on_scalar_receivers() {
+fn rejects_tensor_intrinsic_method_names_on_non_tensor_receivers() {
+    // The AIR pass still owns "a tensor method name needs a tensor receiver"
+    // for receivers typecheck leaves open (collections, text).
     let errors = air_errors(
         r#"
 @ radix lane "air"
-functio combine(fractus x) → fractus {
+functio combine(lista<fractus> x) → lista<fractus> {
     redde x.gelu()
 }
 "#,
@@ -126,6 +128,30 @@ functio combine(fractus x) → fractus {
         err.args
             .iter()
             .any(|arg| arg.name == "method" && arg.value == "gelu")
+    );
+}
+
+#[test]
+fn tensor_intrinsic_method_names_on_scalar_receivers_fail_in_typecheck() {
+    // 433f616de: a scalar numeric receiver is a closed method surface, so
+    // `x.gelu()` is `unknown_method` at check time and never reaches the AIR
+    // purity pass.
+    let source = r#"
+@ radix lane "air"
+functio combine(fractus x) → fractus {
+    redde x.gelu()
+}
+"#;
+    let errors = analyze(source);
+    assert!(errors.iter().any(|err| {
+        err.args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == "unknown_method")
+    }));
+    assert!(
+        !errors
+            .iter()
+            .any(|err| err.kind == SemanticErrorKind::AirPurityViolation)
     );
 }
 
