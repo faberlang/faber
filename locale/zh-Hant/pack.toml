@@ -158,6 +158,14 @@ descriptio = "描述"
 longum = "詳"
 lane = "車道"
 ubique = "全局"
+# Reduction expression surface (`reducta via Op ex source`).
+reducta = "歸約"
+pro = "按"
+factum = "求積"
+numeratio = "計數"
+quilibet = "任一"
+argmaxima = "最大值索引"
+argminima = "最小值索引"
 
 [types]
 ascii = "ascii"

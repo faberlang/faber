@@ -158,6 +158,14 @@ descriptio = "คำอธิบาย"
 longum = "ยาว"
 lane = "เลน"
 ubique = "โกลบอล"
+# Reduction expression surface (`reducta via Op ex source`).
+reducta = "ลดรูป"
+pro = "ตาม"
+factum = "ผลคูณ"
+numeratio = "นับ"
+quilibet = "ใดก็ได้"
+argmaxima = "ดัชนีค่าสูงสุด"
+argminima = "ดัชนีค่าต่ําสุด"
 
 [types]
 ascii = "ascii"

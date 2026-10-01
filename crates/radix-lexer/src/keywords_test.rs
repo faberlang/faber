@@ -78,6 +78,83 @@ fn filum_substring_law_keeps_containing_identifiers_plain() {
     }
 }
 
+// =============================================================================
+// K3-1 (reducta): op-word, head and group registry rows
+//
+// Every row is tokenless and contextual: the words lex as identifiers and the
+// parser claims them by Latin key in their grammar slot only.
+// =============================================================================
+
+#[test]
+fn reduction_words_are_tokenless_contextual_rows_with_reduction_owners() {
+    let new_rows: &[(&str, KeywordOwner)] = &[
+        ("reducta", KeywordOwner::ReductionHead),
+        ("pro", KeywordOwner::ReductionGroup),
+        ("factum", KeywordOwner::ReductionOperator),
+        ("numeratio", KeywordOwner::ReductionOperator),
+        ("quilibet", KeywordOwner::ReductionOperator),
+        ("argmaxima", KeywordOwner::ReductionOperator),
+        ("argminima", KeywordOwner::ReductionOperator),
+    ];
+    for &(text, owner) in new_rows {
+        let spec =
+            lookup_keyword_spec(text).unwrap_or_else(|| panic!("'{text}' needs a registry row"));
+        assert!(spec.token_kind.is_none(), "'{text}' must be tokenless");
+        let KeywordScope::Contextual(owners) = spec.scope else {
+            panic!("'{text}' must be contextual");
+        };
+        assert_eq!(owners, [owner], "'{text}' owner");
+
+        let result = crate::lex(text);
+        assert!(result.success(), "'{text}' must lex cleanly");
+        assert!(
+            matches!(result.tokens[0].kind, crate::TokenKind::Ident(_)),
+            "'{text}' must lex as a plain identifier, got {:?}",
+            result.tokens[0].kind
+        );
+    }
+}
+
+#[test]
+fn existing_rows_gain_the_reduction_owner_and_keep_their_old_one() {
+    let gained: &[(&str, KeywordOwner, KeywordOwner)] = &[
+        (
+            "summa",
+            KeywordOwner::ExpressionIntroducer,
+            KeywordOwner::ReductionOperator,
+        ),
+        (
+            "maxima",
+            KeywordOwner::ExpressionIntroducer,
+            KeywordOwner::ReductionOperator,
+        ),
+        (
+            "minima",
+            KeywordOwner::ExpressionIntroducer,
+            KeywordOwner::ReductionOperator,
+        ),
+        (
+            "omnia",
+            KeywordOwner::DeclarationMarker,
+            KeywordOwner::ReductionOperator,
+        ),
+        (
+            "via",
+            KeywordOwner::ConversionHint,
+            KeywordOwner::ReductionHead,
+        ),
+    ];
+    for &(text, old, new) in gained {
+        let spec =
+            lookup_keyword_spec(text).unwrap_or_else(|| panic!("'{text}' needs a registry row"));
+        let KeywordScope::Contextual(owners) = spec.scope else {
+            panic!("'{text}' must be contextual");
+        };
+        assert!(owners.contains(&old), "'{text}' keeps {old:?}");
+        assert!(owners.contains(&new), "'{text}' gains {new:?}");
+    }
+}
+
 #[test]
 fn registry_texts_are_unique() {
     let mut texts = std::collections::BTreeSet::new();
