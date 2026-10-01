@@ -1,7 +1,7 @@
 +++
 term = "failable-in-closure"
 kind = "concept"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "iace_stmt", "si_stmt", "fac_stmt", "cape_clause", "fixum_decl", "type_annotation", "owned_type", "base_type", "clausura_expr", "clausura_signature", "clausura_param", "clausura_params", "return_clause", "expression", "additive_expr", "multiplicative_expr", "comparison", "call_expr", "call_suffix", "argument_list", "argument", "literal", "scriptum_expr", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "iace_stmt", "si_stmt", "fac_stmt", "cape_clause", "fixum_decl", "type_annotation", "owned_type", "base_type", "clausura_expr", "clausura_signature", "clausura_param", "clausura_params", "expression", "additive_expr", "multiplicative_expr", "comparison", "call_expr", "call_suffix", "argument_list", "argument", "literal", "scriptum_expr", "nota_stmt"]
 category = "function"
 canonical = true
 summary = "A closure is its own frame: it neither inherits the enclosing function's `⇥` channel nor leaks one; a failable call inside a closure is handled inside the closure."
