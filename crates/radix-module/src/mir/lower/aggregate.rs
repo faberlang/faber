@@ -174,6 +174,7 @@ impl FunctionBuilder<'_> {
                     | Type::Stack(_)
                     | Type::BoundedStack { .. }
                     | Type::Set(_)
+                    | Type::Vector(_, _)
             )
         };
         let members: Vec<TypeId> = match self.normalized_type(ty) {
