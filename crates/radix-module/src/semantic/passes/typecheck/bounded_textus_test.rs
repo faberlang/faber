@@ -28,7 +28,7 @@ incipit {
         "bounded textus must retain N in Rust type, got: {code}"
     );
     assert!(
-        code.contains(".get((") && code.contains("textus index trap"),
+        code.contains(".get(0usize)") && code.contains("textus index trap"),
         "bounded textus scalar index must use the carrier O(1) get/trap path, got: {code}"
     );
     assert!(
