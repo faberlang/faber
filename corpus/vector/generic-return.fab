@@ -1,0 +1,47 @@
++++
+term = "vector"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "generic_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "register"
+canonical = false
+summary = "A generic function returns a width-generic vector; the call result takes the argument's width."
+syntax = "fn <name><size N>(vector<elem, N> v) → vector<elem, N>"
+related = ["vector", "generic", "magnitudo"]
+locale = "en"
++++
+# =============================================================================
+# vector — a width-generic vector returned from a generic function
+# =============================================================================
+#
+# What this teaches:
+#   • `size N` binds the width from the argument: calling with a
+#     `vector<f32, 3>` makes the result `vector<f32, 3>`.
+#   • The call result needs no annotation: `const _ w ← idv(v)` infers the
+#     bound width, and a call can be printed directly.
+#   • The body can compute with the generic width (`v + v`).
+#
+# Common mistakes:
+#   • annotating the result with a different width than the argument's — the
+#     width is bound once per call, so both must agree
+#
+# See also: vector, generic, magnitudo
+#
+# EXPECTED OUTPUT:
+#   generic-return.expected
+# =============================================================================
+
+fn idv<size N>(vector<f32, N> v) → vector<f32, N> {
+    return v
+}
+
+fn dbl<size N>(vector<f32, N> v) → vector<f32, N> {
+    return v + v
+}
+
+main {
+    const vector<f32, 3> v ← [3.0, 4.0, 0.0] ↦ vector<f32, 3>
+    print idv(v)
+    const _ w ← dbl(v)
+    print w
+    print dbl(idv(v))
+}
