@@ -248,7 +248,17 @@ impl super::FaberCodegen<'_> {
                 writer.write(")");
             }
             HirExpressionKind::Field(object, name) => {
-                self.write_expr_prec(object, 13, names, surface, writer);
+                match &object.kind {
+                    // `ego` and the type name both lower to `Path(genus)`; a
+                    // read of a static field through it is the authored
+                    // type-qualified read, so the type name is the receiver.
+                    HirExpressionKind::Path(def_id)
+                        if self.static_fields.contains(&(*def_id, *name)) =>
+                    {
+                        writer.write(&self.name_for_def_imported(*def_id, names));
+                    }
+                    _ => self.write_expr_prec(object, 13, names, surface, writer),
+                }
                 writer.write(".");
                 writer.write(&self.symbol_to_string(*name));
             }

@@ -54,6 +54,10 @@ pub struct FaberCodegen<'a> {
     /// value position is a `ego` (self) reference and must re-emit as the
     /// self keyword, not the type name.
     pub(crate) self_def_ids: FxHashSet<DefId>,
+    /// `(struct def, field name)` of this unit's static (`generis`) fields: a
+    /// `Field(Path(struct), name)` read of one of these is the authored
+    /// type-qualified read `Tab.Z`, not an `ego` member read.
+    pub(crate) static_fields: FxHashSet<(DefId, Symbol)>,
     /// Def ids of this unit's union variants: a `Call(Path(…), …)` whose
     /// callee is one of these is a `finge` variant construction lowered to a
     /// call shape, and must re-emit with the `finge` keyword (a bare
@@ -139,6 +143,7 @@ impl<'a> FaberCodegen<'a> {
             imported_pattern_spellings: FxHashMap::default(),
             authored_variant_spellings: FxHashMap::default(),
             self_def_ids: FxHashSet::default(),
+            static_fields: FxHashSet::default(),
             variant_def_ids: FxHashSet::default(),
             qualified_local_variants: FxHashMap::default(),
             imported_variant_union_path_ids: FxHashSet::default(),
@@ -307,6 +312,21 @@ impl FaberCodegen<'_> {
             .filter_map(|item| match &item.kind {
                 HirItemKind::Struct(_) | HirItemKind::Enum(_) => Some(item.def_id),
                 _ => None,
+            })
+            .collect();
+        self.static_fields = hir
+            .items
+            .iter()
+            .filter_map(|item| match &item.kind {
+                HirItemKind::Struct(strukt) => Some((item.def_id, strukt)),
+                _ => None,
+            })
+            .flat_map(|(def_id, strukt)| {
+                strukt
+                    .fields
+                    .iter()
+                    .filter(|field| field.is_static())
+                    .map(move |field| (def_id, field.name))
             })
             .collect();
         self.variant_def_ids = hir
