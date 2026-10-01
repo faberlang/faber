@@ -44,7 +44,7 @@ MIR_TARGETS = [
     "wgsl-text",
     "sexp-struct",
     "sexp",
-    "scena",
+    "runner",
 ]
 
 CONV_HIR_TARGETS = ["rust", "ts", "go", "faber"]
