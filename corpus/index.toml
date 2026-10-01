@@ -272,7 +272,7 @@ phase = 4
 action = "review"
 rule = "operator-group"
 primary = "conversio/conversio.fab"
-paths = ["bounded/conversio-ascii-resize.fab", "bounded/conversio-ascii-textus.fab", "bounded/conversio-lista-to-bounded-lista.fab", "bounded/conversio-lista-to-bounded-textus.fab", "bounded/conversio-lista-to-octeti.fab", "bounded/conversio-lista-to-tensor.fab", "bounded/conversio-octeti-to-lista.fab", "bounded/conversio-textus-to-textus.fab", "conversio/ascii-format.fab", "conversio/bits-conversio.fab", "conversio/bivalens.fab", "conversio/collectiones.fab", "conversio/conversio.fab", "conversio/lista-tensor-shaped.fab", "conversio/numeric-bool.fab", "conversio/numerus-narrowing.fab", "conversio/octeti-endian.fab", "conversio/octeti-lista.fab", "conversio/octeti.fab", "conversio/radix.fab", "conversio/rectangular-lista-literal-tensor.fab", "conversio/tabula-lista.fab", "conversio/tensor-data-edge.fab", "conversio/tensor.fab"]
+paths = ["bounded/conversio-ascii-resize.fab", "bounded/conversio-ascii-textus.fab", "bounded/conversio-lista-to-bounded-lista.fab", "bounded/conversio-lista-to-bounded-textus.fab", "bounded/conversio-lista-to-octeti.fab", "bounded/conversio-lista-to-tensor.fab", "bounded/conversio-octeti-to-lista.fab", "bounded/conversio-textus-to-textus.fab", "conversio/ascii-format.fab", "conversio/bits-conversio.fab", "conversio/bivalens.fab", "conversio/collectiones.fab", "conversio/conversio.fab", "conversio/copia-lista.fab", "conversio/lista-tensor-shaped.fab", "conversio/numeric-bool.fab", "conversio/numerus-narrowing.fab", "conversio/octeti-endian.fab", "conversio/octeti-lista.fab", "conversio/octeti.fab", "conversio/radix.fab", "conversio/rectangular-lista-literal-tensor.fab", "conversio/tabula-lista.fab", "conversio/tensor-data-edge.fab", "conversio/tensor.fab"]
 
 [[terms]]
 term = "copia"
@@ -2086,6 +2086,12 @@ category = "conversion"
 path = "conversio/conversio.fab"
 term = "↦"
 kind = "operator-group"
+category = "conversion"
+
+[[files]]
+path = "conversio/copia-lista.fab"
+term = "↦"
+kind = "concept"
 category = "conversion"
 
 [[files]]

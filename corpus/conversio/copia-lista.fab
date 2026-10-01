@@ -1,0 +1,59 @@
++++
+term = "↦"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal"]
+category = "conversion"
+canonical = false
+summary = "lista ↦ copia and copia ↦ lista read their source: the source collection stays usable after the conversion."
+syntax = "<lista> ↦ <copia-type> | <copia> ↦ <lista-type>"
+related = ["↦", "lista", "copia"]
+locale = "en"
++++
+# =============================================================================
+# ↦ — lista ↦ copia and copia ↦ lista read their source.
+# =============================================================================
+#
+# What this teaches:
+#   • `list<T> ↦ set<T>` deduplicates into a new set; the list is unchanged and
+#     still readable afterwards.
+#   • `set<T> ↦ list<T>` materializes the elements into a new list; the set is
+#     unchanged, so it can be converted again.
+#   • set order is unspecified, so materialized lists are sorted before they
+#     are printed.
+#
+# Common mistakes:
+#   • assuming a conversion consumes its source — `↦` always reads
+#   • printing a list materialized from a set without sorting it first
+#
+# See also: ↦, lista, copia
+# =============================================================================
+
+# EXPECTED OUTPUT:
+#   3
+#   [3, 1, 2, 1]
+#   [1, 2, 3]
+#   3
+#   [1, 2, 3]
+#   ["a", "b"]
+#   ["a", "b", "a"]
+
+main {
+    var list<int> xs ← [3, 1, 2, 1]
+    var set<int> unique ← xs ↦ set<int>
+    print unique.length()
+    print xs
+    var list<int> first ← unique ↦ list<int>
+    first.sort()
+    print first
+    print unique.length()
+    var list<int> second ← unique ↦ list<int>
+    second.sort()
+    print second
+
+    var list<string> names ← ["a", "b", "a"]
+    var set<string> nameSet ← names ↦ set<string>
+    var list<string> nameList ← nameSet ↦ list<string>
+    nameList.sort()
+    print nameList
+    print names
+}

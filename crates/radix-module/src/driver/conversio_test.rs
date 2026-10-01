@@ -493,6 +493,62 @@ fn copia_to_lista_conversio_emits_vec_collect() {
 }
 
 #[test]
+fn named_lista_to_copia_conversio_clones_source_before_consuming() {
+    let session = test_session(Target::HirRust);
+    let source = "incipit {\n  fixum lista<numerus> xs ← [1, 2, 2]\n  fixum _ s ← xs ↦ copia<numerus>\n  fixum _ n ← xs.longitudo()\n}";
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
+    assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
+    let code = super::rust_output(result).code;
+    assert!(
+        code.contains("xs.clone().into_iter().collect::<HashSet<_>>()"),
+        "a named lista source must be read, not moved, got:\n{code}"
+    );
+}
+
+#[test]
+fn named_copia_to_lista_conversio_clones_source_before_consuming() {
+    let session = test_session(Target::HirRust);
+    let source = "incipit {\n  varia copia<numerus> s ← vacua\n  s.adde(1)\n  fixum _ xs ← s ↦ lista<numerus>\n  fixum _ ys ← s ↦ lista<numerus>\n}";
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
+    assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
+    let code = super::rust_output(result).code;
+    assert_eq!(
+        code.matches("s.clone().into_iter().collect::<Vec<_>>()")
+            .count(),
+        2,
+        "a named copia source must be read, not moved, got:\n{code}"
+    );
+}
+
+#[test]
+fn lista_copia_conversio_emits_swift_set_and_array_initializers() {
+    let session = test_session(Target::HirSwift);
+    let source = "incipit {\n  fixum lista<numerus> xs ← [1, 2, 2]\n  fixum copia<numerus> s ← xs ↦ copia<numerus>\n  fixum lista<numerus> ys ← s ↦ lista<numerus>\n}";
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
+    assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
+    let Some(crate::Output::Swift(output)) = result.output else {
+        panic!("expected Swift output");
+    };
+    let code = output.code;
+    assert!(code.contains("= Set(xs)"), "expected Set(xs), got:\n{code}");
+    assert!(code.contains("= Array(s)"), "expected Array(s), got:\n{code}");
+    assert!(!code.contains("as!"), "no trapping cast, got:\n{code}");
+}
+
+#[test]
+fn rvalue_lista_to_copia_conversio_moves_without_clone() {
+    let session = test_session(Target::HirRust);
+    let source = "incipit { fixum _ s ← [1, 2, 2] ↦ copia<numerus> }";
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
+    assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
+    let code = super::rust_output(result).code;
+    assert!(
+        !code.contains(".clone().into_iter()"),
+        "an rvalue source needs no duplicate, got:\n{code}"
+    );
+}
+
+#[test]
 fn tensor_to_lista_conversio_emits_planata() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  fixum tensor<numerus, []> t ← vacua\n  fixum _ xs ← t ↦ lista<numerus>\n}";
