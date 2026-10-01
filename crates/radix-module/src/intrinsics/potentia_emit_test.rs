@@ -54,8 +54,8 @@ fn go_float_display_never_suffixes_a_non_finite_value() {
     let nan = out.code.find("s == \"NaN\"").expect("NaN guard");
     let suffix = out
         .code
-        .find("return s + \".0\"")
-        .expect("whole-float suffix");
+        .find("if !strings.Contains(s, \".\")")
+        .expect("whole-float branch");
     assert!(nan < suffix, "the guard precedes the whole-float suffix:\n{}", out.code);
     assert!(out.code.contains("s == \"+Inf\"") && out.code.contains("s == \"-Inf\""));
 }
