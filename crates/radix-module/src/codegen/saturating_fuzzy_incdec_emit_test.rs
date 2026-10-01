@@ -66,8 +66,8 @@ fn rust_saturating_division_is_exact_floor_division() {
 #[test]
 fn swift_saturating_division_is_exact_floor_division() {
     let code = emit(Target::HirSwift, SATURATING);
-    assert!(code.contains("print(faberXDiv(Int128(a), Int128(two)))"), "{code}");
-    assert!(code.contains("print(faberXMod(Int128(a), Int128(two)))"), "{code}");
+    assert!(code.contains("Swift.print(faberXDiv(Int128(a), Int128(two)))"), "{code}");
+    assert!(code.contains("Swift.print(faberXMod(Int128(a), Int128(two)))"), "{code}");
     assert!(!code.contains("dividedReportingOverflow"), "{code}");
 }
 
