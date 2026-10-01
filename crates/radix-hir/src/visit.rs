@@ -292,6 +292,7 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
     match &expr.kind {
         HirExpressionKind::Path(_)
         | HirExpressionKind::Literal(_)
+        | HirExpressionKind::Insere(_)
         | HirExpressionKind::Vacua
         | HirExpressionKind::ReadLine(_)
         | HirExpressionKind::Error => {}
@@ -885,6 +886,7 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
     match &mut expr.kind {
         HirExpressionKind::Path(_)
         | HirExpressionKind::Literal(_)
+        | HirExpressionKind::Insere(_)
         | HirExpressionKind::Vacua
         | HirExpressionKind::ReadLine(_)
         | HirExpressionKind::Error => {}

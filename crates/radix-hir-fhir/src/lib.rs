@@ -23,6 +23,8 @@ pub mod package;
 #[cfg(test)]
 mod commune_emit_test;
 #[cfg(test)]
+mod insere_node_test;
+#[cfg(test)]
 mod test_support;
 
 pub use artifact::*;

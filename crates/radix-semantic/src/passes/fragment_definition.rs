@@ -207,8 +207,10 @@ impl FragmentDefinitionChecker<'_> {
     fn check_expr(&mut self, expr: &HirExpression) {
         match &expr.kind {
             HirExpressionKind::Path(def_id) => self.check_path_value(*def_id, expr.span),
-            HirExpressionKind::Literal(_) | HirExpressionKind::Vacua | HirExpressionKind::Error => {
-            }
+            HirExpressionKind::Literal(_)
+            | HirExpressionKind::Insere(_)
+            | HirExpressionKind::Vacua
+            | HirExpressionKind::Error => {}
             HirExpressionKind::Binary(_, lhs, rhs) => {
                 self.check_expr(lhs);
                 self.check_expr(rhs);

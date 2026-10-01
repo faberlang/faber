@@ -697,7 +697,13 @@ impl Lowerer<'_> {
                         false,
                     )
                 });
-                let init = decl.init.as_ref().map(|expr| self.lower_expr(expr));
+                let init = decl.init.as_ref().map(|expr| {
+                    if decl.compile_time {
+                        self.lower_compile_time_local_initializer(expr)
+                    } else {
+                        self.lower_expr(expr)
+                    }
+                });
                 HirStatementKind::Local(radix_hir::HirLocal {
                     def_id,
                     name: ident.name,

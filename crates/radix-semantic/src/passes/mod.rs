@@ -65,6 +65,7 @@ pub mod float_literal_fold;
 pub mod fragment_definition;
 pub mod import_path;
 pub mod import_seam;
+pub mod insere_fold;
 pub mod kernel_legality;
 mod kernel_legality_body;
 mod kernel_legality_types;

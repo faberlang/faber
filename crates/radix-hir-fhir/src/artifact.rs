@@ -531,8 +531,11 @@ pub struct FunctionProvenanceTableWire {
 /// artifacts fail closed. Version 24 adds
 /// `HirPresentation::function_modifier_bindings` (which `errors` / `options` /
 /// `exit` signature modifier introduced each runtime-provided binding local);
-/// schema-v23 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 24;
+/// schema-v23 artifacts fail closed. Version 25 adds
+/// `HirExpressionKind::Insere` (a build-time embed in any `=` position, st1
+/// U4), shifting the serde ordinal of the variants after `Praefixum`;
+/// schema-v24 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 25;
 
 /// Serializable snapshot of one analyzed provider unit carried for HIR
 /// emission (ARCH-U4 carriage).

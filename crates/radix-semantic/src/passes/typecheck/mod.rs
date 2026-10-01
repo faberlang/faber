@@ -122,6 +122,7 @@ pub mod hashable;
 pub mod index_infer;
 mod inf;
 pub mod infer;
+mod insere;
 pub mod integer_range;
 pub mod intervallum;
 pub mod intrinsics;

@@ -1,12 +1,25 @@
-//! Build-time file embed `insere "path"` (DECISIONS D8.10, campaign F8).
+//! Build-time file embed `insere "path"` (DECISIONS D8.10, campaign F8; st1 U4).
 //!
-//! Contract: `insere` (en `embed`) is a contextual keyword. It is claimed
-//! only as the head of a module-level constant or `generis` field initializer
-//! directly followed by a string literal, where it parses to `ExprKind::Insere` carrying the authored path.
-//! Everywhere else the spelling stays an ordinary identifier.
+//! Contract: `insere` (en `embed`) is a contextual keyword. It is claimed in
+//! expression-primary position directly followed by a string literal, where it
+//! parses to `ExprKind::Insere` carrying the authored path. Whether an embed
+//! is legal at that position is lowering's decision, not the parser's.
+//! Without a following string the spelling stays an ordinary identifier.
 
-use crate::test_support::{parse_ok, symbol_name};
+use crate::test_support::{parse_ok, parse_program, symbol_name};
 use radix_syntax::{ClassMemberKind, ExprKind, StmtKind};
+
+fn first_class_field_init_kind(source: &str) -> String {
+    let result = parse_ok(source);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Class(class) = &program.statements[0].kind else {
+        panic!("expected genus");
+    };
+    let ClassMemberKind::Field(field) = &class.members[0].kind else {
+        panic!("expected field");
+    };
+    format!("{:?}", field.init.as_deref().expect("initializer").kind)
+}
 
 #[test]
 fn module_constant_initializer_claims_insere() {
@@ -24,24 +37,40 @@ fn module_constant_initializer_claims_insere() {
 
 #[test]
 fn genus_static_field_initializer_claims_insere() {
-    let result = parse_ok("genus Icon {\n    generis octeti LOGO = insere \"logo.png\"\n}\n");
-    let program = result.program.as_ref().expect("program");
-    let StmtKind::Class(class) = &program.statements[0].kind else {
-        panic!("expected genus");
-    };
-    let ClassMemberKind::Field(field) = &class.members[0].kind else {
-        panic!("expected field");
-    };
-    let init = field.init.as_ref().expect("initializer");
-    assert!(
-        matches!(init.kind, ExprKind::Insere(_)),
-        "got {:?}",
-        init.kind
+    let init = first_class_field_init_kind(
+        "genus Icon {\n    generis octeti LOGO = insere \"logo.png\"\n}\n",
     );
+    assert!(init.starts_with("Insere("), "got {init}");
 }
 
 #[test]
-fn insere_stays_an_identifier_outside_a_compile_time_initializer() {
+fn every_field_modifier_default_claims_insere() {
+    for modifier in ["fixum", "varia", "generis"] {
+        let source = format!("genus G {{\n    {modifier} textus s = insere \"x.txt\"\n}}\n");
+        let init = first_class_field_init_kind(&source);
+        assert!(
+            init.starts_with("Insere("),
+            "modifier `{modifier}`: got {init}"
+        );
+    }
+}
+
+#[test]
+fn block_level_constant_claims_insere() {
+    let result = parse_ok("incipit {\n    fixum textus x = insere \"a.txt\"\n}\n");
+    assert!(format!("{:?}", result.program).contains("Insere("));
+}
+
+#[test]
+fn insere_is_claimed_in_any_expression_position() {
+    // Lowering rejects an embed outside a constant initializer; the parser
+    // only recognizes the shape (keyword directly followed by a string).
+    let result = parse_ok("incipit {\n    varia textus x ← \"a\"\n    x ← insere \"a.txt\"\n}\n");
+    assert!(format!("{:?}", result.program).contains("Insere("));
+}
+
+#[test]
+fn insere_stays_an_identifier_without_a_following_string() {
     let result = parse_ok(
         "fixum numerus insere = 3\nfixum numerus ALIUS = insere\nfunctio f() → numerus {\n    fixum numerus insere ← 4\n    redde insere\n}\n",
     );
@@ -58,11 +87,14 @@ fn insere_stays_an_identifier_outside_a_compile_time_initializer() {
 }
 
 #[test]
-fn instance_field_default_does_not_claim_insere() {
-    // Only a `generis` initializer is a compile-time fact; an instance field
-    // default keeps `insere` as an identifier (so `insere "x"` is not an
-    // embed there and fails as ordinary syntax).
-    let result =
-        crate::test_support::parse_program("genus G {\n    fixum textus s = insere \"x.txt\"\n}\n");
-    assert!(!result.success(), "instance field default must not embed");
+fn insere_call_stays_a_call() {
+    let result = parse_ok("fixum numerus N = insere(3)");
+    assert!(!format!("{:?}", result.program).contains("Insere("));
+}
+
+#[test]
+fn insere_without_a_string_path_is_not_an_embed_anywhere() {
+    // A field default `insere x` is no embed; it fails as ordinary syntax.
+    let result = parse_program("genus G {\n    fixum textus s = insere x\n}\n");
+    assert!(!result.success());
 }

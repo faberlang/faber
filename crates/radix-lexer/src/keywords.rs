@@ -182,10 +182,6 @@ pub enum KeywordOwner {
     /// Route expression in expression or statement position (`ad`).
     RouteExpression,
 
-    /// Head of a compile-time initializer (`insere "path"`, D8.10): a module-level
-    /// constant or a `generis` genus field.
-    CompileTimeInitializer,
-
     /// Convert-hint clause after a `↦` target type (`u32 via Hex`, D11.9).
     ConversionHint,
 }
@@ -342,7 +338,6 @@ const OPERATOR: &[KeywordOwner] = &[KeywordOwner::Operator];
 const DECLARATION_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::DeclarationIntroducer];
 const CONTROL_FLOW: &[KeywordOwner] = &[KeywordOwner::ControlFlow];
 const EXPRESSION_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::ExpressionIntroducer];
-const COMPILE_TIME_INITIALIZER: &[KeywordOwner] = &[KeywordOwner::CompileTimeInitializer];
 const CONVERSION_HINT: &[KeywordOwner] = &[KeywordOwner::ConversionHint];
 const RANGE_OPERATOR: &[KeywordOwner] = &[KeywordOwner::RangeOperator];
 const STATEMENT_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::StatementIntroducer];
@@ -1074,14 +1069,14 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
         category: KeywordKind::Misc,
     },
-    // `insere` (en `embed`, D8.10) is claimed only as the head of a
-    // module-level constant or `generis` field initializer followed by a
-    // string literal; everywhere else the spelling
-    // stays an ordinary identifier (F8 contextual keyword).
+    // `insere` (en `embed`, D8.10) is claimed in expression-primary position
+    // only when directly followed by a string literal; everywhere else the
+    // spelling stays an ordinary identifier (F8 contextual keyword). Where an
+    // embed is legal (a compile-time initializer) is lowering's decision.
     KeywordSpec {
         text: "insere",
         token_kind: Some(TokenKind::Insere),
-        scope: KeywordScope::Contextual(COMPILE_TIME_INITIALIZER),
+        scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
         category: KeywordKind::Misc,
     },
     KeywordSpec {
@@ -1543,7 +1538,6 @@ fn keyword_owner_is_identifier_like(owner: KeywordOwner) -> bool {
         | KeywordOwner::StatementIntroducer
         | KeywordOwner::DeclarationMarker
         | KeywordOwner::RouteExpression
-        | KeywordOwner::CompileTimeInitializer
         | KeywordOwner::ConversionHint => false,
     }
 }

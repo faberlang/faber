@@ -48,9 +48,8 @@ use radix_hir::{
 use radix_lexer::{Span, Symbol};
 use radix_syntax::{
     AstMutability, AstParamMode, BindingPattern, CallablePosture, ClassDecl, ClassMemberKind,
-    EnumDecl, EnumValue, ExprKind, FuncDecl, ImportDecl, ImportKind, InterfaceDecl,
-    InterfaceMethod, Param, SchemaDecl, Stmt, TypeAliasDecl, TypeParam, UnionDecl, VarDecl,
-    Variant,
+    EnumDecl, EnumValue, FuncDecl, ImportDecl, ImportKind, InterfaceDecl, InterfaceMethod, Param,
+    SchemaDecl, Stmt, TypeAliasDecl, TypeParam, UnionDecl, VarDecl, Variant,
 };
 
 type ModifierLocal = (DefId, Symbol, Span);
@@ -445,7 +444,7 @@ impl Lowerer<'_> {
         let is_constant = decl.compile_time;
         let value = if let Some(init) = &decl.init {
             if is_constant {
-                self.lower_static_initializer(init, ty)
+                self.lower_compile_time_initializer(init)
             } else {
                 self.lower_expr(init)
             }
@@ -696,18 +695,14 @@ impl Lowerer<'_> {
             match &member.kind {
                 ClassMemberKind::Field(field) => {
                     let annotations = self.lower_annotations(&member.annotations);
-                    // A static field's embed folds against the declared type,
-                    // so it lowers once the field type is known (below); a
-                    // `praefixum` body takes the same static-initializer path.
-                    let embeds = field.is_static()
-                        && field.init.as_ref().is_some_and(|init| {
-                            matches!(init.kind, ExprKind::Insere(_) | ExprKind::Praefixum(_))
-                        });
-                    let mut init = if embeds {
-                        None
-                    } else {
-                        field.init.as_ref().map(|expr| self.lower_expr(expr))
-                    };
+                    // A field default is a compile-time initializer tree under
+                    // every modifier (`fixum`, `varia`, `generis`): the one `=`
+                    // surface admits `insere` and `praefixum` here as it does
+                    // for a module constant.
+                    let init = field
+                        .init
+                        .as_ref()
+                        .map(|expr| self.lower_compile_time_initializer(expr));
                     let def_id = self.next_def_id();
                     let member_trivia = self.hir_trivia(&member.leading_trivia);
                     if !member_trivia.is_empty() {
@@ -726,9 +721,6 @@ impl Lowerer<'_> {
                         false,
                         false,
                     );
-                    if embeds && let Some(expr) = &field.init {
-                        init = Some(self.lower_static_initializer(expr, Some(field_ty)));
-                    }
                     fields.push(HirField {
                         def_id,
                         name: field.name.name,

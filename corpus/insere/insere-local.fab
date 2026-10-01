@@ -1,0 +1,73 @@
++++
+term = "insere ="
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "fixum_decl", "const_init", "insere_expr", "praefixum_expr", "block_stmt", "genus_decl", "genus_member", "genus_field_decl", "field_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "functio_decl", "redde_stmt", "incipit_stmt", "expression", "literal", "nota_stmt", "call_expr", "call_suffix", "member_suffix"]
+category = "comptime"
+canonical = false
+summary = "embed reads a package file in every = position: block-level constants, genus field defaults, and comptime bodies."
+syntax = "const <type> <name> = embed \"<path>\""
+aliases = ["local embed", "embed field default"]
+related = ["insere", "praefixum", "fixum", "generis"]
+locale = "en"
++++
+# =============================================================================
+# insere = — Embeds a package file in any `=` position.
+# =============================================================================
+#
+# What this teaches:
+#   • One initializer surface — `embed "path"` takes the same positions a
+#     module constant does: a block-level `const T x = embed "p"`, a genus
+#     field default under any modifier (`static`, `const`, `var`), and the
+#     `return` of a `comptime { … }` body.
+#   • The slot types the embed — the declared type decides: `string` takes the
+#     file as UTF-8 text, `bytes` takes the raw bytes. Inside a `comptime`
+#     body the constant's own type is the slot.
+#   • Compile time only — the program carries the finished literal, never a
+#     file read.
+#
+# Common mistakes:
+#   • Using `embed "p"` outside a constant initializer — `x ← embed "p"` and
+#     `print embed "p"` are SEM061 `insere_outside_constant`; bind a constant
+#     first.
+#   • Giving the embed no type to take — `const _ x = embed "p"` is SEM061
+#     `insere_type_required`; declare `string` or `bytes`.
+#
+# See also: insere, praefixum, fixum, generis
+# =============================================================================
+
+# insere = — build-time file embed in every `=` position
+#
+# GRAMMAR:
+#   fixum_decl  :← 'fixum' type_annotation IDENTIFIER '=' const_init
+#   const_init  :← insere_expr | expression
+#   insere_expr :← 'insere' STRING
+#
+# EXPECTED OUTPUT:
+#   insere-local.expected — the embedded text, its length, and byte counts.
+
+class Folium {
+    static string TITULUS = embed "nuntius.txt"
+    const string MONITUM = embed "nuntius.txt"
+    var bytes signum = embed "signum.bin"
+}
+
+const string SUMMA = comptime {
+    return embed "nuntius.txt"
+}
+
+fn longitudo() → int {
+    const string textus = embed "nuntius.txt"
+    return textus.length()
+}
+
+main {
+    const string localis = embed "nuntius.txt"
+    const bytes octeti = embed "signum.bin"
+    const Folium folium ← Folium {}
+    print localis
+    print octeti.length()
+    print folium.MONITUM
+    print folium.signum.length()
+    print SUMMA
+    print longitudo()
+}

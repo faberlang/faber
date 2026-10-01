@@ -201,6 +201,7 @@ impl AirPurityChecker<'_> {
         match &expr.kind {
             HirExpressionKind::Path(_)
             | HirExpressionKind::Literal(_)
+            | HirExpressionKind::Insere(_)
             | HirExpressionKind::Vacua => {}
             HirExpressionKind::Binary(op, lhs, rhs) => {
                 if self.integer_op_unproven(*op, lhs, rhs) {

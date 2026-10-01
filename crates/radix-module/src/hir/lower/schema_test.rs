@@ -43,7 +43,6 @@ fn lower_schema_source(source: &str) -> (crate::hir::LoweredProgram, crate::lexe
         cli_program: None,
         locale_pack: None,
         annotation_contracts: None,
-        insere_files: &Default::default(),
     });
     assert!(errors.is_empty(), "lower failed: {errors:?}");
     (lowered, interner, types)

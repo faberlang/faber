@@ -212,12 +212,12 @@ pub struct Lowerer<'a> {
     /// local so by-label loop patterns resolve like binding-position forms.
     list_element_labels: FxHashMap<radix_hir::DefId, Vec<Option<Symbol>>>,
 
-    /// Driver-resolved build-time embed files (`insere`, D8.10).
-    insere_files: &'a crate::insere::InsereFiles,
+    /// Nesting depth of compile-time initializer trees being lowered (a
+    /// module constant, a `=` local, or a genus field default). `insere` is
+    /// legal only while this is non-zero (st1 R5); a `praefixum` body inherits
+    /// the depth of the initializer that owns it.
+    compile_time_depth: u32,
 }
-
-/// Embed table for lowerers built without a driver file context.
-static NO_INSERE_FILES: crate::insere::InsereFiles = crate::insere::InsereFiles::new();
 
 /// Recoverable diagnostic emitted while converting resolved AST into HIR.
 ///
@@ -294,7 +294,7 @@ impl<'a> Lowerer<'a> {
             locale_pack,
             annotation_contracts,
             list_element_labels: FxHashMap::default(),
-            insere_files: &NO_INSERE_FILES,
+            compile_time_depth: 0,
         }
     }
 
@@ -1089,7 +1089,6 @@ pub struct LowerRequest<'a> {
     pub cli_program: Option<&'a CliProgram>,
     pub locale_pack: Option<&'a LocalePack>,
     pub annotation_contracts: Option<&'a AnnotationContractMetadata>,
-    pub insere_files: &'a crate::insere::InsereFiles,
 }
 
 /// Lower resolved AST to HIR.
@@ -1103,7 +1102,6 @@ pub fn lower(request: LowerRequest<'_>) -> (LoweredProgram, Vec<LowerError>) {
         cli_program,
         locale_pack,
         annotation_contracts,
-        insere_files,
     } = request;
     let mut lowerer = Lowerer::new_with_contracts(
         resolver,
@@ -1113,7 +1111,6 @@ pub fn lower(request: LowerRequest<'_>) -> (LoweredProgram, Vec<LowerError>) {
         locale_pack,
         annotation_contracts,
     );
-    lowerer.insere_files = insere_files;
     let hir = lowerer.lower_program(program);
     let errors = lowerer.take_errors();
     let mut presentation = lowerer.presentation;

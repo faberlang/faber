@@ -1812,6 +1812,15 @@ impl Parser {
                 if self.check_keyword_ident(TokenKind::Praefixum) {
                     return self.parse_praefixum_expr();
                 }
+                // `insere` (en `embed`) claims the spelling only directly
+                // followed by a string literal, so `insere(21)` and bare
+                // identifier uses keep their ordinary meaning. Whether an
+                // embed is legal at this position is lowering's call.
+                if self.check_keyword_ident(TokenKind::Insere)
+                    && let TokenKind::String(path) = self.peek_at(1).kind
+                {
+                    return Ok(self.parse_insere_expr(path));
+                }
                 if self.check_keyword_ident(TokenKind::Clausura) {
                     return self.parse_clausura_expr();
                 }
@@ -3027,6 +3036,24 @@ impl Parser {
             kind: ExprKind::Praefixum(PraefixumExpr { body }),
             span,
         })
+    }
+
+    /// Parse `insere "path"`, the build-time file embed (DECISIONS D8.10).
+    /// The caller has matched the keyword followed by the string literal
+    /// `path`.
+    ///
+    /// GRAMMAR:
+    ///   insere-expr := `insere` STRING
+    fn parse_insere_expr(&mut self, path: Symbol) -> Expr {
+        let start = self.current_span();
+        self.advance();
+        let path_span = self.current_span();
+        self.advance();
+        Expr {
+            id: self.next_id(),
+            kind: ExprKind::Insere(InsereExpr { path, path_span }),
+            span: start.merge(path_span),
+        }
     }
 
     /// Parse `capta { ... }`, the capture-boundary expression.

@@ -56,7 +56,6 @@ pub fn sites(hir: &HirModule) -> Vec<PraefixumSite> {
             HirItemKind::Struct(strukt) => {
                 for field in &strukt.fields {
                     if let Some(init) = &field.init
-                        && field.is_static()
                         && is_praefixum(init)
                     {
                         sites.push(PraefixumSite {
@@ -214,9 +213,7 @@ impl<'a> Graph<'a> {
                             .insert((item.def_id, method.func.name), method.def_id);
                     }
                     for field in &strukt.fields {
-                        if let Some(init) = &field.init
-                            && field.is_static()
-                        {
+                        if let Some(init) = &field.init {
                             graph.statics.insert(field.def_id, (field.name, init));
                         }
                     }

@@ -600,7 +600,6 @@ pub fn analyze_with_cli(
         cli_program,
         locale_pack: config.locale_pack.as_ref(),
         annotation_contracts: Some(&annotation_contracts),
-        insere_files: &config.insere_files,
     });
     let mut hir = lowered.hir;
 
@@ -651,6 +650,14 @@ pub fn analyze_with_cli(
         Some(&radix_lanes),
     ) {
         Ok(()) => {
+            // Build-time embeds fold to their file's literal once typecheck
+            // has typed each from its slot (st1 R5); nothing later sees one.
+            diagnostics.extend(passes::insere_fold::fold(
+                &mut hir,
+                &config.insere_files,
+                &types,
+                interner,
+            ));
             passes::decimal_integer_literal::respell(&mut hir, &types, interner);
             if config.folds_literal_floats() {
                 passes::float_literal_fold::fold(&mut hir, &types, interner);
@@ -1105,6 +1112,10 @@ mod def_id_closure_test;
 #[cfg(test)]
 #[path = "insere_test.rs"]
 mod insere_test;
+
+#[cfg(test)]
+#[path = "insere_position_test.rs"]
+mod insere_position_test;
 
 #[cfg(test)]
 #[path = "error_test.rs"]

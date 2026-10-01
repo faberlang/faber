@@ -2226,6 +2226,7 @@ pub(super) fn rewrite_expr(
         }
         HirExpressionKind::Path(_)
         | HirExpressionKind::Literal(_)
+        | HirExpressionKind::Insere(_)
         | HirExpressionKind::Vacua
         | HirExpressionKind::ReadLine(_)
         | HirExpressionKind::Error => {}

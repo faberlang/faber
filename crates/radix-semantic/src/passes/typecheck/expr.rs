@@ -692,6 +692,9 @@ impl TypeChecker<'_> {
                 self.bool_type()
             }
             HirExpressionKind::Praefixum(inner) => self.check_praefixum(inner, expected),
+            HirExpressionKind::Insere(path) => {
+                super::insere::check_insere(self, *path, expected, expr.span)
+            }
             HirExpressionKind::Error => {
                 if self.errored_exprs.insert(expr.id) {
                     self.error_issue(

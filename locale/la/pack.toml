@@ -3631,6 +3631,14 @@ help = "declare the constant as `octeti` to embed raw bytes"
 message = "an `{insere}` initializer must declare `textus` or `octeti`"
 help = "declare `textus` for UTF-8 text or `octeti` for raw bytes"
 
+[diagnostics.SEM061.issues.insere_type_required]
+message = "an `{insere}` initializer has no `textus` or `octeti` slot to take its type from"
+help = "bind it to a typed constant: `{fixum} textus NAME = {insere} \"path\"` for UTF-8 text or `{fixum} octeti NAME = {insere} \"path\"` for raw bytes"
+
+[diagnostics.SEM061.issues.insere_outside_constant]
+message = "`{insere}` is allowed only in the initializer of a `=` constant or field default"
+help = "read the file into a constant (`{fixum} textus NAME = {insere} \"path\"`) and use that constant here"
+
 [diagnostics.SEM062]
 message = "top-level binding"
 help = "a module-level value is a compile-time constant: `{fixum} T X = …`; a runtime value belongs in a function"

@@ -4,10 +4,11 @@
 //! Reading a neighbouring file at build time is a compile-time intrinsic, not
 //! I/O. The driver owns the file system: before semantic analysis it resolves
 //! every authored `insere` path package-relative and records the outcome here,
-//! keyed by the authored path spelling. Semantic lowering then folds each
-//! embed to a literal whose type follows the declaration: `textus` requires
-//! valid UTF-8, `octeti` takes the raw bytes. Diagnostics stay in the semantic
-//! catalog (SEM061) so every rejection has one stable identity.
+//! keyed by the authored path spelling. Typecheck types each embed from its
+//! slot, then the `insere_fold` pass folds it to a literal of that type:
+//! `textus` requires valid UTF-8, `octeti` takes the raw bytes. Diagnostics
+//! stay in the semantic catalog (SEM061) so every rejection has one stable
+//! identity.
 
 use std::collections::BTreeMap;
 

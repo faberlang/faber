@@ -165,6 +165,18 @@ impl super::FaberCodegen<'_> {
         }
     }
 
+    /// Emit a build-time embed (`insere "path"`, D8.10) as authored.
+    pub(super) fn write_insere(
+        &self,
+        path: Symbol,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        writer.write(surface.keyword(TokenKind::Insere));
+        writer.write(" ");
+        self.write_textus_literal(path, writer);
+    }
+
     /// Format a fractus literal so whole values keep their decimal point (`7.0`).
     pub(super) fn format_float_literal(&self, value: f64) -> String {
         if value.is_nan() {

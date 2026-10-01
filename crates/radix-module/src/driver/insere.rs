@@ -21,7 +21,7 @@ use std::path::{Component, Path, PathBuf};
 
 use crate::semantic::insere::{InsereFiles, InsereRejection, InsereSource};
 use radix_lexer::Interner;
-use radix_syntax::{ClassMemberKind, ExprKind, Program, StmtKind};
+use radix_syntax::{Expr, ExprKind, Program, Visitor, walk_expr};
 
 const MANIFEST_FILE: &str = "faber.toml";
 
@@ -31,7 +31,7 @@ pub(crate) struct ResolvedInsere {
     pub inputs: Vec<PathBuf>,
 }
 
-/// Resolve every `insere` path authored in `program`'s `generis` initializers.
+/// Resolve every `insere` path authored in `program`.
 pub(crate) fn resolve_insere_files(program: &Program, interner: &Interner, source_name: &str) -> ResolvedInsere {
     let mut resolved = ResolvedInsere { files: InsereFiles::new(), inputs: Vec::new() };
     let paths = authored_insere_paths(program, interner);
@@ -49,34 +49,28 @@ pub(crate) fn resolve_insere_files(program: &Program, interner: &Interner, sourc
     resolved
 }
 
-/// Authored embed paths in module-level constants and genus static fields.
+/// Every authored embed path anywhere in `program`. An unreachable embed (a
+/// depth-pruned subtree) stays unresolved and is rejected at fold time, so
+/// the walk never needs to know which positions are legal.
 fn authored_insere_paths(program: &Program, interner: &Interner) -> Vec<String> {
-    let mut paths = Vec::new();
-    let mut push = |kind: &ExprKind| {
-        if let ExprKind::Insere(insere) = kind {
-            paths.push(interner.resolve(insere.path).to_owned());
+    let mut collector = InserePaths { interner, paths: Vec::new() };
+    collector.visit_program(program);
+    collector.paths
+}
+
+struct InserePaths<'a> {
+    interner: &'a Interner,
+    paths: Vec<String>,
+}
+
+impl Visitor for InserePaths<'_> {
+    fn visit_expr(&mut self, expr: &Expr) {
+        if let ExprKind::Insere(insere) = &expr.kind {
+            self.paths
+                .push(self.interner.resolve(insere.path).to_owned());
         }
-    };
-    for stmt in &program.statements {
-        match &stmt.kind {
-            StmtKind::Var(decl) if decl.compile_time => {
-                if let Some(init) = &decl.init {
-                    push(&init.kind);
-                }
-            }
-            StmtKind::Class(class) => {
-                for member in &class.members {
-                    if let ClassMemberKind::Field(field) = &member.kind
-                        && let Some(init) = &field.init
-                    {
-                        push(&init.kind);
-                    }
-                }
-            }
-            _ => {}
-        }
+        walk_expr(self, expr);
     }
-    paths
 }
 
 /// The canonical package root for a source file, or `None` when the source
@@ -153,3 +147,7 @@ fn package_relative(authored: &str) -> Result<PathBuf, InsereRejection> {
 #[cfg(test)]
 #[path = "insere_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "insere_position_test.rs"]
+mod position_tests;

@@ -1406,6 +1406,13 @@ pub enum HirExpressionKind {
     /// Compile-time evaluation marker (`praefixum`).
     Praefixum(Box<HirExpression>),
 
+    /// Build-time file embed (`insere "path"`, D8.10) carrying the authored
+    /// path. Legal only inside a compile-time initializer; its type comes
+    /// from the slot it fills (`textus` or `octeti`). The post-typecheck
+    /// `insere_fold` pass replaces it with the file's literal, so no backend
+    /// ever sees this node.
+    Insere(Symbol),
+
     /// Assertion expression.
     Adfirma(Box<HirExpression>, Option<Box<HirExpression>>),
 

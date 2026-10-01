@@ -1256,6 +1256,7 @@ fn collect_expr_defs(
     match &expr.kind {
         HirExpressionKind::Path(_)
         | HirExpressionKind::Literal(_)
+        | HirExpressionKind::Insere(_)
         | HirExpressionKind::Vacua
         | HirExpressionKind::ReadLine(_)
         | HirExpressionKind::Error => {}
@@ -1905,6 +1906,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
             }
             HirExpressionKind::Path(_)
             | HirExpressionKind::Literal(_)
+            | HirExpressionKind::Insere(_)
             | HirExpressionKind::Vacua
             | HirExpressionKind::ReadLine(_)
             | HirExpressionKind::Error => {}
@@ -2854,6 +2856,9 @@ pub(crate) fn validate_referential_integrity(
             HirExpressionKind::Format { value, spec } => {
                 checks.check_symbol(*spec)?;
                 validate_expr(value, checks)?;
+            }
+            HirExpressionKind::Insere(path) => {
+                checks.check_symbol(*path)?;
             }
             HirExpressionKind::Vacua
             | HirExpressionKind::ReadLine(_)

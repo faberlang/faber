@@ -284,6 +284,7 @@ impl SummaBodyState {
         match &expr.kind {
             HirExpressionKind::Path(_)
             | HirExpressionKind::Literal(_)
+            | HirExpressionKind::Insere(_)
             | HirExpressionKind::Vacua
             | HirExpressionKind::Error => {}
             HirExpressionKind::Binary(_, lhs, rhs) => {

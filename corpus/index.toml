@@ -2845,6 +2845,12 @@ kind = "operator"
 category = "mutation"
 
 [[files]]
+path = "insere/insere-local.fab"
+term = "insere ="
+kind = "operator-group"
+category = "comptime"
+
+[[files]]
 path = "insere/insere.fab"
 term = "insere"
 kind = "keyword"

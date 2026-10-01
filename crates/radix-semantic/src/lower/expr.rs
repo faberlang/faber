@@ -89,8 +89,9 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
             .lower_shadowed_builtin(expr.id, lege.symbol)
             .unwrap_or(HirExpressionKind::ReadLine(lege.is_line)),
 
-        // `praefixum` is legal only as a module-constant or `generis` field
-        // initializer, which lowers through `lower_static_initializer` (D8.6).
+        // `praefixum` is legal only as the whole initializer of a module
+        // constant or a genus field default, which lowers through
+        // `lower_compile_time_initializer` (D8.6).
         ExprKind::Praefixum(_) => {
             lowerer.push_error(
                 SemanticErrorKind::PraefixumInvalid,
@@ -99,13 +100,9 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
             );
             HirExpressionKind::Error
         }
-        // The parser claims `insere` only as a module-constant or `generis`
-        // field initializer, which lowers through `lower_static_initializer`; reaching here means a
-        // parser invariant broke.
-        ExprKind::Insere(_) => {
-            lowerer.error_with_args(issue_args("unknown_lowering_error"));
-            HirExpressionKind::Error
-        }
+        // The parser claims `insere "path"` in any expression position; it
+        // is legal only inside a compile-time initializer tree (st1 R5).
+        ExprKind::Insere(insere) => lowerer.lower_insere(insere, id, span),
         ExprKind::Ego(span) => lowerer.lower_ego(*span),
         ExprKind::Paren(expr) => lower_expr(lowerer, expr).kind,
         ExprKind::TypeCheck(type_check) => lowerer.lower_type_check(type_check, id),

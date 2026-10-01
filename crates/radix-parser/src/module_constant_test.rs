@@ -2,8 +2,9 @@
 //!
 //! Contract: `fixum T NAME = expr` at top level parses to an immutable
 //! `compile_time` `VarDecl`. `_` is a legal type slot. A module-level `=`
-//! constant claims the build-time embed and `praefixum`; a block-level
-//! constant does not claim the embed.
+//! constant takes the build-time embed and `praefixum` initializers; the
+//! embed is an expression-position claim, so a block-level constant takes it
+//! too.
 
 use crate::ParseResult;
 use crate::test_support::{parse_ok, parse_program};
@@ -48,14 +49,19 @@ fn top_level_fixum_claims_the_embed_and_praefixum_initializers() {
 }
 
 #[test]
-fn embed_spelling_stays_an_identifier_outside_a_module_constant() {
-    // Block level: the embed is not claimed, so no `Insere` node is produced.
-    let result = parse_program(
-        "functio f() → textus {\n    fixum textus x = insere \"a.txt\"\n    redde x\n}",
-    );
-    assert!(!format!("{:?}", result.program).contains("Insere("));
+fn embed_spelling_stays_an_identifier_when_no_string_follows() {
     // Module level without a string path: still an ordinary call.
     let result = parse_ok("fixum numerus N = insere(3)");
     let init = first_decl(&result).init.as_ref().expect("initializer");
     assert!(!matches!(init.kind, ExprKind::Insere(_)), "{:?}", init.kind);
+}
+
+#[test]
+fn block_level_constant_claims_the_embed() {
+    // st1 U4: the embed is an expression-position claim, so a block-level
+    // `=` constant takes it exactly like a module constant.
+    let result = parse_program(
+        "functio f() → textus {\n    fixum textus x = insere \"a.txt\"\n    redde x\n}",
+    );
+    assert!(format!("{:?}", result.program).contains("Insere("));
 }

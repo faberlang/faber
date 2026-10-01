@@ -51,7 +51,6 @@ fn lower_source(source: &str) -> (LoweredProgram, Vec<LowerError>, Interner) {
         cli_program: None,
         locale_pack: None,
         annotation_contracts: None,
-        insere_files: &Default::default(),
     });
     (lowered, errors, interner)
 }

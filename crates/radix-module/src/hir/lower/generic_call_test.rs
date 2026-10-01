@@ -35,7 +35,6 @@ fn lower_source(source: &str) -> crate::hir::LoweredProgram {
         cli_program: None,
         locale_pack: None,
         annotation_contracts: None,
-        insere_files: &Default::default(),
     });
     assert!(errors.is_empty(), "lower failed: {errors:?}");
     lowered
@@ -91,7 +90,6 @@ fn rejects_template_call_with_explicit_type_args_at_lowering() {
         cli_program: None,
         locale_pack: None,
         annotation_contracts: None,
-        insere_files: &Default::default(),
     });
     assert!(
         errors.iter().any(|err| err
