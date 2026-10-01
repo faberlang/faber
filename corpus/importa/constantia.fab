@@ -20,9 +20,9 @@ locale = "en"
 # See also: importa, fixum, publica
 # =============================================================================
 
-# importa imported-constant-source — sibling module for importa/imported-constant.fab
+# importa constantia — sibling module for importa/imported-constant.fab
 #
-# `BASE` is exported with `@ public`; the importer folds `source.BASE * 2` at
+# `BASE` is exported with `@ public`; the importer folds `constantia.BASE * 2` at
 # compile time. Editing `BASE` here changes the importer's constant on the next
 # check, run or build (no stale interface).
 #

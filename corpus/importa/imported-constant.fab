@@ -4,7 +4,7 @@ kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "named_import", "fixum_decl", "type_annotation", "owned_type", "base_type", "multiplicative_expr", "member_suffix", "incipit_stmt", "nota_stmt", "expression", "literal"]
 category = "package"
 canonical = false
-summary = "An imported constant folds in a module constant initializer: const int D = source.BASE * 2."
+summary = "An imported constant folds in a module constant initializer: const int D = constantia.BASE * 2."
 syntax = "const <type> <name> = <namespace>.<CONST> <op> <expression>"
 related = ["importa", "fixum", "publica"]
 locale = "en"
@@ -16,7 +16,7 @@ locale = "en"
 # What this teaches:
 #   • `module.NAME` of an exported constant is a compile-time fact in this
 #     module's own `const T X = e` initializer.
-#   • An imported function call (`source.f()`) is still not constant
+#   • An imported function call (`constantia.f()`) is still not constant
 #     (`constant_initializer_not_constant`).
 #
 # Common mistakes:
@@ -29,17 +29,17 @@ locale = "en"
 # importa imported-constant — module constant from an imported constant
 #
 # GRAMMAR:
-#   const int D = source.BASE * 2
+#   const int D = constantia.BASE * 2
 #
 # Requires module layout: imported-constant.fab imports
-# imported-constant-source.fab (package or module mode).
+# constantia.fab (package or module mode).
 #
 # EXPECTED OUTPUT:
 #   imported-constant.expected (10)
 
-import from "./imported-constant-source" source
+import from "./constantia" constantia
 
-const int D = source.BASE * 2
+const int D = constantia.BASE * 2
 
 main {
     print D
