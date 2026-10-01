@@ -224,14 +224,10 @@ fn sem008_comment_and_callable_posture_rows_exist_in_every_installed_pack() {
     }
 }
 
-/// The six width cells per pack (diagnostic code, issue key, field) that
+/// The two width cells per pack (diagnostic code, issue key, field) that
 /// enumerate float widths. Each must name every float marker the compiler
 /// accepts on `fractus`.
 const WIDTH_CELLS: &[(&str, &str, &str)] = &[
-    ("SEM002", "float_width_on_numerus", "message"),
-    ("SEM002", "invalid_fractus_width_marker", "message"),
-    ("SEM008", "float_width_on_numerus", "message"),
-    ("SEM008", "invalid_fractus_width_marker", "message"),
     ("SEM016", "bits_pair_width_mismatch", "message"),
     ("SEM016", "bits_pair_width_mismatch", "help"),
 ];

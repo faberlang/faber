@@ -780,28 +780,8 @@ help = "ประกาศชนิดหรือนำเข้า"
 message = "พารามิเตอร์ดัชนีใน Figura ไม่รู้จัก"
 help = "ประกาศชนิดหรือนำเข้า"
 
-[diagnostics.SEM002.issues.float_width_on_numerus]
-message = "f16, bf16, f32 และ f64 เป็นความกว้างของ fractus; ใช้ f16, bf16, f32 หรือ f64"
-help = "ประกาศชนิดหรือนำเข้า"
-
-[diagnostics.SEM002.issues.integer_width_on_fractus]
-message = "เครื่องหมายความกว้างจำนวนเต็มเป็นความกว้างของ numerus; ใช้ i8…u64"
-help = "ประกาศชนิดหรือนำเข้า"
-
 [diagnostics.SEM002.issues.invalid_precision_marker]
 message = "instans รับเครื่องหมายความแม่นยำเฉพาะ ms, us หรือ ns"
-help = "ประกาศชนิดหรือนำเข้า"
-
-[diagnostics.SEM002.issues.invalid_fractus_width_marker]
-message = "fractus รับเฉพาะ f16, bf16, f32 หรือ f64"
-help = "ประกาศชนิดหรือนำเข้า"
-
-[diagnostics.SEM002.issues.invalid_numerus_width_marker]
-message = "เครื่องหมายความกว้างของ numerus ไม่รู้จัก"
-help = "ประกาศชนิดหรือนำเข้า"
-
-[diagnostics.SEM002.issues.invalid_width_marker]
-message = "เครื่องหมายความกว้างสำหรับตระกูลนี้ไม่รู้จัก"
 help = "ประกาศชนิดหรือนำเข้า"
 
 [diagnostics.SEM002.issues.name_not_type]
@@ -850,10 +830,6 @@ help = "ประกาศชนิดหรือนำเข้า"
 
 [diagnostics.SEM002.issues.width_marker_params]
 message = "เครื่องหมายความกว้างรับพารามิเตอร์ไม่ได้"
-help = "ประกาศชนิดหรือนำเข้า"
-
-[diagnostics.SEM002.issues.width_marker_shape]
-message = "เครื่องหมายความกว้างต้องเป็นการเขียนแบบเปลือย เช่น i32 หรือ u8"
 help = "ประกาศชนิดหรือนำเข้า"
 
 [diagnostics.SEM003]
@@ -1096,10 +1072,6 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 message = "ตัวแปรดัชนีที่ไม่รู้จักใน Figura"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
-[diagnostics.SEM008.issues.float_width_on_numerus]
-message = "f16, bf16, f32 และ f64 เป็นความกว้างของ fractus; ใช้ f16, bf16, f32 หรือ f64"
-help = "แก้โครงสร้าง AST สำหรับ lowering"
-
 [diagnostics.SEM008.issues.forma_builtin_missing]
 message = "ยังไม่ได้ลงทะเบียน genus forma ในตัว"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
@@ -1118,14 +1090,6 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.forma_template_field_missing]
 message = "genus forma ในตัวไม่มีฟิลด์ template"
-help = "แก้โครงสร้าง AST สำหรับ lowering"
-
-[diagnostics.SEM008.issues.fractus_width_params]
-message = "fractus รับตัวระบุความกว้างได้มากที่สุดหนึ่งรายการ"
-help = "แก้โครงสร้าง AST สำหรับ lowering"
-
-[diagnostics.SEM008.issues.integer_width_on_fractus]
-message = "ตัวระบุความกว้างจำนวนเต็มเป็นความกว้างของ numerus; ใช้ i8…u64"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.instans_precision_params]
@@ -1152,24 +1116,12 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 message = "atomic ต้องมีชนิดสมาชิกหนึ่งรายการ; ใช้ atomic<T>"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
-[diagnostics.SEM008.issues.invalid_fractus_width_marker]
-message = "fractus รับได้เฉพาะ f16, bf16, f32 หรือ f64"
-help = "แก้โครงสร้าง AST สำหรับ lowering"
-
 [diagnostics.SEM008.issues.invalid_lowered_expression]
 message = "เกิด expression ที่ไม่ถูกต้องระหว่าง lowering"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
-[diagnostics.SEM008.issues.invalid_numerus_width_marker]
-message = "ไม่รู้จักตัวระบุความกว้างสำหรับ numerus"
-help = "แก้โครงสร้าง AST สำหรับ lowering"
-
 [diagnostics.SEM008.issues.invalid_precision_marker]
 message = "instans รับเฉพาะ ms, us หรือ ns เป็นตัวระบุความละเอียด"
-help = "แก้โครงสร้าง AST สำหรับ lowering"
-
-[diagnostics.SEM008.issues.invalid_width_marker]
-message = "ไม่รู้จักตัวระบุความกว้างสำหรับตระกูลนี้"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.json_valor_pattern]
@@ -1228,10 +1180,6 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 message = "ยังไม่รองรับการลดระดับการแยกโครงสร้าง object ซ้อนกัน"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
-[diagnostics.SEM008.issues.numerus_width_params]
-message = "numerus รับตัวระบุความกว้างได้มากที่สุดหนึ่งรายการ"
-help = "แก้โครงสร้าง AST สำหรับ lowering"
-
 [diagnostics.SEM008.issues.object_destructuring_initializer]
 message = "การแยกโครงสร้าง object ต้องมี initializer"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
@@ -1251,10 +1199,6 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 [diagnostics.SEM008.issues.primitive_params]
 message = "ชนิด primitive รับพารามิเตอร์ไม่ได้"
 help = "textus<N>, ascii<N> และ octeti<N> เป็นรูปแบบความจุที่จัดส่งแล้ว"
-
-[diagnostics.SEM008.issues.primitive_width_params]
-message = "primitive รับตัวระบุความกว้างได้มากที่สุดหนึ่งรายการ"
-help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "namespace ไม่ได้ส่งออก qualified type"
@@ -1378,10 +1322,6 @@ help = "แก้ไขโครงสร้าง AST สำหรับกา�
 
 [diagnostics.SEM008.issues.width_marker_params]
 message = "width marker ไม่รับพารามิเตอร์"
-help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
-
-[diagnostics.SEM008.issues.width_marker_shape]
-message = "width marker ต้องเป็นรูปแบบที่ไม่มีอาร์กิวเมนต์ เช่น i32 หรือ u8"
 help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
 
 [diagnostics.SEM009]

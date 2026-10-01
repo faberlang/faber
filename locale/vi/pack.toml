@@ -776,28 +776,8 @@ help = "khai báo kiểu hoặc import kiểu đó"
 message = "tham số chỉ mục không xác định trong Figura"
 help = "khai báo kiểu hoặc import kiểu đó"
 
-[diagnostics.SEM002.issues.float_width_on_numerus]
-message = "f16, bf16, f32 và f64 là độ rộng fractus; dùng f16, bf16, f32 hoặc f64"
-help = "khai báo kiểu hoặc import kiểu đó"
-
-[diagnostics.SEM002.issues.integer_width_on_fractus]
-message = "ký hiệu độ rộng số nguyên là độ rộng numerus; dùng i8…u64"
-help = "khai báo kiểu hoặc import kiểu đó"
-
 [diagnostics.SEM002.issues.invalid_precision_marker]
 message = "instans chỉ chấp nhận ms, us hoặc ns làm ký hiệu độ chính xác"
-help = "khai báo kiểu hoặc import kiểu đó"
-
-[diagnostics.SEM002.issues.invalid_fractus_width_marker]
-message = "fractus chỉ chấp nhận f16, bf16, f32 hoặc f64"
-help = "khai báo kiểu hoặc import kiểu đó"
-
-[diagnostics.SEM002.issues.invalid_numerus_width_marker]
-message = "ký hiệu độ rộng không xác định cho numerus"
-help = "khai báo kiểu hoặc import kiểu đó"
-
-[diagnostics.SEM002.issues.invalid_width_marker]
-message = "ký hiệu độ rộng không xác định cho họ kiểu này"
 help = "khai báo kiểu hoặc import kiểu đó"
 
 [diagnostics.SEM002.issues.name_not_type]
@@ -846,10 +826,6 @@ help = "khai báo kiểu hoặc import kiểu đó"
 
 [diagnostics.SEM002.issues.width_marker_params]
 message = "ký hiệu độ rộng không thể nhận tham số"
-help = "khai báo kiểu hoặc import kiểu đó"
-
-[diagnostics.SEM002.issues.width_marker_shape]
-message = "ký hiệu độ rộng phải là cách viết trần như i32 hoặc u8"
 help = "khai báo kiểu hoặc import kiểu đó"
 
 [diagnostics.SEM003]
@@ -1084,10 +1060,6 @@ help = "sửa cấu trúc AST để hạ mức"
 message = "biến chỉ mục không xác định trong Figura"
 help = "sửa cấu trúc AST để hạ mức"
 
-[diagnostics.SEM008.issues.float_width_on_numerus]
-message = "f16, bf16, f32 và f64 là độ rộng fractus; dùng f16, bf16, f32 hoặc f64"
-help = "sửa cấu trúc AST để hạ mức"
-
 [diagnostics.SEM008.issues.forma_builtin_missing]
 message = "genus forma dựng sẵn chưa được đăng ký"
 help = "sửa cấu trúc AST để hạ mức"
@@ -1106,14 +1078,6 @@ help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.forma_template_field_missing]
 message = "genus forma dựng sẵn thiếu trường template"
-help = "sửa cấu trúc AST để hạ mức"
-
-[diagnostics.SEM008.issues.fractus_width_params]
-message = "fractus chấp nhận nhiều nhất một dấu độ rộng"
-help = "sửa cấu trúc AST để hạ mức"
-
-[diagnostics.SEM008.issues.integer_width_on_fractus]
-message = "các dấu độ rộng số nguyên là độ rộng numerus; dùng i8…u64"
 help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.instans_precision_params]
@@ -1140,24 +1104,12 @@ help = "sửa cấu trúc AST để hạ mức"
 message = "atomic yêu cầu một kiểu phần tử; dùng atomic<T>"
 help = "sửa cấu trúc AST để hạ mức"
 
-[diagnostics.SEM008.issues.invalid_fractus_width_marker]
-message = "fractus chỉ chấp nhận f16, bf16, f32 hoặc f64"
-help = "sửa cấu trúc AST để hạ mức"
-
 [diagnostics.SEM008.issues.invalid_lowered_expression]
 message = "biểu thức không hợp lệ được tạo ra trong khi hạ mức"
 help = "sửa cấu trúc AST để hạ mức"
 
-[diagnostics.SEM008.issues.invalid_numerus_width_marker]
-message = "dấu độ rộng không xác định cho numerus"
-help = "sửa cấu trúc AST để hạ mức"
-
 [diagnostics.SEM008.issues.invalid_precision_marker]
 message = "instans chỉ chấp nhận ms, us hoặc ns làm dấu độ chính xác"
-help = "sửa cấu trúc AST để hạ mức"
-
-[diagnostics.SEM008.issues.invalid_width_marker]
-message = "dấu độ rộng không xác định cho họ này"
 help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.json_valor_pattern]
@@ -1216,10 +1168,6 @@ help = "sửa cấu trúc AST để hạ mức"
 message = "phân rã đối tượng lồng nhau chưa được hạ mức"
 help = "sửa cấu trúc AST để hạ mức"
 
-[diagnostics.SEM008.issues.numerus_width_params]
-message = "numerus chấp nhận nhiều nhất một dấu độ rộng"
-help = "sửa cấu trúc AST để hạ mức"
-
 [diagnostics.SEM008.issues.object_destructuring_initializer]
 message = "phân rã đối tượng yêu cầu bộ khởi tạo"
 help = "sửa cấu trúc AST để hạ mức"
@@ -1239,10 +1187,6 @@ help = "sửa cấu trúc AST để hạ mức"
 [diagnostics.SEM008.issues.primitive_params]
 message = "kiểu nguyên thủy không thể nhận tham số"
 help = "textus<N>, ascii<N> và octeti<N> là dạng bounded đã phát hành"
-
-[diagnostics.SEM008.issues.primitive_width_params]
-message = "primitive chấp nhận nhiều nhất một dấu độ rộng"
-help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "kiểu đủ điều kiện không được namespace xuất ra"
@@ -1366,10 +1310,6 @@ help = "sửa cấu trúc AST để hạ cấp"
 
 [diagnostics.SEM008.issues.width_marker_params]
 message = "dấu độ rộng không thể nhận tham số"
-help = "sửa cấu trúc AST để hạ cấp"
-
-[diagnostics.SEM008.issues.width_marker_shape]
-message = "dấu độ rộng phải là cách viết trần như i32 hoặc u8"
 help = "sửa cấu trúc AST để hạ cấp"
 
 [diagnostics.SEM009]

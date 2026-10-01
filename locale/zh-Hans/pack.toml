@@ -776,28 +776,8 @@ help = "声明 type 或导入它"
 message = "Figura 中的 index parameter 未知"
 help = "声明 type 或导入它"
 
-[diagnostics.SEM002.issues.float_width_on_numerus]
-message = "f16、bf16、f32 和 f64 是 fractus 宽度；请使用 f16、bf16、f32 或 f64"
-help = "声明 type 或导入它"
-
-[diagnostics.SEM002.issues.integer_width_on_fractus]
-message = "integer width markers 是 numerus 宽度；请使用 i8…u64"
-help = "声明 type 或导入它"
-
 [diagnostics.SEM002.issues.invalid_precision_marker]
 message = "instans 只接受 ms、us 或 ns 作为 precision marker"
-help = "声明 type 或导入它"
-
-[diagnostics.SEM002.issues.invalid_fractus_width_marker]
-message = "fractus 只接受 f16、bf16、f32 或 f64"
-help = "声明 type 或导入它"
-
-[diagnostics.SEM002.issues.invalid_numerus_width_marker]
-message = "numerus 的 width marker 未知"
-help = "声明 type 或导入它"
-
-[diagnostics.SEM002.issues.invalid_width_marker]
-message = "此 family 的 width marker 未知"
 help = "声明 type 或导入它"
 
 [diagnostics.SEM002.issues.name_not_type]
@@ -846,10 +826,6 @@ help = "声明 type 或导入它"
 
 [diagnostics.SEM002.issues.width_marker_params]
 message = "width marker 不能接受 parameters"
-help = "声明 type 或导入它"
-
-[diagnostics.SEM002.issues.width_marker_shape]
-message = "width marker 必须是裸写法，例如 i32 或 u8"
 help = "声明 type 或导入它"
 
 [diagnostics.SEM003]
@@ -1084,10 +1060,6 @@ help = "修正用于 lowering 的 AST construct"
 message = "Figura 中有未知 index 变量"
 help = "修正用于 lowering 的 AST construct"
 
-[diagnostics.SEM008.issues.float_width_on_numerus]
-message = "f16、bf16、f32 和 f64 是 fractus 宽度；请使用 f16、bf16、f32 或 f64"
-help = "修正用于 lowering 的 AST construct"
-
 [diagnostics.SEM008.issues.forma_builtin_missing]
 message = "builtin forma genus 未注册"
 help = "修正用于 lowering 的 AST construct"
@@ -1106,14 +1078,6 @@ help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.forma_template_field_missing]
 message = "builtin forma genus 缺少 template field"
-help = "修正用于 lowering 的 AST construct"
-
-[diagnostics.SEM008.issues.fractus_width_params]
-message = "fractus 最多接受一个 width marker"
-help = "修正用于 lowering 的 AST construct"
-
-[diagnostics.SEM008.issues.integer_width_on_fractus]
-message = "integer width markers 是 numerus 宽度；请使用 i8…u64"
 help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.instans_precision_params]
@@ -1140,24 +1104,12 @@ help = "修正用于 lowering 的 AST construct"
 message = "atomic 需要一个 element type；请使用 atomic<T>"
 help = "修正用于 lowering 的 AST construct"
 
-[diagnostics.SEM008.issues.invalid_fractus_width_marker]
-message = "fractus 只接受 f16、bf16、f32 或 f64"
-help = "修正用于 lowering 的 AST construct"
-
 [diagnostics.SEM008.issues.invalid_lowered_expression]
 message = "lowering 期间产生无效表达式"
 help = "修正用于 lowering 的 AST construct"
 
-[diagnostics.SEM008.issues.invalid_numerus_width_marker]
-message = "numerus 的 width marker 未知"
-help = "修正用于 lowering 的 AST construct"
-
 [diagnostics.SEM008.issues.invalid_precision_marker]
 message = "instans 只接受 ms、us 或 ns 作为 precision marker"
-help = "修正用于 lowering 的 AST construct"
-
-[diagnostics.SEM008.issues.invalid_width_marker]
-message = "此 family 的 width marker 未知"
 help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.json_valor_pattern]
@@ -1216,10 +1168,6 @@ help = "修正用于 lowering 的 AST construct"
 message = "nested object destructuring 尚未实现 lowering"
 help = "修正用于 lowering 的 AST construct"
 
-[diagnostics.SEM008.issues.numerus_width_params]
-message = "numerus 最多接受一个 width marker"
-help = "修正用于 lowering 的 AST construct"
-
 [diagnostics.SEM008.issues.object_destructuring_initializer]
 message = "object destructuring 需要 initializer"
 help = "修正用于 lowering 的 AST construct"
@@ -1239,10 +1187,6 @@ help = "修正用于 lowering 的 AST construct"
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type 不能接受 parameters"
 help = "textus<N>、ascii<N> 和 octeti<N> 是已交付的有界形式"
-
-[diagnostics.SEM008.issues.primitive_width_params]
-message = "primitive 最多接受一个 width marker"
-help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "namespace 未导出 qualified type"
@@ -1366,10 +1310,6 @@ help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.width_marker_params]
 message = "width marker 不能接受 parameters"
-help = "修正用于 lowering 的 AST construct"
-
-[diagnostics.SEM008.issues.width_marker_shape]
-message = "width marker 必须是裸写法，例如 i32 或 u8"
 help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM009]

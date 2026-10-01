@@ -776,28 +776,8 @@ help = "صرح عن type أو استورده"
 message = "index parameter غير معروف في Figura"
 help = "صرح عن type أو استورده"
 
-[diagnostics.SEM002.issues.float_width_on_numerus]
-message = "f16 و bf16 و f32 و f64 هي عروض {fractus}؛ استخدم f16 أو bf16 أو f32 أو f64"
-help = "صرح عن type أو استورده"
-
-[diagnostics.SEM002.issues.integer_width_on_fractus]
-message = "integer width markers هي عروض {numerus}؛ استخدم {numerus}<...>"
-help = "صرح عن type أو استورده"
-
 [diagnostics.SEM002.issues.invalid_precision_marker]
 message = "{instans} يقبل فقط ms أو us أو ns كـ precision marker"
-help = "صرح عن type أو استورده"
-
-[diagnostics.SEM002.issues.invalid_fractus_width_marker]
-message = "{fractus} يقبل فقط f16 أو bf16 أو f32 أو f64"
-help = "صرح عن type أو استورده"
-
-[diagnostics.SEM002.issues.invalid_numerus_width_marker]
-message = "width marker غير معروف لـ {numerus}"
-help = "صرح عن type أو استورده"
-
-[diagnostics.SEM002.issues.invalid_width_marker]
-message = "width marker غير معروف لهذه family"
 help = "صرح عن type أو استورده"
 
 [diagnostics.SEM002.issues.name_not_type]
@@ -846,10 +826,6 @@ help = "صرح عن type أو استورده"
 
 [diagnostics.SEM002.issues.width_marker_params]
 message = "width marker لا يقبل parameters"
-help = "صرح عن type أو استورده"
-
-[diagnostics.SEM002.issues.width_marker_shape]
-message = "width marker يجب أن يكون كتابة عارية مثل i32 أو u8"
 help = "صرح عن type أو استورده"
 
 [diagnostics.SEM003]
@@ -1084,10 +1060,6 @@ help = "أصلح تركيب AST للتخفيض"
 message = "index variable غير معروف في Figura"
 help = "أصلح تركيب AST للتخفيض"
 
-[diagnostics.SEM008.issues.float_width_on_numerus]
-message = "f16 و bf16 و f32 و f64 هي عروض {fractus}؛ استخدم f16 أو bf16 أو f32 أو f64"
-help = "أصلح تركيب AST للتخفيض"
-
 [diagnostics.SEM008.issues.forma_builtin_missing]
 message = "builtin forma genus غير مسجل"
 help = "أصلح تركيب AST للتخفيض"
@@ -1106,14 +1078,6 @@ help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.forma_template_field_missing]
 message = "builtin forma genus يفتقد template field"
-help = "أصلح تركيب AST للتخفيض"
-
-[diagnostics.SEM008.issues.fractus_width_params]
-message = "{fractus} يقبل width marker واحدا على الأكثر"
-help = "أصلح تركيب AST للتخفيض"
-
-[diagnostics.SEM008.issues.integer_width_on_fractus]
-message = "integer width markers هي عروض {numerus}؛ استخدم {numerus}<...>"
 help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.instans_precision_params]
@@ -1140,24 +1104,12 @@ help = "أصلح تركيب AST للتخفيض"
 message = "atomic يتطلب element type واحدا؛ استخدم atomic<T>"
 help = "أصلح تركيب AST للتخفيض"
 
-[diagnostics.SEM008.issues.invalid_fractus_width_marker]
-message = "{fractus} يقبل فقط f16 أو bf16 أو f32 أو f64"
-help = "أصلح تركيب AST للتخفيض"
-
 [diagnostics.SEM008.issues.invalid_lowered_expression]
 message = "expression غير صالح أنتج أثناء التخفيض"
 help = "أصلح تركيب AST للتخفيض"
 
-[diagnostics.SEM008.issues.invalid_numerus_width_marker]
-message = "width marker غير معروف لـ {numerus}"
-help = "أصلح تركيب AST للتخفيض"
-
 [diagnostics.SEM008.issues.invalid_precision_marker]
 message = "{instans} يقبل فقط ms أو us أو ns كـ precision marker"
-help = "أصلح تركيب AST للتخفيض"
-
-[diagnostics.SEM008.issues.invalid_width_marker]
-message = "width marker غير معروف لهذه family"
 help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.json_valor_pattern]
@@ -1216,10 +1168,6 @@ help = "أصلح تركيب AST للتخفيض"
 message = "nested object destructuring لم يخفض بعد"
 help = "أصلح تركيب AST للتخفيض"
 
-[diagnostics.SEM008.issues.numerus_width_params]
-message = "{numerus} يقبل width marker واحدا على الأكثر"
-help = "أصلح تركيب AST للتخفيض"
-
 [diagnostics.SEM008.issues.object_destructuring_initializer]
 message = "object destructuring يتطلب initializer"
 help = "أصلح تركيب AST للتخفيض"
@@ -1239,10 +1187,6 @@ help = "أصلح تركيب AST للتخفيض"
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type لا يقبل parameters"
 help = "textus<N> و ascii<N> و octeti<N> أشكال محدودة مشحونة"
-
-[diagnostics.SEM008.issues.primitive_width_params]
-message = "primitive يقبل width marker واحدا على الأكثر"
-help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "namespace لا يصدر qualified type"
@@ -1366,10 +1310,6 @@ help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.width_marker_params]
 message = "width marker لا يقبل parameters"
-help = "أصلح تركيب AST للتخفيض"
-
-[diagnostics.SEM008.issues.width_marker_shape]
-message = "width marker يجب أن يكون كتابة عارية مثل i32 أو u8"
 help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM009]

@@ -780,28 +780,8 @@ help = "प्रकार घोषित करें या उसे import 
 message = "Figura में अज्ञात index parameter"
 help = "प्रकार घोषित करें या उसे import करें"
 
-[diagnostics.SEM002.issues.float_width_on_numerus]
-message = "f16, bf16, f32 और f64 fractus widths हैं; f16, bf16, f32, या f64 उपयोग करें"
-help = "प्रकार घोषित करें या उसे import करें"
-
-[diagnostics.SEM002.issues.integer_width_on_fractus]
-message = "integer width markers numerus widths हैं; i8…u64 उपयोग करें"
-help = "प्रकार घोषित करें या उसे import करें"
-
 [diagnostics.SEM002.issues.invalid_precision_marker]
 message = "instans precision marker के रूप में केवल ms, us, या ns स्वीकार करता है"
-help = "प्रकार घोषित करें या उसे import करें"
-
-[diagnostics.SEM002.issues.invalid_fractus_width_marker]
-message = "fractus केवल f16, bf16, f32, या f64 स्वीकार करता है"
-help = "प्रकार घोषित करें या उसे import करें"
-
-[diagnostics.SEM002.issues.invalid_numerus_width_marker]
-message = "numerus के लिए अज्ञात width marker"
-help = "प्रकार घोषित करें या उसे import करें"
-
-[diagnostics.SEM002.issues.invalid_width_marker]
-message = "इस family के लिए अज्ञात width marker"
 help = "प्रकार घोषित करें या उसे import करें"
 
 [diagnostics.SEM002.issues.name_not_type]
@@ -850,10 +830,6 @@ help = "प्रकार घोषित करें या उसे import 
 
 [diagnostics.SEM002.issues.width_marker_params]
 message = "width marker parameters स्वीकार नहीं कर सकता"
-help = "प्रकार घोषित करें या उसे import करें"
-
-[diagnostics.SEM002.issues.width_marker_shape]
-message = "width marker bare spelling होना चाहिए, जैसे i32 या u8"
 help = "प्रकार घोषित करें या उसे import करें"
 
 [diagnostics.SEM003]
@@ -1096,10 +1072,6 @@ help = "lowering के लिए AST construct ठीक करें"
 message = "Figura में अज्ञात index variable"
 help = "lowering के लिए AST construct ठीक करें"
 
-[diagnostics.SEM008.issues.float_width_on_numerus]
-message = "f16, bf16, f32 और f64 fractus widths हैं; f16, bf16, f32 या f64 का उपयोग करें"
-help = "lowering के लिए AST construct ठीक करें"
-
 [diagnostics.SEM008.issues.forma_builtin_missing]
 message = "builtin forma genus पंजीकृत नहीं है"
 help = "lowering के लिए AST construct ठीक करें"
@@ -1118,14 +1090,6 @@ help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.forma_template_field_missing]
 message = "builtin forma genus में template field नहीं है"
-help = "lowering के लिए AST construct ठीक करें"
-
-[diagnostics.SEM008.issues.fractus_width_params]
-message = "fractus अधिकतम एक width marker स्वीकार करता है"
-help = "lowering के लिए AST construct ठीक करें"
-
-[diagnostics.SEM008.issues.integer_width_on_fractus]
-message = "integer width markers numerus widths हैं; i8…u64 का उपयोग करें"
 help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.instans_precision_params]
@@ -1152,24 +1116,12 @@ help = "lowering के लिए AST construct ठीक करें"
 message = "atomic के लिए एक element type आवश्यक है; atomic<T> का उपयोग करें"
 help = "lowering के लिए AST construct ठीक करें"
 
-[diagnostics.SEM008.issues.invalid_fractus_width_marker]
-message = "fractus केवल f16, bf16, f32 या f64 स्वीकार करता है"
-help = "lowering के लिए AST construct ठीक करें"
-
 [diagnostics.SEM008.issues.invalid_lowered_expression]
 message = "lowering के दौरान अमान्य expression उत्पन्न हुआ"
 help = "lowering के लिए AST construct ठीक करें"
 
-[diagnostics.SEM008.issues.invalid_numerus_width_marker]
-message = "numerus के लिए अज्ञात width marker"
-help = "lowering के लिए AST construct ठीक करें"
-
 [diagnostics.SEM008.issues.invalid_precision_marker]
 message = "instans precision marker के रूप में केवल ms, us या ns स्वीकार करता है"
-help = "lowering के लिए AST construct ठीक करें"
-
-[diagnostics.SEM008.issues.invalid_width_marker]
-message = "इस family के लिए अज्ञात width marker"
 help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.json_valor_pattern]
@@ -1228,10 +1180,6 @@ help = "lowering के लिए AST construct ठीक करें"
 message = "nested object destructuring को अभी lower नहीं किया जाता"
 help = "lowering के लिए AST construct ठीक करें"
 
-[diagnostics.SEM008.issues.numerus_width_params]
-message = "numerus अधिकतम एक width marker स्वीकार करता है"
-help = "lowering के लिए AST construct ठीक करें"
-
 [diagnostics.SEM008.issues.object_destructuring_initializer]
 message = "object destructuring के लिए initializer आवश्यक है"
 help = "lowering के लिए AST construct ठीक करें"
@@ -1251,10 +1199,6 @@ help = "lowering के लिए AST construct ठीक करें"
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type parameters स्वीकार नहीं कर सकता"
 help = "textus<N>, ascii<N>, और octeti<N> shipped bounded forms हैं"
-
-[diagnostics.SEM008.issues.primitive_width_params]
-message = "primitive अधिकतम एक width marker स्वीकार करता है"
-help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "qualified type namespace द्वारा export नहीं किया गया है"
@@ -1378,10 +1322,6 @@ help = "लोअरिंग के लिए AST संरचना ठीक 
 
 [diagnostics.SEM008.issues.width_marker_params]
 message = "width marker पैरामीटर स्वीकार नहीं कर सकता"
-help = "लोअरिंग के लिए AST संरचना ठीक करें"
-
-[diagnostics.SEM008.issues.width_marker_shape]
-message = "width marker i32 या u8 जैसी बिना तर्क वाली spelling होनी चाहिए"
 help = "लोअरिंग के लिए AST संरचना ठीक करें"
 
 [diagnostics.SEM009]

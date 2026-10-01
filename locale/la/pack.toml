@@ -943,28 +943,8 @@ help = "declare the type or import it"
 message = "unknown index parameter in Figura"
 help = "declare the type or import it"
 
-[diagnostics.SEM002.issues.float_width_on_numerus]
-message = "f16, bf16, f32, and f64 are fractus widths; use f16, bf16, f32, or f64"
-help = "declare the type or import it"
-
-[diagnostics.SEM002.issues.integer_width_on_fractus]
-message = "integer width markers are numerus widths; write the bare marker (i8…u64)"
-help = "declare the type or import it"
-
 [diagnostics.SEM002.issues.invalid_precision_marker]
 message = "instans accepts only ms, us, or ns as a precision marker"
-help = "declare the type or import it"
-
-[diagnostics.SEM002.issues.invalid_fractus_width_marker]
-message = "fractus accepts only f16, bf16, f32, or f64"
-help = "declare the type or import it"
-
-[diagnostics.SEM002.issues.invalid_numerus_width_marker]
-message = "unknown width marker for numerus"
-help = "declare the type or import it"
-
-[diagnostics.SEM002.issues.invalid_width_marker]
-message = "unknown width marker for this family"
 help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.removed_decimal_width_d32]
@@ -1017,10 +997,6 @@ help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.width_marker_params]
 message = "width marker cannot accept parameters"
-help = "declare the type or import it"
-
-[diagnostics.SEM002.issues.width_marker_shape]
-message = "width marker must be a bare spelling such as i32 or u8"
 help = "declare the type or import it"
 
 [diagnostics.SEM003]
@@ -1335,10 +1311,6 @@ help = "fix the AST construct for lowering"
 message = "unknown index variable in Figura"
 help = "fix the AST construct for lowering"
 
-[diagnostics.SEM008.issues.float_width_on_numerus]
-message = "f16, bf16, f32, and f64 are fractus widths; use f16, bf16, f32, or f64"
-help = "fix the AST construct for lowering"
-
 [diagnostics.SEM008.issues.forma_builtin_missing]
 message = "builtin forma genus is not registered"
 help = "fix the AST construct for lowering"
@@ -1357,14 +1329,6 @@ help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.forma_template_field_missing]
 message = "builtin forma genus is missing template field"
-help = "fix the AST construct for lowering"
-
-[diagnostics.SEM008.issues.fractus_width_params]
-message = "fractus accepts at most one width marker"
-help = "fix the AST construct for lowering"
-
-[diagnostics.SEM008.issues.integer_width_on_fractus]
-message = "integer width markers are numerus widths; write the bare marker (i8…u64)"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.instans_precision_params]
@@ -1391,16 +1355,8 @@ help = "fix the AST construct for lowering"
 message = "atomic requires one element type; use atomic<T>"
 help = "fix the AST construct for lowering"
 
-[diagnostics.SEM008.issues.invalid_fractus_width_marker]
-message = "fractus accepts only f16, bf16, f32, or f64"
-help = "fix the AST construct for lowering"
-
 [diagnostics.SEM008.issues.invalid_lowered_expression]
 message = "invalid expression produced during lowering"
-help = "fix the AST construct for lowering"
-
-[diagnostics.SEM008.issues.invalid_numerus_width_marker]
-message = "unknown width marker for numerus"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.invalid_precision_marker]
@@ -1410,10 +1366,6 @@ help = "fix the AST construct for lowering"
 [diagnostics.SEM008.issues.removed_decimal_width_d32]
 message = "d32 non est typus"
 help = "d32 remotus est; utere d64, sola latitudine decimali"
-
-[diagnostics.SEM008.issues.invalid_width_marker]
-message = "unknown width marker for this family"
-help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.nan_pattern]
 message = "a NaN pattern can never match: NaN is not equal to itself"
@@ -1527,10 +1479,6 @@ help = "errorem ad vocationem lancientem perveniat, ubi hospes eum tractat"
 message = "nucleum '{construct}' ({site}) nominare non potest; status greigis internus compilatoris est"
 help = "exemplar parallelum per ansam filum vel reductionem exprime"
 
-[diagnostics.SEM008.issues.numerus_width_params]
-message = "numerus accepts at most one width marker"
-help = "fix the AST construct for lowering"
-
 [diagnostics.SEM008.issues.object_destructuring_initializer]
 message = "object destructuring requires initializer"
 help = "fix the AST construct for lowering"
@@ -1554,10 +1502,6 @@ help = "write ascii<N> via Hex, ascii<N> via Bin, or ascii<N> via Oct with N as 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type cannot accept parameters"
 help = "textus<N>, ascii<N>, and octeti<N> are proposed bounded forms, not yet shipped"
-
-[diagnostics.SEM008.issues.primitive_width_params]
-message = "primitive accepts at most one width marker"
-help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "qualified type is not exported by namespace"
@@ -1709,10 +1653,6 @@ help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.width_marker_params]
 message = "width marker cannot accept parameters"
-help = "fix the AST construct for lowering"
-
-[diagnostics.SEM008.issues.width_marker_shape]
-message = "width marker must be a bare spelling such as i32 or u8"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.modular_word_width_required]
