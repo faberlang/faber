@@ -380,6 +380,7 @@ impl<'a> Lowerer<'a> {
         let mut entry_is_async = false;
         let mut implicit_entry_stmts = Vec::new();
         let mut implicit_entry_scope = false;
+        let mut beside_entry_spans = Vec::new();
 
         for stmt in &program.statements {
             self.current_span = stmt.span;
@@ -441,6 +442,25 @@ impl<'a> Lowerer<'a> {
                         self.push_scope();
                         implicit_entry_scope = true;
                     }
+                    // Declarations whose lowering failed already carry their own
+                    // error; only executable statement kinds can sit beside `incipit`.
+                    if !matches!(
+                        &stmt.kind,
+                        StmtKind::Var(_)
+                            | StmtKind::Func(_)
+                            | StmtKind::Class(_)
+                            | StmtKind::Enum(_)
+                            | StmtKind::Union(_)
+                            | StmtKind::Interface(_)
+                            | StmtKind::TypeAlias(_)
+                            | StmtKind::Schema(_)
+                            | StmtKind::Import(_)
+                            | StmtKind::Proba(_)
+                            | StmtKind::Probandum(_)
+                            | StmtKind::Incipit(_)
+                    ) {
+                        beside_entry_spans.push(stmt.span);
+                    }
                     let lowered = stmt::lower_stmt(self, stmt);
                     self.attach_stmt_trivia(stmt, std::slice::from_ref(&lowered));
                     implicit_entry_stmts.push(lowered);
@@ -453,6 +473,18 @@ impl<'a> Lowerer<'a> {
 
         if implicit_entry_scope {
             self.pop_scope();
+        }
+
+        if entry.is_some() {
+            for span in beside_entry_spans {
+                self.error_with_args_at(
+                    vec![DiagnosticArg::new(
+                        "issue",
+                        "top_level_statement_beside_entry",
+                    )],
+                    span,
+                );
+            }
         }
 
         if entry.is_none() && !implicit_entry_stmts.is_empty() {

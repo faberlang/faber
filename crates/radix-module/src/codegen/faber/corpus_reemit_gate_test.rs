@@ -64,10 +64,6 @@ const EXPECTED_STRUCTURE_REFUSALS: &[(&str, &str)] = &[
     ("postparabit/postparabit.fab", "async hook blocks: see postpara/postpara.fab"),
     ("praepara/praepara.fab", "hook blocks: see postpara/postpara.fab"),
     ("praeparabit/praeparabit.fab", "async hook blocks: see postpara/postpara.fab"),
-    (
-        "intra/intra.fab",
-        "top-level statements beside an explicit `main` are dropped by lowering, so they cannot re-emit",
-    ),
 ];
 
 /// Witness losses (strings, comments, annotation heads) the meaning fingerprint cannot see.

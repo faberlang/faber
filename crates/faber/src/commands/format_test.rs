@@ -773,7 +773,8 @@ fn formatted_source_for_write_handles_no_frontmatter_with_empty_raw() {
 /// A suite hook (`setup`) that HIR does not carry.
 pub(crate) const HOOK_SOURCE: &str = "+++\nlocale = \"en\"\n+++\ndescribe \"hooks\" {\n    setup {\n        print \"before each\"\n    }\n    test \"sample\" {\n        assert true\n    }\n}\n\nmain {}\n";
 
-/// A top-level statement beside an explicit `main`, which lowering drops.
+/// A top-level statement beside an explicit `main`: analysis rejects it
+/// (`SEM008:top_level_statement_beside_entry`) before format can drop it.
 const BESIDE_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nconst int aetas = 25\n\nif aetas within 0‥100 {\n    print \"in range\"\n}\n\nmain {\n    print \"main\"\n}\n";
 
 /// The hook fixture without the hook: nothing is lost, so format succeeds.
@@ -843,7 +844,37 @@ fn format_refuses_hook_loss() {
 
 #[test]
 fn format_refuses_top_level_statement_loss() {
-    assert_format_refuses("beside", BESIDE_SOURCE, "top:si");
+    let dir = tempfile::tempdir().expect("create scratch");
+    let path = dir.path().join("beside.fab");
+    let path_arg = path.to_str().expect("utf8 path");
+    fs::write(&path, BESIDE_SOURCE).expect("write fixture");
+
+    for (mode, args) in [
+        ("in place", vec!["format", path_arg]),
+        ("--stdout", vec!["format", "--stdout", path_arg]),
+        ("--check", vec!["format", "--check", path_arg]),
+        ("check", vec!["check", path_arg]),
+    ] {
+        let output = run_faber_capture(&args, None);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            !output.status.success(),
+            "beside: {mode} must exit non-zero:\n{stderr}"
+        );
+        assert!(
+            stderr.contains("SEM008") && stderr.contains("top_level_statement_beside_entry"),
+            "beside: {mode} must name the SEM008 issue:\n{stderr}"
+        );
+        assert!(
+            output.stdout.is_empty(),
+            "beside: {mode} must print nothing to stdout"
+        );
+    }
+    assert_eq!(
+        fs::read_to_string(&path).expect("read back"),
+        BESIDE_SOURCE,
+        "beside: the file must stay byte-identical"
+    );
 }
 
 #[test]

@@ -189,3 +189,65 @@ fn coherence_class_errors_stop_before_lowering() {
         result.diagnostics
     );
 }
+
+// ---------------------------------------------------------------------------
+// format-data-loss TL-1 — executable top-level statements beside `incipit`.
+// ---------------------------------------------------------------------------
+
+/// Parse `source` and return the `issue` slug of every `LoweringError`, with its span line.
+fn lowering_issues(source: &str) -> Vec<(String, usize)> {
+    let lex = radix_lexer::lex(source);
+    let mut parsed = radix_parser::parse(lex);
+    assert!(
+        parsed.errors.is_empty(),
+        "parse errors: {:?}",
+        parsed.errors
+    );
+    let program = parsed.program.expect("program");
+    let config = PassConfig::for_target(Target::HirRust);
+    let result = analyze(&program, &config, &mut parsed.interner);
+    result
+        .diagnostics
+        .iter()
+        .filter(|err| err.kind == SemanticErrorKind::LoweringError)
+        .map(|err| {
+            let issue = err
+                .args
+                .iter()
+                .find(|arg| arg.name == "issue")
+                .map(|arg| arg.value.to_string())
+                .expect("issue arg");
+            (
+                issue,
+                source[..err.span.start as usize].matches('\n').count() + 1,
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn top_level_statements_beside_incipit_are_rejected_one_per_statement() {
+    let issues = lowering_issues(
+        "fixum numerus a ← 25\nsi a > 1 {\n    scribe \"x\"\n}\nsi a > 2 {\n    scribe \"y\"\n}\nsi a > 3 {\n    scribe \"z\"\n}\nincipit {\n    scribe \"m\"\n}\n",
+    );
+    assert_eq!(
+        issues,
+        vec![
+            ("top_level_statement_beside_entry".to_owned(), 2),
+            ("top_level_statement_beside_entry".to_owned(), 5),
+            ("top_level_statement_beside_entry".to_owned(), 8),
+        ]
+    );
+}
+
+#[test]
+fn top_level_statements_without_incipit_keep_the_implicit_entry() {
+    let issues = lowering_issues("fixum numerus a ← 25\nsi a > 1 {\n    scribe \"x\"\n}\n");
+    assert!(issues.is_empty(), "unexpected issues: {issues:?}");
+}
+
+#[test]
+fn failed_top_level_declaration_beside_incipit_has_only_its_own_error() {
+    let issues = lowering_issues("fixum numerus x\nincipit {\n    scribe \"m\"\n}\n");
+    assert_eq!(issues, vec![("top_level_initializer".to_owned(), 1)]);
+}
