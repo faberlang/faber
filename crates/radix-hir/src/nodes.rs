@@ -2176,6 +2176,34 @@ pub struct HirPresentation {
     /// Emission re-renders it first; its doc block is the module doc.
     #[serde(default)]
     pub region: Option<HirRegion>,
+
+    /// Function modifier bindings (`errors e`, `options o`, `exit code`),
+    /// in authored order. Each lowers to a runtime-provided local with no
+    /// source statement; this records which modifier introduced it so Faber
+    /// re-emission writes the modifier back into the signature.
+    #[serde(default)]
+    pub function_modifier_bindings: Vec<HirFunctionModifierBinding>,
+}
+
+/// Which function modifier introduced a runtime-provided binding local.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum HirFunctionModifierKind {
+    /// `errata <name>` (en `errors`): the typed error-channel binding.
+    Errata,
+
+    /// `optiones <name>` (en `options`): the CLI options binding.
+    Optiones,
+
+    /// `exitus <name>` (en `exit`): the named exit-code binding.
+    Exitus,
+}
+
+/// One authored function modifier binding, keyed by its runtime-provided local.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirFunctionModifierBinding {
+    /// The runtime-provided `HirLocal` the modifier introduced.
+    pub local: DefId,
+    pub kind: HirFunctionModifierKind,
 }
 
 /// One authored build-time embed: the folded literal's id and its path.

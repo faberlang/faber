@@ -29,14 +29,6 @@ use std::path::{Path, PathBuf};
 /// only while the list is exact.
 const KNOWN_MEANING_GAPS: &[(&str, &str)] = &[
     (
-        "errata/errata.fab",
-        "function modifier bindings (`errors T`) lower to a runtime-provided HIR local with no marker for which modifier was authored; the emitter cannot re-emit them (needs a presentation fact populated in radix-semantic lowering)",
-    ),
-    (
-        "optiones/optiones.fab",
-        "function modifier bindings (`options T`): same as errata/errata.fab",
-    ),
-    (
         "intrinseca/numeric-operator-methods.fab",
         "en source uses a non-en intrinsic method spelling (LOCALE002); the re-analyzed statement types differently",
     ),

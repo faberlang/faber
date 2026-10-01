@@ -70,6 +70,7 @@ pub(crate) fn stub_artifact() -> HirArtifact {
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
         insere_exprs: Vec::new(),
+        function_modifier_bindings: Vec::new(),
         region: None,
     };
     let types = TypeTable::new();

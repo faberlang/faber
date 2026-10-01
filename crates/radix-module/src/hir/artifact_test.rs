@@ -153,6 +153,7 @@ fn empty_presentation() -> radix_hir::HirPresentation {
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
         insere_exprs: Vec::new(),
+        function_modifier_bindings: Vec::new(),
         region: None,
     }
 }
@@ -835,6 +836,7 @@ fn presentation_dangling_attachment_anchor() {
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
         insere_exprs: Vec::new(),
+        function_modifier_bindings: Vec::new(),
         region: None,
     };
     let bytes = serialize_artifact(&artifact);
@@ -872,6 +874,7 @@ fn presentation_dangling_entry_anchor() {
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
         insere_exprs: Vec::new(),
+        function_modifier_bindings: Vec::new(),
         region: None,
     };
     let bytes = serialize_artifact(&artifact);
@@ -911,6 +914,7 @@ fn presentation_duplicate_owner_anchor() {
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
         insere_exprs: Vec::new(),
+        function_modifier_bindings: Vec::new(),
         region: None,
     };
     let bytes = serialize_artifact(&artifact);
@@ -950,6 +954,7 @@ fn presentation_duplicate_attachment_owner() {
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
         insere_exprs: Vec::new(),
+        function_modifier_bindings: Vec::new(),
         region: None,
     };
     let bytes = serialize_artifact(&artifact);
@@ -992,6 +997,7 @@ fn presentation_dangling_comment_symbol() {
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
         insere_exprs: Vec::new(),
+        function_modifier_bindings: Vec::new(),
         region: None,
     };
     let bytes = serialize_artifact(&artifact);
@@ -1034,6 +1040,7 @@ fn presentation_dangling_def_backref() {
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
         insere_exprs: Vec::new(),
+        function_modifier_bindings: Vec::new(),
         region: None,
     };
     let bytes = serialize_artifact(&artifact);

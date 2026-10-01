@@ -273,6 +273,7 @@ impl<'a> Lowerer<'a> {
                 authored_types: Vec::new(),
                 tuple_label_accesses: Vec::new(),
                 insere_exprs: Vec::new(),
+                function_modifier_bindings: Vec::new(),
                 region: None,
             },
             local_variant_path_indices: Vec::new(),

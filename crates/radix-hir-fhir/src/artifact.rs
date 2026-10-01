@@ -528,8 +528,11 @@ pub struct FunctionProvenanceTableWire {
 /// Version 22 adds `HirPresentation::insere_exprs` (authored build-time
 /// embed paths, D8.10); schema-v21 artifacts fail closed. Version 23 carries
 /// genus member visibility on `StructFieldSnapshot` (D5.3); schema-v22
-/// artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 23;
+/// artifacts fail closed. Version 24 adds
+/// `HirPresentation::function_modifier_bindings` (which `errors` / `options` /
+/// `exit` signature modifier introduced each runtime-provided binding local);
+/// schema-v23 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 24;
 
 /// Serializable snapshot of one analyzed provider unit carried for HIR
 /// emission (ARCH-U4 carriage).

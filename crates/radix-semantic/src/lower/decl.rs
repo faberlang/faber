@@ -286,9 +286,15 @@ impl Lowerer<'_> {
     ) -> Vec<ModifierLocal> {
         modifier_bindings(modifiers)
             .into_iter()
-            .map(|ident| {
+            .map(|(kind, ident)| {
                 let def_id = self.next_def_id();
                 self.bind_local(ident.name, def_id);
+                self.presentation.function_modifier_bindings.push(
+                    radix_hir::HirFunctionModifierBinding {
+                        local: def_id,
+                        kind,
+                    },
+                );
                 (def_id, ident.name, ident.span)
             })
             .collect()
@@ -1278,16 +1284,17 @@ impl Lowerer<'_> {
     }
 }
 
-fn modifier_bindings(modifiers: &[radix_syntax::FuncModifier]) -> Vec<&radix_syntax::Ident> {
+fn modifier_bindings(
+    modifiers: &[radix_syntax::FuncModifier],
+) -> Vec<(radix_hir::HirFunctionModifierKind, &radix_syntax::Ident)> {
+    use radix_hir::HirFunctionModifierKind as Kind;
     let mut out = Vec::new();
     for modifier in modifiers {
         match modifier {
-            radix_syntax::FuncModifier::Errata(ident)
-            | radix_syntax::FuncModifier::Optiones(ident) => {
-                out.push(ident);
-            }
+            radix_syntax::FuncModifier::Errata(ident) => out.push((Kind::Errata, ident)),
+            radix_syntax::FuncModifier::Optiones(ident) => out.push((Kind::Optiones, ident)),
             radix_syntax::FuncModifier::Exitus(radix_syntax::ExitusValue::Name(ident)) => {
-                out.push(ident)
+                out.push((Kind::Exitus, ident));
             }
             _ => {}
         }

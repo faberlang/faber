@@ -22,8 +22,9 @@ use crate::surface::KeywordSurface;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     DefId, HirAnnotation, HirAvailability, HirBlock, HirEnum, HirExpressionKind, HirFunction,
-    HirInterface, HirItem, HirItemKind, HirOwnerRef, HirParam, HirStruct, HirTestModifier,
-    HirTypeParam, HirTypeParamConstraint, HirTypeSite, HirTypeSlot,
+    HirFunctionModifierKind, HirInterface, HirItem, HirItemKind, HirOwnerRef, HirParam,
+    HirStatementKind, HirStruct, HirTestModifier, HirTypeParam, HirTypeParamConstraint,
+    HirTypeSite, HirTypeSlot,
 };
 use radix_lexer::{Interner, Symbol, TokenKind};
 use radix_syntax::{CallablePosture, GenericParamKind};
@@ -256,11 +257,50 @@ impl super::FaberCodegen<'_> {
             writer.write(" ");
             writer.write(&self.symbol_to_string(cli_args.name));
         }
+        self.write_function_modifier_bindings(func, surface, writer);
         if !has_legacy_posture_annotation(annotations, self.interner) {
             self.write_callable_posture(func.posture, surface, writer);
         }
         self.write_function_result_types(func.ret_ty, func.err_ty, owner, names, surface, writer);
         self.write_optional_block_body(func.body.as_ref(), names, surface, writer);
+    }
+
+    /// Re-emit `errors e` / `options o` / `exit code` signature modifiers.
+    ///
+    /// Each binds a runtime-provided local at the head of the body; the body
+    /// writer skips those locals, so the authored modifier is written here, in
+    /// the order the locals were lowered (which is the authored order).
+    fn write_function_modifier_bindings(
+        &self,
+        func: &HirFunction,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        if self.function_modifier_bindings.is_empty() {
+            return;
+        }
+        let Some(body) = &func.body else {
+            return;
+        };
+        for stmt in &body.statements {
+            let HirStatementKind::Local(local) = &stmt.kind else {
+                continue;
+            };
+            if !local.runtime_provided {
+                continue;
+            }
+            let Some(kind) = self.function_modifier_bindings.get(&local.def_id) else {
+                continue;
+            };
+            writer.write(" ");
+            writer.write(surface.keyword(match kind {
+                HirFunctionModifierKind::Errata => TokenKind::Errata,
+                HirFunctionModifierKind::Optiones => TokenKind::Optiones,
+                HirFunctionModifierKind::Exitus => TokenKind::Exitus,
+            }));
+            writer.write(" ");
+            writer.write(&self.symbol_to_string(local.name));
+        }
     }
 
     /// Emit a synthetic HIR test function as a source-level `proba` block.

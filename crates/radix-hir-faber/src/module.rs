@@ -98,6 +98,10 @@ pub struct FaberCodegen<'a> {
     /// Authored build-time embed paths (`insere "path"`, D8.10), keyed by the
     /// folded literal's `HirId`: those literals re-emit as the embed.
     pub(crate) insere_exprs: FxHashMap<radix_hir::HirId, Symbol>,
+    /// Function modifier bindings (`errors e`, `options o`, `exit code`) by the
+    /// runtime-provided local each introduced: those locals re-emit as the
+    /// signature modifier, not as body statements.
+    pub(crate) function_modifier_bindings: FxHashMap<DefId, radix_hir::HirFunctionModifierKind>,
     /// First malformed authored type form observed during emission.
     type_emission_error: RefCell<Option<CodegenError>>,
 }
@@ -148,6 +152,7 @@ impl<'a> FaberCodegen<'a> {
             authored_type_forms: FxHashMap::default(),
             tuple_label_accesses: FxHashMap::default(),
             insere_exprs: FxHashMap::default(),
+            function_modifier_bindings: FxHashMap::default(),
             type_emission_error: RefCell::new(None),
         }
     }
@@ -211,6 +216,7 @@ pub fn empty_presentation() -> HirPresentation {
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
         insere_exprs: Vec::new(),
+        function_modifier_bindings: Vec::new(),
         region: None,
     }
 }
@@ -286,6 +292,11 @@ impl FaberCodegen<'_> {
             .insere_exprs
             .iter()
             .map(|insere| (insere.expr, insere.path))
+            .collect();
+        self.function_modifier_bindings = presentation
+            .function_modifier_bindings
+            .iter()
+            .map(|binding| (binding.local, binding.kind))
             .collect();
 
         let mut writer = CodeWriter::new();

@@ -2988,6 +2988,9 @@ pub(crate) fn validate_referential_integrity(
         for def_id in &presentation.compile_time_locals {
             checks.check_def(*def_id)?;
         }
+        for binding in &presentation.function_modifier_bindings {
+            checks.check_def(binding.local)?;
+        }
         // Every attachment anchor must name a registered owner, each owner
         // may carry at most one attachment, and comment Symbols must resolve
         // in the interner table.

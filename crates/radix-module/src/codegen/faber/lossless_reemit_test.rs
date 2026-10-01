@@ -148,3 +148,89 @@ fn top_level_tests_stay_outside_suites() {
     assert!(alone < group && group < after, "item order must be kept:\n{emitted}");
     assert_fixed_point(&emitted, "en");
 }
+
+// ── function modifier bindings (`errors e`, `options o`) ───────────────────
+//
+// Each modifier binds a runtime-provided HIR local with no source statement.
+// Re-emission must write the authored modifier in the signature, or the
+// re-analysis loses the binding and `hir_meaning_diverged` refuses the file.
+
+#[test]
+fn errors_modifier_binding_stays_in_the_signature() {
+    let source = format!("{EN}fn parse(string raw) errors failure → int {{\n    return 0\n}}\n");
+    let emitted = reemit(&source, "en");
+    assert!(
+        emitted.contains("fn parse(string raw) errors failure → int {"),
+        "the `errors` binding must re-emit in the signature:\n{emitted}"
+    );
+    assert_fixed_point(&emitted, "en");
+}
+
+#[test]
+fn options_modifier_binding_stays_in_the_signature() {
+    let source = format!("{EN}fn mitte() options opts → string {{\n    return \"ok\"\n}}\n");
+    let emitted = reemit(&source, "en");
+    assert!(
+        emitted.contains("fn mitte() options opts → string {"),
+        "the `options` binding must re-emit in the signature:\n{emitted}"
+    );
+    assert_fixed_point(&emitted, "en");
+}
+
+#[test]
+fn modifier_binding_keeps_its_own_kind_and_order() {
+    let source = format!("{EN}fn run() options opts errors failure {{\n}}\n");
+    let emitted = reemit(&source, "en");
+    assert!(
+        emitted.contains("fn run() options opts errors failure"),
+        "each binding keeps its modifier keyword, in authored order:\n{emitted}"
+    );
+}
+
+#[test]
+fn modifier_bindings_survive_locale_conversion() {
+    let source = format!("{EN}fn parse(string raw) errors failure → int {{\n    return 0\n}}\n");
+    let la = reemit(&source, "la");
+    assert!(la.contains("errata failure"), "{la}");
+    let back = reemit(&la, "en");
+    assert!(back.contains("errors failure"), "{back}");
+}
+
+#[test]
+fn method_modifier_binding_stays_in_the_signature() {
+    let source = format!("{EN}class Box {{\n    fn probe() errors failure → int {{\n        return 0\n    }}\n}}\n");
+    let emitted = reemit(&source, "en");
+    assert!(emitted.contains("fn probe() errors failure → int {"), "{emitted}");
+    assert_fixed_point(&emitted, "en");
+}
+
+#[test]
+fn function_without_modifier_bindings_is_unchanged() {
+    let source = format!("{EN}fn plain(string raw) → int {{\n    return 0\n}}\n");
+    let emitted = reemit(&source, "en");
+    assert!(!emitted.contains("errors") && !emitted.contains("options"), "{emitted}");
+}
+
+// ── labeled record annotations keep their authored element forms ───────────
+
+#[test]
+fn record_annotation_keeps_its_hole_and_authored_order() {
+    let source = format!(
+        "{EN}main {{\n    const record<g: _, w: int> hole ← ratio<g: f32, w: int> {{ g = 1.0, w = 2 }}\n    print hole.w\n}}\n"
+    );
+    let emitted = reemit(&source, "en");
+    assert!(
+        emitted.contains("ratio<g: _, w: int> hole"),
+        "the `_` element hole must not be re-spelled as its solved type:\n{emitted}"
+    );
+    assert_fixed_point(&emitted, "en");
+}
+
+#[test]
+fn record_annotation_keeps_authored_field_order() {
+    let source = format!(
+        "{EN}main {{\n    const record<w: int, g: _> hole ← ratio<g: f32, w: int> {{ g = 1.0, w = 2 }}\n    print hole.w\n}}\n"
+    );
+    let emitted = reemit(&source, "en");
+    assert!(emitted.contains("ratio<w: int, g: _> hole"), "{emitted}");
+}

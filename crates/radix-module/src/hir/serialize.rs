@@ -493,8 +493,15 @@ fn normalize_type_form(form: &mut radix_hir::HirTypeForm, expected: TypeId, type
         Type::Ref(_, inner) => normalize_first_type_arg(form, *inner, types),
         Type::Tuple(members) => normalize_type_args(form, members, types),
         Type::Record(fields) => {
-            let members = fields.values().copied().collect::<Vec<_>>();
-            normalize_type_args(form, &members, types);
+            // The witness map has no order; authored children are keyed by
+            // their label, never zipped against map iteration order.
+            for arg in &mut form.args {
+                if let radix_hir::HirTypeFormArg::Type(child) = arg
+                    && let Some(expected) = child.label.and_then(|label| fields.get(&label))
+                {
+                    normalize_type_form_arg(child, *expected, types);
+                }
+            }
         }
         Type::Applied(_, args) => {
             let members = args

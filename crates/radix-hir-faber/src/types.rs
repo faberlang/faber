@@ -703,9 +703,24 @@ impl super::FaberCodegen<'_> {
                     members[1]
                 ))
             }
-            Type::Record(_) => {
-                // Labels and canonical field order live on the witness only.
-                Ok(self.type_to_faber(form.ty, names, surface))
+            Type::Record(fields) => {
+                // Authored children carry the label and the authored field
+                // order, so a hole (`ratio<g: _, w: int>`) and an authored
+                // nested spelling survive. A solved or hand-built record has
+                // no complete labeled child list and re-emits canonically.
+                let labeled = form.args.len() == fields.len()
+                    && form.args.iter().all(
+                        |arg| matches!(arg, HirTypeFormArg::Type(child) if child.label.is_some()),
+                    );
+                if !labeled {
+                    return Ok(self.type_to_faber(form.ty, names, surface));
+                }
+                let rendered = self.labeled_iuncta_children(form, fields.len(), names, surface)?;
+                Ok(format!(
+                    "{}<{}>",
+                    surface.contextual_keyword("ratio"),
+                    rendered.join(", ")
+                ))
             }
             Type::Tensor(_, shape) => {
                 let elem = self.tensor_element_child(form, *shape, names, surface)?;
