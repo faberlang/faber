@@ -39,6 +39,24 @@ pub fn check_diagnostics_for_source_with_locale_pack(
     code_pack: Option<&crate::locale::LocalePack>,
     templates: Option<&std::collections::BTreeMap<String, String>>,
 ) -> CheckDiagnosticsResult {
+    // Reader-locale suggestions wait until the check result is known: an
+    // edit-distance guess is shown only where an error sits at its span.
+    let mut locale_candidates = Vec::new();
+    let mut result =
+        check_source_deferring_locale(name, source, permissive, code_pack, templates, &mut locale_candidates);
+    let kept = crate::diagnostics::Diagnostic::filter_locale_suggestions(locale_candidates, &result.diagnostics);
+    result.diagnostics.extend(kept);
+    result
+}
+
+fn check_source_deferring_locale(
+    name: &str,
+    source: &str,
+    permissive: bool,
+    code_pack: Option<&crate::locale::LocalePack>,
+    templates: Option<&std::collections::BTreeMap<String, String>>,
+    locale_candidates: &mut Vec<crate::diagnostics::Diagnostic>,
+) -> CheckDiagnosticsResult {
     let mut diagnostics = Vec::new();
     let peeled = match crate::driver::peel_raw_source(name, source) {
         Ok(peeled) => peeled,
@@ -59,7 +77,7 @@ pub fn check_diagnostics_for_source_with_locale_pack(
         .or_else(|| crate::program::compile::frontmatter_locale_pack_from_frontmatter(peeled.frontmatter.as_ref()));
 
     let lex_result = lex_check_source(body, resolved_pack.as_ref());
-    collect_locale_diagnostics(&mut diagnostics, name, body, &lex_result);
+    collect_locale_diagnostics(&mut diagnostics, locale_candidates, name, body, &lex_result);
     if !lex_result.success() {
         collect_lex_diagnostics(&mut diagnostics, name, body, &lex_result.errors);
         return CheckDiagnosticsResult { diagnostics, success: false };
@@ -154,11 +172,12 @@ fn lex_check_source(source: &str, code_pack: Option<&crate::locale::LocalePack>)
 
 fn collect_locale_diagnostics(
     diagnostics: &mut Vec<crate::diagnostics::Diagnostic>,
+    locale_candidates: &mut Vec<crate::diagnostics::Diagnostic>,
     name: &str,
     source: &str,
     lex_result: &crate::lexer::LexResult,
 ) {
-    diagnostics.extend(
+    locale_candidates.extend(
         lex_result
             .locale_suggestions
             .iter()

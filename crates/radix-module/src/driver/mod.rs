@@ -3302,17 +3302,35 @@ pub fn analyze_source_with_kernel_template_admissions(
     let body_byte_offset = split_frontmatter(source)
         .ok()
         .map_or(0, |split| split.body_byte_offset);
-    let result = analyze_source_with_kernel_template_admissions_unadjusted(session, name, source, request, admissions);
+    // Reader-locale suggestions wait here until the analysis result is known:
+    // an edit-distance guess is shown only where an error sits at its span.
+    let mut locale_candidates = Vec::new();
+    let result = analyze_source_with_kernel_template_admissions_unadjusted(
+        session,
+        name,
+        source,
+        request,
+        admissions,
+        &mut locale_candidates,
+    );
     match result {
         Ok(mut analysis) => {
+            push_filtered_locale_suggestions(&mut analysis.diagnostics, locale_candidates);
             adjust_diagnostic_lines_for_body(&mut analysis.diagnostics, source, body_byte_offset);
             Ok(analysis)
         }
         Err(mut diagnostics) => {
+            push_filtered_locale_suggestions(&mut diagnostics, locale_candidates);
             adjust_diagnostic_lines_for_body(&mut diagnostics, source, body_byte_offset);
             Err(diagnostics)
         }
     }
+}
+
+/// Append the LOCALE002 candidates the shared suggestion filter allows.
+fn push_filtered_locale_suggestions(diagnostics: &mut Vec<Diagnostic>, candidates: Vec<Diagnostic>) {
+    let kept = Diagnostic::filter_locale_suggestions(candidates, diagnostics);
+    diagnostics.extend(kept);
 }
 
 /// Translate diagnostics whose spans were calculated against a peeled body
@@ -3338,12 +3356,13 @@ fn analyze_source_with_kernel_template_admissions_unadjusted(
     source: &str,
     request: AnalyzeRequest,
     admissions: &PackageKernelTemplateAdmissions,
+    locale_candidates: &mut Vec<Diagnostic>,
 ) -> Result<AnalyzedModule, Vec<Diagnostic>> {
     let AnalyzeRequest { cli_program: cli_program_override, contract } = request;
     let mut diagnostics = Vec::new();
 
     let Ok(ParsedSourceBody { body, mut program, mut interner, lex_pack }) =
-        parse_frontend_source(session, name, source, &mut diagnostics)
+        parse_frontend_source_deferring_locale(session, name, source, &mut diagnostics, locale_candidates)
     else {
         return Err(diagnostics);
     };
@@ -3578,6 +3597,21 @@ fn parse_frontend_source<'a>(
     source: &'a str,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Result<ParsedSourceBody<'a>, ()> {
+    let mut locale_candidates = Vec::new();
+    let parsed = parse_frontend_source_deferring_locale(session, name, source, diagnostics, &mut locale_candidates);
+    push_filtered_locale_suggestions(diagnostics, locale_candidates);
+    parsed
+}
+
+/// Parse a source body, leaving the lexer's LOCALE002 candidates in
+/// `locale_candidates` for the caller to filter once its error set is known.
+fn parse_frontend_source_deferring_locale<'a>(
+    session: &Session,
+    name: &str,
+    source: &'a str,
+    diagnostics: &mut Vec<Diagnostic>,
+    locale_candidates: &mut Vec<Diagnostic>,
+) -> Result<ParsedSourceBody<'a>, ()> {
     let peeled = match peel_raw_source(name, source) {
         Ok(peeled) => peeled,
         Err(error) => {
@@ -3596,7 +3630,7 @@ fn parse_frontend_source<'a>(
         Some(pack) => lexer::lex_with_locale_pack(body, pack),
         None => lexer::lex(body),
     };
-    diagnostics.extend(
+    locale_candidates.extend(
         lex_result
             .locale_suggestions
             .iter()

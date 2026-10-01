@@ -1663,3 +1663,80 @@ incipit {
             .all(|d| d.issue() != Some("assignment_type_mismatch"))
     );
 }
+
+// ── LOCALE002 edit-distance suggestions fire only at an error span (WB-1) ──
+
+fn locale002_spellings(diagnostics: &[crate::diagnostics::Diagnostic]) -> Vec<String> {
+    diagnostics
+        .iter()
+        .filter(|d| d.code == Some("LOCALE002"))
+        .filter_map(|d| {
+            d.args
+                .iter()
+                .find(|arg| arg.name == "spelling")
+                .map(|arg| arg.value.clone())
+        })
+        .collect()
+}
+
+fn compile_with_installed_pack(locale: &str, source: &str) -> crate::CompileResult {
+    let pack_path = crate::locale::workspace_locale_pack_path(locale);
+    let pack = crate::locale::LocalePack::from_toml_path(pack_path).expect("installed pack should load");
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirRust)
+            .with_locale_pack(pack),
+    );
+    compile(&session, "test.fab", source, ModuleCompileRequest::default())
+}
+
+#[test]
+fn compile_valid_identifier_near_keyword_draws_no_locale002() {
+    // `clamp` is within the edit-distance threshold of an English keyword, but
+    // it is a valid local name: no error sits at its span, so no guess.
+    let result = compile_with_installed_pack("en", "main {\n  const int clamp ← 1\n  print clamp\n}\n");
+
+    assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
+    assert!(
+        locale002_spellings(&result.diagnostics).is_empty(),
+        "a valid identifier must not draw LOCALE002: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn compile_misspelled_name_at_resolve_error_keeps_locale002() {
+    // The valid `clamp` stays quiet; the misspelled `clamq` is rejected by the
+    // resolver at its own span, so its guess is shown.
+    let result = compile_with_installed_pack("en", "main {\n  const int clamp ← 1\n  print clamq\n}\n");
+
+    assert!(!result.success());
+    assert_eq!(
+        locale002_spellings(&result.diagnostics),
+        vec!["clamq".to_string()],
+        "diagnostics: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn compile_misspelled_keyword_at_parse_error_keeps_locale002() {
+    // `retorn` is one edit from the English `return`; the parser rejects it.
+    let result = compile_with_installed_pack("en", "main {\n    print 1 retorn\n}\n");
+
+    assert!(!result.success());
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.phase == crate::diagnostics::DiagnosticPhase::Parse),
+        "expected a parse error: {:?}",
+        result.diagnostics
+    );
+    assert_eq!(
+        locale002_spellings(&result.diagnostics),
+        vec!["retorn".to_string()],
+        "diagnostics: {:?}",
+        result.diagnostics
+    );
+}

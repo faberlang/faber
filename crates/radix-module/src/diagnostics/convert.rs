@@ -45,6 +45,72 @@ pub fn convert_from_locale_suggestion(file: &str, source: &str, suggestion: &Loc
         .with_source_context(file, source, suggestion.span)
 }
 
+/// Keep the LOCALE002 candidates that may be shown, given the file's other diagnostics.
+///
+/// This is the single filter for every consumption site of the lexer's
+/// reader-locale suggestions. A candidate is kept when either:
+///
+/// - it is an accent/width match (phase 1): the folded spelling equals the
+///   folded suggestion, so the source is the keyword in a variant form; or
+/// - it is an edit-distance guess (phase 2) and an error in the same file
+///   overlaps its span: a parse error, or a name-lookup failure
+///   (`SEM001:unknown_identifier`, `SEM008:undefined_name`).
+///
+/// A valid identifier that is merely near a keyword therefore never draws a
+/// guess; a misspelled keyword or name that the compiler already rejected does.
+#[must_use]
+pub fn convert_filter_locale_suggestions(candidates: Vec<Diagnostic>, diagnostics: &[Diagnostic]) -> Vec<Diagnostic> {
+    candidates
+        .into_iter()
+        .filter(|candidate| is_accent_match(candidate) || is_at_error_span(candidate, diagnostics))
+        .collect()
+}
+
+fn is_accent_match(candidate: &Diagnostic) -> bool {
+    match (
+        radix_semantic::arg_value(&candidate.args, "spelling"),
+        radix_semantic::arg_value(&candidate.args, "suggestion"),
+    ) {
+        (Some(spelling), Some(suggestion)) => {
+            radix_semantic::locale::suggestion_key(spelling) == radix_semantic::locale::suggestion_key(suggestion)
+        }
+        _ => false,
+    }
+}
+
+fn is_at_error_span(candidate: &Diagnostic, diagnostics: &[Diagnostic]) -> bool {
+    let Some(span) = candidate.span else {
+        return false;
+    };
+    diagnostics.iter().any(|other| {
+        other.file == candidate.file
+            && is_suggestion_error(other)
+            && other
+                .span
+                .is_some_and(|other_span| spans_overlap(span, other_span))
+    })
+}
+
+fn is_suggestion_error(diagnostic: &Diagnostic) -> bool {
+    if !diagnostic.is_error() {
+        return false;
+    }
+    match (diagnostic.phase, diagnostic.code) {
+        (DiagnosticPhase::Parse, _) => true,
+        (DiagnosticPhase::Analysis, Some("SEM001")) => {
+            radix_semantic::arg_value(&diagnostic.args, "issue") == Some("unknown_identifier")
+        }
+        (DiagnosticPhase::Analysis, Some("SEM008")) => {
+            radix_semantic::arg_value(&diagnostic.args, "issue") == Some("undefined_name")
+        }
+        _ => false,
+    }
+}
+
+fn spans_overlap(left: radix_diagnostics::Span, right: radix_diagnostics::Span) -> bool {
+    left == right || (left.start < right.end && right.start < left.end)
+}
+
 /// Normalize a mixed-script identifier advisory into a non-fatal warning.
 #[must_use]
 pub fn convert_from_mixed_script_advisory(file: &str, source: &str, advisory: &MixedScriptAdvisory) -> Diagnostic {
@@ -116,6 +182,9 @@ pub trait DiagnosticConvert {
     /// Normalize a mixed-script identifier advisory into a non-fatal warning.
     fn from_mixed_script_advisory(file: &str, source: &str, advisory: &MixedScriptAdvisory) -> Diagnostic;
 
+    /// Keep the LOCALE002 candidates allowed by the shared suggestion filter.
+    fn filter_locale_suggestions(candidates: Vec<Diagnostic>, diagnostics: &[Diagnostic]) -> Vec<Diagnostic>;
+
     /// Normalize a parser error using the diagnostic code catalog.
     fn from_parse_error(file: &str, source: &str, err: &ParseError) -> Diagnostic;
 
@@ -134,6 +203,10 @@ impl DiagnosticConvert for Diagnostic {
 
     fn from_mixed_script_advisory(file: &str, source: &str, advisory: &MixedScriptAdvisory) -> Diagnostic {
         convert_from_mixed_script_advisory(file, source, advisory)
+    }
+
+    fn filter_locale_suggestions(candidates: Vec<Diagnostic>, diagnostics: &[Diagnostic]) -> Vec<Diagnostic> {
+        convert_filter_locale_suggestions(candidates, diagnostics)
     }
 
     fn from_parse_error(file: &str, source: &str, err: &ParseError) -> Diagnostic {

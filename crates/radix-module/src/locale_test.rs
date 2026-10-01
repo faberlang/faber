@@ -2137,3 +2137,115 @@ fn every_installed_pack_renders_fac_cape_after_dum() {
         }
     }
 }
+
+fn suggestion_candidate(file: &str, spelling: &str, suggestion: &str, span: Span) -> Diagnostic {
+    Diagnostic::from_locale_suggestion(
+        file,
+        "0123456789012345678901234567890123456789",
+        &LocaleSuggestion {
+            pack_id: "test".to_owned(),
+            spelling: spelling.to_owned(),
+            suggestion: suggestion.to_owned(),
+            span,
+        },
+    )
+}
+
+fn error_at(
+    file: &str,
+    phase: crate::diagnostics::DiagnosticPhase,
+    code: &'static str,
+    issue: &str,
+    span: Span,
+) -> Diagnostic {
+    Diagnostic::error("error")
+        .with_phase(phase)
+        .with_code(code)
+        .with_args(vec![DiagnosticArg::new("issue", issue)])
+        .with_source_context(file, "0123456789012345678901234567890123456789", span)
+}
+
+fn kept_spellings(candidates: Vec<Diagnostic>, diagnostics: &[Diagnostic]) -> Vec<String> {
+    Diagnostic::filter_locale_suggestions(candidates, diagnostics)
+        .iter()
+        .filter_map(|d| {
+            d.args
+                .iter()
+                .find(|arg| arg.name == "spelling")
+                .map(|arg| arg.value.clone())
+        })
+        .collect()
+}
+
+#[test]
+fn locale_suggestion_filter_keeps_accent_matches_and_guesses_at_error_spans_only() {
+    use crate::diagnostics::DiagnosticPhase;
+
+    let guess = suggestion_candidate("a.fab", "clamq", "clamp", Span { start: 10, end: 15 });
+    let accent = suggestion_candidate("a.fab", "ham", "hàm", Span { start: 20, end: 23 });
+    let candidates = vec![guess, accent];
+
+    // No error anywhere: the accent match stays, the edit-distance guess goes.
+    assert_eq!(kept_spellings(candidates.clone(), &[]), vec!["ham"]);
+
+    // A parse error overlapping the span, or a name-lookup failure at it, keeps the guess.
+    for error in [
+        error_at(
+            "a.fab",
+            DiagnosticPhase::Parse,
+            "PARSE030",
+            "expected_expression",
+            Span { start: 12, end: 14 },
+        ),
+        error_at(
+            "a.fab",
+            DiagnosticPhase::Analysis,
+            "SEM001",
+            "unknown_identifier",
+            Span { start: 10, end: 15 },
+        ),
+        error_at(
+            "a.fab",
+            DiagnosticPhase::Analysis,
+            "SEM008",
+            "undefined_name",
+            Span { start: 10, end: 15 },
+        ),
+    ] {
+        assert_eq!(kept_spellings(candidates.clone(), &[error]), vec!["clamq", "ham"]);
+    }
+
+    // Errors elsewhere in the file, in another file, or of another kind keep it out.
+    for error in [
+        error_at(
+            "a.fab",
+            DiagnosticPhase::Parse,
+            "PARSE030",
+            "expected_expression",
+            Span { start: 30, end: 33 },
+        ),
+        error_at(
+            "b.fab",
+            DiagnosticPhase::Parse,
+            "PARSE030",
+            "expected_expression",
+            Span { start: 10, end: 15 },
+        ),
+        error_at(
+            "a.fab",
+            DiagnosticPhase::Analysis,
+            "SEM001",
+            "scribe_callee",
+            Span { start: 10, end: 15 },
+        ),
+        error_at(
+            "a.fab",
+            DiagnosticPhase::Analysis,
+            "SEM010",
+            "type_mismatch",
+            Span { start: 10, end: 15 },
+        ),
+    ] {
+        assert_eq!(kept_spellings(candidates.clone(), &[error]), vec!["ham"]);
+    }
+}

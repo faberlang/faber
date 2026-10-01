@@ -1546,7 +1546,13 @@ pub fn format_locale_pack_load_error(err: &LocalePackLoadError) -> String {
     }
 }
 
-fn suggestion_key(text: &str) -> String {
+/// Fold a spelling for suggestion matching: NFKC, then strip combining marks.
+///
+/// Two spellings with the same key are accent/width-equivalent, which is the
+/// phase-1 match of [`LocalePack::keyword_suggestion`]. Diagnostics layers use
+/// the same fold to tell that match apart from an edit-distance suggestion.
+#[must_use]
+pub fn suggestion_key(text: &str) -> String {
     text.nfkc()
         .flat_map(|ch| ch.to_string().nfd().collect::<Vec<_>>())
         .filter(|ch| !is_combining_mark(*ch))

@@ -2295,3 +2295,70 @@ fn emit_fhir_round_trip_hello_world() {
         "FHIR round-trip: Faber codegen output must be byte-identical"
     );
 }
+
+fn check_locale002_spellings(result: &crate::services::CheckDiagnosticsResult) -> Vec<String> {
+    result
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == Some("LOCALE002"))
+        .filter_map(|d| {
+            d.args
+                .iter()
+                .find(|arg| arg.name == "spelling")
+                .map(|arg| arg.value.clone())
+        })
+        .collect()
+}
+
+fn check_with_installed_pack(locale: &str, source: &str) -> crate::services::CheckDiagnosticsResult {
+    let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path(locale))
+        .expect("installed pack should load");
+    check_diagnostics_for_source_with_locale_pack("main.fab", source, false, Some(&pack), None)
+}
+
+#[test]
+fn check_valid_identifier_near_keyword_draws_no_locale002() {
+    let result = check_with_installed_pack("en", "main {\n  const int clamp ← 1\n  print clamp\n}\n");
+
+    assert!(result.success, "diagnostics: {:?}", result.diagnostics);
+    assert!(
+        check_locale002_spellings(&result).is_empty(),
+        "a valid identifier must not draw LOCALE002: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn check_misspelled_name_at_resolve_error_keeps_locale002() {
+    let result = check_with_installed_pack("en", "main {\n  const int clamp ← 1\n  print clamq\n}\n");
+
+    assert!(!result.success);
+    assert_eq!(
+        check_locale002_spellings(&result),
+        vec!["clamq".to_string()],
+        "diagnostics: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn check_misspelled_keyword_at_parse_error_keeps_locale002() {
+    // `retorn` is one edit from the English `return`; the parser rejects it.
+    let result = check_with_installed_pack("en", "main {\n    print 1 retorn\n}\n");
+
+    assert!(!result.success);
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.phase == crate::diagnostics::DiagnosticPhase::Parse),
+        "expected a parse error: {:?}",
+        result.diagnostics
+    );
+    assert_eq!(
+        check_locale002_spellings(&result),
+        vec!["retorn".to_string()],
+        "diagnostics: {:?}",
+        result.diagnostics
+    );
+}

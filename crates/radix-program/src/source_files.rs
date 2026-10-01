@@ -219,12 +219,14 @@ pub fn load_package_source(
         Some(pack) => radix_module::lexer::lex_with_locale_pack(&body, pack),
         None => radix_module::lexer::lex(&body),
     };
-    diagnostics.extend(
-        lex_result
-            .locale_suggestions
-            .iter()
-            .map(|suggestion| Diagnostic::from_locale_suggestion(&display_name, &body, suggestion)),
-    );
+    // Reader-locale suggestions wait for the parse result: an edit-distance
+    // guess is shown only where a parse error sits at its span. Name-lookup
+    // errors are found later, by the per-file analysis, which filters its own.
+    let locale_candidates: Vec<Diagnostic> = lex_result
+        .locale_suggestions
+        .iter()
+        .map(|suggestion| Diagnostic::from_locale_suggestion(&display_name, &body, suggestion))
+        .collect();
     diagnostics.extend(
         lex_result
             .mixed_script_advisories
@@ -238,6 +240,8 @@ pub fn load_package_source(
                 .iter()
                 .map(|error| Diagnostic::from_lex_error(&display_name, &body, error)),
         );
+        let kept = Diagnostic::filter_locale_suggestions(locale_candidates, diagnostics);
+        diagnostics.extend(kept);
         radix_module::driver::adjust_diagnostic_lines_for_body(
             &mut diagnostics[source_diagnostic_start..],
             &raw_source,
@@ -259,6 +263,10 @@ pub fn load_package_source(
                 .iter()
                 .map(|error| Diagnostic::from_parse_error(&display_name, &body, error)),
         );
+    }
+    let kept = Diagnostic::filter_locale_suggestions(locale_candidates, diagnostics);
+    diagnostics.extend(kept);
+    if !parse.success() {
         radix_module::driver::adjust_diagnostic_lines_for_body(
             &mut diagnostics[source_diagnostic_start..],
             &raw_source,
