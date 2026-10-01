@@ -35,9 +35,13 @@ fn breakable_emission_has_one_home() {
         .parent()
         .and_then(Path::parent)
         .expect("workspace root above crates/");
+    // Walk `crates/` only: the backends live there. Walking the whole workspace
+    // root also reads `.claude/worktrees/*`, whose checkouts each carry their own
+    // legitimate `breakable.rs`, so the pin failed whenever a worktree existed.
+    let crates_dir = workspace_root.join("crates");
     let mut found = Vec::new();
-    collect_breakable_files(workspace_root, &mut found)
-        .expect("workspace walk must be readable; an IO error must not read as success");
+    collect_breakable_files(&crates_dir, &mut found)
+        .expect("crates walk must be readable; an IO error must not read as success");
     let home = manifest_dir.join("src").join("breakable.rs");
     let copies: Vec<&PathBuf> = found.iter().filter(|p| **p != home).collect();
     assert_eq!(
