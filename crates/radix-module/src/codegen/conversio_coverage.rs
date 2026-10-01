@@ -412,8 +412,30 @@ pub fn classify_conversio_coverage(
 
 /// Mirrors the mir-sexp emitter's admitted conversio surface
 /// (`radix-mir-sexp/src/capability.rs`): `X ↦ tensor` for tensor-shaped
-/// sources, scalar/text `X ↦ textus` formatting, and `vector ↦ vector`.
+/// sources, scalar/text `X ↦ textus` formatting, `vector ↦ vector`,
+/// `tabula ↦ lista`, and the scalar `valor` boxing and extraction rows.
 fn sexp_lowers_conversio(src: ConversioTypeFamily, tgt: ConversioTypeFamily) -> bool {
+    // `tabula ↦ lista` projects the keys or the values (`map_list.rs`); scalar
+    // `↦ valor` boxes by identity and `valor ↦ scalar` checks the carrier
+    // (`valor.rs`), both under their own prefix rows ahead of the text rows.
+    if src == ConversioTypeFamily::Tabula && tgt == ConversioTypeFamily::Lista {
+        return true;
+    }
+    let boxable = |family: ConversioTypeFamily| {
+        matches!(
+            family,
+            ConversioTypeFamily::Numerus
+                | ConversioTypeFamily::Fractus
+                | ConversioTypeFamily::Bivalens
+                | ConversioTypeFamily::Textus
+        )
+    };
+    if tgt == ConversioTypeFamily::Valor && (boxable(src) || src == ConversioTypeFamily::Modulus) {
+        return true;
+    }
+    if src == ConversioTypeFamily::Valor && boxable(tgt) {
+        return true;
+    }
     if tgt == ConversioTypeFamily::Tensor {
         return matches!(
             src,
@@ -422,6 +444,7 @@ fn sexp_lowers_conversio(src: ConversioTypeFamily, tgt: ConversioTypeFamily) -> 
                 | ConversioTypeFamily::Ascii
                 | ConversioTypeFamily::Octeti
                 | ConversioTypeFamily::Json
+                | ConversioTypeFamily::Valor
                 | ConversioTypeFamily::Modulus
                 | ConversioTypeFamily::Lista
                 | ConversioTypeFamily::Tensor

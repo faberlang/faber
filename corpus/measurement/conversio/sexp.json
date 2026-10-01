@@ -5,10 +5,10 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "dedicated": 27,
+    "dedicated": 38,
     "fallback": 0,
     "rejected": 208,
-    "not-emitted": 206
+    "not-emitted": 195
   },
   "cells": [
     {
@@ -62,7 +62,7 @@
     {
       "src": "numerus",
       "tgt": "valor",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
@@ -188,7 +188,7 @@
     {
       "src": "fractus",
       "tgt": "valor",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
@@ -314,7 +314,7 @@
     {
       "src": "bivalens",
       "tgt": "valor",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
@@ -440,7 +440,7 @@
     {
       "src": "textus",
       "tgt": "valor",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
@@ -1022,25 +1022,25 @@
     {
       "src": "valor",
       "tgt": "numerus",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
       "src": "valor",
       "tgt": "fractus",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
       "src": "valor",
       "tgt": "bivalens",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
       "src": "valor",
       "tgt": "textus",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
@@ -1112,7 +1112,7 @@
     {
       "src": "valor",
       "tgt": "tensor",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
@@ -1322,7 +1322,7 @@
     {
       "src": "modulus",
       "tgt": "valor",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
@@ -1592,7 +1592,7 @@
     {
       "src": "tabula",
       "tgt": "lista",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
