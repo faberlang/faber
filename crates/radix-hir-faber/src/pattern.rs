@@ -50,7 +50,7 @@ impl super::FaberCodegen<'_> {
             } else {
                 writer.write(surface.contextual_keyword("casu"));
                 writer.write(" ");
-                self.write_pattern_list(&arm.patterns, names, surface, writer);
+                self.write_arm_patterns(&arm.patterns, names, surface, writer);
             }
             writer.writeln(" {");
             writer.indented(|writer| {
@@ -125,7 +125,7 @@ impl super::FaberCodegen<'_> {
                     writer.write(" ");
                     writer.write(surface.contextual_keyword("fixum"));
                     writer.write(" ");
-                    self.write_pattern_list(patterns, names, surface, writer);
+                    self.write_binding_patterns(patterns, names, surface, writer);
                 }
             }
             HirPattern::TypeTest {
@@ -156,7 +156,26 @@ impl super::FaberCodegen<'_> {
         }
     }
 
-    fn write_pattern_list(
+    /// Arm-head patterns, one per subject, separated by `et`.
+    fn write_arm_patterns(
+        &self,
+        patterns: &[HirPattern],
+        names: &FxHashMap<DefId, Symbol>,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        for (idx, pattern) in patterns.iter().enumerate() {
+            if idx > 0 {
+                writer.write(" ");
+                writer.write(surface.contextual_keyword("et"));
+                writer.write(" ");
+            }
+            self.write_pattern(pattern, names, surface, writer);
+        }
+    }
+
+    /// Payload bindings of one variant pattern: a comma list.
+    fn write_binding_patterns(
         &self,
         patterns: &[HirPattern],
         names: &FxHashMap<DefId, Symbol>,
