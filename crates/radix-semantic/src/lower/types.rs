@@ -1011,20 +1011,6 @@ impl Lowerer<'_> {
             self.error("generic_size_argument_in_type_position");
             return self.types.intern(Type::Error);
         };
-        if matches!(prim, Primitive::Numerus | Primitive::Fractus) {
-            let mut issues = Vec::new();
-            let ty = crate::numeric_width::lower_sized_primitive(
-                prim,
-                &type_params,
-                self.interner,
-                self.types,
-                &mut |issue| issues.push(issue),
-            );
-            if let Some(issue) = issues.first() {
-                self.error(issue.issue());
-            }
-            return ty;
-        }
         // WHY: `instans<ms|us|ns>` uses reserved precision markers, parallel to
         // sized `numerus`/`fractus` width markers — not generic type parameters.
         if matches!(prim, Primitive::Instans) {

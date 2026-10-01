@@ -307,9 +307,7 @@ fn ascii_format_hints_are_hex_bin_oct_only() {
 
 // S03-1: lowering failures cross the producer boundary as typed issues, not
 // prose that downstream tables re-parse into a diagnostic identity.
-use crate::numeric_width::{
-    WidthLowerIssue, lower_modular_word, lower_sized_primitive, lower_standalone_width_type,
-};
+use crate::numeric_width::{WidthLowerIssue, lower_modular_word, lower_standalone_width_type};
 use radix_lexer::{Interner, Span};
 use radix_syntax::{GenericArgExpr, Ident, TypeExpr, TypeExprKind, TypeFormLevel};
 
@@ -362,67 +360,6 @@ fn width_lowering_failures_report_typed_issues() {
         .is_some()
     );
     assert!(reported.is_empty());
-}
-
-#[test]
-fn sized_primitive_lowering_reports_typed_issues() {
-    let mut interner = Interner::new();
-    let mut types = TypeTable::new();
-
-    let cases: [(Primitive, Vec<TypeExpr>, WidthLowerIssue, &str); 6] = [
-        (
-            Primitive::Numerus,
-            vec![marker_expr("f32", &mut interner)],
-            WidthLowerIssue::FloatOnNumerus,
-            "float_width_on_numerus",
-        ),
-        (
-            Primitive::Fractus,
-            vec![marker_expr("i32", &mut interner)],
-            WidthLowerIssue::IntOnFractus,
-            "integer_width_on_fractus",
-        ),
-        (
-            Primitive::Numerus,
-            vec![marker_expr("u128", &mut interner)],
-            WidthLowerIssue::InvalidMarker(Primitive::Numerus),
-            "invalid_numerus_width_marker",
-        ),
-        (
-            Primitive::Fractus,
-            vec![marker_expr("x9", &mut interner)],
-            WidthLowerIssue::InvalidMarker(Primitive::Fractus),
-            "invalid_fractus_width_marker",
-        ),
-        (
-            Primitive::Numerus,
-            vec![
-                marker_expr("i32", &mut interner),
-                marker_expr("i64", &mut interner),
-            ],
-            WidthLowerIssue::TooManyParams(Primitive::Numerus),
-            "numerus_width_params",
-        ),
-        (
-            Primitive::Numerus,
-            vec![generic_marker_expr(
-                "foo",
-                vec![GenericArgExpr::Size(radix_syntax::FiguraExpr::Literal(1))],
-                &mut interner,
-            )],
-            WidthLowerIssue::Shape,
-            "width_marker_shape",
-        ),
-    ];
-
-    for (prim, params, expected, issue_name) in cases {
-        let mut reported = Vec::new();
-        lower_sized_primitive(prim, &params, &interner, &mut types, &mut |issue| {
-            reported.push(issue);
-        });
-        assert_eq!(reported, vec![expected], "issue name {issue_name}");
-        assert_eq!(reported[0].issue(), issue_name);
-    }
 }
 
 #[test]

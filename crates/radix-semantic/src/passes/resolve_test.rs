@@ -606,20 +606,25 @@ fn reports_unknown_type_with_structured_event() {
 }
 
 // NOTE: The AST is built by hand: the parser rejects the wrapped numeric
-// spelling `numerus<W>` / `fractus<W>` whole (`numeric_wrapper_retired`, N7d),
-// so the lowerer's own width-marker diagnostics are reachable only this way.
+// spelling `numerus<W>` / `fractus<W>` whole (`numeric_wrapper_retired`, N7d)
+// and recovers it to the bare word, so no source reaches the lowerer with a
+// parameter. A hand-built AST that does carry one falls to the generic
+// `primitive_params` arm; no numeric-wrapper lowering path remains.
 #[test]
-fn reports_invalid_width_marker_with_structured_event() {
-    let cases = [
-        ("numerus", "invalid_numerus_width_marker"),
-        ("fractus", "invalid_fractus_width_marker"),
-    ];
-
-    for (primitive, issue) in cases {
+fn numeric_primitive_with_param_reports_primitive_params() {
+    for primitive in ["numerus", "fractus"] {
         let mut interner = Interner::new();
         let head = ident(&mut interner, primitive);
-        let wat = named_type(ident(&mut interner, "wat"));
-        let program = func_with_param_type(&mut interner, named_type_with_params(head, vec![wat]));
+        let width = named_type(ident(&mut interner, "i32"));
+        let alias_ty = named_type_with_params(head, vec![width]);
+        let program = program(vec![stmt(StmtKind::TypeAlias(
+            radix_syntax::TypeAliasDecl {
+                name: ident(&mut interner, "W"),
+                type_params: Vec::new(),
+                ty: alias_ty,
+                annotations: Vec::new(),
+            },
+        ))]);
 
         let mut resolver = Resolver::new();
         let mut types = TypeTable::new();
@@ -627,12 +632,10 @@ fn reports_invalid_width_marker_with_structured_event() {
 
         let errors = resolve::resolve(&program, &mut resolver, &interner, &mut types)
             .expect_err("resolve should fail");
-        let err = expect_structured_error(&errors, SemanticErrorKind::TypeUndefined, issue);
-
-        assert!(
-            err.args
-                .iter()
-                .any(|arg| arg.name == "primitive" && arg.value == primitive)
+        expect_structured_error(
+            &errors,
+            SemanticErrorKind::LoweringError,
+            "primitive_params",
         );
     }
 }
@@ -2828,10 +2831,10 @@ fn width_issue_names_are_read_from_the_enum_mapping() {
     let src = include_str!("../../../radix-types/src/numeric_width.rs");
     let names = width_issue_names(src);
     assert!(
-        names.len() >= 22,
+        names.len() >= 18,
         "expected the full issue name set: {names:?}"
     );
-    assert!(names.contains(&"float_width_on_numerus".to_owned()));
+    assert!(names.contains(&"width_marker_params".to_owned()));
     assert!(names.contains(&"trapping_float_not_implemented".to_owned()));
 }
 

@@ -44,7 +44,7 @@
 //! by the later HIR passes and driver.
 
 use crate::instans_precision::InstansPrecisionError;
-use crate::numeric_width::{WidthError, WidthLowerIssue};
+use crate::numeric_width::WidthLowerIssue;
 use crate::{
     BareVariantLookup, CollectionKind, FuncSig, GenericParamDescriptor, GenericParamSort,
     IndexExpr, ParamType, Primitive, QualifiedVariantPathLookup, Resolver, SchemaColumnDef,
@@ -71,10 +71,7 @@ const ISSUE_ATOMIC_ELEMENT: &str = "atomic_element";
 const ISSUE_ATOMIC_INCOMPLETE: &str = "atomic_incomplete";
 const ISSUE_FIGURA_UNKNOWN_INDEX: &str = "figura_unknown_index";
 const ISSUE_FIGURA_TYPE_PARAM_IN_INDEX: &str = "figura_type_param_in_index";
-const ISSUE_INVALID_FRACTUS_WIDTH_MARKER: &str = WidthLowerIssue::INVALID_FRACTUS_WIDTH_MARKER;
-const ISSUE_INVALID_NUMERUS_WIDTH_MARKER: &str = WidthLowerIssue::INVALID_NUMERUS_WIDTH_MARKER;
 const ISSUE_INVALID_PRECISION_MARKER: &str = "invalid_precision_marker";
-const ISSUE_INVALID_WIDTH_MARKER: &str = WidthLowerIssue::INVALID_WIDTH_MARKER;
 const ISSUE_INTERVALLUM_ARITY: &str = "intervallum_arity";
 const ISSUE_INTERVALLUM_BOUND: &str = "intervallum_bound";
 const ISSUE_MATRIX_INCOMPLETE: &str = "matrix_incomplete";
@@ -128,8 +125,6 @@ const ISSUE_UNKNOWN_VARIANT: &str = "unknown_variant";
 const ISSUE_VECTOR_INCOMPLETE: &str = "vector_incomplete";
 const ISSUE_VECTOR_MISSING_WIDTH: &str = "vector_missing_width";
 const ISSUE_VECTOR_WIDTH_SINGLE_DIM: &str = "vector_width_single_dim";
-const ISSUE_WIDTH_MARKER_PARAMS: &str = WidthLowerIssue::WIDTH_MARKER_PARAMS;
-const ISSUE_WIDTH_MARKER_SHAPE: &str = WidthLowerIssue::WIDTH_MARKER_SHAPE;
 
 /// Resolve AST-level names and type aliases after declaration collection.
 ///
@@ -1628,12 +1623,6 @@ fn resolve_type_expr(
             resolve_type_ident(resolver, interner, name, errors);
             let name_str = interner.resolve(name.name);
             if let Some(prim) = Primitive::from_name(name_str) {
-                if matches!(prim, Primitive::Numerus | Primitive::Fractus) {
-                    for param in params {
-                        validate_width_marker_param(interner, param, prim, errors);
-                    }
-                    return;
-                }
                 if matches!(prim, Primitive::Instans) {
                     for param in params {
                         validate_instans_precision_param(interner, param, errors);
@@ -1982,44 +1971,6 @@ fn capacity_index_issue(
     }
 }
 
-fn validate_width_marker_param(
-    interner: &Interner,
-    param: &GenericArgExpr,
-    prim: Primitive,
-    errors: &mut Vec<SemanticError>,
-) {
-    if matches!(
-        param,
-        GenericArgExpr::Type(TypeExpr {
-            kind: TypeExprKind::Infer,
-            ..
-        })
-    ) {
-        return;
-    }
-    let Some((ident, nested)) = generic_arg_named_shape(param) else {
-        errors.push(undefined_type_error(
-            ISSUE_WIDTH_MARKER_SHAPE,
-            generic_arg_span(param),
-        ));
-        return;
-    };
-    if nested {
-        errors.push(undefined_type_error(
-            ISSUE_WIDTH_MARKER_PARAMS,
-            generic_arg_span(param),
-        ));
-        return;
-    }
-    let marker = interner.resolve(ident.name);
-    if crate::numeric_width::is_conversio_radix_hint(marker) {
-        return;
-    }
-    if let Err(err) = crate::NumericWidth::from_marker(marker, prim) {
-        errors.push(width_marker_error(err, prim, ident.span));
-    }
-}
-
 /// Unresolved type name: the removed `d32` spelling gets its own issue.
 fn unknown_type_name_error(name: &str, span: radix_lexer::Span) -> SemanticError {
     let issue = if name == crate::numeric_width::REMOVED_D32_MARKER {
@@ -2043,21 +1994,6 @@ fn instans_precision_marker_error(
         InstansPrecisionError::TooManyParams => ISSUE_PRECISION_MARKER_PARAMS,
     };
     undefined_type_error(issue, span)
-}
-
-fn width_marker_error(err: WidthError, prim: Primitive, span: radix_lexer::Span) -> SemanticError {
-    let issue = match err {
-        WidthError::RemovedDecimal => WidthLowerIssue::REMOVED_DECIMAL_WIDTH,
-        WidthError::UnrecognizedMarker => match prim {
-            Primitive::Numerus => ISSUE_INVALID_NUMERUS_WIDTH_MARKER,
-            Primitive::Fractus => ISSUE_INVALID_FRACTUS_WIDTH_MARKER,
-            _ => ISSUE_INVALID_WIDTH_MARKER,
-        },
-        WidthError::FloatOnNumerus => WidthLowerIssue::FLOAT_WIDTH_ON_NUMERUS,
-        WidthError::IntOnFractus => WidthLowerIssue::INTEGER_WIDTH_ON_FRACTUS,
-        WidthError::TooManyParams => ISSUE_WIDTH_MARKER_PARAMS,
-    };
-    undefined_type_error(issue, span).with_arg("primitive", primitive_name(prim))
 }
 
 fn type_mismatch_error(issue: &'static str, span: radix_lexer::Span) -> SemanticError {
@@ -2084,26 +2020,6 @@ fn collection_arity_issue(collection: CollectionKind) -> &'static str {
         CollectionKind::Cursor => "cursor_arity",
         CollectionKind::Queue => "queue_arity",
         CollectionKind::Stack => "stack_arity",
-    }
-}
-
-fn primitive_name(prim: Primitive) -> &'static str {
-    match prim {
-        Primitive::Numerus => "numerus",
-        Primitive::Fractus => "fractus",
-        Primitive::Instans => "instans",
-        Primitive::Ascii => "ascii",
-        Primitive::Littera => "littera",
-        Primitive::Textus => "textus",
-        Primitive::Bivalens => "bivalens",
-        Primitive::Nihil => "nihil",
-        Primitive::Vacuum => "vacuum",
-        Primitive::Numquam => "numquam",
-        Primitive::Ignotum => "ignotum",
-        Primitive::Octeti => "octeti",
-        Primitive::Regex => "regex",
-        Primitive::Json => "json",
-        Primitive::Valor => "valor",
     }
 }
 
@@ -3713,22 +3629,6 @@ fn lower_named_type(
             }
             return Err(TypeLowerError::Issue(ISSUE_PRIMITIVE_PARAMS));
         };
-        if matches!(prim, Primitive::Numerus | Primitive::Fractus) {
-            let mut error = None;
-            let ty = crate::numeric_width::lower_sized_primitive(
-                prim,
-                &type_params,
-                interner,
-                types,
-                &mut |issue| {
-                    error = Some(issue);
-                },
-            );
-            if let Some(issue) = error {
-                return Err(TypeLowerError::Issue(issue.issue()));
-            }
-            return Ok(ty);
-        }
         if matches!(prim, Primitive::Instans) {
             let mut error = None;
             let ty = crate::instans_precision::lower_sized_instans(

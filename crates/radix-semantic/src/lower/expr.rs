@@ -1733,27 +1733,6 @@ fn lower_conversio_target_type(
             lowerer.lower_type(ty)
         }
         radix_syntax::TypeExprKind::Named(ident, target_params)
-            if let Some(prim) = Primitive::from_name(lowerer.interner.resolve(ident.name))
-                && matches!(prim, Primitive::Numerus | Primitive::Fractus) =>
-        {
-            let Some(type_params) = generic_type_exprs(target_params) else {
-                lowerer.error("generic_size_argument_in_type_position");
-                return lowerer.types.intern(crate::Type::Error);
-            };
-            let mut issues = Vec::new();
-            let ty_id = crate::numeric_width::lower_sized_primitive(
-                prim,
-                &type_params,
-                lowerer.interner,
-                lowerer.types,
-                &mut |issue| issues.push(issue),
-            );
-            if let Some(issue) = issues.first() {
-                lowerer.error(issue.issue());
-            }
-            apply_type_target_wrappers(lowerer, ty, ty_id)
-        }
-        radix_syntax::TypeExprKind::Named(ident, target_params)
             if matches!(
                 Primitive::from_name(lowerer.interner.resolve(ident.name)),
                 Some(
