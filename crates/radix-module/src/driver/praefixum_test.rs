@@ -22,7 +22,7 @@ fn analyze_ok(source: &str) -> AnalyzedModule {
     analyze(source).unwrap_or_else(|diagnostics| panic!("analysis failed: {diagnostics:?}"))
 }
 
-fn static_value(unit: &AnalyzedModule, name: &str) -> HirExpression {
+pub(super) fn static_value(unit: &AnalyzedModule, name: &str) -> HirExpression {
     unit.hir
         .items
         .iter()
@@ -33,7 +33,7 @@ fn static_value(unit: &AnalyzedModule, name: &str) -> HirExpression {
         .expect("static item")
 }
 
-fn int(expr: &HirExpression) -> i128 {
+pub(super) fn int(expr: &HirExpression) -> i128 {
     match &expr.kind {
         HirExpressionKind::Literal(HirLiteral::Int(v)) => i128::from(*v),
         HirExpressionKind::Unary(HirUnOp::Neg, inner) => -int(inner),
@@ -53,7 +53,7 @@ fn rejection(source: &str, issue: &str) -> Diagnostic {
         .unwrap_or_else(|| panic!("expected SEM064 {issue}, got {diagnostics:?}"))
 }
 
-fn arg<'a>(diagnostic: &'a Diagnostic, name: &str) -> Option<&'a str> {
+pub(super) fn arg<'a>(diagnostic: &'a Diagnostic, name: &str) -> Option<&'a str> {
     diagnostic
         .args
         .iter()
@@ -158,7 +158,7 @@ fn faber_reemission_keeps_the_authored_body() {
     assert!(matches!(static_value(&unit, "N").kind, HirExpressionKind::Praefixum(_)));
 }
 
-mod imported {
+pub(super) mod imported {
     //! A body that reaches an import never runs in analysis: it is refused
     //! by name, or the whole module is left for the package layer.
 
@@ -171,7 +171,7 @@ mod imported {
     use crate::semantic::passes::visibility_annotation::VisibilityTier;
     use std::collections::BTreeMap;
 
-    const IMPORT: &str = "importa ex \"./consts\" consts\n";
+    pub(in crate::driver::praefixum) const IMPORT: &str = "importa ex \"./consts\" consts\n";
 
     fn contract() -> ModuleImportContract {
         let mut interface = FileInterface::new();
@@ -205,7 +205,10 @@ mod imported {
         }
     }
 
-    fn analyze_with(source: &str, defer: bool) -> Result<AnalyzedModule, Vec<Diagnostic>> {
+    pub(in crate::driver::praefixum) fn analyze_with(
+        source: &str,
+        defer: bool,
+    ) -> Result<AnalyzedModule, Vec<Diagnostic>> {
         let mut config = Config::default().with_dev_locale_root();
         if defer {
             config = config.with_defer_imported_praefixum();
@@ -237,7 +240,7 @@ mod imported {
         assert_eq!(arg(found[0], "callee"), Some(callee));
     }
 
-    fn is_unevaluated(unit: &AnalyzedModule, name: &str) -> bool {
+    pub(in crate::driver::praefixum) fn is_unevaluated(unit: &AnalyzedModule, name: &str) -> bool {
         matches!(static_value(unit, name).kind, HirExpressionKind::Praefixum(_))
     }
 

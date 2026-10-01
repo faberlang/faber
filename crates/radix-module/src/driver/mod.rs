@@ -40,6 +40,8 @@ mod target_policy;
 
 pub use file_frontmatter::{FileFrontmatter, parse_file_frontmatter};
 pub use frontmatter::{FrontmatterError, SplitFrontmatter, split_frontmatter};
+#[cfg(feature = "runner")]
+pub use praefixum::{evaluate_deferred, run_linked_function};
 pub use session::{Config, Session, SessionMemos, WarnPolicy};
 pub use source::{PeeledSource, SourceFile, SourceLoadError, peel_raw_source, source_load_diagnostic};
 pub use target_bindings::TargetBindings;
