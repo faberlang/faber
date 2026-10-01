@@ -663,6 +663,10 @@ help = "pone `@ {ad} 'praefixum:nomen'` directe ante {functio} summi gradus"
 message = "annotatio `@ {annotation}` non est declarata in hac superficie lectoris"
 help = "utere `@ {expected}` pro lingua lectoris huius fasciculi"
 
+[diagnostics.PARSE018.issues.annotatio_unknown_target]
+message = "unknown `@ annotatio` target"
+help = "use `target = {functio}` in v1"
+
 [diagnostics.PARSE019]
 message = "duplicate modifier"
 help = "remove the duplicate modifier"
@@ -1082,6 +1086,10 @@ help = "narrow the receiver (`est M` branch, `discerne`) to recover per-member a
 [diagnostics.SEM004.issues.union_member_differs]
 message = "union member '{member}' differs: {detail}"
 help = "give every union member the same signature or type, or narrow the receiver (`est M`, `discerne`)"
+
+[diagnostics.SEM004.issues.namespace_missing_export]
+message = "imported file exports no member `{member}`"
+help = "check the imported file's `@ {publica}` exports"
 
 [diagnostics.SEM005]
 message = "duplicate definition"
@@ -1690,6 +1698,30 @@ help = "fix the AST construct for lowering"
 [diagnostics.SEM008.issues.width_marker_shape]
 message = "width marker must be a bare spelling such as i32 or u8"
 help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.modular_word_width_required]
+message = "{modulus} type requires exactly one unsigned integer width"
+help = "write the {modulus} type as {modulus}<u8>, {modulus}<u16>, {modulus}<u32>, or {modulus}<u64>"
+
+[diagnostics.SEM008.issues.modular_word_width_shape]
+message = "{modulus} width must be a bare unsigned width marker"
+help = "use a bare unsigned width marker such as u32"
+
+[diagnostics.SEM008.issues.unsupported_modular_word_width]
+message = "{modulus} width must be an unsigned integer width"
+help = "use an unsigned modular word width: {modulus}<u8>, {modulus}<u16>, {modulus}<u32>, or {modulus}<u64>"
+
+[diagnostics.SEM008.issues.modular_word_unsigned_width_required]
+message = "{modulus} width cannot be a float width"
+help = "use an unsigned integer width marker such as u32"
+
+[diagnostics.SEM008.issues.unsupported_saturating_word_width]
+message = "{saturatus} width must be an integer width"
+help = "use an integer width for {saturatus}: i8, i16, i32, i64, u8, u16, u32, or u64"
+
+[diagnostics.SEM008.issues.unsupported_trapping_word_width]
+message = "{exactus} width must be an integer width or d64"
+help = "use an integer width or d64 for {exactus}: i8, i16, i32, i64, u8, u16, u32, u64, or d64"
 
 [diagnostics.SEM009]
 message = "CLI validation error"
@@ -2311,6 +2343,10 @@ help = "utere intervallo totum intra octeti"
 message = "postfix gradient selection (`call(...) ∇ [places]`) is not lowered until the tensor-glyphs 2B autograd surface lands; no operand, selector, or result rule is active in Phase 2A"
 help = "gradient selection (`∇`) is parse-only in Phase 2A; the eligibility/selector rules land with tensor-glyphs 2B"
 
+[diagnostics.SEM010.issues.decimal_literal_out_of_range]
+message = "decimal literal is outside the d64 range"
+help = "a d64 literal has at most 8 fraction digits and lies within ±92233720368.54775807; a written literal is never rounded"
+
 [diagnostics.SEM011]
 message = "invalid operand types"
 help = "use compatible operand types"
@@ -2442,6 +2478,90 @@ help = "handle the call with {fac}/cape, capture it with {capta}, or declare a f
 [diagnostics.SEM011.issues.failable_conversio_requires_handler]
 message = "failable conversion from {source} to {target} requires a '⊥' default, a ⇥ declaring context, a local handler, or a {capta} trap"
 help = "add a '⊥' default, handle it with {fac}/cape or {capta}, or declare a function ⇥; the {incipit} body is exempt"
+
+[diagnostics.SEM011.issues.explicit_union_type_arg_unsupported]
+message = "an explicit type argument cannot be a `∪` hole"
+help = "write _ for a monomorphic hole, or a concrete type"
+
+[diagnostics.SEM011.issues.intervallum_helper_bound_unsupported]
+message = "range expansion helpers support only bare {numerus} bounds"
+help = "use bare {numerus} {intervallum} bounds for expansion helpers today"
+
+[diagnostics.SEM011.issues.modular_word_family_mismatch]
+message = "{modulus} integers cannot mix with other integer families in arithmetic"
+help = "convert both operands to the same {modulus} width, or keep both operands in the {numerus} family"
+
+[diagnostics.SEM011.issues.textus_literal_too_long]
+message = "{textus} literal exceeds its declared capacity of {capacity}"
+help = "shorten the {textus}<N> literal to fit its declared capacity, or use unbounded {textus}"
+
+[diagnostics.SEM011.issues.glyph_operands_unsupported]
+message = "operator {op} does not apply to these operand types"
+help = "use the pinned built-in families: · on vectors/matrices, × on 3-vectors, ⊗ on vectors, ⊙ on identical vector/matrix/tensor shapes"
+
+[diagnostics.SEM011.issues.glyph_static_shape_required]
+message = "operator {op} requires statically known shapes"
+help = "use literal vector widths or matrix/tensor shapes; shape-generic overload is deferred to Phase 2"
+
+[diagnostics.SEM011.issues.glyph_op_numeric_element_required]
+message = "operator {op} requires numeric element types"
+help = "use numeric element types ({numerus}, {fractus}, or sized numeric)"
+
+[diagnostics.SEM011.issues.glyph_element_type_mismatch]
+message = "operator {op} operands have different element types"
+help = "convert one operand with `↦` so both operands share the same element type"
+
+[diagnostics.SEM011.issues.glyph_inner_dim_mismatch]
+message = "operator {op} inner dimensions do not match"
+help = "contract the inner dimension: vector widths must match and matrix columns must equal the peer rows"
+
+[diagnostics.SEM011.issues.glyph_cross_width_mismatch]
+message = "operator {op} operands have different widths"
+help = "cross both operands at the same width"
+
+[diagnostics.SEM011.issues.glyph_cross_width_three_required]
+message = "operator {op} requires 3-vector operands"
+help = "× is pinned to 3-vectors in Phase 1; the 7-vector convention is deferred"
+
+[diagnostics.SEM011.issues.glyph_hadamard_shapes_mismatch]
+message = "operator {op} requires identical operand shapes"
+help = "use `↦` to reshape the operands to identical shapes before applying {op}"
+
+[diagnostics.SEM011.issues.glyph_transpose_operands_unsupported]
+message = "ᵀ applies only to tensor values"
+help = "apply ᵀ to a tensor value"
+
+[diagnostics.SEM011.issues.glyph_transpose_rank1_no_row_column_distinction]
+message = "rank-1 transpose has no row/column distinction"
+help = "rank-1 transpose is permanently declined because it has no row/column distinction"
+
+[diagnostics.SEM011.issues.glyph_transpose_static_rank_required]
+message = "ᵀ requires a statically known rank-2 tensor"
+help = "give ᵀ a statically known rank-2 tensor; shape-generic transpose is not admitted in v1"
+
+[diagnostics.SEM011.issues.glyph_transpose_suffix_takes_no_arguments]
+message = "the ᵀ suffix takes no arguments"
+help = "write ᵀ directly after the tensor; the suffix takes no arguments"
+
+[diagnostics.SEM011.issues.nucleum_fragment_context]
+message = "@ {nucleum} {fragment} call is not legal in this context{?reason| (|)}"
+help = "call an @ {nucleum} {fragment} only from an @ {nucleum} entry or another {fragment}"
+
+[diagnostics.SEM011.issues.nucleum_fragment_effect]
+message = "@ {nucleum} {fragment} effect is not device-safe{?reason|: |}"
+help = "keep the body to scalar/tensor ops, structured control flow, locals, and device-safe argument I/O"
+
+[diagnostics.SEM011.issues.nucleum_fragment_type]
+message = "@ {nucleum} {fragment} call does not match the specialized signature{?reason| (|)}"
+help = "pass arguments whose specialized types, shapes, layouts, and modes match the {fragment} parameters"
+
+[diagnostics.SEM011.issues.nucleum_fragment_cycle]
+message = "@ {nucleum} {fragment} call cycle{?cycle|: |}{?chain|: |}"
+help = "remove the recursive {fragment} call; composition requires an acyclic call graph"
+
+[diagnostics.SEM011.issues.nucleum_fragment_expansion]
+message = "@ {nucleum} {fragment} expansion exceeds the documented budget{?reason| (|)}"
+help = "keep the composed {fragment} expansion inside the documented budget"
 
 [diagnostics.SEM010.issues.call_default_type_mismatch]
 message = "'⊥' default does not match the call's success type"
@@ -2799,6 +2919,14 @@ help = "ensure built-in frame types are registered before typechecking"
 message = "vacua requires an explicit declared type"
 help = "add a declared collection type for vacua"
 
+[diagnostics.SEM014.issues.bounded_capacity_unsolved]
+message = "bounded capacity could not be inferred"
+help = "write a concrete N ({ascii}<8>) or give the hole a bounded witness"
+
+[diagnostics.SEM014.issues.marker_width_unsolved]
+message = "numeric width marker could not be inferred"
+help = "write a concrete marker (i32) or give the hole a same-family witness"
+
 [diagnostics.SEM015]
 message = "invalid cast"
 help = "cast to a compatible type"
@@ -3043,6 +3171,14 @@ help = "expand spread elements before tensor conversion"
 message = "rectangular {lista} literal conversio requires literal leaf elements"
 help = "use literal scalar leaves in the nested {lista}"
 
+[diagnostics.SEM016.issues.bivalens_recovery_unsupported]
+message = "a conversion to {bivalens} cannot fail, so it takes no `⊥` default"
+help = "remove the recovery arm; use the truthiness result directly"
+
+[diagnostics.SEM016.issues.regex_pattern_too_long]
+message = "regex literal pattern is {length} bytes; the maximum is {max}"
+help = "shorten the literal pattern or build it dynamically"
+
 [diagnostics.SEM017]
 message = "unavailable declaration"
 help = "use an available declaration or implement the marked surface"
@@ -3170,6 +3306,58 @@ help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"h
 [diagnostics.SEM018.issues.commune_on_non_union]
 message = "`@ commune` is only valid on union shared fields"
 help = "declare shared fields in a union `@ commune` region"
+
+[diagnostics.SEM018.issues.annotatio_misplaced]
+message = "`@ annotatio` is only valid immediately before a {genus} declaration{?placement|, not on |}"
+help = "write `@ annotatio` with a braced payload that sets target to {functio}, immediately before a {genus} declaration"
+
+[diagnostics.SEM018.issues.annotatio_invalid_marker]
+message = "invalid `@ annotatio` marker{?detail|: |}"
+help = "write `@ annotatio` with a braced payload that sets target to {functio}, immediately before a {genus} declaration"
+
+[diagnostics.SEM018.issues.annotatio_duplicate_marker]
+message = "a {genus} declares `@ annotatio` more than once"
+help = "write `@ annotatio` with a braced payload that sets target to {functio}, immediately before a {genus} declaration"
+
+[diagnostics.SEM018.issues.annotatio_unknown_target]
+message = "unknown `@ annotatio` target{?target|: |}"
+help = "use `target = {functio}` in v1"
+
+[diagnostics.SEM018.issues.annotatio_invalid_field_type]
+message = "annotation contract field `{field}` must have a scalar type"
+help = "declare scalar fields only: `{textus} name`, `{numerus} n`, `{fractus} f`, or `{bivalens} flag`"
+
+[diagnostics.SEM018.issues.annotatio_method_unsupported]
+message = "annotation contracts cannot declare methods{?method|: |}"
+help = "declare scalar fields only: `{textus} name`, `{numerus} n`, `{fractus} f`, or `{bivalens} flag`"
+
+[diagnostics.SEM018.issues.annotatio_unknown_contract]
+message = "unknown annotation contract `{name}`"
+help = "import or declare the contract {genus} with `@ annotatio` before applying it"
+
+[diagnostics.SEM018.issues.annotatio_not_a_contract]
+message = "`{name}` is not an annotation contract"
+help = "import or declare the contract {genus} with `@ annotatio` before applying it"
+
+[diagnostics.SEM018.issues.annotatio_unknown_field]
+message = "annotation contract{?contract| `|`} has no field `{field}`"
+help = "match the braced payload fields to the contract {genus} field schema"
+
+[diagnostics.SEM018.issues.annotatio_duplicate_field]
+message = "field `{field}` is given more than once in the annotation payload"
+help = "match the braced payload fields to the contract {genus} field schema"
+
+[diagnostics.SEM018.issues.annotatio_missing_field]
+message = "annotation contract{?contract| `|`} requires field `{field}`"
+help = "match the braced payload fields to the contract {genus} field schema"
+
+[diagnostics.SEM018.issues.annotatio_invalid_payload]
+message = "annotation field `{field}` has an invalid payload; expected {expected}"
+help = "use a string, number, boolean, or `{nulla}` literal matching the field type"
+
+[diagnostics.SEM018.issues.annotatio_invalid_attachment]
+message = "this annotation contract attaches only to `{expected}` declarations"
+help = "apply this contract only to {functio} declarations"
 
 [diagnostics.SEM019]
 message = "conflicting visibility annotations"
@@ -3589,6 +3777,10 @@ help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lan
 
 [diagnostics.SEM059.issues.tacet]
 message = "@ radix lane \"{lane}\" rejects this function body: `tacet` is outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.summa_expression_unsupported]
+message = "@ radix lane \"{lane}\" rejects this function body: the {summa} reduce expression is outside the v1 AIR subset by design (device admission only)"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
 [diagnostics.SEM060]

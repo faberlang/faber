@@ -17,59 +17,6 @@ use std::collections::BTreeSet;
 const SEMANTIC_CATALOG: &str = include_str!("../../radix-semantic/src/catalog_semantic.rs");
 const SYNTAX_CATALOG: &str = include_str!("../../radix-semantic/src/catalog_syntax.rs");
 
-/// 47 issue keys already selected by the semantic catalog but absent from the
-/// en and la packs. These are known gaps, tracked by pk1; adding one to this
-/// list is the only way to accept catalog debt, so a new missing key fails.
-const KNOWN_MISSING_CATALOG_ISSUES: &[&str] = &[
-    "annotatio_duplicate_field",
-    "annotatio_duplicate_marker",
-    "annotatio_invalid_attachment",
-    "annotatio_invalid_field_type",
-    "annotatio_invalid_marker",
-    "annotatio_invalid_payload",
-    "annotatio_method_unsupported",
-    "annotatio_misplaced",
-    "annotatio_missing_field",
-    "annotatio_not_a_contract",
-    "annotatio_unknown_contract",
-    "annotatio_unknown_field",
-    "annotatio_unknown_target",
-    "bivalens_recovery_unsupported",
-    "bounded_capacity_unsolved",
-    "decimal_literal_out_of_range",
-    "explicit_union_type_arg_unsupported",
-    "glyph_cross_width_mismatch",
-    "glyph_cross_width_three_required",
-    "glyph_element_type_mismatch",
-    "glyph_hadamard_shapes_mismatch",
-    "glyph_inner_dim_mismatch",
-    "glyph_op_numeric_element_required",
-    "glyph_operands_unsupported",
-    "glyph_static_shape_required",
-    "glyph_transpose_operands_unsupported",
-    "glyph_transpose_rank1_no_row_column_distinction",
-    "glyph_transpose_static_rank_required",
-    "glyph_transpose_suffix_takes_no_arguments",
-    "intervallum_helper_bound_unsupported",
-    "marker_width_unsolved",
-    "modular_word_family_mismatch",
-    "modular_word_unsigned_width_required",
-    "modular_word_width_required",
-    "modular_word_width_shape",
-    "namespace_missing_export",
-    "nucleum_fragment_context",
-    "nucleum_fragment_cycle",
-    "nucleum_fragment_effect",
-    "nucleum_fragment_expansion",
-    "nucleum_fragment_type",
-    "regex_pattern_too_long",
-    "summa_expression_unsupported",
-    "textus_literal_too_long",
-    "unsupported_modular_word_width",
-    "unsupported_saturating_word_width",
-    "unsupported_trapping_word_width",
-];
-
 const INSTALLED_LOCALES: &[&str] = &["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"];
 const SEM008_ISSUES: &[&str] = &["callable_posture_conflict", "comment_without_owner"];
 
@@ -235,18 +182,11 @@ fn installed_issue_row_has_message_and_help(locale: &str, issue: &str) -> bool {
 }
 
 #[test]
-fn en_and_la_cover_catalog_issue_keys_except_the_pinned_gap_list() {
-    assert_eq!(KNOWN_MISSING_CATALOG_ISSUES.len(), 47);
-
+fn en_and_la_cover_every_catalog_issue_key() {
     let mut catalog_issues = catalog_issue_keys(SEMANTIC_CATALOG);
     catalog_issues.extend(catalog_issue_keys(SYNTAX_CATALOG));
     catalog_issues.insert(radix_lexer::HOMOGLYPH_ISSUE.to_owned());
     catalog_issues.extend(SEM008_ISSUES.iter().map(|issue| (*issue).to_owned()));
-
-    let known_missing: BTreeSet<String> = KNOWN_MISSING_CATALOG_ISSUES
-        .iter()
-        .map(|issue| (*issue).to_owned())
-        .collect();
 
     let en = owned_installed_pack("en");
     let la = owned_installed_pack("la");
@@ -257,13 +197,10 @@ fn en_and_la_cover_catalog_issue_keys_except_the_pinned_gap_list() {
             .filter(|issue| !present.contains(*issue))
             .cloned()
             .collect();
-        assert_eq!(
-            missing, known_missing,
-            "{locale} catalog issue gaps changed; new gaps fail until a pack row is added, and closed gaps must be removed from the known list"
-        );
+        assert!(missing.is_empty(), "{locale} pack has no row for catalog issues: {missing:?}");
     }
 
-    for issue in catalog_issues.difference(&known_missing) {
+    for issue in &catalog_issues {
         assert_eq!(
             issue_families(&en, issue),
             issue_families(&la, issue),
