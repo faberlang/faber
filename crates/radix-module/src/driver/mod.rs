@@ -1227,8 +1227,10 @@ fn emit_wgsl_vertex_source_output(
     )
     .map_err(wgsl_vertex_abi_error)?;
     let vertex_with_varyings = crate::mir::MirKernelReflection { varyings, ..vertex };
-    let source =
-        crate::mir::emit_wgsl_vertex_entry_contract(&vertex_with_varyings, vertex_mir, mir_validation, mir_interner)?;
+    let source = crate::mir::emit_wgsl_vertex_entry_contract(
+        &vertex_with_varyings,
+        &crate::mir::WgslEntryContext::with_body(vertex_mir, mir_validation, mir_interner),
+    )?;
     Ok(crate::mir::MirWgslTextProbeOutput {
         source,
         reflection: crate::mir::MirGpuReflection { kernels: vec![vertex_with_varyings], pipeline: None },
@@ -1275,7 +1277,10 @@ fn emit_wgsl_fragment_source_output(
         resources,
     )
     .map_err(wgsl_vertex_abi_error)?;
-    let source = crate::mir::emit_wgsl_fragment_entry_contract(&fragment, fragment_mir, mir_validation, mir_interner)?;
+    let source = crate::mir::emit_wgsl_fragment_entry_contract(
+        &fragment,
+        &crate::mir::WgslEntryContext::with_body(fragment_mir, mir_validation, mir_interner),
+    )?;
     Ok(crate::mir::MirWgslTextProbeOutput {
         source,
         reflection: crate::mir::MirGpuReflection { kernels: vec![fragment], pipeline: None },
