@@ -2167,17 +2167,6 @@ pub(super) fn rewrite_expr(
                 );
             }
         }
-        HirExpressionKind::Widen { operand, .. } => {
-            rewrite_expr(
-                unit_path,
-                operand,
-                interner,
-                targets,
-                data_member_targets,
-                namespaces,
-                diagnostics,
-            );
-        }
         HirExpressionKind::Ad { opener, .. } => {
             if let Some(opener) = opener {
                 rewrite_expr(
@@ -2191,7 +2180,9 @@ pub(super) fn rewrite_expr(
                 );
             }
         }
-        HirExpressionKind::Ref(_, inner) | HirExpressionKind::Deref(inner) => {
+        HirExpressionKind::Ref(_, inner)
+        | HirExpressionKind::Deref(inner)
+        | HirExpressionKind::Widen { operand: inner, .. } => {
             rewrite_expr(
                 unit_path,
                 inner,
