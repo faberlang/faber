@@ -2138,6 +2138,69 @@ fn every_installed_pack_renders_fac_cape_after_dum() {
     }
 }
 
+/// Assert every installed pack owns `code.issue` and renders it with its own
+/// spellings of the named keyword identities.
+fn assert_every_installed_pack_renders_issue(kind: ParseErrorKind, code: &str, issue: &str, keywords: &[&str]) {
+    for locale in ["la", "en", "th-TH", "zh-Hans", "zh-Hant", "ar", "hi", "vi"] {
+        assert_issue_template(&owned_pack(locale), code, issue);
+        let pack = installed_pack(locale);
+        let diagnostic = parse_diagnostic(kind, vec![diagnostic_arg("issue", issue)]);
+        let rendered = pack
+            .render_diagnostic_text(&diagnostic)
+            .unwrap_or_else(|err| panic!("{locale} template should render: {err:?}"))
+            .unwrap_or_else(|| panic!("{locale} {code} row should exist"));
+        assert!(!rendered.message.contains("missing row"), "{locale}: {}", rendered.message);
+        for keyword in keywords {
+            let spelling = &pack.keywords.get(*keyword).expect("keyword row").canonical;
+            assert!(
+                rendered.message.contains(spelling.as_str())
+                    || rendered
+                        .help
+                        .as_deref()
+                        .is_some_and(|help| help.contains(spelling.as_str())),
+                "{locale} {issue} must name `{spelling}`: {}",
+                rendered.message
+            );
+        }
+    }
+}
+
+/// A comma between `discerne` subjects reports PARSE020
+/// `discerne_subject_comma_retired` and names the pack's own `et`.
+#[test]
+fn every_installed_pack_renders_discerne_subject_comma_retired() {
+    assert_every_installed_pack_renders_issue(
+        ParseErrorKind::StatementInvalid,
+        "PARSE020",
+        "discerne_subject_comma_retired",
+        &["discerne", "et"],
+    );
+}
+
+/// A `discerne` subject that is not a name or member path reports PARSE020
+/// `discerne_subject_not_path` in every pack.
+#[test]
+fn every_installed_pack_renders_discerne_subject_not_path() {
+    assert_every_installed_pack_renders_issue(
+        ParseErrorKind::StatementInvalid,
+        "PARSE020",
+        "discerne_subject_not_path",
+        &["discerne"],
+    );
+}
+
+/// A comma between arm patterns reports PARSE023
+/// `discerne_pattern_comma_retired` and names the pack's own `et`.
+#[test]
+fn every_installed_pack_renders_discerne_pattern_comma_retired() {
+    assert_every_installed_pack_renders_issue(
+        ParseErrorKind::PatternInvalid,
+        "PARSE023",
+        "discerne_pattern_comma_retired",
+        &["casu", "et"],
+    );
+}
+
 fn suggestion_candidate(file: &str, spelling: &str, suggestion: &str, span: Span) -> Diagnostic {
     Diagnostic::from_locale_suggestion(
         file,

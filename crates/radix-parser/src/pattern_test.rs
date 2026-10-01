@@ -185,7 +185,7 @@ fn discerne_patterns(result: &crate::ParseResult) -> &[Pattern] {
 fn leading_minus_before_a_number_is_a_negated_literal_pattern() {
     // D22.2: the lexer never produces a signed number, so the pattern parser
     // owns the sign for integer, decimal, and infinity literals.
-    let result = parse_ok("discerne n {\n    casu -1, -2.5, -∞ { tacet }\n}");
+    let result = parse_ok("discerne n {\n    casu -1 et -2.5 et -∞ { tacet }\n}");
     let patterns = discerne_patterns(&result);
     assert_eq!(patterns.len(), 3);
     assert!(matches!(
@@ -235,7 +235,8 @@ fn or_alternative_arm_parses_as_one_pattern() {
 
 #[test]
 fn or_alternative_arm_accepts_negated_literals_and_subject_separators() {
-    let result = parse_ok("discerne left, right {\n    casu -1 aut -2, -3 aut -4 ergo tacet\n}");
+    let result =
+        parse_ok("discerne left et right {\n    casu -1 aut -2 et -3 aut -4 ergo tacet\n}");
     let patterns = discerne_patterns(&result);
     assert_eq!(patterns.len(), 2);
     assert!(matches!(patterns[0], Pattern::Or(ref alternatives) if alternatives.len() == 2));

@@ -580,6 +580,14 @@ help = "ใช้ {replacement}"
 message = "ในลูป '{fac}' ต้องเขียน '{cape}' ก่อน '{dum}'"
 help = "เขียนตัวจัดการก่อนเงื่อนไข: {fac} … {cape} … {dum} …"
 
+[diagnostics.PARSE020.issues.discerne_subject_comma_retired]
+message = "เครื่องหมายจุลภาคไม่ใช้คั่นหัวข้อของ '{discerne}' อีกต่อไป"
+help = "คั่นหัวข้อด้วย '{et}'"
+
+[diagnostics.PARSE020.issues.discerne_subject_not_path]
+message = "หัวข้อของ '{discerne}' ต้องเป็นชื่อหรือเส้นทางสมาชิก"
+help = "ผูกค่ากับชื่อก่อน แล้วใช้ '{discerne}' กับชื่อนั้น"
+
 [diagnostics.PARSE021]
 message = "ขาดเงื่อนไข"
 help = "เพิ่มนิพจน์เงื่อนไข"
@@ -599,6 +607,10 @@ help = "ใช้ '∴' ระหว่างลายเซ็น clausura ก�
 [diagnostics.PARSE023]
 message = "ต้องมีแพตเทิร์น เช่น '{wildcard}' หรือ {identifier}"
 help = "ใช้ '{wildcard}', ลิเทอรัล หรือแพตเทิร์น {identifier}"
+
+[diagnostics.PARSE023.issues.discerne_pattern_comma_retired]
+message = "เครื่องหมายจุลภาคไม่ใช้คั่นแพตเทิร์นของ '{casu}' อีกต่อไป"
+help = "คั่นแพตเทิร์นด้วย '{et}'"
 
 [diagnostics.PARSE024]
 message = "ต้องมีแขนง '{casu}' หรือค่าเริ่มต้น '{ceterum}'"

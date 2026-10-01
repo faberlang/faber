@@ -691,6 +691,14 @@ help = "use {replacement}"
 message = "'{cape}' must come before '{dum}' in a '{fac}' loop"
 help = "write the handler before the condition: {fac} … {cape} … {dum} …"
 
+[diagnostics.PARSE020.issues.discerne_subject_comma_retired]
+message = "comma iam non separat subiecta '{discerne}'"
+help = "separa subiecta per '{et}'"
+
+[diagnostics.PARSE020.issues.discerne_subject_not_path]
+message = "subiectum '{discerne}' nomen vel via membri esse debet"
+help = "liga valorem prius ad nomen, deinde '{discerne}' in illo nomine"
+
 [diagnostics.PARSE021]
 message = "missing condition"
 help = "add a condition expression"
@@ -710,6 +718,10 @@ help = "use '∴' between a closure signature and its body"
 [diagnostics.PARSE023]
 message = "expected pattern such as '{wildcard}' or {identifier}"
 help = "use '{wildcard}', a literal, or an {identifier} pattern"
+
+[diagnostics.PARSE023.issues.discerne_pattern_comma_retired]
+message = "comma iam non separat exempla '{casu}'"
+help = "separa exempla per '{et}'"
 
 [diagnostics.PARSE024]
 message = "expected '{casu}' arm or '{ceterum}' default"

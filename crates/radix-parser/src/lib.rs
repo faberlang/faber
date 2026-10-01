@@ -1547,6 +1547,10 @@ mod region_decl_test;
 mod static_decl_test;
 
 #[cfg(test)]
+#[path = "discerne_separator_test.rs"]
+mod discerne_separator_test;
+
+#[cfg(test)]
 #[path = "module_constant_test.rs"]
 mod module_constant_test;
 

@@ -9,6 +9,12 @@ use crate::test_support::{parse_ok, parse_program};
 
 const CS1_ROWS: u8 = 37;
 
+/// Rows 33 (`discerne` subjects) and 36 (arm-head patterns) are no longer
+/// comma-law positions: `et` is the only separator there and a comma is the
+/// named migration diagnostic (`discerne_subject_comma_retired`,
+/// `discerne_pattern_comma_retired`, pinned in `discerne_separator_test.rs`).
+const RETIRED_ROWS: [u8; 2] = [33, 36];
+
 #[derive(Clone, Copy, Debug)]
 enum Expect {
     Accept,
@@ -388,18 +394,6 @@ functio f() → vacuum { }"#,
         "figura_dimensions",
         "functio f(tensor<f32, [2 3]> value) → vacuum { }",
     ),
-    // 33. discerne subjects
-    accept(33, "discerne left, right { casu _, _ { } }"),
-    trailing(
-        33,
-        "discerne_subjects",
-        "discerne left, right, { casu _, _ { } }",
-    ),
-    missing(
-        33,
-        "discerne_subjects",
-        "discerne left right { casu _, _ { } }",
-    ),
     // 34. scribe/vide/mone/nota args
     accept(34, "incipit { nota 1, 2 }"),
     trailing(34, "scribe_arguments", "incipit { nota 1, 2, }"),
@@ -409,10 +403,6 @@ functio f() → vacuum { }"#,
     trailing(35, "extract_fields", "ex source varia nomen, aetas,"),
     missing(35, "extract_fields", "ex source varia nomen aetas"),
     trailing(35, "extract_fields", "ex source varia nomen, ceteri rest,"),
-    // 36. arm-head patterns
-    accept(36, "discerne event { casu a, b { } }"),
-    trailing(36, "pattern_list", "discerne event { casu a, b, { } }"),
-    missing(36, "pattern_list", "discerne event { casu a b { } }"),
     // 37. pattern bindings
     accept(37, "discerne event { casu Ok fixum payload, error { } }"),
     trailing(
@@ -433,8 +423,8 @@ fn comma_law_matrix_covers_every_cs1_parser_site() {
     let mut saw_reject = [false; CS1_ROWS as usize + 1];
     for case in CASES {
         assert!(
-            (1..=CS1_ROWS).contains(&case.row),
-            "case row {} is outside CS-1 inventory 1..={CS1_ROWS}",
+            (1..=CS1_ROWS).contains(&case.row) && !RETIRED_ROWS.contains(&case.row),
+            "case row {} is outside the live CS-1 inventory 1..={CS1_ROWS}",
             case.row
         );
         match case.expect {
@@ -446,7 +436,7 @@ fn comma_law_matrix_covers_every_cs1_parser_site() {
             | Expect::Rejected => saw_reject[usize::from(case.row)] = true,
         }
     }
-    for row in 1..=CS1_ROWS {
+    for row in (1..=CS1_ROWS).filter(|row| !RETIRED_ROWS.contains(row)) {
         assert!(
             saw_accept[usize::from(row)],
             "CS-1 row {row} is missing an accept case"

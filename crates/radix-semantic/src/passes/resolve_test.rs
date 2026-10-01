@@ -1544,7 +1544,7 @@ fn type_alias_union_spellings_with_and_without_alias_member_are_equal() {
 #[test]
 fn reports_non_variant_pattern() {
     compile_and_expect(
-        "ordo MyEnum { Red }\n functio NotAVariant() → vacuum {}\n discerne 1 { casu MyEnum.NotAVariant {} }",
+        "ordo MyEnum { Red }\n functio NotAVariant() → vacuum {}\n incipit { fixum numerus subject ← 1\n discerne subject { casu MyEnum.NotAVariant {} } }",
         "SEM001",
         "name_not_variant",
     );
@@ -1553,7 +1553,7 @@ fn reports_non_variant_pattern() {
 #[test]
 fn reports_unknown_variant_with_structured_event() {
     compile_and_expect(
-        "ordo MyEnum { Red, Green }\n discerne 1 { casu MyEnum.Missing {} }",
+        "ordo MyEnum { Red, Green }\n incipit { fixum numerus subject ← 1\n discerne subject { casu MyEnum.Missing {} } }",
         "SEM001",
         "unknown_variant",
     );
@@ -1581,7 +1581,9 @@ fn resolves_qualified_variant_through_parent_despite_local_shadow() {
 
 #[test]
 fn allows_variant_patterns_from_collected_enum() {
-    let result = compile_ok("ordo Color { Red, Green }\n discerne 1 { casu Color.Red {} }");
+    let result = compile_ok(
+        "ordo Color { Red, Green }\n incipit { fixum numerus subject ← 1\n discerne subject { casu Color.Red {} } }",
+    );
     assert!(
         result.is_ok(),
         "enum variant pattern should resolve: {:?}",

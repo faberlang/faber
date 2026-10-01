@@ -126,16 +126,18 @@ const CS1_ROWS: &[(&str, &str)] = &[
     ("types.rs:242 named type parameters", "pin"),
     ("types.rs:339 function-type parameters", "pin"),
     ("types.rs:526 figura dimensions", "pin"),
-    ("stmt.rs:264 discerne subjects", "pin"),
     ("stmt.rs:614 scribe arguments", "pin"),
     ("stmt.rs:760 ex destructure fields", "verified-note"),
-    ("pattern.rs:37 arm-head patterns", "pin"),
     ("pattern.rs:140 pattern bindings", "pin"),
 ];
 
 #[test]
 fn cs1_every_position_has_an_emitter_pin_or_verified_note() {
-    assert_eq!(CS1_ROWS.len(), 37, "CS-1 census rows must stay exhaustive");
+    assert_eq!(
+        CS1_ROWS.len(),
+        35,
+        "CS-1 census rows must stay exhaustive (discerne subjects and arm patterns are `et` lists, no longer comma-law rows)"
+    );
     for (position, disposition) in CS1_ROWS {
         assert!(
             *disposition == "pin" || *disposition == "verified-note",
@@ -153,7 +155,7 @@ fn cs1_every_position_has_an_emitter_pin_or_verified_note() {
     assert_eq!(CS1_ROWS[3].1, "verified-note");
     assert_eq!(CS1_ROWS[9].1, "verified-note");
     assert_eq!(CS1_ROWS[11].1, "verified-note");
-    assert_eq!(CS1_ROWS[34].1, "verified-note");
+    assert_eq!(CS1_ROWS[33].1, "verified-note");
 }
 
 fn span() -> Span {
@@ -567,7 +569,7 @@ fn expression_item_lists_emit_between_only() {
         span: span(),
     };
     let discerne_output = render_expr(&FaberCodegen::new(&types, &interner), &discerne);
-    assert!(discerne_output.starts_with("discerne 1, 2, 3 {"));
+    assert!(discerne_output.starts_with("discerne 1 et 2 et 3 {"));
 
     for output in [
         "0 ∇ [1, 2, 3]",
@@ -922,8 +924,45 @@ fn pattern_positions_pin_between_only_and_no_trailing() {
     let mut writer = CodeWriter::new();
     codegen.write_match_arms(&[arm], false, &names, &TestSurface, &mut writer);
     let arm_output = writer.finish();
-    assert!(arm_output.contains("casu r, g, b {"));
+    assert!(arm_output.contains("casu r et g et b {"));
     assert_no_trailing_separator(&arm_output);
+}
+
+#[test]
+fn multi_subject_arm_separates_patterns_with_et_and_keeps_binding_commas() {
+    let mut interner = Interner::new();
+    let types = TypeTable::new();
+    let names = FxHashMap::default();
+    let arm = HirCasuArm {
+        patterns: vec![
+            HirPattern::Variant(
+                DefId(10),
+                vec![HirPattern::Binding(DefId(1), interner.intern("r"))],
+            ),
+            HirPattern::Variant(
+                DefId(11),
+                vec![
+                    HirPattern::Binding(DefId(2), interner.intern("a")),
+                    HirPattern::Binding(DefId(3), interner.intern("b")),
+                ],
+            ),
+        ],
+        body: int(&interner, 1),
+        span: span(),
+    };
+    let mut writer = CodeWriter::new();
+    FaberCodegen::new(&types, &interner).write_match_arms(
+        &[arm],
+        false,
+        &names,
+        &TestSurface,
+        &mut writer,
+    );
+    assert!(
+        writer
+            .finish()
+            .contains("casu def_10 fixum r et def_11 fixum a, b {")
+    );
 }
 
 #[test]

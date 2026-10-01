@@ -580,6 +580,14 @@ help = "使用 {replacement}"
 message = "在 '{fac}' 迴圈中，'{cape}' 必須位於 '{dum}' 之前"
 help = "將處理器寫在條件之前：{fac} … {cape} … {dum} …"
 
+[diagnostics.PARSE020.issues.discerne_subject_comma_retired]
+message = "逗號不再用於分隔 '{discerne}' 的主體"
+help = "用 '{et}' 分隔主體"
+
+[diagnostics.PARSE020.issues.discerne_subject_not_path]
+message = "'{discerne}' 的主體必須是名稱或成員路徑"
+help = "先將該值綁定到一個名稱，再對該名稱使用 '{discerne}'"
+
 [diagnostics.PARSE021]
 message = "缺少條件"
 help = "加入條件運算式"
@@ -599,6 +607,10 @@ help = "在閉包簽章與其主體之間使用 '∴'"
 [diagnostics.PARSE023]
 message = "需要類似 '{wildcard}' 或 {identifier} 的模式"
 help = "使用 '{wildcard}'、字面值或 {identifier} 模式"
+
+[diagnostics.PARSE023.issues.discerne_pattern_comma_retired]
+message = "逗號不再用於分隔 '{casu}' 的模式"
+help = "用 '{et}' 分隔模式"
 
 [diagnostics.PARSE024]
 message = "需要 '{casu}' 分支或 '{ceterum}' 預設分支"

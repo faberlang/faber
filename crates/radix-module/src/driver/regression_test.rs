@@ -137,8 +137,8 @@ fn discerne_alias_and_multi_subject_roundtrip_through_faber_codegen() {
 }
 
 functio compare(Res left, Res right) → vacuum {
-  discerne left, right {
-    casu Click ut l, Quit ut r {
+  discerne left et right {
+    casu Click ut l et Quit ut r {
       nota l
       nota r
     }
@@ -148,8 +148,8 @@ functio compare(Res left, Res right) → vacuum {
   }
 }"#;
     let output = super::faber_roundtrip(source);
-    assert!(output.contains("discerne left, right"));
-    assert!(output.contains("casu Click ut l, Quit ut r"));
+    assert!(output.contains("discerne left et right"));
+    assert!(output.contains("casu Click ut l et Quit ut r"));
 }
 
 #[test]

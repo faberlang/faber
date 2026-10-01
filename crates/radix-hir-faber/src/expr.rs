@@ -480,7 +480,9 @@ impl super::FaberCodegen<'_> {
                 writer.write(" ");
                 for (idx, scrutinee) in scrutinees.iter().enumerate() {
                     if idx > 0 {
-                        writer.write(", ");
+                        writer.write(" ");
+                        writer.write(surface.contextual_keyword("et"));
+                        writer.write(" ");
                     }
                     self.write_expr(scrutinee, names, surface, writer);
                 }

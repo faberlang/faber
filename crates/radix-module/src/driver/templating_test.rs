@@ -247,7 +247,8 @@ fn octeti_literal_rejects_template_application() {
 fn octeti_literal_matches_in_discerne_pattern() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
-  discerne |deadbeef| {
+  fixum _ bytes ← |deadbeef|
+  discerne bytes {
     casu |deadbeef| ergo nota "hit"
     casu |00| ergo nota "miss"
     ceterum ergo nota "other"

@@ -8,8 +8,9 @@
 //! The parser records syntactic pattern intent and leaves type-aware matching,
 //! variant resolution, and exhaustiveness to later phases.
 //!
-//! - `,` and `et` separate patterns, but body-starting tokens stop the pattern
-//!   list so `ergo` and `{` remain statement-body syntax.
+//! - `et` separates patterns (a comma is a named migration diagnostic), and
+//!   body-starting tokens stop the pattern list so `ergo` and `{` remain
+//!   statement-body syntax.
 //! - Pattern literals are parsed independently from expression literals because
 //!   this context accepts constants, not operators or calls.
 //! - `fixum` and `varia` in pattern binds describe captured binding mutability;
@@ -25,25 +26,33 @@ impl Parser {
     /// Parse one or more arm-head patterns.
     ///
     /// GRAMMAR:
-    ///   patterns := pattern (',' pattern | `et` pattern)*
+    ///   patterns := pattern (`et` pattern)*
     ///   pattern := `pattern_atom` (`aut` `pattern_atom`)*
     ///
-    /// Both comma and `et` are accepted as subject-pattern separators. `aut`
-    /// groups alternatives for one subject into a single AST node. The parser
-    /// stops before `{` or `ergo` so the arm body is not consumed as another
-    /// pattern.
+    /// `et` is the only subject-pattern separator. A comma is the retired
+    /// separator: it is reported once per arm head (`discerne_pattern_comma_retired`)
+    /// and read as `et`. `aut` groups alternatives for one subject into a
+    /// single AST node. The parser stops before `{` or `ergo` so the arm body
+    /// is not consumed as another pattern.
     pub(super) fn parse_patterns(&mut self) -> Result<Vec<Pattern>, ParseError> {
         let mut patterns = Vec::new();
+        let mut comma_reported = false;
 
         loop {
             patterns.push(self.parse_pattern()?);
             if self.eat(&TokenKind::Comma) {
-                let comma_span = self.previous_span();
+                if !comma_reported {
+                    comma_reported = true;
+                    self.errors.push(
+                        ParseError::structured(
+                            ParseErrorKind::PatternInvalid,
+                            self.previous_span(),
+                        )
+                        .with_arg("issue", "discerne_pattern_comma_retired"),
+                    );
+                }
                 if self.check(&TokenKind::LBrace) || self.check_keyword_ident(TokenKind::Ergo) {
-                    return Err(ParseError::structured(ParseErrorKind::Expected, comma_span)
-                        .with_arg("issue", "item_list_trailing_comma")
-                        .with_arg("family", "item_list")
-                        .with_arg("position", "pattern_list"));
+                    break;
                 }
                 continue;
             }
@@ -58,7 +67,7 @@ impl Parser {
                     .with_arg("issue", "item_list_missing_separator")
                     .with_arg("family", "item_list")
                     .with_arg("position", "pattern_list")
-                    .with_arg("expected", "comma between patterns"),
+                    .with_arg("expected", "et between patterns"),
             );
         }
 
@@ -188,6 +197,12 @@ impl Parser {
                 None
             };
             bindings.push(ExField { name, alias });
+            // L-2: a comma stays a binding comma, except where the next two
+            // words are a name and `fixum`/`varia` — that is the retired
+            // pattern comma, handled by `parse_patterns`.
+            if self.check(&TokenKind::Comma) && self.comma_starts_next_pattern() {
+                break;
+            }
             if self.eat(&TokenKind::Comma) {
                 let comma_span = self.previous_span();
                 if self.check(&TokenKind::LBrace)
@@ -217,6 +232,16 @@ impl Parser {
             );
         }
         Ok(bindings)
+    }
+
+    /// Whether the comma at the cursor is followed by a name and a binding
+    /// introducer (`, Name fixum`), which can only begin another pattern.
+    fn comma_starts_next_pattern(&self) -> bool {
+        matches!(self.peek_at(1).kind, TokenKind::Ident(_))
+            && matches!(
+                self.keyword_ident_at(2),
+                Some(TokenKind::Fixum | TokenKind::Varia)
+            )
     }
 
     /// Try to parse a literal pattern in arm-head context.
