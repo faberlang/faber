@@ -242,10 +242,7 @@ fn the_faber_reemitter_keeps_inf() {
 #[test]
 fn the_faber_reemitter_prints_nothing_for_an_implicit_widening() {
     let source = "fixum numerus<u64> u ← 5\nfixum inf w ← u\nnota w\n";
-    let result = compile_for_target_and_get_result(
-        &format!("incipit {{\n{source}}}\n"),
-        Target::HirFaber,
-    );
+    let result = compile_for_target_and_get_result(&format!("incipit {{\n{source}}}\n"), Target::HirFaber);
     assert_accepts(&result.diagnostics);
     let Some(crate::Output::Faber(output)) = result.output else {
         panic!("expected Faber output: {:?}", result.diagnostics);
