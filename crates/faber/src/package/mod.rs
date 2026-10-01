@@ -30,6 +30,7 @@
 #![allow(clippy::result_large_err)]
 
 pub mod binding;
+mod binding_manifest;
 #[cfg(feature = "hir-rust")]
 mod binding_probe;
 mod cargo;

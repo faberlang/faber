@@ -1,11 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
 use std::path::{Path, PathBuf};
 
+use radix::module::codegen::Target;
 use radix::module::diagnostics::{Diagnostic, DiagnosticPhase};
 use radix::module::driver::Config;
-use serde::Deserialize;
+use radix::module::hir::HirItemKind;
 
+use super::binding_manifest::{BindingManifest, read_binding_manifest};
 use super::{faber_analysis_seams, read_manifest, validate_manifest};
 use radix::program::analyze::AnalyzedProgram;
 use radix::program::discovery::resolve_source_root;
@@ -16,28 +17,6 @@ use radix::program::rust_target::render_binding_probe;
 
 #[cfg(feature = "hir-rust")]
 use super::binding_probe::run_rust_binding_probe;
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct BindingManifest {
-    #[serde(default)]
-    functions: BTreeMap<String, FunctionBinding>,
-
-    #[serde(default)]
-    shim: Option<ShimBinding>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct FunctionBinding {
-    symbol: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ShimBinding {
-    path: String,
-}
 
 #[derive(Debug, Clone, PartialEq)]
 struct BindingContract {
@@ -53,6 +32,7 @@ struct BindingContract {
 pub struct BindingVerification {
     pub declarations: usize,
     pub bindings: usize,
+    pub types: usize,
     pub shim: Option<PathBuf>,
 }
 
@@ -151,36 +131,61 @@ fn verify_library_bindings_with_probe_mode(
             library.provider.as_str()
         });
     let (package, declarations) = collect_binding_contracts(provider, package_root)?;
-    validate_bindings(&binding_path, &binding_manifest, &declarations)?;
-    let shim = validate_shim(package_root, &binding_path, &binding_manifest)?;
-    prove_rust_bindings(
-        target,
-        package_root,
+    let declared_types = collect_declared_types(provider, &package);
+    validate_bindings(
         &binding_path,
-        &target_config.dependencies,
-        shim.as_deref(),
         &binding_manifest,
         &declarations,
-        &package,
-        probe_mode,
+        &declared_types,
     )?;
+    let shim = validate_shim(package_root, &binding_path, &binding_manifest)?;
+    // The Rust ABI probe proves Rust symbols; a WGSL manifest binds opaque
+    // spellings, so shape validation above is the whole check for it.
+    if !is_wgsl_target(target) {
+        prove_rust_bindings(
+            target,
+            package_root,
+            &binding_path,
+            &target_config.dependencies,
+            shim.as_deref(),
+            &binding_manifest,
+            &declarations,
+            &package,
+            probe_mode,
+        )?;
+    }
 
     Ok(BindingVerification {
         declarations: declarations.len(),
         bindings: binding_manifest.functions.len(),
+        types: binding_manifest.types.len(),
         shim,
     })
 }
 
-fn read_binding_manifest(path: &Path) -> Result<BindingManifest, Vec<Diagnostic>> {
-    let source = fs::read_to_string(path).map_err(|err| vec![Diagnostic::io_error(path, &err)])?;
-    toml::from_str::<BindingManifest>(&source).map_err(|err| {
-        vec![
-            crate::package_diagnostic_error(format!("invalid binding manifest: {err}"))
-                .with_file(path.display().to_string())
-                .with_arg("issue", "invalid_binding_manifest"),
-        ]
-    })
+fn is_wgsl_target(target: &str) -> bool {
+    Target::from_spelling(target) == Some(Target::MirWgsl)
+}
+
+/// Route keys (`provider:module.Name`) of every exported struct, genus and
+/// enum item in the library.
+fn collect_declared_types(provider: &str, package: &AnalyzedProgram) -> BTreeSet<String> {
+    let mut types = BTreeSet::new();
+    for unit in package.nodes.values() {
+        let module = unit.module_segments.join("/");
+        for item in &unit.analysis.hir.items {
+            let name = match &item.kind {
+                HirItemKind::Struct(decl) => decl.name,
+                HirItemKind::Enum(decl) => decl.name,
+                _ => continue,
+            };
+            let name = unit.analysis.interner.resolve(name);
+            if unit.export_names.iter().any(|export| export == name) {
+                types.insert(format!("{provider}:{module}.{name}"));
+            }
+        }
+    }
+    types
 }
 
 fn collect_binding_contracts(
@@ -244,6 +249,7 @@ fn validate_bindings(
     path: &Path,
     manifest: &BindingManifest,
     declarations: &[BindingContract],
+    declared_types: &BTreeSet<String>,
 ) -> Result<(), Vec<Diagnostic>> {
     let declaration_keys = declarations
         .iter()
@@ -269,6 +275,23 @@ fn validate_bindings(
                 path,
                 format!("binding `{key}` does not match a Faber declaration"),
                 "binding_unknown_declaration",
+            ));
+        }
+    }
+
+    for (key, binding) in &manifest.types {
+        if binding.symbol.trim().is_empty() {
+            diagnostics.push(diagnostic(
+                path,
+                format!("type binding `{key}` has an empty target spelling"),
+                "binding_symbol_empty",
+            ));
+        }
+        if !declared_types.contains(key) {
+            diagnostics.push(diagnostic(
+                path,
+                format!("type binding `{key}` does not match an exported Faber type"),
+                "binding_unknown_type",
             ));
         }
     }
