@@ -74,3 +74,34 @@ fn formats_each_value_family() {
 fn a_spec_that_does_not_parse_is_an_internal_error() {
     assert!(format(MirConstant::Int(1), "%d").is_err());
 }
+
+fn decimal(value: &Value, spec: &str) -> String {
+    let width = Some(radix_types::NumericWidth::D64);
+    crate::runtime::format_value(value, spec, width, Span::default()).expect("decimal formats")
+}
+
+#[test]
+fn a_stored_decimal_formats_from_its_scale_8_carrier() {
+    // `12.5`, `0.25`, `0.35` stored as scale-8 carriers.
+    let p = Value::Int(1_250_000_000);
+    assert_eq!(decimal(&p, ".2"), "12.50");
+    assert_eq!(decimal(&Value::Int(25_000_000), ".1"), "0.2");
+    assert_eq!(decimal(&Value::Int(35_000_000), ".1"), "0.4");
+    assert_eq!(decimal(&p, ">8"), "    12.5");
+    assert_eq!(decimal(&p, ""), "12.5");
+}
+
+#[test]
+fn an_unstored_decimal_formats_exactly_at_its_own_scale() {
+    // `1.5 * 2.25` is exactly 3.375 at scale 3: the tie rounds to even.
+    assert_eq!(decimal(&Value::Dec(3375, 3), ".2"), "3.38");
+    assert_eq!(decimal(&Value::Dec(3125, 3), ".2"), "3.12");
+    assert_eq!(decimal(&Value::Dec(-3375, 3), ".2"), "-3.38");
+}
+
+#[test]
+fn an_integer_without_decimal_width_still_formats_as_an_integer() {
+    let value = Value::Int(1_250_000_000);
+    let text = crate::runtime::format_value(&value, ".2", None, Span::default()).expect("formats");
+    assert_eq!(text, "1250000000.00");
+}

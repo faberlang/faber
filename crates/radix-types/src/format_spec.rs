@@ -9,7 +9,9 @@
 //!
 //! Each subject accepts only the parts that make sense for it: integers take
 //! every part (precision pads, `42 ¶ ".2"` = `42.00`; `x b o e` kinds);
-//! floats take everything except the radix kinds; `textus` takes fill, align,
+//! floats take everything except the radix kinds; `d64` decimals take the
+//! float parts except any kind (exact digits, `.N` rounds half-even);
+//! `textus` takes fill, align,
 //! width and `.N` (truncate to N scalars); `instans` takes only the named
 //! presets `iso`, `date`, `time`.
 //!
@@ -124,7 +126,7 @@ pub enum FormatSubject {
     Text,
     /// `instans` of any precision.
     Instans,
-    /// Decimal `numerus<d64>`: display policy is held (fork F4).
+    /// Decimal `numerus<d64>`: exact digits, precision rounds half-even (F4).
     Decimal,
     /// Anything else; user types format through an ordinary function.
     Unsupported,
@@ -256,8 +258,8 @@ pub fn parse_format_spec(text: &str) -> Result<FormatSpec, FormatSpecError> {
 
 /// Check a parsed spec against its subject (pass 2, D2.2).
 ///
-/// `Decimal` and `Unsupported` subjects are the caller's to reject first;
-/// here they accept nothing.
+/// `Unsupported` subjects are the caller's to reject first; here they accept
+/// nothing.
 ///
 /// # Errors
 ///
@@ -305,9 +307,15 @@ pub fn validate_format_spec(
             }
             Ok(())
         }
-        FormatSubject::Instans | FormatSubject::Decimal | FormatSubject::Unsupported => {
-            Err(FormatSpecError::PresetRequired)
+        FormatSubject::Decimal => {
+            // Radix kinds are integer-only; the scientific kind on a decimal
+            // is its own later need, so every kind is rejected here.
+            if layout.kind.is_some() {
+                return reject(FormatSpecPart::Kind);
+            }
+            Ok(())
         }
+        FormatSubject::Instans | FormatSubject::Unsupported => Err(FormatSpecError::PresetRequired),
     }
 }
 
@@ -501,6 +509,75 @@ pub fn render_float(value: f64, spec: &LayoutSpec, display: impl FnOnce(f64) -> 
         (_, None) => display(magnitude),
     };
     finish(sign, &body, spec, FormatAlign::Right, true)
+}
+
+/// Render an exact decimal `carrier × 10^-scale` (`d64`, F4 ruling).
+///
+/// A spec prints exactly what it says: `.N` rounds the exact digits half-even
+/// to `N` fraction digits and pads with zeros when the value has fewer
+/// (`12.5 ¶ ".2"` = `12.50`); with no precision the shortest form prints
+/// (trailing fraction zeros dropped, `12.50` is `12.5`, `3.00` is `3`). Sign,
+/// zero, fill, align and width behave as for floats. The sign is the value's
+/// sign, so a negative value that rounds to zero prints `-0.0`, as a float
+/// does. The `kind` is validated away before rendering and is ignored here.
+#[must_use]
+pub fn render_decimal(carrier: i128, scale: u32, spec: &LayoutSpec) -> String {
+    let magnitude = carrier.unsigned_abs();
+    let digits = scale as usize;
+    let (whole, fraction) = match spec.precision {
+        None => {
+            let (whole, fraction) = split_fraction(magnitude, digits);
+            (whole, fraction.trim_end_matches('0').to_owned())
+        }
+        Some(p) if p >= digits => {
+            let (whole, mut fraction) = split_fraction(magnitude, digits);
+            fraction.push_str(&"0".repeat(p - digits));
+            (whole, fraction)
+        }
+        Some(p) => {
+            let rounded = round_half_even_pow10(magnitude, digits - p);
+            split_fraction(rounded, p)
+        }
+    };
+    let body = if fraction.is_empty() {
+        whole
+    } else {
+        format!("{whole}.{fraction}")
+    };
+    finish(
+        sign_of(carrier < 0, spec.plus),
+        &body,
+        spec,
+        FormatAlign::Right,
+        true,
+    )
+}
+
+/// The integer digits and the `digits` fraction digits of `magnitude × 10^-digits`.
+fn split_fraction(magnitude: u128, digits: usize) -> (String, String) {
+    let text = format!("{magnitude:0>width$}", width = digits + 1);
+    let (whole, fraction) = text.split_at(text.len() - digits);
+    (whole.to_owned(), fraction.to_owned())
+}
+
+/// `magnitude / 10^shift` rounded to the nearest integer, ties to even.
+fn round_half_even_pow10(magnitude: u128, shift: usize) -> u128 {
+    let Some(divisor) = u32::try_from(shift)
+        .ok()
+        .and_then(|shift| 10_u128.checked_pow(shift))
+    else {
+        // 10^shift exceeds every `u128`, so the quotient is zero and the
+        // remainder is below half of the divisor.
+        return 0;
+    };
+    let quotient = magnitude / divisor;
+    let remainder = magnitude % divisor;
+    let half = divisor / 2;
+    if remainder > half || (remainder == half && quotient % 2 == 1) {
+        quotient + 1
+    } else {
+        quotient
+    }
 }
 
 /// Render text: `.N` truncates to N scalars; width counts scalars (D2.7).

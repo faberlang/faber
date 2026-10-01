@@ -698,9 +698,6 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "format_type_unsupported" => {
             Some("¶ formats numbers, textus, and instans; write a function that returns textus".to_owned())
         }
-        "format_decimal_unsupported" => {
-            Some("convert the decimal with ↦ fractus or ↦ textus until decimal display is settled".to_owned())
-        }
         "octeti_index_must_be_numerus_or_range" => Some("index octeti with numerus or an integer range".to_owned()),
         "array_index_must_be_numerus" => Some("index lista values with numerus".to_owned()),
         "indexing_requires_array_or_map" => {

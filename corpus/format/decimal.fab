@@ -1,0 +1,46 @@
++++
+term = "¶"
+kind = "operator"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "format"
+summary = "Format operator on decimals: d64 prints its exact digits and .N rounds half-even."
+syntax = "<d64 value> ¶ \"[fill][align][sign][0][width][.precision]\""
+aliases = ["format"]
+related = ["scriptum", "textus", "d64"]
+locale = "en"
++++
+# =============================================================================
+# ¶ on d64 — exact decimal display (DECISIONS D2.6, fork F4)
+# =============================================================================
+#
+# What this teaches:
+#   • `value ¶ "spec"` takes a `d64` like any number: fill, align, sign, `0`,
+#     width and `.N` precision.
+#   • A spec prints exactly what it says: `.2` always shows two fraction
+#     digits (`12.5 ¶ ".2"` is `12.50`).
+#   • `.N` rounds the exact decimal digits half-even: a tie goes to the even
+#     neighbour (`0.25 ¶ ".1"` is `0.2`, `0.35 ¶ ".1"` is `0.4`).
+#   • An expression is formatted exactly before it is stored: `1.5 * 2.25` is
+#     exactly 3.375, so `.2` gives `3.38`.
+#   • Plain display keeps the shortest form: `12.5` stays `12.5`.
+#
+# Common mistakes:
+#   • A kind on a decimal (`p ¶ "x"`, `p ¶ "e"`) — a compile error, so `¶`
+#     itself never fails.
+#
+# See also: scriptum, textus
+# =============================================================================
+
+main {
+    const d64 p ← 12.5
+    const d64 t ← 0.25
+    const d64 u ← 0.35
+    const d64 a ← 1.5
+    const d64 b ← 2.25
+
+    print p ¶ ".2"
+    print t ¶ ".1"
+    print u ¶ ".1"
+    print a * b ¶ ".2"
+    print p ¶ ">8"
+}
