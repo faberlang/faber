@@ -22,7 +22,7 @@ use crate::paths::normalize_path;
 /// The compiler keeps package discovery separate from build layout discovery:
 /// this type describes the Faber source graph only, not the generated Cargo
 /// crate that may later be emitted under `target/faber/`.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PackageSpec {
     /// Directory containing `faber.toml`, or the legacy package root.
     pub package_root: PathBuf,

@@ -57,6 +57,7 @@ pub struct TypeId(pub u32);
 /// becomes available. It deliberately exposes structural [`Self::equals`] and
 /// [`Self::is_assignable`] helpers so callers do not need to know whether two
 /// equivalent shapes were allocated at the same index.
+#[derive(Clone)]
 pub struct TypeTable {
     types: Vec<Type>,
     /// Content-addressed index for O(1) [`Self::intern`] lookup (hash-cons).

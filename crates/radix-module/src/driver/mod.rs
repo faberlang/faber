@@ -2931,6 +2931,7 @@ pub struct PackageImportIdentities {
 /// resolver, annotation metadata, function effects, resolved uses, qualified
 /// identities, CLI entry, and diagnostics from one analysis stamp. Consumers
 /// must not mix fields across source modules or analysis runs.
+#[derive(Clone)]
 pub struct AnalyzedModule {
     /// Coherence stamp shared by every fact family on this unit.
     pub analysis_stamp: semantic::AnalysisStamp,

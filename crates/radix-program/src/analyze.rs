@@ -219,6 +219,7 @@ impl AnalyzedProgram {
 /// This is the program-node (the graph node, not a second analysis stamp).
 /// Path/entry/export/library-import metadata stays here; [`AnalyzedModule`]
 /// remains the module-coherent analysis.
+#[derive(Clone)]
 pub struct AnalyzedProgramNode {
     pub path: PathBuf,
     pub module_segments: Vec<String>,
