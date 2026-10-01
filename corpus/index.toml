@@ -2318,7 +2318,7 @@ category = "iteration"
 
 [[files]]
 path = "decimal/arithmetic.fab"
-term = "numerus<d64>"
+term = "d64 arithmetic"
 kind = "operator-group"
 category = "arithmetic"
 

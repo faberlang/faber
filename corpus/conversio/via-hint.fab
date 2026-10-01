@@ -60,9 +60,9 @@ main {
     const bytes raw ← |3c 00|
 
     # Endian unpack of an exact-width window.
-    const int<u16> little ← raw[0‥2] ↦ u16 via Le
+    const u16 little ← raw[0‥2] ↦ u16 via Le
     print little
-    const int<u16> big ← raw[0‥2] ↦ u16 via Be
+    const u16 big ← raw[0‥2] ↦ u16 via Be
     print big
 
     # A chain: parse hex text as u32, then widen the number to f64.

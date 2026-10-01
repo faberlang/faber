@@ -20,7 +20,7 @@ locale = "en"
 #   • Exact width — the window length must match the integer or float width (2 / 4 / 8).
 #
 # Common mistakes:
-#   • Omitting Be/Le — `bytes ↦ int<u32>` or `bytes ↦ float<f32>` stays rejected (endian unspecified).
+#   • Omitting Be/Le — `bytes ↦ u32` or `bytes ↦ f32` stays rejected (endian unspecified).
 #   • Using a short window — a 3-byte source does not pad.
 #
 # See also: ↦, octeti, int

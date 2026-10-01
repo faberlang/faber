@@ -33,22 +33,22 @@ locale = "en"
 
 # numerus-widening — the numeric model in seven short sections
 
-fn ducenti() → int<u8> {
+fn ducenti() → u8 {
     return 200
 }
 
 main {
-    const int<u8> a ← ducenti()
-    const int<u8> b ← ducenti()
+    const u8 a ← ducenti()
+    const u8 b ← ducenti()
 
     # 1. Range rule: the sum is exact, and fits an i16 slot.
     print a + b
-    const int<i16> wide ← a + b
+    const i16 wide ← a + b
     print wide
 
     # 2. Untyped constants take their range, so no operand needs a width.
     print -100 - 100
-    const int<i8> low ← -100
+    const i8 low ← -100
     print low - 100
 
     # 3. Floor division; the remainder takes the divisor's sign.
@@ -74,8 +74,8 @@ main {
     print a > -1
 
     # A trapping slot aborts on a value it cannot hold; 400 does not fit in `u8`:
-    #   const int<u8> bad ← a + b
+    #   const u8 bad ← a + b
     # u64 with a signed operand is a compile error; convert with `↦` first:
-    #   const int<u64> big ← 1
+    #   const u64 big ← 1
     #   print big + low
 }

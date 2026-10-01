@@ -4,18 +4,18 @@ kind = "existing-home"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "fixum_decl", "vel_expr", "vel_rhs", "cast_expr", "redde_stmt", "expr_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "nota_stmt", "expression", "literal"]
 category = "type"
 canonical = false
-summary = "byte (octetus) is the byte scalar, an exact alias of numerus<u8> and the element type of bytes (octeti)."
+summary = "byte (octetus) is the byte scalar, an exact alias of u8 and the element type of bytes (octeti)."
 syntax = "byte"
 related = ["octeti", "numerus", "lista"]
 locale = "en"
 +++
 # =============================================================================
-# byte — the byte scalar (Latin `octetus`), exactly numerus<u8>, the element of bytes.
+# byte — the byte scalar (Latin `octetus`), exactly u8, the element of bytes.
 # =============================================================================
 #
 # What this teaches:
-#   • Byte scalar type — `byte` is an exact alias of `int<u8>`, the element type of `bytes`.
-#   • Identity — `bytes` is exactly `list<byte>`; a `byte` and an `int<u8>` are one type.
+#   • Byte scalar type — `byte` is an exact alias of `u8`, the element type of `bytes`.
+#   • Identity — `bytes` is exactly `list<byte>`; a `byte` and an `u8` are one type.
 #
 # Common mistakes:
 #   • Confusing byte (one scalar) with bytes (the buffer) — bytes is list<byte>.
@@ -23,25 +23,25 @@ locale = "en"
 # See also: octeti, numerus, lista
 # =============================================================================
 
-# byte - byte scalar (int<u8>), D10.4
+# byte - byte scalar (u8), D10.4
 
 fn describe(bytes buf) → int {
     return buf.length()
 }
 
 fn firstByte(bytes buf) → byte {
-    const byte b ← buf.get(0) coalesce 0 ∷ int<u8>
+    const byte b ← buf.get(0) coalesce 0 ∷ u8
     return b
 }
 
 main {
     var bytes sig ← |de ad be ef|
-    const int<u8> b ← 0x80 ∷ int<u8>
+    const u8 b ← 0x80 ∷ u8
     sig.append(b)
     print describe(sig)
     const byte first ← firstByte(sig)
     print first
-    const int<u8> raw ← b
-    const int<u8> back ← raw
+    const u8 raw ← b
+    const u8 back ← raw
     print back
 }

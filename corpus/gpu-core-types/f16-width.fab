@@ -3,21 +3,21 @@ term = "f16"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "redde_stmt", "expression"]
 category = "numeric"
-summary = "f16 and fractus<f16> type-position width markers."
-syntax = "f16 | fractus<f16>"
+summary = "the bare `f16` type-position width marker."
+syntax = "f16"
 related = ["fractus", "matrix"]
 locale = "en"
 +++
 # =============================================================================
-# f16 — f16 and fractus<f16> type-position width markers
+# f16 — the bare `f16` type-position width marker
 # =============================================================================
 #
 # What this teaches:
-#   • f16 and fractus<f16> type-position width markers.
+#   • the bare `f16` type-position width marker.
 #   • Related keywords: fractus, matrix
 #
 # Common mistakes:
-#   • Using `f16` / `f32` / `f64` with `numerus` — float widths belong to `fractus`; use `fractus<f16>`, `fractus<f32>`, or `fractus<f64>`.
+#   • Using `f16` / `f32` / `f64` with `numerus` — float widths belong to `fractus`; write the bare marker, never the wrapped `numerus<...>` form.
 #
 # See also: fractus, matrix
 # =============================================================================
@@ -25,10 +25,9 @@ locale = "en"
 # f16 — half-width float marker
 #
 # f16 x
-# fractus<f16> y
 #
 # GRAMMAR:
-#   type :← 'f16' | 'fractus' '<' 'f16' '>'
+#   type :← 'f16'
 #
 # EXPECTED OUTPUT:
 #   none; this is a semantic/MIR systems-lane typecheck example.

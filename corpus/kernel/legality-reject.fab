@@ -73,7 +73,7 @@ fn launches_private() → f32 {
 # 5. raw lane id
 @ kernel
 @ public
-fn names_its_lane(float<f32> x) → float<f32> {
+fn names_its_lane(f32 x) → f32 {
     const vector<u32, 3> gid ← global_invocation_id()
     return x
 }

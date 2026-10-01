@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "arithmetic"
 canonical = true
 summary = "Sized numerus arithmetic is exact; storing a value past the declared width traps."
-syntax = "<numerus<i8>> + <numerus<i8>>"
+syntax = "<i8> + <i8>"
 related = ["numerus", "+", "wrapping"]
 locale = "en"
 +++
@@ -14,10 +14,10 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Exact intermediates — `int<i8>` arithmetic does not overflow at 8 bits:
+#   • Exact intermediates — `i8` arithmetic does not overflow at 8 bits:
 #     `127 + 1` is 128 as a number, and it prints as 128.
-#   • Trap at the store — `var int<i8> total ← max + uno()` fails because 128
-#     does not fit `int<i8>`; the program aborts with
+#   • Trap at the store — `var i8 total ← max + uno()` fails because 128
+#     does not fit `i8`; the program aborts with
 #     "128 does not fit in `i8`" and never wraps.
 #   • Policy distinction — every numerus width traps at its store; only
 #     `wrapping<W>` reduces mod 2^W and `saturating<W>` clamps.
@@ -33,18 +33,18 @@ locale = "en"
 # numerus-overflow-sizes — sized-width exact arithmetic, checked store
 #
 # POLICY:
-#   `int<i8>` carries its declared width as the range of its slot. Arithmetic
+#   `i8` carries its declared width as the range of its slot. Arithmetic
 #   is computed exactly; the store applies the slot's policy and traps on a
 #   value outside -128..127. The rhs is a function call so the sum stays a
 #   runtime fact on every target.
 
-fn uno() → int<i8> {
+fn uno() → i8 {
     return 1
 }
 
 main {
-    var int<i8> max ← 127 ∷ int<i8>
+    var i8 max ← 127 ∷ i8
     print max + uno()
-    var int<i8> total ← max + uno()
+    var i8 total ← max + uno()
     print total
 }

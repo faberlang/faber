@@ -28,7 +28,7 @@ locale = "en"
 # Common mistakes:
 #   • Expecting a trap on overflow — `wrapping` reduces, it never traps. Only a
 #     zero divisor fails.
-#   • Mixing families — `wrapping<i8> + int<i8>` is an error; convert with `↦`.
+#   • Mixing families — `wrapping<i8> + i8` is an error; convert with `↦`.
 #
 # See also: numerus, modulus, ¬, ⇒
 # =============================================================================

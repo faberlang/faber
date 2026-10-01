@@ -51,7 +51,7 @@ class Rec {
     var ascii a
     var ascii u
     var list<string> names
-    var int<d64> price
+    var d64 price
     var f32 ratio
     static int LIMIT = 4
 }

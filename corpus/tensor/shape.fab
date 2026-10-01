@@ -30,7 +30,7 @@ locale = "en"
 # tensor — v1 intrinsic catalog (forma, accipe, ponde, reple, crea, sectio, materialize, structa, planata)
 #
 # STYLE: numeric/tensor sugar (f32, tf32[2, 3]) — preferred in tensor corpus;
-# general Faber code may use long form (tensor<fractus<f32>, [2, 3]>). See
+# general Faber code may use long form (tensor<f32, [2, 3]>). See
 # docs/design/numeric-type-sugar.md.
 #
 # GRAMMAR:

@@ -875,7 +875,7 @@ note = "N2 ruling 4; bounded patterns must precede the unbounded family catch-al
 [[cells]]
 id = "cast.decimal-literal"
 family = "casts"
-cell = "annotated decimal literal numerus<d64> ← 4.2 (exact digit text)"
+cell = "annotated decimal literal d64 ← 4.2 (exact digit text)"
 status = "direct"
 exemplum = "decimal/arithmetic.fab"
 expected = true
@@ -921,7 +921,7 @@ exemplum = "decimal/d32-removed.fab"
 expected = true
 required = true
 decline = true
-note = "D11.7: d32 was removed; numerus<d32> and bare d32 fail closed with a diagnostic whose help names d64"
+note = "D11.7: d32 was removed; the retired wrapped numerus<d32> and bare d32 fail closed with a diagnostic whose help names d64"
 
 # =============================================================================
 # closures (31 cells: 31 direct / 0 bare)

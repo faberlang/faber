@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "type"
 canonical = false
 summary = "Sized primitive family violation (expect type error)."
-syntax = "numerus<f32> — rejected; use fractus<f32>"
+syntax = "numerus<f32> — retired wrapped form, rejected; use f32"
 related = ["numerus", "fractus"]
 locale = "en"
 +++
@@ -15,11 +15,11 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Type family restriction — `numerus<W>` rejects float width markers; use `fractus<W>` instead
+#   • Type family restriction — the retired wrapped form `numerus<W>` rejects float width markers; write the bare float marker (`f32`)
 #   • Compile-time error — type family violations are caught and reported at compile time
 #
 # Common mistakes:
-#   • using numerus<f32> instead of fractus<f32> for floating-point types — width families are type-specific
+#   • writing the retired `numerus<f32>` for a floating-point type — width families are type-specific; the bare `f32` is the float spelling
 #
 # See also: numerus, fractus
 # =============================================================================
@@ -29,9 +29,12 @@ locale = "en"
 
 # sized primitive family violation (expect type error)
 #
-# WHY: `numerus<W>` rejects float width markers; use `fractus<f32>` instead.
+# WHY: the retired wrapped form `numerus<W>` rejects float width markers; the bare `f32` is the float spelling.
+#
+# DELIBERATE: this exemplum keeps the retired spelling (`int<f32>`) on purpose, to
+# pin the SEM002 family diagnostic until the parser rejects the wrapped forms (N7d).
 
 main {
-    const int<f32> invalid ← 1.0 ∷ float<f32>
+    const int<f32> invalid ← 1.0 ∷ f32
     print invalid
 }

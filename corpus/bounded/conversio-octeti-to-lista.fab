@@ -3,8 +3,8 @@ term = "↦"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
 category = "conversion"
-summary = "Bounded octeti<N> converts to an unbounded list<int<u8>> prefix."
-syntax = "octeti<N> ↦ list<int<u8>>"
+summary = "Bounded octeti<N> converts to an unbounded list<u8> prefix."
+syntax = "octeti<N> ↦ list<u8>"
 related = ["↦", "octeti", "lista", "u8"]
 locale = "en"
 +++
@@ -18,10 +18,10 @@ locale = "en"
 #
 # Common mistakes:
 #   • using an unsized integer element type — the byte bridge requires
-#     `list<int<u8>>`.
+#     `list<u8>`.
 
 main {
     const bytes<8> raw ← |61 62| ↦ bytes<8>
-    const list<int<u8>> out ← raw ↦ list<int<u8>>
+    const list<u8> out ← raw ↦ list<u8>
     print out
 }

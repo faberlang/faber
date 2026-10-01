@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "conversion"
 canonical = false
 summary = "The decimal conversio rows: decimal↔integer (round-half-even), and fractus↔decimal (string round-trip)."
-syntax = "a ↦ numerus<d64>"
+syntax = "a ↦ d64"
 related = ["↦", "numerus", "d64", "fractus"]
 locale = "en"
 +++
@@ -14,11 +14,11 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • decimal → integer — `a ↦ numerus<i64>` rounds half-even; it never
+#   • decimal → integer — `a ↦ i64` rounds half-even; it never
 #     truncates. 4.2 → 4, 2.5 → 2, 3.5 → 4.
-#   • integer → decimal — `n ↦ numerus<d64>` scales the integer to the
+#   • integer → decimal — `n ↦ d64` scales the integer to the
 #     carrier: 5 prints as `5`.
-#   • fractus → decimal — `g ↦ numerus<d64>` uses the string round-trip,
+#   • fractus → decimal — `g ↦ d64` uses the string round-trip,
 #     so 1.5 prints as `1.5` exactly.
 #   • decimal → fractus — `a ↦ fractus` is a defined rounding; 4.2 keeps
 #     its value through the float carrier.
@@ -40,19 +40,19 @@ locale = "en"
 #   conversio.expected — one value per print, in order.
 
 main {
-    const int<d64> a ← 4.2
-    const int<i64> i ← a ↦ int<i64>
+    const d64 a ← 4.2
+    const i64 i ← a ↦ i64
     print i
-    const int<i64> n ← 5
-    const int<d64> d ← n ↦ int<d64>
+    const i64 n ← 5
+    const d64 d ← n ↦ d64
     print d
     const float f ← a ↦ float
     print f
     const float g ← 1.5
-    const int<d64> h ← g ↦ int<d64>
+    const d64 h ← g ↦ d64
     print h
-    const int<d64> p ← 2.5
-    print p ↦ int<i64>
-    const int<d64> r ← 3.5
-    print r ↦ int<i64>
+    const d64 p ← 2.5
+    print p ↦ i64
+    const d64 r ← 3.5
+    print r ↦ i64
 }

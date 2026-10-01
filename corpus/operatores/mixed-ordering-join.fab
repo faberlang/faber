@@ -61,8 +61,8 @@ main {
     print exact_lt
     const bool exact_gt ← above ≻ boundary
     print exact_gt
-    const int<d64> narrow_decimal ← 4.2
-    const int<d64> wide_decimal ← 1.0
+    const d64 narrow_decimal ← 4.2
+    const d64 wide_decimal ← 1.0
     const bool decimal_width_gt ← narrow_decimal ≻ wide_decimal
     print decimal_width_gt
     const int integer_limit ← 10

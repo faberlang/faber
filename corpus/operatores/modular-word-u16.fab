@@ -34,7 +34,7 @@ main {
     var wrapping<u16> max ← 65535
     const wrapping<u16> one ← 1
     var wrapping<u16> zero ← 0
-    const int<u16> converted ↤ one
+    const u16 converted ↤ one
     print max + one
     print zero - one
     print max * 2

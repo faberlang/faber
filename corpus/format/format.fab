@@ -68,7 +68,7 @@ fn kinds() {
     print factor ¶ ".3"
     print -1.5 ¶ "08.2"
     print "[§]"(3.0 ¶ ">6")
-    const int<u8> octo ← 200
+    const u8 octo ← 200
     print octo ¶ "08b"
 }
 

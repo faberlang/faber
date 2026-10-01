@@ -32,11 +32,11 @@ locale = "en"
 # `Figura`; otherwise it falls back to default 1-d construction. `tensor ↦ lista`
 # flattens.
 # `tensor<numerus, [N]> ↦ tensor<fractus, [N]>` widens element-wise; the reverse
-# truncates toward zero (Rust `as`). Sized `numerus<W>` / `fractus<W>` pairs mirror
+# truncates toward zero (Rust `as`). Sized integer / float width-marker pairs mirror
 # the scalar lattice element-wise on each chain:
 #   signed int: i8 → i16 → i32 → i64
 #   unsigned int: u8 → u16 → u32 → u64
-#   float: f32 → f64; signed int may widen to fractus<f64> (bare `fractus`)
+#   float: f32 → f64; signed int may widen to f64 (bare `fractus`)
 #   fractus → numerus is explicit narrow (any width)
 # Exhaustive pair regression lives in radix lattice matrix tests (100 cells).
 # Scalar extraction, reshape, and broadcast construction reject at typecheck —
@@ -53,14 +53,14 @@ main {
     const tensor<int, [4]> ints ← floats ↦ tensor<int, [4]>
     print ints.length()
 
-    const tensor<int<i32>, []> narrow ← empty
-    const tensor<int<i64>, []> wide ← narrow ↦ tensor<int<i64>, []>
-    const tensor<int<i32>, []> narrowed ← wide ↦ tensor<int<i32>, []>
+    const tensor<i32, []> narrow ← empty
+    const tensor<i64, []> wide ← narrow ↦ tensor<i64, []>
+    const tensor<i32, []> narrowed ← wide ↦ tensor<i32, []>
     print narrowed.length()
 
-    const tensor<int<u8>, []> bytes ← empty
-    const tensor<int<u16>, []> words ← bytes ↦ tensor<int<u16>, []>
-    const tensor<int<u8>, []> shrunk ← words ↦ tensor<int<u8>, []>
+    const tensor<u8, []> bytes ← empty
+    const tensor<u16, []> words ← bytes ↦ tensor<u16, []>
+    const tensor<u8, []> shrunk ← words ↦ tensor<u8, []>
     print shrunk.length()
 
     const tensor<float<f32>, []> half ← empty
@@ -69,10 +69,10 @@ main {
     print single.length()
 
     const tensor<float, []> fromFloat ← empty
-    const tensor<int<i32>, []> fromFractus ← fromFloat ↦ tensor<int<i32>, []>
+    const tensor<i32, []> fromFractus ← fromFloat ↦ tensor<i32, []>
     print fromFractus.length()
 
-    const tensor<int<i32>, []> signed ← empty
+    const tensor<i32, []> signed ← empty
     const tensor<float, []> promoted ← signed ↦ tensor<float, []>
     print promoted.length()
 }

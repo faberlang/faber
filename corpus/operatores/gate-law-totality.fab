@@ -93,10 +93,10 @@ main {
     # ---------------------------------------------------------------- ints
     const int a ← 7
     const int b ← 7
-    const int<u8> narrow ← 3 ∷ int<u8>
-    const int<u16> wider ← 3 ∷ int<u16>
+    const u8 narrow ← 3 ∷ u8
+    const u16 wider ← 3 ∷ u16
     const int signed ← -1
-    const int<u64> unsigned ← 18446744073709551615
+    const u64 unsigned ← 18446744073709551615
     const int large ← 10
 
     # --------------------------------------------------------------- floats
@@ -104,17 +104,17 @@ main {
     const float double ← 2.5
     const float half ← 0.5
     const float four_two ← 4.2
-    const int<i64> above ← 9007199254740993
-    const int<i64> below ← 9007199254740992
+    const i64 above ← 9007199254740993
+    const i64 below ← 9007199254740992
     const float boundary ← 9007199254740992.0
 
     # -------------------------------------------------------------- decimals
-    const int<d64> d64v ← 4.2
-    const int<d64> d64w ← 4.2
+    const d64 d64v ← 4.2
+    const d64 d64w ← 4.2
     const int five ← 5
 
     # ----------------------------------------------------------- conversio
-    const int<u64> five_u ← 5
+    const u64 five_u ← 5
 
     # ----------------------------------------------------- ≡ / ≠ (P1 join)
     # Identical types join exactly (P1 ints, P7 decimals); every other family
@@ -219,25 +219,25 @@ main {
 
     # ------------------------------------------------------- ↦ (all joins)
     # Conversio is directional. Every family direction admits.
-    print narrow ↦ int<u16>
-    print a ↦ int<u8>
+    print narrow ↦ u16
+    print a ↦ u8
     print five_u ↦ int
-    print a ↦ int<u64>
+    print a ↦ u64
     # GT-3: a negative value into an unsigned target fails closed at runtime
     # (conversion never wraps — DEFER-116 boundary contract); the inline
     # recovery supplies the target-typed fallback.
-    print signed ↦ int<u32> ⊥ 0 ∷ int<u32>
+    print signed ↦ u32 ⊥ 0 ∷ u32
     print a ↦ f32
     print single ↦ int
     print a ↦ float
     print four_two ↦ int
     print single ↦ f64
     print double ↦ f32
-    print d64v ↦ int<d64>
+    print d64v ↦ d64
     print d64v ↦ int
-    print five ↦ int<d64>
+    print five ↦ d64
     print d64v ↦ float
-    print four_two ↦ int<d64>
+    print four_two ↦ d64
 
     # ----------------------------------------------------- est (type test)
     # D23.1: `est` / `non est` is a type test, not an equality cell, so it is

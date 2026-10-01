@@ -49,9 +49,9 @@ main {
     print exact_promo
 
     # Cross-width and int↔float honesty rows follow the joined f64 formula.
-    const int<i64> above_precision ← 9007199254740993
-    const int<u64> below_precision ← 9007199254740992
-    const float<f64> float_boundary ← 9007199254740992.0
+    const i64 above_precision ← 9007199254740993
+    const u64 below_precision ← 9007199254740992
+    const f64 float_boundary ← 9007199254740992.0
     const bool fuzzy_cross_width ← above_precision ≈ below_precision
     const bool fuzzy_int_float ← above_precision ≈ float_boundary
 

@@ -1,20 +1,20 @@
 +++
-term = "numerus<d64>"
+term = "d64 arithmetic"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "expression", "additive_expr", "multiplicative_expr", "literal", "nota_stmt"]
 category = "arithmetic"
 canonical = false
-summary = "numerus<d64> arithmetic executes at a scaled-integer carrier — 4.2 + 0.1 = 4.3 exactly."
-syntax = "numerus<d64> a ← 4.2"
+summary = "d64 arithmetic executes at a scaled-integer carrier — 4.2 + 0.1 = 4.3 exactly."
+syntax = "d64 a ← 4.2"
 related = ["numerus", "d64", "↦", "fractus"]
 locale = "en"
 +++
 # =============================================================================
-# numerus<d64> — decimal arithmetic at the scaled carrier
+# d64 — decimal arithmetic at the scaled carrier
 # =============================================================================
 #
 # What this teaches:
-#   • Annotated decimal literals — `numerus<d64> a ← 4.2` carries the exact
+#   • Annotated decimal literals — `d64 a ← 4.2` carries the exact
 #     digit text to typing; 4.2 is 42×10⁻¹, not a float approximation.
 #   • Scaled-integer execution — a stored `d64` is an `i64` carrier at
 #     scale 8 (D11.7: 8 fraction digits, range ±92,233,720,368.54775807;
@@ -29,7 +29,7 @@ locale = "en"
 #     4.2 + 0.1 prints `4.3`, and 4.2 / 0.1 prints `42`, never `42.0`.
 #   • Untyped constants join by exact value — beside a `d64` or in a `d64`
 #     slot, a written constant is a decimal: `a + 1`, `a * 2`, `a * 2.0`,
-#     `a ≅ 4.2`, and `const int<d64> e ← 5` are exact (`a * 2` is 8.4). The
+#     `a ≅ 4.2`, and `const d64 e ← 5` are exact (`a * 2` is 8.4). The
 #     constant may have at most 8 fractional digits and must fit the range.
 #   • A conditional, `discerne` or block that yields decimal arithmetic
 #     rounds at the slot like any other computed decimal: 0.00000005 * 0.5
@@ -59,21 +59,21 @@ locale = "en"
 #   arithmetic.expected — shortest decimals, one per print.
 
 main {
-    const int<d64> a ← 4.2
-    const int<d64> b ← 0.1
+    const d64 a ← 4.2
+    const d64 b ← 0.1
     print a
     print b
     print a + b
     print a - b
     print a * b
     print a / b
-    const int<d64> tiny ← 0.00000005
-    const int<d64> half ← 0.5
-    const int<d64> z ← true ✓ tiny * half ✗ a
+    const d64 tiny ← 0.00000005
+    const d64 half ← 0.5
+    const d64 z ← true ✓ tiny * half ✗ a
     print z
-    const int<d64> w ← false ✓ a ✗ tiny * half
+    const d64 w ← false ✓ a ✗ tiny * half
     print w
-    const int<d64> n ← -1.5
+    const d64 n ← -1.5
     print n
     print "§ and §"(a, n)
     print a + 1
@@ -81,6 +81,6 @@ main {
     print a * 2.0
     print a + 0.1
     print a ≅ 4.2
-    const int<d64> e ← 5
+    const d64 e ← 5
     print e
 }

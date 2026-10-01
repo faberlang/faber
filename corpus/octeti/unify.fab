@@ -4,18 +4,18 @@ kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "fixum_decl", "expr_stmt", "redde_stmt", "cast_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "nota_stmt", "expression", "literal"]
 category = "type"
 canonical = false
-summary = "octeti unifies with lista<numerus<u8>> — every lista method works on octeti."
+summary = "octeti unifies with lista<u8> — every lista method works on octeti."
 syntax = "octeti"
 related = ["octeti", "lista", "numerus"]
 locale = "en"
 +++
 
 # =============================================================================
-# octeti — octeti unifies with lista<numerus<u8>> — every lista method works on octeti.
+# octeti — octeti unifies with lista<u8> — every lista method works on octeti.
 # =============================================================================
 #
 # What this teaches:
-#   • Type unification — `octeti` and `lista<numerus<u8>>` are representation-identical and bidirectionally assignable.
+#   • Type unification — `octeti` and `lista<u8>` are representation-identical and bidirectionally assignable.
 #   • Method inheritance — Because of unification, every `lista` method is available on `octeti` receivers.
 #
 # Common mistakes:
@@ -24,34 +24,34 @@ locale = "en"
 # See also: octeti, lista, numerus
 # =============================================================================
 
-# octeti — lista<numerus<u8>> unification
+# octeti — lista<u8> unification
 #
-# WHY: `octeti` is semantic sugar for `lista<numerus<u8>>`. The two are
+# WHY: `octeti` is semantic sugar for `lista<u8>`. The two are
 # representation-identical (Vec<u8>) and bidirectionally assignable, so octeti
 # carries every `lista` receiver method and either slot accepts the other.
 #
 # Cross-ref: octeti/octeti.fab (literal syntax), lista/lista.fab (lista methods),
-# typi/sized-numerus.fab (numerus<u8>). See docs/factory/octeti-unify-lista/.
+# typi/sized-numerus.fab (u8). See docs/factory/octeti-unify-lista/.
 
 fn describe(bytes buf) → int {
     return buf.length()
 }
 
-fn firstByte(bytes buf) → int<u8> {
-    const int<u8> b ← buf.get(0) coalesce (0 ∷ int<u8>)
+fn firstByte(bytes buf) → u8 {
+    const u8 b ← buf.get(0) coalesce (0 ∷ u8)
     return b
 }
 
-fn appendByte(mut bytes buf, int<u8> b) → bytes {
+fn appendByte(mut bytes buf, u8 b) → bytes {
     buf.append(b)
     return buf
 }
 
 fn fromBytes() → bytes {
     # WHY: lista<numerus<u8>> assigns into octeti bidirectionally.
-    var list<int<u8>> bytes ← empty
-    bytes.append(0xde ∷ int<u8>)
-    bytes.append(0xad ∷ int<u8>)
+    var list<u8> bytes ← empty
+    bytes.append(0xde ∷ u8)
+    bytes.append(0xad ∷ u8)
     const bytes asBytes ← bytes
     return asBytes
 }
@@ -63,11 +63,11 @@ main {
     const int n ← describe(sig)
     print n
 
-    const int<u8> first ← firstByte(sig)
+    const u8 first ← firstByte(sig)
     print first
 
     # construction + cross-assignment
-    const int<u8> marker ← 0xff ∷ int<u8>
+    const u8 marker ← 0xff ∷ u8
     const bytes grown ← appendByte(sig, marker)
     print grown.length()
     const bytes crossed ← fromBytes()

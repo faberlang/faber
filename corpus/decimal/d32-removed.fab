@@ -22,7 +22,7 @@ locale = "en"
 #     There is no compatibility alias.
 #
 # Common mistakes:
-#   • keeping `numerus<d32>` for "small" money values — use `numerus<d64>`
+#   • keeping `numerus<d32>` for "small" money values — use `d64`
 #
 # See also: numerus, d64
 # =============================================================================

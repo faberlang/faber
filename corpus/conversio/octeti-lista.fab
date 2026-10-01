@@ -4,18 +4,18 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal"]
 category = "conversion"
 canonical = false
-summary = "Boundary bridge from octeti to lista<numerus<u8>>."
-syntax = "<octeti> ↦ list<int<u8>>"
+summary = "Boundary bridge from octeti to lista<u8>."
+syntax = "<octeti> ↦ list<u8>"
 related = ["↦", "octeti", "lista", "numerus"]
 locale = "en"
 +++
 # =============================================================================
-# ↦ — Boundary bridge from octeti to lista<numerus<u8>>.
+# ↦ — Boundary bridge from octeti to lista<u8>.
 # =============================================================================
 #
 # What this teaches:
-#   • Representation change — `bytes ↦ list<int<u8>>` copies the buffer once.
-#   • Symmetric reverse — `list<int<u8>> ↦ bytes` is the live lista → octeti direction.
+#   • Representation change — `bytes ↦ list<u8>` copies the buffer once.
+#   • Symmetric reverse — `list<u8> ↦ bytes` is the live lista → octeti direction.
 #   • One endian host — endian windows stay on octeti; lists are for element work.
 #
 # Common mistakes:
@@ -26,7 +26,7 @@ locale = "en"
 # =============================================================================
 
 
-# conversio — octeti ↦ lista<numerus<u8>>
+# conversio — octeti ↦ lista<u8>
 #
 # GRAMMAR:
 #   convertExpr :← expr '↦' 'list' '<' 'int' '<' 'u8' '>' '>'
@@ -40,7 +40,7 @@ locale = "en"
 
 main {
     const bytes raw ← |de ad be ef|
-    const list<int<u8>> asList ← raw ↦ list<int<u8>>
+    const list<u8> asList ← raw ↦ list<u8>
     const bytes back ← asList ↦ bytes
     print asList.length()
     print back.length()

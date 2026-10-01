@@ -4,22 +4,22 @@ kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "cast_expr", "expression", "literal", "nota_stmt"]
 category = "type"
 canonical = false
-summary = "Sized numerus and fractus width annotations in type position."
-syntax = "numerus<W> | fractus<W>"
+summary = "Bare numerus and fractus width markers in type position."
+syntax = "i8 … u64 | f16 f32 f64 bf16"
 related = ["numerus", "fractus", "instans"]
 locale = "en"
 +++
 
 # =============================================================================
-# numerus — Sized numerus and fractus width annotations in type position.
+# numerus — Bare numerus and fractus width markers in type position.
 # =============================================================================
 #
 # What this teaches:
-#   • Width annotations — `numerus<i32>`, `numerus<u64>`, `fractus<f32>` carry explicit bit widths
+#   • Width markers — `i32`, `u64`, `f32` are written bare and carry explicit bit widths (the wrapped `numerus<W>` / `fractus<W>` spellings are retired)
 #   • Signedness — `i32` (signed) vs `u64` (unsigned) distinction in type position
 #
 # Common mistakes:
-#   • confusing sized family widths — fractus<f32> vs numerus<f32>, or modulus<i32> instead of modulus<u32>
+#   • confusing sized family widths — `f32` is a float marker, `i32` an integer marker; or modulus<i32> instead of modulus<u32>
 #
 # See also: numerus, fractus, instans
 # =============================================================================
@@ -27,15 +27,15 @@ locale = "en"
 
 
 
-# sized numerus/fractus width annotations
+# bare numerus/fractus width markers
 #
-# WHY: `numerus<W>` and `fractus<W>` carry explicit target widths in type position.
+# WHY: a bare marker (`i32`, `u64`, `f32`) carries the explicit target width in type position.
 
 main {
-    const int<i32> narrow ← 7 ∷ int<i32>
-    const int<u64> wide ← 255 ∷ int<u64>
-    const int<i64> signed ← narrow
-    const float<f32> single ← 1.5 ∷ float<f32>
+    const i32 narrow ← 7 ∷ i32
+    const u64 wide ← 255 ∷ u64
+    const i64 signed ← narrow
+    const f32 single ← 1.5 ∷ f32
 
     print narrow
     print wide

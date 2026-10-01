@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "conversion"
 canonical = false
 summary = "Radix-parameterized integer parsing from textus."
-syntax = "<textus> ↦ numerus<W, Radix>"
+syntax = "<textus> ↦ W via Hex|Bin|Oct"
 related = ["↦", "numerus", "textus"]
 locale = "en"
 +++
@@ -40,9 +40,9 @@ locale = "en"
 #   HIR-direct Rust and MIR-stepper routes must agree for radix parsing.
 
 main {
-    const int<i32> hex ← "ff" ↦ i32 via Hex
-    const int<i32> bin ← "1010" ↦ i32 via Bin
-    const int<i32> oct ← "755" ↦ i32 via Oct
+    const i32 hex ← "ff" ↦ i32 via Hex
+    const i32 bin ← "1010" ↦ i32 via Bin
+    const i32 oct ← "755" ↦ i32 via Oct
     print hex
     print bin
     print oct

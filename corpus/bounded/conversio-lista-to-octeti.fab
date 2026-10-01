@@ -4,7 +4,7 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
 category = "conversion"
 summary = "Compile-admitted bounded lista<u8,N> to bounded octeti<M> route."
-syntax = "lista<int<u8>, N> ↦ octeti<M>"
+syntax = "lista<u8, N> ↦ octeti<M>"
 related = ["↦", "lista", "octeti", "u8"]
 locale = "en"
 +++
@@ -22,8 +22,8 @@ locale = "en"
 #     part of the source contract.
 
 main {
-    const list<int<u8>> base ← [1, 2]
-    const list<int<u8>, 8> raw ← base ↦ list<int<u8>, 8>
+    const list<u8> base ← [1, 2]
+    const list<u8, 8> raw ← base ↦ list<u8, 8>
     const bytes<8> out ← raw ↦ bytes<8>
     print out
 }

@@ -14,7 +14,7 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • `300 ↦ int<u8>`, `1e300 ↦ int` and a NaN `↦ int` fail without `⊥`; the
+#   • `300 ↦ u8`, `1e300 ↦ int` and a NaN `↦ int` fail without `⊥`; the
 #     failure is the recoverable `⇥` channel, so `fac { … } cape err { … }`
 #     catches it directly and a `⇥ string` function propagates it to its
 #     caller's `cape` (D1.11).
@@ -22,8 +22,8 @@ locale = "en"
 # See also: ↦, ⊥, ⇥, fac, cape
 # =============================================================================
 
-fn narrow(int n) → int<u8> ⇥ string {
-    return n ↦ int<u8>
+fn narrow(int n) → u8 ⇥ string {
+    return n ↦ u8
 }
 
 fn truncate(float x) → int ⇥ string {
@@ -37,14 +37,14 @@ main {
     const float nan ← zero / zero
 
     do {
-        const int<u8> a ← big ↦ int<u8>
+        const u8 a ← big ↦ u8
         print a
     }
     catch err {
         print "caught direct narrowing"
     }
     do {
-        const int<u8> b ← narrow(big)
+        const u8 b ← narrow(big)
         print b
     }
     catch err {

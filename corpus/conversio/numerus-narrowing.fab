@@ -14,9 +14,9 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • `n ↦ int<W>` checks the value against W's range — a value that fits
+#   • `n ↦ W` (a bare integer width marker) checks the value against W's range — a value that fits
 #     converts unchanged; one that does not fails (D1.11). It never wraps
-#     (`300 ↦ int<u8>` is not 44) and never relabels (it is not 300 in a u8).
+#     (`300 ↦ u8` is not 44) and never relabels (it is not 300 in a u8).
 #   • `⊥ default` supplies the target-typed value when the check fails. A
 #     literal recovery shapes to W like a declared initializer.
 #   • A negative value into an unsigned target is out of range the same way.
@@ -33,24 +33,24 @@ locale = "en"
 main {
     # in range: the value converts unchanged
     const int small ← 200
-    const int<u8> fits ← small ↦ int<u8>
+    const u8 fits ← small ↦ u8
     print fits
     const int floor ← -128
-    const int<i8> lowest ← floor ↦ int<i8>
+    const i8 lowest ← floor ↦ i8
     print lowest
 
     # out of range: the check fails and the recovery supplies the value
     const int big ← 300
-    const int<u8> recovered ← big ↦ int<u8> ⊥ 7
+    const u8 recovered ← big ↦ u8 ⊥ 7
     print recovered
-    const int<i8> signedRecovered ← big ↦ int<i8> ⊥ -1
+    const i8 signedRecovered ← big ↦ i8 ⊥ -1
     print signedRecovered
-    const int<u16> wide ← 300
-    const int<u8> fromWide ← wide ↦ int<u8> ⊥ 255
+    const u16 wide ← 300
+    const u8 fromWide ← wide ↦ u8 ⊥ 255
     print fromWide
 
     # negative into unsigned is out of range too
     const int negative ← -1
-    const int<u8> fromNegative ← negative ↦ int<u8> ⊥ 0
+    const u8 fromNegative ← negative ↦ u8 ⊥ 0
     print fromNegative
 }

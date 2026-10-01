@@ -26,7 +26,7 @@ locale = "en"
 #     (exact −190). An inferred slot (`_`) keeps the word and clamps the same way.
 #
 # Common mistakes:
-#   • Mixing families — `saturating<u8> + int<u8>` is an error; convert with `↦`.
+#   • Mixing families — `saturating<u8> + u8` is an error; convert with `↦`.
 #   • Expecting `↦` to fail — a conversion into `saturating<W>` clamps and cannot
 #     fail, so it takes no `⊥` recovery (`wrapping<W>` reduces mod 2^W the same way).
 #

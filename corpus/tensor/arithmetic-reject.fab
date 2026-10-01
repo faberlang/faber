@@ -19,7 +19,7 @@ locale = "en"
 #   • Width safety — mixed-width operations (e.g. i32 + i64) require explicit `↦` conversion
 #
 # Common mistakes:
-#   • expecting silent numeric widening between numerus<i32> and numerus<i64> — use explicit ↦ conversion instead
+#   • expecting silent numeric widening between i32 and i64 — use explicit ↦ conversion instead
 #
 # See also: tensor, typus, conversio
 # =============================================================================
@@ -31,7 +31,7 @@ locale = "en"
 # WHY: documents the typecheck contract for elementwise tensor arithmetic.
 # Both cases must reject:
 #   1. tensor<textus, …> — non-numeric element (numeric gate).
-#   2. numerus<i32> + numerus<i64> — mixed width is a ↦ conversio problem,
+#   2. i32 + i64 — mixed width is a ↦ conversio problem,
 #      never silent promotion at the kernel.
 #
 # This exemplum intentionally fails to compile; it is registered in the
@@ -43,8 +43,8 @@ main {
     const tensor<string, [2]> words_sum ← words_a.added(words_b)
     print words_sum.length()
 
-    const tensor<int<i32>, [2]> i32_a ← empty
-    const tensor<int<i64>, [2]> i64_b ← empty
-    const tensor<int<i32>, [2]> mixed ← i32_a.added(i64_b)
+    const tensor<i32, [2]> i32_a ← empty
+    const tensor<i64, [2]> i64_b ← empty
+    const tensor<i32, [2]> mixed ← i32_a.added(i64_b)
     print mixed.length()
 }

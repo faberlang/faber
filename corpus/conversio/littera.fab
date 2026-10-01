@@ -79,7 +79,7 @@ main {
 
     # Code points use the Code hint.
     const char big ← 'A'
-    const int<u32> code ← big ↦ u32 via Code
+    const u32 code ← big ↦ u32 via Code
     print code
     const char back ← 65 ↦ char via Code ⊥ '?'
     print back

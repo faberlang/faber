@@ -4,7 +4,7 @@ kind = "conversio"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "cast_expr", "assignment", "transfer", "expression", "literal", "redde_stmt"]
 category = "conversion"
 summary = "The Bits conversio hint is an exact-width IEEE bitcast — u16↔f16, u16↔bf16, u32↔f32, u64↔f64 only — never a value conversion."
-syntax = "numerus<u16|u32|u64> ↦ f16|bf16|f32|f64 via Bits and fractus<f16|bf16|f32|f64> ↦ u16|u32|u64 via Bits"
+syntax = "u16|u32|u64 ↦ f16|bf16|f32|f64 via Bits and f16|bf16|f32|f64 ↦ u16|u32|u64 via Bits"
 aliases = ["Bits hint"]
 related = ["↦", "fractus", "octeti"]
 locale = "la"
@@ -27,7 +27,7 @@ locale = "la"
 #     admitted symmetrically
 #
 # Common mistakes:
-#   • cross-width pairing — `n ↦ f32 via Bits` from numerus<u16>
+#   • cross-width pairing — `n ↦ f32 via Bits` from u16
 #     rejects (bits_pair_width_mismatch)
 #   • expecting a float source to be a Bits row — a plain float→float hop
 #     with the hint rejects; spell the integer bit pattern side instead
@@ -35,23 +35,23 @@ locale = "la"
 # See also: ↦, fractus, octeti
 # =============================================================================
 
-functio in_f16(numerus<u16> n) → f16 {
+functio in_f16(u16 n) → f16 {
     redde n ↦ f16 via Bits
 }
 
-functio ex_bf16(bf16 x) → numerus<u16> {
+functio ex_bf16(bf16 x) → u16 {
     redde x ↦ u16 via Bits
 }
 
-functio in_f32(numerus<u32> n) → f32 {
+functio in_f32(u32 n) → f32 {
     redde n ↦ f32 via Bits
 }
 
-functio ex_f64(f64 x) → numerus<u64> {
+functio ex_f64(f64 x) → u64 {
     redde x ↦ u64 via Bits
 }
 
 incipit {
-    fixum numerus<u32> n ← 1065353216
+    fixum u32 n ← 1065353216
     nota in_f32(n)
 }

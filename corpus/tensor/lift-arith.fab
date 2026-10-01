@@ -73,14 +73,14 @@ main {
     const list<f32> negated_out ← negated.flatten()
     print negated_out
 
-    const list<int<i16>> flat_n ← [1, 2, 3, 4]
-    const tensor<int<i16>, []> nseed ← empty
-    var tensor<int<i16>, [4]> n ← nseed.from_flat(flat_n, [4])
-    const tensor<int<i16>, [4]> floored ← n / 2
-    const list<int<i16>> floored_out ← floored.flatten()
+    const list<i16> flat_n ← [1, 2, 3, 4]
+    const tensor<i16, []> nseed ← empty
+    var tensor<i16, [4]> n ← nseed.from_flat(flat_n, [4])
+    const tensor<i16, [4]> floored ← n / 2
+    const list<i16> floored_out ← floored.flatten()
     print floored_out
-    const tensor<int<i16>, [4]> odd ← n % 2
-    const list<int<i16>> odd_out ← odd.flatten()
+    const tensor<i16, [4]> odd ← n % 2
+    const list<i16> odd_out ← odd.flatten()
     print odd_out
     const tensor<f32, [4]> true_half ← n ÷ 2
     const list<f32> true_half_out ← true_half.flatten()
