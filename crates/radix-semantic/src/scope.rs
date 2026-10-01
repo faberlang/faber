@@ -2903,6 +2903,23 @@ impl Resolver {
         }
     }
 
+    /// Consumer-local `DefId` of an imported struct (genus) export, `None` for
+    /// every other export kind. A `module.Tab.Z` static read names the genus
+    /// through this definition.
+    #[must_use]
+    pub fn namespace_file_struct_def(
+        &self,
+        namespace: LexSymbol,
+        type_name: LexSymbol,
+    ) -> Option<DefId> {
+        let interface = self.file_interfaces.get(&namespace)?;
+        let type_key = self.file_interface_export_key(interface, type_name)?;
+        match interface.exports.get(&type_key)? {
+            ImportedFileExport::Struct(strukt) => Some(strukt.def_id),
+            ImportedFileExport::Type(_) | ImportedFileExport::Function(_) => None,
+        }
+    }
+
     /// Whether an imported nominal `DefId` carries variant metadata
     /// (enum/union exports). Struct exports and aliases return `false`.
     #[must_use]

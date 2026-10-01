@@ -805,6 +805,30 @@ impl Lowerer<'_> {
             }
         }
 
+        // `module.Tab.Z` where `Tab` is an imported genus: the object `module.Tab`
+        // has no expression role of its own, so the read lowers against the
+        // imported genus's definition exactly like the same-module `Tab.Z`;
+        // typecheck decides from the field's modifier whether `Z` is static.
+        if let radix_syntax::ExprKind::Member(obj) = &member.object.kind
+            && let radix_syntax::ExprKind::Ident(base) = &obj.object.kind
+            && let Some(base_def) = self.lookup_name(base.name)
+            && self
+                .resolver
+                .get_symbol(base_def)
+                .is_some_and(|symbol| symbol.kind == crate::SymbolKind::Module)
+            && let Some(type_def) = self
+                .resolver
+                .namespace_file_struct_def(base.name, obj.member.name)
+        {
+            let object = radix_hir::HirExpression {
+                id: self.next_hir_id(),
+                kind: HirExpressionKind::Path(type_def),
+                ty: None,
+                span: member.object.span,
+            };
+            return HirExpressionKind::Field(Box::new(object), member.member.name);
+        }
+
         let object = lower_expr(self, &member.object);
         let field = self.canonicalize_namespace_member(&object, member.member.name);
         if let Some(kind) = self.lower_tuple_label_member(&object, field, member.member.span, id) {
