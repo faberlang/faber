@@ -921,7 +921,7 @@ exemplum = "decimal/d32-removed.fab"
 expected = true
 required = true
 decline = true
-note = "D11.7: d32 was removed; the retired wrapped numerus<d32> and bare d32 fail closed with a diagnostic whose help names d64"
+note = "D11.7: d32 was removed; bare d32 fails closed with a diagnostic whose help names d64 (the wrapped numerus<d32> is PARSE040 numeric_wrapper_retired)"
 
 # =============================================================================
 # closures (31 cells: 31 direct / 0 bare)

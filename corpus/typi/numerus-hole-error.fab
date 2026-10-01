@@ -1,0 +1,38 @@
++++
+term = "numerus"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "hole_type", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Retired numeric marker hole numerus<_> (expect parse error)."
+syntax = "numerus<_> — retired marker hole, rejected at parse time (numeric_wrapper_retired); write bare numerus or a bare marker"
+related = ["numerus", "fractus"]
+locale = "en"
++++
+
+# =============================================================================
+# numerus — Retired numeric marker hole (expect parse error).
+# =============================================================================
+#
+# What this teaches:
+#   • The marker holes `numerus<_>` and `fractus<_>` (en `int<_>` / `float<_>`) retired with the wrapped numeric spelling; there is no wrapped form left to leave a hole in
+#   • Parse error — `PARSE040:numeric_wrapper_retired` names the form written; bare `numerus` is the default `i64`, and a bare marker such as `i32` is the sized type
+#   • The policy words keep their hole (`modulus<_>`, `saturatus<_>`)
+#
+# Common mistakes:
+#   • writing `numerus<_>` to let the width be inferred — name the marker (`i32`) or use bare `numerus`
+#
+# See also: numerus, fractus
+# =============================================================================
+
+# retired numeric marker hole (expect parse error)
+#
+# WHY: a width marker is its own type; the wrapped form, holes included, is retired.
+#
+# DELIBERATE: this exemplum keeps the retired spelling (`int<_>`) on purpose, to
+# pin the PARSE040 `numeric_wrapper_retired` diagnostic for the hole form (N7d).
+
+main {
+    const int<_> width ← 1 ∷ i32
+    print width
+}

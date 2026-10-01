@@ -4,22 +4,22 @@ kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "cast_expr", "expression", "literal", "nota_stmt"]
 category = "type"
 canonical = false
-summary = "Sized primitive family violation (expect type error)."
-syntax = "numerus<f32> — retired wrapped form, rejected; use f32"
+summary = "Retired wrapped numeric type with a float marker (expect parse error)."
+syntax = "numerus<f32> — retired wrapped form, rejected at parse time (numeric_wrapper_retired); use f32"
 related = ["numerus", "fractus"]
 locale = "en"
 +++
 
 # =============================================================================
-# numerus — Sized primitive family violation (expect type error).
+# numerus — Retired wrapped numeric type with a float marker (expect parse error).
 # =============================================================================
 #
 # What this teaches:
-#   • Type family restriction — the retired wrapped form `numerus<W>` rejects float width markers; write the bare float marker (`f32`)
-#   • Compile-time error — type family violations are caught and reported at compile time
+#   • A width marker is its own type — the wrapped form `numerus<W>` / `fractus<W>` (en `int<W>` / `float<W>`) is retired and rejected whole at parse time, whatever the marker, including a wrong-family one such as `int<f32>`; write the bare float marker (`f32`)
+#   • Parse error — the diagnostic `PARSE040:numeric_wrapper_retired` names the form written and the bare replacement
 #
 # Common mistakes:
-#   • writing the retired `numerus<f32>` for a floating-point type — width families are type-specific; the bare `f32` is the float spelling
+#   • writing the retired `numerus<f32>` for a floating-point type — the bare `f32` is the float spelling
 #
 # See also: numerus, fractus
 # =============================================================================
@@ -27,12 +27,12 @@ locale = "en"
 
 
 
-# sized primitive family violation (expect type error)
+# retired wrapped numeric type with a float marker (expect parse error)
 #
-# WHY: the retired wrapped form `numerus<W>` rejects float width markers; the bare `f32` is the float spelling.
+# WHY: the wrapped form `numerus<W>` is retired; the bare `f32` is the float spelling.
 #
 # DELIBERATE: this exemplum keeps the retired spelling (`int<f32>`) on purpose, to
-# pin the SEM002 family diagnostic until the parser rejects the wrapped forms (N7d).
+# pin the PARSE040 `numeric_wrapper_retired` diagnostic the parser gives every wrapped form (N7d).
 
 main {
     const int<f32> invalid ← 1.0 ∷ f32

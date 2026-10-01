@@ -4,8 +4,8 @@ kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "expression"]
 category = "type"
 canonical = false
-summary = "Decline: d32 was removed as a type (D11.7); numerus<d32> and bare d32 reject with SEM002:removed_decimal_width_d32, whose help points to d64."
-syntax = "numerus<d32>"
+summary = "Decline: d32 was removed as a type (D11.7); bare d32 rejects with SEM002:removed_decimal_width_d32, whose help points to d64."
+syntax = "d32"
 related = ["numerus", "d64"]
 locale = "en"
 +++
@@ -17,12 +17,13 @@ locale = "en"
 # What this teaches:
 #   • `d64` is the only decimal width. `d32` was removed because its range
 #     (±214.7483647) cannot hold ordinary prices (D11.7).
-#   • `numerus<d32>` (and the bare sugar `d32`) fail closed with the teaching
-#     diagnostic `SEM002:removed_decimal_width_d32`, whose help names `d64`.
-#     There is no compatibility alias.
+#   • The bare marker `d32` fails closed with the teaching diagnostic
+#     `SEM002:removed_decimal_width_d32`, whose help names `d64`. There is no
+#     compatibility alias. (The wrapped `numerus<d32>` is no longer a
+#     spelling at all: it is `PARSE040:numeric_wrapper_retired`.)
 #
 # Common mistakes:
-#   • keeping `numerus<d32>` for "small" money values — use `d64`
+#   • keeping `d32` for "small" money values — use `d64`
 #
 # See also: numerus, d64
 # =============================================================================
@@ -32,6 +33,6 @@ locale = "en"
 # WHY: a retired spelling must reject with a pointer to its replacement, not
 # with a generic unknown-marker error.
 
-fn small(numerus<d32> x) → numerus<d32> {
+fn small(d32 x) → d32 {
     return x
 }
