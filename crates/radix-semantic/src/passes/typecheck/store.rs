@@ -285,12 +285,6 @@ impl TypeChecker<'_> {
     /// decimal `+ - * / %` and unary `-`, or a conditional, `discerne` or
     /// block that yields one from any branch (n5b).
     fn carries_exact_decimal(expr: &HirExpression) -> bool {
-        let tail = |block: &radix_hir::HirBlock| {
-            block
-                .expr
-                .as_deref()
-                .is_some_and(Self::carries_exact_decimal)
-        };
         match &expr.kind {
             HirExpressionKind::Binary(
                 radix_hir::HirBinOp::Add
@@ -301,16 +295,9 @@ impl TypeChecker<'_> {
                 ..,
             )
             | HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, _) => true,
-            HirExpressionKind::Block(block) => tail(block),
-            HirExpressionKind::Si {
-                then_block,
-                else_block,
-                ..
-            } => tail(then_block) || else_block.as_ref().is_some_and(tail),
-            HirExpressionKind::Discerne { arms, .. } => arms
-                .iter()
-                .any(|arm| Self::carries_exact_decimal(&arm.body)),
-            _ => false,
+            _ => radix_hir::tails::branch_tails(expr)
+                .into_iter()
+                .any(Self::carries_exact_decimal),
         }
     }
 

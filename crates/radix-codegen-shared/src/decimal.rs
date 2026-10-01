@@ -217,6 +217,23 @@ pub fn is_decimal_computation(expr: &HirExpression, types: &TypeTable) -> bool {
     !matches!(exact_decimal(expr, types), ExactDecimal::Leaf(_))
 }
 
+/// Whether `expr` is a conditional, block or `discerne` of decimal type that
+/// yields unstored decimal arithmetic from some branch tail (n5c).
+///
+/// The tail set comes from [`radix_hir::tails::branch_tails`], the same
+/// enumerator typecheck uses to decide where a store rounds, so the store and
+/// the exact emission cannot disagree on which constructs are exact. Nested
+/// branching tails are followed.
+#[must_use]
+pub fn yields_exact_decimal_tail(expr: &HirExpression, types: &TypeTable) -> bool {
+    decimal_expr_width(expr, types).is_some()
+        && radix_hir::tails::branch_tails(expr)
+            .into_iter()
+            .any(|tail| {
+                is_decimal_computation(tail, types) || yields_exact_decimal_tail(tail, types)
+            })
+}
+
 /// Scale of a leaf operand of decimal arithmetic: a decimal is stored at
 /// scale 8, anything else (an integer operand) is scale 0.
 #[must_use]

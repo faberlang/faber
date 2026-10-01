@@ -17,6 +17,7 @@ mod nodes;
 mod nodes_test;
 #[cfg(test)]
 mod presentation_test;
+pub mod tails;
 pub mod visit;
 
 pub use nodes::*;

@@ -3,7 +3,11 @@
 use super::{
     carrier_in_width, decimal_scale_factor, decimal_text_to_carrier, round_half_even_quotient,
 };
-use radix_types::NumericWidth;
+use radix_hir::{
+    DefId, HirBinOp, HirBlock, HirCasuArm, HirExpression, HirExpressionKind, HirId, HirPattern,
+};
+use radix_lexer::Span;
+use radix_types::{NumericWidth, Primitive, TypeId, TypeTable};
 
 #[test]
 fn decimal_scale_factors_match_the_cto_ruling() {
@@ -54,4 +58,112 @@ fn carrier_in_width_rejects_out_of_range_values() {
         Some(i64::MAX)
     );
     assert_eq!(carrier_in_width(-1, NumericWidth::I32), None);
+}
+
+fn typed(id: u32, ty: TypeId, kind: HirExpressionKind) -> HirExpression {
+    HirExpression {
+        id: HirId(id),
+        kind,
+        ty: Some(ty),
+        span: Span::default(),
+    }
+}
+
+fn path(id: u32, ty: TypeId) -> HirExpression {
+    typed(id, ty, HirExpressionKind::Path(DefId(id)))
+}
+
+fn mul(id: u32, ty: TypeId) -> HirExpression {
+    typed(
+        id,
+        ty,
+        HirExpressionKind::Binary(
+            HirBinOp::Mul,
+            Box::new(path(id + 100, ty)),
+            Box::new(path(id + 200, ty)),
+        ),
+    )
+}
+
+fn block_of(tail: HirExpression) -> HirBlock {
+    HirBlock::simple(Vec::new(), Some(Box::new(tail)), Span::default())
+}
+
+fn si_of(ty: TypeId, then_tail: HirExpression, else_tail: HirExpression) -> HirExpression {
+    typed(
+        1,
+        ty,
+        HirExpressionKind::Si {
+            cond: Box::new(path(900, ty)),
+            then_block: block_of(then_tail),
+            then_catch: None,
+            else_block: Some(block_of(else_tail)),
+        },
+    )
+}
+
+#[test]
+fn branching_construct_yields_exact_decimal_when_a_tail_is_arithmetic() {
+    use super::yields_exact_decimal_tail;
+    let mut types = TypeTable::new();
+    let d64 = types.sized_numeric(Primitive::Numerus, NumericWidth::D64);
+
+    // Either tail being decimal arithmetic is enough.
+    assert!(yields_exact_decimal_tail(
+        &si_of(d64, mul(10, d64), path(11, d64)),
+        &types
+    ));
+    assert!(yields_exact_decimal_tail(
+        &si_of(d64, path(11, d64), mul(10, d64)),
+        &types
+    ));
+    // Stored leaves in every tail stay stored.
+    assert!(!yields_exact_decimal_tail(
+        &si_of(d64, path(10, d64), path(11, d64)),
+        &types
+    ));
+    // Nested branching tails are followed.
+    let nested = typed(
+        2,
+        d64,
+        HirExpressionKind::Block(block_of(si_of(d64, mul(10, d64), path(11, d64)))),
+    );
+    assert!(yields_exact_decimal_tail(&nested, &types));
+    // A `discerne` arm body counts.
+    let discerne = typed(
+        3,
+        d64,
+        HirExpressionKind::Discerne {
+            scrutinees: vec![path(900, d64)],
+            arms: vec![
+                HirCasuArm {
+                    patterns: vec![HirPattern::Wildcard],
+                    body: path(11, d64),
+                    span: Span::default(),
+                },
+                HirCasuArm {
+                    patterns: vec![HirPattern::Wildcard],
+                    body: mul(10, d64),
+                    span: Span::default(),
+                },
+            ],
+            exhaustive: true,
+        },
+    );
+    assert!(yields_exact_decimal_tail(&discerne, &types));
+}
+
+#[test]
+fn branching_construct_of_other_type_or_plain_arithmetic_is_not_a_decimal_tail() {
+    use super::yields_exact_decimal_tail;
+    let mut types = TypeTable::new();
+    let d64 = types.sized_numeric(Primitive::Numerus, NumericWidth::D64);
+    let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    // Not itself decimal-typed.
+    assert!(!yields_exact_decimal_tail(
+        &si_of(i64, mul(10, d64), path(11, d64)),
+        &types
+    ));
+    // Plain decimal arithmetic is not a branching construct.
+    assert!(!yields_exact_decimal_tail(&mul(10, d64), &types));
 }
