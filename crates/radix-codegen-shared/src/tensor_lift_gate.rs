@@ -29,9 +29,6 @@ pub fn reject_tensor_lift(
     interner: &Interner,
     target: Target,
 ) -> Result<(), CodegenError> {
-    if matches!(target, Target::HirFaber) {
-        return Ok(());
-    }
     struct Gate<'a> {
         types: &'a TypeTable,
         interner: &'a Interner,
@@ -47,6 +44,9 @@ pub fn reject_tensor_lift(
                 walk_expr(self, expr);
             }
         }
+    }
+    if matches!(target, Target::HirFaber) {
+        return Ok(());
     }
     let mut gate = Gate {
         types,

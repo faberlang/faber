@@ -26,7 +26,7 @@ impl Parser {
     ///
     /// GRAMMAR:
     ///   patterns := pattern (',' pattern | `et` pattern)*
-    ///   pattern := pattern_atom (`aut` pattern_atom)*
+    ///   pattern := `pattern_atom` (`aut` `pattern_atom`)*
     ///
     /// Both comma and `et` are accepted as subject-pattern separators. `aut`
     /// groups alternatives for one subject into a single AST node. The parser
@@ -85,7 +85,7 @@ impl Parser {
     /// Parse one pattern atom plus its optional binding suffix.
     ///
     /// GRAMMAR:
-    ///   pattern_atom := `_` | `-` number | literal | type-pattern [`bind`] | ident [`bind`] | path bind
+    ///   `pattern_atom` := `_` | `-` number | literal | type-pattern [`bind`] | ident [`bind`] | path bind
     ///   type-pattern := type-name [type-arguments]
     ///   bind := `ut` ident | (`fixum`|`varia`) binding-list
     ///   binding-list := ident [`ut` ident] (',' ident [`ut` ident])*
