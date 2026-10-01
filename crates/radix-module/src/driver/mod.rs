@@ -4491,3 +4491,8 @@ mod wgsl_bound_call_tests;
 #[cfg(feature = "mir-wgsl")]
 #[path = "wgsl_bound_params_test.rs"]
 mod wgsl_bound_params_tests;
+
+#[cfg(test)]
+#[cfg(feature = "mir-wgsl")]
+#[path = "wgsl_bound_bindings_test.rs"]
+mod wgsl_bound_bindings_tests;
