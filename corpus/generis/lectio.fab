@@ -1,0 +1,37 @@
++++
+term = "generis read"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_sugar", "annotation_name", "genus_decl", "genus_member", "field_decl", "type_annotation", "owned_type", "base_type", "literal", "incipit_stmt", "expression", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Sibling module exporting a genus whose static field an importer reads through the module and the type name."
+syntax = "@ public class <Type> { static <type> <field> = <expression> }"
+aliases = ["static field read across modules"]
+related = ["generis", "genus", "importa"]
+locale = "en"
++++
+# =============================================================================
+# generis read — Sibling module exporting a genus with a static field
+# =============================================================================
+#
+# What this teaches:
+#   • An exported genus carries its static field and the field's initializer
+#     through the file interface, so an importing module reads `module.Tab.Z`.
+#
+# See also: generis, genus, importa
+# =============================================================================
+
+# generis read lectio — sibling module for generis/lectio-importata.fab
+#
+# EXPECTED OUTPUT:
+#   7 when run standalone.
+
+@ public
+class Tab {
+    static int LIMIT = 7
+    var int w = 1
+}
+
+main {
+    print Tab.LIMIT
+}

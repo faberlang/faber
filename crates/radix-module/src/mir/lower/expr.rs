@@ -477,6 +477,17 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
             };
             return self.lower_expr_value(init);
         }
+        // The same read through an imported genus (`module.Tab.Z`): the field's
+        // initializer comes from the file interface.
+        if let HirExpressionKind::Path(def_id) = &object.kind
+            && let Some(init) = self
+                .context
+                .imported_static_fields
+                .get(&(*def_id, name))
+                .cloned()
+        {
+            return self.lower_expr_value(&init);
+        }
         self.lower_field(object, name, expr)
     }
 
