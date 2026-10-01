@@ -41,6 +41,51 @@ pub const RUNNER_INF_BIT_CEILING: u64 = 1 << 31;
 /// it still admits a product of two 2^18-bit (8192-limb) values.
 pub const RUNNER_INF_MUL_WORK_CEILING: u64 = 1 << 27;
 
+/// Longest decimal integer token (digits, sign excluded) the runner reads into
+/// an `inf` from text (ruling 45 on the parse path). Decimal parsing is
+/// O(n^2): nine digits per limb multiply over a growing magnitude. The ceiling
+/// is the largest power of two whose parse work stays within
+/// [`RUNNER_INF_MUL_WORK_CEILING`] (a runner limit like the step budget, not a
+/// language rule); it is far below [`RUNNER_INF_BIT_CEILING`] because the bit
+/// ceiling alone would admit a token that parses for hours.
+pub const RUNNER_INF_PARSE_DIGIT_CEILING: usize = 1 << 17;
+
+/// Schoolbook limb operations of parsing `digits` decimal digits: one multiply
+/// per nine-digit chunk over a magnitude that grows to `digits * log2(10) / 32`
+/// limbs (halved for the average length; rounded up, with `log2(10) < 3.33`).
+const fn parse_work(digits: u64) -> u64 {
+    let chunks = digits.div_ceil(9);
+    let limbs = (digits * 333).div_ceil(100 * 32);
+    chunks * limbs / 2
+}
+
+const _: () =
+    assert!(parse_work(RUNNER_INF_PARSE_DIGIT_CEILING as u64) <= RUNNER_INF_MUL_WORK_CEILING);
+
+/// Refuse a decimal integer token longer than [`RUNNER_INF_PARSE_DIGIT_CEILING`]
+/// before any quadratic work starts. `digits` is the digit count (no sign).
+pub(crate) fn check_parse_token(
+    digits: usize,
+    span: Span,
+    operation: &str,
+) -> Result<(), RunnerError> {
+    if digits <= RUNNER_INF_PARSE_DIGIT_CEILING {
+        return Ok(());
+    }
+    let mut error = RunnerError::internal_with_issue(
+        span,
+        format!(
+            "inf size exhausted in {operation}: an integer token of {digits} digits exceeds the \
+             runner ceiling of {RUNNER_INF_PARSE_DIGIT_CEILING} digits"
+        ),
+        RUNNER_ISSUE_INF_SIZE_EXHAUSTED,
+    );
+    error
+        .args
+        .push(("operation".to_owned(), operation.to_owned()));
+    Err(error)
+}
+
 /// Stable identity of a runner `inf` resource fault (ruling 45).
 pub const RUNNER_ISSUE_INF_SIZE_EXHAUSTED: &str = "runner_inf_size_exhausted";
 

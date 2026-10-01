@@ -3,7 +3,7 @@
 use super::super::value::MapKey;
 use super::super::{RunnerError, Value};
 use super::args::{expect_str, optional_usize};
-use crate::inf::from_magnus;
+use crate::inf::{RUNNER_ISSUE_INF_SIZE_EXHAUSTED, check_parse_token, from_magnus};
 use handroll::Magnus;
 use radix_lexer::Span;
 use std::cell::RefCell;
@@ -31,7 +31,11 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
                 return Err(RunnerError::internal(span, "json.try_parse provider arity"));
             };
             let raw = expect_str(raw, span, "json.try_parse input")?;
-            Ok(parse_json(&raw, span).unwrap_or(Value::Nil))
+            // Malformed text is `nihil`; a resource fault (ruling 45) is not.
+            match parse_json(&raw, span) {
+                Err(error) if error.issue == RUNNER_ISSUE_INF_SIZE_EXHAUSTED => Err(error),
+                parsed => Ok(parsed.unwrap_or(Value::Nil)),
+            }
         }
         other => Err(RunnerError::unsupported(
             span,
@@ -66,13 +70,15 @@ fn serialize_json(
 }
 
 /// The exact integer of a JSON number token that has no fraction or exponent
-/// (`arbitrary_precision` keeps the source digits).
-fn integer_token(number: &serde_json::Number) -> Option<Magnus> {
+/// (`arbitrary_precision` keeps the source digits). A token past the parse
+/// ceiling is refused by length before the quadratic decimal parse (ruling 45).
+fn integer_token(number: &serde_json::Number, span: Span) -> Result<Option<Magnus>, RunnerError> {
     let token = number.to_string();
     if token.contains(['.', 'e', 'E']) {
-        return None;
+        return Ok(None);
     }
-    Magnus::parse_decimal(&token).ok()
+    check_parse_token(token.trim_start_matches('-').len(), span, "json.parse")?;
+    Ok(Magnus::parse_decimal(&token).ok())
 }
 
 fn json_to_value(value: serde_json::Value, span: Span) -> Result<Value, RunnerError> {
@@ -86,7 +92,7 @@ fn json_to_value(value: serde_json::Value, span: Span) -> Result<Value, RunnerEr
                 // F-084: json.parse large u64 (e.g. u64::MAX) must surface as
                 // UInt, not fall through to the lossy as_f64() path.
                 Ok(Value::UInt(number))
-            } else if let Some(exact) = integer_token(&value) {
+            } else if let Some(exact) = integer_token(&value, span)? {
                 // Ruling 40: an integer token of any length is an `inf`.
                 Ok(from_magnus(exact))
             } else if let Some(number) = value.as_f64() {

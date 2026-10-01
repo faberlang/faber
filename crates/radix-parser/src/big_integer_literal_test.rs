@@ -1,7 +1,9 @@
 //! inf track U3 parser pins: an integer literal beyond `u64` parses to
 //! `Literal::BigInt` (expression and pattern position) and stays out of JSON.
 
-use crate::test_support::parse_ok;
+use crate::test_support::{
+    ParseExpectation, assert_parse_error_issue, assert_parse_error_matches, parse_ok,
+};
 use radix_syntax::{ExprKind, Literal, Pattern, StmtKind};
 
 fn first_initializer_literal(source: &str) -> (radix_lexer::Interner, Literal) {
@@ -59,4 +61,31 @@ discerne x {
         stmt.arms[1].patterns[0],
         Pattern::NegatedLiteral(Literal::BigInt(_), _)
     ));
+}
+
+// The Earley reference grammar (`scripta/grammar-earley.py`) reads NUMBER as
+// legal in the two positions below; these are the parser half of the
+// BigInteger restriction recorded there.
+#[test]
+fn a_big_literal_in_a_json_literal_is_rejected() {
+    for source in [
+        "fixum json l ← { \"a\": 18446744073709551616 }\n",
+        "fixum json l ← { \"a\": [1, 123456789012345678901234567890] }\n",
+        // A u64 above i64::MAX is an `Integer` token and fails the same checked boundary.
+        "fixum json l ← { \"a\": 9223372036854775808 }\n",
+    ] {
+        assert_parse_error_issue(source, "json_integer_overflow");
+    }
+}
+
+#[test]
+fn a_big_literal_as_an_enum_member_value_is_rejected() {
+    assert_parse_error_matches(
+        "ordo E { a = 18446744073709551616 }\n",
+        ParseExpectation::Args(&[("expected", "value")]),
+    );
+    assert_parse_error_matches(
+        "ordo E { a = -18446744073709551616 }\n",
+        ParseExpectation::Args(&[("expected", "number")]),
+    );
 }

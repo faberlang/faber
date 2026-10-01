@@ -1085,3 +1085,36 @@ fn json_round_trips_an_inf_beyond_64_bits_as_a_bare_number() {
         Value::Str(digits.to_owned())
     );
 }
+
+/// Ruling 45 on the parse path: a pathologically long integer token is refused
+/// by length before the O(n^2) decimal parse starts.
+#[test]
+fn json_parse_refuses_a_pathologically_long_integer_token_promptly() {
+    let digits = "9".repeat(2_000_000);
+    for source in [digits.clone(), format!("[{digits}]"), format!("-{digits}")] {
+        let started = std::time::Instant::now();
+        let error = json_kernel("parse", Value::Str(source.clone())).expect_err("over ceiling");
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(2),
+            "refusal took {:?}",
+            started.elapsed()
+        );
+        assert_eq!(error.issue, RUNNER_ISSUE_INF_SIZE_EXHAUSTED);
+        assert_eq!(
+            error.args,
+            vec![("operation".to_owned(), "json.parse".to_owned())]
+        );
+        // `try_parse` swallows malformed text, never a resource fault.
+        let error = json_kernel("try_parse", Value::Str(source)).expect_err("fault propagates");
+        assert_eq!(error.issue, RUNNER_ISSUE_INF_SIZE_EXHAUSTED);
+    }
+}
+
+#[test]
+fn json_parse_admits_integer_tokens_up_to_the_ceiling() {
+    let digits = "7".repeat(crate::inf::RUNNER_INF_PARSE_DIGIT_CEILING);
+    let parsed = json_kernel("parse", Value::Str(digits.clone())).expect("at the ceiling");
+    assert_eq!(parsed, big(&digits));
+    let error = json_kernel("parse", Value::Str(format!("{digits}7"))).expect_err("one digit over");
+    assert_eq!(error.issue, RUNNER_ISSUE_INF_SIZE_EXHAUSTED);
+}
