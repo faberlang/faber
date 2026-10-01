@@ -1,7 +1,7 @@
 //! NR-6 emitter proofs for the Cartesian `itera ab` range-product series.
 //!
 //! HIR→Faber emission must preserve the declared source/binder series with
-//! contextual locale spellings (`ab`/`range`, `fixum`/`const`), and the
+//! contextual locale spellings (`ab`/`range`, `fixum`/`const`, `varia`/`var`), and the
 //! emitted head must re-parse through the same series shape — never the
 //! `ex` lockstep mode and never a collapsed single source.
 
@@ -53,6 +53,7 @@ impl KeywordSurface for EnSurface {
         match key {
             "ab" => "range",
             "fixum" => "const",
+            "varia" => "var",
             key => key,
         }
     }
@@ -81,6 +82,7 @@ impl KeywordPack for EnPack {
             "from" => Some("ex"),
             "range" => Some("ab"),
             "const" => Some("fixum"),
+            "var" => Some("varia"),
             _ => None,
         }
     }
@@ -241,4 +243,39 @@ fn english_three_series_round_trips() {
         "N=3 English head must keep the documented `for range` form, got:\n{code}"
     );
     assert_round_trips(&code, 3, 3, true);
+}
+
+/// A mutable authored binder (`varia`) must survive the emit; it is the same
+/// fact the lowering carries on the node, not a presentation choice.
+fn mutable_range_product(ctx: &mut Ctx) -> HirExpression {
+    let mut product = ctx.range_product(vec![int_range(0, 3), int_range(5, 7)], &["i", "j"]);
+    let HirExpressionKind::IteraRange { mutable, .. } = &mut product.kind else {
+        panic!("range product must be IteraRange");
+    };
+    *mutable = true;
+    product
+}
+
+#[test]
+fn latin_mutable_binder_emits_varia() {
+    let mut ctx = Ctx::new();
+    let product = mutable_range_product(&mut ctx);
+    let code = ctx.render(&product, &LatinSurface);
+    assert!(
+        code.starts_with("itera ab 0‥3, 5‥7 varia i, j {"),
+        "mutable Latin head must keep varia, got:\n{code}"
+    );
+    assert_round_trips(&code, 2, 2, false);
+}
+
+#[test]
+fn english_mutable_binder_emits_var() {
+    let mut ctx = Ctx::new();
+    let product = mutable_range_product(&mut ctx);
+    let code = ctx.render(&product, &EnSurface);
+    assert!(
+        code.starts_with("for range 0‥3, 5‥7 var i, j {"),
+        "mutable English head must keep var, got:\n{code}"
+    );
+    assert_round_trips(&code, 2, 2, true);
 }

@@ -27,16 +27,7 @@ use std::path::{Path, PathBuf};
 /// Meaning divergences that exist today. Each needs a fix outside the emitter
 /// leaf (or an exemplum repair) and is tracked here so the gate stays green
 /// only while the list is exact.
-const KNOWN_MEANING_GAPS: &[(&str, &str)] = &[
-    (
-        "itera/varia-binder.fab",
-        "IB-1 carries the `varia` binder mutability on the HIR loop node; the emitter still prints `fixum` (owner: IB-3, radix-hir-faber)",
-    ),
-    (
-        "summa/varia-binder.fab",
-        "IB-1 carries the `varia` binder mutability on the HIR `Summa` node; the emitter still prints `fixum` (owner: IB-3, radix-hir-faber)",
-    ),
-];
+const KNOWN_MEANING_GAPS: &[(&str, &str)] = &[];
 
 /// Files the structure check refuses (`CODEGEN006` / `ast_construct_dropped`): HIR keeps no
 /// representation for the construct, so a re-emit would silently delete it.

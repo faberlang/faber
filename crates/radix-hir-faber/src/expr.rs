@@ -61,6 +61,12 @@ const NON_NULL_CHAIN: PostfixChainPrefixes = PostfixChainPrefixes {
     call_open: "!(",
 };
 
+/// Binder keyword of a loop header: `varia` when the authored binder is
+/// mutable, `fixum` otherwise, spelled in the source's own locale.
+fn loop_binder_keyword<'s>(mutable: bool, surface: &'s impl KeywordSurface) -> &'s str {
+    surface.contextual_keyword(if mutable { "varia" } else { "fixum" })
+}
+
 /// Bare integer literal for the range-spacing law: an
 /// `Int(u64)` literal, or unary minus over one. Negative literals lower as
 /// `Unary(Neg, Int)` (see `HirLiteral::Int`), and the `Unary` arm emits
@@ -533,6 +539,7 @@ impl super::FaberCodegen<'_> {
                 binding_name,
                 iter,
                 body: block,
+                mutable,
                 ..
             } => {
                 writer.write(surface.keyword(TokenKind::Itera));
@@ -574,7 +581,7 @@ impl super::FaberCodegen<'_> {
                         self.write_destructure_pattern(&binding.pattern, surface, writer);
                     }
                     None => {
-                        writer.write(surface.contextual_keyword("fixum"));
+                        writer.write(loop_binder_keyword(*mutable, surface));
                         writer.write(" ");
                         writer.write(&self.symbol_to_string(*binding_name));
                     }
@@ -591,6 +598,7 @@ impl super::FaberCodegen<'_> {
                 coordinates,
                 bindings,
                 body,
+                mutable,
                 ..
             } => {
                 // Lockstep series: `itera ex s1, s2 [apud [i]] fixum b1, b2`.
@@ -614,7 +622,7 @@ impl super::FaberCodegen<'_> {
                     writer.write("]");
                 }
                 writer.write(" ");
-                writer.write(surface.contextual_keyword("fixum"));
+                writer.write(loop_binder_keyword(*mutable, surface));
                 writer.write(" ");
                 for (index, (_, binding_name)) in bindings.iter().enumerate() {
                     if index > 0 {
@@ -638,6 +646,7 @@ impl super::FaberCodegen<'_> {
                 ranges,
                 bindings,
                 body,
+                mutable,
                 ..
             } => {
                 writer.write(surface.keyword(TokenKind::Itera));
@@ -651,7 +660,7 @@ impl super::FaberCodegen<'_> {
                     self.write_expr(range, names, surface, writer);
                 }
                 writer.write(" ");
-                writer.write(surface.contextual_keyword("fixum"));
+                writer.write(loop_binder_keyword(*mutable, surface));
                 writer.write(" ");
                 for (index, (_, binding_name)) in bindings.iter().enumerate() {
                     if index > 0 {
@@ -1117,6 +1126,7 @@ impl super::FaberCodegen<'_> {
                 filum,
                 binding,
                 body,
+                mutable,
                 ..
             } => {
                 // `summa ex src apud [i] filum f fixum s { … }` — the SFR-2
@@ -1148,7 +1158,7 @@ impl super::FaberCodegen<'_> {
                     writer.write(&self.symbol_to_string(*lane));
                 }
                 writer.write(" ");
-                writer.write(surface.contextual_keyword("fixum"));
+                writer.write(loop_binder_keyword(*mutable, surface));
                 writer.write(" ");
                 writer.write(&self.symbol_to_string(binding.1));
                 writer.writeln(" {");
