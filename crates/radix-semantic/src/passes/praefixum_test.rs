@@ -135,3 +135,225 @@ fn evaluation_order_follows_static_reads() {
         .collect();
     assert_eq!(names, ["A", "B"]);
 }
+
+// ST2-2.1: import references.
+
+mod imported {
+    use super::super::praefixum::{
+        ImportedCallee, ImportedEffects, ImportedReference, ImportedReferenceKind, function_effect,
+        imported_references,
+    };
+    use crate::file_interface::{
+        FileExport, FileExportKind, FileInterface, InterfaceCallable, InterfaceConstValue,
+        InterfaceTypeSnapshot,
+    };
+    use crate::passes::visibility_annotation::VisibilityTier::Publica;
+    use crate::test_support::{AnalyzedFixture, analyze_source_with_import_contract};
+    use crate::{DefId, Primitive};
+    use radix_hir::{HirItemKind, HirModule};
+    use radix_lexer::Interner;
+    use std::collections::BTreeMap;
+
+    fn analyze(source: &str) -> AnalyzedFixture {
+        let mut interface = FileInterface::new();
+        interface.insert(FileExport {
+            name: "K".to_owned(),
+            kind: FileExportKind::Const(
+                InterfaceTypeSnapshot::Primitive(Primitive::Numerus),
+                Some(InterfaceConstValue::Int(5)),
+            ),
+        });
+        for name in ["f", "g"] {
+            interface.insert(FileExport {
+                name: name.to_owned(),
+                kind: FileExportKind::Function(InterfaceCallable {
+                    type_params: Vec::new(),
+                    params: Vec::new(),
+                    ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Numerus)),
+                    err: None,
+                    is_async: false,
+                    is_generator: false,
+                    device: None,
+                }),
+            });
+        }
+        let exports = ["K", "f", "g"]
+            .into_iter()
+            .map(|name| (name.to_owned(), Publica))
+            .collect();
+        let fixture = analyze_source_with_import_contract(
+            source,
+            BTreeMap::from([("ns".to_owned(), exports)]),
+            BTreeMap::from([("ns".to_owned(), interface)]),
+        );
+        assert!(
+            fixture.is_ok(),
+            "diagnostics: {:?} in {source}",
+            fixture.diagnostics
+        );
+        fixture
+    }
+
+    fn def_named(fixture: &AnalyzedFixture, hir: &HirModule, wanted: &str) -> DefId {
+        hir.items
+            .iter()
+            .find_map(|item| match &item.kind {
+                HirItemKind::Function(function)
+                    if fixture.interner.resolve(function.name) == wanted =>
+                {
+                    Some(item.def_id)
+                }
+                HirItemKind::Constant(konst) if fixture.interner.resolve(konst.name) == wanted => {
+                    Some(item.def_id)
+                }
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("no item named {wanted}"))
+    }
+
+    fn references(fixture: &AnalyzedFixture, wanted: &str) -> Vec<ImportedReference> {
+        let hir = fixture.result.hir.as_ref().expect("hir");
+        let site = def_named(fixture, hir, wanted);
+        imported_references(hir, &fixture.result.types, site)
+    }
+
+    const IMPORT: &str = "importa ex \"./ns\" ns\n";
+
+    #[test]
+    fn namespace_call_is_one_call_reference() {
+        let fixture = analyze(&format!(
+            "{IMPORT}fixum numerus A = praefixum {{\n    redde ns.f()\n}}\n"
+        ));
+        let found = references(&fixture, "A");
+        assert_eq!(found.len(), 1, "references: {found:?}");
+        assert_eq!(found[0].kind, ImportedReferenceKind::Call);
+        assert_eq!(fixture.interner.resolve(found[0].member), "f");
+    }
+
+    #[test]
+    fn namespace_value_is_one_value_reference() {
+        let fixture = analyze(&format!(
+            "{IMPORT}fixum numerus A = praefixum {{\n    redde ns.K\n}}\n"
+        ));
+        let found = references(&fixture, "A");
+        assert_eq!(found.len(), 1, "references: {found:?}");
+        assert_eq!(found[0].kind, ImportedReferenceKind::Value);
+        assert_eq!(fixture.interner.resolve(found[0].member), "K");
+    }
+
+    #[test]
+    fn reference_through_a_local_helper_is_reported() {
+        let fixture = analyze(&format!(
+            "{IMPORT}functio helper() → numerus {{\n    redde ns.f()\n}}\n\
+             fixum numerus A = praefixum {{\n    redde helper()\n}}\n"
+        ));
+        let found = references(&fixture, "A");
+        assert_eq!(found.len(), 1, "references: {found:?}");
+        assert_eq!(found[0].kind, ImportedReferenceKind::Call);
+    }
+
+    #[test]
+    fn body_without_import_references_reports_none() {
+        let fixture = analyze(&format!(
+            "{IMPORT}functio helper() → numerus {{\n    redde ns.f()\n}}\n\
+             fixum numerus A = praefixum {{\n    redde 1 + 2\n}}\n"
+        ));
+        assert!(references(&fixture, "A").is_empty());
+    }
+
+    #[test]
+    fn local_method_call_is_not_an_import_reference() {
+        let fixture = analyze(&format!(
+            "{IMPORT}genus Cista {{\n    varia numerus n\n    functio ter() → numerus {{\n        \
+             redde 3\n    }}\n}}\n\
+             functio sume(Cista c) → numerus {{\n    redde c.ter()\n}}\n"
+        ));
+        assert!(references(&fixture, "sume").is_empty());
+    }
+
+    /// Answers `Effect { "scribe" }` for the member `g`, `Pure` otherwise.
+    struct Stub<'a>(&'a Interner);
+
+    impl ImportedEffects for Stub<'_> {
+        fn callee(&mut self, reference: &ImportedReference) -> ImportedCallee {
+            if self.0.resolve(reference.member) == "g" {
+                ImportedCallee::Effect {
+                    effect: "scribe",
+                    chain: vec!["g".to_owned()],
+                }
+            } else {
+                ImportedCallee::Pure
+            }
+        }
+    }
+
+    #[test]
+    fn function_effect_spells_an_imported_hop() {
+        let fixture = analyze(&format!(
+            "{IMPORT}functio f() → numerus {{\n    redde ns.g()\n}}\n"
+        ));
+        let hir = fixture.result.hir.as_ref().expect("hir");
+        let root = def_named(&fixture, hir, "f");
+        let found = function_effect(
+            hir,
+            &fixture.result.types,
+            &fixture.interner,
+            root,
+            &mut Stub(&fixture.interner),
+        );
+        assert_eq!(
+            found,
+            ImportedCallee::Effect {
+                effect: "scribe",
+                chain: vec!["f".to_owned(), "ns.g".to_owned()],
+            }
+        );
+    }
+
+    #[test]
+    fn function_effect_keeps_local_hops_before_the_import() {
+        let fixture = analyze(&format!(
+            "{IMPORT}functio inner() → numerus {{\n    redde ns.g()\n}}\n\
+             functio f() → numerus {{\n    redde inner()\n}}\n"
+        ));
+        let hir = fixture.result.hir.as_ref().expect("hir");
+        let root = def_named(&fixture, hir, "f");
+        let found = function_effect(
+            hir,
+            &fixture.result.types,
+            &fixture.interner,
+            root,
+            &mut Stub(&fixture.interner),
+        );
+        assert_eq!(
+            found,
+            ImportedCallee::Effect {
+                effect: "scribe",
+                chain: vec!["f".to_owned(), "inner".to_owned(), "ns.g".to_owned()],
+            }
+        );
+    }
+
+    #[test]
+    fn unavailable_import_is_not_pure() {
+        struct Blind;
+        impl ImportedEffects for Blind {
+            fn callee(&mut self, _: &ImportedReference) -> ImportedCallee {
+                ImportedCallee::Unavailable
+            }
+        }
+        let fixture = analyze(&format!(
+            "{IMPORT}functio f() → numerus {{\n    redde ns.f()\n}}\n"
+        ));
+        let hir = fixture.result.hir.as_ref().expect("hir");
+        let root = def_named(&fixture, hir, "f");
+        let found = function_effect(
+            hir,
+            &fixture.result.types,
+            &fixture.interner,
+            root,
+            &mut Blind,
+        );
+        assert_eq!(found, ImportedCallee::Unavailable);
+    }
+}

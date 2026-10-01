@@ -32,6 +32,15 @@
 //!
 //! A function that contains a local site is, for ordering, a reader of that
 //! site: whoever calls the function waits for the site's evaluation.
+//!
+//! IMPORT REFERENCES
+//! =================
+//! A body may reach into another module through an import namespace
+//! (`ns.f()`, `ns.K`) or call a method of a struct declared elsewhere. `check`
+//! does not follow those references; [`imported_references`] lists them and
+//! [`function_effect`] folds a caller-supplied answer for each into the same
+//! effect search, so a driver that can see the other module can complete the
+//! purity proof.
 
 use crate::{SemanticError, SemanticErrorKind, Type, TypeTable};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local};
@@ -42,6 +51,7 @@ use radix_lexer::{Interner, Span, Symbol};
 use radix_types::{AppliedArg, TypeId, TypeParamConstraint};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::borrow::Cow;
+use std::collections::VecDeque;
 
 const ISSUE_FORBIDDEN: &str = "praefixum_forbidden";
 const ISSUE_CYCLE: &str = "constant_cycle";
@@ -548,6 +558,170 @@ pub fn reached_functions(
     reached
 }
 
+/// How a body reaches into an imported module.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportedReferenceKind {
+    /// A call through an import namespace: `ns.f()`.
+    Call,
+    /// A data member of an import namespace: `ns.K`.
+    Value,
+    /// A method call on a struct that this module does not declare.
+    Method,
+}
+
+/// One place a body reaches into an imported module.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ImportedReference {
+    /// The import binding (`Call`, `Value`) or the receiver's struct
+    /// (`Method`).
+    pub namespace: DefId,
+    pub member: Symbol,
+    pub kind: ImportedReferenceKind,
+    pub span: Span,
+}
+
+/// What an imported callee does, as far as the answerer can tell.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ImportedCallee {
+    /// Deterministic computation: no forbidden effect.
+    Pure,
+    /// A forbidden effect. `chain` runs from the callee itself (first
+    /// element, replaced by the spelled `<binding>.<member>` hop) down to the
+    /// function that performs the effect; it may be empty.
+    Effect {
+        effect: &'static str,
+        chain: Vec<String>,
+    },
+    /// The answerer cannot see the callee, so purity is unproven.
+    Unavailable,
+}
+
+/// Answers for the import references [`function_effect`] meets.
+pub trait ImportedEffects {
+    fn callee(&mut self, reference: &ImportedReference) -> ImportedCallee;
+}
+
+/// Every import reference the definition `site` reaches: in its own body and
+/// in each Faber function it reaches through calls and method calls,
+/// transitively (not through other statics' initializers). A nested namespace
+/// call is reported once, as a `Call`.
+#[must_use]
+pub fn imported_references(
+    hir: &HirModule,
+    types: &TypeTable,
+    site: DefId,
+) -> Vec<ImportedReference> {
+    let mut graph = Graph::new(hir, types, &scan_locals(hir));
+    let mut references = Vec::new();
+    let mut seen = FxHashSet::from_iter([site]);
+    let mut queue = VecDeque::from([site]);
+    while let Some(next) = queue.pop_front() {
+        let facts = graph.facts(next);
+        references.extend(facts.imports.iter().copied());
+        for (callee, _) in facts.callees.clone() {
+            if seen.insert(callee) {
+                queue.push_back(callee);
+            }
+        }
+    }
+    references
+}
+
+/// The first forbidden effect reachable from the function `root`, with the
+/// call chain from `root` (an imported hop is spelled `<binding>.<member>`).
+/// Search order per body: its own effect, its local callees, then its import
+/// references through `imports`. The first non-`Pure` answer wins, so an
+/// `Unavailable` import is never reported as `Pure`.
+#[must_use]
+pub fn function_effect(
+    hir: &HirModule,
+    types: &TypeTable,
+    interner: &Interner,
+    root: DefId,
+    imports: &mut dyn ImportedEffects,
+) -> ImportedCallee {
+    let mut graph = Graph::new(hir, types, &scan_locals(hir));
+    let mut search = EffectSearch {
+        interner,
+        imports,
+        memo: FxHashMap::default(),
+    };
+    search.run(&mut graph, root, &mut FxHashSet::default())
+}
+
+struct EffectSearch<'i> {
+    interner: &'i Interner,
+    imports: &'i mut dyn ImportedEffects,
+    memo: FxHashMap<DefId, ImportedCallee>,
+}
+
+impl EffectSearch<'_> {
+    fn run(
+        &mut self,
+        graph: &mut Graph<'_>,
+        def_id: DefId,
+        visiting: &mut FxHashSet<DefId>,
+    ) -> ImportedCallee {
+        if let Some(known) = self.memo.get(&def_id) {
+            return known.clone();
+        }
+        if !visiting.insert(def_id) {
+            // Recursion: the cycle's own members report their effects.
+            return ImportedCallee::Pure;
+        }
+        let found = self.search(graph, def_id, visiting);
+        visiting.remove(&def_id);
+        self.memo.insert(def_id, found.clone());
+        found
+    }
+
+    fn search(
+        &mut self,
+        graph: &mut Graph<'_>,
+        def_id: DefId,
+        visiting: &mut FxHashSet<DefId>,
+    ) -> ImportedCallee {
+        let name = graph
+            .name_of(def_id)
+            .map_or_else(String::new, |name| self.interner.resolve(name).to_owned());
+        let (effect, callees, references) = {
+            let facts = graph.facts(def_id);
+            (facts.effect, facts.callees.clone(), facts.imports.clone())
+        };
+        if let Some((effect, _)) = effect {
+            return ImportedCallee::Effect {
+                effect,
+                chain: vec![name],
+            };
+        }
+        for (callee, _) in callees {
+            match self.run(graph, callee, visiting) {
+                ImportedCallee::Pure => {}
+                ImportedCallee::Effect { effect, mut chain } => {
+                    chain.insert(0, name);
+                    return ImportedCallee::Effect { effect, chain };
+                }
+                ImportedCallee::Unavailable => return ImportedCallee::Unavailable,
+            }
+        }
+        for reference in references {
+            match self.imports.callee(&reference) {
+                ImportedCallee::Pure => {}
+                ImportedCallee::Effect { effect, chain } => {
+                    let mut hops = vec![name, graph.spell(&reference, self.interner)];
+                    hops.extend(chain.into_iter().skip(1));
+                    return ImportedCallee::Effect {
+                        effect,
+                        chain: hops,
+                    };
+                }
+                ImportedCallee::Unavailable => return ImportedCallee::Unavailable,
+            }
+        }
+        ImportedCallee::Pure
+    }
+}
+
 // GRAPH
 
 /// A forbidden effect reached from a body.
@@ -565,6 +739,7 @@ struct Facts {
     effect: Option<(&'static str, Span)>,
     callees: Vec<(DefId, Span)>,
     statics: Vec<DefId>,
+    imports: Vec<ImportedReference>,
 }
 
 struct Graph<'a> {
@@ -576,6 +751,10 @@ struct Graph<'a> {
     statics: FxHashMap<DefId, (Symbol, Cow<'a, HirExpression>)>,
     facts: FxHashMap<DefId, Facts>,
     violations: FxHashMap<DefId, Option<Violation>>,
+    /// Namespace import bindings → the local name (alias, else exported name).
+    namespaces: FxHashMap<DefId, Symbol>,
+    /// Structs declared in this module.
+    local_structs: FxHashSet<DefId>,
 }
 
 impl<'a> Graph<'a> {
@@ -587,9 +766,18 @@ impl<'a> Graph<'a> {
             statics: FxHashMap::default(),
             facts: FxHashMap::default(),
             violations: FxHashMap::default(),
+            namespaces: FxHashMap::default(),
+            local_structs: FxHashSet::default(),
         };
         for item in &hir.items {
             match &item.kind {
+                HirItemKind::Import(import) if !import.selective => {
+                    for bound in &import.items {
+                        graph
+                            .namespaces
+                            .insert(bound.def_id, bound.alias.unwrap_or(bound.name));
+                    }
+                }
                 HirItemKind::Function(function) => {
                     graph.functions.insert(item.def_id, function);
                 }
@@ -599,6 +787,7 @@ impl<'a> Graph<'a> {
                         .insert(item.def_id, (konst.name, Cow::Borrowed(&konst.value)));
                 }
                 HirItemKind::Struct(strukt) => {
+                    graph.local_structs.insert(item.def_id);
                     for method in &strukt.methods {
                         graph.functions.insert(method.def_id, &method.func);
                         graph
@@ -625,12 +814,30 @@ impl<'a> Graph<'a> {
         graph
     }
 
+    fn name_of(&self, def_id: DefId) -> Option<Symbol> {
+        self.functions
+            .get(&def_id)
+            .map(|function| function.name)
+            .or_else(|| self.statics.get(&def_id).map(|(name, _)| *name))
+    }
+
+    /// `<binding>.<member>`; a method on a foreign struct has no binding and
+    /// is spelled by its member alone.
+    fn spell(&self, reference: &ImportedReference, interner: &Interner) -> String {
+        let member = interner.resolve(reference.member);
+        match self.namespaces.get(&reference.namespace) {
+            Some(binding) => format!("{}.{member}", interner.resolve(*binding)),
+            None => member.to_owned(),
+        }
+    }
+
     /// Direct facts of a function body or static initializer.
     fn facts(&mut self, def_id: DefId) -> &Facts {
         if !self.facts.contains_key(&def_id) {
             let mut collector = Collector {
                 graph: self,
                 facts: Facts::default(),
+                reported: FxHashSet::default(),
             };
             if let Some(function) = collector.graph.functions.get(&def_id).copied() {
                 collector.function(function);
@@ -747,6 +954,9 @@ impl<'a> Graph<'a> {
 struct Collector<'g, 'a> {
     graph: &'g Graph<'a>,
     facts: Facts,
+    /// Namespace callees already reported as a `Call`, so the walk into the
+    /// callee does not report the same member again as a `Value`.
+    reported: FxHashSet<*const HirExpression>,
 }
 
 impl Collector<'_, '_> {
@@ -778,7 +988,36 @@ impl Collector<'_, '_> {
         }
     }
 
+    /// The namespace import binding `object` names, when it names one.
+    fn namespace_of(&self, object: &HirExpression) -> Option<DefId> {
+        match object.kind {
+            HirExpressionKind::Path(def_id) if self.graph.namespaces.contains_key(&def_id) => {
+                Some(def_id)
+            }
+            _ => None,
+        }
+    }
+
+    fn import(
+        &mut self,
+        namespace: DefId,
+        member: Symbol,
+        kind: ImportedReferenceKind,
+        span: Span,
+    ) {
+        self.facts.imports.push(ImportedReference {
+            namespace,
+            member,
+            kind,
+            span,
+        });
+    }
+
     fn method(&mut self, receiver: &HirExpression, name: Symbol, span: Span) {
+        if let Some(namespace) = self.namespace_of(receiver) {
+            self.import(namespace, name, ImportedReferenceKind::Call, span);
+            return;
+        }
         let Some(mut ty) = receiver.ty else {
             return;
         };
@@ -788,6 +1027,8 @@ impl Collector<'_, '_> {
                 Type::Struct(owner) => {
                     if let Some(method) = self.graph.methods.get(&(*owner, name)).copied() {
                         self.call(method, span);
+                    } else if !self.graph.local_structs.contains(owner) {
+                        self.import(*owner, name, ImportedReferenceKind::Method, span);
                     }
                     return;
                 }
@@ -833,6 +1074,21 @@ impl HirVisitor for Collector<'_, '_> {
             }
             HirExpressionKind::MethodCall(receiver, name, ..) => {
                 self.method(receiver, *name, expr.span);
+            }
+            HirExpressionKind::Call(callee, ..) => {
+                if let HirExpressionKind::Field(object, member) = &callee.kind
+                    && let Some(namespace) = self.namespace_of(object)
+                {
+                    self.reported.insert(std::ptr::from_ref(callee.as_ref()));
+                    self.import(namespace, *member, ImportedReferenceKind::Call, expr.span);
+                }
+            }
+            HirExpressionKind::Field(object, member) => {
+                if !self.reported.contains(&std::ptr::from_ref(expr))
+                    && let Some(namespace) = self.namespace_of(object)
+                {
+                    self.import(namespace, *member, ImportedReferenceKind::Value, expr.span);
+                }
             }
             _ => {}
         }
