@@ -670,7 +670,9 @@ pub fn analyze_with_cli(
     // later pass or backend reads them; it needs the finished types.
     diagnostics.extend(passes::statica::reject_top_level_bindings(&hir, interner));
     if !diagnostics.iter().any(SemanticError::is_error) {
-        diagnostics.extend(passes::statica::fold(&mut hir, &types, interner));
+        diagnostics.extend(passes::statica::fold_with_imports(
+            &mut hir, &types, interner, &resolver,
+        ));
         // Local `fixum T x = e` constants (D5.10) reuse the constants' evaluator.
         if !diagnostics.iter().any(SemanticError::is_error) {
             diagnostics.extend(passes::local_constants::check(
