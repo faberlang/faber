@@ -814,14 +814,13 @@ fn reject_rust_unsupported_types(types: &TypeTable) -> Result<(), CodegenError> 
         let ty = TypeId(index as u32);
         if matches!(types.get(ty), Type::SizedNumeric(Primitive::Fractus, NumericWidth::F16)) {
             return Err(CodegenError {
-                message: "Rust target does not support fractus<f16> until a half-float runtime representation exists"
-                    .to_owned(),
+                message: "Rust target does not support f16 until a half-float runtime representation exists".to_owned(),
                 args: vec![DiagnosticArg::new("issue", "rust_target_fractus_f16_unsupported")],
             });
         }
         if matches!(types.get(ty), Type::SizedNumeric(Primitive::Fractus, NumericWidth::BF16)) {
             return Err(CodegenError {
-                message: "Rust target does not support fractus<bf16> until a half-float runtime representation exists"
+                message: "Rust target does not support bf16 until a half-float runtime representation exists"
                     .to_owned(),
                 args: vec![DiagnosticArg::new("issue", "rust_target_fractus_bf16_unsupported")],
             });

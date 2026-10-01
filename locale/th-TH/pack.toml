@@ -769,11 +769,11 @@ message = "พารามิเตอร์ดัชนีใน Figura ไม�
 help = "ประกาศชนิดหรือนำเข้า"
 
 [diagnostics.SEM002.issues.float_width_on_numerus]
-message = "f16, f32 และ f64 เป็นความกว้างของ fractus; ใช้ fractus<f16>, fractus<f32> หรือ fractus<f64>"
+message = "f16, f32 และ f64 เป็นความกว้างของ fractus; ใช้ f16, f32 หรือ f64"
 help = "ประกาศชนิดหรือนำเข้า"
 
 [diagnostics.SEM002.issues.integer_width_on_fractus]
-message = "เครื่องหมายความกว้างจำนวนเต็มเป็นความกว้างของ numerus; ใช้ numerus<…>"
+message = "เครื่องหมายความกว้างจำนวนเต็มเป็นความกว้างของ numerus; ใช้ i8…u64"
 help = "ประกาศชนิดหรือนำเข้า"
 
 [diagnostics.SEM002.issues.invalid_precision_marker]
@@ -1085,7 +1085,7 @@ message = "ตัวแปรดัชนีที่ไม่รู้จัก
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.float_width_on_numerus]
-message = "f16, f32 และ f64 เป็นความกว้างของ fractus; ใช้ fractus<f16>, fractus<f32> หรือ fractus<f64>"
+message = "f16, f32 และ f64 เป็นความกว้างของ fractus; ใช้ f16, f32 หรือ f64"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.forma_builtin_missing]
@@ -1113,7 +1113,7 @@ message = "fractus รับตัวระบุความกว้างไ�
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.integer_width_on_fractus]
-message = "ตัวระบุความกว้างจำนวนเต็มเป็นความกว้างของ numerus; ใช้ numerus<…>"
+message = "ตัวระบุความกว้างจำนวนเต็มเป็นความกว้างของ numerus; ใช้ i8…u64"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.instans_precision_params]
@@ -1133,7 +1133,7 @@ message = "atomic ต้องมีชนิดสมาชิกเพีย�
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.atomic_element]
-message = "ชนิดสมาชิกของ atomic ต้องเป็น numerus<i32> หรือ numerus<u32>"
+message = "ชนิดสมาชิกของ atomic ต้องเป็น i32 หรือ u32"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.atomic_incomplete]
@@ -1837,7 +1837,7 @@ message = "atomic ต้องมีชนิดสมาชิกเพีย�
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
 
 [diagnostics.SEM010.issues.atomic_element]
-message = "ชนิดสมาชิกของ atomic ต้องเป็น numerus<i32> หรือ numerus<u32>"
+message = "ชนิดสมาชิกของ atomic ต้องเป็น i32 หรือ u32"
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
 
 [diagnostics.SEM010.issues.atomic_incomplete]
@@ -2381,7 +2381,7 @@ message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
 
 [diagnostics.SEM016.issues.bits_pair_width_mismatch]
-message = "the Bits bitcast requires exact-width pairs: numerus<u32> ↔ fractus<f32> and numerus<u64> ↔ fractus<f64>"
+message = "the Bits bitcast requires exact-width pairs: u32 ↔ f32 and u64 ↔ f64"
 help = "convert to the matching IEEE width first: u32 pairs with f32, u64 with f64"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]

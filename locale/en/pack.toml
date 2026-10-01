@@ -1147,11 +1147,11 @@ message = "unknown index parameter in Figura"
 help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.float_width_on_numerus]
-message = "f16, f32, and f64 are float widths; use float<f16>, float<f32>, or float<f64>"
+message = "f16, f32, and f64 are float widths; use f16, f32, or f64"
 help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.integer_width_on_fractus]
-message = "integer width markers are int widths; use int<…>"
+message = "integer width markers are int widths; write the bare marker (i8…u64)"
 help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.invalid_precision_marker]
@@ -1172,7 +1172,7 @@ help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.removed_decimal_width_d32]
 message = "d32 is not a type"
-help = "d32 was removed; use d64, the only decimal width (numerus<d64>)"
+help = "d32 was removed; use d64, the only decimal width"
 
 [diagnostics.SEM002.issues.name_not_type]
 message = "name does not refer to a type"
@@ -1527,7 +1527,7 @@ message = "unknown index variable in Figura"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.float_width_on_numerus]
-message = "f16, f32, and f64 are float widths; use float<f16>, float<f32>, or float<f64>"
+message = "f16, f32, and f64 are float widths; use f16, f32, or f64"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.forma_builtin_missing]
@@ -1555,7 +1555,7 @@ message = "float accepts at most one width marker"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.integer_width_on_fractus]
-message = "integer width markers are int widths; use int<…>"
+message = "integer width markers are int widths; write the bare marker (i8…u64)"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.instans_precision_params]
@@ -1575,7 +1575,7 @@ message = "atomic requires exactly one element type; use atomic<T>"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.atomic_element]
-message = "atomic element type must be int<i32> or int<u32>"
+message = "atomic element type must be i32 or u32"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.atomic_incomplete]
@@ -1600,7 +1600,7 @@ help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.removed_decimal_width_d32]
 message = "d32 is not a type"
-help = "d32 was removed; use d64, the only decimal width (numerus<d64>)"
+help = "d32 was removed; use d64, the only decimal width"
 
 [diagnostics.SEM008.issues.invalid_width_marker]
 message = "unknown width marker for this family"
@@ -1731,7 +1731,7 @@ message = "object destructuring should be expanded before statement lowering"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.octet_params]
-message = "byte is fixed-width (exactly int<u8>) and cannot accept parameters"
+message = "byte is fixed-width (exactly u8) and cannot accept parameters"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.precision_marker_shape]
@@ -2415,7 +2415,7 @@ message = "atomic requires exactly one element type; use atomic<T>"
 help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.atomic_element]
-message = "atomic element type must be int<i32> or int<u32>"
+message = "atomic element type must be i32 or u32"
 help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.atomic_incomplete]
@@ -3119,7 +3119,7 @@ message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, char, vector, and octeti<N> targets take a hint"
 
 [diagnostics.SEM016.issues.bits_pair_width_mismatch]
-message = "the Bits bitcast requires exact-width pairs: numerus<u32> ↔ fractus<f32> and numerus<u64> ↔ fractus<f64>"
+message = "the Bits bitcast requires exact-width pairs: u32 ↔ f32 and u64 ↔ f64"
 help = "convert to the matching IEEE width first: u32 pairs with f32, u64 with f64"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
@@ -3216,7 +3216,7 @@ help = "convert explicitly with `↦`, as in `flat ↦ tensor<f32, [8]>`"
 
 [diagnostics.SEM016.issues.numeric_ascription_requires_conversion]
 message = "`∷` states a fact the compiler can prove; this numeric ascription narrows, loses float precision, or crosses int↔float, so it is a conversion"
-help = "convert explicitly with `↦`, as in `n ↦ int<u8>`"
+help = "convert explicitly with `↦`, as in `n ↦ u8`"
 
 [diagnostics.SEM016.issues.cross_collection_unsupported]
 message = "cross-collection conversion has no default `↦` meaning; use an explicit stdlib verb"

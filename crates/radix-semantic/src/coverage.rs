@@ -147,13 +147,13 @@ fn classify_rust(_hir: &HirModule, types: &TypeTable) -> Lowerability {
         match types.get(ty) {
             Type::SizedNumeric(Primitive::Fractus, NumericWidth::F16) => {
                 gaps.push(CapabilityGap::TargetPolicyRejection {
-                    shape: "fractus<f16>".to_owned(),
+                    shape: "f16".to_owned(),
                     slug: "rust_target_fractus_f16_unsupported",
                 });
             }
             Type::SizedNumeric(Primitive::Fractus, NumericWidth::BF16) => {
                 gaps.push(CapabilityGap::TargetPolicyRejection {
-                    shape: "fractus<bf16>".to_owned(),
+                    shape: "bf16".to_owned(),
                     slug: "rust_target_fractus_bf16_unsupported",
                 });
             }

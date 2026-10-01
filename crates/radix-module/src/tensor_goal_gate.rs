@@ -33,7 +33,7 @@ pub fn run_types_gate() {
     let result = analyze_source(
         &session,
         "gate-tensor-decl.fab",
-        "functio hold(tensor<fractus<f32>, _> value) → vacuum {}",
+        "functio hold(tensor<f32, _> value) → vacuum {}",
         AnalyzeRequest::default(),
     );
     assert!(result.is_ok(), "tensor decl should typecheck: {:?}", result.err());
@@ -46,7 +46,7 @@ pub fn run_convert_gate() {
         &session,
         "sized-i32.fab",
         r#"incipit {
-  fixum numerus<i32> n ← "42" ↦ numerus<i32>
+  fixum i32 n ← "42" ↦ i32
   nota n
 }"#,
         AnalyzeRequest::default(),
@@ -57,7 +57,7 @@ pub fn run_convert_gate() {
         &session,
         "sized-f32.fab",
         r#"incipit {
-  fixum fractus<f32> f ← "1.5" ↦ fractus<f32>
+  fixum f32 f ← "1.5" ↦ f32
   nota f
 }"#,
         AnalyzeRequest::default(),
@@ -68,7 +68,7 @@ pub fn run_convert_gate() {
         &session,
         "family-error.fab",
         r"incipit {
-  fixum numerus<f32> invalid ← 1.0 ∷ fractus<f32>
+  fixum numerus<f32> invalid ← 1.0 ∷ f32
   nota invalid
 }",
         AnalyzeRequest::default(),

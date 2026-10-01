@@ -2247,7 +2247,7 @@ pub fn is_intervallum_bound_type(types: &TypeTable, ty: TypeId) -> bool {
 }
 
 /// Diagnostic when `atomic<T>` is declared with an unsupported element `T`.
-pub const ATOMIC_ELEMENT_MSG: &str = "atomic element type must be numerus<i32> or numerus<u32>";
+pub const ATOMIC_ELEMENT_MSG: &str = "atomic element type must be i32 or u32";
 
 /// v1 `atomic<T>` element types: storage-class signed and unsigned 32-bit integers.
 #[must_use]

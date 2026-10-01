@@ -348,10 +348,9 @@ fn semantic_missing_type_annotation_help(args: &[DiagnosticArg]) -> Option<Strin
         "bounded_capacity_unsolved" => {
             Some("write a concrete N (ascii<8>) or give the hole a bounded witness".to_owned())
         }
-        "marker_width_unsolved" => Some(
-            "write a concrete marker (numerus<i32>) or give the hole a same-family witness"
-                .to_owned(),
-        ),
+        "marker_width_unsolved" => {
+            Some("write a concrete marker (i32) or give the hole a same-family witness".to_owned())
+        }
         "cannot_infer_alternate_exit_type"
         | "cannot_infer_constant_type"
         | "cannot_infer_expression_type"
@@ -405,7 +404,7 @@ fn semantic_not_callable_help(args: &[DiagnosticArg]) -> Option<String> {
 fn semantic_removed_width_help(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {
         "removed_decimal_width_d32" => {
-            Some("d32 was removed; use d64, the only decimal width (numerus<d64>)".to_owned())
+            Some("d32 was removed; use d64, the only decimal width".to_owned())
         }
         _ => None,
     }

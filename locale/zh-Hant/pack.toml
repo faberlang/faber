@@ -765,11 +765,11 @@ message = "Figura 中有未知的索引參數"
 help = "宣告型別或匯入型別"
 
 [diagnostics.SEM002.issues.float_width_on_numerus]
-message = "f16、f32 和 f64 是 fractus 寬度；請使用 fractus<f16>、fractus<f32> 或 fractus<f64>"
+message = "f16、f32 和 f64 是 fractus 寬度；請使用 f16、f32 或 f64"
 help = "宣告型別或匯入型別"
 
 [diagnostics.SEM002.issues.integer_width_on_fractus]
-message = "整數寬度標記是 numerus 寬度；請使用 numerus<…>"
+message = "整數寬度標記是 numerus 寬度；請使用 i8…u64"
 help = "宣告型別或匯入型別"
 
 [diagnostics.SEM002.issues.invalid_precision_marker]
@@ -1073,7 +1073,7 @@ message = "Figura 中有未知的索引變數"
 help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.float_width_on_numerus]
-message = "f16、f32 和 f64 是 fractus 寬度；請使用 fractus<f16>、fractus<f32> 或 fractus<f64>"
+message = "f16、f32 和 f64 是 fractus 寬度；請使用 f16、f32 或 f64"
 help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.forma_builtin_missing]
@@ -1101,7 +1101,7 @@ message = "fractus 最多接受一個寬度標記"
 help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.integer_width_on_fractus]
-message = "整數寬度標記屬於 numerus 寬度；請使用 numerus<…>"
+message = "整數寬度標記屬於 numerus 寬度；請使用 i8…u64"
 help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.instans_precision_params]
@@ -1121,7 +1121,7 @@ message = "atomic 需要恰好一個元素型別；請使用 atomic<T>"
 help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.atomic_element]
-message = "atomic 元素型別必須是 numerus<i32> 或 numerus<u32>"
+message = "atomic 元素型別必須是 i32 或 u32"
 help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.atomic_incomplete]
@@ -1825,7 +1825,7 @@ message = "atomic 需要恰好一個元素型別；使用 atomic<T>"
 help = "使運算式型別符合預期型別"
 
 [diagnostics.SEM010.issues.atomic_element]
-message = "atomic 元素型別必須是 numerus<i32> 或 numerus<u32>"
+message = "atomic 元素型別必須是 i32 或 u32"
 help = "使運算式型別符合預期型別"
 
 [diagnostics.SEM010.issues.atomic_incomplete]
@@ -2369,7 +2369,7 @@ message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
 
 [diagnostics.SEM016.issues.bits_pair_width_mismatch]
-message = "the Bits bitcast requires exact-width pairs: numerus<u32> ↔ fractus<f32> and numerus<u64> ↔ fractus<f64>"
+message = "the Bits bitcast requires exact-width pairs: u32 ↔ f32 and u64 ↔ f64"
 help = "convert to the matching IEEE width first: u32 pairs with f32, u64 with f64"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]

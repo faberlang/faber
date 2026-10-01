@@ -51,7 +51,7 @@ forces the source reader pack for every selected file; without it, each file
 uses frontmatter, then its package manifest, then the product default en. --to
 is one command-wide target pack. Successful output replaces or inserts
 frontmatter `locale = \"<target>\"` while preserving unrelated metadata. Use a
-wrapper such as `main { const list<int<u32>> values ← empty }` when probing a
+wrapper such as `main { const list<u32> values ← empty }` when probing a
 local declaration; fragments are not accepted. --stdout and --stdin emit one
 complete converted document, and --check writes nothing.
 ";

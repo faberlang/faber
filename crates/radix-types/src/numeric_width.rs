@@ -890,13 +890,13 @@ pub const TENSOR_INDEX_VECTOR_MSG: &str = "tensor index vector requires lista of
 /// decimal-widths D2 (wildcard audit): decimal widths are value scalars, not
 /// positions. A `numerus<d64>` index would scale-address storage — the
 /// bracket index boundary is integer-only.
-pub const DECIMAL_INDEX_SCALAR_MSG: &str = "decimal-width numerus cannot index; decimal widths are scaled values, not positions — use an integer width such as numerus<i32>";
+pub const DECIMAL_INDEX_SCALAR_MSG: &str = "decimal-width numerus cannot index; decimal widths are scaled values, not positions — use an integer width such as i32";
 
 /// decimal-widths D2 (wildcard audit): tensor `media` reduces over a float
 /// carrier to avoid integer division; a decimal element has no defined media
 /// carrier yet (conversio rows are D3), so it fails closed here.
 pub const DECIMAL_TENSOR_MEDIA_MSG: &str =
-    "tensor media does not accept decimal-width elements; convert to fractus<f64> first";
+    "tensor media does not accept decimal-width elements; convert to f64 first";
 
 /// Whether `ty` is a `lista<integer>` usable as a tensor index vector (DEFER-064).
 ///

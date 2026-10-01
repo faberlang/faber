@@ -769,11 +769,11 @@ message = "Figura में अज्ञात index parameter"
 help = "प्रकार घोषित करें या उसे import करें"
 
 [diagnostics.SEM002.issues.float_width_on_numerus]
-message = "f16, f32 और f64 fractus widths हैं; fractus<f16>, fractus<f32>, या fractus<f64> उपयोग करें"
+message = "f16, f32 और f64 fractus widths हैं; f16, f32, या f64 उपयोग करें"
 help = "प्रकार घोषित करें या उसे import करें"
 
 [diagnostics.SEM002.issues.integer_width_on_fractus]
-message = "integer width markers numerus widths हैं; numerus<…> उपयोग करें"
+message = "integer width markers numerus widths हैं; i8…u64 उपयोग करें"
 help = "प्रकार घोषित करें या उसे import करें"
 
 [diagnostics.SEM002.issues.invalid_precision_marker]
@@ -1085,7 +1085,7 @@ message = "Figura में अज्ञात index variable"
 help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.float_width_on_numerus]
-message = "f16, f32 और f64 fractus widths हैं; fractus<f16>, fractus<f32> या fractus<f64> का उपयोग करें"
+message = "f16, f32 और f64 fractus widths हैं; f16, f32 या f64 का उपयोग करें"
 help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.forma_builtin_missing]
@@ -1113,7 +1113,7 @@ message = "fractus अधिकतम एक width marker स्वीकार 
 help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.integer_width_on_fractus]
-message = "integer width markers numerus widths हैं; numerus<…> का उपयोग करें"
+message = "integer width markers numerus widths हैं; i8…u64 का उपयोग करें"
 help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.instans_precision_params]
@@ -1133,7 +1133,7 @@ message = "atomic के लिए ठीक एक element type आवश्य
 help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.atomic_element]
-message = "atomic element type numerus<i32> या numerus<u32> होना चाहिए"
+message = "atomic element type i32 या u32 होना चाहिए"
 help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.atomic_incomplete]
@@ -1837,7 +1837,7 @@ message = "atomic के लिए ठीक एक तत्व प्रका
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
 
 [diagnostics.SEM010.issues.atomic_element]
-message = "atomic तत्व प्रकार numerus<i32> या numerus<u32> होना चाहिए"
+message = "atomic तत्व प्रकार i32 या u32 होना चाहिए"
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
 
 [diagnostics.SEM010.issues.atomic_incomplete]
@@ -2381,7 +2381,7 @@ message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
 
 [diagnostics.SEM016.issues.bits_pair_width_mismatch]
-message = "the Bits bitcast requires exact-width pairs: numerus<u32> ↔ fractus<f32> and numerus<u64> ↔ fractus<f64>"
+message = "the Bits bitcast requires exact-width pairs: u32 ↔ f32 and u64 ↔ f64"
 help = "convert to the matching IEEE width first: u32 pairs with f32, u64 with f64"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
