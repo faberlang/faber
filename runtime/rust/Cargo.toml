@@ -21,7 +21,9 @@ name = "faber"
 path = "src/lib.rs"
 
 [features]
+default = ["regex"]
+regex = ["dep:regex"]
 test-support = []
 
 [dependencies]
-regex = "1"
+regex = { version = "1", optional = true }

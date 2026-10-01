@@ -20,6 +20,7 @@ pub mod magnus;
 pub mod octeti_bounded;
 pub mod or_recovery;
 pub mod queue_stack;
+#[cfg(feature = "regex")]
 pub mod regex;
 pub mod sparsa;
 pub mod tensor;
@@ -52,6 +53,7 @@ pub use or_recovery::{
     valor_get_i64_or, valor_get_map_or, valor_get_octeti_or, valor_get_text_or,
 };
 pub use queue_stack::{Queue, QueueN, QueueStackError, QueueStackOverflow, Stack, StackN};
+#[cfg(feature = "regex")]
 pub use regex::Regex;
 pub use sparsa::Sparsa;
 pub use tensor::Tensor;
@@ -71,7 +73,7 @@ mod textus_test;
 #[path = "instans_test.rs"]
 mod instans_test;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "regex"))]
 #[path = "regex_test.rs"]
 mod regex_test;
 
