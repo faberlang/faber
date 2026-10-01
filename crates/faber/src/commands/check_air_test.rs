@@ -37,7 +37,7 @@ functio gradus_passus(numerus x) → numerus {
 // Ruling 25 (air1): an AIR store must be proven to fit, so the pure fixture
 // takes a `numerus<i32>` operand whose `+ 1` provably fits the `numerus` result.
 const ANNOTATED_PURE: &str = r#"@ radix lane "air"
-functio computus_purus(numerus<i32> x) → numerus {
+functio computus_purus(i32 x) → numerus {
     redde x + 1
 }
 "#;

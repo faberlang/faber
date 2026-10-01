@@ -54,11 +54,11 @@ main {
     # 3. The folded value lands in the slot it is stored in.
     const float sum ← 0.1 + 0.2
     print sum
-    const float<f32> narrow ← 0.1 + 0.2
+    const f32 narrow ← 0.1 + 0.2
     print narrow
 
     # 4. Narrow slots round once: this exact value sits just above the midpoint
     #    of two f32 neighbours, so a rounding through f64 would choose 1.0.
-    const float<f32> above ← 1.00000005960464477539062501 + 0.0
+    const f32 above ← 1.00000005960464477539062501 + 0.0
     print above
 }

@@ -32,7 +32,7 @@ locale = "en"
 #   removal.
 
 main {
-    var sparsa<float<f32>, [2, 3]> grid ← empty
+    var sparsa<f32, [2, 3]> grid ← empty
 
     grid.set([0, 1], 4.0)
     grid.set([1, 2], 9.0)

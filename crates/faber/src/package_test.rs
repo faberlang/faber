@@ -14226,7 +14226,7 @@ functio nil() → vacuum {
 @ publica
 @ radix lane "air"
 @ radix backward "ghost"
-functio simple_add(numerus<i32> a, numerus<i32> b) → numerus {
+functio simple_add(i32 a, i32 b) → numerus {
     redde a + b
 }
 "#,

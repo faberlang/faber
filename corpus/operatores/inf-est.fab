@@ -46,7 +46,7 @@ locale = "en"
 
 # One line: the three tests, then the extraction both ways.
 fn probe(valor v) → string {
-    return "int=§ inf=§ u64=§ not-inf=§"(v is int, v is inf, v is int<u64>, v not is inf)
+    return "int=§ inf=§ u64=§ not-inf=§"(v is int, v is inf, v is u64, v not is inf)
 }
 
 # `is int` guards the narrowing, so the fallback never triggers for an integer.

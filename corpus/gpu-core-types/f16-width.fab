@@ -41,6 +41,6 @@ fn keep_half(f16 x) → f16 {
     return x
 }
 
-fn keep_half_long(float<f16> x) → float<f16> {
+fn keep_half_long(f16 x) → f16 {
     return x
 }

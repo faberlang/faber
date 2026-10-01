@@ -136,7 +136,7 @@ fn arithmetic_crosses_the_64_bit_cap_without_trapping() {
 fn a_bounded_operand_widens_into_an_inf_expression() {
     // ruling 35: `inf` is contagious only from a typed `inf` operand.
     assert_eq!(
-        ok("fixum inf x ← 18446744073709551615\nfixum numerus<u64> u ← 5\nnota x + u\nnota u + x"),
+        ok("fixum inf x ← 18446744073709551615\nfixum u64 u ← 5\nnota x + u\nnota u + x"),
         ["18446744073709551620", "18446744073709551620"]
     );
 }
@@ -146,11 +146,11 @@ fn a_bounded_value_widens_into_every_inf_slot_exactly() {
     // inf-wn: the widening node is the identity on the runner's canonical
     // carrier, so a `u64` beyond `i64` keeps its value at every site.
     let items = "functio take(inf x) → inf {\n redde x\n}\n\
-                 functio give(numerus<u64> v) → inf {\n redde v\n}\n\
+                 functio give(u64 v) → inf {\n redde v\n}\n\
                  genus Capsa {\n fixum inf f\n}";
     let (out, errors) = run_items(
         items,
-        "fixum numerus<u64> u ← 18446744073709551615\nvaria inf w ← 0\nw ← u\nnota w + 1\n\
+        "fixum u64 u ← 18446744073709551615\nvaria inf w ← 0\nw ← u\nnota w + 1\n\
          nota take(u) + 1\nnota give(u) + 1\nfixum Capsa c ← Capsa { f = u }\nnota c.f + 1\n\
          fixum lista<inf> xs ← [u, w]\nnota xs[0] + 1",
     );
@@ -163,10 +163,10 @@ fn bounded_arithmetic_stored_into_an_inf_slot_keeps_the_64_bit_cap() {
     // Ruling 35: an expression over bounded operands keeps ruling 13's cap, so
     // `u + 1` at `u64::MAX` traps; the store into the `inf` slot only widens
     // the (in-range) result. `(u ↦ inf) + 1` is the opt-in exact form.
-    let (_, issue, message) = trap("fixum numerus<u64> u ← 18446744073709551615\nfixum inf w ← u + 1\nnota w");
+    let (_, issue, message) = trap("fixum u64 u ← 18446744073709551615\nfixum inf w ← u + 1\nnota w");
     assert_eq!(issue, "runner_numerus_overflow", "{message}");
     assert_eq!(
-        ok("fixum numerus<u64> u ← 18446744073709551615\nfixum inf w ← (u ↦ inf) + 1\nnota w"),
+        ok("fixum u64 u ← 18446744073709551615\nfixum inf w ← (u ↦ inf) + 1\nnota w"),
         ["18446744073709551616"]
     );
 }
@@ -197,7 +197,7 @@ fn comparisons_between_inf_and_every_family_are_exact() {
     // ruling 37 (and ruling 22's rule for the other pairs): never rounded.
     assert_eq!(
         ok(&format!(
-            "fixum inf big ← {TWO_64}\nfixum numerus<u64> u ← 18446744073709551615\nnota big > u\nnota u < big\nnota big ≥ u\nnota big ≡ big"
+            "fixum inf big ← {TWO_64}\nfixum u64 u ← 18446744073709551615\nnota big > u\nnota u < big\nnota big ≥ u\nnota big ≡ big"
         )),
         ["verum", "verum", "verum", "verum"]
     );
@@ -213,12 +213,12 @@ fn comparisons_between_inf_and_every_family_are_exact() {
         ["verum", "verum", "verum"]
     );
     assert_eq!(
-        ok("fixum inf five ← 5\nfixum numerus<d64> d ← 1.5\nnota five > d\nnota d < five\nnota five ≤ d"),
+        ok("fixum inf five ← 5\nfixum d64 d ← 1.5\nnota five > d\nnota d < five\nnota five ≤ d"),
         ["verum", "verum", "falsum"]
     );
     assert_eq!(
         ok(&format!(
-            "fixum inf big ← {TWO_64}\nfixum numerus<d64> d ← 1.5\nnota big > d\nnota -big < d"
+            "fixum inf big ← {TWO_64}\nfixum d64 d ← 1.5\nnota big > d\nnota -big < d"
         )),
         ["verum", "verum"]
     );
@@ -245,18 +245,18 @@ fn increment_and_decrement_cross_the_cap() {
 #[test]
 fn an_inf_value_stores_into_a_bounded_slot_only_when_it_fits() {
     // ruling 38: an implicit checked narrowing, never `⇥`, with the store identity.
-    let (_, issue, message) = trap("fixum inf t ← 300\nvaria numerus<u8> b ← 1\nb ← t");
+    let (_, issue, message) = trap("fixum inf t ← 300\nvaria u8 b ← 1\nb ← t");
     assert_eq!(issue, "implicit_store_out_of_range");
     assert!(
         message.contains("300 does not fit in `u8`") && message.contains("`b`"),
         "{message}"
     );
-    let (_, issue, message) = trap(&format!("fixum inf t ← {TWO_64} ⇐ 4\nfixum numerus<u8> b ← t\nnota b"));
+    let (_, issue, message) = trap(&format!("fixum inf t ← {TWO_64} ⇐ 4\nfixum u8 b ← t\nnota b"));
     assert_eq!(issue, "implicit_store_out_of_range");
     assert!(message.contains("does not fit in `u8`") && message.contains("`b`"), "{message}");
-    assert_eq!(ok("fixum inf t ← 200\nfixum numerus<u8> b ← t\nnota b"), ["200"]);
+    assert_eq!(ok("fixum inf t ← 200\nfixum u8 b ← t\nnota b"), ["200"]);
     // A store into an `inf` slot is total.
-    assert_eq!(ok("fixum numerus<u8> b ← 200\nfixum inf t ← b\nnota t + 100"), ["300"]);
+    assert_eq!(ok("fixum u8 b ← 200\nfixum inf t ← b\nnota t + 100"), ["300"]);
 }
 
 #[test]
@@ -264,8 +264,8 @@ fn conversions_out_of_inf_narrow_checked_or_reduce_or_clamp() {
     // ruling 40.
     let src = format!(
         "fixum inf big ← {TWO_64}\nfixum inf mid ← 200\nfixum inf neg ← -1\n\
-         nota mid ↦ numerus<u8> ⊥ 7\nnota big ↦ numerus<u8> ⊥ 7\nnota big ↦ numerus<u64> ⊥ 9\n\
-         nota neg ↦ numerus<u8> ⊥ 8\nnota big ↦ numerus ⊥ 5\nnota mid ↦ numerus<i8> ⊥ -1\n\
+         nota mid ↦ u8 ⊥ 7\nnota big ↦ u8 ⊥ 7\nnota big ↦ u64 ⊥ 9\n\
+         nota neg ↦ u8 ⊥ 8\nnota big ↦ numerus ⊥ 5\nnota mid ↦ i8 ⊥ -1\n\
          fixum inf sum ← big + 5\nnota sum ↦ modulus<u8>\nnota big ↦ saturatus<u8>\nnota neg ↦ saturatus<u8>\nnota mid ↦ modulus<i8>"
     );
     assert_eq!(ok(&src), ["200", "7", "9", "8", "5", "-1", "5", "255", "0", "-56"]);
@@ -307,7 +307,7 @@ fn conversions_with_d64_go_through_the_d64_rules() {
     // ruling 40: `d64 → inf` is the integer reduction; `inf → d64` is range-checked.
     assert_eq!(
         ok(&format!(
-            "fixum numerus<d64> d ← 12.75\nfixum inf mid ← 200\nfixum inf big ← {TWO_64}\nnota d ↦ inf ⊥ 0\nnota mid ↦ numerus<d64> ⊥ 0.0\nnota big ↦ numerus<d64> ⊥ 1.5"
+            "fixum d64 d ← 12.75\nfixum inf mid ← 200\nfixum inf big ← {TWO_64}\nnota d ↦ inf ⊥ 0\nnota mid ↦ d64 ⊥ 0.0\nnota big ↦ d64 ⊥ 1.5"
         )),
         ["13", "200", "1.5"]
     );
@@ -521,7 +521,7 @@ fn the_range_loop_binder_is_typed_by_its_bounds() {
 fn an_inf_beside_a_decimal_is_not_joined_at_d64() {
     // ruling 37: the d64 join would trap for a large value; the comparison is exact.
     assert_eq!(
-        ok("fixum inf huge ← 10 ⇐ 200\nfixum numerus<d64> d ← 1.5\nnota huge > d\nnota d < huge\nnota huge ≥ 1.5"),
+        ok("fixum inf huge ← 10 ⇐ 200\nfixum d64 d ← 1.5\nnota huge > d\nnota d < huge\nnota huge ≥ 1.5"),
         ["verum", "verum", "verum"]
     );
 }

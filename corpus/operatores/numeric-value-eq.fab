@@ -40,7 +40,7 @@ main {
     const _ int_float ← 1 ≅ 1.0
     print int_float
 
-    const _ not_fuzzy ← 42.145 ∷ float<f64> ≅ 42.0 ∷ float<f64>
+    const _ not_fuzzy ← 42.145 ∷ f64 ≅ 42.0 ∷ f64
     print not_fuzzy
 
     const _ differs ← 1 ≇ 2

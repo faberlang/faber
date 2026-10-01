@@ -82,7 +82,7 @@ fn fixum_constants_fold_to_their_values() {
     let list = constant("fixum lista<numerus> XS = [1, 2, 3]\n", "XS");
     assert!(list.statica.is_some());
     let narrow = constant(
-        "fixum numerus<u8> A = 200\nfixum numerus<u8> B = A + 50\n",
+        "fixum u8 A = 200\nfixum u8 B = A + 50\n",
         "B",
     );
     assert_eq!(int_value(&narrow), 250);
@@ -98,7 +98,7 @@ fn constants_read_each_other_in_dependency_order() {
 #[test]
 fn fixum_constant_initializer_faults_keep_their_identity() {
     assert_rejects_with_issue(
-        "fixum numerus<u8> A = 200\nfixum numerus<u8> B = A + 100\n",
+        "fixum u8 A = 200\nfixum u8 B = A + 100\n",
         "constant_arithmetic_overflow",
     );
     assert_rejects_with_issue("fixum numerus D = 1 / 0\n", "constant_division_by_zero");

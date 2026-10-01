@@ -85,11 +85,11 @@ fn an_f32_slot_rounds_once_from_the_exact_value() {
     // 3/10 once into f32; an f64 sum narrowed would also give this here, so the
     // discriminating case below sits just above an f32 midpoint.
     assert_eq!(
-        folded("fixum fractus<f32> x ← 0.1 + 0.2"),
+        folded("fixum f32 x ← 0.1 + 0.2"),
         f64::from(0.3_f32)
     );
     let above = 1.0_f32 + f32::EPSILON;
-    let value = folded("fixum fractus<f32> x ← 1.00000005960464477539062501 + 0.0");
+    let value = folded("fixum f32 x ← 1.00000005960464477539062501 + 0.0");
     assert_eq!(value, f64::from(above));
     // Through f64 first, the same exact value ties to even and lands on 1.0.
     let through_f64: f64 = "1.00000005960464477539062501".parse().unwrap();
@@ -104,10 +104,10 @@ fn f64_to_f32(value: f64) -> f32 {
 #[test]
 fn f16_and_bf16_slots_round_once_from_the_exact_value() {
     assert_eq!(
-        folded("fixum fractus<f16> x ← 0.1 + 0.2"),
+        folded("fixum f16 x ← 0.1 + 0.2"),
         0.300_048_828_125
     );
-    assert_eq!(folded("fixum fractus<bf16> x ← 0.1 + 0.2"), 0.300_781_25);
+    assert_eq!(folded("fixum bf16 x ← 0.1 + 0.2"), 0.300_781_25);
 }
 
 #[test]
@@ -118,7 +118,7 @@ fn one_third_is_one_exact_rational() {
     );
     assert_eq!(folded("fixum fractus t ← 1.0 / 3.0 * 3.0"), 1.0);
     assert_eq!(
-        folded("fixum fractus<f32> t ← 1.0 / 3.0").to_bits(),
+        folded("fixum f32 t ← 1.0 / 3.0").to_bits(),
         f64::from(1.0_f32 / 3.0).to_bits()
     );
 }
@@ -165,7 +165,7 @@ fn large_and_small_exponents_keep_the_exact_intermediate() {
 #[test]
 fn a_result_that_overflows_the_slot_is_not_folded() {
     assert!(is_binary(&last_init("fixum fractus t ← 1e300 * 1e300")));
-    assert!(is_binary(&last_init("fixum fractus<f32> t ← 1e30 * 1e30")));
+    assert!(is_binary(&last_init("fixum f32 t ← 1e30 * 1e30")));
 }
 
 #[test]
@@ -236,7 +236,7 @@ fn an_integer_typed_leaf_is_never_folded_as_an_exact_quotient() {
 fn a_decimal_slot_is_not_rewritten() {
     // Typecheck stores the decimal sum through an implicit conversion; the
     // literal-only sum inside it is decimal-typed and keeps its two literals.
-    let expr = last_init("fixum numerus<d64> e ← 0.1 + 0.2");
+    let expr = last_init("fixum d64 e ← 0.1 + 0.2");
     let HirExpressionKind::Conversio { source, .. } = &expr.kind else {
         panic!("{:?}", expr.kind)
     };

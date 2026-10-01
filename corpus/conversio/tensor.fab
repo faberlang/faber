@@ -63,9 +63,9 @@ main {
     const tensor<u8, []> shrunk ← words ↦ tensor<u8, []>
     print shrunk.length()
 
-    const tensor<float<f32>, []> half ← empty
+    const tensor<f32, []> half ← empty
     const tensor<float, []> full ← half ↦ tensor<float, []>
-    const tensor<float<f32>, []> single ← full ↦ tensor<float<f32>, []>
+    const tensor<f32, []> single ← full ↦ tensor<f32, []>
     print single.length()
 
     const tensor<float, []> fromFloat ← empty

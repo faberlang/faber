@@ -99,7 +99,7 @@ main {
     #    so one more is greater; a rounding comparison would call them equal.
     const u64 top ← 18446744073709551615
     const float flt ← 18446744073709551616.0
-    const int<d64> dec ← 1.5
+    const d64 dec ← 1.5
     print big ≻ top
     print top ≺ big
     print big ≅ flt
@@ -138,8 +138,8 @@ main {
     #    (the `d64 ↦ i64` rule), and only a NaN or infinite float fails.
     const float frac ← 12.75
     const float negfrac ← -12.75
-    const int<d64> half ← 12.5
-    const int<d64> threequarters ← 12.75
+    const d64 half ← 12.5
+    const d64 threequarters ← 12.75
     const float not_a_number ← 0.0 ÷ 0.0
     const float float_infinity ← ∞
     print frac ↦ inf

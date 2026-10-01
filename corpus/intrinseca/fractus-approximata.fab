@@ -56,8 +56,8 @@ main {
     const bool fuzzy_int_float ← above_precision ≈ float_boundary
 
     # Own-precision pin: both values round to 1.0 as f32 before isclose.
-    const float<f32> f32a ← 1.00000001 ∷ float<f32>
-    const float<f32> f32b ← 1.0 ∷ float<f32>
+    const f32 f32a ← 1.00000001 ∷ f32
+    const f32 f32b ← 1.0 ∷ f32
     const bool fuzzy_f32 ← f32a ≈ f32b
 
     print fuzzy_cross_width

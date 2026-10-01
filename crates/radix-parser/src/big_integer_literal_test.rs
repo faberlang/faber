@@ -35,7 +35,7 @@ fn a_big_literal_in_expression_position_is_a_big_int_literal() {
 
 #[test]
 fn a_u64_max_literal_stays_an_ordinary_int() {
-    let (_, literal) = first_initializer_literal("fixum numerus<u64> x ← 18446744073709551615\n");
+    let (_, literal) = first_initializer_literal("fixum u64 x ← 18446744073709551615\n");
     assert!(matches!(literal, Literal::Int(18_446_744_073_709_551_615)));
 }
 

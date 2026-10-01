@@ -1017,7 +1017,7 @@ fn est_integer_tags_follow_the_carrier_law() {
         assert_eq!(
             integer_tag_matches(&value, &u64_width),
             bounded,
-            "int<u64> {value:?}"
+            "u64 {value:?}"
         );
         assert_eq!(
             integer_tag_matches(&value, &inf),

@@ -24,7 +24,7 @@ locale = "en"
 
 
 
-fn takes(vector<float<f32>, 4> v, vf32[4] w) → int {
+fn takes(vector<f32, 4> v, vf32[4] w) → int {
     return 0
 }
 

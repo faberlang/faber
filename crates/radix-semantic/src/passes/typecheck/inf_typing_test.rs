@@ -13,7 +13,7 @@ use radix_types::NumericWidth::{self, I64, Inf, U64};
 use radix_types::numeric_width::numerus_integer_width;
 
 const INF: &str = "fixum inf x ← 3\nfixum inf y ← 4";
-const INF_AND_FRIENDS: &str = "fixum inf x ← 3\nfixum inf y ← 4\nfixum numerus<u64> u ← 5\nfixum numerus<i8> s ← 6\nfixum numerus<u8> b ← 7";
+const INF_AND_FRIENDS: &str = "fixum inf x ← 3\nfixum inf y ← 4\nfixum u64 u ← 5\nfixum i8 s ← 6\nfixum u8 b ← 7";
 
 fn analyze(decls: &str, expr: &str) -> test_support::AnalyzedFixture {
     let source = format!("incipit {{\n{decls}\nfixum _ r ← {expr}\nnota r\n}}\n");
@@ -74,9 +74,9 @@ fn a_literal_beyond_u64_is_out_of_range_everywhere_else() {
     for slot in [
         "_",
         "numerus",
-        "numerus<u64>",
-        "numerus<i64>",
-        "numerus<u8>",
+        "u64",
+        "i64",
+        "u8",
     ] {
         assert_rejects(
             &format!("incipit {{\nfixum {slot} x ← {TWO_TO_64}\nnota x\n}}\n"),
@@ -112,7 +112,7 @@ fn a_constant_expression_beyond_every_64_bit_type_is_out_of_range_unless_an_inf_
 #[test]
 fn a_constant_beyond_u64_beside_a_bounded_operand_is_out_of_range() {
     assert_rejects(
-        &format!("incipit {{\nfixum numerus<u8> b ← 1\nnota b + {TWO_TO_64}\n}}\n"),
+        &format!("incipit {{\nfixum u8 b ← 1\nnota b + {TWO_TO_64}\n}}\n"),
         "numerus_literal_out_of_range",
     );
 }
@@ -128,10 +128,10 @@ fn a_big_literal_beside_an_inf_operand_joins_by_exact_value() {
 fn a_big_literal_in_a_float_slot_follows_the_float_constant_rule() {
     // 2^64 is exactly an f64; 10^40 is not representable in f32's range.
     test_support::assert_accepts(&format!(
-        "incipit {{\nfixum fractus<f64> f ← {TWO_TO_64}\nnota f\n}}\n"
+        "incipit {{\nfixum f64 f ← {TWO_TO_64}\nnota f\n}}\n"
     ));
     assert_rejects(
-        "incipit {\nfixum fractus<f32> f ← 10000000000000000000000000000000000000000\nnota f\n}\n",
+        "incipit {\nfixum f32 f ← 10000000000000000000000000000000000000000\nnota f\n}\n",
         "float_constant_out_of_range",
     );
 }
@@ -206,10 +206,10 @@ fn branches_and_collections_of_inf_are_inf() {
     let decls = "fixum inf x ← 3\nfixum bivalens c ← verum";
     assert_eq!(width_of(decls, "c ✓ x ✗ 0"), Some(Inf));
     assert_eq!(width_of(decls, "c ✓ 0 ✗ x"), Some(Inf));
-    let decls = "fixum inf x ← 3\nfixum numerus<u8> b ← 1\nfixum bivalens c ← verum";
+    let decls = "fixum inf x ← 3\nfixum u8 b ← 1\nfixum bivalens c ← verum";
     assert_eq!(width_of(decls, "c ✓ b ✗ x"), Some(Inf));
     test_support::assert_accepts(
-        "incipit {\nfixum inf x ← 3\nfixum numerus<u8> b ← 1\nfixum lista<inf> xs ← [b, x, 7]\nnota xs\n}\n",
+        "incipit {\nfixum inf x ← 3\nfixum u8 b ← 1\nfixum lista<inf> xs ← [b, x, 7]\nnota xs\n}\n",
     );
 }
 
@@ -228,7 +228,7 @@ fn a_saturating_word_never_meets_inf_in_arithmetic() {
 
 #[test]
 fn u64_minus_u64_stays_i64() {
-    let decls = "fixum numerus<u64> a ← 7\nfixum numerus<u64> b ← 5";
+    let decls = "fixum u64 a ← 7\nfixum u64 b ← 5";
     assert_eq!(width_of(decls, "a - b"), Some(I64));
     assert_eq!(width_of(decls, "a + b"), Some(U64));
     assert_eq!(width_of(decls, "a * b"), Some(U64));
@@ -236,7 +236,7 @@ fn u64_minus_u64_stays_i64() {
 
 #[test]
 fn a_bounded_operand_expression_keeps_the_64_bit_cap() {
-    let decls = "fixum numerus<i64> a ← 7";
+    let decls = "fixum i64 a ← 7";
     assert_eq!(width_of(decls, "a * a"), Some(I64));
     assert_eq!(width_of(decls, "a + 1"), Some(I64));
 }
@@ -244,19 +244,19 @@ fn a_bounded_operand_expression_keeps_the_64_bit_cap() {
 #[test]
 fn u64_with_a_signed_operand_is_still_an_error_with_both_fixes() {
     assert_rejects(
-        "functio f(numerus<u64> a, numerus<i8> b) → numerus { fixum _ r ← a + b\nredde 0 }\n",
+        "functio f(u64 a, i8 b) → numerus { fixum _ r ← a + b\nredde 0 }\n",
         "u64_signed_arithmetic_requires_conversion",
     );
     // `a ↦ inf` is the lossless fix the ruling names.
     test_support::assert_accepts(
-        "functio f(numerus<u64> a, numerus<i8> b) → numerus {\nfixum _ r ← (a ↦ inf) + b\nnota r\nredde 0 }\n",
+        "functio f(u64 a, i8 b) → numerus {\nfixum _ r ← (a ↦ inf) + b\nnota r\nredde 0 }\n",
     );
 }
 
 #[test]
 fn every_bounded_width_widens_into_inf_without_a_conversion() {
     test_support::assert_accepts(
-        "functio f(numerus<u64> u, numerus<i64> i, numerus<u8> b, numerus<i8> s) → inf {\n\
+        "functio f(u64 u, i64 i, u8 b, i8 s) → inf {\n\
          fixum inf a ← u\nfixum inf c ← i\nfixum inf d ← b\nfixum inf e ← s\nnota c\nnota d\nnota e\nredde a\n}\n",
     );
 }
@@ -265,7 +265,7 @@ fn every_bounded_width_widens_into_inf_without_a_conversion() {
 fn inf_widens_into_nothing_implicitly_a_bounded_slot_takes_a_checked_narrowing() {
     // The implicit store of ruling 38: accepted, a trap at run time.
     test_support::assert_accepts(
-        "functio f(inf a) → numerus<u8> {\nfixum numerus<u8> z ← a\nredde z\n}\n",
+        "functio f(inf a) → u8 {\nfixum u8 z ← a\nredde z\n}\n",
     );
     test_support::assert_accepts("functio f(inf a) → numerus {\nredde a\n}\n");
     // Policy-word slots still need an authored conversion.
@@ -283,7 +283,7 @@ fn inf_widens_into_nothing_implicitly_a_bounded_slot_takes_a_checked_narrowing()
 
 #[test]
 fn inf_compares_by_value_against_every_numeric_family() {
-    let decls = "fixum inf x ← 3\nfixum numerus<u64> u ← 5\nfixum numerus<i64> i ← 5\nfixum fractus f ← 1.5\nfixum numerus<d64> d ← 1.5";
+    let decls = "fixum inf x ← 3\nfixum u64 u ← 5\nfixum i64 i ← 5\nfixum fractus f ← 1.5\nfixum d64 d ← 1.5";
     for expr in [
         "x ≺ u",
         "u ≺ x",
@@ -305,7 +305,7 @@ fn inf_compares_by_value_against_every_numeric_family() {
 #[test]
 fn inf_equality_stays_exact_type() {
     assert_rejects(
-        "functio f(inf a, numerus<u64> b) → bivalens { redde a ≡ b }\n",
+        "functio f(inf a, u64 b) → bivalens { redde a ≡ b }\n",
         "equality_exact_types_required",
     );
     test_support::assert_accepts("functio f(inf a, inf b) → bivalens { redde a ≡ b }\n");
@@ -323,16 +323,16 @@ fn inf_equality_stays_exact_type() {
 #[test]
 fn a_store_into_an_inf_slot_is_total() {
     test_support::assert_accepts(
-        "functio f(numerus<u64> a, numerus<u64> b) → inf {\nfixum inf d ← a - b\nredde d\n}\n",
+        "functio f(u64 a, u64 b) → inf {\nfixum inf d ← a - b\nredde d\n}\n",
     );
     test_support::assert_accepts(
-        "functio f(numerus<i64> a) → inf {\nvaria inf d ← 0\nd ← a * a\nredde d\n}\n",
+        "functio f(i64 a) → inf {\nvaria inf d ← 0\nd ← a * a\nredde d\n}\n",
     );
 }
 
 #[test]
 fn an_inf_store_into_a_bounded_slot_is_an_implicit_checked_narrowing() {
-    let source = "functio f(inf a) → numerus<u8> {\nfixum numerus<u8> z ← a\nredde z\n}\n";
+    let source = "functio f(inf a) → u8 {\nfixum u8 z ← a\nredde z\n}\n";
     let fixture = test_support::analyze_ok(source);
     let hir = fixture.hir.as_ref().expect("hir");
     let mut stores = ImplicitStores::default();
@@ -343,7 +343,7 @@ fn an_inf_store_into_a_bounded_slot_is_an_implicit_checked_narrowing() {
     );
     // Into an inf slot there is nothing to check, so no node.
     let total = test_support::analyze_ok(
-        "functio f(numerus<u64> a, numerus<u64> b) → inf {\nfixum inf d ← a - b\nredde d\n}\n",
+        "functio f(u64 a, u64 b) → inf {\nfixum inf d ← a - b\nredde d\n}\n",
     );
     let mut none = ImplicitStores::default();
     walk_program(&mut none, total.hir.as_ref().expect("hir"));
@@ -380,7 +380,7 @@ fn a_constant_into_a_word_slot_beyond_u64_follows_the_slot_policy() {
 #[test]
 fn a_constant_expression_beyond_a_bounded_trapping_slot_is_a_compile_error() {
     assert_rejects(
-        "incipit {\nfixum numerus<u8> x ← 2 ⇐ 200\nnota x\n}\n",
+        "incipit {\nfixum u8 x ← 2 ⇐ 200\nnota x\n}\n",
         "store_constant_out_of_range",
     );
 }
@@ -396,9 +396,9 @@ fn conversion(param: &str, target: &str, expr: &str) -> String {
 #[test]
 fn a_bounded_integer_converts_into_inf_and_never_fails() {
     for source in [
-        "numerus<u8>",
-        "numerus<i64>",
-        "numerus<u64>",
+        "u8",
+        "i64",
+        "u64",
         "modulus<u16>",
         "saturatus<i32>",
     ] {
@@ -408,7 +408,7 @@ fn a_bounded_integer_converts_into_inf_and_never_fails() {
 
 #[test]
 fn inf_into_a_bounded_trapping_integer_is_failable() {
-    for target in ["numerus<u8>", "numerus<i64>", "numerus<u64>", "numerus"] {
+    for target in ["u8", "i64", "u64", "numerus"] {
         assert_rejects(
             &conversion("inf a", target, &format!("a ↦ {target}")),
             "failable_conversio_requires_handler",
@@ -416,12 +416,12 @@ fn inf_into_a_bounded_trapping_integer_is_failable() {
         test_support::assert_accepts(&conversion("inf a", target, &format!("a ↦ {target} ⊥ 0")));
     }
     // `main` is exempt: an unhandled failure there panics.
-    test_support::assert_accepts("incipit {\nfixum inf x ← 300\nnota x ↦ numerus<u8>\n}\n");
+    test_support::assert_accepts("incipit {\nfixum inf x ← 300\nnota x ↦ u8\n}\n");
 }
 
 #[test]
 fn a_constant_that_fits_converts_out_of_inf_without_a_handler() {
-    test_support::assert_accepts("functio f() → numerus<u8> {\nredde 200 ↦ numerus<u8>\n}\n");
+    test_support::assert_accepts("functio f() → u8 {\nredde 200 ↦ u8\n}\n");
 }
 
 #[test]
@@ -432,7 +432,7 @@ fn inf_into_a_policy_word_reduces_or_clamps_and_cannot_fail() {
 
 #[test]
 fn inf_into_a_float_never_fails() {
-    for target in ["fractus<f16>", "fractus<f32>", "fractus"] {
+    for target in ["f16", "f32", "fractus"] {
         test_support::assert_accepts(&conversion("inf a", target, &format!("a ↦ {target}")));
     }
 }
@@ -454,13 +454,13 @@ fn a_float_into_inf_fails_only_at_nan_and_infinity() {
 
 #[test]
 fn d64_into_inf_never_fails_and_inf_into_d64_is_checked() {
-    test_support::assert_accepts(&conversion("numerus<d64> a", "inf", "a ↦ inf"));
+    test_support::assert_accepts(&conversion("d64 a", "inf", "a ↦ inf"));
     assert_rejects(
-        &conversion("inf a", "numerus<d64>", "a ↦ numerus<d64>"),
+        &conversion("inf a", "d64", "a ↦ d64"),
         "failable_conversio_requires_handler",
     );
-    test_support::assert_accepts(&conversion("inf a", "numerus<d64>", "a ↦ numerus<d64> ⊥ 0"));
-    test_support::assert_accepts(&conversion("numerus a", "numerus<d64>", "5 ↦ numerus<d64>"));
+    test_support::assert_accepts(&conversion("inf a", "d64", "a ↦ d64 ⊥ 0"));
+    test_support::assert_accepts(&conversion("numerus a", "d64", "5 ↦ d64"));
 }
 
 #[test]
@@ -498,7 +498,7 @@ fn inf_converts_to_and_from_octeti_through_an_endian_hint() {
     );
     // A bounded width still has no byte encoding.
     assert_rejects(
-        &conversion("numerus<u32> a", "octeti", "a ↦ octeti via Be"),
+        &conversion("u32 a", "octeti", "a ↦ octeti via Be"),
         "numeric_to_octeti_unspecified",
     );
 }
@@ -512,22 +512,22 @@ fn inf_and_valor_convert_both_ways() {
 #[test]
 fn inf_has_no_bits_view() {
     assert_rejects(
-        &conversion("inf a", "fractus<f32>", "a ↦ f32 via Bits"),
+        &conversion("inf a", "f32", "a ↦ f32 via Bits"),
         "bits_pair_width_mismatch",
     );
     assert_rejects(
-        &conversion("fractus<f64> a", "inf", "a ↦ inf via Bits"),
+        &conversion("f64 a", "inf", "a ↦ inf via Bits"),
         "bits_pair_width_mismatch",
     );
 }
 
 #[test]
 fn a_fact_ascription_widens_into_inf_and_holds_any_constant() {
-    test_support::assert_accepts(&conversion("numerus<u8> a", "inf", "a ∷ inf"));
-    test_support::assert_accepts(&conversion("numerus<u64> a", "inf", "a ∷ inf"));
+    test_support::assert_accepts(&conversion("u8 a", "inf", "a ∷ inf"));
+    test_support::assert_accepts(&conversion("u64 a", "inf", "a ∷ inf"));
     test_support::assert_accepts(&conversion("numerus a", "inf", "5 ∷ inf"));
     assert_rejects(
-        &conversion("inf a", "numerus<u64>", "a ∷ numerus<u64>"),
+        &conversion("inf a", "u64", "a ∷ u64"),
         "numeric_ascription_requires_conversion",
     );
 }
@@ -536,7 +536,7 @@ fn a_fact_ascription_widens_into_inf_and_holds_any_constant() {
 fn a_conversion_into_a_float_of_a_constant_beyond_its_range_is_a_compile_error() {
     // Ruling 20 for constants of any size: 10^40 is beyond f32, exact in f64.
     assert_rejects(
-        "incipit {\nfixum fractus<f32> f ← 10000000000000000000000000000000000000000 ↦ f32\nnota f\n}\n",
+        "incipit {\nfixum f32 f ← 10000000000000000000000000000000000000000 ↦ f32\nnota f\n}\n",
         "float_constant_out_of_range",
     );
 }
@@ -622,7 +622,7 @@ fn literals_of(source: &str) -> BigLiterals {
 #[test]
 fn a_big_literal_in_a_float_slot_becomes_a_float_constant() {
     let literals = literals_of(&format!(
-        "incipit {{\nfixum fractus<f64> f ← {TWO_TO_64}\nnota f\n}}\n"
+        "incipit {{\nfixum f64 f ← {TWO_TO_64}\nnota f\n}}\n"
     ));
     assert_eq!(literals.big, 0, "no integer literal carries a float type");
     assert_eq!(literals.floats, 1);

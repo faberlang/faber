@@ -14,9 +14,9 @@ use crate::mir::{BufferHost, RunSourceError, run_source};
 
 /// The integer types of the family: Faber spelling, name, and whether a value fits.
 const FAMILY: [(&str, &str, fn(i128) -> bool); 4] = [
-    ("numerus<i32>", "i32", |v| i32::try_from(v).is_ok()),
+    ("i32", "i32", |v| i32::try_from(v).is_ok()),
     ("numerus", "i64", |v| i64::try_from(v).is_ok()),
-    ("numerus<u64>", "u64", |v| u64::try_from(v).is_ok()),
+    ("u64", "u64", |v| u64::try_from(v).is_ok()),
     ("inf", "inf", |_| true),
 ];
 
