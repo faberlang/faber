@@ -53,6 +53,77 @@ pub const SLICE_OUT: &str = "out0";
 /// temporaries append an ordinal (`b0_1`, `b0_2`, …).
 pub const UPDATE_BASE: &str = "b0";
 
+/// Every fixed hygiene name; a [`TempScope`] never hands one out as a temporary.
+const FIXED_NAMES: [&str; 14] = [
+    FAC_OK,
+    FAC_ERR,
+    YIELDED,
+    YIELD_FN,
+    INPUT,
+    OPTIONAL,
+    CLOSURE_ITEM,
+    CLOSURE_ACC,
+    CLOSURE_SPLIT,
+    MAP_KEY,
+    MAP_VAL,
+    RUNES,
+    SLICE_OUT,
+    UPDATE_BASE,
+];
+
+/// Per-function compiler temporaries.
+///
+/// Names are `<letter><n>` with `n` counted per letter from `0` inside one
+/// function, so a function's temporaries do not depend on the module's HIR ids.
+/// A name is never one the function's user bindings or the fixed hygiene names
+/// already hold: the compiler temporary adapts, a user identifier keeps its
+/// spelling. One `(kind, key)` always returns one name within a scope.
+#[derive(Debug, Clone)]
+pub struct TempScope {
+    taken: std::collections::HashSet<String>,
+    assigned: std::collections::HashMap<(char, u32), String>,
+    next: std::collections::HashMap<char, u32>,
+}
+
+impl TempScope {
+    /// Start a scope for one function. `user_names` are the names the function
+    /// declares; they and the fixed hygiene names are skipped by the allocator.
+    #[must_use]
+    pub fn new<I, S>(user_names: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let mut taken: std::collections::HashSet<String> =
+            FIXED_NAMES.iter().map(|name| (*name).to_owned()).collect();
+        taken.extend(user_names.into_iter().map(|name| name.as_ref().to_owned()));
+        Self {
+            taken,
+            assigned: std::collections::HashMap::new(),
+            next: std::collections::HashMap::new(),
+        }
+    }
+
+    /// The temporary for `(kind, key)`, allocating the next free `<kind><n>` on
+    /// first use. `kind` is one of the existing hygiene letters.
+    pub fn name(&mut self, kind: char, key: u32) -> String {
+        if let Some(existing) = self.assigned.get(&(kind, key)) {
+            return existing.clone();
+        }
+        let counter = self.next.entry(kind).or_insert(0);
+        let name = loop {
+            let candidate = format!("{kind}{counter}");
+            *counter += 1;
+            if !self.taken.contains(&candidate) {
+                break candidate;
+            }
+        };
+        self.taken.insert(name.clone());
+        self.assigned.insert((kind, key), name.clone());
+        name
+    }
+}
+
 /// Expression-or-receiver temporary (`struct`, `vec`, `list`, text base).
 #[must_use]
 pub fn temp(id: u32) -> String {
