@@ -449,6 +449,7 @@ fn scan_go_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
         ExprKind::Format(format) => scan_go_expr(&format.value, file, diagnostics),
         ExprKind::Literal(_)
         | ExprKind::Vacua(_)
+        | ExprKind::KeywordLiteral(_)
         | ExprKind::Ident(_)
         | ExprKind::Lege(_)
         | ExprKind::Ego(_)
@@ -823,6 +824,7 @@ fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
         ExprKind::Format(format) => scan_rust_expr(&format.value, file, diagnostics),
         ExprKind::Literal(_)
         | ExprKind::Vacua(_)
+        | ExprKind::KeywordLiteral(_)
         | ExprKind::Ident(_)
         | ExprKind::Lege(_)
         | ExprKind::Ego(_)

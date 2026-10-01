@@ -1098,6 +1098,12 @@ pub enum ExprKind {
     /// Carries the surface spelling so resolution can prefer a user binding
     /// of the same name (binding-wins).
     Vacua(Ident),
+    /// Value-literal keyword written in source: `verum`/`falsum`, `nulla`
+    /// (or its `nihil` alias) and `nonnumerus`.
+    ///
+    /// Carries the surface spelling so resolution can prefer a user binding
+    /// of the same name (binding-wins), exactly like [`ExprKind::Vacua`].
+    KeywordLiteral(KeywordLiteralExpr),
     Binary(BinaryExpr),
     Unary(UnaryExpr),
     Ternary(TernaryExpr),
@@ -1273,6 +1279,26 @@ pub struct ExtremumExpr {
 pub struct IunctaExpr {
     pub type_args: Vec<TypeExpr>,
     pub elements: Vec<Expr>,
+}
+
+/// A value-literal keyword and the spelling it was written with.
+#[derive(Debug)]
+pub struct KeywordLiteralExpr {
+    pub literal: Literal,
+    pub ident: Ident,
+}
+
+impl ExprKind {
+    /// The literal this form denotes, whether it is a plain literal or a
+    /// value-literal keyword that a same-named binding may still shadow.
+    #[must_use]
+    pub fn literal(&self) -> Option<&Literal> {
+        match self {
+            Self::Literal(literal) => Some(literal),
+            Self::KeywordLiteral(keyword) => Some(&keyword.literal),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

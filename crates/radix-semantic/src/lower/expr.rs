@@ -62,6 +62,12 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Vacua(ident) => lowerer
             .lower_shadowed_builtin(expr.id, ident.name)
             .unwrap_or(HirExpressionKind::Vacua),
+        ExprKind::KeywordLiteral(keyword) => {
+            match lowerer.lower_shadowed_builtin(expr.id, keyword.ident.name) {
+                Some(shadowed) => shadowed,
+                None => lower_literal(lowerer, &keyword.literal),
+            }
+        }
         ExprKind::Ident(ident) => lowerer.lower_nomen(ident),
         ExprKind::Binary(bin) => lowerer.lower_binarius(bin),
         ExprKind::Unary(unary) => lowerer.lower_unarius(unary),

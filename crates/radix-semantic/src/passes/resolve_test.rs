@@ -2308,6 +2308,172 @@ functio g() → lista<numerus> { redde vacua }
     );
 }
 
+fn value_literal_keyword_arg(result: &crate::test_support::AnalyzedFixture, keyword: &str) -> bool {
+    result.diagnostics.iter().any(|d| {
+        crate::semantic_spec(d.kind).code == "WARN021"
+            && d.issue() == Some("value_literal_shadowing")
+            && d.args
+                .iter()
+                .any(|arg| arg.name == "keyword" && arg.value == keyword)
+    })
+}
+
+#[test]
+fn bound_value_literals_are_the_binding_and_warn() {
+    // A user binding named like a value-literal keyword shadows it in scope:
+    // the use is the binding (a `textus`, so it only typechecks as one) and the
+    // declaration warns, naming the keyword.
+    for (keyword, value) in [
+        ("verum", "\"v\""),
+        ("falsum", "\"f\""),
+        ("nulla", "\"n\""),
+        ("nonnumerus", "\"x\""),
+    ] {
+        let result = compile_ok(&format!(
+            "incipit {{\n  fixum textus {keyword} ← {value}\n  fixum textus y ← {keyword}\n  nota y\n}}\n"
+        ));
+        assert!(
+            result.is_ok(),
+            "bound {keyword} must be the binding: {:?}",
+            result.diagnostics
+        );
+        assert!(
+            value_literal_keyword_arg(&result, keyword),
+            "{keyword}-named binding should warn WARN021 value_literal_shadowing: {:?}",
+            result.diagnostics
+        );
+    }
+}
+
+#[test]
+fn unbound_value_literals_stay_literals_without_warning() {
+    let result = compile_ok(
+        r"
+incipit {
+  fixum bivalens a ← verum
+  fixum bivalens b ← falsum
+  fixum numerus ∪ nihil c ← nulla
+  fixum fractus d ← nonnumerus
+  nota a
+  nota b
+  nota c
+  nota d
+}
+",
+    );
+    assert!(
+        result.is_ok(),
+        "unshadowed literals must stay literals: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        !has_issue(&result, "WARN021", "value_literal_shadowing"),
+        "no binding, no warning: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn value_literal_shadowing_is_scoped_to_the_binding() {
+    // The binding lives in the inner block only; after it the keyword is the
+    // literal again.
+    let result = compile_ok(
+        r#"
+incipit {
+  si verum {
+    fixum textus verum ← "inner"
+    nota verum
+  }
+  fixum bivalens ok ← verum
+  nota ok
+}
+"#,
+    );
+    assert!(
+        result.is_ok(),
+        "shadowing must not leak out of its scope: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn param_named_like_a_value_literal_shadows_and_warns() {
+    let result = compile_ok(
+        r#"
+functio f(textus falsum) → textus {
+  redde falsum
+}
+"#,
+    );
+    assert!(
+        result.is_ok(),
+        "bound falsum must be the param: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        value_literal_keyword_arg(&result, "falsum"),
+        "marker-named param should warn: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn function_named_like_a_value_literal_does_not_shadow_it() {
+    let result = compile_ok(
+        r#"
+functio verum() → textus {
+  redde "v"
+}
+incipit {
+  fixum bivalens a ← verum
+  nota a
+}
+"#,
+    );
+    assert!(
+        result.is_ok(),
+        "a function must neither shadow the literal nor warn: {:?}",
+        result.diagnostics
+    );
+    assert!(!has_issue(&result, "WARN021", "value_literal_shadowing"));
+}
+
+#[test]
+fn en_bound_value_literals_are_the_binding_and_warn() {
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
+    let pack = crate::locale::LocalePack::from_toml_path(&pack_path)
+        .expect("installed en pack should load");
+    let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
+    config.locale_pack = Some(pack);
+    let result = crate::test_support::analyze_source_with_config(
+        r#"
+fn probe() → string {
+    const string true ← "t"
+    const string null ← "n"
+    const float nan ← 1.0
+    const string pair ← true + null
+    return pair
+}
+"#,
+        config,
+    );
+    for keyword in ["true", "null", "nan"] {
+        assert!(
+            value_literal_keyword_arg(&result, keyword),
+            "en {keyword}-named binding should warn: {:?}",
+            result.diagnostics
+        );
+    }
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|d| d.issue().is_some_and(|i| i.contains("mismatch"))),
+        "bound en literals must resolve to the bindings: {:?}",
+        result.diagnostics
+    );
+}
+
 #[test]
 fn unshadowed_lege_stays_the_builtin() {
     let result = compile_ok(

@@ -1137,6 +1137,12 @@ fn resolve_expr(
             }
         }
         ExprKind::Literal(_) => {}
+        // A value-literal keyword is the fallback when no same-named value
+        // binding is live; a binding in scope wins and lowering emits its
+        // name load. Functions never shadow (they stay callable as `f()`).
+        ExprKind::KeywordLiteral(keyword) => {
+            record_shadowed_marker(resolver, expr.id, keyword.ident.name);
+        }
         ExprKind::Binary(expr) => {
             resolve_expr(resolver, interner, &expr.lhs, errors);
             resolve_expr(resolver, interner, &expr.rhs, errors);

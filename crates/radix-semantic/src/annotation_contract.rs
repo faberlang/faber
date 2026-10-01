@@ -1094,6 +1094,16 @@ fn payload_value(
                 Ok(ContractPayloadValue::Bool(*b))
             }
             ExprKind::Literal(Literal::Nil) if schema.optional => Ok(ContractPayloadValue::Nihil),
+            ExprKind::KeywordLiteral(keyword) => match &keyword.literal {
+                Literal::Bool(b) if schema.ty == ContractFieldType::Bivalens => {
+                    Ok(ContractPayloadValue::Bool(*b))
+                }
+                Literal::Float(n) if schema.ty == ContractFieldType::Fractus => {
+                    Ok(ContractPayloadValue::Float(*n))
+                }
+                Literal::Nil if schema.optional => Ok(ContractPayloadValue::Nihil),
+                _ => Err(ISSUE_INVALID_PAYLOAD),
+            },
             ExprKind::Ident(ident) if schema.ty == ContractFieldType::Bivalens => {
                 match interner.resolve(ident.name) {
                     "verum" => Ok(ContractPayloadValue::Bool(true)),

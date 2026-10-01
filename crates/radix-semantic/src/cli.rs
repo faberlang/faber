@@ -938,6 +938,12 @@ impl CliBuilder<'_> {
             }
             ExprKind::Literal(Literal::Bool(value)) => CliDefault::Bool(*value),
             ExprKind::Literal(Literal::Nil) => CliDefault::Nil,
+            ExprKind::KeywordLiteral(keyword) => match &keyword.literal {
+                Literal::Bool(value) => CliDefault::Bool(*value),
+                Literal::Nil => CliDefault::Nil,
+                Literal::Float(value) => CliDefault::Float(*value),
+                other => CliDefault::Expr(format!("{other:?}")),
+            },
             other => CliDefault::Expr(format!("{other:?}")),
         }
     }

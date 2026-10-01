@@ -400,8 +400,8 @@ fn ident_from_field(field: &AnnotationField) -> Option<&Ident> {
 
 fn bool_from_field(field: &AnnotationField) -> Option<bool> {
     let expr = expr_from_field(field)?;
-    match &expr.kind {
-        ExprKind::Literal(Literal::Bool(value)) => Some(*value),
+    match expr.kind.literal() {
+        Some(Literal::Bool(value)) => Some(*value),
         _ => None,
     }
 }
