@@ -1,7 +1,7 @@
 +++
 term = "inf-json"
 kind = "operator-group"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "named_import", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "fixum_decl", "varia_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "inline_default", "iteration_stmt", "range_expr", "range_tail", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "named_import", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "inline_default", "itera_stmt", "range_expr", "range_tail", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "conversion"
 canonical = false
 summary = "JSON integer tokens of any length parse into an `inf` exactly, and an integer beyond 64 bits renders back as a bare number."

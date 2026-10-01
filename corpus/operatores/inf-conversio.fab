@@ -1,7 +1,7 @@
 +++
 term = "inf-conversio"
 kind = "operator-group"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "fixum_decl", "varia_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "inline_default", "iteration_stmt", "range_expr", "range_tail", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "inline_default", "itera_stmt", "range_expr", "range_tail", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "conversion"
 canonical = false
 summary = "`inf` crosses the byte and dynamic-value boundaries exactly: `octeti via Be|Le` is minimal two's complement both ways, and `valor` carries an integer of any size."
