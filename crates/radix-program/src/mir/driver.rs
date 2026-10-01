@@ -83,7 +83,7 @@ pub fn with_interpreted_lowered_package_mir<R>(
 /// # Panics
 /// Panics when required internal state is absent.
 pub fn with_linked_test_package_mir<R>(
-    mut package: AnalyzedProgram,
+    package: AnalyzedProgram,
     scope: &TestPackageScope,
     config: &Config,
     seams: &MirSeams,
