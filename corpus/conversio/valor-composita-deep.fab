@@ -4,9 +4,9 @@ kind = "conversio"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "genus_decl", "genus_member", "field_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "typed_constructor", "field_list", "field_init", "field_key", "type_arguments", "type_argument", "shape_suffix", "array_literal", "json_literal", "json_object", "json_member", "json_value", "json_string", "json_number", "conversio_expr", "inline_default", "equality", "equality_tail", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal"]
 category = "conversion"
 canonical = false
-summary = "Deeper composite rows behind a valor: a nested genus, int-to-float widening, the ⊥ recovery on the wrong shape, and `valor is T` tag tests."
-syntax = "<valor> ↦ <genus|lista<genus>|lista<float>> [⊥ <recovery>] | <valor> is <type> | <valor> not is <type>"
-related = ["↦", "⊥", "valor", "genus", "lista", "tabula", "tensor", "est"]
+summary = "Deeper composite rows behind a valor: a nested genus, int-to-float widening, the ⊥ recovery on the wrong shape, and a tensor boxed as a list."
+syntax = "<valor> ↦ <genus|lista<genus>|lista<float>> [⊥ <recovery>]"
+related = ["↦", "⊥", "valor", "genus", "lista", "tensor"]
 locale = "en"
 +++
 # =============================================================================
@@ -16,19 +16,19 @@ locale = "en"
 # What this teaches:
 #   • A genus held by another genus, or by a lista, is still a genus behind the valor: it prints as an object at every depth and comes back typed.
 #   • `valor ↦ lista<fractus>` widens integer elements; a value of the wrong shape takes the `⊥` recovery.
-#   • `valor is T` reads the carrier's kind: a genus matches only its own type, a lista or tabula matches `is list<T>` or `is map<K, V>` with the element types erased, and a tensor matches no list.
+#   • A tensor behind a valor prints as the flat list of its elements.
 #
 # Common mistakes:
 #   • Expecting a nested genus to print as a construction literal — behind a valor every depth prints as JSON, `{"x": 3, "y": 4}`, not `Punctum { x = 3, y = 4 }`.
-#   • Reading `is list<int>` as a check of the elements — it only checks that the carrier is a list, so a list of text matches too.
 #
-# See also: ↦, ⊥, valor, genus, lista, tabula, tensor, est
+# See also: ↦, ⊥, valor, genus, lista, tensor, valor-composita-tags
 # =============================================================================
 
 # conversio/valor-composita-deep — the rows valor-composita leaves out
 #
 # WHY: pins, on the runner (the oracle), what composites do behind a valor
-# beyond the flat boxing and round trips of valor-composita.
+# beyond the flat boxing and round trips of valor-composita. The `valor is T`
+# tag tests live in valor-composita-tags.
 #
 # EXPECTED OUTPUT:
 #   valor-composita-deep.expected — one line per print.
@@ -78,27 +78,8 @@ main {
     const Punctum missing ← boxedNumeri ↦ Punctum ⊥ punctum
     print missing.x
 
-    # 3. Tag tests: a genus is only its own type.
-    const value boxedGenus ← punctum ↦ value
-    print boxedGenus is Punctum
-    print boxedGenus is Linea
-    print boxedGenus is int
-    print boxedGenus not is Linea
-
-    # 4. A lista matches any list type (elements erased) and no genus.
-    print boxedNumeri is list<int>
-    print boxedNumeri is list<string>
-    print boxedNumeri is Punctum
-    print boxedOrdo is list<Punctum>
-
-    # 5. A tabula matches a map type, a tensor matches no list.
-    const map<string, int> scores ← { "alpha": 10 }
-    const value boxedScores ← scores ↦ value
-    print boxedScores is map<string, int>
-    print boxedScores is list<int>
+    # 3. A tensor behind a valor prints as the flat list of its elements.
     const tensor<f32, [2]> grid ← [1.5, 2.5] ↦ tensor<f32, [2]>
     const value boxedGrid ← grid ↦ value
     print boxedGrid
-    print boxedGrid is list<float>
-    print boxedGrid is tensor<f32, [2]>
 }
