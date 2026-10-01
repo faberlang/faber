@@ -1,0 +1,63 @@
++++
+term = "elige negative patterns"
+kind = "feature"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "literal", "elige_stmt", "casu_elige_clause", "ceterum_clause", "incipit_stmt", "fixum_decl", "expression", "unary_expr", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument"]
+category = "control-flow"
+canonical = true
+summary = "A leading minus before a number literal is a case value in elige."
+syntax = "elige <number> { casu -1 ... casu -2.5 ... casu -∞ ... }"
+related = ["elige", "casu", "ceterum"]
+locale = "en"
++++
+# A number literal never carries its own sign, so the case value owns the minus.
+# It covers integers, decimals, and negative infinity.
+fn classify(int n) → string {
+    switch n {
+        case -1 {
+            return "minus one"
+        }
+        case 0 {
+            return "zero"
+        }
+        default {
+            return "other"
+        }
+    }
+}
+
+fn describe(float x) → string {
+    switch x {
+        case -∞ {
+            return "negative infinity"
+        }
+        case -2.5 {
+            return "minus two and a half"
+        }
+        default {
+            return "finite"
+        }
+    }
+}
+
+main {
+    print classify(-1)
+    print classify(0)
+    print classify(7)
+    print describe(-∞)
+    print describe(-2.5)
+    print describe(1.0)
+
+    # The same negative literals work on a local value.
+    const int floor ← -3
+    switch floor {
+        case -3 {
+            print "basement three"
+        }
+        case -1 {
+            print "basement one"
+        }
+        default {
+            print "above ground"
+        }
+    }
+}
