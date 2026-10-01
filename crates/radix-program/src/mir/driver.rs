@@ -2,12 +2,12 @@
 
 use super::{
     AnalyzedProgram, BTreeMap, CliPackagePlan, CliPlanningMode, Config, DefId,
-    DeviceManifestConfig, Diagnostic, HashMap, HirItemKind, LoweredMirUnit, MirIntrinsic,
-    MirProviderKind, MirRuntimeCall, MirSeams, MirStatementKind, ModuleId, PackageMirConsumer,
-    PackageMirLinks, Path, PathBuf, PreparedPackageMir, TestFunctionIds, TestPackageScope,
-    air_specialize, canonicalize_direct_definition_callees, collect_package_runtime_requirements,
-    local_namespace_call_targets, lower_package_units, mir_diag, mir_lowering_diag,
-    plan_cli_package, rewrite_unit_namespace_calls, validate_program,
+    DeviceManifestConfig, Diagnostic, HashMap, HirItemKind, LibraryInterfaceCache, LoweredMirUnit,
+    MirIntrinsic, MirProviderKind, MirRuntimeCall, MirSeams, MirStatementKind, ModuleId,
+    PackageMirConsumer, PackageMirLinks, Path, PathBuf, PreparedPackageMir, TestFunctionIds,
+    TestPackageScope, air_specialize, canonicalize_direct_definition_callees,
+    collect_package_runtime_requirements, local_namespace_call_targets, lower_package_units,
+    mir_diag, mir_lowering_diag, plan_cli_package, rewrite_unit_namespace_calls, validate_program,
 };
 
 struct PackageMirPreparation<'a> {
@@ -83,7 +83,7 @@ pub fn with_interpreted_lowered_package_mir<R>(
 /// # Panics
 /// Panics when required internal state is absent.
 pub fn with_linked_test_package_mir<R>(
-    mut package: AnalyzedProgram,
+    package: AnalyzedProgram,
     scope: &TestPackageScope,
     config: &Config,
     seams: &MirSeams,
@@ -97,8 +97,27 @@ pub fn with_linked_test_package_mir<R>(
         return Err(package.diagnostics);
     }
 
-    let library_resolver = package.library_resolver.clone();
     let mut library_cache = (seams.library_cache_for_config)(config);
+    link_package_functions(package, scope, config, &mut library_cache, run)
+}
+
+/// Link the test roots of an already-analyzed package into one validated MIR
+/// program, resolving library imports through the supplied cache. The core of
+/// [`with_linked_test_package_mir`]: callers that already own a
+/// [`LibraryInterfaceCache`] (and no [`MirSeams`]) enter here.
+///
+/// # Errors
+/// Returns an error when scoping, linking, lowering, or validation fails.
+/// # Panics
+/// Panics when required internal state is absent.
+pub(crate) fn link_package_functions<R>(
+    mut package: AnalyzedProgram,
+    scope: &TestPackageScope,
+    config: &Config,
+    library_cache: &mut LibraryInterfaceCache,
+    run: impl for<'a> FnOnce(&radix_module::mir::ValidatedMir<'a>, &TestFunctionIds) -> R,
+) -> Result<R, Vec<Diagnostic>> {
+    let library_resolver = package.library_resolver.clone();
     let anchor_id = apply_test_link_scope(&mut package, scope)?;
     let anchor_path = package
         .nodes
@@ -109,14 +128,14 @@ pub fn with_linked_test_package_mir<R>(
         &package,
         PackageMirConsumer::Interpreted,
         &library_resolver,
-        &mut library_cache,
+        library_cache,
         None,
     )?;
     air_specialize::plan_package_instances(
         &mut package,
         &mut links,
         &library_resolver,
-        &mut library_cache,
+        library_cache,
     )?;
     reserve_test_scope_sources(&package, &anchor_path, &mut links);
     for unit in package.nodes.values_mut() {
@@ -136,7 +155,7 @@ pub fn with_linked_test_package_mir<R>(
         &anchor_id,
         &links,
         &library_resolver,
-        &mut library_cache,
+        library_cache,
         &cli_plan,
         config.no_fuse,
     )?;
