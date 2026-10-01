@@ -1,6 +1,7 @@
 use std::fs;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use super::super::binding_manifest::read_binding_manifest;
 use super::{verify_library_binding_shapes, verify_library_bindings};
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
@@ -453,4 +454,137 @@ fn unmarked_bodyless_binding_declaration_is_module_private() {
     let diagnostics = verify_library_binding_shapes(root.path(), "rust")
         .expect_err("an unmarked bodyless declaration is not a binding contract");
     assert!(has_issue(&diagnostics, "binding_unknown_declaration"));
+}
+
+const WGSL_TARGET: &str = "wgsl-text";
+
+/// A library whose only target is WGSL: no Rust shim, no Rust probe.
+fn wgsl_package(source: &str, bindings: &str) -> tempfile::TempDir {
+    let root = tempfile::tempdir().expect("create temp root");
+    fs::create_dir_all(root.path().join("src")).expect("create source directory");
+    fs::create_dir_all(root.path().join("bindings")).expect("create binding directory");
+    fs::write(
+        root.path().join("faber.toml"),
+        r#"[package]
+name = "fixture"
+
+[library]
+provider = "fixture"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["wgsl-text"]
+
+[target.wgsl-text]
+bindings = "bindings/wgsl.toml"
+"#,
+    )
+    .expect("write package manifest");
+    fs::write(root.path().join("src/api.fab"), source).expect("write Faber source");
+    fs::write(root.path().join("bindings/wgsl.toml"), bindings).expect("write binding manifest");
+    root
+}
+
+const WGSL_SOURCE: &str = "@ public
+class Lumen {
+    var f32 x = 0.0
+}
+
+@ public
+fn lucis(f32 value) → f32
+";
+
+#[test]
+fn wgsl_manifest_with_function_and_type_binding_verifies() {
+    let root = wgsl_package(
+        WGSL_SOURCE,
+        r#"[functions."fixture:api.lucis"]
+symbol = "zq_lucis"
+opener = "f32"
+result = "f32"
+
+[types."fixture:api.Lumen"]
+symbol = "zq_lumen"
+"#,
+    );
+
+    let result = verify_library_bindings(root.path(), WGSL_TARGET).expect("wgsl bindings verify");
+    assert_eq!(result.declarations, 1);
+    assert_eq!(result.bindings, 1);
+    assert_eq!(result.types, 1);
+    assert!(result.shim.is_none());
+}
+
+#[test]
+fn wgsl_type_binding_naming_no_declared_type_is_rejected() {
+    let root = wgsl_package(
+        WGSL_SOURCE,
+        r#"[functions."fixture:api.lucis"]
+symbol = "zq_lucis"
+
+[types."fixture:api.Absens"]
+symbol = "zq_absens"
+"#,
+    );
+
+    let diagnostics =
+        verify_library_bindings(root.path(), WGSL_TARGET).expect_err("unknown type rejected");
+    assert!(has_issue(&diagnostics, "binding_unknown_type"));
+}
+
+#[test]
+fn type_binding_with_an_empty_spelling_is_rejected() {
+    let root = wgsl_package(
+        WGSL_SOURCE,
+        r#"[functions."fixture:api.lucis"]
+symbol = "zq_lucis"
+
+[types."fixture:api.Lumen"]
+symbol = "  "
+"#,
+    );
+
+    let diagnostics =
+        verify_library_bindings(root.path(), WGSL_TARGET).expect_err("empty spelling rejected");
+    assert!(has_issue(&diagnostics, "binding_symbol_empty"));
+}
+
+#[test]
+fn unknown_manifest_fields_are_still_rejected() {
+    let root = wgsl_package(
+        WGSL_SOURCE,
+        r#"[functions."fixture:api.lucis"]
+symbol = "zq_lucis"
+spelling = "zq_lucis"
+"#,
+    );
+
+    let diagnostics =
+        verify_library_bindings(root.path(), WGSL_TARGET).expect_err("unknown field rejected");
+    assert!(has_issue(&diagnostics, "invalid_binding_manifest"));
+}
+
+#[test]
+fn real_tela_ts_manifest_parses_with_the_unified_schema() {
+    // The lane checkout carries `tela` beside `radix`; `FABER_TELA_HOME`
+    // overrides it for out-of-tree runs.
+    let tela = std::env::var_os("FABER_TELA_HOME").map_or_else(
+        || std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../tela"),
+        std::path::PathBuf::from,
+    );
+    let manifest = read_binding_manifest(&tela.join("bindings/ts.toml")).expect("tela ts.toml");
+
+    let scope = manifest
+        .functions
+        .get("tela:dom.scope")
+        .expect("tela:dom.scope binding");
+    assert_eq!(scope.symbol, "webDomScope");
+    assert_eq!(scope.opener.as_deref(), Some("string"));
+    assert_eq!(scope.result.as_deref(), Some("Scope"));
+    assert!(manifest.shim.is_some());
+    assert!(manifest.shims.contains_key("canvas2d"));
+    assert!(manifest.types.is_empty());
 }
