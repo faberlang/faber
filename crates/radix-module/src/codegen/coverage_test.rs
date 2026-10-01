@@ -2,7 +2,7 @@
 //! emit a given HIR + type table, and which capability gaps block emission with
 //! stable slugs (e.g. matrix, f16, modular words, `ad`).
 
-use super::*;
+use super::coverage::*;
 use crate::hir::{
     DefId, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirId, HirItem, HirItemKind, HirModule,
     HirStatement, HirStatementKind,
