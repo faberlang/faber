@@ -1478,7 +1478,7 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 
 - Declaration parameters (`genericParams`) and applied arguments (`typeArguments`) are distinct grammar categories. Applied arguments admit nested types and static `figura` values. `typeArguments` still admits `NATURAL`.
 - Applied `NATURAL` arguments are `حجم` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, N>`, `queue<T, N>`, `stack<T, N>`, `textus<N>`, `ascii<N>`, `octeti<N>`. Width markers such as `i32` and `f32` stay the separate `widthTypeSugar` production below.
-- **Convert hints are not type arguments (D11.9).** A hint (`Hex` / `Bin` / `Oct` / `Be` / `Le` / `Bits` / `Code`) is a `عبر` clause on the `↦` conversion, never a further argument of the target type (see Runtime conversion). The retired spellings are parse errors with a pointer at the clause: a hint as a further type argument of a scalar head (`numerus<W, Hex>`, `fractus<f64, Bits>`, `ascii<N, Hex>`, `littera<Code>`) is `conversio_hint_type_argument`, and a bracketed hint tail after the target (`octeti<16><Le>`, `vector<u32, 4><Be>`) is `conversio_hint_tail_argument`. Only scalar heads are checked, so a user type named like a hint stays a legal argument of a collection target (`↦ lista<Code>`).
+- **Convert hints are not type arguments (D11.9).** A hint (`Hex` / `Bin` / `Oct` / `Be` / `Le` / `Bits` / `Code`) is a `عبر` clause on the `↦` conversion, never a further argument of the target type (see Runtime conversion). The retired spellings are parse errors with a pointer at the clause: a hint as a further type argument of a scalar head (`ascii<N, Hex>`, `littera<Code>`; the wrapped numeric heads `numerus<W, Hex>` and `fractus<f64, Bits>` are rejected whole as `numeric_wrapper_retired`, see Sized primitives) is `conversio_hint_type_argument`, and a bracketed hint tail after the target (`octeti<16><Le>`, `vector<u32, 4><Be>`) is `conversio_hint_tail_argument`. Only scalar heads are checked, so a user type named like a hint stays a legal argument of a collection target (`↦ lista<Code>`).
 - Type arguments admit the hole forms: `lista<∪>` infers a heterogeneous element union and `tabula<K, ∪>` a heterogeneous value union; `lista<_>` keeps the monomorphic single-inhabitant hole.
 - Explicit generic call-site lists use the same `typeArguments` production: `id<_>(x)` is a type hole (equivalent to omitted `id(x)` for a one-param callee), and mixed lists such as `both<_, textus>(a, b)` are legal. Arity stays exact (`both<_>` is still one argument). `∪` in that list is rejected (`explicit_union_type_arg_unsupported`): a callee type param is a monomorphic witness slot.
 - `labeledTypeArgument` is the optional label prefix on `توبل` type arguments only (`توبل<gx: f32, T>`; mixed labeled/unlabeled legal). A label in a non-`توبل` list (`f<gx: T>(x)`, `lista<gx: T>`) is a parse error. Absence is the only unlabeled form; there is no `_: T` spelling. Keyword spellings are legal labels under the contextual law (`توبل<ثابت: A>`).
@@ -1529,7 +1529,7 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | `numerus`  | integer (default `i64`) |
 | `modulus<W>` | en `wrapping<W>`; modular word, signed or unsigned (N7e); a store reduces modulo 2^W |
 | `saturatus<W>` | en `saturating<W>`; saturating integer; a store clamps at both ends of W |
-| `exactus<W>` | en `trapping<W>`; the trapping policy spelled out (D11.8, N7a): the same type as `numerus<W>`, and a store traps when the value does not fit |
+| `exactus<W>` | en `trapping<W>`; the trapping policy spelled out (D11.8, N7a): the same type as the bare marker `W`, and a store traps when the value does not fit |
 | `inf` | the unbounded integer (D11.5): a width marker in the `numerus` family with no upper or lower bound, spelled `inf` in every locale (no keyword). `inf`, `exactus<inf>`, `modulus<inf>` and `saturatus<inf>` (en `trapping<inf>`, `wrapping<inf>`, `saturating<inf>`) all name this one type; the wrapped `inf` is retired. **Shipped:** the type, big literals, the join, store and conversion rules, exact run-time arithmetic, and the host-only rejections, on the MIR runner, Rust, TypeScript, Go and Python, and in part on the Racket (`sexp`) target. A target with no unbounded carrier (Swift, Haskell, LLVM, Wasm) fails closed with a named diagnostic, and Metal, WGSL and AIR never carry it; see The unbounded integer `inf`. |
 | `fractus`  | float (default `f64`) |
 | `bivalens` | boolean |
@@ -1565,24 +1565,26 @@ length one (the type of `'x'`), not a separate character type; it widens
 implicitly `ascii<1> → littera → textus` (D10.5), so `s[i] ≡ '\n'` keeps
 working across the chain.
 
-Sized primitives accept one optional **width marker** (not a user type parameter):
+A sized numeric type is written as its **bare width marker** (not a user type parameter): `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `d64`, `inf` (the integer family) and `f16`, `bf16`, `f32`, `f64` (the float family). The three policy words wrap a marker and keep their `<W>` argument:
 
 | Family | Markers | Invalid example |
 | ------ | ------- | --------------- |
-| `numerus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `d64`, `inf` | `numerus<f32>` → use `f32` |
-| `fractus<W>` | `f16`, `bf16`, `f32`, `f64` | `fractus<i32>` → use `i32` |
 | `modulus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, and `inf` (the same type as `inf`) | `modulus<f32>` or `modulus<d64>` → a modular word takes an integer width |
 | `saturatus<W>` | the same eight integer widths, and `inf` (the same type as `inf`) | `saturatus<f32>` → use `f32` |
 | `exactus<W>` | the eight integer widths, `d64`, and `inf` | `exactus<f32>` → the trapping float cell is not built (`trapping_float_not_implemented`) |
 
 Bare `numerus` / `fractus` remain shorthand for `i64` / `f64`.
 The bare marker (`i32`, `f32`, `d64`, `inf`) is the canonical spelling of a sized
-numeric type; the wrapped `numerus<W>` / `fractus<W>` form is retired pending
-the parser lock, and the rows above describe what the parser still accepts.
-`inf` is the one marker with no range: `fractus<inf>` is rejected
-(`integer_width_on_fractus`), and an unbounded integer has no word to wrap or
-clamp at, so `modulus<inf>` and `saturatus<inf>` are accepted and change
-nothing.
+numeric type. The wrapped spelling `numerus<W>` / `fractus<W>` (en `int<W>` /
+`float<W>`, and the same words of every locale pack) is **rejected** at parse
+time with `numeric_wrapper_retired` (PARSE040), which names the form written and
+the bare replacement. This covers family-correct forms (`numerus<i32>`),
+wrong-family forms (`numerus<f32>`, `fractus<i32>`), `numerus<d64>` and
+`numerus<inf>`, the removed `numerus<d32>`, extra arguments, and the marker holes
+`numerus<_>` / `fractus<_>` (write bare `numerus` / `fractus`, or a bare marker).
+`inf` is the one marker with no range: it is integer-only (not a float width),
+and an unbounded integer has no word to wrap or clamp at, so `modulus<inf>` and
+`saturatus<inf>` are accepted and change nothing.
 
 `d64` is the one **decimal** width, for money and accounting
 (there is no narrower decimal width). A decimal literal in a decimal context (`d64 a ←
@@ -1597,8 +1599,8 @@ rounds **half-even to scale 8** and traps when the value leaves the range, so
 `amount * rate * (1 + tax)` rounds once, at the store; per-step rounding is
 written as separate stores. `d64` takes only the trapping policy
 (`saturating<d64>` and `wrapping<d64>` are rejected: a clamped money amount is
-silently wrong). The `d` marker is valid only on `numerus` (`fractus<d64>` is
-rejected). Integer literals in a decimal context are rejected
+silently wrong). The `d` marker is integer-family only: `d64` is not a float
+width. Integer literals in a decimal context are rejected
 (`decimal_integer_literal_rejected`); write `1.0` or convert explicitly with
 `↦`, as for every crossing between number families. A decimal literal with more
 than eight fraction digits into `d64` is a compile error: a written literal is
@@ -1608,11 +1610,13 @@ never silently changed, while a computed value is rounded by the slot. Display
 (`print`, `§` holes) it prints the shortest form with trailing zeros dropped,
 `12.5` and `12`, never `12.50` or `12.0`. A decimal stores its value only, with
 no per-value scale.
-`numerus<_>`, `fractus<_>`, `modulus<_>`, `saturatus<_>`, and `instans<_>` are marker holes:
+`modulus<_>`, `saturatus<_>`, and `instans<_>` are marker holes:
 the family stays identity and only the width/precision is inferred from a
 same-family witness (exact marker, no lattice widening). Unsolved `_` is an
-error, never the bare default. A convert hint is never a type argument, so
-there is no hint hole; hints are `عبر` clauses.
+error, never the bare default. The wrapped holes `numerus<_>` and `fractus<_>`
+are retired with the wrapped numeric spelling (`numeric_wrapper_retired`). A
+convert hint is never a type argument, so there is no hint hole; hints are
+`عبر` clauses.
 
 ### Numeric model
 
@@ -1641,7 +1645,7 @@ time.
 
 | Family | Policy at the store | Use |
 | ------ | ------------------- | --- |
-| `numerus<W>` (default) | **traps** if the value does not fit | counts, sizes, money, indices |
+| bare marker `W` (default) | **traps** if the value does not fit | counts, sizes, money, indices |
 | `modulus<W>` (en `wrapping<W>`) | **reduces** modulo 2^W | hashes, checksums |
 | `saturatus<W>` (en `saturating<W>`) | **clamps** to W's bounds, once, at the store | pixels, audio, levels |
 
@@ -1672,10 +1676,10 @@ en `trapping<W>`, `wrapping<W>`, `saturating<W>`; la `exactus<W>`, `modulus<W>`,
 and signed widths on `modulus<W>` — `wrapping<i8>` reduces into the signed
 range, so `100 + 100` stored into it is −56. **Admitted, not shipped:** the
 float cells (`exactus<f32>` is rejected as `trapping_float_not_implemented`;
-`modulus` and `saturatus` take no float width) and the retirement of the long
-forms (N7c/N7d): `numerus<W>`/`fractus<W>` (en `int<W>`/`float<W>`) stay
-accepted beside the policy words until the parser lock, and this document writes
-the bare marker.
+`modulus` and `saturatus` take no float width). **Shipped (N7c/N7d):** the
+retirement of the long forms: the canonical emitter writes the bare marker and
+the parser rejects `numerus<W>`/`fractus<W>` (en `int<W>`/`float<W>`) with
+`numeric_wrapper_retired`; the policy words keep their `<W>`.
 
 **Implicit and explicit failure differ.** A failed implicit store is a trap of
 its own identity: it never enters the `⇥` channel, even inside `افعل … التقط`,
@@ -1772,9 +1776,9 @@ what the compiler can prove, and `↦` is a check). Into a trapping integer type
 it is a magnitude-checked narrowing that fails through `⇥`, `⊥` or `فخ`. Into
 a `wrapping<W>` type it reduces the exact source value modulo 2^W, and into a
 `saturating<W>` type it clamps it; neither can fail and neither takes a `⊥`
-(integer and `d64` sources). `fractus ↦ numerus<W>` saturates at the target
+(integer and `d64` sources). `fractus ↦` an integer width `W` saturates at the target
 width, NaN converting to `0` (the cross-tier Rust `as` status quo); integer
-`numerus<W>` arithmetic traps on overflow while float→integer conversion
+`W` arithmetic traps on overflow while float→integer conversion
 clamps. Overflow policy lives in the type. There are no per-operation checked,
 wrapping, or saturating method families. To ask "does this fit?" of untrusted
 input, convert it to the narrow type with `↦` and handle the failure through the
@@ -1937,7 +1941,7 @@ Value unions use inline `T ∪ U` (nullable: `T ∪ nihil`). The standalone `∪
 
 The bare width marker (`u32`, `f32`, `d64`, `inf`) is the canonical spelling of a
 sized numeric type, and `lista<u32>` is the canonical collection form. The wrapped
-`u32` / `f32` form is retired pending the parser lock. Type
+`numerus<W>` / `fractus<W>` form is rejected (`numeric_wrapper_retired`). Type
 sugar (`lu32`, `tf32`, …) is an ergonomic alternate spelling for collection
 types. It is **type-position only** and **semantically identical** to the long
 form — the compiler treats both the same. This is the single canonical
@@ -1954,7 +1958,7 @@ marker prefixed with `l`, `t`, `s`, `v`, and `m`, respectively.
 
 | Sugar | Long form | Bracket rule |
 | ----- | --------- | ------------ |
-| `i8` … `u64`, `f16`/`f32`/`f64` | `numerus<W>`, `fractus<W>` | none (bare marker) |
+| `i8` … `u64`, `f16`/`f32`/`f64`, `d64`, `inf` | none: the bare marker is the type (the wrapped `numerus<W>` / `fractus<W>` long form is rejected, `numeric_wrapper_retired`) | none (bare marker) |
 | `lf32`, `lu32`, `li64`, … | `lista<f32>`, `lista<u32>`, `lista<i64>`, … | none |
 | `tf32`, `tf32[2, 3]`, `ti64[N]` | `tensor<f32, _>`, `tensor<f32, [2, 3]>`, `tensor<i64, [N]>` | optional `Figura` |
 | `sf32`, `sf32[2, 3]`, `si64[N]` | `sparsa<f32, _>`, `sparsa<f32, [2, 3]>`, `sparsa<i64, [N]>` | optional `Figura` |
@@ -2252,12 +2256,12 @@ The `↦` glyph (U+21A6, "rightwards arrow from bar") is the runtime value conve
 - The clause binds tighter than the `⊥` default: `x ↦ u32 عبر Hex ⊥ 0` is `(x ↦ u32 عبر Hex) ⊥ 0`. Conversions chain, each hop with its own clause.
 - Whether a hint is known, and whether the target takes one, is semantic (lowering), not grammar.
 
-**Retired spellings.** Before D11.9 a hint was written as the second type argument of the `↦` target (`numerus<W, Hex>`, `littera<Code>`) or as a bracketed tail (`octeti<16><Le>`). Both are rejected at parse time (`conversio_hint_type_argument`, `conversio_hint_tail_argument`); the `عبر` clause is the only spelling.
+**Retired spellings.** Before D11.9 a hint was written as the second type argument of the `↦` target (`ascii<N, Hex>`, `littera<Code>`) or as a bracketed tail (`octeti<16><Le>`). Both are rejected at parse time (`conversio_hint_type_argument`, `conversio_hint_tail_argument`); the `عبر` clause is the only spelling.
 
 The hint selects the conversion row. `Hex` / `Bin` / `Oct` / `Be` / `Le` / `Bits` / `Code` are convert hints in the `عبر` clause, not keywords and not new `baseType` productions. For ascii output, `Hex` / `Bin` / `Oct` select the lowercase fixed-width digit pack; the hint is not part of type identity. Target support is not a grammar production (see Target Support).
 
 - `"ff" ↦ i32 عبر Hex` — shipped; text parse at radix 16 (`Bin` = 2, `Oct` = 8). Hex/Bin/Oct text parse is unchanged by endian hints.
-- `octeti[lo‥hi] ↦ W عبر Be` / `… ↦ W عبر Le` — endian unpack of an exact-width window (`W` is `i16` / `i32` / `i64` / `u16` / `u32` / `u64`; window length 2 / 4 / 8). Shipped on rust, the MIR runner, Go, and TypeScript. TypeScript `i64`/`u64` stay fail-closed (JS number is not exact). `int<W>` is the same target in the English reader. `octeti` itself has no endian; `bytes ↦ u32` without `عبر Be` / `عبر Le` stays rejected. A short window fails (no pad).
+- `octeti[lo‥hi] ↦ W عبر Be` / `… ↦ W عبر Le` — endian unpack of an exact-width window (`W` is `i16` / `i32` / `i64` / `u16` / `u32` / `u64`; window length 2 / 4 / 8). Shipped on rust, the MIR runner, Go, and TypeScript. TypeScript `i64`/`u64` stay fail-closed (JS number is not exact). `octeti` itself has no endian; `bytes ↦ u32` without `عبر Be` / `عبر Le` stays rejected. A short window fails (no pad).
 - `octeti[lo‥hi] ↦ f32 عبر Be|Le` / `… ↦ f64 عبر Be|Le` — shipped alongside the integer rows (float endian unpack of an exact-width window, 4 / 8 bytes; same fail rules: exact window required, a short window fails, `عبر Be` / `عبر Le` mandatory).
 - `n ↦ u32 عبر Bits` / `n ↦ u64 عبر Bits` / `n ↦ f32 عبر Bits` / `n ↦ f64 عبر Bits` / `n ↦ f16 عبر Bits` — shipped; the `Bits` hint reinterprets between exact-width integer/float pairs (u32↔f32, u64↔f64, u16↔f16, u16↔bf16) bit-identically. It is reinterpretation, not value conversion; wrong-pair rows reject with the structured issue, and `Bits` is never a base or an ascii format hint. `Bits` is a `عبر` hint, not a keyword and not a `baseType` production.
 - `n ↦ octeti<N> عبر Be` / `… ↦ octeti<N> عبر Le` — proposed (not shipped) for a scalar source (`N` ∈ {2, 4, 8}); the hint is a `عبر` clause, not a second capacity. Register targets take the clause today: `v ↦ octeti<16> عبر Le`, `corpus[0‥16] ↦ vector<u32, 4> عبر Be`.
@@ -2792,7 +2796,7 @@ parser rejects each one.
 | `كرر من t عند [i, j] خيط f ثابت v { … }` | admitted (FLD K2); a `خيط` clause on `كرر` is rejected (`خيط` exists only in `مجموع من` inside kernels) |
 | `reducta عبر Op من source …` (en `reduce عبر Op from …`) | admitted (FLD K3), with `Op` a closed set `Sum Product Max Min Argmax Argmin All Any Count`; it would retire `مجموع من` and `max from` / `min from`, all of which stay shipped meanwhile |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
-| `trapping`/`saturating`/`wrapping` float cells; retiring `numerus<W>`/`fractus<W>` | ruled (D11.8); N7c/N7d pending |
+| `trapping`/`saturating`/`wrapping` float cells | ruled (D11.8); pending. The retirement of `numerus<W>`/`fractus<W>` shipped (N7c/N7d) |
 | Multi-subject `طابق` lowering | parses and is coverage-checked; lowered only by the Rust emitter |
 | Run-time capacities and extents (`[H, W]`, `_`) | admitted (FLD K14); today every extent and capacity is a compile-time value |
 | Slash-delimited regex literals | pending; use `"…" ↦ regex` |

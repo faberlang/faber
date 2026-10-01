@@ -1154,6 +1154,12 @@ failable_promissum_type := IDENTIFIER '<' type_annotation alternate_exit_clause 
 ratio_type      := 'ratio' '<' labeled_type_argument (',' labeled_type_argument)* '>'
 hole_type       := '_'
 qualified_type  := IDENTIFIER ('.' IDENTIFIER)*
+# The bare numeric type words `numerus` and `fractus` (and their locale words)
+# take no type arguments: the wrapped spelling `numerus<W>` / `fractus<W>`,
+# including the holes `numerus<_>` / `fractus<_>`, is a parse error
+# (`numeric_wrapper_retired`), not a production of this grammar. A width marker
+# is its own type (`width_type_sugar`); only the policy words `modulus`,
+# `saturatus` and `exactus` wrap a marker (`modulus<u32>`).
 type_arguments  := '<' type_argument (',' type_argument)* '>'
 type_argument   := labeled_type_argument | type_annotation | NATURAL | '[' figura_list? ']'
 labeled_type_argument := IDENTIFIER ':' type_annotation
@@ -1323,7 +1329,7 @@ cast_expr       := gradient_expr ('∷' type_annotation | conversio_expr)* inlin
 # part of the target type (`"ff" ↦ i32 via Hex`, `octeti[0‥2] ↦ u16 via Le`).
 # It binds tighter than the `⊥` default: `x ↦ u32 via Hex ⊥ 0` is
 # `(x ↦ u32 via Hex) ⊥ 0`. The retired spellings — the hint as a further type
-# argument (`numerus<W, Hex>`, `littera<Code>`) and as a bracketed tail
+# argument (`ascii<N, Hex>`, `littera<Code>`) and as a bracketed tail
 # (`octeti<16><Le>`) — are parse errors (`conversio_hint_type_argument`,
 # `conversio_hint_tail_argument`), not productions of this grammar.
 conversio_expr        := '↦' (type_annotation | interval_target) via_clause? inline_default?
