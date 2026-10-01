@@ -197,7 +197,7 @@ pub struct ScopeEntry {
 /// `symbols` maps source-level interned names to definition identities. The
 /// heavier symbol metadata lives in [`Resolver`] so callers can retain a
 /// `DefId` after leaving the scope where it was declared.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Scope {
     pub id: ScopeId,
     pub parent: Option<ScopeId>,
@@ -226,7 +226,7 @@ impl Scope {
 /// semantic passes: once a source name has been resolved to a `DefId`, this
 /// record carries the declaration kind, optional type, mutability, and source
 /// span needed for diagnostics.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Symbol {
     pub def_id: DefId,
     pub name: LexSymbol,
@@ -695,6 +695,7 @@ const BUILTIN_DEF_ID_BASE: u32 = 0x0000_0001;
 /// range) never collide with user declarations (high range). This keeps user
 /// def ids stable regardless of how many builtins register before user
 /// collection.
+#[derive(Clone)]
 pub struct Resolver {
     scopes: Vec<Scope>,
     symbols: FxHashMap<DefId, Symbol>,
