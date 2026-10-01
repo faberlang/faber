@@ -11,7 +11,9 @@ use std::path::{Path, PathBuf};
 use radix_module::diagnostics::Diagnostic;
 
 use crate::MANIFEST_FILE;
-use crate::manifest::{FaberManifest, manifest_build_target, read_manifest};
+use crate::manifest::{
+    FaberManifest, manifest_build_target, read_manifest, validate_target_tables,
+};
 use crate::member_path::resolve_package_member;
 use crate::paths::normalize_path;
 
@@ -387,6 +389,8 @@ fn validate_compiler_manifest(
             ));
         }
     }
+
+    validate_target_tables(&manifest.target, path)?;
 
     Ok(())
 }

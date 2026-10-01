@@ -175,3 +175,25 @@ fn missing_package_input_names_path_base_and_manifest_artifact() {
         Some("manifest")
     );
 }
+
+fn compiler_manifest_with_tables(tables: &str) -> FaberManifest {
+    toml::from_str(&format!(
+        "[package]\nname = \"demo\"\n\n[paths]\nentry = \"main.fab\"\n{tables}"
+    ))
+    .expect("manifest parses")
+}
+
+#[test]
+fn compiler_manifest_rejects_unknown_target_table() {
+    let manifest = compiler_manifest_with_tables("\n[target.wgsl]\nbindings = \"b.toml\"\n");
+    let err = validate_compiler_manifest(&manifest, Path::new("faber.toml"))
+        .expect_err("an unknown [target.<key>] must fail discovery validation");
+    assert_eq!(err.issue(), Some("package_target_table_unknown"));
+}
+
+#[test]
+fn compiler_manifest_accepts_target_spelling_table() {
+    let manifest = compiler_manifest_with_tables("\n[target.wgsl-text]\nbindings = \"b.toml\"\n");
+    validate_compiler_manifest(&manifest, Path::new("faber.toml"))
+        .expect("a target-spelling table passes discovery validation");
+}

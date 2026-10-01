@@ -21,7 +21,7 @@ use serde::Deserialize;
 use radix::program::library::is_valid_provider_segment;
 use radix::program::manifest::{
     ManifestBuild, ManifestLibrary, ManifestPackage, ManifestPaths, ManifestReader, ManifestTarget,
-    manifest_build_target,
+    manifest_build_target, validate_target_tables,
 };
 #[cfg(feature = "runner")]
 use radix::program::mir::DeviceSelection;
@@ -437,6 +437,8 @@ pub(crate) fn validate_manifest(
             ));
         }
     }
+
+    validate_target_tables(&manifest.target, path)?;
 
     // N1.1: the `[device] backend` selection default is validated at package
     // load so an unsupported spelling fails closed early, never silently

@@ -39,3 +39,25 @@ fn unsupported_backend_fails_closed_with_issue() {
     assert_eq!(err.issue(), Some("package_device_backend_unsupported"));
     assert!(err.message.contains("rocm"));
 }
+
+fn manifest_with_target_tables(tables: &str) -> FaberManifest {
+    toml::from_str(&format!(
+        "[package]\nname = \"demo\"\n\n[paths]\nentry = \"main.fab\"\n{tables}"
+    ))
+    .expect("manifest parses")
+}
+
+#[test]
+fn validate_manifest_rejects_unknown_target_table() {
+    let manifest = manifest_with_target_tables("\n[target.wgsl]\nbindings = \"b.toml\"\n");
+    let err = validate_manifest(&manifest, Path::new("faber.toml"))
+        .expect_err("an unknown [target.<key>] must fail check/build validation");
+    assert_eq!(err.issue(), Some("package_target_table_unknown"));
+}
+
+#[test]
+fn validate_manifest_accepts_target_spelling_table() {
+    let manifest = manifest_with_target_tables("\n[target.wgsl-text]\nbindings = \"b.toml\"\n");
+    validate_manifest(&manifest, Path::new("faber.toml"))
+        .expect("a target-spelling table passes validation");
+}
