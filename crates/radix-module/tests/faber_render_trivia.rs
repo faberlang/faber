@@ -194,7 +194,7 @@ fn faber_render_comments_render_at_structural_positions() {
     );
     // Member trivia precedes the field and the method.
     assert!(
-        code.contains("# field comment\n    textus nomen"),
+        code.contains("# field comment\n    varia textus nomen"),
         "field comment must precede the field:\n{code}"
     );
     assert!(

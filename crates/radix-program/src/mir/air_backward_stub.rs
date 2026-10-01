@@ -9,11 +9,11 @@ pub(super) fn prepare(_analysis: &mut AnalyzedModule) -> Result<Option<AirBundle
     Ok(None)
 }
 
-pub(super) fn apply(
-    lowered: LoweredMirUnit<'_>,
+pub(super) fn apply<'a>(
+    lowered: LoweredMirUnit<'a>,
     _bundle: AirBundle,
     _analysis: &AnalyzedModule,
     _no_fuse: bool,
-) -> Result<LoweredMirUnit<'_>, String> {
+) -> Result<LoweredMirUnit<'a>, String> {
     Ok(lowered)
 }

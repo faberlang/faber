@@ -27,7 +27,7 @@ fn scalar_air_skips_backward_generation() {
     let source = r#"
 @ radix lane "air"
 @ radix backward "scalar_backward"
-functio add_numeri(numerus a, numerus b) → numerus {
+functio add_numeri(numerus<i32> a, numerus<i32> b) → numerus {
     redde a + b
 }
 "#;
