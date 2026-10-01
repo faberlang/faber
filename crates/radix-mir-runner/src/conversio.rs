@@ -186,6 +186,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             Type::Struct(def_id) => {
                 self.convert_to_struct(value, source_ty, *def_id, recovery, struct_defaults, span)
             }
+            // N7E-1: the policy-float cell runs only once N7E-3 lands; fail
+            // closed with its own feature name rather than the generic arm.
+            Type::PolicyFloat(_, _) => Err(RunnerError::unsupported(
+                span,
+                "runtime conversio to a policy-float cell",
+            )),
             other => Err(RunnerError::unsupported(
                 span,
                 &format!("runtime conversio to {other:?}"),

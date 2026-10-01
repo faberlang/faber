@@ -288,3 +288,34 @@ fn decode_rejects_nominal_def_with_no_def_site() {
         other => panic!("expected DanglingIndex DefId, got {other:?}"),
     }
 }
+
+/// N7E-1: an artifact whose type table names both policy-float cells encodes,
+/// decodes and passes referential-integrity validation at the current schema.
+#[test]
+fn policy_float_cells_round_trip_through_the_artifact_codec() {
+    use radix_types::{FloatPolicy, NumericWidth, Type, TypeTable};
+
+    let mut table = TypeTable::new();
+    let trapping = table.intern(Type::PolicyFloat(FloatPolicy::Trapping, NumericWidth::F32));
+    let saturating = table.intern(Type::PolicyFloat(
+        FloatPolicy::Saturating,
+        NumericWidth::F64,
+    ));
+    let mut artifact = stub_artifact();
+    artifact.types = table.snapshot();
+
+    let bytes = encode(&artifact).expect("encode artifact");
+    let decoded = decode(&bytes).expect("decode artifact with policy-float cells");
+    assert_eq!(decoded.schema_version, SCHEMA_VERSION);
+    assert_eq!(artifact, decoded);
+
+    let restored = TypeTable::from_snapshot(decoded.types).expect("restore type table");
+    assert_eq!(
+        restored.get(trapping),
+        &Type::PolicyFloat(FloatPolicy::Trapping, NumericWidth::F32)
+    );
+    assert_eq!(
+        restored.get(saturating),
+        &Type::PolicyFloat(FloatPolicy::Saturating, NumericWidth::F64)
+    );
+}

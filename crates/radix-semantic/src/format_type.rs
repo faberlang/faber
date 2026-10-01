@@ -141,6 +141,13 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
 
         Type::ModularWord(width) => format!("modulus<{}>", width.faber_marker()),
         Type::SaturatingWord(width) => format!("saturatus<{}>", width.faber_marker()),
+        Type::PolicyFloat(policy, width) => {
+            let word = match policy {
+                radix_types::FloatPolicy::Trapping => "exactus",
+                radix_types::FloatPolicy::Saturating => "saturatus",
+            };
+            format!("{word}<{}>", width.faber_marker())
+        }
 
         Type::Option(inner) => {
             let inner =

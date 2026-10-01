@@ -767,6 +767,7 @@ fn canonical_type_shape(analysis: &AnalyzedModule, type_id: TypeId, active: &mut
         Type::SizedNumeric(primitive, width) => format!("sized-numeric:{primitive:?}:{}", width.faber_marker()),
         Type::ModularWord(width) => format!("modular-word:{}", width.faber_marker()),
         Type::SaturatingWord(width) => format!("saturating-word:{}", width.faber_marker()),
+        Type::PolicyFloat(policy, width) => format!("policy-float:{}:{}", policy.word(), width.faber_marker()),
         Type::SizedInstans(precision) => format!("sized-instans:{precision:?}"),
         Type::Option(inner) => format!("option<{}>", canonical_type_shape(analysis, *inner, active)),
         Type::Ref(mutability, inner) => {

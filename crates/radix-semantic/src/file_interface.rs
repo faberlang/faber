@@ -12,6 +12,7 @@ use crate::{
 use radix_hir::{DefId, HirExpression};
 use radix_lexer::Interner;
 use radix_syntax::GenericParamKind;
+use radix_types::FloatPolicy;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -308,6 +309,7 @@ pub enum InterfaceTypeSnapshot {
     SizedNumeric(Primitive, NumericWidth),
     ModularWord(NumericWidth),
     SaturatingWord(NumericWidth),
+    PolicyFloat(FloatPolicy, NumericWidth),
     SizedInstans(InstansPrecision),
     Option(Box<InterfaceTypeSnapshot>),
     Ref(SemanticMutability, Box<InterfaceTypeSnapshot>),
@@ -769,6 +771,7 @@ fn snapshot_interface_type_inner(
         }
         Type::ModularWord(width) => Ok(InterfaceTypeSnapshot::ModularWord(*width)),
         Type::SaturatingWord(width) => Ok(InterfaceTypeSnapshot::SaturatingWord(*width)),
+        Type::PolicyFloat(policy, width) => Ok(InterfaceTypeSnapshot::PolicyFloat(*policy, *width)),
         Type::SizedInstans(precision) => Ok(InterfaceTypeSnapshot::SizedInstans(*precision)),
         Type::Option(inner) => Ok(InterfaceTypeSnapshot::Option(Box::new(
             snapshot_interface_type_inner(*inner, types, interner, resolver, module_identity)?,
@@ -1026,6 +1029,9 @@ fn import_interface_type_inner(
         InterfaceTypeSnapshot::ModularWord(width) => Ok(types.intern(Type::ModularWord(*width))),
         InterfaceTypeSnapshot::SaturatingWord(width) => {
             Ok(types.intern(Type::SaturatingWord(*width)))
+        }
+        InterfaceTypeSnapshot::PolicyFloat(policy, width) => {
+            Ok(types.intern(Type::PolicyFloat(*policy, *width)))
         }
         InterfaceTypeSnapshot::SizedInstans(precision) => Ok(types.sized_instans(*precision)),
         InterfaceTypeSnapshot::Option(inner) => {

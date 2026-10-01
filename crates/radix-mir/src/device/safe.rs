@@ -249,7 +249,9 @@ impl<'a> DeviceSafeClassifier<'a> {
             }
             Type::ModularWord(_) => self.check_device_layout(ty),
             // D11.1: no device clamp lowering yet — fail closed.
-            Type::SaturatingWord(_) => {
+            // N7E-1: the policy-float cell has no device lowering; D6 splits
+            // `trapping` (a language rule) from `saturating` (temporary) in N7E-2.
+            Type::SaturatingWord(_) | Type::PolicyFloat(_, _) => {
                 self.record_policy(format!("device host value type {semantic:?}"));
             }
             Type::SizedNumeric(_, _) => {

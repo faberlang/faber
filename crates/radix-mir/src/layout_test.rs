@@ -153,6 +153,11 @@ fn intended_bucket(ty: &Type) -> Bucket {
         | Type::MarkerHole { .. }
         | Type::Error => Bucket::Internal,
         Type::Alias(_, _) => panic!("alias is transparent; pinned separately, not a census row"),
+        // N7E-1: the policy-float cell has no layout until N7E-3; it resolves to
+        // a loud missing-fact error, pinned by `policy_float_has_no_mir_layout_*`.
+        Type::PolicyFloat(_, _) => {
+            panic!("policy-float has no MIR layout yet; pinned separately, not a census row")
+        }
         Type::BoundedOcteti { .. }
         | Type::Intervallum(_)
         | Type::SizedInstans(_)
@@ -472,6 +477,32 @@ fn resolve_outcome(table: &MirLayoutTable, ty: radix_types::TypeId) -> SizedNume
                 "fallthrough error names the type: {err:?}"
             );
             SizedNumericOutcome::LoudError
+        }
+    }
+}
+
+/// N7E-1: the policy-float cell has no MIR layout yet. It fails loudly with the
+/// fallthrough-law identity (naming the type), never as a silent bare float.
+#[test]
+fn policy_float_has_no_mir_layout_until_the_runner_unit_lands() {
+    for policy in [
+        radix_types::FloatPolicy::Trapping,
+        radix_types::FloatPolicy::Saturating,
+    ] {
+        for width in [
+            NumericWidth::F16,
+            NumericWidth::BF16,
+            NumericWidth::F32,
+            NumericWidth::F64,
+        ] {
+            let mut types = TypeTable::new();
+            let cell = types.intern(Type::PolicyFloat(policy, width));
+            let table = MirLayoutTable::from_types(&types);
+            let err = table
+                .layout_for_type(MirType::semantic(cell))
+                .expect_err("a policy-float cell has no layout yet");
+            assert_eq!(err.issue, "mir_layout_missing_type_fact", "{err:?}");
+            assert_eq!(err.ty, Some(cell), "{err:?}");
         }
     }
 }
