@@ -136,6 +136,13 @@ pub struct Config {
     /// must print the author's text; every compile path leaves it `false`.
     pub keep_authored_constants: bool,
 
+    /// Leave `praefixum` bodies that reach an import for the package layer.
+    /// Analysis never runs another module's code: with this set, a module
+    /// with such a body keeps every `praefixum` initializer unevaluated; with
+    /// it clear, each such body is refused (`praefixum_import_unavailable`).
+    /// Bodies that reach no import evaluate either way.
+    pub defer_imported_praefixum: bool,
+
     /// Opaque route-to-spelling maps for the selected target. The WGSL
     /// graphics path resolves each bound library call in a stage body to its
     /// spelling through these maps; every other path ignores them. Empty by
@@ -165,6 +172,7 @@ impl Default for Config {
             complexity_budget: None,
             kernel_complexity_budget: None,
             keep_authored_constants: false,
+            defer_imported_praefixum: false,
             target_bindings: TargetBindings::default(),
         }
     }
@@ -181,6 +189,14 @@ impl Config {
     #[must_use]
     pub fn with_target(mut self, target: Target) -> Self {
         self.target = target;
+        self
+    }
+
+    /// Defer `praefixum` bodies that reach an import to the package layer
+    /// instead of refusing them.
+    #[must_use]
+    pub fn with_defer_imported_praefixum(mut self) -> Self {
+        self.defer_imported_praefixum = true;
         self
     }
 

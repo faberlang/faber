@@ -157,3 +157,150 @@ fn faber_reemission_keeps_the_authored_body() {
     .expect("analysis");
     assert!(matches!(static_value(&unit, "N").kind, HirExpressionKind::Praefixum(_)));
 }
+
+mod imported {
+    //! A body that reaches an import never runs in analysis: it is refused
+    //! by name, or the whole module is left for the package layer.
+
+    use super::*;
+    use crate::driver::ModuleImportContract;
+    use crate::file_interface::{
+        FileExport, FileExportKind, FileInterface, InterfaceCallable, InterfaceConstValue, InterfaceTypeSnapshot,
+    };
+    use crate::semantic::Primitive;
+    use crate::semantic::passes::visibility_annotation::VisibilityTier;
+    use std::collections::BTreeMap;
+
+    const IMPORT: &str = "importa ex \"./consts\" consts\n";
+
+    fn contract() -> ModuleImportContract {
+        let mut interface = FileInterface::new();
+        interface.insert(FileExport {
+            name: "BASE".to_owned(),
+            kind: FileExportKind::Const(
+                InterfaceTypeSnapshot::Primitive(Primitive::Numerus),
+                Some(InterfaceConstValue::Int(5)),
+            ),
+        });
+        interface.insert(FileExport {
+            name: "seven".to_owned(),
+            kind: FileExportKind::Function(InterfaceCallable {
+                type_params: Vec::new(),
+                params: Vec::new(),
+                ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Numerus)),
+                err: None,
+                is_async: false,
+                is_generator: false,
+                device: None,
+            }),
+        });
+        let exports = ["BASE", "seven"]
+            .into_iter()
+            .map(|name| (name.to_owned(), VisibilityTier::Publica))
+            .collect();
+        ModuleImportContract {
+            namespace_exports: BTreeMap::from([("consts".to_owned(), exports)]),
+            file_interfaces: BTreeMap::from([("consts".to_owned(), interface)]),
+            ..ModuleImportContract::default()
+        }
+    }
+
+    fn analyze_with(source: &str, defer: bool) -> Result<AnalyzedModule, Vec<Diagnostic>> {
+        let mut config = Config::default().with_dev_locale_root();
+        if defer {
+            config = config.with_defer_imported_praefixum();
+        }
+        let session = Session::new(config);
+        analyze_source(
+            &session,
+            "praefixum.fab",
+            source,
+            AnalyzeRequest { cli_program: None, contract: contract() },
+        )
+    }
+
+    fn refusal(source: &str) -> Vec<Diagnostic> {
+        match analyze_with(source, false) {
+            Ok(_) => panic!("a body reaching an import must be refused"),
+            Err(diagnostics) => diagnostics,
+        }
+    }
+
+    fn refused(source: &str, name: &str, callee: &str) {
+        let diagnostics = refusal(source);
+        let found: Vec<&Diagnostic> = diagnostics
+            .iter()
+            .filter(|d| d.code == Some("SEM064") && d.issue() == Some("praefixum_import_unavailable"))
+            .collect();
+        assert_eq!(found.len(), 1, "diagnostics: {diagnostics:?}");
+        assert_eq!(arg(found[0], "name"), Some(name));
+        assert_eq!(arg(found[0], "callee"), Some(callee));
+    }
+
+    fn is_unevaluated(unit: &AnalyzedModule, name: &str) -> bool {
+        matches!(static_value(unit, name).kind, HirExpressionKind::Praefixum(_))
+    }
+
+    #[test]
+    fn flag_off_refuses_an_imported_call_by_name() {
+        refused(
+            &format!("{IMPORT}fixum numerus G = praefixum {{\n    redde consts.seven()\n}}\n"),
+            "G",
+            "consts.seven",
+        );
+    }
+
+    #[test]
+    fn flag_off_refuses_an_imported_value_by_name() {
+        refused(
+            &format!("{IMPORT}fixum numerus E = praefixum {{\n    redde consts.BASE + 1\n}}\n"),
+            "E",
+            "consts.BASE",
+        );
+    }
+
+    #[test]
+    fn flag_off_refuses_a_reference_reached_through_a_local_helper() {
+        refused(
+            &format!(
+                "{IMPORT}functio auxilium() → numerus {{\n    redde consts.seven()\n}}\n\
+                 fixum numerus G = praefixum {{\n    redde auxilium()\n}}\n"
+            ),
+            "G",
+            "consts.seven",
+        );
+    }
+
+    #[test]
+    fn flag_off_evaluates_the_sites_that_reach_nothing() {
+        let diagnostics = refusal(&format!(
+            "{IMPORT}fixum numerus L = praefixum {{\n    redde 2 + 3\n}}\n\
+             fixum numerus G = praefixum {{\n    redde consts.seven()\n}}\n"
+        ));
+        let issues: Vec<_> = diagnostics.iter().filter_map(|d| d.issue()).collect();
+        assert_eq!(issues, ["praefixum_import_unavailable"], "diagnostics: {diagnostics:?}");
+    }
+
+    #[test]
+    fn flag_on_leaves_every_initializer_unevaluated() {
+        let unit = analyze_with(
+            &format!(
+                "{IMPORT}fixum numerus L = praefixum {{\n    redde 2 + 3\n}}\n\
+                 fixum numerus G = praefixum {{\n    redde consts.seven()\n}}\n"
+            ),
+            true,
+        )
+        .unwrap_or_else(|diagnostics| panic!("deferral is not an error: {diagnostics:?}"));
+        assert!(is_unevaluated(&unit, "G"));
+        assert!(is_unevaluated(&unit, "L"), "a module defers all its sites or none");
+    }
+
+    #[test]
+    fn local_only_comptime_evaluates_in_both_modes() {
+        let source = format!("{IMPORT}fixum numerus L = praefixum {{\n    redde 2 + 3\n}}\n");
+        for defer in [false, true] {
+            let unit = analyze_with(&source, defer).unwrap_or_else(|diagnostics| panic!("{diagnostics:?}"));
+            assert_eq!(int(&static_value(&unit, "L")), 5, "defer = {defer}");
+        }
+    }
+}
