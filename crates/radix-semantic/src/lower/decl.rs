@@ -329,31 +329,35 @@ impl Lowerer<'_> {
     // SHADER STAGE LOCALS
 
     fn inject_vertex_shader_locals(&mut self) -> Vec<ShaderLocal> {
-        let (vec3_ty, vec4_ty) = self.shader_stage_vec_types();
+        let (vec2_ty, vec3_ty, vec4_ty) = self.shader_stage_vec_types();
         let span = Span::default();
         vec![
             self.define_shader_local("position", vec3_ty, false, span),
+            self.define_shader_local("uv", vec2_ty, false, span),
             self.define_shader_local("out_position", vec4_ty, true, span),
         ]
     }
 
     fn inject_fragment_shader_locals(&mut self) -> Vec<ShaderLocal> {
-        let (vec3_ty, vec4_ty) = self.shader_stage_vec_types();
+        let (vec2_ty, vec3_ty, vec4_ty) = self.shader_stage_vec_types();
         let span = Span::default();
         vec![
             self.define_shader_local("normal", vec3_ty, false, span),
             self.define_shader_local("color", vec3_ty, false, span),
+            self.define_shader_local("uv", vec2_ty, false, span),
             self.define_shader_local("out_color", vec4_ty, true, span),
         ]
     }
 
-    fn shader_stage_vec_types(&mut self) -> (TypeId, TypeId) {
+    fn shader_stage_vec_types(&mut self) -> (TypeId, TypeId, TypeId) {
         let f32_ty = self
             .types
             .sized_numeric(Primitive::Fractus, NumericWidth::F32);
+        let width2 = self.types.intern_index(IndexExpr::Literal(2));
         let width3 = self.types.intern_index(IndexExpr::Literal(3));
         let width4 = self.types.intern_index(IndexExpr::Literal(4));
         (
+            self.types.vector_with_width(f32_ty, width2),
             self.types.vector_with_width(f32_ty, width3),
             self.types.vector_with_width(f32_ty, width4),
         )

@@ -2767,14 +2767,19 @@ fn define_shader_stage_locals_for_resolution(
     };
 
     if has_annotation("vertex") {
-        for (name, mutable) in [("position", false), ("out_position", true)] {
+        for (name, mutable) in [("position", false), ("uv", false), ("out_position", true)] {
             if let Some(symbol) = symbol_by_text(interner, name) {
                 define_symbol(resolver, symbol, span, SymbolKind::Local, mutable, errors);
             }
         }
     }
     if has_annotation("fragment") {
-        for (name, mutable) in [("normal", false), ("color", false), ("out_color", true)] {
+        for (name, mutable) in [
+            ("normal", false),
+            ("color", false),
+            ("uv", false),
+            ("out_color", true),
+        ] {
             if let Some(symbol) = symbol_by_text(interner, name) {
                 define_symbol(resolver, symbol, span, SymbolKind::Local, mutable, errors);
             }

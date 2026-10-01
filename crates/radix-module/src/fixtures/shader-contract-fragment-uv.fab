@@ -1,0 +1,38 @@
++++
+term = "shader-contract-fragment-uv"
+kind = "concept"
+category = "library"
+canonical = true
+summary = "Fragment stage body that reads the predefined `uv` stage name (SS-U1)."
+locale = "la"
++++
+
+# Fragment stage body reading the predefined stage-scoped `uv` name (vec2<f32>).
+# The `uv` varying is declared through the generic `varying` contract role.
+
+@ shader_contract "varying"
+functio varying_matches(
+    textus source_name, numerus location, numerus format_code,
+    numerus interpolation_code, numerus role_code
+) → bivalens {
+    redde verum
+}
+
+@ shader_contract "fragment_output"
+functio fragment_output_matches(
+    numerus location, numerus format_code, numerus role_code
+) → bivalens {
+    redde verum
+}
+
+@ fragment
+functio shader_uv_fragment() → vacuum {
+    fixum f32 energy ← uv · uv
+    fixum vector<f32, 3> shaded ↤ [energy, energy, energy]
+    out_color ← shaded
+}
+
+incipit {
+    adfirma varying_matches("uv", 0, 2, 1, 4) mori "uv varying at location 0, Float32x2"
+    adfirma fragment_output_matches(0, 4, 2) mori "fragment output location 0, vec4<f32>"
+}

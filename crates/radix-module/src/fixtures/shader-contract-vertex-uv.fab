@@ -1,0 +1,32 @@
++++
+term = "shader-contract-vertex-uv"
+kind = "concept"
+category = "library"
+canonical = true
+summary = "Vertex stage body that reads the predefined `uv` stage name (SS-U1)."
+locale = "la"
++++
+
+# Vertex stage body reading the predefined stage-scoped `uv` name (vec2<f32>).
+# The `uv` vertex attribute is declared through the generic `vertex_layout` role.
+
+@ shader_contract "vertex_layout"
+functio vertex_layout_matches(
+    numerus geo, numerus slot, textus source_name,
+    numerus location, numerus format_code, numerus offset_bytes,
+    numerus stride_bytes, numerus step_mode_code, numerus role_code
+) → bivalens {
+    redde verum
+}
+
+@ vertex
+functio shader_uv_vertex() → vacuum {
+    fixum f32 energy ← uv · uv
+    fixum vector<f32, 3> shifted ↤ [energy, energy, energy]
+    out_position ← shifted
+}
+
+incipit {
+    adfirma vertex_layout_matches(0, 0, "position", 0, 3, 0, 12, 1, 1) mori "position layout fixes location 0, Float32x3"
+    adfirma vertex_layout_matches(0, 1, "uv", 1, 2, 0, 8, 1, 4) mori "uv layout fixes location 1, Float32x2"
+}

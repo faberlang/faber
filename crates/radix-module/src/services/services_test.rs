@@ -2160,6 +2160,43 @@ functio ok_fragment() → vacuum {
     );
 }
 
+fn assert_wgsl_body_reads_uv(fixture: &str, name: &str, source: &str) {
+    let (_td, file) = temp_fab(name, source);
+    let path = PathBuf::from(&file);
+    let result = compile_cli_path(&path, false, crate::codegen::Target::MirWgsl);
+    let _ = std::fs::remove_file(&path);
+
+    assert!(result.success(), "{:?}", result.diagnostics);
+    let output = result.output.expect("wgsl output");
+    let crate::Output::WgslText(wgsl_output) = &output else {
+        panic!("expected WGSL output");
+    };
+    assert!(
+        wgsl_output.code.contains("input.uv"),
+        "expected input.uv in WGSL:\n{}",
+        wgsl_output.code
+    );
+    validate_wgsl_with_naga(&wgsl_output.code, fixture);
+}
+
+#[test]
+fn wgsl_text_fragment_body_reads_uv() {
+    assert_wgsl_body_reads_uv(
+        "shader-contract-fragment-uv",
+        "fragment-reads-uv",
+        include_str!("../fixtures/shader-contract-fragment-uv.fab"),
+    );
+}
+
+#[test]
+fn wgsl_text_vertex_body_reads_uv() {
+    assert_wgsl_body_reads_uv(
+        "shader-contract-vertex-uv",
+        "vertex-reads-uv",
+        include_str!("../fixtures/shader-contract-vertex-uv.fab"),
+    );
+}
+
 #[test]
 fn wgsl_text_source_fragment_entry_rejects_multiple_entries() {
     let source = r"
