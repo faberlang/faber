@@ -81,6 +81,9 @@ pub struct FaberCodegen<'a> {
     /// Ids of transpose `MethodCall`s authored with the `ᵀ` glyph; only these
     /// re-emit as `receiverᵀ` rather than `.transpose()`.
     pub(crate) glyph_transpose_ids: FxHashSet<radix_hir::HirId>,
+    /// Ids of `Assign` expressions desugared from in-place numeric twin
+    /// method calls; only these re-emit as `place.method(arg)`.
+    pub(crate) numeric_twin_ids: FxHashSet<radix_hir::HirId>,
     /// Initializer-expression ids of authored discard bindings (`fixum T _ ← e`)
     /// with their declaration facts, for re-emitting the binding.
     pub(crate) discard_bindings: FxHashMap<radix_hir::HirId, radix_hir::HirDiscardBinding>,
@@ -153,6 +156,7 @@ impl<'a> FaberCodegen<'a> {
             guard_si_ids: FxHashSet::default(),
             elige_expr_ids: FxHashSet::default(),
             glyph_transpose_ids: FxHashSet::default(),
+            numeric_twin_ids: FxHashSet::default(),
             discard_bindings: FxHashMap::default(),
             destructure_bindings: FxHashMap::default(),
             await_assignment_bindings: FxHashSet::default(),
@@ -217,6 +221,7 @@ pub fn empty_presentation() -> HirPresentation {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         glyph_transpose_ids: Vec::new(),
+        numeric_twin_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -255,6 +260,7 @@ impl FaberCodegen<'_> {
         self.guard_si_ids = presentation.guard_si_ids.iter().copied().collect();
         self.elige_expr_ids = presentation.elige_expr_ids.iter().copied().collect();
         self.glyph_transpose_ids = presentation.glyph_transpose_ids.iter().copied().collect();
+        self.numeric_twin_ids = presentation.numeric_twin_ids.iter().copied().collect();
         self.discard_bindings = presentation
             .discard_binding_stmts
             .iter()

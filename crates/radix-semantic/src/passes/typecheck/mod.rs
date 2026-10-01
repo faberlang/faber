@@ -135,6 +135,7 @@ pub mod lookup;
 mod member_privacy;
 mod numeric_twin;
 pub(crate) use numeric_twin::intern_place_temporaries;
+pub use numeric_twin::{in_place_binary_twin_name, in_place_unary_twin_name};
 pub mod ops;
 mod ordering;
 mod store;
@@ -356,6 +357,9 @@ pub(crate) struct TypeChecker<'a> {
     /// Locals declared `fixum T x = e` (D5.10): their initializer is an `=`
     /// position, a compile-time store.
     compile_time_locals: FxHashSet<DefId>,
+    /// Node ids of assignments desugared from in-place numeric twin methods,
+    /// handed to the presentation sidecar when the check finishes.
+    numeric_twin_ids: Vec<HirId>,
 
     /// Type-alias declaration parameter names keyed by alias def-id, in
     /// declaration order. Populated from HIR items so applied alias types
@@ -596,6 +600,9 @@ pub(crate) fn typecheck_with_config(
     checker.check_program(hir);
     if let Some(presentation) = presentation {
         checker.finalize_authored_forms(presentation);
+        presentation
+            .numeric_twin_ids
+            .append(&mut checker.numeric_twin_ids);
     }
 
     if checker.errors.is_empty() {
@@ -643,6 +650,7 @@ impl<'a> TypeChecker<'a> {
             air_lane_defs: FxHashSet::default(),
             current_air_function: false,
             compile_time_locals: FxHashSet::default(),
+            numeric_twin_ids: Vec::new(),
             alias_type_params: FxHashMap::default(),
             import_receivers: FxHashSet::default(),
             target,

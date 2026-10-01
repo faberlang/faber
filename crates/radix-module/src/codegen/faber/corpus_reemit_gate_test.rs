@@ -27,28 +27,7 @@ use std::path::{Path, PathBuf};
 /// Meaning divergences that exist today. Each needs a fix outside the emitter
 /// leaf (or an exemplum repair) and is tracked here so the gate stays green
 /// only while the list is exact.
-const KNOWN_MEANING_GAPS: &[(&str, &str)] = &[
-    (
-        "intrinseca/numeric-operator-methods.fab",
-        "en source uses a non-en intrinsic method spelling (LOCALE002); the re-analyzed statement types differently",
-    ),
-    (
-        "operatores/modular-word.fab",
-        "en source uses a non-en intrinsic method spelling (LOCALE002); see intrinseca/numeric-operator-methods.fab",
-    ),
-    (
-        "operatores/modular-word-u16.fab",
-        "en source uses a non-en intrinsic method spelling (LOCALE002); see intrinseca/numeric-operator-methods.fab",
-    ),
-    (
-        "operatores/modular-word-u64.fab",
-        "en source uses a non-en intrinsic method spelling (LOCALE002); see intrinseca/numeric-operator-methods.fab",
-    ),
-    (
-        "operatores/modular-word-u8.fab",
-        "en source uses a non-en intrinsic method spelling (LOCALE002); see intrinseca/numeric-operator-methods.fab",
-    ),
-];
+const KNOWN_MEANING_GAPS: &[(&str, &str)] = &[];
 
 /// Files the structure check refuses (`CODEGEN006` / `ast_construct_dropped`): HIR keeps no
 /// representation for the construct, so a re-emit would silently delete it.
