@@ -1,0 +1,54 @@
++++
+term = "rust-reserved-names"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "genus_field_decl", "field_decl", "functio_decl", "param_list", "parameter", "redde_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "binary_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "assignment", "incipit_stmt", "nota_stmt"]
+category = "identifier"
+canonical = true
+summary = "Locals, parameters, fields and methods may be spelled like target-language reserved words."
+syntax = "class Cista { var int box; fn move(int yield) → int { const int match ← yield; return match + self.box } }"
+related = ["keyword-as-ident", "fixum"]
+locale = "en"
++++
+# =============================================================================
+# rust-reserved-names — names spelled like reserved words of a target language
+# =============================================================================
+#
+# What this teaches:
+#   • A Faber name is only a Faber name. `box`, `match`, `final`, `type`,
+#     `yield` and `move` are ordinary identifiers here, and the program means
+#     the same on every backend even where the target language reserves the
+#     word (Rust reserves all six).
+#   • The same name works as a field, a method, a parameter and a local.
+#
+# Common mistakes:
+#   • Renaming a name to dodge a target's reserved word — the compiler spells
+#     it safely for each target.
+#
+# See also: keyword-as-ident, fixum
+# =============================================================================
+
+# rust-reserved-names — fields, methods, parameters and locals with reserved spellings
+#
+# EXPECTED OUTPUT:
+#   rust-reserved-names.expected — the computed values.
+
+class Cista {
+    var int box
+    var int final
+
+    fn move(int yield, int type) → int {
+        const int match ← yield + type
+        const int box ← match + self.box
+        return box + self.final
+    }
+}
+
+fn pack(int box) → int {
+    return box + 1
+}
+
+main {
+    const Cista c ← Cista { box = 2, final = 3 }
+    print c.move(10, 20)
+    print pack(4)
+}
