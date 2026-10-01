@@ -22,6 +22,7 @@
 //! - `locale_root` is optional; package-mode library resolution owns provider
 //!   repos through `library_home`, not this field.
 
+use super::target_bindings::TargetBindings;
 use crate::codegen::{OutputMode, Target};
 use crate::diagnostics::Severity;
 use crate::locale::LocalePack;
@@ -134,6 +135,12 @@ pub struct Config {
     /// by the Faber re-emit behind `faber format` and `faber convert`, which
     /// must print the author's text; every compile path leaves it `false`.
     pub keep_authored_constants: bool,
+
+    /// Opaque route-to-spelling maps for the selected target. The WGSL
+    /// graphics path resolves each bound library call in a stage body to its
+    /// spelling through these maps; every other path ignores them. Empty by
+    /// default, in which case a stage-body library call fails closed.
+    pub target_bindings: TargetBindings,
 }
 
 impl Default for Config {
@@ -158,6 +165,7 @@ impl Default for Config {
             complexity_budget: None,
             kernel_complexity_budget: None,
             keep_authored_constants: false,
+            target_bindings: TargetBindings::default(),
         }
     }
 }
@@ -187,6 +195,13 @@ impl Config {
     #[must_use]
     pub fn with_library_home(mut self, path: PathBuf) -> Self {
         self.library_home = Some(path);
+        self
+    }
+
+    /// Install the opaque target-binding maps (route to spelling).
+    #[must_use]
+    pub fn with_target_bindings(mut self, bindings: TargetBindings) -> Self {
+        self.target_bindings = bindings;
         self
     }
 
