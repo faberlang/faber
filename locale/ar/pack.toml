@@ -1800,6 +1800,10 @@ help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 message = "عدم تطابق في pattern type"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 
+[diagnostics.SEM010.issues.discerne_pattern_not_in_closed_set]
+message = "`discerne` يميّز مجموعة مغلقة فقط؛ نوع pattern '{pattern}' ليس عضوا في '{scrutinee}'"
+help = "اسأل عن عرض العدد الصحيح أو نطاقه باختبار `est`، وعن الطول بـ `.longitudo()` داخل `si`؛ يقبل `discerne` أعضاء union أو variants الخاصة بـ enum أو أنواع variant فقط"
+
 [diagnostics.SEM010.issues.parameter_default_type_mismatch]
 message = "عدم تطابق في parameter default type"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"

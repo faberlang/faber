@@ -203,12 +203,7 @@ fn normalize(
         }
         HirPattern::TypeTest { ty, candidate, .. } => match (space, candidate) {
             (Space::Enum(_), Some(def_id)) => Head::Variant(*def_id),
-            _ if column_ty.is_some_and(|column| {
-                types.equals(*ty, column) || radix_types::width_pattern_covers(types, *ty, column)
-            }) =>
-            {
-                Head::Wild
-            }
+            _ if column_ty.is_some_and(|column| types.equals(*ty, column)) => Head::Wild,
             _ => Head::TypeTest(*ty),
         },
         HirPattern::Literal(HirLiteral::Bool(value)) => Head::Bool(*value),
@@ -248,9 +243,7 @@ fn covers(head: Head, ctor: Ctor, types: &TypeTable) -> bool {
         (Head::Wild, _) => true,
         (Head::Variant(a), Ctor::Variant(b)) => a == b,
         (Head::Bool(a), Ctor::Bool(b)) => a == b,
-        (Head::TypeTest(ty), Ctor::Member(member)) => {
-            types.equals(ty, member) || radix_types::width_pattern_covers(types, ty, member)
-        }
+        (Head::TypeTest(ty), Ctor::Member(member)) => types.equals(ty, member),
         (Head::Nil, Ctor::Member(member)) => {
             matches!(types.get(member), Type::Primitive(Primitive::Nihil))
         }

@@ -1800,6 +1800,10 @@ help = "使運算式型別符合預期型別"
 message = "模式型別不相符"
 help = "使運算式型別符合預期型別"
 
+[diagnostics.SEM010.issues.discerne_pattern_not_in_closed_set]
+message = "`discerne` 只區分封閉集合；pattern 型別 '{pattern}' 不是 '{scrutinee}' 的成員"
+help = "用 `est` 測試詢問整數寬度或範圍，在 `si` 中用 `.longitudo()` 詢問長度；`discerne` 只接受 union 的成員、enum 的 variants 或 variant 型別"
+
 [diagnostics.SEM010.issues.parameter_default_type_mismatch]
 message = "參數預設型別不相符"
 help = "使運算式型別符合預期型別"

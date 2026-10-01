@@ -1812,6 +1812,10 @@ help = "अभिव्यक्ति का प्रकार अपेक्
 message = "पैटर्न का प्रकार मेल नहीं खाता"
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
 
+[diagnostics.SEM010.issues.discerne_pattern_not_in_closed_set]
+message = "`discerne` केवल बंद समुच्चय में भेद करता है; pattern का प्रकार '{pattern}' '{scrutinee}' का सदस्य नहीं है"
+help = "पूर्णांक की चौड़ाई या सीमा `est` परीक्षण से पूछें, और लंबाई `si` के भीतर `.longitudo()` से पूछें; `discerne` केवल union के सदस्य, enum के variants या variant प्रकार स्वीकार करता है"
+
 [diagnostics.SEM010.issues.parameter_default_type_mismatch]
 message = "पैरामीटर के डिफ़ॉल्ट प्रकार का मिलान नहीं होता"
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"

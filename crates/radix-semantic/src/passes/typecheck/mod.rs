@@ -143,6 +143,9 @@ mod store;
 #[path = "closing_test.rs"]
 mod closing_test;
 #[cfg(test)]
+#[path = "discerne_closed_set_test.rs"]
+mod discerne_closed_set_test;
+#[cfg(test)]
 #[path = "ordering_test.rs"]
 mod ordering_test;
 pub mod ordo_conversio;
@@ -168,9 +171,6 @@ mod union_member_refinement_test;
 #[cfg(test)]
 #[path = "union_overlap_access_test.rs"]
 mod union_overlap_access_test;
-#[cfg(test)]
-#[path = "width_pattern_test.rs"]
-mod width_pattern_test;
 
 // Lane-gated: compiles through the full driver to the Rust target; a
 // core-only build excludes the module.

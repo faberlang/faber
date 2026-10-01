@@ -1800,6 +1800,10 @@ help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầ
 message = "kiểu pattern không khớp"
 help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
 
+[diagnostics.SEM010.issues.discerne_pattern_not_in_closed_set]
+message = "`discerne` chỉ phân biệt một tập đóng; kiểu pattern '{pattern}' không phải thành viên của '{scrutinee}'"
+help = "hỏi độ rộng hoặc phạm vi số nguyên bằng phép thử `est`, và hỏi độ dài bằng `.longitudo()` trong `si`; `discerne` chỉ nhận thành viên của union, variants của enum hoặc kiểu variant"
+
 [diagnostics.SEM010.issues.parameter_default_type_mismatch]
 message = "kiểu giá trị mặc định của parameter không khớp"
 help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"

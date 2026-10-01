@@ -504,7 +504,7 @@ impl TypeChecker<'_> {
         true
     }
 
-    fn format_type_for_diagnostic(&self, ty: TypeId) -> String {
+    pub(crate) fn format_type_for_diagnostic(&self, ty: TypeId) -> String {
         let Some(interner) = self.interner else {
             return format!("{:?}", self.types.get(ty));
         };

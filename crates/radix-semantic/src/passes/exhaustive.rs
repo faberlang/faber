@@ -219,10 +219,6 @@ fn check_match(
 
     let mut covered = FxHashSet::default();
     let mut covered_members = Vec::new();
-    // Width patterns form an ordered specificity lattice. A later bounded
-    // pattern is unreachable after a covering bound or family catch-all, while
-    // a family pattern remains reachable after a narrower bounded arm.
-    let mut covered_width_patterns = Vec::new();
     let mut has_catchall = false;
     let mut catchall_span = None;
     let mut explicit_null_arm = false;
@@ -249,26 +245,7 @@ fn check_match(
                     );
                 }
             } else if let Some(member) = pattern_type_id(pattern) {
-                if covered_width_patterns
-                    .iter()
-                    .copied()
-                    .any(|covered| radix_types::width_pattern_covers(types, covered, member))
-                {
-                    errors.push(
-                        SemanticError::structured(SemanticErrorKind::UnreachablePattern, arm.span)
-                            .with_arg("issue", "after_width_pattern"),
-                    );
-                    continue;
-                }
-                if let Some(width) = radix_types::width_pattern(types, member) {
-                    if width.bound.is_some() {
-                        covered_width_patterns.push(member);
-                    } else {
-                        // The unbounded family is the least-specific pattern,
-                        // but it covers every member of that family from here.
-                        covered_width_patterns.push(member);
-                    }
-                } else if covered_members
+                if covered_members
                     .iter()
                     .copied()
                     .any(|covered| types.equals(covered, member))

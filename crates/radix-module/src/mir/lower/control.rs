@@ -928,9 +928,7 @@ impl FunctionBuilder<'_> {
                 return None;
             };
 
-            if radix_types::is_family_catchall(self.types, *ty)
-                && radix_types::width_pattern_covers(self.types, *ty, scrutinee_ty)
-            {
+            if self.types.equals(*ty, scrutinee_ty) {
                 has_default = true;
                 if let Some((def_id, name)) = binding {
                     self.bind_type_test_family(*def_id, *name, &scrutinee_place, scrutinee_ty, arm.span)?;
@@ -940,42 +938,12 @@ impl FunctionBuilder<'_> {
                 break;
             }
 
-            let condition = if let Some(capacity) = radix_types::literal_length_guard(self.types, *ty) {
-                let capacity = i64::try_from(capacity)
-                    .map_err(|_| MirError::unsupported(arm.span, "width-pattern capacity exceeds MIR integer range"))
-                    .ok()?;
-                let length_ty = MirType::semantic(self.types.primitive(Primitive::Numerus));
-                let length = self.runtime_call_value(
-                    MirIntrinsic::Collection(MirCollectionOp::Length),
-                    vec![value.clone()],
-                    length_ty,
-                    arm.span,
-                );
-                self.assign_temp(
-                    MirValueKind::Binary {
-                        op: MirBinOp::LtEq,
-                        lhs: length,
-                        rhs: MirOperand::Constant(MirConstant::Int(capacity)),
-                    },
-                    bool_ty,
-                    arm.span,
-                )
-            } else if radix_types::width_pattern(self.types, *ty).is_some_and(|pattern| {
-                pattern.bound.is_some() || matches!(pattern.family, radix_types::WidthFamily::Numerus(Some(_)))
-            }) {
-                self.errors.push(MirError::unsupported(
-                    arm.span,
-                    "width-pattern requires a literal runtime length guard",
-                ));
-                return None;
-            } else {
-                self.runtime_call_value(
-                    MirIntrinsic::TypeCheck(MirTypeCheckOp { positive: true, ty: MirType::semantic(*ty) }),
-                    vec![value.clone()],
-                    bool_ty,
-                    arm.span,
-                )
-            };
+            let condition = self.runtime_call_value(
+                MirIntrinsic::TypeCheck(MirTypeCheckOp { positive: true, ty: MirType::semantic(*ty) }),
+                vec![value.clone()],
+                bool_ty,
+                arm.span,
+            );
             let then_id = self.fresh_block(arm.span);
             let else_id = self.fresh_block(arm.span);
             self.terminate_current(
@@ -985,12 +953,7 @@ impl FunctionBuilder<'_> {
 
             self.switch_to(then_id);
             if let Some((def_id, name)) = binding {
-                let bound_ty = if radix_types::width_pattern(self.types, *ty).is_some() {
-                    scrutinee_ty
-                } else {
-                    *ty
-                };
-                self.bind_type_test_family(*def_id, *name, &scrutinee_place, bound_ty, arm.span)?;
+                self.bind_type_test_family(*def_id, *name, &scrutinee_place, *ty, arm.span)?;
             }
             self.lower_type_test_arm_body(arm, destination.clone(), result_ty)?;
             reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), arm.span);

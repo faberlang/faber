@@ -88,6 +88,6 @@ functio probe(textus u) → vacuum {
         casu Formal fixum f { nota f }
     }
 }",
-        "pattern_type_mismatch",
+        "discerne_pattern_not_in_closed_set",
     );
 }

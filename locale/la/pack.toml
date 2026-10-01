@@ -2171,6 +2171,10 @@ help = "make the expression type match the expected type"
 message = "pattern type mismatch"
 help = "make the expression type match the expected type"
 
+[diagnostics.SEM010.issues.discerne_pattern_not_in_closed_set]
+message = "`discerne` discriminates a closed set; pattern type '{pattern}' is not a member of '{scrutinee}'"
+help = "ask an integer width or range with an `est` test, and a length with `.longitudo()` inside a `si`; `discerne` accepts only the members of a union, the variants of an enum, or variant types"
+
 [diagnostics.SEM010.issues.parameter_default_type_mismatch]
 message = "parameter default type mismatch"
 help = "make the expression type match the expected type"

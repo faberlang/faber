@@ -1800,6 +1800,10 @@ help = "使表达式类型与期望类型一致"
 message = "pattern 类型不匹配"
 help = "使表达式类型与期望类型一致"
 
+[diagnostics.SEM010.issues.discerne_pattern_not_in_closed_set]
+message = "`discerne` 只区分封闭集合；pattern 类型 '{pattern}' 不是 '{scrutinee}' 的成员"
+help = "用 `est` 测试询问整数宽度或范围，在 `si` 中用 `.longitudo()` 询问长度；`discerne` 只接受 union 的成员、enum 的 variants 或 variant 类型"
+
 [diagnostics.SEM010.issues.parameter_default_type_mismatch]
 message = "parameter default 类型不匹配"
 help = "使表达式类型与期望类型一致"

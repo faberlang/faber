@@ -1812,6 +1812,10 @@ help = "ทำให้ชนิดของนิพจน์ตรงกับ
 message = "ชนิดแพตเทิร์นไม่ตรงกัน"
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
 
+[diagnostics.SEM010.issues.discerne_pattern_not_in_closed_set]
+message = "`discerne` แยกแยะได้เฉพาะเซตปิด ชนิดแพตเทิร์น '{pattern}' ไม่ใช่สมาชิกของ '{scrutinee}'"
+help = "ถามความกว้างหรือช่วงของจำนวนเต็มด้วยการทดสอบ `est` และถามความยาวด้วย `.longitudo()` ภายใน `si`; `discerne` รับเฉพาะสมาชิกของ union, variants ของ enum หรือชนิด variant"
+
 [diagnostics.SEM010.issues.parameter_default_type_mismatch]
 message = "ชนิดค่าเริ่มต้นของพารามิเตอร์ไม่ตรงกัน"
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"

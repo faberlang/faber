@@ -21,6 +21,7 @@
 use super::*;
 
 const ISSUE_PATTERN_TYPE_MISMATCH: &str = "pattern_type_mismatch";
+const ISSUE_DISCERNE_PATTERN_NOT_IN_CLOSED_SET: &str = "discerne_pattern_not_in_closed_set";
 const ISSUE_VARIANT_PATTERN_SCRUTINEE_MISMATCH: &str = "variant_pattern_scrutinee_mismatch";
 
 /// Select the effective member for a type-test pattern.
@@ -72,6 +73,18 @@ pub fn resolve_type_test_target(
 }
 
 impl TypeChecker<'_> {
+    /// Whether a type-pattern target belongs to the scrutinee's closed set:
+    /// a member of its union (looking through option and alias), or the
+    /// scrutinee's own type when it is not a union.
+    fn type_pattern_in_closed_set(&mut self, expected: TypeId, target: TypeId) -> bool {
+        match self.union_members_of(expected) {
+            Some(members) => members
+                .into_iter()
+                .any(|member| self.member_type_equals(member, target)),
+            None => self.member_type_equals(expected, target),
+        }
+    }
+
     /// Check a pattern against an expected scrutinee or field type.
     ///
     /// The caller owns scope setup. This function only inserts the bindings
@@ -98,33 +111,22 @@ impl TypeChecker<'_> {
                     span,
                     ISSUE_PATTERN_TYPE_MISMATCH,
                 );
-                let width_applies =
-                    radix_types::width_pattern_applies(self.types, expected, target);
-                if !constrained && !width_applies {
-                    if let Some(members) = self.union_members_of(expected) {
-                        let is_member = members
-                            .iter()
-                            .copied()
-                            .any(|member| self.member_type_equals(member, target));
-                        if !is_member {
-                            self.error_issue(
-                                SemanticErrorKind::TypeMismatch,
-                                ISSUE_PATTERN_TYPE_MISMATCH,
-                                span,
-                            );
-                        }
-                    } else if !self.member_type_equals(expected, target) {
-                        self.error_issue(
-                            SemanticErrorKind::TypeMismatch,
-                            ISSUE_PATTERN_TYPE_MISMATCH,
-                            span,
-                        );
-                    }
+                if !constrained && !self.type_pattern_in_closed_set(expected, target) {
+                    // `discerne` discriminates a closed set: a union's members,
+                    // an enum's variants, or the one type of a non-union
+                    // scrutinee. Any other target type (a numeric width, a
+                    // length-shaped collection) is not a member of that set.
+                    let pattern = self.format_type_for_diagnostic(target);
+                    let scrutinee = self.format_type_for_diagnostic(expected);
+                    self.error_issue_with_args(
+                        SemanticErrorKind::TypeMismatch,
+                        ISSUE_DISCERNE_PATTERN_NOT_IN_CLOSED_SET,
+                        span,
+                        &[("pattern", pattern), ("scrutinee", scrutinee)],
+                    );
                 }
                 if let Some((def_id, _name)) = binding {
-                    // A width guard narrows the runtime value without changing
-                    // its carrier type. Keep the expected carrier in the arm.
-                    self.insert_binding(*def_id, if width_applies { expected } else { target });
+                    self.insert_binding(*def_id, target);
                 }
             }
             HirPattern::Alias(def_id, _name, pattern) => {

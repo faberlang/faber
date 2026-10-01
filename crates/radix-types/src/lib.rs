@@ -24,12 +24,7 @@ mod schema_subset;
 pub mod type_graph;
 mod types;
 pub mod vocabulary;
-pub mod width_pattern;
 pub use big_literal::Magnus;
-pub use width_pattern::{
-    WidthFamily, WidthPattern, is_family_catchall, literal_length_guard, width_pattern,
-    width_pattern_applies, width_pattern_covers,
-};
 
 pub use capability::{
     CAPABILITY_VOCABULARY_VERSION, CapabilityAnswer, CapabilityFamily, CapabilityKind,
@@ -105,10 +100,6 @@ mod capability_test;
 #[cfg(test)]
 #[path = "lattice_property_test.rs"]
 mod lattice_property_tests;
-
-#[cfg(test)]
-#[path = "width_pattern_test.rs"]
-mod width_pattern_tests;
 
 #[cfg(test)]
 #[path = "schema_subset_test.rs"]
