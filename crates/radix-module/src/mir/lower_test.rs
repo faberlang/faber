@@ -40,7 +40,7 @@ fn dump_source(source: &str) -> String {
 fn lowers_decimal_ordering_on_the_shared_scaled_carrier() {
     let dump = dump_source(
         r"
-functio maior(numerus<d64> a, numerus<d64> b) → bivalens {
+functio maior(d64 a, d64 b) → bivalens {
     redde a > b
 }
 ",
@@ -60,7 +60,7 @@ functio maior(numerus<d64> a, numerus<d64> b) → bivalens {
 fn lowers_decimal_integer_ordering_at_the_d64_scaled_carrier() {
     let dump = dump_source(
         r"
-functio maior(numerus<d64> a, numerus n) → bivalens {
+functio maior(d64 a, numerus n) → bivalens {
     redde a > n
 }
 ",
@@ -82,7 +82,7 @@ functio maior(numerus<d64> a, numerus n) → bivalens {
 fn lowers_decimal_equality_on_the_shared_scaled_carrier() {
     let dump = dump_source(
         r"
-functio aequalis(numerus<d64> a, numerus<d64> b) → bivalens {
+functio aequalis(d64 a, d64 b) → bivalens {
     redde a ≅ b
 }
 ",
@@ -105,8 +105,8 @@ fn lowers_decimal_literal_text_to_the_exact_carrier_across_mir() {
     // i64::MAX; a carrier derived from the rounded f64 leaves the width.
     let dump = dump_source(
         r"
-functio exacta() → numerus<d64> {
-    fixum numerus<d64> x ← 92233720368.54775807
+functio exacta() → d64 {
+    fixum d64 x ← 92233720368.54775807
     redde x
 }
 ",
@@ -130,7 +130,7 @@ fn decimal_literal_executes_at_the_exact_scaled_carrier() {
         &Session::new(Config::default().with_target(Target::HirTypeScript)),
         "decimal-exact-carrier.fab",
         r"incipit {
-    fixum numerus<d64> x ← 92233720368.54775807
+    fixum d64 x ← 92233720368.54775807
     nota x
 }",
         &mut host,
@@ -148,7 +148,7 @@ fn decimal_literal_switch_matches_at_the_exact_carrier() {
         &Session::new(Config::default().with_target(Target::HirTypeScript)),
         "decimal-exact-switch.fab",
         r#"incipit {
-    fixum numerus<d64> x ← 4.2
+    fixum d64 x ← 4.2
     discerne x {
         casu 4.2 { nota "hit" }
         ceterum { nota "miss" }
@@ -164,7 +164,7 @@ fn decimal_literal_switch_matches_at_the_exact_carrier() {
 fn lowers_decimal_fuzzy_equality_on_the_d64_scaled_carrier() {
     let dump = dump_source(
         r"
-functio aequalis(numerus<d64> a, numerus<d64> b) → bivalens {
+functio aequalis(d64 a, d64 b) → bivalens {
     redde a ≈ b
 }
 ",
@@ -707,7 +707,7 @@ fn lowers_vacua_to_empty_collection_aggregates() {
 fn lowers_tensor_vacua_to_rank_zero_aggregate() {
     let dump = dump_source(
         r"functio empty_tensor() → numerus {
-  fixum tensor<fractus<f32>, []> grid ← vacua
+  fixum tensor<f32, []> grid ← vacua
   redde 0
 }",
     );
@@ -2479,7 +2479,7 @@ fn tensor_itera_ex_rank1_lowers_to_literal_bound_index_loop() {
 #[test]
 fn tensor_itera_ex_rank2_lowers_to_nested_coordinate_loops() {
     let dump = dump_source(
-        r"functio sumGrid(tensor<fractus<f32>, [2, 2]> t) → fractus<f32> {
+        r"functio sumGrid(tensor<f32, [2, 2]> t) → f32 {
   itera ex t apud [i, j] fixum x {
     nota i
     nota j
@@ -3497,7 +3497,7 @@ fn lowers_sized_numeric_varia_zero_init_through_typed_temp() {
         r"
 functio f() → numerus {
     varia f32 x
-    varia numerus<u8> y
+    varia u8 y
     redde 1
 }
 ",
@@ -3509,7 +3509,7 @@ functio f() → numerus {
     );
     assert!(
         dump.contains("%1 = const int 0"),
-        "numerus<u8> zero must go through the sized typed temp: {dump}"
+        "u8 zero must go through the sized typed temp: {dump}"
     );
     assert!(!dump.contains("type zero-init before MIR lowering completed"), "{dump}");
     assert!(dump.contains("return"), "lowering must reach return: {dump}");
@@ -3672,8 +3672,7 @@ fn lowers_format_conversion_collection_and_provider_runtime_intrinsics() {
     assert!(format_dump.contains("runtime format_string template sym#"));
     assert!(!format_dump.contains("format!"));
 
-    let conversion_dump =
-        dump_source(r"functio parse(textus raw) → numerus<i32> { redde raw ↦ i32 via Hex ⊥ 0 ∷ numerus<i32> }");
+    let conversion_dump = dump_source(r"functio parse(textus raw) → i32 { redde raw ↦ i32 via Hex ⊥ 0 ∷ i32 }");
     assert!(conversion_dump.contains("runtime convert runtime ty#"));
     assert!(conversion_dump.contains(" -> ty#"));
     assert!(conversion_dump.contains("hints [sym#"));
@@ -3845,8 +3844,8 @@ fn lowers_cross_family_scalar_conversion_to_a_runtime_convert() {
         r"
 functio ascriptiones() → numerus ⇥ textus {
   fixum numerus truncatum ← 1.9 ↦ numerus
-  fixum numerus<i8> saturatum ← 300.0 ↦ numerus<i8>
-  fixum numerus<i32> idem ← 7 ∷ numerus<i32>
+  fixum i8 saturatum ← 300.0 ↦ i8
+  fixum i32 idem ← 7 ∷ i32
   redde truncatum
 }",
     );
@@ -3931,7 +3930,7 @@ fn lowers_tensor_longitudo_to_collection_length() {
     let dump = dump_source(
         r"
 incipit {
-    fixum tensor<fractus<f32>, []> empty_tensor ← vacua
+    fixum tensor<f32, []> empty_tensor ← vacua
     nota empty_tensor.longitudo()
 }
 ",
@@ -4361,12 +4360,12 @@ fn production_named_public_kernel_metadata_reaches_device_program_selection() {
         r"
 @ nucleum
 @ publica
-functio publica_entry(fractus<f32> value) → fractus<f32> {
+functio publica_entry(f32 value) → f32 {
     redde value
 }
 
 @ nucleum
-functio privata_helper(fractus<f32> value) → fractus<f32> {
+functio privata_helper(f32 value) → f32 {
     redde value
 }
 ",
@@ -6798,9 +6797,7 @@ fn run_lines(body: &str) -> Result<Vec<String>, String> {
 #[test]
 fn decimal_sum_is_exact_and_stores_at_scale_eight() {
     // 0.1 + 0.2 = 0.3 (carrier 30_000_000 at scale 8), printed shortest.
-    let lines =
-        run_lines("fixum numerus<d64> a ← 0.1\nfixum numerus<d64> b ← 0.2\nfixum numerus<d64> c ← a + b\nnota c")
-            .expect("runs");
+    let lines = run_lines("fixum d64 a ← 0.1\nfixum d64 b ← 0.2\nfixum d64 c ← a + b\nnota c").expect("runs");
     assert_eq!(lines, ["0.3"]);
 }
 
@@ -6810,9 +6807,9 @@ fn decimal_product_keeps_its_exact_scale_until_a_slot_stores_it() {
     // 19.99 * 0.0725 * 0.0725 = 0.1050724375 (scale 10) prints exactly and
     // stores half-even at scale 8 as 0.10507244.
     let lines = run_lines(
-        "fixum numerus<d64> p ← 19.99\nfixum numerus<d64> r ← 0.0725\n\
-         fixum numerus<d64> t ← p * r\nnota t\nnota p * r * r\n\
-         fixum numerus<d64> s ← p * r * r\nnota s",
+        "fixum d64 p ← 19.99\nfixum d64 r ← 0.0725\n\
+         fixum d64 t ← p * r\nnota t\nnota p * r * r\n\
+         fixum d64 s ← p * r * r\nnota s",
     )
     .expect("runs");
     assert_eq!(lines, ["1.449275", "0.1050724375", "0.10507244"]);
@@ -6823,8 +6820,8 @@ fn decimal_expression_rounds_once_at_the_store_not_per_operation() {
     // 1.5 * 0.00000001 = 0.000000015 (a tie at scale 8); * 100.0 gives
     // 0.0000015 exactly. Rounding after `*` would give 0.00000002 * 100.0.
     let lines = run_lines(
-        "fixum numerus<d64> a ← 1.5\nfixum numerus<d64> r ← 0.00000001\n\
-         fixum numerus<d64> h ← 100.0\nfixum numerus<d64> t ← a * r * h\nnota t",
+        "fixum d64 a ← 1.5\nfixum d64 r ← 0.00000001\n\
+         fixum d64 h ← 100.0\nfixum d64 t ← a * r * h\nnota t",
     )
     .expect("runs");
     assert_eq!(lines, ["0.0000015"]);
@@ -6834,8 +6831,8 @@ fn decimal_expression_rounds_once_at_the_store_not_per_operation() {
 fn decimal_division_rounds_half_even_to_the_larger_scale() {
     // 1.0 / 3.0 at scale 8 is 0.33333333; 2.0 / 3.0 is 0.66666667.
     let lines = run_lines(
-        "fixum numerus<d64> one ← 1.0\nfixum numerus<d64> two ← 2.0\nfixum numerus<d64> three ← 3.0\n\
-         fixum numerus<d64> q ← one / three\nnota q\nfixum numerus<d64> w ← two / three\nnota w",
+        "fixum d64 one ← 1.0\nfixum d64 two ← 2.0\nfixum d64 three ← 3.0\n\
+         fixum d64 q ← one / three\nnota q\nfixum d64 w ← two / three\nnota w",
     )
     .expect("runs");
     assert_eq!(lines, ["0.33333333", "0.66666667"]);
@@ -6846,14 +6843,14 @@ fn decimal_intermediate_may_leave_the_range_until_the_store() {
     // big + 1.0 - 1.0 passes through 92233720369.0, past the d64 range, and
     // lands back inside it; big * 2.0 lands outside and traps at the store.
     let lines = run_lines(
-        "fixum numerus<d64> big ← 92233720368.0\nfixum numerus<d64> one ← 1.0\n\
-         fixum numerus<d64> ok ← big + one - one\nnota ok",
+        "fixum d64 big ← 92233720368.0\nfixum d64 one ← 1.0\n\
+         fixum d64 ok ← big + one - one\nnota ok",
     )
     .expect("runs");
     assert_eq!(lines, ["92233720368"]);
     let trap = run_lines(
-        "fixum numerus<d64> big ← 92233720368.0\nfixum numerus<d64> two ← 2.0\n\
-         fixum numerus<d64> boom ← big * two\nnota boom",
+        "fixum d64 big ← 92233720368.0\nfixum d64 two ← 2.0\n\
+         fixum d64 boom ← big * two\nnota boom",
     )
     .expect_err("out of range store traps");
     assert!(trap.contains("implicit_store_out_of_range"), "{trap}");
@@ -6863,7 +6860,7 @@ fn decimal_intermediate_may_leave_the_range_until_the_store() {
 #[test]
 fn decimal_comparison_of_intermediates_is_exact() {
     let lines = run_lines(
-        "fixum numerus<d64> p ← 19.99\nfixum numerus<d64> r ← 0.0725\n\
+        "fixum d64 p ← 19.99\nfixum d64 r ← 0.0725\n\
          nota p * r * r > p * r\nnota p * r * r < p * r\nnota p * r * r ≅ p * r * r",
     )
     .expect("runs");
@@ -6879,22 +6876,22 @@ fn decimal_store_positions_all_round_at_the_slot() {
     crate::mir::run_source(
         &Session::new(Config::default().with_target(Target::HirTypeScript)),
         "decimal-store-positions.fab",
-        r"functio cubus(numerus<d64> x) → numerus<d64> {
+        r"functio cubus(d64 x) → d64 {
     redde x * x * x
 }
-functio idem(numerus<d64> x) → numerus<d64> {
+functio idem(d64 x) → d64 {
     redde x
 }
 incipit {
-    fixum numerus<d64> r ← 0.0725
+    fixum d64 r ← 0.0725
     nota cubus(r)
     nota idem(r * r * r)
-    varia numerus<d64> v ← 1.0
+    varia d64 v ← 1.0
     v ← r * r * r
     nota v
     fixum _ w ← r * r * r
     nota w
-    fixum lista<numerus<d64>> xs ← [r * r * r]
+    fixum lista<d64> xs ← [r * r * r]
     nota xs[0]
     nota r * r * r
 }",

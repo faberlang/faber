@@ -218,14 +218,14 @@ const TABLE: [[Pin; 9]; 9] = [
 fn pair_types(family: Family) -> (&'static str, &'static str) {
     match family {
         Family::P1IntIdentical => ("numerus", "numerus"),
-        Family::P2IntCrossWidth => ("numerus<u8>", "numerus<u16>"),
-        Family::P3SignBoundary => ("numerus<i64>", "numerus<u64>"),
-        Family::P4IntF32 => ("numerus<i64>", "fractus<f32>"),
+        Family::P2IntCrossWidth => ("u8", "u16"),
+        Family::P3SignBoundary => ("i64", "u64"),
+        Family::P4IntF32 => ("i64", "f32"),
         Family::P5IntF64 => ("numerus", "fractus"),
-        Family::P6F32F64 => ("fractus<f32>", "fractus<f64>"),
-        Family::P7D64Identical => ("numerus<d64>", "numerus<d64>"),
-        Family::P8DecimalInteger => ("numerus<d64>", "numerus"),
-        Family::P9DecimalFractus => ("numerus<d64>", "fractus"),
+        Family::P6F32F64 => ("f32", "f64"),
+        Family::P7D64Identical => ("d64", "d64"),
+        Family::P8DecimalInteger => ("d64", "numerus"),
+        Family::P9DecimalFractus => ("d64", "fractus"),
     }
 }
 
@@ -246,15 +246,15 @@ fn op_glyph(op: Op) -> &'static str {
 fn probe(op: Op, family: Family) -> String {
     if op == Op::Conversio {
         let (src, tgt) = match family {
-            Family::P1IntIdentical => ("numerus", "numerus<u64>"),
-            Family::P2IntCrossWidth => ("numerus<u8>", "numerus<u16>"),
-            Family::P3SignBoundary => ("numerus<u64>", "numerus"),
-            Family::P4IntF32 => ("numerus<i64>", "fractus<f32>"),
+            Family::P1IntIdentical => ("numerus", "u64"),
+            Family::P2IntCrossWidth => ("u8", "u16"),
+            Family::P3SignBoundary => ("u64", "numerus"),
+            Family::P4IntF32 => ("i64", "f32"),
             Family::P5IntF64 => ("numerus", "fractus"),
-            Family::P6F32F64 => ("fractus<f32>", "fractus<f64>"),
-            Family::P7D64Identical => ("numerus<d64>", "numerus<d64>"),
-            Family::P8DecimalInteger => ("numerus<d64>", "numerus"),
-            Family::P9DecimalFractus => ("numerus<d64>", "fractus"),
+            Family::P6F32F64 => ("f32", "f64"),
+            Family::P7D64Identical => ("d64", "d64"),
+            Family::P8DecimalInteger => ("d64", "numerus"),
+            Family::P9DecimalFractus => ("d64", "fractus"),
         };
         return format!("functio p({src} a) → {tgt} ⇥ textus {{ redde a ↦ {tgt} }}");
     }

@@ -379,7 +379,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     let session = Session::new(config);
     let source = r#"函数 checksum() → numerus {
   fixum 模数<u32> m ← 5
-  fixum numerus<u32> checked ← 5
+  fixum u32 checked ← 5
   fixum _ w ← checked ↦ 模数<u32>
   fixum 元组<textus, numerus> t ← 元组<textus, numerus> ["salve", 7]
   redde 0

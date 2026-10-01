@@ -66,7 +66,7 @@ fn numeric_lista_static_bounds_must_match() {
 #[test]
 fn numeric_lista_width_mismatch_points_to_conversion() {
     assert_rejects_with_issue(
-        r"functio mismatch(lista<numerus<i32>> a, lista<numerus<i64>> b) → lista<numerus<i32>> {
+        r"functio mismatch(lista<i32> a, lista<i64> b) → lista<i32> {
     redde a + b
 }",
         "numeric_lista_operator_law",

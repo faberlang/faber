@@ -2298,7 +2298,7 @@ fn kernel_closure_arg<'a>(error: &'a crate::SemanticError, name: &str) -> Option
 fn typechecks_legal_kernel_closure_scalar_signature() {
     let source = r"
 incipit {
-    fixum _ kernel ← (fractus<f32> a, fractus<f32> b) nucleum → fractus<f32> ∴ a + b
+    fixum _ kernel ← (f32 a, f32 b) nucleum → f32 ∴ a + b
 }
 ";
     let unit = analyze(source);
@@ -2400,7 +2400,7 @@ functio take() → vacuum {
 fn kernel_closure_signature_admits_sized_numerics_and_boolean() {
     let source = r"
 functio take() → vacuum {
-    fixum _ kernel ← (numerus<u32> value, bivalens flag) nucleum → numerus<u64> ∴ value
+    fixum _ kernel ← (u32 value, bivalens flag) nucleum → u64 ∴ value
     tacet
 }
 ";

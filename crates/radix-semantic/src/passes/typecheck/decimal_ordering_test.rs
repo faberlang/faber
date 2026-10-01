@@ -8,21 +8,15 @@ use crate::test_support;
 
 #[test]
 fn decimal_integer_ordering_accepts() {
-    test_support::assert_accepts(
-        "functio maior(numerus<d64> a, numerus n) → bivalens { redde a > n }",
-    );
+    test_support::assert_accepts("functio maior(d64 a, numerus n) → bivalens { redde a > n }");
 }
 
 #[test]
 fn decimal_fractus_ordering_accepts_cross_family() {
-    test_support::assert_accepts(
-        "functio maior(numerus<d64> a, fractus f) → bivalens { redde a > f }",
-    );
+    test_support::assert_accepts("functio maior(d64 a, fractus f) → bivalens { redde a > f }");
 }
 
 #[test]
 fn same_width_decimal_ordering_stays_admitted() {
-    test_support::assert_accepts(
-        "functio maior(numerus<d64> a, numerus<d64> b) → bivalens { redde a > b }",
-    );
+    test_support::assert_accepts("functio maior(d64 a, d64 b) → bivalens { redde a > b }");
 }

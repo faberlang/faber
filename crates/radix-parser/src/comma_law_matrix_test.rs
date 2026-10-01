@@ -206,12 +206,9 @@ functio f() → vacuum { }"#,
     missing(14, "gradient_selectors", "fixum _ g ← loss(x, y) ∇ [x y]"),
     // 15. tensor/sparsa/vector/matrix shape-sugar separator (call-position type
     // args parse as ordinary generic calls; type-name callees reject in check)
-    accept(
-        15,
-        "functio f(tensor<fractus<f32>, [2, 3]> value) → vacuum { }",
-    ),
-    accept(15, "fixum _ t ← tensor<fractus<f32>>(x)"),
-    rejected(15, "fixum _ t ← tensor<fractus<f32>, [2],>(x)"),
+    accept(15, "functio f(tensor<f32, [2, 3]> value) → vacuum { }"),
+    accept(15, "fixum _ t ← tensor<f32>(x)"),
+    rejected(15, "fixum _ t ← tensor<f32, [2],>(x)"),
     // 16. finge named field initializers
     accept(
         16,
@@ -348,19 +345,13 @@ functio f() → vacuum { }"#,
         "functio f(promissum<numerus, textus> future) → vacuum { }",
     ),
     // 29. tensor-family element/figura pair
-    accept(
-        29,
-        "functio f(tensor<fractus<f32>, [2, 3]> value) → vacuum { }",
-    ),
+    accept(29, "functio f(tensor<f32, [2, 3]> value) → vacuum { }"),
     fixed_issue(
         29,
         "tensor_figura_after_element",
-        "functio f(tensor<fractus<f32>> value) → vacuum { }",
+        "functio f(tensor<f32> value) → vacuum { }",
     ),
-    rejected(
-        29,
-        "functio f(tensor<fractus<f32>, [2, 3],> value) → vacuum { }",
-    ),
+    rejected(29, "functio f(tensor<f32, [2, 3],> value) → vacuum { }"),
     // 30. named type parameters
     accept(30, "functio f(iuncta<textus, numerus> pair) → vacuum { }"),
     trailing(
@@ -386,19 +377,16 @@ functio f() → vacuum { }"#,
         "typus Op = (numerus textus) → vacuum",
     ),
     // 32. figura dimensions
-    accept(
-        32,
-        "functio f(tensor<fractus<f32>, [2, 3]> value) → vacuum { }",
-    ),
+    accept(32, "functio f(tensor<f32, [2, 3]> value) → vacuum { }"),
     trailing(
         32,
         "figura_dimensions",
-        "functio f(tensor<fractus<f32>, [2, 3,]> value) → vacuum { }",
+        "functio f(tensor<f32, [2, 3,]> value) → vacuum { }",
     ),
     missing(
         32,
         "figura_dimensions",
-        "functio f(tensor<fractus<f32>, [2 3]> value) → vacuum { }",
+        "functio f(tensor<f32, [2 3]> value) → vacuum { }",
     ),
     // 33. discerne subjects
     accept(33, "discerne left, right { casu _, _ { } }"),

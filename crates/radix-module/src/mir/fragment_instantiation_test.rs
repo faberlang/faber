@@ -711,12 +711,12 @@ fn lowering_composes_entry_to_entry() {
     // call composes instead of the v1 nested-dispatch reject.
     let source = r"
 @ nucleum
-functio inner(fractus<f32> x) → fractus<f32> {
+functio inner(f32 x) → f32 {
     redde x
 }
 
 @ nucleum
-functio outer(fractus<f32> x) → fractus<f32> {
+functio outer(f32 x) → f32 {
     redde inner(x)
 }
 ";
@@ -743,12 +743,12 @@ functio outer(fractus<f32> x) → fractus<f32> {
 fn legal_entry_to_fragment_reaches_composition() {
     let source = r"
 @ nucleum fragment
-functio helper(fractus<f32> x) → fractus<f32> {
+functio helper(f32 x) → f32 {
     redde x
 }
 
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde helper(x)
 }
 ";

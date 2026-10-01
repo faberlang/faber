@@ -719,7 +719,7 @@ fn fractus_bf16_resolves_to_named_bf16_scalar_layout() {
 
     let layout = table
         .layout_for_type(MirType::semantic(bf16))
-        .expect("fractus<bf16> layout fact");
+        .expect("bf16 layout fact");
     assert_eq!(layout.kind, MirLayoutKind::Scalar(MirScalarLayout::Bf16));
     assert_eq!(MirScalarLayout::Bf16.spelling(), "bf16");
     assert_eq!(MirScalarLayout::Bf16.size_bits(), 16);

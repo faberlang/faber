@@ -80,7 +80,7 @@ fn numerus_width_is_checkable_but_not_a_family_catchall() {
     test_support::assert_accepts(
         r"functio probe(numerus values) → vacuum {
     discerne values {
-        casu numerus<i32> { tacet }
+        casu i32 { tacet }
         casu numerus { tacet }
     }
 }",

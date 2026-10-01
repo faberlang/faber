@@ -18,7 +18,7 @@ fn keep(inf a, trapping<inf> b, wrapping<inf> c, saturating<inf> d) → inf {
     const trapping<inf> t ← b
     const wrapping<inf> w ← c
     const saturating<inf> s ← d
-    const int<inf> long_form ← a
+    const inf long_form ← a
     const list<inf> items ← empty
     const list<wrapping<inf>> nested ← empty
     return plain
@@ -42,7 +42,7 @@ fn convert_keeps_each_inf_spelling_across_locales() {
     assert!(latin.contains("fixum exactus<inf> t"), "{latin}");
     assert!(latin.contains("fixum modulus<inf> w"), "{latin}");
     assert!(latin.contains("fixum saturatus<inf> s"), "{latin}");
-    assert!(latin.contains("fixum numerus<inf> long_form"), "{latin}");
+    assert!(latin.contains("fixum inf long_form"), "{latin}");
     assert!(latin.contains("fixum lista<inf> items"), "{latin}");
     assert!(
         latin.contains("fixum lista<modulus<inf>> nested"),
@@ -61,7 +61,7 @@ fn convert_keeps_each_inf_spelling_across_locales() {
     assert!(english.contains("const trapping<inf> t"), "{english}");
     assert!(english.contains("const wrapping<inf> w"), "{english}");
     assert!(english.contains("const saturating<inf> s"), "{english}");
-    assert!(english.contains("const int<inf> long_form"), "{english}");
+    assert!(english.contains("const inf long_form"), "{english}");
     assert!(
         english.contains("const list<wrapping<inf>> nested"),
         "{english}"
@@ -85,7 +85,7 @@ fn format_is_a_fixed_point_on_the_inf_spellings() {
         "const trapping<inf> t",
         "const wrapping<inf> w",
         "const saturating<inf> s",
-        "const int<inf> long_form",
+        "const inf long_form",
     ] {
         assert!(once.contains(spelling), "lost `{spelling}`:\n{once}");
     }

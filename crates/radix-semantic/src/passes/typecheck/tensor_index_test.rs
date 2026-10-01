@@ -73,10 +73,10 @@ fn tensor_param_and_dynamic_shapes_decline_static_oob_check() {
 fn tensor_structa_infers_shape_from_literal_shape_binding() {
     accepts(
         r"incipit {
-  fixum lista<fractus<f32>> flat ← [1.0, 2.0]
+  fixum lista<f32> flat ← [1.0, 2.0]
   fixum lista<numerus> shape ← [2, 1]
-  fixum tensor<fractus<f32>, _> seed ← vacua
-  fixum tensor<fractus<f32>, _> grid ← seed.strue(flat, shape)
+  fixum tensor<f32, _> seed ← vacua
+  fixum tensor<f32, _> grid ← seed.strue(flat, shape)
   nota grid.longitudo()
 }",
     );
@@ -86,8 +86,8 @@ fn tensor_structa_infers_shape_from_literal_shape_binding() {
 fn tensor_forma_infers_output_shape() {
     accepts(
         r"incipit {
-  fixum tensor<fractus<f32>, [2, 2]> grid ← vacua
-  fixum tensor<fractus<f32>, _> reshaped ← grid.forma([4, 1])
+  fixum tensor<f32, [2, 2]> grid ← vacua
+  fixum tensor<f32, _> reshaped ← grid.forma([4, 1])
   nota reshaped.longitudo()
 }",
     );
@@ -97,7 +97,7 @@ fn tensor_forma_infers_output_shape() {
 fn tensor_sugar_tf32_typechecks_with_inferred_shape() {
     accepts(
         r"incipit {
-  fixum lista<fractus<f32>> flat ← [1.0, 2.0]
+  fixum lista<f32> flat ← [1.0, 2.0]
   fixum lista<numerus> shape ← [2, 1]
   fixum tf32 seed ← vacua
   sit grid ← seed.strue(flat, shape)
@@ -237,9 +237,9 @@ fn tensor_arithmetic_mixed_width_element_rejects() {
     // numerus<i32> + numerus<i64> is a ↦ problem, not silent promotion.
     rejects_with_issue(
         r"incipit {
-  fixum tensor<numerus<i32>, [2]> a ← vacua
-  fixum tensor<numerus<i64>, [2]> b ← vacua
-  fixum tensor<numerus<i32>, [2]> c ← a.addita(b)
+  fixum tensor<i32, [2]> a ← vacua
+  fixum tensor<i64, [2]> b ← vacua
+  fixum tensor<i32, [2]> c ← a.addita(b)
   nota c.longitudo()
 }",
         "argument_type_mismatch",
@@ -275,8 +275,8 @@ fn tensor_reduction_summa_on_numerus_i32_tensor() {
     // EDGE: explicit-width integer tensor summa keeps the element width.
     accepts(
         r"incipit {
-  fixum tensor<numerus<i32>, [3]> grid ← vacua
-  fixum numerus<i32> total ← grid.summa()
+  fixum tensor<i32, [3]> grid ← vacua
+  fixum i32 total ← grid.summa()
   nota total
 }",
     );
@@ -576,9 +576,9 @@ fn batched_matmul_decode_shape_typechecks() {
     // (rectangular decode, never square).
     accepts(
         r"incipit {
-  fixum tensor<fractus<f32>, [5, 3, 1, 64]> q ← vacua
-  fixum tensor<fractus<f32>, [5, 64, 76]> kt ← vacua
-  fixum tensor<fractus<f32>, [5, 3, 1, 76]> scores ← q · kt
+  fixum tensor<f32, [5, 3, 1, 64]> q ← vacua
+  fixum tensor<f32, [5, 64, 76]> kt ← vacua
+  fixum tensor<f32, [5, 3, 1, 76]> scores ← q · kt
   nota scores.longitudo()
 }",
     );
@@ -589,9 +589,9 @@ fn batched_matmul_prefill_shape_typechecks() {
     // Prefill: [5,3,36,64] · [5,64,36] → [5,3,36,36].
     accepts(
         r"incipit {
-  fixum tensor<fractus<f32>, [5, 3, 36, 64]> q ← vacua
-  fixum tensor<fractus<f32>, [5, 64, 36]> kt ← vacua
-  fixum tensor<fractus<f32>, [5, 3, 36, 36]> scores ← q · kt
+  fixum tensor<f32, [5, 3, 36, 64]> q ← vacua
+  fixum tensor<f32, [5, 64, 36]> kt ← vacua
+  fixum tensor<f32, [5, 3, 36, 36]> scores ← q · kt
   nota scores.longitudo()
 }",
     );
@@ -603,9 +603,9 @@ fn batched_matmul_wrong_result_shape_rejects() {
     // [76]-major result shape contradicts the constraint.
     rejects_with_issue(
         r"incipit {
-  fixum tensor<fractus<f32>, [5, 3, 1, 64]> q ← vacua
-  fixum tensor<fractus<f32>, [5, 64, 76]> kt ← vacua
-  fixum tensor<fractus<f32>, [5, 3, 76, 1]> scores ← q · kt
+  fixum tensor<f32, [5, 3, 1, 64]> q ← vacua
+  fixum tensor<f32, [5, 64, 76]> kt ← vacua
+  fixum tensor<f32, [5, 3, 76, 1]> scores ← q · kt
   nota scores.longitudo()
 }",
         "incompatible_tensor_index",
@@ -618,9 +618,9 @@ fn batched_matmul_prefix_mismatch_rejects() {
     // receiver's (kv-head share): 6 ≠ 5.
     rejects_with_issue(
         r"incipit {
-  fixum tensor<fractus<f32>, [5, 3, 1, 64]> q ← vacua
-  fixum tensor<fractus<f32>, [6, 64, 76]> kt ← vacua
-  fixum tensor<fractus<f32>, [5, 3, 1, 76]> scores ← q · kt
+  fixum tensor<f32, [5, 3, 1, 64]> q ← vacua
+  fixum tensor<f32, [6, 64, 76]> kt ← vacua
+  fixum tensor<f32, [5, 3, 1, 76]> scores ← q · kt
   nota scores.longitudo()
 }",
         "incompatible_tensor_index",
@@ -632,9 +632,9 @@ fn batched_matmul_inner_dim_mismatch_rejects() {
     // K tail must unify: 64 ≠ 63.
     rejects_with_issue(
         r"incipit {
-  fixum tensor<fractus<f32>, [5, 3, 1, 64]> q ← vacua
-  fixum tensor<fractus<f32>, [5, 63, 76]> kt ← vacua
-  fixum tensor<fractus<f32>, [5, 3, 1, 76]> scores ← q · kt
+  fixum tensor<f32, [5, 3, 1, 64]> q ← vacua
+  fixum tensor<f32, [5, 63, 76]> kt ← vacua
+  fixum tensor<f32, [5, 3, 1, 76]> scores ← q · kt
   nota scores.longitudo()
 }",
         "incompatible_tensor_index",
@@ -647,9 +647,9 @@ fn batched_matmul_rank1_argument_rejects() {
     // requires a trailing [K, N] matrix on the argument.
     rejects_with_issue(
         r"incipit {
-  fixum tensor<fractus<f32>, [5, 3, 1, 64]> q ← vacua
-  fixum tensor<fractus<f32>, [64]> k ← vacua
-  fixum tensor<fractus<f32>, [5, 3, 1]> scores ← q · k
+  fixum tensor<f32, [5, 3, 1, 64]> q ← vacua
+  fixum tensor<f32, [64]> k ← vacua
+  fixum tensor<f32, [5, 3, 1]> scores ← q · k
   nota scores.longitudo()
 }",
         "matmul_argument_rank_must_be_two",
@@ -662,9 +662,9 @@ fn batched_matmul_rank5_receiver_still_rejects() {
     // closed with the existing receiver rank issue.
     rejects_with_issue(
         r"incipit {
-  fixum tensor<fractus<f32>, [2, 2, 2, 2, 2]> a ← vacua
-  fixum tensor<fractus<f32>, [2, 2, 2]> b ← vacua
-  fixum tensor<fractus<f32>, [2, 2, 2, 2, 2]> c ← a · b
+  fixum tensor<f32, [2, 2, 2, 2, 2]> a ← vacua
+  fixum tensor<f32, [2, 2, 2]> b ← vacua
+  fixum tensor<f32, [2, 2, 2, 2, 2]> c ← a · b
   nota c.longitudo()
 }",
         "matmul_receiver_rank_must_be_two",
@@ -677,9 +677,9 @@ fn batched_matmul_argument_rank_above_receiver_rejects() {
     // batch prefix than the receiver has is not a share).
     rejects_with_issue(
         r"incipit {
-  fixum tensor<fractus<f32>, [5, 64, 76]> kt ← vacua
-  fixum tensor<fractus<f32>, [3, 5, 64, 76]> q ← vacua
-  fixum tensor<fractus<f32>, [3, 5, 64, 76]> scores ← kt · q
+  fixum tensor<f32, [5, 64, 76]> kt ← vacua
+  fixum tensor<f32, [3, 5, 64, 76]> q ← vacua
+  fixum tensor<f32, [3, 5, 64, 76]> scores ← kt · q
   nota scores.longitudo()
 }",
         "matmul_argument_rank_must_be_two",
@@ -725,9 +725,9 @@ fn batched_masked_softmax_decode_shape_typechecks() {
     // the last two axes are query_seq × key_seq, never required square.
     accepts(
         r"incipit {
-    fixum tensor<fractus<f32>, [5, 3, 1, 76]> scores ← vacua
-    fixum tensor<fractus<f32>, [1, 76]> length_mask ← vacua
-    fixum tensor<fractus<f32>, [5, 3, 1, 76]> probabilities ← (scores + length_mask).activatio_softmax()
+    fixum tensor<f32, [5, 3, 1, 76]> scores ← vacua
+    fixum tensor<f32, [1, 76]> length_mask ← vacua
+    fixum tensor<f32, [5, 3, 1, 76]> probabilities ← (scores + length_mask).activatio_softmax()
     nota probabilities.longitudo()
 }",
     );
@@ -738,9 +738,9 @@ fn batched_masked_softmax_prefill_shape_typechecks() {
     // Prefill: [5,3,36,36] scores + causal additive mask [36,36].
     accepts(
         r"incipit {
-    fixum tensor<fractus<f32>, [5, 3, 36, 36]> scores ← vacua
-    fixum tensor<fractus<f32>, [36, 36]> causal_mask ← vacua
-    fixum tensor<fractus<f32>, [5, 3, 36, 36]> probabilities ← (scores + causal_mask).activatio_softmax()
+    fixum tensor<f32, [5, 3, 36, 36]> scores ← vacua
+    fixum tensor<f32, [36, 36]> causal_mask ← vacua
+    fixum tensor<f32, [5, 3, 36, 36]> probabilities ← (scores + causal_mask).activatio_softmax()
     nota probabilities.longitudo()
 }",
     );
@@ -752,9 +752,9 @@ fn batched_masked_softmax_non_broadcast_mask_rejects() {
     // is not a broadcast — the merged shape constraint fails typed.
     rejects_with_issue(
         r"incipit {
-    fixum tensor<fractus<f32>, [5, 3, 1, 76]> scores ← vacua
-    fixum tensor<fractus<f32>, [2, 38]> bad_mask ← vacua
-    fixum tensor<fractus<f32>, [5, 3, 1, 76]> probabilities ← (scores + bad_mask).activatio_softmax()
+    fixum tensor<f32, [5, 3, 1, 76]> scores ← vacua
+    fixum tensor<f32, [2, 38]> bad_mask ← vacua
+    fixum tensor<f32, [5, 3, 1, 76]> probabilities ← (scores + bad_mask).activatio_softmax()
     nota probabilities.longitudo()
 }",
         "incompatible_tensor_index",

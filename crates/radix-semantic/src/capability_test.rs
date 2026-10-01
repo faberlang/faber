@@ -542,7 +542,7 @@ fn nominal_struct_reflexivity_rejects_float_fields() {
     let (queries, hir, _types) = source_queries(
         r"
 genus Vivum {
-    varia fractus<f32> v
+    varia f32 v
 }
 functio clare(Vivum v) → numerus {
     redde 1

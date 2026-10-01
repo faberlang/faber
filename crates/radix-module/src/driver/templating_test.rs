@@ -262,7 +262,7 @@ fn octeti_literal_matches_in_discerne_pattern() {
 #[test]
 fn octetus_builtin_resolves_to_numerus_u8_and_lowers_to_u8() {
     let session = test_session(Target::HirRust);
-    let source = "functio firstByte(octeti buf) → octetus {\n    fixum octetus b ← buf.accipe(0)\n    redde b\n}\n\nincipit {\n    varia octeti sig ← |de ad be ef|\n    fixum octetus a ← firstByte(sig)\n    fixum numerus<u8> raw ← a\n    sig.appende(raw)\n    nota a\n}\n";
+    let source = "functio firstByte(octeti buf) → octetus {\n    fixum octetus b ← buf.accipe(0)\n    redde b\n}\n\nincipit {\n    varia octeti sig ← |de ad be ef|\n    fixum octetus a ← firstByte(sig)\n    fixum u8 raw ← a\n    sig.appende(raw)\n    nota a\n}\n";
     let result = compile(&session, "octet_builtin.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "expected success, got: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;

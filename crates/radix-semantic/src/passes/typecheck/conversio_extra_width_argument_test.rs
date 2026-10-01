@@ -45,8 +45,6 @@ fn a_valid_looking_or_hole_extra_argument_is_the_declarations_params_error() {
 
 #[test]
 fn one_width_marker_and_a_via_clause_stay_accepted() {
-    assert_accepts("functio f(numerus n) → numerus<u32> {\n    redde n ↦ numerus<u32> ⊥ 0\n}\n");
-    assert_accepts(
-        "functio f(textus s) → numerus<u32> {\n    redde s ↦ numerus<u32> via Hex ⊥ 0\n}\n",
-    );
+    assert_accepts("functio f(numerus n) → u32 {\n    redde n ↦ u32 ⊥ 0\n}\n");
+    assert_accepts("functio f(textus s) → u32 {\n    redde s ↦ u32 via Hex ⊥ 0\n}\n");
 }

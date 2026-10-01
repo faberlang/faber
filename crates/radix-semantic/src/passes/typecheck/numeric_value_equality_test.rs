@@ -24,7 +24,7 @@ fn numeric_value_equality_cases() -> Vec<ValueEqualityCase> {
             name: "u8_default_numerus_approx_accepts",
             source: r"
 incipit {
-    fixum numerus<u8> port ← 42 ∷ numerus<u8>
+    fixum u8 port ← 42 ∷ u8
     fixum numerus count ← 42
     adfirma port ≅ count
 }
@@ -35,7 +35,7 @@ incipit {
             name: "u8_default_numerus_exact_rejects",
             source: r"
 incipit {
-    fixum numerus<u8> port ← 42 ∷ numerus<u8>
+    fixum u8 port ← 42 ∷ u8
     fixum numerus count ← 42
     adfirma port ≡ count
 }
@@ -54,7 +54,7 @@ incipit {
         },
         ValueEqualityCase {
             name: "fractus_approx_typechecks",
-            source: "incipit { adfirma 42.145 ∷ fractus<f64> ≅ 42.0 ∷ fractus<f64> }",
+            source: "incipit { adfirma 42.145 ∷ f64 ≅ 42.0 ∷ f64 }",
             expect: ValueEqualityExpect::Accepts,
         },
         ValueEqualityCase {
@@ -75,8 +75,8 @@ functio same(instans<ns> fine, instans<ms> coarse) → bivalens {
             name: "signed_unsigned_approx_accepts",
             source: r"
 incipit {
-    fixum numerus<i32> signed ← -1
-    fixum numerus<u8> unsigned ← 255 ∷ numerus<u8>
+    fixum i32 signed ← -1
+    fixum u8 unsigned ← 255 ∷ u8
     adfirma signed ≅ unsigned
 }
 ",
@@ -85,7 +85,7 @@ incipit {
         ValueEqualityCase {
             name: "cross_width_params_approx_accepts",
             source: r"
-functio promoted(numerus left, numerus<u8> right) → bivalens {
+functio promoted(numerus left, u8 right) → bivalens {
     redde left ≅ right
 }
 ",
@@ -110,48 +110,48 @@ functio promoted(numerus left, numerus<u8> right) → bivalens {
         // admission law across the i64/u64/f64 carrier pairs.
         ValueEqualityCase {
             name: "i64_u64_promoted_exact_accepts",
-            source: "incipit { adfirma 1 ∷ numerus<i64> ≅ 1 ∷ numerus<u64> }",
+            source: "incipit { adfirma 1 ∷ i64 ≅ 1 ∷ u64 }",
             expect: ValueEqualityExpect::Accepts,
         },
         ValueEqualityCase {
             name: "i64_f64_promoted_exact_accepts",
-            source: "incipit { adfirma 1 ∷ numerus<i64> ≅ 1.0 ∷ fractus<f64> }",
+            source: "incipit { adfirma 1 ∷ i64 ≅ 1.0 ∷ f64 }",
             expect: ValueEqualityExpect::Accepts,
         },
         ValueEqualityCase {
             name: "u64_f64_promoted_exact_accepts",
-            source: "incipit { adfirma 1 ∷ numerus<u64> ≅ 1.0 ∷ fractus<f64> }",
+            source: "incipit { adfirma 1 ∷ u64 ≅ 1.0 ∷ f64 }",
             expect: ValueEqualityExpect::Accepts,
         },
         ValueEqualityCase {
             name: "i64_u64_fuzzy_accepts",
-            source: "incipit { adfirma 1 ∷ numerus<i64> ≈ 1 ∷ numerus<u64> }",
+            source: "incipit { adfirma 1 ∷ i64 ≈ 1 ∷ u64 }",
             expect: ValueEqualityExpect::Accepts,
         },
         ValueEqualityCase {
             name: "i64_f64_fuzzy_accepts",
-            source: "incipit { adfirma 1 ∷ numerus<i64> ≈ 1.0 ∷ fractus<f64> }",
+            source: "incipit { adfirma 1 ∷ i64 ≈ 1.0 ∷ f64 }",
             expect: ValueEqualityExpect::Accepts,
         },
         ValueEqualityCase {
             name: "u64_f64_fuzzy_accepts",
-            source: "incipit { adfirma 1 ∷ numerus<u64> ≈ 1.0 ∷ fractus<f64> }",
+            source: "incipit { adfirma 1 ∷ u64 ≈ 1.0 ∷ f64 }",
             expect: ValueEqualityExpect::Accepts,
         },
         // The same carrier pairs stay red under strict `≡` (fail-closed).
         ValueEqualityCase {
             name: "i64_u64_exact_rejects",
-            source: "incipit { adfirma 1 ∷ numerus<i64> ≡ 1 ∷ numerus<u64> }",
+            source: "incipit { adfirma 1 ∷ i64 ≡ 1 ∷ u64 }",
             expect: ValueEqualityExpect::RejectsIssue(EXACT_EQ_ISSUE),
         },
         ValueEqualityCase {
             name: "i64_f64_exact_rejects",
-            source: "incipit { adfirma 1 ∷ numerus<i64> ≡ 1.0 ∷ fractus<f64> }",
+            source: "incipit { adfirma 1 ∷ i64 ≡ 1.0 ∷ f64 }",
             expect: ValueEqualityExpect::RejectsIssue(EXACT_EQ_ISSUE),
         },
         ValueEqualityCase {
             name: "u64_f64_exact_rejects",
-            source: "incipit { adfirma 1 ∷ numerus<u64> ≡ 1.0 ∷ fractus<f64> }",
+            source: "incipit { adfirma 1 ∷ u64 ≡ 1.0 ∷ f64 }",
             expect: ValueEqualityExpect::RejectsIssue(EXACT_EQ_ISSUE),
         },
     ]
@@ -200,8 +200,8 @@ fn sign_boundary_row_admits() {
     let result = compile(
         r"
 incipit {
-    fixum numerus<i64> n ← -1
-    fixum numerus<u64> u ← 18446744073709551615
+    fixum i64 n ← -1
+    fixum u64 u ← 18446744073709551615
     adfirma n ≅ u
 }
 ",
@@ -218,8 +218,8 @@ fn cross_width_row_admits() {
     let result = compile(
         r"
 incipit {
-    fixum numerus<i64> n ← 9007199254740993 ∷ numerus<i64>
-    fixum numerus<u64> u ← 9007199254740992 ∷ numerus<u64>
+    fixum i64 n ← 9007199254740993 ∷ i64
+    fixum u64 u ← 9007199254740992 ∷ u64
     adfirma n ≅ u
 }
 ",

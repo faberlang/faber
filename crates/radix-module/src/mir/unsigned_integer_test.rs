@@ -30,7 +30,7 @@ fn unsigned_integer_runner_preserves_i64_max_plus_one() {
     run_fixture_source(
         r"
 incipit {
-    fixum numerus<u64> sha ← 9223372036854775808
+    fixum u64 sha ← 9223372036854775808
     nota sha
 }
 ",
@@ -46,7 +46,7 @@ fn unsigned_integer_runner_preserves_u64_max() {
     run_fixture_source(
         r"
 incipit {
-    fixum numerus<u64> max ← 18446744073709551615
+    fixum u64 max ← 18446744073709551615
     nota max
     nota max ↦ textus
 }
@@ -65,7 +65,7 @@ fn unsigned_integer_runner_does_not_encode_upper_half_as_negative() {
     run_fixture_source(
         r"
 incipit {
-    fixum numerus<u64> high ← 18446744073709551615
+    fixum u64 high ← 18446744073709551615
     nota high > 9223372036854775807
 }
 ",
@@ -81,7 +81,7 @@ fn unsigned_integer_runner_tabula_key_above_i64_max() {
     run_fixture_source(
         r#"
 incipit {
-    varia tabula<numerus<u64>, textus> index ← vacua
+    varia tabula<u64, textus> index ← vacua
     index.pone(18446744073709551615, "sha")
     index.pone(9223372036854775808, "round")
     nota index.accipe(18446744073709551615) vel "absens"
@@ -101,7 +101,7 @@ fn unsigned_integer_runner_copia_member_above_i64_max() {
     run_fixture_source(
         r"
 incipit {
-    varia copia<numerus<u64>> words ← vacua
+    varia copia<u64> words ← vacua
     words.adde(18446744073709551615)
     nota words.habet(18446744073709551615)
     nota words.habet(9223372036854775807)
@@ -259,8 +259,8 @@ incipit {
     fixum modulus<u64> uno ← 1 ↦ modulus<u64>
     nota one ≡ uno
     nota one ≡ one + 0
-    fixum numerus<u64> wrapped ← 1
-    nota wrapped ≡ (1 ↦ numerus<u64>)
+    fixum u64 wrapped ← 1
+    nota wrapped ≡ (1 ↦ u64)
     nota wrapped ≡ wrapped + 0
 }
 ",
@@ -276,14 +276,14 @@ fn unsigned_integer_runner_mixed_carrier_tabula_and_copia_keys() {
     run_fixture_source(
         r#"
 incipit {
-    fixum numerus<u64> five ← 5
-    fixum numerus<u64> big ← 9223372036854775808
-    fixum numerus<u64> computed ← big - 9223372036854775808 + 5
-    varia tabula<numerus<u64>, textus> t ← vacua
+    fixum u64 five ← 5
+    fixum u64 big ← 9223372036854775808
+    fixum u64 computed ← big - 9223372036854775808 + 5
+    varia tabula<u64, textus> t ← vacua
     t.pone(five, "quinque")
     nota t.accipe(computed) vel "absens"
     nota t.accipe(five) vel "absens"
-    varia copia<numerus<u64>> s ← vacua
+    varia copia<u64> s ← vacua
     s.adde(five)
     nota s.habet(computed)
     nota s.habet(big)
@@ -306,8 +306,8 @@ incipit {
         casu 1 { nota "primus" }
         ceterum { nota "aliud" }
     }
-    fixum numerus<u64> two ← 2
-    elige two ↦ numerus<u64> {
+    fixum u64 two ← 2
+    elige two ↦ u64 {
         casu 2 { nota "secundus" }
         ceterum { nota "aliud" }
     }
@@ -325,7 +325,7 @@ fn unsigned_integer_runner_upper_half_bitwise_accepts_small_literals() {
     run_fixture_source(
         r"
 incipit {
-    fixum numerus<u64> big ← 15165310421466868936
+    fixum u64 big ← 15165310421466868936
     nota big ∧ 255
     nota big ∨ 255
     nota big ⊻ 255
@@ -334,7 +334,7 @@ incipit {
 ",
         &mut host,
     )
-    .expect("upper-half numerus<u64> bitwise with small literals runs");
+    .expect("upper-half u64 bitwise with small literals runs");
     assert_eq!(
         host.stdout_lines,
         vec![
@@ -354,7 +354,7 @@ fn unsigned_integer_runner_upper_half_left_shift_traps_past_the_range() {
     let errors = run_fixture_source(
         r"
 incipit {
-    fixum numerus<u64> big ← 15165310421466868936
+    fixum u64 big ← 15165310421466868936
     nota big ⇐ 1
 }
 ",
@@ -393,14 +393,14 @@ fn unsigned_integer_runner_sorts_lista_with_upper_half_members() {
     run_fixture_source(
         r"
 incipit {
-    varia lista<numerus<u64>> xs ← [15165310421466868936, 3, 10, 2]
+    varia lista<u64> xs ← [15165310421466868936, 3, 10, 2]
     xs.ordina()
     nota xs
 }
 ",
         &mut host,
     )
-    .expect("sort of lista<numerus<u64>> with upper-half member runs");
+    .expect("sort of lista<u64> with upper-half member runs");
     assert_eq!(host.stdout_lines, vec!["[2, 3, 10, 15165310421466868936]"]);
 }
 

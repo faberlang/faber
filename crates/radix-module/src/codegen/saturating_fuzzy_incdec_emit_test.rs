@@ -23,7 +23,7 @@ const FUZZY: &str = r#"+++
 locale = "en"
 +++
 main {
-    const int<d64> d ← 0.1
+    const d64 d ← 0.1
     const float f ← 0.1
     print d ≈ f
 }
@@ -36,7 +36,7 @@ fn idx() → int {
     return 1
 }
 main {
-    var list<int<u8>> xs ← [1, 2]
+    var list<u8> xs ← [1, 2]
     xs[idx()] ↑
     print xs
 }

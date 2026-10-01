@@ -2529,7 +2529,7 @@ fn run_accepts_a_fitting_constant_argument_for_a_narrow_parameter() {
     let path = dir.join("narrow.fab");
     fs::write(
         &path,
-        "fn f(int<u8> v) → int<u8> {\n    return v\n}\nmain {\n    print f(200)\n}\n",
+        "fn f(u8 v) → u8 {\n    return v\n}\nmain {\n    print f(200)\n}\n",
     )
     .expect("write source");
     let path = path.to_str().expect("utf-8 path");

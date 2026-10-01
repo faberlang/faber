@@ -40,13 +40,13 @@ fn write_nucleum_package(dir: &Path) {
         r"
 @ public
 @ kernel fragment
-fn helper(fractus<f32> x) → fractus<f32> {
+fn helper(f32 x) → f32 {
     return x
 }
 
 @ public
 @ kernel
-fn k(fractus<f32> x) → fractus<f32> {
+fn k(f32 x) → f32 {
     return helper(x)
 }
 ",
@@ -79,7 +79,7 @@ fn signature_only_fragment_package_fails_at_analyze() {
     let dir = temp_root("sigonly");
     fs::write(
         dir.join("main.fab"),
-        "@ public\n@ kernel fragment\nfn helper(fractus<f32> x) → fractus<f32>\n",
+        "@ public\n@ kernel fragment\nfn helper(f32 x) → f32\n",
     )
     .expect("source");
     let err = analyze_package(&Config::default(), &dir.join("main.fab"), &test_seams());

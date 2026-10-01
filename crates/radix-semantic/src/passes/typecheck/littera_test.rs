@@ -195,8 +195,8 @@ fn littera_converts_to_textus() {
 #[test]
 fn octetus_is_numerus_u8() {
     test_support::assert_accepts(
-        "functio f(octetus b) → numerus<u8> {
-    fixum numerus<u8> n ← b
+        "functio f(octetus b) → u8 {
+    fixum u8 n ← b
     fixum octetus back ← n
     redde back
 }",

@@ -103,7 +103,7 @@ incipit {
         r"functio grow() → vacuum {
     varia octeti raw ← |61|
     varia octeti<8> o ← raw ↦ octeti<8>
-    o.appende(0x62 ∷ numerus<u8>)
+    o.appende(0x62 ∷ u8)
 }
 
 incipit {
@@ -135,7 +135,7 @@ functio grow_ascii() → vacuum ⇥ textus {
 functio grow_octeti() → vacuum ⇥ textus {
     varia octeti raw ← |61|
     varia octeti<8> o ← raw ↦ octeti<8>
-    o.appende(0x62 ∷ numerus<u8>)
+    o.appende(0x62 ∷ u8)
 }
 
 incipit {

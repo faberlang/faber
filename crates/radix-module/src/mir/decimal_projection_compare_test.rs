@@ -84,7 +84,7 @@ fn projected_decimal_beside_a_huge_integer_does_not_trap() {
         ["verum", "verum", "falsum"]
     );
     assert_eq!(
-        ok("varia Pt p ← Pt { x = -0.5 }\nvaria numerus<u64> u ← 18446744073709551615\nnota p.x < u\nnota u < p.x"),
+        ok("varia Pt p ← Pt { x = -0.5 }\nvaria u64 u ← 18446744073709551615\nnota p.x < u\nnota u < p.x"),
         ["verum", "falsum"]
     );
 }

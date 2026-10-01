@@ -4009,7 +4009,7 @@ fn parses_test_annotation_keywords_as_import_binding_names() {
 fn parses_tensor_bridge_member_method_names() {
     let result = parse_ok(
         r"incipit {
-  fixum tensor<fractus<f32>, []> t ← vacua
+  fixum tensor<f32, []> t ← vacua
   fixum _ g ← t.strue(flat, shape)
   fixum _ f ← g.planata()
 }",

@@ -25,7 +25,7 @@ fn numerus_to_ascii_oct_accepts() {
 #[test]
 fn sized_unsigned_to_ascii_hex_accepts() {
     test_support::assert_accepts(
-        "incipit { fixum numerus<u8> n ← 255
+        "incipit { fixum u8 n ← 255
 fixum ascii<2> hex ← n ↦ ascii<2> via Hex }",
     );
 }

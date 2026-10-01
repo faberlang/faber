@@ -385,11 +385,11 @@ fn octeti_unifies_bidirectionally_with_lista_numerus_u8() {
 
     assert!(
         types.is_assignable(octeti, lista_u8),
-        "octeti should widen to lista<numerus<u8>>"
+        "octeti should widen to lista<u8>"
     );
     assert!(
         types.is_assignable(lista_u8, octeti),
-        "lista<numerus<u8>> should narrow to octeti"
+        "lista<u8> should narrow to octeti"
     );
 }
 

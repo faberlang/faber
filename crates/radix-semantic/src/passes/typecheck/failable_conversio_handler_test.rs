@@ -27,8 +27,7 @@ fn arg<'a>(err: &'a crate::SemanticError, name: &str) -> Option<&'a str> {
 
 #[test]
 fn unhandled_narrowing_in_a_plain_function_is_rejected_with_structured_facts() {
-    let result =
-        analyze_source("functio g(numerus x) → numerus<u8> {\n    redde x ↦ numerus<u8>\n}\n");
+    let result = analyze_source("functio g(numerus x) → u8 {\n    redde x ↦ u8\n}\n");
     let err = result
         .diagnostics
         .iter()
@@ -36,7 +35,7 @@ fn unhandled_narrowing_in_a_plain_function_is_rejected_with_structured_facts() {
         .unwrap_or_else(|| panic!("expected {ISSUE}, got {:?}", result.diagnostics));
     assert_eq!(err.kind, crate::SemanticErrorKind::OperandTypesInvalid); // SEM011
     assert_eq!(arg(err, "source"), Some("numerus"));
-    assert_eq!(arg(err, "target"), Some("numerus<u8>"));
+    assert_eq!(arg(err, "target"), Some("u8"));
     assert!(test_support::args_have_no_legacy_message(&err.args));
 }
 
@@ -45,9 +44,9 @@ fn every_failable_conversio_kind_is_rejected_without_a_handler() {
     for (param, target) in [
         ("textus", "numerus"),
         ("fractus", "numerus"),
-        ("numerus", "numerus<u8>"),
-        ("numerus<u16>", "numerus<u8>"),
-        ("d64", "numerus<i32>"),
+        ("numerus", "u8"),
+        ("u16", "u8"),
+        ("d64", "i32"),
     ] {
         assert_rejects_with_issue(
             &format!("functio g({param} x) → {target} {{\n    redde x ↦ {target}\n}}\n"),
@@ -75,7 +74,7 @@ fn registered_row_with_a_declared_channel_uses_the_same_rule() {
 
 #[test]
 fn default_covers_the_conversio() {
-    assert_accepts("functio g(numerus x) → numerus<u8> {\n    redde x ↦ numerus<u8> ⊥ 0\n}\n");
+    assert_accepts("functio g(numerus x) → u8 {\n    redde x ↦ u8 ⊥ 0\n}\n");
     assert_accepts("functio g(textus s) → numerus {\n    redde s ↦ numerus ⊥ 0\n}\n");
 }
 
@@ -83,7 +82,7 @@ fn default_covers_the_conversio() {
 fn fac_cape_covers_the_conversio() {
     assert_accepts(concat!(
         "functio g(numerus x) → numerus {\n",
-        "    fac {\n        redde x ↦ numerus<u8>\n    } cape err {\n        redde 0\n    }\n",
+        "    fac {\n        redde x ↦ u8\n    } cape err {\n        redde 0\n    }\n",
         "}\n",
     ));
 }
@@ -92,14 +91,14 @@ fn fac_cape_covers_the_conversio() {
 fn capta_covers_the_conversio() {
     assert_accepts(concat!(
         "functio g(textus s) → vacuum {\n",
-        "    fixum _ r ← capta { s ↦ numerus<u8> }\n    nota r\n",
+        "    fixum _ r ← capta { s ↦ u8 }\n    nota r\n",
         "}\n",
     ));
 }
 
 #[test]
 fn enclosing_error_channel_covers_the_conversio() {
-    assert_accepts("functio g(numerus x) → numerus<u8> ⇥ textus {\n    redde x ↦ numerus<u8>\n}\n");
+    assert_accepts("functio g(numerus x) → u8 ⇥ textus {\n    redde x ↦ u8\n}\n");
 }
 
 #[test]
@@ -107,8 +106,8 @@ fn a_handler_does_not_leak_past_its_boundary() {
     assert_rejects_with_issue(
         concat!(
             "functio g(textus s) → numerus {\n",
-            "    fixum _ r ← capta { s ↦ numerus<u8> }\n    nota r\n",
-            "    fixum numerus<u8> y ← s ↦ numerus<u8>\n    redde 0\n",
+            "    fixum _ r ← capta { s ↦ u8 }\n    nota r\n",
+            "    fixum u8 y ← s ↦ u8\n    redde 0\n",
             "}\n",
         ),
         ISSUE,
@@ -120,13 +119,13 @@ fn closures_do_not_inherit_the_enclosing_error_channel_or_main() {
     // A closure is its own frame: errors do not unwind through it, so it
     // needs its own handler even inside main or a `⇥` function.
     assert_rejects_with_issue(
-        "incipit {\n    fixum _ h ← numerus x ∴ x ↦ numerus<u8>\n    nota h(1)\n}\n",
+        "incipit {\n    fixum _ h ← numerus x ∴ x ↦ u8\n    nota h(1)\n}\n",
         ISSUE,
     );
     assert_rejects_with_issue(
         concat!(
             "functio g() → vacuum ⇥ textus {\n",
-            "    fixum _ h ← numerus x ∴ x ↦ numerus<u8>\n    nota h(1)\n",
+            "    fixum _ h ← numerus x ∴ x ↦ u8\n    nota h(1)\n",
             "}\n",
         ),
         ISSUE,
@@ -138,7 +137,7 @@ fn closures_do_not_inherit_the_enclosing_error_channel_or_main() {
 #[test]
 fn main_body_is_exempt_for_conversions() {
     assert_accepts(
-        "incipit {\n    fixum numerus<u8> n ← 300 ↦ numerus<u8>\n    fixum numerus m ← \"12\" ↦ numerus\n    nota n\n    nota m\n}\n",
+        "incipit {\n    fixum u8 n ← 300 ↦ u8\n    fixum numerus m ← \"12\" ↦ numerus\n    nota n\n    nota m\n}\n",
     );
 }
 
@@ -172,7 +171,7 @@ fn helper_called_from_main_is_not_exempt_for_failable_calls() {
 
 #[test]
 fn helper_called_from_main_is_not_exempt() {
-    let source = "functio helper(numerus x) → numerus<u8> {\n    redde x ↦ numerus<u8>\n}\n\nincipit {\n    nota helper(300)\n}\n";
+    let source = "functio helper(numerus x) → u8 {\n    redde x ↦ u8\n}\n\nincipit {\n    nota helper(300)\n}\n";
     assert_rejects_with_issue(source, ISSUE);
 }
 
@@ -188,12 +187,12 @@ fn a_failable_call_in_a_plain_function_still_needs_a_handler() {
 
 #[test]
 fn widening_is_exempt() {
-    assert_accepts("functio g(numerus<u8> x) → numerus {\n    redde x ↦ numerus\n}\n");
+    assert_accepts("functio g(u8 x) → numerus {\n    redde x ↦ numerus\n}\n");
 }
 
 #[test]
 fn constant_proven_to_fit_is_exempt() {
-    assert_accepts("functio g() → numerus<u8> {\n    redde 200 ↦ numerus<u8>\n}\n");
+    assert_accepts("functio g() → u8 {\n    redde 200 ↦ u8\n}\n");
 }
 
 #[test]
@@ -213,7 +212,5 @@ fn infallible_text_rows_are_exempt() {
 
 #[test]
 fn exact_width_bits_bitcast_is_exempt() {
-    assert_accepts(
-        "functio bits(fractus<f32> x) → numerus<u32> {\n    redde x ↦ u32 via Bits\n}\n",
-    );
+    assert_accepts("functio bits(f32 x) → u32 {\n    redde x ↦ u32 via Bits\n}\n");
 }

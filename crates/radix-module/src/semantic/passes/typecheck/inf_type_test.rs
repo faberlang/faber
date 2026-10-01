@@ -83,7 +83,7 @@ incipit {
 
 const AIR_INF_LOCAL: &str = r#"
 @ radix lane "air"
-functio p(numerus<i32> n) → numerus<i32> {
+functio p(i32 n) → i32 {
     fixum inf x ← 1
     redde n
 }

@@ -605,7 +605,7 @@ fn tensor_fractus_to_numerus_conversio_emits_convert_elements() {
 #[test]
 fn tensor_numerus_i32_to_i64_conversio_emits_convert_elements() {
     let session = test_session(Target::HirRust);
-    let source = "incipit {\n  fixum tensor<numerus<i32>, []> a ← vacua\n  fixum _ b ← a ↦ tensor<numerus<i64>, []>\n}";
+    let source = "incipit {\n  fixum tensor<i32, []> a ← vacua\n  fixum _ b ← a ↦ tensor<i64, []>\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;

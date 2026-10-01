@@ -1689,8 +1689,8 @@ fn validate_locale_pack_ok(pack: &crate::locale::LocalePack) -> bool {
 /// pack-authoritative, no Latin support vocabulary.
 #[test]
 fn localized_tensor_vacua_surface_lowers_to_latin_identity() {
-    let latin_source = "incipit {\n  fixum tensor<fractus<f32>, []> empty ← vacua\n}\n";
-    let thai_source = "เริ่ม {\n  คงที่ เทนเซอร์<เศษ<f32>, []> empty ← เซตว่าง\n}\n";
+    let latin_source = "incipit {\n  fixum tensor<f32, []> empty ← vacua\n}\n";
+    let thai_source = "เริ่ม {\n  คงที่ เทนเซอร์<f32, []> empty ← เซตว่าง\n}\n";
 
     let (latin_lowered, _, latin_types) = lower_source(latin_source);
     let pack_path = crate::locale::workspace_locale_pack_path("th-TH");

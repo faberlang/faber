@@ -72,13 +72,13 @@ fn inferred_slot_takes_the_constant_default() {
 
 #[test]
 fn constant_that_fits_its_type_is_accepted() {
-    assert_accepts("functio f() → numerus {\n    fixum numerus<u8> d = 200\n    redde 0\n}\n");
+    assert_accepts("functio f() → numerus {\n    fixum u8 d = 200\n    redde 0\n}\n");
 }
 
 #[test]
 fn constant_that_does_not_fit_is_rejected() {
     assert_rejects_with_issue(
-        "functio f() → numerus {\n    fixum numerus<u8> d = 300\n    redde 0\n}\n",
+        "functio f() → numerus {\n    fixum u8 d = 300\n    redde 0\n}\n",
         "store_constant_out_of_range",
     );
 }
@@ -98,8 +98,8 @@ fn constant_must_fit_whatever_the_overflow_policy() {
 #[test]
 fn computed_constant_that_does_not_fit_is_rejected() {
     assert_rejects_with_issue(
-        "fixum numerus<u8> A = 200\n\
-         functio f() → numerus {\n    fixum numerus<u8> d = A + 100\n    redde 0\n}\n",
+        "fixum u8 A = 200\n\
+         functio f() → numerus {\n    fixum u8 d = A + 100\n    redde 0\n}\n",
         "constant_arithmetic_overflow",
     );
 }

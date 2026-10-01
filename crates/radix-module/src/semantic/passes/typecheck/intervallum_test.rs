@@ -132,7 +132,7 @@ fn intervallum_fractus_rejects() {
 #[test]
 fn intervallum_sized_fractus_rejects() {
     let source = r"incipit {
-  fixum intervallum<fractus<f32>> fines ← 0‥10
+  fixum intervallum<f32> fines ← 0‥10
 }";
     rejects_with_issue(&compile(source), "intervallum_bound");
 }
@@ -257,10 +257,10 @@ fn intervallum_materialize_tensor_element_mismatch_rejects() {
 #[test]
 fn intervallum_sized_numerus_materialize_rejects_until_runtime_helpers_exist() {
     let source = r"incipit {
-  fixum numerus<u8> lo ← 1 ∷ numerus<u8>
-  fixum numerus<u8> hi ← 4 ∷ numerus<u8>
-  fixum intervallum<numerus<u8>> fines ← lo‥hi
-  fixum lista<numerus<u8>> xs ← fines ↦ lista<numerus<u8>>
+  fixum u8 lo ← 1 ∷ u8
+  fixum u8 hi ← 4 ∷ u8
+  fixum intervallum<u8> fines ← lo‥hi
+  fixum lista<u8> xs ← fines ↦ lista<u8>
 }";
     rejects_with_issue(&compile(source), "intervallum_helper_bound_unsupported");
 }
@@ -303,11 +303,11 @@ fn intervallum_clamp_recovery_rejects() {
 #[test]
 fn intervallum_sized_numerus_clamp_rejects_until_runtime_helpers_exist() {
     let source = r"incipit {
-  fixum numerus<u8> x ← 7 ∷ numerus<u8>
-  fixum numerus<u8> lo ← 1 ∷ numerus<u8>
-  fixum numerus<u8> hi ← 4 ∷ numerus<u8>
-  fixum intervallum<numerus<u8>> fines ← lo‥hi
-  fixum numerus<u8> clamped ← x ↦ fines
+  fixum u8 x ← 7 ∷ u8
+  fixum u8 lo ← 1 ∷ u8
+  fixum u8 hi ← 4 ∷ u8
+  fixum intervallum<u8> fines ← lo‥hi
+  fixum u8 clamped ← x ↦ fines
 }";
     rejects_with_issue(&compile(source), "intervallum_helper_bound_unsupported");
 }
@@ -315,13 +315,13 @@ fn intervallum_sized_numerus_clamp_rejects_until_runtime_helpers_exist() {
 #[test]
 fn intervallum_sized_numerus_range_clamp_rejects_until_runtime_helpers_exist() {
     let source = r"incipit {
-  fixum numerus<u8> zero ← 0 ∷ numerus<u8>
-  fixum numerus<u8> one ← 1 ∷ numerus<u8>
-  fixum numerus<u8> four ← 4 ∷ numerus<u8>
-  fixum numerus<u8> ten ← 10 ∷ numerus<u8>
-  fixum intervallum<numerus<u8>> wide ← zero‥ten
-  fixum intervallum<numerus<u8>> narrow ← one‥four
-  fixum intervallum<numerus<u8>> clipped ← wide ↦ narrow
+  fixum u8 zero ← 0 ∷ u8
+  fixum u8 one ← 1 ∷ u8
+  fixum u8 four ← 4 ∷ u8
+  fixum u8 ten ← 10 ∷ u8
+  fixum intervallum<u8> wide ← zero‥ten
+  fixum intervallum<u8> narrow ← one‥four
+  fixum intervallum<u8> clipped ← wide ↦ narrow
 }";
     rejects_with_issue(&compile(source), "intervallum_helper_bound_unsupported");
 }
@@ -384,7 +384,7 @@ fn intervallum_instans_longitudo_rejects() {
 
 #[test]
 fn intervallum_sized_numerus_longitudo_rejects_until_runtime_helpers_exist() {
-    let source = r"functio probe(intervallum<numerus<u8>> fines) → numerus {
+    let source = r"functio probe(intervallum<u8> fines) → numerus {
   redde fines.longitudo()
 }";
     rejects_with_issue(&compile(source), "intervallum_longitudo_bound");

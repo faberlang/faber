@@ -4,21 +4,17 @@ use crate::test_support;
 
 #[test]
 fn octeti_to_lista_u8_accepts() {
-    test_support::assert_accepts(
-        "functio bridge(octeti o) → lista<numerus<u8>> { redde o ↦ lista<numerus<u8>> }",
-    );
+    test_support::assert_accepts("functio bridge(octeti o) → lista<u8> { redde o ↦ lista<u8> }");
 }
 
 #[test]
 fn octeti_literal_to_lista_u8_accepts() {
-    test_support::assert_accepts("incipit { fixum _ b ← |de ad be ef| ↦ lista<numerus<u8>> }");
+    test_support::assert_accepts("incipit { fixum _ b ← |de ad be ef| ↦ lista<u8> }");
 }
 
 #[test]
 fn lista_u8_to_octeti_still_accepts() {
-    test_support::assert_accepts(
-        "functio from_list(lista<numerus<u8>> b) → octeti { redde b ↦ octeti }",
-    );
+    test_support::assert_accepts("functio from_list(lista<u8> b) → octeti { redde b ↦ octeti }");
 }
 
 #[test]

@@ -96,10 +96,10 @@ fn integer_division_and_remainder_floor() {
 #[test]
 fn intermediates_are_exact_over_the_64_bit_range() {
     // Ruling 17a: `MAX * 2 + 1` passes through 2^64 - 2, which no `i64` holds.
-    let source = "fixum numerus<u64> M = 9223372036854775807\nfixum numerus<u64> N = M * 2 + 1\n";
+    let source = "fixum u64 M = 9223372036854775807\nfixum u64 N = M * 2 + 1\n";
     let (konst, _) = static_const(source, "N");
     assert_eq!(int_value(&konst.value), i128::from(u64::MAX));
-    let source = "fixum numerus<u64> M = 9223372036854775807\nfixum numerus<u64> N = M + 1\n";
+    let source = "fixum u64 M = 9223372036854775807\nfixum u64 N = M + 1\n";
     let (konst, _) = static_const(source, "N");
     assert_eq!(int_value(&konst.value), 1_i128 << 63);
 }
@@ -107,18 +107,18 @@ fn intermediates_are_exact_over_the_64_bit_range() {
 #[test]
 fn the_static_itself_must_fit_its_declared_type() {
     assert_rejects_with_issue(
-        "fixum numerus<u8> A = 200\nfixum numerus<u8> B = A + 100\n",
+        "fixum u8 A = 200\nfixum u8 B = A + 100\n",
         "constant_arithmetic_overflow",
     );
     assert_rejects_with_issue(
-        "fixum numerus<u64> M = 18446744073709551615\nfixum numerus<u64> N = M + 1\n",
+        "fixum u64 M = 18446744073709551615\nfixum u64 N = M + 1\n",
         "constant_arithmetic_overflow",
     );
 }
 
 #[test]
 fn shifts_fold_as_pure_math() {
-    let (shl, _) = static_const("fixum numerus<u64> S = 1 ⇐ 63\n", "S");
+    let (shl, _) = static_const("fixum u64 S = 1 ⇐ 63\n", "S");
     assert_eq!(int_value(&shl.value), 1_i128 << 63);
     let (shr, _) = static_const("fixum numerus S = (0 - 5) ⇒ 1\n", "S");
     assert_eq!(int_value(&shr.value), -3);
@@ -126,7 +126,7 @@ fn shifts_fold_as_pure_math() {
     assert_eq!(int_value(&big.value), 0);
     // 2^64 is a constant in an `=` position: refused at the store.
     assert_rejects_with_issue(
-        "fixum numerus<u64> S = 1 ⇐ 64\n",
+        "fixum u64 S = 1 ⇐ 64\n",
         "store_constant_out_of_range",
     );
 }

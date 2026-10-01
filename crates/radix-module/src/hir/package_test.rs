@@ -433,18 +433,18 @@ fn package_dependencies_survive_round_trip() {
 fn nucleum_source() -> &'static str {
     r"
 @ nucleum fragment
-functio helper(fractus<f32> x) → fractus<f32> {
+functio helper(f32 x) → f32 {
     redde x
 }
 
 @ publica
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde helper(x)
 }
 
 @ nucleum
-functio secret(fractus<f32> x) → fractus<f32> {
+functio secret(f32 x) → f32 {
     redde x
 }
 "
@@ -553,7 +553,7 @@ fn signature_only_device_import_fails_closed() {
     let Err(err) = analyze_source(
         &session,
         "iface.fab",
-        "@ nucleum fragment\nfunctio helper(fractus<f32> x) → fractus<f32>\n",
+        "@ nucleum fragment\nfunctio helper(f32 x) → f32\n",
         AnalyzeRequest::default(),
     ) else {
         panic!("signature-only fragment must fail at compile time");
@@ -658,12 +658,12 @@ fn device_call_graph_rejects_cycle_after_import() {
         "ping.fab",
         r"
 @ nucleum fragment
-functio ping(fractus<f32> x) → fractus<f32> {
+functio ping(f32 x) → f32 {
     redde pong(x)
 }
 
 @ nucleum fragment
-functio pong(fractus<f32> x) → fractus<f32> {
+functio pong(f32 x) → f32 {
     redde ping(x)
 }
 ",
@@ -687,13 +687,13 @@ fn device_call_graph_rejects_kernel_cycle() {
         r"
 @ publica
 @ nucleum
-functio k1(fractus<f32> x) → fractus<f32> {
+functio k1(f32 x) → f32 {
     redde k2(x)
 }
 
 @ publica
 @ nucleum
-functio k2(fractus<f32> x) → fractus<f32> {
+functio k2(f32 x) → f32 {
     redde k1(x)
 }
 ",
@@ -872,10 +872,10 @@ fn device_transfer_sink_is_recorded_as_device_callee() {
         "device.fab",
         r"
 @ nucleum fragment
-functio emit(fractus<f32> x) → vacuum { tacet }
+functio emit(f32 x) → vacuum { tacet }
 
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     emit ⇇ x
     redde x
 }

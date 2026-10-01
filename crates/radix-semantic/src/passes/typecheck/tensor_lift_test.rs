@@ -73,7 +73,7 @@ functio i(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> { redde 1.0 - a }",
 #[test]
 fn unary_minus_lifts_over_a_tensor() {
     accepts("functio f(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> { redde -a }");
-    accepts("functio f(tensor<numerus<i8>, [3]> a) → tensor<numerus<i8>, [3]> { redde -a }");
+    accepts("functio f(tensor<i8, [3]> a) → tensor<i8, [3]> { redde -a }");
 }
 
 #[test]
@@ -106,9 +106,9 @@ fn tensor_times_tensor_keeps_todays_rejection() {
 fn an_untyped_constant_adopts_the_tensor_element_type() {
     accepts("functio f(tensor<f32, [2]> a) → tensor<f32, [2]> { redde a * 2 }");
     accepts("functio f(tensor<f32, [2]> a) → tensor<f32, [2]> { redde a + 0.25 }");
-    accepts("functio f(tensor<numerus<u8>, [2]> a) → tensor<numerus<u8>, [2]> { redde a + 1 }");
+    accepts("functio f(tensor<u8, [2]> a) → tensor<u8, [2]> { redde a + 1 }");
     // A constant beside an integer tensor joins by value: 300 needs `u16`.
-    accepts("functio f(tensor<numerus<u8>, [2]> a) → tensor<numerus<u16>, [2]> { redde a + 300 }");
+    accepts("functio f(tensor<u8, [2]> a) → tensor<u16, [2]> { redde a + 300 }");
 }
 
 #[test]
@@ -118,7 +118,7 @@ fn family_crossing_needs_a_conversion() {
         FAMILY_CROSSING,
     );
     operands_invalid(
-        "functio f(tensor<numerus, [2]> a, fractus<f64> x) → tensor<numerus, [2]> { redde a * x }",
+        "functio f(tensor<numerus, [2]> a, f64 x) → tensor<numerus, [2]> { redde a * x }",
         FAMILY_CROSSING,
     );
 }
@@ -127,21 +127,21 @@ fn family_crossing_needs_a_conversion() {
 fn integer_elements_follow_the_lossless_join_per_element() {
     // Same-width mixes join by the lattice; a wider scalar joins the tensor.
     accepts(
-        r"functio f(tensor<numerus<u8>, [2]> a, tensor<numerus<u16>, [2]> b) → tensor<numerus<u16>, [2]> { redde a + b }
-functio g(tensor<numerus<u8>, [2]> a, numerus<u16> s) → tensor<numerus<u16>, [2]> { redde a + s }
-functio h(tensor<numerus<i8>, [2]> a, tensor<numerus<u8>, [2]> b) → tensor<numerus<i16>, [2]> { redde a - b }",
+        r"functio f(tensor<u8, [2]> a, tensor<u16, [2]> b) → tensor<u16, [2]> { redde a + b }
+functio g(tensor<u8, [2]> a, u16 s) → tensor<u16, [2]> { redde a + s }
+functio h(tensor<i8, [2]> a, tensor<u8, [2]> b) → tensor<i16, [2]> { redde a - b }",
     );
     // A float pair joins by the lossless lattice like the scalar rule.
     accepts(
         r"functio f(tensor<f32, [2]> a, tensor<f64, [2]> b) → tensor<f64, [2]> { redde a + b }
-functio g(tensor<f32, [2]> a, fractus<f64> s) → tensor<f64, [2]> { redde a * s }",
+functio g(tensor<f32, [2]> a, f64 s) → tensor<f64, [2]> { redde a * s }",
     );
 }
 
 #[test]
 fn a_narrower_join_result_is_not_assignable_to_the_wider_operand_type() {
     operands_invalid_or_mismatch(
-        "functio f(tensor<numerus<u8>, [2]> a, tensor<numerus<u16>, [2]> b) → tensor<numerus<u8>, [2]> { redde a + b }",
+        "functio f(tensor<u8, [2]> a, tensor<u16, [2]> b) → tensor<u8, [2]> { redde a + b }",
     );
 }
 
@@ -153,7 +153,7 @@ fn operands_invalid_or_mismatch(source: &str) {
 #[test]
 fn u64_with_a_signed_element_has_no_lossless_join() {
     operands_invalid(
-        "functio f(tensor<numerus<u64>, [2]> a, tensor<numerus<i64>, [2]> b) → tensor<numerus<i64>, [2]> { redde a + b }",
+        "functio f(tensor<u64, [2]> a, tensor<i64, [2]> b) → tensor<i64, [2]> { redde a + b }",
         "u64_signed_arithmetic_requires_conversion",
     );
 }
@@ -189,23 +189,23 @@ fn true_division_lifts_on_any_shape_with_ruling_23_widths() {
     accepts("functio f(tensor<f32, [2]> a, tensor<f32, [2]> b) → tensor<f32, [2]> { redde a ÷ b }");
     // 8 and 16 bit integers divide to f32; 32/64 bit to f64.
     accepts(
-        r"functio f(tensor<numerus<u8>, [2]> a, tensor<numerus<u8>, [2]> b) → tensor<f32, [2]> { redde a ÷ b }
-functio g(tensor<numerus<i16>, [2]> a, tensor<numerus<u8>, [2]> b) → tensor<f32, [2]> { redde a ÷ b }
-functio h(tensor<numerus<i32>, [2]> a, tensor<numerus<i32>, [2]> b) → tensor<f64, [2]> { redde a ÷ b }
+        r"functio f(tensor<u8, [2]> a, tensor<u8, [2]> b) → tensor<f32, [2]> { redde a ÷ b }
+functio g(tensor<i16, [2]> a, tensor<u8, [2]> b) → tensor<f32, [2]> { redde a ÷ b }
+functio h(tensor<i32, [2]> a, tensor<i32, [2]> b) → tensor<f64, [2]> { redde a ÷ b }
 functio i(tensor<numerus, [2]> a) → tensor<f64, [2]> { redde a ÷ 3 }
-functio j(tensor<numerus<u8>, [2]> a) → tensor<f32, [2]> { redde a ÷ 2 }
-functio k(tensor<numerus<u8>, [2]> a) → tensor<f32, [2]> { redde 100 ÷ a }
-functio l(tensor<numerus<u8>, [2]> a, numerus<i16> s) → tensor<f32, [2]> { redde a ÷ s }",
+functio j(tensor<u8, [2]> a) → tensor<f32, [2]> { redde a ÷ 2 }
+functio k(tensor<u8, [2]> a) → tensor<f32, [2]> { redde 100 ÷ a }
+functio l(tensor<u8, [2]> a, i16 s) → tensor<f32, [2]> { redde a ÷ s }",
     );
     // The result is never an integer tensor, and f64 does not narrow to f32.
     rejects(
-        "functio f(tensor<numerus<u8>, [2]> a, tensor<numerus<u8>, [2]> b) → tensor<numerus<u8>, [2]> { redde a ÷ b }",
+        "functio f(tensor<u8, [2]> a, tensor<u8, [2]> b) → tensor<u8, [2]> { redde a ÷ b }",
         SemanticErrorKind::TypeMismatch,
         "return_type_mismatch",
         &[],
     );
     rejects(
-        "functio f(tensor<numerus<i32>, [2]> a, tensor<numerus<i32>, [2]> b) → tensor<f32, [2]> { redde a ÷ b }",
+        "functio f(tensor<i32, [2]> a, tensor<i32, [2]> b) → tensor<f32, [2]> { redde a ÷ b }",
         SemanticErrorKind::TypeMismatch,
         "return_type_mismatch",
         &[],
@@ -220,7 +220,7 @@ fn extrema_lift_tensor_against_tensor() {
         r"functio f(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]> { redde a ⤒ b }
 functio g(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]> { redde a ⤓ b }
 functio h(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> { redde a ⤒ 2.5 }
-functio i(tensor<numerus<u8>, [2]> a, tensor<numerus<u16>, [2]> b) → tensor<numerus<u16>, [2]> { redde a ⤒ b }",
+functio i(tensor<u8, [2]> a, tensor<u16, [2]> b) → tensor<u16, [2]> { redde a ⤒ b }",
     );
     rejects(
         "functio f(tensor<f32, [2, 2]> a, tensor<f32, [3, 2]> b) → tensor<f32, [2, 2]> { redde a ⤒ b }",
@@ -247,7 +247,7 @@ fn comparisons_produce_a_bivalens_tensor() {
             "functio f(tensor<f32, [2, 2]> a) → tensor<bivalens, [2, 2]> {{ redde 1.0 {op} a }}"
         ));
     }
-    accepts("functio f(tensor<numerus<u8>, [3]> a) → tensor<bivalens, [3]> { redde a > 100 }");
+    accepts("functio f(tensor<u8, [3]> a) → tensor<bivalens, [3]> { redde a > 100 }");
     // The result is a tensor, never a scalar.
     rejects(
         "functio f(tensor<f32, [2]> a, tensor<f32, [2]> b) → bivalens { redde a > b }",
@@ -260,16 +260,16 @@ fn comparisons_produce_a_bivalens_tensor() {
 #[test]
 fn exact_equality_needs_identical_elements_and_value_equality_does_not() {
     rejects(
-        "functio f(tensor<numerus<u8>, [2]> a, tensor<numerus<u16>, [2]> b) → tensor<bivalens, [2]> { redde a ≡ b }",
+        "functio f(tensor<u8, [2]> a, tensor<u16, [2]> b) → tensor<bivalens, [2]> { redde a ≡ b }",
         SemanticErrorKind::TypeMismatch,
         EXACT_EQUALITY,
         &[],
     );
     accepts(
-        "functio f(tensor<numerus<u8>, [2]> a, tensor<numerus<u16>, [2]> b) → tensor<bivalens, [2]> { redde a ≅ b }",
+        "functio f(tensor<u8, [2]> a, tensor<u16, [2]> b) → tensor<bivalens, [2]> { redde a ≅ b }",
     );
     accepts(
-        "functio f(tensor<numerus<i32>, [2]> a, tensor<f32, [2]> b) → tensor<bivalens, [2]> { redde a < b }",
+        "functio f(tensor<i32, [2]> a, tensor<f32, [2]> b) → tensor<bivalens, [2]> { redde a < b }",
     );
 }
 
@@ -326,9 +326,7 @@ functio g(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> { redde (a > 0.0) ✓ a
 functio h(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> { redde (a > 0.0) ✓ 1.0 ✗ a }
 functio i(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> { redde (a > 0.0) ✓ 1.0 ✗ 0.0 }",
     );
-    accepts(
-        "functio f(tensor<numerus<u8>, [3]> a) → tensor<numerus<u8>, [3]> { redde (a > 100) ✓ a ✗ 0 }",
-    );
+    accepts("functio f(tensor<u8, [3]> a) → tensor<u8, [3]> { redde (a > 100) ✓ a ✗ 0 }");
 }
 
 #[test]

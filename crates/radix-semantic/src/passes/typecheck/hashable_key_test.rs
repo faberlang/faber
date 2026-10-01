@@ -118,7 +118,7 @@ functio probe(
     tabula<iuncta<textus, numerus>, numerus> b,
     tabula<Locus, numerus> c,
     copia<Clavis> d,
-    copia<numerus<u8>> e
+    copia<u8> e
 ) → numerus {
     redde a.longitudo() + b.longitudo() + c.longitudo() + d.longitudo() + e.longitudo()
 }",

@@ -291,7 +291,7 @@ incipit {
 fn signed_modular_word_keeps_family_and_width_isolation() {
     let diagnostics = analyze_diagnostics(
         r"
-functio bad(modulus<i8> x, numerus<i8> y) → modulus<i8> {
+functio bad(modulus<i8> x, i8 y) → modulus<i8> {
     redde x + y
 }
 ",

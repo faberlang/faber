@@ -11,7 +11,7 @@ functio fetch() fiet → numerus {
 }
 
 functio caller() fiet → vacuum {
-    fixum numerus<u8> v ↢ fetch()
+    fixum u8 v ↢ fetch()
     nota v
 }"#;
 
@@ -58,12 +58,12 @@ fn typescript_checks_the_value_after_await() {
 #[test]
 fn an_assignable_await_bind_emits_no_check() {
     let source = r#"
-functio fetch() fiet → numerus<u8> {
+functio fetch() fiet → u8 {
     redde 5
 }
 
 functio caller() fiet → vacuum {
-    fixum numerus<u8> v ↢ fetch()
+    fixum u8 v ↢ fetch()
     nota v
 }"#;
     let code = emit(Target::HirRust, source);

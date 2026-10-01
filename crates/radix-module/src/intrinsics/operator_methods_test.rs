@@ -305,9 +305,9 @@ fn rejects_bitwise_operator_on_fractus_receiver() {
 #[test]
 fn sized_integer_absolutum_and_potentia_emit_exact_i128_values() {
     let source = r"incipit {
-    fixum numerus<i8> n ← -128
-    fixum numerus<u8> m ← n.absolutum()
-    fixum numerus<i32> p ← 100000
+    fixum i8 n ← -128
+    fixum u8 m ← n.absolutum()
+    fixum i32 p ← 100000
     nota m, p.potentia(2)
 }";
     let code = compile_rust("abs-power-sized.fab", source);

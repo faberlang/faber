@@ -547,15 +547,15 @@ incipit {
 #[test]
 fn constrained_generic_call_accepts_repeated_and_sugar_domains_structurally() {
     accepts(
-        r"@ radix typus T in i32 numerus<i32>
-@ radix typus T in f32 fractus<f32>
+        r"@ radix typus T in i32 i32
+@ radix typus T in f32 f32
 functio id<T>(T x) → T {
     redde x
 }
 
 incipit {
-    fixum numerus<i32> n ← id<numerus<i32>>(1 ∷ numerus<i32>)
-    fixum fractus<f32> f ← id<fractus<f32>>(1.0 ∷ fractus<f32>)
+    fixum i32 n ← id<i32>(1 ∷ i32)
+    fixum f32 f ← id<f32>(1.0 ∷ f32)
     nota n
     nota f
 }",
@@ -925,7 +925,7 @@ functio _probe(tensor<f32, [4, 8]> a, tensor<f32, [4, 8]> b) → tensor<f32, [4,
     };
     let shown = crate::format_faber_type(call_ty, &unit.types, &unit.interner, &name_of);
     assert_eq!(
-        shown, "tensor<fractus<f32>, [4, 8]>",
+        shown, "tensor<f32, [4, 8]>",
         "imported generic call must solve the concrete result shape"
     );
     assert!(
@@ -965,7 +965,7 @@ incipit {
         )
     };
     let shown = crate::format_faber_type(tys[2], &unit.types, &unit.interner, &name_of);
-    assert_eq!(shown, "tensor<fractus<f32>, [4, 8]>");
+    assert_eq!(shown, "tensor<f32, [4, 8]>");
 }
 
 #[test]

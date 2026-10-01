@@ -249,7 +249,7 @@ fn extract_callable_contracts_records_nucleum_fragment_role() {
         r"
 @ publica
 @ nucleum fragment
-functio helper(fractus<f32> x) → fractus<f32> {
+functio helper(f32 x) → f32 {
     redde x
 }
 ",
@@ -274,7 +274,7 @@ fn signature_only_fragment_export_fails_closed() {
     let Err(err) = radix_module::driver::analyze_source(
         &session,
         "test.fab",
-        "@ publica\n@ nucleum fragment\nfunctio helper(fractus<f32> x) → fractus<f32>\n",
+        "@ publica\n@ nucleum fragment\nfunctio helper(f32 x) → f32\n",
         AnalyzeRequest::default(),
     ) else {
         panic!("signature-only fragment must fail at compile time");

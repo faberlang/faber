@@ -13,15 +13,15 @@ const ISSUE: &str = "failable_conversio_requires_handler";
 
 /// `(target spelling, lo, hi)` for every trapping integer width.
 const TARGETS: [(&str, i128, i128); 9] = [
-    ("numerus<i8>", i8::MIN as i128, i8::MAX as i128),
-    ("numerus<i16>", i16::MIN as i128, i16::MAX as i128),
-    ("numerus<i32>", i32::MIN as i128, i32::MAX as i128),
-    ("numerus<i64>", i64::MIN as i128, i64::MAX as i128),
+    ("i8", i8::MIN as i128, i8::MAX as i128),
+    ("i16", i16::MIN as i128, i16::MAX as i128),
+    ("i32", i32::MIN as i128, i32::MAX as i128),
+    ("i64", i64::MIN as i128, i64::MAX as i128),
     ("numerus", i64::MIN as i128, i64::MAX as i128),
-    ("numerus<u8>", 0, u8::MAX as i128),
-    ("numerus<u16>", 0, u16::MAX as i128),
-    ("numerus<u32>", 0, u32::MAX as i128),
-    ("numerus<u64>", 0, u64::MAX as i128),
+    ("u8", 0, u8::MAX as i128),
+    ("u16", 0, u16::MAX as i128),
+    ("u32", 0, u32::MAX as i128),
+    ("u64", 0, u64::MAX as i128),
 ];
 
 fn check(target: &str, literal: &str, fits: bool) {
@@ -81,24 +81,22 @@ fn the_reported_cases() {
     // 2^63 does not fit `int`; 2^64 does not fit u64; the largest f64 below
     // 2^64 and -2^63 do.
     check("numerus", "9223372036854775808.0", false);
-    check("numerus<u64>", "18446744073709551616.0", false);
-    check("numerus<u64>", "18446744073709549568.0", true);
+    check("u64", "18446744073709551616.0", false);
+    check("u64", "18446744073709549568.0", true);
     check("numerus", "-9223372036854775808.0", true);
 }
 
 #[test]
 fn truncation_toward_zero_decides_fit() {
-    check("numerus<u8>", "255.9", true);
-    check("numerus<u8>", "256.0", false);
-    check("numerus<u8>", "-0.5", true);
-    check("numerus<u8>", "-1.0", false);
-    check("numerus<i8>", "-128.9", true);
-    check("numerus<i8>", "-129.0", false);
+    check("u8", "255.9", true);
+    check("u8", "256.0", false);
+    check("u8", "-0.5", true);
+    check("u8", "-1.0", false);
+    check("i8", "-128.9", true);
+    check("i8", "-129.0", false);
 }
 
 #[test]
 fn a_handler_still_covers_a_constant_that_does_not_fit() {
-    assert_accepts(
-        "functio g() → numerus<u64> {\n    redde 18446744073709551616.0 ↦ numerus<u64> ⊥ 0\n}\n",
-    );
+    assert_accepts("functio g() → u64 {\n    redde 18446744073709551616.0 ↦ u64 ⊥ 0\n}\n");
 }

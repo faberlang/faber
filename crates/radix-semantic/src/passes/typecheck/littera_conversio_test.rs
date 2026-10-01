@@ -25,7 +25,7 @@ fn numerus_to_ascii_is_infallible() {
 
 #[test]
 fn sized_numerus_to_ascii_accepts() {
-    test_support::assert_accepts("functio f(numerus<u8> n) → ascii { redde n ↦ ascii }");
+    test_support::assert_accepts("functio f(u8 n) → ascii { redde n ↦ ascii }");
 }
 
 // --- n ↦ littera: one digit, fails outside 0–9 ----------------------------
@@ -71,9 +71,7 @@ fn littera_to_numerus_accepts_with_default() {
 
 #[test]
 fn littera_to_sized_numerus_accepts() {
-    test_support::assert_accepts(
-        "functio f(littera c) → numerus<u8> { redde c ↦ numerus<u8> ⊥ 0 }",
-    );
+    test_support::assert_accepts("functio f(littera c) → u8 { redde c ↦ u8 ⊥ 0 }");
 }
 
 #[test]
@@ -125,14 +123,12 @@ fn octeti_window_to_ascii_accepts() {
 
 #[test]
 fn littera_to_u32_code_accepts() {
-    test_support::assert_accepts("functio f(littera c) → numerus<u32> { redde c ↦ u32 via Code }");
+    test_support::assert_accepts("functio f(littera c) → u32 { redde c ↦ u32 via Code }");
 }
 
 #[test]
 fn littera_to_u32_code_is_infallible() {
-    test_support::assert_accepts(
-        "functio f(littera c) → numerus<u32> ⇥ numerus { redde c ↦ u32 via Code }",
-    );
+    test_support::assert_accepts("functio f(littera c) → u32 ⇥ numerus { redde c ↦ u32 via Code }");
 }
 
 #[test]
@@ -153,7 +149,7 @@ fn numerus_to_littera_code_is_failable() {
 #[test]
 fn code_hint_on_other_width_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio f(littera c) → numerus<i64> { redde c ↦ i64 via Code }",
+        "functio f(littera c) → i64 { redde c ↦ i64 via Code }",
         CODE_PAIR,
     );
 }
@@ -161,7 +157,7 @@ fn code_hint_on_other_width_rejects() {
 #[test]
 fn code_hint_on_text_source_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio f(textus s) → numerus<u32> { redde s ↦ u32 via Code ⊥ 0 }",
+        "functio f(textus s) → u32 { redde s ↦ u32 via Code ⊥ 0 }",
         CODE_PAIR,
     );
 }

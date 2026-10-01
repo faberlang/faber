@@ -11,8 +11,8 @@ fn constant_negative_exponent_on_an_integer_receiver_is_a_compile_error() {
     for source in [
         "incipit {\nnota 2.potentia(-1)\n}\n",
         "incipit {\nfixum numerus two ← 2\nnota two.potentia(-1)\n}\n",
-        "incipit {\nfixum numerus<u8> two ← 2\nnota two.potentia(-3)\n}\n",
-        "incipit {\nfixum numerus<i16> two ← 2\nnota two.potentia(1 - 2)\n}\n",
+        "incipit {\nfixum u8 two ← 2\nnota two.potentia(-3)\n}\n",
+        "incipit {\nfixum i16 two ← 2\nnota two.potentia(1 - 2)\n}\n",
     ] {
         assert_rejects_with_issue(source, ISSUE);
     }

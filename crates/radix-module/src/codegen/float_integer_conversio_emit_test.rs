@@ -11,9 +11,9 @@ const MESSAGE: &str = "fractus to numerus conversion out of range";
 const SOURCE: &str = "
 incipit {
     fixum fractus d ← 300.0
-    fixum numerus<u8> r ← d ↦ numerus<u8> ⊥ 7
+    fixum u8 r ← d ↦ u8 ⊥ 7
     nota r
-    fixum numerus<u8> t ← d ↦ numerus<u8>
+    fixum u8 t ← d ↦ u8
     nota t
 }
 ";

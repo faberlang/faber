@@ -14,7 +14,7 @@ use crate::test_support;
 
 #[test]
 fn within_width_d64_equality_accepts() {
-    test_support::assert_accepts("functio same(numerus<d64> a) → bivalens { redde a ≡ a }");
+    test_support::assert_accepts("functio same(d64 a) → bivalens { redde a ≡ a }");
 }
 
 #[test]
@@ -22,7 +22,7 @@ fn cross_family_decimal_integer_equality_rejects() {
     // No decimal-wins promotion: a decimal value never compares bare with an
     // integer value, even though both are numerus-family widths.
     test_support::assert_rejects_with_issue(
-        "functio same(numerus<d64> a, numerus n) → bivalens { redde a ≡ n }",
+        "functio same(d64 a, numerus n) → bivalens { redde a ≡ n }",
         "equality_exact_types_required",
     );
 }
@@ -30,7 +30,7 @@ fn cross_family_decimal_integer_equality_rejects() {
 #[test]
 fn cross_family_decimal_fractus_equality_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio same(numerus<d64> a) → bivalens { redde a ≡ 4.2 }",
+        "functio same(d64 a) → bivalens { redde a ≡ 4.2 }",
         "equality_exact_types_required",
     );
 }
@@ -39,81 +39,63 @@ fn cross_family_decimal_fractus_equality_rejects() {
 
 #[test]
 fn decimal_to_integer_arrow_accepts() {
-    test_support::assert_accepts(
-        "functio c(numerus<d64> a) → numerus<i64> { redde a ↦ numerus<i64> }",
-    );
+    test_support::assert_accepts("functio c(d64 a) → i64 { redde a ↦ i64 }");
 }
 
 #[test]
 fn decimal_to_unsigned_integer_arrow_accepts() {
-    test_support::assert_accepts(
-        "functio c(numerus<d64> a) → numerus<u32> ⇥ textus { redde a ↦ numerus<u32> }",
-    );
+    test_support::assert_accepts("functio c(d64 a) → u32 ⇥ textus { redde a ↦ u32 }");
 }
 
 #[test]
 fn integer_to_decimal_arrow_accepts() {
-    test_support::assert_accepts(
-        "functio c(numerus<i64> a) → numerus<d64> { redde a ↦ numerus<d64> }",
-    );
+    test_support::assert_accepts("functio c(i64 a) → d64 { redde a ↦ d64 }");
 }
 
 #[test]
 fn unsigned_integer_to_decimal_arrow_accepts() {
-    test_support::assert_accepts(
-        "functio c(numerus<u32> a) → numerus<d64> { redde a ↦ numerus<d64> }",
-    );
+    test_support::assert_accepts("functio c(u32 a) → d64 { redde a ↦ d64 }");
 }
 
 // --- conversio rows: fractus ↔ decimal (string round-trip / defined rounding) ---
 
 #[test]
 fn fractus_to_decimal_arrow_accepts() {
-    test_support::assert_accepts("functio c(fractus x) → numerus<d64> { redde x ↦ numerus<d64> }");
+    test_support::assert_accepts("functio c(fractus x) → d64 { redde x ↦ d64 }");
 }
 
 #[test]
 fn sized_fractus_to_decimal_arrow_accepts() {
-    test_support::assert_accepts(
-        "functio c(fractus<f32> x) → numerus<d64> { redde x ↦ numerus<d64> }",
-    );
+    test_support::assert_accepts("functio c(f32 x) → d64 { redde x ↦ d64 }");
 }
 
 #[test]
 fn decimal_to_fractus_arrow_accepts() {
-    test_support::assert_accepts("functio c(numerus<d64> a) → fractus { redde a ↦ fractus }");
+    test_support::assert_accepts("functio c(d64 a) → fractus { redde a ↦ fractus }");
 }
 
 #[test]
 fn decimal_to_sized_fractus_arrow_accepts() {
-    test_support::assert_accepts(
-        "functio c(numerus<d64> a) → fractus<f32> { redde a ↦ fractus<f32> }",
-    );
+    test_support::assert_accepts("functio c(d64 a) → f32 { redde a ↦ f32 }");
 }
 
 #[test]
 fn integer_narrowing_arrow_still_accepts() {
     // The decimal narrowing arm must not disturb the established integer
     // explicit-narrowing law (i64 → i32 stays a `↦` row).
-    test_support::assert_accepts(
-        "functio c(numerus<i64> a) → numerus<i32> ⇥ textus { redde a ↦ numerus<i32> }",
-    );
+    test_support::assert_accepts("functio c(i64 a) → i32 ⇥ textus { redde a ↦ i32 }");
 }
 
 #[test]
 fn float_narrowing_arrow_still_accepts() {
-    test_support::assert_accepts(
-        "functio c(fractus<f64> x) → fractus<f32> { redde x ↦ fractus<f32> }",
-    );
+    test_support::assert_accepts("functio c(f64 x) → f32 { redde x ↦ f32 }");
 }
 
 // --- conversio rows: textus → decimal (settled at D3) ---
 
 #[test]
 fn textus_to_d64_arrow_accepts() {
-    test_support::assert_accepts(
-        "functio c(textus s) → numerus<d64> ⇥ textus { redde s ↦ numerus<d64> }",
-    );
+    test_support::assert_accepts("functio c(textus s) → d64 ⇥ textus { redde s ↦ d64 }");
 }
 
 // --- CTR-02: channel contract for the builtin decimal rows ---
@@ -134,11 +116,9 @@ use radix_target::Target;
 
 #[test]
 fn textus_to_decimal_bare_arrow_requires_textus_channel() {
-    test_support::assert_accepts(
-        "functio c(textus s) → numerus<d64> ⇥ textus { redde s ↦ numerus<d64> }",
-    );
+    test_support::assert_accepts("functio c(textus s) → d64 ⇥ textus { redde s ↦ d64 }");
     test_support::assert_rejects_with_issue(
-        "functio c(textus s) → numerus<d64> ⇥ numerus { redde s ↦ numerus<d64> }",
+        "functio c(textus s) → d64 ⇥ numerus { redde s ↦ d64 }",
         "conversio_failure_channel_textus_required",
     );
 }
@@ -147,9 +127,7 @@ fn textus_to_decimal_bare_arrow_requires_textus_channel() {
 fn decimal_identity_bare_arrow_needs_no_recovery_in_failable_function() {
     // d64 → d64 identity is total: a bare `↦` composes no failure channel and
     // needs no inline recovery.
-    test_support::assert_accepts(
-        "functio c(numerus<d64> a) → numerus<d64> ⇥ numerus { redde a ↦ numerus<d64> }",
-    );
+    test_support::assert_accepts("functio c(d64 a) → d64 ⇥ numerus { redde a ↦ d64 }");
 }
 
 #[test]
@@ -198,6 +176,6 @@ fn decimal_builtin_row_carries_no_declared_channel() {
     assert!(
         err.args
             .iter()
-            .any(|arg| arg.name == "destination" && arg.value == "numerus<d64>")
+            .any(|arg| arg.name == "destination" && arg.value == "d64")
     );
 }

@@ -3296,7 +3296,7 @@ locale = "en"
 
 @ public
 class Punctum {
-    var int<u32> gradus
+    var u32 gradus
 }
 "#,
     )
@@ -3555,7 +3555,7 @@ name = "probe"
         r"
 @ kernel
 @ public
-fn scala(float<f32> x) → float<f32> {
+fn scala(f32 x) → f32 {
     return x + 1.0
 }
 ",

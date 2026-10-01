@@ -102,8 +102,8 @@ functio parse(valor v, instans epoch) → instans ⇥ numerus {
 fn valor_to_sized_numerus_direct_extraction_typechecks() {
     test_support::assert_accepts(
         r"
-functio parse(valor v) → numerus<u8> ⇥ textus {
-    redde v ↦ numerus<u8>
+functio parse(valor v) → u8 ⇥ textus {
+    redde v ↦ u8
 }
 ",
     );
@@ -113,8 +113,8 @@ functio parse(valor v) → numerus<u8> ⇥ textus {
 fn valor_to_sized_fractus_direct_extraction_rejects_until_width_policy_exists() {
     test_support::assert_rejects_with_issue(
         r"
-functio parse(valor v) → fractus<f32> {
-    redde v ↦ fractus<f32>
+functio parse(valor v) → f32 {
+    redde v ↦ f32
 }
 ",
         "valor_to_sized_numeric_unsupported",
@@ -127,7 +127,7 @@ fn valor_to_sized_numeric_lista_extraction_rejects_until_runtime_trait_exists() 
         r"
 incipit {
     fixum valor v ← [1, 2]
-    fixum lista<numerus<u8>> xs ← v ↦ lista<numerus<u8>>
+    fixum lista<u8> xs ← v ↦ lista<u8>
 }
 ",
         "valor_to_sized_numeric_unsupported",
@@ -139,7 +139,7 @@ fn valor_to_genus_sized_fractus_field_rejects_until_width_policy_exists() {
     test_support::assert_rejects_with_issue(
         r#"
 genus Sample {
-    varia fractus<f32> ratio
+    varia f32 ratio
 }
 
 incipit {
@@ -1000,7 +1000,7 @@ fn tensor_conversio_matrix_cases() -> &'static [TensorMatrixCase] {
         // Element-width lattice pairs: see `tensor_element_width_lattice_matrix_typecheck` (100 cells).
         TensorMatrixCase {
             name: "tensor_sized_to_scalar_rejects",
-            source: "incipit {\n  fixum tensor<numerus<i32>, []> t ← vacua\n  fixum _ n ← t ↦ numerus<i32>\n}",
+            source: "incipit {\n  fixum tensor<i32, []> t ← vacua\n  fixum _ n ← t ↦ i32\n}",
             expect: MatrixExpect::RejectsIssue("tensor_to_scalar_unsupported"),
         },
         TensorMatrixCase {
@@ -2046,8 +2046,8 @@ fn verte_ascription_rejects_runtime_narrowing_into_sized_numerus() {
     // conversion, never a `∷` fact.
     test_support::assert_rejects_with_issue(
         r"
-functio probe(numerus n) → numerus<u8> {
-    redde n ∷ numerus<u8>
+functio probe(numerus n) → u8 {
+    redde n ∷ u8
 }
 ",
         "numeric_ascription_requires_conversion",
@@ -2059,7 +2059,7 @@ fn verte_ascription_rejects_literal_over_target_width() {
     // D1.11: a literal the target cannot hold (`300 ∷ int<u8>`) is a
     // compile error, not a silent cast.
     test_support::assert_rejects_with_issue(
-        r"incipit { fixum numerus<u8> b ← 300 ∷ numerus<u8> }",
+        r"incipit { fixum u8 b ← 300 ∷ u8 }",
         "numeric_ascription_requires_conversion",
     );
 }
@@ -2068,8 +2068,8 @@ fn verte_ascription_rejects_literal_over_target_width() {
 fn verte_ascription_rejects_float_precision_loss() {
     test_support::assert_rejects_with_issue(
         r"
-functio narrow(fractus x) → fractus<f32> {
-    redde x ∷ fractus<f32>
+functio narrow(fractus x) → f32 {
+    redde x ∷ f32
 }
 ",
         "numeric_ascription_requires_conversion",
@@ -2102,8 +2102,8 @@ functio truncate(fractus x) → numerus {
     );
     test_support::assert_rejects_with_issue(
         r"
-functio truncate(fractus x) → numerus<u8> {
-    redde x ∷ numerus<u8>
+functio truncate(fractus x) → u8 {
+    redde x ∷ u8
 }
 ",
         "numeric_ascription_requires_conversion",
@@ -2124,8 +2124,8 @@ fn verte_ascription_rejects_float_literal_into_integer() {
 fn verte_ascription_accepts_float_literal_rounding_to_target_width() {
     test_support::assert_accepts(
         r"incipit {
-    fixum fractus<f32> rounded ← 0.1 ∷ fractus<f32>
-    fixum fractus<f32> precise ← 0.7978845608028654 ∷ fractus<f32>
+    fixum f32 rounded ← 0.1 ∷ f32
+    fixum f32 precise ← 0.7978845608028654 ∷ f32
 }",
     );
 }
@@ -2133,7 +2133,7 @@ fn verte_ascription_accepts_float_literal_rounding_to_target_width() {
 #[test]
 fn verte_ascription_rejects_float_literal_overflow_to_infinity() {
     test_support::assert_rejects_with_issue(
-        r"incipit { fixum fractus<f32> overflow ← 1e39 ∷ fractus<f32> }",
+        r"incipit { fixum f32 overflow ← 1e39 ∷ f32 }",
         "numeric_ascription_requires_conversion",
     );
 }
@@ -2142,22 +2142,22 @@ fn verte_ascription_rejects_float_literal_overflow_to_infinity() {
 fn verte_ascription_keeps_provable_numeric_facts() {
     // The F3 fact cases: an in-range literal, i32→i64, f32→f64, and a
     // float literal the target width holds exactly.
-    test_support::assert_accepts(r"incipit { fixum numerus<u8> port ← 42 ∷ numerus<u8> }");
+    test_support::assert_accepts(r"incipit { fixum u8 port ← 42 ∷ u8 }");
     test_support::assert_accepts(
         r"
-functio widen(numerus<i32> n) → numerus {
+functio widen(i32 n) → numerus {
     redde n ∷ numerus
 }
 ",
     );
     test_support::assert_accepts(
         r"
-functio widen_fractus(fractus<f32> x) → fractus {
+functio widen_fractus(f32 x) → fractus {
     redde x ∷ fractus
 }
 ",
     );
-    test_support::assert_accepts(r"incipit { fixum fractus<f32> two ← 2.5 ∷ fractus<f32> }");
+    test_support::assert_accepts(r"incipit { fixum f32 two ← 2.5 ∷ f32 }");
 }
 #[test]
 fn verte_ascription_keeps_modular_widening() {
@@ -2220,8 +2220,8 @@ fn policy_word_conversio_rejects_float_and_text_sources() {
 fn numeric_narrowing_conversio_requires_textus_alternate_exit() {
     test_support::assert_rejects_with_issue(
         r"
-functio narrow(numerus n) → numerus<u8> ⇥ numerus {
-    redde n ↦ numerus<u8>
+functio narrow(numerus n) → u8 ⇥ numerus {
+    redde n ↦ u8
 }
 ",
         "conversio_failure_channel_textus_required",
@@ -2244,8 +2244,8 @@ functio trunc(fractus x) → numerus ⇥ numerus {
 fn numeric_narrowing_conversio_accepts_textus_alternate_exit() {
     test_support::assert_accepts(
         r"
-functio narrow(numerus n) → numerus<u8> ⇥ textus {
-    redde n ↦ numerus<u8>
+functio narrow(numerus n) → u8 ⇥ textus {
+    redde n ↦ u8
 }
 ",
     );
@@ -2255,8 +2255,8 @@ functio narrow(numerus n) → numerus<u8> ⇥ textus {
 fn numeric_narrowing_conversio_with_recovery_accepts_non_textus_exit() {
     test_support::assert_accepts(
         r"
-functio narrow(numerus n) → numerus<u8> ⇥ numerus {
-    redde n ↦ numerus<u8> ⊥ 0
+functio narrow(numerus n) → u8 ⇥ numerus {
+    redde n ↦ u8 ⊥ 0
 }
 ",
     );
@@ -2277,7 +2277,7 @@ functio wrap(numerus n) → modulus<u8> ⇥ numerus {
 fn numeric_widening_conversio_accepts_non_textus_alternate_exit() {
     test_support::assert_accepts(
         r"
-functio widen(numerus<u8> n) → numerus ⇥ numerus {
+functio widen(u8 n) → numerus ⇥ numerus {
     redde n ↦ numerus
 }
 ",
@@ -2288,8 +2288,8 @@ functio widen(numerus<u8> n) → numerus ⇥ numerus {
 fn constant_fitting_conversio_accepts_non_textus_alternate_exit() {
     test_support::assert_accepts(
         r"
-functio konst() → numerus<u8> ⇥ numerus {
-    redde 200 ↦ numerus<u8>
+functio konst() → u8 ⇥ numerus {
+    redde 200 ↦ u8
 }
 ",
     );

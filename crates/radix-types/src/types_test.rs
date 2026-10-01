@@ -679,11 +679,11 @@ fn octeti_unifies_bidirectionally_with_lista_numerus_u8() {
 
     assert!(
         types.is_assignable(octeti, lista_u8),
-        "octeti should widen to lista<numerus<u8>>"
+        "octeti should widen to lista<u8>"
     );
     assert!(
         types.is_assignable(lista_u8, octeti),
-        "lista<numerus<u8>> should narrow to octeti"
+        "lista<u8> should narrow to octeti"
     );
 }
 
@@ -1197,11 +1197,11 @@ fn f003_alias_wrapped_octeti_lista_unify_still_works() {
 
     assert!(
         types.is_assignable(alias_octeti, alias_lista_u8),
-        "F-003: alias-wrapped octeti must widen to alias-wrapped lista<numerus<u8>>"
+        "F-003: alias-wrapped octeti must widen to alias-wrapped lista<u8>"
     );
     assert!(
         types.is_assignable(alias_lista_u8, alias_octeti),
-        "F-003: alias-wrapped lista<numerus<u8>> must narrow to alias-wrapped octeti"
+        "F-003: alias-wrapped lista<u8> must narrow to alias-wrapped octeti"
     );
 }
 
@@ -1668,11 +1668,11 @@ fn f066_collection_covariant_assignable() {
 
     assert!(
         types.is_assignable(lista_i32, lista_i64),
-        "F-066: lista<numerus<i32>> must be assignable to lista<numerus<i64>> (covariant)"
+        "F-066: lista<i32> must be assignable to lista<i64> (covariant)"
     );
     assert!(
         !types.is_assignable(lista_i64, lista_i32),
-        "F-066: lista<numerus<i64>> must NOT be assignable to lista<numerus<i32>> (narrowing)"
+        "F-066: lista<i64> must NOT be assignable to lista<i32> (narrowing)"
     );
 
     // Set, Promissum, Cursor also covariant.

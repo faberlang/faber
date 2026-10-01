@@ -589,12 +589,12 @@ fn instance_budget_fails_closed() {
 fn legal_entry_to_fragment_composes_through_lowering() {
     let source = r"
 @ nucleum fragment
-functio helper(fractus<f32> x) → fractus<f32> {
+functio helper(f32 x) → f32 {
     redde x
 }
 
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde helper(x)
 }
 ";
@@ -621,17 +621,17 @@ functio k(fractus<f32> x) → fractus<f32> {
 fn source_cycle_is_rejected_at_lower() {
     let source = r"
 @ nucleum fragment
-functio ping(fractus<f32> x) → fractus<f32> {
+functio ping(f32 x) → f32 {
     redde pong(x)
 }
 
 @ nucleum fragment
-functio pong(fractus<f32> x) → fractus<f32> {
+functio pong(f32 x) → f32 {
     redde ping(x)
 }
 
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde ping(x)
 }
 ";
@@ -650,12 +650,12 @@ functio k(fractus<f32> x) → fractus<f32> {
 fn budget_override_rejects_source_expansion() {
     let source = r"
 @ nucleum fragment
-functio helper(fractus<f32> x) → fractus<f32> {
+functio helper(f32 x) → f32 {
     redde x
 }
 
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde helper(x)
 }
 ";
@@ -929,12 +929,12 @@ fn kernel_helper_binds_argument_once() {
 fn kernel_helper_source_composes_through_lowering() {
     let source = r"
 @ nucleum
-functio helper(fractus<f32> x) → fractus<f32> {
+functio helper(f32 x) → f32 {
     redde x * 2.0
 }
 
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde helper(x)
 }
 ";
@@ -1160,12 +1160,12 @@ fn multi_block_callee_keeps_goto_join_and_fails_device_safe() {
 fn single_unit_route_composes_single_block() {
     let source = r"
 @ nucleum fragment
-functio helper(fractus<f32> x) → fractus<f32> {
+functio helper(f32 x) → f32 {
     redde x
 }
 
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde helper(x)
 }
 ";

@@ -105,21 +105,21 @@ struct Row {
 const ROWS: &[Row] = &[
     Row {
         name: "Hex",
-        frame: "functio f(textus s) → numerus<i32> {{ redde s {} ⊥ 0 }}",
+        frame: "functio f(textus s) → i32 {{ redde s {} ⊥ 0 }}",
         legacy: "↦ numerus<i32, Hex>",
-        via: "↦ numerus<i32> via Hex",
+        via: "↦ i32 via Hex",
     },
     Row {
         name: "Bin",
-        frame: "functio f(textus s) → numerus<u8> {{ redde s {} ⊥ 0 }}",
+        frame: "functio f(textus s) → u8 {{ redde s {} ⊥ 0 }}",
         legacy: "↦ numerus<u8, Bin>",
-        via: "↦ numerus<u8> via Bin",
+        via: "↦ u8 via Bin",
     },
     Row {
         name: "Oct",
-        frame: "functio f(textus s) → numerus<i32> {{ redde s {} ⊥ 0 }}",
+        frame: "functio f(textus s) → i32 {{ redde s {} ⊥ 0 }}",
         legacy: "↦ numerus<i32, Oct>",
-        via: "↦ numerus<i32> via Oct",
+        via: "↦ i32 via Oct",
     },
     Row {
         name: "Be",
@@ -147,19 +147,19 @@ const ROWS: &[Row] = &[
     },
     Row {
         name: "Bits u32 to f32",
-        frame: "functio f(numerus<u32> n) → fractus<f32> {{ redde n {} }}",
+        frame: "functio f(u32 n) → f32 {{ redde n {} }}",
         legacy: "↦ fractus<f32, Bits>",
         via: "↦ f32 via Bits",
     },
     Row {
         name: "Bits f64 to u64",
-        frame: "functio f(fractus<f64> x) → numerus<u64> {{ redde x {} }}",
+        frame: "functio f(f64 x) → u64 {{ redde x {} }}",
         legacy: "↦ numerus<u64, Bits>",
         via: "↦ u64 via Bits",
     },
     Row {
         name: "Code read",
-        frame: "functio f(littera c) → numerus<u32> {{ redde c {} }}",
+        frame: "functio f(littera c) → u32 {{ redde c {} }}",
         legacy: "↦ numerus<u32, Code>",
         via: "↦ u32 via Code",
     },
@@ -171,19 +171,19 @@ const ROWS: &[Row] = &[
     },
     Row {
         name: "ascii Hex",
-        frame: "functio f(numerus<u32> n) → ascii<8> {{ redde n {} ⊥ '--' }}",
+        frame: "functio f(u32 n) → ascii<8> {{ redde n {} ⊥ '--' }}",
         legacy: "↦ ascii<8, Hex>",
         via: "↦ ascii<8> via Hex",
     },
     Row {
         name: "ascii Bin",
-        frame: "functio f(numerus<u8> n) → ascii<8> {{ redde n {} ⊥ '--' }}",
+        frame: "functio f(u8 n) → ascii<8> {{ redde n {} ⊥ '--' }}",
         legacy: "↦ ascii<8, Bin>",
         via: "↦ ascii<8> via Bin",
     },
     Row {
         name: "ascii Oct",
-        frame: "functio f(numerus<u16> n) → ascii<8> {{ redde n {} ⊥ '--' }}",
+        frame: "functio f(u16 n) → ascii<8> {{ redde n {} ⊥ '--' }}",
         legacy: "↦ ascii<8, Oct>",
         via: "↦ ascii<8> via Oct",
     },
@@ -224,9 +224,9 @@ fn every_retired_type_argument_spelling_is_rejected_pointing_at_the_clause() {
 #[test]
 fn the_retired_type_argument_is_rejected_under_the_english_surface() {
     for source in [
-        "fn f(string s) → int<i32> { return s ↦ int<i32, Hex> ⊥ 0 }",
-        "fn f(int<u32> n) → float<f32> { return n ↦ float<f32, Bits> }",
-        "fn f(char c) → int<u32> { return c ↦ int<u32, Code> }",
+        "fn f(string s) → i32 { return s ↦ int<i32, Hex> ⊥ 0 }",
+        "fn f(u32 n) → f32 { return n ↦ float<f32, Bits> }",
+        "fn f(char c) → u32 { return c ↦ int<u32, Code> }",
     ] {
         assert_issue(&diagnostics_with(english_config(), source), "conversio_hint_type_argument");
     }
@@ -235,9 +235,9 @@ fn the_retired_type_argument_is_rejected_under_the_english_surface() {
 #[test]
 fn every_hint_routes_under_the_english_surface() {
     for source in [
-        "fn f(string s) → int<i32> { return s ↦ int<i32> via Hex ⊥ 0 }",
-        "fn f(int<u32> n) → float<f32> { return n ↦ f32 via Bits }",
-        "fn f(char c) → int<u32> { return c ↦ u32 via Code }",
+        "fn f(string s) → i32 { return s ↦ i32 via Hex ⊥ 0 }",
+        "fn f(u32 n) → f32 { return n ↦ f32 via Bits }",
+        "fn f(char c) → u32 { return c ↦ u32 via Code }",
         "main { const _ v ← |de ad be ef|[0‥4] ↦ u32 via Be }",
     ] {
         let _ = rust_code(english_config(), source);
@@ -248,7 +248,7 @@ fn every_hint_routes_under_the_english_surface() {
 fn the_conversion_node_carries_the_via_hint() {
     let via = entry_conversions(
         r#"incipit {
-    fixum _ a ← "ff" ↦ numerus<i32> via Hex
+    fixum _ a ← "ff" ↦ i32 via Hex
     fixum littera big ← 'A'
     fixum _ b ← big ↦ u32 via Code
 }"#,
@@ -261,7 +261,7 @@ fn the_conversion_node_carries_the_via_hint() {
 fn the_f16_bits_row_carries_its_hint() {
     // The Rust target has no half-float carrier, so this row is read at the
     // HIR conversion node instead of through generated code.
-    let via = entry_conversions("incipit { fixum numerus<u16> n ← 15360\n fixum _ x ← n ↦ f16 via Bits }");
+    let via = entry_conversions("incipit { fixum u16 n ← 15360\n fixum _ x ← n ↦ f16 via Bits }");
     assert_eq!(via[0].1, vec!["Bits".to_owned()]);
 }
 
@@ -274,10 +274,7 @@ fn a_plain_conversion_carries_no_hint() {
 
 #[test]
 fn the_default_binds_after_the_via_clause() {
-    let code = rust_code(
-        latin_config(),
-        r#"functio f(textus s) → numerus<i32> { redde s ↦ numerus<i32> via Hex ⊥ 7 }"#,
-    );
+    let code = rust_code(latin_config(), r#"functio f(textus s) → i32 { redde s ↦ i32 via Hex ⊥ 7 }"#);
     assert!(code.contains('7'), "{code}");
 }
 
@@ -299,14 +296,11 @@ fn existing_pair_rules_still_reject_through_the_via_clause() {
     // The clause changes the spelling, not the rows: a wrong pair fails with
     // the same structured issue it failed with as a type argument.
     assert_issue(
-        &diagnostics_with(
-            latin_config(),
-            "functio f(numerus<u16> n) → fractus<f32> { redde n ↦ f32 via Bits }",
-        ),
+        &diagnostics_with(latin_config(), "functio f(u16 n) → f32 { redde n ↦ f32 via Bits }"),
         "bits_pair_width_mismatch",
     );
     assert_issue(
-        &diagnostics_with(latin_config(), "functio f(textus s) → numerus<u32> { redde s ↦ u32 via Code }"),
+        &diagnostics_with(latin_config(), "functio f(textus s) → u32 { redde s ↦ u32 via Code }"),
         "code_hint_pair_mismatch",
     );
 }
@@ -314,10 +308,7 @@ fn existing_pair_rules_still_reject_through_the_via_clause() {
 #[test]
 fn an_unknown_hint_after_via_is_a_structured_error() {
     assert_issue(
-        &diagnostics_with(
-            latin_config(),
-            "functio f(textus s) → numerus<i32> { redde s ↦ numerus<i32> via Hexx }",
-        ),
+        &diagnostics_with(latin_config(), "functio f(textus s) → i32 { redde s ↦ i32 via Hexx }"),
         "conversio_via_unknown_hint",
     );
 }
@@ -338,8 +329,8 @@ fn via_on_a_target_that_takes_no_hint_is_a_structured_error() {
 fn a_register_target_takes_a_via_hint() {
     // The register windows carry `Be`/`Le` in the clause like any other target.
     for source in [
-        "functio w(octeti c) → vector<numerus<u32>, 4> { redde c[0‥16] ↦ vector<numerus<u32>, 4> via Be }",
-        "functio o(vector<numerus<u32>, 4> v) → octeti<16> { redde v ↦ octeti<16> via Le }",
+        "functio w(octeti c) → vector<u32, 4> { redde c[0‥16] ↦ vector<u32, 4> via Be }",
+        "functio o(vector<u32, 4> v) → octeti<16> { redde v ↦ octeti<16> via Le }",
     ] {
         let diagnostics = diagnostics_with(latin_config(), source);
         assert!(
@@ -352,8 +343,8 @@ fn a_register_target_takes_a_via_hint() {
 #[test]
 fn the_retired_register_tail_is_rejected_pointing_at_the_clause() {
     for source in [
-        "functio w(octeti c) → vector<numerus<u32>, 4> { redde c[0‥16] ↦ vector<numerus<u32>, 4><Be> }",
-        "functio o(vector<numerus<u32>, 4> v) → octeti<16> { redde v ↦ octeti<16><Le> }",
+        "functio w(octeti c) → vector<u32, 4> { redde c[0‥16] ↦ vector<u32, 4><Be> }",
+        "functio o(vector<u32, 4> v) → octeti<16> { redde v ↦ octeti<16><Le> }",
     ] {
         assert_issue(&diagnostics_with(latin_config(), source), "conversio_hint_tail_argument");
     }
@@ -362,10 +353,7 @@ fn the_retired_register_tail_is_rejected_pointing_at_the_clause() {
 #[test]
 fn via_without_a_hint_is_a_parse_error_issue() {
     assert_issue(
-        &diagnostics_with(
-            latin_config(),
-            "functio f(textus s) → numerus<i32> { redde s ↦ numerus<i32> via }",
-        ),
+        &diagnostics_with(latin_config(), "functio f(textus s) → i32 { redde s ↦ i32 via }"),
         "conversio_via_missing_hint",
     );
 }
@@ -374,8 +362,8 @@ fn via_without_a_hint_is_a_parse_error_issue() {
 fn via_stays_an_ordinary_name_in_a_program_that_also_uses_the_clause() {
     let code = rust_code(
         latin_config(),
-        r#"functio f(textus via) → numerus<i32> {
-    fixum _ n ← via ↦ numerus<i32> via Hex ⊥ 0
+        r#"functio f(textus via) → i32 {
+    fixum _ n ← via ↦ i32 via Hex ⊥ 0
     redde n
 }"#,
     );

@@ -5,21 +5,21 @@ use crate::test_support;
 #[test]
 fn octeti_window_to_u32_be_accepts() {
     test_support::assert_accepts(
-        "functio win(octeti corpus) → numerus<u32> { redde corpus[0‥4] ↦ u32 via Be }",
+        "functio win(octeti corpus) → u32 { redde corpus[0‥4] ↦ u32 via Be }",
     );
 }
 
 #[test]
 fn octeti_window_to_i32_be_accepts() {
     test_support::assert_accepts(
-        "functio win(octeti corpus) → numerus<i32> { redde corpus[0‥4] ↦ i32 via Be }",
+        "functio win(octeti corpus) → i32 { redde corpus[0‥4] ↦ i32 via Be }",
     );
 }
 
 #[test]
 fn octeti_window_to_u32_le_accepts() {
     test_support::assert_accepts(
-        "functio win(octeti corpus) → numerus<u32> { redde corpus[0‥4] ↦ u32 via Le }",
+        "functio win(octeti corpus) → u32 { redde corpus[0‥4] ↦ u32 via Le }",
     );
 }
 
@@ -31,7 +31,7 @@ fn octeti_literal_window_to_u32_be_accepts() {
 #[test]
 fn octeti_literal_without_endian_still_unspecified() {
     test_support::assert_rejects_with_issue(
-        "incipit { fixum _ n ← |de ad be ef| ↦ numerus<u32> }",
+        "incipit { fixum _ n ← |de ad be ef| ↦ u32 }",
         "octeti_to_numerus_unspecified",
     );
 }
@@ -39,7 +39,7 @@ fn octeti_literal_without_endian_still_unspecified() {
 #[test]
 fn octeti_window_without_endian_still_unspecified() {
     test_support::assert_rejects_with_issue(
-        "incipit { fixum _ n ← |de ad be ef|[0‥4] ↦ numerus<u32> }",
+        "incipit { fixum _ n ← |de ad be ef|[0‥4] ↦ u32 }",
         "octeti_to_numerus_unspecified",
     );
 }
@@ -71,35 +71,35 @@ fn four_byte_window_mismatches_u16() {
 #[test]
 fn octeti_window_to_f32_be_accepts() {
     test_support::assert_accepts(
-        "functio win(octeti corpus) → fractus<f32> { redde corpus[0‥4] ↦ f32 via Be }",
+        "functio win(octeti corpus) → f32 { redde corpus[0‥4] ↦ f32 via Be }",
     );
 }
 
 #[test]
 fn octeti_window_to_f32_le_accepts() {
     test_support::assert_accepts(
-        "functio win(octeti corpus) → fractus<f32> { redde corpus[0‥4] ↦ f32 via Le }",
+        "functio win(octeti corpus) → f32 { redde corpus[0‥4] ↦ f32 via Le }",
     );
 }
 
 #[test]
 fn octeti_window_to_f64_be_accepts() {
     test_support::assert_accepts(
-        "functio win(octeti corpus) → fractus<f64> { redde corpus[0‥8] ↦ f64 via Be }",
+        "functio win(octeti corpus) → f64 { redde corpus[0‥8] ↦ f64 via Be }",
     );
 }
 
 #[test]
 fn octeti_window_to_f64_le_accepts() {
     test_support::assert_accepts(
-        "functio win(octeti corpus) → fractus<f64> { redde corpus[0‥8] ↦ f64 via Le }",
+        "functio win(octeti corpus) → f64 { redde corpus[0‥8] ↦ f64 via Le }",
     );
 }
 
 #[test]
 fn fractus_without_endian_still_unspecified() {
     test_support::assert_rejects_with_issue(
-        "incipit { fixum _ n ← |de ad be ef|[0‥4] ↦ fractus<f32> }",
+        "incipit { fixum _ n ← |de ad be ef|[0‥4] ↦ f32 }",
         "octeti_to_fractus_unspecified",
     );
 }

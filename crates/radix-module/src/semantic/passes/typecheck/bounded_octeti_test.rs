@@ -38,7 +38,7 @@ incipit {
 #[test]
 fn bounded_octeti_scalar_index_is_o1_live_byte() {
     let result = compile_and_get_result(
-        r"functio probe(octeti<8> xs) → numerus<u8> {
+        r"functio probe(octeti<8> xs) → u8 {
     redde xs[0]
 }
 
@@ -124,7 +124,7 @@ incipit {
 
 #[test]
 fn bounded_octeti_rejects_non_rust_targets_fail_closed() {
-    let source = r"functio probe(octeti<8> xs) → numerus<u8> {
+    let source = r"functio probe(octeti<8> xs) → u8 {
     redde xs[0]
 }
 

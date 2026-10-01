@@ -3544,7 +3544,7 @@ fn named_int_u32_context(
 ) -> MirValidationContext<'_> {
     let int_u32 = types
         .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
-        .expect("int<u32> interned");
+        .expect("u32 interned");
     let mut context = MirValidationContext::new(types);
     let mut fields = FxHashMap::default();
     fields.insert(field, MirType::semantic(int_u32));
@@ -3564,7 +3564,7 @@ fn named_aggregate_accepts_fitting_int_literal() {
     let errors = validate_with(&program, &context);
     assert!(
         errors.is_empty(),
-        "expected fitting numerus literal into int<u32> named field, got: {errors:?}"
+        "expected fitting numerus literal into u32 named field, got: {errors:?}"
     );
 }
 
@@ -3596,7 +3596,7 @@ fn named_aggregate_rejects_non_integer_field_mismatch() {
         errors
             .iter()
             .any(|e| e.contains("named aggregate field type mismatch")),
-        "expected bool into int<u32> field still rejected, got: {errors:?}"
+        "expected bool into u32 field still rejected, got: {errors:?}"
     );
 }
 
@@ -3847,7 +3847,7 @@ fn mlp_shape_wrong_shape_call_preserves_argument_mismatch() {
     let expected = (0..6)
         .map(|index| {
             format!(
-                "call argument type mismatch (arg {index}: expected tensor<fractus<f32>, [8, 8]>, got tensor<fractus<f32>, [4, 4]>)"
+                "call argument type mismatch (arg {index}: expected tensor<f32, [8, 8]>, got tensor<f32, [4, 4]>)"
             )
         })
         .chain(std::iter::once("destination type mismatch".to_owned()))

@@ -18,7 +18,7 @@ fn format_yields_textus() {
 #[test]
 fn integer_kinds_and_sign_are_accepted() {
     test_support::assert_accepts(
-        "functio f(numerus n, numerus<u8> b) → textus { redde (n ¶ \"+08x\") + (b ¶ \"b\") + (n ¶ \".1e\") }",
+        "functio f(numerus n, u8 b) → textus { redde (n ¶ \"+08x\") + (b ¶ \"b\") + (n ¶ \".1e\") }",
     );
 }
 
@@ -113,7 +113,7 @@ fn bivalens_is_not_a_format_subject() {
 #[test]
 fn decimal_display_is_not_yet_supported() {
     test_support::assert_rejects_with_issue(
-        "functio f(numerus<d64> d) → textus { redde d ¶ \".2\" }",
+        "functio f(d64 d) → textus { redde d ¶ \".2\" }",
         "format_decimal_unsupported",
     );
 }

@@ -61,9 +61,7 @@ fn kinds(source: &str) -> Vec<HirStoreKind> {
 
 /// Wrap statements in an entry block that has a wide `n` and two `u8`s.
 fn entry(body: &str) -> String {
-    format!(
-        "incipit {{\nfixum numerus n ← 200\nvaria numerus<u8> x ← 100\nfixum numerus<u8> y ← 50\n{body}\n}}\n"
-    )
+    format!("incipit {{\nfixum numerus n ← 200\nvaria u8 x ← 100\nfixum u8 y ← 50\n{body}\n}}\n")
 }
 
 fn assert_rejected(source: &str) {
@@ -82,7 +80,7 @@ fn assert_issue(source: &str, issue: &str) {
 #[test]
 fn row_01_declaration_narrowing_is_wrapped() {
     // `x * 3 / 2` is `u16` by the range rule; the store into `u8` is checked.
-    let source = entry("fixum numerus<u8> z ← x * 3 / 2");
+    let source = entry("fixum u8 z ← x * 3 / 2");
     assert_eq!(kinds(&source), vec![HirStoreKind::Declaration]);
 }
 
@@ -90,13 +88,13 @@ fn row_01_declaration_narrowing_is_wrapped() {
 fn row_01_widening_and_equal_stores_carry_no_node() {
     // `u8 - u8` is `i16`; into `i32` it cannot fail (ruling 12), and a `u8`
     // into a `u8` slot is the identity.
-    let source = entry("fixum numerus<i32> d ← x - y\nfixum numerus<u8> e ← x");
+    let source = entry("fixum i32 d ← x - y\nfixum u8 e ← x");
     assert!(kinds(&source).is_empty());
 }
 
 #[test]
 fn row_01_node_carries_the_slot_type_and_name() {
-    let source = entry("fixum numerus<u8> z ← n");
+    let source = entry("fixum u8 z ← n");
     let (stores, result) = stores_of(&source);
     assert_eq!(stores.len(), 1);
     let target = result.types.get(stores[0].target);
@@ -134,7 +132,7 @@ fn await_stores(source: &str) -> Vec<Option<HirStoreSite>> {
 #[test]
 fn row_02_narrowing_await_bind_is_marked() {
     let source = "functio fetch() fiet → numerus {\n    redde 300\n}\n\
-                  functio caller() fiet → vacuum {\n    fixum numerus<u8> v ↢ fetch()\n    nota v\n}\n";
+                  functio caller() fiet → vacuum {\n    fixum u8 v ↢ fetch()\n    nota v\n}\n";
     let stores = await_stores(source);
     assert_eq!(stores.len(), 1);
     let site = stores[0].clone().expect("narrowing await-bind is marked");
@@ -144,15 +142,15 @@ fn row_02_narrowing_await_bind_is_marked() {
 
 #[test]
 fn row_02_assignable_await_bind_is_not_marked() {
-    let source = "functio fetch() fiet → numerus<u8> {\n    redde 5\n}\n\
-                  functio caller() fiet → vacuum {\n    fixum numerus<i32> v ↢ fetch()\n    fixum numerus<u8> w ↢ fetch()\n    nota v\n    nota w\n}\n";
+    let source = "functio fetch() fiet → u8 {\n    redde 5\n}\n\
+                  functio caller() fiet → vacuum {\n    fixum i32 v ↢ fetch()\n    fixum u8 w ↢ fetch()\n    nota v\n    nota w\n}\n";
     assert_eq!(await_stores(source), vec![None, None]);
 }
 
 #[test]
 fn row_02_figendum_form_is_marked() {
     let source = "functio fetch() fiet → numerus {\n    redde 300\n}\n\
-                  functio caller() fiet → vacuum {\n    figendum numerus<u8> v ← fetch()\n    nota v\n}\n";
+                  functio caller() fiet → vacuum {\n    figendum u8 v ← fetch()\n    nota v\n}\n";
     let stores = await_stores(source);
     assert_eq!(stores.len(), 1);
     assert_eq!(
@@ -193,56 +191,54 @@ fn row_04_increment_is_its_own_checked_store() {
 
 #[test]
 fn row_05_call_arguments_are_stores() {
-    let source = "functio take(numerus<u8> v) → vacuum {\n    nota v\n}\n\
+    let source = "functio take(u8 v) → vacuum {\n    nota v\n}\n\
                   incipit {\nfixum numerus n ← 200\ntake(n)\n}\n";
     assert_eq!(kinds(source), vec![HirStoreKind::Argument]);
 }
 
 #[test]
 fn row_05_method_arguments_are_stores() {
-    let source = entry("varia lista<numerus<u8>> xs ← [1]\nxs.appende(n)");
+    let source = entry("varia lista<u8> xs ← [1]\nxs.appende(n)");
     assert_eq!(kinds(&source), vec![HirStoreKind::Argument]);
 }
 
 #[test]
 fn row_05_a_widening_argument_carries_no_node() {
-    let source = "functio take(numerus<i32> v) → vacuum {\n    nota v\n}\n\
-                  incipit {\nfixum numerus<u8> a ← 1\nfixum numerus<u8> b ← 2\ntake(a - b)\n}\n";
+    let source = "functio take(i32 v) → vacuum {\n    nota v\n}\n\
+                  incipit {\nfixum u8 a ← 1\nfixum u8 b ← 2\ntake(a - b)\n}\n";
     assert!(kinds(source).is_empty());
 }
 
 #[test]
 fn row_06_parameter_default_is_a_store() {
-    let fits = "functio f(numerus<u8> v vel 7) → numerus<u8> {\n    redde v\n}\n";
+    let fits = "functio f(u8 v vel 7) → u8 {\n    redde v\n}\n";
     assert!(kinds(fits).is_empty());
-    let too_big = "functio f(numerus<u8> v vel 300) → numerus<u8> {\n    redde v\n}\n";
+    let too_big = "functio f(u8 v vel 300) → u8 {\n    redde v\n}\n";
     assert_issue(too_big, "store_constant_out_of_range");
 }
 
 #[test]
 fn row_07_return_is_a_store() {
-    let source = "functio lata(numerus n) → numerus<u8> {\n    redde n\n}\n";
+    let source = "functio lata(numerus n) → u8 {\n    redde n\n}\n";
     assert_eq!(kinds(source), vec![HirStoreKind::Return]);
 }
 
 #[test]
 fn row_08_reddet_is_a_return_store_on_resolution() {
     let source = "functio fetch() fiet → numerus {\n    redde 1\n}\n\
-                  functio caller() fiet → numerus<u8> {\n    reddet fetch()\n}\n";
+                  functio caller() fiet → u8 {\n    reddet fetch()\n}\n";
     assert_eq!(kinds(source), vec![HirStoreKind::Return]);
 }
 
 #[test]
 fn row_09_closure_with_declared_return_is_a_store() {
-    let source = entry(
-        "fixum (numerus) → numerus<u8> f ← clausura numerus v → numerus<u8> { redde v }\nnota f(n)",
-    );
+    let source = entry("fixum (numerus) → u8 f ← clausura numerus v → u8 { redde v }\nnota f(n)");
     assert_eq!(kinds(&source), vec![HirStoreKind::Return]);
 }
 
 #[test]
 fn row_10_yield_is_a_store_against_the_element_type() {
-    let source = "functio gignit(numerus n) fiunt → numerus<u8> {\n    cede n\n}\n";
+    let source = "functio gignit(numerus n) fiunt → u8 {\n    cede n\n}\n";
     assert_eq!(kinds(source), vec![HirStoreKind::Yield]);
 }
 
@@ -250,13 +246,13 @@ fn row_10_yield_is_a_store_against_the_element_type() {
 fn row_10_yield_of_a_mismatched_element_is_rejected() {
     // The element type was unchecked before U4; a `textus` yield into a
     // numeric generator is now the ordinary mismatch.
-    let source = "functio gignit() fiunt → numerus<u8> {\n    cede \"x\"\n}\n";
+    let source = "functio gignit() fiunt → u8 {\n    cede \"x\"\n}\n";
     assert_rejected(source);
 }
 
 #[test]
 fn row_11_throw_is_a_store_against_the_declared_error_type() {
-    let source = "functio iacit(numerus n) → numerus ⇥ numerus<u8> {\n    iace n\n}\n";
+    let source = "functio iacit(numerus n) → numerus ⇥ u8 {\n    iace n\n}\n";
     assert_eq!(kinds(source), vec![HirStoreKind::Throw]);
 }
 
@@ -264,7 +260,7 @@ fn row_11_throw_is_a_store_against_the_declared_error_type() {
 // Rows 12-16: constructors, elements, positions, conversion default
 // ---------------------------------------------------------------------------
 
-const ARCA: &str = "genus Arca {\n    fixum numerus<u8> a\n}\n";
+const ARCA: &str = "genus Arca {\n    fixum u8 a\n}\n";
 
 #[test]
 fn row_12_typed_constructor_fields_are_stores() {
@@ -275,14 +271,14 @@ fn row_12_typed_constructor_fields_are_stores() {
 
 #[test]
 fn row_13_variant_fields_are_stores() {
-    let source = "discretio Forma {\n    Plena { numerus<u8> res }\n}\n\
+    let source = "discretio Forma {\n    Plena { u8 res }\n}\n\
                   incipit {\nfixum numerus n ← 200\nfixum Forma f ← finge Plena { res = n }\n}\n";
     assert_eq!(kinds(source), vec![HirStoreKind::Field]);
 }
 
 #[test]
 fn row_14_elements_against_a_declared_element_type_are_stores() {
-    let source = entry("fixum lista<numerus<u8>> xs ← [n, 1]");
+    let source = entry("fixum lista<u8> xs ← [n, 1]");
     assert_eq!(kinds(&source), vec![HirStoreKind::Element]);
 }
 
@@ -290,20 +286,19 @@ fn row_14_elements_against_a_declared_element_type_are_stores() {
 fn row_14_elements_with_no_declared_type_use_the_range_rule() {
     // No slot: `[x, m]` with `u8`, `i16` is typed by the smallest type holding
     // both elements, and nothing is narrowed.
-    let source = entry("fixum numerus<i16> m ← 5\nfixum _ xs ← [x, m]");
+    let source = entry("fixum i16 m ← 5\nfixum _ xs ← [x, m]");
     assert!(kinds(&source).is_empty());
 }
 
 #[test]
 fn row_15_iuncta_positions_are_stores() {
-    let source =
-        entry("fixum iuncta<numerus<u8>, numerus<u8>> t ← iuncta<numerus<u8>, numerus<u8>>[n, y]");
+    let source = entry("fixum iuncta<u8, u8> t ← iuncta<u8, u8>[n, y]");
     assert_eq!(kinds(&source), vec![HirStoreKind::TuplePosition]);
 }
 
 #[test]
 fn row_16_conversion_default_is_a_store_into_the_target() {
-    let source = entry("fixum numerus<u8> r ← n ↦ numerus<u8> ⊥ n");
+    let source = entry("fixum u8 r ← n ↦ u8 ⊥ n");
     assert_eq!(kinds(&source), vec![HirStoreKind::ConversionDefault]);
 }
 
@@ -313,9 +308,9 @@ fn row_16_conversion_default_is_a_store_into_the_target() {
 
 #[test]
 fn row_17_generis_constant_must_fit() {
-    assert!(kinds("fixum numerus<u8> W = 200\nincipit {\nnota W\n}\n").is_empty());
+    assert!(kinds("fixum u8 W = 200\nincipit {\nnota W\n}\n").is_empty());
     assert_issue(
-        "fixum numerus<u8> W = 300\nincipit {\nnota W\n}\n",
+        "fixum u8 W = 300\nincipit {\nnota W\n}\n",
         "store_constant_out_of_range",
     );
 }
@@ -329,9 +324,9 @@ fn row_17_generis_constant_must_fit_whatever_the_policy() {
 
 #[test]
 fn row_18_field_default_constant_must_fit() {
-    let fits = "genus G {\n    fixum numerus<u8> b = 5\n}\n";
+    let fits = "genus G {\n    fixum u8 b = 5\n}\n";
     assert!(kinds(fits).is_empty());
-    let too_big = "genus G {\n    fixum numerus<u8> b = 300\n}\n";
+    let too_big = "genus G {\n    fixum u8 b = 300\n}\n";
     assert_issue(too_big, "store_constant_out_of_range");
 }
 
@@ -352,8 +347,7 @@ fn row_20_inferred_declarations_take_the_expression_type() {
 
 #[test]
 fn row_21_bindings_are_not_stores() {
-    let source =
-        entry("fixum lista<numerus<u8>> xs ← [1, 2]\nitera ex xs fixum v {\n    nota v\n}");
+    let source = entry("fixum lista<u8> xs ← [1, 2]\nitera ex xs fixum v {\n    nota v\n}");
     assert!(kinds(&source).is_empty());
 }
 
@@ -361,7 +355,7 @@ fn row_21_bindings_are_not_stores() {
 fn row_22_type_pattern_bindings_are_not_stores() {
     // The binding takes the tested member's type; the value matches only if it
     // is a `u8`, so nothing is narrowed.
-    let source = "functio probe(numerus<u8> ∪ textus u) → vacuum {\n    discerne u {\n        casu numerus<u8> fixum b { nota b }\n        casu textus fixum s { nota s }\n    }\n}\n";
+    let source = "functio probe(u8 ∪ textus u) → vacuum {\n    discerne u {\n        casu u8 fixum b { nota b }\n        casu textus fixum s { nota s }\n    }\n}\n";
     assert!(kinds(source).is_empty());
 }
 
@@ -371,7 +365,7 @@ fn row_22_type_pattern_bindings_are_not_stores() {
 
 #[test]
 fn row_23_one_numeric_member_narrows_into_that_member() {
-    let source = entry("fixum numerus<u8> ∪ nihil u ← n");
+    let source = entry("fixum u8 ∪ nihil u ← n");
     let (stores, result) = stores_of(&source);
     assert_eq!(stores.len(), 1);
     assert!(matches!(
@@ -382,13 +376,13 @@ fn row_23_one_numeric_member_narrows_into_that_member() {
 
 #[test]
 fn row_24_several_numeric_members_take_no_narrowing() {
-    assert_rejected(&entry("fixum numerus<u8> ∪ numerus<i16> u ← n"));
+    assert_rejected(&entry("fixum u8 ∪ i16 u ← n"));
 }
 
 #[test]
 fn row_25_type_arguments_stay_invariant() {
     assert_rejected(&entry(
-        "fixum lista<numerus> wide ← [n]\nfixum lista<numerus<u8>> narrow ← wide",
+        "fixum lista<numerus> wide ← [n]\nfixum lista<u8> narrow ← wide",
     ));
 }
 
@@ -398,7 +392,7 @@ fn row_25_type_arguments_stay_invariant() {
 
 #[test]
 fn row_26_ascription_is_proof_only() {
-    assert_rejected(&entry("fixum numerus<u8> z ← n ∷ numerus<u8>"));
+    assert_rejected(&entry("fixum u8 z ← n ∷ u8"));
 }
 
 #[test]
@@ -414,11 +408,11 @@ fn row_28_slotless_positions_never_narrow() {
 #[test]
 fn constant_that_certainly_traps_is_a_compile_error() {
     assert_issue(
-        "incipit {\nfixum numerus<u8> w ← 300\nnota w\n}\n",
+        "incipit {\nfixum u8 w ← 300\nnota w\n}\n",
         "store_constant_out_of_range",
     );
     assert_issue(
-        "incipit {\nfixum numerus<u8> w ← -1\nnota w\n}\n",
+        "incipit {\nfixum u8 w ← -1\nnota w\n}\n",
         "store_constant_out_of_range",
     );
 }
@@ -427,16 +421,16 @@ fn constant_that_certainly_traps_is_a_compile_error() {
 fn folded_constant_expressions_are_checked_at_compile_time() {
     // `10 - 100` is -90 as an exact constant; it does not fit `u8` (ruling 12a).
     assert_issue(
-        "incipit {\nfixum numerus<u8> d ← 10 - 100\nnota d\n}\n",
+        "incipit {\nfixum u8 d ← 10 - 100\nnota d\n}\n",
         "store_constant_out_of_range",
     );
-    assert!(kinds("incipit {\nfixum numerus<u8> d ← 100 + 100\nnota d\n}\n").is_empty());
+    assert!(kinds("incipit {\nfixum u8 d ← 100 + 100\nnota d\n}\n").is_empty());
 }
 
 #[test]
 fn constant_call_argument_that_traps_is_a_compile_error() {
     assert_issue(
-        "functio take(numerus<u8> v) → vacuum {\n    nota v\n}\nincipit {\ntake(300)\n}\n",
+        "functio take(u8 v) → vacuum {\n    nota v\n}\nincipit {\ntake(300)\n}\n",
         "store_constant_out_of_range",
     );
 }
@@ -511,7 +505,7 @@ fn an_open_inference_slot_binds_instead_of_narrowing() {
     // A generic parameter bound by the first argument is not a declared slot:
     // the second argument does not silently narrow into it.
     let source = "functio duo<T>(T a, T b) → T {\n    redde a\n}\n\
-                  incipit {\nfixum numerus<u8> a ← 1\nfixum numerus<i16> b ← 2\nnota duo(a, b)\n}\n";
+                  incipit {\nfixum u8 a ← 1\nfixum i16 b ← 2\nnota duo(a, b)\n}\n";
     assert_rejected(source);
 }
 
@@ -544,7 +538,7 @@ fn summa_at_the_cap_is_checked_at_the_return_store() {
     // f1s (ruling 21): `summa` over signed integers is typed `i64` at the
     // cap, and its element count is unbounded, so returning it as `int` is a
     // checked store. Unsigned terms give `u64`, which narrows into `int`.
-    for term in ["numerus<i64>", "numerus<i8>", "numerus<u8>"] {
+    for term in ["i64", "i8", "u8"] {
         let source = format!(
             "functio total(tensor<{term}, [2]> a) → numerus {{\n  redde summa ex a fixum s {{\n    redde s\n  }}\n}}\n"
         );
@@ -555,7 +549,7 @@ fn summa_at_the_cap_is_checked_at_the_return_store() {
 #[test]
 fn provably_fitting_int_stores_carry_no_node() {
     // `i32 * i32` fits `i64`; a bare `int` copy and a literal need no check.
-    let source = "incipit {\nvaria numerus<i32> p ← 3\nvaria numerus a ← 1\n\
+    let source = "incipit {\nvaria i32 p ← 3\nvaria numerus a ← 1\n\
                   fixum numerus q ← p * p\nfixum numerus r ← a\nfixum numerus s ← 7\n}\n";
     assert!(kinds(source).is_empty());
 }
@@ -563,6 +557,6 @@ fn provably_fitting_int_stores_carry_no_node() {
 #[test]
 fn bitnot_of_u64_is_accepted_into_an_int_slot() {
     // `¬u` keeps its sign at the cap, so it is `i64` and stores into `int`.
-    let source = "incipit {\nvaria numerus<u64> u ← 5\nfixum numerus y ← ¬u\n}\n";
+    let source = "incipit {\nvaria u64 u ← 5\nfixum numerus y ← ¬u\n}\n";
     test_support::analyze_ok(source);
 }

@@ -5,19 +5,19 @@ use crate::test_support::{self, analyze_source};
 
 #[test]
 fn annotated_d64_literal_typechecks() {
-    let fixture = analyze_source("incipit { fixum numerus<d64> b ← 4.2 }");
-    assert!(fixture.success(), "numerus<d64> must accept 4.2");
+    let fixture = analyze_source("incipit { fixum d64 b ← 4.2 }");
+    assert!(fixture.success(), "d64 must accept 4.2");
 }
 
 #[test]
 fn explicit_integer_to_decimal_conversion_still_accepts() {
-    test_support::assert_accepts("incipit { fixum numerus<d64> e ← 5 ↦ numerus<d64> }");
+    test_support::assert_accepts("incipit { fixum d64 e ← 5 ↦ d64 }");
 }
 
 #[test]
 fn d64_literal_out_of_range_rejects() {
     // The i64 scaled carrier cannot hold 1e20.
-    let fixture = analyze_source("incipit { fixum numerus<d64> a ← 1e20 }");
+    let fixture = analyze_source("incipit { fixum d64 a ← 1e20 }");
     assert!(fixture.is_err(), "1e20 exceeds the d64 scaled carrier");
 }
 
@@ -69,14 +69,14 @@ fn removed_d32_help_points_at_d64() {
 
 #[test]
 fn d64_literal_accepts_eight_fraction_digits_and_the_range_edge() {
-    test_support::assert_accepts("incipit { fixum numerus<d64> a ← 0.12345678 }");
-    test_support::assert_accepts("incipit { fixum numerus<d64> a ← 92233720368.54775807 }");
+    test_support::assert_accepts("incipit { fixum d64 a ← 0.12345678 }");
+    test_support::assert_accepts("incipit { fixum d64 a ← 92233720368.54775807 }");
 }
 
 #[test]
 fn d64_literal_with_nine_fraction_digits_rejects() {
     test_support::assert_rejects_with_issue(
-        "incipit { fixum numerus<d64> a ← 0.123456789 }",
+        "incipit { fixum d64 a ← 0.123456789 }",
         "decimal_literal_out_of_range",
     );
 }
@@ -84,7 +84,7 @@ fn d64_literal_with_nine_fraction_digits_rejects() {
 #[test]
 fn d64_literal_past_the_range_edge_rejects() {
     test_support::assert_rejects_with_issue(
-        "incipit { fixum numerus<d64> a ← 92233720368.54775808 }",
+        "incipit { fixum d64 a ← 92233720368.54775808 }",
         "decimal_literal_out_of_range",
     );
 }

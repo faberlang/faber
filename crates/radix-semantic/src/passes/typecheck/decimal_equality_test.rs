@@ -8,28 +8,20 @@ use crate::test_support;
 
 #[test]
 fn decimal_integer_equality_accepts() {
-    test_support::assert_accepts(
-        "functio aequalis(numerus<d64> a, numerus n) → bivalens { redde a ≅ n }",
-    );
+    test_support::assert_accepts("functio aequalis(d64 a, numerus n) → bivalens { redde a ≅ n }");
 }
 
 #[test]
 fn decimal_fractus_equality_accepts_cross_family() {
-    test_support::assert_accepts(
-        "functio aequalis(numerus<d64> a, fractus f) → bivalens { redde a ≅ f }",
-    );
+    test_support::assert_accepts("functio aequalis(d64 a, fractus f) → bivalens { redde a ≅ f }");
 }
 
 #[test]
 fn decimal_fractus_fuzzy_equality_accepts_cross_family() {
-    test_support::assert_accepts(
-        "functio aequalis(numerus<d64> a, fractus f) → bivalens { redde a ≈ f }",
-    );
+    test_support::assert_accepts("functio aequalis(d64 a, fractus f) → bivalens { redde a ≈ f }");
 }
 
 #[test]
 fn same_width_decimal_equality_stays_admitted() {
-    test_support::assert_accepts(
-        "functio aequalis(numerus<d64> a, numerus<d64> b) → bivalens { redde a ≅ b }",
-    );
+    test_support::assert_accepts("functio aequalis(d64 a, d64 b) → bivalens { redde a ≅ b }");
 }

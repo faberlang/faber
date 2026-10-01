@@ -217,8 +217,8 @@ fn phase4_full_cross_locale_fanout() {
 /// localized emit surface.
 const TENSOR_VACUA_SOURCE: &str = "\
 incipit {
-  fixum lista<fractus<f32>> xs ← vacua
-  fixum tensor<fractus<f32>, []> empty ← vacua
+  fixum lista<f32> xs ← vacua
+  fixum tensor<f32, []> empty ← vacua
   fixum numerus n ← 0
   nota n
 }
@@ -356,7 +356,7 @@ fn th_locale_vacua_acceptance_is_bounded_to_owned_rows() {
     // for its support keywords (`เริ่ม` incipit, `คงที่` fixum, `บันทึก` nota,
     // `เทนเซอร์` tensor, `เศษ` fractus) — pack-authoritative, no Latin
     // support vocabulary under the non-la pack.
-    let owned = "เริ่ม {\n  คงที่ เทนเซอร์<เศษ<f32>, []> empty ← เซตว่าง\n  บันทึก empty\n}\n";
+    let owned = "เริ่ม {\n  คงที่ เทนเซอร์<f32, []> empty ← เซตว่าง\n  บันทึก empty\n}\n";
     let result = reemit_faber(
         &session,
         session
@@ -377,7 +377,7 @@ fn th_locale_vacua_acceptance_is_bounded_to_owned_rows() {
     // identifier and is NOT claimed as `vacua` — the initializer is an
     // undefined variable reference, so compilation fails. If the parser
     // started accepting unmapped spellings, this would (wrongly) succeed.
-    let unmapped = "เริ่ม {\n  คงที่ เทนเซอร์<เศษ<f32>, []> empty ← หุ่นจำลอง\n  บันทึก empty\n}\n";
+    let unmapped = "เริ่ม {\n  คงที่ เทนเซอร์<f32, []> empty ← หุ่นจำลอง\n  บันทึก empty\n}\n";
     let result = reemit_faber(
         &session,
         session

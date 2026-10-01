@@ -175,7 +175,7 @@ fn device_roles_from_hir_includes_genus_method_nucleum_annotation() {
     let source = r"
 genus Worker {
     @ nucleum
-    functio run(fractus<f32> x) → fractus<f32> {
+    functio run(f32 x) → f32 {
         redde x
     }
 }
@@ -1135,8 +1135,8 @@ fn gpu_control_device_safe_accepts_structured_scalar_switch() {
 fn gpu_control_device_safe_accepts_structured_scalar_loop() {
     let source = r"
 @ nucleum
-functio countdown(fractus<f32> x) → fractus<f32> {
-    varia fractus<f32> y ← x
+functio countdown(f32 x) → f32 {
+    varia f32 y ← x
     dum y > 0.0 {
         y ← y - 1.0
     }
@@ -1159,8 +1159,8 @@ fn gpu_control_device_safe_accepts_transparent_scalar_loop_entry_goto() {
 fn gpu_control_device_safe_accepts_structured_scalar_loop_break() {
     let source = r"
 @ nucleum
-functio countdown(fractus<f32> x) → fractus<f32> {
-    varia fractus<f32> y ← x
+functio countdown(f32 x) → f32 {
+    varia f32 y ← x
     dum y > 0.0 {
         si y < 2.0 {
             rumpe
@@ -1186,8 +1186,8 @@ fn gpu_control_device_safe_accepts_transparent_scalar_loop_break_entry_goto() {
 fn gpu_control_device_safe_accepts_structured_scalar_loop_continue() {
     let source = r"
 @ nucleum
-functio countdown(fractus<f32> x) → fractus<f32> {
-    varia fractus<f32> y ← x
+functio countdown(f32 x) → f32 {
+    varia f32 y ← x
     dum y > 0.0 {
         si y < 2.0 {
             perge
@@ -1213,8 +1213,8 @@ fn gpu_control_device_safe_accepts_transparent_scalar_loop_continue_entry_goto()
 fn gpu_control_device_safe_accepts_nested_scalar_loop_branch() {
     let source = r"
 @ nucleum
-functio countdown(fractus<f32> x) → fractus<f32> {
-    varia fractus<f32> y ← x
+functio countdown(f32 x) → f32 {
+    varia f32 y ← x
     dum y > 0.0 {
         si y > 2.0 {
             y ← y - 1.0
@@ -1280,7 +1280,7 @@ fn gpu_control_device_safe_accepts_structured_indexed_value_join_branch() {
     let source = r"
 @ nucleum
 functio choose(tf32[4] input, tf32[4] output, u32 id) → vacuum {
-    varia fractus<f32> selected ← 0.0
+    varia f32 selected ← 0.0
     si id > id {
         selected ← input[id]
     } secus {
@@ -2263,7 +2263,7 @@ fn first_function_item(analysis: &crate::driver::AnalyzedModule) -> (&crate::hir
 fn nucleum_annotation_lowers_to_entry_role() {
     let source = r"
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde x
 }
 ";
@@ -2282,7 +2282,7 @@ functio k(fractus<f32> x) → fractus<f32> {
 fn nucleum_fragment_annotation_lowers_to_fragment_role() {
     let source = r"
 @ nucleum fragment
-functio helper(fractus<f32> x) → fractus<f32> {
+functio helper(f32 x) → f32 {
     redde x
 }
 ";
@@ -2305,12 +2305,12 @@ functio helper(fractus<f32> x) → fractus<f32> {
 fn nucleum_fragment_is_not_a_dispatch_or_reflection_entry() {
     let source = r"
 @ nucleum fragment
-functio helper(fractus<f32> x) → fractus<f32> {
+functio helper(f32 x) → f32 {
     redde x
 }
 
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde x
 }
 ";
@@ -2338,12 +2338,12 @@ functio k(fractus<f32> x) → fractus<f32> {
 fn nucleum_fragment_call_composes_into_entry() {
     let source = r"
 @ nucleum fragment
-functio helper(fractus<f32> x) → fractus<f32> {
+functio helper(f32 x) → f32 {
     redde x
 }
 
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde helper(x)
 }
 ";

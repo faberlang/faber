@@ -13,7 +13,7 @@ use crate::semantic::passes::typecheck::test_support;
 fn fractus_f32_arithmetic_preserves_width() {
     test_support::assert_accepts(
         r"
-functio add(fractus<f32> x, fractus<f32> y) → fractus<f32> {
+functio add(f32 x, f32 y) → f32 {
     redde x + y
 }
 ",
@@ -25,7 +25,7 @@ functio add(fractus<f32> x, fractus<f32> y) → fractus<f32> {
 fn fractus_f32_arithmetic_shapes_float_literal() {
     test_support::assert_accepts(
         r"
-functio addOne(fractus<f32> x) → fractus<f32> {
+functio addOne(f32 x) → f32 {
     redde x + 1.0
 }
 ",
@@ -37,7 +37,7 @@ functio addOne(fractus<f32> x) → fractus<f32> {
 fn fractus_f64_arithmetic_preserves_width() {
     test_support::assert_accepts(
         r"
-functio add(fractus<f64> x, fractus<f64> y) → fractus<f64> {
+functio add(f64 x, f64 y) → f64 {
     redde x + y
 }
 ",
@@ -48,7 +48,7 @@ functio add(fractus<f64> x, fractus<f64> y) → fractus<f64> {
 fn fractus_f16_is_known_to_semantic_analysis() {
     test_support::assert_analysis_accepts(
         r"
-functio keep(fractus<f16> x) → fractus<f16> {
+functio keep(f16 x) → f16 {
     redde x
 }
 ",
@@ -59,7 +59,7 @@ functio keep(fractus<f16> x) → fractus<f16> {
 fn standalone_f16_is_fractus_width_sugar() {
     test_support::assert_analysis_accepts(
         r"
-functio keep(f16 x) → fractus<f16> {
+functio keep(f16 x) → f16 {
     redde x
 }
 ",
@@ -82,7 +82,7 @@ functio bad(numerus<f16> x) → numerus<f16> {
 fn bf16_is_admitted_as_a_whole_width_marker() {
     test_support::assert_analysis_accepts(
         r"
-functio keep(fractus<bf16> x) → fractus<bf16> {
+functio keep(bf16 x) → bf16 {
     redde x
 }
 ",
@@ -94,7 +94,7 @@ functio keep(fractus<bf16> x) → fractus<bf16> {
 fn rust_codegen_rejects_f16_until_runtime_representation_exists() {
     test_support::assert_rejects_with_issue(
         r"
-functio keep(fractus<f16> x) → fractus<f16> {
+functio keep(f16 x) → f16 {
     redde x
 }
 ",
@@ -108,7 +108,7 @@ functio keep(fractus<f16> x) → fractus<f16> {
 fn fractus_f16_with_f32_arithmetic_joins_at_f32() {
     test_support::assert_analysis_accepts(
         r"
-functio add(fractus<f16> x, fractus<f32> y) → fractus<f32> {
+functio add(f16 x, f32 y) → f32 {
     redde x + y
 }
 ",
@@ -121,7 +121,7 @@ functio add(fractus<f16> x, fractus<f32> y) → fractus<f32> {
 fn numerus_i32_arithmetic_grows_to_i64() {
     test_support::assert_analysis_accepts(
         r"
-functio add(numerus<i32> x, numerus<i32> y) → numerus<i64> {
+functio add(i32 x, i32 y) → i64 {
     redde x + y
 }
 ",
@@ -134,7 +134,7 @@ functio add(numerus<i32> x, numerus<i32> y) → numerus<i64> {
 fn numerus_i32_arithmetic_joins_int_constant_by_value() {
     test_support::assert_analysis_accepts(
         r"
-functio addOne(numerus<i32> x) → numerus<i64> {
+functio addOne(i32 x) → i64 {
     redde x + 1
 }
 ",
@@ -147,7 +147,7 @@ functio addOne(numerus<i32> x) → numerus<i64> {
 fn arithmetic_accepts_integer_constant_beside_float() {
     test_support::assert_analysis_accepts(
         r"
-functio addOne(fractus<f32> x) → fractus<f32> {
+functio addOne(f32 x) → f32 {
     redde x + 1
 }
 ",
@@ -159,7 +159,7 @@ functio addOne(fractus<f32> x) → fractus<f32> {
 fn arithmetic_rejects_typed_integer_beside_float() {
     test_support::assert_rejects_with_issue(
         r"
-functio add(fractus<f32> x, numerus<i32> n) → fractus<f32> {
+functio add(f32 x, i32 n) → f32 {
     redde x + n
 }
 ",
@@ -172,7 +172,7 @@ functio add(fractus<f32> x, numerus<i32> n) → fractus<f32> {
 fn arithmetic_joins_mixed_fractus_widths() {
     test_support::assert_analysis_accepts(
         r"
-functio add(fractus<f32> x, fractus<f64> y) → fractus<f64> {
+functio add(f32 x, f64 y) → f64 {
     redde x + y
 }
 ",
@@ -185,7 +185,7 @@ functio add(fractus<f32> x, fractus<f64> y) → fractus<f64> {
 fn arithmetic_joins_mixed_numerus_widths() {
     test_support::assert_analysis_accepts(
         r"
-functio add(numerus<i32> x, numerus<i64> y) → numerus<i64> {
+functio add(i32 x, i64 y) → i64 {
     redde x + y
 }
 ",
@@ -197,7 +197,7 @@ functio add(numerus<i32> x, numerus<i64> y) → numerus<i64> {
 fn numerus_u8_arithmetic_grows_to_u16() {
     test_support::assert_analysis_accepts(
         r"
-functio add(numerus<u8> x, numerus<u8> y) → numerus<u16> {
+functio add(u8 x, u8 y) → u16 {
     redde x + y
 }
 ",
@@ -256,7 +256,7 @@ incipit {
 fn modular_word_rejects_mixed_numerus_arithmetic() {
     test_support::assert_analysis_rejects_with_issue(
         r"
-functio add(modulus<u32> x, numerus<u32> y) → modulus<u32> {
+functio add(modulus<u32> x, u32 y) → modulus<u32> {
     redde x + y
 }
 ",
@@ -270,7 +270,7 @@ fn modular_word_compares_with_numerus_by_value() {
     // plain integer or a constant compares exact values.
     test_support::assert_accepts(
         r"
-functio compare(modulus<u32> x, numerus<u32> y) → bivalens {
+functio compare(modulus<u32> x, u32 y) → bivalens {
     redde x > y
 }
 functio constant(modulus<u8> a) → bivalens {
@@ -308,7 +308,7 @@ fn modular_word_rejects_numerus_to_modulus_assignment() {
     test_support::assert_analysis_rejects_with_issue(
         r"
 incipit {
-    fixum numerus<u32> checked ← 1
+    fixum u32 checked ← 1
     fixum modulus<u32> word ← checked
     nota word
 }
@@ -323,7 +323,7 @@ fn modular_word_rejects_modulus_to_numerus_assignment() {
         r"
 incipit {
     fixum modulus<u32> word ← 1
-    fixum numerus<u32> checked ← word
+    fixum u32 checked ← word
     nota checked
 }
 ",
@@ -337,7 +337,7 @@ fn modular_word_method_rejects_numerus_argument() {
         r"
 incipit {
     fixum modulus<u32> word ← 4294967295
-    fixum numerus<u32> checked ← 1
+    fixum u32 checked ← 1
     nota word.addita(checked)
 }
 ",
@@ -351,7 +351,7 @@ fn numerus_method_rejects_modulus_argument() {
         r"
 incipit {
     fixum modulus<u32> word ← 4294967295
-    fixum numerus<u32> checked ← 1
+    fixum u32 checked ← 1
     nota checked.addita(word)
 }
 ",
@@ -437,11 +437,11 @@ functio add(modulus<u32> x, modulus<u32> y) → modulus<u32> {
 fn same_width_modular_and_numerus_conversion_is_explicitly_available() {
     test_support::assert_accepts(
         r"
-functio toNumerus(modulus<u32> value) → numerus<u32> {
-    redde value ↦ numerus<u32>
+functio toNumerus(modulus<u32> value) → u32 {
+    redde value ↦ u32
 }
 
-functio toModulus(numerus<u32> value) → modulus<u32> {
+functio toModulus(u32 value) → modulus<u32> {
     redde value ↦ modulus<u32>
 }
 ",
@@ -632,7 +632,7 @@ incipit {
 fn assignment_widening_remains_assimilative() {
     test_support::assert_accepts(
         r"
-functio widen(numerus<i16> x) → numerus<i32> {
+functio widen(i16 x) → i32 {
     redde x
 }
 ",
@@ -645,8 +645,8 @@ fn explicit_lista_target_allows_sized_numeric_widening() {
     test_support::assert_accepts(
         r"
 incipit {
-    fixum fractus<f32> single ← 1.0 ∷ fractus<f32>
-    fixum lista<fractus<f64>> xs ← [single] ∷ lista<fractus<f64>>
+    fixum f32 single ← 1.0 ∷ f32
+    fixum lista<f64> xs ← [single] ∷ lista<f64>
 }
 ",
     );
@@ -656,8 +656,8 @@ incipit {
 fn explicit_lista_target_warns_only_for_sized_numeric_narrowing() {
     let source = r"
 incipit {
-    fixum fractus<f64> wide ← 1.0 ∷ fractus<f64>
-    fixum lista<fractus<f32>> xs ← [wide] ∷ lista<fractus<f32>>
+    fixum f64 wide ← 1.0 ∷ f64
+    fixum lista<f32> xs ← [wide] ∷ lista<f32>
 }
 ";
     let diagnostics = test_support::analyze_and_get_diagnostics(source);

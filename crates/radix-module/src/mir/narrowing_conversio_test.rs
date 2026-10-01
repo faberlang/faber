@@ -35,7 +35,7 @@ fn int_above_u8_range_fails_closed() {
         r"
 incipit {
     fixum numerus n ← 300
-    fixum numerus<u8> b ← n ↦ numerus<u8>
+    fixum u8 b ← n ↦ u8
     nota b
 }
 ",
@@ -49,7 +49,7 @@ fn int_above_i8_range_fails_closed() {
         r"
 incipit {
     fixum numerus n ← 300
-    fixum numerus<i8> b ← n ↦ numerus<i8>
+    fixum i8 b ← n ↦ i8
     nota b
 }
 ",
@@ -63,7 +63,7 @@ fn negative_into_unsigned_still_fails_closed() {
         r"
 incipit {
     fixum numerus n ← -1
-    fixum numerus<u8> b ← n ↦ numerus<u8>
+    fixum u8 b ← n ↦ u8
     nota b
 }
 ",
@@ -78,11 +78,11 @@ fn literal_recovery_shapes_to_the_target_width() {
         r"
 incipit {
     fixum numerus n ← 300
-    fixum numerus<u8> b ← n ↦ numerus<u8> ⊥ 7
+    fixum u8 b ← n ↦ u8 ⊥ 7
     nota b
-    fixum numerus<i8> c ← n ↦ numerus<i8> ⊥ -7
+    fixum i8 c ← n ↦ i8 ⊥ -7
     nota c
-    fixum numerus<u8> d ← 200 ↦ numerus<u8> ⊥ 7
+    fixum u8 d ← 200 ↦ u8 ⊥ 7
     nota d
 }
 ",

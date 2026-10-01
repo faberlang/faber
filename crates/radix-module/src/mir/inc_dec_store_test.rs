@@ -8,7 +8,7 @@ use crate::codegen::Target;
 use crate::driver::{Config, Session};
 use crate::mir::{BufferHost, RunSourceError, run_source};
 
-const CELL: &str = "genus Cell {\n    varia numerus c\n    varia numerus<u8> b\n    varia numerus<i8> k\n    varia numerus<u64> u\n    varia modulus<u8> w\n    varia saturatus<u8> s\n    varia modulus<i64> mw\n    varia saturatus<i64> ms\n}\n";
+const CELL: &str = "genus Cell {\n    varia numerus c\n    varia u8 b\n    varia i8 k\n    varia u64 u\n    varia modulus<u8> w\n    varia saturatus<u8> s\n    varia modulus<i64> mw\n    varia saturatus<i64> ms\n}\n";
 
 fn cell(overrides: &str) -> String {
     let base = [
@@ -80,7 +80,7 @@ fn range_trap(body: &str) {
 #[test]
 fn increment_past_i64_max_traps_at_the_store_on_every_place_kind() {
     store_trap(
-        "varia numerus<i64> u ← 9223372036854775807\nu ↑",
+        "varia i64 u ← 9223372036854775807\nu ↑",
         "9223372036854775808 does not fit in `i64` (assignment to `u`)",
     );
     store_trap(
@@ -100,29 +100,26 @@ fn increment_past_i64_max_traps_at_the_store_on_every_place_kind() {
 #[test]
 fn a_successor_outside_the_whole_64_bit_range_is_the_range_trap() {
     // The same identity and text as `m - 1` and `u + 1` at the cap.
-    range_trap("varia numerus<i64> u ← -9223372036854775808\nu ↓");
+    range_trap("varia i64 u ← -9223372036854775808\nu ↓");
     range_trap(&format!("{}\np.c ↓", cell("c=-9223372036854775808")));
     range_trap("varia lista<numerus> xs ← [-9223372036854775808]\nxs[0] ↓");
-    range_trap("varia numerus<u64> u ← 18446744073709551615\nu ↑");
+    range_trap("varia u64 u ← 18446744073709551615\nu ↑");
     range_trap(&format!("{}\np.u ↑", cell("u=18446744073709551615")));
-    range_trap("varia lista<numerus<u64>> xs ← [18446744073709551615]\nxs[0] ↑");
-    range_trap("varia numerus<i64> m ← -9223372036854775808\nfixum numerus r ← m - 1");
-    range_trap("varia numerus<u64> m ← 18446744073709551615\nfixum numerus<u64> r ← m + 1");
+    range_trap("varia lista<u64> xs ← [18446744073709551615]\nxs[0] ↑");
+    range_trap("varia i64 m ← -9223372036854775808\nfixum numerus r ← m - 1");
+    range_trap("varia u64 m ← 18446744073709551615\nfixum u64 r ← m + 1");
 }
 
 #[test]
 fn narrow_slots_trap_at_both_ends_on_every_place_kind() {
-    store_trap("varia numerus<u8> x ← 255\nx ↑", "256 does not fit in `u8` (assignment to `x`)");
+    store_trap("varia u8 x ← 255\nx ↑", "256 does not fit in `u8` (assignment to `x`)");
     store_trap(
-        "varia numerus<u8> x ← 0\nx ↓",
+        "varia u8 x ← 0\nx ↓",
         "-1 does not fit in `u8` (assignment to `x`) (a negative value cannot be stored in an unsigned slot)",
     );
+    store_trap("varia i8 x ← -128\nx ↓", "-129 does not fit in `i8` (assignment to `x`)");
     store_trap(
-        "varia numerus<i8> x ← -128\nx ↓",
-        "-129 does not fit in `i8` (assignment to `x`)",
-    );
-    store_trap(
-        "varia numerus<u64> x ← 0\nx ↓",
+        "varia u64 x ← 0\nx ↓",
         "-1 does not fit in `u64` (assignment to `x`) (a negative value cannot be stored in an unsigned slot)",
     );
     store_trap(
@@ -137,12 +134,9 @@ fn narrow_slots_trap_at_both_ends_on_every_place_kind() {
         &format!("{}\np.u ↓", cell("u=0")),
         "-1 does not fit in `u64` (assignment to `u`) (a negative value cannot be stored in an unsigned slot)",
     );
+    store_trap("varia lista<u8> xs ← [255]\nxs[0] ↑", "256 does not fit in `u8` (assignment)");
     store_trap(
-        "varia lista<numerus<u8>> xs ← [255]\nxs[0] ↑",
-        "256 does not fit in `u8` (assignment)",
-    );
-    store_trap(
-        "varia lista<numerus<u8>> xs ← [0]\nxs[0] ↓",
+        "varia lista<u8> xs ← [0]\nxs[0] ↓",
         "-1 does not fit in `u8` (assignment) (a negative value cannot be stored in an unsigned slot)",
     );
 }
@@ -188,28 +182,19 @@ fn word_slots_reduce_or_clamp_at_both_ends_on_every_place_kind() {
 #[test]
 fn in_range_steps_still_store_at_the_edges() {
     assert_eq!(
-        ok(
-            "varia numerus<i64> a ← 9223372036854775806\na ↑\nnota a\nvaria numerus<i64> b ← -9223372036854775807\nb ↓\nnota b"
-        ),
+        ok("varia i64 a ← 9223372036854775806\na ↑\nnota a\nvaria i64 b ← -9223372036854775807\nb ↓\nnota b"),
         ["9223372036854775807", "-9223372036854775808"]
     );
     assert_eq!(
-        ok(
-            "varia numerus<u64> a ← 18446744073709551614\na ↑\nnota a\nvaria numerus<u64> b ← 9223372036854775808\nb ↓\nnota b"
-        ),
+        ok("varia u64 a ← 18446744073709551614\na ↑\nnota a\nvaria u64 b ← 9223372036854775808\nb ↓\nnota b"),
         ["18446744073709551615", "9223372036854775807"]
     );
     assert_eq!(
-        ok(
-            "varia numerus<i64> a ← 9223372036854775807\na ↓\nnota a\nvaria numerus<i64> b ← -9223372036854775808\nb ↑\nnota b"
-        ),
+        ok("varia i64 a ← 9223372036854775807\na ↓\nnota a\nvaria i64 b ← -9223372036854775808\nb ↑\nnota b"),
         ["9223372036854775806", "-9223372036854775807"]
     );
     assert_eq!(ok("varia numerus i ← 41\ni ↑\ni ↑\ni ↓\nnota i"), ["42"]);
-    assert_eq!(
-        ok("varia numerus<u8> x ← 254\nx ↑\nnota x\nvaria numerus<u8> y ← 1\ny ↓\nnota y"),
-        ["255", "0"]
-    );
+    assert_eq!(ok("varia u8 x ← 254\nx ↑\nnota x\nvaria u8 y ← 1\ny ↓\nnota y"), ["255", "0"]);
     assert_eq!(
         ok(&format!(
             "{}\np.c ↑\np.k ↓\np.b ↑\nnota p.c\nnota p.k\nnota p.b",

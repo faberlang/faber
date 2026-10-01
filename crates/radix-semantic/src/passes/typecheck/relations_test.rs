@@ -309,10 +309,10 @@ main {
 fn equality_relation_relaxed_admits_mixed_width_pairs() {
     assert_en_accepts(
         "main {
-    assert 1 ∷ int<i64> ≅ 1 ∷ int<u64>
-    assert 1 ∷ int<i64> ≅ 1.0 ∷ float<f64>
-    assert 1 ∷ int<u64> ≅ 1.0 ∷ float<f64>
-    assert 1 ∷ int<i64> ≈ 1 ∷ int<u64>
+    assert 1 ∷ i64 ≅ 1 ∷ u64
+    assert 1 ∷ i64 ≅ 1.0 ∷ f64
+    assert 1 ∷ u64 ≅ 1.0 ∷ f64
+    assert 1 ∷ i64 ≈ 1 ∷ u64
 }
 ",
     );
@@ -322,7 +322,7 @@ fn equality_relation_relaxed_admits_mixed_width_pairs() {
 fn equality_relation_strict_rejects_mixed_width_pairs() {
     assert_en_rejects_with_issue(
         "main {
-    assert 1 ∷ int<i64> ≡ 1 ∷ int<u64>
+    assert 1 ∷ i64 ≡ 1 ∷ u64
 }
 ",
         "equality_exact_types_required",

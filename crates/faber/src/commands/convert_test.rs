@@ -333,7 +333,7 @@ type Word = wrapping<u32>
 fn forms() → int {
     const int scalar_long ← 1
     const u32 scalar_short ← 2
-    const list<int<u32>> list_long ← empty
+    const list<u32> list_long ← empty
     const list<u32> list_middle ← empty
     const lu32 list_short ← empty
     const tensor<float, [2, 3]> tensor_long ← empty
@@ -379,7 +379,7 @@ fn convert_preserves_authored_type_forms_en_to_la() {
         "scalar L1 must stay short:\n{output}"
     );
     assert!(
-        output.contains("fixum lista<numerus<u32>> list_long"),
+        output.contains("fixum lista<u32> list_long"),
         "list L0/L0 must stay long:\n{output}"
     );
     assert!(
@@ -425,7 +425,7 @@ fn convert_preserves_three_way_list_forms_en_to_la() {
 locale = "en"
 +++
 fn lists() → int {
-    const list<int<u32>> long_form ← empty
+    const list<u32> long_form ← empty
     const list<u32> child_short ← empty
     const lu32 root_short ← empty
     return 0
@@ -443,7 +443,7 @@ fn lists() → int {
     let _ = fs::remove_file(&fixture);
 
     assert!(
-        output.contains("lista<numerus<u32>> long_form"),
+        output.contains("lista<u32> long_form"),
         "long list form changed:\n{output}"
     );
     assert!(
@@ -470,7 +470,7 @@ locale = "en"
 fn policy(trapping<u8> a) → trapping<i64> {
     const trapping<u8> spelled ← a
     const u8 bare ← a
-    const int<u8> long_form ← a
+    const u8 long_form ← a
     const list<trapping<u16>> inner ← empty
     return 0
 }
@@ -485,7 +485,7 @@ fn policy(trapping<u8> a) → trapping<i64> {
     );
     assert!(latin.contains("fixum exactus<u8> spelled"), "{latin}");
     assert!(latin.contains("fixum u8 bare"), "{latin}");
-    assert!(latin.contains("fixum numerus<u8> long_form"), "{latin}");
+    assert!(latin.contains("fixum u8 long_form"), "{latin}");
     assert!(latin.contains("fixum lista<exactus<u16>> inner"), "{latin}");
 
     fs::write(&fixture, &latin).expect("rewrite latin fixture");
@@ -497,7 +497,7 @@ fn policy(trapping<u8> a) → trapping<i64> {
     );
     assert!(english.contains("const trapping<u8> spelled"), "{english}");
     assert!(english.contains("const u8 bare"), "{english}");
-    assert!(english.contains("const int<u8> long_form"), "{english}");
+    assert!(english.contains("const u8 long_form"), "{english}");
     assert!(
         english.contains("const list<trapping<u16>> inner"),
         "{english}"
@@ -511,10 +511,10 @@ locale = "en"
 main {
     const bytes raw ← |3c 00 00 00|
     const char big ← 'A'
-    const int<u16> a ← raw[0‥2] ↦ int<u16> via Le
+    const u16 a ← raw[0‥2] ↦ u16 via Le
     const f16 b ← a ↦ f16 via Bits
-    const int c ← "ff" ↦ int<i32> via Hex ⊥ 0
-    const int<u32> d ← big ↦ int<u32> via Code
+    const int c ← "ff" ↦ i32 via Hex ⊥ 0
+    const u32 d ← big ↦ u32 via Code
     const char e ← 65 ↦ char via Code ⊥ '?'
     const int via ← c
     print via
@@ -531,13 +531,10 @@ fn convert_keeps_hints_in_the_via_clause() {
     let _ = fs::remove_file(&fixture);
 
     for (needle, what) in [
-        ("↦ int<u16> via Le", "the endian read keeps its clause"),
+        ("↦ u16 via Le", "the endian read keeps its clause"),
         ("↦ f16 via Bits", "the bitcast keeps its clause"),
-        (
-            "↦ int<i32> via Hex ⊥ 0",
-            "the clause binds before the default",
-        ),
-        ("↦ int<u32> via Code", "the code-point read"),
+        ("↦ i32 via Hex ⊥ 0", "the clause binds before the default"),
+        ("↦ u32 via Code", "the code-point read"),
         (
             "↦ char via Code ⊥ '?'",
             "the code-point build keeps its clause",
@@ -555,7 +552,7 @@ fn convert_keeps_hints_in_the_via_clause() {
         formatted.contains("const int via ← c") && formatted.contains("print via"),
         "`via` stays an ordinary name:\n{formatted}"
     );
-    assert!(latin.contains("↦ numerus<u16> via Le"), "{latin}");
+    assert!(latin.contains("↦ u16 via Le"), "{latin}");
     assert!(latin.contains("↦ littera via Code ⊥ '?'"), "{latin}");
 }
 

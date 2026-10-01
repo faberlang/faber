@@ -218,12 +218,12 @@ const G_PARAM_CAPTURE: &str = r#"+++
 locale = "en"
 +++
 
-fn _cut(list<int<u8>> b, int start, int length) → int {
+fn _cut(list<u8> b, int start, int length) → int {
     return start + length
 }
 
 @ public
-fn inspect_wrap(list<int<u8>> b) → int {
+fn inspect_wrap(list<u8> b) → int {
     return _fold((int start, int length) → int ∴ _cut(b, start, length), b.length())
 }
 
@@ -249,7 +249,7 @@ locale = "en"
 import from "rlib:g" g
 
 test "sibling closure captures param" {
-    const list<int<u8>> b ← [1, 2, 3]
+    const list<u8> b ← [1, 2, 3]
     const int out ← g.inspect_wrap(b)
     print out ≡ 4
     assert out ≡ 4
@@ -434,7 +434,7 @@ fn package_test_entry_unit_capture_closure_control() {
         r#"+++
 locale = "en"
 +++
-fn _cut(list<int<u8>> b, int start, int length) → int {
+fn _cut(list<u8> b, int start, int length) → int {
     return start + length
 }
 
@@ -443,7 +443,7 @@ fn _fold((int, int) → int f, int n) → int {
 }
 
 test "entry closure captures param" {
-    const list<int<u8>> b ← [1, 2, 3]
+    const list<u8> b ← [1, 2, 3]
     const int out ← _fold((int start, int length) → int ∴ _cut(b, start, length), b.length())
     print out ≡ 4
     assert out ≡ 4

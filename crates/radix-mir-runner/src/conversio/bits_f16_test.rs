@@ -71,7 +71,7 @@ fn u16_to_f16(bits: u16) -> Value {
 }
 
 fn f16_to_u16(value: Value) -> u16 {
-    let result = eval_convert(value, NumericWidth::U16).expect("fractus<f16> -> u16 via Bits");
+    let result = eval_convert(value, NumericWidth::U16).expect("f16 -> u16 via Bits");
     let Value::UInt(bits) = result else {
         panic!("expected u16 bits carrier, got {result:?}");
     };
@@ -108,9 +108,7 @@ fn f16_bits_folded_chain_equals_direct_exact_widen() {
         let folded = u16_to_f16(bits);
         // The fold step `fractus<f16> -> fractus<f32>` is a plain widen — no
         // Bits hint on the second hop.
-        let Value::Float(v) =
-            eval_widen(folded).expect("fractus<f16> -> fractus<f32> identity fold")
-        else {
+        let Value::Float(v) = eval_widen(folded).expect("f16 -> f32 identity fold") else {
             panic!("expected float fold result");
         };
         let direct = f64::from(crate::half_to_f32(bits));

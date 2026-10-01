@@ -654,7 +654,7 @@ fn gpu_reflection_fixture() -> (String, serde_json::Value) {
     let source = r"
 @ nucleum
 @ publica
-functio add_one(fractus<f32> x) → fractus<f32> {
+functio add_one(f32 x) → f32 {
     redde x + 1.0
 }
 ";

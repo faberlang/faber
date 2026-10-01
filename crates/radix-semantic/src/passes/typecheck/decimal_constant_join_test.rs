@@ -5,7 +5,7 @@
 
 use crate::test_support::{assert_accepts, assert_rejects_with_issue};
 
-const D: &str = "numerus<d64>";
+const D: &str = "d64";
 
 fn body(text: &str) -> String {
     format!("functio f({D} d) → {D} {{ {text} }}")
@@ -103,5 +103,5 @@ fn explicit_conversion_still_accepts() {
 #[test]
 fn integer_and_float_slots_are_unchanged() {
     assert_accepts("functio f(numerus n) → numerus { redde n + 1 }");
-    assert_accepts("incipit { fixum numerus<d64> e ← 4.2 }");
+    assert_accepts("incipit { fixum d64 e ← 4.2 }");
 }

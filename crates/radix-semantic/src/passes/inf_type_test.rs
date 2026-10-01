@@ -83,7 +83,7 @@ functio tere(inf a, exactus<inf> b, modulus<inf> c, saturatus<inf> d) → inf {
 fn numerus_inf_is_the_same_type_as_bare_inf() {
     assert_accepts(
         r"
-functio tere(numerus<inf> a) → inf {
+functio tere(inf a) → inf {
     redde a
 }
 ",
@@ -284,7 +284,7 @@ fn an_air_lane_inf_local_is_rejected() {
     let err = expect_issue(
         r#"
 @ radix lane "air"
-functio pura(numerus<i32> n) → numerus<i32> {
+functio pura(i32 n) → i32 {
     fixum inf x ← 1
     redde n
 }

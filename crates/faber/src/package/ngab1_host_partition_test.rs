@@ -47,16 +47,16 @@ use std::path::PathBuf;
 /// kernel, plus the entry that exercises the call at the declared input.
 /// `fractus<f32>` is the f32 scalar surface (plain `fractus` is f64).
 const NGAB0_U11_FIXTURE: &str = r#"@ nucleum
-functio scale_kernel(fractus<f32> x) → fractus<f32> {
+functio scale_kernel(f32 x) → f32 {
     redde x * 2.0 + 1.0
 }
 
-functio run_scale(fractus<f32> x) → fractus<f32> {
+functio run_scale(f32 x) → f32 {
     redde scale_kernel(x)
 }
 
 incipit {
-    nota run_scale(3.0 ∷ fractus<f32>)
+    nota run_scale(3.0 ∷ f32)
 }"#;
 
 fn llvm_host_config() -> radix::module::Config {
@@ -323,16 +323,16 @@ fn expect_boundary_rejection(source: &str, class: &'static str) {
 fn ngab1_boundary_rejects_wrong_type() {
     expect_boundary_rejection(
         r#"@ nucleum
-functio scale_kernel(fractus<f32> x) → fractus<f32> {
+functio scale_kernel(f32 x) → f32 {
     redde x * 2.0 + 1.0
 }
 
-functio run_scale(fractus<f16> x) → fractus<f32> {
+functio run_scale(f16 x) → f32 {
     redde scale_kernel(x)
 }
 
 incipit {
-    nota run_scale(1.0 ∷ fractus<f16>)
+    nota run_scale(1.0 ∷ f16)
 }"#,
         "type",
     );
@@ -359,17 +359,17 @@ fn ngab1_boundary_rejects_output_into_parameter_guarded() {
     fs::write(
         &entry,
         r#"@ nucleum
-functio scale_kernel(fractus<f32> x) → fractus<f32> {
+functio scale_kernel(f32 x) → f32 {
     redde x * 2.0 + 1.0
 }
 
-functio run_scale(fractus<f32> x) → fractus<f32> {
-    x ← scale_kernel(1.0 ∷ fractus<f32>)
+functio run_scale(f32 x) → f32 {
+    x ← scale_kernel(1.0 ∷ f32)
     redde x
 }
 
 incipit {
-    nota run_scale(3.0 ∷ fractus<f32>)
+    nota run_scale(3.0 ∷ f32)
 }"#,
     )
     .expect("write fixture");
@@ -399,18 +399,18 @@ incipit {
 fn ngab1_boundary_rejects_in_place_mutation() {
     expect_boundary_rejection(
         r#"@ nucleum
-functio scale_kernel(fractus<f32> x) → fractus<f32> {
+functio scale_kernel(f32 x) → f32 {
     redde x * 2.0 + 1.0
 }
 
-functio run_scale(fractus<f32> x) → fractus<f32> {
-    varia fractus<f32> y ← x
+functio run_scale(f32 x) → f32 {
+    varia f32 y ← x
     y ← scale_kernel(y)
     redde y
 }
 
 incipit {
-    nota run_scale(3.0 ∷ fractus<f32>)
+    nota run_scale(3.0 ∷ f32)
 }"#,
         "mutation",
     );
@@ -423,17 +423,17 @@ incipit {
 fn ngab1_boundary_rejects_observing_unlaunched_work() {
     expect_boundary_rejection(
         r#"@ nucleum
-functio scale_kernel(fractus<f32> x) → fractus<f32> {
+functio scale_kernel(f32 x) → f32 {
     redde x * 2.0 + 1.0
 }
 
-functio run_scale(fractus<f32> x) → fractus<f32> {
-    varia fractus<f32> y ← scale_kernel(x)
+functio run_scale(f32 x) → f32 {
+    varia f32 y ← scale_kernel(x)
     redde scale_kernel(y)
 }
 
 incipit {
-    nota run_scale(3.0 ∷ fractus<f32>)
+    nota run_scale(3.0 ∷ f32)
 }"#,
         "observation",
     );
@@ -454,22 +454,22 @@ incipit {
 /// Both kernels' typed facts (entry identity, ordered launches, declared
 /// observations) survive into the derived device program.
 const NGAB1_U4_TWO_KERNEL_FIXTURE: &str = r#"@ nucleum
-functio scale_kernel(fractus<f32> x) → fractus<f32> {
+functio scale_kernel(f32 x) → f32 {
     redde x * 2.0 + 1.0
 }
 
 @ nucleum
-functio offset_kernel(fractus<f32> x) → fractus<f32> {
+functio offset_kernel(f32 x) → f32 {
     redde x + 5.0
 }
 
-functio run_batch(fractus<f32> x) → fractus<f32> {
-    varia fractus<f32> y ← scale_kernel(x)
+functio run_batch(f32 x) → f32 {
+    varia f32 y ← scale_kernel(x)
     redde offset_kernel(y)
 }
 
 incipit {
-    nota run_batch(3.0 ∷ fractus<f32>)
+    nota run_batch(3.0 ∷ f32)
 }"#;
 
 #[test]

@@ -150,17 +150,17 @@ fn assert_composed(source: &str) {
 #[test]
 fn definition_host_callable_emphasizes_fragment_body() {
     let source = r"
-functio host_add(fractus<f32> x) → fractus<f32> {
+functio host_add(f32 x) → f32 {
     redde x
 }
 
 @ nucleum fragment
-functio helper(fractus<f32> x) → fractus<f32> {
+functio helper(f32 x) → f32 {
     redde host_add(x)
 }
 
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde helper(x)
 }
 ";
@@ -187,16 +187,16 @@ functio k(fractus<f32> x) → fractus<f32> {
 fn instantiation_host_callable_emphasizes_call_site() {
     let source = r"
 @ nucleum fragment
-functio helper(fractus<f32> x) → fractus<f32> {
+functio helper(f32 x) → f32 {
     redde x
 }
 
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde helper(x)
 }
 
-functio host(fractus<f32> x) → fractus<f32> {
+functio host(f32 x) → f32 {
     redde helper(x)
 }
 ";
@@ -227,13 +227,13 @@ functio host(fractus<f32> x) → fractus<f32> {
 fn definition_effect_through_wrapper_keeps_identifier() {
     let source = r"
 @ nucleum fragment
-functio helper(fractus<f32> x) → fractus<f32> {
+functio helper(f32 x) → f32 {
     scribe x
     redde x
 }
 
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde helper(x)
 }
 ";
@@ -274,12 +274,12 @@ fn matrix_entry_to_fragment_composes_through_wrapper() {
     assert_composed(
         r"
 @ nucleum fragment
-functio helper(fractus<f32> x) → fractus<f32> {
+functio helper(f32 x) → f32 {
     redde x
 }
 
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde helper(x)
 }
 ",
@@ -291,17 +291,17 @@ fn matrix_fragment_to_fragment_to_entry_composes() {
     assert_composed(
         r"
 @ nucleum fragment
-functio inner(fractus<f32> x) → fractus<f32> {
+functio inner(f32 x) → f32 {
     redde x
 }
 
 @ nucleum fragment
-functio outer(fractus<f32> x) → fractus<f32> {
+functio outer(f32 x) → f32 {
     redde inner(x)
 }
 
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde outer(x)
 }
 ",
@@ -315,17 +315,17 @@ fn matrix_entry_to_kernel_helper_composes() {
     // validation, transitively through the fragment it wraps.
     let source = r"
 @ nucleum fragment
-functio helper(fractus<f32> x) → fractus<f32> {
+functio helper(f32 x) → f32 {
     redde x
 }
 
 @ nucleum
-functio inner(fractus<f32> x) → fractus<f32> {
+functio inner(f32 x) → f32 {
     redde helper(x)
 }
 
 @ nucleum
-functio outer(fractus<f32> x) → fractus<f32> {
+functio outer(f32 x) → f32 {
     redde inner(x)
 }
 ";
@@ -348,17 +348,17 @@ functio outer(fractus<f32> x) → fractus<f32> {
 fn matrix_fragment_to_entry_is_rejected() {
     let source = r"
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde x
 }
 
 @ nucleum fragment
-functio helper(fractus<f32> x) → fractus<f32> {
+functio helper(f32 x) → f32 {
     redde k(x)
 }
 
 @ nucleum
-functio wrap(fractus<f32> x) → fractus<f32> {
+functio wrap(f32 x) → f32 {
     redde helper(x)
 }
 ";
@@ -433,17 +433,17 @@ functio k() → vacuum {
 #[test]
 fn matrix_entry_to_ordinary_is_rejected() {
     let source = r"
-functio host_add(fractus<f32> x) → fractus<f32> {
+functio host_add(f32 x) → f32 {
     redde x
 }
 
 @ nucleum fragment
-functio helper(fractus<f32> x) → fractus<f32> {
+functio helper(f32 x) → f32 {
     redde x
 }
 
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde host_add(helper(x))
 }
 ";
@@ -460,12 +460,12 @@ functio k(fractus<f32> x) → fractus<f32> {
 fn eval_once_through_wrapper_binds_argument_once() {
     let source = r"
 @ nucleum fragment
-functio twice(fractus<f32> x) → fractus<f32> {
+functio twice(f32 x) → f32 {
     redde x + x
 }
 
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde twice(x)
 }
 ";
@@ -524,17 +524,17 @@ functio k(fractus<f32> x) → fractus<f32> {
 fn cycle_rejection_reports_caller_callee_chain() {
     let source = r"
 @ nucleum fragment
-functio ping(fractus<f32> x) → fractus<f32> {
+functio ping(f32 x) → f32 {
     redde pong(x)
 }
 
 @ nucleum fragment
-functio pong(fractus<f32> x) → fractus<f32> {
+functio pong(f32 x) → f32 {
     redde ping(x)
 }
 
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde ping(x)
 }
 ";
@@ -549,12 +549,12 @@ functio k(fractus<f32> x) → fractus<f32> {
 fn budget_override_rejects_wrapper_expansion() {
     let source = r"
 @ nucleum fragment
-functio helper(fractus<f32> x) → fractus<f32> {
+functio helper(f32 x) → f32 {
     redde x
 }
 
 @ nucleum
-functio k(fractus<f32> x) → fractus<f32> {
+functio k(f32 x) → f32 {
     redde helper(x)
 }
 ";

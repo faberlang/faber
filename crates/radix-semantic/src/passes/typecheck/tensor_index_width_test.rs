@@ -66,7 +66,7 @@ fn accipe_accepts_inline_u32_index_literal() {
 fn accipe_accepts_lista_numerus_u32_spelling() {
     accepts(
         r"functio check(tf32[16] input, u32 id) → f32 {
-    fixum lista<numerus<u32>> idx ← [id]
+    fixum lista<u32> idx ← [id]
     redde input.accipe(idx) vel 0.0
 }",
     );
@@ -75,7 +75,7 @@ fn accipe_accepts_lista_numerus_u32_spelling() {
 #[test]
 fn accipe_accepts_lista_i32_index() {
     accepts(
-        r"functio check(tf32[16] input, numerus<i32> id) → f32 {
+        r"functio check(tf32[16] input, i32 id) → f32 {
     redde input.accipe([id]) vel 0.0
 }",
     );

@@ -86,11 +86,11 @@ fn times_divide_and_remainder_lift_against_a_scalar() {
 #[test]
 fn integer_division_and_remainder_floor_per_element() {
     let program = "incipit {
-fixum tensor<numerus<i32>, []> seed ← vacua
-fixum tensor<numerus<i32>, [4]> a ← seed.strue([7, -7, 9, -9], [4])
-fixum tensor<numerus<i32>, [4]> q ← a / 2
-fixum tensor<numerus<i32>, [4]> r ← a % 2
-fixum tensor<numerus<i32>, [4]> s ← a % -2
+fixum tensor<i32, []> seed ← vacua
+fixum tensor<i32, [4]> a ← seed.strue([7, -7, 9, -9], [4])
+fixum tensor<i32, [4]> q ← a / 2
+fixum tensor<i32, [4]> r ← a % 2
+fixum tensor<i32, [4]> s ← a % -2
 nota q.planata()
 nota r.planata()
 nota s.planata()
@@ -102,10 +102,10 @@ nota s.planata()
 fn a_zero_integer_divisor_traps_and_a_zero_float_divisor_is_ieee() {
     let (out, issue, message) = trap(
         "incipit {
-fixum tensor<numerus<i32>, []> seed ← vacua
-fixum tensor<numerus<i32>, [2]> a ← seed.strue([4, 8], [2])
+fixum tensor<i32, []> seed ← vacua
+fixum tensor<i32, [2]> a ← seed.strue([4, 8], [2])
 nota \"a\"
-fixum tensor<numerus<i32>, [2]> r ← a / 0
+fixum tensor<i32, [2]> r ← a / 0
 nota r.planata()
 }",
     );
@@ -123,25 +123,24 @@ nota r.planata()
 
 #[test]
 fn u8_elements_are_stored_per_element_and_trap_past_the_type() {
-    let setup = "fixum tensor<numerus<u8>, []> seed ← vacua
-fixum tensor<numerus<u8>, [3]> a ← seed.strue([200, 1, 100], [3])\n";
+    let setup = "fixum tensor<u8, []> seed ← vacua
+fixum tensor<u8, [3]> a ← seed.strue([200, 1, 100], [3])\n";
     // Fits: each element is stored under `u8`.
-    let fits = format!("incipit {{\n{setup}fixum tensor<numerus<u8>, [3]> r ← a + 50\nnota r.planata()\n}}");
+    let fits = format!("incipit {{\n{setup}fixum tensor<u8, [3]> r ← a + 50\nnota r.planata()\n}}");
     assert_eq!(ok(&fits), ["[250, 51, 150]"]);
     // 200 + 100 leaves `u8`: the element store traps with its identity.
-    let over =
-        format!("incipit {{\n{setup}nota \"a\"\nfixum tensor<numerus<u8>, [3]> r ← a + 100\nnota r.planata()\n}}");
+    let over = format!("incipit {{\n{setup}nota \"a\"\nfixum tensor<u8, [3]> r ← a + 100\nnota r.planata()\n}}");
     let (out, issue, message) = trap(&over);
     assert_eq!(out, ["a"]);
     assert_eq!(issue, "implicit_store_out_of_range");
     assert!(message.contains("300 does not fit in `u8`"), "{message}");
     // Below zero: `1 - 2` does not fit an unsigned element.
-    let under = format!("incipit {{\n{setup}fixum tensor<numerus<u8>, [3]> r ← a - 2\nnota r.planata()\n}}");
+    let under = format!("incipit {{\n{setup}fixum tensor<u8, [3]> r ← a - 2\nnota r.planata()\n}}");
     let (_, issue, message) = trap(&under);
     assert_eq!(issue, "implicit_store_out_of_range");
     assert!(message.contains("-1 does not fit in `u8`"), "{message}");
     // Negation of an unsigned element is a store too.
-    let neg = format!("incipit {{\n{setup}fixum tensor<numerus<u8>, [3]> r ← -a\nnota r.planata()\n}}");
+    let neg = format!("incipit {{\n{setup}fixum tensor<u8, [3]> r ← -a\nnota r.planata()\n}}");
     let (_, issue, _) = trap(&neg);
     assert_eq!(issue, "implicit_store_out_of_range");
 }
@@ -150,9 +149,9 @@ fixum tensor<numerus<u8>, [3]> a ← seed.strue([200, 1, 100], [3])\n";
 fn a_constant_beyond_the_element_widens_the_join() {
     // `a + 300` joins `u8` with the constant's range: elements are `u16`.
     let program = "incipit {
-fixum tensor<numerus<u8>, []> seed ← vacua
-fixum tensor<numerus<u8>, [3]> a ← seed.strue([200, 1, 100], [3])
-fixum tensor<numerus<u16>, [3]> r ← a + 300
+fixum tensor<u8, []> seed ← vacua
+fixum tensor<u8, [3]> a ← seed.strue([200, 1, 100], [3])
+fixum tensor<u16, [3]> r ← a + 300
 nota r.planata()
 }";
     assert_eq!(ok(program), ["[500, 301, 400]"]);
@@ -161,13 +160,13 @@ nota r.planata()
 #[test]
 fn mixed_integer_widths_join_losslessly_between_tensors() {
     let program = "incipit {
-fixum tensor<numerus<u8>, []> s8 ← vacua
-fixum tensor<numerus<u16>, []> s16 ← vacua
-fixum tensor<numerus<u8>, [2]> a ← s8.strue([200, 100], [2])
-fixum tensor<numerus<u16>, [2]> b ← s16.strue([1000, 2], [2])
-fixum tensor<numerus<u16>, [2]> r ← a + b
+fixum tensor<u8, []> s8 ← vacua
+fixum tensor<u16, []> s16 ← vacua
+fixum tensor<u8, [2]> a ← s8.strue([200, 100], [2])
+fixum tensor<u16, [2]> b ← s16.strue([1000, 2], [2])
+fixum tensor<u16, [2]> r ← a + b
 nota r.planata()
-fixum tensor<numerus<u16>, [2]> m ← a ⤒ b
+fixum tensor<u16, [2]> m ← a ⤒ b
 nota m.planata()
 }";
     assert_eq!(ok(program), ["[1200, 102]", "[1000, 100]"]);
@@ -176,9 +175,9 @@ nota m.planata()
 #[test]
 fn true_division_takes_ruling_23_widths_and_traps_an_integer_zero_divisor() {
     let program = "incipit {
-fixum tensor<numerus<u8>, []> seed ← vacua
-fixum tensor<numerus<u8>, [3]> a ← seed.strue([1, 2, 3], [3])
-fixum tensor<numerus<u8>, [3]> b ← seed.strue([2, 4, 4], [3])
+fixum tensor<u8, []> seed ← vacua
+fixum tensor<u8, [3]> a ← seed.strue([1, 2, 3], [3])
+fixum tensor<u8, [3]> b ← seed.strue([2, 4, 4], [3])
 fixum tensor<f32, [3]> r ← a ÷ 2
 fixum tensor<f32, [3]> s ← a ÷ b
 nota r.planata()
@@ -187,9 +186,9 @@ nota s.planata()
     assert_eq!(ok(program), ["[0.5, 1.0, 1.5]", "[0.5, 0.5, 0.75]"]);
     let (_, issue, _) = trap(
         "incipit {
-fixum tensor<numerus<i32>, []> seed ← vacua
-fixum tensor<numerus<i32>, [2]> a ← seed.strue([1, 2], [2])
-fixum tensor<numerus<i32>, [2]> z ← seed.strue([1, 0], [2])
+fixum tensor<i32, []> seed ← vacua
+fixum tensor<i32, [2]> a ← seed.strue([1, 2], [2])
+fixum tensor<i32, [2]> z ← seed.strue([1, 0], [2])
 fixum tensor<f64, [2]> r ← a ÷ z
 nota r.planata()
 }",

@@ -106,8 +106,8 @@ fn resolve_rejects_convert_hint_hole() {
 fn numerus_hole_solves_exact_sized_witness() {
     test_support::assert_accepts(
         r"incipit {
-    fixum numerus<_> n ← 1 ∷ numerus<i32>
-    fixum numerus<i32> m ← n
+    fixum numerus<_> n ← 1 ∷ i32
+    fixum i32 m ← n
     nota m
 }",
     );
@@ -118,7 +118,7 @@ fn numerus_hole_materializes_bare_witness_to_i64() {
     test_support::assert_accepts(
         r"incipit {
     fixum numerus<_> n ← 42
-    fixum numerus<i64> m ← n
+    fixum i64 m ← n
     nota m
 }",
     );
@@ -128,7 +128,7 @@ fn numerus_hole_materializes_bare_witness_to_i64() {
 fn bare_numerus_still_accepts_i32_via_default_path() {
     test_support::assert_accepts(
         r"incipit {
-    fixum numerus n ← 1 ∷ numerus<i32>
+    fixum numerus n ← 1 ∷ i32
     nota n
 }",
     );
@@ -138,7 +138,7 @@ fn bare_numerus_still_accepts_i32_via_default_path() {
 fn numerus_hole_rejects_fractus_witness() {
     test_support::assert_rejects_with_issue(
         r"incipit {
-    fixum numerus<_> n ← 1.0 ∷ fractus<f32>
+    fixum numerus<_> n ← 1.0 ∷ f32
     nota n
 }",
         "expression_type_mismatch",
@@ -149,8 +149,8 @@ fn numerus_hole_rejects_fractus_witness() {
 fn fractus_hole_solves_exact_sized_witness() {
     test_support::assert_accepts(
         r"incipit {
-    fixum fractus<_> x ← 1.0 ∷ fractus<f32>
-    fixum fractus<f32> y ← x
+    fixum fractus<_> x ← 1.0 ∷ f32
+    fixum f32 y ← x
     nota y
 }",
     );
@@ -191,7 +191,7 @@ fn unsolved_numerus_hole_errors() {
 fn numerus_hole_interns_sized_i32_not_i64() {
     let unit = test_support::analyze_ok(
         r"incipit {
-    fixum numerus<_> n ← 1 ∷ numerus<i32>
+    fixum numerus<_> n ← 1 ∷ i32
     nota n
 }",
     );
@@ -243,7 +243,7 @@ fn numerus_hole_and_bare_are_two_interned_types() {
 fn fractus_hole_interns_sized_f32() {
     let unit = test_support::analyze_ok(
         r"incipit {
-    fixum fractus<_> x ← 1.0 ∷ fractus<f32>
+    fixum fractus<_> x ← 1.0 ∷ f32
     nota x
 }",
     );
@@ -283,7 +283,7 @@ fn fractus_hole_materializes_bare_witness_to_f64() {
 fn fractus_hole_rejects_numerus_witness() {
     test_support::assert_rejects_with_issue(
         r"incipit {
-    fixum fractus<_> x ← 1 ∷ numerus<i32>
+    fixum fractus<_> x ← 1 ∷ i32
     nota x
 }",
         "expression_type_mismatch",
@@ -311,7 +311,7 @@ fn modulus_hole_interns_u32() {
 fn modulus_hole_rejects_signed_numerus() {
     test_support::assert_analysis_rejects_with_issue(
         r"incipit {
-    fixum modulus<_> m ← 1 ∷ numerus<i32>
+    fixum modulus<_> m ← 1 ∷ i32
     nota m
 }",
         "expression_type_mismatch",
@@ -478,7 +478,7 @@ fn harness_exact_marker_does_not_widen() {
     let unified = checker.unify_assign_issue(i32_ty, hole, span, "expression_type_mismatch");
     assert!(
         checker.errors.is_empty(),
-        "numerus<i32> → numerus<_> must unify: {:?}",
+        "i32 → numerus<_> must unify: {:?}",
         checker.errors
     );
     assert!(

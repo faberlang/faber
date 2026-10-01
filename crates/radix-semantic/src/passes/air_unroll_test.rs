@@ -996,7 +996,7 @@ functio octeti_full() → vacuum {
     );
     assert!(
         gathers.0.iter().all(|ty| is_numerus_u8(&result.types, *ty)),
-        "every octeti<N> lane gathers numerus<u8>: {:?}",
+        "every octeti<N> lane gathers u8: {:?}",
         gathers.0
     );
 }

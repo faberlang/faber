@@ -27,7 +27,7 @@ locale = "en"
 
 @ kernel
 @ public
-fn densa(float<f32> x) → float<f32> {
+fn densa(f32 x) → f32 {
     var f32 n ← 0.0
     if x > 1.0 { n ← 1.0 }
     if x > 2.0 { n ← 2.0 }
@@ -36,7 +36,7 @@ fn densa(float<f32> x) → float<f32> {
 
 @ kernel
 @ public
-fn quieta(float<f32> x) → float<f32> {
+fn quieta(f32 x) → f32 {
     var f32 n ← 0.0
     if x > 1.0 { n ← 1.0 }
     return n

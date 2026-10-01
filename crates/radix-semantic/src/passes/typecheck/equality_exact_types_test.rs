@@ -77,7 +77,7 @@ functio same(instans<ns> fine, instans<ms> coarse) → bivalens {
             name: "sized_numerus_cross_width_eq_rejects",
             source: r#"
 incipit {
-    fixum numerus<u8> narrow ← 1 ∷ numerus<u8>
+    fixum u8 narrow ← 1 ∷ u8
     fixum numerus wide ← 1
     si narrow ≡ wide { nota "bad" }
 }
@@ -90,7 +90,7 @@ incipit {
             name: "sized_numerus_d64_within_width_eq_accepts",
             source: r#"
 incipit {
-    fixum numerus<d64> a ← 4.2
+    fixum d64 a ← 4.2
     si a ≡ a { nota "ok" }
 }
 "#,
@@ -100,7 +100,7 @@ incipit {
             name: "decimal_integer_cross_family_eq_rejects",
             source: r#"
 incipit {
-    fixum numerus<d64> a ← 4.2
+    fixum d64 a ← 4.2
     si a ≡ 1 { nota "bad" }
 }
 "#,
@@ -110,7 +110,7 @@ incipit {
             name: "decimal_fractus_cross_family_eq_rejects",
             source: r#"
 incipit {
-    fixum numerus<d64> a ← 4.2
+    fixum d64 a ← 4.2
     si a ≡ 4.2 { nota "bad" }
 }
 "#,
@@ -122,7 +122,7 @@ incipit {
             source: r#"
 incipit {
     fixum octeti raw ← |41|
-    fixum lista<numerus<u8>> bytes ← [0x41 ∷ numerus<u8>]
+    fixum lista<u8> bytes ← [0x41 ∷ u8]
     si raw ≡ bytes { nota "same" }
 }
 "#,

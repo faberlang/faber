@@ -13910,8 +13910,8 @@ fn package_fmir_text_image_round_trips_upper_half_u64_constants() {
         &entry,
         r"
 main {
-  const int<u64> max ← 18446744073709551615
-  const int<u64> sha ← 9223372036854775808
+  const u64 max ← 18446744073709551615
+  const u64 sha ← 9223372036854775808
   print max
   print sha
 }
@@ -13947,8 +13947,8 @@ fn package_fmir_image_round_trips_upper_half_u64_constants() {
         &entry,
         r"
 main {
-  const int<u64> max ← 18446744073709551615
-  const int<u64> sha ← 9223372036854775808
+  const u64 max ← 18446744073709551615
+  const u64 sha ← 9223372036854775808
   print max
   print sha
 }

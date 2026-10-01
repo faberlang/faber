@@ -30,7 +30,7 @@ typus Matrix<magnitudo R, magnitudo C> = matrix<f32, [R, C]>
 fn intrinsic_methods_check_on_applied_alias_receivers() {
     test_support::assert_accepts(&format!(
         "{LOCAL_ALIASES}\
-functio probe(Vector<3> a, Vector<3> b) → fractus<f32> {{
+functio probe(Vector<3> a, Vector<3> b) → f32 {{
     fixum Vector<3> swapped ← a.swizzle(\"zyx\")
     redde a.addita(b).productum(a) + swapped.productum(a) + a.transversum(b).productum(a)
 }}"
@@ -41,7 +41,7 @@ functio probe(Vector<3> a, Vector<3> b) → fractus<f32> {{
 fn glyph_operators_check_on_applied_alias_operands() {
     test_support::assert_accepts(&format!(
         "{LOCAL_ALIASES}\
-functio probe(Vector<3> a, Vector<2> b) → fractus<f32> {{
+functio probe(Vector<3> a, Vector<2> b) → f32 {{
     fixum Matrix<3, 2> outer ← a ⊗ b
     fixum Matrix<2, 3> inner ← b ⊗ a
     fixum Matrix<3, 3> product ← outer · inner
@@ -54,7 +54,7 @@ functio probe(Vector<3> a, Vector<2> b) → fractus<f32> {{
 fn literal_conversio_targets_applied_alias() {
     test_support::assert_accepts(&format!(
         "{LOCAL_ALIASES}\
-functio probe() → fractus<f32> {{
+functio probe() → f32 {{
     fixum Vector<2> a ← [1.0, 2.0] ↦ Vector<2>
     fixum Vector<3> b ← [1.0, 2.0, 3.0] ↦ Vector<3>
     fixum Vector<4> c ← [1.0, 2.0, 3.0, 4.0] ↦ Vector<4>
@@ -69,7 +69,7 @@ fn builtin_value_assigns_to_alias_annotation() {
     // bound to an alias-annotated local.
     test_support::assert_accepts(&format!(
         "{LOCAL_ALIASES}\
-functio probe() → fractus<f32> {{
+functio probe() → f32 {{
     fixum vector<f32, 4> s ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
     fixum vector<f32, 3> t ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
     fixum Matrix<4, 3> outer ← s ⊗ t
@@ -86,7 +86,7 @@ functio addita2<magnitudo N>(Vector<N> a, Vector<N> b) → Vector<N> {{
     redde a.addita(b)
 }}
 
-functio probe() → fractus<f32> {{
+functio probe() → f32 {{
     fixum Vector<2> a ← [1.0, 2.0] ↦ Vector<2>
     fixum Vector<2> b ← [2.0, 4.0] ↦ Vector<2>
     fixum Vector<2> s ← addita2(a, b)
@@ -105,7 +105,7 @@ functio transversum3(Vector<3> a, Vector<3> b) → Vector<3> {{
     redde a.transversum(b)
 }}
 
-functio probe() → fractus<f32> {{
+functio probe() → f32 {{
     fixum Vector<3> a ← [1.0, 2.0, 3.0] ↦ Vector<3>
     fixum Vector<3> x ← transversum3(a, a)
     redde x.productum(a)
@@ -123,7 +123,7 @@ fn wrong_width_literal_conversio_keeps_builtin_diagnostic() {
     test_support::assert_rejects_with_issue(
         &format!(
             "{LOCAL_ALIASES}\
-functio probe() → fractus<f32> {{
+functio probe() → f32 {{
     fixum Vector<3> v ← [1.0, 2.0] ↦ Vector<3>
     redde v.productum(v)
 }}"
@@ -137,7 +137,7 @@ fn builtin_to_alias_wrong_width_assignment_still_rejects() {
     test_support::assert_rejects_with_issue(
         &format!(
             "{LOCAL_ALIASES}\
-functio probe() → fractus<f32> {{
+functio probe() → f32 {{
     fixum vector<f32, 3> s ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
     fixum vector<f32, 4> t ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
     fixum Matrix<4, 3> bad ← s ⊗ t
@@ -157,7 +157,7 @@ functio addita2<magnitudo N>(Vector<N> a, Vector<N> b) → Vector<N> {{
     redde a.addita(b)
 }}
 
-functio probe() → fractus<f32> {{
+functio probe() → f32 {{
     fixum Vector<2> a ← [1.0, 2.0] ↦ Vector<2>
     fixum Vector<3> b ← [1.0, 2.0, 3.0] ↦ Vector<3>
     fixum Vector<2> s ← addita2(a, b)
@@ -174,7 +174,7 @@ fn unknown_method_on_alias_receiver_keeps_rejecting() {
     test_support::assert_rejects_with_issue(
         &format!(
             "{LOCAL_ALIASES}\
-functio probe(Vector<3> a) → fractus<f32> {{
+functio probe(Vector<3> a) → f32 {{
     redde a.nusquam_methodus()
 }}"
         ),
@@ -191,7 +191,7 @@ fn applied_nominal_receiver_keeps_unknown_method() {
     varia vector<f32, N> lanes
 }
 
-functio probe(Capsula<3> c) → fractus<f32> {
+functio probe(Capsula<3> c) → f32 {
     redde c.addita(c)
 }",
         "unknown_method",
@@ -252,7 +252,7 @@ fn imported_alias_application_is_value_transparent() {
     let fixture = analyze_imported(
         r#"importa ex "./gmt" gmt
 
-functio probe() → fractus<f32> {
+functio probe() → f32 {
     fixum vector<f32, 4> s ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
     fixum vector<f32, 3> t ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
     fixum gmt.Matrix<4, 3> outer ← s ⊗ t
@@ -271,7 +271,7 @@ fn imported_alias_wrong_width_still_rejects() {
     let fixture = analyze_imported(
         r#"importa ex "./gmt" gmt
 
-functio probe() → fractus<f32> {
+functio probe() → f32 {
     fixum vector<f32, 3> s ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
     fixum vector<f32, 4> t ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
     fixum gmt.Matrix<4, 3> bad ← s ⊗ t

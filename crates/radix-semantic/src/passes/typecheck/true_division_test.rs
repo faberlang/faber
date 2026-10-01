@@ -8,7 +8,7 @@ const EXACT_EQ: &str = "equality_exact_types_required";
 
 #[test]
 fn constant_true_division_is_f64() {
-    assert_accepts("functio p() → fractus<f64> { redde 7 ÷ 2 }");
+    assert_accepts("functio p() → f64 { redde 7 ÷ 2 }");
     assert_rejects_with_issue(
         "functio p() → numerus { redde 7 ÷ 2 }",
         "return_type_mismatch",
@@ -19,83 +19,79 @@ fn constant_true_division_is_f64() {
 #[test]
 fn integer_true_division_width_follows_the_operands() {
     // 8- and 16-bit operands: f32.
-    assert_accepts("functio p(numerus<u8> a, numerus<u8> b) → fractus<f32> { redde a ÷ b }");
-    assert_accepts("functio p(numerus<i16> a, numerus<u8> b) → fractus<f32> { redde a ÷ b }");
+    assert_accepts("functio p(u8 a, u8 b) → f32 { redde a ÷ b }");
+    assert_accepts("functio p(i16 a, u8 b) → f32 { redde a ÷ b }");
     // 32/64-bit or default `int`: f64; mixed widths use the wider.
-    assert_accepts("functio p(numerus<i16> a, numerus<i32> b) → fractus<f64> { redde a ÷ b }");
-    assert_accepts("functio p(numerus<i32> a, numerus<u16> b) → fractus<f64> { redde a ÷ b }");
-    assert_accepts("functio p(numerus a) → fractus<f64> { redde a ÷ 3 }");
+    assert_accepts("functio p(i16 a, i32 b) → f64 { redde a ÷ b }");
+    assert_accepts("functio p(i32 a, u16 b) → f64 { redde a ÷ b }");
+    assert_accepts("functio p(numerus a) → f64 { redde a ÷ 3 }");
     // A constant joins by value beside a typed operand, defaults to `int` alone.
-    assert_accepts("functio p(numerus<u8> a) → fractus<f32> { redde a ÷ 2 }");
-    assert_accepts("functio p(numerus<u8> a) → fractus<f32> { redde 1000 ÷ a }");
-    assert_accepts("functio p(numerus<u8> a) → fractus<f64> { redde a ÷ 100000 }");
-    assert_accepts("functio p() → fractus<f64> { redde 7 ÷ 2 }");
+    assert_accepts("functio p(u8 a) → f32 { redde a ÷ 2 }");
+    assert_accepts("functio p(u8 a) → f32 { redde 1000 ÷ a }");
+    assert_accepts("functio p(u8 a) → f64 { redde a ÷ 100000 }");
+    assert_accepts("functio p() → f64 { redde 7 ÷ 2 }");
     // A sub-expression keys on its range type: `u8 + u8` is `u16`.
-    assert_accepts(
-        "functio p(numerus<u8> a, numerus<u8> b, numerus<u8> c) → fractus<f32> { redde (a + b) ÷ c }",
-    );
-    assert_accepts(
-        "functio p(numerus<u8> a, numerus<u8> b, numerus<u8> c) → fractus<f64> { redde (a * b * c) ÷ c }",
-    );
+    assert_accepts("functio p(u8 a, u8 b, u8 c) → f32 { redde (a + b) ÷ c }");
+    assert_accepts("functio p(u8 a, u8 b, u8 c) → f64 { redde (a * b * c) ÷ c }");
     assert_rejects_with_issue(
-        "functio p(numerus<u8> a, numerus<u8> b) → numerus<u8> { redde a ÷ b }",
+        "functio p(u8 a, u8 b) → u8 { redde a ÷ b }",
         "return_type_mismatch",
     );
     // The reverse: an `f64` quotient does not narrow into `f32`.
     assert_rejects_with_issue(
-        "functio p(numerus a, numerus b) → fractus<f32> { redde a ÷ b }",
+        "functio p(numerus a, numerus b) → f32 { redde a ÷ b }",
         "return_type_mismatch",
     );
 }
 
 #[test]
 fn word_true_division_follows_the_word_width() {
-    assert_accepts("functio p(modulus<u8> a, modulus<u8> b) → fractus<f32> { redde a ÷ b }");
-    assert_accepts("functio p(modulus<u32> a, modulus<u32> b) → fractus<f64> { redde a ÷ b }");
-    assert_accepts("functio p(saturatus<i16> a) → fractus<f32> { redde a ÷ 2 }");
+    assert_accepts("functio p(modulus<u8> a, modulus<u8> b) → f32 { redde a ÷ b }");
+    assert_accepts("functio p(modulus<u32> a, modulus<u32> b) → f64 { redde a ÷ b }");
+    assert_accepts("functio p(saturatus<i16> a) → f32 { redde a ÷ 2 }");
 }
 
 #[test]
 fn float_true_division_keeps_the_operand_width() {
-    assert_accepts("functio p(fractus<f32> a, fractus<f32> b) → fractus<f32> { redde a ÷ b }");
+    assert_accepts("functio p(f32 a, f32 b) → f32 { redde a ÷ b }");
     assert_rejects_with_issue(
-        "functio p(fractus<f64> a, fractus<f64> b) → fractus<f32> { redde a ÷ b }",
+        "functio p(f64 a, f64 b) → f32 { redde a ÷ b }",
         "return_type_mismatch",
     );
 }
 
 #[test]
 fn float_beside_integer_constant_is_accepted() {
-    assert_accepts("functio p(fractus<f64> a) → fractus<f64> { redde a ÷ 2 }");
-    assert_accepts("functio p(fractus<f64> a) → fractus<f64> { redde 2 ÷ a }");
+    assert_accepts("functio p(f64 a) → f64 { redde a ÷ 2 }");
+    assert_accepts("functio p(f64 a) → f64 { redde 2 ÷ a }");
 }
 
 #[test]
 fn integer_beside_float_variable_is_rejected() {
     assert_rejects_with_issue(
-        "functio p(numerus a, fractus<f64> b) → fractus<f64> { redde a ÷ b }",
+        "functio p(numerus a, f64 b) → f64 { redde a ÷ b }",
         FAMILY_CROSSING,
     );
     assert_rejects_with_issue(
-        "functio p(fractus<f64> a, numerus<u8> b) → fractus<f64> { redde a ÷ b }",
+        "functio p(f64 a, u8 b) → f64 { redde a ÷ b }",
         FAMILY_CROSSING,
     );
 }
 
 #[test]
 fn decimal_true_division_follows_slash() {
-    assert_accepts("functio p(numerus<d64> a, numerus<d64> b) → numerus<d64> { redde a ÷ b }");
+    assert_accepts("functio p(d64 a, d64 b) → d64 { redde a ÷ b }");
 }
 
 #[test]
 fn cross_family_comparison_is_accepted() {
     for (lhs, rhs) in [
-        ("numerus", "fractus<f64>"),
-        ("numerus<u8>", "fractus<f32>"),
-        ("numerus<d64>", "fractus<f64>"),
-        ("numerus<d64>", "numerus"),
-        ("fractus<f32>", "numerus<i64>"),
-        ("fractus<f64>", "numerus<d64>"),
+        ("numerus", "f64"),
+        ("u8", "f32"),
+        ("d64", "f64"),
+        ("d64", "numerus"),
+        ("f32", "i64"),
+        ("f64", "d64"),
     ] {
         for glyph in ["<", ">", "≤", "≥", "≅", "≇", "≈", "≉"] {
             assert_accepts(&format!(
@@ -109,11 +105,11 @@ fn cross_family_comparison_is_accepted() {
 fn strict_equality_still_rejects_cross_family() {
     assert_rejects_with_issue("functio p() → bivalens { redde 1 ≡ 1.0 }", EXACT_EQ);
     assert_rejects_with_issue(
-        "functio p(numerus a, fractus<f64> b) → bivalens { redde a ≡ b }",
+        "functio p(numerus a, f64 b) → bivalens { redde a ≡ b }",
         EXACT_EQ,
     );
     assert_rejects_with_issue(
-        "functio p(numerus<d64> a, fractus<f64> b) → bivalens { redde a ≠ b }",
+        "functio p(d64 a, f64 b) → bivalens { redde a ≠ b }",
         EXACT_EQ,
     );
 }

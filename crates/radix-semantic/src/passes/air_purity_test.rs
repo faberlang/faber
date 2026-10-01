@@ -48,7 +48,7 @@ fn accepts_pure_scalar_air_function() {
     let errors = air_errors(
         r#"
 @ radix lane "air"
-functio loss(numerus<i32> x, numerus<i32> y) → numerus {
+functio loss(i32 x, i32 y) → numerus {
     fixum numerus sum ← x + y
     si sum > 0 {
         redde sum
@@ -67,12 +67,12 @@ fn accepts_calls_to_other_air_lane_functions() {
     let errors = air_errors(
         r#"
 @ radix lane "air"
-functio square(numerus<i32> x) → numerus {
+functio square(i32 x) → numerus {
     redde x * x
 }
 
 @ radix lane "air"
-functio loss(numerus<i32> x) → numerus {
+functio loss(i32 x) → numerus {
     redde square(x)
 }
 "#,
@@ -1334,7 +1334,7 @@ fn air_accepts_integer_store_proven_by_the_range_rule() {
     let errors = air_errors(
         r#"
 @ radix lane "air"
-functio diff(numerus<u8> a, numerus<u8> b) → numerus<i16> {
+functio diff(u8 a, u8 b) → i16 {
     redde a - b
 }
 "#,
@@ -1368,7 +1368,7 @@ fn air_rejects_narrowing_store_that_needs_a_check() {
     let errors = air_errors(
         r#"
 @ radix lane "air"
-functio narrow(numerus<i16> a, numerus<i16> b) → numerus<u8> {
+functio narrow(i16 a, i16 b) → u8 {
     redde a - b
 }
 "#,
@@ -1381,8 +1381,8 @@ fn air_still_admits_conversion_with_bottom_default() {
     let errors = air_errors(
         r#"
 @ radix lane "air"
-functio narrow(numerus<i16> a) → numerus<u8> {
-    redde a ↦ numerus<u8> ⊥ 0
+functio narrow(i16 a) → u8 {
+    redde a ↦ u8 ⊥ 0
 }
 "#,
     );

@@ -179,7 +179,7 @@ incipit {
 fn saturating_word_rejects_mixed_family_arithmetic() {
     analysis_rejects_with_issue(
         r"
-functio mix(saturatus<u8> x, numerus<u8> y) → saturatus<u8> {
+functio mix(saturatus<u8> x, u8 y) → saturatus<u8> {
     redde x + y
 }
 ",
@@ -195,7 +195,7 @@ functio mix(saturatus<u8> x, modulus<u8> y) → saturatus<u8> {
     );
     analysis_rejects_with_issue(
         r"
-functio mix(numerus<i32> x, saturatus<i32> y) → numerus<i32> {
+functio mix(i32 x, saturatus<i32> y) → i32 {
     redde x * y
 }
 ",
@@ -207,7 +207,7 @@ functio mix(numerus<i32> x, saturatus<i32> y) → numerus<i32> {
 fn saturating_word_family_does_not_flow_implicitly() {
     let diagnostics = analyze_diagnostics(
         r"
-functio keep(numerus<u8> x) → saturatus<u8> {
+functio keep(u8 x) → saturatus<u8> {
     redde x
 }
 ",
@@ -216,7 +216,7 @@ functio keep(numerus<u8> x) → saturatus<u8> {
         diagnostics
             .iter()
             .any(radix_diagnostics::Diagnostic::is_error),
-        "numerus<u8> must not flow into saturatus<u8> without ↦: {diagnostics:?}"
+        "u8 must not flow into saturatus<u8> without ↦: {diagnostics:?}"
     );
 }
 
@@ -304,7 +304,7 @@ incipit {
         r"
 incipit {
     fixum saturatus<u8> s ← 250
-    fixum numerus<u8> narrow ← s + 10
+    fixum u8 narrow ← s + 10
     fixum saturatus<u16> other ← narrow
     nota other
 }

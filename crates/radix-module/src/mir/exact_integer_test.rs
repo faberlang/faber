@@ -36,23 +36,20 @@ fn trap(body: &str) -> (Vec<String>, String, String) {
 #[test]
 fn probes_store_or_widen_by_value() {
     // p01, p03, p12: arithmetic is wide; only the final store is checked.
-    assert_eq!(ok("varia numerus<u8> x ← 250\nfixum numerus<u8> y ← x + 2\nnota y"), ["252"]);
-    assert_eq!(ok("varia numerus<u8> x ← 250\nfixum numerus w ← x + 10\nnota w"), ["260"]);
-    assert_eq!(
-        ok("varia numerus<u8> x ← 200\nfixum numerus<u8> y ← x * 2 / 4\nnota y"),
-        ["100"]
-    );
+    assert_eq!(ok("varia u8 x ← 250\nfixum u8 y ← x + 2\nnota y"), ["252"]);
+    assert_eq!(ok("varia u8 x ← 250\nfixum numerus w ← x + 10\nnota w"), ["260"]);
+    assert_eq!(ok("varia u8 x ← 200\nfixum u8 y ← x * 2 / 4\nnota y"), ["100"]);
     // p18
-    assert_eq!(ok("varia numerus<i8> x ← -128\nfixum numerus y ← -x\nnota y"), ["128"]);
+    assert_eq!(ok("varia i8 x ← -128\nfixum numerus y ← -x\nnota y"), ["128"]);
 }
 
 #[test]
 fn probes_trap_at_the_store_with_the_store_identity() {
     // p02, p04, p08b (ruling 5): identity is distinct from arithmetic overflow.
     for body in [
-        "varia numerus<u8> x ← 250\nnota \"a\"\nfixum numerus<u8> y ← x + 10\nnota y",
-        "varia numerus<u8> x ← 0\nnota \"a\"\nfixum numerus<u8> y ← x + 300\nnota y",
-        "varia numerus<u8> x ← 250\nnota \"a\"\nfixum numerus<u8> y ← x ⇐ 2\nnota y",
+        "varia u8 x ← 250\nnota \"a\"\nfixum u8 y ← x + 10\nnota y",
+        "varia u8 x ← 0\nnota \"a\"\nfixum u8 y ← x + 300\nnota y",
+        "varia u8 x ← 250\nnota \"a\"\nfixum u8 y ← x ⇐ 2\nnota y",
     ] {
         let (out, issue, message) = trap(body);
         assert_eq!(out, ["a"]);
@@ -64,17 +61,17 @@ fn probes_trap_at_the_store_with_the_store_identity() {
 #[test]
 fn increment_of_a_narrow_slot_is_a_store() {
     // p10 (row 4).
-    let (out, issue, message) = trap("varia numerus<u8> x ← 255\nnota \"a\"\nx ↑\nnota x");
+    let (out, issue, message) = trap("varia u8 x ← 255\nnota \"a\"\nx ↑\nnota x");
     assert_eq!(out, ["a"]);
     assert_eq!(issue, "implicit_store_out_of_range");
     assert!(message.contains("256") && message.contains("`x`"), "{message}");
-    assert_eq!(ok("varia numerus<u8> x ← 254\nx ↑\nnota x"), ["255"]);
+    assert_eq!(ok("varia u8 x ← 254\nx ↑\nnota x"), ["255"]);
 }
 
 #[test]
 fn inferred_slot_trap_names_the_source_expression() {
     // ruling 19(i): the message points at the inferring expression.
-    let (_, _, message) = trap("varia numerus<u8> a ← 200\nvaria _ total ← a + 1\ntotal ← total + 100000");
+    let (_, _, message) = trap("varia u8 a ← 200\nvaria _ total ← a + 1\ntotal ← total + 100000");
     assert!(message.contains("inferred"), "{message}");
     assert!(message.contains("from `a + 1`"), "{message}");
     assert!(!message.contains("bytes"), "{message}");
@@ -94,8 +91,7 @@ fn floor_division_and_remainder() {
 #[test]
 fn min_over_minus_one_is_exact_and_only_the_i64_store_traps() {
     // ruling 14 / 17: 2^63 is a valid intermediate and a valid u64.
-    let out =
-        ok("varia numerus m ← -9223372036854775807 - 1\nvaria numerus d ← -1\nfixum numerus<u64> q ← m / d\nnota q");
+    let out = ok("varia numerus m ← -9223372036854775807 - 1\nvaria numerus d ← -1\nfixum u64 q ← m / d\nnota q");
     assert_eq!(out, ["9223372036854775808"]);
     let (_, issue, _) =
         trap("varia numerus m ← -9223372036854775807 - 1\nvaria numerus d ← -1\nfixum numerus r ← m / d\nnota r");
@@ -105,21 +101,15 @@ fn min_over_minus_one_is_exact_and_only_the_i64_store_traps() {
 #[test]
 fn bitnot_is_minus_x_minus_one() {
     // rulings 9, 19(b).
-    assert_eq!(
-        ok("varia numerus<u8> x ← 250\nfixum numerus<i16> y ← ¬x\nnota y\nnota ¬0"),
-        ["-251", "-1"]
-    );
-    assert_eq!(
-        ok("varia numerus<u64> a ← 9223372036854775807\nnota ¬a"),
-        ["-9223372036854775808"]
-    );
-    let (_, issue, _) = trap("varia numerus<u64> a ← 9223372036854775808\nnota ¬a");
+    assert_eq!(ok("varia u8 x ← 250\nfixum i16 y ← ¬x\nnota y\nnota ¬0"), ["-251", "-1"]);
+    assert_eq!(ok("varia u64 a ← 9223372036854775807\nnota ¬a"), ["-9223372036854775808"]);
+    let (_, issue, _) = trap("varia u64 a ← 9223372036854775808\nnota ¬a");
     assert_eq!(issue, "runner_numerus_overflow");
 }
 
 #[test]
 fn bitnot_of_u64_max_is_past_the_range() {
-    let (out, issue, _) = trap("varia numerus<u64> a ← 18446744073709551615\nnota \"a\"\nnota ¬a");
+    let (out, issue, _) = trap("varia u64 a ← 18446744073709551615\nnota \"a\"\nnota ¬a");
     assert_eq!(out, ["a"]);
     assert_eq!(issue, "runner_numerus_overflow");
 }
@@ -128,14 +118,14 @@ fn bitnot_of_u64_max_is_past_the_range() {
 fn shifts_are_unmasked() {
     // ruling 10 and the audit's reproductions.
     assert_eq!(
-        ok("varia numerus<u8> a ← 1\nvaria numerus<u8> n ← 63\nfixum numerus<u64> y ← a ⇐ n\nnota y"),
+        ok("varia u8 a ← 1\nvaria u8 n ← 63\nfixum u64 y ← a ⇐ n\nnota y"),
         ["9223372036854775808"]
     );
     for n in ["64"] {
-        let body = format!("varia numerus<u8> a ← 1\nvaria numerus<u8> n ← {n}\nnota \"a\"\nnota a ⇐ n");
+        let body = format!("varia u8 a ← 1\nvaria u8 n ← {n}\nnota \"a\"\nnota a ⇐ n");
         assert_eq!(trap(&body).0, ["a"]);
     }
-    let (_, _, _) = trap("varia numerus<u8> a ← 255\nvaria numerus<u8> n ← 60\nnota \"a\"\nnota a ⇐ n");
+    let (_, _, _) = trap("varia u8 a ← 255\nvaria u8 n ← 60\nnota \"a\"\nnota a ⇐ n");
     assert_eq!(
         ok("varia numerus a ← 5\nvaria numerus n ← 200\nnota a ⇒ n\nvaria numerus m ← -5\nnota m ⇒ n\nnota m ⇒ 1"),
         ["0", "-1", "-3"]
@@ -206,41 +196,29 @@ fn decimal_float_comparison_is_exact() {
 
 #[test]
 fn u64_arithmetic_past_the_range_traps() {
-    let (out, issue, _) =
-        trap("varia numerus<u64> a ← 18446744073709551615\nvaria numerus<u64> b ← 1\nnota \"a\"\nnota a + b");
+    let (out, issue, _) = trap("varia u64 a ← 18446744073709551615\nvaria u64 b ← 1\nnota \"a\"\nnota a + b");
     assert_eq!(out, ["a"]);
     assert_eq!(issue, "runner_numerus_overflow");
 }
 
 #[test]
 fn explicit_narrowing_stays_recoverable() {
-    assert_eq!(
-        ok("varia numerus n ← 300\nfixum numerus<u8> y ← n ↦ numerus<u8> ⊥ 7\nnota y"),
-        ["7"]
-    );
+    assert_eq!(ok("varia numerus n ← 300\nfixum u8 y ← n ↦ u8 ⊥ 7\nnota y"), ["7"]);
 }
 
 #[test]
 fn true_division_width_follows_the_operands() {
     // ruling 23: 8- and 16-bit operands divide in f32; 32/64-bit in f64.
-    assert_eq!(
-        ok("varia numerus<u8> a ← 1\nvaria numerus<u8> b ← 3\nnota a ÷ b"),
-        ["0.33333334"]
-    );
-    assert_eq!(
-        ok("varia numerus<i16> a ← 1\nvaria numerus<i32> b ← 3\nnota a ÷ b"),
-        ["0.3333333333333333"]
-    );
-    assert_eq!(ok("varia numerus<u8> a ← 1\nnota a ÷ 3"), ["0.33333334"]);
+    assert_eq!(ok("varia u8 a ← 1\nvaria u8 b ← 3\nnota a ÷ b"), ["0.33333334"]);
+    assert_eq!(ok("varia i16 a ← 1\nvaria i32 b ← 3\nnota a ÷ b"), ["0.3333333333333333"]);
+    assert_eq!(ok("varia u8 a ← 1\nnota a ÷ 3"), ["0.33333334"]);
     assert_eq!(ok("nota 7 ÷ 2\nnota 1 ÷ 3"), ["3.5", "0.3333333333333333"]);
     // A sub-expression keys on its range type: (u8 + u8) is u16, still f32.
     assert_eq!(
-        ok(
-            "varia numerus<u8> a ← 200\nvaria numerus<u8> b ← 100\nvaria numerus<u8> c ← 7\nfixum _ q ← (a + b) ÷ c\nnota q"
-        ),
+        ok("varia u8 a ← 200\nvaria u8 b ← 100\nvaria u8 c ← 7\nfixum _ q ← (a + b) ÷ c\nnota q"),
         ["42.857143"]
     );
-    let (out, _, _) = trap("varia numerus<u8> a ← 1\nvaria numerus<u8> b ← 0\nnota \"a\"\nnota a ÷ b");
+    let (out, _, _) = trap("varia u8 a ← 1\nvaria u8 b ← 0\nnota \"a\"\nnota a ÷ b");
     assert_eq!(out, ["a"]);
 }
 
@@ -335,8 +313,8 @@ fn cap_typed_sum_is_checked_at_argument_and_return_stores() {
 #[test]
 fn bitnot_of_u64_stores_into_int_as_a_checked_narrowing() {
     // f2 (rulings 9, 19a): `¬u` keeps its sign at the cap, so `int` takes it.
-    assert_eq!(ok("varia numerus<u64> u ← 5\nfixum numerus y ← ¬u\nnota y"), ["-6"]);
-    let (out, issue, _) = trap("varia numerus<u64> u ← 18446744073709551615\nnota \"a\"\nfixum numerus y ← ¬u\nnota y");
+    assert_eq!(ok("varia u64 u ← 5\nfixum numerus y ← ¬u\nnota y"), ["-6"]);
+    let (out, issue, _) = trap("varia u64 u ← 18446744073709551615\nnota \"a\"\nfixum numerus y ← ¬u\nnota y");
     assert_eq!(out, ["a"]);
     assert_eq!(issue, "runner_numerus_overflow");
 }
@@ -353,7 +331,7 @@ fn decimal_beside_a_nonconstant_integer_compares_exactly() {
         ["verum", "verum", "falsum", "falsum"]
     );
     assert_eq!(
-        ok("varia d64 d ← -0.5\nvaria numerus<u64> u ← 18446744073709551615\nnota d < u\nnota u < d"),
+        ok("varia d64 d ← -0.5\nvaria u64 u ← 18446744073709551615\nnota d < u\nnota u < d"),
         ["verum", "falsum"]
     );
 }
@@ -415,7 +393,7 @@ fn negated_i64_min_constant_fits_every_64_bit_slot() {
     // trapping slot and follows the slot's policy in a saturating one.
     assert_eq!(
         ok(
-            "fixum saturatus<i64> x ← -9223372036854775808\nvaria saturatus<i64> y ← -9223372036854775808\nfixum numerus<i64> z ← -9223372036854775808\nfixum numerus w ← -9223372036854775808\nnota x\nnota y\nnota z\nnota w"
+            "fixum saturatus<i64> x ← -9223372036854775808\nvaria saturatus<i64> y ← -9223372036854775808\nfixum i64 z ← -9223372036854775808\nfixum numerus w ← -9223372036854775808\nnota x\nnota y\nnota z\nnota w"
         ),
         ["-9223372036854775808"; 4]
     );
@@ -434,11 +412,11 @@ fn summa_at_the_cap_is_a_checked_store() {
     // f1s (ruling 21): a `summa` sits at the 64-bit cap, so returning it as
     // `int` checks the store; a small sum returns fine.
     let functions =
-        "functio total(tensor<numerus<i64>, [3]> a) → numerus {\n  redde summa ex a fixum s {\n    redde s\n  }\n}\n";
+        "functio total(tensor<i64, [3]> a) → numerus {\n  redde summa ex a fixum s {\n    redde s\n  }\n}\n";
     let run_total = |values: &str| {
         let session = Session::new(Config::default().with_target(Target::HirTypeScript));
         let source = format!(
-            "{functions}incipit {{\nfixum lista<numerus<i64>> v ← [{values}]\nfixum tensor<numerus<i64>, []> seed ← vacua\nnota \"a\"\nnota total(seed.strue(v, [3]))\n}}\n"
+            "{functions}incipit {{\nfixum lista<i64> v ← [{values}]\nfixum tensor<i64, []> seed ← vacua\nnota \"a\"\nnota total(seed.strue(v, [3]))\n}}\n"
         );
         let mut host = BufferHost::default();
         let result = run_source(&session, "summa.fab", &source, &mut host);
@@ -460,11 +438,11 @@ fn summa_accumulates_exactly_and_checks_at_the_store() {
     // sm1: the running total is exact (2^64 - 2 is inside the exact range);
     // only the store of the result into its slot applies the slot policy.
     let functions =
-        "functio total(tensor<numerus<i64>, [3]> a) → numerus {\n  redde summa ex a fixum s {\n    redde s\n  }\n}\n";
+        "functio total(tensor<i64, [3]> a) → numerus {\n  redde summa ex a fixum s {\n    redde s\n  }\n}\n";
     let run_total = |values: &str| {
         let session = Session::new(Config::default().with_target(Target::HirTypeScript));
         let source = format!(
-            "{functions}incipit {{\nfixum lista<numerus<i64>> v ← [{values}]\nfixum tensor<numerus<i64>, []> seed ← vacua\nnota total(seed.strue(v, [3]))\n}}\n"
+            "{functions}incipit {{\nfixum lista<i64> v ← [{values}]\nfixum tensor<i64, []> seed ← vacua\nnota total(seed.strue(v, [3]))\n}}\n"
         );
         let mut host = BufferHost::default();
         let result = run_source(&session, "summa.fab", &source, &mut host);
@@ -508,9 +486,8 @@ fn saturating_bitwise_operators_are_exact_and_clamp_at_the_store() {
 
 #[test]
 fn value_twin_is_exact_and_checked_at_the_store() {
-    assert_eq!(ok("fixum numerus<u8> x ← 200\nnota x.addita(100)"), ["300"]);
-    let (out, issue, message) =
-        trap("fixum numerus<u8> x ← 200\nnota \"a\"\nfixum numerus<u8> y ← x.addita(100)\nnota y");
+    assert_eq!(ok("fixum u8 x ← 200\nnota x.addita(100)"), ["300"]);
+    let (out, issue, message) = trap("fixum u8 x ← 200\nnota \"a\"\nfixum u8 y ← x.addita(100)\nnota y");
     assert_eq!(out, ["a"]);
     assert_eq!(issue, "implicit_store_out_of_range");
     assert!(
@@ -521,11 +498,11 @@ fn value_twin_is_exact_and_checked_at_the_store() {
 
 #[test]
 fn in_place_twin_is_a_store_into_the_place() {
-    assert_eq!(ok("varia numerus<u8> x ← 100\nx.adde(100)\nnota x"), ["200"]);
+    assert_eq!(ok("varia u8 x ← 100\nx.adde(100)\nnota x"), ["200"]);
     for body in [
-        "varia numerus<u8> x ← 200\nnota \"a\"\nx.adde(100)\nnota x",
-        "varia numerus<u8> x ← 200\nnota \"a\"\nx.multiplica(2)\nnota x",
-        "varia numerus<u8> x ← 200\nnota \"a\"\nx.sinistra(1)\nnota x",
+        "varia u8 x ← 200\nnota \"a\"\nx.adde(100)\nnota x",
+        "varia u8 x ← 200\nnota \"a\"\nx.multiplica(2)\nnota x",
+        "varia u8 x ← 200\nnota \"a\"\nx.sinistra(1)\nnota x",
     ] {
         let (out, issue, message) = trap(body);
         assert_eq!(out, ["a"], "{body}");
@@ -537,15 +514,15 @@ fn in_place_twin_is_a_store_into_the_place() {
 #[test]
 fn in_place_twin_through_an_index_place() {
     assert_eq!(
-        ok("varia _ xs ← [1, 2, 3] ∷ lista<numerus<i32>>\nxs[1].multiplica(10)\nnota xs[1]"),
+        ok("varia _ xs ← [1, 2, 3] ∷ lista<i32>\nxs[1].multiplica(10)\nnota xs[1]"),
         ["20"]
     );
 }
 
 #[test]
 fn unary_twins_follow_the_range_rule() {
-    assert_eq!(ok("fixum numerus<i8> n ← -128\nnota n.negativa()"), ["128"]);
-    let (_, issue, _) = trap("fixum numerus<i8> n ← -128\nfixum numerus<i8> m ← n.negativa()\nnota m");
+    assert_eq!(ok("fixum i8 n ← -128\nnota n.negativa()"), ["128"]);
+    let (_, issue, _) = trap("fixum i8 n ← -128\nfixum i8 m ← n.negativa()\nnota m");
     assert_eq!(issue, "implicit_store_out_of_range");
 }
 
@@ -557,12 +534,9 @@ fn word_twins_keep_the_word_semantics() {
 
 #[test]
 fn absolutum_is_exact_for_sized_integers() {
-    assert_eq!(ok("fixum numerus<i8> n ← -128\nnota n.absolutum()"), ["128"]);
-    assert_eq!(
-        ok("fixum numerus<i8> n ← -128\nfixum numerus<u8> m ← n.absolutum()\nnota m"),
-        ["128"]
-    );
-    let (_, issue, _) = trap("fixum numerus<i8> n ← -128\nfixum numerus<i8> m ← n.absolutum()\nnota m");
+    assert_eq!(ok("fixum i8 n ← -128\nnota n.absolutum()"), ["128"]);
+    assert_eq!(ok("fixum i8 n ← -128\nfixum u8 m ← n.absolutum()\nnota m"), ["128"]);
+    let (_, issue, _) = trap("fixum i8 n ← -128\nfixum i8 m ← n.absolutum()\nnota m");
     assert_eq!(issue, "implicit_store_out_of_range");
     // `|i64::MIN|` is 2^63, a valid exact value.
     assert_eq!(
@@ -573,14 +547,11 @@ fn absolutum_is_exact_for_sized_integers() {
 
 #[test]
 fn potentia_is_exact_and_range_typed() {
-    assert_eq!(ok("fixum numerus<i32> p ← 100000\nnota p.potentia(2)"), ["10000000000"]);
-    let (_, issue, message) = trap("fixum numerus<i32> p ← 100000\nfixum numerus<i32> q ← p.potentia(2)\nnota q");
+    assert_eq!(ok("fixum i32 p ← 100000\nnota p.potentia(2)"), ["10000000000"]);
+    let (_, issue, message) = trap("fixum i32 p ← 100000\nfixum i32 q ← p.potentia(2)\nnota q");
     assert_eq!(issue, "implicit_store_out_of_range");
     assert!(message.contains("10000000000"), "{message}");
-    assert_eq!(
-        ok("fixum numerus<u8> u ← 3\nfixum numerus<u8> q ← u.potentia(3)\nnota q"),
-        ["27"]
-    );
+    assert_eq!(ok("fixum u8 u ← 3\nfixum u8 q ← u.potentia(3)\nnota q"), ["27"]);
 }
 
 fn run_module(source: &str) -> (Vec<String>, Vec<(String, String)>) {
@@ -599,7 +570,7 @@ const PLACE_HELPER: &str = "functio idx(numerus n) → numerus {\n    nota \"idx
 #[test]
 fn in_place_twin_evaluates_an_effectful_place_once() {
     let source = format!(
-        "{PLACE_HELPER}incipit {{\nvaria _ xs ← [10, 20, 30] ∷ lista<numerus<i32>>\nxs[idx(1)].adde(1)\nnota xs[1]\n}}\n"
+        "{PLACE_HELPER}incipit {{\nvaria _ xs ← [10, 20, 30] ∷ lista<i32>\nxs[idx(1)].adde(1)\nnota xs[1]\n}}\n"
     );
     let (out, errors) = run_module(&source);
     assert!(errors.is_empty(), "{errors:?}");
@@ -635,7 +606,7 @@ fn in_place_twin_evaluates_more_than_sixteen_effectful_indices_once() {
 #[test]
 fn in_place_twin_on_an_effectful_place_traps_at_the_store() {
     let source = format!(
-        "{PLACE_HELPER}incipit {{\nvaria _ xs ← [10, 20, 30] ∷ lista<numerus<u8>>\nxs[idx(1)].multiplica(1000)\nnota xs[1]\n}}\n"
+        "{PLACE_HELPER}incipit {{\nvaria _ xs ← [10, 20, 30] ∷ lista<u8>\nxs[idx(1)].multiplica(1000)\nnota xs[1]\n}}\n"
     );
     let (out, errors) = run_module(&source);
     assert_eq!(out, ["idx"]);
@@ -661,17 +632,17 @@ fn in_place_twin_yields_no_value() {
 fn list_sum_is_typed_at_the_cap_and_exact() {
     // ss4 (rulings 17, 21): the `.summa()` method is typed like the construct.
     // Partial sums are exact; only the store applies the slot policy.
-    assert_eq!(ok("fixum lista<numerus<i8>> a ← [100, 100, -100]\nnota a.summa()"), ["100"]);
+    assert_eq!(ok("fixum lista<i8> a ← [100, 100, -100]\nnota a.summa()"), ["100"]);
     assert_eq!(
         ok("fixum lista<numerus> a ← [9223372036854775807, 1, -1]\nnota a.summa()"),
         ["9223372036854775807"]
     );
-    assert_eq!(ok("fixum lista<numerus<u8>> c ← [200, 100]\nnota c.summa()"), ["300"]);
+    assert_eq!(ok("fixum lista<u8> c ← [200, 100]\nnota c.summa()"), ["300"]);
     assert_eq!(
-        ok("fixum lista<numerus<i8>> a ← [100, 100, -100]\nvaria numerus<i8> t ← a.summa()\nnota t"),
+        ok("fixum lista<i8> a ← [100, 100, -100]\nvaria i8 t ← a.summa()\nnota t"),
         ["100"]
     );
-    let (out, _, message) = trap("fixum lista<numerus<u8>> c ← [200, 100]\nvaria numerus<u8> s ← c.summa()\nnota s");
+    let (out, _, message) = trap("fixum lista<u8> c ← [200, 100]\nvaria u8 s ← c.summa()\nnota s");
     assert!(out.is_empty());
     assert!(message.contains("300 does not fit in `u8`"), "{message}");
 }
@@ -689,13 +660,13 @@ fn list_sum_at_the_cap_is_a_checked_store() {
 #[test]
 fn tensor_matmul_dot_products_are_exact_and_store_per_element() {
     // Partial sum 200 leaves `i8`; the finished cell 0 fits and is stored.
-    let setup = "fixum tensor<numerus<i8>, []> seed ← vacua\nfixum tensor<numerus<i8>, [1, 3]> l ← seed.strue([100, 100, 100], [1, 3])\n";
+    let setup = "fixum tensor<i8, []> seed ← vacua\nfixum tensor<i8, [1, 3]> l ← seed.strue([100, 100, 100], [1, 3])\n";
     let fits = format!(
-        "{setup}fixum tensor<numerus<i8>, [3, 1]> r ← seed.strue([1, 1, -2], [3, 1])\nfixum tensor<numerus<i8>, [1, 1]> p ← l.matmul(r)\nnota p.summa()"
+        "{setup}fixum tensor<i8, [3, 1]> r ← seed.strue([1, 1, -2], [3, 1])\nfixum tensor<i8, [1, 1]> p ← l.matmul(r)\nnota p.summa()"
     );
     assert_eq!(ok(&fits), ["0"]);
     let too_big = format!(
-        "{setup}fixum tensor<numerus<i8>, [3, 1]> r ← seed.strue([1, 1, 1], [3, 1])\nfixum tensor<numerus<i8>, [1, 1]> p ← l.matmul(r)\nnota p.summa()"
+        "{setup}fixum tensor<i8, [3, 1]> r ← seed.strue([1, 1, 1], [3, 1])\nfixum tensor<i8, [1, 1]> p ← l.matmul(r)\nnota p.summa()"
     );
     let (_, issue, message) = trap(&too_big);
     assert_eq!(issue, "implicit_store_out_of_range");
@@ -705,16 +676,16 @@ fn tensor_matmul_dot_products_are_exact_and_store_per_element() {
 #[test]
 fn tensor_elementwise_stores_each_element_under_the_element_type() {
     // ts1 (rulings 17, 19): each element is exact and stored per element.
-    let setup = "fixum tensor<numerus<i8>, []> seed ← vacua\nfixum tensor<numerus<i8>, [3]> a ← seed.strue([100, 100, -100], [3])\n";
+    let setup = "fixum tensor<i8, []> seed ← vacua\nfixum tensor<i8, [3]> a ← seed.strue([100, 100, -100], [3])\n";
     let sum = format!(
-        "{setup}fixum tensor<numerus<i8>, [3]> b ← seed.strue([100, 1, -100], [3])\nfixum tensor<numerus<i8>, [3]> s ← a + b\nnota s.summa()"
+        "{setup}fixum tensor<i8, [3]> b ← seed.strue([100, 1, -100], [3])\nfixum tensor<i8, [3]> s ← a + b\nnota s.summa()"
     );
     let (out, issue, message) = trap(&sum);
     assert!(out.is_empty());
     assert_eq!(issue, "implicit_store_out_of_range");
     assert!(message.contains("200 does not fit in `i8`"), "{message}");
     let prod = format!(
-        "{setup}fixum tensor<numerus<i8>, [3]> b ← seed.strue([1, 1, 1], [3])\nfixum tensor<numerus<i8>, [3]> s ← a ⊙ b\nnota s.summa()"
+        "{setup}fixum tensor<i8, [3]> b ← seed.strue([1, 1, 1], [3])\nfixum tensor<i8, [3]> s ← a ⊙ b\nnota s.summa()"
     );
     assert_eq!(ok(&prod), ["100"]);
 }

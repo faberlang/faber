@@ -47,7 +47,7 @@ fn a_computed_value_that_fits_is_stored() {
     // `x * 3 / 2` is 150 at `x = 100`: the multiply does not trap, the store fits.
     let out = run_ok(
         "fits.fab",
-        "incipit {\n    fixum numerus<u8> x ← 100\n    fixum numerus<u8> y ← x * 3 / 2\n    nota y\n}",
+        "incipit {\n    fixum u8 x ← 100\n    fixum u8 y ← x * 3 / 2\n    nota y\n}",
     );
     assert_eq!(out, ["150"]);
 }
@@ -57,7 +57,7 @@ fn a_computed_value_that_does_not_fit_traps_at_the_store() {
     // `x * 3 / 2` is 300 at `x = 200`: the trap is at the store, not the multiply.
     let (result, stdout) = run(
         "trap.fab",
-        "incipit {\n    fixum numerus<u8> x ← 200\n    nota \"before\"\n    fixum numerus<u8> y ← x * 3 / 2\n    nota \"after\"\n}",
+        "incipit {\n    fixum u8 x ← 200\n    nota \"before\"\n    fixum u8 y ← x * 3 / 2\n    nota \"after\"\n}",
     );
     assert!(matches!(result, Err(RunSourceError::Stepper(_))));
     assert_eq!(stdout, ["before"]);
@@ -67,7 +67,7 @@ fn a_computed_value_that_does_not_fit_traps_at_the_store() {
 fn a_failed_implicit_store_is_not_caught_by_cape() {
     let (result, stdout) = run(
         "cape.fab",
-        "incipit {\n    fixum numerus n ← 300\n    fac {\n        fixum numerus<u8> z ← n\n        nota z\n    } cape err {\n        nota \"caught\"\n    }\n}",
+        "incipit {\n    fixum numerus n ← 300\n    fac {\n        fixum u8 z ← n\n        nota z\n    } cape err {\n        nota \"caught\"\n    }\n}",
     );
     assert!(matches!(result, Err(RunSourceError::Stepper(_))));
     assert!(stdout.is_empty(), "the handler must not run: {stdout:?}");
@@ -77,7 +77,7 @@ fn a_failed_implicit_store_is_not_caught_by_cape() {
 fn an_explicit_conversion_stays_recoverable() {
     let out = run_ok(
         "explicit.fab",
-        "incipit {\n    fixum numerus n ← 300\n    fixum numerus<u8> z ← n ↦ numerus<u8> ⊥ 7\n    nota z\n}",
+        "incipit {\n    fixum numerus n ← 300\n    fixum u8 z ← n ↦ u8 ⊥ 7\n    nota z\n}",
     );
     assert_eq!(out, ["7"]);
 }
@@ -88,7 +88,7 @@ const FETCH: &str = "functio fetch(numerus n) fiet → numerus {\n    redde n\n}
 fn a_narrowing_await_bind_that_fits_is_stored() {
     let out = run_ok(
         "await-fits.fab",
-        &format!("{FETCH}incipiet {{\n    fixum numerus<u8> v ↢ fetch(5)\n    nota v\n}}"),
+        &format!("{FETCH}incipiet {{\n    fixum u8 v ↢ fetch(5)\n    nota v\n}}"),
     );
     assert_eq!(out, ["5"]);
 }
@@ -97,7 +97,7 @@ fn a_narrowing_await_bind_that_fits_is_stored() {
 fn a_narrowing_await_bind_that_does_not_fit_traps() {
     let (result, stdout) = run(
         "await-trap.fab",
-        &format!("{FETCH}incipiet {{\n    nota \"before\"\n    fixum numerus<u8> v ↢ fetch(300)\n    nota v\n}}"),
+        &format!("{FETCH}incipiet {{\n    nota \"before\"\n    fixum u8 v ↢ fetch(300)\n    nota v\n}}"),
     );
     assert!(matches!(result, Err(RunSourceError::Stepper(_))));
     assert_eq!(stdout, ["before"]);
@@ -108,7 +108,7 @@ fn a_failed_await_store_is_not_caught_by_cape() {
     let (result, stdout) = run(
         "await-cape.fab",
         &format!(
-            "{FETCH}incipiet {{\n    fac {{\n        fixum numerus<u8> v ↢ fetch(300)\n        nota v\n    }} cape err {{\n        nota \"caught\"\n    }}\n}}"
+            "{FETCH}incipiet {{\n    fac {{\n        fixum u8 v ↢ fetch(300)\n        nota v\n    }} cape err {{\n        nota \"caught\"\n    }}\n}}"
         ),
     );
     assert!(matches!(result, Err(RunSourceError::Stepper(_))));
@@ -119,7 +119,7 @@ fn a_failed_await_store_is_not_caught_by_cape() {
 fn a_figendum_await_bind_traps_like_its_twin() {
     let (result, _) = run(
         "await-figendum.fab",
-        &format!("{FETCH}incipiet {{\n    figendum numerus<u8> v ← fetch(300)\n    nota v\n}}"),
+        &format!("{FETCH}incipiet {{\n    figendum u8 v ← fetch(300)\n    nota v\n}}"),
     );
     assert!(matches!(result, Err(RunSourceError::Stepper(_))));
 }
