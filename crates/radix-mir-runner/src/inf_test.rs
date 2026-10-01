@@ -989,6 +989,52 @@ fn valor_type() -> Type {
     Type::Primitive(Primitive::Valor)
 }
 
+/// isint-carrier law: `est inf` holds every integer carrier; `est int` and
+/// `est int<w>` hold an integer inside `i64` only (widths are erased, as in
+/// `valor ↦ int<w>`), so the test agrees with the extraction and with the Rust
+/// `Valor::Numerus` tag.
+#[test]
+fn est_integer_tags_follow_the_carrier_law() {
+    use crate::runtime::integer_tag_matches;
+    let int = Type::Primitive(Primitive::Numerus);
+    let u64_width = sized(NumericWidth::U64);
+    let inf = inf_type();
+    let beyond = big("18446744073709551616");
+    let below = big("-9223372036854775809");
+    let rows = [
+        (Value::Int(7), true, true),
+        (Value::Int(i64::MIN), true, true),
+        // A `u64` carrier holding a small value is still inside `i64`.
+        (Value::UInt(7), true, true),
+        (Value::UInt(i64::MAX as u64), true, true),
+        (Value::UInt(i64::MAX as u64 + 1), false, true),
+        (Value::UInt(u64::MAX), false, true),
+        (beyond, false, true),
+        (below, false, true),
+    ];
+    for (value, bounded, unbounded) in rows {
+        assert_eq!(integer_tag_matches(&value, &int), bounded, "int {value:?}");
+        assert_eq!(
+            integer_tag_matches(&value, &u64_width),
+            bounded,
+            "int<u64> {value:?}"
+        );
+        assert_eq!(
+            integer_tag_matches(&value, &inf),
+            unbounded,
+            "inf {value:?}"
+        );
+    }
+    for value in [
+        Value::Float(1.5),
+        Value::Str("7".to_owned()),
+        Value::Bool(true),
+    ] {
+        assert!(!integer_tag_matches(&value, &int), "{value:?}");
+        assert!(!integer_tag_matches(&value, &inf), "{value:?}");
+    }
+}
+
 #[test]
 fn valor_to_inf_extracts_every_integer_carrier_and_nothing_else() {
     let beyond = big("18446744073709551616");

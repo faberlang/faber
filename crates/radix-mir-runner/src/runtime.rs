@@ -984,15 +984,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
         let nominal_match = self.nominal_type_check_matches(value, target);
         nominal_match
+            || integer_tag_matches(value, target)
             || matches!(
                 (value, target),
                 (Value::Nil, Type::Primitive(Primitive::Nihil))
                     | (Value::Bool(_), Type::Primitive(Primitive::Bivalens))
-                    | (
-                        Value::Int(_) | Value::UInt(_) | Value::Magnus(_),
-                        Type::Primitive(Primitive::Numerus)
-                            | Type::SizedNumeric(Primitive::Numerus, _)
-                    )
                     | (
                         Value::Float(_),
                         Type::Primitive(Primitive::Fractus)
@@ -4409,6 +4405,33 @@ fn require_rank1_extent(
         return Err(RunnerError::internal(span, message));
     }
     Ok(())
+}
+
+/// Whether an integer carrier passes an `est` test against a `numerus` family
+/// target (`int`, `int<w>`, `inf`).
+///
+/// The tag law (isint-carrier): `valor est inf` holds for every integer. Any
+/// bounded integer target (`int`, `int<w>`; widths are erased exactly as in
+/// `valor ↦ int<w>`) holds only for an integer inside `i64`, so
+/// `est int` agrees with `↦ int` succeeding and a Rust `Valor::Numerus` tag.
+/// A `u64` carrier above `i64::MAX` and every `Magnus` are beyond it.
+pub(crate) fn integer_tag_matches(value: &Value, target: &Type) -> bool {
+    let unbounded = matches!(
+        target,
+        Type::SizedNumeric(Primitive::Numerus, width) if width.is_unbounded()
+    );
+    let family = unbounded
+        || matches!(
+            target,
+            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _)
+        );
+    family
+        && match value {
+            Value::Int(_) => true,
+            Value::UInt(magnitude) => unbounded || i64::try_from(*magnitude).is_ok(),
+            Value::Magnus(_) => unbounded,
+            _ => false,
+        }
 }
 
 fn byte_from_value(value: Value, span: Span) -> Result<u8, RunnerError> {

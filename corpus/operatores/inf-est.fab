@@ -1,0 +1,126 @@
++++
+term = "inf-est"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "iace_stmt", "si_stmt", "fac_stmt", "cape_clause", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "inline_default", "scriptum_expr", "equality", "equality_tail", "comparison", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "logic"
+canonical = false
+summary = "`valor est inf` holds for every integer; `est int` and `est int<w>` hold only for an integer inside `i64`, so a type test agrees with the extraction that follows it."
+syntax = "<valor> is inf | <valor> is int | <valor> is int<w> | <valor> not is inf"
+related = ["inf", "valor", "est", "↦", "⊥"]
+locale = "en"
++++
+# =============================================================================
+# inf-est — type tests on a `valor` that holds an integer
+# =============================================================================
+#
+# What this teaches:
+#   • `v is inf` is true for every integer a `valor` holds, of any size. A
+#     float, text or boolean is not an integer: false.
+#   • `v is int` is true only when the integer fits `int` (inside `i64`).
+#     Past `i64` it is false, so `if v is int { v ↦ int }` never falls onto
+#     the failing conversion; test `is inf` and take `v ↦ inf` beyond it.
+#   • A width on `int` does not change the test: `v is int<u64>` reads the
+#     same tag as `v is int`, exactly as `v ↦ int<u64>` extracts through
+#     `i64`. A `u64` above `i64::MAX` is therefore not `is int<u64>`.
+#   • The test is carrier-independent. The same program gives the same
+#     answers on the MIR runner and in generated Rust.
+#
+# Common mistakes:
+#   • Treating `is int` as "this is some integer" — past `i64` that is
+#     `is inf`, and `is int` is false.
+#   • Reading the `int<u64>` column as a range check — widths are erased in
+#     a `valor`, so it matches the `int` column.
+#
+# See also: inf, valor, est, ↦, ⊥
+# =============================================================================
+
+# operatores/inf-est — the `valor` integer tag law on every carrier
+#
+# WHY: pins the isint-carrier law: `is inf` ⇔ the valor holds an integer;
+# `is int` / `is int<w>` ⇔ it holds one inside `i64` (⇔ `↦ int` succeeds).
+# The last section keeps `do { return … } catch { }` inside a failable
+# function, which Rust once emitted as an untyped `Ok(())` handler arm.
+#
+# EXPECTED OUTPUT:
+#   inf-est.expected — one line per print.
+
+# One line: the three tests, then the extraction both ways.
+fn probe(valor v) → string {
+    return "int=§ inf=§ u64=§ not-inf=§"(v is int, v is inf, v is int<u64>, v not is inf)
+}
+
+# `is int` guards the narrowing, so the fallback never triggers for an integer.
+fn narrow(valor v) → int {
+    if v is int {
+        return v ↦ int ⊥ -2
+    }
+    return -1
+}
+
+# Past `i64` the integer is still there: `is inf`, then `↦ inf`.
+fn widen(valor v) → inf {
+    if v is inf {
+        return v ↦ inf ⊥ -3
+    }
+    return 0
+}
+
+fn risky(int n) → int ⇥ string {
+    if n ≻ 5 {
+        throw "too big"
+    }
+    return n
+}
+
+# A guarded `return` inside a failable function, with an empty handler.
+fn attempt(int n) → string ⇥ string {
+    do {
+        const int v ← risky(n)
+        return "ok §"(v)
+    }
+    catch err {
+    }
+    return "caught"
+}
+
+main {
+    const inf small ← 7
+    const inf int_max ← 9223372036854775807
+    const inf past_int ← 9223372036854775808
+    const inf past_u64 ← 18446744073709551616
+    const inf int_min ← -9223372036854775808
+    const inf below_int ← -9223372036854775809
+    const inf u64_max ← 18446744073709551615
+
+    # 1. The tag table: an integer, at the edges of `i64` and `u64`.
+    print probe(small ↦ valor)
+    print probe(int_max ↦ valor)
+    print probe(past_int ↦ valor)
+    print probe(u64_max ↦ valor)
+    print probe(past_u64 ↦ valor)
+    print probe(int_min ↦ valor)
+    print probe(below_int ↦ valor)
+
+    # 2. Not integers: a float, text and a boolean fail every integer test.
+    print probe(1.5 ↦ valor)
+    print probe("7" ↦ valor)
+    print probe(true ↦ valor)
+
+    # 3. `is int` guards `↦ int`; `is inf` guards `↦ inf`.
+    print narrow(small ↦ valor)
+    print narrow(int_min ↦ valor)
+    print narrow(past_int ↦ valor)
+    print narrow(1.5 ↦ valor)
+    print widen(past_u64 ↦ valor)
+    print widen(below_int ↦ valor)
+    print widen("7" ↦ valor)
+
+    # 4. A guarded return in a failable function: the handler only runs on a throw.
+    do {
+        print attempt(1)
+        print attempt(9)
+    }
+    catch err {
+        print "outer: §"(err)
+    }
+}

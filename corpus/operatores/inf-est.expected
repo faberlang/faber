@@ -1,0 +1,19 @@
+int=verum inf=verum u64=verum not-inf=falsum
+int=verum inf=verum u64=verum not-inf=falsum
+int=falsum inf=verum u64=falsum not-inf=falsum
+int=falsum inf=verum u64=falsum not-inf=falsum
+int=falsum inf=verum u64=falsum not-inf=falsum
+int=verum inf=verum u64=verum not-inf=falsum
+int=falsum inf=verum u64=falsum not-inf=falsum
+int=falsum inf=falsum u64=falsum not-inf=verum
+int=falsum inf=falsum u64=falsum not-inf=verum
+int=falsum inf=falsum u64=falsum not-inf=verum
+7
+-9223372036854775808
+-1
+-1
+18446744073709551616
+-9223372036854775809
+0
+ok 1
+caught
