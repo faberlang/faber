@@ -1073,7 +1073,7 @@ and definite return, and the function can be tested on its own.
 Coverage is checked as a pattern matrix. Each scrutinee has a space: the
 variants of an `ordo` or `discretio`, the members of a union, and `bivalens`
 as the closed set `{verum, falsum}`. A match over several scrutinees is
-checked over their product, so `discerne a, b` over two `bivalens` values
+checked over their product, so `discerne a et b` over two `bivalens` values
 needs all four combinations or a `ceterum`. A missing variant or combination is
 an error that names one uncovered case. The multi-subject form parses today —
 subjects are comma-separated, and an arm's patterns are separated by `,` or

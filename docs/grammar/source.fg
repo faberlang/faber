@@ -1207,11 +1207,15 @@ casu_elige_clause    := 'casu' expression (block_stmt | ergo_joint statement)
 ceterum_clause  := 'ceterum' (block_stmt | ergo_joint statement)
 
 discerne_stmt := 'discerne' 'omnia'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
-discriminants := expression (',' expression)*
+discriminants := subject_path ('et' subject_path)*
+# A `discerne` subject is a name or member path, not an expression; bind a
+# call or computed value to a name first.
+subject_path := IDENTIFIER ('.' IDENTIFIER)*
 casu_variant_clause  := 'casu' patterns (block_stmt | ergo_joint statement)
-patterns     := pattern ((',' | 'et') pattern)*
-# `aut` joins alternatives for one subject into one pattern; commas and `et`
-# still separate patterns for multi-subject arms.
+patterns     := pattern ('et' pattern)*
+# `aut` joins alternatives for one subject into one pattern; `et` separates
+# patterns for multi-subject arms. A comma only separates the field bindings
+# inside one variant pattern, never two patterns.
 pattern      := pattern_atom ('aut' pattern_atom)*
 # A one-segment type name in a `discerne` arm is classified as a type pattern
 # by the parser's type-name lookahead; qualified paths remain variant patterns.
