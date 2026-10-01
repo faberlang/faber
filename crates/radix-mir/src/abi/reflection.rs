@@ -35,6 +35,7 @@ impl MirKernelReflection {
                 .resources()
                 .map(|resource| reflect_kernel_resource(resource, validation))
                 .collect::<Result<_, _>>()?,
+            bound_resources: Vec::new(),
             vertex_inputs: Vec::new(),
             varyings: Vec::new(),
             fragment_outputs: Vec::new(),
@@ -106,6 +107,7 @@ impl MirKernelReflection {
             entry_name: entry_name.into(),
             shader_stage: MirKernelShaderStage::Vertex,
             resources,
+            bound_resources: Vec::new(),
             vertex_inputs,
             varyings: Vec::new(),
             fragment_outputs: Vec::new(),
@@ -137,6 +139,7 @@ impl MirKernelReflection {
             entry_name: entry_name.into(),
             shader_stage: MirKernelShaderStage::Fragment,
             resources,
+            bound_resources: Vec::new(),
             vertex_inputs: Vec::new(),
             varyings,
             fragment_outputs,
@@ -168,6 +171,7 @@ impl MirKernelReflection {
             entry_name: entry_name.into(),
             shader_stage: MirKernelShaderStage::Fragment,
             resources,
+            bound_resources: Vec::new(),
             vertex_inputs: Vec::new(),
             varyings,
             fragment_outputs,
