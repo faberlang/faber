@@ -225,6 +225,41 @@ functio run(ignotum callback) → vacuum {
 }
 
 #[test]
+fn lowers_non_null_method_call_to_method_call_on_asserted_receiver() {
+    // audit1-a2: `xs!.appende(1)` is a `MethodCall` whose receiver is the bare
+    // assertion `NonNull(xs, Value)`, not a `Call` over `NonNull(Member)`.
+    let source = r"
+functio run(lista<numerus> ∪ nihil xs) → vacuum {
+  xs!.appende(1)
+}
+";
+
+    let (lowered, _, _) = lower_source(source);
+    let hir = lowered.hir;
+    let Some(HirItemKind::Function(function)) = hir
+        .items
+        .iter()
+        .map(|item| &item.kind)
+        .find(|kind| matches!(kind, HirItemKind::Function(_)))
+    else {
+        panic!("expected function item");
+    };
+    let body = function.body.as_ref().expect("expected function body");
+
+    let HirStatementKind::Expr(method_call) = &body.statements[0].kind else {
+        panic!("expected method call statement");
+    };
+    let HirExpressionKind::MethodCall(receiver, _, _, args, _) = &method_call.kind else {
+        panic!("expected MethodCall, got {:?}", method_call.kind);
+    };
+    assert!(matches!(
+        receiver.kind,
+        HirExpressionKind::NonNull(_, crate::hir::HirNonNullKind::Value)
+    ));
+    assert_eq!(args.len(), 1);
+}
+
+#[test]
 fn lowers_custodi_to_first_class_statement_in_source_order() {
     let source = r"
 functio probe(numerus n) → numerus {

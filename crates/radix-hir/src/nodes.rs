@@ -1616,6 +1616,12 @@ pub enum HirOptionalChainKind {
 /// One non-null assertion operation after the base expression.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum HirNonNullKind {
+    /// Assert only: the node's value is the asserted payload of the base.
+    ///
+    /// Lowering produces this as the receiver of `base!.method(...)`, so the
+    /// call is an ordinary `MethodCall` whose receiver traps on `nihil`.
+    Value,
+
     /// Assert then access a member.
     Member(Symbol),
 

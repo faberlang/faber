@@ -808,20 +808,11 @@ impl TypeChecker<'_> {
     }
 
     /// The place a method call writes through. In `value!.method()` the
-    /// parser lowers the non-null member boundary into the callee, so the
-    /// receiver node is `NonNull(value, Member(method))`; the place is `value`.
-    /// Any other receiver (including `a!.b` as a field receiver) is its own
-    /// place.
-    pub(super) fn method_receiver_place<'e>(
-        receiver: &'e HirExpression,
-        method: Symbol,
-    ) -> &'e HirExpression {
+    /// receiver is the assertion `NonNull(value, Value)`; the place is
+    /// `value`. Any other receiver is its own place.
+    pub(super) fn method_receiver_place(receiver: &HirExpression) -> &HirExpression {
         match &receiver.kind {
-            HirExpressionKind::NonNull(object, radix_hir::HirNonNullKind::Member(name))
-                if *name == method =>
-            {
-                object
-            }
+            HirExpressionKind::NonNull(object, radix_hir::HirNonNullKind::Value) => object,
             _ => receiver,
         }
     }
@@ -863,6 +854,7 @@ impl TypeChecker<'_> {
         };
 
         match chain {
+            radix_hir::HirNonNullKind::Value => inner_ty,
             radix_hir::HirNonNullKind::Member(name) => {
                 self.check_field_from_type(inner_ty, *name, object.span)
             }
@@ -876,34 +868,6 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// Typechecks the receiver in `value!.method()` as a method receiver.
-    ///
-    /// The parser lowers the non-null member boundary into the callee/receiver
-    /// of the surrounding call. It must not be resolved as a field first,
-    /// because imported and declared methods are looked up by the ordinary
-    /// method-call path. The receiver's resulting type is the asserted payload
-    /// type so MIR lowering can preserve the existing non-null assertion.
-    pub fn check_non_null_method_receiver(
-        &mut self,
-        receiver: &mut HirExpression,
-        method: Symbol,
-    ) -> Option<TypeId> {
-        let object = match &mut receiver.kind {
-            HirExpressionKind::NonNull(object, radix_hir::HirNonNullKind::Member(name))
-                if *name == method =>
-            {
-                object.as_mut()
-            }
-            _ => return None,
-        };
-        let object_ty = self.check_expr(object);
-        let inner_ty = match self.types.get(self.resolve_inferred_type(object_ty)) {
-            Type::Option(inner) => *inner,
-            _ => object_ty,
-        };
-        receiver.ty = Some(inner_ty);
-        Some(inner_ty)
-    }
     /// Checks an optional chain segment and wraps the access result in `optio`.
     ///
     /// The receiver is checked once, then an existing option is unwrapped for

@@ -743,7 +743,9 @@ impl<'a> BorrowChecker<'a> {
             HirExpressionKind::Path(def_id) => Some(*def_id),
             HirExpressionKind::Field(object, _) => Self::root_def_id(object),
             HirExpressionKind::Index(object, _) => Self::root_def_id(object),
-            HirExpressionKind::Deref(inner) => Self::root_def_id(inner),
+            HirExpressionKind::Deref(inner) | HirExpressionKind::NonNull(inner, _) => {
+                Self::root_def_id(inner)
+            }
             _ => None,
         }
     }
@@ -756,6 +758,18 @@ impl<'a> BorrowChecker<'a> {
             HirExpressionKind::Index(object, index) => {
                 self.check_projection_inputs(object);
                 self.check_expr(index);
+            }
+            HirExpressionKind::NonNull(object, chain) => {
+                self.check_projection_inputs(object);
+                match chain {
+                    radix_hir::HirNonNullKind::Index(index) => self.check_expr(index),
+                    radix_hir::HirNonNullKind::Call(args) => {
+                        for arg in args {
+                            self.check_expr(&arg.expr);
+                        }
+                    }
+                    radix_hir::HirNonNullKind::Value | radix_hir::HirNonNullKind::Member(_) => {}
+                }
             }
             _ => {}
         }

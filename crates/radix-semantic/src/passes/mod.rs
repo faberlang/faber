@@ -121,6 +121,14 @@ mod borrow_alias_test;
 mod borrow_receiver_write_test;
 
 #[cfg(test)]
+#[path = "lint_mut_arg_test.rs"]
+mod lint_mut_arg_test;
+
+#[cfg(test)]
+#[path = "borrow_non_null_receiver_test.rs"]
+mod borrow_non_null_receiver_test;
+
+#[cfg(test)]
 #[path = "borrow_alias_container_test.rs"]
 mod borrow_alias_container_test;
 

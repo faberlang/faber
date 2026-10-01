@@ -1,0 +1,62 @@
++++
+term = "!."
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "fixum_decl", "varia_decl", "expression", "literal", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "non_null_suffix", "redde_stmt", "nota_stmt"]
+category = "non-null-chain"
+canonical = false
+summary = "A method call through a non-null assertion: `value!.method(args)` calls the method on the asserted payload."
+syntax = "<expression>!.<method>(<args>)"
+related = ["!."]
+locale = "en"
++++
+# =============================================================================
+# !. — A method call through a non-null assertion
+# =============================================================================
+#
+# What this teaches:
+#   • `value!.method(args)` asserts `value` is not `nihil`, then calls the
+#     method on the payload — the only spelling that calls a method on a
+#     `T ∪ none` binding.
+#   • A read method (`length`) and an in-place writer (`append`) both go
+#     through the assertion; the writer mutates the stored list, so the
+#     length after two appends is 4.
+#   • The binding must be `var` for an in-place writer; reading through `!.`
+#     only needs `const`.
+#   • The assertion traps like any other `!` use when the value is `nihil`.
+#
+# Common mistakes:
+#   • calling a method directly on a `T ∪ none` binding (`xs.append(3)`) —
+#     assert first with `xs!.append(3)`
+#   • asserting a value that can really be `nihil`: it aborts the program
+#     instead of handling the absent case
+#
+# See also: !.
+# =============================================================================
+
+# assertio — method calls through !.
+#
+# <expr>!.<method>(<args>)
+#
+# EXPECTED OUTPUT:
+#   The list length after two appends, the string length, and an element read.
+
+fn wrap(list<int> v) → list<int> ∪ none {
+    return v
+}
+
+fn greeting() → string ∪ none {
+    return "hello"
+}
+
+main {
+    const list<int> base ← [1, 2]
+    var list<int> ∪ none xs ← wrap(base)
+    xs!.append(3)
+    xs!.append(4)
+    print xs!.length()
+
+    const string ∪ none text ← greeting()
+    print text!.length()
+
+    print xs![2]
+}

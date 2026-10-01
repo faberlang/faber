@@ -1364,7 +1364,7 @@ fn collect_expr_defs(
         HirExpressionKind::NonNull(base, chain) => {
             collect_expr_defs(base, registry);
             match chain {
-                radix_hir::HirNonNullKind::Member(_) => {}
+                radix_hir::HirNonNullKind::Value | radix_hir::HirNonNullKind::Member(_) => {}
                 radix_hir::HirNonNullKind::Index(e) => collect_expr_defs(e, registry),
                 radix_hir::HirNonNullKind::Call(args) => {
                     for arg in args {
@@ -1728,7 +1728,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                         }
                     }
                     radix_hir::HirNonNullKind::Index(e) => collect_expr(e, registry),
-                    radix_hir::HirNonNullKind::Member(_) => {}
+                    radix_hir::HirNonNullKind::Value | radix_hir::HirNonNullKind::Member(_) => {}
                 }
             }
             HirExpressionKind::Block(block) => collect_block(block, registry),
@@ -2569,6 +2569,7 @@ pub(crate) fn validate_referential_integrity(
             HirExpressionKind::NonNull(base, chain) => {
                 validate_expr(base, checks)?;
                 match chain {
+                    radix_hir::HirNonNullKind::Value => {}
                     radix_hir::HirNonNullKind::Member(s) => checks.check_symbol(*s)?,
                     radix_hir::HirNonNullKind::Index(e) => {
                         validate_expr(e, checks)?;

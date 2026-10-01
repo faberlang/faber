@@ -230,40 +230,25 @@ impl FunctionBuilder<'_> {
         }
     }
 
-    /// A non-null member receiver whose expression type is the asserted
-    /// nominal type is the lowered shape of `value!.method()`, not a field
-    /// projection. Keep this check metadata-driven so fields are never
-    /// invented to recover a method call.
-    fn non_null_member_is_method(&self, expr: &HirExpression, name: crate::lexer::Symbol) -> bool {
-        let Some(receiver_ty) = expr.ty else {
-            return false;
-        };
-        let Some(def_id) = self.method_receiver_struct_def(receiver_ty) else {
-            return false;
-        };
-        self.context.method_targets.contains_key(&(def_id, name))
-            || self
-                .context
-                .imported_method_providers
-                .contains_key(&(def_id, name))
-    }
-
-    /// Lower non-null member/index access by asserting the base option into a
-    /// temp-backed place before applying the requested projection.
+    /// Lower a non-null assertion (alone as a method receiver, or followed by
+    /// a member/index/call) by asserting the base option into a temp-backed
+    /// place before applying the requested projection.
     pub(super) fn lower_non_null(
         &mut self,
         object: &HirExpression,
         chain: &HirNonNullKind,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
-        let method_receiver =
-            matches!(chain, HirNonNullKind::Member(name) if self.non_null_member_is_method(expr, *name));
-        let mut place = self.lower_non_null_base(object)?;
+        let (mut place, storage) = self.lower_non_null_base(object)?;
         match chain {
-            HirNonNullKind::Member(name) => {
-                if method_receiver {
-                    return Some(MirOperand::Place(place));
+            HirNonNullKind::Value => {
+                if let Some((storage, storage_ty)) = storage {
+                    self.asserted_receivers
+                        .push((storage, place.clone(), storage_ty));
                 }
+                Some(MirOperand::Place(place))
+            }
+            HirNonNullKind::Member(name) => {
                 place.projections.push(MirProjection::Field(*name));
                 Some(MirOperand::Place(place))
             }
@@ -280,7 +265,10 @@ impl FunctionBuilder<'_> {
         }
     }
 
-    fn lower_non_null_base(&mut self, object: &HirExpression) -> Option<MirPlace> {
+    /// The asserted payload place of `object`, plus the option storage and its
+    /// type when the payload is a temp unwrapped from that storage (a write to
+    /// the payload then needs storing back; see `store_back_asserted_receivers`).
+    fn lower_non_null_base(&mut self, object: &HirExpression) -> Option<(MirPlace, Option<(MirPlace, MirType)>)> {
         let place = self.lower_projectable_place(object)?;
         if let Some(inner_ty) = self.nullable_inner_ty(object) {
             // Typecheck wraps `sponte` field loads as `T ∪ nihil`, but MIR
@@ -290,18 +278,36 @@ impl FunctionBuilder<'_> {
                 .place_ty(&place)
                 .is_some_and(|ty| self.types.nullable_inner(ty.semantic_id()).is_none())
             {
-                return Some(place);
+                return Some((place, None));
             }
-            return Some(self.assign_temp_place(
+            let storage_ty = MirType::semantic(object.ty?);
+            let payload = self.assign_temp_place(
                 MirValueKind::Option(MirOptionOp::Unwrap {
-                    value: MirOperand::Place(place),
+                    value: MirOperand::Place(place.clone()),
                     mode: MirOptionUnwrapMode::Assert,
                 }),
                 inner_ty,
                 object.span,
-            ));
+            );
+            return Some((payload, Some((place, storage_ty))));
         }
-        Some(place)
+        Some((place, None))
+    }
+
+    /// Store each asserted receiver recorded since `mark` back into its option
+    /// storage. A mutating method writes the unwrapped payload temp; MIR
+    /// targets with value semantics (immutable lists) would otherwise lose the
+    /// write, so the storage is re-wrapped from the payload.
+    pub(super) fn store_back_asserted_receivers(&mut self, mark: usize, span: Span) {
+        let recorded = self.asserted_receivers.split_off(mark);
+        for (storage, payload, storage_ty) in recorded {
+            let wrapped = self.assign_temp(
+                MirValueKind::Option(MirOptionOp::Some(MirOperand::Place(payload))),
+                storage_ty,
+                span,
+            );
+            self.assign(storage, wrapped, storage_ty, span);
+        }
     }
 
     fn place_ty(&self, place: &MirPlace) -> Option<MirType> {

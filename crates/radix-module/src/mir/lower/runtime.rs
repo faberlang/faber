@@ -68,6 +68,36 @@ impl FunctionBuilder<'_> {
         conversion: Option<DefId>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        let mark = self.asserted_receivers.len();
+        let result = self.lower_method_call_on_receiver(receiver, method, generic_args, args, conversion, expr);
+        if self.method_writes_receiver(receiver, method, args.len()) {
+            self.store_back_asserted_receivers(mark, expr.span);
+        } else {
+            self.asserted_receivers.truncate(mark);
+        }
+        result
+    }
+
+    /// Whether the registry marks `receiver.method(..)` as rewriting its
+    /// receiver in place (the same predicate typecheck gates on).
+    fn method_writes_receiver(&self, receiver: &HirExpression, method: Symbol, arg_count: usize) -> bool {
+        let (Some(ty), Some(name)) = (receiver.ty, self.resolve_method_name(method)) else {
+            return false;
+        };
+        let payload = self.types.get(self.method_receiver_payload_id(ty));
+        crate::intrinsics::lookup_method_for_type(payload, name, arg_count)
+            .is_some_and(radix_intrinsics::is_mutating_receiver)
+    }
+
+    fn lower_method_call_on_receiver(
+        &mut self,
+        receiver: &HirExpression,
+        method: Symbol,
+        generic_args: &[TypeId],
+        args: &[HirCallArg],
+        conversion: Option<DefId>,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
         if let Some(target) = self.genus_method_target(receiver, method) {
             let mut lowered_args = Vec::with_capacity(args.len() + 1);
             lowered_args.push(self.lower_expr_value(receiver)?);
@@ -2235,10 +2265,6 @@ impl FunctionBuilder<'_> {
         conversion: Option<DefId>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
-        if let HirExpressionKind::NonNull(_, HirNonNullKind::Member(name)) = callee.kind {
-            return self.lower_method_call(callee, name, &[], args, conversion, expr);
-        }
-
         // Callable value: a local binding or non-path expression. Positional args,
         // indirect call via MirCallee::Value.
         let value_callee = match &callee.kind {

@@ -253,9 +253,6 @@ pub(super) fn check_intrinsic_method_call(
     // dispatches on its substituted builtin carrier.
     let receiver_resolved = checker.value_carrier_type(receiver_ty);
     let (_, payload_ty) = checker.types.peel_access_marker(receiver_resolved);
-    // The call's own method symbol, before any canonical-spelling rewrite: it
-    // identifies the `value!.method()` callee boundary in the receiver node.
-    let written_method = *name;
     let method_name = checker.interner.map_or_else(
         || "method".to_owned(),
         |interner| interner.resolve(*name).to_owned(),
@@ -370,9 +367,9 @@ pub(super) fn check_intrinsic_method_call(
     }
 
     // `value!.method()` writes through `value`: look through the non-null
-    // member boundary so the mandatory spelling for an optional receiver
-    // meets the same gates as the direct call on a plain binding.
-    let place = TypeChecker::method_receiver_place(receiver, written_method);
+    // assertion so the mandatory spelling for an optional receiver meets the
+    // same gates as the direct call on a plain binding.
+    let place = TypeChecker::method_receiver_place(receiver);
 
     if checker.expr_is_ref_view(place) && is_mutating_receiver(entry) {
         checker.error_issue(

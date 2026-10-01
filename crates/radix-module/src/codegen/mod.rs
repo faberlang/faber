@@ -149,6 +149,19 @@ mod conversio_function_emit_test;
 #[path = "unhandled_call_main_emit_test.rs"]
 mod unhandled_call_main_emit_test;
 
+#[cfg(all(
+    test,
+    feature = "hir-rust",
+    feature = "hir-go",
+    feature = "hir-ts",
+    feature = "hir-faber",
+    feature = "hir-swift",
+    feature = "hir-python",
+    feature = "hir-haskell"
+))]
+#[path = "non_null_method_call_emit_test.rs"]
+mod non_null_method_call_emit_test;
+
 #[cfg(feature = "hir-go")]
 pub use needs::{GoNeeds, collect_go_needs};
 #[cfg(feature = "hir-rust")]

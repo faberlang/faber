@@ -1753,6 +1753,11 @@ struct FunctionBuilder<'a> {
     /// `innermost_capture` picks the lexically innermost boundary.
     capture_depth: usize,
     materializing_consts: FxHashSet<DefId>,
+    /// `object!` method receivers lowered inside the call being lowered:
+    /// `(storage place, asserted payload temp, storage type)`. A receiver
+    /// write lands on the payload temp, so a mutating call stores the payload
+    /// back into the storage afterwards (`lower_method_call`).
+    asserted_receivers: Vec<(MirPlace, MirPlace, MirType)>,
     errors: Vec<MirError>,
     next_value: u32,
     synthetic_functions: Vec<MirFunction>,
@@ -1821,6 +1826,7 @@ impl<'a> FunctionBuilder<'a> {
             traps: Vec::new(),
             capture_depth: 0,
             materializing_consts: FxHashSet::default(),
+            asserted_receivers: Vec::new(),
             errors: Vec::new(),
             next_value: 0,
             synthetic_functions: Vec::new(),

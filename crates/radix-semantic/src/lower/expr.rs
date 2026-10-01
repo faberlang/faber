@@ -479,6 +479,24 @@ impl Lowerer<'_> {
                     None => HirExpressionKind::Error,
                 }
             }
+            // `base!.method(args)` is a method call on the asserted payload:
+            // the assertion becomes the receiver, so every later phase sees
+            // the same `MethodCall` shape as a call on a plain binding.
+            ExprKind::NonNull(radix_syntax::NonNullExpr {
+                object,
+                chain: radix_syntax::NonNullKind::Member(method),
+            }) => {
+                let base = lower_expr(self, object);
+                let span = base.span;
+                let recv = HirExpression {
+                    id: self.next_hir_id(),
+                    kind: HirExpressionKind::NonNull(Box::new(base), HirNonNullKind::Value),
+                    ty: None,
+                    span,
+                };
+                let args = self.lower_call_args(&call.args);
+                HirExpressionKind::MethodCall(Box::new(recv), method.name, type_args, args, None)
+            }
             ExprKind::Member(member) => {
                 let (recv, name) = self.flatten_dotted_method_callee(member);
                 let name = self.canonicalize_namespace_member(&recv, name);

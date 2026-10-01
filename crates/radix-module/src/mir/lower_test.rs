@@ -3370,6 +3370,33 @@ functio certum(Persona ∪ nihil p) → textus {
 }
 
 #[test]
+fn lowers_non_null_method_call_with_store_back_only_for_receiver_writes() {
+    // audit1-a2: `xs!.appende(1)` writes the unwrapped payload temp, so the
+    // storage is re-wrapped from it; the read `xs!.longitudo()` is not.
+    let write_dump = dump_source(
+        r"
+functio f(lista<numerus> ∪ nihil p) → vacuum {
+    varia lista<numerus> ∪ nihil xs ← p
+    xs!.appende(1)
+}
+",
+    );
+    assert!(write_dump.contains("option unwrap_assert("), "{write_dump}");
+    assert!(write_dump.contains("option some("), "{write_dump}");
+    assert!(!write_dump.contains("method call before runtime/provider MIR lowering"));
+
+    let read_dump = dump_source(
+        r"
+functio f(lista<numerus> ∪ nihil xs) → numerus {
+    redde xs!.longitudo()
+}
+",
+    );
+    assert!(read_dump.contains("option unwrap_assert(_0)"), "{read_dump}");
+    assert!(!read_dump.contains("option some("), "{read_dump}");
+}
+
+#[test]
 fn lowers_enum_variant_construction() {
     let dump = dump_source(
         r#"

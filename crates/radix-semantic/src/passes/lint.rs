@@ -26,8 +26,8 @@
 //!   diagnostic policy promotes warning-kind diagnostics.
 
 use crate::{
-    Primitive, Resolver, SemanticError, SemanticErrorKind, Type, TypeTable, error::WarningKind,
-    locale::LocalePack,
+    Primitive, Resolver, SemanticError, SemanticErrorKind, SemanticParamMode, Type, TypeTable,
+    error::WarningKind, locale::LocalePack,
 };
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
@@ -98,6 +98,8 @@ struct LintContext<'a> {
     defs: Vec<(radix_hir::DefId, Span, WarningKind)>,
     mutable_locals: Vec<(radix_hir::DefId, Span)>,
     mutable_local_defs: FxHashSet<radix_hir::DefId>,
+    /// Per declared function: which parameter positions are `mut` (`in`).
+    mut_param_positions: rustc_hash::FxHashMap<radix_hir::DefId, Vec<bool>>,
     imports: Vec<(radix_hir::DefId, Span)>,
     functions: Vec<(radix_hir::DefId, Span)>,
     scope: Vec<rustc_hash::FxHashMap<radix_lexer::Symbol, radix_hir::DefId>>,
@@ -138,6 +140,7 @@ impl<'a> LintContext<'a> {
             defs: Vec::new(),
             mutable_locals: Vec::new(),
             mutable_local_defs: FxHashSet::default(),
+            mut_param_positions: rustc_hash::FxHashMap::default(),
             imports: Vec::new(),
             functions: Vec::new(),
             scope: Vec::new(),
@@ -150,6 +153,15 @@ impl<'a> LintContext<'a> {
 
     fn collect_items(&mut self, hir: &HirModule) {
         for item in &hir.items {
+            if let HirItemKind::Function(func) = &item.kind {
+                self.mut_param_positions.insert(
+                    item.def_id,
+                    func.params
+                        .iter()
+                        .map(|param| param.mode == radix_hir::HirParamMode::In)
+                        .collect(),
+                );
+            }
             match &item.kind {
                 HirItemKind::Import(import) => self.collect_import(import),
                 // A `@ ad` handler is used by its route, not by name.
@@ -427,6 +439,31 @@ impl<'a> LintContext<'a> {
         }
     }
 
+    /// A `mut` (`in`) parameter is the in-place-mutation mode: the callee may
+    /// rewrite the argument's contents and the argument must be mutable, so an
+    /// argument place passed to one is mutated like an assignment target. A
+    /// `ref`/owned/`ex` position reads (or moves) and does not count.
+    fn mark_mut_param_args(&mut self, callee: &HirExpression, args: &[radix_hir::HirCallArg]) {
+        let modes: Vec<bool> = match (callee.ty.map(|ty| self.types.get(ty)), &callee.kind) {
+            (Some(Type::Func(sig)), _) => sig
+                .params
+                .iter()
+                .map(|param| param.mode == SemanticParamMode::MutRef)
+                .collect(),
+            (_, HirExpressionKind::Path(def_id)) => self
+                .mut_param_positions
+                .get(def_id)
+                .cloned()
+                .unwrap_or_default(),
+            _ => return,
+        };
+        for (arg, is_mut) in args.iter().zip(modes) {
+            if is_mut {
+                self.mark_place_mutated(&arg.expr);
+            }
+        }
+    }
+
     fn mark_place_mutated(&mut self, expr: &HirExpression) {
         if let Some(def_id) = root_place_def_id(expr) {
             self.mutated.insert(def_id);
@@ -663,15 +700,8 @@ impl HirVisitor for LintContext<'_> {
                     self.visit_expr(&arg.expr);
                 }
             }
-            // `value!.method(…)` lowers to a call whose callee is the non-null
-            // member boundary; it is the method-call form for an optional
-            // receiver, so it reassigns exactly like `value.method(…)`.
             HirExpressionKind::Call(callee, _, args, _) => {
-                if let HirExpressionKind::NonNull(_, radix_hir::HirNonNullKind::Member(method)) =
-                    &callee.kind
-                {
-                    self.mark_receiver_reassigned_if_needed(callee, *method, args.len());
-                }
+                self.mark_mut_param_args(callee, args);
                 walk_expr(self, expr);
             }
             HirExpressionKind::Adfirma(cond, message) => {

@@ -157,8 +157,8 @@ use radix_module::driver::Config;
 use radix_module::file_interface::{InterfaceLibraryIdentity, InterfaceNominalKind};
 use radix_module::hir::{
     DefId, HirBlock, HirCallArg, HirCape, HirCasuArm, HirConst, HirExpression, HirExpressionKind,
-    HirId, HirItem, HirItemKind, HirLiteral, HirNonNullKind, HirObjectField, HirOptionalChainKind,
-    HirStatement, HirStatementKind,
+    HirId, HirItem, HirItemKind, HirLiteral, HirObjectField, HirOptionalChainKind, HirStatement,
+    HirStatementKind,
 };
 use radix_module::lexer::{Interner, Symbol};
 use radix_module::mir::{

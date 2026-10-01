@@ -618,7 +618,7 @@ fn walk_optional_chain<V: HirVisitor>(visitor: &mut V, chain: &HirOptionalChainK
 
 fn walk_non_null<V: HirVisitor>(visitor: &mut V, chain: &HirNonNullKind) {
     match chain {
-        HirNonNullKind::Member(_) => {}
+        HirNonNullKind::Value | HirNonNullKind::Member(_) => {}
         HirNonNullKind::Index(index) => visitor.visit_expr(index),
         HirNonNullKind::Call(args) => walk_call_args(visitor, args),
     }
@@ -1211,7 +1211,7 @@ fn walk_optional_chain_mut<V: HirVisitorMut>(visitor: &mut V, chain: &mut HirOpt
 
 fn walk_non_null_mut<V: HirVisitorMut>(visitor: &mut V, chain: &mut HirNonNullKind) {
     match chain {
-        HirNonNullKind::Member(_) => {}
+        HirNonNullKind::Value | HirNonNullKind::Member(_) => {}
         HirNonNullKind::Index(index) => visitor.visit_expr_mut(index),
         HirNonNullKind::Call(args) => walk_call_args_mut(visitor, args),
     }

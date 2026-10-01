@@ -93,12 +93,15 @@ impl<'a> From<&'a HirOptionalChainKind> for PostfixChainTail<'a> {
     }
 }
 
-impl<'a> From<&'a HirNonNullKind> for PostfixChainTail<'a> {
-    fn from(kind: &'a HirNonNullKind) -> Self {
+impl<'a> PostfixChainTail<'a> {
+    /// The tail after `!`; the bare assertion has none (a method call writes
+    /// its own `!.`).
+    fn after_assertion(kind: &'a HirNonNullKind) -> Option<Self> {
         match kind {
-            HirNonNullKind::Member(name) => Self::Member(*name),
-            HirNonNullKind::Index(index) => Self::Index(index),
-            HirNonNullKind::Call(args) => Self::Call(args),
+            HirNonNullKind::Value => None,
+            HirNonNullKind::Member(name) => Some(Self::Member(*name)),
+            HirNonNullKind::Index(index) => Some(Self::Index(index)),
+            HirNonNullKind::Call(args) => Some(Self::Call(args)),
         }
     }
 }
@@ -220,8 +223,15 @@ impl super::FaberCodegen<'_> {
                 }
             }
             HirExpressionKind::MethodCall(receiver, name, type_args, args, _) => {
-                self.write_expr_prec(receiver, 13, names, surface, writer);
-                writer.write(".");
+                // `base!.method(..)`: the receiver is the bare assertion, so
+                // the authored `!.` boundary is written in place of `.`.
+                if let HirExpressionKind::NonNull(base, HirNonNullKind::Value) = &receiver.kind {
+                    self.write_expr_prec(base, 13, names, surface, writer);
+                    writer.write("!.");
+                } else {
+                    self.write_expr_prec(receiver, 13, names, surface, writer);
+                    writer.write(".");
+                }
                 let method_name = self.method_spelling(receiver, *name, names, surface);
                 writer.write(&method_name);
                 self.write_call_type_args(type_args, names, surface, writer);
@@ -292,14 +302,16 @@ impl super::FaberCodegen<'_> {
             }
             HirExpressionKind::NonNull(object, chain) => {
                 self.write_expr_prec(object, 13, names, surface, writer);
-                self.write_postfix_chain_tail(
-                    NON_NULL_CHAIN,
-                    chain.into(),
-                    self.receiver_projects_intrinsic(object),
-                    names,
-                    surface,
-                    writer,
-                );
+                if let Some(tail) = PostfixChainTail::after_assertion(chain) {
+                    self.write_postfix_chain_tail(
+                        NON_NULL_CHAIN,
+                        tail,
+                        self.receiver_projects_intrinsic(object),
+                        names,
+                        surface,
+                        writer,
+                    );
+                }
             }
             HirExpressionKind::Block(block) => {
                 // A plain `fac { }` body is a breakable scope: `rumpe` exits

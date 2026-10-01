@@ -452,9 +452,7 @@ impl TypeChecker<'_> {
         ) {
             return ret;
         }
-        let receiver_ty = self
-            .check_non_null_method_receiver(receiver, *name)
-            .unwrap_or_else(|| self.check_expr(receiver));
+        let receiver_ty = self.check_expr(receiver);
         if let Some(def_id) = self
             .struct_def_from_type(receiver_ty)
             .or_else(|| self.interface_def_from_type(receiver_ty))
@@ -1131,14 +1129,6 @@ impl TypeChecker<'_> {
             self.invalid_operand_types(issue, callee.span);
             self.typecheck_call_arg_exprs(args);
             return self.error_type;
-        }
-
-        let non_null_method = match &callee.kind {
-            HirExpressionKind::NonNull(_, radix_hir::HirNonNullKind::Member(name)) => Some(*name),
-            _ => None,
-        };
-        if let Some(mut name) = non_null_method {
-            return self.check_method_call(callee, &mut name, explicit_type_args, args, expected);
         }
 
         if let HirExpressionKind::Path(def_id) = &callee.kind {

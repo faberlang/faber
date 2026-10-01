@@ -3,13 +3,13 @@
 use super::{
     AnalyzedProgram, AnalyzedProgramNode, BTreeMap, BTreeSet, DataMemberLink, DefId, Diagnostic,
     HashMap, HashSet, HirBlock, HirCallArg, HirCape, HirCasuArm, HirConst, HirExpression,
-    HirExpressionKind, HirItemKind, HirNonNullKind, HirObjectField, HirOptionalChainKind,
-    HirStatement, HirStatementKind, ImportResolution, Interner, LibraryImportBinding,
-    LibraryInterfaceCache, LibraryLinkTarget, LibraryResolver, MethodCallTargets,
-    NamespaceCallTargets, NamespaceDataMemberTargets, NamespaceExports,
-    PACKAGE_MIR_SYNTHETIC_DEF_BASE, PackageMirConsumer, PackageMirLinks, Path, PathBuf, Primitive,
-    Resolver, SourceRewrites, Symbol, Type, TypeId, TypeTable, is_bridged_norma_import_path,
-    library_cached_analysis, library_cached_file_interface, resolve_import,
+    HirExpressionKind, HirItemKind, HirObjectField, HirOptionalChainKind, HirStatement,
+    HirStatementKind, ImportResolution, Interner, LibraryImportBinding, LibraryInterfaceCache,
+    LibraryLinkTarget, LibraryResolver, MethodCallTargets, NamespaceCallTargets,
+    NamespaceDataMemberTargets, NamespaceExports, PACKAGE_MIR_SYNTHETIC_DEF_BASE,
+    PackageMirConsumer, PackageMirLinks, Path, PathBuf, Primitive, Resolver, SourceRewrites,
+    Symbol, Type, TypeId, TypeTable, is_bridged_norma_import_path, library_cached_analysis,
+    library_cached_file_interface, resolve_import,
 };
 use radix_module::hir::visit::{
     HirVisitor, HirVisitorMut, walk_expr, walk_expr_mut, walk_program_mut,
@@ -2793,9 +2793,6 @@ impl HirVisitorMut for LibraryMethodCallRewriter<'_> {
             HirExpressionKind::Call(callee, type_args, args, _) => {
                 let (receiver, method) = match &callee.kind {
                     HirExpressionKind::Field(receiver, method) => (receiver, *method),
-                    HirExpressionKind::NonNull(receiver, HirNonNullKind::Member(method)) => {
-                        (receiver, *method)
-                    }
                     _ => {
                         walk_expr_mut(self, expr);
                         return;
@@ -2959,7 +2956,8 @@ pub(super) fn rewrite_non_null_chain(
     diagnostics: &mut Vec<String>,
 ) {
     match chain {
-        radix_module::hir::HirNonNullKind::Member(_) => {}
+        radix_module::hir::HirNonNullKind::Value | radix_module::hir::HirNonNullKind::Member(_) => {
+        }
         radix_module::hir::HirNonNullKind::Index(index) => rewrite_expr(
             unit_path,
             index,
