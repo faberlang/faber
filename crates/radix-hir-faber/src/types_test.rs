@@ -2526,15 +2526,13 @@ fn bounded_types_print_via_the_surface() {
 
 #[test]
 fn marker_hole_prints_its_family() {
-    // A marker hole's family is identity (`fractus<_>` is not `numerus<_>`);
+    // A marker hole's family is identity (`instans<_>` is not `modulus<_>`);
     // re-emission must keep the family the semantic layer interned.
     let mut types = TypeTable::new();
     let names = FxHashMap::default();
     let interner = Interner::new();
 
     let holes = [
-        (MarkerFamily::Numerus, "numerus<_>"),
-        (MarkerFamily::Fractus, "fractus<_>"),
         (MarkerFamily::Modulus, "modulus<_>"),
         (MarkerFamily::Instans, "instans<_>"),
     ]

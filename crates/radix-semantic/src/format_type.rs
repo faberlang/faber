@@ -198,8 +198,6 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
         Type::Infer(_) => "_".to_owned(),
         Type::InferUnion(_) => "∪".to_owned(),
         Type::MarkerHole { family, .. } => match family {
-            MarkerFamily::Numerus => "numerus<_>",
-            MarkerFamily::Fractus => "fractus<_>",
             MarkerFamily::Modulus => "modulus<_>",
             MarkerFamily::Saturatus => "saturatus<_>",
             MarkerFamily::Instans => "instans<_>",

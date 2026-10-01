@@ -275,7 +275,7 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     rows.push(Type::Infer(InferVar(0)));
     rows.push(Type::InferUnion(InferVar(1)));
     rows.push(Type::MarkerHole {
-        family: MarkerFamily::Numerus,
+        family: MarkerFamily::Modulus,
         var: InferVar(2),
     });
     rows.push(Type::Error);

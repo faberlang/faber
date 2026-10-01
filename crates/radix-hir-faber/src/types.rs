@@ -256,12 +256,6 @@ impl super::FaberCodegen<'_> {
             Type::InferUnion(_) => "∪".to_owned(),
             Type::MarkerHole { family, .. } => {
                 let head = match family {
-                    MarkerFamily::Numerus => {
-                        surface.type_surface(TypeBindingKind::Primitive(Primitive::Numerus))
-                    }
-                    MarkerFamily::Fractus => {
-                        surface.type_surface(TypeBindingKind::Primitive(Primitive::Fractus))
-                    }
                     MarkerFamily::Modulus => surface.contextual_keyword("modulus"),
                     MarkerFamily::Saturatus => {
                         surface.type_surface(TypeBindingKind::SaturatingWord)
