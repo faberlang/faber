@@ -38,6 +38,8 @@ mod commune_emit_test;
 mod instance_spacing_test;
 #[cfg(test)]
 mod intervallum_spacing_test;
+#[cfg(test)]
+mod static_field_read_test;
 
 #[cfg(test)]
 mod itera_range_emit_test;
