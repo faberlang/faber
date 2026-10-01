@@ -324,6 +324,9 @@ mod unsigned_integer_tests;
 #[cfg(test)]
 #[path = "vector_crea_test.rs"]
 mod vector_crea_tests;
+#[cfg(test)]
+#[path = "vector_expand_oracle_test.rs"]
+mod vector_expand_oracle_tests;
 
 #[cfg(test)]
 #[allow(unused_imports)]

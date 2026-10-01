@@ -46,6 +46,7 @@ pub mod tensor_systems_target;
 mod tensor_type;
 pub mod ty;
 pub mod validate;
+pub mod vector_expand;
 pub mod visit;
 
 mod figura;
@@ -61,6 +62,8 @@ mod packed_negative_matrix;
 mod param_mode_test;
 /// Shared statement/value read analysis for device-program lowering.
 mod read_analysis;
+#[cfg(test)]
+mod vector_expand_test;
 #[cfg(test)]
 mod vector_op_test;
 
