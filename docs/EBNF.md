@@ -1121,17 +1121,26 @@ Compile-time integer arithmetic is checked (overflow and division by zero are
 compile errors: `constant_arithmetic_overflow`, `constant_division_by_zero`),
 matching the runner's checked runtime semantics. A value that needs
 computation takes a `praefixum { … }` block (en `comptime { … }`), which runs
-during the build; it is legal today as the initializer of a module-level
-constant or of a `generis` field default, and is `SEM064`
-`praefixum_outside_constant` anywhere else.
+during the build; it is legal as the whole initializer of an `=` constant, at
+module level or at block level (inside any function, method, closure or entry
+body), and as a `genus` field default under any modifier. Anywhere else it is
+`SEM064` `praefixum_outside_constant`. The body stands alone: it may read module
+constants but not a parameter or local of the enclosing body
+(`praefixum_captures_local`), and inside a generic function, method or genus it
+may not mention a type parameter (`praefixum_type_parameter`). A block-level body
+is evaluated like a module constant; an inner `praefixum` constant runs before
+the one that contains it, and a cycle through a site is `constant_cycle`.
 
-**Build-time file embed, `insere` (en `embed`, D8.10).** A module-level `=`
-constant, or a `generis` field default on a `genus`, may open its initializer
-with `insere "path"` instead of an ordinary expression:
-`fixum textus LICENSE = insere "LICENSE.txt"`. `insere` is contextual (claimed
-only as the first word of such an initializer, directly followed by a string
-literal); elsewhere the spelling is an ordinary identifier, and today a
-block-level constant and a `fixum`/`varia` field default never claim the word. The path is package-relative, resolved against the nearest ancestor `faber.toml` (or the source file's own directory when none exists); an absolute path or a `..` escape is rejected, and a missing file is a compile error. The file is read once, at build time — it is a build input, like the source itself. The declared type decides how the bytes land: `textus` requires valid UTF-8 and fails to build otherwise; `octeti` reads the raw bytes unconditionally.
+**Build-time file embed, `insere` (en `embed`, D8.10).** An `=` constant at
+module level or block level, or a `genus` field default under any modifier
+(`generis`, `fixum`, `varia`), may take `insere "path"` as its initializer
+instead of an ordinary expression:
+`fixum textus LICENSE = insere "LICENSE.txt"`. `insere` is contextual (the
+parser claims it in expression position when directly followed by a string
+literal; any other use of the spelling is an ordinary identifier). Lowering
+admits it only as the whole initializer of such a constant or field default;
+anywhere else (`x ← insere "p"`, a call argument, a `redde` value) it is `SEM061`
+`insere_outside_constant`. The path is package-relative, resolved against the nearest ancestor `faber.toml` (or the source file's own directory when none exists); an absolute path or a `..` escape is rejected, and a missing file is a compile error. The file is read once, at build time — it is a build input, like the source itself. The declared type decides how the bytes land: `textus` requires valid UTF-8 and fails to build otherwise; `octeti` reads the raw bytes unconditionally. The result type follows the slot: a `_` slot, or no slot, is `SEM061` `insere_type_required`, and any other concrete slot type is `insere_type_invalid`.
 
 ### Functions
 

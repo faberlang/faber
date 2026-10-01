@@ -935,22 +935,28 @@ expr_stmt      := expression
 block_stmt     := '{' statement* '}'
 # `const_init` (D8.10, st1 R4): the initializer of an `=` binding is either the
 # build-time file embed or an ordinary expression (`praefixum { … }` is an
-# expression, D8.4-D8.6). It is the `=` tail of a module-level constant
-# (`fixum_decl`) and of a `genus` field default (`genus_field_decl`,
-# `field_decl`). Today the parser claims `insere_expr` only as the first word
-# of a module-level `=` constant and of a `generis` field default; after a
-# block-level `fixum`, after a `fixum`/`varia` field, and in a bare assignment
-# the spelling stays an ordinary identifier.
+# expression, D8.4-D8.6). It is the `=` tail of a `fixum` constant, at module
+# level or inside a block (`fixum_decl`), and of a `genus` field default under
+# any of the three modifiers (`genus_field_decl`, `field_decl`).
 const_init     := insere_expr | expression
-# `insere` (en `embed`, D8.10) is contextual: it is claimed only when it is
-# the first word of a claiming `const_init` (above) and is directly followed by
-# a string literal; every other appearance of the spelling stays an ordinary
-# identifier. The string is a package-relative path, resolved against the
-# nearest ancestor `faber.toml` (or, absent one, the source file's own
-# directory); an absolute path or a `..` escape is rejected, and a missing
-# file is a compile error. The file is a build input, read once at compile
-# time. The result's type follows the declaration: `textus` requires the file
-# to be valid UTF-8; `octeti` reads the raw bytes.
+# `insere` (en `embed`, D8.10) is contextual: the parser claims it in
+# expression-primary position when the word is directly followed by a string
+# literal; any other appearance of the spelling (a call `insere(21)`, a binding
+# named `insere`) stays an ordinary identifier. Lowering admits an
+# `insere_expr` only as the whole initializer of a `const_init` — a
+# module-level `=` constant, a block-level `=` constant, or a `genus` field
+# default under any modifier (`generis`, `fixum`, `varia`). Anywhere else
+# (`x ← insere "p"`, a call argument, a `redde` value) it is `SEM061`
+# `insere_outside_constant`; as a bare operand of a larger initializer
+# expression it has no slot of its own (`insere_type_required`). The string is
+# a package-relative path, resolved against the nearest ancestor `faber.toml`
+# (or, absent one, the source file's own directory); an absolute path or a `..`
+# escape is rejected, and a missing file is a compile error. The file is a
+# build input, read once at compile time. The result's type follows the slot,
+# the declared type of the constant or field: `textus` requires the file to be
+# valid UTF-8; `octeti` reads the raw bytes. A `_` slot, or no slot, is `SEM061`
+# `insere_type_required`; any other concrete slot type is `SEM061`
+# `insere_type_invalid`.
 insere_expr    := 'insere' STRING
 
 # `fixum T x = e` (D5.10) is a typed constant: `=` states a compile-time fact,
@@ -1027,10 +1033,9 @@ genus_member  := annotation* (genus_field_decl | functio_method_decl)
 # reassigned (`SEM020 assignment_to_fixum_field`); `Genus { … } ex p` copies
 # it unchanged. `varia T x`: reassignable per instance. `generis T X = …`: one
 # per type, compile-time. Independent of visibility (`@ privata` + `fixum` is
-# legal). The initializer is `const_init` (D8.10) so a `generis` field may
-# also open with the build-time `insere_expr`; `fixum`/`varia` fields only
-# ever take the `expression` alternative today — `insere` there parses as an
-# ordinary identifier, not the build-time embed.
+# legal). The initializer is `const_init` (D8.10): under all three modifiers a
+# field default may be an ordinary expression, the build-time `insere_expr`, or
+# a `praefixum { … }` block.
 genus_field_decl := ('fixum' | 'varia' | 'generis') type_annotation IDENTIFIER 'sponte'? ('=' const_init)?
 # `field_decl` is the `discretio` shared-field form, where the modifier stays
 # optional (F7 held); `genus_field_decl` above is the `genus` form.
@@ -1404,9 +1409,17 @@ qualified_ident := IDENTIFIER ('.' IDENTIFIER)*
 # `praefixum` (D8.4-D8.6, D9): the compile-time initializer for a constant. The
 # retired parenthesized form (`'praefixum' '(' expression ')'`) is gone; a
 # bare block is the only shape, rejected with `praefixum_expression_form_retired`
-# when written. It is legal today only as the initializer of a module-level
-# `=` constant (`fixum_decl`) or of a `generis` field default (`const_init`) —
-# anywhere else it is `SEM064` (`praefixum_outside_constant`). The body is a
+# when written. It is legal as the whole initializer of an `=` constant
+# (`fixum_decl`) at module level or at block level (inside any function,
+# method, closure or entry body), and as a `genus` field default under any
+# modifier (`const_init`); anywhere else it is `SEM064`
+# (`praefixum_outside_constant`). The body stands alone: it may read module
+# constants but not a parameter or local of the enclosing body
+# (`praefixum_captures_local`), and inside a generic function, method or genus
+# it may not mention a type parameter (`praefixum_type_parameter`). A
+# block-level body is evaluated like a module constant; an inner `praefixum`
+# constant runs before the one that contains it, and a cycle through a site is
+# `constant_cycle`. The body is a
 # `block_stmt` ending in a `redde`; it lowers to MIR and runs on `radix-mir-runner` during the build
 # under a step budget (10M steps), so an endless loop fails the build instead
 # of hanging it (`SEM064 praefixum_step_limit`), and `mori` or a propagated
