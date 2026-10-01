@@ -109,6 +109,9 @@ mod mutating_intrinsic_test;
 #[cfg(test)]
 #[path = "non_null_mutating_receiver_test.rs"]
 mod non_null_mutating_receiver_test;
+#[cfg(test)]
+#[path = "register_shape_finalize_test.rs"]
+mod register_shape_finalize_test;
 
 mod closing;
 #[cfg(test)]

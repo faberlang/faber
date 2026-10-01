@@ -63,7 +63,7 @@ impl TypeChecker<'_> {
     /// inference variables do not survive into MIR lowering.
     ///
     /// BO-S-5: memoize by input `TypeId` (pure over frozen substitutions).
-    fn canonicalize_type(&mut self, ty: TypeId) -> TypeId {
+    pub(super) fn canonicalize_type(&mut self, ty: TypeId) -> TypeId {
         if let Some(&cached) = self.canonical_cache.get(&ty) {
             return cached;
         }
@@ -176,6 +176,21 @@ impl TypeChecker<'_> {
                 let elem = self.canonicalize_type(elem);
                 let shape = self.canonicalize_index(shape);
                 self.types.tensor_with_shape(elem, shape)
+            }
+            Type::Vector(elem, width) => {
+                let elem = self.canonicalize_type(elem);
+                let width = self.canonicalize_index(width);
+                self.types.vector_with_width(elem, width)
+            }
+            Type::Matrix(elem, shape) => {
+                let elem = self.canonicalize_type(elem);
+                let shape = self.canonicalize_index(shape);
+                self.types.matrix_with_shape(elem, shape)
+            }
+            Type::Sparsa(elem, shape) => {
+                let elem = self.canonicalize_type(elem);
+                let shape = self.canonicalize_index(shape);
+                self.types.sparsa_with_shape(elem, shape)
             }
             Type::BoundedAscii { capacity } => {
                 let capacity = self.canonicalize_index(capacity);
