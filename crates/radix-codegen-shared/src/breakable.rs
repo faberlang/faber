@@ -61,6 +61,12 @@ impl BreakableLoopStyle {
         }
     }
 
+    /// Whether this backend drops the one-shot loop from a breakable block
+    /// that cannot leave early (see [`block_may_exit_early`]).
+    fn drops_dead_shell(self) -> bool {
+        matches!(self, Self::TypeScript)
+    }
+
     /// Swift statements carry no terminating `;`.
     fn break_stmt(self) -> &'static str {
         match self {
@@ -369,8 +375,9 @@ pub fn block_needs_fallthrough_break(block: &HirBlock) -> bool {
 
 /// Emit a breakable loop or plain block around `emit_inner`.
 ///
-/// Returns `true` when a breakable loop was emitted so callers can append
-/// success/return glue after the loop. Swift has no bare block expression, so
+/// Returns `true` when a breakable scope was emitted (a loop, or on a backend
+/// that drops the dead shell, the bare block standing in for it) so callers
+/// can append success/return glue after it. Swift has no bare block expression, so
 /// its plain blocks emit inline instead of becoming unused closures.
 pub fn write_breakable_scope<F>(
     block: &HirBlock,
@@ -399,6 +406,16 @@ where
     F: FnOnce(&mut CodeWriter),
 {
     if block.breakable.is_some() {
+        if loop_style.drops_dead_shell() && !block_may_exit_early(block) {
+            // No `rumpe` and no routed `perge`: the loop would run once and
+            // `break` at its end. Keep the braces (they scope the body's
+            // locals) and the caller's after-the-scope glue; drop the loop.
+            writer.writeln("{");
+            writer.indented(emit_inner);
+            writer.ensure_line_start();
+            loop_style.write_footer(writer);
+            return true;
+        }
         if let Some(label) = label {
             writer.write(&loop_style.label_prefix(label));
         }
