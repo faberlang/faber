@@ -187,7 +187,7 @@ fn every_hir_backend_fails_closed_with_a_named_diagnostic() {
         (Target::HirTypeScript, "HirTypeScript"),
         // HirGo carries `inf` as `*big.Int` (inf-U6g); it is no longer fail-closed.
         (Target::HirSwift, "HirSwift"),
-        (Target::HirPython, "HirPython"),
+        // HirPython carries `inf` as its own `int` (inf-U6p).
         (Target::HirHaskell, "HirHaskell"),
     ] {
         let result = compile_for_target_and_get_result(INF_FILE, target);
@@ -209,6 +209,16 @@ fn the_rust_backend_carries_inf() {
 fn the_go_backend_carries_inf() {
     for source in [INF_FILE, INF_BIG_LITERAL] {
         let result = compile_for_target_and_get_result(source, Target::HirGo);
+        assert_accepts(&result.diagnostics);
+    }
+}
+
+/// Python carries `inf` as its own unbounded `int` (inf track U6p): the module
+/// compiles.
+#[test]
+fn the_python_backend_carries_inf() {
+    for source in [INF_FILE, INF_BIG_LITERAL] {
+        let result = compile_for_target_and_get_result(source, Target::HirPython);
         assert_accepts(&result.diagnostics);
     }
 }

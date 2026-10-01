@@ -17,10 +17,13 @@ const ISSUE: &str = "inf_target_unsupported";
 
 /// Targets whose emitters carry `inf` faithfully. The Faber re-emitter keeps
 /// the authored spelling; Rust carries it as the runtime bignum
-/// (`faber::Magnus`, unit U6r). Units U6t, U6g and U6p of the `inf` track add
-/// TypeScript, Go and Python.
+/// (`faber::Magnus`, unit U6r) and Python as its native unbounded `int` (unit
+/// U6p). Units U6t and U6g of the `inf` track add TypeScript and Go.
 fn target_admits_inf(target: Target) -> bool {
-    matches!(target, Target::HirFaber | Target::HirFhir | Target::HirRust)
+    matches!(
+        target,
+        Target::HirFaber | Target::HirFhir | Target::HirRust | Target::HirPython
+    )
 }
 
 /// The error for a big integer literal (beyond `u64`, ruling 34) reaching a
