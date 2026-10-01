@@ -65,7 +65,7 @@ impl HirVisitor for DecisionPointCounter {
             HirExpressionKind::Discerne { .. } => self.0 += 1,
             HirExpressionKind::Loop(_)
             | HirExpressionKind::Dum(..)
-            | HirExpressionKind::Itera(..)
+            | HirExpressionKind::Itera { .. }
             | HirExpressionKind::IteraLockstep { .. }
             | HirExpressionKind::IteraRange { .. } => self.0 += 1,
             HirExpressionKind::Binary(HirBinOp::And | HirBinOp::Or | HirBinOp::Coalesce, _, _) => {

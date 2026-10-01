@@ -741,7 +741,7 @@ impl radix_hir::visit::HirVisitor for Ar2Facts {
                     self.handled_wrapping_dum += 1;
                 }
                 if block_contains_kind(body, |k| {
-                    matches!(k, radix_hir::HirExpressionKind::Itera(..))
+                    matches!(k, radix_hir::HirExpressionKind::Itera { .. })
                 }) {
                     self.handled_wrapping_itera += 1;
                 }
@@ -749,7 +749,7 @@ impl radix_hir::visit::HirVisitor for Ar2Facts {
                     matches!(
                         k,
                         radix_hir::HirExpressionKind::Dum(..)
-                            | radix_hir::HirExpressionKind::Itera(..)
+                            | radix_hir::HirExpressionKind::Itera { .. }
                     )
                 }) {
                     self.handled_wrapping_block += 1;
@@ -805,14 +805,15 @@ fn ar2_dum_and_itera_variants_carry_no_catch_field() {
             let _: &Box<radix_hir::HirExpression> = cond;
             let _: &radix_hir::HirBlock = block;
         }
-        radix_hir::HirExpressionKind::Itera(
+        radix_hir::HirExpressionKind::Itera {
             mode,
-            bindings,
-            index_def,
-            index_name,
-            source,
+            coordinates: bindings,
+            binding: index_def,
+            binding_name: index_name,
+            iter: source,
             body,
-        ) => {
+            mutable: false,
+        } => {
             let _: &radix_hir::HirIteraMode = mode;
             let _: &Vec<(radix_hir::DefId, radix_lexer::Symbol)> = bindings;
             let _: &radix_hir::DefId = index_def;

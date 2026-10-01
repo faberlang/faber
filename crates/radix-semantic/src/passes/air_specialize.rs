@@ -1205,7 +1205,7 @@ incipit {
         struct Find(bool);
         impl HirVisitor for Find {
             fn visit_expr(&mut self, expr: &HirExpression) {
-                if matches!(expr.kind, HirExpressionKind::Itera(..)) {
+                if matches!(expr.kind, HirExpressionKind::Itera { .. }) {
                     self.0 = true;
                 }
                 walk_expr(self, expr);

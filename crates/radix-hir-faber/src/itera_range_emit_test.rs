@@ -139,6 +139,7 @@ impl Ctx {
             ranges,
             bindings,
             body: HirBlock::simple(Vec::new(), None, Span::new(0, 0)),
+            mutable: false,
         })
     }
 

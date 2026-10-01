@@ -166,6 +166,7 @@ fn range_product_artifact(bindings: Vec<(DefId, Symbol)>) -> crate::artifact::Hi
                 None,
                 Span::default(),
             ),
+            mutable: false,
         },
         ty: None,
         span: Span::default(),
@@ -206,6 +207,7 @@ fn itera_range_product_passes_referential_integrity() {
         ranges,
         bindings,
         body,
+        ..
     } = &expr.kind
     else {
         panic!("expected IteraRange product");

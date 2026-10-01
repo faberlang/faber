@@ -53,6 +53,7 @@ fn summa_expression_lowers_to_hir_and_admits_sequential() {
         filum,
         binding,
         body: term_body,
+        ..
     } = &expression.kind
     else {
         panic!("expected HIR summa node");

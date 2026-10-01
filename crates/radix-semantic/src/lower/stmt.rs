@@ -925,14 +925,15 @@ impl Lowerer<'_> {
         self.pop_scope();
         let expr = HirExpression {
             id: self.next_hir_id(),
-            kind: HirExpressionKind::Itera(
+            kind: HirExpressionKind::Itera {
                 mode,
-                coordinate_bindings,
+                coordinates: coordinate_bindings,
                 binding,
                 binding_name,
-                Box::new(iter),
+                iter: Box::new(iter),
                 body,
-            ),
+                mutable: iter_stmt.mutability == radix_syntax::AstMutability::Mutable,
+            },
             ty: None,
             span: self.current_span,
         };
@@ -998,6 +999,7 @@ impl Lowerer<'_> {
                 coordinates: coordinate_bindings,
                 bindings,
                 body,
+                mutable: iter_stmt.mutability == radix_syntax::AstMutability::Mutable,
             },
             ty: None,
             span: self.current_span,
@@ -1071,6 +1073,7 @@ impl Lowerer<'_> {
                 ranges,
                 bindings,
                 body,
+                mutable: iter_stmt.mutability == radix_syntax::AstMutability::Mutable,
             },
             ty: None,
             span: self.current_span,

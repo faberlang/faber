@@ -358,7 +358,11 @@ impl SummaBodyState {
                 self.walk_expr(checker, cond);
                 self.walk_block(checker, block);
             }
-            HirExpressionKind::Itera(_, _, _, _, source, block) => {
+            HirExpressionKind::Itera {
+                iter: source,
+                body: block,
+                ..
+            } => {
                 self.walk_expr(checker, source);
                 self.walk_block(checker, block);
             }

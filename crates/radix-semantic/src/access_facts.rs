@@ -749,7 +749,9 @@ impl HirVisitor for DeadSourceAnalyzer<'_> {
                 self.visit_expr(cond);
                 self.with_unknown_branch(|this| this.visit_block(block), |_| {});
             }
-            HirExpressionKind::Itera(_, _, _, _, iter, block) => {
+            HirExpressionKind::Itera {
+                iter, body: block, ..
+            } => {
                 self.visit_expr(iter);
                 self.with_unknown_branch(|this| this.visit_block(block), |_| {});
             }

@@ -544,8 +544,11 @@ pub struct FunctionProvenanceTableWire {
 /// in-place numeric twin method calls); schema-v27 artifacts fail closed.
 /// Version 29 adds `Type::PolicyFloat` (the `trapping<W>` / `saturating<W>`
 /// float cell, N7E-1), shifting the serde ordinal of the `Type` variants after
-/// `SaturatingWord`; schema-v28 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 29;
+/// `SaturatingWord`; schema-v28 artifacts fail closed. Version 30 (IB-1)
+/// converts `HirExpressionKind::Itera` from a positional tuple to named fields
+/// and adds the authored element-binder `mutable` flag to `Itera`,
+/// `IteraLockstep`, `IteraRange` and `Summa`; schema-v29 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 30;
 
 /// Serializable snapshot of one analyzed provider unit carried for HIR
 /// emission (ARCH-U4 carriage).

@@ -391,7 +391,14 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
             visitor.visit_expr(cond);
             visitor.visit_block(block);
         }
-        HirExpressionKind::Itera(_, coordinates, def_id, name, iter, block) => {
+        HirExpressionKind::Itera {
+            coordinates,
+            binding: def_id,
+            binding_name: name,
+            iter,
+            body: block,
+            ..
+        } => {
             for (coordinate_def_id, coordinate_name) in coordinates {
                 visitor.visit_def(*coordinate_def_id, *coordinate_name);
             }
@@ -404,6 +411,7 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
             coordinates,
             bindings,
             body,
+            ..
         } => {
             for (coordinate_def_id, coordinate_name) in coordinates {
                 visitor.visit_def(*coordinate_def_id, *coordinate_name);
@@ -420,6 +428,7 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
             ranges,
             bindings,
             body,
+            ..
         } => {
             // Ranges evaluate outside the binder scope, so they walk before
             // the binder defs (leftmost-outermost order preserved).
@@ -437,6 +446,7 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
             filum,
             binding,
             body,
+            ..
         } => {
             for (coordinate_def_id, coordinate_name) in coordinates {
                 visitor.visit_def(*coordinate_def_id, *coordinate_name);
@@ -986,7 +996,14 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
             visitor.visit_expr_mut(cond);
             visitor.visit_block_mut(block);
         }
-        HirExpressionKind::Itera(_, coordinates, def_id, name, iter, block) => {
+        HirExpressionKind::Itera {
+            coordinates,
+            binding: def_id,
+            binding_name: name,
+            iter,
+            body: block,
+            ..
+        } => {
             for (coordinate_def_id, coordinate_name) in coordinates {
                 visitor.visit_def(*coordinate_def_id, *coordinate_name);
             }
@@ -999,6 +1016,7 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
             coordinates,
             bindings,
             body,
+            ..
         } => {
             for (coordinate_def_id, coordinate_name) in coordinates {
                 visitor.visit_def(*coordinate_def_id, *coordinate_name);
@@ -1015,6 +1033,7 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
             ranges,
             bindings,
             body,
+            ..
         } => {
             // Ranges evaluate outside the binder scope, so they walk before
             // the binder defs (leftmost-outermost order preserved).
@@ -1032,6 +1051,7 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
             filum,
             binding,
             body,
+            ..
         } => {
             for (coordinate_def_id, coordinate_name) in coordinates {
                 visitor.visit_def(*coordinate_def_id, *coordinate_name);

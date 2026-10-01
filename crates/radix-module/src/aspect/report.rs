@@ -547,7 +547,7 @@ impl HirVisitor for HirAspectCollector<'_> {
         if let HirExpressionKind::MethodCall(_, method, _, args, _) = &expr.kind {
             self.record_mask_neutrality(expr, *method, args);
         }
-        if let HirExpressionKind::Itera(mode, coordinates, _, _, source, _) = &expr.kind {
+        if let HirExpressionKind::Itera { mode, coordinates, iter: source, .. } = &expr.kind {
             self.record_unroll_equivalence(expr, *mode, coordinates, source);
         }
 
