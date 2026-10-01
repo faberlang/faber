@@ -34,12 +34,14 @@ mod session;
 #[cfg(feature = "mir-core")]
 mod shader_contract;
 mod source;
+mod target_bindings;
 mod target_policy;
 
 pub use file_frontmatter::{FileFrontmatter, parse_file_frontmatter};
 pub use frontmatter::{FrontmatterError, SplitFrontmatter, split_frontmatter};
 pub use session::{Config, Session, SessionMemos, WarnPolicy};
 pub use source::{PeeledSource, SourceFile, SourceLoadError, peel_raw_source, source_load_diagnostic};
+pub use target_bindings::TargetBindings;
 
 use crate::CompileResult;
 use crate::codegen::{self, Target};
@@ -318,6 +320,7 @@ pub fn compile(session: &Session, name: &str, source: &str, request: ModuleCompi
         session.config.module_name.as_deref(),
         session.config.no_fuse,
         session.config.emit_nvvm_device_module,
+        &session.config.target_bindings,
     ) {
         Ok(output) => CompileResult { output: Some(output), diagnostics: analysis.diagnostics },
         Err(err) => compile_codegen_error(analysis, name, source, err),
@@ -613,6 +616,7 @@ fn generate_output(
     module_name: Option<&str>,
     no_fuse: bool,
     emit_nvvm_device_module: bool,
+    target_bindings: &TargetBindings,
 ) -> Result<crate::Output, SpannedCodegenError> {
     match target {
         Target::MirStepper => Err(codegen::CodegenError {
@@ -681,7 +685,7 @@ fn generate_output(
         Target::MirWgsl => {
             reject_modular_word_target(analysis, "WGSL text")?;
             reject_saturating_word_target(analysis, "WGSL text")?;
-            generate_wgsl_text_output(analysis, no_fuse)
+            generate_wgsl_text_output(analysis, no_fuse, target_bindings)
         }
         #[cfg(not(feature = "mir-wgsl"))]
         Target::MirWgsl => Err(unavailable_target_spanned(Target::MirWgsl)),
@@ -1058,6 +1062,7 @@ fn generate_metal_text_output(
 fn generate_wgsl_text_output(
     analysis: &mut AnalyzedModule,
     no_fuse: bool,
+    target_bindings: &TargetBindings,
 ) -> Result<crate::Output, SpannedCodegenError> {
     #[cfg(not(feature = "mir-wgsl"))]
     {
@@ -1085,6 +1090,10 @@ fn generate_wgsl_text_output(
                 .iter()
                 .any(|e| e.body_shape == GraphicsVertexBodyShape::Unsupported);
             let mir_result = lower_graphics_mir_with_context_for_target(analysis);
+            let bound_calls = mir_result.as_ref().map_or_else(
+                |_| crate::mir::WgslBoundCallTable::new(),
+                |mir| target_bindings::wgsl_bound_call_table(target_bindings, mir.validated.program(), &mir.interner),
+            );
             let (vertex_mir, fragment_mir, mir_validation, mir_interner) = match &mir_result {
                 Ok(mir) => {
                     let v = mir
@@ -1136,6 +1145,7 @@ fn generate_wgsl_text_output(
                     fragment_mir,
                     mir_validation,
                     mir_interner,
+                    &bound_calls,
                 )
                 .map_err(wgsl_text_codegen_error)?;
                 return Ok(crate::Output::WgslText(crate::WgslTextOutput {
@@ -1144,17 +1154,28 @@ fn generate_wgsl_text_output(
                 }));
             }
             if has_vertex {
-                let output = emit_wgsl_vertex_source_output(&graphics_source, vertex_mir, mir_validation, mir_interner)
-                    .map_err(wgsl_text_codegen_error)?;
+                let output = emit_wgsl_vertex_source_output(
+                    &graphics_source,
+                    vertex_mir,
+                    mir_validation,
+                    mir_interner,
+                    &bound_calls,
+                )
+                .map_err(wgsl_text_codegen_error)?;
                 return Ok(crate::Output::WgslText(crate::WgslTextOutput {
                     code: output.source,
                     reflection: Some(output.reflection),
                 }));
             }
             if has_fragment {
-                let output =
-                    emit_wgsl_fragment_source_output(&graphics_source, fragment_mir, mir_validation, mir_interner)
-                        .map_err(wgsl_text_codegen_error)?;
+                let output = emit_wgsl_fragment_source_output(
+                    &graphics_source,
+                    fragment_mir,
+                    mir_validation,
+                    mir_interner,
+                    &bound_calls,
+                )
+                .map_err(wgsl_text_codegen_error)?;
                 return Ok(crate::Output::WgslText(crate::WgslTextOutput {
                     code: output.source,
                     reflection: Some(output.reflection),
@@ -1193,6 +1214,7 @@ fn emit_wgsl_vertex_source_output(
     vertex_mir: Option<&crate::mir::MirFunction>,
     mir_validation: Option<&crate::mir::ValidatedMir<'_>>,
     mir_interner: Option<&crate::lexer::Interner>,
+    bound_calls: &crate::mir::WgslBoundCallTable,
 ) -> Result<crate::mir::MirWgslTextProbeOutput, crate::mir::MirWgslTextProbeError> {
     if graphics_source.vertex_entries.len() != 1 {
         return Err(wgsl_vertex_source_error(
@@ -1229,7 +1251,10 @@ fn emit_wgsl_vertex_source_output(
     let vertex_with_varyings = crate::mir::MirKernelReflection { varyings, ..vertex };
     let source = crate::mir::emit_wgsl_vertex_entry_contract(
         &vertex_with_varyings,
-        &crate::mir::WgslEntryContext::with_body(vertex_mir, mir_validation, mir_interner),
+        &crate::mir::WgslEntryContext {
+            bound_calls: bound_calls.clone(),
+            ..crate::mir::WgslEntryContext::with_body(vertex_mir, mir_validation, mir_interner)
+        },
     )?;
     Ok(crate::mir::MirWgslTextProbeOutput {
         source,
@@ -1243,6 +1268,7 @@ fn emit_wgsl_fragment_source_output(
     fragment_mir: Option<&crate::mir::MirFunction>,
     mir_validation: Option<&crate::mir::ValidatedMir<'_>>,
     mir_interner: Option<&crate::lexer::Interner>,
+    bound_calls: &crate::mir::WgslBoundCallTable,
 ) -> Result<crate::mir::MirWgslTextProbeOutput, crate::mir::MirWgslTextProbeError> {
     if graphics_source.fragment_entries.len() != 1 {
         return Err(wgsl_vertex_source_error(
@@ -1279,7 +1305,10 @@ fn emit_wgsl_fragment_source_output(
     .map_err(wgsl_vertex_abi_error)?;
     let source = crate::mir::emit_wgsl_fragment_entry_contract(
         &fragment,
-        &crate::mir::WgslEntryContext::with_body(fragment_mir, mir_validation, mir_interner),
+        &crate::mir::WgslEntryContext {
+            bound_calls: bound_calls.clone(),
+            ..crate::mir::WgslEntryContext::with_body(fragment_mir, mir_validation, mir_interner)
+        },
     )?;
     Ok(crate::mir::MirWgslTextProbeOutput {
         source,
@@ -1294,10 +1323,12 @@ fn emit_wgsl_graphics_pipeline_output(
     fragment_mir: Option<&crate::mir::MirFunction>,
     mir_validation: Option<&crate::mir::ValidatedMir<'_>>,
     mir_interner: Option<&crate::lexer::Interner>,
+    bound_calls: &crate::mir::WgslBoundCallTable,
 ) -> Result<crate::mir::MirWgslTextProbeOutput, crate::mir::MirWgslTextProbeError> {
-    let vertex_output = emit_wgsl_vertex_source_output(graphics_source, vertex_mir, mir_validation, mir_interner)?;
+    let vertex_output =
+        emit_wgsl_vertex_source_output(graphics_source, vertex_mir, mir_validation, mir_interner, bound_calls)?;
     let fragment_output =
-        emit_wgsl_fragment_source_output(graphics_source, fragment_mir, mir_validation, mir_interner)?;
+        emit_wgsl_fragment_source_output(graphics_source, fragment_mir, mir_validation, mir_interner, bound_calls)?;
 
     let pipeline = graphics_source
         .shader_pipeline_states
@@ -4309,3 +4340,8 @@ mod closure_shared_capture_tests;
 #[cfg(test)]
 #[path = "print_text_kind_test.rs"]
 mod print_text_kind_tests;
+
+#[cfg(test)]
+#[cfg(feature = "mir-wgsl")]
+#[path = "wgsl_bound_call_test.rs"]
+mod wgsl_bound_call_tests;
