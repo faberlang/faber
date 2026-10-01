@@ -115,12 +115,6 @@ fn rejects_invalid_number_forms_and_ranges() {
         JsonErrorKind::InvalidNumber(_)
     ));
     assert!(matches!(
-        Json::parse(r#"{"n": 9223372036854775808}"#)
-            .expect_err("large integer")
-            .kind(),
-        JsonErrorKind::InvalidNumber(_)
-    ));
-    assert!(matches!(
         Json::parse(r#"{"n": 1e999}"#)
             .expect_err("non finite exponent")
             .kind(),

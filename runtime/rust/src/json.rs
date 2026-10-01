@@ -1,6 +1,6 @@
 //! Object-rooted JSON document carrier for Faber `json`.
 
-use crate::Valor;
+use crate::{Magnus, Valor};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt;
@@ -450,12 +450,15 @@ impl<'a> Parser<'a> {
                 ))
             }
         } else {
-            // WHY: beyond-`i64` tokens stay rejected until U8a/U8b gives the runner and every
-            // backend the same any-length parse; `Valor::Magnus` only renders (below).
-            token
-                .parse::<i64>()
-                .map(Valor::Numerus)
-                .map_err(|_| JsonError::new(path, JsonErrorKind::InvalidNumber(token.into())))
+            // WHY: an integer token of any length is exact, as in the MIR runner: `i64` is
+            // `Valor::Numerus`, anything beyond it the canonical `Valor::Magnus` carrier
+            // (`From<Magnus>` normalises, so a small token can never be a `Magnus`).
+            match token.parse::<i64>() {
+                Ok(value) => Ok(Valor::Numerus(value)),
+                Err(_) => Magnus::parse_decimal(token)
+                    .map(Valor::from)
+                    .map_err(|_| JsonError::new(path, JsonErrorKind::InvalidNumber(token.into()))),
+            }
         }
     }
 

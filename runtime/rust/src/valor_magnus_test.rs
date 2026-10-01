@@ -45,3 +45,33 @@ fn json_renders_a_magnus_field_as_its_decimal_digits() {
         r#"{"n":18446744073709551616,"s":9223372036854775807}"#
     );
 }
+
+#[test]
+fn json_parses_integer_tokens_of_any_length_into_the_canonical_carrier() {
+    let json = Json::parse(
+        r#"{"a":18446744073709551616,"b":-18446744073709551617,"c":9223372036854775808,"d":-9223372036854775808,"e":-5,"f":1.5}"#,
+    )
+    .expect("any-length integer tokens parse");
+    let fields = json.as_object();
+    let magnus = |text: &str| Valor::Magnus(Magnus::parse_decimal(text).expect("digits"));
+    assert_eq!(fields["a"], magnus("18446744073709551616"));
+    assert_eq!(fields["b"], magnus("-18446744073709551617"));
+    // One past `i64::MAX` is already a `Magnus`; `i64::MIN` still fits `Numerus`.
+    assert_eq!(fields["c"], magnus("9223372036854775808"));
+    assert_eq!(fields["d"], Valor::Numerus(i64::MIN));
+    assert_eq!(fields["e"], Valor::Numerus(-5));
+    assert_eq!(fields["f"], Valor::Fractus(1.5));
+    assert_eq!(Magnus::from_valor(&fields["a"]), Some(big()));
+}
+
+#[test]
+fn json_round_trips_a_thousand_digit_integer_as_a_bare_number() {
+    let digits = "7".repeat(1000);
+    let wire = format!(r#"{{"n":{digits},"xs":[{digits},-{digits}]}}"#);
+    let json = Json::parse(&wire).expect("1000-digit token");
+    assert_eq!(json.to_wire(), wire);
+    assert_eq!(
+        Magnus::from_valor(&json.as_object()["n"]).map(|n| n.to_string()),
+        Some(digits)
+    );
+}
