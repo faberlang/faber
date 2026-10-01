@@ -280,6 +280,40 @@ pub fn manifest_build_target(target: Option<&str>, path: &Path) -> Result<Target
     }
 }
 
+/// Reject `[target.<key>]` tables whose key is not an accepted target
+/// spelling.
+///
+/// Target tables are looked up by the canonical spelling of the target being
+/// emitted, so a table under any other key is never read: its bindings would
+/// load as empty and every bound call would fail as unbound with nothing
+/// pointing at the manifest. The diagnostic names the key and lists the
+/// accepted spellings (the `[build] target` vocabulary). No alias is accepted.
+///
+/// # Errors
+/// Returns the first unknown `[target.<key>]` table as a structured
+/// diagnostic.
+pub fn validate_target_tables(
+    targets: &BTreeMap<String, ManifestTarget>,
+    path: &Path,
+) -> Result<(), Box<Diagnostic>> {
+    let Some(key) = targets
+        .keys()
+        .find(|key| !Target::from_spelling(key).is_some_and(is_manifest_build_target))
+    else {
+        return Ok(());
+    };
+    Err(Box::new(
+        crate::package_diagnostic_error(format!(
+            "faber.toml [target.{key}] is not a target; use one of: {}",
+            manifest_build_target_spellings()
+        ))
+        .with_file(path.display().to_string())
+        .with_arg("issue", "package_target_table_unknown")
+        .with_arg("target", key.clone())
+        .with_arg("accepted", manifest_build_target_spellings()),
+    ))
+}
+
 /// Read and deserialize the compiler projection of a `faber.toml` manifest.
 ///
 /// Product-only sections are tolerated (they are faber's product view);

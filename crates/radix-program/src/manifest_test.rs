@@ -302,3 +302,39 @@ fn build_target_rejects_internal_targets_with_the_rule_named() {
         );
     }
 }
+
+fn manifest_with_target_tables(tables: &str) -> FaberManifest {
+    toml::from_str(&format!("[package]\nname = \"demo\"\n{tables}")).expect("manifest parses")
+}
+
+#[test]
+fn target_tables_reject_unknown_key_naming_it_and_the_accepted_spellings() {
+    let manifest = manifest_with_target_tables("\n[target.wgsl]\nbindings = \"b.toml\"\n");
+    let err = validate_target_tables(&manifest.target, Path::new("faber.toml"))
+        .expect_err("an unknown [target.<key>] must fail validation");
+    assert_eq!(err.code, Some("PKG001"));
+    assert_eq!(err.issue(), Some("package_target_table_unknown"));
+    assert!(err.message.contains("[target.wgsl]"));
+    assert_eq!(
+        err.args
+            .iter()
+            .find(|arg| arg.name == "target")
+            .map(|arg| arg.value.as_str()),
+        Some("wgsl")
+    );
+    let accepted: Vec<&str> = accepted_arg(&err).split(", ").collect();
+    assert!(accepted.contains(&"wgsl-text"));
+    assert!(accepted.contains(&"rust"));
+    assert!(!accepted.contains(&"wgsl"));
+}
+
+#[test]
+fn target_tables_accept_target_spellings() {
+    let manifest = manifest_with_target_tables(
+        "\n[target.wgsl-text]\nbindings = \"w.toml\"\n\n[target.rust]\n\n[target.ts]\n",
+    );
+    validate_target_tables(&manifest.target, Path::new("faber.toml"))
+        .expect("target spellings validate");
+    let empty = manifest_with_target_tables("");
+    validate_target_tables(&empty.target, Path::new("faber.toml")).expect("no tables validate");
+}

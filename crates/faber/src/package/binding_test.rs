@@ -588,3 +588,35 @@ fn real_tela_ts_manifest_parses_with_the_unified_schema() {
     assert!(manifest.shims.contains_key("canvas2d"));
     assert!(manifest.types.is_empty());
 }
+
+fn write_target_table_package(table: &str) -> tempfile::TempDir {
+    let root = tempfile::tempdir().expect("create temp root");
+    fs::create_dir_all(root.path().join("src")).expect("create source directory");
+    fs::write(
+        root.path().join("faber.toml"),
+        format!(
+            "[package]\nname = \"fixture\"\n\n[library]\nprovider = \"fixture\"\n\n[build]\nkind = \"lib\"\ntargets = [\"rust\"]\n\n[target.{table}]\nbindings = \"bindings/b.toml\"\n"
+        ),
+    )
+    .expect("write package manifest");
+    root
+}
+
+#[test]
+fn load_target_bindings_rejects_an_unknown_target_table() {
+    let root = write_target_table_package("wgsl");
+    let err = super::load_target_bindings(root.path(), "wgsl-text")
+        .expect_err("a [target.wgsl] table must be an error, not empty maps");
+    assert!(has_issue(&err, "package_target_table_unknown"));
+    assert!(err.iter().any(|d| d.message.contains("wgsl")));
+}
+
+#[test]
+fn load_target_bindings_accepts_a_target_spelling_table() {
+    let root = write_target_table_package("wgsl-text");
+    fs::create_dir_all(root.path().join("bindings")).expect("create binding directory");
+    fs::write(root.path().join("bindings/b.toml"), "").expect("write binding manifest");
+    let bindings =
+        super::load_target_bindings(root.path(), "wgsl-text").expect("a known target table loads");
+    assert!(bindings.functions.is_empty() && bindings.types.is_empty());
+}

@@ -11,6 +11,7 @@ use super::{faber_analysis_seams, read_manifest, validate_manifest};
 use radix::program::analyze::AnalyzedProgram;
 use radix::program::discovery::resolve_source_root;
 use radix::program::file_interface::extract_callable_contracts;
+use radix::program::manifest::validate_target_tables;
 use radix::program::member_path::resolve_package_member;
 #[cfg(feature = "hir-rust")]
 use radix::program::rust_target::render_binding_probe;
@@ -68,6 +69,9 @@ pub fn load_target_bindings(
         Ok(manifest) => manifest,
         Err(diag) => return Err(vec![*diag]),
     };
+    if let Err(diag) = validate_target_tables(&manifest.target, &manifest_path) {
+        return Err(vec![*diag]);
+    }
     let Some(bindings_path) = manifest
         .target
         .get(target)
@@ -113,6 +117,9 @@ fn verify_library_bindings_with_probe_mode(
         Err(diag) => return Err(vec![*diag]),
     };
     if let Err(diag) = validate_manifest(&manifest, &manifest_path) {
+        return Err(vec![*diag]);
+    }
+    if let Err(diag) = validate_target_tables(&manifest.target, &manifest_path) {
         return Err(vec![*diag]);
     }
     if manifest.build.kind != "lib" {
