@@ -1,6 +1,5 @@
 use crate::codegen::Target;
-use crate::driver::ModuleCompileRequest;
-use crate::driver::compile;
+use crate::driver::{AnalyzeRequest, ModuleCompileRequest, analyze_source, compile};
 use crate::mir::MirKernelShaderStage;
 use crate::test_support::test_session;
 
@@ -283,4 +282,126 @@ adfirma vertex_layout_matches(0, 0, "position", 0, 3, 0, 12) mori "missing step 
             .all(|diag| diag.issue() != Some("shader_contract_fact_conflict")),
         "arity mismatch must not be reported as a duplicate/conflict"
     );
+}
+
+const BOUND_RESOURCE_BINDING_FN: &str = r#"
+@ shader_contract "bound_resource_binding"
+functio bound_resource_binding_matches(
+numerus group, numerus binding, textus source_name
+) → bivalens {
+redde verum
+}
+"#;
+
+const RESOURCE_BINDING_FN: &str = r#"
+@ shader_contract "resource_binding"
+functio resource_binding_matches(
+numerus group, numerus binding, numerus kind_code, numerus role_code,
+numerus access_code, numerus element_count, numerus layout_code,
+textus source_name, numerus stage_io_role_code
+) → bivalens {
+redde verum
+}
+"#;
+
+#[test]
+fn contract_bound_resource_binding_yields_one_fact() {
+    let source = format!(
+        r#"
+{BOUND_RESOURCE_BINDING_FN}
+incipit {{
+adfirma bound_resource_binding_matches(1, 2, "tex") mori "tex binding"
+}}
+"#
+    );
+    let analysis = analyze_source(
+        &test_session(Target::MirWgsl),
+        "shader_contract.fab",
+        &source,
+        AnalyzeRequest::default(),
+    )
+    .unwrap_or_else(|diagnostics| panic!("analysis failed: {diagnostics:?}"));
+    let mut diagnostics = Vec::new();
+    let facts = super::collect_shader_contract_facts(
+        &analysis.hir,
+        &analysis.types,
+        &analysis.interner,
+        "shader_contract.fab",
+        &mut diagnostics,
+    );
+    assert!(diagnostics.is_empty(), "unexpected diagnostics: {diagnostics:?}");
+    assert_eq!(facts.bound_resource_bindings.len(), 1);
+    let fact = &facts.bound_resource_bindings[0];
+    assert_eq!(fact.group, 1);
+    assert_eq!(fact.binding, 2);
+    assert_eq!(fact.source_name, "tex");
+    assert!(fact.provenance.source.is_some());
+    assert!(facts.resource_bindings.is_empty());
+}
+
+#[test]
+fn contract_bound_and_plain_resource_binding_share_conflict_key() {
+    let source = format!(
+        r#"
+{RESOURCE_BINDING_FN}
+{BOUND_RESOURCE_BINDING_FN}
+incipit {{
+adfirma resource_binding_matches(0, 1, 1, 1, 1, 64, 1, "transform", 3) mori "transform buffer"
+adfirma bound_resource_binding_matches(0, 1, "tex") mori "tex binding on the same slot"
+}}
+"#
+    );
+    let result = compile_source(&source);
+    assert!(!result.success(), "same (group, binding) across roles must be rejected");
+    let conflict = result
+        .diagnostics
+        .iter()
+        .find(|diag| diag.issue() == Some("shader_contract_fact_conflict"))
+        .expect("shared (group, binding) must report the conflict identity");
+    assert_eq!(conflict.code, Some("SHADERCONTRACT004"));
+}
+
+#[test]
+fn contract_bound_resource_binding_non_constant_argument_is_diagnostic() {
+    let source = format!(
+        r#"
+{BOUND_RESOURCE_BINDING_FN}
+incipit {{
+fixum numerus binding ← 2
+adfirma bound_resource_binding_matches(1, binding, "tex") mori "tex binding"
+}}
+"#
+    );
+    let result = compile_source(&source);
+    assert!(!result.success(), "non-constant bound binding argument must fail closed");
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.issue() == Some("shader_contract_arg_non_constant"))
+    );
+}
+
+#[test]
+fn contract_bound_resource_binding_wrong_arity_is_diagnostic() {
+    let source = r#"
+@ shader_contract "bound_resource_binding"
+functio bound_resource_binding_matches(
+numerus group, numerus binding, textus source_name sponte
+) → bivalens {
+redde verum
+}
+
+incipit {
+adfirma bound_resource_binding_matches(1, 2) mori "missing source name"
+}
+"#;
+    let result = compile_source(source);
+    assert!(!result.success(), "wrong-argument-count bound binding call must fail closed");
+    let arity = result
+        .diagnostics
+        .iter()
+        .find(|diag| diag.issue() == Some("shader_contract_arg_count"))
+        .expect("arity mismatch must report the arity identity");
+    assert_eq!(arity.code, Some("SHADERCONTRACT005"));
 }

@@ -34,6 +34,7 @@
 //! | `fragment_output` | `(location, format_code, stage_io_role_code)` |
 //! | `pipeline` | `(color_target_format_code, depth_compare_code, depth_write_enabled_code, primitive_topology_code, vertex_count)` |
 //! | `resource_binding` | `(group, binding, kind_code, role_code, access_code, element_count, layout_code, source_name, stage_io_role_code)` |
+//! | `bound_resource_binding` | `(group, binding, source_name)` |
 //!
 //! Numeric codes are the canonical code tables in
 //! `radix_mir::shader_contract`; unknown codes fail closed with
@@ -73,8 +74,8 @@ use crate::semantic::{Primitive, TypeTable};
 
 use radix_mir::{
     ContractProvenance, MirAbiError, MirDepthStencilState, MirScalarLayout, MirStencilFaceState, MirType,
-    ShaderFragmentOutput, ShaderPipelineState, ShaderResourceBinding, ShaderVarying, ShaderVertexAttribute,
-    color_target_format_from_code, depth_compare_function_from_code, input_step_mode_from_code,
+    ShaderBoundResourceBinding, ShaderFragmentOutput, ShaderPipelineState, ShaderResourceBinding, ShaderVarying,
+    ShaderVertexAttribute, color_target_format_from_code, depth_compare_function_from_code, input_step_mode_from_code,
     primitive_topology_from_code, resource_access_from_code, resource_kind_from_code, resource_role_from_code,
     stage_io_role_from_code, varying_interpolation_from_code, vertex_format_from_code,
 };
@@ -96,6 +97,7 @@ pub(crate) enum ShaderContractRole {
     FragmentOutput,
     Pipeline,
     ResourceBinding,
+    BoundResourceBinding,
 }
 
 impl ShaderContractRole {
@@ -106,6 +108,7 @@ impl ShaderContractRole {
             "fragment_output" => Some(Self::FragmentOutput),
             "pipeline" => Some(Self::Pipeline),
             "resource_binding" => Some(Self::ResourceBinding),
+            "bound_resource_binding" => Some(Self::BoundResourceBinding),
             _ => None,
         }
     }
@@ -118,6 +121,7 @@ impl ShaderContractRole {
             Self::FragmentOutput => "fragment_output",
             Self::Pipeline => "pipeline",
             Self::ResourceBinding => "resource_binding",
+            Self::BoundResourceBinding => "bound_resource_binding",
         }
     }
 }
@@ -130,6 +134,7 @@ pub(crate) struct ShaderContractFacts {
     pub fragment_outputs: Vec<ShaderFragmentOutput>,
     pub pipeline_states: Vec<ShaderPipelineState>,
     pub resource_bindings: Vec<ShaderResourceBinding>,
+    pub bound_resource_bindings: Vec<ShaderBoundResourceBinding>,
 }
 
 /// Collect shader-contract facts from the analyzed unit.
@@ -269,6 +274,8 @@ struct FactKeys {
     vertex_locations: FxHashSet<u32>,
     varying_locations: FxHashSet<u32>,
     fragment_output_locations: FxHashSet<u32>,
+    /// `(group, binding)` slots claimed by `resource_binding` and
+    /// `bound_resource_binding` calls alike: one slot, one declaration.
     resource_bindings: FxHashSet<(u32, u32)>,
     pipeline_declared: bool,
 }
@@ -310,6 +317,7 @@ impl ContractCollector<'_> {
             ShaderContractRole::FragmentOutput => self.ingest_fragment_output(callee, args, span),
             ShaderContractRole::Pipeline => self.ingest_pipeline(callee, args, span),
             ShaderContractRole::ResourceBinding => self.ingest_resource_binding(callee, args, span),
+            ShaderContractRole::BoundResourceBinding => self.ingest_bound_resource_binding(callee, args, span),
         }
     }
 
@@ -628,6 +636,37 @@ impl ContractCollector<'_> {
             vertex_count: u32::try_from(vertex_count).unwrap_or(u32::MAX),
             provenance: self.provenance(callee, span),
         });
+    }
+
+    fn ingest_bound_resource_binding(&mut self, callee: DefId, args: &[HirCallArg], span: Span) {
+        let role = ShaderContractRole::BoundResourceBinding;
+        if args.len() != 3 {
+            self.push_arg_count_diagnostic(role, 3, span);
+            return;
+        }
+        let Some(group) = self.int_arg(args, 0, role, span) else {
+            return;
+        };
+        let Some(binding) = self.int_arg(args, 1, role, span) else {
+            return;
+        };
+        let Some(source_name) = self.string_arg(args, 2, role, span) else {
+            return;
+        };
+        let group = u32::try_from(group).unwrap_or(u32::MAX);
+        let binding = u32::try_from(binding).unwrap_or(u32::MAX);
+        if !self.keys.resource_bindings.insert((group, binding)) {
+            self.push_conflict_diagnostic(role, format!("group-{group}-binding-{binding}"), span);
+            return;
+        }
+        self.facts
+            .bound_resource_bindings
+            .push(ShaderBoundResourceBinding {
+                group,
+                binding,
+                source_name,
+                provenance: self.provenance(callee, span),
+            });
     }
 
     fn ingest_resource_binding(&mut self, callee: DefId, args: &[HirCallArg], span: Span) {
