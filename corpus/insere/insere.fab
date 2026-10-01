@@ -4,17 +4,17 @@ kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "static_decl", "static_init", "insere_expr", "genus_decl", "genus_member", "field_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "expression", "literal", "nota_stmt", "call_expr", "call_suffix", "member_suffix"]
 category = "comptime"
 canonical = true
-summary = "Embeds a package file into a static at build time."
-syntax = "static <type> <name> = embed \"<path>\""
+summary = "Embeds a package file into a module constant at build time."
+syntax = "const <type> <name> = embed \"<path>\""
 related = ["generis", "textus", "octeti", "praefixum"]
 locale = "en"
 +++
 # =============================================================================
-# insere — Embeds a package file into a static at build time.
+# insere — Embeds a package file into a module constant at build time.
 # =============================================================================
 #
 # What this teaches:
-#   • Build-time embed — `static T X = embed "path"` reads a file while compiling; the program carries its contents as a literal.
+#   • Build-time embed — `const T X = embed "path"` reads a file while compiling; the program carries its contents as a literal.
 #   • One keyword, two results — the declared type decides: `string` requires valid UTF-8, `bytes` takes the raw bytes.
 #   • Package-relative paths — resolved against the package root (the nearest `faber.toml`), or this file's directory when there is none.
 #
@@ -28,7 +28,7 @@ locale = "en"
 
 # insere — build-time file embed (en `embed`)
 #
-# static <type> <name> = embed "<path>"
+# const <type> <name> = embed "<path>"
 #
 # GRAMMAR:
 #   static_decl :← 'generis' type IDENTIFIER '=' 'insere' STRING
@@ -36,15 +36,15 @@ locale = "en"
 # EXPECTED OUTPUT:
 #   insere.expected — the embedded text, its length, and the byte count.
 
-static string NUNTIUS = embed "nuntius.txt"
+const string NUNTIUS = embed "nuntius.txt"
 
-static bytes SIGNUM = embed "signum.bin"
+const bytes SIGNUM = embed "signum.bin"
 
 class Tabula {
     static string TITULUS = embed "nuntius.txt"
 }
 
-# `embed` is contextual: outside a static initializer it is an ordinary name.
+# `embed` is contextual: outside a constant initializer it is an ordinary name.
 fn embed(int n) → int {
     return n * 2
 }

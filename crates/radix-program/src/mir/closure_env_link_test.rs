@@ -313,7 +313,7 @@ locale = "en"
 +++
 
 @ public
-static int LIMIT = 8
+const int LIMIT = 8
 
 fn _add(int start, int base) → int {
     return start + base
@@ -377,7 +377,7 @@ locale = "en"
 +++
 
 @ public
-static int LIMIT = 8
+const int LIMIT = 8
 "#,
             ),
             (

@@ -173,7 +173,7 @@ incipit {{
         );
         analysis_accepts(&source);
         let generis = format!(
-            "generis modulus<{w}> TOO_BIG = {max_plus_one}\nincipit {{\n    nota TOO_BIG\n}}\n",
+            "fixum modulus<{w}> TOO_BIG = {max_plus_one}\nincipit {{\n    nota TOO_BIG\n}}\n",
             w = row.width,
             max_plus_one = row.max_plus_one
         );

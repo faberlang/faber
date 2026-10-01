@@ -50,7 +50,7 @@ fn constant_is_recorded_in_the_presentation_sidecar() {
 #[test]
 fn constants_reference_other_constants_and_statics() {
     assert_accepts(
-        "generis numerus BASIS = 10\n\
+        "fixum numerus BASIS = 10\n\
          functio f() → numerus {\n    \
              fixum numerus a = BASIS * 2\n    \
              fixum numerus b = a + 1\n    \
@@ -98,7 +98,7 @@ fn constant_must_fit_whatever_the_overflow_policy() {
 #[test]
 fn computed_constant_that_does_not_fit_is_rejected() {
     assert_rejects_with_issue(
-        "generis numerus<u8> A = 200\n\
+        "fixum numerus<u8> A = 200\n\
          functio f() → numerus {\n    fixum numerus<u8> d = A + 100\n    redde 0\n}\n",
         "local_constant_overflow",
     );

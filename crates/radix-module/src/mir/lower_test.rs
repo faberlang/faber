@@ -287,7 +287,7 @@ fn lowers_top_level_static_as_entry_prefix_local() {
     // representation.
     let dump = dump_source(
         r"
-generis numerus age = 25
+fixum numerus age = 25
 
 incipit {
     nota age
@@ -305,7 +305,7 @@ incipit {
 fn top_level_fixum_constant_lowers_like_the_static_including_the_hole() {
     // st1 R1/R2: `fixum T X = e` and `fixum _ X = e` at top level are the
     // same constant the `generis` spelling names; `_` infers the type.
-    let static_dump = dump_source("generis numerus age = 25\n\nincipit {\n    nota age\n}\n");
+    let static_dump = dump_source("fixum numerus age = 25\n\nincipit {\n    nota age\n}\n");
     for spelling in ["fixum numerus age = 25", "fixum _ age = 25"] {
         let dump = dump_source(&format!("{spelling}\n\nincipit {{\n    nota age\n}}\n"));
         assert_eq!(dump, static_dump, "{spelling}");
@@ -317,7 +317,7 @@ fn lowers_top_level_static_paths_inside_functions() {
     // D5.7 retired top-level `fixum`; the top-level equivalent is `generis`.
     let dump = dump_source(
         r"
-generis numerus answer = 42
+fixum numerus answer = 42
 
 functio readAnswer() → numerus {
     redde answer

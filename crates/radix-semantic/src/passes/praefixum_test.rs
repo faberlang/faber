@@ -37,7 +37,7 @@ fn rejection(source: &str, expected: &str) -> SemanticError {
 fn loop_body_with_callee_is_accepted() {
     let result = analyze_source(
         "functio quadratum(numerus n) → numerus {\n    redde n * n\n}\n\
-         generis numerus SUMMA = praefixum {\n    varia numerus s ← 0\n    \
+         fixum numerus SUMMA = praefixum {\n    varia numerus s ← 0\n    \
          itera ab 1‥4 fixum i {\n        s ← s + quadratum(i)\n    }\n    redde s\n}\n",
     );
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
@@ -46,7 +46,7 @@ fn loop_body_with_callee_is_accepted() {
 #[test]
 fn result_must_type_check_as_the_declared_type() {
     assert_rejects_with_issue(
-        "generis numerus N = praefixum {\n    redde \"non numerus\"\n}\n",
+        "fixum numerus N = praefixum {\n    redde \"non numerus\"\n}\n",
         "return_type_mismatch",
     );
 }
@@ -62,7 +62,7 @@ fn praefixum_outside_a_static_is_rejected() {
 #[test]
 fn direct_ad_is_forbidden() {
     let err = rejection(
-        "generis textus T = praefixum {\n    \
+        "fixum textus T = praefixum {\n    \
          fixum textus t ← ad 'runtime:echo' (\"salve\") ↦ textus\n    redde t\n}\n",
         "praefixum_forbidden",
     );
@@ -76,7 +76,7 @@ fn transitive_ad_names_the_call_chain() {
         "functio ima() → textus {\n    \
          fixum textus t ← ad 'runtime:echo' (\"salve\") ↦ textus\n    redde t\n}\n\
          functio media() → textus {\n    redde ima()\n}\n\
-         generis textus T = praefixum {\n    redde media()\n}\n",
+         fixum textus T = praefixum {\n    redde media()\n}\n",
         "praefixum_forbidden",
     );
     assert_eq!(arg(&err, "effect"), Some("ad"));
@@ -87,7 +87,7 @@ fn transitive_ad_names_the_call_chain() {
 fn async_callee_is_forbidden() {
     let err = rejection(
         "functio lente() fiet → numerus {\n    redde 1\n}\n\
-         generis numerus N = praefixum {\n    fixum _ f ← lente()\n    redde 1\n}\n",
+         fixum numerus N = praefixum {\n    fixum _ f ← lente()\n    redde 1\n}\n",
         "praefixum_forbidden",
     );
     assert_eq!(arg(&err, "effect"), Some("async"));
@@ -96,7 +96,7 @@ fn async_callee_is_forbidden() {
 #[test]
 fn output_is_forbidden() {
     let err = rejection(
-        "generis numerus N = praefixum {\n    nota \"x\"\n    redde 1\n}\n",
+        "fixum numerus N = praefixum {\n    nota \"x\"\n    redde 1\n}\n",
         "praefixum_forbidden",
     );
     assert_eq!(arg(&err, "effect"), Some("scribe"));
@@ -105,7 +105,7 @@ fn output_is_forbidden() {
 #[test]
 fn self_reference_is_a_cycle() {
     assert_rejects_with_issue(
-        "generis numerus A = praefixum {\n    redde A + 1\n}\n",
+        "fixum numerus A = praefixum {\n    redde A + 1\n}\n",
         "static_cycle",
     );
 }
@@ -114,7 +114,7 @@ fn self_reference_is_a_cycle() {
 fn cycle_through_a_callee_is_rejected() {
     assert_rejects_with_issue(
         "functio lege_a() → numerus {\n    redde A\n}\n\
-         generis numerus A = praefixum {\n    redde lege_a() + 1\n}\n",
+         fixum numerus A = praefixum {\n    redde lege_a() + 1\n}\n",
         "static_cycle",
     );
 }
@@ -122,9 +122,9 @@ fn cycle_through_a_callee_is_rejected() {
 #[test]
 fn evaluation_order_follows_static_reads() {
     let fixture = analyze_source(
-        "generis numerus B = praefixum {\n    redde A * 2\n}\n\
-         generis numerus C = A + 1\n\
-         generis numerus A = praefixum {\n    redde 3\n}\n",
+        "fixum numerus B = praefixum {\n    redde A * 2\n}\n\
+         fixum numerus C = A + 1\n\
+         fixum numerus A = praefixum {\n    redde 3\n}\n",
     );
     assert!(fixture.is_ok(), "diagnostics: {:?}", fixture.diagnostics);
     let hir = fixture.result.hir.as_ref().expect("hir");

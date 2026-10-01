@@ -127,7 +127,7 @@ locale = "en"
 +++
 
 @ public
-static list<string> KEYS = ["a", "b"]
+const list<string> KEYS = ["a", "b"]
 
 @ public
 fn admits(string k) → bool {

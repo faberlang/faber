@@ -10,7 +10,7 @@ use radix_syntax::{ClassMemberKind, ExprKind, StmtKind};
 
 #[test]
 fn top_level_static_initializer_claims_insere() {
-    let result = parse_ok("generis textus SCHEMA = insere \"schema.sql\"");
+    let result = parse_ok("fixum textus SCHEMA = insere \"schema.sql\"");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(decl) = &program.statements[0].kind else {
         panic!("expected static var decl");
@@ -43,7 +43,7 @@ fn genus_static_field_initializer_claims_insere() {
 #[test]
 fn insere_stays_an_identifier_outside_the_static_initializer() {
     let result = parse_ok(
-        "generis numerus insere = 3\ngeneris numerus ALIUS = insere\nfunctio f() → numerus {\n    fixum numerus insere ← 4\n    redde insere\n}\n",
+        "fixum numerus insere = 3\nfixum numerus ALIUS = insere\nfunctio f() → numerus {\n    fixum numerus insere ← 4\n    redde insere\n}\n",
     );
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(decl) = &program.statements[1].kind else {

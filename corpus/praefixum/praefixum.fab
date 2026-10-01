@@ -4,30 +4,30 @@ kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "static_decl", "praefixum_expr", "block_stmt", "genus_decl", "genus_member", "field_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "functio_decl", "redde_stmt", "fixum_decl", "itera_stmt", "range_expr", "si_stmt", "assignment", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "nota_stmt"]
 category = "comptime"
 canonical = true
-summary = "Computes a static's value at build time."
-syntax = "static <type> <name> = comptime { … return <value> }"
+summary = "Computes a module constant's value at build time."
+syntax = "const <type> <name> = comptime { … return <value> }"
 related = ["generis", "insere", "redde"]
 locale = "en"
 +++
 # =============================================================================
-# praefixum — Computes a static's value at build time.
+# praefixum — Computes a module constant's value at build time.
 # =============================================================================
 #
 # What this teaches:
-#   • A `comptime { … }` body is the initializer of a static. It runs once,
+#   • A `comptime { … }` body is the initializer of a module constant. It runs once,
 #     during the build, and `return`s the value; the program only ever sees
 #     the finished literal.
 #   • The body is ordinary Faber: loops, `if`, locals, collections, genus
 #     values, and calls to pure functions.
-#   • Statics may read other statics; the build evaluates them in dependency
-#     order.
+#   • Module constants may read other module constants; the build evaluates
+#     them in dependency order.
 #
 # Common mistakes:
-#   • Using `comptime` outside a static initializer — it is legal only as
-#     `static T NAME = comptime { … }`.
+#   • Using `comptime` outside a constant initializer — it is legal only as
+#     `const T NAME = comptime { … }`.
 #   • The retired `comptime(expr)` form — a plain expression needs no marker:
-#     `static int N = 4 * 1024` already folds at compile time.
-#   • Reaching I/O, `call`, or async code — the build rejects the static and
+#     `const int N = 4 * 1024` already folds at compile time.
+#   • Reaching I/O, `call`, or async code — the build rejects the constant and
 #     names the call chain that got there.
 #
 # See also: generis, insere
@@ -50,7 +50,7 @@ fn quadratum(int n) → int {
 }
 
 # A loop that calls a pure function.
-static int SUMMA_QUADRATORUM = comptime {
+const int SUMMA_QUADRATORUM = comptime {
     var int total ← 0
     for range 1‥11 const i {
         total ← total + quadratum(i)
@@ -59,7 +59,7 @@ static int SUMMA_QUADRATORUM = comptime {
 }
 
 # A collection built at build time.
-static list<int> PRIMI = comptime {
+const list<int> PRIMI = comptime {
     var list<int> found ← empty
     for range 2‥30 const n {
         var bool isPrime ← true
@@ -76,7 +76,7 @@ static list<int> PRIMI = comptime {
 }
 
 # Text and a genus value.
-static string LINEA = comptime {
+const string LINEA = comptime {
     var string stripe ← ""
     for range 0‥8 const i {
         stripe ← stripe + "="
@@ -84,12 +84,12 @@ static string LINEA = comptime {
     return stripe
 }
 
-static Punctum ORIGO = comptime {
+const Punctum ORIGO = comptime {
     return Punctum { x = SUMMA_QUADRATORUM % 10, y = -3 }
 }
 
-# A plain static reading a build-time one folds after it.
-static int DUPLEX = SUMMA_QUADRATORUM * 2
+# A plain module constant reading a build-time one folds after it.
+const int DUPLEX = SUMMA_QUADRATORUM * 2
 
 main {
     print SUMMA_QUADRATORUM

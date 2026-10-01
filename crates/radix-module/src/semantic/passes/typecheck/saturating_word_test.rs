@@ -110,7 +110,7 @@ incipit {{
 "
         ));
         analysis_rejects_with_issue(
-            &format!("generis saturatus<{width}> TOO_BIG = {max_plus_one}\nincipit {{\n    nota TOO_BIG\n}}\n"),
+            &format!("fixum saturatus<{width}> TOO_BIG = {max_plus_one}\nincipit {{\n    nota TOO_BIG\n}}\n"),
             "store_constant_out_of_range",
         );
     }

@@ -2301,7 +2301,7 @@ fn const_named_like_the_marker_still_shadows_and_warns() {
     // em1 pin: a top-level constant named like the marker still shadows and warns.
     let result = compile_ok(
         r#"
-generis lista<numerus> vacua = [1]
+fixum lista<numerus> vacua = [1]
 functio g() → lista<numerus> { redde vacua }
 "#,
     );

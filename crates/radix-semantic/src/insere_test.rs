@@ -63,7 +63,7 @@ fn textus_embed_folds_to_escaped_text_literal() {
         InsereSource::Bytes(b"CREATE \"t\";\n\\x".to_vec()),
     );
     let (value, interner) = static_value(
-        "generis textus SCHEMA = insere \"schema.sql\"\n",
+        "fixum textus SCHEMA = insere \"schema.sql\"\n",
         config,
         "SCHEMA",
     );
@@ -77,7 +77,7 @@ fn textus_embed_folds_to_escaped_text_literal() {
 fn textus_embed_rejects_invalid_utf8() {
     let config = config_with("bad.txt", InsereSource::Bytes(vec![0x66, 0xff, 0xfe]));
     rejects_with(
-        "generis textus S = insere \"bad.txt\"\n",
+        "fixum textus S = insere \"bad.txt\"\n",
         config,
         "insere_invalid_utf8",
     );
@@ -86,11 +86,8 @@ fn textus_embed_rejects_invalid_utf8() {
 #[test]
 fn octeti_embed_folds_to_raw_bytes() {
     let config = config_with("logo.bin", InsereSource::Bytes(vec![0x00, 0xff, 0x10]));
-    let (value, interner) = static_value(
-        "generis octeti LOGO = insere \"logo.bin\"\n",
-        config,
-        "LOGO",
-    );
+    let (value, interner) =
+        static_value("fixum octeti LOGO = insere \"logo.bin\"\n", config, "LOGO");
     let HirExpressionKind::Literal(HirLiteral::Octeti(sym)) = value.kind else {
         panic!("expected octeti literal, got {:?}", value.kind);
     };
@@ -100,14 +97,14 @@ fn octeti_embed_folds_to_raw_bytes() {
 #[test]
 fn octeti_embed_accepts_invalid_utf8() {
     let config = config_with("raw.bin", InsereSource::Bytes(vec![0xff, 0xfe]));
-    let _ = static_value("generis octeti RAW = insere \"raw.bin\"\n", config, "RAW");
+    let _ = static_value("fixum octeti RAW = insere \"raw.bin\"\n", config, "RAW");
 }
 
 #[test]
 fn other_declared_type_is_rejected() {
     let config = config_with("n.txt", InsereSource::Bytes(b"3".to_vec()));
     rejects_with(
-        "generis numerus N = insere \"n.txt\"\n",
+        "fixum numerus N = insere \"n.txt\"\n",
         config,
         "insere_type_invalid",
     );
@@ -123,7 +120,7 @@ fn driver_rejections_surface_their_issue() {
     ] {
         let config = config_with("p.txt", InsereSource::Rejected(rejection));
         rejects_with(
-            "generis textus S = insere \"p.txt\"\n",
+            "fixum textus S = insere \"p.txt\"\n",
             config,
             rejection.issue(),
         );
@@ -133,7 +130,7 @@ fn driver_rejections_surface_their_issue() {
 #[test]
 fn analysis_without_driver_context_has_no_source_root() {
     rejects_with(
-        "generis textus S = insere \"p.txt\"\n",
+        "fixum textus S = insere \"p.txt\"\n",
         PassConfig::for_target(Target::HirRust),
         "insere_no_source_root",
     );

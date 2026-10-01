@@ -65,7 +65,7 @@ fn arg<'a>(diagnostic: &'a Diagnostic, name: &str) -> Option<&'a str> {
 fn loop_with_callee_folds_to_int_literal() {
     let unit = analyze_ok(
         "functio quadratum(numerus n) → numerus {\n    redde n * n\n}\n\
-         generis numerus SUMMA = praefixum {\n    varia numerus s ← 0\n    \
+         fixum numerus SUMMA = praefixum {\n    varia numerus s ← 0\n    \
          itera ab 1‥4 fixum i {\n        s ← s + quadratum(i)\n    }\n    redde s\n}\n\
          incipit {\n    nota SUMMA\n}\n",
     );
@@ -75,9 +75,9 @@ fn loop_with_callee_folds_to_int_literal() {
 #[test]
 fn dependent_statics_fold_after_evaluation() {
     let unit = analyze_ok(
-        "generis numerus B = praefixum {\n    redde A * 2\n}\n\
-         generis numerus C = B + 1\n\
-         generis numerus A = praefixum {\n    redde 0 - 3\n}\n",
+        "fixum numerus B = praefixum {\n    redde A * 2\n}\n\
+         fixum numerus C = B + 1\n\
+         fixum numerus A = praefixum {\n    redde 0 - 3\n}\n",
     );
     assert_eq!(int(&static_value(&unit, "A")), -3);
     assert_eq!(int(&static_value(&unit, "B")), -6);
@@ -87,7 +87,7 @@ fn dependent_statics_fold_after_evaluation() {
 #[test]
 fn list_result_is_an_array_literal() {
     let unit = analyze_ok(
-        "generis lista<numerus> L = praefixum {\n    varia lista<numerus> xs ← vacua\n    \
+        "fixum lista<numerus> L = praefixum {\n    varia lista<numerus> xs ← vacua\n    \
          itera ab 0‥3 fixum i {\n        xs.appende(i * 10)\n    }\n    redde xs\n}\n",
     );
     let HirExpressionKind::Array(elements) = static_value(&unit, "L").kind else {
@@ -107,7 +107,7 @@ fn list_result_is_an_array_literal() {
 fn genus_result_is_a_typed_construction_literal() {
     let unit = analyze_ok(
         "genus Punctum {\n    fixum numerus x\n    fixum numerus y\n}\n\
-         generis Punctum P = praefixum {\n    redde Punctum { x = 2 * 3, y = 0 - 1 }\n}\n",
+         fixum Punctum P = praefixum {\n    redde Punctum { x = 2 * 3, y = 0 - 1 }\n}\n",
     );
     let HirExpressionKind::Verte { entries: Some(entries), .. } = static_value(&unit, "P").kind else {
         panic!("expected typed construction");
@@ -125,7 +125,7 @@ fn genus_result_is_a_typed_construction_literal() {
 #[test]
 fn mori_is_a_build_error_carrying_its_message() {
     let diagnostic = rejection(
-        "generis numerus N = praefixum {\n    si 1 ≡ 1 {\n        mori \"limes excessus\"\n    }\n    redde 1\n}\n",
+        "fixum numerus N = praefixum {\n    si 1 ≡ 1 {\n        mori \"limes excessus\"\n    }\n    redde 1\n}\n",
         "praefixum_failed",
     );
     assert_eq!(arg(&diagnostic, "message"), Some("limes excessus"));
@@ -135,7 +135,7 @@ fn mori_is_a_build_error_carrying_its_message() {
 #[test]
 fn endless_loop_hits_the_step_limit() {
     let diagnostic = rejection(
-        "generis numerus N = praefixum {\n    varia numerus i ← 0\n    dum verum {\n        i ← i + 1\n    }\n    redde i\n}\n",
+        "fixum numerus N = praefixum {\n    varia numerus i ← 0\n    dum verum {\n        i ← i + 1\n    }\n    redde i\n}\n",
         "praefixum_step_limit",
     );
     assert_eq!(arg(&diagnostic, "name"), Some("N"));
@@ -151,7 +151,7 @@ fn faber_reemission_keeps_the_authored_body() {
     let unit = analyze_source(
         &session,
         "praefixum.fab",
-        "generis numerus N = praefixum {\n    redde 2 + 2\n}\n",
+        "fixum numerus N = praefixum {\n    redde 2 + 2\n}\n",
         AnalyzeRequest::default(),
     )
     .expect("analysis");

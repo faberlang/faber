@@ -10,7 +10,7 @@ use radix_syntax::{ExprKind, StmtKind};
 #[test]
 fn static_initializer_parses_block_body() {
     let result =
-        parse_ok("generis numerus N = praefixum {\n    varia numerus s ← 1\n    redde s + 1\n}\n");
+        parse_ok("fixum numerus N = praefixum {\n    varia numerus s ← 1\n    redde s + 1\n}\n");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(decl) = &program.statements[0].kind else {
         panic!("expected static var decl");
@@ -24,7 +24,7 @@ fn static_initializer_parses_block_body() {
 
 #[test]
 fn retired_expression_form_gets_migration_diagnostic() {
-    let result = parse_program("generis numerus N = praefixum(4 * 1024)\n");
+    let result = parse_program("fixum numerus N = praefixum(4 * 1024)\n");
     assert!(
         result.errors.iter().any(|err| err
             .args

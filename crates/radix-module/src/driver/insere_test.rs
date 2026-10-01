@@ -61,7 +61,7 @@ fn textus_embed_reads_file_next_to_single_file_source() {
     let main = dir.path().join("main.fab");
     write(
         &main,
-        b"generis textus SCHEMA = insere \"schema.sql\"\nincipit {\n    nota SCHEMA\n}\n",
+        b"fixum textus SCHEMA = insere \"schema.sql\"\nincipit {\n    nota SCHEMA\n}\n",
     );
     let unit = analyze_file(&main).unwrap_or_else(|d| panic!("analysis failed: {d:?}"));
     let HirLiteral::String(sym) = static_literal(&unit, "SCHEMA") else {
@@ -81,7 +81,7 @@ fn textus_embed_rejects_invalid_utf8() {
     let dir = tempfile::tempdir().expect("tempdir");
     write(&dir.path().join("bad.txt"), &[0x61, 0xff]);
     let main = dir.path().join("main.fab");
-    write(&main, b"generis textus S = insere \"bad.txt\"\nincipit {\n    nota S\n}\n");
+    write(&main, b"fixum textus S = insere \"bad.txt\"\nincipit {\n    nota S\n}\n");
     assert_insere_issue(analyze_file(&main), "insere_invalid_utf8");
 }
 
@@ -92,7 +92,7 @@ fn octeti_embed_reads_raw_bytes() {
     let main = dir.path().join("main.fab");
     write(
         &main,
-        b"generis octeti LOGO = insere \"logo.bin\"\nincipit {\n    nota \"ok\"\n}\n",
+        b"fixum octeti LOGO = insere \"logo.bin\"\nincipit {\n    nota \"ok\"\n}\n",
     );
     let unit = analyze_file(&main).unwrap_or_else(|d| panic!("analysis failed: {d:?}"));
     let HirLiteral::Octeti(sym) = static_literal(&unit, "LOGO") else {
@@ -105,7 +105,7 @@ fn octeti_embed_reads_raw_bytes() {
 fn missing_file_is_an_error() {
     let dir = tempfile::tempdir().expect("tempdir");
     let main = dir.path().join("main.fab");
-    write(&main, b"generis textus S = insere \"absens.txt\"\nincipit {\n    nota S\n}\n");
+    write(&main, b"fixum textus S = insere \"absens.txt\"\nincipit {\n    nota S\n}\n");
     assert_insere_issue(analyze_file(&main), "insere_file_missing");
 }
 
@@ -115,7 +115,7 @@ fn absolute_path_is_an_error() {
     let data = dir.path().join("data.txt");
     write(&data, b"x");
     let main = dir.path().join("main.fab");
-    let source = format!("generis textus S = insere \"{}\"\nincipit {{\n    nota S\n}}\n", data.display());
+    let source = format!("fixum textus S = insere \"{}\"\nincipit {{\n    nota S\n}}\n", data.display());
     write(&main, source.as_bytes());
     assert_insere_issue(analyze_file(&main), "insere_path_absolute");
 }
@@ -125,10 +125,7 @@ fn parent_escape_from_the_package_is_an_error() {
     let dir = tempfile::tempdir().expect("tempdir");
     write(&dir.path().join("secret.txt"), b"x");
     let main = dir.path().join("pkg").join("main.fab");
-    write(
-        &main,
-        b"generis textus S = insere \"../secret.txt\"\nincipit {\n    nota S\n}\n",
-    );
+    write(&main, b"fixum textus S = insere \"../secret.txt\"\nincipit {\n    nota S\n}\n");
     assert_insere_issue(analyze_file(&main), "insere_path_escapes_package");
 }
 
@@ -141,7 +138,7 @@ fn package_sources_resolve_against_the_manifest_root() {
     // `..` inside the root is fine; it only may not climb above it.
     write(
         &main,
-        b"generis textus S = insere \"src/../data/x.txt\"\nincipit {\n    nota S\n}\n",
+        b"fixum textus S = insere \"src/../data/x.txt\"\nincipit {\n    nota S\n}\n",
     );
     let unit = analyze_file(&main).unwrap_or_else(|d| panic!("analysis failed: {d:?}"));
     let HirLiteral::String(sym) = static_literal(&unit, "S") else {
@@ -157,7 +154,7 @@ fn en_embed_spelling_is_contextual() {
     let main = dir.path().join("main.fab");
     write(
         &main,
-        b"+++\nlocale = \"en\"\n+++\nstatic string S = embed \"x.txt\"\nfn embed(int x) \xe2\x86\x92 int {\n    return x\n}\nfn local() \xe2\x86\x92 int {\n    const int embed \xe2\x86\x90 3\n    return embed\n}\nmain {\n    print S\n    print embed(local())\n}\n",
+        b"+++\nlocale = \"en\"\n+++\nconst string S = embed \"x.txt\"\nfn embed(int x) \xe2\x86\x92 int {\n    return x\n}\nfn local() \xe2\x86\x92 int {\n    const int embed \xe2\x86\x90 3\n    return embed\n}\nmain {\n    print S\n    print embed(local())\n}\n",
     );
     let unit = analyze_file(&main).unwrap_or_else(|d| panic!("analysis failed: {d:?}"));
     let HirLiteral::String(sym) = static_literal(&unit, "S") else {
@@ -172,7 +169,7 @@ fn faber_reemission_prints_the_embed_not_the_bytes() {
     write(&dir.path().join("x.txt"), b"salve");
     write(&dir.path().join("x.bin"), &[1, 2]);
     let main = dir.path().join("main.fab");
-    let source = "generis textus S = insere \"x.txt\"\n\ngeneris octeti B = insere \"x.bin\"\n\ngenus G {\n    generis textus T = insere \"x.txt\"\n}\n\nincipit {\n    nota S\n}\n";
+    let source = "fixum textus S = insere \"x.txt\"\n\nfixum octeti B = insere \"x.bin\"\n\ngenus G {\n    generis textus T = insere \"x.txt\"\n}\n\nincipit {\n    nota S\n}\n";
     write(&main, source.as_bytes());
     let session = Session::new(
         Config::default()

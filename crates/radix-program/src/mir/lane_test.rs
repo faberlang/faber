@@ -107,7 +107,7 @@ fn package_mir_shadowed_alias_rewrite_skips_plain_local_method_calls() {
 }
 
 const VERTE_CONST_LIB: &str =
-    "+++\nlocale = \"en\"\n+++\n@ public\nstatic f32 GELU_ALPHA = (0.7978845608028654 ∷ f32)\n";
+    "+++\nlocale = \"en\"\n+++\n@ public\nconst f32 GELU_ALPHA = (0.7978845608028654 ∷ f32)\n";
 const VERTE_CONST_MAIN: &str =
     "import from \"verteclib:lib\" vals\n\nmain {\n    print vals.GELU_ALPHA\n}\n";
 
@@ -498,16 +498,16 @@ fn package_mir_const_data_member_verte_initializer_transplants() {
 // referenced N and K stay unmarked (module-private): every top-level const is
 // linked for transplant, and only exports become member-reference targets.
 const PATH_CONST_SIBLING_MATH: &str =
-    "static int N = 320\n\nstatic int K = 960\n\n@ internal\nstatic int ELEMENTS = N * K\n";
+    "const int N = 320\n\nconst int K = 960\n\n@ internal\nconst int ELEMENTS = N * K\n";
 const PATH_CONST_SIBLING_MAIN: &str =
     "import from \"./math\" math\n\nmain {\n    print math.ELEMENTS\n}\n";
-const PATH_CONST_LIB: &str = "+++\nlocale = \"en\"\n+++\nstatic int N = 320\n\nstatic int K = 960\n\n@ public\nstatic int ELEMENTS = N * K\n";
+const PATH_CONST_LIB: &str = "+++\nlocale = \"en\"\n+++\nconst int N = 320\n\nconst int K = 960\n\n@ public\nconst int ELEMENTS = N * K\n";
 const PATH_CONST_LIB_MAIN: &str =
     "import from \"pathclib:lib\" vals\n\nmain {\n    print vals.ELEMENTS\n}\n";
 // D5.1: a `Path` to an `@ private` const of the same source unit links — the
 // const is transplanted without becoming a member-reference target.
 const PATH_CONST_PRIVATA_MATH: &str =
-    "@ private\nstatic int PRIVATE_N = 320\n\n@ internal\nstatic int ELEMENTS = PRIVATE_N * 3\n";
+    "@ private\nconst int PRIVATE_N = 320\n\n@ internal\nconst int ELEMENTS = PRIVATE_N * 3\n";
 const PATH_CONST_PRIVATA_MAIN: &str =
     "import from \"./math\" math\n\nmain {\n    print math.ELEMENTS\n}\n";
 

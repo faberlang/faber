@@ -8,9 +8,9 @@
 use crate::codegen::Target;
 use crate::driver::{Config, ModuleCompileRequest, Session};
 
-const SOURCE: &str = "generis numerus LIMES = 4 * 1024\n\
-generis numerus DUPLEX = LIMES * 2\n\
-generis textus NOMEN = \"lim\" + \"es\"\n\
+const SOURCE: &str = "fixum numerus LIMES = 4 * 1024\n\
+fixum numerus DUPLEX = LIMES * 2\n\
+fixum textus NOMEN = \"lim\" + \"es\"\n\
 incipit {\n    nota LIMES\n    nota DUPLEX\n    nota NOMEN\n}\n";
 
 fn emit(target: Target) -> String {
@@ -71,7 +71,7 @@ fn rust_emits_octeti_static_as_byte_slice() {
             .with_target(Target::HirRust)
             .with_dev_locale_root(),
     );
-    let source = "generis octeti SIGNUM = |de ad|\nincipit {\n    nota SIGNUM.longitudo()\n}\n";
+    let source = "fixum octeti SIGNUM = |de ad|\nincipit {\n    nota SIGNUM.longitudo()\n}\n";
     let result = crate::driver::compile(&session, "<test>", source, ModuleCompileRequest::default());
     assert!(result.success(), "compilation failed: {:?}", result.diagnostics);
     let crate::Output::Rust(out) = result.output.expect("output") else {

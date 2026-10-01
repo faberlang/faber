@@ -50,13 +50,13 @@ fn int_value(expr: &HirExpression) -> i128 {
 
 #[test]
 fn arithmetic_initializer_folds_to_literal() {
-    let (konst, _) = static_const("generis numerus LIMES = 4 * 1024\n", "LIMES");
+    let (konst, _) = static_const("fixum numerus LIMES = 4 * 1024\n", "LIMES");
     assert_eq!(int_value(&konst.value), 4096);
 }
 
 #[test]
 fn folding_keeps_the_authored_initializer_for_reemission() {
-    let (konst, _) = static_const("generis numerus LIMES = 4 * 1024\n", "LIMES");
+    let (konst, _) = static_const("fixum numerus LIMES = 4 * 1024\n", "LIMES");
     let Some(HirStatic {
         authored: Some(authored),
     }) = &konst.statica
@@ -68,14 +68,14 @@ fn folding_keeps_the_authored_initializer_for_reemission() {
 
 #[test]
 fn literal_initializer_is_not_rewritten() {
-    let (konst, _) = static_const("generis numerus N = 7\n", "N");
+    let (konst, _) = static_const("fixum numerus N = 7\n", "N");
     assert_eq!(int_value(&konst.value), 7);
     assert_eq!(konst.statica, Some(HirStatic { authored: None }));
 }
 
 #[test]
 fn negative_results_fold_to_negated_literals() {
-    let (konst, _) = static_const("generis numerus N = 3 - 10\n", "N");
+    let (konst, _) = static_const("fixum numerus N = 3 - 10\n", "N");
     assert_eq!(int_value(&konst.value), -7);
 }
 
@@ -83,24 +83,23 @@ fn negative_results_fold_to_negated_literals() {
 // takes the divisor's sign.
 #[test]
 fn integer_division_and_remainder_floor() {
-    let (div, _) = static_const("generis numerus D = 7 / 2\n", "D");
+    let (div, _) = static_const("fixum numerus D = 7 / 2\n", "D");
     assert_eq!(int_value(&div.value), 3);
-    let (neg, _) = static_const("generis numerus D = (0 - 7) / 2\n", "D");
+    let (neg, _) = static_const("fixum numerus D = (0 - 7) / 2\n", "D");
     assert_eq!(int_value(&neg.value), -4);
-    let (rem, _) = static_const("generis numerus R = (0 - 7) % 3\n", "R");
+    let (rem, _) = static_const("fixum numerus R = (0 - 7) % 3\n", "R");
     assert_eq!(int_value(&rem.value), 2);
-    let (rem, _) = static_const("generis numerus R = 7 % (0 - 2)\n", "R");
+    let (rem, _) = static_const("fixum numerus R = 7 % (0 - 2)\n", "R");
     assert_eq!(int_value(&rem.value), -1);
 }
 
 #[test]
 fn intermediates_are_exact_over_the_64_bit_range() {
     // Ruling 17a: `MAX * 2 + 1` passes through 2^64 - 2, which no `i64` holds.
-    let source =
-        "generis numerus<u64> M = 9223372036854775807\ngeneris numerus<u64> N = M * 2 + 1\n";
+    let source = "fixum numerus<u64> M = 9223372036854775807\nfixum numerus<u64> N = M * 2 + 1\n";
     let (konst, _) = static_const(source, "N");
     assert_eq!(int_value(&konst.value), i128::from(u64::MAX));
-    let source = "generis numerus<u64> M = 9223372036854775807\ngeneris numerus<u64> N = M + 1\n";
+    let source = "fixum numerus<u64> M = 9223372036854775807\nfixum numerus<u64> N = M + 1\n";
     let (konst, _) = static_const(source, "N");
     assert_eq!(int_value(&konst.value), 1_i128 << 63);
 }
@@ -108,26 +107,26 @@ fn intermediates_are_exact_over_the_64_bit_range() {
 #[test]
 fn the_static_itself_must_fit_its_declared_type() {
     assert_rejects_with_issue(
-        "generis numerus<u8> A = 200\ngeneris numerus<u8> B = A + 100\n",
+        "fixum numerus<u8> A = 200\nfixum numerus<u8> B = A + 100\n",
         "static_arithmetic_overflow",
     );
     assert_rejects_with_issue(
-        "generis numerus<u64> M = 18446744073709551615\ngeneris numerus<u64> N = M + 1\n",
+        "fixum numerus<u64> M = 18446744073709551615\nfixum numerus<u64> N = M + 1\n",
         "static_arithmetic_overflow",
     );
 }
 
 #[test]
 fn shifts_fold_as_pure_math() {
-    let (shl, _) = static_const("generis numerus<u64> S = 1 ⇐ 63\n", "S");
+    let (shl, _) = static_const("fixum numerus<u64> S = 1 ⇐ 63\n", "S");
     assert_eq!(int_value(&shl.value), 1_i128 << 63);
-    let (shr, _) = static_const("generis numerus S = (0 - 5) ⇒ 1\n", "S");
+    let (shr, _) = static_const("fixum numerus S = (0 - 5) ⇒ 1\n", "S");
     assert_eq!(int_value(&shr.value), -3);
-    let (big, _) = static_const("generis numerus S = 5 ⇒ 200\n", "S");
+    let (big, _) = static_const("fixum numerus S = 5 ⇒ 200\n", "S");
     assert_eq!(int_value(&big.value), 0);
     // 2^64 is a constant in an `=` position: refused at the store.
     assert_rejects_with_issue(
-        "generis numerus<u64> S = 1 ⇐ 64\n",
+        "fixum numerus<u64> S = 1 ⇐ 64\n",
         "store_constant_out_of_range",
     );
 }
@@ -135,14 +134,14 @@ fn shifts_fold_as_pure_math() {
 #[test]
 fn references_fold_in_dependency_order() {
     // `B` is declared before the static it depends on.
-    let source = "generis numerus B = A * 2 + 1\ngeneris numerus A = 4\n";
+    let source = "fixum numerus B = A * 2 + 1\nfixum numerus A = 4\n";
     let (konst, _) = static_const(source, "B");
     assert_eq!(int_value(&konst.value), 9);
 }
 
 #[test]
 fn fractus_arithmetic_folds() {
-    let (konst, _) = static_const("generis fractus F = 1.5 * 2.0\n", "F");
+    let (konst, _) = static_const("fixum fractus F = 1.5 * 2.0\n", "F");
     assert!(
         matches!(konst.value.kind, HirExpressionKind::Literal(HirLiteral::Float(v)) if (v - 3.0).abs() < f64::EPSILON),
         "got {:?}",
@@ -153,7 +152,7 @@ fn fractus_arithmetic_folds() {
 #[test]
 fn comparison_folds_to_bivalens() {
     let (konst, _) = static_const(
-        "generis numerus A = 3\ngeneris bivalens MAGNUS = A > 2\n",
+        "fixum numerus A = 3\nfixum bivalens MAGNUS = A > 2\n",
         "MAGNUS",
     );
     assert!(matches!(
@@ -165,7 +164,7 @@ fn comparison_folds_to_bivalens() {
 #[test]
 fn textus_concatenation_folds() {
     let (konst, interner) = static_const(
-        "generis textus PRAE = \"ab\"\ngeneris textus NOMEN = PRAE + \"cd\"\n",
+        "fixum textus PRAE = \"ab\"\nfixum textus NOMEN = PRAE + \"cd\"\n",
         "NOMEN",
     );
     let HirExpressionKind::Literal(HirLiteral::String(sym)) = konst.value.kind else {
@@ -177,7 +176,7 @@ fn textus_concatenation_folds() {
 #[test]
 fn collection_literal_of_constants_is_accepted() {
     let (konst, _) = static_const(
-        "generis numerus N = 2\ngeneris lista<numerus> XS = [1, N * 3, 4]\n",
+        "fixum numerus N = 2\nfixum lista<numerus> XS = [1, N * 3, 4]\n",
         "XS",
     );
     let HirExpressionKind::Array(elements) = &konst.value.kind else {
@@ -192,7 +191,7 @@ fn collection_literal_of_constants_is_accepted() {
 #[test]
 fn call_initializer_is_not_constant() {
     assert_rejects_with_issue(
-        "functio f() → numerus { redde 1 }\ngeneris numerus N = f()\n",
+        "functio f() → numerus { redde 1 }\nfixum numerus N = f()\n",
         "static_initializer_not_constant",
     );
 }
@@ -203,7 +202,7 @@ fn reference_to_top_level_fixum_rejects_the_fixum_itself() {
     // that references it never reaches the "not constant" fold check —
     // the fixum's own top_level_binding error is what's reported.
     assert_rejects_with_issue(
-        "fixum numerus A ← 1\ngeneris numerus N = A + 1\n",
+        "fixum numerus A ← 1\nfixum numerus N = A + 1\n",
         "top_level_binding",
     );
 }
@@ -211,14 +210,14 @@ fn reference_to_top_level_fixum_rejects_the_fixum_itself() {
 #[test]
 fn static_cycle_is_rejected() {
     assert_rejects_with_issue(
-        "generis numerus A = B + 1\ngeneris numerus B = A + 1\n",
+        "fixum numerus A = B + 1\nfixum numerus B = A + 1\n",
         "static_cycle",
     );
 }
 
 #[test]
 fn self_reference_is_a_cycle() {
-    assert_rejects_with_issue("generis numerus A = A + 1\n", "static_cycle");
+    assert_rejects_with_issue("fixum numerus A = A + 1\n", "static_cycle");
 }
 
 #[test]
@@ -226,7 +225,7 @@ fn overflow_is_rejected() {
     // A reference keeps the fold with the static pass: `MAX + 1` is not a
     // literal-only constant, so the checked fold owns the overflow.
     assert_rejects_with_issue(
-        "generis numerus MAX = 9223372036854775807\ngeneris numerus N = MAX + 1\n",
+        "fixum numerus MAX = 9223372036854775807\nfixum numerus N = MAX + 1\n",
         "static_arithmetic_overflow",
     );
 }
@@ -238,20 +237,20 @@ fn literal_constant_that_exceeds_the_slot_is_a_store_error() {
     // the literal form is refused at the store before the fold runs. This
     // replaces the old literal-form pin on `static_arithmetic_overflow`.
     assert_rejects_with_issue(
-        "generis numerus N = 9223372036854775807 + 1\n",
+        "fixum numerus N = 9223372036854775807 + 1\n",
         "store_constant_out_of_range",
     );
 }
 
 #[test]
 fn division_by_zero_is_rejected() {
-    assert_rejects_with_issue("generis numerus N = 1 / 0\n", "static_division_by_zero");
+    assert_rejects_with_issue("fixum numerus N = 1 / 0\n", "static_division_by_zero");
 }
 
 #[test]
 fn statics_are_usable_from_functions() {
     let fixture = analyze_source(
-        "generis numerus LIMES = 4 * 1024\nfunctio f() → numerus { redde LIMES + 1 }\n",
+        "fixum numerus LIMES = 4 * 1024\nfunctio f() → numerus { redde LIMES + 1 }\n",
     );
     assert!(fixture.is_ok(), "diagnostics: {:?}", fixture.diagnostics);
 }
@@ -259,7 +258,7 @@ fn statics_are_usable_from_functions() {
 #[test]
 fn statics_are_immutable() {
     assert_rejects_with_issue(
-        "generis numerus LIMES = 4\nfunctio f() → vacuum { LIMES ← 5 }\n",
+        "fixum numerus LIMES = 4\nfunctio f() → vacuum { LIMES ← 5 }\n",
         "assignment_to_constant",
     );
 }
@@ -276,7 +275,7 @@ fn top_level_varia_rejects_with_migration_issue() {
 
 #[test]
 fn top_level_static_does_not_reject() {
-    let fixture = analyze_source("generis numerus N = 4\n");
+    let fixture = analyze_source("fixum numerus N = 4\n");
     assert!(
         fixture.diagnostics.is_empty(),
         "diagnostics: {:?}",
@@ -289,7 +288,7 @@ fn failed_dependency_declared_later_still_reports_its_own_error() {
     // `B` evaluates `A` first as a dependency; `A` must still carry its own
     // diagnostic when the loop reaches it.
     assert_rejects_with_issue(
-        "functio f() → numerus { redde 1 }\ngeneris numerus B = A + 1\ngeneris numerus A = f()\n",
+        "functio f() → numerus { redde 1 }\nfixum numerus B = A + 1\nfixum numerus A = f()\n",
         "static_initializer_not_constant",
     );
 }

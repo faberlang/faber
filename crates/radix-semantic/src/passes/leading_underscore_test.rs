@@ -92,7 +92,7 @@ fn parameter_warns() {
 
 #[test]
 fn static_warns() {
-    assert_single("generis numerus _LIMES = 4096", "_LIMES", "constant");
+    assert_single("fixum numerus _LIMES = 4096", "_LIMES", "constant");
 }
 
 #[test]

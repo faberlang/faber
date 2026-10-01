@@ -35,7 +35,7 @@ locale = "en"
 # EXPECTED OUTPUT:
 #   none — stdout not pinned for this exemplum.
 
-static int aetas = 25
+const int aetas = 25
 
 # Basic intra with ‥ operator (exclusive end)
 if aetas within 0‥100 {

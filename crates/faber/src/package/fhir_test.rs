@@ -74,11 +74,11 @@ const LOCAL_MAIN: &str = "import from \"./util\" * as utilModule\n\nfn run() →
 const LOCAL_UTIL: &str = "@ public\nfn salutare() → string {\n    return \"salve\"\n}\n";
 
 const CONST_MEMBER_MAIN: &str = "import from \"./util\" * as utilModule\n\nfn run() → string {\n    return utilModule.VALUE\n}\n\nmain {\n    print utilModule.VALUE\n}\n";
-const CONST_MEMBER_UTIL: &str = "@ public\nstatic string VALUE = \"salve\"\n";
+const CONST_MEMBER_UTIL: &str = "@ public\nconst string VALUE = \"salve\"\n";
 
 const LIBRARY_CONST_MAIN: &str = "import from \"constlib:vals\" vals\n\nfn run() → string {\n    return vals.LIBRARY_VALUE\n}\n\nmain {\n    print vals.LIBRARY_VALUE\n}\n";
 const LIBRARY_CONST_VALS: &str =
-    "+++\nlocale = \"en\"\n+++\n@ public\nstatic string LIBRARY_VALUE = \"salve\"\n";
+    "+++\nlocale = \"en\"\n+++\n@ public\nconst string LIBRARY_VALUE = \"salve\"\n";
 
 /// Entry that CALLS a const data member — an unsupported shape that must
 /// keep the non-function fail-closed diagnostic (U1 `done_when` 4).

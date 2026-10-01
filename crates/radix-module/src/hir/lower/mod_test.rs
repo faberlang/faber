@@ -1391,7 +1391,7 @@ fn assert_matching_hir_annotations_on_first_item(sugar: &str, canonical: &str) {
 #[test]
 fn preserves_praefixum_static_block() {
     let source = r"
-generis numerus N = praefixum {
+fixum numerus N = praefixum {
   redde 2 + 3
 }
 ";

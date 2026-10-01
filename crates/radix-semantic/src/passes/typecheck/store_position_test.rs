@@ -313,9 +313,9 @@ fn row_16_conversion_default_is_a_store_into_the_target() {
 
 #[test]
 fn row_17_generis_constant_must_fit() {
-    assert!(kinds("generis numerus<u8> W = 200\nincipit {\nnota W\n}\n").is_empty());
+    assert!(kinds("fixum numerus<u8> W = 200\nincipit {\nnota W\n}\n").is_empty());
     assert_issue(
-        "generis numerus<u8> W = 300\nincipit {\nnota W\n}\n",
+        "fixum numerus<u8> W = 300\nincipit {\nnota W\n}\n",
         "store_constant_out_of_range",
     );
 }
@@ -323,8 +323,8 @@ fn row_17_generis_constant_must_fit() {
 #[test]
 fn row_17_generis_constant_must_fit_whatever_the_policy() {
     // A saturating or wrapping slot does not reduce an `=` constant.
-    assert_rejected("generis saturatus<u8> W = 300\nincipit {\nnota W\n}\n");
-    assert_rejected("generis modulus<u8> W = 300\nincipit {\nnota W\n}\n");
+    assert_rejected("fixum saturatus<u8> W = 300\nincipit {\nnota W\n}\n");
+    assert_rejected("fixum modulus<u8> W = 300\nincipit {\nnota W\n}\n");
 }
 
 #[test]
