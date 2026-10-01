@@ -983,3 +983,12 @@ fn literal_only_float_expressions_keep_the_authors_text() {
         assert!(emitted.contains(text), "{text}: {emitted}");
     }
 }
+
+#[test]
+fn template_application_keeps_guillemets_when_the_text_holds_quotes() {
+    // inf-json (U8b): a template with an embedded `"` must stay `«…»` in the
+    // reader-locale emit, or the emitted text no longer lexes.
+    let source = "incipit {\n    fixum textus payload ← «{\"n\":§}»(\"7\")\n    nota payload\n}\n";
+    let emitted = assert_idempotent(source);
+    assert!(emitted.contains("«{\"n\":§}»(\"7\")"), "{emitted}");
+}

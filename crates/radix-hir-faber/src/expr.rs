@@ -781,9 +781,10 @@ impl super::FaberCodegen<'_> {
                     // `"template"(arg, …)`: keyword spellings localize but the
                     // template-application shape must survive so the semantic
                     // program re-renders with only its spellings changed.
-                    writer.write("\"");
-                    writer.write(&self.symbol_to_string(*template));
-                    writer.write("\"(");
+                    // The template keeps `«…»` when its text holds `"` or a
+                    // newline, exactly like a plain `textus` literal.
+                    self.write_textus_literal(*template, writer);
+                    writer.write("(");
                     for (idx, arg) in args.iter().enumerate() {
                         if idx > 0 {
                             writer.write(", ");
@@ -793,9 +794,8 @@ impl super::FaberCodegen<'_> {
                     writer.write(")");
                 } else {
                     writer.write(surface.contextual_keyword("scriptum"));
-                    writer.write("(\"");
-                    writer.write(&self.symbol_to_string(*template));
-                    writer.write("\"");
+                    writer.write("(");
+                    self.write_textus_literal(*template, writer);
                     for arg in args {
                         writer.write(", ");
                         self.write_expr(arg, names, surface, writer);
