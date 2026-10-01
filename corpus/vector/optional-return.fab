@@ -1,0 +1,46 @@
++++
+term = "vector"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "si_stmt", "coalesce_expr", "redde_stmt", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "type"
+summary = "A vector literal returned into an optional vector return type lowers as the vector and widens into the option."
+locale = "en"
++++
+
+# =============================================================================
+# vector — a vector literal returned into `vector<f32, 3> ∪ none`.
+# =============================================================================
+#
+# What this teaches:
+#   • Optional vector return — `vector<f32, 3> ∪ none` accepts a vector literal or `null`
+#   • Literal typing — the literal is the vector value; the return widens it into the option
+#
+# Common mistakes:
+#   • treating the literal as the option itself — the aggregate is the vector, the option wraps it
+#
+# See also: vector
+# =============================================================================
+
+
+
+# A literal returned on one path and `null` on the other; `coalesce` reads the
+# present vector, or the fallback when the option is empty.
+#
+# EXPECTED stdout:
+#   [-1.0, 0.0, 0.0]
+#   [0.0, 0.0, 0.0]
+#   none
+
+fn normal(int code) → vector<f32, 3> ∪ none {
+    if code ≡ 1 then return [-1.0, 0.0, 0.0] ↦ vector<f32, 3>
+    return null
+}
+
+main {
+    const vector<f32, 3> fallback ← [0.0, 0.0, 0.0] ↦ vector<f32, 3>
+    print normal(1) coalesce fallback
+    print normal(2) coalesce fallback
+    if normal(2) ≡ null {
+        print "none"
+    }
+}

@@ -43,6 +43,9 @@ mod bounded_itera_test;
 #[path = "interface_dispatch_test.rs"]
 mod interface_dispatch_test;
 #[cfg(test)]
+#[path = "optional_vector_literal_test.rs"]
+mod optional_vector_literal_tests;
+#[cfg(test)]
 #[path = "queue_stack_test.rs"]
 mod queue_stack_test;
 #[cfg(test)]
