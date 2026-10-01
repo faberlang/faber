@@ -54,6 +54,27 @@ pub type DisplayNames = FxHashMap<DefId, String>;
 /// its slot is a `littera`, an `ascii<1>` or an unbounded `ascii` (pr4).
 pub type FieldCharSet = FxHashSet<(DefId, Symbol)>;
 
+/// Declared display shape of a tuple: one entry per element, in order. Only
+/// the static type tells a tuple from an interval (both are `Value::Tuple`),
+/// and only it tells a `d64` element from an integer one, so a value is shown
+/// as `iuncta [a, b]` exactly when this shape is attached to its display.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TupleParts(pub Vec<TuplePart>);
+
+/// One element of a [`TupleParts`]: the width its value renders at, and the
+/// shape of the element itself when it is a tuple (or holds one).
+#[derive(Debug, Clone, PartialEq)]
+pub struct TuplePart {
+    pub width: Option<NumericWidth>,
+    pub tuple: Option<TupleParts>,
+}
+
+/// Struct and variant fields whose declared type holds a tuple.
+pub type FieldTupleParts = FxHashMap<(DefId, Symbol), TupleParts>;
+
+static NO_TUPLE_FIELDS: std::sync::LazyLock<FieldTupleParts> =
+    std::sync::LazyLock::new(FxHashMap::default);
+
 static NO_FLOAT_WIDTHS: std::sync::LazyLock<FieldFloatWidths> =
     std::sync::LazyLock::new(FxHashMap::default);
 
@@ -81,6 +102,11 @@ pub struct FieldOrder<'a> {
     /// The value is shown through a `valor`/`json` static type: a dynamic
     /// carrier displays as a JSON-shaped object, not a construction literal.
     pub dynamic: bool,
+    /// Declared tuple fields (see [`FieldTupleParts`]).
+    pub tuple_fields: &'a FieldTupleParts,
+    /// The value being shown is (or holds) a tuple per its static type: its
+    /// shape. Reset per field and per element, where the declared type decides.
+    pub tuple: Option<&'a TupleParts>,
 }
 
 impl<'a> FieldOrder<'a> {
@@ -96,7 +122,15 @@ impl<'a> FieldOrder<'a> {
             char_text: false,
             names: &NO_DISPLAY_NAMES,
             dynamic: false,
+            tuple_fields: &NO_TUPLE_FIELDS,
+            tuple: None,
         }
+    }
+
+    /// The same metadata for a value whose static type is (or holds) a tuple.
+    #[must_use]
+    pub fn with_tuple(self, tuple: Option<&'a TupleParts>) -> Self {
+        Self { tuple, ..self }
     }
 
     /// The same metadata with construction-literal names attached.
@@ -519,7 +553,13 @@ impl Value {
                     )?
                 }
             }
-            Value::Set(_) | Value::Tuple(_) => format!("{self:?}"),
+            Value::Tuple(items) => match order.tuple {
+                Some(parts) => display_tuple(items, parts, interner, order, span)?,
+                // No tuple shape: an interval (the same carrier) or a value
+                // whose type the caller could not resolve.
+                None => format!("{self:?}"),
+            },
+            Value::Set(_) => format!("{self:?}"),
             Value::GradientHandle(id) => format!("gradient-handle#{id}"),
             Value::Cursor(_) => "cursor".to_owned(),
         })
@@ -566,6 +606,32 @@ impl Value {
             _ => false,
         }
     }
+}
+
+/// Render a tuple as `iuncta [a, b]`: each element is a composite member shown
+/// at its own declared width and shape.
+fn display_tuple<'a>(
+    items: &[Value],
+    parts: &'a TupleParts,
+    interner: &Interner,
+    order: FieldOrder<'a>,
+    span: Span,
+) -> Result<String, RunnerError> {
+    let rendered = items
+        .iter()
+        .enumerate()
+        .map(|(index, item)| {
+            let part = parts.0.get(index);
+            display_element(
+                item,
+                interner,
+                order.with_tuple(part.and_then(|part| part.tuple.as_ref())),
+                span,
+                part.and_then(|part| part.width),
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(format!("iuncta [{}]", rendered.join(", ")))
 }
 
 fn display_list(
@@ -772,7 +838,9 @@ fn display_construction(
         });
         // The field's declared type decides char vs text quoting; nothing is
         // inherited from the enclosing value.
-        let field_order = order.with_char_text(order.char_fields.contains(&(def, *symbol)));
+        let field_order = order
+            .with_char_text(order.char_fields.contains(&(def, *symbol)))
+            .with_tuple(order.tuple_fields.get(&(def, *symbol)));
         let val_str = display_element(value, interner, field_order, span, width)?;
         parts.push(format!("{field} = {val_str}"));
     }
@@ -1604,6 +1672,30 @@ pub fn format_template(
     order: FieldOrder<'_>,
     span: Span,
 ) -> Result<String, RunnerError> {
+    format_template_shaped(
+        template,
+        args,
+        widths,
+        char_text,
+        &[],
+        interner,
+        order,
+        span,
+    )
+}
+
+/// [`format_template`] with the static tuple shape of each argument.
+#[expect(clippy::too_many_arguments)]
+pub fn format_template_shaped(
+    template: &str,
+    args: &[Value],
+    widths: &[Option<NumericWidth>],
+    char_text: &[bool],
+    tuples: &[Option<TupleParts>],
+    interner: &Interner,
+    order: FieldOrder<'_>,
+    span: Span,
+) -> Result<String, RunnerError> {
     let mut out = String::with_capacity(template.len());
     let mut chars = template.chars().peekable();
     let mut next_arg = 0usize;
@@ -1631,7 +1723,9 @@ pub fn format_template(
             .map(|arg| {
                 let width = widths.get(arg_index).copied().flatten();
                 let chars = char_text.get(arg_index).copied().unwrap_or(false);
-                arg.display_typed(interner, order.with_char_text(chars), span, width)
+                let tuple = tuples.get(arg_index).and_then(Option::as_ref);
+                let order = order.with_char_text(chars).with_tuple(tuple);
+                arg.display_typed(interner, order, span, width)
             })
             .transpose()?
             .unwrap_or_else(|| format!("§{index}"));

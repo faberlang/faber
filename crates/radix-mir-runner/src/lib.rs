@@ -318,6 +318,9 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     /// Struct and variant fields holding a `littera`, so display quotes them
     /// as chars and every other ascii-carried text as text (pr4).
     field_char_set: value::FieldCharSet,
+    /// Struct and variant fields whose declared type holds a tuple, so display
+    /// prints them as `iuncta [..]` at their element widths.
+    field_tuple_parts: value::FieldTupleParts,
 }
 
 impl<'a, H: Host + ?Sized> Runner<'a, H> {
@@ -341,6 +344,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
         }
         let field_float_widths = index_field_float_widths(context, types);
         let field_char_set = index_field_char_set(context, types);
+        let field_tuple_parts = index_field_tuple_parts(context, types);
         Self {
             function_index: program.function_index(),
             program,
@@ -369,6 +373,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             conversation_slots: Rc::default(),
             field_float_widths,
             field_char_set,
+            field_tuple_parts,
         }
     }
 
@@ -380,10 +385,30 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             variants: &self.context.variant_field_order,
             float_widths: &self.field_float_widths,
             char_fields: &self.field_char_set,
+            tuple_fields: &self.field_tuple_parts,
+            tuple: None,
             char_text: false,
             names: &self.context.display_names,
             dynamic: false,
         }
+    }
+}
+
+/// The element type of a collection or option wrapper, which a value of that
+/// type renders through.
+fn wrapped_element(ty: TypeId, types: &TypeTable) -> Option<TypeId> {
+    match types.get(ty) {
+        Type::Map(_, elem)
+        | Type::Option(elem)
+        | Type::Queue(elem)
+        | Type::Stack(elem)
+        | Type::Vector(elem, _)
+        | Type::Matrix(elem, _)
+        | Type::Tensor(elem, _)
+        | Type::Sparsa(elem, _)
+        | Type::Array(elem)
+        | Type::BoundedArray { element: elem, .. } => Some(*elem),
+        _ => None,
     }
 }
 
@@ -393,17 +418,28 @@ fn element_display_width(ty: TypeId, types: &TypeTable, depth: u8) -> Option<Num
     }
     match types.get(ty) {
         Type::SizedNumeric(_, width) if width.is_float() || width.is_decimal() => Some(*width),
-        Type::Map(_, elem) | Type::Option(elem) => element_display_width(*elem, types, depth + 1),
-        Type::Queue(elem) | Type::Stack(elem) => element_display_width(*elem, types, depth + 1),
-        Type::Vector(elem, _)
-        | Type::Matrix(elem, _)
-        | Type::Tensor(elem, _)
-        | Type::Sparsa(elem, _)
-        | Type::Array(elem)
-        | Type::BoundedArray { element: elem, .. } => {
-            element_display_width(*elem, types, depth + 1)
-        }
-        _ => None,
+        _ => element_display_width(wrapped_element(ty, types)?, types, depth + 1),
+    }
+}
+
+/// Display shape of `ty` when it is (or holds, through collections and
+/// options) a tuple: each element's width and nested shape come from the
+/// declared tuple type. An interval has its own type and gets no shape.
+fn tuple_parts(ty: TypeId, types: &TypeTable, depth: u8) -> Option<value::TupleParts> {
+    if depth > 8 {
+        return None;
+    }
+    match types.get(ty) {
+        Type::Tuple(elements) => Some(value::TupleParts(
+            elements
+                .iter()
+                .map(|element| value::TuplePart {
+                    width: element_display_width(*element, types, 0),
+                    tuple: tuple_parts(*element, types, depth + 1),
+                })
+                .collect(),
+        )),
+        _ => tuple_parts(wrapped_element(ty, types)?, types, depth + 1),
     }
 }
 
@@ -463,6 +499,25 @@ fn index_field_char_set(
         }
     }
     set
+}
+
+fn index_field_tuple_parts(
+    context: &MirValidationContext<'_>,
+    types: &TypeTable,
+) -> value::FieldTupleParts {
+    let mut parts = FxHashMap::default();
+    let owners = context
+        .struct_fields
+        .iter()
+        .chain(context.variant_fields.iter());
+    for (def, fields) in owners {
+        for (name, ty) in fields {
+            if let Some(shape) = tuple_parts(ty.semantic_id(), types, 0) {
+                parts.insert((*def, *name), shape);
+            }
+        }
+    }
+    parts
 }
 
 fn index_field_float_widths(
@@ -1624,6 +1679,12 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         Self::element_display_width(self.operand_static_type(operand)?, self.types, 0)
     }
 
+    /// Display shape of a diagnostic operand whose static type is (or holds) a
+    /// tuple; `None` for an interval and every non-tuple.
+    fn operand_tuple_parts(&self, operand: &MirOperand) -> Option<value::TupleParts> {
+        tuple_parts(self.operand_static_type(operand)?, self.types, 0)
+    }
+
     /// Whether a diagnostic operand's static type is (or holds) a dynamic
     /// `valor`/`json` carrier, which displays as a JSON-shaped object.
     fn operand_is_dynamic(&self, operand: &MirOperand) -> bool {
@@ -1668,6 +1729,15 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                                 .get(def)?
                                 .get(field)?
                                 .semantic_id()
+                        }
+                        // An element of a tuple is its declared part.
+                        MirProjection::Index(MirOperand::Constant(MirConstant::Int(position)))
+                            if matches!(self.types.get(ty), Type::Tuple(_)) =>
+                        {
+                            let Type::Tuple(parts) = self.types.get(ty) else {
+                                return None;
+                            };
+                            *parts.get(usize::try_from(*position).ok()?)?
                         }
                         // An element of a numeric collection renders at the
                         // collection's element width.
