@@ -3,7 +3,7 @@
 //! docs/operator/convert-command.md.
 
 use super::super::format_test::{
-    code_only, exempla, faber_binary, run_faber_format_stdout,
+    HOOK_SOURCE, code_only, exempla, faber_binary, run_faber_capture, run_faber_format_stdout,
     run_faber_format_stdout_with_args as run_faber_convert_stdout_with_args,
 };
 use std::fs;
@@ -916,4 +916,40 @@ fn run_round_trip_check(binary: &std::path::Path, package: &std::path::Path) -> 
         .filter(|line| line.starts_with("warning[") || line.starts_with("error["))
         .map(str::to_owned)
         .collect()
+}
+
+/// FD-1: `convert` refuses rather than deleting a construct HIR cannot carry.
+#[test]
+fn convert_refuses_construct_loss() {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let path = dir.path().join("lossy.fab");
+    let path_arg = path.to_str().expect("utf8 path");
+    fs::write(&path, HOOK_SOURCE).expect("write fixture");
+
+    for args in [
+        vec!["convert", "--to", "la", path_arg],
+        vec!["convert", "--to", "la", "--stdout", path_arg],
+    ] {
+        let output = run_faber_capture(&args, None);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            !output.status.success(),
+            "{args:?} must exit non-zero:\n{stderr}"
+        );
+        assert!(
+            stderr.contains("CODEGEN006")
+                && stderr.contains("ast_construct_dropped")
+                && stderr.contains("hook:Praepara"),
+            "{args:?} must name the loss:\n{stderr}"
+        );
+        assert!(
+            output.stdout.is_empty(),
+            "{args:?} must print nothing to stdout"
+        );
+    }
+    assert_eq!(
+        fs::read_to_string(&path).expect("read back"),
+        HOOK_SOURCE,
+        "the file must stay byte-identical"
+    );
 }
