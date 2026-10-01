@@ -350,7 +350,6 @@ const OPERATOR: &[KeywordOwner] = &[KeywordOwner::Operator];
 const DECLARATION_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::DeclarationIntroducer];
 const CONTROL_FLOW: &[KeywordOwner] = &[KeywordOwner::ControlFlow];
 const EXPRESSION_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::ExpressionIntroducer];
-const CONVERSION_HINT: &[KeywordOwner] = &[KeywordOwner::ConversionHint];
 const RANGE_OPERATOR: &[KeywordOwner] = &[KeywordOwner::RangeOperator];
 const STATEMENT_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::StatementIntroducer];
 const DECLARATION_MARKER: &[KeywordOwner] = &[KeywordOwner::DeclarationMarker];
