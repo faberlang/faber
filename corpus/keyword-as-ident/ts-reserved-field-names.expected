@@ -1,0 +1,13 @@
+1
+2
+3
+16
+22
+38
+3
+15
+34
+0
+1
+2
+Pouch { yield = 1, delete = 2, default = 3, static = 4, enum = 5, implements = 6, interface = 7, package = 8, private = 9, protected = 10, public = 11 }

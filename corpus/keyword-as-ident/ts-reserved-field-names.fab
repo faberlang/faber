@@ -1,0 +1,111 @@
++++
+term = "ts-reserved-field-names"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "genus_field_decl", "field_decl", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "assignment", "incipit_stmt", "nota_stmt", "discretio_decl", "variant", "variant_fields", "finge_expr", "field_init", "field_key", "discerne_stmt", "ex_stmt", "extract_fields", "extract_field"]
+category = "identifier"
+canonical = true
+summary = "Genus fields, methods, variant fields, parameters and locals may be spelled like ECMAScript reserved words; a field is read, written and built under the name it was declared with."
+syntax = "class Pouch { var int yield; fn delete(int await) → int { const int let ← await + self.yield; return let } }"
+related = ["keyword-as-ident", "rust-reserved-names"]
+locale = "en"
++++
+# =============================================================================
+# ts-reserved-field-names — property names that look like JavaScript keywords
+# =============================================================================
+#
+# What this teaches:
+#   • `yield`, `delete`, `default`, `new`, `await`, `let`, `static`, `enum`,
+#     `implements`, `interface`, `package`, `private`, `protected` and `public`
+#     are ordinary identifiers in Faber. A genus field or method, a union
+#     variant field, a parameter and a local may all use them.
+#   • A field keeps one spelling on every backend: the name it was declared
+#     with is the name it is read, written, constructed and displayed under.
+#
+# Common mistakes:
+#   • Renaming a field to dodge a target's reserved word — the compiler keeps
+#     the property name and only escapes bindings (locals, parameters).
+#
+# See also: keyword-as-ident, rust-reserved-names
+# =============================================================================
+
+# ts-reserved-field-names — reserved-word spellings as fields, methods, variant fields and bindings
+#
+# EXPECTED OUTPUT:
+#   ts-reserved-field-names.expected — the computed values, then the displayed genus.
+
+class Pouch {
+    var int yield
+    var int delete
+    var int default
+    var int static
+    var int enum
+    var int implements
+    var int interface
+    var int package
+    var int private
+    var int protected
+    var int public
+
+    fn new(int await) → int {
+        const int let ← await + self.yield
+        return let + self.delete + self.default
+    }
+
+    fn function() → int {
+        return self.static + self.enum + self.implements + self.interface
+    }
+
+    fn visibility() → int {
+        return self.package + self.private + self.protected + self.public
+    }
+}
+
+union Shift {
+    Move {
+        int yield
+        int delete
+    },
+    Stay
+}
+
+fn pack(int yield, int default) → int {
+    return yield + default
+}
+
+fn weigh(Shift s) → int {
+    match s {
+        case Move const yield, delete {
+            return yield * 10 + delete
+        }
+        case Stay {
+            return 0
+        }
+    }
+}
+
+main {
+    const Pouch b ← Pouch { yield = 1, delete = 2, default = 3, static = 4, enum = 5, implements = 6, interface = 7, package = 8, private = 9, protected = 10, public = 11 }
+    print b.yield
+    print b.delete
+    print b.default
+    print b.new(10)
+    print b.function()
+    print b.visibility()
+    print pack(1, 2)
+
+    var Pouch c ← Pouch { yield = 4, delete = 5, default = 6, static = 0, enum = 0, implements = 0, interface = 0, package = 0, private = 0, protected = 0, public = 0 }
+    c.yield ← 9
+    c.delete ← c.delete + 1
+    print c.yield + c.delete
+
+    const Shift moved ← variant Move { yield = 3, delete = 4 } ∷ Shift
+    print weigh(moved)
+    print weigh(variant Stay ∷ Shift)
+
+    # Destructuring reads the properties and binds escaped local names.
+    from b const yield, delete as new
+    print yield
+    print new
+
+    print b
+}
