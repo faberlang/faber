@@ -135,6 +135,20 @@ mod imported {
     }
 
     #[test]
+    fn static_field_read_through_imported_type_name_uses_the_import() {
+        let fixture = analyze("functio g() → numerus { redde fons.Tab.Z }");
+        assert!(fixture.is_ok(), "diagnostics: {:?}", fixture.diagnostics);
+        assert!(
+            !fixture
+                .diagnostics
+                .iter()
+                .any(|err| test_support::issue(err) == Some("unused_import")),
+            "diagnostics: {:?}",
+            fixture.diagnostics
+        );
+    }
+
+    #[test]
     fn static_field_read_of_imported_instance_field_through_type_is_named() {
         assert_issue(
             "functio g() → numerus { redde fons.Tab.w }",

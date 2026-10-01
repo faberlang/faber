@@ -2188,6 +2188,17 @@ fn resolve_member_expr(
     {
         return;
     }
+    // A value read through an import binding (`module.NAME`, `module.Tab.Z`) is
+    // a use of the import, even when later folding or lowering drops the
+    // namespace path from the HIR.
+    if let ExprKind::Ident(base) = &expr.object.kind
+        && let Some(def_id) = resolver.lookup(base.name)
+        && resolver
+            .get_symbol(def_id)
+            .is_some_and(|symbol| symbol.kind == SymbolKind::Module)
+    {
+        resolver.mark_namespace_used(base.name);
+    }
     if allow_struct_base
         && let ExprKind::Ident(base) = &expr.object.kind
         && let Some(def_id) = resolver.lookup(base.name)

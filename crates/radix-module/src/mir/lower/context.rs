@@ -66,6 +66,9 @@ struct FrozenMaps<'a> {
     /// Static (`generis`) genus fields keyed by `(struct, field)`; a read through
     /// the type name inlines the field's folded initializer.
     static_fields: Arc<FxHashMap<(DefId, Symbol), &'a HirField>>,
+    /// Static (`generis`) fields of imported genus exports by `(struct, field)`:
+    /// the interface's folded initializer, inlined by a `module.Tab.Z` read.
+    imported_static_fields: Arc<FxHashMap<(DefId, Symbol), HirExpression>>,
     /// Producer-side defaults for imported class fields, keyed by importer-local type.
     imported_struct_defaults: Arc<FxHashMap<DefId, Vec<(Symbol, HirExpression)>>>,
     provider_imports: Arc<FxHashMap<DefId, ProviderImport>>,
@@ -105,6 +108,7 @@ pub(super) struct LoweringContextMaps<'a> {
     scrinium_data_field: Option<Symbol>,
     top_level_consts: FxHashMap<DefId, &'a HirConst>,
     static_fields: FxHashMap<(DefId, Symbol), &'a HirField>,
+    imported_static_fields: FxHashMap<(DefId, Symbol), HirExpression>,
     provider_imports: FxHashMap<DefId, ProviderImport>,
     imported_type_members: FxHashMap<(DefId, Symbol), MirType>,
     imported_method_providers: FxHashMap<(DefId, Symbol), ImportedMethodProvider>,
@@ -171,6 +175,7 @@ impl<'a> LoweringContextMaps<'a> {
             scrinium_data_field: None,
             top_level_consts: FxHashMap::default(),
             static_fields: FxHashMap::default(),
+            imported_static_fields: FxHashMap::default(),
             provider_imports: FxHashMap::default(),
             imported_type_members: FxHashMap::default(),
             imported_method_providers: FxHashMap::default(),
@@ -194,6 +199,7 @@ impl<'a> LoweringContextMaps<'a> {
                 conversion_rows: Arc::new(FxHashMap::default()),
                 top_level_consts: Arc::new(FxHashMap::default()),
                 static_fields: Arc::new(FxHashMap::default()),
+                imported_static_fields: Arc::new(FxHashMap::default()),
                 imported_struct_defaults: Arc::new(FxHashMap::default()),
                 provider_imports: Arc::new(FxHashMap::default()),
                 imported_type_members: Arc::new(FxHashMap::default()),
@@ -274,6 +280,7 @@ impl<'a> LoweringContextMaps<'a> {
             conversion_rows: Arc::new(core::mem::take(&mut maps.conversion_rows)),
             top_level_consts: Arc::new(core::mem::take(&mut maps.top_level_consts)),
             static_fields: Arc::new(core::mem::take(&mut maps.static_fields)),
+            imported_static_fields: Arc::new(core::mem::take(&mut maps.imported_static_fields)),
             imported_struct_defaults: Arc::new(core::mem::take(&mut maps.imported_struct_defaults)),
             provider_imports: Arc::new(core::mem::take(&mut maps.provider_imports)),
             imported_type_members: Arc::new(core::mem::take(&mut maps.imported_type_members)),
@@ -335,6 +342,7 @@ impl<'a> LoweringContextMaps<'a> {
             scrinium_data_field: self.scrinium_data_field,
             top_level_consts: Arc::clone(&self.frozen.top_level_consts),
             static_fields: Arc::clone(&self.frozen.static_fields),
+            imported_static_fields: Arc::clone(&self.frozen.imported_static_fields),
             provider_imports: Arc::clone(&self.frozen.provider_imports),
             imported_type_members: Arc::clone(&self.frozen.imported_type_members),
             method_targets: Arc::clone(&self.frozen.method_targets),
@@ -582,6 +590,10 @@ impl<'a> LoweringContextMaps<'a> {
             for field in imported_fields {
                 fields.insert(field.name, MirType::semantic(field.ty));
                 if let Some(init) = field.init {
+                    if field.modifier == Some(radix_syntax::FieldModifier::Generis) {
+                        self.imported_static_fields
+                            .insert((def_id, field.name), init.clone());
+                    }
                     defaults.push((field.name, init));
                 }
                 if field.optional || !field.required {

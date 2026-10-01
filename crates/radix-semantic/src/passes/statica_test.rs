@@ -363,6 +363,23 @@ fn imported_constant_with_folded_value_folds_in_initializer() {
 }
 
 #[test]
+fn imported_constant_folded_in_initializer_uses_the_import() {
+    let fixture = analyze_with_consts(
+        "importa ex \"./consts\" consts\nfixum numerus D = consts.BASE * 2\n",
+        Some(crate::file_interface::InterfaceConstValue::Int(5)),
+    );
+    assert!(fixture.is_ok(), "diagnostics: {:?}", fixture.diagnostics);
+    assert!(
+        !fixture
+            .diagnostics
+            .iter()
+            .any(|err| crate::test_support::issue(err) == Some("unused_import")),
+        "diagnostics: {:?}",
+        fixture.diagnostics
+    );
+}
+
+#[test]
 fn imported_constant_without_folded_value_stays_not_constant() {
     let fixture = analyze_with_consts(
         "importa ex \"./consts\" consts\nfixum numerus D = consts.BASE * 2\n",

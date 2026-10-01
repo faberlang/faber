@@ -45,3 +45,58 @@ fn static_field_read_of_an_instance_field_through_the_type_is_a_compile_error() 
     assert!(!err.contains("invalid MIR"), "{err}");
     assert!(err.contains("instance_field_read_through_type"), "{err}");
 }
+
+#[test]
+fn static_field_read_through_an_imported_genus_inlines_the_interface_initializer() {
+    use crate::driver::{AnalyzeRequest, ModuleImportContract};
+    use crate::file_interface::{
+        FileExport, FileExportKind, FileInterface, InterfaceStructExport, InterfaceStructField, InterfaceTypeSnapshot,
+    };
+    use crate::hir::{HirExpression, HirExpressionKind, HirId, HirLiteral};
+    use crate::semantic::Primitive;
+    use crate::syntax::{FieldModifier, MemberVisibility};
+
+    let init = HirExpression {
+        id: HirId(0),
+        kind: HirExpressionKind::Literal(HirLiteral::Int(4242)),
+        ty: None,
+        span: radix_lexer::Span::default(),
+    };
+    let mut interface = FileInterface::new();
+    interface.insert(FileExport {
+        name: "Tab".to_owned(),
+        kind: FileExportKind::Struct(InterfaceStructExport {
+            is_json: false,
+            params: Vec::new(),
+            name: "Tab".to_owned(),
+            fields: vec![InterfaceStructField {
+                name: "Z".to_owned(),
+                ty: InterfaceTypeSnapshot::Primitive(Primitive::Numerus),
+                optional: false,
+                required: false,
+                default: Some(init),
+                modifier: Some(FieldModifier::Generis),
+                visibility: MemberVisibility::Publica,
+            }],
+            methods: Vec::new(),
+            annotation_contract: None,
+        }),
+    });
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let unit = crate::driver::analyze_source(
+        &session,
+        "test.fab",
+        "importa ex \"demo:lib\" demo\nfunctio g() → numerus { redde demo.Tab.Z }\n",
+        AnalyzeRequest {
+            cli_program: None,
+            contract: ModuleImportContract {
+                namespace_exports: std::collections::BTreeMap::new(),
+                file_interfaces: std::collections::BTreeMap::from([("demo".to_owned(), interface)]),
+                ..ModuleImportContract::default()
+            },
+        },
+    )
+    .expect("imported static read analyzes");
+    let dump = crate::mir::dump_analyzed_unit(&unit).expect("imported static read lowers");
+    assert!(dump.contains("4242"), "expected the inlined initializer, got:\n{dump}");
+}
