@@ -543,17 +543,9 @@ help = "keep schemas as plain relational headings"
 message = "a schema cannot declare a method"
 help = "declare the method on a genus instead"
 
-[diagnostics.PARSE010.issues.static_not_top_level]
-message = "a {generis} static is a top-level declaration; it cannot appear inside a block"
-help = "move the static to top level, or use {fixum} for a local binding"
-
-[diagnostics.PARSE010.issues.static_initializer_eq]
-message = "a {generis} static is initialized with `=`, not `←`"
-help = "write `{generis} T NAME = value`; a static is a compile-time fact"
-
-[diagnostics.PARSE010.issues.static_initializer_required]
-message = "a {generis} static needs an initializer"
-help = "write `{generis} T NAME = value`"
+[diagnostics.PARSE010.issues.static_decl_retired]
+message = "the module-level `{keyword}` declaration was removed; `{name}` is a constant"
+help = "write `{fixum} T {name} = …`; a module-level constant is spelled like a local one, and `{generis}` remains only the genus field modifier"
 
 [diagnostics.PARSE010.issues.varia_compile_time_initializer]
 message = "a {varia} binding cannot be a compile-time constant; `=` states a compile-time fact and `←` stores at runtime"
@@ -570,10 +562,6 @@ help = "keep one modifier; a {generis} field is already immutable"
 [diagnostics.PARSE010.issues.field_modifier_missing]
 message = "a {genus} field must declare {fixum}, {varia} or {generis}"
 help = "write `{varia} T name` to keep today's meaning (or {fixum} when never reassigned); `faber field-modifier-codemod <PATH>` migrates whole files"
-
-[diagnostics.PARSE010.issues.static_sponte]
-message = "a {generis} static cannot be {sponte}"
-help = "remove {sponte}; a static always has its compile-time value"
 
 [diagnostics.PARSE010.issues.module_declaration_misplaced]
 message = "a {regio} declaration must be the first declaration of the file, before any {importa}"
@@ -765,7 +753,7 @@ help = "write '↦ T ⊥ value' (or '↤ … ⊥ value'); '⇥' never takes a va
 
 [diagnostics.PARSE030.issues.praefixum_expression_form_retired]
 message = "`{praefixum}(expression)` is retired"
-help = "write a static: `{generis} T NAME = {praefixum}` followed by a block that ends in `{redde}` value"
+help = "write a constant: `{fixum} T NAME = {praefixum}` followed by a block that ends in `{redde}` value"
 
 [diagnostics.PARSE030.issues.default_with_propagation]
 message = "an expression either propagates with '⇥' or defaults with '⊥', never both"
@@ -1167,9 +1155,9 @@ help = "break the cycle between modules"
 message = "type alias cycle"
 help = "break the cycle between modules"
 
-[diagnostics.SEM007.issues.static_cycle]
-message = "static `{name}` depends on itself"
-help = "break the cycle between the static initializers"
+[diagnostics.SEM007.issues.constant_cycle]
+message = "constant `{name}` depends on itself"
+help = "break the cycle between the constant initializers"
 
 [diagnostics.SEM008]
 message = "lowering error"
@@ -3596,30 +3584,18 @@ message = "@ radix lane \"{lane}\" rejects this function body: `tacet` is outsid
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
 [diagnostics.SEM060]
-message = "invalid static initializer"
+message = "invalid constant initializer"
 help = "move the computation into a function, or use a `{praefixum}` block"
 
-[diagnostics.SEM060.issues.static_initializer_not_constant]
-message = "the initializer of static `{name}` is not a compile-time constant"
-help = "a static allows literals, arithmetic, text, collection literals of those, and other statics; move the computation into a function, or use a `{praefixum}` block"
-
-[diagnostics.SEM060.issues.static_arithmetic_overflow]
-message = "the initializer of static `{name}` overflows its type"
-help = "use a wider type or a smaller value"
-
-[diagnostics.SEM060.issues.static_division_by_zero]
-message = "the initializer of static `{name}` divides by zero"
-help = "fix the divisor"
-
-[diagnostics.SEM060.issues.local_constant_not_constant]
+[diagnostics.SEM060.issues.constant_initializer_not_constant]
 message = "the initializer of constant `{name}` is not a compile-time constant"
-help = "`=` states a compile-time fact: use literals, arithmetic, and other constants; for a value computed at runtime write `{fixum} T name ← value`"
+help = "`=` states a compile-time fact: use literals, arithmetic, text, collection literals of those, and other constants; compute with a `{praefixum}` block, or for a value computed at runtime write `{fixum} T name ← value`"
 
-[diagnostics.SEM060.issues.local_constant_overflow]
+[diagnostics.SEM060.issues.constant_arithmetic_overflow]
 message = "the initializer of constant `{name}` does not fit its type"
 help = "a `=` constant must fit its type whatever the overflow policy; use a wider type or a smaller value"
 
-[diagnostics.SEM060.issues.local_constant_division_by_zero]
+[diagnostics.SEM060.issues.constant_division_by_zero]
 message = "the initializer of constant `{name}` divides by zero"
 help = "fix the divisor"
 
@@ -3649,7 +3625,7 @@ help = "`{insere}` needs a source file on disk; it cannot be used from stdin"
 
 [diagnostics.SEM061.issues.insere_invalid_utf8]
 message = "embedded file `{path}` is not valid UTF-8"
-help = "declare the static as `octeti` to embed raw bytes"
+help = "declare the constant as `octeti` to embed raw bytes"
 
 [diagnostics.SEM061.issues.insere_type_invalid]
 message = "an `{insere}` initializer must declare `textus` or `octeti`"
@@ -3699,9 +3675,9 @@ help = "declare `{member}` with the same visibility on every member of the union
 message = "invalid `{praefixum}` initializer"
 help = "keep a `{praefixum}` body to pure computation that yields a literal value"
 
-[diagnostics.SEM064.issues.praefixum_outside_static]
-message = "`{praefixum}` is allowed only as a `{generis}` initializer"
-help = "move the computation into a `{generis}` initializer: `{generis} T NAME = {praefixum}` followed by a block"
+[diagnostics.SEM064.issues.praefixum_outside_constant]
+message = "`{praefixum}` is allowed only as the initializer of a module-level constant or a `{generis}` genus field"
+help = "move the computation into a constant initializer: `{fixum} T NAME = {praefixum}` followed by a block"
 
 [diagnostics.SEM064.issues.praefixum_forbidden]
 message = "`{praefixum}` initializer of `{name}` reaches `{effect}` through {chain}"

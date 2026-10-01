@@ -2,20 +2,20 @@
 //!
 //! A local constant is an ordinary immutable local whose initializer is a
 //! compile-time fact. Its initializer must be evaluable by the same evaluator
-//! that folds `generis` statics ([`super::statica::fold`]), so this pass hands
-//! that evaluator a scratch module made of the already-folded statics plus
-//! every local constant, and reports what it rejects under local-constant
-//! issue names. The scratch module is discarded: the local keeps its authored
-//! initializer, so every backend and Faber re-emission see an ordinary
-//! immutable local.
+//! that folds module constants ([`super::statica::fold`]), so this pass hands
+//! that evaluator a scratch module made of the already-folded module
+//! constants plus every local constant, and reports what it rejects under the
+//! same issue names (one condition, one identity). The scratch module is
+//! discarded: the local keeps its authored initializer, so every backend and
+//! Faber re-emission see an ordinary immutable local.
 //!
-//! The evaluable surface is therefore exactly the statics' surface: literals,
-//! arithmetic on scalars, other constants (statics and other local
-//! constants), and collections of those. The value must fit the declared
-//! type whatever its overflow policy (`=` states a compile-time fact).
+//! The evaluable surface is therefore exactly the module constants' surface:
+//! literals, arithmetic on scalars, other constants (module and local), and
+//! collections of those. The value must fit the declared type whatever its
+//! overflow policy (`=` states a compile-time fact).
 
 use super::statica;
-use crate::{SemanticError, SemanticErrorKind, TypeTable};
+use crate::{SemanticError, TypeTable};
 use radix_hir::visit::{HirVisitor, walk_local, walk_program};
 use radix_hir::{
     DefId, HirConst, HirId, HirItem, HirItemKind, HirLocal, HirModule, HirPresentation, HirStatic,
@@ -23,14 +23,10 @@ use radix_hir::{
 use radix_lexer::Interner;
 use rustc_hash::FxHashSet;
 
-const ISSUE_NOT_CONSTANT: &str = "local_constant_not_constant";
-const ISSUE_OVERFLOW: &str = "local_constant_overflow";
-const ISSUE_DIVISION_BY_ZERO: &str = "local_constant_division_by_zero";
-
 /// Evaluate every local compile-time constant and report the ones that are
 /// not constant or do not fit their type.
 ///
-/// Runs after [`statica::fold`] succeeded, so the statics copied into the
+/// Runs after [`statica::fold`] succeeded, so the module constants copied into the
 /// scratch module are already valid and folded; every error the scratch fold
 /// reports belongs to a local constant.
 pub fn check(
@@ -88,25 +84,6 @@ pub fn check(
     }
 
     statica::fold(&mut scratch, types, interner)
-        .into_iter()
-        .map(|error| relabel(&error))
-        .collect()
-}
-
-/// Recast a static's fault as the matching local-constant fault.
-fn relabel(error: &SemanticError) -> SemanticError {
-    let issue = match error.issue() {
-        Some("static_arithmetic_overflow") => ISSUE_OVERFLOW,
-        Some("static_division_by_zero") => ISSUE_DIVISION_BY_ZERO,
-        _ => ISSUE_NOT_CONSTANT,
-    };
-    let mut relabeled =
-        SemanticError::structured(SemanticErrorKind::StaticInitializerInvalid, error.span)
-            .with_arg("issue", issue);
-    if let Some(name) = error.args.iter().find(|arg| arg.name == "name") {
-        relabeled = relabeled.with_arg("name", name.value.clone());
-    }
-    relabeled
 }
 
 struct Collector<'a> {

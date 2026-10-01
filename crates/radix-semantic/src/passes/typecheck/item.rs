@@ -148,8 +148,8 @@ impl TypeChecker<'_> {
     /// phases read the annotated HIR.
     pub fn check_const(&mut self, def_id: DefId, const_item: &mut radix_hir::HirConst) {
         let ty = if let Some(annotated) = const_item.ty {
-            // `generis T X = e` states a compile-time fact (an `=` position);
-            // a legacy top-level `fixum T x ← e` is an ordinary store.
+            // `const T X = e` states a compile-time fact (an `=` position);
+            // a top-level `fixum T x ← e` is an ordinary store (SEM062).
             let site = StoreSite::new(HirStoreKind::Declaration).named(const_item.name);
             let site = if const_item.statica.is_some() {
                 site.compile_time()

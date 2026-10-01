@@ -1,4 +1,5 @@
-//! Build-time file embeds: `generis T X = insere "path"` (DECISIONS D8.10).
+//! Build-time file embeds: `const T X = embed "path"` / la `fixum T X = insere
+//! "path"` (DECISIONS D8.10).
 //!
 //! Reading a neighbouring file at build time is a compile-time intrinsic, not
 //! I/O. The driver owns the file system: before semantic analysis it resolves

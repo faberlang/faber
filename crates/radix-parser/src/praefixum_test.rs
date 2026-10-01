@@ -8,12 +8,12 @@ use crate::test_support::{parse_ok, parse_program};
 use radix_syntax::{ExprKind, StmtKind};
 
 #[test]
-fn static_initializer_parses_block_body() {
+fn constant_initializer_parses_block_body() {
     let result =
         parse_ok("fixum numerus N = praefixum {\n    varia numerus s ← 1\n    redde s + 1\n}\n");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(decl) = &program.statements[0].kind else {
-        panic!("expected static var decl");
+        panic!("expected constant var decl");
     };
     let init = decl.init.as_ref().expect("initializer");
     let ExprKind::Praefixum(praefixum) = &init.kind else {

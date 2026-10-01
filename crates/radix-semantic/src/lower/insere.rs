@@ -1,6 +1,6 @@
 //! Lowering for build-time file embeds (`insere "path"`, DECISIONS D8.10).
 //!
-//! A `generis` initializer that embeds a file folds here, during lowering,
+//! A constant initializer that embeds a file folds here, during lowering,
 //! to the literal the declared type asks for: `textus` (valid UTF-8 only) or
 //! `octeti` (raw bytes). The bytes come from the driver-resolved
 //! [`InsereFiles`](crate::insere::InsereFiles); every rejection is SEM061 with
@@ -15,7 +15,8 @@ use radix_hir::{HirExpression, HirExpressionKind, HirInsere, HirLiteral};
 use radix_syntax::{Expr, ExprKind, InsereExpr};
 
 impl Lowerer<'_> {
-    /// Lower a `generis` initializer, folding a build-time embed against the
+    /// Lower a compile-time initializer (a module-level constant or a
+    /// `generis` field), folding a build-time embed against the
     /// declared type. A `praefixum { … }` body lowers to `Praefixum(Block)`
     /// for the driver's build-time evaluation (D8.5); it is legal only here.
     /// Every other initializer lowers as an ordinary expression.

@@ -1,9 +1,11 @@
-//! Top-level statics: compile-time evaluation and the legacy-binding warning
-//! (DECISIONS D5.7, D5.8, D5.9, D8.4).
+//! Module-level constants: compile-time evaluation and the top-level-binding
+//! error (DECISIONS D5.7, D5.8, D5.9, D8.4, st1).
 //!
-//! A top-level static (`generis T NAME = expr`) is immutable and has no
-//! runtime initialization: its initializer must be evaluable at compile time.
-//! This pass evaluates every static after typecheck and rewrites each
+//! A module-level constant (`const T NAME = expr`, la `fixum`) is immutable
+//! and has no runtime initialization: its initializer must be evaluable at
+//! compile time. (The `static`/`generis` declaration is retired: PARSE010
+//! `static_decl_retired`; the lowering marker keeps the `statica` name.)
+//! This pass evaluates every constant after typecheck and rewrites each
 //! foldable scalar subexpression to the literal it evaluates to, so every
 //! backend receives the constant through the ordinary top-level-constant
 //! path and initialization order can never differ between targets.
@@ -12,16 +14,16 @@
 //! - literals;
 //! - arithmetic, comparison, bit, and logical operators on `numerus`,
 //!   `fractus`, and `bivalens` scalars, plus `textus` concatenation;
-//! - references to other statics, evaluated in dependency order (a cycle is
-//!   SEM007 `static_cycle`);
+//! - references to other constants, evaluated in dependency order (a cycle is
+//!   SEM007 `constant_cycle`);
 //! - collection literals (`lista`, tuples, map construction) whose elements
 //!   are constants. These stay structural; only their scalar leaves fold.
 //!
-//! Anything else is SEM060 `static_initializer_not_constant`. Integer
+//! Anything else is SEM060 `constant_initializer_not_constant`. Integer
 //! arithmetic is checked (overflow and division by zero are compile errors),
 //! matching the runner's exact integer semantics (d11-6 ruling 17a: every
 //! intermediate lies in [-2^63, 2^64 - 1], the declared type bounds only the
-//! static itself); `/` floors and `%` takes the divisor's sign.
+//! constant itself); `/` floors and `%` takes the divisor's sign.
 //! Decimal widths and modular words are not folded, so arithmetic on them
 //! is not constant.
 //!
@@ -31,13 +33,11 @@
 //!
 //! A `praefixum { … }` initializer (D8.4) is not evaluated here: the driver
 //! runs it on the MIR runner, substitutes the literal, and calls [`fold`]
-//! again so statics that read it fold too.
+//! again so constants that read it fold too.
 //!
-//! D5.7: a legacy top-level `fixum`/`varia` is SEM062 `top_level_binding`.
-//! It was WARN030 until the library sweep landed; the library sweep is
-//! complete (norma, gradus, triga, tela, examples, and the radix corpora
-//! carry zero top-level `fixum`/`varia`), so the migration diagnostic is
-//! now a hard error.
+//! D5.7: a top-level `fixum`/`varia` store (`←`, `↤`, `↢`, `varia`) is SEM062
+//! `top_level_binding`: module-level state is a compile-time constant
+//! (`const T X = e`) or does not exist.
 
 use crate::{SemanticError, SemanticErrorKind, Type, TypeTable};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_program};
@@ -50,10 +50,10 @@ use radix_types::{Primitive, TypeId};
 use rustc_hash::FxHashMap;
 
 const ISSUE_TOP_LEVEL_BINDING: &str = "top_level_binding";
-const ISSUE_NOT_CONSTANT: &str = "static_initializer_not_constant";
-const ISSUE_CYCLE: &str = "static_cycle";
-const ISSUE_OVERFLOW: &str = "static_arithmetic_overflow";
-const ISSUE_DIVISION_BY_ZERO: &str = "static_division_by_zero";
+const ISSUE_NOT_CONSTANT: &str = "constant_initializer_not_constant";
+const ISSUE_CYCLE: &str = "constant_cycle";
+const ISSUE_OVERFLOW: &str = "constant_arithmetic_overflow";
+const ISSUE_DIVISION_BY_ZERO: &str = "constant_division_by_zero";
 
 /// Reject every legacy top-level `fixum`/`varia` binding (D5.7 migration).
 #[must_use]
@@ -144,12 +144,12 @@ pub fn fold(hir: &mut HirModule, types: &TypeTable, interner: &mut Interner) -> 
 
 /// Marker issue: a static failed because a static it references failed.
 /// The referenced static carries the diagnostic; this one stays quiet.
-const ISSUE_DEPENDENCY: &str = "static_dependency";
+const ISSUE_DEPENDENCY: &str = "constant_dependency";
 
 /// Marker issue: a `praefixum { … }` initializer (D8.5). The driver evaluates
 /// it on the MIR runner after analysis, then folds again; statics that
 /// depend on it stay quiet until then.
-const ISSUE_DEFERRED: &str = "static_deferred";
+const ISSUE_DEFERRED: &str = "constant_deferred";
 
 #[derive(Debug, Clone, PartialEq)]
 enum Value {

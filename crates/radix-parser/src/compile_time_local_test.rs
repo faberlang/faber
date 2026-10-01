@@ -82,7 +82,6 @@ fn latin_fixum_with_equals_is_a_compile_time_local() {
     let result = parse_ok("functio f() → vacuum { fixum numerus n = 4 * 8 }");
     let decl = first_local(&result);
     assert!(decl.compile_time);
-    assert!(!decl.is_static);
     assert_eq!(decl.mutability, AstMutability::Immutable);
     assert!(decl.ty.is_some());
     assert!(decl.init.is_some());

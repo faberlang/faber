@@ -1,9 +1,9 @@
 //! Build-time file embeds fold to literals (DECISIONS D8.10).
 //!
 //! Contract:
-//! - `generis textus S = insere "p"` folds to a `textus` literal when the
+//! - `fixum textus S = insere "p"` folds to a `textus` literal when the
 //!   bytes are valid UTF-8, else SEM061 `insere_invalid_utf8`;
-//! - `generis octeti B = insere "p"` folds to an `octeti` literal of the raw
+//! - `fixum octeti B = insere "p"` folds to an `octeti` literal of the raw
 //!   bytes;
 //! - any other declared type is SEM061 `insere_type_invalid`;
 //! - driver rejections (missing file, absolute path, `..` escape, no source

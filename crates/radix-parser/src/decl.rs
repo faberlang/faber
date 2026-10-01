@@ -75,9 +75,12 @@ impl Parser {
             TokenKind::Ident(_) => match self.current_keyword_ident() {
                 Some(TokenKind::Discretio) => self.parse_union_decl()?,
                 Some(TokenKind::Fixum | TokenKind::Varia) => self.parse_var_decl()?,
-                // `generis` is a genus-member modifier; at statement start it
-                // introduces a top-level static only when a type follows.
-                Some(TokenKind::Generis) if self.at_static_decl() => self.parse_static_decl()?,
+                // `generis` is a genus-member modifier. At statement start the
+                // retired module-level static shape (modifier + type + name)
+                // is diagnosed; any other use stays an ordinary identifier.
+                Some(TokenKind::Generis) if self.at_retired_static_decl() => {
+                    self.parse_retired_static_decl()?
+                }
                 Some(TokenKind::Functio) => self.parse_func_decl()?,
                 Some(TokenKind::Genus) => self.parse_class_decl()?,
                 Some(TokenKind::Implendum) => self.parse_interface_decl()?,
@@ -228,7 +231,6 @@ impl Parser {
             ty,
             binding,
             init,
-            is_static: false,
             compile_time,
         }))
     }
@@ -269,56 +271,52 @@ impl Parser {
         Ok((Some(Box::new(self.parse_expression()?)), None))
     }
 
-    /// Whether the current `generis` word starts a static declaration: the
-    /// next token must begin a type (an identifier or a parenthesized type).
-    fn at_static_decl(&self) -> bool {
+    /// Whether the current `generis` word opens the retired module-level
+    /// static: the next token must begin a type (an identifier or a
+    /// parenthesized type). Anything else leaves `generis` an identifier.
+    fn at_retired_static_decl(&self) -> bool {
         matches!(
             self.peek_at(1).kind,
             TokenKind::Ident(_) | TokenKind::LParen
         )
     }
 
-    /// Parse a top-level static declaration (DECISIONS D5.8, D5.9).
+    /// Diagnose the retired module-level static (st1 R1): `PARSE010
+    /// static_decl_retired`, args `keyword` (the spelling as written, i.e.
+    /// the pack's `generis` row) and `name`.
     ///
-    /// GRAMMAR:
-    ///   static-decl := `generis` type ident '=' expr
-    ///
-    /// This is the genus static-field production used at top level. The
-    /// initializer is a compile-time fact, so it is spelled with `=`; `←` and
-    /// a missing initializer are named errors. The result is an immutable
-    /// `VarDecl` with `is_static`, so it reuses the top-level constant path.
-    fn parse_static_decl(&mut self) -> Result<StmtKind, ParseError> {
-        let field = self.parse_field_decl()?;
-        if field.sponte {
-            return Err(ParseError::structured(
-                ParseErrorKind::DeclarationInvalid,
-                field.name.span,
-            )
-            .with_arg("issue", "static_sponte"));
-        }
-        let init = if let Some(init) = field.init {
-            init
-        } else if self.check(&TokenKind::Assign) {
-            return Err(ParseError::structured(
-                ParseErrorKind::DeclarationInvalid,
-                self.current_span(),
-            )
-            .with_arg("issue", "static_initializer_eq"));
-        } else {
-            return Err(ParseError::structured(
-                ParseErrorKind::DeclarationInvalid,
-                field.name.span,
-            )
-            .with_arg("issue", "static_initializer_required"));
+    /// The old declaration (the genus static-field production) is parsed
+    /// whole so recovery resumes after it, then answered as the constant it
+    /// became (`fixum T NAME = e`); the error is already recorded, so nothing
+    /// downstream runs on it. The keyword stays retired permanently: there is
+    /// no alias period.
+    fn parse_retired_static_decl(&mut self) -> Result<StmtKind, ParseError> {
+        let keyword_span = self.current_span();
+        let keyword = match self.peek().kind {
+            TokenKind::Ident(sym) => self.interner.resolve(sym).to_owned(),
+            _ => String::new(),
         };
+        let mut field = self.parse_field_decl()?;
+        // The old surface also took `←` here (a named error then); consume the
+        // initializer so the whole declaration is skipped, not half of it.
+        if field.init.is_none() && self.eat(&TokenKind::Assign) {
+            field.init = Some(Box::new(self.parse_expression()?));
+        }
+        let name = self.interner.resolve(field.name.name).to_owned();
+        self.errors.push(
+            ParseError::structured(ParseErrorKind::DeclarationInvalid, keyword_span)
+                .with_arg("issue", "static_decl_retired")
+                .with_arg("keyword", keyword)
+                .with_arg("name", name),
+        );
+        let compile_time = field.init.is_some();
         Ok(StmtKind::Var(VarDecl {
             mutability: AstMutability::Immutable,
             await_form: None,
             ty: Some(field.ty),
             binding: BindingPattern::Ident(field.name),
-            init: Some(init),
-            is_static: true,
-            compile_time: false,
+            init: field.init,
+            compile_time,
         }))
     }
 
@@ -405,7 +403,6 @@ impl Parser {
             ty,
             binding,
             init,
-            is_static: false,
             compile_time: false,
         }))
     }
@@ -501,7 +498,6 @@ impl Parser {
             ty,
             binding,
             init,
-            is_static: false,
             compile_time: false,
         }))
     }
@@ -2957,7 +2953,6 @@ impl Parser {
             || self.check_keyword_ident(TokenKind::Sit)
             || self.check_keyword_ident(TokenKind::Typus)
             || self.check_keyword_ident(TokenKind::Varia)
-            || (self.check_keyword_ident(TokenKind::Generis) && self.at_static_decl())
     }
 
     fn is_annotation_arg(&self) -> bool {
@@ -3055,19 +3050,6 @@ impl Parser {
                 // D22.1: declarations are top-level. The declaration is parsed
                 // whole so recovery resumes after it, then dropped with a
                 // named diagnostic instead of reaching lowering.
-                Ok(Stmt {
-                    kind:
-                        StmtKind::Var(VarDecl {
-                            is_static: true, ..
-                        }),
-                    span,
-                    ..
-                }) => {
-                    self.errors.push(
-                        ParseError::structured(ParseErrorKind::DeclarationInvalid, span)
-                            .with_arg("issue", "static_not_top_level"),
-                    );
-                }
                 Ok(stmt) if is_top_level_only_declaration(&stmt.kind) => {
                     self.errors.push(
                         ParseError::structured(ParseErrorKind::DeclarationInvalid, stmt.span)

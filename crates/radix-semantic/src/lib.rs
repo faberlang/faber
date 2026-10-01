@@ -658,13 +658,13 @@ pub fn analyze_with_cli(
         }
         Err(e) => diagnostics.extend(e),
     }
-    // Top-level statics: legacy `fixum`/`varia` migration error (D5.7), then
-    // compile-time evaluation. Folding rewrites static initializers before any
+    // Module constants: top-level `fixum`/`varia` stores are an error (D5.7),
+    // then compile-time evaluation. Folding rewrites constant initializers before any
     // later pass or backend reads them; it needs the finished types.
     diagnostics.extend(passes::statica::reject_top_level_bindings(&hir, interner));
     if !diagnostics.iter().any(SemanticError::is_error) {
         diagnostics.extend(passes::statica::fold(&mut hir, &types, interner));
-        // Local `fixum T x = e` constants (D5.10) reuse the statics' evaluator.
+        // Local `fixum T x = e` constants (D5.10) reuse the constants' evaluator.
         if !diagnostics.iter().any(SemanticError::is_error) {
             diagnostics.extend(passes::local_constants::check(
                 &hir,

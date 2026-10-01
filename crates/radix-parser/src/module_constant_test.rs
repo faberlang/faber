@@ -1,10 +1,9 @@
 //! Parser tests for the top-level `=` constant (st1 R1).
 //!
 //! Contract: `fixum T NAME = expr` at top level parses to an immutable
-//! `compile_time` `VarDecl` that is not `is_static` (the `generis` static keeps
-//! that flag until the lock unit). `_` is a legal type slot. A module-level
-//! `=` constant claims the build-time embed and `praefixum` exactly as a
-//! `generis` declaration does; a block-level constant does not claim the embed.
+//! `compile_time` `VarDecl`. `_` is a legal type slot. A module-level `=`
+//! constant claims the build-time embed and `praefixum`; a block-level
+//! constant does not claim the embed.
 
 use crate::ParseResult;
 use crate::test_support::{parse_ok, parse_program};
@@ -23,7 +22,6 @@ fn top_level_fixum_equals_is_a_compile_time_constant() {
     let result = parse_ok("fixum numerus LIMES = 4 * 1024");
     let decl = first_decl(&result);
     assert!(decl.compile_time);
-    assert!(!decl.is_static);
     assert_eq!(decl.mutability, AstMutability::Immutable);
     assert!(decl.ty.is_some());
     assert!(decl.init.is_some());

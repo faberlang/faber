@@ -185,15 +185,10 @@ pub struct VarDecl {
     pub binding: BindingPattern,
     pub init: Option<Box<Expr>>,
 
-    /// Top-level static (`generis T NAME = expr`, DECISIONS D5.8/D5.9): an
-    /// immutable, compile-time-evaluated value. Always `Immutable`, never
-    /// awaited, and initialized with `=`.
-    pub is_static: bool,
-
-    /// Local compile-time constant (`fixum T x = e`, DECISIONS D5.10): an
-    /// immutable local whose initializer is a compile-time fact, spelled with
-    /// `=` rather than `←`. Never set together with `is_static` or an await
-    /// form.
+    /// Compile-time constant (`const T x = e` / la `fixum`, DECISIONS D5.10):
+    /// an immutable binding whose initializer is a compile-time fact, spelled
+    /// with `=` rather than `←`. At module level it is the module constant
+    /// (st1). Never set together with an await form.
     pub compile_time: bool,
 }
 
@@ -1140,8 +1135,8 @@ pub enum ExprKind {
     /// `praefixum(expr)` comptime.
     Praefixum(PraefixumExpr),
     /// Build-time file embed `insere "path"` (en `embed`, D8.10). Claimed
-    /// only as a `generis` initializer; the result type follows the
-    /// declaration (`textus` or `octeti`).
+    /// only as a module-level constant or `generis` field initializer; the
+    /// result type follows the declaration (`textus` or `octeti`).
     Insere(InsereExpr),
     /// `ego` self reference.
     Ego(Span),
@@ -1661,7 +1656,7 @@ pub struct AdExpr {
     pub span: Span,
 }
 
-/// `praefixum { … }`: a static's build-time initializer body (D8.4). The
+/// `praefixum { … }`: a constant's build-time initializer body (D8.4). The
 /// block runs on the MIR runner during the build and `redde`s the value.
 #[derive(Debug)]
 pub struct PraefixumExpr {

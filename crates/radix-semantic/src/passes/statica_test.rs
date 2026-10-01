@@ -7,7 +7,7 @@
 //!   dependency order, so every backend sees the constant;
 //! - collection literals of constants are accepted and left structural;
 //! - a non-constant initializer is SEM060 with a named issue;
-//! - a cycle between statics is SEM007 `static_cycle`;
+//! - a cycle between statics is SEM007 `constant_cycle`;
 //! - arithmetic overflow and division by zero are compile errors;
 //! - a legacy top-level `fixum`/`varia` is SEM062 `top_level_binding`
 //!   (D5.7: the library sweep landed, so the migration warning is now an
@@ -108,11 +108,11 @@ fn intermediates_are_exact_over_the_64_bit_range() {
 fn the_static_itself_must_fit_its_declared_type() {
     assert_rejects_with_issue(
         "fixum numerus<u8> A = 200\nfixum numerus<u8> B = A + 100\n",
-        "static_arithmetic_overflow",
+        "constant_arithmetic_overflow",
     );
     assert_rejects_with_issue(
         "fixum numerus<u64> M = 18446744073709551615\nfixum numerus<u64> N = M + 1\n",
-        "static_arithmetic_overflow",
+        "constant_arithmetic_overflow",
     );
 }
 
@@ -192,7 +192,7 @@ fn collection_literal_of_constants_is_accepted() {
 fn call_initializer_is_not_constant() {
     assert_rejects_with_issue(
         "functio f() → numerus { redde 1 }\nfixum numerus N = f()\n",
-        "static_initializer_not_constant",
+        "constant_initializer_not_constant",
     );
 }
 
@@ -208,16 +208,16 @@ fn reference_to_top_level_fixum_rejects_the_fixum_itself() {
 }
 
 #[test]
-fn static_cycle_is_rejected() {
+fn constant_cycle_is_rejected() {
     assert_rejects_with_issue(
         "fixum numerus A = B + 1\nfixum numerus B = A + 1\n",
-        "static_cycle",
+        "constant_cycle",
     );
 }
 
 #[test]
 fn self_reference_is_a_cycle() {
-    assert_rejects_with_issue("fixum numerus A = A + 1\n", "static_cycle");
+    assert_rejects_with_issue("fixum numerus A = A + 1\n", "constant_cycle");
 }
 
 #[test]
@@ -226,7 +226,7 @@ fn overflow_is_rejected() {
     // literal-only constant, so the checked fold owns the overflow.
     assert_rejects_with_issue(
         "fixum numerus MAX = 9223372036854775807\nfixum numerus N = MAX + 1\n",
-        "static_arithmetic_overflow",
+        "constant_arithmetic_overflow",
     );
 }
 
@@ -235,7 +235,7 @@ fn literal_constant_that_exceeds_the_slot_is_a_store_error() {
     // d11-6 U4 (ruling 21, `=` rule): the exact value 2^63 is a valid
     // intermediate, but a constant in an `=` position must fit its slot, so
     // the literal form is refused at the store before the fold runs. This
-    // replaces the old literal-form pin on `static_arithmetic_overflow`.
+    // replaces the old literal-form pin on `constant_arithmetic_overflow`.
     assert_rejects_with_issue(
         "fixum numerus N = 9223372036854775807 + 1\n",
         "store_constant_out_of_range",
@@ -244,7 +244,7 @@ fn literal_constant_that_exceeds_the_slot_is_a_store_error() {
 
 #[test]
 fn division_by_zero_is_rejected() {
-    assert_rejects_with_issue("fixum numerus N = 1 / 0\n", "static_division_by_zero");
+    assert_rejects_with_issue("fixum numerus N = 1 / 0\n", "constant_division_by_zero");
 }
 
 #[test]
@@ -289,6 +289,6 @@ fn failed_dependency_declared_later_still_reports_its_own_error() {
     // diagnostic when the loop reaches it.
     assert_rejects_with_issue(
         "functio f() → numerus { redde 1 }\nfixum numerus B = A + 1\nfixum numerus A = f()\n",
-        "static_initializer_not_constant",
+        "constant_initializer_not_constant",
     );
 }

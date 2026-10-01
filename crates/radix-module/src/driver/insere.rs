@@ -1,6 +1,7 @@
 //! Driver-side resolution of build-time file embeds (DECISIONS D8.10).
 //!
-//! `generis T X = insere "path"` reads a neighbouring file at build time.
+//! `const T X = embed "path"` / la `fixum T X = insere "path"` reads a
+//! neighbouring file at build time.
 //! Semantic analysis stays free of file-system access, so the driver resolves
 //! every authored embed path first and hands the bytes (or the rejection) to
 //! lowering through [`InsereFiles`].
@@ -48,7 +49,7 @@ pub(crate) fn resolve_insere_files(program: &Program, interner: &Interner, sourc
     resolved
 }
 
-/// Authored embed paths in top-level statics and genus static fields.
+/// Authored embed paths in module-level constants and genus static fields.
 fn authored_insere_paths(program: &Program, interner: &Interner) -> Vec<String> {
     let mut paths = Vec::new();
     let mut push = |kind: &ExprKind| {
@@ -58,7 +59,7 @@ fn authored_insere_paths(program: &Program, interner: &Interner) -> Vec<String> 
     };
     for stmt in &program.statements {
         match &stmt.kind {
-            StmtKind::Var(decl) if decl.is_static || decl.compile_time => {
+            StmtKind::Var(decl) if decl.compile_time => {
                 if let Some(init) = &decl.init {
                     push(&init.kind);
                 }

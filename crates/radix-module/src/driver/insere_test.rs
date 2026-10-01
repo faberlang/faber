@@ -1,6 +1,6 @@
 //! Driver resolution of build-time embeds (DECISIONS D8.10).
 //!
-//! Contract: `generis T X = insere "path"` reads a package-relative file
+//! Contract: `fixum T X = insere "path"` reads a package-relative file
 //! during analysis. The package root is the nearest `faber.toml` ancestor of
 //! the source file, else the file's directory. Absolute paths, `..` that
 //! leaves the root, and missing files are SEM061 errors; the read file is

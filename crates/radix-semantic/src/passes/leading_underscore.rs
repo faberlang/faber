@@ -9,7 +9,7 @@
 //! INVARIANTS
 //! ==========
 //! - Only the identifier as declared is checked, never each use: function and
-//!   method names, type names, fields, locals, parameters, and statics.
+//!   method names, type names, fields, locals, parameters, and constants.
 //! - A bare `_` is the hole/wildcard and never warns.
 //! - AST-only and source-shaped, so desugared HIR names cannot trip it.
 //! - The walk is warn-only. A depth-limited subtree simply goes unlinted; it
@@ -184,8 +184,7 @@ impl Checker<'_> {
     fn declarations(&mut self, stmt: &Stmt) {
         match &stmt.kind {
             StmtKind::Var(decl) => {
-                let module_constant =
-                    decl.is_static || (decl.compile_time && self.top_level_stmt == Some(stmt.id));
+                let module_constant = decl.compile_time && self.top_level_stmt == Some(stmt.id);
                 let kind = if module_constant {
                     DeclarationKind::Static
                 } else {

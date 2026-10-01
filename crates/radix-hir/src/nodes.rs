@@ -813,15 +813,15 @@ pub struct HirConst {
     /// Whether the initializer should be awaited.
     pub is_await: bool,
 
-    /// Present for a top-level static (`generis T X = …`, DECISIONS
-    /// D5.8/D5.9); absent for a legacy top-level `fixum`/`varia`. After
-    /// semantic analysis a static's `value` is its compile-time folded
-    /// constant.
+    /// Present for a module-level constant (`const T X = e` / la `fixum`,
+    /// DECISIONS D5.8-D5.10, st1); absent for a top-level `fixum`/`varia` store
+    /// (SEM062). After semantic analysis its `value` is the compile-time
+    /// folded constant.
     #[serde(default)]
     pub statica: Option<HirStatic>,
 }
 
-/// Static-declaration facts for a top-level [`HirConst`].
+/// Module-constant facts for a top-level [`HirConst`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirStatic {
     /// The authored initializer, kept only when constant folding replaced

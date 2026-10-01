@@ -17,7 +17,7 @@
 //! The same walk records which statics each initializer reads, directly or
 //! through its callees. [`evaluation_order`] turns that into the order the
 //! driver evaluates `praefixum` statics in; a cycle through a `praefixum`
-//! static is SEM007 `static_cycle`.
+//! static is SEM007 `constant_cycle`.
 
 use crate::{SemanticError, SemanticErrorKind, Type, TypeTable};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local};
@@ -28,10 +28,10 @@ use radix_lexer::{Interner, Span, Symbol};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 const ISSUE_FORBIDDEN: &str = "praefixum_forbidden";
-const ISSUE_CYCLE: &str = "static_cycle";
+const ISSUE_CYCLE: &str = "constant_cycle";
 
-/// One static whose initializer is a `praefixum { … }` body: a top-level
-/// static (`generis T X = praefixum { … }`) or a genus static field.
+/// One constant whose initializer is a `praefixum { … }` body: a module
+/// constant (`fixum T X = praefixum { … }`) or a genus static field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PraefixumSite {
     /// The static's definition: the constant item or the field.

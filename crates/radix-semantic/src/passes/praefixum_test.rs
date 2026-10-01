@@ -2,13 +2,13 @@
 //!
 //! Contract:
 //! - `praefixum` is legal only as a `generis` initializer; elsewhere it is
-//!   SEM064 `praefixum_outside_static`;
+//!   SEM064 `praefixum_outside_constant`;
 //! - its body type-checks like a function body returning the declared type;
 //! - a body that reaches `ad`, await, async, `externa`, input, or output —
 //!   directly or through Faber callees — is SEM064 `praefixum_forbidden`,
 //!   naming the effect and the call chain;
 //! - a static that reads itself through a `praefixum` body is SEM007
-//!   `static_cycle`;
+//!   `constant_cycle`;
 //! - evaluation order puts every static a body reads before it.
 
 use super::praefixum::evaluation_order;
@@ -55,7 +55,7 @@ fn result_must_type_check_as_the_declared_type() {
 fn praefixum_outside_a_static_is_rejected() {
     assert_rejects_with_issue(
         "incipit {\n    fixum numerus n ← praefixum {\n        redde 1\n    }\n}\n",
-        "praefixum_outside_static",
+        "praefixum_outside_constant",
     );
 }
 
@@ -106,7 +106,7 @@ fn output_is_forbidden() {
 fn self_reference_is_a_cycle() {
     assert_rejects_with_issue(
         "fixum numerus A = praefixum {\n    redde A + 1\n}\n",
-        "static_cycle",
+        "constant_cycle",
     );
 }
 
@@ -115,7 +115,7 @@ fn cycle_through_a_callee_is_rejected() {
     assert_rejects_with_issue(
         "functio lege_a() → numerus {\n    redde A\n}\n\
          fixum numerus A = praefixum {\n    redde lege_a() + 1\n}\n",
-        "static_cycle",
+        "constant_cycle",
     );
 }
 

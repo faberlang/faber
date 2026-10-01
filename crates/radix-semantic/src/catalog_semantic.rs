@@ -284,7 +284,7 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
         SemanticErrorKind::TopLevelBindingForbidden => DiagnosticSpec {
             code: "SEM062",
             help: Some(
-                "use `generis T X = …` for a compile-time constant, or move the binding into a function",
+                "a module-level value is a compile-time constant: `fixum T X = …`; a runtime value belongs in a function",
             ),
         },
         SemanticErrorKind::Warning(kind) => warning_spec(kind),

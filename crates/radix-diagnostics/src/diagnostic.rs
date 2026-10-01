@@ -302,7 +302,7 @@ pub enum SemanticErrorKind {
     ConversionInvalid,
     UnavailableDeclaration,
     AirPurityViolation,
-    /// A top-level static initializer that is not a compile-time constant,
+    /// A module-level constant initializer that is not a compile-time constant,
     /// or whose evaluation overflows or divides by zero (D5.9).
     StaticInitializerInvalid,
     /// A build-time file embed (`insere "path"`, D8.10) that cannot be
@@ -345,9 +345,9 @@ pub enum SemanticErrorKind {
     ModeMismatch,
 
     /// A legacy top-level `fixum`/`varia` binding. Module-level mutable
-    /// state does not exist; the migration target is a `generis` static
-    /// (D5.7). Was WARN030 `top_level_binding` until the library sweep
-    /// landed; now an error.
+    /// state does not exist; the migration target is a module-level
+    /// `fixum T X = e` constant (D5.7). Was WARN030 `top_level_binding` until
+    /// the library sweep landed; now an error.
     TopLevelBindingForbidden,
 
     // Warnings

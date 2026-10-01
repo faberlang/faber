@@ -1,9 +1,8 @@
 //! Module-level constants survive Faber re-emission spelled `fixum` (st1 R15).
 //!
-//! A top-level `fixum T X = e` and the legacy module `static`/`generis` are the
-//! same constant, so both re-emit with the pack's `fixum` spelling (en `const`)
-//! and the authored initializer as written. The genus `generis` field keeps
-//! its modifier.
+//! A top-level `fixum T X = e` is the module constant, so it re-emits with the
+//! pack's `fixum` spelling (en `const`) and the authored initializer as
+//! written. The genus `generis` field keeps its modifier.
 
 use super::reemit_faber;
 use crate::codegen::Target;
@@ -37,7 +36,7 @@ fn reemit(source: &str, to: &str) -> String {
         .code
 }
 
-const BODY: &str = "const int LIMIT = 4 * 1024\nconst _ INFERRED = 10\nstatic string NAME = \"ab\" + \"cd\"\n\nclass Punctum {\n    const int x\n    static int Z = 3\n}\n\nmain {\n    print LIMIT\n}\n";
+const BODY: &str = "const int LIMIT = 4 * 1024\nconst _ INFERRED = 10\nconst string NAME = \"ab\" + \"cd\"\n\nclass Punctum {\n    const int x\n    static int Z = 3\n}\n\nmain {\n    print LIMIT\n}\n";
 
 fn en_source() -> String {
     format!("+++\nlocale = \"en\"\n+++\n{BODY}")
@@ -48,10 +47,9 @@ fn en_format_spells_module_constants_const_and_keeps_the_field_modifier() {
     let formatted = reemit(&en_source(), "en");
     assert!(formatted.contains("const int LIMIT = 4 * 1024\n"), "{formatted}");
     assert!(formatted.contains("const _ INFERRED = 10\n"), "{formatted}");
-    // The legacy `static` spelling re-emits as the constant it is.
     assert!(formatted.contains("const string NAME = \"ab\" + \"cd\"\n"), "{formatted}");
     assert!(formatted.contains("    static int Z = 3\n"), "{formatted}");
-    assert!(!formatted.contains("\nstatic string NAME"), "{formatted}");
+    assert!(!formatted.contains("\nstatic "), "{formatted}");
 }
 
 #[test]

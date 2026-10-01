@@ -151,8 +151,8 @@ impl super::FaberCodegen<'_> {
                         self.write_expr_prec(recovery, 12, names, surface, writer);
                     }
                 } else if let Some(statica) = &c.statica {
-                    // A static is a compile-time fact: `generis T NAME = value`,
-                    // re-emitted from its authored (unfolded) initializer.
+                    // A module constant is a compile-time fact: `fixum T NAME =
+                    // value`, re-emitted from its authored (unfolded) initializer.
                     writer.write(" = ");
                     let value = statica.authored.as_deref().unwrap_or(&c.value);
                     self.write_expr(value, names, surface, writer);

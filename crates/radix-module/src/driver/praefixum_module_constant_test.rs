@@ -1,9 +1,9 @@
-//! A top-level `fixum T X = praefixum { … }` is evaluated at build time exactly
-//! as the `generis` static is (st1 R1/R2).
+//! A top-level `fixum T X = praefixum { … }` is evaluated at build time (st1
+//! R1/R2).
 //!
 //! Contract: the body runs on the MIR runner, the literal replaces the
-//! initializer, statics of either spelling that read it fold after it, and a
-//! `_` type slot takes its type from the body's `redde`.
+//! initializer, constants that read it fold after it, and a `_` type slot
+//! takes its type from the body's `redde`.
 #![cfg(feature = "runner")]
 
 use crate::driver::{AnalyzeRequest, AnalyzedModule, Config, Session, analyze_source};
@@ -32,13 +32,11 @@ fn int_of(unit: &AnalyzedModule, name: &str) -> u64 {
 const HELPER: &str = "functio septem() → numerus {\n    redde 7\n}\n";
 
 #[test]
-fn fixum_praefixum_evaluates_like_the_static() {
-    for spelling in ["generis", "fixum"] {
-        let unit = analyze_ok(&format!(
-            "{HELPER}{spelling} numerus Z = praefixum {{\n    redde septem() + 1\n}}\nincipit {{\n    nota Z\n}}\n"
-        ));
-        assert_eq!(int_of(&unit, "Z"), 8, "{spelling}");
-    }
+fn fixum_praefixum_evaluates_at_build_time() {
+    let unit = analyze_ok(&format!(
+        "{HELPER}fixum numerus Z = praefixum {{\n    redde septem() + 1\n}}\nincipit {{\n    nota Z\n}}\n"
+    ));
+    assert_eq!(int_of(&unit, "Z"), 8);
 }
 
 #[test]
@@ -50,9 +48,9 @@ fn underscore_takes_its_type_from_the_body() {
 }
 
 #[test]
-fn mixed_spellings_fold_after_the_evaluated_constant() {
+fn dependent_constants_fold_after_the_evaluated_constant() {
     let unit = analyze_ok(&format!(
-        "{HELPER}fixum numerus Z = praefixum {{\n    redde septem()\n}}\ngeneris numerus D = Z * 2\nfixum numerus E = D + Z\nincipit {{\n    nota E\n}}\n"
+        "{HELPER}fixum numerus Z = praefixum {{\n    redde septem()\n}}\nfixum numerus D = Z * 2\nfixum numerus E = D + Z\nincipit {{\n    nota E\n}}\n"
     ));
     assert_eq!(int_of(&unit, "D"), 14);
     assert_eq!(int_of(&unit, "E"), 21);

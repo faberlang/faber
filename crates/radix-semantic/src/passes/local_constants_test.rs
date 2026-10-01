@@ -4,7 +4,7 @@
 //! - the initializer is evaluated by the statics' evaluator: literals,
 //!   arithmetic, other local constants, and `generis` statics all qualify;
 //! - the value must fit the declared type whatever its overflow policy;
-//! - a non-constant initializer is SEM060 `local_constant_not_constant`;
+//! - a non-constant initializer is SEM060 `constant_initializer_not_constant`;
 //! - `varia T x = e` is a parse error naming the `=` rule;
 //! - a constant is an ordinary immutable local of type `T`, usable in
 //!   arithmetic;
@@ -100,7 +100,7 @@ fn computed_constant_that_does_not_fit_is_rejected() {
     assert_rejects_with_issue(
         "fixum numerus<u8> A = 200\n\
          functio f() → numerus {\n    fixum numerus<u8> d = A + 100\n    redde 0\n}\n",
-        "local_constant_overflow",
+        "constant_arithmetic_overflow",
     );
 }
 
@@ -108,7 +108,7 @@ fn computed_constant_that_does_not_fit_is_rejected() {
 fn division_by_zero_is_rejected() {
     assert_rejects_with_issue(
         "functio f() → numerus {\n    fixum numerus n = 4 / 0\n    redde n\n}\n",
-        "local_constant_division_by_zero",
+        "constant_division_by_zero",
     );
 }
 
@@ -116,7 +116,7 @@ fn division_by_zero_is_rejected() {
 fn non_constant_initializer_is_rejected() {
     assert_rejects_with_issue(
         "functio f(numerus p) → numerus {\n    fixum numerus n = p + 1\n    redde n\n}\n",
-        "local_constant_not_constant",
+        "constant_initializer_not_constant",
     );
 }
 
@@ -124,7 +124,7 @@ fn non_constant_initializer_is_rejected() {
 fn runtime_local_is_not_a_constant() {
     assert_rejects_with_issue(
         "functio f() → numerus {\n    fixum numerus r ← 5\n    fixum numerus n = r + 1\n    redde n\n}\n",
-        "local_constant_not_constant",
+        "constant_initializer_not_constant",
     );
 }
 
@@ -133,7 +133,7 @@ fn call_initializer_is_rejected() {
     assert_rejects_with_issue(
         "functio g() → numerus { redde 1 }\n\
          functio f() → numerus {\n    fixum numerus n = g()\n    redde n\n}\n",
-        "local_constant_not_constant",
+        "constant_initializer_not_constant",
     );
 }
 
@@ -183,7 +183,7 @@ fn english_spelling_is_a_constant_too() {
     assert!(
         bad.diagnostics
             .iter()
-            .any(|err| err.issue() == Some("local_constant_not_constant")),
+            .any(|err| err.issue() == Some("constant_initializer_not_constant")),
         "diagnostics: {:?}",
         bad.diagnostics
     );

@@ -1,6 +1,5 @@
-//! A top-level `fixum T X = e` is the same exported constant a `generis`
-//! declaration names (st1 R11): `@ publica` exports it through the same file
-//! interface entry.
+//! A top-level `fixum T X = e` is an exported constant (st1 R11): `@ publica`
+//! exports it through the file interface as a `Const` entry.
 
 use super::extract_file_interface_with_identity;
 use radix_module::driver::{AnalyzeRequest, Config, ModuleImportContract, Session, analyze_source};
@@ -25,9 +24,8 @@ fn export_of(source: &str) -> String {
 }
 
 #[test]
-fn publica_fixum_constant_exports_like_a_publica_generis_constant() {
+fn publica_fixum_constant_exports_as_a_const() {
     let constant = export_of("@ publica\nfixum numerus LIMES = 4096\n");
-    let legacy = export_of("@ publica\ngeneris numerus LIMES = 4096\n");
     assert!(constant.contains("Const"), "{constant}");
-    assert_eq!(constant, legacy);
+    assert!(constant.contains("LIMES"), "{constant}");
 }

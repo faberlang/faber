@@ -43,7 +43,7 @@ fn a_runtime_value_is_rejected_with_the_local_constant_issue() {
     );
     assert!(!ok);
     assert!(
-        stderr.contains("local_constant_not_constant"),
+        stderr.contains("constant_initializer_not_constant"),
         "stderr: {stderr}"
     );
 }

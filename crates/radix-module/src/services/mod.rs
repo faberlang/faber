@@ -2,7 +2,6 @@
 
 mod check;
 mod commands;
-mod const_codemod;
 mod emit;
 mod field_modifier_codemod;
 mod inspect;
@@ -21,7 +20,6 @@ pub use crate::program::{
 };
 pub use check::{CheckDiagnosticsResult, check_diagnostics_for_source, check_diagnostics_for_source_with_locale_pack};
 pub use commands::{BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand};
-pub use const_codemod::{ConstCodemod, convert_static_to_const};
 pub use emit::{build_output_path, output_code};
 pub use field_modifier_codemod::{FieldModifierCodemod, insert_field_modifiers};
 #[cfg(feature = "mir-core")]

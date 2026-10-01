@@ -89,18 +89,18 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
             .lower_shadowed_builtin(expr.id, lege.symbol)
             .unwrap_or(HirExpressionKind::ReadLine(lege.is_line)),
 
-        // `praefixum` is legal only as a `generis` initializer, which lowers
-        // through `lower_static_initializer` (D8.6).
+        // `praefixum` is legal only as a module-constant or `generis` field
+        // initializer, which lowers through `lower_static_initializer` (D8.6).
         ExprKind::Praefixum(_) => {
             lowerer.push_error(
                 SemanticErrorKind::PraefixumInvalid,
-                vec![DiagnosticArg::new("issue", "praefixum_outside_static")],
+                vec![DiagnosticArg::new("issue", "praefixum_outside_constant")],
                 expr.span,
             );
             HirExpressionKind::Error
         }
-        // The parser claims `insere` only as a `generis` initializer, which
-        // lowers through `lower_static_initializer`; reaching here means a
+        // The parser claims `insere` only as a module-constant or `generis`
+        // field initializer, which lowers through `lower_static_initializer`; reaching here means a
         // parser invariant broke.
         ExprKind::Insere(_) => {
             lowerer.error_with_args(issue_args("unknown_lowering_error"));

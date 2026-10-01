@@ -439,10 +439,10 @@ impl Lowerer<'_> {
                 false,
             )
         });
-        // A top-level `=` constant (`const T X = e`) and the legacy module
-        // `static` are the same constant (st1 R1/R3): both carry the statica
-        // marker and lower through the compile-time initializer path.
-        let is_constant = decl.is_static || decl.compile_time;
+        // A top-level `=` constant (`const T X = e`) is the module constant
+        // (st1 R1/R3): it carries the statica marker and lowers through the
+        // compile-time initializer path.
+        let is_constant = decl.compile_time;
         let value = if let Some(init) = &decl.init {
             if is_constant {
                 self.lower_static_initializer(init, ty)
