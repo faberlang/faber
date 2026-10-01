@@ -1,0 +1,131 @@
++++
+term = "inf-conversio"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "fixum_decl", "varia_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "inline_default", "iteration_stmt", "range_expr", "range_tail", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "`inf` crosses the byte and dynamic-value boundaries exactly: `octeti via Be|Le` is minimal two's complement both ways, and `valor` carries an integer of any size."
+syntax = "<inf> ↦ octeti via Be|Le | <octeti> ↦ inf via Be|Le | <inf> ↦ valor | <valor> ↦ inf [⊥ <default>]"
+related = ["inf", "octeti", "valor", "↦", "⊥"]
+locale = "en"
++++
+# =============================================================================
+# inf-conversio — `inf` across bytes and `valor`
+# =============================================================================
+#
+# What this teaches:
+#   • `inf ↦ octeti via Be` (or `Le`) is the minimal two's-complement byte
+#     string, most (or least) significant byte first: 0 is one byte, 128 needs
+#     a leading zero byte, -1 is `ff`, -129 is `ff 7f`. `octeti ↦ inf via Be`
+#     reads the same bytes back, so the round trip is exact at any size.
+#   • `inf ↦ valor` keeps every digit, and `valor ↦ inf` takes any integer
+#     back out of a `valor`. A value that is not an integer (a float, text)
+#     fails; `⊥` supplies the fallback.
+#
+# Common mistakes:
+#   • Reading bytes without `via Be` or `via Le` — the byte order is part of
+#     the conversion, there is no default.
+#   • Expecting a fixed width — the byte string is as long as the value
+#     needs, so `0` and `-1` are one byte each.
+#
+# See also: inf, octeti, valor, ↦, ⊥
+# =============================================================================
+
+# operatores/inf-conversio — U8a/U8b conversion rows on every carrier
+#
+# WHY: pins ruling 40's byte and valor rows beyond what operatores/inf prints,
+# with the two's-complement edge rows (0, ±1, 127/128, 255/256, -129, 2^64,
+# big negatives). The JSON rows live in operatores/inf-json.
+#
+# EXPECTED OUTPUT:
+#   inf-conversio.expected — one result per print.
+
+# One line of hex per byte string, so the byte order is visible.
+fn dump(bytes buf) → string {
+    var string line ← ""
+    for range 0‥buf.length() const i {
+        const int<u8> piece ← buf.get(i) coalesce 0 ∷ int<u8>
+        line ← "§§ "(line, piece ¶ "02x")
+    }
+    return line
+}
+
+fn encode_be(inf value) → string {
+    return dump(value ↦ octeti via Be)
+}
+
+fn encode_le(inf value) → string {
+    return dump(value ↦ octeti via Le)
+}
+
+fn round_be(inf value) → inf {
+    return value ↦ octeti via Be ↦ inf via Be
+}
+
+fn round_le(inf value) → inf {
+    return value ↦ octeti via Le ↦ inf via Le
+}
+
+main {
+    # 1. Minimal two's complement, most significant byte first.
+    const inf zero ← 0
+    const inf minus_one ← -1
+    const inf top_positive ← 127
+    const inf first_two_bytes ← 128
+    const inf minus_128 ← -128
+    const inf minus_129 ← -129
+    const inf byte_max ← 255
+    const inf over_byte ← 256
+    const inf big ← 18446744073709551616
+    const inf big_negative ← -18446744073709551617
+    print encode_be(zero)
+    print encode_be(minus_one)
+    print encode_be(top_positive)
+    print encode_be(first_two_bytes)
+    print encode_be(minus_128)
+    print encode_be(minus_129)
+    print encode_be(byte_max)
+    print encode_be(over_byte)
+    print encode_be(big)
+    print encode_be(big_negative)
+
+    # 2. The same values, least significant byte first.
+    print encode_le(first_two_bytes)
+    print encode_le(minus_129)
+    print encode_le(over_byte)
+    print encode_le(big)
+    print encode_le(big_negative)
+
+    # 3. Reading the bytes back is exact in both orders.
+    print round_be(zero)
+    print round_be(minus_one)
+    print round_be(minus_129)
+    print round_be(byte_max)
+    print round_be(big)
+    print round_be(big_negative)
+    print round_le(minus_129)
+    print round_le(over_byte)
+    print round_le(big)
+    print round_le(big_negative)
+
+    # 4. Decoding fixed bytes: `ff 7f` is -129, `00 80` is 128.
+    const bytes pattern ← |ff 7f|
+    const bytes padded ← |00 80|
+    print pattern ↦ inf via Be
+    print padded ↦ inf via Be
+    print pattern ↦ inf via Le
+
+    # 5. A valor carries an inf of any size and gives it back exactly.
+    const valor boxed ← big ↦ valor
+    print boxed ↦ inf
+    const valor small_boxed ← minus_129 ↦ valor
+    print small_boxed ↦ inf
+    const valor from_numerus ← 7 ↦ valor
+    print from_numerus ↦ inf
+
+    # 6. A valor that is not an integer fails; `⊥` recovers.
+    const valor fractional ← 1.5 ↦ valor
+    const valor word ← "7" ↦ valor
+    print fractional ↦ inf ⊥ 9
+    print word ↦ inf ⊥ 8
+}
