@@ -166,8 +166,8 @@ the radix measurement):
 
 | Lane | Targets | Support |
 | --- | --- | --- |
-| Application (HIR) | Rust · Go · TypeScript · Faber | 99% · 92% · 100% · 100% |
-| Systems (MIR) | llvm-text · wasm-text · sexp · scena | 99% · 92% · 79% · 86% |
+| Application (HIR) | Rust · Go · TypeScript · Faber | 99% · 93% · 100% · 100% |
+| Systems (MIR) | llvm-text · wasm-text · sexp · runner | 90% · 72% · 80% · 84% |
 | Device kernels | Metal · CUDA | measured against the kernel surface, not the general corpus |
 
 Full per-term tables: [grammar × target support](docs/EBNF_MATRIX.md) ·

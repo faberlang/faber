@@ -11,7 +11,7 @@
 # Format:  "term"."target" = "short reason / owner"
 # Keys must match index.toml `term` spellings and the target column names
 # (rust, go, ts, faber, llvm-text, wasm-text, wasm, metal-text, wgsl-text,
-#  sexp-struct, sexp, scena).
+#  sexp-struct, sexp, runner).
 #
 # Seeded empty on purpose: do not guess planned items. Curate each entry from
 # the policy doc. Every entry here must trace to a stated deferral in
