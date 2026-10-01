@@ -16,11 +16,21 @@ use std::fmt::Display;
 
 pub trait FractusDisplay: Copy + Display {
     fn has_zero_fraction(self) -> bool;
+
+    /// The text of a value with a zero fraction. An `f64` prints its exact
+    /// decimal expansion with one fraction digit; an `f32` prints its shortest
+    /// round-trip digits plus `.0`, never the exact binary expansion (the MIR
+    /// runner's `display_float_at_width` is the oracle for both).
+    fn display_whole(self) -> String;
 }
 
 impl FractusDisplay for f32 {
     fn has_zero_fraction(self) -> bool {
         self.fract() == 0.0
+    }
+
+    fn display_whole(self) -> String {
+        format!("{self}.0")
     }
 }
 
@@ -28,11 +38,15 @@ impl FractusDisplay for f64 {
     fn has_zero_fraction(self) -> bool {
         self.fract() == 0.0
     }
+
+    fn display_whole(self) -> String {
+        format!("{self:.1}")
+    }
 }
 
 pub fn display_fractus<T: FractusDisplay>(value: T) -> String {
     if value.has_zero_fraction() {
-        format!("{value:.1}")
+        value.display_whole()
     } else {
         value.to_string()
     }

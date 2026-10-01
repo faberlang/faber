@@ -17,6 +17,33 @@ fn display_fractus_preserves_width_native_stringification() {
 }
 
 #[test]
+fn display_fractus_f32_integral_keeps_shortest_digits_plus_point_zero() {
+    // The MIR runner (the oracle) prints an integral `f32` as its shortest
+    // round-trip digits plus `.0`, never the exact binary expansion.
+    assert_eq!(
+        display_fractus(f32::MAX),
+        "340282350000000000000000000000000000000.0"
+    );
+    assert_eq!(display_fractus(1.0e20_f32), "100000000000000000000.0");
+    assert_eq!(display_fractus(16_777_216.0_f32), "16777216.0");
+    assert_eq!(display_fractus(-0.0_f32), "-0.0");
+    assert_eq!(
+        display_option_fractus(Some(f32::MAX)),
+        display_fractus(f32::MAX)
+    );
+}
+
+#[test]
+fn display_fractus_f64_integral_keeps_the_exact_expansion() {
+    assert_eq!(display_fractus(1.0e21_f64), "1000000000000000000000.0");
+    assert_eq!(
+        display_fractus(18_446_744_073_709_551_616.0_f64),
+        "18446744073709551616.0"
+    );
+    assert_eq!(display_fractus(-0.0_f64), "-0.0");
+}
+
+#[test]
 fn display_bivalens_uses_faber_words() {
     assert_eq!(display_bivalens(true), "verum");
     assert_eq!(display_bivalens(false), "falsum");
