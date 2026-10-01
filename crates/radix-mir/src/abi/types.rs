@@ -386,6 +386,11 @@ pub struct MirKernelReflection {
     pub entry_name: String,
     pub shader_stage: MirKernelShaderStage,
     pub resources: Vec<MirKernelResourceReflection>,
+    /// Opaque library-typed resources bound to a stage parameter. Omitted
+    /// from serialized reflection when empty so existing reflection JSON is
+    /// byte-identical.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bound_resources: Vec<MirBoundResourceReflection>,
     pub vertex_inputs: Vec<MirVertexInputReflection>,
     pub varyings: Vec<MirVaryingReflection>,
     pub fragment_outputs: Vec<MirFragmentOutputReflection>,
@@ -394,6 +399,17 @@ pub struct MirKernelReflection {
     pub workgroup: MirWorkgroupSize,
     pub dispatch_size: MirKernelDispatchSize,
     pub workgroup_count: MirKernelWorkgroupCount,
+}
+
+/// A bound resource whose type is an opaque library type: the group/binding
+/// slot, the stage-parameter name, and the bound type's name as the library
+/// declared it. The compiler attaches no meaning to `bound_type`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MirBoundResourceReflection {
+    pub group: u32,
+    pub binding: u32,
+    pub name: String,
+    pub bound_type: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

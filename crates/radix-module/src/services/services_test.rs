@@ -1777,6 +1777,7 @@ fn emit_reflection_json_serializes_deferred_gpu_builtin_facts() {
             entry_name: "deferred_builtins".to_owned(),
             shader_stage: crate::mir::MirKernelShaderStage::Compute,
             resources: Vec::new(),
+            bound_resources: Vec::new(),
             vertex_inputs: Vec::new(),
             varyings: Vec::new(),
             fragment_outputs: Vec::new(),

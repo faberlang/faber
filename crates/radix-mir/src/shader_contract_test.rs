@@ -548,3 +548,55 @@ fn graphics_pipeline_rejects_stage_mismatch() {
     .expect_err("vertex stage pair without fragment must fail closed");
     assert_eq!(error.issue, "mir_graphics_pipeline_requires_fragment");
 }
+
+#[test]
+fn bound_resource_reflection_round_trips_and_is_omitted_when_empty() {
+    let binding = ShaderBoundResourceBinding {
+        group: 1,
+        binding: 3,
+        source_name: "tex".to_owned(),
+        provenance: provenance(),
+    };
+    let bound = bound_resource_reflection_from_shader_contract(&binding, "zq_handle<f32>");
+    assert_eq!(bound.group, 1);
+    assert_eq!(bound.binding, 3);
+    assert_eq!(bound.name, "tex");
+    assert_eq!(bound.bound_type, "zq_handle<f32>");
+
+    let mut reflection = MirKernelReflection::fragment_entry(
+        MirFunctionId(0),
+        "frag",
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    )
+    .expect("fragment entry");
+    assert!(reflection.bound_resources.is_empty());
+
+    // Empty: the key is absent, so the JSON is byte-identical to the shape
+    // that predates the field.
+    let empty_json = serde_json::to_string(&reflection).expect("serializes");
+    assert!(!empty_json.contains("bound_resources"));
+    assert_eq!(
+        empty_json,
+        concat!(
+            r#"{"function":0,"provenance":{"MirFunction":0},"entry_name":"frag","#,
+            r#""shader_stage":"Fragment","resources":[],"vertex_inputs":[],"varyings":[],"#,
+            r#""fragment_outputs":[],"builtin_inputs":[],"called_builtins":[],"#,
+            r#""workgroup":{"x":1,"y":1,"z":1},"dispatch_size":{"x":1,"y":1,"z":1},"#,
+            r#""workgroup_count":{"x":1,"y":1,"z":1}}"#
+        )
+    );
+    assert_eq!(
+        serde_json::from_str::<MirKernelReflection>(&empty_json).expect("decodes"),
+        reflection
+    );
+
+    reflection.bound_resources.push(bound.clone());
+    let json = serde_json::to_string(&reflection).expect("serializes");
+    assert!(json.contains("\"bound_type\":\"zq_handle<f32>\""));
+    assert_eq!(
+        serde_json::from_str::<MirKernelReflection>(&json).expect("decodes"),
+        reflection
+    );
+}

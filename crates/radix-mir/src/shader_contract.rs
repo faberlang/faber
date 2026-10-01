@@ -16,12 +16,12 @@
 //! [`MirGraphicsPipelineReflection`].
 
 use crate::{
-    MirAbiError, MirColorTargetFormat, MirDepthCompareFunction, MirDepthStencilState,
-    MirFragmentOutputReflection, MirFunctionId, MirGraphicsPipelineReflection, MirInputStepMode,
-    MirKernelProvenance, MirKernelReflection, MirKernelResourceAccess, MirKernelResourceKind,
-    MirKernelResourceReflection, MirKernelResourceRole, MirPrimitiveTopology, MirScalarLayout,
-    MirType, MirVaryingInterpolation, MirVaryingReflection, MirVertexInputFormat,
-    MirVertexInputReflection,
+    MirAbiError, MirBoundResourceReflection, MirColorTargetFormat, MirDepthCompareFunction,
+    MirDepthStencilState, MirFragmentOutputReflection, MirFunctionId,
+    MirGraphicsPipelineReflection, MirInputStepMode, MirKernelProvenance, MirKernelReflection,
+    MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceReflection,
+    MirKernelResourceRole, MirPrimitiveTopology, MirScalarLayout, MirType, MirVaryingInterpolation,
+    MirVaryingReflection, MirVertexInputFormat, MirVertexInputReflection,
 };
 use radix_hir::DefId;
 use radix_lexer::Span;
@@ -170,6 +170,22 @@ pub struct ShaderResourceBinding {
     pub source_name: Option<String>,
     /// Explicit stage-I/O role (declared on the contract call).
     pub stage_io_role: ShaderStageIoRole,
+    /// Provenance + source span for diagnostics.
+    pub provenance: ContractProvenance,
+}
+
+/// Bound-resource contract: a stage parameter of an opaque library type that
+/// occupies a `(group, binding)` slot. The bound type's name is supplied by the
+/// caller when the fact is projected onto reflection; the compiler attaches no
+/// meaning to it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShaderBoundResourceBinding {
+    /// Bind group index.
+    pub group: u32,
+    /// Binding index within the bind group.
+    pub binding: u32,
+    /// Source name of the bound stage parameter.
+    pub source_name: String,
     /// Provenance + source span for diagnostics.
     pub provenance: ContractProvenance,
 }
@@ -392,6 +408,20 @@ pub fn resource_reflection_from_shader_contract(
         source_local: None,
         source_name: binding.source_name.clone(),
         stage_io_role: binding.stage_io_role,
+    }
+}
+
+/// Project a bound-resource contract onto [`MirBoundResourceReflection`].
+#[must_use]
+pub fn bound_resource_reflection_from_shader_contract(
+    binding: &ShaderBoundResourceBinding,
+    bound_type: impl Into<String>,
+) -> MirBoundResourceReflection {
+    MirBoundResourceReflection {
+        group: binding.group,
+        binding: binding.binding,
+        name: binding.source_name.clone(),
+        bound_type: bound_type.into(),
     }
 }
 
