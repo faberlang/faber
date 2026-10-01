@@ -29,8 +29,9 @@ const COPY_PARAM: &str = r#"+++
 locale = "en"
 +++
 fn take(copy list<int> xs) → int {
-    xs.append(5)
-    return xs.length()
+    var list<int> fresh ← xs
+    fresh.append(5)
+    return fresh.length()
 }
 main {
     const list<int> a ← [1, 2]

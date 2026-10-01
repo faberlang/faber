@@ -732,12 +732,14 @@ impl FunctionBuilder<'_> {
         args: &[HirCallArg],
         expr: &HirExpression,
     ) -> Option<MirOperand> {
-        let receiver_ty = receiver.ty?;
-        if !matches!(self.normalized_type(receiver_ty), Type::Atomic(_)) {
+        // Atomic mutation requires a `mut` receiver (SEM020), so the receiver
+        // type usually carries the access marker; look through it.
+        let payload_ty = self.method_receiver_payload_id(receiver.ty?);
+        if !matches!(self.normalized_type(payload_ty), Type::Atomic(_)) {
             return None;
         }
         let entry =
-            crate::intrinsics::lookup_method_for_type(self.normalized_type(receiver_ty), method_name, args.len())?;
+            crate::intrinsics::lookup_method_for_type(self.normalized_type(payload_ty), method_name, args.len())?;
         let op = crate::intrinsics::mir_atomic_op(entry)?;
         let mut lowered_args = Vec::with_capacity(args.len() + 1);
         lowered_args.push(self.lower_expr_value(receiver)?);
@@ -2122,8 +2124,10 @@ impl FunctionBuilder<'_> {
         if method_name != "ordina" || !args.is_empty() {
             return None;
         }
-        let receiver_ty = receiver.ty?;
-        if !matches!(self.normalized_type(receiver_ty), Type::Array(_)) {
+        // In-place `ordina` requires a `mut` receiver (SEM020), so the receiver
+        // type usually carries the access marker; look through it.
+        let payload_ty = self.method_receiver_payload_id(receiver.ty?);
+        if !matches!(self.normalized_type(payload_ty), Type::Array(_)) {
             return None;
         }
 

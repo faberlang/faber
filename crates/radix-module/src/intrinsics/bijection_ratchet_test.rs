@@ -43,9 +43,12 @@ struct Dtype {
     /// Fn-parameter list for the immutable receiver probe.
     param: String,
     /// `varia <ty> r ← <init>` local declaration for the mutable probe
-    /// (imperative rows need a mutable place; `in` params are not one).
+    /// (imperative rows need a mutable place; a `fixum` binding or unmarked
+    /// parameter is not one). Empty when the receiver cannot be constructed
+    /// as a local and `extra_param` carries it as an `in` parameter.
     decl: String,
-    /// Extra fn parameters that survive into the mutable probe (peer sets).
+    /// Extra fn parameters that survive into the mutable probe (peer sets, or
+    /// the `in` receiver of a dtype with no local constructor).
     extra_param: String,
     /// Extra bindings the row's arguments need (peer sets, flat data).
     locals: String,
@@ -221,8 +224,10 @@ fn dtypes_for(receiver: IntrinsicReceiver) -> Vec<Dtype> {
         IntrinsicReceiver::Atomic => vec![dtype(
             "i32",
             "atomic<i32> r",
-            "varia atomic<i32> r ← 1 ↦ atomic<i32>",
+            // An atomic has no constructor, so the mutable probe takes the
+            // receiver as an `in` (mutable-borrow) parameter instead of a local.
             "",
+            "in atomic<i32> r",
             "fixum i32 v ← 1 ↦ i32",
             "v",
             "numerus",
@@ -346,9 +351,11 @@ fn probe_source(row: &crate::intrinsics::MethodIntrinsic, dtype: &Dtype, mutable
     };
     let mut decl_locals = String::new();
     if mutable {
-        // Imperative rows need a mutable place; `in` params do not lower as
-        // one, so the mutable probe binds a `varia` local instead.
-        decl_locals = format!("{}\n", dtype.decl);
+        // Imperative rows need a mutable place: a `varia` local, or an `in`
+        // parameter for a receiver with no local constructor.
+        if !dtype.decl.is_empty() {
+            decl_locals = format!("{}\n", dtype.decl);
+        }
         param.clone_from(&dtype.extra_param);
     }
     let args = if override_args.is_empty() {

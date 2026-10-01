@@ -190,7 +190,7 @@ fn en_canonical_latin_spelling_is_compile_error() {
 /// example (`x.append()` resolves; `x.appende()` = compile error).
 #[test]
 fn en_append_surface_resolves_and_latin_spelling_errors() {
-    let en_source = "fn probe(list<string> xs) → void {\n    xs.append(\"a\")\n}\n";
+    let en_source = "fn probe(mut list<string> xs) → void {\n    xs.append(\"a\")\n}\n";
     let unit = analyze(en_source, Some(en_pack())).expect("en `append` on a Lista must resolve with the en pack");
     assert_eq!(
         method_call_spellings(&unit.hir, &unit.interner),
@@ -198,7 +198,7 @@ fn en_append_surface_resolves_and_latin_spelling_errors() {
         "the en surface `append` must rewrite to canonical `appende` on the HIR"
     );
 
-    let latin_source = "fn probe(list<string> xs) → void {\n    xs.appende(\"a\")\n}\n";
+    let latin_source = "fn probe(mut list<string> xs) → void {\n    xs.appende(\"a\")\n}\n";
     let result = analyze(latin_source, Some(en_pack()));
     let diagnostics = result.unwrap_err_or_diagnostics();
     assert!(
@@ -422,7 +422,7 @@ fn en_surface_union_is_identity_row_on_intervallum() {
 /// rewrites to its own canonical row (`ordina` / `ordinata`).
 #[test]
 fn en_surface_mutating_imperative_scheme_sort_sorted() {
-    let sort_source = "fn probe(list<int> xs) → void {\n    xs.sort()\n}\n";
+    let sort_source = "fn probe(mut list<int> xs) → void {\n    xs.sort()\n}\n";
     let sorted_source = "fn probe(list<int> xs) → list<int> {\n    return xs.sorted()\n}\n";
 
     let sort = analyze(sort_source, Some(en_pack())).expect("en `.sort()` on a list must typecheck with the en pack");

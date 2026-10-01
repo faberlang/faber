@@ -121,8 +121,9 @@ locale = "la"
 +++
 @ ad 'lista:auge'
 functio auge(lista<numerus> xs) → numerus {
-    xs.appende(99)
-    redde xs.longitudo()
+    varia lista<numerus> local ← xs
+    local.appende(99)
+    redde local.longitudo()
 }
 
 incipit {

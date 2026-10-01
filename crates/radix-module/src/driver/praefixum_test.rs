@@ -87,7 +87,7 @@ fn dependent_statics_fold_after_evaluation() {
 #[test]
 fn list_result_is_an_array_literal() {
     let unit = analyze_ok(
-        "generis lista<numerus> L = praefixum {\n    fixum lista<numerus> xs ← vacua\n    \
+        "generis lista<numerus> L = praefixum {\n    varia lista<numerus> xs ← vacua\n    \
          itera ab 0‥3 fixum i {\n        xs.appende(i * 10)\n    }\n    redde xs\n}\n",
     );
     let HirExpressionKind::Array(elements) = static_value(&unit, "L").kind else {

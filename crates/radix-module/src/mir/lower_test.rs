@@ -366,7 +366,7 @@ incipit {
 fn lowers_atomic_methods_to_dedicated_mir_intrinsics() {
     let dump = dump_source(
         r"
-functio atomic_ops(atomic<i32> cell, i32 value) → bivalens {
+functio atomic_ops(in atomic<i32> cell, i32 value) → bivalens {
     fixum i32 loaded ← cell.load()
     cell.store(value)
     fixum i32 old ← cell.exchange(loaded)
