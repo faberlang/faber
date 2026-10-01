@@ -338,15 +338,32 @@ impl Lowerer<'_> {
         ]
     }
 
-    fn inject_fragment_shader_locals(&mut self) -> Vec<ShaderLocal> {
+    /// Fragment stage locals, skipping any name the vertex stage already bound.
+    ///
+    /// A function carrying both stage annotations is diagnosed later, at MIR
+    /// lowering; it must reach that diagnostic rather than fail analysis on a
+    /// doubly-bound stage local.
+    fn inject_fragment_shader_locals(&mut self, bound: &[ShaderLocal]) -> Vec<ShaderLocal> {
         let (vec2_ty, vec3_ty, vec4_ty) = self.shader_stage_vec_types();
         let span = Span::default();
-        vec![
-            self.define_shader_local("normal", vec3_ty, false, span),
-            self.define_shader_local("color", vec3_ty, false, span),
-            self.define_shader_local("uv", vec2_ty, false, span),
-            self.define_shader_local("out_color", vec4_ty, true, span),
-        ]
+        let wanted = [
+            ("normal", vec3_ty, false),
+            ("color", vec3_ty, false),
+            ("uv", vec2_ty, false),
+            ("out_color", vec4_ty, true),
+        ];
+        let mut locals = Vec::new();
+        for (name, ty, mutable) in wanted {
+            let name_sym = self.interner.intern(name);
+            if bound
+                .iter()
+                .any(|&(_, bound_name, ..)| bound_name == name_sym)
+            {
+                continue;
+            }
+            locals.push(self.define_shader_local(name, ty, mutable, span));
+        }
+        locals
     }
 
     fn shader_stage_vec_types(&mut self) -> (TypeId, TypeId, TypeId) {
@@ -549,7 +566,7 @@ impl Lowerer<'_> {
         }
 
         let fragment_locals = if is_fragment {
-            self.inject_fragment_shader_locals()
+            self.inject_fragment_shader_locals(&vertex_locals)
         } else {
             Vec::new()
         };

@@ -65,3 +65,14 @@ fn a_kernel_without_a_lane_binding_parses() {
             .contains(&"nucleum_lane_removed".to_owned())
     );
 }
+
+#[test]
+fn a_function_with_both_shader_stages_does_not_shadow_stage_locals() {
+    // Both stage injectors provide `uv`; a function carrying both annotations
+    // is diagnosed at MIR lowering, so analysis must not reject it first.
+    let issues = issues("@ vertex\n@ fragment\nfunctio both() → vacuum { redde }\n");
+    assert!(
+        !issues.contains(&"shadowed_variable".to_owned()),
+        "issues: {issues:?}"
+    );
+}
