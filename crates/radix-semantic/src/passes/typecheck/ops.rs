@@ -70,10 +70,9 @@ impl TypeChecker<'_> {
 
         let lhs_shape = self.numeric_shape(self.resolve_inferred_type(lhs));
         let rhs_shape = self.numeric_shape(self.resolve_inferred_type(rhs));
-        if lhs_shape
-            .zip(rhs_shape)
-            .is_some_and(|(lhs, rhs)| lhs.family != rhs.family)
-        {
+        if lhs_shape.zip(rhs_shape).is_some_and(|(lhs, rhs)| {
+            lhs.family != rhs.family || (either_policy(lhs, rhs) && lhs.width != rhs.width)
+        }) {
             let issue = family_mismatch_issue(lhs_shape, rhs_shape);
             self.invalid_operand_types(issue, span);
             return self.error_type;
@@ -182,7 +181,14 @@ impl TypeChecker<'_> {
             }
         }
         if lhs_shape.prim != rhs_shape.prim || lhs_shape.width != rhs_shape.width {
-            self.invalid_operand_types(NUMERIC_ARITHMETIC_OPERANDS_IDENTICAL, span);
+            // D4: a typed mix of a float cell with another float (a bare
+            // float, the other cell, another width) names the cell family.
+            let issue = if lhs_shape.prim == rhs_shape.prim && either_policy(lhs_shape, rhs_shape) {
+                POLICY_FLOAT_FAMILY_MISMATCH
+            } else {
+                NUMERIC_ARITHMETIC_OPERANDS_IDENTICAL
+            };
+            self.invalid_operand_types(issue, span);
             return self.error_type;
         }
         if lhs_shape.family != rhs_shape.family {
@@ -483,6 +489,11 @@ impl TypeChecker<'_> {
                 width: *width,
                 family: IntFamily::Saturating,
             }),
+            Type::PolicyFloat(policy, width) => Some(NumericShape {
+                prim: Primitive::Fractus,
+                width: *width,
+                family: IntFamily::Policy(*policy),
+            }),
             Type::Alias(_, target) => self.numeric_shape(*target),
             _ => None,
         }
@@ -496,13 +507,19 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         if matches!(
             self.types.get(lhs),
-            Type::SizedNumeric(_, _) | Type::ModularWord(_) | Type::SaturatingWord(_)
+            Type::SizedNumeric(_, _)
+                | Type::ModularWord(_)
+                | Type::SaturatingWord(_)
+                | Type::PolicyFloat(_, _)
         ) {
             return lhs;
         }
         if matches!(
             self.types.get(rhs),
-            Type::SizedNumeric(_, _) | Type::ModularWord(_) | Type::SaturatingWord(_)
+            Type::SizedNumeric(_, _)
+                | Type::ModularWord(_)
+                | Type::SaturatingWord(_)
+                | Type::PolicyFloat(_, _)
         ) {
             return rhs;
         }
@@ -623,6 +640,26 @@ impl TypeChecker<'_> {
         let is_word = |f: IntFamily| f != IntFamily::Plain;
         let other_ok = |f: IntFamily, c: bool| f == IntFamily::Plain || c;
         (is_word(lf) && !lc && other_ok(rf, rc)) || (is_word(rf) && !rc && other_ok(lf, lc))
+    }
+
+    /// A float cell beside an untyped numeric constant in an ordering or a
+    /// value comparison: the comparison stores nothing and compares exact
+    /// values, and a written constant stands beside any number (N7e D4).
+    fn policy_float_constant_comparison(
+        &self,
+        lhs: &HirExpression,
+        lhs_ty: TypeId,
+        rhs: &HirExpression,
+        rhs_ty: TypeId,
+    ) -> bool {
+        if self.current_device_function {
+            return false;
+        }
+        let is_cell = |ty: TypeId| {
+            self.numeric_shape(self.resolve_inferred_type(ty))
+                .is_some_and(|shape| matches!(shape.family, IntFamily::Policy(_)))
+        };
+        (is_cell(lhs_ty) && is_numeric_literal(rhs)) || (is_cell(rhs_ty) && is_numeric_literal(lhs))
     }
 
     /// Enforce the numeric-equality admission law for `≅`/`≇` and `≈`/`≉`.
@@ -1390,7 +1427,9 @@ impl TypeChecker<'_> {
                 if let Some(result) = self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty) {
                     return result;
                 }
-                if !self.word_value_comparison(lhs, lhs_ty, rhs, rhs_ty) {
+                if !self.word_value_comparison(lhs, lhs_ty, rhs, rhs_ty)
+                    && !self.policy_float_constant_comparison(lhs, lhs_ty, rhs, rhs_ty)
+                {
                     self.numeric_value_equality_types(lhs_ty, rhs_ty, lhs.span);
                 }
                 self.bool_type()
@@ -1446,6 +1485,8 @@ impl TypeChecker<'_> {
                 } else if self.word_value_comparison(lhs, lhs_ty, rhs, rhs_ty) {
                     // A `wrapping`/`saturating` word beside a constant or a
                     // plain integer: exact values (rulings 12, 22).
+                } else if self.policy_float_constant_comparison(lhs, lhs_ty, rhs, rhs_ty) {
+                    // A float cell beside a written constant: exact values.
                 } else {
                     self.numeric_ordering_bin(lhs_ty, rhs_ty, lhs.span);
                 }
@@ -2252,10 +2293,29 @@ pub(super) const NUMERIC_ARITHMETIC_OPERANDS_IDENTICAL: &str =
     "numeric_arithmetic_operands_identical";
 const MODULAR_WORD_FAMILY_MISMATCH: &str = "modular_word_family_mismatch";
 pub(super) const SATURATING_WORD_FAMILY_MISMATCH: &str = "saturating_word_family_mismatch";
+/// A typed mix of a `trapping<W>` or `saturating<W>` float cell with a bare
+/// float, the other cell, or another width (N7e D4).
+pub(super) const POLICY_FLOAT_FAMILY_MISMATCH: &str = "policy_float_family_mismatch";
+/// A method call on a float cell: the cell's math surface is not built yet
+/// (N7e D3, interim fail-closed).
+pub(super) const POLICY_FLOAT_MATH_NOT_BUILT: &str = "policy_float_math_not_built";
+
+fn either_policy(lhs: NumericShape, rhs: NumericShape) -> bool {
+    [lhs, rhs]
+        .iter()
+        .any(|shape| matches!(shape.family, IntFamily::Policy(_)))
+}
 
 /// Mixed integer families name the saturating family when it is involved,
 /// otherwise the modular family (both require an explicit `↦`).
 fn family_mismatch_issue(lhs: Option<NumericShape>, rhs: Option<NumericShape>) -> &'static str {
+    if [lhs, rhs]
+        .into_iter()
+        .flatten()
+        .any(|shape| matches!(shape.family, IntFamily::Policy(_)))
+    {
+        return POLICY_FLOAT_FAMILY_MISMATCH;
+    }
     let saturating = [lhs, rhs]
         .into_iter()
         .flatten()
@@ -2304,12 +2364,16 @@ pub(super) struct NumericShape {
     pub(super) family: IntFamily,
 }
 
-/// Overflow policy family of an integer shape (D11.1): trap, wrap, or clamp.
+/// Overflow policy family of a numeric shape: trap, wrap, or clamp for an
+/// integer (D11.1), or the policy of a `trapping<W>` / `saturating<W>` float
+/// cell (N7e D5). A cell is never `Plain`, so every range rule that is keyed
+/// on the plain family leaves it alone.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum IntFamily {
     Plain,
     Modular,
     Saturating,
+    Policy(radix_types::FloatPolicy),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

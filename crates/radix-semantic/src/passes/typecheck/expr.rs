@@ -237,7 +237,9 @@ impl TypeChecker<'_> {
     fn retype_integer_constant_as_float(&self, lit: &mut HirLiteral, ty: TypeId) {
         if !matches!(
             self.types.get(ty),
-            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+            Type::Primitive(Primitive::Fractus)
+                | Type::SizedNumeric(Primitive::Fractus, _)
+                | Type::PolicyFloat(_, _)
         ) {
             return;
         }

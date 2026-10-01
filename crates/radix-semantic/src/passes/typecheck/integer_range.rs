@@ -380,7 +380,7 @@ impl TypeChecker<'_> {
     /// Width of a float type, `f64` for the bare `fractus`.
     fn float_slot_width(&self, float_ty: TypeId) -> NumericWidth {
         match self.types.get(self.resolve_inferred_type(float_ty)) {
-            Type::SizedNumeric(Primitive::Fractus, width) => *width,
+            Type::SizedNumeric(Primitive::Fractus, width) | Type::PolicyFloat(_, width) => *width,
             _ => NumericWidth::F64,
         }
     }

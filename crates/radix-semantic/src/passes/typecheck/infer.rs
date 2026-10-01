@@ -182,6 +182,13 @@ impl TypeChecker<'_> {
             (MarkerFamily::Saturatus, Type::SaturatingWord(width)) => {
                 Some(self.types.intern(Type::SaturatingWord(width)))
             }
+            (
+                MarkerFamily::Saturatus,
+                Type::PolicyFloat(radix_types::FloatPolicy::Saturating, width),
+            ) => Some(self.types.intern(Type::PolicyFloat(
+                radix_types::FloatPolicy::Saturating,
+                width,
+            ))),
             (MarkerFamily::Instans, Type::SizedInstans(precision)) => {
                 Some(self.types.sized_instans(precision))
             }

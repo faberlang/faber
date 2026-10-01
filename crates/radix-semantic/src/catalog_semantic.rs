@@ -579,8 +579,11 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         WidthLowerIssue::UNSUPPORTED_TRAPPING_WORD_WIDTH => Some(
             "use an integer width or d64 for exactus: i8, i16, i32, i64, u8, u16, u32, u64, or d64".to_owned(),
         ),
-        WidthLowerIssue::TRAPPING_FLOAT_NOT_IMPLEMENTED => Some(
-            "write the bare float width (f16, bf16, f32, or f64) for IEEE arithmetic; trapping floats are not implemented yet".to_owned(),
+        "policy_float_family_mismatch" => Some(
+            "convert the other operand to the same float cell with `↦`; a trapping or saturating float never mixes with a bare float, another cell, or another width implicitly".to_owned(),
+        ),
+        "policy_float_math_not_built" => Some(
+            "convert the cell to the bare float width with `↦`, call the method on that, and convert back".to_owned(),
         ),
         "saturating_word_family_mismatch" => Some(
             "convert the other operand to the same saturatus width with `↦`; saturating, wrapping, and trapping integers never mix implicitly".to_owned(),

@@ -307,7 +307,10 @@ fn ascii_format_hints_are_hex_bin_oct_only() {
 
 // S03-1: lowering failures cross the producer boundary as typed issues, not
 // prose that downstream tables re-parse into a diagnostic identity.
-use crate::numeric_width::{WidthLowerIssue, lower_modular_word, lower_standalone_width_type};
+use crate::numeric_width::{
+    WidthLowerIssue, lower_modular_word, lower_saturating_word, lower_standalone_width_type,
+    lower_trapping_word,
+};
 use radix_lexer::{Interner, Span};
 use radix_syntax::{GenericArgExpr, Ident, TypeExpr, TypeExprKind, TypeFormLevel};
 
@@ -550,4 +553,49 @@ fn float_overflow_is_rounding_to_infinity() {
     assert!(!over(NumericWidth::BF16, 3.389_531_389_251_535_5e38));
     assert!(over(NumericWidth::BF16, 1e39));
     assert!(!over(NumericWidth::F64, f64::MAX));
+}
+
+#[test]
+fn policy_float_cells_lower_for_every_float_width_and_both_policies() {
+    use crate::{FloatPolicy, Type};
+    let mut interner = Interner::new();
+    let mut types = TypeTable::new();
+    for (marker, width) in [
+        ("f16", NumericWidth::F16),
+        ("bf16", NumericWidth::BF16),
+        ("f32", NumericWidth::F32),
+        ("f64", NumericWidth::F64),
+    ] {
+        let params = [marker_expr(marker, &mut interner)];
+        let mut reported = Vec::new();
+        let trapping = lower_trapping_word(&params, &interner, &mut types, &mut |issue| {
+            reported.push(issue);
+        });
+        let saturating = lower_saturating_word(&params, &interner, &mut types, &mut |issue| {
+            reported.push(issue);
+        });
+        assert!(reported.is_empty(), "{marker}: {reported:?}");
+        assert_eq!(
+            types.get(trapping),
+            &Type::PolicyFloat(FloatPolicy::Trapping, width)
+        );
+        assert_eq!(
+            types.get(saturating),
+            &Type::PolicyFloat(FloatPolicy::Saturating, width)
+        );
+        assert_ne!(trapping, saturating);
+    }
+}
+
+#[test]
+fn policy_float_saturating_keeps_the_decimal_rejection() {
+    let mut interner = Interner::new();
+    let mut types = TypeTable::new();
+    let params = [marker_expr("d64", &mut interner)];
+    let mut reported = Vec::new();
+    lower_saturating_word(&params, &interner, &mut types, &mut |issue| {
+        reported.push(issue);
+    });
+    assert_eq!(reported, vec![WidthLowerIssue::SaturatingWordUnsupported]);
+    assert_eq!(reported[0].issue(), "unsupported_saturating_word_width");
 }

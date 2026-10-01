@@ -984,10 +984,6 @@ help = "write the trapping type with one width, such as trapping<u8> or trapping
 message = "trapping width must be a bare width marker"
 help = "use a bare width marker such as u8 or i64"
 
-[diagnostics.SEM008.issues.trapping_float_not_implemented]
-message = "trapping floats are not implemented yet"
-help = "write the bare float width (f16, bf16, f32, or f64) for IEEE arithmetic; trapping floats are not implemented yet"
-
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "tư thế callable trong chú giải '{annotation_posture}' xung đột với tư thế đã viết '{written_posture}'"
 help = "sửa cấu trúc AST để hạ mức"
