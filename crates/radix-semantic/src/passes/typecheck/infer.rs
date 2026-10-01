@@ -176,20 +176,6 @@ impl TypeChecker<'_> {
     ) -> Option<TypeId> {
         let witness = self.resolve_inferred_type(witness);
         match (family, self.types.get(witness).clone()) {
-            (MarkerFamily::Numerus, Type::SizedNumeric(Primitive::Numerus, width)) => {
-                Some(self.types.sized_numeric(Primitive::Numerus, width))
-            }
-            (MarkerFamily::Numerus, Type::Primitive(Primitive::Numerus)) => Some(
-                self.types
-                    .sized_numeric(Primitive::Numerus, NumericWidth::I64),
-            ),
-            (MarkerFamily::Fractus, Type::SizedNumeric(Primitive::Fractus, width)) => {
-                Some(self.types.sized_numeric(Primitive::Fractus, width))
-            }
-            (MarkerFamily::Fractus, Type::Primitive(Primitive::Fractus)) => Some(
-                self.types
-                    .sized_numeric(Primitive::Fractus, NumericWidth::F64),
-            ),
             (MarkerFamily::Modulus, Type::ModularWord(width)) => {
                 Some(self.types.intern(Type::ModularWord(width)))
             }

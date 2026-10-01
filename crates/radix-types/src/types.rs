@@ -2545,11 +2545,9 @@ pub struct InferVar(pub u32);
 /// Closed-marker family for [`Type::MarkerHole`].
 ///
 /// Width and precision enums stay closed; this names which family the hole
-/// belongs to so `numerus<_>` cannot become `fractus<f32>`.
+/// belongs to so `modulus<_>` cannot become `saturatus<u8>`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MarkerFamily {
-    Numerus,
-    Fractus,
     Modulus,
     Saturatus,
     Instans,

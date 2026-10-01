@@ -1,7 +1,7 @@
 //! PH-2/PH-3 pins: the policy-word and `instans` marker holes as
 //! family-preserving holes. The `numerus<_>` / `fractus<_>` holes retired with
-//! the wrapped numeric spelling (N7d); the checker harness tests below still
-//! drive the `Numerus` family through hand-built `MarkerHole` types.
+//! the wrapped numeric spelling (N7d, DB-3); the checker harness tests below
+//! drive the `Modulus` family through hand-built `MarkerHole` types.
 
 use super::*;
 use crate::passes::collect;
@@ -202,28 +202,24 @@ fn unsolved_modulus_hole_errors() {
 }
 
 #[test]
-fn harness_exact_i32_does_not_join_i64() {
+fn harness_exact_u32_does_not_join_u64() {
     let mut types = TypeTable::new();
     let resolver = Resolver::new();
     let interner = Interner::new();
     let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
     let hole = checker.types.intern(Type::MarkerHole {
-        family: MarkerFamily::Numerus,
+        family: MarkerFamily::Modulus,
         var: InferVar(1),
     });
-    let i32_ty = checker
-        .types
-        .sized_numeric(Primitive::Numerus, NumericWidth::I32);
-    let i64_ty = checker
-        .types
-        .sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let u32_ty = checker.types.intern(Type::ModularWord(NumericWidth::U32));
+    let u64_ty = checker.types.intern(Type::ModularWord(NumericWidth::U64));
     let span = radix_lexer::Span::default();
-    checker.unify_assign_issue(i32_ty, hole, span, "expression_type_mismatch");
+    checker.unify_assign_issue(u32_ty, hole, span, "expression_type_mismatch");
     assert!(checker.errors.is_empty(), "{:?}", checker.errors);
-    checker.unify_assign_issue(i64_ty, hole, span, "expression_type_mismatch");
+    checker.unify_assign_issue(u64_ty, hole, span, "expression_type_mismatch");
     assert!(
         !checker.errors.is_empty(),
-        "numerus<_> solved to i32 must not then accept i64"
+        "modulus<_> solved to u32 must not then accept u64"
     );
 }
 
@@ -234,7 +230,7 @@ fn harness_family_mismatch_does_not_bind() {
     let interner = Interner::new();
     let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
     let hole = checker.types.intern(Type::MarkerHole {
-        family: MarkerFamily::Numerus,
+        family: MarkerFamily::Modulus,
         var: InferVar(2),
     });
     let f32_ty = checker
@@ -253,23 +249,21 @@ fn harness_exact_marker_does_not_widen() {
     let interner = Interner::new();
     let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
     let hole = checker.types.intern(Type::MarkerHole {
-        family: MarkerFamily::Numerus,
+        family: MarkerFamily::Modulus,
         var: InferVar(1),
     });
-    let i32_ty = checker
-        .types
-        .sized_numeric(Primitive::Numerus, NumericWidth::I32);
+    let u32_ty = checker.types.intern(Type::ModularWord(NumericWidth::U32));
     let span = radix_lexer::Span::default();
-    let unified = checker.unify_assign_issue(i32_ty, hole, span, "expression_type_mismatch");
+    let unified = checker.unify_assign_issue(u32_ty, hole, span, "expression_type_mismatch");
     assert!(
         checker.errors.is_empty(),
-        "i32 → numerus<_> must unify: {:?}",
+        "u32 → modulus<_> must unify: {:?}",
         checker.errors
     );
     assert!(
         matches!(
             checker.types.get(checker.resolve_inferred_type(unified)),
-            Type::SizedNumeric(Primitive::Numerus, NumericWidth::I32)
+            Type::ModularWord(NumericWidth::U32)
         ),
         "exact marker, not widened, got {:?}",
         checker.types.get(checker.resolve_inferred_type(unified))
