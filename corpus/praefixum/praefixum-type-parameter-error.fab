@@ -1,7 +1,7 @@
 +++
 term = "praefixum type parameter"
 kind = "reject"
-grammar = ["fab_file", "program", "statement", "statement_core", "fixum_decl", "const_init", "praefixum_expr", "block_stmt", "functio_decl", "type_parameters", "type_parameter", "parameter_list", "parameter", "redde_stmt", "assignment", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "incipit_stmt", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument"]
+grammar = ["fab_file", "program", "statement", "statement_core", "fixum_decl", "const_init", "praefixum_expr", "block_stmt", "functio_decl", "generic_params", "type_param_list", "generic_param", "param_list", "parameter", "redde_stmt", "assignment", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "incipit_stmt", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument"]
 category = "comptime"
 canonical = false
 summary = "A comptime body runs once, so inside a generic function or genus it may not depend on a type parameter."
