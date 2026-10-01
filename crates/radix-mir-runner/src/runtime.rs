@@ -32,7 +32,7 @@
 use super::cursor::GeneratorCursor;
 use super::sermo::SermoView;
 use super::value::{
-    GradientStorage, MapKey, TensorValue, Value, format_template, modular_operand,
+    GradientStorage, MapKey, TensorValue, Value, format_template_shaped, modular_operand,
     modular_word_reduce, modular_word_result, round_float, uint_width_checked_add, values_equal,
     width_checked_add,
 };
@@ -113,10 +113,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 // 9007e12c3 follow-through: floats declared at a narrower
                 // width than f64 display at that width.
                 let float_width = self.operand_float_width(arg);
+                let tuple = self.operand_tuple_parts(arg);
                 let order = self
                     .field_order()
                     .with_dynamic(self.operand_is_dynamic(arg))
-                    .with_char_text(self.operand_holds_littera(arg));
+                    .with_char_text(self.operand_holds_littera(arg))
+                    .with_tuple(tuple.as_ref());
                 let text = value.display_typed(self.interner, order, span, float_width)?;
                 self.host.scribe(*kind, &text)?;
                 Ok(Value::Unit)
@@ -140,11 +142,17 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .iter()
                     .map(|arg| self.operand_holds_littera(arg))
                     .collect();
-                Ok(Value::Str(format_template(
+                let tuples: Vec<_> = call
+                    .args
+                    .iter()
+                    .map(|arg| self.operand_tuple_parts(arg))
+                    .collect();
+                Ok(Value::Str(format_template_shaped(
                     template_text,
                     &args,
                     &widths,
                     &char_text,
+                    &tuples,
                     self.interner,
                     self.field_order(),
                     span,

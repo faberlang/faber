@@ -311,3 +311,113 @@ fn variant_payload_fields_display_at_their_declared_width() {
         "Item.Cost { value = 1.25, ratio = 0.1, count = 3 }"
     );
 }
+
+#[test]
+fn tuple_prints_as_iuncta_at_every_depth_with_per_element_widths() {
+    let mut types = TypeTable::new();
+    let interner = Interner::new();
+    let d64 = types.intern(decimal(NumericWidth::D64));
+    let int = types.intern(integer(NumericWidth::I64));
+    let pair = types.tuple(vec![d64, int]);
+    let nested = types.tuple(vec![pair, int]);
+    let list = types.array(pair);
+    let option = types.option(pair);
+
+    // The declared tuple type tells the two `Int` carriers apart, through
+    // collections and options, and nests.
+    let shape = tuple_parts(pair, &types, 0).expect("tuple shape");
+    assert_eq!(shape.0[0].width, Some(NumericWidth::D64));
+    assert_eq!(shape.0[1].width, None);
+    assert_eq!(tuple_parts(list, &types, 0), Some(shape.clone()));
+    assert_eq!(tuple_parts(option, &types, 0), Some(shape.clone()));
+    assert_eq!(tuple_parts(d64, &types, 0), None);
+    let outer = tuple_parts(nested, &types, 0).expect("nested shape");
+    assert_eq!(outer.0[0].tuple, Some(shape.clone()));
+
+    let structs = rustc_hash::FxHashMap::default();
+    let variants = rustc_hash::FxHashMap::default();
+    let order = value::FieldOrder::new(&structs, &variants);
+    let tuple = Value::Tuple(vec![Value::Int(125_000_000), Value::Int(4)]);
+    let show = |value: &Value, shape: Option<&value::TupleParts>| {
+        value
+            .display(&interner, order.with_tuple(shape), Span::default())
+            .expect("display")
+    };
+    assert_eq!(show(&tuple, Some(&shape)), "iuncta [1.25, 4]");
+    let items = Value::Array(std::rc::Rc::new(std::cell::RefCell::new(vec![
+        tuple.clone(),
+    ])));
+    assert_eq!(show(&items, Some(&shape)), "[iuncta [1.25, 4]]");
+    let wrapped = Value::Tuple(vec![tuple.clone(), Value::Str("x".into())]);
+    let wrapped_shape = value::TupleParts(vec![
+        value::TuplePart {
+            width: None,
+            tuple: Some(shape.clone()),
+        },
+        value::TuplePart {
+            width: None,
+            tuple: None,
+        },
+    ]);
+    assert_eq!(
+        show(&wrapped, Some(&wrapped_shape)),
+        "iuncta [iuncta [1.25, 4], \"x\"]"
+    );
+
+    // An interval is the same carrier with no tuple shape: its display is
+    // unchanged.
+    let interval = Value::Tuple(vec![Value::Int(1), Value::Int(3), Value::Bool(false)]);
+    assert_eq!(show(&interval, None), format!("{interval:?}"));
+}
+
+#[test]
+fn tuple_fields_index_by_declared_type() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let pair_field = interner.intern("pair");
+    let count_field = interner.intern("count");
+    let def = radix_hir::DefId(31);
+    let d64 = types.intern(decimal(NumericWidth::D64));
+    let int = types.intern(integer(NumericWidth::I64));
+    let pair = types.tuple(vec![d64, int]);
+    let mut context = MirValidationContext::new(&types);
+    context.struct_fields.insert(
+        def,
+        [
+            (pair_field, MirType::semantic(pair)),
+            (count_field, MirType::semantic(int)),
+        ]
+        .into_iter()
+        .collect(),
+    );
+    let fields = index_field_tuple_parts(&context, &types);
+    assert!(fields.contains_key(&(def, pair_field)));
+    assert!(!fields.contains_key(&(def, count_field)));
+
+    let mut names = value::DisplayNames::default();
+    names.insert(def, "Box".to_owned());
+    let mut structs = rustc_hash::FxHashMap::default();
+    structs.insert(def, vec![pair_field, count_field]);
+    let variants = rustc_hash::FxHashMap::default();
+    let order = value::FieldOrder {
+        names: &names,
+        tuple_fields: &fields,
+        ..value::FieldOrder::new(&structs, &variants)
+    };
+    let values: rustc_hash::FxHashMap<_, _> = [
+        (
+            pair_field,
+            Value::Tuple(vec![Value::Int(125_000_000), Value::Int(3)]),
+        ),
+        (count_field, Value::Int(2)),
+    ]
+    .into_iter()
+    .collect();
+    let boxed = Value::Struct(def, std::rc::Rc::new(std::cell::RefCell::new(values)));
+    assert_eq!(
+        boxed
+            .display(&interner, order, Span::default())
+            .expect("genus display"),
+        "Box { pair = iuncta [1.25, 3], count = 2 }"
+    );
+}
