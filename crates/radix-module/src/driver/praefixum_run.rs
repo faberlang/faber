@@ -1,13 +1,15 @@
 //! Run one `praefixum` body on the MIR runner (DECISIONS D8.5).
 
-use super::evaluation::{PRAEFIXUM_STEP_BUDGET, initializer_mut, invalid};
+use super::evaluation::{PRAEFIXUM_STEP_BUDGET, invalid, with_initializer_mut};
 use crate::driver::AnalyzedModule;
 use crate::mir::{MirLoweringOptions, lower_analyzed_unit};
 use crate::semantic::{self, SemanticError};
-use radix_hir::{DefId, HirExpressionKind, HirFunction, HirItem, HirItemKind};
+use radix_hir::visit::{HirVisitor, walk_local};
+use radix_hir::{DefId, HirExpressionKind, HirFunction, HirItem, HirItemKind, HirLocal};
 use radix_lexer::Span;
 use radix_mir_runner::{BufferHost, EvaluationFailure, RunnerError, Value, evaluate_function};
 use radix_syntax::CallablePosture;
+use rustc_hash::FxHashSet;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 /// Definition id of the synthetic evaluation function. It exists only while
@@ -31,7 +33,7 @@ pub(super) fn run_site(unit: &mut AnalyzedModule, def_id: DefId, span: Span) -> 
             HirItemKind::Constant(konst) => !matches!(konst.value.kind, HirExpressionKind::Praefixum(_)),
             _ => true,
         })
-        .cloned()
+        .map(|item| runnable_item(item, &reached))
         .chain(std::iter::once(HirItem {
             id: function.1,
             def_id: EVALUATION_DEF_ID,
@@ -48,6 +50,36 @@ pub(super) fn run_site(unit: &mut AnalyzedModule, def_id: DefId, span: Span) -> 
     result
 }
 
+/// An item with the methods the evaluation cannot lower removed: a method
+/// that still holds an unevaluated local `praefixum` and is not reached by the
+/// body (a reached method's sites were evaluated first, in dependency order).
+fn runnable_item(item: &HirItem, reached: &FxHashSet<DefId>) -> HirItem {
+    let mut item = item.clone();
+    if let HirItemKind::Struct(strukt) = &mut item.kind {
+        strukt
+            .methods
+            .retain(|method| reached.contains(&method.def_id) || !holds_praefixum(&method.func));
+    }
+    item
+}
+
+/// Whether a function body still contains a `praefixum` constant.
+fn holds_praefixum(function: &HirFunction) -> bool {
+    struct Finder(bool);
+    impl HirVisitor for Finder {
+        fn visit_local(&mut self, local: &HirLocal) {
+            self.0 |= local
+                .init
+                .as_ref()
+                .is_some_and(|init| matches!(init.kind, HirExpressionKind::Praefixum(_)));
+            walk_local(self, local);
+        }
+    }
+    let mut finder = Finder(false);
+    finder.visit_function(function);
+    finder.0
+}
+
 /// The body as a zero-argument synchronous function returning the declared
 /// type, with its HIR id.
 fn evaluation_function(
@@ -55,15 +87,15 @@ fn evaluation_function(
     def_id: DefId,
     span: Span,
 ) -> Result<(HirFunction, radix_hir::HirId), SemanticError> {
-    let (body, ret_ty) = initializer_mut(unit, def_id)
-        .and_then(|init| match &init.kind {
-            HirExpressionKind::Praefixum(inner) => match &inner.kind {
-                HirExpressionKind::Block(block) => Some((block.clone(), init.ty)),
-                _ => None,
-            },
+    let (body, ret_ty) = with_initializer_mut(unit, def_id, |init| match &init.kind {
+        HirExpressionKind::Praefixum(inner) => match &inner.kind {
+            HirExpressionKind::Block(block) => Some((block.clone(), init.ty)),
             _ => None,
-        })
-        .ok_or_else(|| invalid("praefixum_unsupported", span))?;
+        },
+        _ => None,
+    })
+    .flatten()
+    .ok_or_else(|| invalid("praefixum_unsupported", span))?;
     let symbol = unit.interner.intern("praefixum_evaluatio");
     let id = radix_hir::HirId(semantic::passes::statica::max_hir_id(&unit.hir) + 1);
     Ok((

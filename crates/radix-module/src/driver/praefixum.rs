@@ -1,13 +1,19 @@
-//! Build-time evaluation of `praefixum { … }` statics (DECISIONS D8.4–D8.6).
+//! Build-time evaluation of `praefixum { … }` constants (DECISIONS D8.4–D8.6).
 //!
-//! Semantic analysis has already proved each body pure and acyclic
-//! (`passes::praefixum`). Here, in dependency order, each body becomes the
-//! body of a synthetic zero-argument function that returns the declared type;
-//! the module is lowered to MIR with only that function and the functions it
-//! reaches, and the MIR runner evaluates it under a fixed step budget. The
-//! value is rebuilt as a HIR literal of the declared type and replaces the
-//! initializer, so every backend sees an ordinary constant. Statics that read
-//! a `praefixum` static fold afterwards (`statica::fold` runs again).
+//! Semantic analysis has already proved each body pure, acyclic and
+//! standalone (`passes::praefixum`). Here, in dependency order, each body
+//! becomes the body of a synthetic zero-argument function that returns the
+//! declared type; the module is lowered to MIR with only that function and the
+//! functions it reaches, and the MIR runner evaluates it under a fixed step
+//! budget. The value is rebuilt as a HIR literal of the declared type and
+//! replaces the initializer, so every backend sees an ordinary constant.
+//! Constants that read a `praefixum` constant fold afterwards
+//! (`statica::fold` runs again).
+//!
+//! The sites are module constants, genus field defaults, and block-level
+//! constants inside function bodies (`PraefixumSiteKind::Local`). A local
+//! site is found by its definition id wherever it sits, and keeps no authored
+//! copy: Faber re-emission never evaluates, so it prints the body itself.
 //!
 //! FAILURES
 //! ========
@@ -41,7 +47,8 @@ mod evaluation {
     use super::{AnalyzedModule, Diagnostic};
     use crate::diagnostics::DiagnosticConvert;
     use crate::semantic::{self, SemanticError, SemanticErrorKind};
-    use radix_hir::{DefId, HirExpression, HirItemKind};
+    use radix_hir::visit::{HirVisitorMut, walk_local_mut};
+    use radix_hir::{DefId, HirExpression, HirItemKind, HirLocal};
     use radix_lexer::Span;
 
     /// Step budget for one `praefixum` body. One step is one MIR basic-block
@@ -88,39 +95,62 @@ mod evaluation {
         SemanticError::structured(SemanticErrorKind::PraefixumInvalid, span).with_arg("issue", issue)
     }
 
-    /// The initializer slot of a static (top-level constant or static field).
-    pub(crate) fn initializer_mut(unit: &mut AnalyzedModule, def_id: DefId) -> Option<&mut HirExpression> {
+    /// Run `f` on the initializer slot of a site: a top-level constant, a
+    /// genus field default, or a block-level constant anywhere in a body.
+    pub(crate) fn with_initializer_mut<R>(
+        unit: &mut AnalyzedModule,
+        def_id: DefId,
+        f: impl FnOnce(&mut HirExpression) -> R,
+    ) -> Option<R> {
         for item in &mut unit.hir.items {
             match &mut item.kind {
-                HirItemKind::Constant(konst) if item.def_id == def_id => return Some(&mut konst.value),
+                HirItemKind::Constant(konst) if item.def_id == def_id => return Some(f(&mut konst.value)),
                 HirItemKind::Struct(strukt) => {
                     if let Some(field) = strukt
                         .fields
                         .iter_mut()
                         .find(|field| field.def_id == def_id)
                     {
-                        return field.init.as_mut();
+                        return field.init.as_mut().map(f);
                     }
                 }
                 _ => {}
             }
         }
-        None
+        let mut finder = LocalFinder { def_id, f: Some(f), out: None };
+        finder.visit_program_mut(&mut unit.hir);
+        finder.out
+    }
+
+    /// Finds a block-level constant by definition id.
+    struct LocalFinder<F, R> {
+        def_id: DefId,
+        f: Option<F>,
+        out: Option<R>,
+    }
+
+    impl<F: FnOnce(&mut HirExpression) -> R, R> HirVisitorMut for LocalFinder<F, R> {
+        fn visit_local_mut(&mut self, local: &mut HirLocal) {
+            if local.def_id != self.def_id {
+                walk_local_mut(self, local);
+            } else if let (Some(init), Some(f)) = (local.init.as_mut(), self.f.take()) {
+                self.out = Some(f(init));
+            }
+        }
     }
 
     fn evaluate_site(unit: &mut AnalyzedModule, def_id: DefId, span: Span) -> Result<(), SemanticError> {
         let value = super::run::run_site(unit, def_id, span)?;
         let literal = {
-            let declared = initializer_mut(unit, def_id)
-                .and_then(|init| init.ty)
+            let declared = with_initializer_mut(unit, def_id, |init| init.ty)
+                .flatten()
                 .ok_or_else(|| invalid("praefixum_result_not_literal", span))?;
             let mut builder = super::literal::LiteralBuilder::new(unit, span);
             builder.build(&value, declared)?
         };
-        let Some(init) = initializer_mut(unit, def_id) else {
+        let Some(authored) = with_initializer_mut(unit, def_id, |init| std::mem::replace(init, literal)) else {
             return Err(invalid("praefixum_unsupported", span));
         };
-        let authored = std::mem::replace(init, literal);
         // Faber re-emission prints the authored body, not the value.
         for item in &mut unit.hir.items {
             if let HirItemKind::Constant(konst) = &mut item.kind
@@ -150,3 +180,7 @@ mod tests;
 #[cfg(test)]
 #[path = "praefixum_module_constant_test.rs"]
 mod module_constant_tests;
+
+#[cfg(test)]
+#[path = "praefixum_local_test.rs"]
+mod local_tests;

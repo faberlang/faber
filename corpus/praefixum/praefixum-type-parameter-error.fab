@@ -1,0 +1,49 @@
++++
+term = "praefixum type parameter"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "fixum_decl", "const_init", "praefixum_expr", "block_stmt", "functio_decl", "type_parameters", "type_parameter", "parameter_list", "parameter", "redde_stmt", "assignment", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "incipit_stmt", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument"]
+category = "comptime"
+canonical = false
+summary = "A comptime body runs once, so inside a generic function or genus it may not depend on a type parameter."
+syntax = "fn f<T>() { const int n = comptime { var list<T> xs ← empty … } } — rejected"
+related = ["praefixum", "fixum"]
+locale = "en"
++++
+# =============================================================================
+# praefixum — a body may not depend on a type parameter
+# =============================================================================
+#
+# What this teaches:
+#   • A `comptime { … }` body is evaluated once, at build time, not once per
+#     instantiation of the enclosing generic function or genus. A body that
+#     mentions the type parameter `T` has no single value to compute, so it
+#     is `praefixum_type_parameter`, and the error names `T`.
+#   • A body that does not mention the parameter is fine inside a generic
+#     declaration.
+#
+# Common mistakes:
+#   • using the parameter in a local of the body — keep the body in concrete
+#     types, or move the constant out of the generic declaration.
+#
+# See also: praefixum, fixum
+# =============================================================================
+
+# praefixum-type-parameter-error — a comptime body names the type parameter
+#
+# WHY: pins st1 sub-ruling (b)/R9 at `faber check`: evaluation is once per
+# function, so a type-parameter dependence is rejected by issue name.
+#
+# EXPECTED OUTPUT:
+#   praefixum-type-parameter-error.expected — the stable diagnostic identity.
+
+fn longitudo<T>(T x) → int {
+    const int n = comptime {
+        var list<T> xs ← empty
+        return xs.length()
+    }
+    return n
+}
+
+main {
+    print longitudo(1)
+}

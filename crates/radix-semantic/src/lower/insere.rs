@@ -17,7 +17,8 @@ use radix_hir::{HirExpression, HirExpressionKind, HirId, HirInsere};
 use radix_syntax::{Expr, ExprKind, InsereExpr};
 
 impl Lowerer<'_> {
-    /// Lower the initializer of a module constant or genus field default.
+    /// Lower the initializer of a module constant, a block-level `=` constant,
+    /// or a genus field default: the one initializer surface (st1 R4/R6).
     ///
     /// A `praefixum { … }` body lowers to `Praefixum(Block)` for the driver's
     /// build-time evaluation (D8.5); it is legal only as the whole initializer.
@@ -39,17 +40,6 @@ impl Lowerer<'_> {
             }
             _ => self.lower_expr(init),
         };
-        self.compile_time_depth -= 1;
-        lowered
-    }
-
-    /// Lower the `=` initializer of a block-level constant. The expression
-    /// lowers inside a compile-time tree (so an embed is admitted); a bare
-    /// `praefixum` initializer stays rejected here until local evaluation
-    /// lands (`lower_expr` reports it).
-    pub(super) fn lower_compile_time_local_initializer(&mut self, init: &Expr) -> HirExpression {
-        self.compile_time_depth += 1;
-        let lowered = self.lower_expr(init);
         self.compile_time_depth -= 1;
         lowered
     }

@@ -699,7 +699,7 @@ impl Lowerer<'_> {
                 });
                 let init = decl.init.as_ref().map(|expr| {
                     if decl.compile_time {
-                        self.lower_compile_time_local_initializer(expr)
+                        self.lower_compile_time_initializer(expr)
                     } else {
                         self.lower_expr(expr)
                     }

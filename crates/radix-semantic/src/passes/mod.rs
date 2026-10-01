@@ -273,6 +273,9 @@ mod local_constants_test;
 mod module_constant_test;
 
 #[cfg(test)]
+#[path = "praefixum_local_test.rs"]
+mod praefixum_local_test;
+#[cfg(test)]
 #[path = "praefixum_test.rs"]
 mod praefixum_test;
 #[cfg(test)]

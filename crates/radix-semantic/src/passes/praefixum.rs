@@ -18,6 +18,20 @@
 //! through its callees. [`evaluation_order`] turns that into the order the
 //! driver evaluates `praefixum` statics in; a cycle through a `praefixum`
 //! static is SEM007 `constant_cycle`.
+//!
+//! LOCAL SITES
+//! ===========
+//! `fixum T x = praefixum { … }` inside a function body, method, closure or
+//! the entry block is a *local* site (st1 R6/R7). It runs exactly like a
+//! module constant (a free-standing synthetic function on the runner), so
+//! its body must stand alone (st1 R8/R9):
+//! - it may not read an enclosing parameter or local, including an earlier
+//!   compile-time local: SEM064 `praefixum_captures_local`;
+//! - in a generic function, method or genus it may not mention a type
+//!   parameter of the enclosing declaration: SEM064 `praefixum_type_parameter`.
+//!
+//! A function that contains a local site is, for ordering, a reader of that
+//! site: whoever calls the function waits for the site's evaluation.
 
 use crate::{SemanticError, SemanticErrorKind, Type, TypeTable};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local};
@@ -25,24 +39,54 @@ use radix_hir::{
     DefId, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirLocal, HirModule,
 };
 use radix_lexer::{Interner, Span, Symbol};
+use radix_types::{AppliedArg, TypeId, TypeParamConstraint};
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::borrow::Cow;
 
 const ISSUE_FORBIDDEN: &str = "praefixum_forbidden";
 const ISSUE_CYCLE: &str = "constant_cycle";
+const ISSUE_CAPTURES_LOCAL: &str = "praefixum_captures_local";
+const ISSUE_TYPE_PARAMETER: &str = "praefixum_type_parameter";
 
-/// One constant whose initializer is a `praefixum { … }` body: a module
-/// constant (`fixum T X = praefixum { … }`) or a genus static field.
+/// Where a `praefixum { … }` initializer sits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PraefixumSiteKind {
+    /// A module constant: `fixum T X = praefixum { … }`.
+    Constant,
+    /// A genus field default (`generis`, `fixum` or `varia`).
+    Field,
+    /// A block-level constant inside a function, method, closure or the
+    /// entry block. The driver keeps no authored copy: Faber re-emission
+    /// never evaluates, so it prints the body from the HIR itself.
+    Local,
+}
+
+/// One constant whose initializer is a `praefixum { … }` body.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PraefixumSite {
-    /// The static's definition: the constant item or the field.
+    /// The constant's definition: the constant item, the field, or the local.
     pub def_id: DefId,
     pub name: Symbol,
     pub span: Span,
+    pub kind: PraefixumSiteKind,
 }
 
-/// Every `praefixum` static in the module, in source order.
+/// Every `praefixum` site in the module: module constants and genus field
+/// defaults in item order, then local sites (innermost first inside one
+/// body, so an enclosing body never runs ahead of a site it contains).
 #[must_use]
 pub fn sites(hir: &HirModule) -> Vec<PraefixumSite> {
+    let scan = scan_locals(hir);
+    all_sites(hir, &scan)
+}
+
+fn all_sites(hir: &HirModule, scan: &LocalScan) -> Vec<PraefixumSite> {
+    let mut sites = item_sites(hir);
+    sites.extend(scan.sites.iter().map(|local| local.site));
+    sites
+}
+
+fn item_sites(hir: &HirModule) -> Vec<PraefixumSite> {
     let mut sites = Vec::new();
     for item in &hir.items {
         match &item.kind {
@@ -51,6 +95,7 @@ pub fn sites(hir: &HirModule) -> Vec<PraefixumSite> {
                     def_id: item.def_id,
                     name: konst.name,
                     span: konst.value.span,
+                    kind: PraefixumSiteKind::Constant,
                 });
             }
             HirItemKind::Struct(strukt) => {
@@ -62,6 +107,7 @@ pub fn sites(hir: &HirModule) -> Vec<PraefixumSite> {
                             def_id: field.def_id,
                             name: field.name,
                             span: init.span,
+                            kind: PraefixumSiteKind::Field,
                         });
                     }
                 }
@@ -72,18 +118,131 @@ pub fn sites(hir: &HirModule) -> Vec<PraefixumSite> {
     sites
 }
 
+// LOCAL SITES
+
+/// One declaration body (function, method, entry, field default) and the
+/// bindings it introduces: what a local site inside it could capture.
+struct Root {
+    bindings: FxHashMap<DefId, Symbol>,
+    /// Type parameters of the enclosing declaration(s).
+    type_params: Vec<Symbol>,
+}
+
+struct LocalSite {
+    site: PraefixumSite,
+    /// The `Praefixum` initializer expression (cloned out of the module).
+    init: HirExpression,
+    root: usize,
+}
+
+#[derive(Default)]
+struct LocalScan {
+    roots: Vec<Root>,
+    sites: Vec<LocalSite>,
+}
+
+/// Collects the bindings of one root and its local sites, innermost first.
+struct RootWalk {
+    bindings: FxHashMap<DefId, Symbol>,
+    found: Vec<(PraefixumSite, HirExpression)>,
+}
+
+impl HirVisitor for RootWalk {
+    fn visit_def(&mut self, def_id: DefId, name: Symbol) {
+        self.bindings.insert(def_id, name);
+    }
+
+    fn visit_local(&mut self, local: &HirLocal) {
+        walk_local(self, local);
+        if let Some(init) = &local.init
+            && is_praefixum(init)
+        {
+            self.found.push((
+                PraefixumSite {
+                    def_id: local.def_id,
+                    name: local.name,
+                    span: init.span,
+                    kind: PraefixumSiteKind::Local,
+                },
+                init.clone(),
+            ));
+        }
+    }
+}
+
+impl LocalScan {
+    fn add_root(&mut self, type_params: Vec<Symbol>, walk: impl FnOnce(&mut RootWalk)) {
+        let mut root_walk = RootWalk {
+            bindings: FxHashMap::default(),
+            found: Vec::new(),
+        };
+        walk(&mut root_walk);
+        if root_walk.found.is_empty() {
+            return;
+        }
+        let root = self.roots.len();
+        self.roots.push(Root {
+            bindings: root_walk.bindings,
+            type_params,
+        });
+        for (site, init) in root_walk.found {
+            self.sites.push(LocalSite { site, init, root });
+        }
+    }
+}
+
+fn scan_locals(hir: &HirModule) -> LocalScan {
+    let mut scan = LocalScan::default();
+    for item in &hir.items {
+        match &item.kind {
+            HirItemKind::Function(function) => {
+                let params = function
+                    .type_params
+                    .iter()
+                    .map(|param| param.name)
+                    .collect();
+                scan.add_root(params, |walk| walk.visit_function(function));
+            }
+            HirItemKind::Struct(strukt) => {
+                let owner: Vec<Symbol> =
+                    strukt.type_params.iter().map(|param| param.name).collect();
+                for method in &strukt.methods {
+                    let mut params = owner.clone();
+                    params.extend(method.func.type_params.iter().map(|param| param.name));
+                    scan.add_root(params, |walk| walk.visit_function(&method.func));
+                }
+                for field in &strukt.fields {
+                    if let Some(init) = &field.init {
+                        scan.add_root(owner.clone(), |walk| walk.visit_expr(init));
+                    }
+                }
+            }
+            HirItemKind::Constant(konst) => {
+                scan.add_root(Vec::new(), |walk| walk.visit_expr(&konst.value));
+            }
+            _ => {}
+        }
+    }
+    if let Some(entry) = &hir.entry {
+        scan.add_root(Vec::new(), |walk| walk.visit_block(entry));
+    }
+    scan
+}
+
 fn is_praefixum(expr: &HirExpression) -> bool {
     matches!(expr.kind, HirExpressionKind::Praefixum(_))
 }
 
-/// Check every `praefixum` body for forbidden effects and static cycles.
+/// Check every `praefixum` body for forbidden effects, static cycles,
+/// captured locals and type-parameter dependence.
 #[must_use]
 pub fn check(hir: &HirModule, types: &TypeTable, interner: &Interner) -> Vec<SemanticError> {
-    let sites = sites(hir);
+    let scan = scan_locals(hir);
+    let sites = all_sites(hir, &scan);
     if sites.is_empty() {
         return Vec::new();
     }
-    let mut graph = Graph::new(hir, types);
+    let mut graph = Graph::new(hir, types, &scan);
     let mut errors = Vec::new();
     for site in &sites {
         if let Some(violation) = graph.site_violation(site.def_id) {
@@ -103,6 +262,7 @@ pub fn check(hir: &HirModule, types: &TypeTable, interner: &Interner) -> Vec<Sem
             );
         }
     }
+    errors.extend(standalone_errors(hir, types, interner, &scan));
     if let Err(cycle) = graph.order(&sites) {
         errors.push(
             SemanticError::structured(SemanticErrorKind::CircularDependency, cycle.span)
@@ -111,6 +271,210 @@ pub fn check(hir: &HirModule, types: &TypeTable, interner: &Interner) -> Vec<Sem
         );
     }
     errors
+}
+
+// STANDALONE BODIES (st1 R8, R9)
+
+/// What a `praefixum` body mentions that ties it to its surroundings.
+struct BodyWalk<'a> {
+    types: &'a TypeTable,
+    functions: &'a FxHashSet<DefId>,
+    /// Type parameters of the enclosing declarations.
+    type_params: &'a [Symbol],
+    declared: FxHashSet<DefId>,
+    paths: Vec<DefId>,
+    param: Option<Symbol>,
+}
+
+impl BodyWalk<'_> {
+    fn note_type(&mut self, ty: Option<TypeId>) {
+        if self.param.is_none()
+            && let Some(ty) = ty
+        {
+            self.param = type_param_in(self.types, ty, self.type_params, &mut FxHashSet::default());
+        }
+    }
+}
+
+impl HirVisitor for BodyWalk<'_> {
+    fn visit_def(&mut self, def_id: DefId, _name: Symbol) {
+        self.declared.insert(def_id);
+    }
+
+    fn visit_local(&mut self, local: &HirLocal) {
+        self.note_type(local.ty);
+        walk_local(self, local);
+    }
+
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        match &expr.kind {
+            HirExpressionKind::Path(def_id) => {
+                self.paths.push(*def_id);
+                // A named function's type carries the callee's own
+                // parameters, not the enclosing declaration's.
+                if !self.functions.contains(def_id) {
+                    self.note_type(expr.ty);
+                }
+            }
+            HirExpressionKind::Call(_, type_args, ..)
+            | HirExpressionKind::MethodCall(_, _, type_args, ..) => {
+                for ty in type_args {
+                    self.note_type(Some(*ty));
+                }
+                self.note_type(expr.ty);
+            }
+            _ => self.note_type(expr.ty),
+        }
+        walk_expr(self, expr);
+    }
+}
+
+fn standalone_errors(
+    hir: &HirModule,
+    types: &TypeTable,
+    interner: &Interner,
+    scan: &LocalScan,
+) -> Vec<SemanticError> {
+    let functions: FxHashSet<DefId> = hir
+        .items
+        .iter()
+        .flat_map(|item| match &item.kind {
+            HirItemKind::Function(_) => vec![item.def_id],
+            HirItemKind::Struct(strukt) => {
+                strukt.methods.iter().map(|method| method.def_id).collect()
+            }
+            _ => Vec::new(),
+        })
+        .collect();
+    let mut errors = Vec::new();
+    let mut check_body = |site: &PraefixumSite,
+                          init: &HirExpression,
+                          root: Option<&Root>,
+                          type_params: &[Symbol]| {
+        let mut walk = BodyWalk {
+            types,
+            functions: &functions,
+            type_params,
+            declared: FxHashSet::default(),
+            paths: Vec::new(),
+            param: None,
+        };
+        walk.visit_expr(init);
+        let name = interner.resolve(site.name);
+        if let Some(root) = root
+            && let Some(captured) = walk
+                .paths
+                .iter()
+                .find(|def| root.bindings.contains_key(def) && !walk.declared.contains(def))
+        {
+            errors.push(
+                SemanticError::structured(SemanticErrorKind::PraefixumInvalid, init.span)
+                    .with_arg("issue", ISSUE_CAPTURES_LOCAL)
+                    .with_arg("name", name)
+                    .with_arg("captured", interner.resolve(root.bindings[captured])),
+            );
+        }
+        if let Some(param) = walk.param {
+            errors.push(
+                SemanticError::structured(SemanticErrorKind::PraefixumInvalid, init.span)
+                    .with_arg("issue", ISSUE_TYPE_PARAMETER)
+                    .with_arg("name", name)
+                    .with_arg("param", interner.resolve(param)),
+            );
+        }
+    };
+    for local in &scan.sites {
+        let root = &scan.roots[local.root];
+        check_body(&local.site, &local.init, Some(root), &root.type_params);
+    }
+    // A generic genus's field default runs once per genus, not per instance.
+    for item in &hir.items {
+        let HirItemKind::Struct(strukt) = &item.kind else {
+            continue;
+        };
+        if strukt.type_params.is_empty() {
+            continue;
+        }
+        let params: Vec<Symbol> = strukt.type_params.iter().map(|param| param.name).collect();
+        for field in &strukt.fields {
+            if let Some(init) = &field.init
+                && is_praefixum(init)
+            {
+                let site = PraefixumSite {
+                    def_id: field.def_id,
+                    name: field.name,
+                    span: init.span,
+                    kind: PraefixumSiteKind::Field,
+                };
+                check_body(&site, init, None, &params);
+            }
+        }
+    }
+    errors
+}
+
+/// The first of `params` that `ty` mentions, looking through every
+/// structural shape (aliases, containers, function signatures, applications).
+fn type_param_in(
+    types: &TypeTable,
+    ty: TypeId,
+    params: &[Symbol],
+    seen: &mut FxHashSet<TypeId>,
+) -> Option<Symbol> {
+    if params.is_empty() || !seen.insert(ty) {
+        return None;
+    }
+    let children: Vec<TypeId> = match types.get(ty) {
+        Type::Param(name) => return params.contains(name).then_some(*name),
+        Type::Array(inner)
+        | Type::Option(inner)
+        | Type::Ref(_, inner)
+        | Type::Promissum(inner)
+        | Type::Cursor(inner)
+        | Type::Atomic(inner)
+        | Type::Intervallum(inner)
+        | Type::Set(inner)
+        | Type::Queue(inner)
+        | Type::Stack(inner)
+        | Type::Alias(_, inner)
+        | Type::Tensor(inner, _)
+        | Type::Vector(inner, _)
+        | Type::Matrix(inner, _)
+        | Type::Sparsa(inner, _) => vec![*inner],
+        Type::BoundedArray { element, .. }
+        | Type::BoundedQueue { element, .. }
+        | Type::BoundedStack { element, .. } => vec![*element],
+        Type::Map(key, value)
+        | Type::PromissumFailable(key, value)
+        | Type::AsyncCursor(key, value) => vec![*key, *value],
+        Type::Func(sig) => {
+            let mut kids: Vec<TypeId> = sig.params.iter().map(|param| param.ty).collect();
+            kids.push(sig.ret);
+            kids.extend(sig.err);
+            for param in &sig.type_params {
+                if let TypeParamConstraint::OneOf(members) = &param.constraint {
+                    kids.extend(members.iter().copied());
+                }
+            }
+            kids
+        }
+        Type::Applied(base, args) => {
+            let mut kids = vec![*base];
+            kids.extend(args.iter().filter_map(|arg| match arg {
+                AppliedArg::Type(id) => Some(*id),
+                AppliedArg::Size(_) => None,
+            }));
+            kids
+        }
+        Type::Union(members) | Type::Intersection(members) | Type::Tuple(members) => {
+            members.clone()
+        }
+        Type::Record(fields) => fields.values().copied().collect(),
+        _ => return None,
+    };
+    children
+        .into_iter()
+        .find_map(|child| type_param_in(types, child, params, seen))
 }
 
 /// A `praefixum` static that depends on itself.
@@ -131,8 +495,9 @@ pub fn evaluation_order(
     hir: &HirModule,
     types: &TypeTable,
 ) -> Result<Vec<PraefixumSite>, StaticCycle> {
-    let sites = sites(hir);
-    Graph::new(hir, types).order(&sites)
+    let scan = scan_locals(hir);
+    let sites = all_sites(hir, &scan);
+    Graph::new(hir, types, &scan).order(&sites)
 }
 
 /// Every Faber function a static's initializer reaches through calls and
@@ -143,7 +508,7 @@ pub fn reached_functions(
     types: &TypeTable,
     static_def: DefId,
 ) -> FxHashSet<DefId> {
-    let mut graph = Graph::new(hir, types);
+    let mut graph = Graph::new(hir, types, &scan_locals(hir));
     let mut reached = FxHashSet::default();
     let mut stack = vec![static_def];
     while let Some(next) = stack.pop() {
@@ -179,14 +544,15 @@ struct Graph<'a> {
     types: &'a TypeTable,
     functions: FxHashMap<DefId, &'a HirFunction>,
     methods: FxHashMap<(DefId, Symbol), DefId>,
-    /// Static definitions (top-level constants, static fields) → initializer.
-    statics: FxHashMap<DefId, (Symbol, &'a HirExpression)>,
+    /// Static definitions (top-level constants, genus fields, local
+    /// `praefixum` constants) → initializer.
+    statics: FxHashMap<DefId, (Symbol, Cow<'a, HirExpression>)>,
     facts: FxHashMap<DefId, Facts>,
     violations: FxHashMap<DefId, Option<Violation>>,
 }
 
 impl<'a> Graph<'a> {
-    fn new(hir: &'a HirModule, types: &'a TypeTable) -> Self {
+    fn new(hir: &'a HirModule, types: &'a TypeTable, scan: &LocalScan) -> Self {
         let mut graph = Self {
             types,
             functions: FxHashMap::default(),
@@ -203,7 +569,7 @@ impl<'a> Graph<'a> {
                 HirItemKind::Constant(konst) => {
                     graph
                         .statics
-                        .insert(item.def_id, (konst.name, &konst.value));
+                        .insert(item.def_id, (konst.name, Cow::Borrowed(&konst.value)));
                 }
                 HirItemKind::Struct(strukt) => {
                     for method in &strukt.methods {
@@ -214,12 +580,20 @@ impl<'a> Graph<'a> {
                     }
                     for field in &strukt.fields {
                         if let Some(init) = &field.init {
-                            graph.statics.insert(field.def_id, (field.name, init));
+                            graph
+                                .statics
+                                .insert(field.def_id, (field.name, Cow::Borrowed(init)));
                         }
                     }
                 }
                 _ => {}
             }
+        }
+        for local in &scan.sites {
+            graph.statics.insert(
+                local.site.def_id,
+                (local.site.name, Cow::Owned(local.init.clone())),
+            );
         }
         graph
     }
@@ -233,7 +607,7 @@ impl<'a> Graph<'a> {
             };
             if let Some(function) = collector.graph.functions.get(&def_id).copied() {
                 collector.function(function);
-            } else if let Some((_, init)) = collector.graph.statics.get(&def_id).copied() {
+            } else if let Some((_, init)) = collector.graph.statics.get(&def_id) {
                 collector.visit_expr(init);
             }
             let facts = collector.facts;
@@ -404,6 +778,12 @@ impl HirVisitor for Collector<'_, '_> {
                 .as_ref()
                 .map_or(Span::default(), |init| init.span);
             self.effect("await", span);
+        }
+        if local.init.as_ref().is_some_and(is_praefixum) {
+            // A local `praefixum` is its own site. The body that contains it
+            // reads its substituted value: callers wait for the site.
+            self.facts.statics.push(local.def_id);
+            return;
         }
         walk_local(self, local);
     }

@@ -1,0 +1,126 @@
++++
+term = "praefixum ="
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "fixum_decl", "const_init", "praefixum_expr", "block_stmt", "genus_decl", "genus_member", "genus_field_decl", "field_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "functio_decl", "redde_stmt", "itera_stmt", "range_expr", "assignment", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "nota_stmt"]
+category = "comptime"
+canonical = false
+summary = "comptime computes a block-level constant at build time: inside functions, methods and the entry block."
+syntax = "const <type> <name> = comptime { … return <value> }"
+aliases = ["local comptime", "block-level comptime"]
+related = ["praefixum", "fixum", "insere"]
+locale = "en"
++++
+# =============================================================================
+# praefixum = — Computes a block-level constant at build time.
+# =============================================================================
+#
+# What this teaches:
+#   • One initializer surface — `comptime { … }` takes the same positions a
+#     module constant does: a block-level `const T x = comptime { … }` inside a
+#     function, a method, or the entry block. The `_` slot takes the type of
+#     the body's `return`.
+#   • The body runs once, during the build, and the program carries the
+#     finished literal. Every backend sees an ordinary local with a constant
+#     value.
+#   • The body stands alone: it may read module constants, call pure
+#     functions, and use its own locals. It may not read a parameter or a
+#     local of the enclosing body (that is a build error, `praefixum_captures_local`),
+#     and inside a generic function or genus it may not mention the type
+#     parameter (`praefixum_type_parameter`). Hoist what it needs to a
+#     module-level `const`.
+#   • A body may hold another `comptime` constant; the inner one runs first.
+#
+# Common mistakes:
+#   • Reading an enclosing parameter or local from the body — compute it
+#     inside the body, or hoist it to a module constant.
+#   • Using `comptime` outside an `=` constant — `x ← comptime { … }` and
+#     `1 + comptime { … }` are `praefixum_outside_constant`.
+#
+# See also: praefixum, fixum, insere
+# =============================================================================
+
+# praefixum = — build-time computation of a block-level constant
+#
+# GRAMMAR:
+#   fixum_decl     :← 'fixum' type_annotation IDENTIFIER '=' const_init
+#   const_init     :← expression
+#   praefixum_expr :← 'praefixum' block_stmt
+#
+# EXPECTED OUTPUT:
+#   praefixum-local.expected — the values computed at build time.
+
+const int LATUS = comptime {
+    return 4
+}
+
+fn quadratum(int n) → int {
+    return n * n
+}
+
+class Cista {
+    var int n
+
+    fn ter() → int {
+        const int factor = comptime {
+            return 3
+        }
+        return self.n * factor
+    }
+}
+
+fn grid_cells(int multiplier) → int {
+    # Computed once at build time, read at run time.
+    const int cells = comptime {
+        return LATUS * LATUS
+    }
+    return cells * multiplier
+}
+
+fn dash_line() → string {
+    const string dashes = comptime {
+        var string acc ← ""
+        for range 0‥6 const i {
+            acc ← acc + "-"
+        }
+        return acc
+    }
+    return dashes
+}
+
+fn squares_upto() → list<int> {
+    const list<int> squares = comptime {
+        var list<int> acc ← empty
+        for range 1‥6 const i {
+            acc.append(quadratum(i))
+        }
+        return acc
+    }
+    return squares
+}
+
+main {
+    const int seven = comptime {
+        return quadratum(2) + 3
+    }
+    const _ total_sq = comptime {
+        var int total ← 0
+        for range 1‥5 const i {
+            total ← total + quadratum(i)
+        }
+        return total
+    }
+    const int nested = comptime {
+        const int inner = comptime {
+            return 2
+        }
+        return inner + 1
+    }
+    print seven
+    print total_sq
+    print nested
+    print grid_cells(2)
+    print dash_line()
+    print squares_upto()
+    const Cista holder ← Cista { n = 5 }
+    print holder.ter()
+}

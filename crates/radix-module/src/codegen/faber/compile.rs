@@ -8,7 +8,7 @@
 //! analysis to their respective subsystems; this module integrates them and
 //! produces Faber output. Does not own emit internals.
 
-use crate::codegen::CodegenError;
+use crate::codegen::{CodegenError, Target};
 use crate::driver::{AnalyzeRequest, AnalyzedModule, Session, analyze_source};
 use crate::locale::{KeywordSurface, LocalePack, latin_locale_pack};
 use crate::program::compile::prepare_program_module_for_name;
@@ -59,6 +59,11 @@ pub fn reemit_faber(source_session: &Session, emit_pack: &LocalePack, name: &str
     // Re-emit prints the author's text: constant expressions stay unfolded
     // (F9 ruling 31), here and in the revalidation session cloned from this one.
     session.config.keep_authored_constants = true;
+    // Re-emission is the HirFaber path whichever session the caller passed:
+    // the driver evaluates `comptime` bodies only for other targets, and a
+    // block-level body keeps no authored copy, so evaluating here would print
+    // its literal value in place of the author's body.
+    session.config.target = Target::HirFaber;
     let mut analysis = match analyze_source(
         &session,
         name,

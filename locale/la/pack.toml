@@ -3684,8 +3684,16 @@ message = "invalid `{praefixum}` initializer"
 help = "keep a `{praefixum}` body to pure computation that yields a literal value"
 
 [diagnostics.SEM064.issues.praefixum_outside_constant]
-message = "`{praefixum}` is allowed only as the initializer of a module-level constant or a `{generis}` genus field"
+message = "`{praefixum}` is allowed only as the initializer of a `=` constant: a module-level constant, a block-level constant, or a genus field default"
 help = "move the computation into a constant initializer: `{fixum} T NAME = {praefixum}` followed by a block"
+
+[diagnostics.SEM064.issues.praefixum_captures_local]
+message = "`{praefixum}` initializer of `{name}` reads `{captured}`, a parameter or local of the enclosing body"
+help = "a build-time body stands alone: hoist `{captured}` to a module-level `{fixum} T NAME = …`, or compute it inside the body"
+
+[diagnostics.SEM064.issues.praefixum_type_parameter]
+message = "`{praefixum}` initializer of `{name}` depends on the type parameter `{param}`"
+help = "a build-time body runs once, not once per instantiation: keep `{param}` out of the body, or move the constant out of the generic declaration"
 
 [diagnostics.SEM064.issues.praefixum_forbidden]
 message = "`{praefixum}` initializer of `{name}` reaches `{effect}` through {chain}"

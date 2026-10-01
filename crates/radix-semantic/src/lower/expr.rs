@@ -89,9 +89,11 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
             .lower_shadowed_builtin(expr.id, lege.symbol)
             .unwrap_or(HirExpressionKind::ReadLine(lege.is_line)),
 
-        // `praefixum` is legal only as the whole initializer of a module
-        // constant or a genus field default, which lowers through
-        // `lower_compile_time_initializer` (D8.6).
+        // `praefixum` is legal only as the whole initializer of a `=`
+        // constant (module level, block level, genus field default), which
+        // lowers through `lower_compile_time_initializer` (D8.6, st1 R6).
+        // Every other position (a runtime `←` store, an operand, an
+        // argument) reaches here.
         ExprKind::Praefixum(_) => {
             lowerer.push_error(
                 SemanticErrorKind::PraefixumInvalid,
