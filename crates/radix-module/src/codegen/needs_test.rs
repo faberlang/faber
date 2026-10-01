@@ -57,6 +57,35 @@ incipit {
 }
 
 #[test]
+#[cfg(feature = "hir-rust")]
+fn rust_needs_regex_follows_the_regex_type_in_use() {
+    let (hir, types) = analyze_hir(
+        r#"
+incipit {
+  fixum textus s ← "a+"
+  fixum regex r ← s ↦ regex
+  nota r
+}
+"#,
+    );
+    let needs = collect_rust_needs(&hir, &types, BTreeSet::new(), None);
+    assert!(needs.needs_regex, "a regex literal requires the regex feature");
+    assert!(needs.needs_faber_runtime);
+
+    let (hir, types) = analyze_hir(
+        r"
+incipit {
+  fixum valor v ← 1
+  nota v
+}
+",
+    );
+    let needs = collect_rust_needs(&hir, &types, BTreeSet::new(), None);
+    assert!(!needs.needs_regex, "a program without a regex stays off the feature");
+    assert!(needs.needs_faber_runtime);
+}
+
+#[test]
 fn rust_prelude_policy_no_longer_scans_body_for_hashmap() {
     let prelude = include_str!("../../../radix-hir-rust/src/prelude.rs");
     assert!(!prelude.contains("code.contains(\"HashMap\""));
