@@ -258,3 +258,56 @@ fn negative_signed_to_unsigned_conversion_fails_closed() {
         Value::Int(5),
     );
 }
+
+#[test]
+fn variant_payload_fields_display_at_their_declared_width() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let cost = interner.intern("value");
+    let ratio = interner.intern("ratio");
+    let count = interner.intern("count");
+    let def = radix_hir::DefId(21);
+    let d64 = types.intern(decimal(NumericWidth::D64));
+    let f32 = types.intern(fractus(NumericWidth::F32));
+    let int = types.intern(integer(NumericWidth::I64));
+    let mut context = MirValidationContext::new(&types);
+    context.variant_fields.insert(
+        def,
+        [
+            (cost, MirType::semantic(d64)),
+            (ratio, MirType::semantic(f32)),
+            (count, MirType::semantic(int)),
+        ]
+        .into_iter()
+        .collect(),
+    );
+    let widths = index_field_float_widths(&context, &types);
+    assert_eq!(widths.get(&(def, cost)), Some(&NumericWidth::D64));
+    assert_eq!(widths.get(&(def, ratio)), Some(&NumericWidth::F32));
+    assert_eq!(widths.get(&(def, count)), None);
+
+    let mut names = value::DisplayNames::default();
+    names.insert(def, "Item.Cost".to_owned());
+    let structs = rustc_hash::FxHashMap::default();
+    let mut variants = rustc_hash::FxHashMap::default();
+    variants.insert(def, vec![cost, ratio, count]);
+    let order = value::FieldOrder {
+        float_widths: &widths,
+        names: &names,
+        ..value::FieldOrder::new(&structs, &variants)
+    };
+    let fields: rustc_hash::FxHashMap<_, _> = [
+        (cost, Value::Int(125_000_000)),
+        (ratio, Value::Float(f64::from(0.1_f32))),
+        (count, Value::Int(3)),
+    ]
+    .into_iter()
+    .collect();
+    let variant = Value::EnumVariant(def, std::rc::Rc::new(std::cell::RefCell::new(fields)));
+    assert_eq!(
+        variant
+            .display(&interner, order, Span::default())
+            .expect("variant display"),
+        "Item.Cost { value = 1.25, ratio = 0.1, count = 3 }"
+    );
+}
