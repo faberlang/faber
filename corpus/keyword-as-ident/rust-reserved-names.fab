@@ -1,7 +1,7 @@
 +++
 term = "rust-reserved-names"
 kind = "concept"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "genus_field_decl", "field_decl", "functio_decl", "param_list", "parameter", "redde_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "binary_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "assignment", "incipit_stmt", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "genus_field_decl", "field_decl", "functio_decl", "param_list", "parameter", "redde_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "assignment", "incipit_stmt", "nota_stmt"]
 category = "identifier"
 canonical = true
 summary = "Locals, parameters, fields and methods may be spelled like target-language reserved words."
