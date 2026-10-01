@@ -1,0 +1,47 @@
++++
+term = "shader-contract-bound-bindings"
+kind = "concept"
+category = "library"
+canonical = true
+summary = "Fragment stage with two bound-type parameters and a bound library call (SS-3E)."
+locale = "la"
++++
+
+# End-to-end bound-binding fixture. The library `zqlib:shade` (opaque types
+# `ZqTex` and `ZqSampler`, function `zq_sample`) is written into a temp library
+# home by the driver test, which also supplies the target maps.
+
+importa ex "zqlib:shade" shade
+
+@ shader_contract "varying"
+functio varying_matches(
+    textus source_name, numerus location, numerus format_code,
+    numerus interpolation_code, numerus role_code
+) → bivalens {
+    redde verum
+}
+
+@ shader_contract "fragment_output"
+functio fragment_output_matches(
+    numerus location, numerus format_code, numerus role_code
+) → bivalens {
+    redde verum
+}
+
+@ shader_contract "bound_resource_binding"
+functio bound_matches(numerus group, numerus binding, textus source_name) → bivalens {
+    redde verum
+}
+
+@ fragment
+functio shader_bound_bindings_fragment(shade.ZqTex tex, shade.ZqSampler samp) → vacuum {
+    fixum vector<f32, 4> sampled ← shade.zq_sample(tex, samp, uv)
+    out_color ← sampled
+}
+
+incipit {
+    adfirma varying_matches("uv", 0, 2, 1, 4) mori "uv varying at location 0, Float32x2"
+    adfirma fragment_output_matches(0, 4, 2) mori "fragment output location 0, vec4<f32>"
+    adfirma bound_matches(0, 0, "tex") mori "tex at group 0 binding 0"
+    adfirma bound_matches(0, 1, "samp") mori "samp at group 0 binding 1"
+}
