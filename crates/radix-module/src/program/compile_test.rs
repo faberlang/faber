@@ -3190,7 +3190,7 @@ functio limes() → iuncta<numerus, numerus> {
         .exports
         .get("schema_versio")
         .expect("const export");
-    let crate::file_interface::FileExportKind::Const(snapshot) = &schema_versio.kind else {
+    let crate::file_interface::FileExportKind::Const(snapshot, _) = &schema_versio.kind else {
         panic!("typed fixum must export as a Const snapshot, got {:?}", schema_versio.kind);
     };
     assert_eq!(

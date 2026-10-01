@@ -47,7 +47,7 @@ pub(super) fn exported_nominal_names(interface: &FileInterface) -> BTreeSet<Stri
             }
             FileExportKind::Function(_)
             | FileExportKind::TypeAlias(_)
-            | FileExportKind::Const(_) => None,
+            | FileExportKind::Const(..) => None,
         })
         .collect()
 }

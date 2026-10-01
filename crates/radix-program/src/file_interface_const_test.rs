@@ -29,3 +29,16 @@ fn publica_fixum_constant_exports_as_a_const() {
     assert!(constant.contains("Const"), "{constant}");
     assert!(constant.contains("LIMES"), "{constant}");
 }
+
+#[test]
+fn exported_constant_carries_its_folded_value() {
+    let constant = export_of("@ publica\nfixum numerus LIMES = 4 * 1024\n");
+    assert!(constant.contains("Some(Int(4096))"), "{constant}");
+}
+
+#[test]
+fn exported_constant_without_a_scalar_fold_carries_no_value() {
+    let constant = export_of("@ publica\nfixum lista<numerus> LIMES = [1, 2]\n");
+    assert!(constant.contains("Const"), "{constant}");
+    assert!(!constant.contains("Some(Int"), "{constant}");
+}

@@ -131,7 +131,21 @@ pub enum FileExportKind {
     Struct(InterfaceStructExport),
     Enum(InterfaceNominalExport),
     Interface(InterfaceNominalExport),
-    Const(InterfaceTypeSnapshot),
+    /// Constant type plus its folded compile-time value when the exporter's
+    /// initializer folds to a scalar or text; `None` keeps the importer
+    /// fail-closed (an imported constant without a value is not constant in a
+    /// consumer's `=` initializer).
+    Const(InterfaceTypeSnapshot, Option<InterfaceConstValue>),
+}
+
+/// Folded compile-time value of an exported constant: the scalar or text the
+/// exporter's initializer evaluates to (the `statica` fold domain).
+#[derive(Debug, Clone, PartialEq)]
+pub enum InterfaceConstValue {
+    Int(i128),
+    Float(f64),
+    Bool(bool),
+    Text(String),
 }
 
 /// Type-alias export: ordered declaration parameters plus the resolved body.

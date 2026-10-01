@@ -289,3 +289,116 @@ fn failed_dependency_declared_later_still_reports_its_own_error() {
         "constant_initializer_not_constant",
     );
 }
+
+// ST2-1: imported constants fold in `=` initializers.
+
+fn consts_interface(
+    value: Option<crate::file_interface::InterfaceConstValue>,
+) -> crate::file_interface::FileInterface {
+    use crate::file_interface::{
+        FileExport, FileExportKind, InterfaceCallable, InterfaceTypeSnapshot,
+    };
+    let mut interface = crate::file_interface::FileInterface::new();
+    interface.insert(FileExport {
+        name: "BASE".to_owned(),
+        kind: FileExportKind::Const(
+            InterfaceTypeSnapshot::Primitive(crate::Primitive::Numerus),
+            value,
+        ),
+    });
+    interface.insert(FileExport {
+        name: "septem".to_owned(),
+        kind: FileExportKind::Function(InterfaceCallable {
+            type_params: Vec::new(),
+            params: Vec::new(),
+            ret: Box::new(InterfaceTypeSnapshot::Primitive(crate::Primitive::Numerus)),
+            err: None,
+            is_async: false,
+            is_generator: false,
+            device: None,
+        }),
+    });
+    interface
+}
+
+fn analyze_with_consts(
+    source: &str,
+    value: Option<crate::file_interface::InterfaceConstValue>,
+) -> crate::test_support::AnalyzedFixture {
+    use crate::passes::visibility_annotation::VisibilityTier::Publica;
+    use std::collections::BTreeMap;
+    crate::test_support::analyze_source_with_import_contract(
+        source,
+        BTreeMap::from([(
+            "consts".to_owned(),
+            BTreeMap::from([("BASE".to_owned(), Publica), ("septem".to_owned(), Publica)]),
+        )]),
+        BTreeMap::from([("consts".to_owned(), consts_interface(value))]),
+    )
+}
+
+#[test]
+fn imported_constant_with_folded_value_folds_in_initializer() {
+    let fixture = analyze_with_consts(
+        "importa ex \"./consts\" consts\nfixum numerus D = consts.BASE * 2\n",
+        Some(crate::file_interface::InterfaceConstValue::Int(5)),
+    );
+    assert!(fixture.is_ok(), "diagnostics: {:?}", fixture.diagnostics);
+    let hir = fixture.result.hir.as_ref().expect("hir");
+    let konst = hir
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            HirItemKind::Constant(konst) if fixture.interner.resolve(konst.name) == "D" => {
+                Some(konst)
+            }
+            _ => None,
+        })
+        .expect("D");
+    assert_eq!(int_value(&konst.value), 10);
+    assert!(
+        konst.statica.as_ref().is_some_and(|s| s.authored.is_some()),
+        "the authored initializer stays for re-emission"
+    );
+}
+
+#[test]
+fn imported_constant_without_folded_value_stays_not_constant() {
+    let fixture = analyze_with_consts(
+        "importa ex \"./consts\" consts\nfixum numerus D = consts.BASE * 2\n",
+        None,
+    );
+    assert!(!fixture.is_ok());
+    assert!(
+        fixture.diagnostics.iter().any(|err| err.is_error()
+            && crate::test_support::issue(err) == Some("constant_initializer_not_constant")),
+        "diagnostics: {:?}",
+        fixture.diagnostics
+    );
+}
+
+#[test]
+fn imported_function_call_stays_not_constant() {
+    let fixture = analyze_with_consts(
+        "importa ex \"./consts\" consts\nfixum numerus G = consts.septem()\n",
+        Some(crate::file_interface::InterfaceConstValue::Int(5)),
+    );
+    assert!(!fixture.is_ok());
+    assert!(
+        fixture.diagnostics.iter().any(|err| err.is_error()
+            && crate::test_support::issue(err) == Some("constant_initializer_not_constant")),
+        "diagnostics: {:?}",
+        fixture.diagnostics
+    );
+}
+
+#[test]
+fn export_value_reads_folded_literals_by_declared_type() {
+    use crate::file_interface::InterfaceConstValue;
+    let (konst, interner) = static_const("fixum numerus LIMES = 4 * 1024\n", "LIMES");
+    let fixture = analyze_source("fixum numerus LIMES = 4 * 1024\n");
+    assert_eq!(
+        super::statica::export_value(&konst.value, konst.ty, &fixture.types, &interner),
+        Some(InterfaceConstValue::Int(4096))
+    );
+}

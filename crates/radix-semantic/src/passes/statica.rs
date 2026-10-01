@@ -16,6 +16,9 @@
 //!   `fractus`, and `bivalens` scalars, plus `textus` concatenation;
 //! - references to other constants, evaluated in dependency order (a cycle is
 //!   SEM007 `constant_cycle`);
+//! - `module.NAME` references to exported constants of an imported file whose
+//!   interface carries the folded value (ST2-1); an imported function call or
+//!   an exported constant without a folded value stays SEM060;
 //! - collection literals (`lista`, tuples, map construction) whose elements
 //!   are constants. These stay structural; only their scalar leaves fold.
 //!
@@ -39,7 +42,8 @@
 //! `top_level_binding`: module-level state is a compile-time constant
 //! (`const T X = e`) or does not exist.
 
-use crate::{SemanticError, SemanticErrorKind, Type, TypeTable};
+use crate::file_interface::InterfaceConstValue;
+use crate::{Resolver, SemanticError, SemanticErrorKind, SymbolKind, Type, TypeTable};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_program};
 use radix_hir::{
     DefId, HirArrayElement, HirBinOp, HirExpression, HirExpressionKind, HirId, HirItemKind,
@@ -73,7 +77,59 @@ pub fn reject_top_level_bindings(hir: &HirModule, interner: &Interner) -> Vec<Se
 
 /// Evaluate every static, report non-constant initializers and cycles, and
 /// rewrite foldable initializers to literals.
+///
+/// Module-local constants only: a `module.NAME` reference to an imported
+/// constant needs the resolver, see [`fold_with_imports`].
 pub fn fold(hir: &mut HirModule, types: &TypeTable, interner: &mut Interner) -> Vec<SemanticError> {
+    fold_inner(hir, types, interner, None)
+}
+
+/// [`fold`], additionally resolving `module.NAME` references to imported
+/// constants through the file interfaces installed in `resolver`.
+pub fn fold_with_imports(
+    hir: &mut HirModule,
+    types: &TypeTable,
+    interner: &mut Interner,
+    resolver: &Resolver,
+) -> Vec<SemanticError> {
+    fold_inner(hir, types, interner, Some(resolver))
+}
+
+/// The value an exported constant's interface carries: the scalar or text its
+/// (already folded) initializer evaluates to, conformed to the declared type.
+/// `None` for anything that does not fold to a scalar or text.
+#[must_use]
+pub fn export_value(
+    value: &HirExpression,
+    declared: Option<TypeId>,
+    types: &TypeTable,
+    interner: &Interner,
+) -> Option<InterfaceConstValue> {
+    let mut evaluator = Evaluator {
+        types,
+        imports: None,
+        inits: FxHashMap::default(),
+        state: FxHashMap::default(),
+    };
+    let folded = evaluator
+        .eval(value, interner)
+        .and_then(|folded| evaluator.fit_slot(folded, declared, value.span))
+        .ok()?;
+    match folded {
+        Value::Int(v) => Some(InterfaceConstValue::Int(v)),
+        Value::Float(v) => Some(InterfaceConstValue::Float(v)),
+        Value::Bool(b) => Some(InterfaceConstValue::Bool(b)),
+        Value::Text(text) => Some(InterfaceConstValue::Text(text)),
+        Value::Opaque => None,
+    }
+}
+
+fn fold_inner(
+    hir: &mut HirModule,
+    types: &TypeTable,
+    interner: &mut Interner,
+    imports: Option<&Resolver>,
+) -> Vec<SemanticError> {
     let mut inits = FxHashMap::default();
     let mut order = Vec::new();
     for item in &hir.items {
@@ -90,6 +146,7 @@ pub fn fold(hir: &mut HirModule, types: &TypeTable, interner: &mut Interner) -> 
 
     let mut evaluator = Evaluator {
         types,
+        imports,
         inits,
         state: FxHashMap::default(),
     };
@@ -120,6 +177,7 @@ pub fn fold(hir: &mut HirModule, types: &TypeTable, interner: &mut Interner) -> 
     let mut rewriter = Rewriter {
         evaluator: Evaluator {
             types,
+            imports,
             inits: FxHashMap::default(),
             state,
         },
@@ -192,6 +250,8 @@ enum Class {
 
 struct Evaluator<'a> {
     types: &'a TypeTable,
+    /// Resolver whose installed file interfaces supply imported constants.
+    imports: Option<&'a Resolver>,
     inits: FxHashMap<DefId, (Symbol, HirExpression, Option<TypeId>)>,
     state: FxHashMap<DefId, State>,
 }
@@ -261,6 +321,9 @@ impl Evaluator<'_> {
                         _ => Fault::at(ISSUE_DEPENDENCY, expr.span),
                     })?
             }
+            HirExpressionKind::Field(object, member) => self
+                .imported_value(object, *member)
+                .ok_or(Fault::at(ISSUE_NOT_CONSTANT, expr.span))?,
             HirExpressionKind::Praefixum(_) => return Err(Fault::at(ISSUE_DEFERRED, expr.span)),
             // An implicit store node (a narrowing into the static's slot):
             // the exact source value must fit the slot's type.
@@ -321,6 +384,27 @@ impl Evaluator<'_> {
             _ => return Err(Fault::at(ISSUE_NOT_CONSTANT, expr.span)),
         };
         self.fit(value, expr)
+    }
+
+    /// The folded value of `module.member` when `module` is an imported file
+    /// namespace whose interface carries one for that constant.
+    fn imported_value(&self, object: &HirExpression, member: Symbol) -> Option<Value> {
+        let resolver = self.imports?;
+        let HirExpressionKind::Path(module) = &object.kind else {
+            return None;
+        };
+        let namespace = resolver.get_symbol(*module)?;
+        if namespace.kind != SymbolKind::Module {
+            return None;
+        }
+        Some(
+            match resolver.namespace_file_const_value_canonical(namespace.name, member)? {
+                InterfaceConstValue::Int(v) => Value::Int(*v),
+                InterfaceConstValue::Float(v) => Value::Float(*v),
+                InterfaceConstValue::Bool(b) => Value::Bool(*b),
+                InterfaceConstValue::Text(text) => Value::Text(text.clone()),
+            },
+        )
     }
 
     fn eval_literal(
