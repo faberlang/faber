@@ -1,0 +1,92 @@
++++
+term = "functio"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "iace_stmt", "si_stmt", "fac_stmt", "cape_clause", "fixum_decl", "type_annotation", "owned_type", "base_type", "comparison", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "scriptum_expr", "nota_stmt"]
+category = "function"
+canonical = false
+summary = "In a ⇥ function, `fac { … redde … } cape err { }` returns only when the body succeeds; a handler that does not itself leave continues with the code after the block."
+syntax = "fac { <body with redde> } cape <name> { <handler> }  (in a ⇥ function)"
+related = ["functio", "⇥", "fac", "cape", "redde"]
+locale = "en"
++++
+# =============================================================================
+# functio — A handler that falls through continues after the block
+# =============================================================================
+#
+# What this teaches:
+#   • A `redde` inside `fac { }` returns from the enclosing function — but
+#     only on the path where the body succeeds.
+#   • When the body fails, the `cape` handler runs. A handler that does not
+#     leave (`redde`, `iace`) is not the end of the function: execution
+#     continues with the statement after the block.
+#   • A handler that throws sends its error out through the function's own
+#     `⇥` channel.
+#
+# Common mistakes:
+#   • Reading `fac { … redde … } cape { }` as "always returns": on failure
+#     the function carries on after the block.
+#
+# See also: functio, ⇥, fac, cape, redde
+# =============================================================================
+
+# functio — guarded return with a fall-through handler
+#
+# EXPECTED OUTPUT:
+#   handled-return-fallthrough.expected — one line per print.
+
+fn risky(int n) → int ⇥ string {
+    if n ≻ 5 {
+        throw "too big"
+    }
+    return n
+}
+
+# An empty handler: failure falls through to the code after the block.
+fn attempt(int n) → string ⇥ string {
+    do {
+        const int v ← risky(n)
+        return "ok §"(v)
+    }
+    catch err {
+    }
+    return "caught"
+}
+
+# A handler with a side effect that still falls through.
+fn recover(int n) → string ⇥ string {
+    do {
+        const int v ← risky(n)
+        return "ok §"(v)
+    }
+    catch err {
+        print "recovering: §"(err)
+    }
+    return "fell through"
+}
+
+# A handler that leaves: through the function's own ⇥ channel.
+fn escalate(int n) → string ⇥ string {
+    do {
+        const int v ← risky(n)
+        return "ok §"(v)
+    }
+    catch err {
+        throw "wrapped: §"(err)
+    }
+    return "unreached"
+}
+
+main {
+    print attempt(1)
+    print attempt(9)
+    print recover(2)
+    print recover(7)
+    do {
+        print escalate(3)
+        print escalate(8)
+        print "unreached"
+    }
+    catch err {
+        print "outer: §"(err)
+    }
+}

@@ -1,0 +1,113 @@
++++
+term = "functio"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "iace_stmt", "si_stmt", "fac_stmt", "cape_clause", "fixum_decl", "type_annotation", "owned_type", "base_type", "comparison", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "scriptum_expr", "nota_stmt"]
+category = "function"
+canonical = false
+summary = "A failable call is unwrapped wherever it stands in an expression: as a print argument, an operand, an argument of another call or a statement of its own. A failure leaves the enclosing handler or ⇥ function at that call."
+syntax = "print <failable call>  |  <failable call> + <failable call>  |  <failable call>  (inside fac/cape or a ⇥ function)"
+related = ["functio", "⇥", "fac", "cape", "iace"]
+locale = "en"
++++
+# =============================================================================
+# functio — A failable call nested in an expression
+# =============================================================================
+#
+# What this teaches:
+#   • A failable call (`→ T ⇥ E`) does not need to be a local initialiser or
+#     a `redde` value. It can be a `print` argument, an operand, an argument
+#     of another call, or a statement of its own.
+#   • Wherever it stands, the call yields its success value when it succeeds.
+#     When it fails, the failure leaves the enclosing `fac { } cape err { }`
+#     (the `cape` runs) or the enclosing `⇥` function (its caller sees the
+#     same error) at that call. Nothing after it in the expression runs.
+#   • Evaluation order is the source order, left to right.
+#
+# Common mistakes:
+#   • Expecting a failed call in a `print` to print something. The failure
+#     leaves first; the `print` never happens.
+#   • Calling a failable function in a helper that has neither a handler nor
+#     its own `⇥` — that is `failable_call_requires_handler`.
+#
+# See also: functio, ⇥, fac, cape, iace
+# =============================================================================
+
+# functio — failable calls nested in expressions
+#
+# EXPECTED OUTPUT:
+#   failable-call-nested.expected — one line per print.
+
+fn risky(int n) → int ⇥ string {
+    if n ≻ 5 {
+        throw "too big"
+    }
+    return n
+}
+
+# An operand inside a `redde`, and an argument of another call.
+fn doubled(int n) → int ⇥ string {
+    return risky(n) * 2
+}
+
+# A print argument, an operand in a local initialiser, and a statement of its
+# own, inside a function that declares the same `⇥` channel.
+fn tally(int n) → string ⇥ string {
+    print risky(n)
+    const int total ← risky(n) + risky(n + 1)
+    risky(n + 2)
+    return "total §"(total)
+}
+
+main {
+    # 1. A print argument in a protected block: the second call fails.
+    do {
+        print risky(1)
+        print risky(9)
+        print "unreached"
+    }
+    catch err {
+        print "caught: §"(err)
+    }
+
+    # 2. Several failable calls in one expression, left to right: the failure
+    #    is the first failing call.
+    do {
+        print "sum §"(risky(2) + risky(3))
+        print "sum §"(risky(4) + risky(7) + risky(1))
+        print "unreached"
+    }
+    catch err {
+        print "caught: §"(err)
+    }
+
+    # 3. A failable call as the argument of another failable call.
+    do {
+        print doubled(risky(2))
+        print doubled(risky(6))
+        print "unreached"
+    }
+    catch err {
+        print "caught: §"(err)
+    }
+
+    # 4. Through a ⇥ function: success, then each failing position.
+    do {
+        print tally(1)
+        print tally(4)
+        print "unreached"
+    }
+    catch err {
+        print "caught: §"(err)
+    }
+
+    # 5. A failable call as a statement of its own.
+    do {
+        risky(2)
+        print "statement ok"
+        risky(8)
+        print "unreached"
+    }
+    catch err {
+        print "caught: §"(err)
+    }
+}
