@@ -88,6 +88,31 @@ fn stub_artifact_round_trips_through_msgpack() {
     assert_eq!(original, decoded);
 }
 
+/// N7E-1: the policy-float cell survives the MessagePack wire at the current
+/// schema (the encode/decode pair validates the artifact on both sides).
+#[test]
+fn policy_float_cells_round_trip_through_msgpack() {
+    use radix_types::{FloatPolicy, NumericWidth, Type, TypeTable};
+
+    let mut table = TypeTable::new();
+    let cell = table.intern(Type::PolicyFloat(
+        FloatPolicy::Saturating,
+        NumericWidth::F16,
+    ));
+    let mut original = stub_artifact();
+    original.types = table.snapshot();
+
+    let bytes = encode_msgpack(&original).expect("msgpack-encode HirArtifact");
+    let decoded = decode_msgpack(&bytes).expect("msgpack-decode HirArtifact");
+    assert_eq!(decoded.schema_version, SCHEMA_VERSION);
+    assert_eq!(original, decoded);
+    let restored = TypeTable::from_snapshot(decoded.types).expect("restore type table");
+    assert_eq!(
+        restored.get(cell),
+        &Type::PolicyFloat(FloatPolicy::Saturating, NumericWidth::F16)
+    );
+}
+
 #[test]
 fn selective_import_round_trips_through_msgpack() {
     let original = crate::test_support::selective_import_artifact();
@@ -177,7 +202,7 @@ fn unit_wire_uses_the_named_keys_in_order() {
     assert_eq!(top_keys(&value), UNIT_KEYS);
 
     // §2 row 1: version is a uint fact.
-    assert_eq!(get(&value, &["schema_version"]), Some(&Value::Uint(28)));
+    assert_eq!(get(&value, &["schema_version"]), Some(&Value::Uint(29)));
 
     // §2 row 2: source identity map with its named keys.
     assert!(matches!(
@@ -621,7 +646,7 @@ fn package_msgpack_wire_uses_named_keys_and_nested_unit_values() {
     // modules[0] is src/aux.fab; its record carries the named module keys.
     let aux = at(&value, &[Step::Key("modules"), Step::Idx(0)]).expect("modules[0]");
     assert_eq!(top_keys(aux), MODULE_KEYS);
-    assert_eq!(get(aux, &["unit_schema_version"]), Some(&Value::Uint(28)));
+    assert_eq!(get(aux, &["unit_schema_version"]), Some(&Value::Uint(29)));
 
     // The unit is a nested named map with the unit keys — not bin.
     let unit = get(aux, &["unit"]).expect("nested unit");

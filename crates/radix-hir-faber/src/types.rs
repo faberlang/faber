@@ -166,6 +166,12 @@ impl super::FaberCodegen<'_> {
                 width.faber_marker()
             ),
 
+            Type::PolicyFloat(policy, width) => format!(
+                "{}<{}>",
+                surface.type_surface(policy_word_binding(*policy)),
+                width.faber_marker()
+            ),
+
             Type::Option(inner) => {
                 let inner = self.type_to_faber(self.flatten_option(*inner), names, surface);
                 // Nullable type: both members are type positions, so the null
@@ -613,6 +619,14 @@ impl super::FaberCodegen<'_> {
                 Ok(format!(
                     "{}<{}>",
                     surface.type_surface(TypeBindingKind::SaturatingWord),
+                    width.faber_marker()
+                ))
+            }
+            Type::PolicyFloat(policy, width) => {
+                Self::expect_no_form_args(form)?;
+                Ok(format!(
+                    "{}<{}>",
+                    surface.type_surface(policy_word_binding(*policy)),
                     width.faber_marker()
                 ))
             }
@@ -1141,3 +1155,12 @@ mod tests;
 #[cfg(test)]
 #[path = "types_form_test.rs"]
 mod form_test;
+
+/// Type-surface binding of a policy-float cell's policy word (D5): the same
+/// `TrappingWord` / `SaturatingWord` bindings the integer cells use.
+fn policy_word_binding(policy: radix_types::FloatPolicy) -> TypeBindingKind {
+    match policy {
+        radix_types::FloatPolicy::Trapping => TypeBindingKind::TrappingWord,
+        radix_types::FloatPolicy::Saturating => TypeBindingKind::SaturatingWord,
+    }
+}

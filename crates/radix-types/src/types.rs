@@ -254,6 +254,18 @@ impl TypeTable {
         self.first_modular_word
     }
 
+    /// First interned [`Type::PolicyFloat`] cell, if any.
+    ///
+    /// Linear scan used by backend gates that have no cell lowering yet
+    /// (N7E-1: each fails closed by its own named issue).
+    #[must_use]
+    pub fn first_policy_float(&self) -> Option<(FloatPolicy, NumericWidth)> {
+        self.types.iter().find_map(|ty| match ty {
+            Type::PolicyFloat(policy, width) => Some((*policy, *width)),
+            _ => None,
+        })
+    }
+
     /// First interned [`Type::SaturatingWord`] width, if any.
     ///
     /// Linear scan used by backend rejection (targets without a clamp lowering).
@@ -725,6 +737,7 @@ impl TypeTable {
             Type::SizedNumeric(_, _)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
+            | Type::PolicyFloat(_, _)
             | Type::SizedInstans(_) => true,
             _ => false,
         }
@@ -1000,6 +1013,7 @@ impl TypeTable {
             (Type::SizedNumeric(pa, aw), Type::SizedNumeric(pb, bw)) => pa == pb && aw == bw,
             (Type::ModularWord(aw), Type::ModularWord(bw))
             | (Type::SaturatingWord(aw), Type::SaturatingWord(bw)) => aw == bw,
+            (Type::PolicyFloat(ap, aw), Type::PolicyFloat(bp, bw)) => ap == bp && aw == bw,
             (Type::SizedInstans(ap), Type::SizedInstans(bp)) => ap == bp,
             // Bare seconds default and explicit `instans<N>` are distinct semantic types.
             (Type::Primitive(Primitive::Instans), Type::SizedInstans(_))
@@ -1702,6 +1716,12 @@ pub enum Type {
     /// arithmetic clamps at both ends of `W` (D11.1). Signed or unsigned.
     SaturatingWord(NumericWidth),
 
+    /// Policy-carrying float cell (`trapping<W>` or `saturating<W>` with `W`
+    /// a float width, D5 of the N7e delivery). One variant for both policies:
+    /// the policy is data. The width is always a float width. Constructible
+    /// only through the type table; the front end does not resolve it yet.
+    PolicyFloat(FloatPolicy, NumericWidth),
+
     /// Sized `instans<N>` primitive (`ms`, `us`, `ns`).
     SizedInstans(InstansPrecision),
 
@@ -1809,6 +1829,10 @@ impl Hash for Type {
                 w.hash(state);
             }
             Self::ModularWord(w) | Self::SaturatingWord(w) => w.hash(state),
+            Self::PolicyFloat(policy, w) => {
+                policy.hash(state);
+                w.hash(state);
+            }
             Self::SizedInstans(p) => p.hash(state),
             Self::Ref(m, t) => {
                 m.hash(state);
@@ -1834,6 +1858,26 @@ impl Hash for Type {
                 members.hash(state);
             }
             Self::Error => {}
+        }
+    }
+}
+
+/// Overflow policy of a [`Type::PolicyFloat`] cell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum FloatPolicy {
+    /// `trapping<W>`: a non-finite value stored into the cell traps.
+    Trapping,
+    /// `saturating<W>`: evaluates as the bare float; the cell is a type identity.
+    Saturating,
+}
+
+impl FloatPolicy {
+    /// Policy word used in diagnostics and pretty-print (`trapping`/`saturating`).
+    #[must_use]
+    pub fn word(self) -> &'static str {
+        match self {
+            Self::Trapping => "trapping",
+            Self::Saturating => "saturating",
         }
     }
 }
@@ -2230,6 +2274,7 @@ fn is_numeric_carrier(ty: &Type) -> bool {
             | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
+            | Type::PolicyFloat(_, _)
     )
 }
 
@@ -2341,6 +2386,7 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
         | Type::SizedNumeric(_, _)
         | Type::ModularWord(_)
         | Type::SaturatingWord(_)
+        | Type::PolicyFloat(_, _)
         | Type::SizedInstans(_)
         | Type::Struct(_)
         | Type::Enum(_)

@@ -1884,6 +1884,7 @@ fn via_target_takes_hint(lowerer: &Lowerer<'_>, target: &HirConversioTarget) -> 
             | crate::Type::SizedNumeric(..)
             | crate::Type::ModularWord(_)
             | crate::Type::SaturatingWord(_)
+            | crate::Type::PolicyFloat(..)
             | crate::Type::BoundedAscii { .. }
             | crate::Type::BoundedOcteti { .. }
             | crate::Type::Vector(..)

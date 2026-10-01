@@ -29,6 +29,7 @@ impl KeywordSurface for LaSurface {
             TypeBindingKind::Primitive(Primitive::Textus) => "textus",
             TypeBindingKind::Primitive(Primitive::Octeti) => "octeti",
             TypeBindingKind::TrappingWord => "exactus",
+            TypeBindingKind::SaturatingWord => "saturatus",
             TypeBindingKind::Collection(CollectionKind::Lista) => "lista",
             TypeBindingKind::Collection(CollectionKind::Tabula) => "tabula",
             TypeBindingKind::TensorFamily(TensorFamilyKind::Tensor) => "tensor",
@@ -53,6 +54,7 @@ impl KeywordSurface for EnSurface {
         match kind {
             TypeBindingKind::Primitive(Primitive::Numerus) => "int",
             TypeBindingKind::TrappingWord => "trapping",
+            TypeBindingKind::SaturatingWord => "saturating",
             TypeBindingKind::Collection(CollectionKind::Lista) => "list",
             other => LaSurface.type_surface(other),
         }
@@ -229,6 +231,70 @@ fn trapping_policy_word_keeps_its_own_spelling_over_one_type_id() {
     assert_eq!(
         render_at(&codegen, &declared_site(4), fx.lista_u32, &EnSurface),
         "list<trapping<u32>>"
+    );
+}
+
+/// N7E-1: the policy-float cell re-emits through the existing
+/// `TrappingWord` / `SaturatingWord` bindings in both locales, both through
+/// the canonical spelling (no recorded form) and through a recorded LONG form.
+#[test]
+fn policy_float_cells_re_emit_in_both_locales() {
+    let mut fx = fixture();
+    let trapping_f32 = fx.types.intern(Type::PolicyFloat(
+        radix_types::FloatPolicy::Trapping,
+        NumericWidth::F32,
+    ));
+    let saturating_f16 = fx.types.intern(Type::PolicyFloat(
+        radix_types::FloatPolicy::Saturating,
+        NumericWidth::F16,
+    ));
+    let codegen = codegen_with_forms(
+        &fx,
+        vec![
+            (
+                declared_site(1),
+                semantic_form(TypeFormLevel::LONG, trapping_f32, Vec::new()),
+            ),
+            (
+                declared_site(2),
+                semantic_form(TypeFormLevel::LONG, saturating_f16, Vec::new()),
+            ),
+        ],
+    );
+    let names = FxHashMap::default();
+
+    assert_eq!(
+        codegen.type_to_faber(trapping_f32, &names, &LaSurface),
+        "exactus<f32>"
+    );
+    assert_eq!(
+        codegen.type_to_faber(trapping_f32, &names, &EnSurface),
+        "trapping<f32>"
+    );
+    assert_eq!(
+        codegen.type_to_faber(saturating_f16, &names, &LaSurface),
+        "saturatus<f16>"
+    );
+    assert_eq!(
+        codegen.type_to_faber(saturating_f16, &names, &EnSurface),
+        "saturating<f16>"
+    );
+
+    assert_eq!(
+        render_at(&codegen, &declared_site(1), trapping_f32, &LaSurface),
+        "exactus<f32>"
+    );
+    assert_eq!(
+        render_at(&codegen, &declared_site(1), trapping_f32, &EnSurface),
+        "trapping<f32>"
+    );
+    assert_eq!(
+        render_at(&codegen, &declared_site(2), saturating_f16, &LaSurface),
+        "saturatus<f16>"
+    );
+    assert_eq!(
+        render_at(&codegen, &declared_site(2), saturating_f16, &EnSurface),
+        "saturating<f16>"
     );
 }
 

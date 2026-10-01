@@ -84,13 +84,14 @@ pub use schema_subset::{
 };
 pub use types::{
     ATOMIC_ELEMENT_MSG, AccessMarker, AppliedArg, CollectionKind, CollectionTypeSpec, ContractRef,
-    FuncSig, GenericBindingSource, GenericParamDescriptor, GenericParamSort, GenericWitness,
-    INTERVALLUM_BOUND_MSG, InferVar, MarkerFamily, ParamType, Primitive, PrimitiveTypeSpec,
-    ResolvedGenericBinding, ResolvedGenericCall, SemanticGenericParamDefault, SemanticMutability,
-    SemanticParamMode, TensorFamilyKind, TensorFamilyTypeSpec, Type, TypeId, TypeParamConstraint,
-    TypeTable, TypeTableSnapshot, collection_type_specs, is_atomic_element_type,
-    is_intervallum_bound_type, lookup_collection_type_spec, lookup_primitive_type_spec,
-    lookup_tensor_family_type_spec, primitive_type_specs, tensor_family_type_specs,
+    FloatPolicy, FuncSig, GenericBindingSource, GenericParamDescriptor, GenericParamSort,
+    GenericWitness, INTERVALLUM_BOUND_MSG, InferVar, MarkerFamily, ParamType, Primitive,
+    PrimitiveTypeSpec, ResolvedGenericBinding, ResolvedGenericCall, SemanticGenericParamDefault,
+    SemanticMutability, SemanticParamMode, TensorFamilyKind, TensorFamilyTypeSpec, Type, TypeId,
+    TypeParamConstraint, TypeTable, TypeTableSnapshot, collection_type_specs,
+    is_atomic_element_type, is_intervallum_bound_type, lookup_collection_type_spec,
+    lookup_primitive_type_spec, lookup_tensor_family_type_spec, primitive_type_specs,
+    tensor_family_type_specs,
 };
 
 #[cfg(test)]

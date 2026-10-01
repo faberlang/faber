@@ -297,3 +297,33 @@ fn unrepresentable_type_and_index_shapes_fail_closed() {
         })
     );
 }
+
+/// N7E-1: the policy-float cell snapshots and imports back to the same
+/// structural type, for both policies and a float width of each family.
+#[test]
+fn policy_float_file_interface_round_trip() {
+    use radix_types::FloatPolicy;
+
+    let interner = Interner::new();
+    let mut types = TypeTable::new();
+    let cases = [
+        (FloatPolicy::Trapping, NumericWidth::F32),
+        (FloatPolicy::Trapping, NumericWidth::F64),
+        (FloatPolicy::Saturating, NumericWidth::F16),
+        (FloatPolicy::Saturating, NumericWidth::BF16),
+    ];
+    for (policy, width) in cases {
+        let cell = types.intern(Type::PolicyFloat(policy, width));
+        let snapshot = snapshot_interface_type(cell, &types, &interner).expect("snapshot cell");
+        assert_eq!(snapshot, InterfaceTypeSnapshot::PolicyFloat(policy, width));
+
+        let mut target_types = TypeTable::new();
+        let mut target_interner = Interner::new();
+        let imported = import_interface_type(&snapshot, &mut target_types, &mut target_interner)
+            .expect("import cell");
+        assert_eq!(
+            target_types.get(imported),
+            &Type::PolicyFloat(policy, width)
+        );
+    }
+}

@@ -527,6 +527,7 @@ impl TypeName for Type {
             Type::Intervallum(_) => "intervallum",
             Type::ModularWord(_) => "modular",
             Type::SaturatingWord(_) => "saturating",
+            Type::PolicyFloat(_, _) => "policy_float",
             Type::Union(_) => "union",
             Type::Intersection(_) => "intersection",
             Type::Ref(_, _) => "ref",

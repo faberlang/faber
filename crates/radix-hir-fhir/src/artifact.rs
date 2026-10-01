@@ -542,7 +542,10 @@ pub struct FunctionProvenanceTableWire {
 /// with the `ᵀ` glyph); schema-v26 artifacts fail closed. Version 28 adds
 /// `HirPresentation::numeric_twin_ids` (which assignments are desugared
 /// in-place numeric twin method calls); schema-v27 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 28;
+/// Version 29 adds `Type::PolicyFloat` (the `trapping<W>` / `saturating<W>`
+/// float cell, N7E-1), shifting the serde ordinal of the `Type` variants after
+/// `SaturatingWord`; schema-v28 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 29;
 
 /// Serializable snapshot of one analyzed provider unit carried for HIR
 /// emission (ARCH-U4 carriage).

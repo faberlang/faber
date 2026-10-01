@@ -11,11 +11,11 @@ use crate::NumericWidth;
 use crate::TypeId;
 use crate::index::{IndexExpr, IndexId, i64s_from_literal_index};
 use crate::{
-    AccessMarker, AppliedArg, CollectionKind, FuncSig, GenericParamDescriptor, GenericParamSort,
-    ParamType, Primitive, SemanticGenericParamDefault, SemanticMutability, SemanticParamMode,
-    TensorFamilyKind, Type, TypeParamConstraint, TypeTable, collection_type_specs,
-    lookup_collection_type_spec, lookup_primitive_type_spec, lookup_tensor_family_type_spec,
-    primitive_type_specs, tensor_family_type_specs,
+    AccessMarker, AppliedArg, CollectionKind, FloatPolicy, FuncSig, GenericParamDescriptor,
+    GenericParamSort, ParamType, Primitive, SemanticGenericParamDefault, SemanticMutability,
+    SemanticParamMode, TensorFamilyKind, Type, TypeParamConstraint, TypeTable,
+    collection_type_specs, lookup_collection_type_spec, lookup_primitive_type_spec,
+    lookup_tensor_family_type_spec, primitive_type_specs, tensor_family_type_specs,
 };
 
 /// One unconstrained, default-free `typus` descriptor for `FuncSig` tests.
@@ -1969,4 +1969,63 @@ fn intersection_equality_ignores_member_order() {
     let second = types.intern(Type::Intersection(vec![b, a]));
     assert!(types.equals(first, second));
     assert!(!types.equals(first, a));
+}
+
+// --- N7E-1: policy-float cell type (plumbing; nothing constructs it yet) ---
+
+#[test]
+fn policy_float_interns_by_policy_and_width() {
+    let mut types = TypeTable::new();
+    let trapping_f32 = types.intern(Type::PolicyFloat(FloatPolicy::Trapping, NumericWidth::F32));
+    assert_eq!(
+        types.intern(Type::PolicyFloat(FloatPolicy::Trapping, NumericWidth::F32)),
+        trapping_f32
+    );
+    let saturating_f32 = types.intern(Type::PolicyFloat(
+        FloatPolicy::Saturating,
+        NumericWidth::F32,
+    ));
+    let trapping_f64 = types.intern(Type::PolicyFloat(FloatPolicy::Trapping, NumericWidth::F64));
+    assert_ne!(trapping_f32, saturating_f32);
+    assert_ne!(trapping_f32, trapping_f64);
+    assert!(types.equals(trapping_f32, trapping_f32));
+    assert!(!types.equals(trapping_f32, saturating_f32));
+    assert!(!types.equals(trapping_f32, trapping_f64));
+    // A cell is its own type, never the bare float of its width.
+    let bare_f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    assert_ne!(trapping_f32, bare_f32);
+    assert!(!types.equals(trapping_f32, bare_f32));
+}
+
+#[test]
+fn policy_float_is_a_scalar_for_access_markers() {
+    let mut types = TypeTable::new();
+    let cell = types.intern(Type::PolicyFloat(
+        FloatPolicy::Saturating,
+        NumericWidth::F16,
+    ));
+    assert!(types.is_scalar_for_access_marker(cell));
+}
+
+#[test]
+fn first_policy_float_tracks_the_table_and_survives_snapshot() {
+    let mut types = TypeTable::new();
+    assert_eq!(types.first_policy_float(), None);
+    let _ = types.intern(Type::PolicyFloat(
+        FloatPolicy::Saturating,
+        NumericWidth::BF16,
+    ));
+    let _ = types.intern(Type::PolicyFloat(FloatPolicy::Trapping, NumericWidth::F64));
+    assert_eq!(
+        types.first_policy_float(),
+        Some((FloatPolicy::Saturating, NumericWidth::BF16))
+    );
+    let restored = TypeTable::from_snapshot(types.snapshot()).expect("snapshot");
+    assert_eq!(restored.first_policy_float(), types.first_policy_float());
+}
+
+#[test]
+fn policy_float_policy_words_are_the_surface_words() {
+    assert_eq!(FloatPolicy::Trapping.word(), "trapping");
+    assert_eq!(FloatPolicy::Saturating.word(), "saturating");
 }

@@ -517,6 +517,7 @@ fn contains_unresolved_type(
         Type::Primitive(_)
         | Type::ModularWord(_)
         | Type::SaturatingWord(_)
+        | Type::PolicyFloat(_, _)
         | Type::SizedInstans(_)
         | Type::Struct(_)
         | Type::Enum(_)

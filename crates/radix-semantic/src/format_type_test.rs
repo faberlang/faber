@@ -113,3 +113,28 @@ fn format_faber_type_record_render_round_trips_through_parser() {
         parsed.errors
     );
 }
+
+/// N7E-1: the policy-float cell prints with the Latin policy word and its
+/// float width marker.
+#[test]
+fn policy_float_cells_format_with_policy_word_and_width() {
+    use radix_types::{FloatPolicy, Type};
+
+    let interner = Interner::new();
+    let mut types = TypeTable::new();
+    let trapping = types.intern(Type::PolicyFloat(FloatPolicy::Trapping, NumericWidth::F32));
+    let saturating = types.intern(Type::PolicyFloat(
+        FloatPolicy::Saturating,
+        NumericWidth::F16,
+    ));
+
+    let name = |_| "unused".to_owned();
+    assert_eq!(
+        format_faber_type(trapping, &types, &interner, &name),
+        "exactus<f32>"
+    );
+    assert_eq!(
+        format_faber_type(saturating, &types, &interner, &name),
+        "saturatus<f16>"
+    );
+}

@@ -676,6 +676,11 @@ impl<'a> DerivedCapabilityQueries<'a> {
             Type::Primitive(prim) => Ok(self.primitive_law(*prim, law)),
             Type::SizedNumeric(prim, width) => Ok(self.sized_numeric_law(*prim, *width, law)),
             Type::ModularWord(_) | Type::SaturatingWord(_) | Type::SizedInstans(_) => Ok(true),
+            // N7E-1: a policy-float cell carries the laws of the bare float of
+            // its width (D2/D3: it evaluates as that float).
+            Type::PolicyFloat(_, width) => {
+                Ok(self.sized_numeric_law(Primitive::Fractus, *width, law))
+            }
             Type::Option(inner) => {
                 Ok(self.type_law(*inner, law, visiting)? && !matches!(law, TypeLaw::Ordering))
             }
