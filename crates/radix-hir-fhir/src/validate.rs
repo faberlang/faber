@@ -3483,7 +3483,7 @@ pub(crate) fn validate_referential_integrity(
             crate::artifact::ReturnedBorrowWire::None => {}
             crate::artifact::ReturnedBorrowWire::Parameter(def_id)
             | crate::artifact::ReturnedBorrowWire::Definition(def_id) => {
-                checks.check_def(def_id)?
+                checks.check_def(def_id)?;
             }
         }
         for relationship in &row.required_regions {

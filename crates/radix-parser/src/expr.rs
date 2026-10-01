@@ -415,7 +415,7 @@ impl Parser {
     /// Parse the format tier.
     ///
     /// GRAMMAR:
-    ///   format := bitwise_or ['¶' STRING]
+    ///   format := `bitwise_or` ['¶' STRING]
     ///
     /// WHY: `¶` (D2.1) is looser than arithmetic and tighter than comparison,
     /// so `a + b ¶ ".2"` is `(a + b) ¶ ".2"` (D2.5). The spec must be a string
