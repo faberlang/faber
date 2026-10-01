@@ -918,6 +918,36 @@ fn run_round_trip_check(binary: &std::path::Path, package: &std::path::Path) -> 
         .collect()
 }
 
+/// FD-1: the refusal names the lost construct by code, issue and args.
+#[test]
+fn convert_construct_loss_diagnostic_carries_code_issue_and_construct() {
+    let path = Path::new("lossy.fab");
+    let session = super::super::format::format_session(path, None, HOOK_SOURCE)
+        .expect("hook fixture must resolve a session");
+    let emit_pack = faber_cli::package::embedded_conversion_locale_pack("la").expect("la pack");
+    let result =
+        radix::module::codegen::faber::reemit_faber(&session, &emit_pack, "lossy.fab", HOOK_SOURCE);
+    assert!(result.output.is_none(), "a lossy conversion writes nothing");
+    let refusal = result
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.issue() == Some("ast_construct_dropped"))
+        .expect("the refusal must carry the ast_construct_dropped issue");
+    assert_eq!(
+        refusal.lookup_key().as_deref(),
+        Some("CODEGEN006:ast_construct_dropped")
+    );
+    let construct = refusal
+        .args
+        .iter()
+        .find(|arg| arg.name == "construct")
+        .map(|arg| arg.value.as_str());
+    assert!(
+        construct.is_some_and(|value| value.starts_with("hook:Praepara")),
+        "the construct arg must name the dropped hook: {construct:?}"
+    );
+}
+
 /// FD-1: `convert` refuses rather than deleting a construct HIR cannot carry.
 #[test]
 fn convert_refuses_construct_loss() {
@@ -937,10 +967,8 @@ fn convert_refuses_construct_loss() {
             "{args:?} must exit non-zero:\n{stderr}"
         );
         assert!(
-            stderr.contains("CODEGEN006")
-                && stderr.contains("ast_construct_dropped")
-                && stderr.contains("hook:Praepara"),
-            "{args:?} must name the loss:\n{stderr}"
+            !stderr.is_empty(),
+            "{args:?} must report the refusal on stderr"
         );
         assert!(
             output.stdout.is_empty(),
