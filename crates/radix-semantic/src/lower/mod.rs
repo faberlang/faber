@@ -925,14 +925,15 @@ impl<'a> Lowerer<'a> {
         suite_path: &[Symbol],
         out: &mut Vec<HirItem>,
     ) {
-        // Only `praepara ... omnia` setup/teardown blocks flow into nested
-        // suites. Local setup blocks are intentionally owned by the suite level
-        // where they were written so generated tests do not inherit more fixture
-        // work than the source requested.
-        let mut combined_setup = inherited_setup.to_vec();
+        // Every hook declared on this suite runs for this suite's own cases, in
+        // source order after the inherited ones. Only `omnia` hooks also flow
+        // into nested suites; a local hook stays with the suite that wrote it.
+        let mut case_setup = inherited_setup.to_vec();
+        let mut nested_setup = inherited_setup.to_vec();
         for setup in &suite.body.setup {
+            case_setup.push(setup);
             if setup.all {
-                combined_setup.push(setup);
+                nested_setup.push(setup);
             }
         }
 
@@ -945,7 +946,7 @@ impl<'a> Lowerer<'a> {
         for case in &suite.body.tests {
             out.push(self.lower_proba_item(
                 case,
-                &combined_setup,
+                &case_setup,
                 &combined_modifiers,
                 &combined_suite_path,
             ));
@@ -954,7 +955,7 @@ impl<'a> Lowerer<'a> {
         for nested in &suite.body.nested {
             self.lower_probandum_items(
                 nested,
-                &combined_setup,
+                &nested_setup,
                 &combined_modifiers,
                 &combined_suite_path,
                 out,

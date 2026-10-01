@@ -629,6 +629,57 @@ fn compile_lowers_probandum_nested_cases_without_lowering_errors() {
     }));
 }
 
+#[test]
+fn compile_probandum_hooks_scope_local_to_suite_and_omnia_to_nested() {
+    let session = test_session(Target::HirRust);
+    let source = r#"probandum "outer" {
+  praepara omnia {
+    nota "HOOK_ALL"
+  }
+
+  praepara {
+    nota "HOOK_LOCAL"
+  }
+
+  proba "own case" {
+    nota "BODY_OWN"
+  }
+
+  probandum "inner" {
+    proba "nested case" {
+      nota "BODY_NESTED"
+    }
+  }
+}"#;
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
+    assert!(
+        result.success(),
+        "expected suite hooks to compile, got {:?}",
+        result.diagnostics
+    );
+    let code = super::rust_output(result).code;
+
+    let own_start = code.find("BODY_OWN").expect("own case body emitted");
+    let own_case = &code[code[..own_start].rfind("fn ").expect("own case fn")..];
+    let own_end = own_case.find("BODY_NESTED").unwrap_or(own_case.len());
+    let own_case = &own_case[..own_end];
+    let all = own_case.find("HOOK_ALL").expect("omnia hook in own case");
+    let local = own_case.find("HOOK_LOCAL").expect("local hook in own case");
+    let body = own_case.find("BODY_OWN").expect("body in own case");
+    assert!(all < local && local < body, "hooks precede body: {own_case}");
+
+    let nested_start = code.find("BODY_NESTED").expect("nested body emitted");
+    let nested_case = &code[code[..nested_start].rfind("fn ").expect("nested case fn")..];
+    assert!(
+        nested_case.contains("HOOK_ALL"),
+        "omnia hook reaches nested case: {nested_case}"
+    );
+    assert!(
+        !nested_case.contains("HOOK_LOCAL"),
+        "local hook must not reach nested case: {nested_case}"
+    );
+}
+
 // ── struct / constructors / destructuring ──
 
 #[test]
