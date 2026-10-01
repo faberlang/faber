@@ -5,9 +5,9 @@
   "lane": "hir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "dedicated": 7,
-    "fallback": 1,
-    "rejected": 0,
+    "dedicated": 6,
+    "fallback": 0,
+    "rejected": 2,
     "not-emitted": 0
   },
   "cells": [
@@ -26,7 +26,7 @@
     {
       "src": "d64",
       "tgt": "u32",
-      "tier": "dedicated",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -50,13 +50,13 @@
     {
       "src": "textus",
       "tgt": "d64",
-      "tier": "dedicated",
+      "tier": "rejected",
       "measured": true
     },
     {
       "src": "d64",
       "tgt": "textus",
-      "tier": "fallback",
+      "tier": "dedicated",
       "measured": true
     }
   ]

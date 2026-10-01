@@ -352,9 +352,9 @@ pub fn classify_conversio_coverage(
             }
         }
         ConversioCoverageTarget::Go => {
-            if driver_modular_word_blocked(src, tgt) {
-                ConversioCoverage::NotEmitted
-            } else if go_family_unrepresentable(src) || go_family_unrepresentable(tgt) {
+            // No modulus block: the Go backend lowers words (measured; the
+            // block now survives on TypeScript only).
+            if go_family_unrepresentable(src) || go_family_unrepresentable(tgt) {
                 // Go's `type_to_go` rejects these families outright; no
                 // lowering exists, not even the `.(T)` type-assertion fallback.
                 ConversioCoverage::NotEmitted
@@ -443,6 +443,17 @@ fn sexp_lowers_conversio(src: ConversioTypeFamily, tgt: ConversioTypeFamily) -> 
                 | ConversioTypeFamily::Regex
         );
     }
+    // Integer ↦ integer slot and integer/float ↦ float lower through the exact
+    // Racket carriers (`is_integer_conversion` / `is_float_conversion`; words
+    // count as integers).
+    let is_integer =
+        |family: ConversioTypeFamily| matches!(family, ConversioTypeFamily::Numerus | ConversioTypeFamily::Modulus);
+    if is_integer(src) && (is_integer(tgt) || tgt == ConversioTypeFamily::Fractus) {
+        return true;
+    }
+    if src == ConversioTypeFamily::Fractus && tgt == ConversioTypeFamily::Fractus {
+        return true;
+    }
     src == ConversioTypeFamily::Vector && tgt == ConversioTypeFamily::Vector
 }
 
@@ -472,6 +483,15 @@ fn semantic_conversio_rejected(src: ConversioTypeFamily, tgt: ConversioTypeFamil
         return true;
     }
     if src == ConversioTypeFamily::Octeti && is_numeric_family(tgt) {
+        return true;
+    }
+
+    // D11.6 ruling 24: `↦` into a `wrapping`/`saturating` word admits integer
+    // sources (the `numerus` family, words included) only; float, text, and
+    // every other family are `unsupported_conversio`.
+    if tgt == ConversioTypeFamily::Modulus
+        && !matches!(src, ConversioTypeFamily::Numerus | ConversioTypeFamily::Modulus)
+    {
         return true;
     }
 
@@ -617,8 +637,9 @@ fn rust_dedicated_composite_arm(src: ConversioTypeFamily, tgt: ConversioTypeFami
         return true;
     }
 
-    // Instans precision and `valor`/`textus → instans`.
-    if matches!((src, tgt), (Instans | Valor | Textus, Instans)) {
+    // Instans precision, `valor`/`textus → instans`, and `numerus → instans`
+    // (epoch units via `Instans::from_epoch_integer`, rg1 `55a44a9fc`).
+    if matches!((src, tgt), (Instans | Valor | Textus | Numerus, Instans)) {
         return true;
     }
 
@@ -668,8 +689,10 @@ fn rust_dedicated_composite_arm(src: ConversioTypeFamily, tgt: ConversioTypeFami
 // cells render `—`. These are oracle predictions; measurement owns the cells.
 // ===========================================================================
 
-/// The driver hard-blocks `modulus` on non-Rust, non-Faber targets
-/// (`reject_modular_word_target`) until modular edge-vector parity lands.
+/// The TypeScript backend hard-blocks `modulus` (`modulus is not supported by
+/// the ts target until modular edge-vector parity is landed`). Go lowers
+/// words; the driver's own `reject_modular_word_target` now covers only the
+/// Metal/WGSL text lanes.
 fn driver_modular_word_blocked(src: ConversioTypeFamily, tgt: ConversioTypeFamily) -> bool {
     src == ConversioTypeFamily::Modulus || tgt == ConversioTypeFamily::Modulus
 }
@@ -687,7 +710,7 @@ fn ts_has_dedicated_conversio_arm(src: ConversioTypeFamily, tgt: ConversioTypeFa
 
 /// `true` when the Go backend has a dedicated arm for the pair.
 fn go_has_dedicated_conversio_arm(src: ConversioTypeFamily, tgt: ConversioTypeFamily) -> bool {
-    use ConversioTypeFamily::{Ascii, Bivalens, Fractus, Instans, Numerus, Octeti, Regex, Textus, Valor};
+    use ConversioTypeFamily::{Ascii, Bivalens, Fractus, Instans, Modulus, Numerus, Octeti, Regex, Textus, Valor};
     // Go's dedicated set: scalar/text/byte/truthiness bridges, instans
     // formatting/parsing, valor boxing (`any(...)`), valor→scalar/byte
     // extraction, and regex sources. Tensor/sparsa targets have no dedicated
@@ -700,7 +723,19 @@ fn go_has_dedicated_conversio_arm(src: ConversioTypeFamily, tgt: ConversioTypeFa
     }
     if matches!(
         (src, tgt),
-        (Instans | Valor | Textus, Instans) | (Numerus | Fractus | Bivalens | Textus | Ascii, Valor)
+        (Instans | Valor | Textus | Numerus, Instans) | (Numerus | Fractus | Bivalens | Textus | Ascii, Valor)
+    ) {
+        return true;
+    }
+    // Word (`wrapping`/`saturating`) sources reduce to the scalar/text/byte/
+    // valor/instans targets with dedicated arms; `numerus ↦ modulus` reduces.
+    // Collection and ML targets take the type-assertion fallback.
+    if matches!(
+        (src, tgt),
+        (
+            Modulus,
+            Numerus | Fractus | Bivalens | Textus | Ascii | Octeti | Valor | Instans | Modulus
+        ) | (Numerus, Modulus)
     ) {
         return true;
     }

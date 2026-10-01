@@ -165,22 +165,6 @@
     },
     {
       "src": "numerus",
-      "tgt": "instans",
-      "target": "ts",
-      "predicted": "fallback",
-      "measured": "dedicated",
-      "detail": "arm:dedicated"
-    },
-    {
-      "src": "numerus",
-      "tgt": "instans",
-      "target": "go",
-      "predicted": "fallback",
-      "measured": "dedicated",
-      "detail": "arm:dedicated"
-    },
-    {
-      "src": "numerus",
       "tgt": "modulus",
       "target": "llvm-text",
       "predicted": "not-emitted",
@@ -618,30 +602,6 @@
       "predicted": "fallback",
       "measured": "dedicated",
       "detail": "arm:dedicated"
-    },
-    {
-      "src": "fractus",
-      "tgt": "modulus",
-      "target": "llvm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "fractus",
-      "tgt": "modulus",
-      "target": "wasm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "fractus",
-      "tgt": "modulus",
-      "target": "wasm",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
     },
     {
       "src": "fractus",
@@ -1130,30 +1090,6 @@
       "predicted": "fallback",
       "measured": "dedicated",
       "detail": "arm:dedicated"
-    },
-    {
-      "src": "bivalens",
-      "tgt": "modulus",
-      "target": "llvm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "bivalens",
-      "tgt": "modulus",
-      "target": "wasm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "bivalens",
-      "tgt": "modulus",
-      "target": "wasm",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
     },
     {
       "src": "bivalens",
@@ -1615,14 +1551,6 @@
       "src": "textus",
       "tgt": "instans",
       "target": "wasm",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "textus",
-      "tgt": "modulus",
-      "target": "llvm-text",
       "predicted": "not-emitted",
       "measured": "dedicated",
       "detail": "mir-capable"
@@ -2125,14 +2053,6 @@
     },
     {
       "src": "ascii",
-      "tgt": "modulus",
-      "target": "llvm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "ascii",
       "tgt": "lista",
       "target": "ts",
       "predicted": "fallback",
@@ -2589,14 +2509,6 @@
     },
     {
       "src": "octeti",
-      "tgt": "modulus",
-      "target": "llvm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "octeti",
       "tgt": "lista",
       "target": "rust",
       "predicted": "fallback",
@@ -3162,14 +3074,6 @@
       "predicted": "fallback",
       "measured": "dedicated",
       "detail": "arm:dedicated"
-    },
-    {
-      "src": "regex",
-      "tgt": "modulus",
-      "target": "llvm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
     },
     {
       "src": "regex",
@@ -4061,14 +3965,6 @@
     },
     {
       "src": "json",
-      "tgt": "modulus",
-      "target": "llvm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "json",
       "tgt": "lista",
       "target": "ts",
       "predicted": "fallback",
@@ -4565,14 +4461,6 @@
     },
     {
       "src": "valor",
-      "tgt": "modulus",
-      "target": "llvm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "valor",
       "tgt": "lista",
       "target": "go",
       "predicted": "fallback",
@@ -5063,14 +4951,6 @@
       "src": "instans",
       "tgt": "instans",
       "target": "wasm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "instans",
-      "tgt": "modulus",
-      "target": "llvm-text",
       "predicted": "not-emitted",
       "measured": "dedicated",
       "detail": "mir-capable"
@@ -5917,14 +5797,6 @@
     },
     {
       "src": "lista",
-      "tgt": "modulus",
-      "target": "llvm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "lista",
       "tgt": "lista",
       "target": "ts",
       "predicted": "fallback",
@@ -6349,14 +6221,6 @@
     },
     {
       "src": "tabula",
-      "tgt": "modulus",
-      "target": "llvm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "tabula",
       "tgt": "lista",
       "target": "go",
       "predicted": "fallback",
@@ -6765,14 +6629,6 @@
     },
     {
       "src": "copia",
-      "tgt": "modulus",
-      "target": "llvm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "copia",
       "tgt": "lista",
       "target": "go",
       "predicted": "fallback",
@@ -7170,14 +7026,6 @@
       "predicted": "not-emitted",
       "measured": "dedicated",
       "detail": "arm:dedicated"
-    },
-    {
-      "src": "intervallum",
-      "tgt": "modulus",
-      "target": "llvm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
     },
     {
       "src": "intervallum",
@@ -7565,14 +7413,6 @@
     },
     {
       "src": "tensor",
-      "tgt": "modulus",
-      "target": "llvm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "tensor",
       "tgt": "lista",
       "target": "go",
       "predicted": "fallback",
@@ -8110,14 +7950,6 @@
     {
       "src": "vector",
       "tgt": "instans",
-      "target": "llvm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "vector",
-      "tgt": "modulus",
       "target": "llvm-text",
       "predicted": "not-emitted",
       "measured": "dedicated",
@@ -9102,14 +8934,6 @@
     {
       "src": "cursor",
       "tgt": "instans",
-      "target": "llvm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "cursor",
-      "tgt": "modulus",
       "target": "llvm-text",
       "predicted": "not-emitted",
       "measured": "dedicated",

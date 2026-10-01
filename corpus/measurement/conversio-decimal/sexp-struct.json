@@ -5,58 +5,58 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "dedicated": 0,
+    "dedicated": 6,
     "fallback": 0,
-    "rejected": 0,
-    "not-emitted": 8
+    "rejected": 2,
+    "not-emitted": 0
   },
   "cells": [
     {
       "src": "d64",
       "tgt": "i64",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
       "src": "i64",
       "tgt": "d64",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
       "src": "d64",
       "tgt": "u32",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
       "src": "u32",
       "tgt": "d64",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
       "src": "fractus",
       "tgt": "d64",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
       "src": "d64",
       "tgt": "fractus",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
       "src": "textus",
       "tgt": "d64",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
       "src": "d64",
       "tgt": "textus",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     }
   ]

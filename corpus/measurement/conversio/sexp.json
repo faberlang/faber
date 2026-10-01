@@ -5,22 +5,22 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "dedicated": 20,
+    "dedicated": 27,
     "fallback": 0,
-    "rejected": 191,
-    "not-emitted": 230
+    "rejected": 208,
+    "not-emitted": 206
   },
   "cells": [
     {
       "src": "numerus",
       "tgt": "numerus",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
       "src": "numerus",
       "tgt": "fractus",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
@@ -74,7 +74,7 @@
     {
       "src": "numerus",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
@@ -146,7 +146,7 @@
     {
       "src": "fractus",
       "tgt": "fractus",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
@@ -200,7 +200,7 @@
     {
       "src": "fractus",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -326,7 +326,7 @@
     {
       "src": "bivalens",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -452,7 +452,7 @@
     {
       "src": "textus",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -578,7 +578,7 @@
     {
       "src": "ascii",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -704,7 +704,7 @@
     {
       "src": "octeti",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -830,7 +830,7 @@
     {
       "src": "regex",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -956,7 +956,7 @@
     {
       "src": "json",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -1082,7 +1082,7 @@
     {
       "src": "valor",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -1208,7 +1208,7 @@
     {
       "src": "instans",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -1274,13 +1274,13 @@
     {
       "src": "modulus",
       "tgt": "numerus",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
       "src": "modulus",
       "tgt": "fractus",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
@@ -1334,7 +1334,7 @@
     {
       "src": "modulus",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
@@ -1460,7 +1460,7 @@
     {
       "src": "lista",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -1586,7 +1586,7 @@
     {
       "src": "tabula",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -1712,7 +1712,7 @@
     {
       "src": "copia",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -1838,7 +1838,7 @@
     {
       "src": "intervallum",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -1964,7 +1964,7 @@
     {
       "src": "tensor",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -2090,7 +2090,7 @@
     {
       "src": "vector",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -2216,7 +2216,7 @@
     {
       "src": "matrix",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -2468,7 +2468,7 @@
     {
       "src": "cursor",
       "tgt": "modulus",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {

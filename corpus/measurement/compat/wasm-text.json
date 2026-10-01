@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 255,
-    "analyzable": 350
+    "capable": 257,
+    "analyzable": 357
   },
   "terms": [
     {
@@ -409,7 +409,7 @@
       "term": "functio",
       "rule": "keyword",
       "capable": 5,
-      "analyzable": 7
+      "analyzable": 8
     },
     {
       "term": "futura",
@@ -432,8 +432,8 @@
     {
       "term": "genus",
       "rule": "keyword",
-      "capable": 6,
-      "analyzable": 6
+      "capable": 7,
+      "analyzable": 8
     },
     {
       "term": "≥",
@@ -654,8 +654,8 @@
     {
       "term": "numerus",
       "rule": "keyword",
-      "capable": 4,
-      "analyzable": 4
+      "capable": 5,
+      "analyzable": 6
     },
     {
       "term": "non est",
@@ -1075,7 +1075,7 @@
       "term": "tensor",
       "rule": "keyword",
       "capable": 1,
-      "analyzable": 10
+      "analyzable": 13
     },
     {
       "term": "targets",
@@ -1153,7 +1153,7 @@
       "term": "vector",
       "rule": "keyword",
       "capable": 4,
-      "analyzable": 9
+      "analyzable": 8
     },
     {
       "term": "∷",

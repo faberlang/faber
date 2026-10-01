@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 267,
-    "analyzable": 350
+    "capable": 281,
+    "analyzable": 357
   },
   "terms": [
     {
@@ -408,8 +408,8 @@
     {
       "term": "functio",
       "rule": "keyword",
-      "capable": 7,
-      "analyzable": 7
+      "capable": 8,
+      "analyzable": 8
     },
     {
       "term": "futura",
@@ -432,8 +432,8 @@
     {
       "term": "genus",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 6
+      "capable": 4,
+      "analyzable": 8
     },
     {
       "term": "≥",
@@ -534,7 +534,7 @@
     {
       "term": "itera",
       "rule": "keyword",
-      "capable": 15,
+      "capable": 18,
       "analyzable": 20
     },
     {
@@ -600,31 +600,31 @@
     {
       "term": "mori",
       "rule": "keyword",
-      "capable": 0,
+      "capable": 2,
       "analyzable": 2
     },
     {
       "term": "modulus<u16>",
       "rule": "operator-group",
-      "capable": 0,
+      "capable": 1,
       "analyzable": 1
     },
     {
       "term": "modulus<u32>",
       "rule": "operator-group",
-      "capable": 1,
+      "capable": 2,
       "analyzable": 2
     },
     {
       "term": "modulus<u64>",
       "rule": "operator-group",
-      "capable": 1,
+      "capable": 2,
       "analyzable": 2
     },
     {
       "term": "modulus<u8>",
       "rule": "operator-group",
-      "capable": 0,
+      "capable": 1,
       "analyzable": 1
     },
     {
@@ -648,14 +648,14 @@
     {
       "term": "numquam",
       "rule": "keyword",
-      "capable": 0,
+      "capable": 1,
       "analyzable": 1
     },
     {
       "term": "numerus",
       "rule": "keyword",
-      "capable": 4,
-      "analyzable": 4
+      "capable": 6,
+      "analyzable": 6
     },
     {
       "term": "non est",
@@ -1075,7 +1075,7 @@
       "term": "tensor",
       "rule": "keyword",
       "capable": 10,
-      "analyzable": 10
+      "analyzable": 13
     },
     {
       "term": "targets",
@@ -1153,7 +1153,7 @@
       "term": "vector",
       "rule": "keyword",
       "capable": 8,
-      "analyzable": 9
+      "analyzable": 8
     },
     {
       "term": "∷",

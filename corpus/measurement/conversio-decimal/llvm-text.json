@@ -7,8 +7,8 @@
   "summary": {
     "dedicated": 0,
     "fallback": 0,
-    "rejected": 0,
-    "not-emitted": 8
+    "rejected": 2,
+    "not-emitted": 6
   },
   "cells": [
     {
@@ -26,7 +26,7 @@
     {
       "src": "d64",
       "tgt": "u32",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -50,7 +50,7 @@
     {
       "src": "textus",
       "tgt": "d64",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {

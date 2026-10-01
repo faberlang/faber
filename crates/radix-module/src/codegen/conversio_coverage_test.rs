@@ -112,8 +112,8 @@ fn target_universe_is_full_hir_and_mir_lanes() {
 // --- acceptance criteria: representative pairs -------------------------------
 
 #[test]
-fn rust_instans_numerus_is_fallback() {
-    // `instans ↔ numerus`: semantic accepts, no Rust arm, fallback won't compile.
+fn rust_instans_to_numerus_is_fallback_numerus_to_instans_is_dedicated() {
+    // `instans ↦ numerus`: semantic accepts, no Rust arm, fallback won't compile.
     assert_eq!(
         classify_conversio_coverage(
             ConversioTypeFamily::Instans,
@@ -122,13 +122,15 @@ fn rust_instans_numerus_is_fallback() {
         ),
         ConversioCoverage::Fallback
     );
+    // `numerus ↦ instans` counts epoch units through `Instans::from_epoch_integer`
+    // (rg1 `55a44a9fc`): a dedicated arm.
     assert_eq!(
         classify_conversio_coverage(
             ConversioTypeFamily::Numerus,
             ConversioTypeFamily::Instans,
             ConversioCoverageTarget::Rust
         ),
-        ConversioCoverage::Fallback
+        ConversioCoverage::Dedicated
     );
 }
 
@@ -426,8 +428,35 @@ fn wasm_text_has_no_fallback_tier() {
 // --- TypeScript / Go / Faber prediction arms ---------------------------------
 
 #[test]
-fn ts_go_block_modulus_words() {
-    for &target in &[ConversioCoverageTarget::TypeScript, ConversioCoverageTarget::Go] {
+fn ts_blocks_modulus_words_and_go_lowers_them() {
+    // Go lowers words (the block survives on TypeScript only): a semantic-
+    // accepted word cell is emitted, scalar targets through a dedicated arm.
+    assert_eq!(
+        classify_conversio_coverage(
+            ConversioTypeFamily::Modulus,
+            ConversioTypeFamily::Textus,
+            ConversioCoverageTarget::Go
+        ),
+        ConversioCoverage::Dedicated
+    );
+    assert_eq!(
+        classify_conversio_coverage(
+            ConversioTypeFamily::Numerus,
+            ConversioTypeFamily::Modulus,
+            ConversioCoverageTarget::Go
+        ),
+        ConversioCoverage::Dedicated
+    );
+    // Ruling 24: a non-integer source into a word is a semantic rejection on
+    // every target.
+    for &target in ConversioCoverageTarget::ALL {
+        assert_eq!(
+            classify_conversio_coverage(ConversioTypeFamily::Textus, ConversioTypeFamily::Modulus, target),
+            ConversioCoverage::Rejected,
+            "{target:?}: textus ↦ modulus is unsupported_conversio"
+        );
+    }
+    for &target in &[ConversioCoverageTarget::TypeScript] {
         for &tgt in ConversioTypeFamily::ALL {
             // Semantic rejections (Rejected) win over the driver block
             // (NotEmitted) — `✕ > —`; the modulus block must still deny
