@@ -978,7 +978,12 @@ fn constants_read_back_through_the_canonical_carrier() {
 // U8a: `inf` <-> `valor` and any-length JSON integer tokens (ruling 40).
 // ---------------------------------------------------------------------------
 
-const VALOR_TO_NUMERUS: &str = "valor to numerus conversion failed";
+/// The recoverable `valor ↦ numerus` failure, by structured identity (code and
+/// issue), never by its prose message.
+fn assert_valor_to_numerus_failure(err: &RunnerError) {
+    assert_eq!(err.code, RUNNER_CODE_CONVERSION);
+    assert_eq!(err.issue, "runner_valor_to_numerus_conversion_failed");
+}
 
 fn valor_type() -> Type {
     Type::Primitive(Primitive::Valor)
@@ -1006,7 +1011,7 @@ fn valor_to_inf_extracts_every_integer_carrier_and_nothing_else() {
         Value::Bool(true),
     ] {
         let err = convert(valor_type(), inf_type(), value, &[], None).expect_err("not integer");
-        assert_eq!(err.message, VALOR_TO_NUMERUS);
+        assert_valor_to_numerus_failure(&err);
     }
     // A `⊥` recovery supplies the value instead.
     assert_eq!(
@@ -1032,7 +1037,7 @@ fn inf_to_valor_keeps_the_canonical_carrier_and_narrowing_back_is_checked() {
     // `valor ↦ int<W>` from a beyond-64-bit integer fails (Rust `i64::from_valor` is `None`).
     let err =
         convert(valor_type(), sized(NumericWidth::I64), beyond, &[], None).expect_err("beyond i64");
-    assert_eq!(err.message, VALOR_TO_NUMERUS);
+    assert_valor_to_numerus_failure(&err);
 }
 
 fn json_kernel(verb: &str, value: Value) -> Result<Value, RunnerError> {
