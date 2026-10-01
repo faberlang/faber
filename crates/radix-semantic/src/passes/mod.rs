@@ -81,6 +81,7 @@ pub mod return_path;
 pub mod statica;
 pub(crate) mod typecheck;
 pub use typecheck::integer_range::{const_int_exact, const_int_value, is_const_int};
+pub use typecheck::{in_place_binary_twin_name, in_place_unary_twin_name};
 pub mod visibility_annotation;
 
 #[cfg(test)]

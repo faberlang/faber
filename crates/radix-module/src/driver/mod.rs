@@ -4176,6 +4176,7 @@ fn empty_presentation() -> HirPresentation {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         glyph_transpose_ids: Vec::new(),
+        numeric_twin_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),

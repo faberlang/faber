@@ -230,6 +230,25 @@ impl super::FaberCodegen<'_> {
                     writer.write(")");
                 }
             }
+            HirExpressionKind::Assign(..) if self.numeric_twin_call(expr).is_some() => {
+                // Authored in-place numeric twin (`a.add(2)`): typecheck
+                // desugared it to `a ← a + 2` and kept the node id; restore
+                // the method spelling in the reader locale.
+                if let Some((receiver, canonical, argument)) = self.numeric_twin_call(expr) {
+                    self.write_expr_prec(receiver, 13, names, surface, writer);
+                    writer.write(".");
+                    writer.write(
+                        &surface
+                            .intrinsic_surface(canonical)
+                            .unwrap_or_else(|| canonical.to_owned()),
+                    );
+                    writer.write("(");
+                    if let Some(argument) = argument {
+                        self.write_expr(argument, names, surface, writer);
+                    }
+                    writer.write(")");
+                }
+            }
             HirExpressionKind::MethodCall(receiver, _, type_args, args, _)
                 if type_args.is_empty()
                     && args.is_empty()
@@ -1640,6 +1659,47 @@ impl super::FaberCodegen<'_> {
                 self.write_expr(&field.expr, names, surface, writer);
             }
             writer.write(" }");
+        }
+    }
+
+    /// The `(receiver, canonical method, argument)` of an assignment that
+    /// typecheck desugared from an in-place numeric twin call, or `None` when
+    /// `expr` is not a recorded twin or no longer has the desugared shape
+    /// (`place ← place op arg`, `place ← op place`).
+    pub(super) fn numeric_twin_call<'e>(
+        &self,
+        expr: &'e HirExpression,
+    ) -> Option<(&'e HirExpression, &'static str, Option<&'e HirExpression>)> {
+        if !self.numeric_twin_ids.contains(&expr.id) {
+            return None;
+        }
+        let HirExpressionKind::Assign(place, value) = &expr.kind else {
+            return None;
+        };
+        let mut value = &**value;
+        // The store's implicit conversion and widening nodes are the
+        // checker's, not part of the authored call.
+        loop {
+            match &value.kind {
+                HirExpressionKind::Conversio {
+                    implicit: Some(_),
+                    source,
+                    ..
+                } => value = source,
+                HirExpressionKind::Widen { operand, .. } => value = operand,
+                _ => break,
+            }
+        }
+        match &value.kind {
+            HirExpressionKind::Binary(op, _, argument) => {
+                let name = radix_semantic::passes::in_place_binary_twin_name(*op)?;
+                Some((place, name, Some(argument)))
+            }
+            HirExpressionKind::Unary(op, _) => {
+                let name = radix_semantic::passes::in_place_unary_twin_name(*op)?;
+                Some((place, name, None))
+            }
+            _ => None,
         }
     }
 

@@ -2147,6 +2147,14 @@ pub struct HirPresentation {
     #[serde(default)]
     pub glyph_transpose_ids: Vec<HirId>,
 
+    /// Ids of the `Assign` expressions typecheck produced by desugaring an
+    /// in-place numeric twin method (`a.add(2)` means `a ← a + 2`; the rewrite
+    /// keeps the call's node id). Faber re-emission prints the authored method
+    /// spelling in the source locale for exactly these ids, so `faber format`
+    /// stays surface-faithful instead of respelling the call as an assignment.
+    #[serde(default)]
+    pub numeric_twin_ids: Vec<HirId>,
+
     /// Initializer-expression ids of wildcard-bound declarations
     /// (`fixum T _ ← expr`), which lower to bare expression statements.
     /// Emission restores the authored discard binding for exactly these.

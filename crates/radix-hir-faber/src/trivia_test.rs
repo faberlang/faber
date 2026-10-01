@@ -137,6 +137,7 @@ fn empty_presentation() -> HirPresentation {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         glyph_transpose_ids: Vec::new(),
+        numeric_twin_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -281,6 +282,7 @@ fn emits_statement_trivia_before_each_statement() {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         glyph_transpose_ids: Vec::new(),
+        numeric_twin_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -336,6 +338,7 @@ fn emits_block_end_trivia_before_closing_brace() {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         glyph_transpose_ids: Vec::new(),
+        numeric_twin_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -386,6 +389,7 @@ fn emits_program_end_trivia_before_eof() {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         glyph_transpose_ids: Vec::new(),
+        numeric_twin_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -437,6 +441,7 @@ fn emits_item_trivia_before_item() {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         glyph_transpose_ids: Vec::new(),
+        numeric_twin_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -475,6 +480,7 @@ fn emits_entry_trivia_before_incipit_keyword() {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         glyph_transpose_ids: Vec::new(),
+        numeric_twin_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -578,6 +584,7 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         glyph_transpose_ids: Vec::new(),
+        numeric_twin_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -644,6 +651,7 @@ fn emits_trivia_before_annotation_sequence() {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         glyph_transpose_ids: Vec::new(),
+        numeric_twin_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -724,6 +732,7 @@ fn comment_bearing_branch_stays_braced_not_ergo() {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         glyph_transpose_ids: Vec::new(),
+        numeric_twin_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -837,6 +846,7 @@ fn comment_bearing_branch_prevents_sic_secus_compaction() {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         glyph_transpose_ids: Vec::new(),
+        numeric_twin_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -962,6 +972,7 @@ fn boundary_newline_normalization_does_not_manufacture_blank_lines() {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         glyph_transpose_ids: Vec::new(),
+        numeric_twin_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -1027,6 +1038,7 @@ fn file_start_trivia_keeps_no_leading_blank_lines() {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         glyph_transpose_ids: Vec::new(),
+        numeric_twin_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -1089,6 +1101,7 @@ fn explicit_tacet_prints_implicit_ends_do_not() {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         glyph_transpose_ids: Vec::new(),
+        numeric_twin_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -1157,6 +1170,7 @@ fn rendering_is_deterministic() {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         glyph_transpose_ids: Vec::new(),
+        numeric_twin_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -1244,4 +1258,62 @@ fn transpose_without_a_recorded_glyph_stays_a_method_call() {
         render_transpose(sum_of_two_literals(), false),
         "(1 + 2).transpose()"
     );
+}
+
+/// Render `<place> ← <place> <op> 2` (or the unary form) as the printer sees
+/// the desugared in-place numeric twin, optionally recorded on the sidecar.
+fn render_in_place_twin(unary: bool, recorded: bool) -> String {
+    let types = TypeTable::new();
+    let interner = Interner::new();
+    let mut codegen = FaberCodegen::new(&types, &interner);
+    let node = HirId(200);
+    if recorded {
+        codegen.numeric_twin_ids.insert(node);
+    }
+    let literal = |id: u32, value: u64| {
+        Box::new(HirExpression {
+            id: HirId(id),
+            kind: HirExpressionKind::Literal(HirLiteral::Int(value)),
+            ty: None,
+            span: span(),
+        })
+    };
+    let value = if unary {
+        HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, literal(202, 1))
+    } else {
+        HirExpressionKind::Binary(radix_hir::HirBinOp::Add, literal(202, 1), literal(203, 2))
+    };
+    let assign = HirExpression {
+        id: node,
+        kind: HirExpressionKind::Assign(
+            literal(201, 1),
+            Box::new(HirExpression {
+                id: HirId(204),
+                kind: value,
+                ty: None,
+                span: span(),
+            }),
+        ),
+        ty: None,
+        span: span(),
+    };
+    let mut writer = radix_codegen_shared::CodeWriter::new();
+    codegen.write_expr(
+        &assign,
+        &rustc_hash::FxHashMap::default(),
+        &TestSurface,
+        &mut writer,
+    );
+    writer.finish()
+}
+
+#[test]
+fn recorded_in_place_numeric_twin_prints_the_method_call() {
+    assert_eq!(render_in_place_twin(false, true), "1.adde(2)");
+    assert_eq!(render_in_place_twin(true, true), "1.nega()");
+}
+
+#[test]
+fn unrecorded_assignment_stays_an_assignment() {
+    assert_eq!(render_in_place_twin(false, false), "1 ← 1 + 2");
 }

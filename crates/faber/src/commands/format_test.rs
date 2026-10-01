@@ -926,3 +926,29 @@ fn format_cli_keeps_the_transpose_glyph() {
     assert_canonical_reparses_with(body, "glyph transpose CLI --stdout", Some(&english_pack()))
         .expect("reparse");
 }
+
+/// Need: `faber format` keeps an authored in-place numeric twin
+/// (`a.add(2)`) instead of respelling it as the desugared `a ← a + 2`.
+#[test]
+fn format_cli_keeps_the_in_place_numeric_twin() {
+    let source = "+++\nlocale = \"en\"\n+++\nmain {\n    var int a ← 1\n    a.add(2)\n    a.negate()\n    print a\n}\n";
+    let fixture = std::env::temp_dir().join("faber-format-numeric-twin-cli.fab");
+    fs::write(&fixture, source).expect("write numeric twin fixture");
+
+    let formatted = run_faber_format_stdout(&fixture);
+    let _ = fs::remove_file(&fixture);
+
+    let body = radix::module::driver::split_frontmatter(&formatted)
+        .expect("split")
+        .body;
+    assert!(
+        body.contains("a.add(2)") && body.contains("a.negate()"),
+        "format must keep the in-place twin method spelling:\n{formatted}"
+    );
+    assert!(
+        !body.contains("a ← a"),
+        "format must not respell the twin as an assignment:\n{formatted}"
+    );
+    assert_canonical_reparses_with(body, "numeric twin CLI --stdout", Some(&english_pack()))
+        .expect("reparse");
+}
