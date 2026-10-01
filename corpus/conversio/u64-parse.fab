@@ -1,0 +1,62 @@
++++
+term = "u64-parse"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "inline_default", "expression", "unary_expr", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Parsing text into `u64` is exact through the whole unsigned range, in decimal and at a radix; text outside the range, or not a number, takes the `⊥` default."
+syntax = "<textus> ↦ u64 [via Hex|Bin|Oct] [⊥ <default>]"
+related = ["↦", "⊥", "via", "u64"]
+locale = "en"
++++
+# =============================================================================
+# u64-parse — text into `u64` is exact
+# =============================================================================
+#
+# What this teaches:
+#   • `"18446744073709551615" ↦ u64` is the largest `u64`, and the upper half
+#     of the range (from 2^63) parses exactly, in decimal and with `via Hex`,
+#     `via Bin` and `via Oct`.
+#   • Text outside the target's range — 2^64, a minus sign into an unsigned
+#     target, 2^63 into `i64` — and text that is not a number take the `⊥`
+#     default; the parse never wraps and never rounds.
+#
+# Common mistakes:
+#   • Expecting a `u64` parse to stop at 2^63 − 1: the unsigned range is
+#     the whole of 0 to 2^64 − 1.
+#
+# See also: ↦, ⊥, via, u64
+# =============================================================================
+
+# conversio/u64-parse — exact unsigned parsing
+#
+# WHY: the runner used to parse text into every integer target through `i64`,
+# so `"18446744073709551615" ↦ u64 ⊥ 7` printed 7.
+#
+# EXPECTED OUTPUT:
+#   u64-parse.expected — one value per print.
+
+main {
+    # 1. Decimal text across the whole unsigned range.
+    print "18446744073709551615" ↦ u64 ⊥ 7
+    print "9223372036854775808" ↦ u64 ⊥ 7
+    print "9223372036854775807" ↦ u64 ⊥ 7
+    print "0" ↦ u64 ⊥ 7
+
+    # 2. Out of range or not a number: the default.
+    print "18446744073709551616" ↦ u64 ⊥ 7
+    print "-1" ↦ u64 ⊥ 7
+    print "twelve" ↦ u64 ⊥ 7
+
+    # 3. The same range at a radix.
+    print "ffffffffffffffff" ↦ u64 via Hex ⊥ 7
+    print "8000000000000000" ↦ u64 via Hex ⊥ 7
+    print "10000000000000000" ↦ u64 via Hex ⊥ 7
+    print "1111111111111111111111111111111111111111111111111111111111111111" ↦ u64 via Bin ⊥ 7
+    print "1777777777777777777777" ↦ u64 via Oct ⊥ 7
+    print "2000000000000000000000" ↦ u64 via Oct ⊥ 7
+
+    # 4. `i64` keeps its own bounds.
+    print "-9223372036854775808" ↦ i64 ⊥ 7
+    print "9223372036854775808" ↦ i64 ⊥ 7
+}

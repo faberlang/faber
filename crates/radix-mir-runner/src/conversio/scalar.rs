@@ -190,7 +190,9 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Value::Str(text) => match self.parse_textus_numerus(&text, params) {
                 // SA-002: range-check against `W` so `textus ↦ numerus<u8>` of
                 // "300" fails here exactly as Rust codegen's `.parse::<u8>()`.
-                Ok(v) if numerus_fits_width(v, width) => Ok(Value::Int(v)),
+                // The parse is exact (`i128`), so a `u64` target keeps every
+                // magnitude through `u64::MAX` (u64-parse).
+                Ok(v) if exact_fits_width(v, width) => Ok(exact_numerus_value(v)),
                 Ok(_) => self.recover_or_fail(
                     recovery,
                     span,
@@ -527,10 +529,10 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         &self,
         text: &str,
         params: &[Symbol],
-    ) -> Result<i64, std::num::ParseIntError> {
+    ) -> Result<i128, std::num::ParseIntError> {
         match self.numerus_radix(params) {
-            Some(radix) => i64::from_str_radix(text, radix),
-            None => text.parse::<i64>(),
+            Some(radix) => i128::from_str_radix(text, radix),
+            None => text.parse::<i128>(),
         }
     }
 
@@ -1373,8 +1375,22 @@ fn f64_to_f16_bits(v: f64) -> u16 {
 /// `.parse::<W>()` accept/reject boundary for `textus ↦ numerus<W>` (SA-002);
 /// uses the runner's existing target-neutral integer width table.
 fn numerus_fits_width(v: i64, width: NumericWidth) -> bool {
+    exact_fits_width(i128::from(v), width)
+}
+
+/// Whether an exact integer lies in the declared width's range.
+fn exact_fits_width(v: i128, width: NumericWidth) -> bool {
     let (lo, hi) = int_width_range(width);
-    (lo..=hi).contains(&(v as i128))
+    (lo..=hi).contains(&v)
+}
+
+/// The carrier of an exact integer already range-checked against its width:
+/// `Int` while it fits `i64`, `UInt` for the upper half of `u64`.
+fn exact_numerus_value(v: i128) -> Value {
+    match i64::try_from(v) {
+        Ok(v) => Value::Int(v),
+        Err(_) => Value::UInt(u64::try_from(v).unwrap_or(u64::MAX)),
+    }
 }
 
 /// Render an f64 as JSON number wire text, ensuring a decimal point

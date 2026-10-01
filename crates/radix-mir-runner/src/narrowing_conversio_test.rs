@@ -247,3 +247,58 @@ fn saturating_store_of_huge_value_clamps() {
         Value::Int(-32_768)
     );
 }
+
+// u64-parse: `textus ↦ u64` parses the exact magnitude. The parse used to run
+// through `i64`, so every text from 2^63 up failed as if it were not a number.
+
+const TEXT_OUT_OF_RANGE: &str = "runner_textus_to_numerus_conversion_out_of_range";
+const TEXT_FAILED: &str = "runner_textus_to_numerus_conversion_failed";
+
+fn parse_text(width: NumericWidth, text: &str) -> Result<Value, RunnerError> {
+    run_conversion(
+        Type::Primitive(Primitive::Textus),
+        integer(width),
+        Value::Str(text.to_owned()),
+        None,
+    )
+}
+
+#[test]
+fn text_parses_into_u64_through_its_full_range() {
+    assert_eq!(
+        parse_text(NumericWidth::U64, "18446744073709551615").expect("u64::MAX parses"),
+        Value::UInt(u64::MAX)
+    );
+    assert_eq!(
+        parse_text(NumericWidth::U64, "9223372036854775808").expect("2^63 parses"),
+        Value::UInt(1 << 63)
+    );
+    assert_eq!(
+        parse_text(NumericWidth::U64, "9223372036854775807").expect("i64::MAX parses"),
+        Value::Int(i64::MAX)
+    );
+    assert_eq!(
+        parse_text(NumericWidth::U64, "0").expect("zero parses"),
+        Value::Int(0)
+    );
+}
+
+#[test]
+fn text_beyond_u64_or_below_zero_fails_closed_for_u64() {
+    let past = parse_text(NumericWidth::U64, "18446744073709551616").expect_err("2^64 > u64::MAX");
+    assert_eq!(past.issue, TEXT_OUT_OF_RANGE);
+    let negative = parse_text(NumericWidth::U64, "-1").expect_err("negative into u64");
+    assert_eq!(negative.issue, TEXT_OUT_OF_RANGE);
+    let word = parse_text(NumericWidth::U64, "twelve").expect_err("not a number");
+    assert_eq!(word.issue, TEXT_FAILED);
+}
+
+#[test]
+fn text_into_i64_keeps_its_bounds() {
+    assert_eq!(
+        parse_text(NumericWidth::I64, "-9223372036854775808").expect("i64::MIN parses"),
+        Value::Int(i64::MIN)
+    );
+    let past = parse_text(NumericWidth::I64, "9223372036854775808").expect_err("2^63 > i64::MAX");
+    assert_eq!(past.issue, TEXT_OUT_OF_RANGE);
+}
