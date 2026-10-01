@@ -2,6 +2,7 @@ package rt
 
 import (
 	"math/big"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +25,23 @@ func TestListDisplay(t *testing.T) {
 	})
 	if got != "[falsum, verum, falsum]" {
 		t.Fatalf("ListDisplay = %q, want [falsum, verum, falsum]", got)
+	}
+}
+
+// TestMapDisplay pins the `{"k": v}` renderer with key and value renderers.
+func TestMapDisplay(t *testing.T) {
+	quote := func(k string) string { return strconv.Quote(k) }
+	one := map[string]int{"a": 1}
+	if got := MapDisplay(one, quote, strconv.Itoa); got != `{"a": 1}` {
+		t.Fatalf("MapDisplay = %q, want {\"a\": 1}", got)
+	}
+	if got := MapDisplay(map[string]int{}, quote, strconv.Itoa); got != "{}" {
+		t.Fatalf("MapDisplay(empty) = %q, want {}", got)
+	}
+	dec := map[string]int64{"a": 125000000}
+	got := MapDisplay(dec, quote, func(v int64) string { return strconv.FormatFloat(float64(v)/1e8, 'f', -1, 64) })
+	if got != `{"a": 1.25}` {
+		t.Fatalf("MapDisplay(decimal) = %q, want {\"a\": 1.25}", got)
 	}
 }
 

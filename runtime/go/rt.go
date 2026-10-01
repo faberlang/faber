@@ -46,6 +46,18 @@ func ListDisplay[T any](values []T, render func(T) string) string {
 	return "[" + strings.Join(parts, ", ") + "]"
 }
 
+// MapDisplay renders a Faber map as `{"k": v, ...}` via the key and value
+// renderers. Entry order is unspecified by the language; entries are emitted
+// in the order of their rendered keys so a print is repeatable.
+func MapDisplay[K comparable, V any](entries map[K]V, renderKey func(K) string, renderValue func(V) string) string {
+	parts := make([]string, 0, len(entries))
+	for key, value := range entries {
+		parts = append(parts, renderKey(key)+": "+renderValue(value))
+	}
+	sort.Strings(parts)
+	return "{" + strings.Join(parts, ", ") + "}"
+}
+
 // ValorDisplay renders a boxed Faber valor/json value with Faber display
 // semantics. See the package doc for the per-type rules.
 func ValorDisplay(value any) string {
