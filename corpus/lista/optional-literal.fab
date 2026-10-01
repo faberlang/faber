@@ -1,0 +1,68 @@
++++
+term = "lista"
+kind = "existing-home"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "fixum_decl", "assignment", "expr_stmt", "si_stmt", "array_literal", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "redde_stmt", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "A list literal stored into a `list<T> ∪ none` slot: declaration, assignment, argument, return, and field."
+syntax = "list<T> ∪ none <name> ← [<elements>]"
+related = ["lista", "optionalis"]
+locale = "en"
++++
+# =============================================================================
+# lista — a list literal in an optional slot
+# =============================================================================
+#
+# What this teaches:
+#   • a list literal stores into a `list<T> ∪ none` slot exactly as it stores
+#     into a plain `list<T>` slot: the optional slot holds the list itself
+#   • the same holds at every store site: declaration, reassignment, call
+#     argument, return value, and class field
+#   • the literal's elements are checked against `T`, not against the optional
+#   • an optional slot may still hold `none`; test it with `not is none`
+#     before calling a list method on it
+#
+# Common mistakes:
+#   • calling a list method on an optional list without testing it first:
+#     `xs.length()` needs the `xs not is none` branch around it
+#
+# EXPECTED OUTPUT:
+#   The length of the list stored at each site, one per line: declaration,
+#   reassignment, argument, return value, field.
+#   2
+#   4
+#   2
+#   3
+#   1
+
+class Bag {
+    var list<int> ∪ none items
+}
+
+fn make() → list<int> ∪ none {
+    return [1, 2, 3]
+}
+
+fn size(list<int> ∪ none xs) → int {
+    if xs not is none {
+        return xs.length()
+    }
+    return 0
+}
+
+main {
+    const list<int> ∪ none declared ← [10, 20]
+    print size(declared)
+
+    var list<int> ∪ none later ← null
+    later ← [4, 5, 6, 7]
+    print size(later)
+
+    print size([8, 9])
+
+    const list<int> ∪ none returned ← make()
+    print size(returned)
+
+    const Bag bag ← Bag { items = [1] }
+    print size(bag.items)
+}

@@ -645,6 +645,31 @@ impl TypeChecker<'_> {
 
         self.common_type(a, b, span)
     }
+    /// The list shape an expected slot type supplies to an array literal:
+    /// the slot itself, or the single list member of an optional / union slot
+    /// (`list<T> ∪ none` hands the literal `list<T>`; several list members
+    /// supply none, like the single-numeric-member rule of a store).
+    fn expected_list_shape(
+        &self,
+        expected: TypeId,
+    ) -> Option<(TypeId, Option<radix_types::IndexId>)> {
+        let payload = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(expected))
+            .1;
+        match self.types.get(payload) {
+            Type::Array(inner) => Some((*inner, None)),
+            Type::BoundedArray { element, capacity } => Some((*element, Some(*capacity))),
+            Type::Option(inner) => self.expected_list_shape(*inner),
+            Type::Union(members) => {
+                let mut shapes = members.iter().filter_map(|m| self.expected_list_shape(*m));
+                let only = shapes.next()?;
+                shapes.next().is_none().then_some(only)
+            }
+            _ => None,
+        }
+    }
+
     /// Checks an array literal and returns its list type.
     ///
     /// Expected list context supplies the element type for each non-spread item.
@@ -660,17 +685,7 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         let expected_is_open =
             expected.is_some_and(|ty| self.is_infer(self.resolve_inferred_type(ty)));
-        let expected_shape = expected.and_then(|ty| {
-            let payload = self
-                .types
-                .peel_access_marker(self.resolve_inferred_type(ty))
-                .1;
-            match self.types.get(payload) {
-                Type::Array(inner) => Some((*inner, None)),
-                Type::BoundedArray { element, capacity } => Some((*element, Some(*capacity))),
-                _ => None,
-            }
-        });
+        let expected_shape = expected.and_then(|ty| self.expected_list_shape(ty));
         let expected_elem = expected_shape.map_or_else(|| self.fresh_infer(), |(elem, _)| elem);
         let expected_capacity = expected_shape.and_then(|(_, capacity)| capacity);
         let has_expected_element = expected_shape.is_some();

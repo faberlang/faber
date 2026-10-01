@@ -1167,6 +1167,10 @@ mod union_conversio_test;
 mod union_construction_test;
 
 #[cfg(test)]
+#[path = "optional_list_literal_test.rs"]
+mod optional_list_literal_test;
+
+#[cfg(test)]
 #[path = "union_pattern_test.rs"]
 mod union_pattern_test;
 

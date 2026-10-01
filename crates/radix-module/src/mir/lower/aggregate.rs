@@ -153,7 +153,42 @@ impl FunctionBuilder<'_> {
     ) -> Option<MirOperand> {
         let fields = self.lower_array_items(elements)?;
         let ty = self.expr_ty(expr)?;
+        let ty = MirType::semantic(self.ordered_literal_carrier(ty.semantic_id()));
         Some(self.construct_temp(kind, MirAggregateFields::Ordered(fields), ty, expr.span))
+    }
+
+    /// The ordered collection a literal constructs when its expression type is
+    /// the slot it lands in. Typecheck types an expression by its destination,
+    /// so a literal stored into `list<T> ∪ none` (or a union with one
+    /// collection member) carries the optional/union type; the aggregate
+    /// itself is the single collection member, and the surrounding store
+    /// widens it into the slot.
+    fn ordered_literal_carrier(&self, ty: TypeId) -> TypeId {
+        let is_ordered = |ty: TypeId| {
+            matches!(
+                self.normalized_type(ty),
+                Type::Array(_)
+                    | Type::BoundedArray { .. }
+                    | Type::Queue(_)
+                    | Type::BoundedQueue { .. }
+                    | Type::Stack(_)
+                    | Type::BoundedStack { .. }
+                    | Type::Set(_)
+            )
+        };
+        let members: Vec<TypeId> = match self.normalized_type(ty) {
+            Type::Option(inner) => vec![*inner],
+            Type::Union(members) => members.clone(),
+            _ => return ty,
+        };
+        let mut ordered = members
+            .into_iter()
+            .map(|member| self.ordered_literal_carrier(member))
+            .filter(|member| is_ordered(*member));
+        match (ordered.next(), ordered.next()) {
+            (Some(only), None) => only,
+            _ => ty,
+        }
     }
 
     fn lower_array_items(&mut self, elements: &[HirArrayElement]) -> Option<Vec<MirAggregateItem>> {

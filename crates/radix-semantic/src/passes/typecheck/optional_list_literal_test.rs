@@ -1,0 +1,39 @@
+//! A list literal stored into an optional or union slot takes its element
+//! type from the slot's single list member, exactly as it does for a plain
+//! `lista<T>` slot (opt-lit).
+
+use crate::test_support::{analyze_source, assert_accepts};
+
+fn rejected(source: &str) -> bool {
+    !analyze_source(source).is_ok()
+}
+
+#[test]
+fn list_literal_checks_against_optional_list_slot() {
+    assert_accepts(
+        r"incipit {
+    fixum lista<numerus> ∪ nihil a ← [1, 2]
+    varia lista<numerus> ∪ nihil b ← nihil
+    b ← [3]
+    nota a
+    nota b
+}",
+    );
+}
+
+#[test]
+fn optional_list_slot_elements_are_stores_into_the_element_type() {
+    // The element is range-checked against `numerus<i8>` through the
+    // optional slot, as it is for the plain slot.
+    let plain = "incipit { fixum lista<numerus<i8>> a ← [300] nota a }";
+    let optional = "incipit { fixum lista<numerus<i8>> ∪ nihil a ← [300] nota a }";
+    assert!(
+        rejected(plain),
+        "plain slot rejects an out-of-range element"
+    );
+    assert!(
+        rejected(optional),
+        "optional slot rejects an out-of-range element"
+    );
+    assert_accepts("incipit { fixum lista<numerus<i8>> ∪ nihil a ← [100] nota a }");
+}
