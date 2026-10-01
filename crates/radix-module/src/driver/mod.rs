@@ -1089,6 +1089,12 @@ fn generate_wgsl_text_output(
                 .fragment_entries
                 .iter()
                 .any(|e| e.body_shape == GraphicsVertexBodyShape::Unsupported);
+            let bound_types = target_bindings::wgsl_bound_type_table(
+                target_bindings,
+                &analysis.hir,
+                &analysis.resolver,
+                &analysis.interner,
+            );
             let mir_result = lower_graphics_mir_with_context_for_target(analysis);
             let bound_calls = mir_result.as_ref().map_or_else(
                 |_| crate::mir::WgslBoundCallTable::new(),
@@ -1146,6 +1152,7 @@ fn generate_wgsl_text_output(
                     mir_validation,
                     mir_interner,
                     &bound_calls,
+                    &bound_types,
                 )
                 .map_err(wgsl_text_codegen_error)?;
                 return Ok(crate::Output::WgslText(crate::WgslTextOutput {
@@ -1160,6 +1167,7 @@ fn generate_wgsl_text_output(
                     mir_validation,
                     mir_interner,
                     &bound_calls,
+                    &bound_types,
                 )
                 .map_err(wgsl_text_codegen_error)?;
                 return Ok(crate::Output::WgslText(crate::WgslTextOutput {
@@ -1174,6 +1182,7 @@ fn generate_wgsl_text_output(
                     mir_validation,
                     mir_interner,
                     &bound_calls,
+                    &bound_types,
                 )
                 .map_err(wgsl_text_codegen_error)?;
                 return Ok(crate::Output::WgslText(crate::WgslTextOutput {
@@ -1215,6 +1224,7 @@ fn emit_wgsl_vertex_source_output(
     mir_validation: Option<&crate::mir::ValidatedMir<'_>>,
     mir_interner: Option<&crate::lexer::Interner>,
     bound_calls: &crate::mir::WgslBoundCallTable,
+    bound_types: &target_bindings::BoundTypeTable,
 ) -> Result<crate::mir::MirWgslTextProbeOutput, crate::mir::MirWgslTextProbeError> {
     if graphics_source.vertex_entries.len() != 1 {
         return Err(wgsl_vertex_source_error(
@@ -1230,7 +1240,8 @@ fn emit_wgsl_vertex_source_output(
     }
 
     let entry = &graphics_source.vertex_entries[0];
-    validate_wgsl_vertex_source_entry(entry)?;
+    validate_wgsl_vertex_source_entry(entry, bound_types)?;
+    let (bound_params, bound_resources) = wgsl_bound_stage_params(graphics_source, &entry.params, bound_types)?;
     let varyings: Vec<crate::mir::MirVaryingReflection> = graphics_source
         .shader_varyings
         .iter()
@@ -1248,11 +1259,11 @@ fn emit_wgsl_vertex_source_output(
         resources,
     )
     .map_err(wgsl_vertex_abi_error)?;
-    let vertex_with_varyings = crate::mir::MirKernelReflection { varyings, ..vertex };
+    let vertex_with_varyings = crate::mir::MirKernelReflection { varyings, bound_resources, ..vertex };
     let source = crate::mir::emit_wgsl_vertex_entry_contract(
         &vertex_with_varyings,
         &crate::mir::WgslEntryContext {
-            bound_calls: bound_calls.clone(),
+            bound_calls: bound_calls_with_params(bound_calls, bound_params),
             ..crate::mir::WgslEntryContext::with_body(vertex_mir, mir_validation, mir_interner)
         },
     )?;
@@ -1269,6 +1280,7 @@ fn emit_wgsl_fragment_source_output(
     mir_validation: Option<&crate::mir::ValidatedMir<'_>>,
     mir_interner: Option<&crate::lexer::Interner>,
     bound_calls: &crate::mir::WgslBoundCallTable,
+    bound_types: &target_bindings::BoundTypeTable,
 ) -> Result<crate::mir::MirWgslTextProbeOutput, crate::mir::MirWgslTextProbeError> {
     if graphics_source.fragment_entries.len() != 1 {
         return Err(wgsl_vertex_source_error(
@@ -1278,7 +1290,8 @@ fn emit_wgsl_fragment_source_output(
     }
 
     let entry = &graphics_source.fragment_entries[0];
-    validate_wgsl_fragment_source_entry(entry)?;
+    validate_wgsl_fragment_source_entry(entry, bound_types)?;
+    let (bound_params, bound_resources) = wgsl_bound_stage_params(graphics_source, &entry.params, bound_types)?;
     let fragment_outputs: Vec<crate::mir::MirFragmentOutputReflection> = graphics_source
         .shader_fragment_outputs
         .iter()
@@ -1295,7 +1308,7 @@ fn emit_wgsl_fragment_source_output(
         .iter()
         .map(radix_mir::resource_reflection_from_shader_contract)
         .collect();
-    let fragment = radix_mir::source_fragment_entry_from_shader_contract(
+    let mut fragment = radix_mir::source_fragment_entry_from_shader_contract(
         entry.def_id,
         entry.entry_name.clone(),
         &graphics_source.shader_varyings,
@@ -1303,10 +1316,11 @@ fn emit_wgsl_fragment_source_output(
         resources,
     )
     .map_err(wgsl_vertex_abi_error)?;
+    fragment.bound_resources = bound_resources;
     let source = crate::mir::emit_wgsl_fragment_entry_contract(
         &fragment,
         &crate::mir::WgslEntryContext {
-            bound_calls: bound_calls.clone(),
+            bound_calls: bound_calls_with_params(bound_calls, bound_params),
             ..crate::mir::WgslEntryContext::with_body(fragment_mir, mir_validation, mir_interner)
         },
     )?;
@@ -1324,11 +1338,24 @@ fn emit_wgsl_graphics_pipeline_output(
     mir_validation: Option<&crate::mir::ValidatedMir<'_>>,
     mir_interner: Option<&crate::lexer::Interner>,
     bound_calls: &crate::mir::WgslBoundCallTable,
+    bound_types: &target_bindings::BoundTypeTable,
 ) -> Result<crate::mir::MirWgslTextProbeOutput, crate::mir::MirWgslTextProbeError> {
-    let vertex_output =
-        emit_wgsl_vertex_source_output(graphics_source, vertex_mir, mir_validation, mir_interner, bound_calls)?;
-    let fragment_output =
-        emit_wgsl_fragment_source_output(graphics_source, fragment_mir, mir_validation, mir_interner, bound_calls)?;
+    let vertex_output = emit_wgsl_vertex_source_output(
+        graphics_source,
+        vertex_mir,
+        mir_validation,
+        mir_interner,
+        bound_calls,
+        bound_types,
+    )?;
+    let fragment_output = emit_wgsl_fragment_source_output(
+        graphics_source,
+        fragment_mir,
+        mir_validation,
+        mir_interner,
+        bound_calls,
+        bound_types,
+    )?;
 
     let pipeline = graphics_source
         .shader_pipeline_states
@@ -1353,16 +1380,19 @@ fn emit_wgsl_graphics_pipeline_output(
 }
 
 #[cfg(feature = "mir-wgsl")]
-fn validate_wgsl_vertex_source_entry(entry: &GraphicsVertexEntry) -> Result<(), crate::mir::MirWgslTextProbeError> {
+fn validate_wgsl_vertex_source_entry(
+    entry: &GraphicsVertexEntry,
+    bound_types: &target_bindings::BoundTypeTable,
+) -> Result<(), crate::mir::MirWgslTextProbeError> {
     if entry.annotation_payload_count != 0 {
         return Err(wgsl_vertex_source_error(
             "wgsl vertex entry annotation must not carry payload fields or arguments",
             "mir_wgsl_vertex_source_annotation_payload",
         ));
     }
-    if entry.param_count != 0 {
+    if !stage_params_all_bound(entry.param_count, &entry.params, bound_types) {
         return Err(wgsl_vertex_source_error(
-            "wgsl vertex entry requires zero source parameters",
+            "wgsl vertex entry requires zero source parameters or only bound-type parameters",
             "mir_wgsl_vertex_source_params",
         ));
     }
@@ -1380,6 +1410,85 @@ fn validate_wgsl_vertex_source_entry(entry: &GraphicsVertexEntry) -> Result<(), 
     }
     // Non-empty vertex bodies are now supported via MIR lowering (U4).
     Ok(())
+}
+
+/// True when every source parameter of a stage entry has a bound type.
+///
+/// `param_count` also counts a CLI-args parameter, which carries no entry in
+/// `params`; a count that exceeds `params` is therefore never bound.
+#[cfg(feature = "mir-wgsl")]
+fn stage_params_all_bound(
+    param_count: usize,
+    params: &[GraphicsStageParam],
+    bound_types: &target_bindings::BoundTypeTable,
+) -> bool {
+    param_count == params.len()
+        && params.iter().all(|param| {
+            param
+                .type_def
+                .is_some_and(|def_id| bound_types.contains_key(&def_id))
+        })
+}
+
+/// Match each bound stage parameter to its `bound_resource_binding` fact by
+/// name. Returns the carrier facts (spelling and slot) and the reflection
+/// records, both in parameter order. A parameter with no matching contract
+/// call fails closed.
+#[cfg(feature = "mir-wgsl")]
+fn wgsl_bound_stage_params(
+    graphics_source: &GraphicsSourceFacts,
+    params: &[GraphicsStageParam],
+    bound_types: &target_bindings::BoundTypeTable,
+) -> Result<
+    (Vec<radix_mir_wgsl::WgslBoundParam>, Vec<radix_mir::MirBoundResourceReflection>),
+    crate::mir::MirWgslTextProbeError,
+> {
+    let mut facts = Vec::with_capacity(params.len());
+    let mut reflections = Vec::with_capacity(params.len());
+    for param in params {
+        let bound_type = param.type_def.and_then(|def_id| bound_types.get(&def_id));
+        let bound_type = bound_type.ok_or_else(|| {
+            wgsl_vertex_source_error(
+                "wgsl stage entry parameter has no bound type",
+                "mir_wgsl_bound_param_unbound_type",
+            )
+        })?;
+        let contract = graphics_source
+            .bound_resource_bindings
+            .iter()
+            .find(|binding| binding.source_name == param.name)
+            .ok_or_else(|| {
+                wgsl_vertex_source_error_with_detail(
+                    "wgsl bound stage parameter has no matching bound_resource_binding call",
+                    "mir_wgsl_bound_param_unmatched",
+                    &param.name,
+                )
+            })?;
+        facts.push(radix_mir_wgsl::WgslBoundParam {
+            name: param.name.clone(),
+            group: contract.group,
+            binding: contract.binding,
+            spelling: bound_type.spelling.clone(),
+            bound_type: bound_type.type_name.clone(),
+        });
+        reflections.push(radix_mir::bound_resource_reflection_from_shader_contract(
+            contract,
+            bound_type.type_name.clone(),
+        ));
+    }
+    Ok((facts, reflections))
+}
+
+#[cfg(feature = "mir-wgsl")]
+fn bound_calls_with_params(
+    bound_calls: &crate::mir::WgslBoundCallTable,
+    params: Vec<radix_mir_wgsl::WgslBoundParam>,
+) -> crate::mir::WgslBoundCallTable {
+    let mut table = bound_calls.clone();
+    for param in params {
+        table.push_param(param);
+    }
+    table
 }
 
 #[cfg(feature = "mir-wgsl")]
@@ -1425,16 +1534,19 @@ fn wgsl_vertex_source_error_with_detail(
 }
 
 #[cfg(feature = "mir-wgsl")]
-fn validate_wgsl_fragment_source_entry(entry: &GraphicsFragmentEntry) -> Result<(), crate::mir::MirWgslTextProbeError> {
+fn validate_wgsl_fragment_source_entry(
+    entry: &GraphicsFragmentEntry,
+    bound_types: &target_bindings::BoundTypeTable,
+) -> Result<(), crate::mir::MirWgslTextProbeError> {
     if entry.annotation_payload_count != 0 {
         return Err(wgsl_vertex_source_error(
             "wgsl fragment entry annotation must not carry payload fields or arguments",
             "mir_wgsl_fragment_source_annotation_payload",
         ));
     }
-    if entry.param_count != 0 {
+    if !stage_params_all_bound(entry.param_count, &entry.params, bound_types) {
         return Err(wgsl_vertex_source_error(
-            "wgsl fragment entry requires zero source parameters",
+            "wgsl fragment entry requires zero source parameters or only bound-type parameters",
             "mir_wgsl_fragment_source_params",
         ));
     }
@@ -3027,6 +3139,16 @@ pub struct GraphicsSourceFacts {
     pub shader_fragment_outputs: Vec<radix_mir::ShaderFragmentOutput>,
     pub shader_pipeline_states: Vec<radix_mir::ShaderPipelineState>,
     pub shader_resource_bindings: Vec<radix_mir::ShaderResourceBinding>,
+    pub bound_resource_bindings: Vec<radix_mir::ShaderBoundResourceBinding>,
+}
+
+/// One stage-entry source parameter: its name and, when its type is a nominal
+/// (`Type::Struct`), that nominal's identity. Identity is the map key a bound
+/// type is resolved by; it is `None` for every other type.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraphicsStageParam {
+    pub name: String,
+    pub type_def: Option<crate::hir::DefId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -3035,6 +3157,7 @@ pub struct GraphicsVertexEntry {
     pub entry_name: String,
     pub annotation_payload_count: usize,
     pub param_count: usize,
+    pub params: Vec<GraphicsStageParam>,
     pub returns_vacuum: bool,
     pub has_error_type: bool,
     pub body_shape: GraphicsVertexBodyShape,
@@ -3053,6 +3176,7 @@ pub struct GraphicsFragmentEntry {
     pub entry_name: String,
     pub annotation_payload_count: usize,
     pub param_count: usize,
+    pub params: Vec<GraphicsStageParam>,
     pub returns_vacuum: bool,
     pub has_error_type: bool,
     pub body_shape: GraphicsVertexBodyShape,
@@ -4044,6 +4168,7 @@ fn collect_graphics_source_facts(
         shader_fragment_outputs: contract.fragment_outputs,
         shader_pipeline_states: contract.pipeline_states,
         shader_resource_bindings: contract.resource_bindings,
+        bound_resource_bindings: contract.bound_resource_bindings,
     }
 }
 
@@ -4073,6 +4198,7 @@ fn collect_vertex_entries(
                 entry_name: interner.resolve(function.name).to_owned(),
                 annotation_payload_count: vertex_payload_count,
                 param_count: function.params.len() + usize::from(function.cli_args.is_some()),
+                params: stage_params(function, types, interner),
                 returns_vacuum: function_returns_vacuum(function, types),
                 has_error_type: function.err_ty.is_some(),
                 body_shape: vertex_body_shape(function.body.as_ref()),
@@ -4080,6 +4206,20 @@ fn collect_vertex_entries(
         }
     }
     entries
+}
+
+fn stage_params(function: &HirFunction, types: &semantic::TypeTable, interner: &Interner) -> Vec<GraphicsStageParam> {
+    function
+        .params
+        .iter()
+        .map(|param| GraphicsStageParam {
+            name: interner.resolve(param.name).to_owned(),
+            type_def: match types.get(param.ty) {
+                Type::Struct(def_id) => Some(*def_id),
+                _ => None,
+            },
+        })
+        .collect()
 }
 
 fn function_returns_vacuum(function: &HirFunction, types: &semantic::TypeTable) -> bool {
@@ -4117,6 +4257,7 @@ fn collect_fragment_entries(
             entry_name: interner.resolve(function.name).to_owned(),
             annotation_payload_count: fragment_payload_count,
             param_count: function.params.len() + usize::from(function.cli_args.is_some()),
+            params: stage_params(function, types, interner),
             returns_vacuum: function_returns_vacuum(function, types),
             has_error_type: function.err_ty.is_some(),
             body_shape: vertex_body_shape(function.body.as_ref()),
@@ -4345,3 +4486,8 @@ mod print_text_kind_tests;
 #[cfg(feature = "mir-wgsl")]
 #[path = "wgsl_bound_call_test.rs"]
 mod wgsl_bound_call_tests;
+
+#[cfg(test)]
+#[cfg(feature = "mir-wgsl")]
+#[path = "wgsl_bound_params_test.rs"]
+mod wgsl_bound_params_tests;
