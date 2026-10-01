@@ -37,6 +37,7 @@ pub mod ident;
 pub mod names;
 pub mod runtime_api;
 pub mod tensor_lift_gate;
+pub mod terminates;
 pub mod text_literal;
 pub mod unbounded_gate;
 pub mod unsupported;
