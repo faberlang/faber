@@ -537,8 +537,10 @@ pub struct FunctionProvenanceTableWire {
 /// schema-v24 artifacts fail closed. Version 26 adds
 /// `HirExpressionKind::Widen` (the implicit lossless bounded-integer → `inf`
 /// widening typecheck inserts, inf-wn), shifting the serde ordinal of the
-/// variants after `Conversio`; schema-v25 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 26;
+/// variants after `Conversio`; schema-v25 artifacts fail closed. Version 27 adds
+/// `HirPresentation::glyph_transpose_ids` (which transpose calls were authored
+/// with the `ᵀ` glyph); schema-v26 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 27;
 
 /// Serializable snapshot of one analyzed provider unit carried for HIR
 /// emission (ARCH-U4 carriage).

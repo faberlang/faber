@@ -2140,6 +2140,13 @@ pub struct HirPresentation {
     #[serde(default)]
     pub elige_expr_ids: Vec<HirId>,
 
+    /// Ids of `MethodCall` expressions lowered from the source-only `ᵀ`
+    /// transpose suffix. Typecheck rewrites the glyph marker to the canonical
+    /// transpose intrinsic and keeps the node id; Faber re-emission prints the
+    /// glyph form (`xᵀ`) for exactly these ids instead of `.transpose()`.
+    #[serde(default)]
+    pub glyph_transpose_ids: Vec<HirId>,
+
     /// Initializer-expression ids of wildcard-bound declarations
     /// (`fixum T _ ← expr`), which lower to bare expression statements.
     /// Emission restores the authored discard binding for exactly these.
