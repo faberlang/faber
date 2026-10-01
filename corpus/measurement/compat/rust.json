@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 358,
-    "analyzable": 362
+    "capable": 360,
+    "analyzable": 364
   },
   "terms": [
     {
@@ -144,8 +144,8 @@
     {
       "term": "!.",
       "rule": "operator-group",
-      "capable": 2,
-      "analyzable": 2
+      "capable": 3,
+      "analyzable": 3
     },
     {
       "term": "≠",
@@ -210,8 +210,8 @@
     {
       "term": "↦",
       "rule": "operator-group",
-      "capable": 22,
-      "analyzable": 22
+      "capable": 23,
+      "analyzable": 23
     },
     {
       "term": "copia",

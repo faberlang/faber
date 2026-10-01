@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 6,
-    "analyzable": 357
+    "analyzable": 359
   },
   "terms": [
     {
@@ -145,7 +145,7 @@
       "term": "!.",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 2
+      "analyzable": 3
     },
     {
       "term": "≠",
@@ -211,7 +211,7 @@
       "term": "↦",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 21
+      "analyzable": 22
     },
     {
       "term": "copia",
