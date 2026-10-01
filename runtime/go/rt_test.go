@@ -1,6 +1,7 @@
 package rt
 
 import (
+	"math/big"
 	"strings"
 	"testing"
 	"time"
@@ -98,5 +99,32 @@ func TestValorDisplayStruct(t *testing.T) {
 	// ValorDisplay (textus unquoted) — the frozen emit surface.
 	if !strings.Contains(got, `"nomen": Marcus`) || !strings.Contains(got, `"numerus": 3`) {
 		t.Fatalf("ValorDisplay(struct) = %q, want lowercased quoted names", got)
+	}
+}
+
+// TestValorDisplayBigInt pins the unbounded `inf` carrier: a `*big.Int`
+// renders its decimal digits, on its own and inside a boxed collection or
+// record, and an unset (nil) slot reads as zero.
+func TestValorDisplayBigInt(t *testing.T) {
+	huge, _ := new(big.Int).SetString("18446744073709551616", 10)
+	negative, _ := new(big.Int).SetString("-340282366920938463463374607431768211456", 10)
+	if got := ValorDisplay(huge); got != "18446744073709551616" {
+		t.Fatalf("ValorDisplay(*big.Int) = %q, want 18446744073709551616", got)
+	}
+	if got := ValorDisplay(negative); got != "-340282366920938463463374607431768211456" {
+		t.Fatalf("ValorDisplay(negative *big.Int) = %q", got)
+	}
+	if got := ValorDisplay((*big.Int)(nil)); got != "0" {
+		t.Fatalf("ValorDisplay(nil *big.Int) = %q, want 0", got)
+	}
+	if got := ValorDisplay([]any{huge, 1}); got != "[18446744073709551616, 1]" {
+		t.Fatalf("ValorDisplay(boxed list) = %q", got)
+	}
+	if got := ValorDisplay([]*big.Int{huge}); got != "[18446744073709551616]" {
+		t.Fatalf("ValorDisplay([]*big.Int) = %q", got)
+	}
+	type genus struct{ V *big.Int }
+	if got := ValorDisplay(genus{V: huge}); got != `{"v": 18446744073709551616}` {
+		t.Fatalf("ValorDisplay(record) = %q", got)
 	}
 }

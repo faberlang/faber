@@ -15,11 +15,13 @@
 // `[a, b, c]` / `{"k": v}` with sorted quoted keys, genus records render
 // `{"field": value}` with Go-exported field names lowercased and quoted, and
 // the tensor/vector carriers render their flat data list. `time.Time` renders
-// as RFC3339.
+// as RFC3339. A `*big.Int` (the unbounded `inf` carrier) renders its decimal
+// digits.
 package rt
 
 import (
 	"fmt"
+	"math/big"
 	"reflect"
 	"sort"
 	"strconv"
@@ -86,6 +88,13 @@ func ValorDisplay(value any) string {
 		return valorFractusDisplay(v)
 	case time.Time:
 		return v.UTC().Format(time.RFC3339)
+	case *big.Int:
+		// An unbounded `inf` carrier: its decimal digits (a nil pointer is the
+		// unset slot, which reads as zero).
+		if v == nil {
+			return "0"
+		}
+		return v.String()
 	}
 	rv := reflect.ValueOf(value)
 	for rv.Kind() == reflect.Pointer {
