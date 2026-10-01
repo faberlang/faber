@@ -38,6 +38,21 @@ impl TypeChecker<'_> {
             .push(SemanticError::structured(kind, span).with_arg("issue", issue));
     }
 
+    /// [`Self::error_issue`] carrying named message arguments.
+    pub fn error_issue_with_args(
+        &mut self,
+        kind: SemanticErrorKind,
+        issue: &'static str,
+        span: radix_lexer::Span,
+        args: &[(&'static str, String)],
+    ) {
+        let mut error = SemanticError::structured(kind, span).with_arg("issue", issue);
+        for (name, value) in args {
+            error = error.with_arg(name, value);
+        }
+        self.errors.push(error);
+    }
+
     /// Reject an illegal own-bind RHS and attach the D-6 `copy` suggestion.
     pub fn reject_own_bind(&mut self, issue: &'static str, span: radix_lexer::Span) {
         self.errors.push(

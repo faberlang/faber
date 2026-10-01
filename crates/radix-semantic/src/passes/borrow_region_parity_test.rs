@@ -71,9 +71,15 @@ fn parity_check(source: &str, label: &str) -> Parity {
     };
     let resolver = Resolver::new();
 
-    let approximation = crate::passes::borrow::analyze(hir, &resolver, &result.types);
-    let region =
-        crate::passes::borrow::analyze_with_regions(hir, &resolver, &result.types, Some(&regions));
+    let approximation =
+        crate::passes::borrow::analyze(hir, &resolver, &result.types, &result.interner);
+    let region = crate::passes::borrow::analyze_with_regions(
+        hir,
+        &resolver,
+        &result.types,
+        &result.interner,
+        Some(&regions),
+    );
 
     let approx_issues = issue_set(&approximation);
     let region_issues = issue_set(&region);

@@ -253,6 +253,9 @@ pub(super) fn check_intrinsic_method_call(
     // dispatches on its substituted builtin carrier.
     let receiver_resolved = checker.value_carrier_type(receiver_ty);
     let (_, payload_ty) = checker.types.peel_access_marker(receiver_resolved);
+    // The call's own method symbol, before any canonical-spelling rewrite: it
+    // identifies the `value!.method()` callee boundary in the receiver node.
+    let written_method = *name;
     let method_name = checker.interner.map_or_else(
         || "method".to_owned(),
         |interner| interner.resolve(*name).to_owned(),
@@ -366,7 +369,12 @@ pub(super) fn check_intrinsic_method_call(
         return Some(checker.error_type);
     }
 
-    if checker.expr_is_ref_view(receiver) && is_mutating_receiver(entry) {
+    // `value!.method()` writes through `value`: look through the non-null
+    // member boundary so the mandatory spelling for an optional receiver
+    // meets the same gates as the direct call on a plain binding.
+    let place = TypeChecker::method_receiver_place(receiver, written_method);
+
+    if checker.expr_is_ref_view(place) && is_mutating_receiver(entry) {
         checker.error_issue(
             SemanticErrorKind::AssignToImmutableBorrow,
             crate::ISSUE_MUTATING_RECEIVER_THROUGH_REF,
@@ -382,14 +390,27 @@ pub(super) fn check_intrinsic_method_call(
     // the registry predicate alone is the gate. Non-path receivers keep the
     // shallow mutability-engine D-1 behavior: a `fixum` field's contents stay
     // mutable through calls.
-    if matches!(receiver.kind, HirExpressionKind::Path(_))
+    if let HirExpressionKind::Path(binding_id) = &place.kind
         && is_mutating_receiver(entry)
-        && !checker.path_binding_is_mutable(receiver)
+        && !checker.path_binding_is_mutable(place)
     {
-        checker.error_issue(
+        let binding = checker
+            .binding_names
+            .get(binding_id)
+            .or_else(|| {
+                checker
+                    .resolver
+                    .get_symbol(*binding_id)
+                    .map(|symbol| &symbol.name)
+            })
+            .and_then(|symbol| checker.interner.map(|interner| interner.resolve(*symbol)))
+            .unwrap_or("value")
+            .to_owned();
+        checker.error_issue_with_args(
             SemanticErrorKind::ImmutableAssignment,
             ISSUE_IMPERATIVUS_OPERATOR_METHOD_REQUIRES_VARIA_RECEIVER,
             span,
+            &[("binding", binding), ("method", method_name.clone())],
         );
         return Some(checker.error_type);
     }

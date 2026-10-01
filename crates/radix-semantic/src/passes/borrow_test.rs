@@ -13,6 +13,7 @@ use radix_hir::{
     HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirItem, HirItemKind,
     HirLiteral, HirModule, HirParam, HirParamMode, HirStatement, HirStatementKind,
 };
+use radix_lexer::Interner;
 
 fn expect_structured_error<'a>(
     errors: &'a [SemanticError],
@@ -141,7 +142,7 @@ fn reports_use_after_move() {
         entry_is_async: false,
     };
 
-    let result = analyze(&program, &Resolver::new(), &types);
+    let result = analyze(&program, &Resolver::new(), &types, &Interner::new());
     assert!(result.is_err());
     let errors = result.unwrap_err();
     expect_structured_error(&errors, SemanticErrorKind::UseAfterMove, "use_after_move");
@@ -236,7 +237,7 @@ fn reports_mutable_borrow_conflict() {
         entry_is_async: false,
     };
 
-    let result = analyze(&program, &Resolver::new(), &types);
+    let result = analyze(&program, &Resolver::new(), &types, &Interner::new());
     assert!(result.is_err());
     let errors = result.unwrap_err();
     expect_structured_error(
@@ -319,7 +320,7 @@ fn reports_assign_to_de_parameter() {
         entry_is_async: false,
     };
 
-    let result = analyze(&program, &Resolver::new(), &types);
+    let result = analyze(&program, &Resolver::new(), &types, &Interner::new());
     assert!(result.is_err());
     let errors = result.unwrap_err();
     expect_structured_error(
@@ -472,7 +473,7 @@ fn reports_use_after_move_in_assignment_index() {
         entry_is_async: false,
     };
 
-    let result = analyze(&program, &Resolver::new(), &types);
+    let result = analyze(&program, &Resolver::new(), &types, &Interner::new());
     assert!(result.is_err());
     let errors = result.unwrap_err();
     expect_structured_error(&errors, SemanticErrorKind::UseAfterMove, "use_after_move");
@@ -570,7 +571,7 @@ fn reports_de_passed_to_in_position() {
         entry_is_async: false,
     };
 
-    let result = analyze(&program, &Resolver::new(), &types);
+    let result = analyze(&program, &Resolver::new(), &types, &Interner::new());
     assert!(result.is_err());
     let errors = result.unwrap_err();
     expect_structured_error(
@@ -640,7 +641,7 @@ fn warns_when_in_parameter_is_never_mutated() {
         entry_is_async: false,
     };
 
-    let result = analyze(&program, &Resolver::new(), &types);
+    let result = analyze(&program, &Resolver::new(), &types, &Interner::new());
     assert!(result.is_err());
     let errors = result.unwrap_err();
     expect_structured_error(
@@ -710,7 +711,7 @@ fn warns_when_ex_parameter_is_never_consumed() {
         entry_is_async: false,
     };
 
-    let result = analyze(&program, &Resolver::new(), &types);
+    let result = analyze(&program, &Resolver::new(), &types, &Interner::new());
     assert!(result.is_err());
     let errors = result.unwrap_err();
     expect_structured_error(
@@ -828,7 +829,7 @@ fn analyze_modes_rejects_use_after_move_without_rust_lifetime() {
         entry_is_async: false,
     };
 
-    let result = analyze_modes(&program, &Resolver::new(), &types);
+    let result = analyze_modes(&program, &Resolver::new(), &types, &Interner::new());
     assert!(
         result.is_err(),
         "mode analysis must reject use-after-move of own"
@@ -946,7 +947,7 @@ fn reports_write_while_borrowed_via_mutating_method_call() {
         entry_is_async: false,
     };
 
-    let result = analyze(&program, &Resolver::new(), &types);
+    let result = analyze(&program, &Resolver::new(), &types, &Interner::new());
     assert!(
         result.is_err(),
         "mutating method call on shared-borrowed value must report conflict"
@@ -1048,7 +1049,7 @@ fn allows_consecutive_mutating_method_calls_on_same_receiver() {
         entry_is_async: false,
     };
 
-    let result = analyze(&program, &Resolver::new(), &types);
+    let result = analyze(&program, &Resolver::new(), &types, &Interner::new());
     assert!(
         result.is_ok(),
         "statement-position mutating method calls must not retain a borrow: {result:?}"
@@ -1160,7 +1161,7 @@ fn allows_non_mutating_method_call_while_borrowed() {
         entry_is_async: false,
     };
 
-    let result = analyze(&program, &Resolver::new(), &types);
+    let result = analyze(&program, &Resolver::new(), &types, &Interner::new());
     assert!(
         result.is_ok(),
         "non-mutating method call on shared-borrowed value must not report conflict"
@@ -1252,7 +1253,7 @@ fn mutating_method_call_marks_param_as_mutated() {
 
     // With a mut access parameter mutated by a method call, the function
     // should not warn about an unused mut parameter.
-    let result = analyze(&program, &Resolver::new(), &types);
+    let result = analyze(&program, &Resolver::new(), &types, &Interner::new());
     // The method call mutates the parameter, so no unused-mut warning appears.
     assert!(
         result.is_ok(),
@@ -1304,7 +1305,7 @@ fn bodyless_function_with_in_param_has_no_warning() {
         entry_is_async: false,
     };
 
-    let result = analyze(&program, &Resolver::new(), &types);
+    let result = analyze(&program, &Resolver::new(), &types, &Interner::new());
     assert!(
         result.is_ok(),
         "bodyless function with a mut access parameter should not produce a warning"
@@ -1355,7 +1356,7 @@ fn bodyless_function_with_ex_param_has_no_warning() {
         entry_is_async: false,
     };
 
-    let result = analyze(&program, &Resolver::new(), &types);
+    let result = analyze(&program, &Resolver::new(), &types, &Interner::new());
     assert!(
         result.is_ok(),
         "bodyless function with an own access parameter should not produce a warning"
@@ -1406,7 +1407,7 @@ fn bodyless_function_with_owned_param_is_ok() {
         entry_is_async: false,
     };
 
-    let result = analyze(&program, &Resolver::new(), &types);
+    let result = analyze(&program, &Resolver::new(), &types, &Interner::new());
     assert!(
         result.is_ok(),
         "bodyless function with owned param should pass"
@@ -1457,7 +1458,7 @@ fn empty_function_body_has_no_borrow_errors() {
         entry_is_async: false,
     };
 
-    let result = analyze(&program, &Resolver::new(), &types);
+    let result = analyze(&program, &Resolver::new(), &types, &Interner::new());
     assert!(
         result.is_ok(),
         "function with no body should pass borrow check"
@@ -1592,6 +1593,7 @@ fn analyze_modes_does_not_reject_unmarked_explicit_ref_conflict() {
         &dual_explicit_ref_program(numerus),
         &Resolver::new(),
         &types,
+        &Interner::new(),
     );
     assert!(
         result.is_ok(),
@@ -1605,7 +1607,12 @@ fn analyze_modes_rejects_mut_root_explicit_ref_conflict() {
     let mut types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);
     let mut_ty = types.access_marker(AccessMarker::Mut, numerus);
-    let result = analyze_modes(&dual_explicit_ref_program(mut_ty), &Resolver::new(), &types);
+    let result = analyze_modes(
+        &dual_explicit_ref_program(mut_ty),
+        &Resolver::new(),
+        &types,
+        &Interner::new(),
+    );
     assert!(
         result.is_err(),
         "mut-root explicit refs are a language conflict"

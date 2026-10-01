@@ -3415,8 +3415,8 @@ message = "second assignment to immutable binding"
 help = "use a `var` binding to allow reassignment, or remove the extra assignment"
 
 [diagnostics.SEM020.issues.imperativus_operator_method_requires_varia_receiver]
-message = "imperativus operator method requires var receiver"
-help = "use a `var` binding to allow reassignment, or remove the extra assignment"
+message = "`{method}` changes `{binding}` in place, but `{binding}` is an immutable binding"
+help = "declare `{binding}` with `var` so it can be changed in place, or call a method that returns a new value instead"
 
 [diagnostics.SEM021]
 message = "invalid assignment target"

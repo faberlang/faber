@@ -663,6 +663,17 @@ impl HirVisitor for LintContext<'_> {
                     self.visit_expr(&arg.expr);
                 }
             }
+            // `value!.method(…)` lowers to a call whose callee is the non-null
+            // member boundary; it is the method-call form for an optional
+            // receiver, so it reassigns exactly like `value.method(…)`.
+            HirExpressionKind::Call(callee, _, args, _) => {
+                if let HirExpressionKind::NonNull(_, radix_hir::HirNonNullKind::Member(method)) =
+                    &callee.kind
+                {
+                    self.mark_receiver_reassigned_if_needed(callee, *method, args.len());
+                }
+                walk_expr(self, expr);
+            }
             HirExpressionKind::Adfirma(cond, message) => {
                 self.visit_expr(cond);
                 if let Some(message) = message {

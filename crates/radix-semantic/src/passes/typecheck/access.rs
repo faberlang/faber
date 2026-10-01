@@ -807,6 +807,25 @@ impl TypeChecker<'_> {
         }
     }
 
+    /// The place a method call writes through. In `value!.method()` the
+    /// parser lowers the non-null member boundary into the callee, so the
+    /// receiver node is `NonNull(value, Member(method))`; the place is `value`.
+    /// Any other receiver (including `a!.b` as a field receiver) is its own
+    /// place.
+    pub(super) fn method_receiver_place<'e>(
+        receiver: &'e HirExpression,
+        method: Symbol,
+    ) -> &'e HirExpression {
+        match &receiver.kind {
+            HirExpressionKind::NonNull(object, radix_hir::HirNonNullKind::Member(name))
+                if *name == method =>
+            {
+                object
+            }
+            _ => receiver,
+        }
+    }
+
     /// Whether `expr` is a declared `ref` root or a projection of one.
     pub(super) fn expr_is_ref_view(&self, expr: &HirExpression) -> bool {
         if let Some(ty) = expr.ty

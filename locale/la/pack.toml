@@ -3196,8 +3196,8 @@ message = "second assignment to immutable binding"
 help = "use a `varia` binding to allow reassignment, or remove the extra assignment"
 
 [diagnostics.SEM020.issues.imperativus_operator_method_requires_varia_receiver]
-message = "imperativus operator method requires varia receiver"
-help = "use a `varia` binding to allow reassignment, or remove the extra assignment"
+message = "`{method}` mutat `{binding}` in loco, sed `{binding}` est ligatio immutabilis"
+help = "declara `{binding}` cum `varia` ut in loco mutari possit, aut utere methodo quae valorem novum reddit"
 
 [diagnostics.SEM021]
 message = "invalid assignment target"

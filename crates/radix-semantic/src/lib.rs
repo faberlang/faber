@@ -742,14 +742,22 @@ pub fn analyze_with_cli(
     // When borrow_analysis is already on (legacy for_target(Rust)), full
     // `borrow::analyze` covers modes + Rust lifetime — skip the dual pass.
     if config.borrow_analysis {
-        if let Err(e) =
-            passes::borrow::analyze_with_regions(&hir, &resolver, &types, region_facts.as_ref())
-        {
+        if let Err(e) = passes::borrow::analyze_with_regions(
+            &hir,
+            &resolver,
+            &types,
+            interner,
+            region_facts.as_ref(),
+        ) {
             diagnostics.extend(e);
         }
-    } else if let Err(e) =
-        passes::borrow::analyze_modes_with_regions(&hir, &resolver, &types, region_facts.as_ref())
-    {
+    } else if let Err(e) = passes::borrow::analyze_modes_with_regions(
+        &hir,
+        &resolver,
+        &types,
+        interner,
+        region_facts.as_ref(),
+    ) {
         diagnostics.extend(e);
     }
 

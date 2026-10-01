@@ -106,6 +106,9 @@ mod fieldless_type_access_test;
 #[cfg(test)]
 #[path = "mutating_intrinsic_test.rs"]
 mod mutating_intrinsic_test;
+#[cfg(test)]
+#[path = "non_null_mutating_receiver_test.rs"]
+mod non_null_mutating_receiver_test;
 
 mod closing;
 #[cfg(test)]

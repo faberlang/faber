@@ -40,9 +40,13 @@
 //!   exits.
 //! - Mutating method calls are receiver writes, not retained borrows; this
 //!   keeps statement-position collection intrinsics such as `xs.appende(v)`
-//!   reusable within one block.
-//! - The `TypeTable` is consulted only for callee signatures, because argument
-//!   modes determine whether a call reads, mutably borrows, or moves an input.
+//!   reusable within one block. An intrinsic call is a write when the registry
+//!   says so (`is_mutating_receiver`, including value-returning mutators like
+//!   `detrahe`); only a method with no registry row falls back to its vacuum
+//!   return.
+//! - The `TypeTable` is consulted for callee signatures, because argument
+//!   modes determine whether a call reads, mutably borrows, or moves an input,
+//!   and for receiver types to resolve the intrinsic registry row.
 //! - Marked-value borrows (`mut`/`ref` local binds and explicit refs of
 //!   marked roots) route their conflict decisions through the BRI-2 region
 //!   engine when region facts are supplied: a borrow conflicts only while its
@@ -66,6 +70,8 @@ use radix_hir::{
     DefId, HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirItem,
     HirItemKind, HirModule, HirParamMode, HirStatement, HirStatementKind,
 };
+use radix_intrinsics::{is_mutating_receiver, lookup_method_for_type_id};
+use radix_lexer::Interner;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 const ISSUE_ASSIGN_TO_DE_PARAMETER: &str = "assign_to_de_parameter";
@@ -93,8 +99,9 @@ pub fn analyze_modes(
     hir: &HirModule,
     _resolver: &Resolver,
     types: &TypeTable,
+    interner: &Interner,
 ) -> Result<(), Vec<SemanticError>> {
-    run(hir, types, false, true, None)
+    run(hir, types, interner, false, true, None)
 }
 
 /// Region-routed [`analyze_modes`]: marked-value borrow conflicts consult the
@@ -107,9 +114,10 @@ pub fn analyze_modes_with_regions(
     hir: &HirModule,
     _resolver: &Resolver,
     types: &TypeTable,
+    interner: &Interner,
     regions: Option<&RegionFacts>,
 ) -> Result<(), Vec<SemanticError>> {
-    run(hir, types, false, true, regions)
+    run(hir, types, interner, false, true, regions)
 }
 
 /// Legacy Rust-target analysis: declared access facts plus the Rust lifetime
@@ -124,8 +132,9 @@ pub fn analyze(
     hir: &HirModule,
     _resolver: &Resolver,
     types: &TypeTable,
+    interner: &Interner,
 ) -> Result<(), Vec<SemanticError>> {
-    run(hir, types, true, true, None)
+    run(hir, types, interner, true, true, None)
 }
 
 /// Region-routed [`analyze`]: marked-value borrow conflicts consult the
@@ -139,9 +148,10 @@ pub fn analyze_with_regions(
     hir: &HirModule,
     _resolver: &Resolver,
     types: &TypeTable,
+    interner: &Interner,
     regions: Option<&RegionFacts>,
 ) -> Result<(), Vec<SemanticError>> {
-    run(hir, types, true, true, regions)
+    run(hir, types, interner, true, true, regions)
 }
 
 /// Retired Rust lifetime simulation hook.
@@ -165,11 +175,13 @@ pub fn analyze_rust_lifetime(
 fn run(
     hir: &HirModule,
     types: &TypeTable,
+    interner: &Interner,
     rust_lifetime: bool,
     language_conflicts: bool,
     regions: Option<&RegionFacts>,
 ) -> Result<(), Vec<SemanticError>> {
-    let mut checker = BorrowChecker::new(types, rust_lifetime, language_conflicts, regions);
+    let mut checker =
+        BorrowChecker::new(types, interner, rust_lifetime, language_conflicts, regions);
     checker.check_program(hir);
 
     if checker.errors.is_empty() {
@@ -227,6 +239,9 @@ struct BorrowChecker<'a> {
     /// Semantic type table produced before analysis; call signatures determine
     /// whether each argument is read, borrowed, or moved.
     types: &'a TypeTable,
+    /// Resolves method-call symbols so receiver writes key on the intrinsic
+    /// registry (`is_mutating_receiver`), not on the call's return type.
+    interner: &'a Interner,
     /// Retained only for the retired qualification implementation path;
     /// normal analysis never enables simulated Rust lifetime diagnostics.
     rust_lifetime: bool,
@@ -282,12 +297,14 @@ struct ParamUsage {
 impl<'a> BorrowChecker<'a> {
     fn new(
         types: &'a TypeTable,
+        interner: &'a Interner,
         rust_lifetime: bool,
         language_conflicts: bool,
         regions: Option<&'a RegionFacts>,
     ) -> Self {
         Self {
             types,
+            interner,
             rust_lifetime,
             language_conflicts,
             states: FxHashMap::default(),
@@ -955,6 +972,25 @@ impl<'a> BorrowChecker<'a> {
         }
     }
 
+    fn method_call_writes_receiver(
+        &self,
+        call: &HirExpression,
+        receiver: &HirExpression,
+        method: radix_lexer::Symbol,
+        args: &[HirCallArg],
+    ) -> bool {
+        let registry_row = receiver
+            .ty
+            .zip(self.interner.strings().get(method.0 as usize))
+            .and_then(|(ty, name)| lookup_method_for_type_id(ty, self.types, name, args.len()));
+        match registry_row {
+            Some(entry) => is_mutating_receiver(entry),
+            None => call
+                .ty
+                .is_some_and(|ty| matches!(self.types.get(ty), Type::Primitive(Primitive::Vacuum))),
+        }
+    }
+
     fn write_use(&mut self, def_id: DefId, span: radix_lexer::Span) {
         self.note_live_unmarked_own_bind(def_id);
         if let Some(usage) = self.param_usage.get_mut(&def_id) {
@@ -1321,14 +1357,15 @@ impl HirVisitor for BorrowChecker<'_> {
                 }
                 _ => self.visit_expr(inner),
             },
-            HirExpressionKind::MethodCall(receiver, _method, _type_args, args, _) => {
-                // Determine receiver semantics from the method call's return type.
-                // Methods returning Vacuum mutate the receiver in place; treat as
-                // a receiver write. The call may conflict with an existing borrow,
-                // but it does not keep a mutable borrow alive after the statement.
-                let is_mutating = expr.ty.is_some_and(|ty| {
-                    matches!(self.types.get(ty), Type::Primitive(Primitive::Vacuum))
-                });
+            HirExpressionKind::MethodCall(receiver, method, _type_args, args, _) => {
+                // A call is a receiver write when the registry marks the
+                // intrinsic as mutating its receiver (value-returning in-place
+                // mutators such as `remove_last` included). A method with no
+                // registry row (a user method) keeps the Vacuum-return
+                // heuristic. The call may conflict with an existing borrow,
+                // but it does not keep a mutable borrow alive after the
+                // statement.
+                let is_mutating = self.method_call_writes_receiver(expr, receiver, *method, args);
                 if is_mutating {
                     if let Some(def_id) = Self::root_def_id(receiver) {
                         self.check_projection_inputs(receiver);
