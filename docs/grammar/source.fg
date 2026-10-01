@@ -117,7 +117,7 @@ glyph = "="
 codepoint = "U+003D"
 unicode_name = "EQUALS SIGN"
 role = "assignment"
-claiming_slots = ["annotation_field", "enum_member", "field_decl", "field_init", "fixum_decl", "ut_field", "nomen_field", "ex_field", "visibilitas_field", "omnia_field", "nucleum_field", "typus_decl", "static_decl"]
+claiming_slots = ["annotation_field", "enum_member", "field_decl", "field_init", "fixum_decl", "ut_field", "nomen_field", "ex_field", "visibilitas_field", "omnia_field", "nucleum_field", "typus_decl"]
 
 [[glyphs]]
 glyph = ">"
@@ -818,7 +818,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 @status capture-pending
 IDENTIFIER ::=
 
-# scan.rs scan_number; decimal/hex/bin/oct integers and floats with '_' separators; TokenKind::Integer(u64) when the value fits u64, TokenKind::BigInteger(text) when an integer literal is longer (no upper bound on length; inf track, F9 ruling 34) or Float(f64); a BigInteger is legal only where an expression literal or a `casu` constant pattern stands (its value must then fit the receiving slot: always an `inf` slot, otherwise the slot's range) and is a parse error in a NATURAL or enum-member position; scan.rs also lexes the glyph '∞' as Float(+inf), never an `inf` value
+# scan.rs scan_number; decimal/hex/bin/oct integers and floats with '_' separators; TokenKind::Integer(u64) when the value fits u64, TokenKind::BigInteger(text) when an integer literal is longer (no upper bound on length; inf track, F9 ruling 34) or Float(f64); a BigInteger is legal only where an expression literal or a `casu` constant pattern stands (its value must then fit the receiving slot: always an `inf` slot, otherwise the slot's range) and is a parse error in a NATURAL, enum-member or JSON-literal position (a JSON integer keeps the signed 64-bit wire range: `json_integer_overflow` / `json_integer_underflow`); scan.rs also lexes the glyph '∞' as Float(+inf), never an `inf` value
 @status capture-pending
 NUMBER ::=
 
@@ -846,7 +846,7 @@ OCTETI_STRING ::=
 @status capture-pending
 NEWLINE ::=
 
-# parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64 and decimal d64 (numerus and exactus), f16/bf16/f32/f64 (fractus only); every integer width i8…u64 (modulus and saturatus; no d64, no float); integer widths and d64 (exactus; a float width is `trapping_float_not_implemented`); the unbounded integer marker `inf` (numerus, exactus, modulus and saturatus all name the same type; locale-invariant, not a keyword; never prefixed sugar; not a float width; not a tensor, sparsa, vector or matrix element); not a lexer token
+# parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64 and decimal d64 (numerus and exactus), f16/bf16/f32/f64 (fractus only); every integer width i8…u64 (modulus and saturatus; no d64, no float); integer widths and d64 (exactus; a float width is `trapping_float_not_implemented`); the unbounded integer marker `inf` (numerus, exactus, modulus and saturatus all name the same type; locale-invariant, not a keyword; never prefixed sugar; not a float width; not a tensor, sparsa, vector or matrix element; host-only, so no kernel or AIR-lane position takes it); not a lexer token
 @status capture-pending
 WIDTH_MARKER ::=
 
@@ -922,7 +922,7 @@ statement     := annotation* statement_core | ad_handler_decl
 # placement, handler shape and reserved routes are semantic.
 ad_handler_decl := annotation* ad_annotation annotation* functio_decl
 statement_core := importa_decl | binding_decl | functio_decl | genus_decl | implendum_decl
-               | typus_decl | ordo_decl | discretio_decl | schema_decl | static_decl
+               | typus_decl | ordo_decl | discretio_decl | schema_decl
                | si_stmt | dum_stmt | itera_stmt
                | elige_stmt | discerne_stmt | custodi_stmt | fac_stmt
                | redde_stmt | reddet_stmt | tacebit_stmt | cede_stmt
@@ -933,33 +933,38 @@ statement_core := importa_decl | binding_decl | functio_decl | genus_decl | impl
 binding_decl   := fixum_decl | sit_decl | array_destruct | object_destruct | figendum_decl
 expr_stmt      := expression
 block_stmt     := '{' statement* '}'
-# `static_decl` is a top-level-only declaration (D5.8): a `generis` binding
-# inside a `block_stmt` is parsed by this same production and rejected with
-# `static_not_top_level`, the same enforcement shape as `functio_decl` /
-# `genus_decl` / `ordo_decl` / `discretio_decl` (`declaration_not_top_level`).
-static_decl    := 'generis' concrete_type IDENTIFIER '=' static_init
-# `static_init` (D8.10): a `generis` initializer is either the build-time
-# file embed or an ordinary expression (`praefixum { … }` included, D8.4-D8.6).
-# `insere_expr` is legal only here and in a `field_decl` initializer that
-# follows the `generis` modifier — never after `fixum`/`varia`, and never in
-# a bare assignment.
-static_init    := insere_expr | expression
+# `const_init` (D8.10, st1 R4): the initializer of an `=` binding is either the
+# build-time file embed or an ordinary expression (`praefixum { … }` is an
+# expression, D8.4-D8.6). It is the `=` tail of a module-level constant
+# (`fixum_decl`) and of a `genus` field default (`genus_field_decl`,
+# `field_decl`). Today the parser claims `insere_expr` only as the first word
+# of a module-level `=` constant and of a `generis` field default; after a
+# block-level `fixum`, after a `fixum`/`varia` field, and in a bare assignment
+# the spelling stays an ordinary identifier.
+const_init     := insere_expr | expression
 # `insere` (en `embed`, D8.10) is contextual: it is claimed only when it is
-# the first word of a `generis` initializer and is directly followed by a
-# string literal; every other appearance of the spelling stays an ordinary
+# the first word of a claiming `const_init` (above) and is directly followed by
+# a string literal; every other appearance of the spelling stays an ordinary
 # identifier. The string is a package-relative path, resolved against the
 # nearest ancestor `faber.toml` (or, absent one, the source file's own
 # directory); an absolute path or a `..` escape is rejected, and a missing
 # file is a compile error. The file is a build input, read once at compile
-# time. The result's type follows the `generis` declaration: `textus` requires
-# the file to be valid UTF-8; `octeti` reads the raw bytes.
+# time. The result's type follows the declaration: `textus` requires the file
+# to be valid UTF-8; `octeti` reads the raw bytes.
 insere_expr    := 'insere' STRING
 
-# `fixum T x = e` (D5.10) is a typed local constant: `=` states a compile-time
-# fact, so `e` is evaluated while compiling (literals, arithmetic, statics and
-# earlier constants) and must fit `T` whatever `T`'s policy. `varia` never takes
-# `=` (`varia_compile_time_initializer`); a runtime store is `←`.
-fixum_decl      := ('fixum' | 'varia') type_annotation IDENTIFIER (('←' expression) | ('=' expression) | ('↤' assignment inline_default?) | ('↢' expression))?
+# `fixum T x = e` (D5.10) is a typed constant: `=` states a compile-time fact,
+# so `e` is evaluated while compiling (literals, arithmetic, module constants
+# and earlier constants) and must fit `T` whatever `T`'s policy. At the top of a
+# file the same declaration is the module-level constant (st1 R1; en
+# `const T X = e`); that is the only value a module can declare, so a
+# module-level `varia`, `sit`, destructuring, or a runtime `←` / `↤` / `↢`
+# initializer is `SEM062 top_level_binding`. `varia` never takes `=`
+# (`varia_compile_time_initializer`); a runtime store is `←`. The retired
+# `generis T X = e` declaration (en `static`) parses whole for recovery and is
+# reported as `PARSE010 static_decl_retired`, at the top level and in blocks
+# alike; `generis` survives only as the `genus` field modifier below.
+fixum_decl      := ('fixum' | 'varia') type_annotation IDENTIFIER (('←' expression) | ('=' const_init) | ('↤' assignment inline_default?) | ('↢' expression))?
 figendum_decl := ('figendum' | 'variandum') type_annotation IDENTIFIER '←' expression
 sit_decl      := 'sit' IDENTIFIER (('←' | '↢') expression)?
 array_destruct := ('fixum' | 'varia') array_pattern '←' expression
@@ -1022,14 +1027,14 @@ genus_member  := annotation* (genus_field_decl | functio_method_decl)
 # reassigned (`SEM020 assignment_to_fixum_field`); `Genus { … } ex p` copies
 # it unchanged. `varia T x`: reassignable per instance. `generis T X = …`: one
 # per type, compile-time. Independent of visibility (`@ privata` + `fixum` is
-# legal). The initializer is `static_init` (D8.10) so a `generis` field may
+# legal). The initializer is `const_init` (D8.10) so a `generis` field may
 # also open with the build-time `insere_expr`; `fixum`/`varia` fields only
-# ever take the `expression` alternative — `insere` there parses as an
+# ever take the `expression` alternative today — `insere` there parses as an
 # ordinary identifier, not the build-time embed.
-genus_field_decl := ('fixum' | 'varia' | 'generis') type_annotation IDENTIFIER 'sponte'? ('=' static_init)?
+genus_field_decl := ('fixum' | 'varia' | 'generis') type_annotation IDENTIFIER 'sponte'? ('=' const_init)?
 # `field_decl` is the `discretio` shared-field form, where the modifier stays
 # optional (F7 held); `genus_field_decl` above is the `genus` form.
-field_decl    := ('fixum' | 'varia' | 'generis')? type_annotation IDENTIFIER 'sponte'? ('=' static_init)?
+field_decl    := ('fixum' | 'varia' | 'generis')? type_annotation IDENTIFIER 'sponte'? ('=' const_init)?
 functio_method_decl   := 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 
 annotation            := nucleum_annotation | radix_annotation | braced_annotation | annotation_sugar
@@ -1390,25 +1395,26 @@ json_value := json_object | json_array | json_string | json_number | 'true' | 'f
 json_object := '{' (json_member (',' json_member)*)? '}'
 json_array  := '[' (json_value (',' json_value)*)? ']'
 json_string := STRING
-# Numerus when no decimal point or exponent is present; otherwise Fractus.
+# Numerus when no decimal point or exponent is present; otherwise Fractus. A
+# numerus literal keeps the signed 64-bit wire range (`json_integer_overflow`).
 json_number := NUMBER
 
 finge_expr     := 'finge' qualified_ident ('{' field_list? '}')? ('∷' type_annotation)?
 qualified_ident := IDENTIFIER ('.' IDENTIFIER)*
-# `praefixum` (D8.4-D8.6, D9): the compile-time initializer for a static. The
+# `praefixum` (D8.4-D8.6, D9): the compile-time initializer for a constant. The
 # retired parenthesized form (`'praefixum' '(' expression ')'`) is gone; a
 # bare block is the only shape, rejected with `praefixum_expression_form_retired`
-# when written. It is legal only as a `static_decl` or static `field_decl`
-# initializer (`static_init`) — anywhere else it is `SEM064`
-# (`praefixum_outside_static`). The body is a `block_stmt` ending in a
-# `redde`; it lowers to MIR and runs on `radix-mir-runner` during the build
+# when written. It is legal today only as the initializer of a module-level
+# `=` constant (`fixum_decl`) or of a `generis` field default (`const_init`) —
+# anywhere else it is `SEM064` (`praefixum_outside_constant`). The body is a
+# `block_stmt` ending in a `redde`; it lowers to MIR and runs on `radix-mir-runner` during the build
 # under a step budget (10M steps), so an endless loop fails the build instead
 # of hanging it (`SEM064 praefixum_step_limit`), and `mori` or a propagated
 # `⇥` is a build error carrying its message (`praefixum_failed`). Allowed:
 # pure computation (arithmetic, `textus`, collections, loops, `si`,
 # `discerne`, building `genus` values), calls to ordinary functions that obey
-# the same rules (checked transitively), reading other statics in dependency
-# order (a cycle is an error), and sync generators (`fiunt`). Forbidden: any
+# the same rules (checked transitively), reading other module constants in
+# dependency order (a cycle is an error), and sync generators (`fiunt`). Forbidden: any
 # `ad`, await, async cursors, and `externa` — each rejected as `SEM064`
 # (`praefixum_forbidden`). A body with no `redde` value is
 # `praefixum_no_result`; a result with no literal form on every backend

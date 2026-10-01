@@ -106,47 +106,66 @@ use a top-level function.
   the written type is the conversion destination, then the binding is
   initialized. `figendum`/`variandum` keep `←`; `fixum _`, `sit`, and untyped
   destructuring reject `↤` (no concrete destination type).
-- `fixum T x = e` (D5.10) declares a typed **local constant**. `=` states a
+- `fixum T x = e` (D5.10) declares a typed **constant**; at the top of a file
+  the same declaration is the module-level constant (next section). `=` states a
   compile-time fact, so `e` is evaluated while compiling (literals, arithmetic
-  and the other operators on scalars, `generis` statics, earlier constants) and
+  and the other operators on scalars, module constants, earlier constants) and
   must fit `T` whatever `T`'s overflow policy: `fixum u8 d = 300` is a compile
   error even for `saturating<u8>`. `fixum _ x = 10` infers `int`. The result is
   an ordinary immutable local of type `T`. `varia` never takes `=`
   (`varia_compile_time_initializer`), and a value that is not known at compile
-  time is stored with `←` (`local_constant_not_constant`, SEM060).
+  time is stored with `←` (`constant_initializer_not_constant`, SEM060).
 - Deferred init: `fixum numerus x` or `sit x` declares an uninitialized immutable
   slot that must be assigned exactly once before any read; a second assignment is
   rejected. The definite-assignment pass (semantic Phase 3a) enforces this.
 
-### Top-level statics
+### Module-level constants
 
+A module declares values only as compile-time constants: `fixum T X = e` at the
+top of a file (en `const T X = e`), for example `fixum numerus LIMES = 4096`
+(D5.8, st1 R1). It is the same declaration as the block-level constant above,
+with `=` stating a compile-time fact, and it is the only top-level value
+declaration. Module-level mutable state does not exist (D5.7): a top-level
+`varia`, `sit`, destructuring, or a runtime initializer (`←`, `↤`, `↢`) is a
+compile error, SEM062 `top_level_binding` — a runtime value belongs in a
+function. `varia T X = e` stays `varia_compile_time_initializer`, and a
+top-level declaration with no initializer is SEM008 `top_level_initializer`.
+`fixum _ X = 10` infers `int` as it does for a local.
 
-`fixum` and `varia` are not allowed at top level (D5.7): module-level mutable
-state does not exist. A top-level `fixum`/`varia` binding is a compile error: SEM062
-`top_level_binding`.
+**Retired spelling.** The module-level static `generis T X = e` (en
+`static T X = e`) no longer exists. A statement-initial `generis` followed by an
+identifier or `(`, at the top level or in a block, parses as the old
+declaration whole and is reported as `PARSE010 static_decl_retired` (args
+`keyword`, the spelling written, and `name`; the help names the `fixum`
+spelling); there is no alias period, and the diagnostic stays. `generis`
+followed by anything else is an ordinary identifier. `generis` survives only as
+the `genus` field modifier (see Classes).
 
-The top-level static is `generis` (en `static`): `generis numerus LIMES = 4096`
-(D5.8) — the same production as a `genus` static field, used in a second,
-top-level-only scope. It is the only top-level value declaration; declaring
-one inside a block is a parse error (`static_not_top_level`), the same
-enforcement shape as `functio`/`genus`/`ordo`/`discretio` at non-top level.
-
-A static's declared type cannot be a hole: `generis _ X = …` and `generis ∪ X = …` are parse errors (the same holds for an annotation field's type value and the `@ radix typus` domain list, which take a `concrete_type`).
-
-Statics are **immutable and initialized with `=` only** (D5.9), never `←`; a
-missing initializer or an initializer spelled with `←` is a named parse
-error. The initializer must be evaluable at compile time: literals;
+Constants are **immutable and initialized with `=` only** (D5.9), never `←`.
+The initializer must be evaluable at compile time: literals;
 arithmetic, comparison, bit, and logical operators on `numerus`, `fractus`,
 and `bivalens` scalars, plus `textus` concatenation; references to other
-statics (evaluated in dependency order — a cycle is `static_cycle`); and
+constants (evaluated in dependency order, so a constant may be used before its
+declaration — a cycle is `constant_cycle`, SEM007); and
 collection literals (`lista`, tuples, map construction) whose elements are
 constants (only their scalar leaves fold). Anything else is
-`static_initializer_not_constant`. Decimal widths and `modulus<W>`/`saturatus<W>` values are
+`constant_initializer_not_constant` (SEM060). Decimal widths and `modulus<W>`/`saturatus<W>` values are
 not folded, so arithmetic on them is not a compile-time constant today.
 Compile-time integer arithmetic is checked (overflow and division by zero are
-compile errors), matching the runner's checked runtime semantics.
+compile errors: `constant_arithmetic_overflow`, `constant_division_by_zero`),
+matching the runner's checked runtime semantics. A value that needs
+computation takes a `praefixum { … }` block (en `comptime { … }`), which runs
+during the build; it is legal today as the initializer of a module-level
+constant or of a `generis` field default, and is `SEM064`
+`praefixum_outside_constant` anywhere else.
 
-**Build-time file embed, `insere` (en `embed`, D8.10).** A `generis` initializer — top-level static or `genus` static field — may open with `insere "path"` instead of an ordinary expression: `generis textus LICENSE = insere "LICENSE.txt"`. `insere` is contextual (claimed only as the first word of a `generis` initializer, directly followed by a string literal); elsewhere the spelling is an ordinary identifier, and on a `fixum`/`varia` field it never claims the word. The path is package-relative, resolved against the nearest ancestor `faber.toml` (or the source file's own directory when none exists); an absolute path or a `..` escape is rejected, and a missing file is a compile error. The file is read once, at build time — it is a build input, like the source itself. The declared type decides how the bytes land: `textus` requires valid UTF-8 and fails to build otherwise; `octeti` reads the raw bytes unconditionally.
+**Build-time file embed, `insere` (en `embed`, D8.10).** A module-level `=`
+constant, or a `generis` field default on a `genus`, may open its initializer
+with `insere "path"` instead of an ordinary expression:
+`fixum textus LICENSE = insere "LICENSE.txt"`. `insere` is contextual (claimed
+only as the first word of such an initializer, directly followed by a string
+literal); elsewhere the spelling is an ordinary identifier, and today a
+block-level constant and a `fixum`/`varia` field default never claim the word. The path is package-relative, resolved against the nearest ancestor `faber.toml` (or the source file's own directory when none exists); an absolute path or a `..` escape is rejected, and a missing file is a compile error. The file is read once, at build time — it is a build input, like the source itself. The declared type decides how the bytes land: `textus` requires valid UTF-8 and fails to build otherwise; `octeti` reads the raw bytes unconditionally.
 
 ### Functions
 
@@ -315,7 +334,7 @@ wire operation such as `json.pange(value ↦ json)`.
   a construction literal (`Genus { field = value }`), never reassigned;
   `Genus { … } ex p` copies it unchanged (D16.3), independent of visibility
   (`@ privata` + `fixum` is legal). `varia T x`: per instance, reassignable.
-  `generis T X = …`: one per type, compile-time (unchanged). A write to a
+  `generis T X = …`: one per type, compile-time (the only remaining `generis` position). A write to a
   `fixum` field outside a construction literal is `SEM020`
   (`assignment_to_fixum_field`). The former `nexum` field modifier is removed
   and rejected with a migration diagnostic.
@@ -536,7 +555,7 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | `modulus<W>` | en `wrapping<W>`; modular word, signed or unsigned (N7e); a store reduces modulo 2^W |
 | `saturatus<W>` | en `saturating<W>`; saturating integer; a store clamps at both ends of W |
 | `exactus<W>` | en `trapping<W>`; the trapping policy spelled out (D11.8, N7a): the same type as `numerus<W>`, and a store traps when the value does not fit |
-| `inf` | the unbounded integer (D11.5): a width marker in the `numerus` family with no upper or lower bound, spelled `inf` in every locale (no keyword). `numerus<inf>`, `exactus<inf>`, `modulus<inf>` and `saturatus<inf>` (en `int<inf>`, `trapping<inf>`, `wrapping<inf>`, `saturating<inf>`) all name this one type. **Shipped:** the type, big literals, the join, store and conversion typing rules, and the host-only rejections. **Admitted, scheduled (inf track U4, U6\*), not shipped:** run-time arithmetic beyond a 64-bit carrier and the target backends; see The unbounded integer `inf`. |
+| `inf` | the unbounded integer (D11.5): a width marker in the `numerus` family with no upper or lower bound, spelled `inf` in every locale (no keyword). `numerus<inf>`, `exactus<inf>`, `modulus<inf>` and `saturatus<inf>` (en `int<inf>`, `trapping<inf>`, `wrapping<inf>`, `saturating<inf>`) all name this one type. **Shipped:** the type, big literals, the join, store and conversion rules, exact run-time arithmetic, and the host-only rejections, on the MIR runner, Rust, TypeScript, Go and Python, and in part on the Racket (`sexp`) target. A target with no unbounded carrier (Swift, Haskell, LLVM, Wasm) fails closed with a named diagnostic, and Metal, WGSL and AIR never carry it; see The unbounded integer `inf`. |
 | `fractus`  | float (default `f64`) |
 | `bivalens` | boolean |
 | `nihil`    | null |
@@ -659,8 +678,8 @@ family a store into a narrower width applies the slot's policy
 `↦`. A constant stored with `←` follows the slot's policy
 (`saturating<u8> w ← 300` is 255, `wrapping<u8> w ← -1` is 255, and a trapping
 slot's certain trap is a compile error); a constant in an `=` position
-(`generis`, field default, enum member, `fixum T x = e`) must fit `W` whatever
-the policy. Literals in `modulus<W>` and `saturatus<W>` slots must fit `W`.
+(a `fixum T X = e` constant at module level or in a block, `generis`, field
+default, enum member) must fit `W` whatever the policy. Literals in `modulus<W>` and `saturatus<W>` slots must fit `W`.
 The unbounded integer `inf` (D11.5) is a type (see its subsection below), so a
 bounded expression still obeys the 64-bit range above and an `inf` slot never
 applies a size policy.
@@ -871,21 +890,33 @@ author writes `inf` in a slot or converts with `↦ inf`. Its rules in full:
   decimal digits with a leading `-` for a negative, with no grouping or suffix;
   the `¶` integer specs apply as for `int`.
 
-**What is shipped and what is not.** The compiler front end accepts and checks
-`inf`: the type in all four spellings, the host-only rejections, big literals
-and their slot rule, the join, widening, store and conversion typing rules, and
-comparisons. At run time only value flow is lowered today (declare, store, pass,
-return, collect, compare), exact for values within the 64-bit carrier; every
-operation that would compute or convert an `inf`, and every literal beyond `u64`,
-fails closed with a named `inf_mir_unsupported_<operation>` error. **Admitted,
-scheduled (inf track), not shipped:** exact run-time semantics for all of the
-rules above (U4, the MIR runner and its bignum), the `inf`-bounded `itera` binder
-(U9), `octeti`/`valor`/`json` rows (U8a), literal-only float folding on the same
-bignum (U7), and the target backends: Rust, TypeScript, Go, Python and the
-Racket (`sexp`) target are scheduled (U6r, U6t, U6g, U6p, U6x); LLVM, Wasm,
-Swift and Haskell are scheduled to fail closed with a named diagnostic (U6fc),
-and Metal, WGSL and AIR never carry `inf`. Until a unit lands, a program that
-needs its rule does not run.
+**What is shipped.** `inf` is shipped; every rule above is checked at compile
+time and computed exactly at run time. The front end accepts the type in all
+four spellings, the host-only rejections, big literals and their slot rule, the
+join, widening, store and conversion typing rules, and comparisons. Literal-only
+float expressions fold exactly before the slot rounds them. Run-time
+semantics are carried per target, on an unbounded integer of the target's own:
+
+- **Supported.** The MIR runner (the oracle), Rust, TypeScript, Go and Python
+  run the arithmetic, comparison, conversion and display rules above; the
+  runner also runs the `itera` binder over `inf` bounds. The runner, Rust and TypeScript also carry
+  the `octeti via Be|Le` and `valor`/`json` rows with every digit; Go carries
+  `valor ↦ inf` and `octeti via Be|Le`. The Racket (`sexp`) target carries the
+  arithmetic and comparison rows.
+- **Named gaps.** Python has no `↦ valor` and no `octeti` route; the Racket
+  target lacks formatted display, genus printing and `↦ valor` (as it does for
+  every type); Go fails closed on a few container and intrinsic constructs
+  holding an `inf`; TypeScript keeps bounded `int` and `u64` as numbers, so a
+  bounded `u64` slot past 2⁵³ still traps there. Each gap is a named
+  compile-time diagnostic or a documented trap, never a bounded substitute.
+- **Fail closed.** Swift, Haskell, LLVM and Wasm have no unbounded carrier and
+  reject `inf` with a named diagnostic (`inf_target_unsupported` on Swift and
+  Haskell, `llvm_target_inf_unsupported`, `mir_wasm_unsupported`). The language
+  does not change to fit them. Metal, WGSL and AIR never carry `inf`: it is host
+  only, rejected by language rule before emission.
+
+The per-target rows with their open gaps are kept in the target capability
+matrix and the numeric model; this file states only the language.
 
 ### Generic Collections
 
@@ -1780,7 +1811,6 @@ parser rejects each one.
 | `itera ex t apud [i, j] filum f fixum v { … }` | admitted (FLD K2); a `filum` clause on `itera` is rejected (`filum` exists only in `summa ex` inside kernels) |
 | `reducta via Op ex source …` (en `reduce via Op from …`) | admitted (FLD K3), with `Op` a closed set `Sum Product Max Min Argmax Argmin All Any Count`; it would retire `summa ex` and `max from` / `min from`, all of which stay shipped meanwhile |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
-| The unbounded integer `inf`: run-time arithmetic and the target backends | type, literals and the typing rules shipped; exact run-time semantics (U4), `itera` binder (U9), `octeti`/`valor`/`json` rows (U8a), literal-only float folding (U7) and the Rust, TypeScript, Go, Python and Racket backends (U6r/t/g/p/x) admitted, scheduled, not shipped; LLVM, Wasm, Swift and Haskell fail closed; `inf` never reaches Metal, WGSL or AIR |
 | `trapping`/`saturating`/`wrapping` float cells; retiring `numerus<W>`/`fractus<W>` | ruled (D11.8); N7c/N7d pending |
 | Multi-subject `discerne` lowering | parses and is coverage-checked; lowered only by the Rust emitter |
 | Run-time capacities and extents (`[H, W]`, `_`) | admitted (FLD K14); today every extent and capacity is a compile-time value |

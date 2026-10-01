@@ -23,506 +23,504 @@ statement ::= annotation* statement_core | ad_handler_decl
 # [006] ad_handler_decl
 ad_handler_decl ::= annotation* ad_annotation annotation* functio_decl
 # [007] statement_core
-statement_core ::= importa_decl | binding_decl | functio_decl | genus_decl | implendum_decl | typus_decl | ordo_decl | discretio_decl | schema_decl | static_decl | si_stmt | dum_stmt | itera_stmt | elige_stmt | discerne_stmt | custodi_stmt | fac_stmt | redde_stmt | reddet_stmt | tacebit_stmt | cede_stmt | rumpe_stmt | perge_stmt | tacet_stmt | iace_stmt | adfirma_stmt | requirit_stmt | reice_stmt | nota_stmt | incipit_stmt | incipiet_stmt | ex_stmt | probandum_decl | proba_stmt | block_stmt | inc_dec_stmt | expr_stmt
+statement_core ::= importa_decl | binding_decl | functio_decl | genus_decl | implendum_decl | typus_decl | ordo_decl | discretio_decl | schema_decl | si_stmt | dum_stmt | itera_stmt | elige_stmt | discerne_stmt | custodi_stmt | fac_stmt | redde_stmt | reddet_stmt | tacebit_stmt | cede_stmt | rumpe_stmt | perge_stmt | tacet_stmt | iace_stmt | adfirma_stmt | requirit_stmt | reice_stmt | nota_stmt | incipit_stmt | incipiet_stmt | ex_stmt | probandum_decl | proba_stmt | block_stmt | inc_dec_stmt | expr_stmt
 # [008] binding_decl
 binding_decl ::= fixum_decl | sit_decl | array_destruct | object_destruct | figendum_decl
 # [009] expr_stmt
 expr_stmt ::= expression
 # [010] block_stmt
 block_stmt ::= '{' statement* '}'
-# [011] static_decl
-static_decl ::= 'tĩnh' concrete_type IDENTIFIER '=' static_init
-# [012] static_init
-static_init ::= insere_expr | expression
-# [013] insere_expr
+# [011] const_init
+const_init ::= insere_expr | expression
+# [012] insere_expr
 insere_expr ::= 'nhúng' STRING
-# [014] fixum_decl
-fixum_decl ::= ('hằng' | 'biến') type_annotation IDENTIFIER (('←' expression) | ('=' expression) | ('↤' assignment inline_default?) | ('↢' expression))?
-# [015] figendum_decl
+# [013] fixum_decl
+fixum_decl ::= ('hằng' | 'biến') type_annotation IDENTIFIER (('←' expression) | ('=' const_init) | ('↤' assignment inline_default?) | ('↢' expression))?
+# [014] figendum_decl
 figendum_decl ::= ('đợi_hằng' | 'đợi_biến') type_annotation IDENTIFIER '←' expression
-# [016] sit_decl
+# [015] sit_decl
 sit_decl ::= 'đặt' IDENTIFIER (('←' | '↢') expression)?
-# [017] array_destruct
+# [016] array_destruct
 array_destruct ::= ('hằng' | 'biến') array_pattern '←' expression
-# [018] object_destruct
+# [017] object_destruct
 object_destruct ::= ('hằng' | 'biến') object_pattern '←' expression
-# [019] functio_decl
+# [018] functio_decl
 functio_decl ::= 'hàm' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
-# [020] param_list
+# [019] param_list
 param_list ::= (parameter (',' parameter)*)?
-# [021] generic_params
+# [020] generic_params
 generic_params ::= '<' (type_param_list (',' size_param_list)? | size_param_list) '>'
-# [022] type_param_list
+# [021] type_param_list
 type_param_list ::= generic_param (',' generic_param)*
-# [023] size_param_list
+# [022] size_param_list
 size_param_list ::= size_param (',' size_param)*
-# [024] generic_param
+# [023] generic_param
 generic_param ::= IDENTIFIER generic_bound? generic_type_default?
-# [025] size_param
+# [024] size_param
 size_param ::= 'kích_thước' IDENTIFIER generic_size_default?
-# [026] generic_bound
+# [025] generic_bound
 generic_bound ::= 'thực_thi' contract_ref ('∩' contract_ref)*
-# [027] contract_ref
+# [026] contract_ref
 contract_ref ::= IDENTIFIER ('<' type_annotation (',' type_annotation)* '>')?
-# [028] generic_type_default
+# [027] generic_type_default
 generic_type_default ::= '=' type_annotation
-# [029] generic_size_default
+# [028] generic_size_default
 generic_size_default ::= '=' NATURAL
-# [030] call_type_args
+# [029] call_type_args
 call_type_args ::= '<' type_annotation (',' type_annotation)* '>'
-# [031] parameter
+# [030] parameter
 parameter ::= 'còn_lại'? type_annotation IDENTIFIER 'tự_nguyện'? ('như' IDENTIFIER)? ('hoặc_nếu_rỗng' expression)?
-# [032] func_modifier
+# [031] func_modifier
 func_modifier ::= 'đối_số' IDENTIFIER | 'lỗi' IDENTIFIER | 'thoát' (IDENTIFIER | NATURAL) | 'bất_biến' | 'ném_lỗi' | 'lựa_chọn' IDENTIFIER
-# [033] callable_posture
+# [032] callable_posture
 callable_posture ::= 'async' | 'sinh' | 'async_sinh'
-# [034] return_clause
+# [033] return_clause
 return_clause ::= '→' type_annotation
-# [035] alternate_exit_clause
+# [034] alternate_exit_clause
 alternate_exit_clause ::= '⇥' type_annotation
-# [036] ergo_joint
+# [035] ergo_joint
 ergo_joint ::= 'do_đó'
-# [037] clausura_joint
+# [036] clausura_joint
 clausura_joint ::= '∴'
-# [038] clausura_expr
+# [037] clausura_expr
 clausura_expr ::= compact_clausura_expr | clausura_legacy_expr
-# [039] compact_clausura_expr
+# [038] compact_clausura_expr
 compact_clausura_expr ::= clausura_signature clausura_joint (expression | fac_block)
-# [040] clausura_signature
+# [039] clausura_signature
 clausura_signature ::= (clausura_param | '(' clausura_params? ')') closure_modifier? return_clause? alternate_exit_clause?
-# [041] closure_modifier
+# [040] closure_modifier
 closure_modifier ::= 'tự_do' | 'hạt_nhân'
-# [042] fac_block
+# [041] fac_block
 fac_block ::= 'làm' block_stmt cape_clause?
-# [043] clausura_legacy_expr
+# [042] clausura_legacy_expr
 clausura_legacy_expr ::= 'đóng' clausura_params? closure_modifier? ('→' type_annotation)? (':' expression | block_stmt)
-# [044] clausura_params
+# [043] clausura_params
 clausura_params ::= clausura_param (',' clausura_param)*
-# [045] clausura_param
+# [044] clausura_param
 clausura_param ::= type_annotation IDENTIFIER
-# [046] genus_decl
+# [045] genus_decl
 genus_decl ::= 'kiểu' IDENTIFIER generic_params? ('thực_thi' contract_ref ((',' | '∩') contract_ref)*)? '{' genus_member* '}'
-# [047] genus_member
+# [046] genus_member
 genus_member ::= annotation* (genus_field_decl | functio_method_decl)
-# [048] genus_field_decl
-genus_field_decl ::= ('hằng' | 'biến' | 'tĩnh') type_annotation IDENTIFIER 'tự_nguyện'? ('=' static_init)?
-# [049] field_decl
-field_decl ::= ('hằng' | 'biến' | 'tĩnh')? type_annotation IDENTIFIER 'tự_nguyện'? ('=' static_init)?
-# [050] functio_method_decl
+# [047] genus_field_decl
+genus_field_decl ::= ('hằng' | 'biến' | 'tĩnh') type_annotation IDENTIFIER 'tự_nguyện'? ('=' const_init)?
+# [048] field_decl
+field_decl ::= ('hằng' | 'biến' | 'tĩnh')? type_annotation IDENTIFIER 'tự_nguyện'? ('=' const_init)?
+# [049] functio_method_decl
 functio_method_decl ::= 'hàm' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
-# [051] annotation
+# [050] annotation
 annotation ::= nucleum_annotation | radix_annotation | braced_annotation | annotation_sugar
-# [052] annotation_name
+# [051] annotation_name
 annotation_name ::= ANNOTATION_NAME
-# [053] braced_annotation
+# [052] braced_annotation
 braced_annotation ::= '@' annotation_name '{' annotation_field_list? '}'
-# [054] annotation_field_list
+# [053] annotation_field_list
 annotation_field_list ::= annotation_field (',' annotation_field)*
-# [055] annotation_field
+# [054] annotation_field
 annotation_field ::= ANNOTATION_FIELD_NAME '=' (expression | concrete_type)
-# [056] annotation_sugar
+# [055] annotation_sugar
 annotation_sugar ::= '@' annotation_name NON_NEWLINE_TOKEN* NEWLINE
-# [057] nucleum_annotation
+# [056] nucleum_annotation
 nucleum_annotation ::= nucleum_sugar | nucleum_braced
-# [058] nucleum_sugar
+# [057] nucleum_sugar
 nucleum_sugar ::= '@' 'hạt_nhân' nucleum_modifier? NEWLINE
-# [059] nucleum_braced
+# [058] nucleum_braced
 nucleum_braced ::= '@' 'hạt_nhân' '{' nucleum_field_list? '}'
-# [060] nucleum_modifier
+# [059] nucleum_modifier
 nucleum_modifier ::= 'mảnh'
-# [061] nucleum_field_list
+# [060] nucleum_field_list
 nucleum_field_list ::= nucleum_field (',' nucleum_field)*
-# [062] nucleum_field
+# [061] nucleum_field
 nucleum_field ::= 'mảnh' '=' ('đúng' | 'sai')
-# [063] radix_annotation
+# [062] radix_annotation
 radix_annotation ::= '@' 'radix' radix_directive NEWLINE
-# [064] radix_directive
+# [063] radix_directive
 radix_directive ::= 'làn' STRING | 'backward' STRING | 'contract' STRING | 'kiểu_tên' IDENTIFIER 'vào' concrete_type+
-# [065] ad_annotation
+# [064] ad_annotation
 ad_annotation ::= '@' 'gọi' ASCII_STRING NEWLINE
-# [066] implendum_decl
+# [065] implendum_decl
 implendum_decl ::= 'giao_ước' IDENTIFIER generic_params? '{' implendum_method_decl* '}'
-# [067] implendum_method_decl
+# [066] implendum_method_decl
 implendum_method_decl ::= annotation* 'hàm' IDENTIFIER '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
-# [068] typus_decl
+# [067] typus_decl
 typus_decl ::= 'kiểu_tên' IDENTIFIER generic_params? '=' type_annotation
-# [069] ordo_decl
+# [068] ordo_decl
 ordo_decl ::= 'liệt_kê' IDENTIFIER '{' enum_member (',' enum_member)* '}'
-# [070] enum_member
+# [069] enum_member
 enum_member ::= IDENTIFIER ('=' ('-'? NUMBER | STRING))?
-# [071] discretio_decl
+# [070] discretio_decl
 discretio_decl ::= 'hợp_nhất' IDENTIFIER generic_params? '{' union_fields? variant (',' variant)* '}'
-# [072] union_fields
+# [071] union_fields
 union_fields ::= annotation+ field_decl union_member*
-# [073] union_member
+# [072] union_member
 union_member ::= annotation* field_decl
-# [074] variant
+# [073] variant
 variant ::= IDENTIFIER ('{' variant_fields '}')?
-# [075] variant_fields
+# [074] variant_fields
 variant_fields ::= (type_annotation IDENTIFIER)*
-# [076] schema_decl
+# [075] schema_decl
 schema_decl ::= 'lược_đồ' IDENTIFIER '{' (schema_column (NEWLINE schema_column)*)? '}'
-# [077] schema_column
+# [076] schema_column
 schema_column ::= 'cột' type_annotation IDENTIFIER (':' IDENTIFIER)?
-# [078] importa_decl
+# [077] importa_decl
 importa_decl ::= importa_record | importa_sugar
-# [079] importa_record
+# [078] importa_record
 importa_record ::= 'nhập' '{' import_field_list '}'
-# [080] import_field_list
+# [079] import_field_list
 import_field_list ::= import_field (',' import_field)*
-# [081] import_field
+# [080] import_field
 import_field ::= ex_field | visibilitas_field | nomen_field | ut_field | omnia_field
-# [082] ex_field
+# [081] ex_field
 ex_field ::= 'từ' '=' STRING
-# [083] visibilitas_field
+# [082] visibilitas_field
 visibilitas_field ::= 'visibilitas' '=' publica
-# [084] nomen_field
+# [083] nomen_field
 nomen_field ::= 'tên' '=' IDENTIFIER
-# [085] ut_field
+# [084] ut_field
 ut_field ::= 'như' '=' IDENTIFIER
-# [086] omnia_field
+# [085] omnia_field
 omnia_field ::= 'mọi' '=' IDENTIFIER
-# [087] importa_sugar
+# [086] importa_sugar
 importa_sugar ::= 'nhập' 'từ' STRING publica? (named_import | wildcard_import | selective_import)?
-# [088] publica
+# [087] publica
 publica ::= 'công_khai'
-# [089] named_import
+# [088] named_import
 named_import ::= IDENTIFIER ('như' IDENTIFIER)?
-# [090] wildcard_import
+# [089] wildcard_import
 wildcard_import ::= '*' 'như' IDENTIFIER
-# [091] selective_import
+# [090] selective_import
 selective_import ::= 'hằng' import_value_binding (',' import_value_binding)*
-# [092] import_value_binding
+# [091] import_value_binding
 import_value_binding ::= IDENTIFIER ('như' IDENTIFIER)?
-# [093] type_annotation
+# [092] type_annotation
 type_annotation ::= union_hole_type | concrete_type
-# [094] concrete_type
+# [093] concrete_type
 concrete_type ::= intersection_type ('∪' intersection_type)*
-# [095] union_hole_type
+# [094] union_hole_type
 union_hole_type ::= ('ra' | 'vào' | 'sở_hữu' | 'sao_chép')? '∪'
-# [096] intersection_type
+# [095] intersection_type
 intersection_type ::= owned_type ('∩' owned_type)*
-# [097] owned_type
+# [096] owned_type
 owned_type ::= ('ra' | 'vào' | 'sở_hữu' | 'sao_chép')? base_type
-# [098] base_type
+# [097] base_type
 base_type ::= hole_type | function_type | width_type_sugar | ratio_type | failable_promissum_type | qualified_type type_arguments?
-# [099] failable_promissum_type
+# [098] failable_promissum_type
 failable_promissum_type ::= IDENTIFIER '<' type_annotation alternate_exit_clause '>'
-# [100] ratio_type
+# [099] ratio_type
 ratio_type ::= 'ratio' '<' labeled_type_argument (',' labeled_type_argument)* '>'
-# [101] hole_type
+# [100] hole_type
 hole_type ::= '_'
-# [102] qualified_type
+# [101] qualified_type
 qualified_type ::= IDENTIFIER ('.' IDENTIFIER)*
-# [103] type_arguments
+# [102] type_arguments
 type_arguments ::= '<' type_argument (',' type_argument)* '>'
-# [104] type_argument
+# [103] type_argument
 type_argument ::= labeled_type_argument | type_annotation | NATURAL | '[' figura_list? ']'
-# [105] labeled_type_argument
+# [104] labeled_type_argument
 labeled_type_argument ::= IDENTIFIER ':' type_annotation
-# [106] width_type_sugar
+# [105] width_type_sugar
 width_type_sugar ::= WIDTH_MARKER | LISTA_WIDTH_SUGAR | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix? | MATRIX_WIDTH_SUGAR shape_suffix
-# [107] shape_suffix
+# [106] shape_suffix
 shape_suffix ::= '[' figura_list? ']'
-# [108] figura
+# [107] figura
 figura ::= '_' | NATURAL | IDENTIFIER | '[' figura_list? ']'
-# [109] figura_list
+# [108] figura_list
 figura_list ::= figura (',' figura)*
-# [110] function_type
+# [109] function_type
 function_type ::= '(' type_list? ')' '→' type_annotation alternate_exit_clause?
-# [111] type_list
+# [110] type_list
 type_list ::= type_annotation (',' type_annotation)*
-# [112] si_stmt
+# [111] si_stmt
 si_stmt ::= 'nếu' si_tail
-# [113] si_tail
+# [112] si_tail
 si_tail ::= expression arm ('nếukhôngthì' si_tail | secus_clause)?
-# [114] secus_clause
+# [113] secus_clause
 secus_clause ::= 'khác' else_arm
-# [115] arm
+# [114] arm
 arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [116] else_arm
+# [115] else_arm
 else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [117] dum_stmt
+# [116] dum_stmt
 dum_stmt ::= 'trong_khi' expression (block_stmt | ergo_joint statement) cape_clause?
-# [118] itera_stmt
+# [117] itera_stmt
 itera_stmt ::= 'lặp' ('từ' expression (',' expression)* | 'ra' expression | 'khoảng' expression (',' expression)*) apud_clause? ('hằng' | 'biến') itera_binding (block_stmt | ergo_joint statement) cape_clause?
-# [119] itera_binding
+# [118] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
-# [120] apud_clause
+# [119] apud_clause
 apud_clause ::= 'tại' '[' IDENTIFIER (',' IDENTIFIER)* ']'
-# [121] elige_stmt
+# [120] elige_stmt
 elige_stmt ::= 'chọn' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
-# [122] casu_elige_clause
+# [121] casu_elige_clause
 casu_elige_clause ::= 'trường_hợp' expression (block_stmt | ergo_joint statement)
-# [123] ceterum_clause
+# [122] ceterum_clause
 ceterum_clause ::= 'mặc_định' (block_stmt | ergo_joint statement)
-# [124] discerne_stmt
+# [123] discerne_stmt
 discerne_stmt ::= 'phân_tích' 'mọi'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
-# [125] discriminants
+# [124] discriminants
 discriminants ::= expression (',' expression)*
-# [126] casu_variant_clause
+# [125] casu_variant_clause
 casu_variant_clause ::= 'trường_hợp' patterns (block_stmt | ergo_joint statement)
-# [127] patterns
+# [126] patterns
 patterns ::= pattern ((',' | 'và') pattern)*
-# [128] pattern
+# [127] pattern
 pattern ::= pattern_atom ('hoặc' pattern_atom)*
-# [129] pattern_atom
+# [128] pattern_atom
 pattern_atom ::= '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_pattern?)
-# [130] negated_number
+# [129] negated_number
 negated_number ::= '-' NUMBER
-# [131] type_pattern
+# [130] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
-# [132] ut_pattern
+# [131] ut_pattern
 ut_pattern ::= ('như' IDENTIFIER) | (('hằng' | 'biến') pattern_binding (',' pattern_binding)*)
-# [133] pattern_binding
+# [132] pattern_binding
 pattern_binding ::= IDENTIFIER ('như' IDENTIFIER)?
-# [134] custodi_stmt
+# [133] custodi_stmt
 custodi_stmt ::= 'canh_gác' '{' si_guard_clause+ '}'
-# [135] si_guard_clause
+# [134] si_guard_clause
 si_guard_clause ::= 'nếu' expression (block_stmt | ergo_joint statement)
-# [136] ex_stmt
+# [135] ex_stmt
 ex_stmt ::= 'từ' expression ('hằng' | 'biến') extract_fields
-# [137] extract_fields
+# [136] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
-# [138] extract_field
+# [137] extract_field
 extract_field ::= IDENTIFIER ('như' IDENTIFIER)?
-# [139] ceteri_field
+# [138] ceteri_field
 ceteri_field ::= 'còn_lại' IDENTIFIER
-# [140] redde_stmt
+# [139] redde_stmt
 redde_stmt ::= 'trả' expression?
-# [141] reddet_stmt
+# [140] reddet_stmt
 reddet_stmt ::= 'đợi_trả' expression
-# [142] tacebit_stmt
+# [141] tacebit_stmt
 tacebit_stmt ::= 'đợi_bỏ' expression
-# [143] cede_stmt
+# [142] cede_stmt
 cede_stmt ::= 'nhường' expression
-# [144] rumpe_stmt
+# [143] rumpe_stmt
 rumpe_stmt ::= 'dừng'
-# [145] perge_stmt
+# [144] perge_stmt
 perge_stmt ::= 'tiếp'
-# [146] tacet_stmt
+# [145] tacet_stmt
 tacet_stmt ::= 'im_lặng'
-# [147] iace_stmt
+# [146] iace_stmt
 iace_stmt ::= iace_expr | iace_guarded_expr
-# [148] iace_expr
+# [147] iace_expr
 iace_expr ::= ('ném' | 'chết') expression
-# [149] iace_guarded_expr
+# [148] iace_guarded_expr
 iace_guarded_expr ::= ('ném' | 'chết') expression NO_NEWLINE 'nếu' expression
-# [150] cape_clause
+# [149] cape_clause
 cape_clause ::= 'bắt' IDENTIFIER block_stmt
-# [151] adfirma_stmt
+# [150] adfirma_stmt
 adfirma_stmt ::= 'khẳng_định' expression ('chết' expression)?
-# [152] requirit_stmt
+# [151] requirit_stmt
 requirit_stmt ::= 'yêu_cầu' expression 'ném' expression
-# [153] reice_stmt
+# [152] reice_stmt
 reice_stmt ::= 'từ_chối' expression 'ném' expression
-# [154] expression
+# [153] expression
 expression ::= assignment
-# [155] transfer
+# [154] transfer
 transfer ::= ternary ('⇇' ternary)*
-# [156] assignment
+# [155] assignment
 assignment ::= transfer ('←' assignment | '↤' assignment inline_default?)?
-# [157] inc_dec_stmt
+# [156] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
-# [158] place
+# [157] place
 place ::= call_expr
-# [159] ternary
+# [158] ternary
 ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
-# [160] aut_expr
+# [159] aut_expr
 aut_expr ::= et_expr (('hoặc') et_expr)*
-# [161] et_expr
+# [160] et_expr
 et_expr ::= equality (('và') equality)*
-# [162] equality
+# [161] equality
 equality ::= comparison equality_tail*
-# [163] equality_tail
+# [162] equality_tail
 equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉') comparison | ('là' | 'không' 'là') type_annotation
-# [164] comparison
+# [163] comparison
 comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | 'trong' | 'giữa') format_expr)*
-# [165] format_expr
+# [164] format_expr
 format_expr ::= bitwise_or_expr ('¶' STRING)?
-# [166] bitwise_or_expr
+# [165] bitwise_or_expr
 bitwise_or_expr ::= bitwise_xor_expr ('∨' bitwise_xor_expr)*
-# [167] bitwise_xor_expr
+# [166] bitwise_xor_expr
 bitwise_xor_expr ::= bitwise_and_expr ('⊻' bitwise_and_expr)*
-# [168] bitwise_and_expr
+# [167] bitwise_and_expr
 bitwise_and_expr ::= shift_expr ('∧' shift_expr)*
-# [169] shift_expr
+# [168] shift_expr
 shift_expr ::= range_expr (('⇐' | '⇒') range_expr)*
-# [170] range_expr
+# [169] range_expr
 range_expr ::= additive_expr range_tail?
-# [171] range_tail
+# [170] range_tail
 range_tail ::= ('‥' | '…' | 'trước' | 'tới') additive_expr ('qua' additive_expr)?
-# [172] additive_expr
+# [171] additive_expr
 additive_expr ::= multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
-# [173] multiplicative_expr
+# [172] multiplicative_expr
 multiplicative_expr ::= vel_expr (('*' | '/' | '÷' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
-# [174] vel_expr
+# [173] vel_expr
 vel_expr ::= unary_expr ('hoặc_nếu_rỗng' vel_rhs)*
-# [175] vel_rhs
+# [174] vel_rhs
 vel_rhs ::= unary_expr vel_range_tail?
-# [176] vel_range_tail
+# [175] vel_range_tail
 vel_range_tail ::= ('‥' | '…' | 'trước' | 'tới') unary_expr ('qua' unary_expr)?
-# [177] unary_expr
+# [176] unary_expr
 unary_expr ::= ('-' | '¬' | 'không') unary_expr | finge_expr | cast_expr
-# [178] gradient_expr
+# [177] gradient_expr
 gradient_expr ::= call_expr ('∇' gradient_selection?)?
-# [179] gradient_selection
+# [178] gradient_selection
 gradient_selection ::= '[' gradient_place (',' gradient_place)* ']'
-# [180] gradient_place
+# [179] gradient_place
 gradient_place ::= expression
-# [181] cast_expr
+# [180] cast_expr
 cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)* inline_default?
-# [182] conversio_expr
+# [181] conversio_expr
 conversio_expr ::= '↦' (type_annotation | interval_target) via_clause? inline_default?
-# [183] interval_target
+# [182] interval_target
 interval_target ::= range_expr
-# [184] via_clause
+# [183] via_clause
 via_clause ::= 'thông_qua' IDENTIFIER
-# [185] inline_default
+# [184] inline_default
 inline_default ::= '⊥' unary_expr
-# [186] call_expr
+# [185] call_expr
 call_expr ::= primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
-# [187] call_suffix
+# [186] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
-# [188] member_suffix
+# [187] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
-# [189] transpose_suffix
+# [188] transpose_suffix
 transpose_suffix ::= 'ᵀ'
-# [190] optional_suffix
+# [189] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
-# [191] non_null_suffix
+# [190] non_null_suffix
 non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
-# [192] argument_list
+# [191] argument_list
 argument_list ::= (argument (',' argument)*)?
-# [193] argument
+# [192] argument
 argument ::= template_argument | 'rải'? expression
-# [194] template_argument
+# [193] template_argument
 template_argument ::= 'rải'? IDENTIFIER ':' expression
-# [195] literal
+# [194] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'đúng' | 'sai' | 'không_gì' | '∞' | 'nan'
-# [196] primary
+# [195] primary
 primary ::= IDENTIFIER | literal | 'tôi' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | summa_expr | extrema_expr | capta_expr | '(' expression ')'
-# [197] ad_expr
+# [196] ad_expr
 ad_expr ::= 'gọi' ASCII_STRING ad_opener?
-# [198] ad_opener
+# [197] ad_opener
 ad_opener ::= '(' expression ')'
-# [199] array_literal
+# [198] array_literal
 array_literal ::= '[' argument_list? ']'
-# [200] iuncta_expr
+# [199] iuncta_expr
 iuncta_expr ::= 'bộ' type_arguments '[' argument_list? ']'
-# [201] json_literal
+# [200] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
-# [202] json_member
+# [201] json_member
 json_member ::= STRING ':' json_value
-# [203] typed_constructor
+# [202] typed_constructor
 typed_constructor ::= type_annotation '{' field_list? '}' construction_source?
-# [204] field_list
+# [203] field_list
 field_list ::= field_init (',' field_init)*
-# [205] field_init
+# [204] field_init
 field_init ::= (field_key '=' expression) | IDENTIFIER
-# [206] field_key
+# [205] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
-# [207] construction_source
+# [206] construction_source
 construction_source ::= 'từ' call_expr
-# [208] json_value
+# [207] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
-# [209] json_object
+# [208] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
-# [210] json_array
+# [209] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
-# [211] json_string
+# [210] json_string
 json_string ::= STRING
-# [212] json_number
+# [211] json_number
 json_number ::= NUMBER
-# [213] finge_expr
+# [212] finge_expr
 finge_expr ::= 'tạo' qualified_ident ('{' field_list? '}')? ('∷' type_annotation)?
-# [214] qualified_ident
+# [213] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
-# [215] praefixum_expr
+# [214] praefixum_expr
 praefixum_expr ::= 'tiền_tố' block_stmt
-# [216] scriptum_expr
+# [215] scriptum_expr
 scriptum_expr ::= 'văn_bản_hóa' '(' STRING (',' expression)* ')'
-# [217] lege_expr
+# [216] lege_expr
 lege_expr ::= 'đọc' 'dòng'?
-# [218] first_match_expr
+# [217] first_match_expr
 first_match_expr ::= 'khớp_đầu_tiên' '(' expression apud_clause? ',' 'nơi' IDENTIFIER block_stmt ')'
-# [219] summa_expr
+# [218] summa_expr
 summa_expr ::= 'tổng' 'từ' expression apud_clause? filum_clause? ('hằng' | 'biến') IDENTIFIER block_stmt
-# [220] filum_clause
+# [219] filum_clause
 filum_clause ::= 'sợi' IDENTIFIER
-# [221] extrema_expr
+# [220] extrema_expr
 extrema_expr ::= ('lớn_nhất' | 'nhỏ_nhất') 'từ' expression apud_clause? extrema_identity?
-# [222] extrema_identity
+# [221] extrema_identity
 extrema_identity ::= 'hoặc_nếu_rỗng' expression
-# [223] capta_expr
+# [222] capta_expr
 capta_expr ::= 'bẫy' block_stmt
-# [224] object_pattern
+# [223] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [225] pattern_property
+# [224] pattern_property
 pattern_property ::= 'còn_lại'? IDENTIFIER ('như' IDENTIFIER)?
-# [226] array_pattern
+# [225] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [227] array_pattern_element
+# [226] array_pattern_element
 array_pattern_element ::= '_' | 'còn_lại'? IDENTIFIER
-# [228] nota_stmt
+# [227] nota_stmt
 nota_stmt ::= ('ghi_chú' | 'xem' | 'cảnh_báo' | 'viết') expression (',' expression)*
-# [229] entry_header
+# [228] entry_header
 entry_header ::= ('đối_số' IDENTIFIER)? ('thoát' expression)?
-# [230] incipit_stmt
+# [229] incipit_stmt
 incipit_stmt ::= 'bắt_đầu' entry_header block_stmt
-# [231] incipiet_stmt
+# [230] incipiet_stmt
 incipiet_stmt ::= 'bắt_đầu_bất_đồng_bộ' entry_header block_stmt
-# [232] probandum_decl
+# [231] probandum_decl
 probandum_decl ::= 'đối_tượng_kiểm_thử' STRING proba_modifier* '{' probandum_body '}'
-# [233] probandum_body
+# [232] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [234] proba_stmt
+# [233] proba_stmt
 proba_stmt ::= 'kiểm_thử' STRING proba_modifier* block_stmt
-# [235] proba_modifier
+# [234] proba_modifier
 proba_modifier ::= 'mong_đợi_thất_bại' | 'bỏ_qua' STRING | 'việc_cần_làm' STRING | 'chỉ' | 'nhãn' STRING | 'thời_gian' NATURAL | 'đo_lường' | 'lặp_lại' NATURAL | 'mong_manh' NATURAL | 'chỉ_trong' STRING
-# [236] praepara_block
+# [235] praepara_block
 praepara_block ::= ('chuẩn_bị' | 'sẽ_chuẩn_bị' | 'sau_chuẩn_bị' | 'sẽ_sau_chuẩn_bị') 'mọi'? block_stmt
-# [237] fac_stmt
+# [236] fac_stmt
 fac_stmt ::= 'làm' block_stmt cape_clause? ('trong_khi' expression)?
-# [238] IDENTIFIER
+# [237] IDENTIFIER
 IDENTIFIER ::=
-# [239] NUMBER
+# [238] NUMBER
 NUMBER ::=
-# [240] NATURAL
+# [239] NATURAL
 NATURAL ::=
-# [241] STRING
+# [240] STRING
 STRING ::=
-# [242] ASCII_STRING
+# [241] ASCII_STRING
 ASCII_STRING ::=
-# [243] BACKTICK_STRING
+# [242] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [244] OCTETI_STRING
+# [243] OCTETI_STRING
 OCTETI_STRING ::=
-# [245] NEWLINE
+# [244] NEWLINE
 NEWLINE ::=
-# [246] WIDTH_MARKER
+# [245] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [247] LISTA_WIDTH_SUGAR
+# [246] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [248] TENSOR_WIDTH_SUGAR
+# [247] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [249] SPARSA_WIDTH_SUGAR
+# [248] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [250] VECTOR_WIDTH_SUGAR
+# [249] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [251] MATRIX_WIDTH_SUGAR
+# [250] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [252] FRONTMATTER_DELIMITER
+# [251] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [253] TOML_LINES
+# [252] TOML_LINES
 TOML_LINES ::=
-# [254] ANNOTATION_NAME
+# [253] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [255] ANNOTATION_FIELD_NAME
+# [254] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [256] NON_NEWLINE_TOKEN
+# [255] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [257] NO_NEWLINE
+# [256] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -560,8 +558,7 @@ NO_NEWLINE ::=
 | [`binding_decl`](#binding-decl) | `#binding-decl` | live |
 | [`expr_stmt`](#expr-stmt) | `#expr-stmt` | live |
 | [`block_stmt`](#block-stmt) | `#block-stmt` | live |
-| [`static_decl`](#static-decl) | `#static-decl` | live |
-| [`static_init`](#static-init) | `#static-init` | live |
+| [`const_init`](#const-init) | `#const-init` | live |
 | [`insere_expr`](#insere-expr) | `#nhúng-expr` | live |
 | [`fixum_decl`](#fixum-decl) | `#hằng-decl` | live |
 | [`figendum_decl`](#figendum-decl) | `#đợi_hằng-decl` | live |
@@ -796,14 +793,14 @@ driver. `capture-pending` rows intentionally carry no invented token shape.
 | Terminal | Status | Capture notes |
 |---|---|---|
 | `IDENTIFIER` | `capture-pending` | Lexical tier. Empty RHS; status is capture-pending. radix-lexer / driver / parser is the authority (crates/radix-lexer/src/). Not a second lexer spec. scan.rs scan_identifier; Unicode XID_Start or '_' then XID_Continue or '_'; NFKC intern; TokenKind::Ident (keywords also lex as identifiers) |
-| `NUMBER` | `capture-pending` | scan.rs scan_number; decimal/hex/bin/oct integers and floats with '_' separators; TokenKind::Integer(u64) when the value fits u64, TokenKind::BigInteger(text) when an integer literal is longer (no upper bound on length; inf track, F9 ruling 34) or Float(f64); a BigInteger is legal only where an expression literal or a `trường_hợp` constant pattern stands (its value must then fit the receiving slot: always an `inf` slot, otherwise the slot's range) and is a parse error in a NATURAL or enum-member position; scan.rs also lexes the glyph '∞' as Float(+inf), never an `inf` value |
+| `NUMBER` | `capture-pending` | scan.rs scan_number; decimal/hex/bin/oct integers and floats with '_' separators; TokenKind::Integer(u64) when the value fits u64, TokenKind::BigInteger(text) when an integer literal is longer (no upper bound on length; inf track, F9 ruling 34) or Float(f64); a BigInteger is legal only where an expression literal or a `trường_hợp` constant pattern stands (its value must then fit the receiving slot: always an `inf` slot, otherwise the slot's range) and is a parse error in a NATURAL, enum-member or JSON-literal position (a JSON integer keeps the signed 64-bit wire range: `json_integer_overflow` / `json_integer_underflow`); scan.rs also lexes the glyph '∞' as Float(+inf), never an `inf` value |
 | `NATURAL` | `capture-pending` | not a distinct lexer token; TokenKind::Integer (so at most u64::MAX; a BigInteger here is a parse error) used as magnitudo capacity in type position, as the count of a `kiểm_thử` modifier (`thời_gian`, `lặp_lại`, `mong_manh`; a float is `test_modifier_integer`), and as a function's `thoát` code (no fraction/exponent) |
 | `STRING` | `capture-pending` | scan.rs scan_string / scan_guillemet_block_string; double-quoted or guillemet block; TokenKind::String |
 | `ASCII_STRING` | `capture-pending` | scan.rs scan_ascii_string; single-quoted; TokenKind::AsciiString |
 | `BACKTICK_STRING` | `capture-pending` | scan.rs scan_backtick_string; backtick forma template; TokenKind::BacktickString |
 | `OCTETI_STRING` | `capture-pending` | scan.rs scan_octeti_string; pipe-delimited hex; TokenKind::OctetiString |
 | `NEWLINE` | `capture-pending` | scan.rs scan_line_break; LF or CRLF; TokenKind::Newline |
-| `WIDTH_MARKER` | `capture-pending` | parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64 and decimal d64 (numerus and exactus), f16/bf16/f32/f64 (fractus only); every integer width i8…u64 (modulus and saturatus; no d64, no float); integer widths and d64 (exactus; a float width is `trapping_float_not_implemented`); the unbounded integer marker `inf` (numerus, exactus, modulus and saturatus all name the same type; locale-invariant, not a keyword; never prefixed sugar; not a float width; not a tensor, sparsa, vector or matrix element); not a lexer token |
+| `WIDTH_MARKER` | `capture-pending` | parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64 and decimal d64 (numerus and exactus), f16/bf16/f32/f64 (fractus only); every integer width i8…u64 (modulus and saturatus; no d64, no float); integer widths and d64 (exactus; a float width is `trapping_float_not_implemented`); the unbounded integer marker `inf` (numerus, exactus, modulus and saturatus all name the same type; locale-invariant, not a keyword; never prefixed sugar; not a float width; not a tensor, sparsa, vector or matrix element; host-only, so no kernel or AIR-lane position takes it); not a lexer token |
 | `LISTA_WIDTH_SUGAR` | `capture-pending` | parser type-position l + WIDTH_MARKER; not a lexer token |
 | `TENSOR_WIDTH_SUGAR` | `capture-pending` | parser type-position t + WIDTH_MARKER; not a lexer token |
 | `SPARSA_WIDTH_SUGAR` | `capture-pending` | parser type-position s + WIDTH_MARKER; not a lexer token |
@@ -1075,47 +1072,66 @@ use a top-level function.
   the written type is the conversion destination, then the binding is
   initialized. `đợi_hằng`/`đợi_biến` keep `←`; `hằng _`, `đặt`, and untyped
   destructuring reject `↤` (no concrete destination type).
-- `hằng T x = e` (D5.10) declares a typed **local constant**. `=` states a
+- `hằng T x = e` (D5.10) declares a typed **constant**; at the top of a file
+  the same declaration is the module-level constant (next section). `=` states a
   compile-time fact, so `e` is evaluated while compiling (literals, arithmetic
-  and the other operators on scalars, `tĩnh` statics, earlier constants) and
+  and the other operators on scalars, module constants, earlier constants) and
   must fit `T` whatever `T`'s overflow policy: `hằng u8 d = 300` is a compile
   error even for `saturating<u8>`. `hằng _ x = 10` infers `int`. The result is
   an ordinary immutable local of type `T`. `biến` never takes `=`
   (`varia_compile_time_initializer`), and a value that is not known at compile
-  time is stored with `←` (`local_constant_not_constant`, SEM060).
+  time is stored with `←` (`constant_initializer_not_constant`, SEM060).
 - Deferred init: `hằng numerus x` or `đặt x` declares an uninitialized immutable
   slot that must be assigned exactly once before any read; a second assignment is
   rejected. The definite-assignment pass (semantic Phase 3a) enforces this.
 
-### Top-level statics
+### Module-level constants
 
+A module declares values only as compile-time constants: `hằng T X = e` at the
+top of a file (en `const T X = e`), for example `hằng numerus LIMES = 4096`
+(D5.8, st1 R1). It is the same declaration as the block-level constant above,
+with `=` stating a compile-time fact, and it is the only top-level value
+declaration. Module-level mutable state does not exist (D5.7): a top-level
+`biến`, `đặt`, destructuring, or a runtime initializer (`←`, `↤`, `↢`) is a
+compile error, SEM062 `top_level_binding` — a runtime value belongs in a
+function. `biến T X = e` stays `varia_compile_time_initializer`, and a
+top-level declaration with no initializer is SEM008 `top_level_initializer`.
+`hằng _ X = 10` infers `int` as it does for a local.
 
-`hằng` and `biến` are not allowed at top level (D5.7): module-level mutable
-state does not exist. A top-level `hằng`/`biến` binding is a compile error: SEM062
-`top_level_binding`.
+**Retired spelling.** The module-level static `tĩnh T X = e` (en
+`static T X = e`) no longer exists. A statement-initial `tĩnh` followed by an
+identifier or `(`, at the top level or in a block, parses as the old
+declaration whole and is reported as `PARSE010 static_decl_retired` (args
+`keyword`, the spelling written, and `name`; the help names the `hằng`
+spelling); there is no alias period, and the diagnostic stays. `tĩnh`
+followed by anything else is an ordinary identifier. `tĩnh` survives only as
+the `kiểu` field modifier (see Classes).
 
-The top-level static is `tĩnh` (en `static`): `tĩnh numerus LIMES = 4096`
-(D5.8) — the same production as a `kiểu` static field, used in a second,
-top-level-only scope. It is the only top-level value declaration; declaring
-one inside a block is a parse error (`static_not_top_level`), the same
-enforcement shape as `hàm`/`kiểu`/`liệt_kê`/`hợp_nhất` at non-top level.
-
-A static's declared type cannot be a hole: `tĩnh _ X = …` and `tĩnh ∪ X = …` are parse errors (the same holds for an annotation field's type value and the `@ radix kiểu_tên` domain list, which take a `concrete_type`).
-
-Statics are **immutable and initialized with `=` only** (D5.9), never `←`; a
-missing initializer or an initializer spelled with `←` is a named parse
-error. The initializer must be evaluable at compile time: literals;
+Constants are **immutable and initialized with `=` only** (D5.9), never `←`.
+The initializer must be evaluable at compile time: literals;
 arithmetic, comparison, bit, and logical operators on `numerus`, `fractus`,
 and `bivalens` scalars, plus `textus` concatenation; references to other
-statics (evaluated in dependency order — a cycle is `static_cycle`); and
+constants (evaluated in dependency order, so a constant may be used before its
+declaration — a cycle is `constant_cycle`, SEM007); and
 collection literals (`lista`, tuples, map construction) whose elements are
 constants (only their scalar leaves fold). Anything else is
-`static_initializer_not_constant`. Decimal widths and `modulus<W>`/`saturatus<W>` values are
+`constant_initializer_not_constant` (SEM060). Decimal widths and `modulus<W>`/`saturatus<W>` values are
 not folded, so arithmetic on them is not a compile-time constant today.
 Compile-time integer arithmetic is checked (overflow and division by zero are
-compile errors), matching the runner's checked runtime semantics.
+compile errors: `constant_arithmetic_overflow`, `constant_division_by_zero`),
+matching the runner's checked runtime semantics. A value that needs
+computation takes a `tiền_tố { … }` block (en `comptime { … }`), which runs
+during the build; it is legal today as the initializer of a module-level
+constant or of a `tĩnh` field default, and is `SEM064`
+`praefixum_outside_constant` anywhere else.
 
-**Build-time file embed, `nhúng` (en `embed`, D8.10).** A `tĩnh` initializer — top-level static or `kiểu` static field — may open with `nhúng "path"` instead of an ordinary expression: `tĩnh textus LICENSE = nhúng "LICENSE.txt"`. `nhúng` is contextual (claimed only as the first word of a `tĩnh` initializer, directly followed by a string literal); elsewhere the spelling is an ordinary identifier, and on a `hằng`/`biến` field it never claims the word. The path is package-relative, resolved against the nearest ancestor `faber.toml` (or the source file's own directory when none exists); an absolute path or a `..` escape is rejected, and a missing file is a compile error. The file is read once, at build time — it is a build input, like the source itself. The declared type decides how the bytes land: `textus` requires valid UTF-8 and fails to build otherwise; `octeti` reads the raw bytes unconditionally.
+**Build-time file embed, `nhúng` (en `embed`, D8.10).** A module-level `=`
+constant, or a `tĩnh` field default on a `kiểu`, may open its initializer
+with `nhúng "path"` instead of an ordinary expression:
+`hằng textus LICENSE = nhúng "LICENSE.txt"`. `nhúng` is contextual (claimed
+only as the first word of such an initializer, directly followed by a string
+literal); elsewhere the spelling is an ordinary identifier, and today a
+block-level constant and a `hằng`/`biến` field default never claim the word. The path is package-relative, resolved against the nearest ancestor `faber.toml` (or the source file's own directory when none exists); an absolute path or a `..` escape is rejected, and a missing file is a compile error. The file is read once, at build time — it is a build input, like the source itself. The declared type decides how the bytes land: `textus` requires valid UTF-8 and fails to build otherwise; `octeti` reads the raw bytes unconditionally.
 
 ### Functions
 
@@ -1284,7 +1300,7 @@ wire operation such as `json.pange(value ↦ json)`.
   a construction literal (`Genus { field = value }`), never reassigned;
   `Genus { … } từ p` copies it unchanged (D16.3), independent of visibility
   (`@ privata` + `hằng` is legal). `biến T x`: per instance, reassignable.
-  `tĩnh T X = …`: one per type, compile-time (unchanged). A write to a
+  `tĩnh T X = …`: one per type, compile-time (the only remaining `tĩnh` position). A write to a
   `hằng` field outside a construction literal is `SEM020`
   (`assignment_to_fixum_field`). The former `nexum` field modifier is removed
   and rejected with a migration diagnostic.
@@ -1505,7 +1521,7 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | `modulus<W>` | en `wrapping<W>`; modular word, signed or unsigned (N7e); a store reduces modulo 2^W |
 | `saturatus<W>` | en `saturating<W>`; saturating integer; a store clamps at both ends of W |
 | `exactus<W>` | en `trapping<W>`; the trapping policy spelled out (D11.8, N7a): the same type as `numerus<W>`, and a store traps when the value does not fit |
-| `inf` | the unbounded integer (D11.5): a width marker in the `numerus` family with no upper or lower bound, spelled `inf` in every locale (no keyword). `numerus<inf>`, `exactus<inf>`, `modulus<inf>` and `saturatus<inf>` (en `int<inf>`, `trapping<inf>`, `wrapping<inf>`, `saturating<inf>`) all name this one type. **Shipped:** the type, big literals, the join, store and conversion typing rules, and the host-only rejections. **Admitted, scheduled (inf track U4, U6\*), not shipped:** run-time arithmetic beyond a 64-bit carrier and the target backends; see The unbounded integer `inf`. |
+| `inf` | the unbounded integer (D11.5): a width marker in the `numerus` family with no upper or lower bound, spelled `inf` in every locale (no keyword). `numerus<inf>`, `exactus<inf>`, `modulus<inf>` and `saturatus<inf>` (en `int<inf>`, `trapping<inf>`, `wrapping<inf>`, `saturating<inf>`) all name this one type. **Shipped:** the type, big literals, the join, store and conversion rules, exact run-time arithmetic, and the host-only rejections, on the MIR runner, Rust, TypeScript, Go and Python, and in part on the Racket (`sexp`) target. A target with no unbounded carrier (Swift, Haskell, LLVM, Wasm) fails closed with a named diagnostic, and Metal, WGSL and AIR never carry it; see The unbounded integer `inf`. |
 | `fractus`  | float (default `f64`) |
 | `bivalens` | boolean |
 | `nihil`    | null |
@@ -1628,8 +1644,8 @@ family a store into a narrower width applies the slot's policy
 `↦`. A constant stored with `←` follows the slot's policy
 (`saturating<u8> w ← 300` is 255, `wrapping<u8> w ← -1` is 255, and a trapping
 slot's certain trap is a compile error); a constant in an `=` position
-(`tĩnh`, field default, enum member, `hằng T x = e`) must fit `W` whatever
-the policy. Literals in `modulus<W>` and `saturatus<W>` slots must fit `W`.
+(a `hằng T X = e` constant at module level or in a block, `tĩnh`, field
+default, enum member) must fit `W` whatever the policy. Literals in `modulus<W>` and `saturatus<W>` slots must fit `W`.
 The unbounded integer `inf` (D11.5) is a type (see its subsection below), so a
 bounded expression still obeys the 64-bit range above and an `inf` slot never
 applies a size policy.
@@ -1840,21 +1856,33 @@ author writes `inf` in a slot or converts with `↦ inf`. Its rules in full:
   decimal digits with a leading `-` for a negative, with no grouping or suffix;
   the `¶` integer specs apply as for `int`.
 
-**What is shipped and what is not.** The compiler front end accepts and checks
-`inf`: the type in all four spellings, the host-only rejections, big literals
-and their slot rule, the join, widening, store and conversion typing rules, and
-comparisons. At run time only value flow is lowered today (declare, store, pass,
-return, collect, compare), exact for values within the 64-bit carrier; every
-operation that would compute or convert an `inf`, and every literal beyond `u64`,
-fails closed with a named `inf_mir_unsupported_<operation>` error. **Admitted,
-scheduled (inf track), not shipped:** exact run-time semantics for all of the
-rules above (U4, the MIR runner and its bignum), the `inf`-bounded `lặp` binder
-(U9), `octeti`/`valor`/`json` rows (U8a), literal-only float folding on the same
-bignum (U7), and the target backends: Rust, TypeScript, Go, Python and the
-Racket (`sexp`) target are scheduled (U6r, U6t, U6g, U6p, U6x); LLVM, Wasm,
-Swift and Haskell are scheduled to fail closed with a named diagnostic (U6fc),
-and Metal, WGSL and AIR never carry `inf`. Until a unit lands, a program that
-needs its rule does not run.
+**What is shipped.** `inf` is shipped; every rule above is checked at compile
+time and computed exactly at run time. The front end accepts the type in all
+four spellings, the host-only rejections, big literals and their slot rule, the
+join, widening, store and conversion typing rules, and comparisons. Literal-only
+float expressions fold exactly before the slot rounds them. Run-time
+semantics are carried per target, on an unbounded integer of the target's own:
+
+- **Supported.** The MIR runner (the oracle), Rust, TypeScript, Go and Python
+  run the arithmetic, comparison, conversion and display rules above; the
+  runner also runs the `lặp` binder over `inf` bounds. The runner, Rust and TypeScript also carry
+  the `octeti thông_qua Be|Le` and `valor`/`json` rows with every digit; Go carries
+  `valor ↦ inf` and `octeti thông_qua Be|Le`. The Racket (`sexp`) target carries the
+  arithmetic and comparison rows.
+- **Named gaps.** Python has no `↦ valor` and no `octeti` route; the Racket
+  target lacks formatted display, genus printing and `↦ valor` (as it does for
+  every type); Go fails closed on a few container and intrinsic constructs
+  holding an `inf`; TypeScript keeps bounded `int` and `u64` as numbers, so a
+  bounded `u64` slot past 2⁵³ still traps there. Each gap is a named
+  compile-time diagnostic or a documented trap, never a bounded substitute.
+- **Fail closed.** Swift, Haskell, LLVM and Wasm have no unbounded carrier and
+  reject `inf` with a named diagnostic (`inf_target_unsupported` on Swift and
+  Haskell, `llvm_target_inf_unsupported`, `mir_wasm_unsupported`). The language
+  does not change to fit them. Metal, WGSL and AIR never carry `inf`: it is host
+  only, rejected by language rule before emission.
+
+The per-target rows with their open gaps are kept in the target capability
+matrix and the numeric model; this file states only the language.
 
 ### Generic Collections
 
@@ -2749,7 +2777,6 @@ parser rejects each one.
 | `lặp từ t tại [i, j] sợi f hằng v { … }` | admitted (FLD K2); a `sợi` clause on `lặp` is rejected (`sợi` exists only in `tổng từ` inside kernels) |
 | `reducta thông_qua Op từ source …` (en `reduce thông_qua Op from …`) | admitted (FLD K3), with `Op` a closed set `Sum Product Max Min Argmax Argmin All Any Count`; it would retire `tổng từ` and `max from` / `min from`, all of which stay shipped meanwhile |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
-| The unbounded integer `inf`: run-time arithmetic and the target backends | type, literals and the typing rules shipped; exact run-time semantics (U4), `lặp` binder (U9), `octeti`/`valor`/`json` rows (U8a), literal-only float folding (U7) and the Rust, TypeScript, Go, Python and Racket backends (U6r/t/g/p/x) admitted, scheduled, not shipped; LLVM, Wasm, Swift and Haskell fail closed; `inf` never reaches Metal, WGSL or AIR |
 | `trapping`/`saturating`/`wrapping` float cells; retiring `numerus<W>`/`fractus<W>` | ruled (D11.8); N7c/N7d pending |
 | Multi-subject `phân_tích` lowering | parses and is coverage-checked; lowered only by the Rust emitter |
 | Run-time capacities and extents (`[H, W]`, `_`) | admitted (FLD K14); today every extent and capacity is a compile-time value |
