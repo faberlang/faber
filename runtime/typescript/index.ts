@@ -80,13 +80,34 @@ export function __faberDisplay(value: any, hint: FaberDisplayHint = "unknown"): 
   }
 }
 
-/** Render a fractus (fraction) as text. */
+/**
+ * Render an f64 fractus as text, byte-identical to the MIR runner and the Rust
+ * runtime: a float with a zero fraction prints its exact decimal expansion with
+ * one fraction digit (`18446744073709551616.0`, `-0.0`); every other finite
+ * value prints its shortest round-trip digits in plain positional form, never
+ * an exponent; infinities print `inf` / `-inf`; NaN prints `NaN`.
+ */
 export function __faberDisplayFractus(value: any): string {
   const n = Number(value);
-  if (!Number.isFinite(n)) {
-    return String(value);
+  if (Number.isNaN(n)) {
+    return "NaN";
   }
-  return Number.isInteger(n) ? `${n}.0` : String(n);
+  if (!Number.isFinite(n)) {
+    return n < 0 ? "-inf" : "inf";
+  }
+  if (Object.is(n, -0)) {
+    return "-0.0";
+  }
+  if (Number.isInteger(n)) {
+    return `${BigInt(n)}.0`;
+  }
+  // JS prints a non-integral number with an exponent only below 1e-6.
+  const text = String(n);
+  const small = /^(-?)(\d)(?:\.(\d+))?e-(\d+)$/.exec(text);
+  if (small === null) {
+    return text;
+  }
+  return `${small[1]}0.${"0".repeat(Number(small[4]) - 1)}${small[2]}${small[3] ?? ""}`;
 }
 
 /** Render a list/array under an element hint. */
@@ -151,7 +172,11 @@ export function __faberDisplayValor(value: any): string {
     return value ? "verum" : "falsum";
   }
   if (typeof value === "number") {
-    return String(value);
+    // A bare JS number is a numerus unless it can only be a float (fractional,
+    // non-finite or beyond the integer range).
+    return Number.isInteger(value) && Math.abs(value) < 1e21
+      ? String(value)
+      : __faberDisplayFractus(value);
   }
   if (typeof value === "string") {
     return value;
