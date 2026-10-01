@@ -88,9 +88,35 @@ const CONST_MEMBER_CALL_MAIN: &str =
 const LOCAL_LOCALE_MAIN: &str = "import from \"./util\" * as utilModule\n\nfn run() → string {\n    return utilModule.greet()\n}\n\nmain {\n    print utilModule.greet()\n}\n";
 const LOCAL_LOCALE_UTIL: &str = "@ public\nfn salutare() → string {\n    return \"salve\"\n}\n";
 
-// Live Triga names are source-canonical.
-const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" math\nimport from \"norma:text\" text\n\nfn run() → string {\n    const math.Vector3 origin ← math.vector3(1.0, 0.0, 0.0)\n    const string reversed ← text.reverse(\"abc\")\n    const string decoded ← text.decode(text.encode(\"abc\"))\n    const list<string> parts ← text.split_n(\"a,b\", \",\", 2)\n    print parts\n    return decoded\n}\n\nmain {\n    print run()\n}\n";
+// The `triga:` provider is an inline fixture library (see
+// `fixture_library_home`), not the live triga sibling, so a sibling's API
+// churn cannot break this test. The fixture names are source-canonical.
+const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" math\nimport from \"norma:text\" text\n\nfn run() → string {\n    const math.Point3 origin ← math.point3(1.0, 0.0, 0.0)\n    const string reversed ← text.reverse(\"abc\")\n    const string decoded ← text.decode(text.encode(\"abc\"))\n    const list<string> parts ← text.split_n(\"a,b\", \",\", 2)\n    print parts\n    return decoded\n}\n\nmain {\n    print run()\n}\n";
 const NORMA_LATIN_COMPATIBILITY_MAIN: &str = "importa ex \"norma:text\" chorda\n\nfunctio run() → textus {\n    redde chorda.retorta(\"abc\")\n}\n\nincipit {\n    nota run()\n}\n";
+
+/// A library home with the real Norma stdlib (symlinked) and an inline
+/// `triga` source library exporting a stable `Point3` genus and `point3`
+/// constructor. The test proves the source-library projection, not triga's
+/// live public surface.
+fn fixture_library_home(dir: &Path) -> PathBuf {
+    let home = dir.join("library-home");
+    let triga_src = home.join("triga/src");
+    fs::create_dir_all(&triga_src).expect("create fixture triga src");
+    fs::write(
+        home.join("triga/faber.toml"),
+        "[package]\nname = \"triga\"\nversion = \"0.0.0\"\nedition = \"2026\"\n\n[library]\nprovider = \"triga\"\n\n[paths]\nsource = \"src\"\n\n[build]\nkind = \"lib\"\ntargets = [\"rust\"]\n\n[locale]\nlocale = \"en\"\n",
+    )
+    .expect("write fixture triga manifest");
+    fs::write(
+        triga_src.join("math.fab"),
+        "@ public\nclass Point3 {\n    var f32 x\n    var f32 y\n    var f32 z\n}\n\n@ public\nfn point3(f32 x, f32 y, f32 z) → Point3 {\n    return Point3 { x = x, y = y, z = z }\n}\n",
+    )
+    .expect("write fixture triga math");
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(dev_norma_library_home().join("norma"), home.join("norma"))
+        .expect("link norma into the fixture library home");
+    home
+}
 
 /// Two-module package with a local import and a namespace call in the entry.
 fn write_local_package(dir: &std::path::Path) -> std::path::PathBuf {
@@ -541,9 +567,11 @@ fn strict_pack_rejects_unlisted_canonical_member_spelling() {
 }
 
 #[test]
-fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
+fn english_pack_resolves_source_library_and_norma_surfaces() {
     // 80b59a6c(a) / CTO e2ca2b57 F2: en pack has zero triga library_members;
-    // analysis projects live Triga exports. Norma surfaces stay the en identity rows.
+    // analysis projects the exports of a source library under the `triga`
+    // provider (an inline fixture, so the live triga surface cannot break
+    // this). Norma surfaces stay the en identity rows.
     let dir = test_temp_dir("fhir-external-library-locale");
     let entry = write_external_library_locale_package(&dir, EXTERNAL_LIBRARY_LOCALE_MAIN);
     let (config, _diagnostic_pack) = crate::package::config_with_locale(
@@ -553,7 +581,7 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
         None,
     )
     .expect("load installed English library locale");
-    let config = config.with_library_home(dev_norma_library_home());
+    let config = config.with_library_home(fixture_library_home(&dir));
     let en_pack = config
         .locale_pack
         .as_ref()
@@ -584,7 +612,7 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
     assert_eq!(
         entry_unit.expanded_library_imports.len(),
         2,
-        "the consumer must resolve both real source-library imports"
+        "the consumer must resolve both source-library imports"
     );
     let library_items = entry_unit
         .analysis
@@ -596,19 +624,19 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
         library_items.iter().any(|item| {
             item.identity.provider == LibraryProvider::Package("triga".to_owned())
                 && item.identity.module_path == ["math".to_owned()]
-                && item.exported_name == "vector3"
+                && item.exported_name == "point3"
                 && item.kind == LibraryItemKind::Function
         }),
-        "live-projected triga vector3: {library_items:?}"
+        "projected triga point3: {library_items:?}"
     );
     assert!(
         library_items.iter().any(|item| {
             item.identity.provider == LibraryProvider::Package("triga".to_owned())
                 && item.identity.module_path == ["math".to_owned()]
-                && item.exported_name == "Vector3"
+                && item.exported_name == "Point3"
                 && item.kind == LibraryItemKind::Struct
         }),
-        "live-projected triga Vector3: {library_items:?}"
+        "projected triga Point3: {library_items:?}"
     );
     assert!(
         library_items.iter().any(|item| {
