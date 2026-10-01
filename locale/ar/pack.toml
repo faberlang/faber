@@ -580,6 +580,14 @@ help = "استخدم {replacement}"
 message = "يجب أن يأتي '{cape}' قبل '{dum}' في حلقة '{fac}'"
 help = "اكتب المعالج قبل الشرط: {fac} … {cape} … {dum} …"
 
+[diagnostics.PARSE020.issues.discerne_subject_comma_retired]
+message = "لم تعد الفاصلة تفصل بين موضوعات '{discerne}'"
+help = "افصل بين الموضوعات بـ '{et}'"
+
+[diagnostics.PARSE020.issues.discerne_subject_not_path]
+message = "يجب أن يكون موضوع '{discerne}' اسمًا أو مسار عضو"
+help = "اربط القيمة باسم أولًا، ثم استخدم '{discerne}' على ذلك الاسم"
+
 [diagnostics.PARSE021]
 message = "شرط مفقود"
 help = "أضف تعبير شرط"
@@ -599,6 +607,10 @@ help = "استخدم '∴' بين توقيع الإغلاق وجسمه"
 [diagnostics.PARSE023]
 message = "مطلوب نمط مثل '{wildcard}' أو {identifier}"
 help = "استخدم '{wildcard}' أو حرفية أو نمط {identifier}"
+
+[diagnostics.PARSE023.issues.discerne_pattern_comma_retired]
+message = "لم تعد الفاصلة تفصل بين أنماط '{casu}'"
+help = "افصل بين الأنماط بـ '{et}'"
 
 [diagnostics.PARSE024]
 message = "مطلوب فرع '{casu}' أو default '{ceterum}'"

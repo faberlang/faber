@@ -580,6 +580,14 @@ help = "{replacement} उपयोग करें"
 message = "'{fac}' लूप में '{cape}' को '{dum}' से पहले आना चाहिए"
 help = "हैंडलर को शर्त से पहले लिखें: {fac} … {cape} … {dum} …"
 
+[diagnostics.PARSE020.issues.discerne_subject_comma_retired]
+message = "अब अल्पविराम '{discerne}' के विषयों को अलग नहीं करता"
+help = "विषयों को '{et}' से अलग करें"
+
+[diagnostics.PARSE020.issues.discerne_subject_not_path]
+message = "'{discerne}' का विषय एक नाम या सदस्य पथ होना चाहिए"
+help = "पहले मान को किसी नाम से बाँधें, फिर उसी नाम पर '{discerne}' करें"
+
 [diagnostics.PARSE021]
 message = "शर्त गायब है"
 help = "एक शर्त अभिव्यक्ति जोड़ें"
@@ -599,6 +607,10 @@ help = "closure signature और उसकी बॉडी के बीच '∴
 [diagnostics.PARSE023]
 message = "'{wildcard}' या {identifier} जैसा पैटर्न अपेक्षित है"
 help = "'{wildcard}', एक literal, या {identifier} पैटर्न उपयोग करें"
+
+[diagnostics.PARSE023.issues.discerne_pattern_comma_retired]
+message = "अब अल्पविराम '{casu}' के पैटर्न को अलग नहीं करता"
+help = "पैटर्न को '{et}' से अलग करें"
 
 [diagnostics.PARSE024]
 message = "'{casu}' arm या '{ceterum}' default अपेक्षित है"

@@ -339,10 +339,7 @@ pub fn parse_message(kind: ParseErrorKind, args: &[DiagnosticArg]) -> Option<Str
         ParseErrorKind::ErgoWrongContext => Some(
             "ergo is only for single-statement bodies; use ∴ for a compact clausura".to_owned(),
         ),
-        ParseErrorKind::PatternInvalid => quote_arg(args, "wildcard").and_then(|wildcard| {
-            arg_value(args, "identifier")
-                .map(|identifier| format!("expected pattern such as {wildcard} or {identifier}"))
-        }),
+        ParseErrorKind::PatternInvalid => invalid_pattern_message(args),
         ParseErrorKind::CasuArmInvalid => quote_arg(args, "casu").and_then(|casu| {
             quote_arg(args, "ceterum")
                 .map(|ceterum| format!("expected {casu} arm or {ceterum} default"))
@@ -404,13 +401,7 @@ pub fn parse_help(kind: ParseErrorKind, args: &[DiagnosticArg]) -> Option<String
         ParseErrorKind::ErgoWrongContext => {
             Some("use '∴' between a closure signature and its body".to_owned())
         }
-        ParseErrorKind::PatternInvalid => {
-            let wildcard = quote_arg(args, "wildcard")?;
-            let identifier = arg_value(args, "identifier")?;
-            Some(format!(
-                "use {wildcard}, a literal, or an {identifier} pattern"
-            ))
-        }
+        ParseErrorKind::PatternInvalid => invalid_pattern_help(args),
         ParseErrorKind::CasuArmInvalid => {
             let casu = quote_arg(args, "casu")?;
             let ceterum = quote_arg(args, "ceterum")?;
@@ -418,10 +409,7 @@ pub fn parse_help(kind: ParseErrorKind, args: &[DiagnosticArg]) -> Option<String
                 "start the dispatch arm with {casu} or close with {ceterum}"
             ))
         }
-        ParseErrorKind::StatementInvalid => {
-            let replacement = arg_value(args, "replacement")?;
-            Some(format!("use {replacement}"))
-        }
+        ParseErrorKind::StatementInvalid => invalid_statement_help(args),
         ParseErrorKind::ExpressionInvalid => invalid_expression_help(args),
         ParseErrorKind::TypeInvalid => invalid_type_help(args),
         ParseErrorKind::ImportInvalid => invalid_import_help(args),
@@ -455,11 +443,87 @@ fn invalid_parameter_help(args: &[DiagnosticArg]) -> Option<String> {
 // STATEMENTS
 
 fn invalid_statement_message(args: &[DiagnosticArg]) -> Option<String> {
+    if let Some(issue) = arg_value(args, "issue") {
+        return statement_issue_message(issue);
+    }
     let statement = arg_value(args, "statement")?;
     match statement {
         "ad" => Some("ad is only valid in expression position".to_owned()),
         _ => quote_arg(args, "statement")
             .map(|statement| format!("{statement} is not a valid statement form")),
+    }
+}
+
+fn statement_issue_message(issue: &str) -> Option<String> {
+    match issue {
+        "discerne_subject_comma_retired" => Some(
+            "a comma no longer separates discerne subjects; separate them with 'et'".to_owned(),
+        ),
+        "discerne_subject_not_path" => {
+            Some("a discerne subject is a name or a member path, not an expression".to_owned())
+        }
+        _ => None,
+    }
+}
+
+fn invalid_statement_help(args: &[DiagnosticArg]) -> Option<String> {
+    if let Some(issue) = arg_value(args, "issue") {
+        return statement_issue_help(issue);
+    }
+    let replacement = arg_value(args, "replacement")?;
+    Some(format!("use {replacement}"))
+}
+
+fn statement_issue_help(issue: &str) -> Option<String> {
+    match issue {
+        "discerne_subject_comma_retired" => {
+            Some("write 'discerne a et b { … }'; 'et' is the only subject separator".to_owned())
+        }
+        "discerne_subject_not_path" => {
+            Some("bind the value to a name first, then discerne on that name".to_owned())
+        }
+        _ => None,
+    }
+}
+
+// PATTERNS
+
+fn invalid_pattern_message(args: &[DiagnosticArg]) -> Option<String> {
+    if let Some(issue) = arg_value(args, "issue") {
+        return pattern_issue_message(issue);
+    }
+    quote_arg(args, "wildcard").and_then(|wildcard| {
+        arg_value(args, "identifier")
+            .map(|identifier| format!("expected pattern such as {wildcard} or {identifier}"))
+    })
+}
+
+fn pattern_issue_message(issue: &str) -> Option<String> {
+    match issue {
+        "discerne_pattern_comma_retired" => {
+            Some("a comma no longer separates arm patterns; separate them with 'et'".to_owned())
+        }
+        _ => None,
+    }
+}
+
+fn invalid_pattern_help(args: &[DiagnosticArg]) -> Option<String> {
+    if let Some(issue) = arg_value(args, "issue") {
+        return pattern_issue_help(issue);
+    }
+    let wildcard = quote_arg(args, "wildcard")?;
+    let identifier = arg_value(args, "identifier")?;
+    Some(format!(
+        "use {wildcard}, a literal, or an {identifier} pattern"
+    ))
+}
+
+fn pattern_issue_help(issue: &str) -> Option<String> {
+    match issue {
+        "discerne_pattern_comma_retired" => {
+            Some("write 'casu a et b { … }'; 'et' is the only pattern separator".to_owned())
+        }
+        _ => None,
     }
 }
 

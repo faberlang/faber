@@ -310,23 +310,22 @@ impl Parser {
     /// Parse pattern-based `discerne` dispatch.
     ///
     /// GRAMMAR:
-    ///   discerne-stmt := `discerne` [`omnia`] expr (',' expr)* '{' arm* [`default`] '}'
-    ///   arm := `casu` pattern (',' pattern)* if-body
+    ///   discerne-stmt := `discerne` [`omnia`] subject-path (`et` subject-path)* '{' arm* [`default`] '}'
+    ///   subject-path := ident ('.' ident)*
+    ///   arm := `casu` pattern (`et` pattern)* if-body
     ///
-    /// `omnia` is only recorded here; later phases own the exhaustive-coverage
-    /// check because they know the subject types and variant sets.
+    /// `omnia` is the exhaustive marker only where a subject path follows it
+    /// (`discerne omnia a et b`); before `{`, `.` or the separator it is the
+    /// first subject, because keywords are contextual and a binding may be
+    /// named like one. `omnia` is only recorded here; later phases own the
+    /// exhaustive-coverage check because they know the subject types and
+    /// variant sets. A comma between subjects, and a subject that is not a
+    /// path, are named migration diagnostics.
     pub(super) fn parse_discerne_stmt(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Discerne, "expected 'discerne'")?;
 
-        let exhaustive = self.eat_keyword_ident(TokenKind::Omnia);
-
-        let mut subjects = Vec::new();
-        loop {
-            subjects.push(self.parse_expression()?);
-            if !self.consume_item_separator(&TokenKind::LBrace, "discerne_subjects")? {
-                break;
-            }
-        }
+        let exhaustive = self.eat_discerne_exhaustive_marker();
+        let subjects = self.parse_discerne_subjects()?;
 
         self.expect(&TokenKind::LBrace, "expected '{'")?;
 
@@ -363,6 +362,120 @@ impl Parser {
             arms,
             default,
         }))
+    }
+
+    /// Eat the exhaustive marker only when a subject path follows it (D-10).
+    fn eat_discerne_exhaustive_marker(&mut self) -> bool {
+        if !self.check_keyword_ident(TokenKind::Omnia) {
+            return false;
+        }
+        let subject_follows = matches!(self.peek_at(1).kind, TokenKind::Ident(_) | TokenKind::Tag)
+            && self.keyword_ident_at(1) != Some(TokenKind::Et);
+        if subject_follows {
+            self.advance();
+        }
+        subject_follows
+    }
+
+    /// Parse the `et`-separated subject list of a `discerne` header.
+    ///
+    /// A comma is the retired separator: it is reported once for the header
+    /// and read as `et`, so the rest of the header parses without a cascade.
+    fn parse_discerne_subjects(&mut self) -> Result<Vec<Expr>, ParseError> {
+        let mut subjects = Vec::new();
+        let mut comma_reported = false;
+        loop {
+            subjects.push(self.parse_discerne_subject()?);
+            if self.eat_keyword_ident(TokenKind::Et) {
+                continue;
+            }
+            if self.eat(&TokenKind::Comma) {
+                if !comma_reported {
+                    comma_reported = true;
+                    self.errors.push(
+                        ParseError::structured(
+                            ParseErrorKind::StatementInvalid,
+                            self.previous_span(),
+                        )
+                        .with_arg("issue", "discerne_subject_comma_retired"),
+                    );
+                }
+                if self.check(&TokenKind::LBrace) {
+                    break;
+                }
+                continue;
+            }
+            break;
+        }
+        Ok(subjects)
+    }
+
+    /// Parse one subject: a name or member path (`ego` included), never an
+    /// expression. Anything else is parsed as an expression for recovery and
+    /// reported as `discerne_subject_not_path`.
+    fn parse_discerne_subject(&mut self) -> Result<Expr, ParseError> {
+        let start = self.current_span();
+        let checkpoint = self.checkpoint();
+        if self.at_subject_path_start() {
+            let path = self.parse_subject_path()?;
+            if self.check(&TokenKind::LBrace)
+                || self.check(&TokenKind::Comma)
+                || self.check_keyword_ident(TokenKind::Et)
+            {
+                return Ok(path);
+            }
+            self.restore(checkpoint);
+        }
+        let expr = self.parse_expression()?;
+        self.errors.push(
+            ParseError::structured(ParseErrorKind::StatementInvalid, start.merge(expr.span))
+                .with_arg("issue", "discerne_subject_not_path"),
+        );
+        Ok(expr)
+    }
+
+    /// Whether the current word can begin a subject path. The null and bool
+    /// keyword literals are values, not names.
+    fn at_subject_path_start(&self) -> bool {
+        matches!(self.peek().kind, TokenKind::Ident(_) | TokenKind::Tag)
+            && !self.check_keyword_ident(TokenKind::Verum)
+            && !self.check_keyword_ident(TokenKind::Falsum)
+            && !self.check_keyword_ident(TokenKind::Nihil)
+    }
+
+    /// Parse `ident ('.' ident)*` into the expression kinds the expression
+    /// parser builds for the same text.
+    fn parse_subject_path(&mut self) -> Result<Expr, ParseError> {
+        let start = self.current_span();
+        let mut path = if self.check_keyword_ident(TokenKind::Ego) {
+            let span = self.peek().span;
+            self.advance();
+            Expr {
+                id: self.next_id(),
+                kind: ExprKind::Ego(span),
+                span,
+            }
+        } else {
+            let ident = self.parse_ident()?;
+            Expr {
+                id: self.next_id(),
+                kind: ExprKind::Ident(ident),
+                span: start.merge(self.previous_span()),
+            }
+        };
+        while self.check(&TokenKind::Dot) {
+            self.advance();
+            let member = self.parse_member_ident()?;
+            path = Expr {
+                id: self.next_id(),
+                kind: ExprKind::Member(MemberExpr {
+                    object: Box::new(path),
+                    member,
+                }),
+                span: start.merge(self.previous_span()),
+            };
+        }
+        Ok(path)
     }
 
     fn invalid_casu_arm_error(&self) -> ParseError {

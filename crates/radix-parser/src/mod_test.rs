@@ -2506,7 +2506,7 @@ fn parses_elige_switch() {
 #[test]
 fn parses_discerne_match() {
     let result = parse_ok(
-        "discerne omnia value, other { casu Ok ut result, _ ergo redde result ceterum ergo mori \"bad\" }",
+        "discerne omnia value et other { casu Ok ut result et _ ergo redde result ceterum ergo mori \"bad\" }",
     );
     let program = result
         .program

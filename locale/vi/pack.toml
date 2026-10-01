@@ -580,6 +580,14 @@ help = "dùng {replacement}"
 message = "'{cape}' phải đứng trước '{dum}' trong vòng lặp '{fac}'"
 help = "viết trình xử lý trước điều kiện: {fac} … {cape} … {dum} …"
 
+[diagnostics.PARSE020.issues.discerne_subject_comma_retired]
+message = "dấu phẩy không còn ngăn cách các đối tượng của '{discerne}'"
+help = "ngăn cách các đối tượng bằng '{et}'"
+
+[diagnostics.PARSE020.issues.discerne_subject_not_path]
+message = "đối tượng của '{discerne}' phải là một tên hoặc đường dẫn thành viên"
+help = "gán giá trị cho một tên trước, rồi dùng '{discerne}' trên tên đó"
+
 [diagnostics.PARSE021]
 message = "thiếu điều kiện"
 help = "thêm một biểu thức điều kiện"
@@ -599,6 +607,10 @@ help = "dùng '∴' giữa chữ ký clausura và thân của nó"
 [diagnostics.PARSE023]
 message = "cần mẫu như '{wildcard}' hoặc {identifier}"
 help = "dùng '{wildcard}', một literal, hoặc một mẫu {identifier}"
+
+[diagnostics.PARSE023.issues.discerne_pattern_comma_retired]
+message = "dấu phẩy không còn ngăn cách các mẫu của '{casu}'"
+help = "ngăn cách các mẫu bằng '{et}'"
 
 [diagnostics.PARSE024]
 message = "cần nhánh '{casu}' hoặc mặc định '{ceterum}'"

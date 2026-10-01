@@ -77,11 +77,11 @@ fn bool_match_covering_both_values_definitely_returns() {
 fn two_bool_scrutinees_with_all_four_combinations_definitely_return() {
     assert_clean(
         "functio g(bivalens a, bivalens b) → numerus {
-            discerne a, b {
-                casu verum, verum { redde 3 }
-                casu verum, falsum { redde 2 }
-                casu falsum, verum { redde 1 }
-                casu falsum, falsum { redde 0 }
+            discerne a et b {
+                casu verum et verum { redde 3 }
+                casu verum et falsum { redde 2 }
+                casu falsum et verum { redde 1 }
+                casu falsum et falsum { redde 0 }
             }
         }",
     );
@@ -91,10 +91,10 @@ fn two_bool_scrutinees_with_all_four_combinations_definitely_return() {
 fn two_bool_scrutinees_with_wildcard_rows_definitely_return() {
     assert_clean(
         "functio g(bivalens a, bivalens b) → numerus {
-            discerne a, b {
-                casu verum, _ { redde 1 }
-                casu _, verum { redde 2 }
-                casu falsum, falsum { redde 0 }
+            discerne a et b {
+                casu verum et _ { redde 1 }
+                casu _ et verum { redde 2 }
+                casu falsum et falsum { redde 0 }
             }
         }",
     );
@@ -120,10 +120,10 @@ fn statement_bool_match_missing_falsum_is_rejected() {
 fn two_bool_scrutinees_missing_one_combination_names_it() {
     assert_missing(
         "functio g(bivalens a, bivalens b) → numerus {
-            discerne a, b {
-                casu verum, verum { redde 3 }
-                casu verum, falsum { redde 2 }
-                casu falsum, verum { redde 1 }
+            discerne a et b {
+                casu verum et verum { redde 3 }
+                casu verum et falsum { redde 2 }
+                casu falsum et verum { redde 1 }
             }
             redde 0
         }",
@@ -137,9 +137,9 @@ fn enum_by_bool_product_missing_combination_names_it() {
     assert_missing(
         "discretio Lumen { Rubeum, Viride }
         functio h(Lumen l, bivalens b) → numerus {
-            discerne l, b {
-                casu Rubeum, _ { redde 1 }
-                casu Viride, verum { redde 2 }
+            discerne l et b {
+                casu Rubeum et _ { redde 1 }
+                casu Viride et verum { redde 2 }
             }
             redde 0
         }",
@@ -153,10 +153,10 @@ fn enum_by_bool_product_fully_covered_definitely_returns() {
     assert_clean(
         "discretio Lumen { Rubeum, Viride }
         functio h(Lumen l, bivalens b) → numerus {
-            discerne l, b {
-                casu Rubeum, _ { redde 1 }
-                casu Viride, verum { redde 2 }
-                casu Viride, falsum { redde 3 }
+            discerne l et b {
+                casu Rubeum et _ { redde 1 }
+                casu Viride et verum { redde 2 }
+                casu Viride et falsum { redde 3 }
             }
         }",
     );
@@ -197,8 +197,8 @@ fn literal_match_over_open_domain_without_catchall_is_rejected() {
 fn multi_scrutinee_literal_rows_with_ceterum_definitely_return() {
     assert_clean(
         "functio k(numerus n, bivalens b) → numerus {
-            discerne n, b {
-                casu 1, verum { redde 10 }
+            discerne n et b {
+                casu 1 et verum { redde 10 }
                 ceterum { redde 0 }
             }
         }",
@@ -212,9 +212,9 @@ fn multi_scrutinee_missing_row_is_no_longer_silent() {
         "incipit {
             fixum numerus n ← 1
             fixum bivalens b ← verum
-            discerne n, b {
-                casu 1, verum { nota \"unum\" }
-                casu _, falsum { nota \"falsum\" }
+            discerne n et b {
+                casu 1 et verum { nota \"unum\" }
+                casu _ et falsum { nota \"falsum\" }
             }
         }",
         "missing_cases",
