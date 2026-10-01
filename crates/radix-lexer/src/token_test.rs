@@ -12,9 +12,9 @@ fn span_merge_covers_both_inputs() {
 fn unregistered_statement_spellings_are_plain_identifiers() {
     use crate::{lex, lookup_keyword_spec};
 
-    // tempta / demum / emitte / pro have no keyword spec behind them; each
-    // must lex as an ordinary identifier.
-    for spelling in ["tempta", "demum", "emitte", "pro"] {
+    // tempta / demum / emitte have no keyword spec behind them; each must lex
+    // as an ordinary identifier.
+    for spelling in ["tempta", "demum", "emitte"] {
         assert!(
             lookup_keyword_spec(spelling).is_none(),
             "{spelling} must not be a registered keyword"
@@ -30,6 +30,26 @@ fn unregistered_statement_spellings_are_plain_identifiers() {
 
     let ident = lex("emitte_suffix");
     assert!(matches!(ident.tokens[0].kind, TokenKind::Ident(_)));
+}
+
+#[test]
+fn pro_is_a_tokenless_contextual_row_that_lexes_as_an_identifier() {
+    use crate::{KeywordOwner, KeywordScope, lex, lookup_keyword_spec};
+
+    let spec = lookup_keyword_spec("pro").expect("pro has a registry row (K3 grouping word)");
+    assert!(spec.token_kind.is_none(), "pro must stay tokenless");
+    assert!(matches!(
+        spec.scope,
+        KeywordScope::Contextual(owners) if owners == [KeywordOwner::ReductionGroup]
+    ));
+
+    let result = lex("pro");
+    assert!(result.errors.is_empty(), "pro must lex cleanly");
+    assert!(
+        matches!(result.tokens[0].kind, TokenKind::Ident(_)),
+        "pro must lex as an identifier, got {:?}",
+        result.tokens[0].kind
+    );
 }
 
 #[test]

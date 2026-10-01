@@ -315,3 +315,7 @@ mod tests;
 #[cfg(test)]
 #[path = "parse_probe_test.rs"]
 mod parse_probe_test;
+
+#[cfg(test)]
+#[path = "reduction_words_pack_test.rs"]
+mod reduction_words_pack_test;

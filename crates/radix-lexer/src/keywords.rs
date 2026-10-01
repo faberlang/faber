@@ -184,6 +184,18 @@ pub enum KeywordOwner {
 
     /// Convert-hint clause after a `↦` target type (`u32 via Hex`, D11.9).
     ConversionHint,
+
+    /// Head of the `reducta via Op ex source …` expression (`reducta`, and
+    /// `via` as the mandatory operator introducer).
+    ReductionHead,
+
+    /// Operator word after `reducta via` (`summa` / `factum` / `maxima` /
+    /// `minima` / `argmaxima` / `argminima` / `omnia` / `quilibet` /
+    /// `numeratio`).
+    ReductionOperator,
+
+    /// Grouping word after the source and optional `apud` clause (`pro`).
+    ReductionGroup,
 }
 
 /// Keyword grouping used by diagnostics, explain data, and registry consumers.
@@ -342,6 +354,23 @@ const CONVERSION_HINT: &[KeywordOwner] = &[KeywordOwner::ConversionHint];
 const RANGE_OPERATOR: &[KeywordOwner] = &[KeywordOwner::RangeOperator];
 const STATEMENT_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::StatementIntroducer];
 const DECLARATION_MARKER: &[KeywordOwner] = &[KeywordOwner::DeclarationMarker];
+const REDUCTION_HEAD: &[KeywordOwner] = &[KeywordOwner::ReductionHead];
+const REDUCTION_OPERATOR: &[KeywordOwner] = &[KeywordOwner::ReductionOperator];
+const REDUCTION_GROUP: &[KeywordOwner] = &[KeywordOwner::ReductionGroup];
+// WHY: `summa`/`maxima`/`minima` keep their expression-head owner until the
+// retired `summa ex` / `max ex` productions are removed; `omnia` keeps its
+// declaration-marker owner; `via` keeps its convert-hint owner. Each gains the
+// reduction owner for its new slot.
+const EXPRESSION_INTRODUCER_OR_REDUCTION_OPERATOR: &[KeywordOwner] = &[
+    KeywordOwner::ExpressionIntroducer,
+    KeywordOwner::ReductionOperator,
+];
+const DECLARATION_MARKER_OR_REDUCTION_OPERATOR: &[KeywordOwner] = &[
+    KeywordOwner::DeclarationMarker,
+    KeywordOwner::ReductionOperator,
+];
+const CONVERSION_HINT_OR_REDUCTION_HEAD: &[KeywordOwner] =
+    &[KeywordOwner::ConversionHint, KeywordOwner::ReductionHead];
 // WHY: `ad` opens the route expression and names the compiler-owned
 // `@ ad '<route>'` handler annotation; claiming the annotation slot seals the
 // locale surface (`@ ad` under an en reader is `wrong_locale_annotation`).
@@ -866,7 +895,7 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "summa",
         token_kind: None,
-        scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
+        scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER_OR_REDUCTION_OPERATOR),
         category: KeywordKind::Misc,
     },
     KeywordSpec {
@@ -881,13 +910,61 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "maxima",
         token_kind: None,
-        scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
+        scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER_OR_REDUCTION_OPERATOR),
         category: KeywordKind::Misc,
     },
     KeywordSpec {
         text: "minima",
         token_kind: None,
-        scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
+        scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER_OR_REDUCTION_OPERATOR),
+        category: KeywordKind::Misc,
+    },
+    // === Keywords: Reduction expression (`reducta via Op ex source`) ===
+    // `reducta` heads the expression, `pro` names the optional grouping key
+    // after the source and `apud` clause, and the remaining rows are op words
+    // claimed after `via`. All are tokenless: each lexes as an ordinary
+    // identifier and is claimed by Latin key only in its grammar slot. The op
+    // words `summa`, `maxima`, `minima`, `omnia` are the existing rows above.
+    KeywordSpec {
+        text: "reducta",
+        token_kind: None,
+        scope: KeywordScope::Contextual(REDUCTION_HEAD),
+        category: KeywordKind::Misc,
+    },
+    KeywordSpec {
+        text: "pro",
+        token_kind: None,
+        scope: KeywordScope::Contextual(REDUCTION_GROUP),
+        category: KeywordKind::Misc,
+    },
+    KeywordSpec {
+        text: "factum",
+        token_kind: None,
+        scope: KeywordScope::Contextual(REDUCTION_OPERATOR),
+        category: KeywordKind::Misc,
+    },
+    KeywordSpec {
+        text: "numeratio",
+        token_kind: None,
+        scope: KeywordScope::Contextual(REDUCTION_OPERATOR),
+        category: KeywordKind::Misc,
+    },
+    KeywordSpec {
+        text: "quilibet",
+        token_kind: None,
+        scope: KeywordScope::Contextual(REDUCTION_OPERATOR),
+        category: KeywordKind::Misc,
+    },
+    KeywordSpec {
+        text: "argmaxima",
+        token_kind: None,
+        scope: KeywordScope::Contextual(REDUCTION_OPERATOR),
+        category: KeywordKind::Misc,
+    },
+    KeywordSpec {
+        text: "argminima",
+        token_kind: None,
+        scope: KeywordScope::Contextual(REDUCTION_OPERATOR),
         category: KeywordKind::Misc,
     },
     // === Keywords: First-match selection ===
@@ -1060,7 +1137,7 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "omnia",
         token_kind: Some(TokenKind::Omnia),
-        scope: KeywordScope::Contextual(DECLARATION_MARKER),
+        scope: KeywordScope::Contextual(DECLARATION_MARKER_OR_REDUCTION_OPERATOR),
         category: KeywordKind::Misc,
     },
     KeywordSpec {
@@ -1103,7 +1180,7 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "via",
         token_kind: Some(TokenKind::Via),
-        scope: KeywordScope::Contextual(CONVERSION_HINT),
+        scope: KeywordScope::Contextual(CONVERSION_HINT_OR_REDUCTION_HEAD),
         category: KeywordKind::Misc,
     },
     // === Keywords: Ranges ===
@@ -1538,7 +1615,10 @@ fn keyword_owner_is_identifier_like(owner: KeywordOwner) -> bool {
         | KeywordOwner::StatementIntroducer
         | KeywordOwner::DeclarationMarker
         | KeywordOwner::RouteExpression
-        | KeywordOwner::ConversionHint => false,
+        | KeywordOwner::ConversionHint
+        | KeywordOwner::ReductionHead
+        | KeywordOwner::ReductionOperator
+        | KeywordOwner::ReductionGroup => false,
     }
 }
 

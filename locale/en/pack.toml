@@ -178,6 +178,14 @@ summa = "sum"
 filum = "thread"
 maxima = "max"
 minima = "min"
+# Reduction expression surface (`reducta via Op ex source`).
+reducta = "reduce"
+pro = "per"
+factum = "product"
+numeratio = "count"
+quilibet = "any"
+argmaxima = "argmax"
+argminima = "argmin"
 
 [types]
 ascii = "ascii"

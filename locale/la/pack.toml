@@ -163,6 +163,14 @@ summa = "summa"
 filum = "filum"
 maxima = "maxima"
 minima = "minima"
+# Reduction expression surface (`reducta via Op ex source`).
+reducta = "reducta"
+pro = "pro"
+factum = "factum"
+numeratio = "numeratio"
+quilibet = "quilibet"
+argmaxima = "argmaxima"
+argminima = "argminima"
 
 [types]
 ascii = "ascii"
