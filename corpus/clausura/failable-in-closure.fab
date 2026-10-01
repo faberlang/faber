@@ -1,0 +1,103 @@
++++
+term = "failable-in-closure"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "iace_stmt", "si_stmt", "fac_stmt", "cape_clause", "fixum_decl", "type_annotation", "owned_type", "base_type", "clausura_expr", "clausura_signature", "clausura_param", "clausura_params", "return_clause", "expression", "additive_expr", "multiplicative_expr", "comparison", "call_expr", "call_suffix", "argument_list", "argument", "literal", "scriptum_expr", "nota_stmt"]
+category = "function"
+canonical = true
+summary = "A closure is its own frame: it neither inherits the enclosing function's `⇥` channel nor leaks one; a failable call inside a closure is handled inside the closure."
+syntax = "(<T>) → <R> <name> ← <params> → <R> ∴ do { do { … risky(x) … } catch err { … } }"
+related = ["clausura", "⇥", "fac", "cape"]
+locale = "en"
++++
+# =============================================================================
+# failable-in-closure — closures inside failable functions, failable calls inside closures
+# =============================================================================
+#
+# What this teaches:
+#   • A closure's `return` returns a plain value of the closure, even when
+#     the enclosing function declares `⇥`: the error channel belongs to the
+#     function, not to the closures it creates.
+#   • A failable call inside a closure body needs a handler inside that body
+#     (`do { … } catch err { … }`); the handled failure becomes the closure's
+#     own value, and the enclosing function never sees it.
+#
+# Common mistakes:
+#   • Calling a failable function in a closure body with no handler and no
+#     `⇥` of its own — rejected by the analyzer.
+#
+# See also: clausura, ⇥, fac, cape
+# =============================================================================
+
+# failable-in-closure — closures keep their own frame
+#
+# EXPECTED OUTPUT:
+#   failable-in-closure.expected — one line per call; the handled failures print -1.
+
+fn risky(int n) → int ⇥ string {
+    if n ≻ 5 {
+        throw "too big"
+    }
+    return n
+}
+
+# Plain closures inside a failable function: their returns are plain values.
+fn plain(int n) → int ⇥ string {
+    const (int) → int f ← int x → int ∴ do {
+        const int y ← x + 1
+        return y * 2
+    }
+    const (int) → int g ← int x → int ∴ x + 7
+    const int z ← risky(n)
+    return f(z) + g(z)
+}
+
+# A failable call nested in an argument, handled inside the closure.
+fn handled(int n) → int ⇥ string {
+    const (int) → int h ← int x → int ∴ do {
+        var int verdict ← -1
+        do {
+            print "in §"(risky(x))
+            verdict ← 1
+        }
+        catch err {
+            verdict ← -1
+        }
+        return verdict
+    }
+    return h(n)
+}
+
+# The same closure in a function with no channel of its own.
+fn handled_free(int n) → int {
+    const (int) → int h ← int x → int ∴ do {
+        var int verdict ← -1
+        do {
+            print "in §"(risky(x))
+            verdict ← 1
+        }
+        catch err {
+            verdict ← -1
+        }
+        return verdict
+    }
+    return h(n)
+}
+
+main {
+    do {
+        print plain(1)
+        print plain(9)
+    }
+    catch err {
+        print "caught: §"(err)
+    }
+    do {
+        print handled(2)
+        print handled(9)
+    }
+    catch err {
+        print "caught: §"(err)
+    }
+    print handled_free(3)
+    print handled_free(9)
+}
