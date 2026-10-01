@@ -50,16 +50,23 @@ pub(crate) fn evaluate(
 
 #[cfg(feature = "runner")]
 pub(crate) use evaluation::evaluate;
+#[cfg(feature = "runner")]
+pub use evaluation::evaluate_deferred;
+#[cfg(feature = "runner")]
+pub use run::run_linked_function;
 
 #[cfg(feature = "runner")]
 mod evaluation {
     use super::{AnalyzedModule, Diagnostic};
     use crate::diagnostics::DiagnosticConvert;
-    use crate::semantic::passes::praefixum::{ImportedReference, ImportedReferenceKind, imported_references};
+    use crate::semantic::passes::praefixum::{
+        ImportedCallee, ImportedEffects, ImportedReference, ImportedReferenceKind, PraefixumSite, imported_references,
+    };
     use crate::semantic::{self, SemanticError, SemanticErrorKind};
     use radix_hir::visit::{HirVisitorMut, walk_local_mut};
     use radix_hir::{DefId, HirExpression, HirItemKind, HirLocal};
     use radix_lexer::Span;
+    use radix_mir_runner::Value;
 
     /// Step budget for one `praefixum` body. One step is one MIR basic-block
     /// visit; a real initializer stays far below it, an endless loop reaches
@@ -109,6 +116,95 @@ mod evaluation {
                 errors.push(error.with_arg("name", unit.interner.resolve(site.name)));
             }
         }
+        finish(unit, name, body, errors)
+    }
+
+    /// The deferred counterpart of [`evaluate`]: the package layer evaluates
+    /// the sites of a module that analysis left unevaluated because they
+    /// reach an import.
+    ///
+    /// Each site, in evaluation order, first sends its import references
+    /// (calls and data members of an import namespace) to `imports`: an
+    /// `Effect` is `praefixum_forbidden` with the call chain, an
+    /// `Unavailable` is `praefixum_import_unavailable`. A site that passes
+    /// goes to `run` as a scratch clone of the unit, filtered and holding the
+    /// synthetic evaluation function exactly as the local path builds it, with
+    /// the definition id of that function and the site's span. The returned
+    /// value is installed by the literal builder the local path uses. After
+    /// the last site `statica::fold` runs.
+    ///
+    /// The scratch clone is the one deep copy of an analyzed module in this
+    /// path: the runner takes the module by value and the real unit must keep
+    /// its HIR.
+    ///
+    /// # Errors
+    ///
+    /// Returns the diagnostics for every site that failed; the unit must not
+    /// reach codegen then.
+    pub fn evaluate_deferred(
+        unit: &mut AnalyzedModule,
+        name: &str,
+        body: &str,
+        imports: &mut dyn ImportedEffects,
+        run: &mut dyn FnMut(AnalyzedModule, DefId, Span) -> Result<Value, SemanticError>,
+    ) -> Result<(), Vec<Diagnostic>> {
+        let order = match semantic::passes::praefixum::evaluation_order(&unit.hir, &unit.types) {
+            Ok(order) => order,
+            // Analysis already reported the cycle.
+            Err(_) => return Ok(()),
+        };
+        let mut errors = Vec::new();
+        for site in &order {
+            if let Err(error) = evaluate_deferred_site(unit, site, imports, run) {
+                errors.push(error.with_arg("name", unit.interner.resolve(site.name)));
+            }
+        }
+        finish(unit, name, body, errors)
+    }
+
+    fn evaluate_deferred_site(
+        unit: &mut AnalyzedModule,
+        site: &PraefixumSite,
+        imports: &mut dyn ImportedEffects,
+        run: &mut dyn FnMut(AnalyzedModule, DefId, Span) -> Result<Value, SemanticError>,
+    ) -> Result<(), SemanticError> {
+        let references = imported_references(&unit.hir, &unit.types, site.def_id)
+            .into_iter()
+            .filter(|reference| reference.kind != ImportedReferenceKind::Method);
+        for reference in references {
+            match imports.callee(&reference) {
+                ImportedCallee::Pure => {}
+                ImportedCallee::Effect { effect, chain } => {
+                    let mut hops = vec![
+                        unit.interner.resolve(site.name).to_owned(),
+                        spell_import(unit, &reference),
+                    ];
+                    hops.extend(chain.into_iter().skip(1));
+                    return Err(invalid("praefixum_forbidden", reference.span)
+                        .with_arg("effect", effect)
+                        .with_arg("chain", hops.join(" → ")));
+                }
+                ImportedCallee::Unavailable => {
+                    return Err(invalid("praefixum_import_unavailable", site.span)
+                        .with_arg("callee", spell_import(unit, &reference)));
+                }
+            }
+        }
+        let mut scratch = unit.clone();
+        scratch.hir.items = super::run::evaluation_items(&mut scratch, site.def_id, site.span)?;
+        scratch.hir.entry = None;
+        let value = run(scratch, super::run::EVALUATION_DEF_ID, site.span)?;
+        install_value(unit, site.def_id, site.span, &value)
+    }
+
+    /// Refold the constants that read an evaluated site, then map every error
+    /// to a diagnostic.
+    fn finish(
+        unit: &mut AnalyzedModule,
+        name: &str,
+        body: &str,
+        mut errors: Vec<SemanticError>,
+    ) -> Result<(), Vec<Diagnostic>> {
         if errors.is_empty() {
             let hir = &mut unit.hir;
             errors.extend(semantic::passes::statica::fold(hir, &unit.types, &mut unit.interner));
@@ -198,12 +294,18 @@ mod evaluation {
 
     fn evaluate_site(unit: &mut AnalyzedModule, def_id: DefId, span: Span) -> Result<(), SemanticError> {
         let value = super::run::run_site(unit, def_id, span)?;
+        install_value(unit, def_id, span, &value)
+    }
+
+    /// Replace the initializer of the site `def_id` with the literal of
+    /// `value`, keeping the authored body for Faber re-emission.
+    fn install_value(unit: &mut AnalyzedModule, def_id: DefId, span: Span, value: &Value) -> Result<(), SemanticError> {
         let literal = {
             let declared = with_initializer_mut(unit, def_id, |init| init.ty)
                 .flatten()
                 .ok_or_else(|| invalid("praefixum_result_not_literal", span))?;
             let mut builder = super::literal::LiteralBuilder::new(unit, span);
-            builder.build(&value, declared)?
+            builder.build(value, declared)?
         };
         let Some(authored) = with_initializer_mut(unit, def_id, |init| std::mem::replace(init, literal)) else {
             return Err(invalid("praefixum_unsupported", span));
@@ -233,6 +335,10 @@ mod literal;
 #[cfg(test)]
 #[path = "praefixum_test.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "runner"))]
+#[path = "praefixum_deferred_test.rs"]
+mod deferred;
 
 #[cfg(test)]
 #[path = "praefixum_module_constant_test.rs"]

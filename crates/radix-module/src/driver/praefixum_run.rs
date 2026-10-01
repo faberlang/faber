@@ -2,7 +2,7 @@
 
 use super::evaluation::{PRAEFIXUM_STEP_BUDGET, invalid, with_initializer_mut};
 use crate::driver::AnalyzedModule;
-use crate::mir::{MirLoweringOptions, lower_analyzed_unit};
+use crate::mir::{MirFunctionId, MirLoweringOptions, ValidatedMir, lower_analyzed_unit};
 use crate::semantic::{self, SemanticError};
 use radix_hir::visit::{HirVisitor, walk_local};
 use radix_hir::{DefId, HirExpressionKind, HirFunction, HirItem, HirItemKind, HirLocal};
@@ -15,16 +15,35 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 /// Definition id of the synthetic evaluation function. It exists only while
 /// one body is lowered and run, and sits between the HIR-synthetic band and
 /// the closure-lift band, so it never meets a real definition.
-const EVALUATION_DEF_ID: DefId = DefId(0x3FFF_FF00);
+pub(super) const EVALUATION_DEF_ID: DefId = DefId(0x3FFF_FF00);
 
 /// Evaluate the `praefixum` body of the static `def_id`.
 pub(super) fn run_site(unit: &mut AnalyzedModule, def_id: DefId, span: Span) -> Result<Value, SemanticError> {
+    let items = evaluation_items(unit, def_id, span)?;
+    let saved_items = std::mem::replace(&mut unit.hir.items, items);
+    let saved_entry = unit.hir.entry.take();
+    let result = lower_and_run(unit, span);
+    unit.hir.items = saved_items;
+    unit.hir.entry = saved_entry;
+    result
+}
+
+/// The items a module holds while the body of `def_id` is evaluated: the
+/// synthetic function (`EVALUATION_DEF_ID`), the functions it reaches, and
+/// every declaration. The caller installs them in place of `unit.hir.items`
+/// and drops the entry; `unit` itself is not changed except for interning the
+/// synthetic function's name.
+pub(super) fn evaluation_items(
+    unit: &mut AnalyzedModule,
+    def_id: DefId,
+    span: Span,
+) -> Result<Vec<HirItem>, SemanticError> {
     let function = evaluation_function(unit, def_id, span)?;
     let reached = semantic::passes::praefixum::reached_functions(&unit.hir, &unit.types, def_id);
     // Lower only what the body needs: the synthetic function, the functions
     // it reaches, and every declaration. Statics still awaiting evaluation
     // are unread by this body (dependency order) and would not lower.
-    let items: Vec<HirItem> = unit
+    Ok(unit
         .hir
         .items
         .iter()
@@ -41,13 +60,7 @@ pub(super) fn run_site(unit: &mut AnalyzedModule, def_id: DefId, span: Span) -> 
             kind: HirItemKind::Function(Box::new(function.0)),
             span,
         }))
-        .collect();
-    let saved_items = std::mem::replace(&mut unit.hir.items, items);
-    let saved_entry = unit.hir.entry.take();
-    let result = lower_and_run(unit, span);
-    unit.hir.items = saved_items;
-    unit.hir.entry = saved_entry;
-    result
+        .collect())
 }
 
 /// An item with the methods the evaluation cannot lower removed: a method
@@ -138,12 +151,29 @@ fn lower_and_run(unit: &AnalyzedModule, span: Span) -> Result<Value, SemanticErr
         return Err(invalid("praefixum_unsupported", span).with_arg("detail", "no lowered body"));
     };
 
+    run_linked_function(&lowered.validated, function_id, span)
+}
+
+/// Run the lowered function `function_id` of `validated` under the step
+/// budget and map every way it can fail to a `praefixum` issue. A `mori`
+/// panic is trapped quietly. The shared tail of the local path and of the
+/// package layer's linked evaluation.
+///
+/// # Errors
+///
+/// `praefixum_failed`, `praefixum_step_limit`, `praefixum_no_result`, or
+/// `praefixum_unsupported`, each on `span`.
+pub fn run_linked_function(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    span: Span,
+) -> Result<Value, SemanticError> {
     // `mori` reaches `BufferHost::abort`, which panics; trap it quietly.
     let mut host = BufferHost::default();
     let previous_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(|_| {}));
     let trapped = catch_unwind(AssertUnwindSafe(|| {
-        evaluate_function(&lowered.validated, function_id, &mut host, PRAEFIXUM_STEP_BUDGET)
+        evaluate_function(validated, function_id, &mut host, PRAEFIXUM_STEP_BUDGET)
     }));
     std::panic::set_hook(previous_hook);
 
@@ -151,17 +181,24 @@ fn lower_and_run(unit: &AnalyzedModule, span: Span) -> Result<Value, SemanticErr
         Ok(Ok(value)) => Ok(value),
         Ok(Err(EvaluationFailure::Errors(errors))) => Err(runner_failure(&errors, span)),
         Ok(Err(EvaluationFailure::Raised(value))) => {
-            let message = value
-                .display(
-                    &lowered.interner,
-                    radix_mir_runner::FieldOrder::new(
-                        &lowered.validated.validation().struct_field_order,
-                        &lowered.validated.validation().variant_field_order,
-                    )
-                    .with_names(&lowered.validated.validation().display_names),
-                    span,
-                )
-                .unwrap_or_else(|_| "error".to_owned());
+            let context = validated.validation();
+            let message = context
+                .interner
+                .as_interner()
+                .and_then(|interner| {
+                    value
+                        .display(
+                            interner,
+                            radix_mir_runner::FieldOrder::new(
+                                &context.struct_field_order,
+                                &context.variant_field_order,
+                            )
+                            .with_names(&context.display_names),
+                            span,
+                        )
+                        .ok()
+                })
+                .unwrap_or_else(|| "error".to_owned());
             Err(invalid("praefixum_failed", span).with_arg("message", message))
         }
         Ok(Err(EvaluationFailure::NoValue)) => Err(invalid("praefixum_no_result", span)),
