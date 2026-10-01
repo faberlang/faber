@@ -42,7 +42,7 @@ locale = "en"
 # `_` infers exactly one inhabitant type from the initializer: `n` is `int`.
 fn member_count(list<int ∪ string> xs) → int {
     const _ n ← xs.length()
-    if n > 0 then return 1
+    if n ≻ 0 then return 1
     return 0
 }
 
