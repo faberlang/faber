@@ -511,7 +511,7 @@ impl Value {
                         *def,
                         &fields.borrow(),
                         declared,
-                        None,
+                        Some((*def, None)),
                         true,
                         interner,
                         order,

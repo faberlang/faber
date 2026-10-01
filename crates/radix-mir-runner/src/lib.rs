@@ -470,7 +470,11 @@ fn index_field_float_widths(
     types: &TypeTable,
 ) -> value::FieldFloatWidths {
     let mut widths = FxHashMap::default();
-    for (def, fields) in &context.struct_fields {
+    let owners = context
+        .struct_fields
+        .iter()
+        .chain(context.variant_fields.iter());
+    for (def, fields) in owners {
         for (name, ty) in fields {
             if let Some(width) = element_display_width(ty.semantic_id(), types, 0)
                 && width != NumericWidth::F64
