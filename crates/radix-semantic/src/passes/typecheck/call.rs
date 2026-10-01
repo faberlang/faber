@@ -636,9 +636,16 @@ impl TypeChecker<'_> {
         let receiver_carrier = self.value_carrier_type(intrinsic_ty);
         let resolved_receiver = self.types.get(receiver_carrier);
         let receiver_is_atomic = matches!(resolved_receiver, Type::Atomic(_));
+        // Scalar numeric receivers join the closed set: the numeric registry
+        // owns their method surface, so a registry miss is `unknown_method`
+        // here rather than an inferred result that fails in a later phase.
         let receiver_requires_known_method = matches!(
             resolved_receiver,
-            Type::Tensor(_, _) | Type::Vector(_, _) | Type::Matrix(_, _)
+            Type::Tensor(_, _)
+                | Type::Vector(_, _)
+                | Type::Matrix(_, _)
+                | Type::Primitive(Primitive::Numerus | Primitive::Fractus)
+                | Type::SizedNumeric(_, _)
         );
         let tensor_higher_order_method = matches!(resolved_receiver, Type::Tensor(_, _))
             && super::super::air_closure_lift::is_higher_order_method(&method_name);
@@ -670,8 +677,8 @@ impl TypeChecker<'_> {
                 return self.error_type;
             }
             if receiver_requires_known_method && !tensor_higher_order_method {
-                // Tensor, vector, and matrix methods are closed compiler-owned
-                // surfaces. A registry miss must not manufacture an inferred
+                // Tensor, vector, matrix, and scalar numeric methods are closed
+                // compiler-owned surfaces. A registry miss must not manufacture an inferred
                 // result that survives check and fails only during lowering.
                 self.undefined_member("unknown_method", receiver.span);
                 return self.error_type;
