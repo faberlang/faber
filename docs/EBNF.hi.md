@@ -2063,6 +2063,16 @@ A negative number pattern is written with a leading minus (`स्थिति -
 `स्थिति -∞`). The lexer never signs a number, so the pattern claims the sign;
 `-` before anything else is not pattern syntax.
 
+`मिलाओ` matches a closed set and nothing else: the variants of an `क्रम` or
+`विभेद`, or the members of a union (`स्थिति numerus स्थिर n` over
+`numerus ∪ textus`). It is not a generic "match this thing" keyword. A type
+pattern that is not a member of the scrutinee's closed set is rejected
+(`SEM010 discerne_pattern_not_in_closed_set`). That covers numeric-width
+patterns (`स्थिति u32` over a `numerus`) and length-shaped patterns (`स्थिति
+lista<numerus, 4>` over a `lista<numerus>`; bounded `textus`, `ascii` and
+`octeti`; tensor figures). Ask an integer's width or range with an `है` test,
+and ask a length with `.longitudo()` in a `यदि`.
+
 There are no range patterns (`स्थिति 1‥5`). Test the range with `यदि` inside the
 arm.
 

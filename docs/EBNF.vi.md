@@ -2063,6 +2063,16 @@ A negative number pattern is written with a leading minus (`trường_hợp -1`,
 `trường_hợp -∞`). The lexer never signs a number, so the pattern claims the sign;
 `-` before anything else is not pattern syntax.
 
+`phân_tích` matches a closed set and nothing else: the variants of an `liệt_kê` or
+`hợp_nhất`, or the members of a union (`trường_hợp numerus hằng n` over
+`numerus ∪ textus`). It is not a generic "match this thing" keyword. A type
+pattern that is not a member of the scrutinee's closed set is rejected
+(`SEM010 discerne_pattern_not_in_closed_set`). That covers numeric-width
+patterns (`trường_hợp u32` over a `numerus`) and length-shaped patterns (`trường_hợp
+lista<numerus, 4>` over a `lista<numerus>`; bounded `textus`, `ascii` and
+`octeti`; tensor figures). Ask an integer's width or range with an `là` test,
+and ask a length with `.longitudo()` in a `nếu`.
+
 There are no range patterns (`trường_hợp 1‥5`). Test the range with `nếu` inside the
 arm.
 

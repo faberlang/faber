@@ -1221,7 +1221,11 @@ pattern_atom  := '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_
 # a negated number. `-` before anything else is not pattern syntax. A NaN
 # literal (`nonnumerus`) in a pattern slot is rejected: NaN never equals itself.
 negated_number := '-' NUMBER
-# Type arguments carry bounded widths and hole arguments into pattern lowering.
+# Type arguments name a generic member type (`casu lista<numerus>`). `discerne`
+# matches a closed set only (a union's members, an enum's variants), so a type
+# pattern that is not a member of the scrutinee's closed set — a length-shaped
+# collection (`lista<T, 4>`) or a numeric width (`u32` over `numerus`) — parses
+# but is rejected (`SEM010 discerne_pattern_not_in_closed_set`).
 type_pattern := IDENTIFIER type_arguments? ut_pattern?
 ut_pattern  := ('ut' IDENTIFIER) | (('fixum' | 'varia') pattern_binding (',' pattern_binding)*)
 pattern_binding := IDENTIFIER ('ut' IDENTIFIER)?

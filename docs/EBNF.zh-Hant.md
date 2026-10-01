@@ -2063,6 +2063,16 @@ A negative number pattern is written with a leading minus (`分支 -1`,
 `分支 -∞`). The lexer never signs a number, so the pattern claims the sign;
 `-` before anything else is not pattern syntax.
 
+`比對` matches a closed set and nothing else: the variants of an `列舉` or
+`分支聯集`, or the members of a union (`分支 numerus 定值 n` over
+`numerus ∪ textus`). It is not a generic "match this thing" keyword. A type
+pattern that is not a member of the scrutinee's closed set is rejected
+(`SEM010 discerne_pattern_not_in_closed_set`). That covers numeric-width
+patterns (`分支 u32` over a `numerus`) and length-shaped patterns (`分支
+lista<numerus, 4>` over a `lista<numerus>`; bounded `textus`, `ascii` and
+`octeti`; tensor figures). Ask an integer's width or range with an `是` test,
+and ask a length with `.longitudo()` in a `若`.
+
 There are no range patterns (`分支 1‥5`). Test the range with `若` inside the
 arm.
 

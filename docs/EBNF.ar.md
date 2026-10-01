@@ -2063,6 +2063,16 @@ A negative number pattern is written with a leading minus (`حالة -1`,
 `حالة -∞`). The lexer never signs a number, so the pattern claims the sign;
 `-` before anything else is not pattern syntax.
 
+`طابق` matches a closed set and nothing else: the variants of an `ترتيب` or
+`تمايز`, or the members of a union (`حالة numerus ثابت n` over
+`numerus ∪ textus`). It is not a generic "match this thing" keyword. A type
+pattern that is not a member of the scrutinee's closed set is rejected
+(`SEM010 discerne_pattern_not_in_closed_set`). That covers numeric-width
+patterns (`حالة u32` over a `numerus`) and length-shaped patterns (`حالة
+lista<numerus, 4>` over a `lista<numerus>`; bounded `textus`, `ascii` and
+`octeti`; tensor figures). Ask an integer's width or range with an `هو` test,
+and ask a length with `.longitudo()` in a `إذا`.
+
 There are no range patterns (`حالة 1‥5`). Test the range with `إذا` inside the
 arm.
 

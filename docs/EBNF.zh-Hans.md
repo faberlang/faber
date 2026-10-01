@@ -2063,6 +2063,16 @@ A negative number pattern is written with a leading minus (`情况 -1`,
 `情况 -∞`). The lexer never signs a number, so the pattern claims the sign;
 `-` before anything else is not pattern syntax.
 
+`匹配` matches a closed set and nothing else: the variants of an `枚举` or
+`判别`, or the members of a union (`情况 numerus 常量 n` over
+`numerus ∪ textus`). It is not a generic "match this thing" keyword. A type
+pattern that is not a member of the scrutinee's closed set is rejected
+(`SEM010 discerne_pattern_not_in_closed_set`). That covers numeric-width
+patterns (`情况 u32` over a `numerus`) and length-shaped patterns (`情况
+lista<numerus, 4>` over a `lista<numerus>`; bounded `textus`, `ascii` and
+`octeti`; tensor figures). Ask an integer's width or range with an `是` test,
+and ask a length with `.longitudo()` in a `如果`.
+
 There are no range patterns (`情况 1‥5`). Test the range with `如果` inside the
 arm.
 

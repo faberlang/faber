@@ -2063,6 +2063,16 @@ A negative number pattern is written with a leading minus (`กรณี -1`,
 `กรณี -∞`). The lexer never signs a number, so the pattern claims the sign;
 `-` before anything else is not pattern syntax.
 
+`แยก` matches a closed set and nothing else: the variants of an `ลำดับ` or
+`สหภาพแยก`, or the members of a union (`กรณี numerus คงที่ n` over
+`numerus ∪ textus`). It is not a generic "match this thing" keyword. A type
+pattern that is not a member of the scrutinee's closed set is rejected
+(`SEM010 discerne_pattern_not_in_closed_set`). That covers numeric-width
+patterns (`กรณี u32` over a `numerus`) and length-shaped patterns (`กรณี
+lista<numerus, 4>` over a `lista<numerus>`; bounded `textus`, `ascii` and
+`octeti`; tensor figures). Ask an integer's width or range with an `เป็น` test,
+and ask a length with `.longitudo()` in a `ถ้า`.
+
 There are no range patterns (`กรณี 1‥5`). Test the range with `ถ้า` inside the
 arm.
 
