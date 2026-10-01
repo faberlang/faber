@@ -8,6 +8,8 @@
 pub(crate) mod fragment_composition;
 pub(crate) mod fragment_instantiation;
 mod lower;
+#[cfg(feature = "device")]
+pub(crate) use lower::expand_deferred_vector_ops;
 // Emit + interpret + coverage leaves (façades re-export radix-mir-*).
 #[cfg(feature = "mir-coverage")]
 mod coverage;
@@ -325,8 +327,8 @@ mod unsigned_integer_tests;
 #[path = "vector_crea_test.rs"]
 mod vector_crea_tests;
 #[cfg(test)]
-#[path = "vector_expand_oracle_test.rs"]
-mod vector_expand_oracle_tests;
+#[path = "vector_deferral_test.rs"]
+mod vector_deferral_tests;
 
 #[cfg(test)]
 #[allow(unused_imports)]

@@ -51,12 +51,13 @@ use crate::mir::{
     MirOptionOp, MirOptionUnwrapMode, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirProgram, MirProjection,
     MirProvider, MirProviderKind, MirRuntimeCall, MirStatement, MirStatementKind, MirStructFieldDefaults,
     MirSwitchCase, MirSyntheticFunctionIdentity, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType,
-    MirTypeCheckOp, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir, dump_program,
-    instantiate_existing_generic_type, type_contains_param,
+    MirTypeCheckOp, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind, MirVectorOp, ValidatedMir,
+    dump_program, instantiate_existing_generic_type, type_contains_param,
 };
 use crate::semantic::{ConversionPair, IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId, TypeTable};
 use radix_mir::device::{MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, is_public_entry};
 use radix_mir::validate::PatchProgramError;
+use radix_mir::vector_expand::{expand_vector_ops, numeric_zero_constant};
 use radix_types::{MirCollectionOp, MirKernelBuiltin, SemanticMutability};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
@@ -105,6 +106,23 @@ pub struct MirError {
     pub issue: String,
     pub span: Span,
     pub definition_span: Option<Span>,
+}
+
+/// Expand the deferred vector ops of one executable function (every shape
+/// size already literal), recording any site that cannot expand. Every place
+/// a function becomes executable calls this, so a surviving op is a producer
+/// bug that validation rejects by name.
+pub(crate) fn expand_deferred_vector_ops(types: &TypeTable, function: &mut MirFunction, errors: &mut Vec<MirError>) {
+    errors.extend(
+        expand_vector_ops(types, function)
+            .into_iter()
+            .map(|error| MirError {
+                message: error.message,
+                issue: error.issue,
+                span: error.span,
+                definition_span: None,
+            }),
+    );
 }
 
 impl MirError {

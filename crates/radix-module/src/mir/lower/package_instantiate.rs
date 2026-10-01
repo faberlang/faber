@@ -1445,6 +1445,7 @@ fn finalize_function(
     repair_mean_shape_size_constants(types, function);
     let _ = substitute_tensor_from_flat_shape_size_constants(types, function, shape_bindings);
     let _ = substitute_shape_size_constants(types, function, shape_bindings);
+    super::expand_deferred_vector_ops(types, function, errors);
     true
 }
 

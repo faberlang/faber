@@ -176,7 +176,7 @@ impl FunctionBuilder<'_> {
             return Some(lowered);
         }
         if let Some(lowered) = self.lower_vector_method(receiver, &method_name, args, expr) {
-            return Some(lowered);
+            return lowered;
         }
         if let Some(lowered) = self.lower_matrix_method(receiver, &method_name, args, expr) {
             return Some(lowered);
@@ -567,6 +567,7 @@ impl FunctionBuilder<'_> {
             (Type::Vector(..), Type::Vector(..)) => {
                 let arg = HirCallArg { name: None, spread: false, expr: rhs.clone(), span: rhs.span };
                 self.lower_vector_method(lhs, method_name, std::slice::from_ref(&arg), expr)
+                    .flatten()
             }
             (Type::Matrix(..), Type::Matrix(..) | Type::Vector(..)) => {
                 let arg = HirCallArg { name: None, spread: false, expr: rhs.clone(), span: rhs.span };
@@ -778,206 +779,128 @@ impl FunctionBuilder<'_> {
         Some(self.runtime_call_value(MirIntrinsic::Atomic(op), lowered_args, ty, expr.span))
     }
 
+    /// Lower a vector method to one deferred [`MirIntrinsic::VectorOp`].
+    ///
+    /// Every vector method defers, at literal and symbolic widths alike: the
+    /// lane rules live in `radix_mir::vector_expand`, which runs once a
+    /// function has concrete types. The outer `Option` is `None` when the call
+    /// is not a vector method (the caller keeps resolving); `Some(None)` means
+    /// a diagnostic was recorded and the call is handled.
     fn lower_vector_method(
         &mut self,
         receiver: &HirExpression,
         method_name: &str,
         args: &[HirCallArg],
         expr: &HirExpression,
-    ) -> Option<MirOperand> {
+    ) -> Option<Option<MirOperand>> {
         let method = vector_method_kind(method_name)?;
         let receiver_ty = receiver.ty?;
-        let Type::Vector(element_ty, width) = self.normalized_type(receiver_ty).clone() else {
+        let Type::Vector(element_ty, _) = self.normalized_type(receiver_ty).clone() else {
             return None;
         };
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "vector width literal is bounded to 1..=4 by the pattern"
-        )]
-        let width = match self.types.get_index(width) {
-            IndexExpr::Literal(width @ 1..=4) => *width as u8,
-            IndexExpr::Literal(_) => {
-                self.errors
-                    .push(MirError::unsupported(expr.span, "vector method width before MIR lowering"));
-                return None;
-            }
-            _ => {
-                self.errors.push(MirError::unsupported(
-                    expr.span,
-                    "vector method with non-literal width before MIR lowering",
-                ));
-                return None;
-            }
-        };
-        let lhs = self.lower_expr_value(receiver)?;
-        let lhs = self.value_base_place(lhs, MirType::semantic(receiver_ty), receiver.span)?;
-        let elem_ty = MirType::semantic(element_ty);
         let vector_ty = MirType::semantic(receiver_ty);
-
-        if matches!(
-            method,
-            VectorMethodKind::Crea | VectorMethodKind::Longitudo | VectorMethodKind::Normalizata
-        ) {
-            if !args.is_empty() {
-                return None;
-            }
-            if matches!(method, VectorMethodKind::Crea) {
-                return Some(self.lower_vector_crea(width, element_ty, vector_ty, expr));
-            }
-            if matches!(method, VectorMethodKind::Longitudo) {
-                return Some(self.lower_vector_longitudo(lhs, width, elem_ty, expr));
-            }
-            return Some(self.lower_vector_normalizata(lhs, width, elem_ty, vector_ty, expr));
-        }
-
-        let [arg] = args else {
-            return None;
-        };
-        if matches!(method, VectorMethodKind::Swizzle) {
-            return self.lower_vector_swizzle(lhs, width, vector_ty, &arg.expr, expr);
-        }
-
-        let rhs = self.lower_expr_value(&arg.expr)?;
-        let rhs_ty = arg.expr.ty.map_or(vector_ty, MirType::semantic);
-        let rhs = self.value_base_place(rhs, rhs_ty, arg.expr.span)?;
-        match method {
-            VectorMethodKind::Elementwise(op) => {
-                Some(self.lower_vector_elementwise_op(lhs, rhs, width, op, elem_ty, vector_ty, expr))
-            }
-            VectorMethodKind::Cross => {
-                if width != 3 {
-                    self.errors
-                        .push(MirError::unsupported(expr.span, "vector cross width before MIR lowering"));
+        let (op, peer_args): (MirVectorOp, &[HirCallArg]) = match method {
+            VectorMethodKind::Crea | VectorMethodKind::Longitudo | VectorMethodKind::Normalizata => {
+                if !args.is_empty() {
                     return None;
                 }
-                Some(self.lower_vector_cross(lhs, rhs, elem_ty, vector_ty, expr))
+                let op = match method {
+                    VectorMethodKind::Crea => MirVectorOp::Crea,
+                    VectorMethodKind::Longitudo => MirVectorOp::Length,
+                    _ => MirVectorOp::Normalized,
+                };
+                (op, &[])
             }
-            VectorMethodKind::Dot => Some(self.lower_vector_dot(lhs, rhs, width, elem_ty, expr)),
-            VectorMethodKind::Swizzle => unreachable!("swizzle branch returns before vector peer lowering"),
-            VectorMethodKind::Longitudo | VectorMethodKind::Normalizata | VectorMethodKind::Crea => {
-                unreachable!("zero-arg vector methods handled above")
+            VectorMethodKind::Swizzle => {
+                let [arg] = args else {
+                    return None;
+                };
+                let Some(lanes) = self.vector_swizzle_pattern(&arg.expr, expr) else {
+                    return Some(None);
+                };
+                (MirVectorOp::Swizzle(lanes), &[])
+            }
+            VectorMethodKind::Elementwise(_) | VectorMethodKind::Cross | VectorMethodKind::Dot => {
+                if args.len() != 1 {
+                    return None;
+                }
+                let op = match method {
+                    VectorMethodKind::Elementwise(op) => MirVectorOp::Elementwise(op),
+                    VectorMethodKind::Cross => MirVectorOp::Cross,
+                    _ => MirVectorOp::Dot,
+                };
+                (op, args)
+            }
+        };
+
+        let mut operands = Vec::with_capacity(op.arity());
+        let Some(lhs) = self.lower_expr_value(receiver) else {
+            return Some(None);
+        };
+        operands.push(self.vector_operand_place(lhs, vector_ty, receiver.span));
+        if let [arg] = peer_args {
+            let Some(rhs) = self.lower_expr_value(&arg.expr) else {
+                return Some(None);
+            };
+            let rhs_ty = arg.expr.ty.map_or(vector_ty, MirType::semantic);
+            operands.push(self.vector_operand_place(rhs, rhs_ty, arg.expr.span));
+        }
+        let result_ty = if op.returns_vector() {
+            vector_ty
+        } else {
+            MirType::semantic(element_ty)
+        };
+        Some(Some(self.runtime_call_value(
+            MirIntrinsic::VectorOp(op),
+            operands,
+            result_ty,
+            expr.span,
+        )))
+    }
+
+    /// A vector operand the expander can read lanes from: a temp or an
+    /// unprojected place. Anything else (a projected place, a value, a
+    /// constant) is copied into a temp first.
+    fn vector_operand_place(&mut self, operand: MirOperand, ty: MirType, span: Span) -> MirOperand {
+        match operand {
+            MirOperand::Temp(_) => operand,
+            MirOperand::Place(ref place) if place.projections.is_empty() => operand,
+            MirOperand::Place(_) | MirOperand::Value(_) | MirOperand::Constant(_) => {
+                let temp = self.push_temp(ty, span);
+                self.assign(MirPlace::temp(temp), operand, ty, span);
+                MirOperand::Temp(temp)
             }
         }
     }
 
-    /// `||v|| = sqrt(dot(v, v))`.
-    fn lower_vector_longitudo(
-        &mut self,
-        vector: MirPlace,
-        width: u8,
-        elem_ty: MirType,
-        expr: &HirExpression,
-    ) -> MirOperand {
-        let sum_sq = self.lower_vector_dot(vector.clone(), vector, width, elem_ty, expr);
-        self.assign_temp(MirValueKind::Unary { op: MirUnOp::Sqrt, operand: sum_sq }, elem_ty, expr.span)
-    }
-
-    /// Unit vector; near-zero length (≤ 1e-6) yields the zero vector (Triga policy).
-    fn lower_vector_normalizata(
-        &mut self,
-        vector: MirPlace,
-        width: u8,
-        elem_ty: MirType,
-        vector_ty: MirType,
-        expr: &HirExpression,
-    ) -> MirOperand {
-        let length = self.lower_vector_longitudo(vector.clone(), width, elem_ty, expr);
-        let eps = MirOperand::Constant(MirConstant::Float(0.000_001));
-        let nonzero = self.assign_temp(
-            MirValueKind::Binary { op: MirBinOp::Gt, lhs: length.clone(), rhs: eps },
-            MirType::semantic(self.types.primitive(crate::semantic::Primitive::Bivalens)),
-            expr.span,
-        );
-
-        let result = self.push_temp(vector_ty, expr.span);
-        let scale_id = self.fresh_block(expr.span);
-        let zero_id = self.fresh_block(expr.span);
-        let join_id = self.fresh_block(expr.span);
-        self.terminate_current(
-            MirTerminatorKind::Branch { condition: nonzero, then_block: scale_id, else_block: zero_id },
-            expr.span,
-        );
-
-        self.switch_to(scale_id);
-        {
-            let mut fields = Vec::with_capacity(usize::from(width));
-            for lane in 0..width {
-                let lane_op = vector_lane_operand(&vector, lane);
-                let scaled = self.assign_temp(
-                    MirValueKind::Binary { op: MirBinOp::Div, lhs: lane_op, rhs: length.clone() },
-                    elem_ty,
-                    expr.span,
-                );
-                fields.push(MirAggregateItem::Operand(scaled));
-            }
-            let scaled = self.construct_temp(
-                MirAggregateKind::Vector,
-                MirAggregateFields::Ordered(fields),
-                vector_ty,
-                expr.span,
-            );
-            let value = self.new_value(MirValueKind::Operand(scaled), vector_ty, expr.span);
-            self.append_stmt(MirStatement {
-                kind: MirStatementKind::Assign { place: MirPlace::temp(result), value },
-                span: expr.span,
-            });
-            self.terminate_current(MirTerminatorKind::Goto(join_id), expr.span);
+    /// Resolve a swizzle pattern literal to source lane indices. The pattern
+    /// length and lane bounds depend on the receiver width, so the expander
+    /// checks them once the width is a literal.
+    fn vector_swizzle_pattern(&mut self, pattern_expr: &HirExpression, expr: &HirExpression) -> Option<Vec<u8>> {
+        let Some(interner) = self.context.interner else {
+            self.errors
+                .push(MirError::unsupported(expr.span, "vector swizzle interner before MIR lowering"));
+            return None;
+        };
+        let HirExpressionKind::Literal(HirLiteral::String(pattern)) = &pattern_expr.kind else {
+            self.errors.push(MirError::unsupported(
+                pattern_expr.span,
+                "vector swizzle literal before MIR lowering",
+            ));
+            return None;
+        };
+        let lanes = interner
+            .resolve(*pattern)
+            .chars()
+            .map(vector_swizzle_lane)
+            .collect::<Option<Vec<_>>>();
+        if lanes.is_none() {
+            self.errors.push(MirError::unsupported(
+                pattern_expr.span,
+                "vector swizzle lane before MIR lowering",
+            ));
         }
-
-        self.switch_to(zero_id);
-        {
-            let mut zeros = Vec::with_capacity(usize::from(width));
-            for _ in 0..width {
-                let z = self.assign_temp(
-                    MirValueKind::Operand(MirOperand::Constant(MirConstant::Float(0.0))),
-                    elem_ty,
-                    expr.span,
-                );
-                zeros.push(MirAggregateItem::Operand(z));
-            }
-            let zero = self.construct_temp(
-                MirAggregateKind::Vector,
-                MirAggregateFields::Ordered(zeros),
-                vector_ty,
-                expr.span,
-            );
-            let value = self.new_value(MirValueKind::Operand(zero), vector_ty, expr.span);
-            self.append_stmt(MirStatement {
-                kind: MirStatementKind::Assign { place: MirPlace::temp(result), value },
-                span: expr.span,
-            });
-            self.terminate_current(MirTerminatorKind::Goto(join_id), expr.span);
-        }
-
-        self.switch_to(join_id);
-        MirOperand::Temp(result)
-    }
-
-    /// `crea()` — the zero-vector constructor (OQ1): every lane is the
-    /// element zero at the receiver's admitted width. The receiver is the
-    /// declared shape; the result does not depend on its value.
-    fn lower_vector_crea(
-        &mut self,
-        width: u8,
-        element_ty: TypeId,
-        vector_ty: MirType,
-        expr: &HirExpression,
-    ) -> MirOperand {
-        let mut fields = Vec::with_capacity(usize::from(width));
-        for _ in 0..width {
-            let zero = self.assign_temp(
-                MirValueKind::Operand(MirOperand::Constant(numeric_zero_constant(element_ty, self.types))),
-                MirType::semantic(element_ty),
-                expr.span,
-            );
-            fields.push(MirAggregateItem::Operand(zero));
-        }
-        self.construct_temp(
-            MirAggregateKind::Vector,
-            MirAggregateFields::Ordered(fields),
-            vector_ty,
-            expr.span,
-        )
+        lanes
     }
 
     fn lower_matrix_method(
@@ -1739,152 +1662,6 @@ impl FunctionBuilder<'_> {
             matrix_ty,
             expr.span,
         )
-    }
-
-    fn lower_vector_elementwise_op(
-        &mut self,
-        lhs: MirPlace,
-        rhs: MirPlace,
-        width: u8,
-        op: MirBinOp,
-        elem_ty: MirType,
-        vector_ty: MirType,
-        expr: &HirExpression,
-    ) -> MirOperand {
-        let mut fields = Vec::with_capacity(width as usize);
-        for lane in 0..width {
-            let lhs = vector_lane_operand(&lhs, lane);
-            let rhs = vector_lane_operand(&rhs, lane);
-            let value = self.assign_temp(MirValueKind::Binary { op, lhs, rhs }, elem_ty, expr.span);
-            fields.push(MirAggregateItem::Operand(value));
-        }
-        self.construct_temp(
-            MirAggregateKind::Vector,
-            MirAggregateFields::Ordered(fields),
-            vector_ty,
-            expr.span,
-        )
-    }
-
-    fn lower_vector_cross(
-        &mut self,
-        lhs: MirPlace,
-        rhs: MirPlace,
-        elem_ty: MirType,
-        vector_ty: MirType,
-        expr: &HirExpression,
-    ) -> MirOperand {
-        let lanes = [(1, 2, 2, 1), (2, 0, 0, 2), (0, 1, 1, 0)];
-        let fields = lanes
-            .into_iter()
-            .map(|(lhs_a, rhs_a, lhs_b, rhs_b)| {
-                let a = self.assign_temp(
-                    MirValueKind::Binary {
-                        op: MirBinOp::Mul,
-                        lhs: vector_lane_operand(&lhs, lhs_a),
-                        rhs: vector_lane_operand(&rhs, rhs_a),
-                    },
-                    elem_ty,
-                    expr.span,
-                );
-                let b = self.assign_temp(
-                    MirValueKind::Binary {
-                        op: MirBinOp::Mul,
-                        lhs: vector_lane_operand(&lhs, lhs_b),
-                        rhs: vector_lane_operand(&rhs, rhs_b),
-                    },
-                    elem_ty,
-                    expr.span,
-                );
-                MirAggregateItem::Operand(self.assign_temp(
-                    MirValueKind::Binary { op: MirBinOp::Sub, lhs: a, rhs: b },
-                    elem_ty,
-                    expr.span,
-                ))
-            })
-            .collect();
-        self.construct_temp(
-            MirAggregateKind::Vector,
-            MirAggregateFields::Ordered(fields),
-            vector_ty,
-            expr.span,
-        )
-    }
-
-    fn lower_vector_dot(
-        &mut self,
-        lhs: MirPlace,
-        rhs: MirPlace,
-        width: u8,
-        elem_ty: MirType,
-        expr: &HirExpression,
-    ) -> MirOperand {
-        let mut products = Vec::with_capacity(width as usize);
-        for lane in 0..width {
-            let lhs = vector_lane_operand(&lhs, lane);
-            let rhs = vector_lane_operand(&rhs, lane);
-            products.push(self.assign_temp(MirValueKind::Binary { op: MirBinOp::Mul, lhs, rhs }, elem_ty, expr.span));
-        }
-        let mut acc = products.remove(0);
-        for product in products {
-            acc = self.assign_temp(
-                MirValueKind::Binary { op: MirBinOp::Add, lhs: acc, rhs: product },
-                elem_ty,
-                expr.span,
-            );
-        }
-        acc
-    }
-
-    fn lower_vector_swizzle(
-        &mut self,
-        source: MirPlace,
-        width: u8,
-        vector_ty: MirType,
-        pattern_expr: &HirExpression,
-        expr: &HirExpression,
-    ) -> Option<MirOperand> {
-        let Some(interner) = self.context.interner else {
-            self.errors
-                .push(MirError::unsupported(expr.span, "vector swizzle interner before MIR lowering"));
-            return None;
-        };
-        let HirExpressionKind::Literal(HirLiteral::String(pattern)) = &pattern_expr.kind else {
-            self.errors.push(MirError::unsupported(
-                pattern_expr.span,
-                "vector swizzle literal before MIR lowering",
-            ));
-            return None;
-        };
-        let pattern_span = pattern_expr.span;
-        let pattern = interner.resolve(*pattern);
-        if pattern.chars().count() != usize::from(width) {
-            self.errors
-                .push(MirError::unsupported(pattern_span, "vector swizzle width before MIR lowering"));
-            return None;
-        }
-
-        let mut fields = Vec::with_capacity(usize::from(width));
-        for lane in pattern.chars().map(vector_swizzle_lane) {
-            let Some(lane) = lane else {
-                self.errors
-                    .push(MirError::unsupported(pattern_span, "vector swizzle lane before MIR lowering"));
-                return None;
-            };
-            if lane >= width {
-                self.errors
-                    .push(MirError::unsupported(pattern_span, "vector swizzle lane before MIR lowering"));
-                return None;
-            }
-            fields.push(MirAggregateItem::Operand(vector_lane_operand(&source, lane)));
-        }
-
-        Some(self.construct_temp(
-            MirAggregateKind::Vector,
-            MirAggregateFields::Ordered(fields),
-            vector_ty,
-            expr.span,
-        ))
     }
 
     fn value_base_place(&mut self, operand: MirOperand, ty: MirType, span: Span) -> Option<MirPlace> {
@@ -3825,19 +3602,4 @@ fn vector_lane_operand(place: &MirPlace, lane: u8) -> MirOperand {
 
 fn matrix_cell_operand(place: &MirPlace, row: u8, column: u8) -> MirOperand {
     projected_operand(place, MirProjection::MatrixCell { row, column })
-}
-
-/// Numeric zero of a Route C element type: the default dead-slot fill when the
-/// caller does not name one with `⇥`.
-fn numeric_zero_constant(elem: TypeId, types: &TypeTable) -> MirConstant {
-    let mut ty = elem;
-    loop {
-        match types.get(ty) {
-            Type::Alias(_, inner) => ty = *inner,
-            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
-                return MirConstant::Float(0.0);
-            }
-            _ => return MirConstant::Int(0),
-        }
-    }
 }

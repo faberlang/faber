@@ -543,7 +543,7 @@ fn crea(
     let fields = (0..width)
         .map(|_| {
             b.assign_temp(
-                MirValueKind::Operand(MirOperand::Constant(zero_constant(
+                MirValueKind::Operand(MirOperand::Constant(numeric_zero_constant(
                     element.semantic_id(),
                     types,
                 ))),
@@ -554,8 +554,12 @@ fn crea(
     b.construct_vector(fields, vector)
 }
 
-/// Numeric zero of a vector element type: `0.0` for floats, `0` otherwise.
-fn zero_constant(element: TypeId, types: &TypeTable) -> MirConstant {
+/// Numeric zero of an element type: `0.0` for floats, `0` otherwise.
+///
+/// Also the lowerer's dead-slot fill for padded tensor conversions, so the
+/// rule exists once.
+#[must_use]
+pub fn numeric_zero_constant(element: TypeId, types: &TypeTable) -> MirConstant {
     match unalias(types, element) {
         Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
             MirConstant::Float(0.0)
