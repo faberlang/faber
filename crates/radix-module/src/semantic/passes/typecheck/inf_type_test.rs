@@ -230,11 +230,12 @@ fn the_faber_reemitter_keeps_inf() {
     assert_accepts(&result.diagnostics);
 }
 
-/// MIR-backed targets fail closed at their own layer: LLVM, Wasm and sexp
-/// each reject `numerus<inf>` by their unsupported-shape diagnostic.
+/// MIR-backed targets without an `inf` carrier fail closed at their own layer:
+/// LLVM and Wasm reject `numerus<inf>` by their unsupported-shape diagnostic
+/// (sexp carries `inf` since inf-U6x).
 #[test]
 fn every_mir_backend_fails_closed() {
-    for target in [Target::MirLlvm, Target::MirWasm, Target::MirSexp] {
+    for target in [Target::MirLlvm, Target::MirWasm] {
         let result = compile_for_target_and_get_result(INF_FILE, target);
         let code = result
             .diagnostics
