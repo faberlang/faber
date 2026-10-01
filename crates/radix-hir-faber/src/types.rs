@@ -143,17 +143,12 @@ impl super::FaberCodegen<'_> {
                 surface,
             ),
 
+            // Bare width marker (`u8`, `f32`, `d64`, `inf`): valid in every
+            // locale and every type position. The wrapped `numerus<u8>` /
+            // `fractus<f32>` spellings are retired (N7c); the policy words
+            // (`trapping`, `wrapping`, `saturating`) keep their own heads.
             Type::SizedNumeric(prim, width) => match prim {
-                Primitive::Numerus => format!(
-                    "{}<{}>",
-                    surface.type_surface(TypeBindingKind::Primitive(Primitive::Numerus)),
-                    width.faber_marker()
-                ),
-                // Bare width marker (`f32`): valid in every locale and every
-                // type position; the wrapped `fractus<f32>` / `float<f32>`
-                // spelling is reserved for conversio targets that carry
-                // marker arguments (see the Conversio emit arm).
-                Primitive::Fractus => width.faber_marker().to_owned(),
+                Primitive::Numerus | Primitive::Fractus => width.faber_marker().to_owned(),
                 _ => surface
                     .type_surface(TypeBindingKind::Primitive(Primitive::Ignotum))
                     .to_owned(),
@@ -597,11 +592,7 @@ impl super::FaberCodegen<'_> {
             Type::SizedNumeric(prim, width) => {
                 Self::expect_no_form_args(form)?;
                 match prim {
-                    Primitive::Numerus | Primitive::Fractus => Ok(format!(
-                        "{}<{}>",
-                        surface.type_surface(TypeBindingKind::Primitive(*prim)),
-                        width.faber_marker()
-                    )),
+                    Primitive::Numerus | Primitive::Fractus => Ok(width.faber_marker().to_owned()),
                     _ => Err(malformed_type_form(
                         "sized numeric witness carries an unsupported primitive family".to_owned(),
                     )),

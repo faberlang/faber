@@ -96,15 +96,15 @@ fn convert_shift_cast_operand_parenthesizes() {
     let source = r#"+++
 locale = "la"
 +++
-functio be4(numerus n) → lista<numerus<u8>> ⇥ textus {
-    varia lista<numerus<u8>> out ← []
-    out.appende((n ⇒ 24) ↦ numerus<u8>)
+functio be4(numerus n) → lista<u8> ⇥ textus {
+    varia lista<u8> out ← []
+    out.appende((n ⇒ 24) ↦ u8)
     redde out
 }
 "#;
     let code = convert_to_en(source);
     assert!(
-        code.contains("(n ⇒ 24) ↦ int<u8>"),
+        code.contains("(n ⇒ 24) ↦ u8"),
         "shift-cast operand must keep its grouping parens:\n{code}"
     );
     assert!(
@@ -123,20 +123,20 @@ fn convert_list_element_cast_parenthesizes() {
     let source = r#"+++
 locale = "la"
 +++
-functio casted_bytes(numerus n) → lista<numerus<u8>> {
+functio casted_bytes(numerus n) → lista<u8> {
     redde [
-        (n % 256) ∷ numerus<u8>,
-        ((n ⇒ 8) % 256) ∷ numerus<u8>
+        (n % 256) ∷ u8,
+        ((n ⇒ 8) % 256) ∷ u8
     ]
 }
 "#;
     let code = convert_to_en(source);
     assert!(
-        code.contains("(n % 256) ∷ int<u8>"),
+        code.contains("(n % 256) ∷ u8"),
         "list element cast must keep the modulo expression grouped:\n{code}"
     );
     assert!(
-        code.contains("((n ⇒ 8) % 256) ∷ int<u8>"),
+        code.contains("((n ⇒ 8) % 256) ∷ u8"),
         "list element cast must keep the shift/modulo expression grouped:\n{code}"
     );
     assert_en_output_compiles("list-element-cast.en.fab", &code);

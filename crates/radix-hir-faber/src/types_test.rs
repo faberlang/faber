@@ -166,10 +166,7 @@ fn type_to_faber_renders_primitives_lista_and_option() {
         codegen.type_to_faber(option, &names, &surface),
         "textus ∪ nihil"
     );
-    assert_eq!(
-        codegen.type_to_faber(i32_ty, &names, &surface),
-        "numerus<i32>"
-    );
+    assert_eq!(codegen.type_to_faber(i32_ty, &names, &surface), "i32");
 }
 
 #[test]
@@ -315,23 +312,23 @@ fn tensor_family_type_emit_routes_through_type_surface() {
 
     assert_eq!(
         codegen.type_to_faber(tensor, &names, &surface),
-        "TENSOR_MARKER<numerus<i32>, []>"
+        "TENSOR_MARKER<i32, []>"
     );
     assert_eq!(
         codegen.type_to_faber(vector, &names, &surface),
-        "VECTOR_MARKER<numerus<i32>, [4]>"
+        "VECTOR_MARKER<i32, [4]>"
     );
     assert_eq!(
         codegen.type_to_faber(matrix, &names, &surface),
-        "MATRIX_MARKER<numerus<i32>, [2, 2]>"
+        "MATRIX_MARKER<i32, [2, 2]>"
     );
     assert_eq!(
         codegen.type_to_faber(sparsa, &names, &surface),
-        "SPARSA_MARKER<numerus<i32>, []>"
+        "SPARSA_MARKER<i32, []>"
     );
     assert_eq!(
         codegen.type_to_faber(atomic, &names, &surface),
-        "ATOMIC_MARKER<numerus<i32>>"
+        "ATOMIC_MARKER<i32>"
     );
     assert_eq!(
         codegen.type_to_faber(intervallum, &names, &surface),

@@ -1007,6 +1007,11 @@ impl Parser {
         if self.declared_type_names.contains(source) {
             return true;
         }
+        // Bare width markers (`u8`, `f32`, `lu8`, ...) are type names in every
+        // type position; the retired `numerus<W>` spelling re-emits as them (N7c).
+        if radix_types::numeric_width::is_numeric_width_type_sugar(source) {
+            return true;
+        }
         matches!(
             source,
             "numerus"

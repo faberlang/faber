@@ -66,6 +66,28 @@ fn parses_type_pattern_atoms_and_null_member() {
     assert!(matches!(stmt.arms[1].patterns[0], Pattern::Type(_, None)));
 }
 
+/// N7c: the retired `numerus<u8>` spelling re-emits as the bare marker, so a
+/// bare width marker (and fused sugar) must be a type pattern, not a binding.
+#[test]
+fn bare_width_markers_are_type_patterns() {
+    let result = parse_ok(
+        "functio f(u8 ∪ textus u) → vacuum {\n    discerne u {\n        casu u8 fixum b { tacet }\n        casu textus { tacet }\n    }\n}",
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let body = func.body.as_ref().expect("body");
+    let StmtKind::Discerne(stmt) = &body.statements[0].kind else {
+        panic!("expected discerne statement");
+    };
+    assert!(matches!(
+        stmt.arms[0].patterns[0],
+        Pattern::Type(_, Some(_))
+    ));
+    assert!(matches!(stmt.arms[1].patterns[0], Pattern::Type(_, None)));
+}
+
 #[test]
 fn parses_width_hole_and_tensor_figure_patterns() {
     let result = parse_ok(

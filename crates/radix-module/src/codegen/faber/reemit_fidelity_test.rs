@@ -50,6 +50,33 @@ fn access_marked_parameter_forms_keep_their_inner_type() {
     assert!(emitted.contains("de li32 compact"), "{emitted}");
 }
 
+/// N7c: the wrapped long numeric forms are retired; the canonical emitter
+/// re-spells them as the bare width marker (in every type position, including a
+/// `casu` type pattern), while bare `numerus` / `fractus` stay and the policy
+/// word keeps its own spelling.
+#[test]
+fn retired_long_numeric_forms_re_emit_as_bare_markers() {
+    let source = "functio f(numerus<u8> a, fractus<f32> b, numerus n, exactus<u16> c, lista<numerus<i32>> xs, numerus<u8> ∪ textus u) → fractus<f64> {\n    discerne u {\n        casu numerus<u8> fixum v { tacet }\n        casu textus { tacet }\n    }\n    fixum numerus<d64> d ← 1\n    redde b ↦ fractus<f64>\n}\n";
+    let emitted = assert_idempotent(source);
+    for expected in [
+        "f(u8 a, f32 b, numerus n, exactus<u16> c, lista<i32> xs,",
+        "casu u8 fixum v",
+        "fixum d64 d",
+        "b ↦ f64",
+    ] {
+        assert!(emitted.contains(expected), "missing `{expected}` in:\n{emitted}");
+    }
+    for retired in [
+        "numerus<u8>",
+        "fractus<f32>",
+        "numerus<i32>",
+        "numerus<d64>",
+        "fractus<f64>",
+    ] {
+        assert!(!emitted.contains(retired), "retired `{retired}` survived:\n{emitted}");
+    }
+}
+
 fn imported_token_interface() -> FileInterface {
     let mut interface = FileInterface::new();
     interface.insert(FileExport {
@@ -254,7 +281,7 @@ locale = "la"
 
 #[test]
 fn canonical_revalidation_rejects_swapped_same_typed_sites() {
-    let source = "functio swap() → numerus {\n    fixum lista<numerus<u32>> first ← vacua\n    fixum lista<u32> second ← vacua\n    redde 0\n}\n";
+    let source = "functio swap() → numerus {\n    fixum lista<exactus<u32>> first ← vacua\n    fixum lista<u32> second ← vacua\n    redde 0\n}\n";
     let latin = crate::locale::latin_locale_pack();
     let session = Session::new(Config::default().with_locale_pack(latin.clone()));
     let prepared =
@@ -279,8 +306,8 @@ fn canonical_revalidation_rejects_swapped_same_typed_sites() {
     assert!(output.success(), "faithful source must pass: {:?}", output.diagnostics);
     let emitted = output.output.expect("faithful output").code;
     let swapped = emitted
-        .replace("lista<numerus<u32>> first", "lista<u32> first")
-        .replace("lista<u32> second", "lista<numerus<u32>> second");
+        .replace("lista<exactus<u32>> first", "lista<u32> first")
+        .replace("lista<u32> second", "lista<exactus<u32>> second");
     let diagnostic =
         super::compile::revalidate_emitted_output(&session, "swapped-sites.fab", &swapped, &analysis, &latin)
             .expect_err("swapping same-typed authored forms must fail the occurrence-aware gate");
@@ -373,10 +400,9 @@ fn conversio_via_clause_round_trips() {
     //
     // D5.7 retired top-level `fixum`; this binding moves inside `incipit`
     // (the clause spelling under test is unrelated to item vs. local scope).
-    let code =
-        assert_idempotent("incipit {\n    fixum numerus<u32> le ← |de ad be ef|[0‥4] ↦ numerus<u32> via Be\n}\n");
+    let code = assert_idempotent("incipit {\n    fixum u32 le ← |de ad be ef|[0‥4] ↦ u32 via Be\n}\n");
     assert!(
-        code.contains("↦ numerus<u32> via Be"),
+        code.contains("↦ u32 via Be"),
         "conversio hint must re-emit as a via clause:\n{code}"
     );
 }
@@ -395,9 +421,7 @@ fn littera_code_via_clause_round_trips() {
 #[test]
 fn register_target_via_clause_round_trips() {
     // A register target keeps its hint in the clause, not as a bracketed tail.
-    let code = assert_idempotent(
-        "functio out(vector<numerus<u32>, 4> v) → octeti<16> {\n    redde v ↦ octeti<16> via Le\n}\n",
-    );
+    let code = assert_idempotent("functio out(vector<u32, 4> v) → octeti<16> {\n    redde v ↦ octeti<16> via Le\n}\n");
     assert!(
         code.contains("↦ octeti<16> via Le"),
         "register hint must re-emit as a via clause:\n{code}"
@@ -412,7 +436,7 @@ fn itera_coordinates_survive_reemission() {
     // D5.7 retired top-level `fixum`; the tensor binding moves inside
     // `incipit` (the coordinate spelling under test is unrelated to scope).
     let code = assert_idempotent(
-        "incipit {\n    fixum tensor<fractus<f32>, [3]> linea ← vacua\n    itera ex linea apud [i] fixum n {\n        scribe i\n    }\n}\n",
+        "incipit {\n    fixum tensor<f32, [3]> linea ← vacua\n    itera ex linea apud [i] fixum n {\n        scribe i\n    }\n}\n",
     );
     assert!(
         code.contains("itera ex linea apud [i] fixum n"),
@@ -423,7 +447,7 @@ fn itera_coordinates_survive_reemission() {
 #[test]
 fn summa_reduction_reemits_source_shape() {
     let code = assert_idempotent(
-        "functio total(tensor<fractus<f32>, [8]> a) → fractus<f32> {\n    redde summa ex a apud [i] fixum s { redde s }\n}\n",
+        "functio total(tensor<f32, [8]> a) → f32 {\n    redde summa ex a apud [i] fixum s { redde s }\n}\n",
     );
     assert!(
         code.contains("summa ex a apud [i] fixum s"),
@@ -434,7 +458,7 @@ fn summa_reduction_reemits_source_shape() {
 #[test]
 fn extremum_coalesce_parenthesizes_binary_source() {
     let code = assert_idempotent(
-        "functio peak(tensor<fractus<f32>, [4]> row, tensor<fractus<f32>, [4]> scale) → fractus<f32> {\n    redde maxima ex (row ⊙ scale) vel 0.0\n}\n",
+        "functio peak(tensor<f32, [4]> row, tensor<f32, [4]> scale) → f32 {\n    redde maxima ex (row ⊙ scale) vel 0.0\n}\n",
     );
     assert!(
         code.contains("maxima ex (row ⊙ scale) vel 0.0"),

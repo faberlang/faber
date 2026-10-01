@@ -132,9 +132,10 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
             )
         }
 
+        // Bare width marker: the wrapped `numerus<W>` / `fractus<W>` spellings
+        // are retired (N7c).
         Type::SizedNumeric(prim, width) => match prim {
-            Primitive::Numerus => format!("numerus<{}>", width.faber_marker()),
-            Primitive::Fractus => format!("fractus<{}>", width.faber_marker()),
+            Primitive::Numerus | Primitive::Fractus => width.faber_marker().to_owned(),
             _ => "ignotum".to_owned(),
         },
 

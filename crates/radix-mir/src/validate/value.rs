@@ -652,9 +652,10 @@ fn spell_type_id(types: &TypeTable, id: TypeId, depth: u8) -> String {
             Primitive::Instans => "instans",
         }
         .to_owned(),
+        // Bare width marker: the wrapped `numerus<W>` / `fractus<W>` spellings
+        // are retired (N7c).
         Type::SizedNumeric(prim, width) => match prim {
-            Primitive::Numerus => format!("numerus<{}>", width.faber_marker()),
-            Primitive::Fractus => format!("fractus<{}>", width.faber_marker()),
+            Primitive::Numerus | Primitive::Fractus => width.faber_marker().to_owned(),
             _ => "ignotum".to_owned(),
         },
         Type::Tensor(elem, shape) => format!(

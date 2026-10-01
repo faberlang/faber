@@ -872,15 +872,15 @@ fn type_positions_pin_fixed_and_item_shape_separators() {
     );
     assert_eq!(
         codegen.type_to_faber(function, &names, &surface),
-        "(textus, numerus) → numerus<i32>"
+        "(textus, numerus) → i32"
     );
     assert_eq!(
         codegen.type_to_faber(tensor, &names, &surface),
-        "tensor<numerus<i32>, [2, 3]>"
+        "tensor<i32, [2, 3]>"
     );
     assert_eq!(
         codegen.type_to_faber(atomic, &names, &surface),
-        "atomic<numerus<i32>>"
+        "atomic<i32>"
     );
     assert_eq!(
         codegen.type_to_faber(promissum_failable, &names, &surface),
@@ -888,8 +888,8 @@ fn type_positions_pin_fixed_and_item_shape_separators() {
     );
     assert_no_trailing_separator("Result<textus, numerus>");
     assert_no_trailing_separator("iuncta<textus, numerus>");
-    assert_no_trailing_separator("(textus, numerus) → numerus<i32>");
-    assert_no_trailing_separator("tensor<numerus<i32>, [2, 3]>");
+    assert_no_trailing_separator("(textus, numerus) → i32");
+    assert_no_trailing_separator("tensor<i32, [2, 3]>");
 }
 
 #[test]

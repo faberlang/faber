@@ -18,7 +18,8 @@ use radix_hir::{
     HirExpression, HirExpressionKind, HirItem, HirItemKind, HirOwnerRef, HirTypeForm, HirTypeFormArg, HirTypeFormHead,
     HirTypeSlot,
 };
-use radix_types::{AppliedArg, Type, TypeId};
+use radix_syntax::TypeFormLevel;
+use radix_types::{AppliedArg, Primitive, Type, TypeId};
 use rustc_hash::FxHashMap;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -515,11 +516,27 @@ fn type_slot_key(slot: &HirTypeSlot) -> String {
     }
 }
 
+/// The level the canonical emitter writes for an authored form. The retired
+/// long numeric forms (`numerus<u8>` / `fractus<f32>`, LONG) re-emit as the
+/// bare width marker (SHORT), so both spellings share one fingerprint level
+/// (N7c); every other form keeps its authored level.
+fn emitted_level(analysis: &AnalyzedModule, form: &HirTypeForm, level: TypeFormLevel) -> TypeFormLevel {
+    let sized_numeric = matches!(
+        analysis.types.get(form.ty),
+        Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
+    );
+    if sized_numeric && level == TypeFormLevel::LONG {
+        TypeFormLevel::SHORT
+    } else {
+        level
+    }
+}
+
 fn type_form_signature(analysis: &AnalyzedModule, form: &HirTypeForm) -> String {
     let head = match &form.head {
         HirTypeFormHead::Semantic(level) => format!(
             "semantic(level={},shape={})",
-            level.0,
+            emitted_level(analysis, form, *level).0,
             canonical_type_shape(analysis, form.ty, &mut BTreeSet::new())
         ),
         HirTypeFormHead::Named { path, .. } => format!(

@@ -139,7 +139,7 @@ fn labeled_iuncta_elements_render_with_their_authored_labels() {
     let codegen = codegen_with_forms(&fx, vec![(site.clone(), form)]);
     assert_eq!(
         render_at(&codegen, &site, tuple_ty, &LaSurface),
-        "iuncta<gx: numerus<u32>, f32>"
+        "iuncta<gx: u32, f32>"
     );
 }
 
@@ -150,10 +150,10 @@ fn missing_presentation_falls_back_to_canonical() {
     let site = declared_site(1);
 
     // No form at the site: exact canonical/default spelling, including the
-    // presentation-absent defaults (sized fractus stays the bare width).
+    // presentation-absent defaults (sized numerics are the bare width).
     assert_eq!(
         render_at(&codegen, &site, fx.lista_u32, &LaSurface),
-        "lista<numerus<u32>>"
+        "lista<u32>"
     );
     assert_eq!(
         codegen.type_to_faber(fx.lista_u32, &FxHashMap::default(), &LaSurface),
@@ -163,7 +163,7 @@ fn missing_presentation_falls_back_to_canonical() {
 }
 
 #[test]
-fn scalar_long_and_short_stay_distinct_over_one_type_id() {
+fn scalar_long_and_short_share_the_bare_width_over_one_type_id() {
     let fx = fixture();
     let long = codegen_with_forms(
         &fx,
@@ -174,9 +174,11 @@ fn scalar_long_and_short_stay_distinct_over_one_type_id() {
     );
     let short = codegen_with_forms(&fx, vec![(declared_site(2), short_width(fx.u32_ty))]);
 
+    // The long `numerus<u32>` spelling is retired (N7c): LONG re-emits as
+    // the bare width, the same as SHORT.
     assert_eq!(
         render_at(&long, &declared_site(1), fx.u32_ty, &LaSurface),
-        "numerus<u32>"
+        "u32"
     );
     assert_eq!(
         render_at(&short, &declared_site(2), fx.u32_ty, &LaSurface),
@@ -184,9 +186,10 @@ fn scalar_long_and_short_stay_distinct_over_one_type_id() {
     );
 }
 
-/// D11.8: the explicit policy word, the long head and the bare marker stay
-/// three distinct spellings over one `TypeId`; each re-emits as authored, in
-/// both locales, and a list child keeps its own level.
+/// D11.8: the explicit policy word and the bare marker stay two distinct
+/// spellings over one `TypeId` (the retired long head re-emits as the bare
+/// marker); each re-emits as authored, in both locales, and a list child
+/// keeps its own level.
 #[test]
 fn trapping_policy_word_keeps_its_own_spelling_over_one_type_id() {
     let fx = fixture();
@@ -221,7 +224,7 @@ fn trapping_policy_word_keeps_its_own_spelling_over_one_type_id() {
     );
     assert_eq!(
         render_at(&codegen, &declared_site(3), fx.u32_ty, &EnSurface),
-        "int<u32>"
+        "u32"
     );
     assert_eq!(
         render_at(&codegen, &declared_site(4), fx.lista_u32, &EnSurface),
@@ -266,10 +269,11 @@ fn list_three_way_keeps_root_and_child_levels_exact() {
         ],
     );
 
-    // Three authored spellings over one interned `lista<u32>`.
+    // Three authored spellings over one interned `lista<u32>`; the retired
+    // long child spelling re-emits as the bare marker.
     assert_eq!(
         render_at(&codegen, &declared_site(1), fx.lista_u32, &LaSurface),
-        "lista<numerus<u32>>"
+        "lista<u32>"
     );
     assert_eq!(
         render_at(&codegen, &declared_site(2), fx.lista_u32, &LaSurface),
@@ -642,7 +646,7 @@ fn locale_projection_changes_vocabulary_and_preserves_levels() {
     // en: built-in vocabulary projects; compression levels survive.
     assert_eq!(
         render_at(&codegen, &declared_site(1), fx.lista_u32, &EnSurface),
-        "list<int<u32>>"
+        "list<u32>"
     );
     assert_eq!(
         render_at(&codegen, &declared_site(2), fx.lista_u32, &EnSurface),
@@ -650,7 +654,7 @@ fn locale_projection_changes_vocabulary_and_preserves_levels() {
     );
     assert_eq!(
         render_at(&codegen, &declared_site(3), fx.u32_ty, &EnSurface),
-        "int<u32>"
+        "u32"
     );
     assert_eq!(
         render_at(&codegen, &declared_site(4), fx.u32_ty, &EnSurface),
@@ -660,7 +664,7 @@ fn locale_projection_changes_vocabulary_and_preserves_levels() {
     // la: same forms, canonical vocabulary.
     assert_eq!(
         render_at(&codegen, &declared_site(1), fx.lista_u32, &LaSurface),
-        "lista<numerus<u32>>"
+        "lista<u32>"
     );
     assert_eq!(
         render_at(&codegen, &declared_site(2), fx.lista_u32, &LaSurface),
@@ -668,7 +672,7 @@ fn locale_projection_changes_vocabulary_and_preserves_levels() {
     );
     assert_eq!(
         render_at(&codegen, &declared_site(3), fx.u32_ty, &LaSurface),
-        "numerus<u32>"
+        "u32"
     );
     assert_eq!(
         render_at(&codegen, &declared_site(4), fx.u32_ty, &LaSurface),
@@ -708,8 +712,8 @@ fn registry_renders_special_and_sized_heads() {
         "modulus<u32>"
     );
 
-    // LONG fractus keeps its wrapped spelling; only the presentation-absent
-    // default emits the bare marker.
+    // LONG fractus re-emits as the bare marker (the wrapped spelling is
+    // retired, N7c), like the presentation-absent default.
     let fractus_long = codegen_with_forms(
         &fx,
         vec![(
@@ -719,7 +723,7 @@ fn registry_renders_special_and_sized_heads() {
     );
     assert_eq!(
         render_at(&fractus_long, &declared_site(3), fx.f32_ty, &LaSurface),
-        "fractus<f32>"
+        "f32"
     );
 }
 

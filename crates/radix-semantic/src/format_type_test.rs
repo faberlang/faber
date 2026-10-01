@@ -18,7 +18,7 @@ fn format_faber_type_renders_indexed_tensor() {
 
     let name = |_| "unused".to_owned();
     let rendered = format_faber_type(tensor, &types, &interner, &name);
-    assert_eq!(rendered, "tensor<fractus<f32>, []>");
+    assert_eq!(rendered, "tensor<f32, []>");
 }
 
 #[test]
@@ -47,7 +47,7 @@ fn format_faber_type_renders_matrix_shape() {
 
     let name = |_| "unused".to_owned();
     let rendered = format_faber_type(matrix, &types, &interner, &name);
-    assert_eq!(rendered, "matrix<fractus<f32>, [4, 4]>");
+    assert_eq!(rendered, "matrix<f32, [4, 4]>");
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn format_faber_type_renders_atomic_element() {
 
     let name = |_| "unused".to_owned();
     let rendered = format_faber_type(atomic, &types, &interner, &name);
-    assert_eq!(rendered, "atomic<numerus<i32>>");
+    assert_eq!(rendered, "atomic<i32>");
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn format_faber_type_renders_record_as_sorted_ratio() {
 
     let name = |_| "unused".to_owned();
     let rendered = format_faber_type(record, &types, &interner, &name);
-    assert_eq!(rendered, "ratio<g: fractus<f32>, w: numerus>");
+    assert_eq!(rendered, "ratio<g: f32, w: numerus>");
 }
 
 #[test]
@@ -104,7 +104,7 @@ fn format_faber_type_record_render_round_trips_through_parser() {
 
     let name = |_| "unused".to_owned();
     let rendered = format_faber_type(record, &types, &interner, &name);
-    assert_eq!(rendered, "ratio<g: fractus<f32>, w: numerus>");
+    assert_eq!(rendered, "ratio<g: f32, w: numerus>");
     let source = format!("functio f({rendered} value) → vacuum {{}}");
     let parsed = parse(lex(&source));
     assert!(
