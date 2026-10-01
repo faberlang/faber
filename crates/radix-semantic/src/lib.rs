@@ -713,28 +713,36 @@ pub fn analyze_with_cli(
         passes::air_specialize::specialize(&mut hir, &mut radix_lanes, &mut types, interner);
     }
 
-    // Named unroll: concrete-N `itera ab` → straight line, before air_purity.
-    // Skip when typecheck already failed — types on the rewritten nodes would
-    // be unreliable.
-    if !diagnostics.iter().any(SemanticError::is_error)
-        && let Err(e) = passes::air_unroll::unroll(
-            &mut hir,
-            &mut lowered.presentation,
-            &radix_lanes,
-            interner,
-            &types,
-        )
-    {
-        diagnostics.extend(e);
-    }
-
-    // Skip when typecheck already failed — admission here is decided from
-    // those same (unreliable) types, so a decline would describe a purity
-    // problem the program does not have.
-    if !diagnostics.iter().any(SemanticError::is_error)
-        && let Err(e) = passes::air_purity::check(&mut hir, &mut radix_lanes, interner, &types)
-    {
-        diagnostics.extend(e);
+    // Named unroll + AIR purity: concrete-N `itera ab` → straight line, before
+    // air_purity. Skip when typecheck already failed — types on the rewritten
+    // nodes would be unreliable, and a decline would describe a purity problem
+    // the program does not have.
+    //
+    // The Faber target re-emits authored source and never lowers this HIR to
+    // MIR or codegen, so it runs both passes on clones for their diagnostics
+    // only: the unit keeps the authored loop (the rewrite synthesizes untyped
+    // literals the source never had), while the declines stay observable.
+    if !diagnostics.iter().any(SemanticError::is_error) {
+        if config.target == Target::HirFaber {
+            let mut hir_probe = hir.clone();
+            let mut presentation_probe = lowered.presentation.clone();
+            let mut lanes_probe = radix_lanes.clone();
+            diagnostics.extend(run_air_passes(
+                &mut hir_probe,
+                &mut presentation_probe,
+                &mut lanes_probe,
+                interner,
+                &types,
+            ));
+        } else {
+            diagnostics.extend(run_air_passes(
+                &mut hir,
+                &mut lowered.presentation,
+                &mut radix_lanes,
+                interner,
+                &types,
+            ));
+        }
     }
 
     // BRI-2: construct the sole typed-HIR fact table only after both AIR
@@ -861,6 +869,28 @@ pub fn analyze_with_cli(
 }
 
 // constructor: moves all parameters into result
+/// Runs the named AIR unroll then AIR purity, returning their diagnostics.
+/// Purity runs only when unroll admitted, matching the in-place pipeline.
+fn run_air_passes(
+    hir: &mut HirModule,
+    presentation: &mut HirPresentation,
+    lanes: &mut RadixLaneMetadata,
+    interner: &mut Interner,
+    types: &TypeTable,
+) -> Vec<SemanticError> {
+    let mut diagnostics = Vec::new();
+    if let Err(e) = passes::air_unroll::unroll(hir, presentation, lanes, interner, types) {
+        diagnostics.extend(e);
+    }
+    if diagnostics.iter().any(SemanticError::is_error) {
+        return diagnostics;
+    }
+    if let Err(e) = passes::air_purity::check(hir, lanes, interner, types) {
+        diagnostics.extend(e);
+    }
+    diagnostics
+}
+
 pub(crate) fn early_semantic_result(
     types: TypeTable,
     resolver: Resolver,
@@ -1087,6 +1117,10 @@ fn register_locale_pack_type_spellings(
         }
     }
 }
+
+#[cfg(test)]
+#[path = "air_faber_target_test.rs"]
+mod air_faber_target_test;
 
 #[cfg(test)]
 #[path = "access_facts_test.rs"]
