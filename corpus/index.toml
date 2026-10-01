@@ -2395,6 +2395,12 @@ kind = "annotation"
 category = "metadata"
 
 [[files]]
+path = "discerne/closed-set-decline.fab"
+term = "discerne closed set"
+kind = "reject"
+category = "control-flow"
+
+[[files]]
 path = "discerne/discerne.fab"
 term = "discerne"
 kind = "keyword"
@@ -2409,12 +2415,6 @@ category = "control-flow"
 [[files]]
 path = "discerne/type-patterns.fab"
 term = "discerne type patterns"
-kind = "feature"
-category = "control-flow"
-
-[[files]]
-path = "discerne/width-patterns.fab"
-term = "discerne width patterns"
 kind = "feature"
 category = "control-flow"
 

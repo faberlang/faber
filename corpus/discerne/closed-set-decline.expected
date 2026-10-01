@@ -1,0 +1,3 @@
+# Reject oracle for discerne patterns outside the scrutinee's closed set.
+# Tokens: stable diagnostic identities (faber check output); one per line.
+SEM010:discerne_pattern_not_in_closed_set

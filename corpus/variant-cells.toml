@@ -858,14 +858,15 @@ required = true
 note = "N1 ruling 2+3; type-pattern predicate shares the est member rule"
 
 [[cells]]
-id = "cast.discerne-width-pattern"
+id = "cast.discerne-closed-set-decline"
 family = "casts"
-cell = "discerne bounded width pattern + family catch-all"
+cell = "REJECT: discerne width / length-shape pattern outside the closed set (SEM010 discerne_pattern_not_in_closed_set)"
 status = "direct"
-exemplum = "discerne/width-patterns.fab"
+exemplum = "discerne/closed-set-decline.fab"
 expected = true
 required = true
-note = "N2 ruling 4; bounded patterns must precede the unbounded family catch-all"
+decline = true
+note = "2026-10-02 ruling: discerne matches a closed set (union members, enum variants) only; a numeric-width or length-shape pattern is rejected, ask widths with is and lengths with .length() in an if (retires N2 ruling 4)"
 
 # decimal-width cells (decimal-widths goal D1-D4 surface; landed 2026-08-26).
 # All rows are required (new grammar surface): the D64 marker (D32 was
