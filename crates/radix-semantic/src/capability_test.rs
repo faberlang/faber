@@ -468,7 +468,7 @@ fn solved_indexed_identity_fails_closed_for_unspecified_and_inferred_shapes() {
     let unspecified = table.intern_index(IndexExpr::Unspecified);
     let infer = table.intern_index(IndexExpr::Infer(IndexVar(3)));
     let inferred_vector = table.vector_with_width(num, infer);
-    let inferred_tensor = table.tensor_with_shape(num, infer);
+    let _inferred_tensor = table.tensor_with_shape(num, infer);
     let unspecified_tensor = table.tensor_with_shape(num, unspecified);
     let queries = table_queries(table);
 

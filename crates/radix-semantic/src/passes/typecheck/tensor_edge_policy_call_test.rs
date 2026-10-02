@@ -1,7 +1,16 @@
 //! Shifted tensor optionality and limes policy admission.
 
+fn analyze_english(source: &str) -> crate::test_support::AnalyzedFixture {
+    let pack =
+        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("English locale pack");
+    let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
+    config.locale_pack = Some(pack);
+    crate::test_support::analyze_source_with_config(source, config)
+}
+
 fn accepts(source: &str) {
-    let result = crate::test_support::analyze_source(source);
+    let result = analyze_english(source);
     assert!(
         result.is_ok(),
         "expected source to typecheck: {:?}",
@@ -10,11 +19,8 @@ fn accepts(source: &str) {
 }
 
 fn rejects_with_issue(source: &str, issue: &str) {
-    let result = crate::test_support::analyze_source(source);
-    assert!(
-        !result.is_ok(),
-        "expected source to fail typechecking"
-    );
+    let result = analyze_english(source);
+    assert!(!result.is_ok(), "expected source to fail typechecking");
     assert!(
         result
             .diagnostics

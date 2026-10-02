@@ -4,7 +4,12 @@ use crate::ResolvedTensorEdgePolicy;
 use radix_types::BuiltinTensorEdgePolicy;
 
 fn analyze(source: &str) -> crate::test_support::AnalyzedFixture {
-    crate::test_support::analyze_source(source)
+    let pack =
+        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("English locale pack");
+    let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
+    config.locale_pack = Some(pack);
+    crate::test_support::analyze_source_with_config(source, config)
 }
 
 fn rejects_with_issue(source: &str, issue: &str) {
@@ -31,7 +36,7 @@ fn tensor_seed() -> &'static str {
 #[test]
 fn one_hop_forwarding_discharges_builtin_policy() {
     let result = analyze(&format!(
-        "fn forward<P>(tf32[3] base) → tf32[3] {{\n    return base.shift([1]).limes<P>()\n}}\nmain {{\n{}\nconst tf32[3] mapped ← forward<wrap>(base)\n}}",
+        "fn forward<P>(tf32[3] base) → tf32[3] {{\n    return base.shift([1]).limes<P>().materialize()\n}}\nmain {{\n{}\nconst tf32[3] mapped ← forward<wrap>(base)\n}}",
         tensor_seed()
     ));
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
@@ -47,7 +52,7 @@ fn one_hop_forwarding_discharges_builtin_policy() {
 #[test]
 fn two_hop_forwarding_propagates_and_discharges_the_same_obligation() {
     let result = analyze(&format!(
-        "fn inner<P>(tf32[3] base) → tf32[3] {{\n    return base.shift([1]).limes<P>()\n}}\nfn middle<Q>(tf32[3] base) → tf32[3] {{\n    return inner<Q>(base)\n}}\nfn outer<R>(tf32[3] base) → tf32[3] {{\n    return middle<R>(base)\n}}\nmain {{\n{}\nconst tf32[3] mapped ← outer<reflect>(base)\n}}",
+        "fn inner<P>(tf32[3] base) → tf32[3] {{\n    return base.shift([1]).limes<P>().materialize()\n}}\nfn middle<Q>(tf32[3] base) → tf32[3] {{\n    return inner<Q>(base)\n}}\nfn outer<R>(tf32[3] base) → tf32[3] {{\n    return middle<R>(base)\n}}\nmain {{\n{}\nconst tf32[3] mapped ← outer<reflect>(base)\n}}",
         tensor_seed()
     ));
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
@@ -63,7 +68,7 @@ fn two_hop_forwarding_propagates_and_discharges_the_same_obligation() {
 #[test]
 fn generic_method_forwarding_keeps_the_method_definition_identity() {
     let result = analyze(&format!(
-        "class Router {{\n    fn forward<P>(tf32[3] base) → tf32[3] {{\n        return base.shift([1]).limes<P>()\n    }}\n}}\nmain {{\n{}\nconst Router router ← Router {{}}\nconst tf32[3] mapped ← router.forward<wrap>(base)\n}}",
+        "class Router {{\n    fn forward<P>(tf32[3] base) → tf32[3] {{\n        return base.shift([1]).limes<P>().materialize()\n    }}\n}}\nmain {{\n{}\nconst Router router ← Router {{}}\nconst tf32[3] mapped ← router.forward<wrap>(base)\n}}",
         tensor_seed()
     ));
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
@@ -83,7 +88,7 @@ fn generic_method_forwarding_keeps_the_method_definition_identity() {
 #[test]
 fn forwarded_custom_policy_retains_checked_callback_identities() {
     let result = analyze(&format!(
-        "class ZeroGhost {{\n    fn remap(vector<int, 1> coord) → vector<int, 1> {{ return coord }}\n    fn transform(vector<int, 1> coord, f32 value) → f32 {{ return value }}\n}}\nfn forward<P>(tf32[3] base) → tf32[3] {{\n    return base.shift([1]).limes<P>()\n}}\nmain {{\n{}\nconst tf32[3] mapped ← forward<ZeroGhost>(base)\n}}",
+        "class ZeroGhost {{\n    fn remap(vector<int, 1> coord) → vector<int, 1> {{ return coord }}\n    fn transform(vector<int, 1> coord, f32 value) → f32 {{ return value }}\n}}\nfn forward<P>(tf32[3] base) → tf32[3] {{\n    return base.shift([1]).limes<P>().materialize()\n}}\nmain {{\n{}\nconst tf32[3] mapped ← forward<ZeroGhost>(base)\n}}",
         tensor_seed()
     ));
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);

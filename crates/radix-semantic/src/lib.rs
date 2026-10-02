@@ -1126,8 +1126,13 @@ fn register_locale_pack_type_spellings(
         if matches!(binding.kind, TypeBindingKind::Frame(_)) {
             continue;
         }
+        let canonical_policy_identity = match binding.kind {
+            TypeBindingKind::TensorEdgePolicy(policy) => Some(policy.latin()),
+            _ => None,
+        };
         let spellings = std::iter::once(binding.canonical.as_str())
-            .chain(binding.aliases.iter().map(String::as_str));
+            .chain(binding.aliases.iter().map(String::as_str))
+            .chain(canonical_policy_identity);
         for spelling in spellings {
             let name = interner.intern(spelling);
             if resolver.lookup_type(name).is_some() {

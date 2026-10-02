@@ -363,18 +363,17 @@ fn affine_record_field_size_binding_uses_formal_axes_and_checks_repeats() {
         .and_then(|rows| rows.first())
         .expect("generic size should be witnessed by the first formal axis");
     assert_eq!(size_binding.parameter, 0);
+    let IndexExpr::Affine { base, offset: 1 } = checker.types.get_index(size_binding.witness)
+    else {
+        panic!("generic size witness should add one to the first field axis");
+    };
     assert!(matches!(
-        checker.types.get_index(size_binding.witness),
-        IndexExpr::Affine {
-            base,
-            offset: 1
-        } if matches!(checker.types.get_index(*base), IndexExpr::Runtime(
-            RuntimeExtentId::FunctionParameterFieldAxis {
-                parameter: 0,
-                fields,
-                axis: 0
-            } if fields.as_slice() == &[grid]
-        ))
+        checker.types.get_index(*base),
+        IndexExpr::Runtime(RuntimeExtentId::FunctionParameterFieldAxis {
+            parameter: 0,
+            fields,
+            axis: 0
+        }) if fields.as_slice() == &[grid]
     ));
     let relations = checker
         .shape_obligations

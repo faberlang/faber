@@ -5,6 +5,10 @@
 //! expected surface syntax.
 
 use super::{format_figura, lower_figura_expr};
+use crate::figura::{
+    FIGURA_ARITHMETIC_DIVIDE_BY_ZERO_MSG, FIGURA_ARITHMETIC_NEGATIVE_MSG,
+    FIGURA_ARITHMETIC_NON_INTEGRAL_MSG,
+};
 use crate::index::{IndexExpr, IndexVar};
 use crate::{Resolver, TypeTable};
 use radix_lexer::Interner;
@@ -76,24 +80,21 @@ fn lower_figura_arithmetic_checks_static_naturals_and_division() {
         &resolver,
         &mut types,
     );
-    assert_eq!(negative, Err(super::FIGURA_ARITHMETIC_NEGATIVE_MSG));
+    assert_eq!(negative, Err(FIGURA_ARITHMETIC_NEGATIVE_MSG));
 
     let non_integral = lower_figura_expr(
         &FiguraExpr::Divide(Box::new(FiguraExpr::Literal(5)), 2),
         &resolver,
         &mut types,
     );
-    assert_eq!(non_integral, Err(super::FIGURA_ARITHMETIC_NON_INTEGRAL_MSG));
+    assert_eq!(non_integral, Err(FIGURA_ARITHMETIC_NON_INTEGRAL_MSG));
 
     let zero_divisor = lower_figura_expr(
         &FiguraExpr::Divide(Box::new(FiguraExpr::Literal(5)), 0),
         &resolver,
         &mut types,
     );
-    assert_eq!(
-        zero_divisor,
-        Err(super::FIGURA_ARITHMETIC_DIVIDE_BY_ZERO_MSG)
-    );
+    assert_eq!(zero_divisor, Err(FIGURA_ARITHMETIC_DIVIDE_BY_ZERO_MSG));
 
     let exact = lower_figura_expr(
         &FiguraExpr::Divide(Box::new(FiguraExpr::Literal(6)), 2),
@@ -120,7 +121,7 @@ fn lower_figura_arithmetic_checks_static_naturals_and_division() {
     );
     assert_eq!(
         lower_figura_expr(&canceled_division, &resolver, &mut types),
-        Err(super::FIGURA_ARITHMETIC_NON_INTEGRAL_MSG),
+        Err(FIGURA_ARITHMETIC_NON_INTEGRAL_MSG),
         "affine cancellation must not erase an exact-division obligation"
     );
 }
