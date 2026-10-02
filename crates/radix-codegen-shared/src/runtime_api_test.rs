@@ -421,6 +421,37 @@ fn the_go_exact_rows_spell_as_the_flat_rt_names() {
 }
 
 #[test]
+fn the_go_tensor_vector_and_sparsa_rows_spell_as_the_flat_rt_names() {
+    for ns in [Namespace::Tensor, Namespace::Vector, Namespace::Sparsa] {
+        let go_rows: Vec<&RuntimeItem> = TABLE
+            .iter()
+            .filter(|row| row.ns == ns && row.targets.contains(&Target::HirGo))
+            .collect();
+        // Every shaped carrier has its type row; none is a store row.
+        assert_eq!(
+            go_rows
+                .iter()
+                .filter(|row| row.kind == RuntimeKind::Type)
+                .count(),
+            1,
+            "{ns:?}"
+        );
+        assert!(go_rows.iter().all(|row| row.kind != RuntimeKind::StoreFn));
+    }
+    for (row, spelled) in [
+        (&TENSOR_TENSOR, "rt.TensorTensor"),
+        (&TENSOR_ELEMENT_COUNT, "rt.TensorElementCount"),
+        (&TENSOR_TO_SPARSA, "rt.TensorToSparsa"),
+        (&VECTOR_VECTOR, "rt.VectorVector"),
+        (&VECTOR_FROM_LIST, "rt.VectorFromList"),
+        (&SPARSA_SPARSA, "rt.SparsaSparsa"),
+        (&SPARSA_NEW, "rt.SparsaNew"),
+    ] {
+        assert_eq!(spell_any(Target::HirGo, row), spelled);
+    }
+}
+
+#[test]
 fn the_go_dec_rows_spell_as_the_flat_rt_names() {
     let go_rows: Vec<&RuntimeItem> = TABLE
         .iter()

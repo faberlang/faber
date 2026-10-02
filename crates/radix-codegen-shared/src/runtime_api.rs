@@ -347,6 +347,41 @@ pub const FORMAT_SCI: RuntimeItem = format_row("sci", RuntimeKind::Fn, FORMAT_RU
 pub const FORMAT_SIGNED: RuntimeItem = format_row("signed", RuntimeKind::Fn, FORMAT_GO);
 pub const FORMAT_TEXT: RuntimeItem = format_row("text", RuntimeKind::Fn, FORMAT_RUST_GO);
 
+/// The targets whose runtime package carries a `tensor`, `vector` or `sparsa`
+/// row. Only the Go runtime (`rt.Tensor*`, `rt.Vector*`, `rt.Sparsa*`,
+/// `faber/runtime/go/{tensor,vector,sparsa}.go`) carries them on this table
+/// today.
+const SHAPED_GO: &[Target] = &[Target::HirGo];
+
+const fn shaped_row(ns: Namespace, name: &'static str, kind: RuntimeKind) -> RuntimeItem {
+    RuntimeItem {
+        ns,
+        name,
+        kind,
+        targets: SHAPED_GO,
+    }
+}
+
+/// `tensor`, `vector` and `sparsa` rows (T1-G7): the shaped-numeric carriers of
+/// the Go runtime. A carrier is a type; its operations (`Addita`, `Matmul`,
+/// `Productum`, `Densata`, ...) are methods of that type, carrying the Latin
+/// method names the call sites already use, so they are not table rows. The
+/// rows are the three carrier types plus the four free functions a call site
+/// names: the element count a shape implies (checked before building a recovery
+/// tensor), the dense-to-sparse conversion, the width-checked vector
+/// constructor and the sparse vacua constructor. No row applies a width limit:
+/// a carrier computes in its element type and never stores into a bounded cell.
+pub const TENSOR_TENSOR: RuntimeItem = shaped_row(Namespace::Tensor, "Tensor", RuntimeKind::Type);
+pub const TENSOR_ELEMENT_COUNT: RuntimeItem =
+    shaped_row(Namespace::Tensor, "element_count", RuntimeKind::Fn);
+pub const TENSOR_TO_SPARSA: RuntimeItem =
+    shaped_row(Namespace::Tensor, "to_sparsa", RuntimeKind::Fn);
+pub const VECTOR_VECTOR: RuntimeItem = shaped_row(Namespace::Vector, "Vector", RuntimeKind::Type);
+pub const VECTOR_FROM_LIST: RuntimeItem =
+    shaped_row(Namespace::Vector, "from_list", RuntimeKind::Fn);
+pub const SPARSA_SPARSA: RuntimeItem = shaped_row(Namespace::Sparsa, "Sparsa", RuntimeKind::Type);
+pub const SPARSA_NEW: RuntimeItem = shaped_row(Namespace::Sparsa, "new", RuntimeKind::Fn);
+
 /// The targets whose runtime package carries each `regex` row. Rows differ by
 /// target: the Rust runtime carries the match operations as free functions in
 /// `faber::regex`, the Go runtime carries a constructor plus methods, the Swift
@@ -584,6 +619,13 @@ pub const TABLE: &[RuntimeItem] = &[
     FORMAT_SCI,
     FORMAT_SIGNED,
     FORMAT_TEXT,
+    TENSOR_TENSOR,
+    TENSOR_ELEMENT_COUNT,
+    TENSOR_TO_SPARSA,
+    VECTOR_VECTOR,
+    VECTOR_FROM_LIST,
+    SPARSA_SPARSA,
+    SPARSA_NEW,
     REGEX_MATCHES,
     REGEX_FIND,
     REGEX_FIND_ALL,
