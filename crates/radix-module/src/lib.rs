@@ -154,6 +154,10 @@ pub enum Output {
     /// Haskell backend output.
     Haskell(HaskellOutput),
 
+    /// Novelty Free Pascal backend output (default-off `hir-pascal` feature).
+    #[cfg(feature = "hir-pascal")]
+    Pascal(PascalOutput),
+
     /// Canonical Faber source output.
     Faber(FaberOutput),
 
@@ -213,6 +217,13 @@ pub struct PythonOutput {
 /// Haskell backend output.
 pub struct HaskellOutput {
     /// Complete generated Haskell source.
+    pub code: String,
+}
+
+/// Novelty Free Pascal backend output.
+#[cfg(feature = "hir-pascal")]
+pub struct PascalOutput {
+    /// Complete generated Free Pascal program.
     pub code: String,
 }
 
