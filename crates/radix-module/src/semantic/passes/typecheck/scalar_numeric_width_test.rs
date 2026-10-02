@@ -469,22 +469,21 @@ functio add(modulus<u32> x, modulus<u32> y) → modulus<u32> {
 
 #[cfg(all(feature = "mir-metal", feature = "mir-wgsl"))]
 #[test]
-fn metal_and_wgsl_reject_modular_word_kernels_before_emit() {
+fn metal_and_wgsl_emit_u32_modular_word_kernels() {
+    // K15 implements the 32-bit modular word on both device leaves, so the
+    // old modular-word rejection no longer applies to `modulus<u32>`.
     let source = r"
 @ nucleum
+@ publica
 functio wordAdd(modulus<u32> value) → modulus<u32> {
     redde value + 1
 }
 ";
     for target in [Target::MirMetal, Target::MirWgsl] {
         let result = test_support::compile_for_target_and_get_result(source, target);
-        assert!(!result.success(), "{target:?} unexpectedly accepted a modular word kernel");
         assert!(
-            result.diagnostics.iter().any(|diagnostic| diagnostic
-                .args
-                .iter()
-                .any(|arg| arg.name == "issue" && arg.value == "modular_word_target_unsupported")),
-            "{target:?} diagnostics: {:?}",
+            result.success(),
+            "{target:?} modulus<u32> kernel diagnostics: {:?}",
             result.diagnostics
         );
     }
@@ -514,11 +513,13 @@ fn go_wasm_and_llvm_accept_every_modular_width() {
 
 #[cfg(all(feature = "mir-metal", feature = "mir-wgsl"))]
 #[test]
-fn metal_and_wgsl_reject_every_modular_width_kernel_with_stable_issue() {
-    const WIDTHS: [&str; 4] = ["u8", "u16", "u32", "u64"];
+fn metal_and_wgsl_reject_unimplemented_modular_widths_with_stable_issue() {
+    // Only the 32-bit modular word is implemented on the device leaves; the
+    // other widths fail closed through the per-target requirement gate.
+    const WIDTHS: [&str; 3] = ["u8", "u16", "u64"];
     for width in WIDTHS {
         let source = format!(
-            "@ nucleum\nfunctio wordAdd(modulus<{width}> value) → modulus<{width}> {{\n    redde value + 1\n}}\n"
+            "@ nucleum\n@ publica\nfunctio wordAdd(modulus<{width}> value) → modulus<{width}> {{\n    redde value + 1\n}}\n"
         );
         for target in [Target::MirMetal, Target::MirWgsl] {
             let result = test_support::compile_for_target_and_get_result(&source, target);
@@ -527,7 +528,7 @@ fn metal_and_wgsl_reject_every_modular_width_kernel_with_stable_issue() {
                 result.diagnostics.iter().any(|diagnostic| diagnostic
                     .args
                     .iter()
-                    .any(|arg| arg.name == "issue" && arg.value == "modular_word_target_unsupported")),
+                    .any(|arg| arg.name == "issue" && arg.value == "kernel_target_requirements_not_met")),
                 "{target:?} modulus<{width}> diagnostics: {:?}",
                 result.diagnostics
             );
