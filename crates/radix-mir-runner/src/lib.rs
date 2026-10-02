@@ -1982,6 +1982,17 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         }
                         Ok(Value::Array(cell))
                     }
+                    Value::Vector(lanes) => {
+                        let idx = index.as_index(span)?;
+                        {
+                            let mut borrow = lanes.borrow_mut();
+                            let slot = borrow.get_mut(idx).ok_or_else(|| {
+                                RunnerError::internal(span, "array index out of bounds")
+                            })?;
+                            *slot = assigned;
+                        }
+                        Ok(Value::Vector(lanes))
+                    }
                     Value::Map(cell) => {
                         let key = index.to_key(span)?;
                         cell.borrow_mut().insert(key, assigned);
@@ -2736,3 +2747,7 @@ mod remainder_floor_test;
 #[cfg(test)]
 #[path = "tensor_lift_test.rs"]
 mod tensor_lift_test;
+
+#[cfg(test)]
+#[path = "vector_lane_select_test.rs"]
+mod vector_lane_select_test;

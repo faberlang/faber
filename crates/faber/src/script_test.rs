@@ -152,3 +152,56 @@ fn run_source_surfaces_runner_errors() {
     let error = run_source("@ future\nfn bad() { }\n", &mut host).expect_err("invalid async fails");
     assert!(matches!(error, RunSourceError::Stepper(_)));
 }
+
+// VEC-5b: a run-time index on a `vector<T, N>` is a checked lane select. The
+// loop runs the in-range lanes; an index past the width ends the run with the
+// same runner failure an out-of-range `lista` index produces (the
+// checked-index law), after the lines printed before the trap.
+
+fn runner_failure_issue(source: &str) -> (Vec<String>, String) {
+    let mut host = BufferHost::default();
+    let error = run_source(source, &mut host).expect_err("the run ends on the index trap");
+    let RunSourceError::Stepper(errors) = error else {
+        panic!("expected a runner failure, got a frontend failure");
+    };
+    let issue = errors.first().expect("one runner failure").issue.clone();
+    (host.stdout_lines, issue)
+}
+
+#[test]
+fn vector_runtime_index_sums_the_lanes_then_traps_like_a_lista() {
+    let (printed, vector_issue) = runner_failure_issue(
+        r"
+fn lane(vector<f32, 3> v, int i) → f32 {
+    return v[i]
+}
+
+main {
+    const vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    var f32 sum ← 0.0
+    var int i ← 0
+    while i < 3 {
+        sum ← sum + lane(v, i)
+        i ← i + 1
+    }
+    print sum
+    print lane(v, 3)
+}
+",
+    );
+    assert_eq!(printed, vec!["6.0".to_owned()]);
+
+    let (_, lista_issue) = runner_failure_issue(
+        r"
+fn item(list<f32> xs, int i) → f32 {
+    return xs[i]
+}
+
+main {
+    const list<f32> xs ← [1.0, 2.0, 3.0]
+    print item(xs, 3)
+}
+",
+    );
+    assert_eq!(vector_issue, lista_issue);
+}

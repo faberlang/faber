@@ -3500,6 +3500,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .cloned()
                     .ok_or_else(|| RunnerError::internal(span, "array index out of bounds"))
             }
+            // A run-time lane select: the checked-index law (the failure is the
+            // out-of-range `lista` index failure, text included).
+            Value::Vector(lanes) => {
+                let idx = index.as_index(span)?;
+                lanes
+                    .borrow()
+                    .get(idx)
+                    .cloned()
+                    .ok_or_else(|| RunnerError::internal(span, "array index out of bounds"))
+            }
             Value::Tuple(elems) => {
                 let idx = index.as_index(span)?;
                 elems

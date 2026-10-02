@@ -592,6 +592,44 @@ pub(super) fn reject_static_bounded_index_oob(
     }
 }
 
+/// Check the index of a vector lane access `v[k]`.
+///
+/// A constant lane outside the literal width is provably out of bounds (the
+/// shared index-bounds family). A run-time index is the checked lane select:
+/// it is bounds-checked when the value runs, exactly like a `lista` index, so
+/// there is nothing to reject here. A symbolic width cannot be bounds-checked
+/// here either; the lowered projection is validated against the concrete width.
+pub(super) fn check_vector_lane_index(
+    checker: &mut TypeChecker<'_>,
+    receiver_ty: TypeId,
+    index: &HirExpression,
+) {
+    let resolved = checker.resolve_inferred_type(receiver_ty);
+    let (_, payload) = checker.types.peel_access_marker(resolved);
+    let Type::Vector(_, width) = checker.types.get(payload).clone() else {
+        return;
+    };
+    let Some(lane) = crate::passes::const_int_value(index) else {
+        return;
+    };
+    let width = checker.resolve_index(width);
+    let IndexExpr::Literal(bound) = checker.types.get_index(width) else {
+        return;
+    };
+    let bound = *bound;
+    if lane < 0 || u128::try_from(lane).map_or(true, |lane| lane >= u128::from(bound)) {
+        checker.invalid_operand_types_with_args(
+            ISSUE_PROVABLY_OUT_OF_BOUNDS,
+            index.span,
+            &[
+                ("index", lane.to_string()),
+                ("bound", bound.to_string()),
+                ("axis", "0".to_owned()),
+            ],
+        );
+    }
+}
+
 fn static_tensor_bounds(checker: &mut TypeChecker<'_>, shape: IndexId) -> Vec<u64> {
     let shape = checker.resolve_index(shape);
     match checker.types.get_index(shape).clone() {

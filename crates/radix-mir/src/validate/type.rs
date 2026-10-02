@@ -351,6 +351,20 @@ impl Validator<'_, '_> {
                     }
                 }
             }
+            // A run-time lane select on a vector register value: lane `i` when
+            // `0 <= i < N`, the checked-index failure otherwise (the constant
+            // lane is `VectorLane`).
+            Type::Vector(element, _) => {
+                if let Some((_, index_ty)) = index {
+                    self.require_assignable(
+                        index_ty,
+                        self.primitive(Primitive::Numerus),
+                        span,
+                        "vector lane index is not numerus",
+                    );
+                }
+                Some(MirType::semantic(element))
+            }
             Type::Tensor(inner, _) => {
                 if let Some((_, index_ty)) = index {
                     self.require_device_view_index(index_ty, span);
@@ -555,11 +569,13 @@ impl Validator<'_, '_> {
             MirLayoutKind::DeviceVector(vector) => {
                 if !matches!(
                     projection,
-                    MirProjection::Field(_) | MirProjection::VectorLane(_)
+                    MirProjection::Field(_)
+                        | MirProjection::VectorLane(_)
+                        | MirProjection::Index(_)
                 ) {
                     self.error(
                         span,
-                        "device vector projection must be a swizzle field or lane",
+                        "device vector projection must be a swizzle field, lane, or lane select",
                     );
                 }
                 let Ok(result_layout) = self.context.layouts.layout_for_type(result_ty) else {

@@ -74,9 +74,39 @@ impl FunctionBuilder<'_> {
             return self.lower_tensor_bracket_get(object, index, expr);
         }
         let mut place = self.lower_projectable_place(object)?;
-        let index = self.lower_expr_value(index)?;
-        place.projections.push(MirProjection::Index(index));
+        let projection = self.lower_index_projection(object.ty, index)?;
+        place.projections.push(projection);
         Some(MirOperand::Place(place))
+    }
+
+    /// The projection of `base[index]`.
+    ///
+    /// A vector is a register value, never a storage buffer. A constant lane
+    /// is the `VectorLane` projection swizzle uses; a run-time index stays an
+    /// `Index` projection on the vector base, which MIR defines as the checked
+    /// lane select (the checked-index law: `0 <= i < N`, else the same failure
+    /// as an out-of-range `lista` index).
+    pub(super) fn lower_index_projection(
+        &mut self,
+        base_ty: Option<TypeId>,
+        index: &HirExpression,
+    ) -> Option<MirProjection> {
+        if base_ty.is_some_and(|ty| self.is_vector_lane_base(ty))
+            && let Some(lane) = crate::semantic::passes::const_int_value(index).and_then(|lane| u8::try_from(lane).ok())
+        {
+            return Some(MirProjection::VectorLane(lane));
+        }
+        Some(MirProjection::Index(self.lower_expr_value(index)?))
+    }
+
+    /// Whether `ty`, under access markers, aliases, and one optional layer
+    /// (the base of `v![k]`), is a `vector<T, N>`.
+    fn is_vector_lane_base(&self, ty: TypeId) -> bool {
+        let mut ty = self.types.peel_access_marker(ty).1;
+        if let Some(inner) = self.types.nullable_inner(ty) {
+            ty = inner;
+        }
+        matches!(self.normalized_type(ty), Type::Vector(..))
     }
 
     /// Lower a tensor bracket read (`tensor[`idx`]`) as a `TensorGet` collection
@@ -178,8 +208,8 @@ impl FunctionBuilder<'_> {
             }
             HirExpressionKind::Index(object, index) => {
                 let mut place = self.lower_projectable_place(object)?;
-                let index = self.lower_expr_value(index)?;
-                place.projections.push(MirProjection::Index(index));
+                let projection = self.lower_index_projection(object.ty, index)?;
+                place.projections.push(projection);
                 Some(place)
             }
             _ => {
@@ -253,8 +283,8 @@ impl FunctionBuilder<'_> {
                 Some(MirOperand::Place(place))
             }
             HirNonNullKind::Index(index) => {
-                let index = self.lower_expr_value(index)?;
-                place.projections.push(MirProjection::Index(index));
+                let projection = self.lower_index_projection(object.ty, index)?;
+                place.projections.push(projection);
                 Some(MirOperand::Place(place))
             }
             HirNonNullKind::Call(args) => {

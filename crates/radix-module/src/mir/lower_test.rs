@@ -6933,3 +6933,62 @@ incipit {
         ]
     );
 }
+
+// ──────────────────────────────────────────────────────────────────────
+// VEC-5a: a constant index on a vector is a lane projection, never an Index
+// projection (a vector is a register value, not a storage buffer).
+// ──────────────────────────────────────────────────────────────────────
+
+const VECTOR_LANE_SOURCE: &str = r"
+functio lane(vector<f32, 3> v) → f32 {
+    redde v[1]
+}
+functio asserted(vector<f32, 3> ∪ nihil v) → f32 {
+    redde v![2]
+}
+functio write(vector<f32, 3> v) → vector<f32, 3> {
+    varia vector<f32, 3> u ← v
+    u[0] ← 4.0
+    redde u
+}
+";
+
+#[test]
+fn vector_constant_index_lowers_to_a_lane_projection() {
+    let dump = dump_source(VECTOR_LANE_SOURCE);
+    for lane in ["lane1", "lane2", "lane0"] {
+        assert!(dump.contains(&format!(".{lane}")), "missing .{lane} in:\n{dump}");
+    }
+    assert!(
+        !dump.contains("[1]") && !dump.contains("[2]"),
+        "vector lane lowered as Index:\n{dump}"
+    );
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// VEC-5b: a run-time index on a vector is the checked lane select, an Index
+// projection on the vector base (a constant lane stays VectorLane).
+// ──────────────────────────────────────────────────────────────────────
+
+const VECTOR_LANE_SELECT_SOURCE: &str = r"
+functio pick(vector<f32, 3> v, numerus i) → f32 {
+    redde v[i]
+}
+functio store(numerus i) → vector<f32, 3> {
+    varia vector<f32, 3> u ← [0.0, 0.0, 0.0] ↦ vector<f32, 3>
+    u[i] ← 4.0
+    redde u
+}
+";
+
+#[test]
+fn vector_runtime_index_lowers_to_an_index_projection_on_the_vector() {
+    let dump = dump_source(VECTOR_LANE_SELECT_SOURCE);
+    for projection in ["return _0[_1]", "_1[_0] = "] {
+        assert!(
+            dump.contains(projection),
+            "run-time vector index did not lower to an Index projection ({projection}):\n{dump}"
+        );
+    }
+    assert!(!dump.contains(".lane"), "run-time index became a constant lane:\n{dump}");
+}

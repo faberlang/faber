@@ -860,7 +860,9 @@ impl TypeChecker<'_> {
             }
             radix_hir::HirNonNullKind::Index(index) => {
                 let idx_ty = self.check_expr_allowing_direct_intervallum_step(index);
-                self.check_index_from_type(inner_ty, idx_ty, object.span, index.span)
+                let result = self.check_index_from_type(inner_ty, idx_ty, object.span, index.span);
+                super::tensor_index::check_vector_lane_index(self, inner_ty, index);
+                result
             }
             radix_hir::HirNonNullKind::Call(args) => {
                 self.check_call_from_type(inner_ty, &[], args, span)
@@ -901,7 +903,9 @@ impl TypeChecker<'_> {
             }
             radix_hir::HirOptionalChainKind::Index(index) => {
                 let idx_ty = self.check_expr_allowing_direct_intervallum_step(index);
-                self.check_index_from_type(inner_ty, idx_ty, object.span, index.span)
+                let result = self.check_index_from_type(inner_ty, idx_ty, object.span, index.span);
+                super::tensor_index::check_vector_lane_index(self, inner_ty, index);
+                result
             }
             radix_hir::HirOptionalChainKind::Call(args) => {
                 self.check_call_from_type(inner_ty, &[], args, span)
@@ -931,6 +935,7 @@ impl TypeChecker<'_> {
         };
         let result = self.check_index_from_type(obj_ty, idx_ty, object.span, index.span);
         super::tensor_index::reject_static_bounded_index_oob(self, obj_ty, index);
+        super::tensor_index::check_vector_lane_index(self, obj_ty, index);
         self.reject_static_octeti_index_oob(object, index);
         result
     }
@@ -1047,6 +1052,7 @@ impl TypeChecker<'_> {
             return self.check_tuple_index(&elements, index, object.span, index.span, idx_ty);
         }
         let result = self.check_index_from_type(obj_ty, idx_ty, object.span, index.span);
+        super::tensor_index::check_vector_lane_index(self, obj_ty, index);
         self.reject_static_octeti_index_oob(object, index);
         result
     }

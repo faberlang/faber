@@ -688,17 +688,24 @@ fn batched_matmul_argument_rank_above_receiver_rejects() {
 
 // --- S0-G8: vector lane access ---
 
+// A lane yields the element at literal and parametric widths alike, constant
+// or run-time (the run-time lane is the checked lane select, VEC-5b).
 #[test]
 fn vector_bracket_index_yields_element_at_literal_width() {
     accepts(
-        r"functio lane(vector<f32, 3> v, numerus i) → f32 {
-    redde v[i]
+        r"functio lane(vector<f32, 3> v) → f32 {
+    redde v[2]
 }",
     );
 }
 
 #[test]
 fn vector_bracket_index_yields_element_at_parametric_width() {
+    accepts(
+        r"functio lane<magnitudo N>(vector<f32, N> v) → f32 {
+    redde v[0]
+}",
+    );
     accepts(
         r"functio lane<magnitudo N>(vector<f32, N> v, numerus i) → f32 {
     redde v[i]
@@ -758,5 +765,40 @@ fn batched_masked_softmax_non_broadcast_mask_rejects() {
     nota probabilities.longitudo()
 }",
         "incompatible_tensor_index",
+    );
+}
+
+#[test]
+fn vector_constant_lane_index_accepts_in_bounds() {
+    accepts(
+        r"incipit {
+  fixum vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+  fixum f32 a ← v[2]
+  nota a
+}",
+    );
+}
+
+#[test]
+fn vector_constant_lane_index_rejects_provable_oob_and_negative() {
+    for index in ["3", "-1"] {
+        rejects_with_issue(
+            &format!(
+                r"incipit {{
+  fixum vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+  nota v[{index}]
+}}"
+            ),
+            "index_provably_out_of_bounds",
+        );
+    }
+}
+
+#[test]
+fn vector_runtime_lane_index_is_a_checked_lane_select() {
+    accepts(
+        r"functio lane(vector<f32, 3> v, numerus i) → f32 {
+  redde v[i]
+}",
     );
 }

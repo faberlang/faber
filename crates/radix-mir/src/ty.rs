@@ -216,7 +216,11 @@ pub fn index_projection_result_ty(
     types: &TypeTable,
 ) -> Result<MirType, MirTypeError> {
     match types.get(base_ty.semantic_id()) {
-        Type::Array(inner) | Type::Tensor(inner, _) => Ok(MirType::semantic(*inner)),
+        // A run-time lane select on a vector register value (the constant lane
+        // is the `VectorLane` projection).
+        Type::Array(inner) | Type::Tensor(inner, _) | Type::Vector(inner, _) => {
+            Ok(MirType::semantic(*inner))
+        }
         Type::Map(_, value) => Ok(MirType::semantic(*value)),
         Type::Primitive(Primitive::Textus) => {
             Ok(MirType::semantic(types.primitive(Primitive::Textus)))
