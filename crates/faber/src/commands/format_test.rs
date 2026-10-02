@@ -779,7 +779,7 @@ pub(crate) const HOOK_SOURCE: &str = "+++\nlocale = \"en\"\n+++\ndescribe \"hook
 
 /// A top-level statement beside an explicit `main`: analysis rejects it
 /// (`SEM008:top_level_statement_beside_entry`) before format can drop it.
-const BESIDE_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nconst int aetas = 25\n\nif aetas within 0‥100 {\n    print \"in range\"\n}\n\nmain {\n    print \"main\"\n}\n";
+const BESIDE_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nconst int aetas = 25\n\nif aetas ∈ 0‥100 {\n    print \"in range\"\n}\n\nmain {\n    print \"main\"\n}\n";
 
 /// The hook fixture without the hook: nothing is lost, so format succeeds.
 const CONTROL_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nconst int aetas = 25\n\ndescribe \"plain\" {\n    test \"sample\" {\n        assert true\n    }\n}\n\nmain {\n    print \"main\"\n}\n";

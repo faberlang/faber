@@ -3607,7 +3607,7 @@ fn lowers_inter_membership_to_collection_contains() {
     let dump = dump_source(
         r#"
 functio validum(textus status) → bivalens {
-    redde status inter ["pending", "active"]
+    redde status ∈ ["pending", "active"]
 }
 "#,
     );

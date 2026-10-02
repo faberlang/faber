@@ -1304,9 +1304,9 @@ fn dynamic_collection_invalid_conversion_uses_structured_context_args() {
 
 #[test]
 fn intervallum_invalid_operand_uses_structured_issue_arg() {
-    // The Faber range membership operator is `intra`, and the range operator is `‥`
+    // The Faber range membership operator is `∈`, and the range operator is `‥`
     test_support::assert_rejects_with_issue(
-        "incipit { nota \"text\" intra 0‥3 }",
+        "incipit { nota \"text\" ∈ 0‥3 }",
         "range_operand_must_be_numeric",
     );
 }

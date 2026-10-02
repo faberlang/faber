@@ -47,7 +47,7 @@ fn count(inv: &Inventory, suite: &str, construct: &str) -> usize {
 #[test]
 fn counts_top_level_statement_kinds() {
     let inv = inventory_of(
-        "const int a = 1\nif a within 0‥10 {\n    print \"x\"\n}\nif a within 0‥10 {\n    print \"y\"\n}\nmain {}\n",
+        "const int a = 1\nif a ∈ 0‥10 {\n    print \"x\"\n}\nif a ∈ 0‥10 {\n    print \"y\"\n}\nmain {}\n",
     );
     assert_eq!(count(&inv, "", "top:var"), 1);
     assert_eq!(count(&inv, "", "top:si"), 2);
@@ -97,7 +97,7 @@ fn lost_reports_a_missing_hook() {
 
 #[test]
 fn lost_reports_a_missing_top_level_statement() {
-    let source = inventory_of("const int a = 1\nif a within 0‥10 {\n    print \"x\"\n}\nmain {}\n");
+    let source = inventory_of("const int a = 1\nif a ∈ 0‥10 {\n    print \"x\"\n}\nmain {}\n");
     let output = inventory_of("const int a = 1\nmain {}\n");
     let found = lost(&source, &output);
     assert_eq!(found.len(), 1);
