@@ -1524,25 +1524,7 @@ impl TypeChecker<'_> {
             HirBinOp::Between => {
                 let lhs_ty = self.check_expr(lhs);
                 let rhs_ty = self.check_expr(rhs);
-                match self.types.get(self.resolve_inferred_type(rhs_ty)) {
-                    Type::Array(elem) | Type::Set(elem) => {
-                        self.unify_assign_issue(
-                            lhs_ty,
-                            *elem,
-                            lhs.span,
-                            MEMBERSHIP_OPERAND_TYPE_MISMATCH,
-                        );
-                    }
-                    Type::Map(key, _) => {
-                        self.unify_assign_issue(
-                            lhs_ty,
-                            *key,
-                            lhs.span,
-                            MEMBERSHIP_OPERAND_TYPE_MISMATCH,
-                        );
-                    }
-                    _ => {}
-                }
+                self.check_membership_rhs(lhs_ty, rhs_ty, lhs.span, rhs.span);
                 self.bool_type()
             }
             HirBinOp::Coalesce => unreachable!("coalesce is handled before eager rhs checking"),
@@ -2297,6 +2279,55 @@ impl TypeChecker<'_> {
     }
 }
 
+impl TypeChecker<'_> {
+    /// The right-operand rule of keyword membership (`between` / `inter`).
+    ///
+    /// After peeling aliases and access markers the right operand must be a
+    /// `lista` (bounded or not), a `copia`, a `tabula` (membership by key) or
+    /// `textus` / `ascii` (bounded or not; substring containment, which the
+    /// keyword form keeps until it retires). Every other resolved type is
+    /// rejected with `membership_requires_collection`, carrying the right
+    /// operand's type as `found`. An unresolved right operand (inference
+    /// variable, union hole, marker hole, error type) is left alone: the
+    /// unresolved-operand diagnostic belongs to the unit that adds it.
+    pub(super) fn check_membership_rhs(
+        &mut self,
+        lhs_ty: TypeId,
+        rhs_ty: TypeId,
+        lhs_span: radix_lexer::Span,
+        rhs_span: radix_lexer::Span,
+    ) {
+        let (_, payload) = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(rhs_ty));
+        let payload = self.resolve_inferred_type(payload);
+        match self.types.get(payload).clone() {
+            Type::Array(elem) | Type::Set(elem) | Type::BoundedArray { element: elem, .. } => {
+                self.unify_assign_issue(lhs_ty, elem, lhs_span, MEMBERSHIP_OPERAND_TYPE_MISMATCH);
+            }
+            Type::Map(key, _) => {
+                self.unify_assign_issue(lhs_ty, key, lhs_span, MEMBERSHIP_OPERAND_TYPE_MISMATCH);
+            }
+            Type::Primitive(Primitive::Textus | Primitive::Ascii)
+            | Type::BoundedTextus { .. }
+            | Type::BoundedAscii { .. } => {
+                let text = self.textus_type();
+                self.unify_assign_issue(lhs_ty, text, lhs_span, MEMBERSHIP_OPERAND_TYPE_MISMATCH);
+            }
+            Type::Infer(_) | Type::InferUnion(_) | Type::MarkerHole { .. } | Type::Error => {}
+            _ => {
+                let found = self.format_type_for_diagnostic(rhs_ty);
+                self.error_issue_with_args(
+                    SemanticErrorKind::TypeMismatch,
+                    MEMBERSHIP_REQUIRES_COLLECTION,
+                    rhs_span,
+                    &[("found", found)],
+                );
+            }
+        }
+    }
+}
+
 pub(super) fn is_numeric_literal(expr: &HirExpression) -> bool {
     match &expr.kind {
         HirExpressionKind::Literal(
@@ -2363,6 +2394,7 @@ const EQUALITY_EXACT_TYPES_REQUIRED: &str = "equality_exact_types_required";
 const COMMON_TYPE_MISMATCH: &str = "common_type_mismatch";
 const ASSIGNMENT_TYPE_MISMATCH: &str = "assignment_type_mismatch";
 const MEMBERSHIP_OPERAND_TYPE_MISMATCH: &str = "membership_operand_type_mismatch";
+const MEMBERSHIP_REQUIRES_COLLECTION: &str = "membership_requires_collection";
 const COALESCE_FALLBACK_TYPE_MISMATCH: &str = "coalesce_fallback_type_mismatch";
 const BOOLEAN_OPERANDS_REQUIRED: &str = "boolean_operands_required";
 const INTEGER_OPERANDS_REQUIRED: &str = "integer_operands_required";

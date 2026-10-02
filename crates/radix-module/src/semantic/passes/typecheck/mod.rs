@@ -24,6 +24,10 @@ mod scalar_numeric_width_test;
 mod intervallum_test;
 
 #[cfg(test)]
+#[path = "membership_test.rs"]
+mod membership_test;
+
+#[cfg(test)]
 #[path = "bounded_textus_test.rs"]
 mod bounded_textus_test;
 
