@@ -211,318 +211,320 @@ ratio_type ::= 'ratio' '<' labeled_type_argument (',' labeled_type_argument)* '>
 # [100] hole_type
 hole_type ::= '_'
 # [101] qualified_type
-qualified_type ::= IDENTIFIER ('.' IDENTIFIER)*
-# [102] type_arguments
+qualified_type ::= type_head ('.' IDENTIFIER)*
+# [102] type_head
+type_head ::= IDENTIFIER | '模数'
+# [103] type_arguments
 type_arguments ::= '<' type_argument (',' type_argument)* '>'
-# [103] type_argument
+# [104] type_argument
 type_argument ::= labeled_type_argument | type_annotation | NATURAL | '[' figura_list? ']'
-# [104] labeled_type_argument
+# [105] labeled_type_argument
 labeled_type_argument ::= IDENTIFIER ':' type_annotation
-# [105] width_type_sugar
+# [106] width_type_sugar
 width_type_sugar ::= WIDTH_MARKER | LISTA_WIDTH_SUGAR | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix? | MATRIX_WIDTH_SUGAR shape_suffix
-# [106] shape_suffix
+# [107] shape_suffix
 shape_suffix ::= '[' figura_list? ']'
-# [107] figura
+# [108] figura
 figura ::= '_' | NATURAL | IDENTIFIER | '[' figura_list? ']'
-# [108] figura_list
+# [109] figura_list
 figura_list ::= figura (',' figura)*
-# [109] function_type
+# [110] function_type
 function_type ::= '(' type_list? ')' '→' type_annotation alternate_exit_clause?
-# [110] type_list
+# [111] type_list
 type_list ::= type_annotation (',' type_annotation)*
-# [111] si_stmt
+# [112] si_stmt
 si_stmt ::= '如果' si_tail
-# [112] si_tail
+# [113] si_tail
 si_tail ::= expression arm ('否则如果' si_tail | secus_clause)?
-# [113] secus_clause
+# [114] secus_clause
 secus_clause ::= '否则' else_arm
-# [114] arm
+# [115] arm
 arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [115] else_arm
+# [116] else_arm
 else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [116] dum_stmt
+# [117] dum_stmt
 dum_stmt ::= '当' expression (block_stmt | ergo_joint statement) cape_clause?
-# [117] itera_stmt
+# [118] itera_stmt
 itera_stmt ::= '遍历' ('取自' expression (',' expression)* | '借自' expression | '范围' expression (',' expression)*) apud_clause? ('常量' | '变量') itera_binding (block_stmt | ergo_joint statement) cape_clause?
-# [118] itera_binding
+# [119] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
-# [119] apud_clause
+# [120] apud_clause
 apud_clause ::= '于' '[' IDENTIFIER (',' IDENTIFIER)* ']'
-# [120] elige_stmt
+# [121] elige_stmt
 elige_stmt ::= '选择' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
-# [121] casu_elige_clause
+# [122] casu_elige_clause
 casu_elige_clause ::= '情况' expression (block_stmt | ergo_joint statement)
-# [122] ceterum_clause
+# [123] ceterum_clause
 ceterum_clause ::= '默认' (block_stmt | ergo_joint statement)
-# [123] discerne_stmt
+# [124] discerne_stmt
 discerne_stmt ::= '匹配' '全部'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
-# [124] discriminants
+# [125] discriminants
 discriminants ::= subject_path ('且' subject_path)*
-# [125] subject_path
+# [126] subject_path
 subject_path ::= IDENTIFIER ('.' IDENTIFIER)*
-# [126] casu_variant_clause
+# [127] casu_variant_clause
 casu_variant_clause ::= '情况' patterns (block_stmt | ergo_joint statement)
-# [127] patterns
+# [128] patterns
 patterns ::= pattern ('且' pattern)*
-# [128] pattern
+# [129] pattern
 pattern ::= pattern_atom ('或' pattern_atom)*
-# [129] pattern_atom
+# [130] pattern_atom
 pattern_atom ::= '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_pattern?)
-# [130] negated_number
+# [131] negated_number
 negated_number ::= '-' NUMBER
-# [131] type_pattern
+# [132] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
-# [132] ut_pattern
+# [133] ut_pattern
 ut_pattern ::= ('作为' IDENTIFIER) | (('常量' | '变量') pattern_binding (',' pattern_binding)*)
-# [133] pattern_binding
+# [134] pattern_binding
 pattern_binding ::= IDENTIFIER ('作为' IDENTIFIER)?
-# [134] custodi_stmt
+# [135] custodi_stmt
 custodi_stmt ::= '守护' '{' si_guard_clause+ '}'
-# [135] si_guard_clause
+# [136] si_guard_clause
 si_guard_clause ::= '如果' expression (block_stmt | ergo_joint statement)
-# [136] ex_stmt
+# [137] ex_stmt
 ex_stmt ::= '取自' expression ('常量' | '变量') extract_fields
-# [137] extract_fields
+# [138] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
-# [138] extract_field
+# [139] extract_field
 extract_field ::= IDENTIFIER ('作为' IDENTIFIER)?
-# [139] ceteri_field
+# [140] ceteri_field
 ceteri_field ::= '其余' IDENTIFIER
-# [140] redde_stmt
+# [141] redde_stmt
 redde_stmt ::= '返回' expression?
-# [141] reddet_stmt
+# [142] reddet_stmt
 reddet_stmt ::= '等返' expression
-# [142] tacebit_stmt
+# [143] tacebit_stmt
 tacebit_stmt ::= '等弃' expression
-# [143] cede_stmt
+# [144] cede_stmt
 cede_stmt ::= '让出' expression
-# [144] rumpe_stmt
+# [145] rumpe_stmt
 rumpe_stmt ::= '中断'
-# [145] perge_stmt
+# [146] perge_stmt
 perge_stmt ::= '继续'
-# [146] tacet_stmt
+# [147] tacet_stmt
 tacet_stmt ::= '静默'
-# [147] iace_stmt
+# [148] iace_stmt
 iace_stmt ::= iace_expr | iace_guarded_expr
-# [148] iace_expr
+# [149] iace_expr
 iace_expr ::= ('抛错' | '崩溃') expression
-# [149] iace_guarded_expr
+# [150] iace_guarded_expr
 iace_guarded_expr ::= ('抛错' | '崩溃') expression NO_NEWLINE '如果' expression
-# [150] cape_clause
+# [151] cape_clause
 cape_clause ::= '捕获' IDENTIFIER block_stmt
-# [151] adfirma_stmt
+# [152] adfirma_stmt
 adfirma_stmt ::= '断言' expression ('崩溃' expression)?
-# [152] requirit_stmt
+# [153] requirit_stmt
 requirit_stmt ::= '需求' expression '抛错' expression
-# [153] reice_stmt
+# [154] reice_stmt
 reice_stmt ::= '拒绝' expression '抛错' expression
-# [154] expression
+# [155] expression
 expression ::= assignment
-# [155] transfer
+# [156] transfer
 transfer ::= ternary ('⇇' ternary)*
-# [156] assignment
+# [157] assignment
 assignment ::= transfer ('←' assignment | '↤' assignment inline_default?)?
-# [157] inc_dec_stmt
+# [158] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
-# [158] place
+# [159] place
 place ::= call_expr
-# [159] ternary
+# [160] ternary
 ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
-# [160] aut_expr
+# [161] aut_expr
 aut_expr ::= et_expr (('或') et_expr)*
-# [161] et_expr
+# [162] et_expr
 et_expr ::= equality (('且') equality)*
-# [162] equality
+# [163] equality
 equality ::= comparison equality_tail*
-# [163] equality_tail
+# [164] equality_tail
 equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉') comparison | ('是' | '非' '是') type_annotation
-# [164] comparison
+# [165] comparison
 comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | '∈' | '∉') format_expr)*
-# [165] format_expr
+# [166] format_expr
 format_expr ::= bitwise_or_expr ('¶' STRING)?
-# [166] bitwise_or_expr
+# [167] bitwise_or_expr
 bitwise_or_expr ::= bitwise_xor_expr ('∨' bitwise_xor_expr)*
-# [167] bitwise_xor_expr
+# [168] bitwise_xor_expr
 bitwise_xor_expr ::= bitwise_and_expr ('⊻' bitwise_and_expr)*
-# [168] bitwise_and_expr
+# [169] bitwise_and_expr
 bitwise_and_expr ::= shift_expr ('∧' shift_expr)*
-# [169] shift_expr
+# [170] shift_expr
 shift_expr ::= range_expr (('⇐' | '⇒') range_expr)*
-# [170] range_expr
+# [171] range_expr
 range_expr ::= additive_expr range_tail?
-# [171] range_tail
+# [172] range_tail
 range_tail ::= ('‥' | '…' | '迄' | '到') additive_expr ('步' additive_expr)?
-# [172] additive_expr
+# [173] additive_expr
 additive_expr ::= multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
-# [173] multiplicative_expr
+# [174] multiplicative_expr
 multiplicative_expr ::= vel_expr (('*' | '/' | '÷' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
-# [174] vel_expr
+# [175] vel_expr
 vel_expr ::= unary_expr ('兜底' vel_rhs)*
-# [175] vel_rhs
+# [176] vel_rhs
 vel_rhs ::= unary_expr vel_range_tail?
-# [176] vel_range_tail
+# [177] vel_range_tail
 vel_range_tail ::= ('‥' | '…' | '迄' | '到') unary_expr ('步' unary_expr)?
-# [177] unary_expr
+# [178] unary_expr
 unary_expr ::= ('-' | '¬' | '非') unary_expr | finge_expr | cast_expr
-# [178] gradient_expr
+# [179] gradient_expr
 gradient_expr ::= call_expr ('∇' gradient_selection?)?
-# [179] gradient_selection
+# [180] gradient_selection
 gradient_selection ::= '[' gradient_place (',' gradient_place)* ']'
-# [180] gradient_place
+# [181] gradient_place
 gradient_place ::= expression
-# [181] cast_expr
+# [182] cast_expr
 cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)* inline_default?
-# [182] conversio_expr
+# [183] conversio_expr
 conversio_expr ::= '↦' (type_annotation | interval_target) via_clause? inline_default?
-# [183] interval_target
+# [184] interval_target
 interval_target ::= range_expr
-# [184] via_clause
+# [185] via_clause
 via_clause ::= '经由' IDENTIFIER
-# [185] inline_default
+# [186] inline_default
 inline_default ::= '⊥' unary_expr
-# [186] call_expr
+# [187] call_expr
 call_expr ::= primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
-# [187] call_suffix
+# [188] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
-# [188] member_suffix
+# [189] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
-# [189] transpose_suffix
+# [190] transpose_suffix
 transpose_suffix ::= 'ᵀ'
-# [190] optional_suffix
+# [191] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
-# [191] non_null_suffix
+# [192] non_null_suffix
 non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
-# [192] argument_list
+# [193] argument_list
 argument_list ::= (argument (',' argument)*)?
-# [193] argument
+# [194] argument
 argument ::= template_argument | '展开'? expression
-# [194] template_argument
+# [195] template_argument
 template_argument ::= '展开'? IDENTIFIER ':' expression
-# [195] literal
+# [196] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '真' | '假' | '皆无' | '∞' | 'nan'
-# [196] primary
+# [197] primary
 primary ::= IDENTIFIER | literal | '自身' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | summa_expr | extrema_expr | capta_expr | '(' expression ')'
-# [197] ad_expr
+# [198] ad_expr
 ad_expr ::= '调用' ASCII_STRING ad_opener?
-# [198] ad_opener
+# [199] ad_opener
 ad_opener ::= '(' expression ')'
-# [199] array_literal
+# [200] array_literal
 array_literal ::= '[' argument_list? ']'
-# [200] iuncta_expr
+# [201] iuncta_expr
 iuncta_expr ::= '元组' type_arguments '[' argument_list? ']'
-# [201] json_literal
+# [202] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
-# [202] json_member
+# [203] json_member
 json_member ::= STRING ':' json_value
-# [203] typed_constructor
+# [204] typed_constructor
 typed_constructor ::= type_annotation '{' field_list? '}' construction_source?
-# [204] field_list
+# [205] field_list
 field_list ::= field_init (',' field_init)*
-# [205] field_init
+# [206] field_init
 field_init ::= (field_key '=' expression) | IDENTIFIER
-# [206] field_key
+# [207] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
-# [207] construction_source
+# [208] construction_source
 construction_source ::= '取自' call_expr
-# [208] json_value
+# [209] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
-# [209] json_object
+# [210] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
-# [210] json_array
+# [211] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
-# [211] json_string
+# [212] json_string
 json_string ::= STRING
-# [212] json_number
+# [213] json_number
 json_number ::= NUMBER
-# [213] finge_expr
+# [214] finge_expr
 finge_expr ::= '构造' qualified_ident ('{' field_list? '}')? ('∷' type_annotation)?
-# [214] qualified_ident
+# [215] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
-# [215] praefixum_expr
+# [216] praefixum_expr
 praefixum_expr ::= '前缀' block_stmt
-# [216] scriptum_expr
+# [217] scriptum_expr
 scriptum_expr ::= '格式化' '(' STRING (',' expression)* ')'
-# [217] lege_expr
+# [218] lege_expr
 lege_expr ::= '读取' '行'?
-# [218] first_match_expr
+# [219] first_match_expr
 first_match_expr ::= '首个匹配' '(' expression apud_clause? ',' '其中' IDENTIFIER block_stmt ')'
-# [219] summa_expr
+# [220] summa_expr
 summa_expr ::= '求和' '取自' expression apud_clause? filum_clause? ('常量' | '变量') IDENTIFIER block_stmt
-# [220] filum_clause
+# [221] filum_clause
 filum_clause ::= '线程' IDENTIFIER
-# [221] extrema_expr
+# [222] extrema_expr
 extrema_expr ::= ('最大' | '最小') '取自' expression apud_clause? extrema_identity?
-# [222] extrema_identity
+# [223] extrema_identity
 extrema_identity ::= '兜底' expression
-# [223] capta_expr
+# [224] capta_expr
 capta_expr ::= '陷阱' block_stmt
-# [224] object_pattern
+# [225] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [225] pattern_property
+# [226] pattern_property
 pattern_property ::= '其余'? IDENTIFIER ('作为' IDENTIFIER)?
-# [226] array_pattern
+# [227] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [227] array_pattern_element
+# [228] array_pattern_element
 array_pattern_element ::= '_' | '其余'? IDENTIFIER
-# [228] nota_stmt
+# [229] nota_stmt
 nota_stmt ::= ('显示' | '查看' | '警告' | '写入') expression (',' expression)*
-# [229] entry_header
+# [230] entry_header
 entry_header ::= ('参数' IDENTIFIER)? ('退出' expression)?
-# [230] incipit_stmt
+# [231] incipit_stmt
 incipit_stmt ::= '入口' entry_header block_stmt
-# [231] incipiet_stmt
+# [232] incipiet_stmt
 incipiet_stmt ::= '异步入口' entry_header block_stmt
-# [232] probandum_decl
+# [233] probandum_decl
 probandum_decl ::= '验题' STRING proba_modifier* '{' probandum_body '}'
-# [233] probandum_body
+# [234] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [234] proba_stmt
+# [235] proba_stmt
 proba_stmt ::= '测试' STRING proba_modifier* block_stmt
-# [235] proba_modifier
+# [236] proba_modifier
 proba_modifier ::= '预期失败' | '跳过' STRING | '预期' STRING | '仅' | '标签' STRING | '时限' NATURAL | '计量' | '重复' NATURAL | '易碎' NATURAL | '仅于' STRING
-# [236] praepara_block
+# [237] praepara_block
 praepara_block ::= ('备置' | '异步备置' | '收尾' | '异步收尾') '全部'? block_stmt
-# [237] fac_stmt
+# [238] fac_stmt
 fac_stmt ::= '执行' block_stmt cape_clause? ('当' expression)?
-# [238] IDENTIFIER
+# [239] IDENTIFIER
 IDENTIFIER ::=
-# [239] NUMBER
+# [240] NUMBER
 NUMBER ::=
-# [240] NATURAL
+# [241] NATURAL
 NATURAL ::=
-# [241] STRING
+# [242] STRING
 STRING ::=
-# [242] ASCII_STRING
+# [243] ASCII_STRING
 ASCII_STRING ::=
-# [243] BACKTICK_STRING
+# [244] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [244] OCTETI_STRING
+# [245] OCTETI_STRING
 OCTETI_STRING ::=
-# [245] NEWLINE
+# [246] NEWLINE
 NEWLINE ::=
-# [246] WIDTH_MARKER
+# [247] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [247] LISTA_WIDTH_SUGAR
+# [248] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [248] TENSOR_WIDTH_SUGAR
+# [249] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [249] SPARSA_WIDTH_SUGAR
+# [250] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [250] VECTOR_WIDTH_SUGAR
+# [251] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [251] MATRIX_WIDTH_SUGAR
+# [252] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [252] FRONTMATTER_DELIMITER
+# [253] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [253] TOML_LINES
+# [254] TOML_LINES
 TOML_LINES ::=
-# [254] ANNOTATION_NAME
+# [255] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [255] ANNOTATION_FIELD_NAME
+# [256] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [256] NON_NEWLINE_TOKEN
+# [257] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [257] NO_NEWLINE
+# [258] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -651,6 +653,7 @@ NO_NEWLINE ::=
 | [`ratio_type`](#ratio-type) | `#ratio-type` | live |
 | [`hole_type`](#hole-type) | `#hole-type` | live |
 | [`qualified_type`](#qualified-type) | `#qualified-type` | live |
+| [`type_head`](#type-head) | `#type-head` | live |
 | [`type_arguments`](#type-arguments) | `#type-arguments` | live |
 | [`type_argument`](#type-argument) | `#type-argument` | live |
 | [`labeled_type_argument`](#labeled-type-argument) | `#labeled-type-argument` | live |
@@ -891,6 +894,7 @@ productions. It is not a second keyword authority.
 | Expression | `最大` | maximum reduction (en `max from`) |
 | Testing | `计量` | benchmark |
 | Expression | `最小` | minimum reduction (en `min from`) |
+| Type | `模数` | modular-word policy type head (en `wrapping`) |
 | Diagnostics | `警告` | warn |
 | Error | `崩溃` | panic |
 | Declarations | `名称` | import binding name |
@@ -1116,7 +1120,7 @@ constants (evaluated in dependency order, so a constant may be used before its
 declaration — a cycle is `constant_cycle`, SEM007); and
 collection literals (`lista`, tuples, map construction) whose elements are
 constants (only their scalar leaves fold). Anything else is
-`constant_initializer_not_constant` (SEM060). Decimal widths and `modulus<W>`/`saturatus<W>` values are
+`constant_initializer_not_constant` (SEM060). Decimal widths and `模数<W>`/`saturatus<W>` values are
 not folded, so arithmetic on them is not a compile-time constant today.
 Compile-time integer arithmetic is checked (overflow and division by zero are
 compile errors: `constant_arithmetic_overflow`, `constant_division_by_zero`),
@@ -1528,10 +1532,10 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | `littera`  | en `char`; one Unicode scalar value (D10.1–10.2): a 4-byte value that never allocates (Rust `char`, Go `rune`). Element of `textus` / `ascii` iteration and of `textus[i]` / `ascii[i]` indexing. Grapheme clusters are norma library work, not this type. |
 | `forma`    | captured template + params |
 | `numerus`  | integer (default `i64`) |
-| `modulus<W>` | en `wrapping<W>`; modular word, signed or unsigned (N7e); a store reduces modulo 2^W |
+| `模数<W>` | en `wrapping<W>`; modular word, signed or unsigned (N7e); a store reduces modulo 2^W |
 | `saturatus<W>` | en `saturating<W>`; saturating integer; a store clamps at both ends of W |
 | `exactus<W>` | en `trapping<W>`; the trapping policy spelled out (D11.8, N7a): the same type as the bare marker `W`, and a store traps when the value does not fit |
-| `inf` | the unbounded integer (D11.5): a width marker in the `numerus` family with no upper or lower bound, spelled `inf` in every locale (no keyword). `inf`, `exactus<inf>`, `modulus<inf>` and `saturatus<inf>` (en `trapping<inf>`, `wrapping<inf>`, `saturating<inf>`) all name this one type; the wrapped `inf` is retired. **Shipped:** the type, big literals, the join, store and conversion rules, exact run-time arithmetic, and the host-only rejections, on the MIR runner, Rust, TypeScript, Go and Python, and in part on the Racket (`sexp`) target. A target with no unbounded carrier (Swift, Haskell, LLVM, Wasm) fails closed with a named diagnostic, and Metal, WGSL and AIR never carry it; see The unbounded integer `inf`. |
+| `inf` | the unbounded integer (D11.5): a width marker in the `numerus` family with no upper or lower bound, spelled `inf` in every locale (no keyword). `inf`, `exactus<inf>`, `模数<inf>` and `saturatus<inf>` (en `trapping<inf>`, `wrapping<inf>`, `saturating<inf>`) all name this one type; the wrapped `inf` is retired. **Shipped:** the type, big literals, the join, store and conversion rules, exact run-time arithmetic, and the host-only rejections, on the MIR runner, Rust, TypeScript, Go and Python, and in part on the Racket (`sexp`) target. A target with no unbounded carrier (Swift, Haskell, LLVM, Wasm) fails closed with a named diagnostic, and Metal, WGSL and AIR never carry it; see The unbounded integer `inf`. |
 | `fractus`  | float (default `f64`) |
 | `bivalens` | boolean |
 | `nihil`    | null |
@@ -1570,7 +1574,7 @@ A sized numeric type is written as its **bare width marker** (not a user type pa
 
 | Family | Markers | Invalid example |
 | ------ | ------- | --------------- |
-| `modulus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, and `inf` (the same type as `inf`) | `modulus<f32>` or `modulus<d64>` → a modular word takes an integer width |
+| `模数<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, and `inf` (the same type as `inf`) | `模数<f32>` or `模数<d64>` → a modular word takes an integer width |
 | `saturatus<W>` | the same eight integer widths, and `inf` (the same type as `inf`) | `saturatus<f32>` → use `f32` |
 | `exactus<W>` | the eight integer widths, `d64`, and `inf` | `exactus<f32>` → the trapping float cell is not built (`trapping_float_not_implemented`) |
 
@@ -1584,7 +1588,7 @@ wrong-family forms (`numerus<f32>`, `fractus<i32>`), `numerus<d64>` and
 `numerus<inf>`, the removed `numerus<d32>`, extra arguments, and the marker holes
 `numerus<_>` / `fractus<_>` (write bare `numerus` / `fractus`, or a bare marker).
 `inf` is the one marker with no range: it is integer-only (not a float width),
-and an unbounded integer has no word to wrap or clamp at, so `modulus<inf>` and
+and an unbounded integer has no word to wrap or clamp at, so `模数<inf>` and
 `saturatus<inf>` are accepted and change nothing.
 
 `d64` is the one **decimal** width, for money and accounting
@@ -1611,7 +1615,7 @@ never silently changed, while a computed value is rounded by the slot. Display
 (`print`, `§` holes) it prints the shortest form with trailing zeros dropped,
 `12.5` and `12`, never `12.50` or `12.0`. A decimal stores its value only, with
 no per-value scale.
-`modulus<_>`, `saturatus<_>`, and `instans<_>` are marker holes:
+`模数<_>`, `saturatus<_>`, and `instans<_>` are marker holes:
 the family stays identity and only the width/precision is inferred from a
 same-family witness (exact marker, no lattice widening). Unsolved `_` is an
 error, never the bare default. The wrapped holes `numerus<_>` and `fractus<_>`
@@ -1647,13 +1651,13 @@ time.
 | Family | Policy at the store | Use |
 | ------ | ------------------- | --- |
 | bare marker `W` (default) | **traps** if the value does not fit | counts, sizes, money, indices |
-| `modulus<W>` (en `wrapping<W>`) | **reduces** modulo 2^W | hashes, checksums |
+| `模数<W>` (en `wrapping<W>`) | **reduces** modulo 2^W | hashes, checksums |
 | `saturatus<W>` (en `saturating<W>`) | **clamps** to W's bounds, once, at the store | pixels, audio, levels |
 
 `saturating<u8>` with `x = 250` and `x + 200 - 100` stores 255, not the 155 that
 clamping each step would give; per-step clamping is written as separate stores
 into `saturating` slots. This departs from Rust `Saturating<T>` deliberately.
-For `modulus`, reducing once at the store equals reducing each step for
+For `模数`, reducing once at the store equals reducing each step for
 `+ - * ⇐ ∧ ∨ ⊻ ¬`; before `⇒`, `/`, `%` and comparisons the operand is reduced
 first, so ported hash and crypto code keeps its results. Within one policy
 family a store into a narrower width applies the slot's policy
@@ -1662,22 +1666,22 @@ family a store into a narrower width applies the slot's policy
 (`saturating<u8> w ← 300` is 255, `wrapping<u8> w ← -1` is 255, and a trapping
 slot's certain trap is a compile error); a constant in an `=` position
 (a `常量 T X = e` constant at module level or in a block, `静态`, field
-default, enum member) must fit `W` whatever the policy. Literals in `modulus<W>` and `saturatus<W>` slots must fit `W`.
+default, enum member) must fit `W` whatever the policy. Literals in `模数<W>` and `saturatus<W>` slots must fit `W`.
 The unbounded integer `inf` (D11.5) is a type (see its subsection below), so a
 bounded expression still obeys the 64-bit range above and an `inf` slot never
 applies a size policy.
 
 The D11.8 naming frame puts the policy outside and the representation inside:
-en `trapping<W>`, `wrapping<W>`, `saturating<W>`; la `exactus<W>`, `modulus<W>`,
+en `trapping<W>`, `wrapping<W>`, `saturating<W>`; la `exactus<W>`, `模数<W>`,
 `saturatus<W>`. A bare marker takes its domain's default policy (`u8` is
 `trapping<u8>`; integers and `d64` trap, floats follow IEEE).
 
 **Shipped (N7a, N7e):** the trapping policy word (`exactus<W>` / en
 `trapping<W>`, integer widths and `d64`), bare markers in every type position,
-and signed widths on `modulus<W>` — `wrapping<i8>` reduces into the signed
+and signed widths on `模数<W>` — `wrapping<i8>` reduces into the signed
 range, so `100 + 100` stored into it is −56. **Admitted, not shipped:** the
 float cells (`exactus<f32>` is rejected as `trapping_float_not_implemented`;
-`modulus` and `saturatus` take no float width). **Shipped (N7c/N7d):** the
+`模数` and `saturatus` take no float width). **Shipped (N7c/N7d):** the
 retirement of the long forms: the canonical emitter writes the bare marker and
 the parser rejects `numerus<W>`/`fractus<W>` (en `int<W>`/`float<W>`) with
 `numeric_wrapper_retired`; the policy words keep their `<W>`.
@@ -1693,7 +1697,7 @@ expression is the smallest integer type that holds every possible result,
 computed by interval arithmetic from the operands' declared types and never
 from the destination. With `u8` operands `a + b` and `a * b` are `u16`, `a - b`,
 `-a` and `¬a` are `i16`, and `a / b`, `a % b`, `a ⇒ n`, `a ∧ b` and `a ∨ b` are
-`u8`. Only trapping types grow; `modulus<W>` stays in its ring and
+`u8`. Only trapping types grow; `模数<W>` stays in its ring and
 `saturatus<W>` keeps `W`. Growth stops at the 64-bit containers: past them the
 type keeps the sign of the range (`i64` if it can be negative, else `u64`), so
 `u64 - u64` is `i64` (operator ruling 2026-09-30: it does not become `inf`;
@@ -1802,7 +1806,7 @@ author writes `inf` in a slot or converts with `↦ inf`. Its rules in full:
 - **Spelling.** `inf` is a width marker in the `numerus` family, written the
   same in every locale: it is not a keyword and has no glossary word, and, like
   `u8`, it is reserved in type position only. `inf`, `trapping<inf>`,
-  `wrapping<inf>` and `saturating<inf>` (la `exactus<inf>`, `modulus<inf>`,
+  `wrapping<inf>` and `saturating<inf>` (la `exactus<inf>`, `模数<inf>`,
   `saturatus<inf>`) are one type; the policy words are accepted and never
   produce a wrapping or saturating word. `faber format` keeps the author's
   spelling among them. `∞` remains the IEEE float literal and is never an `inf`
@@ -1975,8 +1979,8 @@ etc. are unchanged. `inf` takes no prefix: `linf`, `tinf`, `sinf`, `vinf` and
 `minf` are not sugar and stay ordinary identifiers (`sinf` and `linf` are
 common names, and a tensor, sparsa, vector or matrix element may not be `inf`).
 
-`modulus<W>`, `saturatus<W>` and `exactus<W>` have no sugar; write
-`modulus<u32>` / `saturatus<i16>` / `exactus<u8>` in full (the bare marker `u8`
+`模数<W>`, `saturatus<W>` and `exactus<W>` have no sugar; write
+`模数<u32>` / `saturatus<i16>` / `exactus<u8>` in full (the bare marker `u8`
 already is the trapping `u8`).
 
 **Spelling preference (author convention, not grammar):** general Faber code
@@ -2295,8 +2299,8 @@ The hint selects the conversion row. `Hex` / `Bin` / `Oct` / `Be` / `Le` / `Bits
 Explicit integer narrowing is magnitude-checked on every backend:
 `n ↦ u8` converts a value that fits unchanged, and a value out of the
 target's range fails — it never wraps and never relabels. The failure takes the
-error channel, or the `⊥` default when one is written. Into `modulus<W>` and
-`saturatus<W>` targets `↦` reduces or clamps and cannot fail. Use `modulus<W>`
+error channel, or the `⊥` default when one is written. Into `模数<W>` and
+`saturatus<W>` targets `↦` reduces or clamps and cannot fail. Use `模数<W>`
 for wrapping arithmetic.
 
 **Interval clamp (`↦ lo‥hi`).** When the target of `↦` is a range instead of a type, the conversion clamps a number into that interval: `15 ↦ 0‥10` is 9 (the half-open `‥` excludes its end), `15 ↦ 0…10` is 10 (`…` includes it), `wide ↦ 10…50` clamps one `intervallum` value into another range, and a stored `intervallum` value is a legal target too (`x ↦ fines`). The grammar production is `conversio_expr := '↦' (type_annotation | interval_target) via_clause? inline_default?` with `interval_target := range_expr`. The parser reads the operand as an interval, not a type, when it opens with a number literal or a non-type identifier; a capitalized name, a known type word, or a qualified `ns.Type` stays a type. A clamp is total, so it takes no `经由` hint (`conversio_via_target_takes_no_hint`), no `⊥` default (`intervallum_clamp_recovery_unsupported`) and no `步` step (`intervallum_value_step_unsupported`); these are semantic rejections of a shape the grammar still admits.
