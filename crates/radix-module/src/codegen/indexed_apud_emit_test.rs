@@ -56,11 +56,12 @@ fn go_keys_composite_maps_by_comparable_array() {
     assert!(lista.contains("for i, x := range xs"), "{lista}");
     let composite = emit(Target::HirGo, COMPOSITE);
     assert!(
-        composite.contains("sales[faberTupleKey([]any{string(east), int(2024)})] = 5"),
+        composite.contains("sales[rt.TupleKey([]any{string(east), int(2024)})] = 5"),
         "{composite}"
     );
-    assert!(composite.contains("func faberTupleKey("), "{composite}");
-    assert!(composite.contains("faberTupleParts("), "{composite}");
+    // T1-G8: the key helpers live in `faber/rt`; no per-file declaration.
+    assert!(!composite.contains("func faberTupleKey("), "{composite}");
+    assert!(composite.contains("rt.TupleParts("), "{composite}");
 }
 
 #[test]

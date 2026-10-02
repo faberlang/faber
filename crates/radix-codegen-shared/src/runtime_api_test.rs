@@ -452,6 +452,27 @@ fn the_go_tensor_vector_and_sparsa_rows_spell_as_the_flat_rt_names() {
 }
 
 #[test]
+fn the_go_carrier_rows_spell_as_the_flat_rt_names() {
+    for (row, spelled) in [
+        (&ORDER_ORDER, "rt.OrderOrder"),
+        (&ORDER_COMPARE, "rt.OrderCompare"),
+        (&INTERVALLUM_INTERVALLUM, "rt.IntervallumIntervallum"),
+        (&INTERVALLUM_VALUE, "rt.IntervallumValue"),
+        (&TUPLE_KEY, "rt.TupleKey"),
+        (&TUPLE_PARTS, "rt.TupleParts"),
+        (&INSTANS_PARSE, "rt.InstansParse"),
+        (&VALOR_STRUCT, "rt.ValorStruct"),
+    ] {
+        assert_eq!(spell_any(Target::HirGo, row), spelled);
+        // Go carries these rows only; none is a store row.
+        assert_eq!(row.targets, &[Target::HirGo]);
+        assert_ne!(row.kind, RuntimeKind::StoreFn);
+    }
+    // The interval carrier is the one type among them.
+    assert_eq!(INTERVALLUM_INTERVALLUM.kind, RuntimeKind::Type);
+}
+
+#[test]
 fn the_go_dec_rows_spell_as_the_flat_rt_names() {
     let go_rows: Vec<&RuntimeItem> = TABLE
         .iter()

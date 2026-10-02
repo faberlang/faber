@@ -231,7 +231,7 @@ const EMITTERS: [Emitter; 3] = [
     },
     Emitter {
         name: "radix-hir-go",
-        legacy_budget: 49,
+        legacy_budget: 4,
         new_shape_budget: 0,
         new_shape: go_new_shape,
     },

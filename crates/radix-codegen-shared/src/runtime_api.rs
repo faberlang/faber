@@ -382,6 +382,44 @@ pub const VECTOR_FROM_LIST: RuntimeItem =
 pub const SPARSA_SPARSA: RuntimeItem = shaped_row(Namespace::Sparsa, "Sparsa", RuntimeKind::Type);
 pub const SPARSA_NEW: RuntimeItem = shaped_row(Namespace::Sparsa, "new", RuntimeKind::Fn);
 
+/// The targets whose runtime package carries an `order`, `intervallum`, `tuple`,
+/// `instans` or `valor` row. Only the Go runtime (`rt.Order*`, `rt.Intervallum*`,
+/// `rt.Tuple*`, `rt.Instans*`, `rt.Valor*`,
+/// `faber/runtime/go/{order,intervallum,tuple,instans,valor}.go`) carries them
+/// on this table today.
+const CARRIER_GO: &[Target] = &[Target::HirGo];
+
+const fn carrier_row(ns: Namespace, name: &'static str, kind: RuntimeKind) -> RuntimeItem {
+    RuntimeItem {
+        ns,
+        name,
+        kind,
+        targets: CARRIER_GO,
+    }
+}
+
+/// `order`, `intervallum`, `tuple`, `instans` and `valor` rows (T1-G8): the Go
+/// carriers and decoders a call site names. `order` is the generic
+/// ordering-contract entry (a genus's own `Compare`, else the built-in
+/// compare) and `compare` the built-in and tuple three-way compare. The
+/// interval carrier is a type whose operations (`Continet`, `Coercere`,
+/// `Inter`, ...) are methods carrying the Latin names the call sites use; its
+/// constructor is the one free function a call site names. `tuple` turns a
+/// tuple carrier into a comparable map key and back. `instans.parse` is the
+/// three-layout time parse, `valor.struct` the valor-to-genus decoder shell
+/// whose field extraction is supplied at the call site. No row applies a width
+/// limit: none of them stores into a bounded cell.
+pub const ORDER_ORDER: RuntimeItem = carrier_row(Namespace::Order, "order", RuntimeKind::Fn);
+pub const ORDER_COMPARE: RuntimeItem = carrier_row(Namespace::Order, "compare", RuntimeKind::Fn);
+pub const INTERVALLUM_INTERVALLUM: RuntimeItem =
+    carrier_row(Namespace::Intervallum, "Intervallum", RuntimeKind::Type);
+pub const INTERVALLUM_VALUE: RuntimeItem =
+    carrier_row(Namespace::Intervallum, "value", RuntimeKind::Fn);
+pub const TUPLE_KEY: RuntimeItem = carrier_row(Namespace::Tuple, "key", RuntimeKind::Fn);
+pub const TUPLE_PARTS: RuntimeItem = carrier_row(Namespace::Tuple, "parts", RuntimeKind::Fn);
+pub const INSTANS_PARSE: RuntimeItem = carrier_row(Namespace::Instans, "parse", RuntimeKind::Fn);
+pub const VALOR_STRUCT: RuntimeItem = carrier_row(Namespace::Valor, "struct", RuntimeKind::Fn);
+
 /// The targets whose runtime package carries each `regex` row. Rows differ by
 /// target: the Rust runtime carries the match operations as free functions in
 /// `faber::regex`, the Go runtime carries a constructor plus methods, the Swift
@@ -626,6 +664,14 @@ pub const TABLE: &[RuntimeItem] = &[
     VECTOR_FROM_LIST,
     SPARSA_SPARSA,
     SPARSA_NEW,
+    ORDER_ORDER,
+    ORDER_COMPARE,
+    INTERVALLUM_INTERVALLUM,
+    INTERVALLUM_VALUE,
+    TUPLE_KEY,
+    TUPLE_PARTS,
+    INSTANS_PARSE,
+    VALOR_STRUCT,
     REGEX_MATCHES,
     REGEX_FIND,
     REGEX_FIND_ALL,
