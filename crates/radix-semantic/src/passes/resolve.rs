@@ -71,6 +71,7 @@ const ISSUE_ATOMIC_ELEMENT: &str = "atomic_element";
 const ISSUE_ATOMIC_INCOMPLETE: &str = "atomic_incomplete";
 const ISSUE_FIGURA_UNKNOWN_INDEX: &str = "figura_unknown_index";
 const ISSUE_FIGURA_TYPE_PARAM_IN_INDEX: &str = "figura_type_param_in_index";
+const ISSUE_FIGURA_ARITHMETIC_INVALID: &str = "figura_arithmetic_invalid";
 const ISSUE_INVALID_PRECISION_MARKER: &str = "invalid_precision_marker";
 const ISSUE_INTERVALLUM_ARITY: &str = "intervallum_arity";
 const ISSUE_INTERVALLUM_BOUND: &str = "intervallum_bound";
@@ -1345,6 +1346,7 @@ fn resolve_expr(
                     radix_syntax::ArrayElement::Spread(expr) => {
                         resolve_expr(resolver, interner, expr, errors)
                     }
+                    radix_syntax::ArrayElement::Infer(_) => {}
                 }
             }
         }
@@ -1832,6 +1834,11 @@ fn resolve_figura_expr(
 ) {
     match figura {
         radix_syntax::FiguraExpr::Infer | radix_syntax::FiguraExpr::Literal(_) => {}
+        radix_syntax::FiguraExpr::Add(value, _)
+        | radix_syntax::FiguraExpr::Subtract(value, _)
+        | radix_syntax::FiguraExpr::Divide(value, _) => {
+            resolve_figura_expr(resolver, value, errors);
+        }
         radix_syntax::FiguraExpr::Tuple(dims) => {
             for dim in dims {
                 resolve_figura_expr(resolver, dim, errors);
@@ -1845,7 +1852,13 @@ fn resolve_figura_expr(
             let Some(symbol) = resolver.get_symbol(def_id) else {
                 return;
             };
-            if !matches!(symbol.kind, SymbolKind::IndexParam) {
+            // An index parameter remains a compile-time term. A local or
+            // formal value can also supply an extent at runtime; lowering
+            // records its binding/parameter identity for boundary checks.
+            if !matches!(
+                symbol.kind,
+                SymbolKind::IndexParam | SymbolKind::Local | SymbolKind::Param
+            ) {
                 errors.push(type_mismatch_error(
                     ISSUE_FIGURA_NOT_INDEX_PARAM,
                     ident.span,
@@ -1862,6 +1875,11 @@ fn generic_arg_span(arg: &GenericArgExpr) -> radix_lexer::Span {
             radix_lexer::Span::default()
         }
         GenericArgExpr::Size(FiguraExpr::Var(ident)) => ident.span,
+        GenericArgExpr::Size(
+            FiguraExpr::Add(value, _)
+            | FiguraExpr::Subtract(value, _)
+            | FiguraExpr::Divide(value, _),
+        ) => generic_figura_span(value),
         GenericArgExpr::Size(FiguraExpr::Tuple(dims)) => {
             dims.first().map(generic_figura_span).unwrap_or_default()
         }
@@ -1873,6 +1891,9 @@ fn generic_figura_span(figura: &FiguraExpr) -> radix_lexer::Span {
     match figura {
         FiguraExpr::Infer | FiguraExpr::Literal(_) => radix_lexer::Span::default(),
         FiguraExpr::Var(ident) => ident.span,
+        FiguraExpr::Add(value, _)
+        | FiguraExpr::Subtract(value, _)
+        | FiguraExpr::Divide(value, _) => generic_figura_span(value),
         FiguraExpr::Tuple(dims) => dims.first().map(generic_figura_span).unwrap_or_default(),
     }
 }
@@ -1951,6 +1972,9 @@ fn capacity_index_issue(
         GenericArgExpr::Size(FiguraExpr::Tuple(_)) => {
             return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL);
         }
+        GenericArgExpr::Size(
+            FiguraExpr::Add(_, _) | FiguraExpr::Subtract(_, _) | FiguraExpr::Divide(_, _),
+        ) => return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL),
         GenericArgExpr::Type(TypeExpr {
             kind: TypeExprKind::Named(ident, nested),
             ..
@@ -2807,6 +2831,11 @@ struct AliasEntry<'a> {
 enum TypeLowerError {
     UnboundAlias,
     Issue(&'static str),
+    IssueWithArg {
+        issue: &'static str,
+        name: &'static str,
+        value: &'static str,
+    },
     CollectionArity(CollectionKind),
 }
 
@@ -2877,6 +2906,11 @@ fn record_type_lowering_error(
     match error {
         TypeLowerError::UnboundAlias => errors.push(lowering_error(ISSUE_TYPE_ALIAS_CYCLE, span)),
         TypeLowerError::Issue(issue) => errors.push(lowering_error(issue, span)),
+        TypeLowerError::IssueWithArg { issue, name, value } => errors.push(
+            SemanticError::structured(SemanticErrorKind::LoweringError, span)
+                .with_arg("issue", issue)
+                .with_arg(name, value),
+        ),
         TypeLowerError::CollectionArity(collection) => {
             errors.push(lowering_collection_arity_error(collection, span))
         }
@@ -2930,6 +2964,17 @@ fn resolve_alias_types(
                     // Mark this alias as consumed (placeholder type) so
                     // dependent aliases do not keep deferring and produce a
                     // false CircularDependency error in a later iteration.
+                    if let Some(symbol) = resolver.get_symbol_mut(alias.def_id) {
+                        symbol.ty = Some(types.primitive(Primitive::Vacuum));
+                    }
+                    progress = true;
+                }
+                Err(TypeLowerError::IssueWithArg { issue, name, value }) => {
+                    errors.push(
+                        SemanticError::structured(SemanticErrorKind::LoweringError, alias.ty.span)
+                            .with_arg("issue", issue)
+                            .with_arg(name, value),
+                    );
                     if let Some(symbol) = resolver.get_symbol_mut(alias.def_id) {
                         symbol.ty = Some(types.primitive(Primitive::Vacuum));
                     }
@@ -3038,6 +3083,7 @@ fn resolve_schema_decls(
                 Err(
                     TypeLowerError::UnboundAlias
                     | TypeLowerError::Issue(_)
+                    | TypeLowerError::IssueWithArg { .. }
                     | TypeLowerError::CollectionArity(_),
                 ) => {
                     errors.push(
@@ -3269,6 +3315,13 @@ fn lower_type_expr_with_context(
 /// handles only helpers that still cross the phase boundary as message
 /// constants (figura, matrix, vector, atomic) or instans precision prose.
 fn type_lower_error_from_message(message: &str) -> TypeLowerError {
+    if let Some(reason) = crate::figura::figura_arithmetic_reason(message) {
+        return TypeLowerError::IssueWithArg {
+            issue: ISSUE_FIGURA_ARITHMETIC_INVALID,
+            name: "reason",
+            value: reason,
+        };
+    }
     let issue = match message {
         crate::FIGURA_NOT_INDEX_PARAM_MSG => ISSUE_FIGURA_NOT_INDEX_PARAM,
         crate::FIGURA_TYPE_PARAM_IN_INDEX_MSG => ISSUE_FIGURA_TYPE_PARAM_IN_INDEX,
@@ -3320,7 +3373,7 @@ fn lower_vector_type_expr(
     let elem_ty = lower_type_expr(elem, resolver, interner, types)?;
     reject_unbounded_element(types, elem_ty)?;
     let width_id = crate::lower_vector_width_expr(width, resolver, types)
-        .map_err(|error| TypeLowerError::Issue(error.issue))?;
+        .map_err(|error| type_lower_error_from_message(error.message))?;
     Ok(types.vector_with_width(elem_ty, width_id))
 }
 

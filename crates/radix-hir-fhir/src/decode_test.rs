@@ -142,6 +142,7 @@ fn decode_accepts_imported_nominal_def_living_in_type_table() {
                         def_id: imported_def,
                         ty: struct_ty,
                         fields: Vec::new(),
+                        methods: Vec::new(),
                     },
                 )],
             },
@@ -157,6 +158,73 @@ fn decode_accepts_imported_nominal_def_living_in_type_table() {
         decoded.resolver.file_interfaces,
         artifact.resolver.file_interfaces
     );
+}
+
+#[test]
+fn decode_rejects_imported_method_with_dangling_signature_type() {
+    use crate::artifact::{
+        FileExportSnapshot, FileInterfaceSnapshot, NominalKind, ResolverSnapshot,
+        StructMethodSnapshot,
+    };
+    use radix_lexer::Symbol;
+    use radix_types::{DefId, FuncSig, Type, TypeId, TypeTable, USER_DEF_ID_BASE};
+
+    let mut artifact = stub_artifact();
+    let owner_def = DefId(USER_DEF_ID_BASE + 12);
+    let callback_def = DefId(USER_DEF_ID_BASE + 13);
+    let mut types = TypeTable::new();
+    let owner_ty = types.intern(Type::Struct(owner_def));
+    artifact.types = types.snapshot();
+    artifact.interner = vec![
+        "demo".to_owned(),
+        "Widget".to_owned(),
+        "transform".to_owned(),
+    ];
+    artifact.resolver = ResolverSnapshot {
+        namespace_exports: vec![(Symbol(0), vec![Symbol(1)])],
+        file_interfaces: vec![(
+            Symbol(0),
+            FileInterfaceSnapshot {
+                exports: vec![(
+                    Symbol(1),
+                    FileExportSnapshot::Struct {
+                        def_id: owner_def,
+                        ty: owner_ty,
+                        fields: Vec::new(),
+                        methods: vec![StructMethodSnapshot {
+                            def_id: callback_def,
+                            name: Symbol(2),
+                            surface_name: Symbol(2),
+                            sig: FuncSig {
+                                type_params: Vec::new(),
+                                params: Vec::new(),
+                                ret: TypeId(999),
+                                err: None,
+                                is_async: false,
+                                is_generator: false,
+                            },
+                            visibility: radix_syntax::MemberVisibility::Publica,
+                        }],
+                        is_json: false,
+                    },
+                )],
+            },
+        )],
+        used_namespaces: vec![Symbol(0)],
+        imported_nominal_types: vec![((NominalKind::Struct, Symbol(1)), owner_ty)],
+        ambiguous_imported_nominal_types: Vec::new(),
+        conversion_rows: Vec::new(),
+    };
+
+    let bytes = encode(&artifact).expect("encode malformed imported method artifact");
+    assert!(matches!(
+        decode(&bytes),
+        Err(HirArtifactError::DanglingIndex {
+            kind: "TypeId",
+            index: 999,
+            ..
+        })
+    ));
 }
 
 #[test]

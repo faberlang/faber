@@ -152,7 +152,8 @@ fn intended_bucket(ty: &Type) -> Bucket {
         | Type::Infer(_)
         | Type::InferUnion(_)
         | Type::MarkerHole { .. }
-        | Type::Error => Bucket::Internal,
+        | Type::Error
+        | Type::TensorEdgePolicy(_) => Bucket::Internal,
         Type::Alias(_, _) => panic!("alias is transparent; pinned separately, not a census row"),
         // N7E-1: the policy-float cell has no layout until N7E-3; it resolves to
         // a loud missing-fact error, pinned by `policy_float_has_no_mir_layout_*`.
@@ -177,8 +178,8 @@ fn intended_bucket(ty: &Type) -> Bucket {
     }
 }
 
-/// One representative `Type` per census row (51 rows: 15 Primitive-expanded
-/// variants + 36 other variants; `Alias` excluded). Nested ids are interned
+/// One representative `Type` per census row (52 rows: 15 Primitive-expanded
+/// variants + 37 other variants; `Alias` excluded). Nested ids are interned
 /// into `types` so the rows are resolvable.
 fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     let int64_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
@@ -277,7 +278,7 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
         int64_ty,
         vec![radix_types::AppliedArg::Type(float64_ty)],
     ));
-    // Internal (5): no layout row.
+    // Internal (6): no runtime layout row, including type-only edge policies.
     rows.push(Type::Param(LexSymbol(2)));
     rows.push(Type::Infer(InferVar(0)));
     rows.push(Type::InferUnion(InferVar(1)));
@@ -286,16 +287,19 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
         var: InferVar(2),
     });
     rows.push(Type::Error);
+    rows.push(Type::TensorEdgePolicy(
+        radix_types::BuiltinTensorEdgePolicy::Clamp,
+    ));
     assert_eq!(
         rows.len(),
-        51,
-        "the census must stay 51 Primitive-expanded rows"
+        52,
+        "the census has 52 Primitive-expanded rows including the type-only policy marker"
     );
     rows
 }
 
 #[test]
-fn pin_table_census_is_51_rows_across_the_four_buckets() {
+fn pin_table_census_is_52_rows_across_the_four_buckets() {
     let mut types = TypeTable::new();
     let rows = census_rows(&mut types);
 
@@ -320,7 +324,7 @@ fn pin_table_census_is_51_rows_across_the_four_buckets() {
         opaque, 21,
         "opaque-by-design census rows (MLC-4: -1 to physical; RX-3a: +1 match)"
     );
-    assert_eq!(internal, 5, "internal census rows");
+    assert_eq!(internal, 6, "internal census rows");
 }
 
 /// The resolver's nominal outcome agrees with each census bucket: opaque

@@ -2642,6 +2642,10 @@ impl Parser {
         while !self.check(&TokenKind::RBracket) && !self.is_at_end() {
             if self.eat_keyword_ident(TokenKind::Sparge) {
                 elements.push(ArrayElement::Spread(Box::new(self.parse_expression()?)));
+            } else if let TokenKind::Underscore(_) = self.peek().kind {
+                let span = self.current_span();
+                self.advance();
+                elements.push(ArrayElement::Infer(span));
             } else {
                 elements.push(ArrayElement::Expr(Box::new(self.parse_expression()?)));
             }

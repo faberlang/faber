@@ -72,7 +72,10 @@ fn tensor_shape_rank(types: &TypeTable, shape: crate::IndexId) -> Option<u64> {
     match types.get_index(shape) {
         IndexExpr::Literal(_) => Some(1),
         IndexExpr::Tuple(dims) => Some(dims.len() as u64),
-        IndexExpr::Param(_) => Some(1),
+        IndexExpr::Param(_)
+        | IndexExpr::Runtime(_)
+        | IndexExpr::Affine { .. }
+        | IndexExpr::Divide { .. } => Some(1),
         IndexExpr::Infer(_) | IndexExpr::Unspecified => None,
     }
 }
@@ -295,7 +298,9 @@ impl TypeChecker<'_> {
             HirExpressionKind::Binary(op, lhs, rhs) => self.check_binary(*op, lhs, rhs, expected),
             HirExpressionKind::Unary(op, operand) => self.check_unary(*op, operand, expected),
             HirExpressionKind::Call(callee, type_args, args, conversion) => {
+                let previous_shape_call = self.current_shape_call.replace(expr.id);
                 let ty = self.check_call(callee, type_args, args, expected);
+                self.current_shape_call = previous_shape_call;
                 *conversion = self.pending_conversion.take();
                 ty
             }
@@ -316,7 +321,9 @@ impl TypeChecker<'_> {
                 super::format::check_format_expr(self, value, *spec, expr.span)
             }
             HirExpressionKind::MethodCall(receiver, name, type_args, args, conversion) => {
+                let previous_shape_call = self.current_shape_call.replace(expr.id);
                 let ty = self.check_method_call(receiver, name, type_args, args, expected);
+                self.current_shape_call = previous_shape_call;
                 *conversion = self.pending_conversion.take();
                 self.record_inferred_sermo_view_type_arg(receiver, *name, type_args, ty);
                 ty
@@ -780,7 +787,29 @@ impl TypeChecker<'_> {
                 .unwrap_or(resolved),
             _ => resolved,
         };
+        if let HirExpressionKind::Path(binding) = &expr.kind {
+            if self
+                .tensor_edge_policies
+                .shifted_bindings
+                .contains(binding)
+            {
+                self.tensor_edge_policies
+                    .shifted_expressions
+                    .insert(expr.id);
+            }
+            if let Some(context) = self
+                .tensor_edge_policies
+                .shifted_view_bindings
+                .get(binding)
+                .copied()
+            {
+                self.tensor_edge_policies
+                    .shifted_view_expressions
+                    .insert(expr.id, context);
+            }
+        }
         expr.ty = Some(resolved);
+        self.record_tensor_edge_policy_runtime_type_use(resolved);
         ty
     }
 

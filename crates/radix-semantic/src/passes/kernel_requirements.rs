@@ -1,0 +1,2697 @@
+//! Per-target kernel requirements and integer range proofs (F9 rulings 18, 27).
+//!
+//! This pass records portable-device admission facts beside the typed HIR. It
+//! does not change Faber arithmetic or lower runtime checks. Exact integer
+//! intermediates must fit the device's 32-bit integer envelope. An implicit
+//! trapping store that is not proven safe remains an explicit option-F
+//! requirement.
+
+use crate::{
+    NumericWidth, Primitive, ResolvedTensorEdgePolicy, TensorEdgePolicyTable, Type, TypeId,
+    TypeTable,
+};
+use radix_hir::visit::{HirVisitor, walk_expr};
+use radix_hir::{
+    DefId, HirArrayElement, HirBinOp, HirBlock, HirExpression, HirExpressionKind, HirFunction,
+    HirId, HirIncDecOp, HirItemKind, HirLocal, HirStatement, HirStatementKind, HirUnOp,
+};
+use radix_lexer::{Interner, Span, Symbol};
+use radix_target::Target;
+use radix_types::{IndexExpr, IndexId, evaluate_index_dimension};
+use rustc_hash::{FxHashMap, FxHashSet};
+use serde::{Deserialize, Serialize};
+
+/// The current device backends for which rule 18 defines portable admission.
+/// Keep this list exhaustive against the device emit targets in `radix-target`.
+pub const DEVICE_TARGETS: [Target; 3] = [Target::MirAmd, Target::MirMetal, Target::MirWgsl];
+
+/// Full analysis result for the kernels declared in one source module.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct KernelRequirementsReport {
+    pub kernels: Vec<KernelRequirement>,
+}
+
+/// One kernel's inferred requirements and admission verdict for every device
+/// target. A kernel can be legal Faber while a particular device rejects it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KernelRequirement {
+    pub def_id: DefId,
+    pub name: String,
+    pub target_reports: Vec<KernelTargetRequirement>,
+}
+
+/// Target-local facts used by reports and product admission.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KernelTargetRequirement {
+    pub target: Target,
+    pub admitted: bool,
+    pub recursive: bool,
+    /// Direct and transitive kernel callees. Their individual rows retain
+    /// argument-dependent extent conditions without flattening foreign axes.
+    pub callees: Vec<DefId>,
+    pub widths: Vec<KernelWidthRequirement>,
+    pub extent_conditions: Vec<KernelExtentCondition>,
+    pub trapping_stores: Vec<KernelTrappingStore>,
+    pub failures: Vec<KernelRequirementFailure>,
+}
+
+/// A numeric carrier used by the body or signature.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KernelWidthRequirement {
+    pub span: Span,
+    pub primitive: Primitive,
+    pub width: NumericWidth,
+    pub policy: KernelNumericPolicy,
+}
+
+/// Store policy attached to an inferred numeric width.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KernelNumericPolicy {
+    Exact,
+    Wrapping,
+    Saturating,
+    PolicyFloat,
+}
+
+/// A value range which must fit the portable device integer envelope for the
+/// kernel to be admitted on a target.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KernelExtentCondition {
+    pub span: Span,
+    pub range: KernelValueRange,
+    pub minimum: i128,
+    pub maximum: i128,
+}
+
+/// Inclusive bounds over exact values. Symbolic terms point into the same
+/// type-table index arena as the module's tensor shapes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KernelValueRange {
+    pub minimum: KernelRangeExpr,
+    pub maximum: KernelRangeExpr,
+}
+
+/// Integer expression used by the launch requirement report.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KernelRangeExpr {
+    Constant(i128),
+    Shape(IndexId),
+    Add(Box<Self>, Box<Self>),
+    Subtract(Box<Self>, Box<Self>),
+    Multiply(Box<Self>, Box<Self>),
+    FloorDivide(Box<Self>, Box<Self>),
+    Minimum(Box<Self>, Box<Self>),
+    Maximum(Box<Self>, Box<Self>),
+}
+
+/// An implicit trapping store whose value is not statically proven to fit.
+/// N6(c)'s device flag implements this requirement; this pass only records it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KernelTrappingStore {
+    pub span: Span,
+    pub width: NumericWidth,
+}
+
+/// Why a device cannot admit the body under the portable profile.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum KernelRequirementFailure {
+    RecursiveCall,
+    CalleeNotAdmitted {
+        callee: DefId,
+    },
+    UnsupportedIntegerWidth {
+        span: Span,
+        width: NumericWidth,
+    },
+    UnsupportedFloatWidth {
+        span: Span,
+        width: NumericWidth,
+    },
+    IntermediateOutOfRange {
+        span: Span,
+        range: KernelValueRange,
+    },
+    StoreOutOfRange {
+        span: Span,
+        range: KernelValueRange,
+    },
+    UnsupportedIntegerRange {
+        span: Span,
+    },
+    DivideByZeroPossible {
+        span: Span,
+    },
+    NegativeShiftCountPossible {
+        span: Span,
+    },
+    SaturatingLoweringDeferred {
+        span: Span,
+        width: NumericWidth,
+    },
+    /// The store needs the GPU-reset option-F error flag, which is not part of
+    /// K15. The requirement remains explicit and the device path stays closed.
+    OptionFRequired {
+        span: Span,
+        width: NumericWidth,
+    },
+    /// A generic limes callback is unresolved until a concrete specialization.
+    TensorEdgePolicyDeferred {
+        span: Span,
+    },
+}
+
+impl KernelRequirementsReport {
+    #[must_use]
+    pub fn kernel(&self, def_id: DefId) -> Option<&KernelRequirement> {
+        self.kernels.iter().find(|kernel| kernel.def_id == def_id)
+    }
+
+    #[must_use]
+    pub fn target(&self, def_id: DefId, target: Target) -> Option<&KernelTargetRequirement> {
+        self.kernel(def_id)?
+            .target_reports
+            .iter()
+            .find(|report| report.target == target)
+    }
+}
+
+/// Infer kernel requirements from a typed module. `recursive_kernels` comes
+/// from the existing legality pass, which already computes the complete local
+/// kernel call graph and its strongly connected definitions.
+#[must_use]
+pub fn check(
+    hir: &radix_hir::HirModule,
+    types: &TypeTable,
+    interner: &Interner,
+    recursive_kernels: &FxHashSet<DefId>,
+    kernel_calls: &FxHashMap<DefId, Vec<DefId>>,
+    tensor_edge_policies: &TensorEdgePolicyTable,
+) -> KernelRequirementsReport {
+    let facts = TypeFacts::from_hir(hir);
+    let mut callables: FxHashMap<DefId, (&HirFunction, Span)> = FxHashMap::default();
+    for item in &hir.items {
+        match &item.kind {
+            HirItemKind::Function(function) => {
+                callables.insert(item.def_id, (function.as_ref(), item.span));
+            }
+            HirItemKind::Struct(strukt) => {
+                for method in &strukt.methods {
+                    callables.insert(method.def_id, (&method.func, method.span));
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut kernels = Vec::new();
+    for item in &hir.items {
+        match &item.kind {
+            HirItemKind::Function(function) if function.is_kernel => {
+                let mut kernel = analyze_kernel(
+                    item.def_id,
+                    function,
+                    &facts,
+                    types,
+                    interner,
+                    tensor_edge_policies,
+                    recursive_kernels.contains(&item.def_id),
+                    None,
+                );
+                analyze_limes_callbacks(
+                    &mut kernel,
+                    function,
+                    tensor_edge_policies,
+                    &callables,
+                    types,
+                    interner,
+                    &facts,
+                    recursive_kernels,
+                );
+                kernels.push(kernel);
+            }
+            HirItemKind::Struct(strukt) => {
+                for method in &strukt.methods {
+                    if method.func.is_kernel {
+                        let mut kernel = analyze_kernel(
+                            method.def_id,
+                            &method.func,
+                            &facts,
+                            types,
+                            interner,
+                            tensor_edge_policies,
+                            recursive_kernels.contains(&method.def_id),
+                            None,
+                        );
+                        analyze_limes_callbacks(
+                            &mut kernel,
+                            &method.func,
+                            tensor_edge_policies,
+                            &callables,
+                            types,
+                            interner,
+                            &facts,
+                            recursive_kernels,
+                        );
+                        kernels.push(kernel);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    let callback_defs: FxHashSet<DefId> = tensor_edge_policies
+        .calls
+        .values()
+        .filter_map(|policy| match policy {
+            ResolvedTensorEdgePolicy::Custom {
+                remap, transform, ..
+            } => Some(std::iter::once(*remap).chain(transform.iter().copied())),
+            ResolvedTensorEdgePolicy::Builtin(_) | ResolvedTensorEdgePolicy::Deferred { .. } => {
+                None
+            }
+        })
+        .flatten()
+        .collect();
+    propagate_callee_requirements(
+        &mut kernels,
+        kernel_calls,
+        recursive_kernels,
+        &callback_defs,
+    );
+    KernelRequirementsReport { kernels }
+}
+
+fn analyze_kernel(
+    def_id: DefId,
+    function: &HirFunction,
+    facts: &TypeFacts,
+    types: &TypeTable,
+    interner: &Interner,
+    tensor_edge_policies: &TensorEdgePolicyTable,
+    recursive: bool,
+    coordinate_ranges: Option<&[AbstractRange]>,
+) -> KernelRequirement {
+    let mut base = BodyFacts {
+        types,
+        facts,
+        interner,
+        tensor_edge_policies,
+        ranges: FxHashMap::default(),
+        range_only_bindings: FxHashSet::default(),
+        coordinate_ranges: FxHashMap::default(),
+        expression_vectors: FxHashMap::default(),
+        has_signed_coordinate_input: coordinate_ranges.is_some(),
+        failures: Vec::new(),
+        conditions: Vec::new(),
+        trapping_stores: Vec::new(),
+        widths: Vec::new(),
+        return_type: function.ret_ty,
+    };
+    for (position, param) in function.params.iter().enumerate() {
+        if position == 0
+            && let Some(coordinates) = coordinate_ranges
+        {
+            base.range_only_bindings.insert(param.def_id);
+            base.coordinate_ranges
+                .insert(param.def_id, coordinates.to_vec());
+            base.widths.push(KernelWidthRequirement {
+                span: param.span,
+                primitive: Primitive::Numerus,
+                width: NumericWidth::I32,
+                policy: KernelNumericPolicy::Exact,
+            });
+            base.ranges.insert(param.def_id, AbstractRange::unknown());
+        } else {
+            base.record_type(param.ty, param.span);
+            base.ranges
+                .insert(param.def_id, AbstractRange::from_type(param.ty, types));
+        }
+    }
+    if let Some(ret_ty) = function.ret_ty {
+        if !is_integer_value_type(Some(ret_ty), types) {
+            base.record_type(
+                ret_ty,
+                function
+                    .body
+                    .as_ref()
+                    .map_or(Span::default(), |body| body.span),
+            );
+        }
+    }
+    if let Some(body) = &function.body {
+        base.visit_block_stateful(body);
+    }
+    let widths = dedupe(base.widths);
+    let conditions = dedupe(base.conditions);
+    let trapping_stores = dedupe(base.trapping_stores);
+    let failures = dedupe(base.failures);
+
+    KernelRequirement {
+        def_id,
+        name: interner.resolve(function.name).to_owned(),
+        target_reports: DEVICE_TARGETS
+            .iter()
+            .copied()
+            .map(|target| {
+                let mut target_failures = failures.clone();
+                if recursive {
+                    target_failures.push(KernelRequirementFailure::RecursiveCall);
+                }
+                for requirement in &widths {
+                    if requirement.policy == KernelNumericPolicy::Saturating {
+                        target_failures.push(
+                            KernelRequirementFailure::SaturatingLoweringDeferred {
+                                span: requirement.span,
+                                width: requirement.width,
+                            },
+                        );
+                    }
+                    if !supports_width(target, requirement) {
+                        target_failures.push(width_failure(requirement));
+                    }
+                }
+                let failures = dedupe(target_failures);
+                KernelTargetRequirement {
+                    target,
+                    admitted: failures.is_empty(),
+                    recursive,
+                    callees: Vec::new(),
+                    widths: widths.clone(),
+                    extent_conditions: conditions.clone(),
+                    trapping_stores: trapping_stores.clone(),
+                    failures,
+                }
+            })
+            .collect(),
+    }
+}
+
+fn analyze_limes_callbacks(
+    owner: &mut KernelRequirement,
+    kernel_function: &HirFunction,
+    policies: &TensorEdgePolicyTable,
+    callables: &FxHashMap<DefId, (&HirFunction, Span)>,
+    types: &TypeTable,
+    interner: &Interner,
+    facts: &TypeFacts,
+    recursive_kernels: &FxHashSet<DefId>,
+) {
+    analyze_limes_callbacks_inner(
+        owner,
+        kernel_function,
+        policies,
+        callables,
+        types,
+        interner,
+        facts,
+        recursive_kernels,
+        &mut FxHashSet::default(),
+    );
+}
+
+fn analyze_limes_callbacks_inner(
+    owner: &mut KernelRequirement,
+    kernel_function: &HirFunction,
+    policies: &TensorEdgePolicyTable,
+    callables: &FxHashMap<DefId, (&HirFunction, Span)>,
+    types: &TypeTable,
+    interner: &Interner,
+    facts: &TypeFacts,
+    recursive_kernels: &FxHashSet<DefId>,
+    active_callbacks: &mut FxHashSet<DefId>,
+) {
+    let mut collector = PolicyCallCollector {
+        policies,
+        expressions: FxHashMap::default(),
+        needed_expressions: policies
+            .calls
+            .keys()
+            .copied()
+            .chain(
+                policies
+                    .limes_contexts
+                    .values()
+                    .map(|context| context.shift_expression),
+            )
+            .collect(),
+        policy_calls: Vec::new(),
+    };
+    collector.visit_function(kernel_function);
+
+    for call_id in collector.policy_calls {
+        let Some(ResolvedTensorEdgePolicy::Custom {
+            remap, transform, ..
+        }) = policies.calls.get(&call_id)
+        else {
+            continue;
+        };
+        let Some(call_expr) = collector.expressions.get(&call_id) else {
+            continue;
+        };
+        let coordinate_seed = policies.limes_contexts.get(&call_id).and_then(|context| {
+            let shifts = collector.expressions.get(&context.shift_expression)?;
+            callback_coordinate_ranges(context.source_shape, shifts, types)
+        });
+        let callback_defs = std::iter::once(*remap).chain(transform.iter().copied());
+        for callback_def in callback_defs {
+            if !active_callbacks.insert(callback_def) {
+                add_callback_failure(owner, KernelRequirementFailure::RecursiveCall);
+                continue;
+            }
+            let Some((callback, _)) = callables.get(&callback_def).copied() else {
+                add_callback_failure(
+                    owner,
+                    KernelRequirementFailure::CalleeNotAdmitted {
+                        callee: callback_def,
+                    },
+                );
+                active_callbacks.remove(&callback_def);
+                continue;
+            };
+            let coordinates = coordinate_seed
+                .as_ref()
+                .map(|(ranges, _)| ranges.as_slice());
+            let mut callback_report = analyze_kernel(
+                callback_def,
+                callback,
+                facts,
+                types,
+                interner,
+                policies,
+                recursive_kernels.contains(&callback_def),
+                coordinates,
+            );
+            if let Some((_, conditions)) = &coordinate_seed {
+                for report in &mut callback_report.target_reports {
+                    report.extent_conditions.extend(conditions.iter().cloned());
+                    report.extent_conditions =
+                        dedupe(std::mem::take(&mut report.extent_conditions));
+                }
+            } else {
+                add_callback_failure(
+                    &mut callback_report,
+                    KernelRequirementFailure::UnsupportedIntegerRange {
+                        span: call_expr.span,
+                    },
+                );
+            }
+            analyze_limes_callbacks_inner(
+                &mut callback_report,
+                callback,
+                policies,
+                callables,
+                types,
+                interner,
+                facts,
+                recursive_kernels,
+                active_callbacks,
+            );
+
+            for owner_report in &mut owner.target_reports {
+                if let Some(callback_report) = callback_report
+                    .target_reports
+                    .iter()
+                    .find(|report| report.target == owner_report.target)
+                {
+                    owner_report
+                        .widths
+                        .extend(callback_report.widths.iter().cloned());
+                    owner_report
+                        .extent_conditions
+                        .extend(callback_report.extent_conditions.iter().cloned());
+                    owner_report
+                        .trapping_stores
+                        .extend(callback_report.trapping_stores.iter().cloned());
+                    owner_report
+                        .failures
+                        .extend(callback_report.failures.iter().cloned());
+                } else {
+                    owner_report
+                        .failures
+                        .push(KernelRequirementFailure::CalleeNotAdmitted {
+                            callee: callback_def,
+                        });
+                }
+                owner_report.widths = dedupe(std::mem::take(&mut owner_report.widths));
+                owner_report.extent_conditions =
+                    dedupe(std::mem::take(&mut owner_report.extent_conditions));
+                owner_report.trapping_stores =
+                    dedupe(std::mem::take(&mut owner_report.trapping_stores));
+                owner_report.failures = dedupe(std::mem::take(&mut owner_report.failures));
+                owner_report.admitted = owner_report.failures.is_empty();
+            }
+            active_callbacks.remove(&callback_def);
+        }
+    }
+}
+
+fn add_callback_failure(report: &mut KernelRequirement, failure: KernelRequirementFailure) {
+    for target in &mut report.target_reports {
+        target.failures.push(failure.clone());
+        target.failures = dedupe(std::mem::take(&mut target.failures));
+        target.admitted = false;
+    }
+}
+
+fn callback_coordinate_ranges(
+    shape: IndexId,
+    shift_expression: &HirExpression,
+    types: &TypeTable,
+) -> Option<(Vec<AbstractRange>, Vec<KernelExtentCondition>)> {
+    let dimensions = match types.get_index(shape) {
+        IndexExpr::Tuple(dimensions) => dimensions.clone(),
+        IndexExpr::Unspecified | IndexExpr::Infer(_) => return None,
+        _ => vec![shape],
+    };
+    let HirExpressionKind::Array(elements) = &shift_expression.kind else {
+        return None;
+    };
+    if elements.len() != dimensions.len() {
+        return None;
+    }
+
+    let mut ranges = Vec::with_capacity(dimensions.len());
+    let mut conditions = Vec::new();
+    for (dimension, element) in dimensions.into_iter().zip(elements) {
+        let HirArrayElement::Expr(offset_expr) = element else {
+            return None;
+        };
+        let offset = crate::passes::const_int_value(offset_expr)?;
+        let coordinate = coordinate_range(dimension, types);
+        let KernelValueRange { minimum, maximum } = coordinate.0?;
+        let range = KernelValueRange {
+            minimum: add(minimum, KernelRangeExpr::Constant(offset)),
+            maximum: add(maximum, KernelRangeExpr::Constant(offset)),
+        };
+        let minimum_bounds = symbolic_bounds(&range.minimum);
+        let maximum_bounds = symbolic_bounds(&range.maximum);
+        let impossible = minimum_bounds
+            .minimum
+            .is_some_and(|minimum| minimum > 2_147_483_647)
+            || maximum_bounds
+                .minimum
+                .is_some_and(|maximum| maximum > 2_147_483_647)
+            || maximum_bounds
+                .maximum
+                .is_some_and(|maximum| maximum < DEVICE_INTEGER_MIN);
+        let fits = minimum_bounds
+            .minimum
+            .is_some_and(|minimum| minimum >= DEVICE_INTEGER_MIN)
+            && maximum_bounds
+                .maximum
+                .is_some_and(|maximum| maximum <= 2_147_483_647);
+        if impossible
+            || constant(&range.minimum)
+                .is_some_and(|min| !(DEVICE_INTEGER_MIN..=2_147_483_647).contains(&min))
+        {
+            return None;
+        }
+        if !fits {
+            if !contains_shape(&range)
+                || !minimum_bounds
+                    .minimum
+                    .is_some_and(|minimum| minimum >= DEVICE_INTEGER_MIN)
+                || !maximum_bounds
+                    .minimum
+                    .is_some_and(|maximum| maximum <= 2_147_483_647)
+            {
+                return None;
+            }
+            conditions.push(KernelExtentCondition {
+                span: shift_expression.span,
+                range: range.clone(),
+                minimum: DEVICE_INTEGER_MIN,
+                maximum: 2_147_483_647,
+            });
+        }
+        ranges.push(AbstractRange(Some(range)));
+    }
+    Some((ranges, conditions))
+}
+
+struct PolicyCallCollector<'a> {
+    policies: &'a TensorEdgePolicyTable,
+    expressions: FxHashMap<HirId, HirExpression>,
+    needed_expressions: FxHashSet<HirId>,
+    policy_calls: Vec<HirId>,
+}
+
+impl HirVisitor for PolicyCallCollector<'_> {
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        if self.needed_expressions.contains(&expr.id) {
+            self.expressions.insert(expr.id, expr.clone());
+        }
+        if self.policies.calls.contains_key(&expr.id) {
+            self.policy_calls.push(expr.id);
+        }
+        walk_expr(self, expr);
+    }
+}
+
+fn supports_width(target: Target, requirement: &KernelWidthRequirement) -> bool {
+    match requirement.primitive {
+        Primitive::Numerus => match requirement.policy {
+            KernelNumericPolicy::Exact | KernelNumericPolicy::Saturating => {
+                matches!(requirement.width, NumericWidth::I32 | NumericWidth::U32)
+            }
+            KernelNumericPolicy::Wrapping => {
+                matches!(target, Target::MirMetal | Target::MirWgsl)
+                    && matches!(requirement.width, NumericWidth::I32 | NumericWidth::U32)
+            }
+            KernelNumericPolicy::PolicyFloat => false,
+        },
+        Primitive::Fractus => match requirement.width {
+            NumericWidth::F32 => true,
+            NumericWidth::F16 => DEVICE_TARGETS.contains(&target),
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+fn width_failure(requirement: &KernelWidthRequirement) -> KernelRequirementFailure {
+    if requirement.primitive == Primitive::Fractus {
+        KernelRequirementFailure::UnsupportedFloatWidth {
+            span: requirement.span,
+            width: requirement.width,
+        }
+    } else {
+        KernelRequirementFailure::UnsupportedIntegerWidth {
+            span: requirement.span,
+            width: requirement.width,
+        }
+    }
+}
+
+/// Copy target blockers through the complete local kernel call graph. Extent
+/// requirements themselves stay attached to each callee's report row: a
+/// caller's actual arguments determine how the callee's formal axes bind.
+fn propagate_callee_requirements(
+    kernels: &mut [KernelRequirement],
+    calls: &FxHashMap<DefId, Vec<DefId>>,
+    recursive_kernels: &FxHashSet<DefId>,
+    callback_defs: &FxHashSet<DefId>,
+) {
+    let target_summaries: FxHashMap<(DefId, usize), KernelTargetRequirement> = kernels
+        .iter()
+        .flat_map(|kernel| {
+            kernel.target_reports.iter().map(move |report| {
+                let target_index = DEVICE_TARGETS
+                    .iter()
+                    .position(|target| *target == report.target)
+                    .expect("all kernel reports use a device target");
+                ((kernel.def_id, target_index), report.clone())
+            })
+        })
+        .collect();
+    let mut requirements = Vec::with_capacity(kernels.len());
+    for kernel in kernels.iter() {
+        let mut reached = Vec::new();
+        let mut seen = FxHashSet::default();
+        let mut stack = calls.get(&kernel.def_id).cloned().unwrap_or_default();
+        while let Some(callee) = stack.pop() {
+            if !seen.insert(callee) {
+                continue;
+            }
+            reached.push(callee);
+            stack.extend(calls.get(&callee).into_iter().flatten().copied());
+        }
+        let reaches_recursion = reached
+            .iter()
+            .any(|callee| recursive_kernels.contains(callee));
+        requirements.push((reached, reaches_recursion));
+    }
+
+    for (kernel, (reached, reaches_recursion)) in kernels.iter_mut().zip(requirements) {
+        for report in &mut kernel.target_reports {
+            report.callees = reached
+                .iter()
+                .filter(|callee| !callback_defs.contains(callee))
+                .copied()
+                .collect();
+            report.recursive |= reaches_recursion;
+            if reaches_recursion
+                && !report
+                    .failures
+                    .contains(&KernelRequirementFailure::RecursiveCall)
+            {
+                report
+                    .failures
+                    .push(KernelRequirementFailure::RecursiveCall);
+            }
+            let target_index = DEVICE_TARGETS
+                .iter()
+                .position(|target| *target == report.target)
+                .expect("all kernel reports use a device target");
+            for callee in &reached {
+                if let Some(callee_report) = target_summaries.get(&(*callee, target_index)) {
+                    report.widths.extend(callee_report.widths.iter().cloned());
+                    report
+                        .extent_conditions
+                        .extend(callee_report.extent_conditions.iter().cloned());
+                    report
+                        .trapping_stores
+                        .extend(callee_report.trapping_stores.iter().cloned());
+                    if !callee_report.admitted {
+                        report
+                            .failures
+                            .push(KernelRequirementFailure::CalleeNotAdmitted { callee: *callee });
+                    }
+                } else if callback_defs.contains(callee) {
+                    // The callback's context-specific report has already been
+                    // folded into the owning kernel. Its kernel callees remain
+                    // in `reached` and are summarized independently below.
+                } else {
+                    report
+                        .failures
+                        .push(KernelRequirementFailure::CalleeNotAdmitted { callee: *callee });
+                }
+            }
+            report.widths = dedupe(std::mem::take(&mut report.widths));
+            report.extent_conditions = dedupe(std::mem::take(&mut report.extent_conditions));
+            report.trapping_stores = dedupe(std::mem::take(&mut report.trapping_stores));
+            report.failures = dedupe(std::mem::take(&mut report.failures));
+            report.admitted = report.failures.is_empty();
+        }
+    }
+}
+
+const DEVICE_INTEGER_MIN: i128 = -2_147_483_648;
+const DEVICE_INTEGER_MAX: i128 = 4_294_967_295;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AbstractRange(Option<KernelValueRange>);
+
+impl AbstractRange {
+    fn unknown() -> Self {
+        Self(None)
+    }
+
+    fn exact(value: i128) -> Self {
+        Self(Some(KernelValueRange {
+            minimum: KernelRangeExpr::Constant(value),
+            maximum: KernelRangeExpr::Constant(value),
+        }))
+    }
+
+    fn from_type(ty: TypeId, types: &TypeTable) -> Self {
+        type_range(ty, types).map_or_else(Self::unknown, |range| Self(Some(range)))
+    }
+}
+
+struct BodyFacts<'a> {
+    types: &'a TypeTable,
+    facts: &'a TypeFacts,
+    interner: &'a Interner,
+    tensor_edge_policies: &'a TensorEdgePolicyTable,
+    ranges: FxHashMap<DefId, AbstractRange>,
+    range_only_bindings: FxHashSet<DefId>,
+    coordinate_ranges: FxHashMap<DefId, Vec<AbstractRange>>,
+    expression_vectors: FxHashMap<HirId, Vec<AbstractRange>>,
+    has_signed_coordinate_input: bool,
+    failures: Vec<KernelRequirementFailure>,
+    conditions: Vec<KernelExtentCondition>,
+    trapping_stores: Vec<KernelTrappingStore>,
+    widths: Vec<KernelWidthRequirement>,
+    return_type: Option<TypeId>,
+}
+
+impl BodyFacts<'_> {
+    fn visit_block_stateful(&mut self, block: &HirBlock) {
+        for stmt in &block.statements {
+            self.visit_statement_stateful(stmt);
+        }
+        if let Some(expr) = &block.expr {
+            self.evaluate(expr);
+        }
+    }
+
+    fn visit_statement_stateful(&mut self, stmt: &HirStatement) {
+        match &stmt.kind {
+            HirStatementKind::Local(local) => self.visit_local_stateful(local),
+            HirStatementKind::Expr(expr) => {
+                self.evaluate(expr);
+            }
+            HirStatementKind::Redde(value) => {
+                if let Some(value) = value {
+                    let range = self.evaluate(value);
+                    if let Some(return_type) = self.return_type {
+                        self.check_store(stmt.span, return_type, range);
+                    }
+                }
+            }
+            HirStatementKind::IncDec(inc_dec) => {
+                let target_range = self.evaluate(&inc_dec.target);
+                let delta = match inc_dec.op {
+                    HirIncDecOp::Inc => 1,
+                    HirIncDecOp::Dec => -1,
+                };
+                let value = binary_range(
+                    if delta > 0 {
+                        HirBinOp::Add
+                    } else {
+                        HirBinOp::Sub
+                    },
+                    target_range,
+                    AbstractRange::exact(1),
+                );
+                if let Some(ty) = inc_dec.target.ty {
+                    self.check_intermediate(stmt.span, value.clone());
+                    let stored = self.check_store(stmt.span, ty, value);
+                    if let HirExpressionKind::Path(def_id) = inc_dec.target.kind {
+                        self.ranges.insert(def_id, stored);
+                    }
+                }
+            }
+            HirStatementKind::Custodi(custodi) => {
+                for clause in &custodi.clauses {
+                    let before = self.ranges.clone();
+                    self.evaluate(&clause.cond);
+                    self.ranges = before.clone();
+                    self.refine_condition(&clause.cond, true);
+                    self.visit_block_stateful(&clause.body);
+                    let entered = self.ranges.clone();
+                    self.ranges = merge_ranges(before, entered);
+                }
+            }
+            HirStatementKind::Rumpe | HirStatementKind::Perge | HirStatementKind::Tacet => {}
+        }
+    }
+
+    fn visit_local_stateful(&mut self, local: &HirLocal) {
+        let declared = local
+            .ty
+            .or_else(|| local.init.as_ref().and_then(|init| init.ty));
+        let range_only_init = local.init.as_ref().is_some_and(|init| {
+            self.range_only_expression(init)
+                && declared.is_some_and(|ty| is_range_narrowable_type(ty, self.types))
+        });
+        if range_only_init {
+            self.range_only_bindings.insert(local.def_id);
+        }
+        if let Some(ty) = declared.filter(|_| !range_only_init) {
+            self.record_type(ty, local.init.as_ref().map_or(Span::default(), |e| e.span));
+        }
+        let value = local
+            .init
+            .as_ref()
+            .map_or_else(AbstractRange::unknown, |init| self.evaluate(init));
+        if let Some(init) = &local.init {
+            let vector_ranges =
+                self.expression_vectors
+                    .get(&init.id)
+                    .cloned()
+                    .or_else(|| match init.kind {
+                        HirExpressionKind::Path(def_id) => {
+                            self.coordinate_ranges.get(&def_id).cloned()
+                        }
+                        _ => None,
+                    });
+            if let Some(vector_ranges) = vector_ranges {
+                self.coordinate_ranges.insert(local.def_id, vector_ranges);
+            }
+        }
+        let stored = declared.map_or(value.clone(), |ty| {
+            self.check_store(
+                local.init.as_ref().map_or(Span::default(), |e| e.span),
+                ty,
+                value,
+            )
+        });
+        self.ranges.insert(local.def_id, stored);
+    }
+
+    fn evaluate(&mut self, expr: &HirExpression) -> AbstractRange {
+        if let Some(ty) = expr.ty
+            && !(self.range_only_expression(expr) && is_range_narrowable_type(ty, self.types))
+        {
+            self.record_type(ty, expr.span);
+        }
+        match &expr.kind {
+            HirExpressionKind::Literal(radix_hir::HirLiteral::Int(value)) => {
+                let range = i128::try_from(*value)
+                    .map_or_else(|_| AbstractRange::unknown(), AbstractRange::exact);
+                self.check_intermediate(expr.span, range.clone());
+                range
+            }
+            HirExpressionKind::Literal(radix_hir::HirLiteral::BigInt(_)) => {
+                let range = crate::passes::const_int_value(expr)
+                    .map_or_else(AbstractRange::unknown, AbstractRange::exact);
+                self.check_intermediate(expr.span, range.clone());
+                range
+            }
+            HirExpressionKind::Path(def_id) => self
+                .ranges
+                .get(def_id)
+                .cloned()
+                .or_else(|| expr.ty.map(|ty| AbstractRange::from_type(ty, self.types)))
+                .unwrap_or_else(AbstractRange::unknown),
+            HirExpressionKind::Index(base, index) => {
+                let index_range = self.evaluate(index);
+                // Generated device address arithmetic is part of the kernel
+                // requirement even when the source never stores the lane id.
+                // In particular, an `apud` binder keeps its `int` source type
+                // but contributes a symbolic [0, E) requirement for the u32
+                // device index path.
+                self.check_intermediate(index.span, index_range);
+                if let HirExpressionKind::Path(def_id) = base.kind
+                    && let Some(axes) = self.coordinate_ranges.get(&def_id)
+                {
+                    if let Some(axis) = crate::passes::const_int_value(index)
+                        .and_then(|axis| usize::try_from(axis).ok())
+                    {
+                        let range = axes
+                            .get(axis)
+                            .cloned()
+                            .unwrap_or_else(AbstractRange::unknown);
+                        self.check_intermediate(expr.span, range.clone());
+                        return range;
+                    }
+                    let range = merge_abstract_ranges(axes);
+                    self.check_intermediate(expr.span, range.clone());
+                    return range;
+                }
+                self.evaluate(base);
+                expr.ty.map_or_else(AbstractRange::unknown, |ty| {
+                    AbstractRange::from_type(ty, self.types)
+                })
+            }
+            HirExpressionKind::Unary(op, operand) => {
+                let input = self.evaluate(operand);
+                let output = if is_modular_unary(expr.ty, *op, self.types) {
+                    AbstractRange::from_type(
+                        expr.ty.expect("modular result has a type"),
+                        self.types,
+                    )
+                } else {
+                    unary_range(*op, input)
+                };
+                if is_integer_value_type(expr.ty, self.types)
+                    && !is_modular_unary(expr.ty, *op, self.types)
+                {
+                    self.check_intermediate(expr.span, output.clone());
+                }
+                output
+            }
+            HirExpressionKind::Binary(op, lhs, rhs) => {
+                if is_non_homomorphic_observer(*op) {
+                    self.check_observed_modular_intermediates(lhs);
+                    self.check_observed_modular_intermediates(rhs);
+                    if *op == HirBinOp::Div
+                        && let Some((carrier_min, carrier_max)) =
+                            modular_carrier_bounds(expr.ty, self.types)
+                    {
+                        let exact = binary_range(*op, self.peek_range(lhs), self.peek_range(rhs));
+                        self.check_intermediate_with_bounds(
+                            expr.span,
+                            exact,
+                            carrier_min,
+                            carrier_max,
+                        );
+                    }
+                }
+                let left = self.evaluate(lhs);
+                let right = self.evaluate(rhs);
+                if is_integer_value_type(expr.ty, self.types) {
+                    match op {
+                        HirBinOp::Div | HirBinOp::Mod if !excludes_zero(&right) => {
+                            self.failures
+                                .push(KernelRequirementFailure::DivideByZeroPossible {
+                                    span: expr.span,
+                                });
+                        }
+                        HirBinOp::Shl | HirBinOp::Shr if !proves_nonnegative(&right) => {
+                            self.failures.push(
+                                KernelRequirementFailure::NegativeShiftCountPossible {
+                                    span: expr.span,
+                                },
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+                let modular = is_modular_binary(expr.ty, *op, self.types);
+                let output = if modular {
+                    AbstractRange::from_type(
+                        expr.ty.expect("modular result has a type"),
+                        self.types,
+                    )
+                } else {
+                    binary_range(*op, left, right)
+                };
+                if is_integer_value_operator(*op)
+                    && is_integer_value_type(expr.ty, self.types)
+                    && !modular
+                {
+                    self.check_intermediate(expr.span, output.clone());
+                }
+                output
+            }
+            HirExpressionKind::Assign(lhs, rhs) => {
+                let value = self.evaluate(rhs);
+                let Some(slot) = lhs.ty else {
+                    return value;
+                };
+                let stored = self.check_store(expr.span, slot, value);
+                if let HirExpressionKind::Path(def_id) = lhs.kind {
+                    self.ranges.insert(def_id, stored.clone());
+                    if self.range_only_expression(rhs) && is_range_narrowable_type(slot, self.types)
+                    {
+                        self.range_only_bindings.insert(def_id);
+                    } else {
+                        self.range_only_bindings.remove(&def_id);
+                    }
+                    if let Some(vector_ranges) = self
+                        .expression_vectors
+                        .get(&rhs.id)
+                        .cloned()
+                        .or_else(|| match rhs.kind {
+                            HirExpressionKind::Path(source) => {
+                                self.coordinate_ranges.get(&source).cloned()
+                            }
+                            _ => None,
+                        })
+                    {
+                        self.coordinate_ranges.insert(def_id, vector_ranges);
+                    } else {
+                        self.coordinate_ranges.remove(&def_id);
+                    }
+                }
+                stored
+            }
+            HirExpressionKind::Conversio {
+                source,
+                target,
+                implicit,
+                ..
+            } => {
+                let value = self.evaluate(source);
+                if implicit.is_some()
+                    && let radix_hir::HirConversioTarget::Type(slot) = target
+                {
+                    return self.check_store(expr.span, *slot, value);
+                }
+                expr.ty
+                    .map_or(value, |ty| AbstractRange::from_type(ty, self.types))
+            }
+            HirExpressionKind::Widen { operand, .. } => self.evaluate(operand),
+            HirExpressionKind::Verte { source, target, .. } => {
+                let value = self.evaluate(source);
+                self.check_store(expr.span, *target, value)
+            }
+            HirExpressionKind::ConversioAssign { target, source, .. } => {
+                let value = self.evaluate(source);
+                let Some(slot) = target.ty else {
+                    return value;
+                };
+                let stored = self.check_store(expr.span, slot, value);
+                if let HirExpressionKind::Path(def_id) = target.kind {
+                    self.ranges.insert(def_id, stored.clone());
+                    if self.range_only_expression(source)
+                        && is_range_narrowable_type(slot, self.types)
+                    {
+                        self.range_only_bindings.insert(def_id);
+                    } else {
+                        self.range_only_bindings.remove(&def_id);
+                    }
+                    if let Some(vector_ranges) = self
+                        .expression_vectors
+                        .get(&source.id)
+                        .cloned()
+                        .or_else(|| match source.kind {
+                            HirExpressionKind::Path(source_def) => {
+                                self.coordinate_ranges.get(&source_def).cloned()
+                            }
+                            _ => None,
+                        })
+                    {
+                        self.coordinate_ranges.insert(def_id, vector_ranges);
+                    } else {
+                        self.coordinate_ranges.remove(&def_id);
+                    }
+                }
+                stored
+            }
+            HirExpressionKind::Array(elements) => {
+                let mut axes = Vec::with_capacity(elements.len());
+                let mut representable = true;
+                for element in elements {
+                    match element {
+                        HirArrayElement::Expr(value) => axes.push(self.evaluate(value)),
+                        HirArrayElement::Spread(value) => {
+                            self.evaluate(value);
+                            representable = false;
+                        }
+                        HirArrayElement::Infer(_) => {
+                            axes.push(AbstractRange::unknown());
+                            representable = false;
+                        }
+                    }
+                }
+                if representable {
+                    self.expression_vectors.insert(expr.id, axes);
+                }
+                AbstractRange::unknown()
+            }
+            HirExpressionKind::Si {
+                cond,
+                then_block,
+                then_catch: _,
+                else_block,
+            } => {
+                self.evaluate(cond);
+                let before = self.ranges.clone();
+                self.ranges = before.clone();
+                self.refine_condition(cond, true);
+                self.visit_block_stateful(then_block);
+                let then_ranges = self.ranges.clone();
+                self.ranges = before.clone();
+                self.refine_condition(cond, false);
+                if let Some(else_block) = else_block {
+                    self.visit_block_stateful(else_block);
+                }
+                let else_ranges = self.ranges.clone();
+                self.ranges = merge_ranges(then_ranges, else_ranges);
+                expr.ty.map_or_else(AbstractRange::unknown, |ty| {
+                    AbstractRange::from_type(ty, self.types)
+                })
+            }
+            HirExpressionKind::Dum(cond, body) => {
+                self.evaluate(cond);
+                let before = self.ranges.clone();
+                self.refine_condition(cond, true);
+                self.visit_block_stateful(body);
+                let after = self.ranges.clone();
+                self.ranges = merge_loop_ranges(before, after);
+                expr.ty.map_or_else(AbstractRange::unknown, |ty| {
+                    AbstractRange::from_type(ty, self.types)
+                })
+            }
+            HirExpressionKind::Loop(body) => {
+                let before = self.ranges.clone();
+                self.visit_block_stateful(body);
+                let after = self.ranges.clone();
+                self.ranges = merge_loop_ranges(before, after);
+                expr.ty.map_or_else(AbstractRange::unknown, |ty| {
+                    AbstractRange::from_type(ty, self.types)
+                })
+            }
+            HirExpressionKind::Itera {
+                iter,
+                coordinates,
+                binding,
+                body,
+                ..
+            } => {
+                self.evaluate(iter);
+                self.visit_tensor_loop(iter, coordinates, *binding, body);
+                expr.ty.map_or_else(AbstractRange::unknown, |ty| {
+                    AbstractRange::from_type(ty, self.types)
+                })
+            }
+            HirExpressionKind::IteraLockstep {
+                sources,
+                coordinates,
+                bindings,
+                body,
+                ..
+            } => {
+                for source in sources {
+                    self.evaluate(source);
+                }
+                let Some(first) = sources.first() else {
+                    return AbstractRange::unknown();
+                };
+                self.visit_tensor_loop_many(first, coordinates, bindings, body);
+                expr.ty.map_or_else(AbstractRange::unknown, |ty| {
+                    AbstractRange::from_type(ty, self.types)
+                })
+            }
+            HirExpressionKind::IteraRange {
+                ranges,
+                bindings,
+                body,
+                ..
+            } => {
+                for range in ranges {
+                    self.evaluate(range);
+                }
+                let before = self.ranges.clone();
+                for (index, (def_id, _)) in bindings.iter().enumerate() {
+                    let range = ranges
+                        .get(index)
+                        .map(|range| self.range_binding(range))
+                        .unwrap_or_else(AbstractRange::unknown);
+                    self.ranges.insert(*def_id, range);
+                }
+                self.visit_block_stateful(body);
+                let after = self.ranges.clone();
+                self.ranges = merge_loop_ranges(before, after);
+                expr.ty.map_or_else(AbstractRange::unknown, |ty| {
+                    AbstractRange::from_type(ty, self.types)
+                })
+            }
+            HirExpressionKind::MethodCall(receiver, method, _, args, _) => {
+                let receiver_range = self.evaluate(receiver);
+                let argument_ranges: Vec<_> = args
+                    .iter()
+                    .map(|argument| self.evaluate(&argument.expr))
+                    .collect();
+                let method_name = self.interner.resolve(*method);
+                if matches!(
+                    self.tensor_edge_policies.calls.get(&expr.id),
+                    Some(ResolvedTensorEdgePolicy::Deferred { .. })
+                ) {
+                    self.failures
+                        .push(KernelRequirementFailure::TensorEdgePolicyDeferred {
+                            span: expr.span,
+                        });
+                }
+                let tensor_element = receiver.ty.and_then(|ty| tensor_element(ty, self.types));
+                if receiver.ty.is_some_and(|ty| is_tensor_type(ty, self.types))
+                    && tensor_element
+                        .is_some_and(|element| integer_slot(element, self.types).is_some())
+                {
+                    match method_name {
+                        "divisio" => {
+                            if !argument_ranges.first().is_some_and(excludes_zero) {
+                                self.failures.push(
+                                    KernelRequirementFailure::DivideByZeroPossible {
+                                        span: expr.span,
+                                    },
+                                );
+                            }
+                        }
+                        "addita" | "subtrahe" | "multiplica" | "nega" => {}
+                        _ => {
+                            return expr.ty.map_or_else(AbstractRange::unknown, |ty| {
+                                AbstractRange::from_type(ty, self.types)
+                            });
+                        }
+                    }
+                    let result = match method_name {
+                        "addita" => argument_ranges
+                            .first()
+                            .cloned()
+                            .map(|right| binary_range(HirBinOp::Add, receiver_range, right)),
+                        "subtrahe" => argument_ranges
+                            .first()
+                            .cloned()
+                            .map(|right| binary_range(HirBinOp::Sub, receiver_range, right)),
+                        "multiplica" => argument_ranges
+                            .first()
+                            .cloned()
+                            .map(|right| binary_range(HirBinOp::Mul, receiver_range, right)),
+                        "divisio" => argument_ranges
+                            .first()
+                            .cloned()
+                            .map(|right| binary_range(HirBinOp::Div, receiver_range, right)),
+                        "nega" => Some(unary_range(HirUnOp::Neg, receiver_range)),
+                        _ => None,
+                    }
+                    .unwrap_or_else(AbstractRange::unknown);
+                    let modular_result = is_modular_type(expr.ty, self.types);
+                    if !modular_result || method_name == "divisio" {
+                        self.check_intermediate(expr.span, result.clone());
+                    }
+                    return if modular_result {
+                        AbstractRange::from_type(
+                            expr.ty.expect("typed tensor method result"),
+                            self.types,
+                        )
+                    } else {
+                        result
+                    };
+                }
+                expr.ty.map_or_else(AbstractRange::unknown, |ty| {
+                    AbstractRange::from_type(ty, self.types)
+                })
+            }
+            _ => {
+                walk_expr(self, expr);
+                expr.ty.map_or_else(AbstractRange::unknown, |ty| {
+                    AbstractRange::from_type(ty, self.types)
+                })
+            }
+        }
+    }
+
+    fn visit_tensor_loop(
+        &mut self,
+        iter: &HirExpression,
+        coordinates: &[(DefId, Symbol)],
+        binding: DefId,
+        body: &HirBlock,
+    ) {
+        let before = self.ranges.clone();
+        let dims = iter
+            .ty
+            .map_or_else(Vec::new, |ty| shape_dimensions(ty, self.types));
+        for (axis, (def_id, _)) in coordinates.iter().enumerate() {
+            let range = dims
+                .get(axis)
+                .copied()
+                .map_or_else(AbstractRange::unknown, |dim| {
+                    coordinate_range(dim, self.types)
+                });
+            self.ranges.insert(*def_id, range);
+            self.range_only_bindings.insert(*def_id);
+        }
+        if let Some(element) = iter.ty.and_then(|ty| tensor_element(ty, self.types)) {
+            self.record_type(element, body.span);
+            self.ranges
+                .insert(binding, AbstractRange::from_type(element, self.types));
+        } else {
+            self.ranges.insert(binding, AbstractRange::unknown());
+        }
+        self.visit_block_stateful(body);
+        let after = self.ranges.clone();
+        self.ranges = merge_loop_ranges(before, after);
+    }
+
+    fn visit_tensor_loop_many(
+        &mut self,
+        first: &HirExpression,
+        coordinates: &[(DefId, Symbol)],
+        bindings: &[(DefId, Symbol)],
+        body: &HirBlock,
+    ) {
+        let before = self.ranges.clone();
+        let dims = first
+            .ty
+            .map_or_else(Vec::new, |ty| shape_dimensions(ty, self.types));
+        for (axis, (def_id, _)) in coordinates.iter().enumerate() {
+            let range = dims
+                .get(axis)
+                .copied()
+                .map_or_else(AbstractRange::unknown, |dim| {
+                    coordinate_range(dim, self.types)
+                });
+            self.ranges.insert(*def_id, range);
+            self.range_only_bindings.insert(*def_id);
+        }
+        for (def_id, _) in bindings {
+            self.ranges.insert(*def_id, AbstractRange::unknown());
+        }
+        self.visit_block_stateful(body);
+        let after = self.ranges.clone();
+        self.ranges = merge_loop_ranges(before, after);
+    }
+
+    fn refine_condition(&mut self, cond: &HirExpression, truth: bool) {
+        match &cond.kind {
+            HirExpressionKind::Binary(HirBinOp::And, lhs, rhs) if truth => {
+                self.refine_condition(lhs, true);
+                self.refine_condition(rhs, true);
+            }
+            HirExpressionKind::Binary(HirBinOp::Or, lhs, rhs) if !truth => {
+                self.refine_condition(lhs, false);
+                self.refine_condition(rhs, false);
+            }
+            HirExpressionKind::Unary(HirUnOp::Not, inner) => self.refine_condition(inner, !truth),
+            HirExpressionKind::Binary(op, lhs, rhs) => {
+                self.refine_comparison(*op, lhs, rhs, truth);
+            }
+            _ => {}
+        }
+    }
+
+    /// Homomorphic modular chains may flow to a wrapping store. A comparison,
+    /// division, remainder, or right shift observes an exact value instead, so
+    /// every modular arithmetic node in its operand tree must fit its carrier.
+    fn check_observed_modular_intermediates(&mut self, expr: &HirExpression) {
+        match &expr.kind {
+            HirExpressionKind::Unary(op, operand) => {
+                self.check_observed_modular_intermediates(operand);
+                if matches!(op, HirUnOp::Neg | HirUnOp::BitNot)
+                    && let Some((carrier_min, carrier_max)) =
+                        modular_carrier_bounds(expr.ty, self.types)
+                {
+                    let exact = unary_range(*op, self.peek_range(operand));
+                    self.check_intermediate_with_bounds(expr.span, exact, carrier_min, carrier_max);
+                }
+            }
+            HirExpressionKind::Binary(op, lhs, rhs) => {
+                self.check_observed_modular_intermediates(lhs);
+                self.check_observed_modular_intermediates(rhs);
+                if matches!(
+                    *op,
+                    HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Shl | HirBinOp::Div
+                ) && let Some((carrier_min, carrier_max)) =
+                    modular_carrier_bounds(expr.ty, self.types)
+                {
+                    let exact = binary_range(*op, self.peek_range(lhs), self.peek_range(rhs));
+                    self.check_intermediate_with_bounds(expr.span, exact, carrier_min, carrier_max);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn range_binding(&self, expr: &HirExpression) -> AbstractRange {
+        let HirExpressionKind::Intervallum {
+            start,
+            end,
+            step,
+            kind,
+        } = &expr.kind
+        else {
+            return self.peek_range(expr);
+        };
+        if step
+            .as_deref()
+            .is_some_and(|step| crate::passes::const_int_value(step) != Some(1))
+        {
+            return AbstractRange::unknown();
+        }
+        let start = self.peek_range(start);
+        let end = self.peek_range(end);
+        let (Some(start), Some(end)) = (start.0, end.0) else {
+            return AbstractRange::unknown();
+        };
+        let maximum = match kind {
+            radix_hir::HirRangeKind::Exclusive => {
+                subtract(end.maximum, KernelRangeExpr::Constant(1))
+            }
+            radix_hir::HirRangeKind::Inclusive => end.maximum,
+        };
+        AbstractRange(Some(KernelValueRange {
+            minimum: start.minimum,
+            maximum,
+        }))
+    }
+
+    fn refine_comparison(
+        &mut self,
+        op: HirBinOp,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+        truth: bool,
+    ) {
+        let (def_id, current, bound, normalized_op) =
+            if let HirExpressionKind::Path(def_id) = lhs.kind {
+                let current = self.ranges.get(&def_id).cloned().unwrap_or_else(|| {
+                    lhs.ty.map_or_else(AbstractRange::unknown, |ty| {
+                        AbstractRange::from_type(ty, self.types)
+                    })
+                });
+                (def_id, current, self.peek_range(rhs), op)
+            } else if let HirExpressionKind::Path(def_id) = rhs.kind {
+                let current = self.ranges.get(&def_id).cloned().unwrap_or_else(|| {
+                    rhs.ty.map_or_else(AbstractRange::unknown, |ty| {
+                        AbstractRange::from_type(ty, self.types)
+                    })
+                });
+                (
+                    def_id,
+                    current,
+                    self.peek_range(lhs),
+                    reverse_comparison(op),
+                )
+            } else {
+                return;
+            };
+        let Some(current) = current.0 else {
+            return;
+        };
+        let Some(bound) = bound.0 else {
+            return;
+        };
+        let Some(next) = refine_interval(normalized_op, current, bound, truth) else {
+            return;
+        };
+        self.ranges.insert(def_id, AbstractRange(Some(next)));
+    }
+
+    fn peek_range(&self, expr: &HirExpression) -> AbstractRange {
+        match &expr.kind {
+            HirExpressionKind::Path(def_id) => self
+                .ranges
+                .get(def_id)
+                .cloned()
+                .or_else(|| expr.ty.map(|ty| AbstractRange::from_type(ty, self.types)))
+                .unwrap_or_else(AbstractRange::unknown),
+            HirExpressionKind::Literal(_) => crate::passes::const_int_value(expr)
+                .map_or_else(AbstractRange::unknown, AbstractRange::exact),
+            HirExpressionKind::Unary(op, operand) => unary_range(*op, self.peek_range(operand)),
+            HirExpressionKind::Binary(op, lhs, rhs) => {
+                binary_range(*op, self.peek_range(lhs), self.peek_range(rhs))
+            }
+            _ => expr.ty.map_or_else(AbstractRange::unknown, |ty| {
+                AbstractRange::from_type(ty, self.types)
+            }),
+        }
+    }
+
+    fn check_intermediate(&mut self, span: Span, range: AbstractRange) {
+        self.check_intermediate_with_bounds(span, range, DEVICE_INTEGER_MIN, DEVICE_INTEGER_MAX);
+    }
+
+    fn check_intermediate_with_bounds(
+        &mut self,
+        span: Span,
+        range: AbstractRange,
+        carrier_min: i128,
+        carrier_max: i128,
+    ) {
+        let Some(range) = range.0 else {
+            self.failures
+                .push(KernelRequirementFailure::UnsupportedIntegerRange { span });
+            return;
+        };
+        let minimum = symbolic_bounds(&range.minimum);
+        let maximum = symbolic_bounds(&range.maximum);
+        let allowed_min = carrier_min.max(DEVICE_INTEGER_MIN);
+        let allowed_max = carrier_max.min(if self.has_signed_coordinate_input {
+            2_147_483_647
+        } else {
+            DEVICE_INTEGER_MAX
+        });
+        let fixed_endpoint_out_of_range = constant(&range.minimum)
+            .is_some_and(|minimum| minimum < allowed_min)
+            || constant(&range.maximum).is_some_and(|maximum| maximum > allowed_max);
+        let impossible = minimum.minimum.is_some_and(|minimum| minimum > allowed_max)
+            || maximum.maximum.is_some_and(|maximum| maximum < allowed_min);
+        if impossible || fixed_endpoint_out_of_range {
+            self.failures
+                .push(KernelRequirementFailure::IntermediateOutOfRange { span, range });
+        } else if minimum
+            .minimum
+            .is_some_and(|minimum| minimum >= allowed_min)
+            && maximum
+                .maximum
+                .is_some_and(|maximum| maximum <= allowed_max)
+        {
+            // Every possible symbolic value is contained in the device envelope.
+        } else if contains_shape(&range) {
+            self.conditions.push(KernelExtentCondition {
+                span,
+                range,
+                minimum: allowed_min,
+                maximum: allowed_max,
+            });
+        } else {
+            self.failures
+                .push(KernelRequirementFailure::UnsupportedIntegerRange { span });
+        }
+    }
+
+    fn check_store(&mut self, span: Span, slot: TypeId, value: AbstractRange) -> AbstractRange {
+        if is_numeric_container(slot, self.types) {
+            return value;
+        }
+        let Some((width, slot_range, is_wrapping, is_saturating)) = integer_slot(slot, self.types)
+        else {
+            return value;
+        };
+        if is_wrapping || is_saturating {
+            return AbstractRange(Some(slot_range));
+        }
+        let Some(value_range) = value.0.as_ref() else {
+            self.trapping_stores
+                .push(KernelTrappingStore { span, width });
+            self.failures
+                .push(KernelRequirementFailure::OptionFRequired { span, width });
+            return AbstractRange(Some(slot_range));
+        };
+        let slot_min = constant(&slot_range.minimum).expect("integer slot has a constant minimum");
+        let slot_max = constant(&slot_range.maximum).expect("integer slot has a constant maximum");
+        let minimum = symbolic_bounds(&value_range.minimum);
+        let maximum = symbolic_bounds(&value_range.maximum);
+        let fixed_endpoint_out_of_range = constant(&value_range.minimum)
+            .is_some_and(|minimum| minimum < slot_min)
+            || constant(&value_range.maximum).is_some_and(|maximum| maximum > slot_max);
+        let impossible = minimum.minimum.is_some_and(|minimum| minimum > slot_max)
+            || maximum.maximum.is_some_and(|maximum| maximum < slot_min);
+        let proven = minimum.minimum.is_some_and(|minimum| minimum >= slot_min)
+            && maximum.maximum.is_some_and(|maximum| maximum <= slot_max);
+        if impossible || fixed_endpoint_out_of_range {
+            self.failures
+                .push(KernelRequirementFailure::StoreOutOfRange {
+                    span,
+                    range: value_range.clone(),
+                });
+        } else if proven {
+            // The full abstract interval fits the destination cell.
+            return AbstractRange(Some(value_range.clone()));
+        } else if contains_shape(value_range) {
+            if !could_fit_between(minimum, maximum, slot_min, slot_max) {
+                self.failures
+                    .push(KernelRequirementFailure::StoreOutOfRange {
+                        span,
+                        range: value_range.clone(),
+                    });
+                return AbstractRange(Some(slot_range));
+            }
+            self.conditions.push(KernelExtentCondition {
+                span,
+                range: value_range.clone(),
+                minimum: slot_min,
+                maximum: slot_max,
+            });
+            return AbstractRange(Some(value_range.clone()));
+        } else {
+            self.trapping_stores
+                .push(KernelTrappingStore { span, width });
+            self.failures
+                .push(KernelRequirementFailure::OptionFRequired { span, width });
+        }
+        AbstractRange(Some(slot_range))
+    }
+
+    fn record_type(&mut self, ty: TypeId, span: Span) {
+        let mut seen_types = FxHashSet::default();
+        let mut seen_defs = FxHashSet::default();
+        self.record_type_inner(ty, span, &mut seen_types, &mut seen_defs);
+    }
+
+    fn record_type_inner(
+        &mut self,
+        ty: TypeId,
+        span: Span,
+        seen_types: &mut FxHashSet<TypeId>,
+        seen_defs: &mut FxHashSet<DefId>,
+    ) {
+        if !seen_types.insert(ty) {
+            return;
+        }
+        match self.types.get(ty) {
+            Type::Primitive(Primitive::Numerus) => self.widths.push(KernelWidthRequirement {
+                span,
+                primitive: Primitive::Numerus,
+                width: NumericWidth::I64,
+                policy: KernelNumericPolicy::Exact,
+            }),
+            Type::Primitive(Primitive::Fractus) => self.widths.push(KernelWidthRequirement {
+                span,
+                primitive: Primitive::Fractus,
+                width: NumericWidth::F64,
+                policy: KernelNumericPolicy::Exact,
+            }),
+            Type::SizedNumeric(primitive, width) => self.widths.push(KernelWidthRequirement {
+                span,
+                primitive: *primitive,
+                width: *width,
+                policy: KernelNumericPolicy::Exact,
+            }),
+            Type::ModularWord(width) => self.widths.push(KernelWidthRequirement {
+                span,
+                primitive: Primitive::Numerus,
+                width: *width,
+                policy: KernelNumericPolicy::Wrapping,
+            }),
+            Type::SaturatingWord(width) => self.widths.push(KernelWidthRequirement {
+                span,
+                primitive: Primitive::Numerus,
+                width: *width,
+                policy: KernelNumericPolicy::Saturating,
+            }),
+            Type::PolicyFloat(_, width) => self.widths.push(KernelWidthRequirement {
+                span,
+                primitive: Primitive::Fractus,
+                width: *width,
+                policy: KernelNumericPolicy::PolicyFloat,
+            }),
+            Type::Tensor(element, _)
+            | Type::Vector(element, _)
+            | Type::Matrix(element, _)
+            | Type::Sparsa(element, _)
+            | Type::Array(element)
+            | Type::BoundedArray { element, .. }
+            | Type::Option(element)
+            | Type::Ref(_, element)
+            | Type::Alias(_, element) => {
+                self.record_type_inner(*element, span, seen_types, seen_defs);
+            }
+            Type::Struct(def) | Type::Enum(def) => {
+                if seen_defs.insert(*def)
+                    && let Some(members) = self.facts.fields.get(def)
+                {
+                    for member in members {
+                        self.record_type_inner(*member, span, seen_types, seen_defs);
+                    }
+                }
+            }
+            Type::Applied(base, args) => {
+                self.record_type_inner(*base, span, seen_types, seen_defs);
+                for arg in args {
+                    if let radix_types::AppliedArg::Type(member) = arg {
+                        self.record_type_inner(*member, span, seen_types, seen_defs);
+                    }
+                }
+            }
+            Type::Union(members) | Type::Intersection(members) | Type::Tuple(members) => {
+                for member in members {
+                    self.record_type_inner(*member, span, seen_types, seen_defs);
+                }
+            }
+            Type::Record(fields) => {
+                for member in fields.values() {
+                    self.record_type_inner(*member, span, seen_types, seen_defs);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn range_only_expression(&self, expr: &HirExpression) -> bool {
+        match &expr.kind {
+            HirExpressionKind::Path(def_id) => self.range_only_bindings.contains(def_id),
+            HirExpressionKind::Literal(
+                radix_hir::HirLiteral::Int(_) | radix_hir::HirLiteral::BigInt(_),
+            ) => true,
+            HirExpressionKind::Unary(_, inner)
+            | HirExpressionKind::Conversio { source: inner, .. }
+            | HirExpressionKind::Widen { operand: inner, .. }
+            | HirExpressionKind::Verte { source: inner, .. } => self.range_only_expression(inner),
+            HirExpressionKind::Binary(_, lhs, rhs) => {
+                self.range_only_expression(lhs) && self.range_only_expression(rhs)
+            }
+            HirExpressionKind::Index(base, _) => matches!(
+                base.kind,
+                HirExpressionKind::Path(def_id) if self.coordinate_ranges.contains_key(&def_id)
+            ),
+            HirExpressionKind::Array(elements) => elements.iter().all(|element| match element {
+                HirArrayElement::Expr(expr) => self.range_only_expression(expr),
+                HirArrayElement::Spread(_) | HirArrayElement::Infer(_) => false,
+            }),
+            _ => false,
+        }
+    }
+}
+
+impl HirVisitor for BodyFacts<'_> {
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        self.evaluate(expr);
+    }
+
+    fn visit_block(&mut self, block: &HirBlock) {
+        self.visit_block_stateful(block);
+    }
+
+    fn visit_local(&mut self, local: &HirLocal) {
+        self.visit_local_stateful(local);
+    }
+
+    fn visit_stmt(&mut self, stmt: &HirStatement) {
+        self.visit_statement_stateful(stmt);
+    }
+}
+
+fn type_range(ty: TypeId, types: &TypeTable) -> Option<KernelValueRange> {
+    let ty = numeric_scalar_type(ty, types);
+    let width = match types.get(ty) {
+        Type::Primitive(Primitive::Numerus) => NumericWidth::I64,
+        Type::SizedNumeric(Primitive::Numerus, width)
+        | Type::ModularWord(width)
+        | Type::SaturatingWord(width) => *width,
+        Type::Alias(_, target) => return type_range(*target, types),
+        _ => return None,
+    };
+    let (minimum, maximum) = width.integer_range()?;
+    Some(KernelValueRange {
+        minimum: KernelRangeExpr::Constant(minimum),
+        maximum: KernelRangeExpr::Constant(maximum),
+    })
+}
+
+fn integer_slot(
+    ty: TypeId,
+    types: &TypeTable,
+) -> Option<(NumericWidth, KernelValueRange, bool, bool)> {
+    let ty = numeric_scalar_type(ty, types);
+    let (width, wrapping, saturating) = match types.get(ty) {
+        Type::Primitive(Primitive::Numerus) => (NumericWidth::I64, false, false),
+        Type::SizedNumeric(Primitive::Numerus, width) => (*width, false, false),
+        Type::ModularWord(width) => (*width, true, false),
+        Type::SaturatingWord(width) => (*width, false, true),
+        Type::Alias(_, target) => return integer_slot(*target, types),
+        _ => return None,
+    };
+    let (minimum, maximum) = width.integer_range()?;
+    Some((
+        width,
+        KernelValueRange {
+            minimum: KernelRangeExpr::Constant(minimum),
+            maximum: KernelRangeExpr::Constant(maximum),
+        },
+        wrapping,
+        saturating,
+    ))
+}
+
+fn is_integer_value_type(ty: Option<TypeId>, types: &TypeTable) -> bool {
+    ty.is_some_and(|ty| integer_slot(ty, types).is_some())
+}
+
+fn is_numeric_container(ty: TypeId, types: &TypeTable) -> bool {
+    match types.get(ty) {
+        Type::Tensor(..)
+        | Type::Vector(..)
+        | Type::Matrix(..)
+        | Type::Sparsa(..)
+        | Type::Array(..)
+        | Type::BoundedArray { .. } => true,
+        Type::Alias(_, target) | Type::Ref(_, target) => is_numeric_container(*target, types),
+        _ => false,
+    }
+}
+
+fn is_range_narrowable_type(ty: TypeId, types: &TypeTable) -> bool {
+    match types.get(ty) {
+        Type::Primitive(Primitive::Numerus) => true,
+        Type::Tensor(element, _)
+        | Type::Vector(element, _)
+        | Type::Matrix(element, _)
+        | Type::Sparsa(element, _)
+        | Type::Array(element)
+        | Type::BoundedArray { element, .. }
+        | Type::Ref(_, element)
+        | Type::Alias(_, element) => is_range_narrowable_type(*element, types),
+        _ => false,
+    }
+}
+
+fn is_modular_unary(ty: Option<TypeId>, op: HirUnOp, types: &TypeTable) -> bool {
+    ty.is_some_and(|ty| {
+        matches!(
+            (types.get(numeric_scalar_type(ty, types)), op),
+            (Type::ModularWord(_), HirUnOp::Neg | HirUnOp::BitNot)
+        )
+    })
+}
+
+fn is_modular_binary(ty: Option<TypeId>, op: HirBinOp, types: &TypeTable) -> bool {
+    if !ty.is_some_and(|ty| {
+        matches!(
+            types.get(numeric_scalar_type(ty, types)),
+            Type::ModularWord(_)
+        )
+    }) {
+        return false;
+    }
+    matches!(
+        op,
+        HirBinOp::Add
+            | HirBinOp::Sub
+            | HirBinOp::Mul
+            | HirBinOp::Div
+            | HirBinOp::Mod
+            | HirBinOp::BitAnd
+            | HirBinOp::BitOr
+            | HirBinOp::BitXor
+            | HirBinOp::Shl
+            | HirBinOp::Shr
+    )
+}
+
+fn is_modular_type(ty: Option<TypeId>, types: &TypeTable) -> bool {
+    ty.is_some_and(|ty| {
+        matches!(
+            types.get(numeric_scalar_type(ty, types)),
+            Type::ModularWord(_)
+        )
+    })
+}
+
+fn modular_carrier_bounds(ty: Option<TypeId>, types: &TypeTable) -> Option<(i128, i128)> {
+    let ty = numeric_scalar_type(ty?, types);
+    match types.get(ty) {
+        Type::ModularWord(NumericWidth::I32) => Some((i128::from(i32::MIN), i128::from(i32::MAX))),
+        Type::ModularWord(NumericWidth::U32) => Some((0, i128::from(u32::MAX))),
+        _ => None,
+    }
+}
+
+fn is_tensor_type(ty: TypeId, types: &TypeTable) -> bool {
+    match types.get(ty) {
+        Type::Tensor(..) => true,
+        Type::Alias(_, target) | Type::Ref(_, target) => is_tensor_type(*target, types),
+        _ => false,
+    }
+}
+
+/// Numeric operators on tensor-like values execute elementwise. Project the
+/// container type to its element before deriving the lane range, storage
+/// policy, or modular arithmetic family. Keeping this projection in one place
+/// makes a `TensorDiv` divisor use the range of its elements rather than
+/// treating the whole tensor as an untyped value.
+fn numeric_scalar_type(ty: TypeId, types: &TypeTable) -> TypeId {
+    match types.get(ty) {
+        Type::Alias(_, target) => numeric_scalar_type(*target, types),
+        Type::Tensor(element, _)
+        | Type::Vector(element, _)
+        | Type::Matrix(element, _)
+        | Type::Sparsa(element, _)
+        | Type::Ref(_, element) => numeric_scalar_type(*element, types),
+        _ => ty,
+    }
+}
+
+fn is_non_homomorphic_observer(op: HirBinOp) -> bool {
+    matches!(
+        op,
+        HirBinOp::Eq
+            | HirBinOp::NotEq
+            | HirBinOp::ApproxEq
+            | HirBinOp::ApproxNotEq
+            | HirBinOp::FuzzyEq
+            | HirBinOp::FuzzyNotEq
+            | HirBinOp::StrictEq
+            | HirBinOp::StrictNotEq
+            | HirBinOp::Lt
+            | HirBinOp::LtEq
+            | HirBinOp::Gt
+            | HirBinOp::GtEq
+            | HirBinOp::InRange
+            | HirBinOp::Between
+            | HirBinOp::NotInRange
+            | HirBinOp::NotBetween
+            | HirBinOp::Div
+            | HirBinOp::Mod
+            | HirBinOp::Shr
+    )
+}
+
+fn is_integer_value_operator(op: HirBinOp) -> bool {
+    matches!(
+        op,
+        HirBinOp::Add
+            | HirBinOp::Sub
+            | HirBinOp::Mul
+            | HirBinOp::Div
+            | HirBinOp::Mod
+            | HirBinOp::BitAnd
+            | HirBinOp::BitOr
+            | HirBinOp::BitXor
+            | HirBinOp::Shl
+            | HirBinOp::Shr
+    )
+}
+
+fn unary_range(op: HirUnOp, value: AbstractRange) -> AbstractRange {
+    let Some(value) = value.0 else {
+        return AbstractRange::unknown();
+    };
+    match op {
+        HirUnOp::Neg => AbstractRange(Some(KernelValueRange {
+            minimum: negate(value.maximum),
+            maximum: negate(value.minimum),
+        })),
+        HirUnOp::BitNot => AbstractRange(Some(KernelValueRange {
+            minimum: subtract(negate(value.maximum), KernelRangeExpr::Constant(1)),
+            maximum: subtract(negate(value.minimum), KernelRangeExpr::Constant(1)),
+        })),
+        HirUnOp::Not => AbstractRange::unknown(),
+    }
+}
+
+fn binary_range(op: HirBinOp, lhs: AbstractRange, rhs: AbstractRange) -> AbstractRange {
+    let (Some(lhs), Some(rhs)) = (lhs.0, rhs.0) else {
+        return AbstractRange::unknown();
+    };
+    let result = match op {
+        HirBinOp::Add => KernelValueRange {
+            minimum: add(lhs.minimum, rhs.minimum),
+            maximum: add(lhs.maximum, rhs.maximum),
+        },
+        HirBinOp::Sub => KernelValueRange {
+            minimum: subtract(lhs.minimum, rhs.maximum),
+            maximum: subtract(lhs.maximum, rhs.minimum),
+        },
+        HirBinOp::Mul => {
+            let values = [
+                multiply(lhs.minimum.clone(), rhs.minimum.clone()),
+                multiply(lhs.minimum, rhs.maximum.clone()),
+                multiply(lhs.maximum.clone(), rhs.minimum),
+                multiply(lhs.maximum, rhs.maximum),
+            ];
+            KernelValueRange {
+                minimum: values.iter().cloned().reduce(minimum).unwrap(),
+                maximum: values.into_iter().reduce(maximum).unwrap(),
+            }
+        }
+        HirBinOp::Div | HirBinOp::Shr => {
+            let divisors = if op == HirBinOp::Shr {
+                let Some(shift) =
+                    constant(&rhs.minimum).filter(|shift| *shift >= 0 && *shift < 127)
+                else {
+                    return AbstractRange::unknown();
+                };
+                if constant(&rhs.maximum) != Some(shift) {
+                    return AbstractRange::unknown();
+                }
+                let factor = KernelRangeExpr::Constant(1_i128 << shift as u32);
+                [factor.clone(), factor.clone()]
+            } else {
+                let (Some(divisor_min), Some(divisor_max)) =
+                    (constant(&rhs.minimum), constant(&rhs.maximum))
+                else {
+                    return AbstractRange::unknown();
+                };
+                if divisor_min <= 0 && divisor_max >= 0 {
+                    return AbstractRange::unknown();
+                }
+                [
+                    KernelRangeExpr::Constant(divisor_min),
+                    KernelRangeExpr::Constant(divisor_max),
+                ]
+            };
+            let values = [
+                floor_divide(lhs.minimum.clone(), divisors[0].clone()),
+                floor_divide(lhs.minimum, divisors[1].clone()),
+                floor_divide(lhs.maximum.clone(), divisors[0].clone()),
+                floor_divide(lhs.maximum, divisors[1].clone()),
+            ];
+            let Some(values) = values.into_iter().collect::<Option<Vec<_>>>() else {
+                return AbstractRange::unknown();
+            };
+            let mut values = values.into_iter();
+            let Some(first) = values.next() else {
+                return AbstractRange::unknown();
+            };
+            let (minimum_value, maximum_value) = values
+                .fold((first.clone(), first), |(lo, hi), value| {
+                    (minimum(lo, value.clone()), maximum(hi, value))
+                });
+            KernelValueRange {
+                minimum: minimum_value,
+                maximum: maximum_value,
+            }
+        }
+        HirBinOp::Mod => {
+            let Some(divisor_min) = constant(&rhs.minimum) else {
+                return AbstractRange::unknown();
+            };
+            let Some(divisor_max) = constant(&rhs.maximum) else {
+                return AbstractRange::unknown();
+            };
+            if divisor_min != divisor_max || divisor_min == 0 {
+                return AbstractRange::unknown();
+            }
+            let Some(bound) = divisor_min
+                .checked_abs()
+                .map(|value| value.saturating_sub(1))
+            else {
+                return AbstractRange::unknown();
+            };
+            if divisor_min > 0 {
+                KernelValueRange {
+                    minimum: KernelRangeExpr::Constant(0),
+                    maximum: KernelRangeExpr::Constant(bound),
+                }
+            } else {
+                KernelValueRange {
+                    minimum: KernelRangeExpr::Constant(-bound),
+                    maximum: KernelRangeExpr::Constant(0),
+                }
+            }
+        }
+        HirBinOp::Shl => {
+            let Some(shift) = constant(&rhs.minimum).filter(|shift| *shift >= 0 && *shift < 127)
+            else {
+                return AbstractRange::unknown();
+            };
+            if constant(&rhs.maximum) != Some(shift) {
+                return AbstractRange::unknown();
+            }
+            let factor = KernelRangeExpr::Constant(1_i128 << shift as u32);
+            let values = [
+                multiply(lhs.minimum.clone(), factor.clone()),
+                multiply(lhs.maximum.clone(), factor),
+            ];
+            KernelValueRange {
+                minimum: values.iter().cloned().reduce(minimum).unwrap(),
+                maximum: values.into_iter().reduce(maximum).unwrap(),
+            }
+        }
+        HirBinOp::BitAnd => {
+            let Some(mask) = constant(&rhs.maximum).filter(|mask| *mask >= 0) else {
+                return AbstractRange::unknown();
+            };
+            KernelValueRange {
+                minimum: KernelRangeExpr::Constant(0),
+                maximum: KernelRangeExpr::Constant(mask),
+            }
+        }
+        HirBinOp::BitOr | HirBinOp::BitXor => {
+            if lhs == rhs {
+                lhs
+            } else {
+                return AbstractRange::unknown();
+            }
+        }
+        _ => return AbstractRange::unknown(),
+    };
+    AbstractRange(Some(result))
+}
+
+fn add(lhs: KernelRangeExpr, rhs: KernelRangeExpr) -> KernelRangeExpr {
+    if let (Some(lhs), Some(rhs)) = (constant(&lhs), constant(&rhs)) {
+        if let Some(value) = lhs.checked_add(rhs) {
+            return KernelRangeExpr::Constant(value);
+        }
+    }
+    match (lhs, rhs) {
+        (value, KernelRangeExpr::Constant(0)) | (KernelRangeExpr::Constant(0), value) => value,
+        (lhs, rhs) => KernelRangeExpr::Add(Box::new(lhs), Box::new(rhs)),
+    }
+}
+
+fn subtract(lhs: KernelRangeExpr, rhs: KernelRangeExpr) -> KernelRangeExpr {
+    if let (Some(lhs), Some(rhs)) = (constant(&lhs), constant(&rhs)) {
+        if let Some(value) = lhs.checked_sub(rhs) {
+            return KernelRangeExpr::Constant(value);
+        }
+    }
+    match (lhs, rhs) {
+        (value, KernelRangeExpr::Constant(0)) => value,
+        (lhs, rhs) => KernelRangeExpr::Subtract(Box::new(lhs), Box::new(rhs)),
+    }
+}
+
+fn negate(value: KernelRangeExpr) -> KernelRangeExpr {
+    match constant(&value).and_then(i128::checked_neg) {
+        Some(value) => KernelRangeExpr::Constant(value),
+        None => subtract(KernelRangeExpr::Constant(0), value),
+    }
+}
+
+fn multiply(lhs: KernelRangeExpr, rhs: KernelRangeExpr) -> KernelRangeExpr {
+    if let (Some(lhs), Some(rhs)) = (constant(&lhs), constant(&rhs)) {
+        if let Some(value) = lhs.checked_mul(rhs) {
+            return KernelRangeExpr::Constant(value);
+        }
+    }
+    match (&lhs, &rhs) {
+        (_, KernelRangeExpr::Constant(0)) | (KernelRangeExpr::Constant(0), _) => {
+            KernelRangeExpr::Constant(0)
+        }
+        (_, KernelRangeExpr::Constant(1)) => lhs,
+        (KernelRangeExpr::Constant(1), _) => rhs,
+        _ => KernelRangeExpr::Multiply(Box::new(lhs), Box::new(rhs)),
+    }
+}
+
+fn floor_divide(lhs: KernelRangeExpr, rhs: KernelRangeExpr) -> Option<KernelRangeExpr> {
+    if let (Some(lhs), Some(rhs)) = (constant(&lhs), constant(&rhs)) {
+        if rhs == 0 {
+            return None;
+        }
+        return lhs.checked_div_euclid(rhs).map(KernelRangeExpr::Constant);
+    }
+    Some(KernelRangeExpr::FloorDivide(Box::new(lhs), Box::new(rhs)))
+}
+
+fn minimum(lhs: KernelRangeExpr, rhs: KernelRangeExpr) -> KernelRangeExpr {
+    match (constant(&lhs), constant(&rhs)) {
+        (Some(lhs), Some(rhs)) => KernelRangeExpr::Constant(lhs.min(rhs)),
+        _ if lhs == rhs => lhs,
+        _ => KernelRangeExpr::Minimum(Box::new(lhs), Box::new(rhs)),
+    }
+}
+
+fn maximum(lhs: KernelRangeExpr, rhs: KernelRangeExpr) -> KernelRangeExpr {
+    match (constant(&lhs), constant(&rhs)) {
+        (Some(lhs), Some(rhs)) => KernelRangeExpr::Constant(lhs.max(rhs)),
+        _ if lhs == rhs => lhs,
+        _ => KernelRangeExpr::Maximum(Box::new(lhs), Box::new(rhs)),
+    }
+}
+
+fn constant(expr: &KernelRangeExpr) -> Option<i128> {
+    match expr {
+        KernelRangeExpr::Constant(value) => Some(*value),
+        KernelRangeExpr::Shape(_) => None,
+        KernelRangeExpr::Add(lhs, rhs) => constant(lhs)?.checked_add(constant(rhs)?),
+        KernelRangeExpr::Subtract(lhs, rhs) => constant(lhs)?.checked_sub(constant(rhs)?),
+        KernelRangeExpr::Multiply(lhs, rhs) => constant(lhs)?.checked_mul(constant(rhs)?),
+        KernelRangeExpr::FloorDivide(lhs, rhs) => {
+            let rhs = constant(rhs)?;
+            (rhs != 0)
+                .then(|| constant(lhs)?.checked_div_euclid(rhs))
+                .flatten()
+        }
+        KernelRangeExpr::Minimum(lhs, rhs) => Some(constant(lhs)?.min(constant(rhs)?)),
+        KernelRangeExpr::Maximum(lhs, rhs) => Some(constant(lhs)?.max(constant(rhs)?)),
+    }
+}
+
+fn contains_shape(range: &KernelValueRange) -> bool {
+    fn visit(expr: &KernelRangeExpr) -> bool {
+        match expr {
+            KernelRangeExpr::Shape(_) => true,
+            KernelRangeExpr::Constant(_) => false,
+            KernelRangeExpr::Add(lhs, rhs)
+            | KernelRangeExpr::Subtract(lhs, rhs)
+            | KernelRangeExpr::Multiply(lhs, rhs)
+            | KernelRangeExpr::FloorDivide(lhs, rhs)
+            | KernelRangeExpr::Minimum(lhs, rhs)
+            | KernelRangeExpr::Maximum(lhs, rhs) => visit(lhs) || visit(rhs),
+        }
+    }
+    visit(&range.minimum) || visit(&range.maximum)
+}
+
+fn merge_ranges(
+    before: FxHashMap<DefId, AbstractRange>,
+    after: FxHashMap<DefId, AbstractRange>,
+) -> FxHashMap<DefId, AbstractRange> {
+    let mut merged = before.clone();
+    for (def_id, next) in after {
+        let Some(previous) = before.get(&def_id).cloned() else {
+            merged.insert(def_id, next);
+            continue;
+        };
+        let (Some(previous), Some(next)) = (previous.0, next.0) else {
+            merged.insert(def_id, AbstractRange::unknown());
+            continue;
+        };
+        merged.insert(
+            def_id,
+            AbstractRange(Some(KernelValueRange {
+                minimum: minimum(previous.minimum, next.minimum),
+                maximum: maximum(previous.maximum, next.maximum),
+            })),
+        );
+    }
+    merged
+}
+
+fn merge_abstract_ranges(ranges: &[AbstractRange]) -> AbstractRange {
+    let Some(mut ranges) = ranges
+        .iter()
+        .map(|range| range.0.clone())
+        .collect::<Option<Vec<_>>>()
+    else {
+        return AbstractRange::unknown();
+    };
+    let Some(mut merged) = ranges.pop() else {
+        return AbstractRange::unknown();
+    };
+    for range in ranges {
+        merged.minimum = minimum(merged.minimum, range.minimum);
+        merged.maximum = maximum(merged.maximum, range.maximum);
+    }
+    AbstractRange(Some(merged))
+}
+
+/// A loop may execute any number of times. Keep an incoming fact only when
+/// the body leaves it unchanged; one-iteration propagation is not a proof for
+/// a backedge.
+fn merge_loop_ranges(
+    before: FxHashMap<DefId, AbstractRange>,
+    after: FxHashMap<DefId, AbstractRange>,
+) -> FxHashMap<DefId, AbstractRange> {
+    before
+        .into_iter()
+        .map(|(def_id, original)| {
+            let next = after.get(&def_id);
+            let merged = if next == Some(&original) {
+                original
+            } else {
+                AbstractRange::unknown()
+            };
+            (def_id, merged)
+        })
+        .collect()
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SymbolicBounds {
+    minimum: Option<i128>,
+    maximum: Option<i128>,
+}
+
+fn symbolic_bounds(expr: &KernelRangeExpr) -> SymbolicBounds {
+    if let Some(value) = constant(expr) {
+        return SymbolicBounds {
+            minimum: Some(value),
+            maximum: Some(value),
+        };
+    }
+    match expr {
+        KernelRangeExpr::Constant(value) => SymbolicBounds {
+            minimum: Some(*value),
+            maximum: Some(*value),
+        },
+        KernelRangeExpr::Shape(_) => SymbolicBounds {
+            minimum: Some(0),
+            maximum: None,
+        },
+        KernelRangeExpr::Add(lhs, rhs) => {
+            let lhs = symbolic_bounds(lhs);
+            let rhs = symbolic_bounds(rhs);
+            SymbolicBounds {
+                minimum: checked_binary(lhs.minimum, rhs.minimum, i128::checked_add),
+                maximum: checked_binary(lhs.maximum, rhs.maximum, i128::checked_add),
+            }
+        }
+        KernelRangeExpr::Subtract(lhs, rhs) => {
+            let lhs = symbolic_bounds(lhs);
+            let rhs = symbolic_bounds(rhs);
+            SymbolicBounds {
+                minimum: checked_binary(lhs.minimum, rhs.maximum, i128::checked_sub),
+                maximum: checked_binary(lhs.maximum, rhs.minimum, i128::checked_sub),
+            }
+        }
+        KernelRangeExpr::Multiply(lhs, rhs) => {
+            let lhs_constant = constant(lhs);
+            let rhs_constant = constant(rhs);
+            match (lhs_constant, rhs_constant) {
+                (Some(value), None) => scale_bounds(symbolic_bounds(rhs), value),
+                (None, Some(value)) => scale_bounds(symbolic_bounds(lhs), value),
+                _ => {
+                    let lhs = symbolic_bounds(lhs);
+                    let rhs = symbolic_bounds(rhs);
+                    let values = [
+                        checked_binary(lhs.minimum, rhs.minimum, i128::checked_mul),
+                        checked_binary(lhs.minimum, rhs.maximum, i128::checked_mul),
+                        checked_binary(lhs.maximum, rhs.minimum, i128::checked_mul),
+                        checked_binary(lhs.maximum, rhs.maximum, i128::checked_mul),
+                    ];
+                    let known: Vec<i128> = values.into_iter().flatten().collect();
+                    if known.len() == 4 {
+                        bounds_of_values(&known)
+                    } else {
+                        SymbolicBounds {
+                            minimum: None,
+                            maximum: None,
+                        }
+                    }
+                }
+            }
+        }
+        KernelRangeExpr::FloorDivide(lhs, rhs) => {
+            let Some(divisor) = constant(rhs).filter(|divisor| *divisor != 0) else {
+                return SymbolicBounds {
+                    minimum: None,
+                    maximum: None,
+                };
+            };
+            let numerator = symbolic_bounds(lhs);
+            if divisor > 0 {
+                SymbolicBounds {
+                    minimum: numerator
+                        .minimum
+                        .and_then(|value| value.checked_div_euclid(divisor)),
+                    maximum: numerator
+                        .maximum
+                        .and_then(|value| value.checked_div_euclid(divisor)),
+                }
+            } else {
+                SymbolicBounds {
+                    minimum: numerator
+                        .maximum
+                        .and_then(|value| value.checked_div_euclid(divisor)),
+                    maximum: numerator
+                        .minimum
+                        .and_then(|value| value.checked_div_euclid(divisor)),
+                }
+            }
+        }
+        KernelRangeExpr::Minimum(lhs, rhs) => {
+            let lhs = symbolic_bounds(lhs);
+            let rhs = symbolic_bounds(rhs);
+            SymbolicBounds {
+                minimum: checked_min_lower(lhs.minimum, rhs.minimum),
+                maximum: checked_min_upper(lhs.maximum, rhs.maximum),
+            }
+        }
+        KernelRangeExpr::Maximum(lhs, rhs) => {
+            let lhs = symbolic_bounds(lhs);
+            let rhs = symbolic_bounds(rhs);
+            SymbolicBounds {
+                minimum: checked_max_lower(lhs.minimum, rhs.minimum),
+                maximum: checked_max_upper(lhs.maximum, rhs.maximum),
+            }
+        }
+    }
+}
+
+fn checked_binary(
+    lhs: Option<i128>,
+    rhs: Option<i128>,
+    operation: fn(i128, i128) -> Option<i128>,
+) -> Option<i128> {
+    operation(lhs?, rhs?)
+}
+
+fn scale_bounds(bounds: SymbolicBounds, scale: i128) -> SymbolicBounds {
+    if scale >= 0 {
+        SymbolicBounds {
+            minimum: bounds.minimum.and_then(|value| value.checked_mul(scale)),
+            maximum: bounds.maximum.and_then(|value| value.checked_mul(scale)),
+        }
+    } else {
+        SymbolicBounds {
+            minimum: bounds.maximum.and_then(|value| value.checked_mul(scale)),
+            maximum: bounds.minimum.and_then(|value| value.checked_mul(scale)),
+        }
+    }
+}
+
+fn bounds_of_values(values: &[i128]) -> SymbolicBounds {
+    let (minimum, maximum) = values
+        .iter()
+        .copied()
+        .fold((i128::MAX, i128::MIN), |(minimum, maximum), value| {
+            (minimum.min(value), maximum.max(value))
+        });
+    SymbolicBounds {
+        minimum: Some(minimum),
+        maximum: Some(maximum),
+    }
+}
+
+fn checked_min_lower(lhs: Option<i128>, rhs: Option<i128>) -> Option<i128> {
+    match (lhs, rhs) {
+        (Some(lhs), Some(rhs)) => Some(lhs.min(rhs)),
+        _ => None,
+    }
+}
+
+fn checked_min_upper(lhs: Option<i128>, rhs: Option<i128>) -> Option<i128> {
+    match (lhs, rhs) {
+        (Some(lhs), Some(rhs)) => Some(lhs.min(rhs)),
+        (Some(value), None) | (None, Some(value)) => Some(value),
+        (None, None) => None,
+    }
+}
+
+fn checked_max_lower(lhs: Option<i128>, rhs: Option<i128>) -> Option<i128> {
+    match (lhs, rhs) {
+        (Some(lhs), Some(rhs)) => Some(lhs.max(rhs)),
+        (Some(lhs), None) | (None, Some(lhs)) => Some(lhs),
+        (None, None) => None,
+    }
+}
+
+fn checked_max_upper(lhs: Option<i128>, rhs: Option<i128>) -> Option<i128> {
+    match (lhs, rhs) {
+        (Some(lhs), Some(rhs)) => Some(lhs.max(rhs)),
+        _ => None,
+    }
+}
+
+fn could_fit_between(
+    minimum: SymbolicBounds,
+    maximum: SymbolicBounds,
+    slot_min: i128,
+    slot_max: i128,
+) -> bool {
+    !minimum.minimum.is_some_and(|minimum| minimum > slot_max)
+        && !maximum.maximum.is_some_and(|maximum| maximum < slot_min)
+}
+
+fn excludes_zero(range: &AbstractRange) -> bool {
+    let Some(range) = &range.0 else {
+        return false;
+    };
+    let minimum = symbolic_bounds(&range.minimum);
+    let maximum = symbolic_bounds(&range.maximum);
+    minimum.minimum.is_some_and(|minimum| minimum > 0)
+        || maximum.maximum.is_some_and(|maximum| maximum < 0)
+}
+
+fn proves_nonnegative(range: &AbstractRange) -> bool {
+    range
+        .0
+        .as_ref()
+        .and_then(|range| symbolic_bounds(&range.minimum).minimum)
+        .is_some_and(|minimum| minimum >= 0)
+}
+
+fn reverse_comparison(op: HirBinOp) -> HirBinOp {
+    match op {
+        HirBinOp::Lt => HirBinOp::Gt,
+        HirBinOp::Gt => HirBinOp::Lt,
+        HirBinOp::LtEq => HirBinOp::GtEq,
+        HirBinOp::GtEq => HirBinOp::LtEq,
+        other => other,
+    }
+}
+
+fn refine_interval(
+    op: HirBinOp,
+    current: KernelValueRange,
+    bound: KernelValueRange,
+    truth: bool,
+) -> Option<KernelValueRange> {
+    let (Some(bound_min), Some(bound_max)) = (constant(&bound.minimum), constant(&bound.maximum))
+    else {
+        return None;
+    };
+    if bound_min != bound_max {
+        return None;
+    }
+    let bound = bound_min;
+    let range = match (op, truth) {
+        (HirBinOp::Lt, true) => KernelValueRange {
+            minimum: current.minimum,
+            maximum: minimum(
+                current.maximum,
+                KernelRangeExpr::Constant(bound.checked_sub(1)?),
+            ),
+        },
+        (HirBinOp::Lt, false) => KernelValueRange {
+            minimum: maximum(current.minimum, KernelRangeExpr::Constant(bound)),
+            maximum: current.maximum,
+        },
+        (HirBinOp::LtEq, true) => KernelValueRange {
+            minimum: current.minimum,
+            maximum: minimum(current.maximum, KernelRangeExpr::Constant(bound)),
+        },
+        (HirBinOp::LtEq, false) => KernelValueRange {
+            minimum: maximum(
+                current.minimum,
+                KernelRangeExpr::Constant(bound.checked_add(1)?),
+            ),
+            maximum: current.maximum,
+        },
+        (HirBinOp::Gt, true) => KernelValueRange {
+            minimum: maximum(
+                current.minimum,
+                KernelRangeExpr::Constant(bound.checked_add(1)?),
+            ),
+            maximum: current.maximum,
+        },
+        (HirBinOp::Gt, false) => KernelValueRange {
+            minimum: current.minimum,
+            maximum: minimum(current.maximum, KernelRangeExpr::Constant(bound)),
+        },
+        (HirBinOp::GtEq, true) => KernelValueRange {
+            minimum: maximum(current.minimum, KernelRangeExpr::Constant(bound)),
+            maximum: current.maximum,
+        },
+        (HirBinOp::GtEq, false) => KernelValueRange {
+            minimum: current.minimum,
+            maximum: minimum(
+                current.maximum,
+                KernelRangeExpr::Constant(bound.checked_sub(1)?),
+            ),
+        },
+        _ => return None,
+    };
+    if constant(&range.minimum)
+        .zip(constant(&range.maximum))
+        .is_some_and(|(min, max)| min > max)
+    {
+        None
+    } else {
+        Some(range)
+    }
+}
+
+fn shape_dimensions(ty: TypeId, types: &TypeTable) -> Vec<IndexId> {
+    let shape = match types.get(ty) {
+        Type::Tensor(_, shape)
+        | Type::Vector(_, shape)
+        | Type::Matrix(_, shape)
+        | Type::Sparsa(_, shape) => *shape,
+        Type::Alias(_, target) => return shape_dimensions(*target, types),
+        _ => return Vec::new(),
+    };
+    match types.get_index(shape) {
+        IndexExpr::Tuple(dimensions) => dimensions.clone(),
+        IndexExpr::Unspecified => Vec::new(),
+        _ => vec![shape],
+    }
+}
+
+fn coordinate_range(dimension: IndexId, types: &TypeTable) -> AbstractRange {
+    match evaluate_index_dimension(dimension, types) {
+        Ok(Some(extent)) if extent > 0 => AbstractRange(Some(KernelValueRange {
+            minimum: KernelRangeExpr::Constant(0),
+            maximum: KernelRangeExpr::Constant(i128::from(extent - 1)),
+        })),
+        Ok(Some(0)) | Err(_) => AbstractRange::unknown(),
+        _ => AbstractRange(Some(KernelValueRange {
+            minimum: KernelRangeExpr::Constant(0),
+            maximum: subtract(
+                KernelRangeExpr::Shape(dimension),
+                KernelRangeExpr::Constant(1),
+            ),
+        })),
+    }
+}
+
+fn tensor_element(ty: TypeId, types: &TypeTable) -> Option<TypeId> {
+    match types.get(ty) {
+        Type::Tensor(element, _)
+        | Type::Vector(element, _)
+        | Type::Matrix(element, _)
+        | Type::Sparsa(element, _)
+        | Type::Array(element)
+        | Type::BoundedArray { element, .. } => Some(*element),
+        Type::Ref(_, target) | Type::Alias(_, target) => tensor_element(*target, types),
+        _ => None,
+    }
+}
+
+fn dedupe<T: Clone + PartialEq>(values: Vec<T>) -> Vec<T> {
+    values.into_iter().fold(Vec::new(), |mut out, value| {
+        if !out.contains(&value) {
+            out.push(value);
+        }
+        out
+    })
+}
+
+#[derive(Debug, Default)]
+struct TypeFacts {
+    fields: FxHashMap<DefId, Vec<TypeId>>,
+}
+
+impl TypeFacts {
+    fn from_hir(hir: &radix_hir::HirModule) -> Self {
+        let mut facts = Self::default();
+        for item in &hir.items {
+            match &item.kind {
+                HirItemKind::Struct(strukt) => {
+                    facts.fields.insert(
+                        item.def_id,
+                        strukt.fields.iter().map(|field| field.ty).collect(),
+                    );
+                }
+                HirItemKind::Enum(enumeration) => {
+                    facts.fields.insert(
+                        item.def_id,
+                        enumeration
+                            .commune_fields
+                            .iter()
+                            .chain(
+                                enumeration
+                                    .variants
+                                    .iter()
+                                    .flat_map(|variant| variant.fields.iter()),
+                            )
+                            .map(|field| field.ty)
+                            .collect(),
+                    );
+                }
+                _ => {}
+            }
+        }
+        facts
+    }
+}

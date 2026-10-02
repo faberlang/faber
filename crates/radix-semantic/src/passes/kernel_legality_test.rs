@@ -182,7 +182,13 @@ functio flat(numerus n) → numerus {
         fixture.diagnostics
     );
     let hir = fixture.hir.as_ref().expect("hir");
-    let report = check(hir, &fixture.resolver, &fixture.types, &fixture.interner);
+    let report = check(
+        hir,
+        &fixture.resolver,
+        &fixture.types,
+        &fixture.interner,
+        &fixture.tensor_edge_policies,
+    );
     assert!(report.errors.is_empty(), "{:?}", report.errors);
     let names: Vec<&str> = hir
         .items

@@ -313,6 +313,8 @@ fn analyzed_application_carries_access_facts() {
         libraries: radix_hir::LibraryRegistry::default(),
         radix_lanes: result.radix_lanes,
         gpu_builtins: result.gpu_builtins,
+        tensor_edge_policies: result.tensor_edge_policies,
+        kernel_requirements: result.kernel_requirements,
         access_facts,
         region_facts: result.region_facts,
         semantic_diagnostics: result.diagnostics,

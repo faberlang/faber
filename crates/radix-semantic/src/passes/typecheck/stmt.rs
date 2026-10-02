@@ -57,6 +57,18 @@ impl TypeChecker<'_> {
             return;
         }
 
+        let previous_shape_return = self.current_shape_return_expr;
+        let value_span = value
+            .as_deref()
+            .map_or(radix_lexer::Span::default(), |expr| expr.span);
+        let unresolved_edge_value = value.as_deref().is_some_and(|expr| {
+            self.tensor_edge_policies
+                .shifted_expressions
+                .contains(&expr.id)
+        });
+        if let Some(expr) = value.as_deref() {
+            self.current_shape_return_expr = Some(expr.id);
+        }
         let value_ty = match value {
             Some(expr) => {
                 if let Some(expected) = self.current_return {
@@ -68,10 +80,21 @@ impl TypeChecker<'_> {
             None => self.vacuum_type(),
         };
 
-        if let Some(expected) = self.current_return {
-            self.unify_carrier_assign(value_ty, expected, span, ISSUE_RETURN_TYPE_MISMATCH);
+        if unresolved_edge_value {
+            self.invalid_operand_types(
+                super::intrinsics::ISSUE_TENSOR_EDGE_VIEW_REQUIRES_RESOLUTION,
+                value_span,
+            );
+            self.current_shape_return_expr = previous_shape_return;
             return;
         }
+
+        if let Some(expected) = self.current_return {
+            self.unify_carrier_assign(value_ty, expected, span, ISSUE_RETURN_TYPE_MISMATCH);
+            self.current_shape_return_expr = previous_shape_return;
+            return;
+        }
+        self.current_shape_return_expr = previous_shape_return;
 
         match self.inferred_return {
             None => self.inferred_return = Some(value_ty),
@@ -90,6 +113,13 @@ impl TypeChecker<'_> {
     /// and declarations without either side receive a fresh inference variable
     /// that must be resolved before finalization.
     pub fn check_local(&mut self, local: &mut HirLocal) {
+        if let Some(ty) = local.ty {
+            let span = local
+                .init
+                .as_ref()
+                .map_or_else(radix_lexer::Span::default, |init| init.span);
+            self.reject_tensor_edge_policy_value_type(ty, span);
+        }
         if local.is_await {
             self.check_await_local(local);
             return;
@@ -151,6 +181,28 @@ impl TypeChecker<'_> {
 
         if local.ty.is_none() {
             local.ty = Some(inferred);
+        }
+
+        if let Some(init) = local.init.as_ref() {
+            if self
+                .tensor_edge_policies
+                .shifted_expressions
+                .contains(&init.id)
+            {
+                self.tensor_edge_policies
+                    .shifted_bindings
+                    .insert(local.def_id);
+            }
+            if let Some(context) = self
+                .tensor_edge_policies
+                .shifted_view_expressions
+                .get(&init.id)
+                .copied()
+            {
+                self.tensor_edge_policies
+                    .shifted_view_bindings
+                    .insert(local.def_id, context);
+            }
         }
 
         let scalar_text = local

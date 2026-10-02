@@ -1088,6 +1088,9 @@ impl Lowerer<'_> {
                 radix_syntax::ArrayElement::Spread(e) => {
                     elements.push(HirArrayElement::Spread(lower_expr(self, e)));
                 }
+                radix_syntax::ArrayElement::Infer(span) => {
+                    elements.push(HirArrayElement::Infer(*span));
+                }
             }
         }
 
@@ -1689,7 +1692,10 @@ fn lower_call_generic_arg(lowerer: &mut Lowerer<'_>, arg: &GenericArgExpr) -> Ty
                 lowerer.types.intern(crate::Type::Param(symbol))
             }
             crate::IndexExpr::Param(symbol) => lowerer.types.intern(crate::Type::Param(symbol)),
-            crate::IndexExpr::Infer(_)
+            crate::IndexExpr::Runtime(_)
+            | crate::IndexExpr::Affine { .. }
+            | crate::IndexExpr::Divide { .. }
+            | crate::IndexExpr::Infer(_)
             | crate::IndexExpr::Unspecified
             | crate::IndexExpr::Tuple(_) => {
                 lowerer.error("generic_call_size_shape_unsupported");

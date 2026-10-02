@@ -183,6 +183,9 @@ numquam = "numquam"
 ignotum = "ignotum"
 octeti = "octeti"
 octetus = "octetus"
+clampa = "clampa"
+reflexa = "reflexa"
+involuta = "involuta"
 littera = "littera"
 regex = "regex"
 json = "json"
@@ -1321,6 +1324,10 @@ help = "fix the AST construct for lowering"
 message = "unknown index variable in Figura"
 help = "fix the AST construct for lowering"
 
+[diagnostics.SEM008.issues.figura_arithmetic_invalid]
+message = "invalid Figura arithmetic: {reason}"
+help = "dimensions are natural numbers, and division must be exact"
+
 [diagnostics.SEM008.issues.forma_builtin_missing]
 message = "builtin forma genus is not registered"
 help = "fix the AST construct for lowering"
@@ -1888,6 +1895,10 @@ help = "use a tensor whose element type is T ∪ nihil, or drop the {vel}"
 [diagnostics.SEM010.issues.common_type_mismatch]
 message = "incompatible types"
 help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.tensor_edge_policy_marker_not_runtime_value]
+message = "tensor edge-policy markers are type arguments, not runtime values"
+help = "use clampa, reflexa, or involuta only as the type argument to limes"
 
 [diagnostics.SEM010.issues.array_element_type_mismatch]
 message = "array element type mismatch"
@@ -2817,6 +2828,26 @@ help = "use grid.forma(shape) for runtime reshape"
 message = "tensor type argument must be a complete tensor type such as tf32[2, 2] or tensor<numerus, [4]>"
 help = "include both element type and shape in the tensor type argument"
 
+[diagnostics.SEM011.issues.tensor_shift_nullable_source_unsupported]
+message = "disloco requirit elementa tensoris non-nulla et non potest novum motum super view nondum resolutum creare"
+help = "resolve pending edges with limes<Policy>() or tensor coalescing before another shift"
+
+[diagnostics.SEM011.issues.tensor_edge_view_requires_resolution]
+message = "tensor motus nondum resolutus a limes aut tensor coalescing tantum consumi potest"
+help = "resolve the edge view with limes<Policy>() or coalesce its optional edge cells"
+
+[diagnostics.SEM011.issues.tensor_limes_requires_shifted_view]
+message = "limes requirit tensoris view motus nondum resolutum"
+help = "call shift(offsets) before limes<Policy>()"
+
+[diagnostics.SEM011.issues.tensor_limes_policy_invalid]
+message = "limes requirit rationem marginis propriam aut genus sine campis instantiarum validum"
+help = "provide remap(vector<int, R>) -> vector<int, R> and an optional transform(vector<int, R>, T) -> T method"
+
+[diagnostics.SEM011.issues.tensor_shift_offset_rank_mismatch]
+message = "tensoris disloco offsets eandem rationem habere debent atque tensor"
+help = "provide one integer offset for each tensor axis"
+
 [diagnostics.SEM011.issues.tuple_index_must_be_constant]
 message = "tuple subscript requires compile-time constant index"
 help = "use a literal integer index such as pair[0] or pair[1]"
@@ -3572,6 +3603,14 @@ help = "align parameter modes between caller and callee"
 [diagnostics.SEM057.issues.de_to_in_or_ex_position]
 message = "cannot pass `de` parameter to `in` or `ex` position"
 help = "align parameter modes between caller and callee"
+
+[diagnostics.SEM057.issues.tensor_view_escape]
+message = "a borrowed tensor view cannot escape or initialize mutable storage"
+help = "call materialize() to create an owned tensor before storing, returning, or capturing it"
+
+[diagnostics.SEM057.issues.tensor_view_read_only]
+message = "a borrowed tensor view is read-only and aliases its base"
+help = "pass the view as de, or call materialize() before using it as mut or own"
 
 [diagnostics.SEM057.issues.ref_to_mut_or_own_position]
 message = "cannot pass a `ref` value to a `mut` or `own` position"

@@ -59,6 +59,8 @@ pub mod radix_contract;
 pub mod radix_lane;
 pub mod resolved_use;
 pub mod scope;
+pub mod shape_obligations;
+pub mod tensor_edge_policy;
 pub mod target_qualification;
 pub mod template_holes;
 pub mod tensor_bracket;
@@ -178,7 +180,7 @@ pub use format_type::format_faber_type;
 pub use function_facts::{
     CaptureFact, CaptureMode, FunctionFact, FunctionFactTable, analyze_function_facts,
 };
-pub use index::{IndexExpr, IndexId, IndexVar};
+pub use index::{IndexExpr, IndexId, IndexVar, RuntimeExtentId};
 pub use index_infer::{
     INCOMPATIBLE_INDEX_MSG, IndexConstraint, IndexInferError, IndexInferState,
     MISSING_TENSOR_SHAPE_MSG, SCALAR_TO_TENSOR_CONVERSIO_MSG, TENSOR_ELEMENT_CONVERSIO_MSG,
@@ -211,9 +213,13 @@ pub use scope::{
     BareVariantLookup, CommuneField, ConversionPair, ConversionRow, ConversionRowConflict,
     QualifiedVariantPathLookup, Resolver, Scope, ScopeId, ScopeKind, Symbol, SymbolKind,
 };
+pub use shape_obligations::{
+    RuntimeSizeBinding, ShapeObligationTable, ShapeRelation, ShapeRelationBoundary,
+};
+pub use tensor_edge_policy::{ResolvedTensorEdgePolicy, TensorEdgePolicyTable, TensorShiftContext};
 use std::collections::BTreeMap;
 pub use types::{
-    ATOMIC_ELEMENT_MSG, AccessMarker, CollectionKind, CollectionTypeSpec, FuncSig,
+    ATOMIC_ELEMENT_MSG, AccessMarker, BuiltinTensorEdgePolicy, CollectionKind, CollectionTypeSpec, FuncSig,
     GenericBindingSource, GenericParamDescriptor, GenericParamSort, GenericWitness,
     INTERVALLUM_BOUND_MSG, ISSUE_ASSIGN_THROUGH_REF, ISSUE_DEREF_INTO_OWN, ISSUE_FIELD_INTO_OWN,
     ISSUE_INDEX_INTO_OWN, ISSUE_MUT_INTO_OWN, ISSUE_MUT_LOCAL, ISSUE_MUTATING_RECEIVER_THROUGH_REF,
@@ -264,6 +270,14 @@ pub struct SemanticResult {
     pub radix_lanes: RadixLaneMetadata,
     pub annotation_contracts: AnnotationContractMetadata,
     pub gpu_builtins: Vec<(radix_hir::DefId, radix_types::MirKernelBuiltin)>,
+    /// Runtime shape relations retained after static typechecking for
+    /// recoverable call, function-entry, and return boundary checks.
+    pub shape_obligations: ShapeObligationTable,
+    /// Resolved policy callbacks reached through `limes` intrinsic calls.
+    pub tensor_edge_policies: TensorEdgePolicyTable,
+    /// Per-kernel, per-device inferred width and range requirements. Reports
+    /// travel with typed HIR into the compiled module boundary.
+    pub kernel_requirements: passes::kernel_requirements::KernelRequirementsReport,
     pub diagnostics: Vec<SemanticError>,
 }
 
@@ -446,6 +460,7 @@ pub fn analyze_with_cli(
     cli_program: Option<&crate::cli::CliProgram>,
 ) -> SemanticResult {
     let mut diagnostics = Vec::new();
+    let mut kernel_requirements = passes::kernel_requirements::KernelRequirementsReport::default();
     let mut types = TypeTable::new();
     let mut resolver = Resolver::new();
     let mut radix_lanes = RadixLaneMetadata::default();
@@ -639,6 +654,8 @@ pub fn analyze_with_cli(
     );
 
     passes::typecheck::intern_place_temporaries(&hir, interner);
+    let mut shape_obligations = ShapeObligationTable::default();
+    let mut tensor_edge_policies = TensorEdgePolicyTable::default();
     match passes::typecheck::typecheck_with_config(
         &mut hir,
         &resolver,
@@ -648,6 +665,8 @@ pub fn analyze_with_cli(
         Some(&companion_signatures),
         Some(&mut lowered.presentation),
         Some(&radix_lanes),
+        &mut shape_obligations,
+        &mut tensor_edge_policies,
     ) {
         Ok(()) => {
             // Build-time embeds fold to their file's literal once typecheck
@@ -689,7 +708,21 @@ pub fn analyze_with_cli(
     // Kernel legality (gpu-reset rule 12) reads the typed HIR before any AIR
     // rewrite reshapes it, and only when typecheck left types it can trust.
     if !diagnostics.iter().any(SemanticError::is_error) {
-        let legality = passes::kernel_legality::check(&hir, &resolver, &types, interner);
+        let legality = passes::kernel_legality::check(
+            &hir,
+            &resolver,
+            &types,
+            interner,
+            &tensor_edge_policies,
+        );
+        kernel_requirements = passes::kernel_requirements::check(
+            &hir,
+            &types,
+            interner,
+            &legality.recursive_kernels,
+            &legality.kernel_calls,
+            &tensor_edge_policies,
+        );
         diagnostics.extend(legality.errors);
         diagnostics.extend(legality.warnings);
     }
@@ -750,7 +783,13 @@ pub fn analyze_with_cli(
     // forward for the analyzed-application snapshot. Unsupported HIR shapes
     // leave region facts unavailable rather than receiving an approximation.
     let access_facts = analyze_access_facts_with_types(&hir, &types);
-    let region_facts = passes::borrow_region::analyze(&hir, &types, &access_facts).ok();
+    let region_facts = passes::borrow_region::analyze_with_interner(
+        &hir,
+        &types,
+        &access_facts,
+        interner,
+    )
+    .ok();
 
     diagnostics
         .extend(passes::fragment_definition::check(&hir, &resolver, &types, interner).errors);
@@ -863,6 +902,9 @@ pub fn analyze_with_cli(
         radix_lanes,
         annotation_contracts,
         gpu_builtins: crate::builtins::gpu::builtin_calls(&resolver),
+        shape_obligations,
+        tensor_edge_policies,
+        kernel_requirements,
         resolver,
         diagnostics,
     }
@@ -909,6 +951,9 @@ pub(crate) fn early_semantic_result(
         types,
         radix_lanes,
         annotation_contracts,
+        shape_obligations: ShapeObligationTable::default(),
+        tensor_edge_policies: TensorEdgePolicyTable::default(),
+        kernel_requirements: passes::kernel_requirements::KernelRequirementsReport::default(),
         gpu_builtins: crate::builtins::gpu::builtin_calls(&resolver),
         resolver,
         diagnostics,
@@ -1074,11 +1119,13 @@ fn register_locale_pack_type_spellings(
         interner.intern(canonical);
     }
     for binding in pack.types.values() {
-        // Conversation-family spellings (`channel`, `frame`, `send`, `recv`)
-        // resolve only through the parser's canonical type ident. They are
-        // never symbols: the words stay ordinary identifiers (a user `fn send`
-        // must not collide with a type alias).
-        if matches!(binding.kind, TypeBindingKind::Frame(_)) {
+        // Frame and edge-policy names resolve in type position through the
+        // parser/lowerer. They stay ordinary value identifiers: a user
+        // `fn send` or `fn wrap` must not collide with a type alias.
+        if matches!(
+            binding.kind,
+            TypeBindingKind::Frame(_) | TypeBindingKind::TensorEdgePolicy(_)
+        ) {
             continue;
         }
         let spellings = std::iter::once(binding.canonical.as_str())
@@ -1090,6 +1137,7 @@ fn register_locale_pack_type_spellings(
             }
             let ty = match binding.kind {
                 TypeBindingKind::Primitive(prim) => Some(types.primitive(prim)),
+                TypeBindingKind::TensorEdgePolicy(policy) => Some(types.tensor_edge_policy(policy)),
                 // Collections and the tensor family are parameterized shapes
                 // (no bare `TypeId`); their spellings register as name-only
                 // aliases and lower through dedicated type syntax.

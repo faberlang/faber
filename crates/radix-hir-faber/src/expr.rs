@@ -743,6 +743,7 @@ impl super::FaberCodegen<'_> {
                             writer.write(" ");
                             self.write_expr(expr, names, surface, writer);
                         }
+                        HirArrayElement::Infer(_) => writer.write("_"),
                     }
                 }
                 writer.write("]");

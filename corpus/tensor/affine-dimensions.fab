@@ -1,0 +1,50 @@
++++
+term = "tensor affine dimensions"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "generic_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "incipit_stmt", "fixum_decl", "redde_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Affine and exact-divide dimensions substitute through generic tensor calls, including a runtime extent witness."
+syntax = "fn drop_one<size N>(tensor<f32, [N - 1]> value) → tensor<f32, [N - 1]>"
+related = ["tensor", "size", "generic"]
+locale = "en"
++++
+
+fn drop_one<size N>(tensor<f32, [N - 1]> value) → tensor<f32, [N - 1]> {
+    return value
+}
+
+fn half_width<size D>(tensor<f32, [D / 2]> value) → tensor<f32, [D / 2]> {
+    return value
+}
+
+fn cancel_offset<size N>(tensor<f32, [N - 1 + 1]> value) → tensor<f32, [N - 1 + 1]> {
+    return value
+}
+
+fn runtime_size(int value) → int {
+    return value
+}
+
+main {
+    const tensor<f32, []> seed ← empty
+    const list<f32> three_values ← [1.0, 2.0, 3.0]
+    const list<f32> four ← [1.0, 2.0, 3.0, 4.0]
+
+    const tensor<f32, [3]> three ← three_values ↦ tensor<f32, [3]>
+    const tensor<f32, [3]> tail ← drop_one(three)
+    print tail.shape()[0]
+
+    const tensor<f32, [4]> four_lanes ← four ↦ tensor<f32, [4]>
+    const tensor<f32, [4]> half ← half_width(four_lanes)
+    print half.shape()[0]
+
+    const tensor<f32, [0]> zero ← seed.from_flat([], [0])
+    const tensor<f32, [0]> canceled ← cancel_offset(zero)
+    print canceled.shape()[0]
+
+    const int n ← runtime_size(4)
+    const tensor<f32, [n - 1]> dynamic ← seed.from_flat([1.0, 2.0, 3.0], [n - 1])
+    const tensor<f32, [n - 1]> dynamic_tail ← drop_one(dynamic)
+    print dynamic_tail.shape()[0]
+}

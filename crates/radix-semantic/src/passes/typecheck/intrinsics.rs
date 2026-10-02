@@ -11,10 +11,11 @@
 use super::TypeChecker;
 use crate::tensor_type_directed::{complete_tensor_type, is_tensor_type};
 use crate::{
-    FuncSig, GenericParamDescriptor, NumericWidth, ParamType, Primitive, SemanticErrorKind,
-    SemanticGenericParamDefault, SemanticParamMode, Type, TypeId, TypeParamConstraint,
+    FuncSig, GenericParamDescriptor, IndexExpr, IndexId, NumericWidth, ParamType,
+    Primitive, SemanticErrorKind, SemanticGenericParamDefault, SemanticParamMode, Type, TypeId,
+    TypeParamConstraint,
 };
-use radix_hir::{HirCallArg, HirExpression, HirExpressionKind};
+use radix_hir::{HirArrayElement, HirCallArg, HirExpression, HirExpressionKind};
 use radix_intrinsics::{
     CatalogGenericDefault, CatalogGenericParam, IntrinsicMirKind, IntrinsicParamKind,
     IntrinsicReceiver, IntrinsicReturnKind, MethodIntrinsic, is_mutating_receiver,
@@ -44,6 +45,14 @@ const ISSUE_IMPERATIVUS_OPERATOR_METHOD_REQUIRES_VARIA_RECEIVER: &str =
 const ISSUE_INTRINSIC_METHOD_TYPE_ARGS: &str = "intrinsic_method_type_args";
 const ISSUE_TENSOR_FORMATA_ELEMENT_TYPE_MISMATCH: &str = "tensor_formata_element_type_mismatch";
 const ISSUE_TENSOR_TYPE_ARG_INCOMPLETE: &str = "tensor_type_arg_incomplete";
+const ISSUE_TENSOR_SHIFT_NULLABLE_SOURCE_UNSUPPORTED: &str =
+    "tensor_shift_nullable_source_unsupported";
+pub(super) const ISSUE_TENSOR_EDGE_VIEW_REQUIRES_RESOLUTION: &str =
+    "tensor_edge_view_requires_resolution";
+const ISSUE_TENSOR_LIMES_REQUIRES_SHIFTED_VIEW: &str =
+    "tensor_limes_requires_shifted_view";
+const ISSUE_TENSOR_LIMES_POLICY_INVALID: &str = "tensor_limes_policy_invalid";
+const ISSUE_TENSOR_SHIFT_OFFSET_RANK_MISMATCH: &str = "tensor_shift_offset_rank_mismatch";
 pub(super) const ISSUE_ATOMIC_METHOD_REQUIRES_ATOMIC_RECEIVER: &str =
     "atomic_method_requires_atomic_receiver";
 pub(super) const ISSUE_UNSUPPORTED_ATOMIC_METHOD: &str = "unsupported_atomic_method";
@@ -342,6 +351,35 @@ pub(super) fn check_intrinsic_method_call(
     {
         return Some(checker.error_type);
     }
+    if matches!(entry.mir_kind, IntrinsicMirKind::TensorLimes) {
+        return Some(check_tensor_limes(
+            checker,
+            receiver,
+            receiver_ty,
+            explicit_type_args,
+            args,
+            span,
+        ));
+    }
+    if matches!(
+        entry.mir_kind,
+        IntrinsicMirKind::Collection(radix_types::MirCollectionOp::TensorShift)
+    ) {
+        let ctx = IntrinsicTypeContext::from_receiver_type(checker, payload_ty);
+        let params = resolve_param_types(checker, entry, &ctx);
+        let ret = resolve_return_type(checker, entry, &ctx, span);
+        check_tensor_method_args(checker, entry, &params, args, ret, span);
+        return Some(check_tensor_shift(checker, receiver, receiver_ty, args, span));
+    }
+    if checker
+        .tensor_edge_policies
+        .shifted_expressions
+        .contains(&receiver.id)
+    {
+        checker.invalid_operand_types(ISSUE_TENSOR_EDGE_VIEW_REQUIRES_RESOLUTION, span);
+        checker.typecheck_call_arg_exprs(args);
+        return Some(checker.error_type);
+    }
     let resolved = checker.types.get(payload_ty);
     let bounded_appende = entry.faber_name == "appende"
         && matches!(
@@ -586,6 +624,7 @@ pub(super) fn check_intrinsic_method_call(
                 super::tensor_index::apply_tensor_intrinsic_shape_constraints(
                     checker,
                     entry.faber_name,
+                    receiver,
                     receiver_ty,
                     result,
                     args,
@@ -1085,7 +1124,7 @@ fn check_matrix_applica(
     args: &mut [HirCallArg],
     span: radix_lexer::Span,
 ) -> TypeId {
-    let resolved = checker.resolve_inferred_type(receiver_ty);
+    let resolved = checker.value_carrier_type(receiver_ty);
     let Type::Matrix(element_ty, shape) = checker.types.get(resolved).clone() else {
         return checker.error_type;
     };
@@ -1130,7 +1169,7 @@ fn check_matrix_applica(
 /// literal or parametric. Shape holes pass through unchanged, mirroring the
 /// tensor transpose shape constraint.
 fn check_matrix_transpone(checker: &mut TypeChecker<'_>, receiver_ty: TypeId) -> TypeId {
-    let resolved = checker.resolve_inferred_type(receiver_ty);
+    let resolved = checker.value_carrier_type(receiver_ty);
     let Type::Matrix(element_ty, shape) = checker.types.get(resolved).clone() else {
         return checker.error_type;
     };
@@ -1189,9 +1228,32 @@ fn check_tensor_method_args(
     if args.len() < required || args.len() > params.len() {
         checker.wrong_arity("wrong_number_of_arguments", span);
     }
-    for ((arg, kind), param) in args.iter_mut().zip(entry.params.iter()).zip(params.iter()) {
+    // The active call/return shape boundary belongs to the method expression
+    // as a whole. Its peer operands are checked against intrinsic parameter
+    // types, so inheriting that boundary would reject a fresh TensorPeer shape
+    // hole before the intrinsic can relate it to the receiver.
+    let previous_shape_argument = checker.current_shape_argument.take();
+    let previous_shape_return_expr = checker.current_shape_return_expr.take();
+    for (arg_index, ((arg, kind), param)) in args
+        .iter_mut()
+        .zip(entry.params.iter())
+        .zip(params.iter())
+        .enumerate()
+    {
         if *kind == IntrinsicParamKind::NumerusArray {
-            check_integer_index_vector_arg(checker, arg, span);
+            if hir_array_has_shape_hole(&arg.expr) {
+                if tensor_shape_hole_argument(entry.faber_name, arg_index) {
+                    check_tensor_shape_hole_argument(checker, arg);
+                } else {
+                    checker.invalid_operand_types(
+                        super::aggregate::ISSUE_SHAPE_HOLE_REQUIRES_SHAPE_ARGUMENT,
+                        arg.span,
+                    );
+                    check_tensor_shape_hole_argument(checker, arg);
+                }
+            } else {
+                check_integer_index_vector_arg(checker, arg, span);
+            }
         } else if *kind == IntrinsicParamKind::NumerusIndex
             && arg_is_symbolic_size(checker, &arg.expr)
         {
@@ -1207,7 +1269,361 @@ fn check_tensor_method_args(
             checker.unify_assign_issue(arg_ty, param.ty, arg.span, ISSUE_ARGUMENT_TYPE_MISMATCH);
         }
     }
+    checker.current_shape_argument = previous_shape_argument;
+    checker.current_shape_return_expr = previous_shape_return_expr;
     ret
+}
+
+/// A shifted tensor remains a lazy optional view until `limes` or tensor
+/// coalescing resolves its edge cells. The semantic element type records that
+/// fact as `T ∪ nihil`; the side table tracks which such tensors carry the
+/// unresolved physical edge descriptor.
+fn check_tensor_shift(
+    checker: &mut TypeChecker<'_>,
+    receiver: &HirExpression,
+    receiver_ty: TypeId,
+    args: &[HirCallArg],
+    span: radix_lexer::Span,
+) -> TypeId {
+    let resolved = checker.resolve_inferred_type(receiver_ty);
+    let (element, shape) = match checker.types.get(resolved).clone() {
+        Type::Tensor(element, shape) => (element, shape),
+        _ => {
+            checker.invalid_operand_types(ISSUE_TENSOR_SHIFT_NULLABLE_SOURCE_UNSUPPORTED, span);
+            return checker.error_type;
+        }
+    };
+    let element = checker.resolve_inferred_type(element);
+    if checker
+        .tensor_edge_policies
+        .shifted_expressions
+        .contains(&receiver.id)
+        || matches!(checker.types.get(element), Type::Option(_))
+    {
+        // A second shift would create nested optional edge state, which the
+        // carrier intentionally cannot represent as an ordinary Tensor<T>.
+        checker.invalid_operand_types(ISSUE_TENSOR_SHIFT_NULLABLE_SOURCE_UNSUPPORTED, span);
+        return checker.error_type;
+    }
+    let Some(rank) = tensor_shape_rank_from_index(checker.types, shape) else {
+        checker.invalid_operand_types(ISSUE_TENSOR_SHIFT_OFFSET_RANK_MISMATCH, span);
+        return checker.error_type;
+    };
+    if let Some(HirCallArg {
+        expr: HirExpression {
+            kind: HirExpressionKind::Array(elements),
+            ..
+        },
+        ..
+    }) = args.first()
+        && elements.iter().all(|element| matches!(element, HirArrayElement::Expr(_)))
+        && elements.len() != rank
+    {
+        checker.invalid_operand_types(ISSUE_TENSOR_SHIFT_OFFSET_RANK_MISMATCH, span);
+        return checker.error_type;
+    }
+
+    let optional_element = checker.types.option(element);
+    let result = checker.types.tensor_with_shape(optional_element, shape);
+    if let (Some(call), Some(offsets)) = (checker.current_shape_call, args.first()) {
+        checker
+            .tensor_edge_policies
+            .shifted_expressions
+            .insert(call);
+        checker
+            .tensor_edge_policies
+            .shifted_view_expressions
+            .insert(
+                call,
+                crate::TensorShiftContext {
+                    source_shape: shape,
+                    shift_expression: offsets.expr.id,
+                },
+            );
+    }
+    result
+}
+
+/// Resolve `limes<Policy>()` only on a tensor known to carry an unresolved
+/// shifted descriptor. Builtins are compiler identities; user policies are
+/// structurally checked ordinary methods on a zero-instance-field class.
+fn check_tensor_limes(
+    checker: &mut TypeChecker<'_>,
+    receiver: &HirExpression,
+    receiver_ty: TypeId,
+    explicit_type_args: &[TypeId],
+    args: &mut [HirCallArg],
+    span: radix_lexer::Span,
+) -> TypeId {
+    if !args.is_empty() {
+        checker.typecheck_call_arg_exprs(args);
+        checker.invalid_operand_types(ISSUE_TENSOR_LIMES_POLICY_INVALID, span);
+        return checker.error_type;
+    }
+    if !checker
+        .tensor_edge_policies
+        .shifted_expressions
+        .contains(&receiver.id)
+    {
+        checker.invalid_operand_types(ISSUE_TENSOR_LIMES_REQUIRES_SHIFTED_VIEW, span);
+        return checker.error_type;
+    }
+    let Some(shift_context) = checker
+        .tensor_edge_policies
+        .shifted_view_expressions
+        .get(&receiver.id)
+        .copied()
+    else {
+        // The sidecar is also consumed by kernel legality and callback range
+        // analysis. A shifted marker without its source provenance is not a
+        // usable proof of an edge-policy call.
+        checker.invalid_operand_types(ISSUE_TENSOR_LIMES_REQUIRES_SHIFTED_VIEW, span);
+        return checker.error_type;
+    };
+    let resolved = checker.resolve_inferred_type(receiver_ty);
+    let Type::Tensor(optional_element, shape) = checker.types.get(resolved).clone() else {
+        checker.invalid_operand_types(ISSUE_TENSOR_LIMES_REQUIRES_SHIFTED_VIEW, span);
+        return checker.error_type;
+    };
+    let optional_element = checker.resolve_inferred_type(optional_element);
+    let Type::Option(element) = checker.types.get(optional_element).clone() else {
+        checker.invalid_operand_types(ISSUE_TENSOR_LIMES_REQUIRES_SHIFTED_VIEW, span);
+        return checker.error_type;
+    };
+    let resolved_element = checker.resolve_inferred_type(element);
+    if matches!(checker.types.get(resolved_element), Type::Option(_)) {
+        checker.invalid_operand_types(ISSUE_TENSOR_LIMES_REQUIRES_SHIFTED_VIEW, span);
+        return checker.error_type;
+    }
+    let Some(&policy_type) = explicit_type_args.first() else {
+        // The catalog arity check normally catches this. Keep the helper
+        // fail-closed when reached from recovery or a synthetic HIR caller.
+        checker.invalid_operand_types(ISSUE_TENSOR_LIMES_POLICY_INVALID, span);
+        return checker.error_type;
+    };
+    let Some(rank) = tensor_shape_rank_from_index(checker.types, shape) else {
+        checker.invalid_operand_types(ISSUE_TENSOR_LIMES_POLICY_INVALID, span);
+        return checker.error_type;
+    };
+    let policy_type_resolved = checker.resolve_inferred_type(policy_type);
+    let policy = if let Some(policy) = checker.types.tensor_edge_policy_kind(policy_type_resolved) {
+        crate::ResolvedTensorEdgePolicy::Builtin(policy)
+    } else {
+        match checker.types.get(policy_type_resolved).clone() {
+            Type::Param(_) if checker.is_tensor_edge_policy_type_param(policy_type_resolved) => {
+                crate::ResolvedTensorEdgePolicy::Deferred { policy_type }
+            }
+            Type::Param(_) => {
+                checker.invalid_operand_types(ISSUE_TENSOR_LIMES_POLICY_INVALID, span);
+                return checker.error_type;
+            }
+            _ => match check_custom_tensor_edge_policy(checker, policy_type, element, rank) {
+                Some(policy) => policy,
+                None => {
+                    checker.invalid_operand_types(ISSUE_TENSOR_LIMES_POLICY_INVALID, span);
+                    return checker.error_type;
+                }
+            },
+        }
+    };
+    if let Some(call) = checker.current_shape_call {
+        checker.tensor_edge_policies.calls.insert(call, policy);
+        checker
+            .tensor_edge_policies
+            .limes_contexts
+            .insert(call, shift_context);
+    }
+    checker.types.tensor_with_shape(element, shape)
+}
+
+pub(super) fn tensor_shape_rank_from_index(
+    types: &crate::TypeTable,
+    shape: IndexId,
+) -> Option<usize> {
+    match types.get_index(shape) {
+        IndexExpr::Tuple(dims) => Some(dims.len()),
+        IndexExpr::Literal(_)
+        | IndexExpr::Param(_)
+        | IndexExpr::Runtime(_)
+        | IndexExpr::Affine { .. }
+        | IndexExpr::Divide { .. } => Some(1),
+        IndexExpr::Infer(_) | IndexExpr::Unspecified => None,
+    }
+}
+
+pub(super) fn check_custom_tensor_edge_policy(
+    checker: &mut TypeChecker<'_>,
+    policy_type: TypeId,
+    element: TypeId,
+    rank: usize,
+) -> Option<crate::ResolvedTensorEdgePolicy> {
+    let mut nominal = checker.resolve_inferred_type(policy_type);
+    while let Type::Alias(_, inner) = checker.types.get(nominal) {
+        nominal = *inner;
+    }
+    let def = checker.struct_def_from_type(nominal)?;
+    if checker.instance_field_counts.get(&def).copied()? != 0 {
+        return None;
+    }
+    let remap_name = checker.interner?.lookup("remap")?;
+    let transform_name = checker.interner?.lookup("transform");
+    let remap_def = *checker.method_defs.get(&(def, remap_name))?;
+    let remap_sig = checker.structs.get(&def)?.methods.get(&remap_name)?.clone();
+    let remap_sig = instantiate_edge_policy_method(checker, nominal, def, &remap_sig)?;
+    let coordinate = validate_edge_policy_callback_signature(
+        checker,
+        &remap_sig,
+        element,
+        rank,
+        false,
+    )?;
+
+    let transform = if let Some(name) = transform_name
+        && let Some(def_id) = checker.method_defs.get(&(def, name)).copied()
+    {
+        let sig = checker.structs.get(&def)?.methods.get(&name)?.clone();
+        let sig = instantiate_edge_policy_method(checker, nominal, def, &sig)?;
+        validate_edge_policy_callback_signature(checker, &sig, element, rank, true)
+            .filter(|transform_coord| checker.types.equals(*transform_coord, coordinate))?;
+        Some(def_id)
+    } else {
+        None
+    };
+    Some(crate::ResolvedTensorEdgePolicy::Custom {
+        policy_def: def,
+        remap: remap_def,
+        transform,
+    })
+}
+
+fn instantiate_edge_policy_method(
+    checker: &mut TypeChecker<'_>,
+    nominal: TypeId,
+    def: radix_hir::DefId,
+    signature: &FuncSig,
+) -> Option<FuncSig> {
+    if !signature.type_params.is_empty() {
+        return None;
+    }
+    let names = checker.type_params_by_def.get(&def).cloned().unwrap_or_default();
+    let applied = match checker.types.get(nominal).clone() {
+        Type::Applied(_, args) => args,
+        Type::Struct(_) => Vec::new(),
+        _ => return None,
+    };
+    if names.len() != applied.len() {
+        return None;
+    }
+    let mut type_vars = rustc_hash::FxHashMap::default();
+    let mut shape_vars = rustc_hash::FxHashMap::default();
+    for (name, argument) in names.into_iter().zip(applied) {
+        match argument {
+            radix_types::AppliedArg::Type(ty) => {
+                type_vars.insert(name, ty);
+            }
+            radix_types::AppliedArg::Size(size) => {
+                shape_vars.insert(name, size);
+            }
+        }
+    }
+    Some(checker.substitute_func_sig(
+        signature,
+        &mut type_vars,
+        Some(&mut shape_vars),
+    ))
+}
+
+fn validate_edge_policy_callback_signature(
+    checker: &TypeChecker<'_>,
+    signature: &FuncSig,
+    element: TypeId,
+    rank: usize,
+    transform: bool,
+) -> Option<TypeId> {
+    if signature.err.is_some() || signature.is_async || signature.is_generator {
+        return None;
+    }
+    let expected_arity = if transform { 2 } else { 1 };
+    if signature.params.len() != expected_arity
+        || signature
+            .params
+            .iter()
+            .any(|param| param.optional || param.mode != SemanticParamMode::Owned)
+    {
+        return None;
+    }
+    let coordinate = checker.resolve_inferred_type(signature.params[0].ty);
+    let Type::Vector(coordinate_element, width) = checker.types.get(coordinate) else {
+        return None;
+    };
+    if !crate::numeric_width::is_integer_index_scalar(checker.types, *coordinate_element)
+        || radix_types::evaluate_index_dimension(*width, checker.types)
+            .ok()
+            .flatten()
+            != u64::try_from(rank).ok()
+    {
+        return None;
+    }
+    if transform {
+        let value = checker.resolve_inferred_type(signature.params[1].ty);
+        if !checker.types.equals(value, element) || !checker.types.equals(signature.ret, element)
+        {
+            return None;
+        }
+        // Transform's result is the tensor element, while its first argument
+        // and the remap result are coordinates. The caller separately checks
+        // the coordinate against `remap`.
+        Some(coordinate)
+    } else {
+        if !checker.types.equals(coordinate, signature.ret) {
+            return None;
+        }
+        Some(coordinate)
+    }
+}
+
+fn tensor_shape_hole_argument(method: &str, arg_index: usize) -> bool {
+    matches!(
+        (method, arg_index),
+        ("forma", 0) | ("crea", 1) | ("strue", 1) | ("expande", 0)
+    )
+}
+
+fn hir_array_has_shape_hole(expr: &HirExpression) -> bool {
+    matches!(&expr.kind, HirExpressionKind::Array(elements)
+        if elements.iter().any(|element| matches!(element, HirArrayElement::Infer(_))))
+}
+
+fn check_tensor_shape_hole_argument(checker: &mut TypeChecker<'_>, arg: &mut HirCallArg) {
+    let HirExpressionKind::Array(elements) = &mut arg.expr.kind else {
+        unreachable!("shape-hole probe only admits array expressions")
+    };
+    for element in elements {
+        match element {
+            HirArrayElement::Expr(expr) => {
+                let ty = checker.check_expr(expr);
+                if !crate::numeric_width::is_integer_index_scalar(
+                    checker.types,
+                    checker.resolve_inferred_type(ty),
+                ) {
+                    checker.invalid_operand_types(
+                        ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS,
+                        expr.span,
+                    );
+                }
+            }
+            HirArrayElement::Spread(expr) => {
+                checker.check_expr(expr);
+                checker.invalid_operand_types(
+                    ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS,
+                    expr.span,
+                );
+            }
+            HirArrayElement::Infer(_) => {}
+        }
+    }
+    let numerus = checker.numerus_type();
+    arg.expr.ty = Some(checker.types.array(numerus));
 }
 
 /// True when the argument is a bare reference to a body-visible `magnitudo`

@@ -39,6 +39,165 @@ fn assert_region_accepted(source: &str, label: &str) {
     );
 }
 
+const TENSOR_VIEW_LAST_USE_SOURCE: &str = r#"
+main {
+    const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
+    const tensor<f32, []> seed ← vacua
+    var tensor<f32, [2, 2]> base ← seed.strue(data, [2, 2])
+    const tensor<f32, [2, 2]> view ← base.transpone()
+    const int dimensions ← view.longitudo()
+    base.ponde([0, 0], 9.0)
+    print dimensions
+}
+"#;
+
+#[test]
+fn tensor_view_base_write_is_allowed_after_last_view_use() {
+    let result = analyze_source(TENSOR_VIEW_LAST_USE_SOURCE);
+    assert!(
+        result.is_ok(),
+        "base write after the view's final dimensions query should be accepted: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn tensor_view_base_write_is_rejected_before_later_view_use() {
+    let source = TENSOR_VIEW_LAST_USE_SOURCE.replace(
+        "    const int dimensions ← view.longitudo()\n    base.ponde([0, 0], 9.0)\n    print dimensions",
+        "    base.ponde([0, 0], 9.0)\n    const int dimensions ← view.longitudo()\n    print dimensions",
+    );
+    let result = analyze_source(&source);
+    assert!(
+        result.diagnostics.iter().any(|diagnostic| {
+            diagnostic.kind == SemanticErrorKind::MutableBorrowConflict
+                && issue(diagnostic) == Some("write_while_borrowed")
+        }),
+        "base write while a later view use remains must report write_while_borrowed: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn tensor_view_ternary_cannot_escape_through_mutable_binding() {
+    let source = r#"
+main {
+    const tf32[] seed ← empty
+    var tf32[2, 2] base ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [2, 2])
+    var tf32[2, 2] view ← true ✓ base.transpose() ✗ base.transpose()
+}
+"#;
+    let result = analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|diagnostic| {
+            diagnostic.kind == SemanticErrorKind::ModeMismatch
+                && issue(diagnostic) == Some("tensor_view_escape")
+        }),
+        "a tensor-view ternary must retain provenance at a mutable binding: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn tensor_view_ternary_can_be_consumed_by_materialize() {
+    let source = r#"
+main {
+    const tf32[] seed ← empty
+    var tf32[2, 2] base ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [2, 2])
+    const tf32[2, 2] owned ← (true ✓ base.transpose() ✗ base.transpose()).materialize()
+    base.set([0, 0], 9.0)
+    print owned.get([0, 0]) coalesce 0.0
+}
+"#;
+    let result = analyze_source(source);
+    assert!(
+        result.is_ok(),
+        "materialize must end ternary view provenance before a later base write: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn expanded_transpose_chain_cannot_escape_through_mutable_binding() {
+    let source = r#"
+main {
+    const tf32[] seed ← empty
+    var tf32[1, 2] base ← seed.from_flat([1.0, 2.0], [1, 2])
+    var tf32[2, 1] escaped ← base.expanded([1, 2]).transpose()
+}
+"#;
+    let result = analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|diagnostic| {
+            diagnostic.kind == SemanticErrorKind::ModeMismatch
+                && issue(diagnostic) == Some("tensor_view_escape")
+        }),
+        "expanded and chained transpose provenance must reach mutable sinks: {:?}",
+        result.diagnostics
+    );
+}
+
+const TENSOR_EDGE_POLICY_DECLARATIONS: &str = r#"
+interface EdgePolicy<C> {
+    fn remap(C coord) → C
+}
+interface EdgeTransform<C, T> {
+    fn transform(C coord, T value) → T
+}
+class ZeroGhost implements EdgePolicy<vector<int, 1>> ∩ EdgeTransform<vector<int, 1>, f32> {
+    fn remap(vector<int, 1> coord) → vector<int, 1> {
+        return [0] ↦ vector<int, 1>
+    }
+    fn transform(vector<int, 1> coord, f32 value) → f32 {
+        return -value
+    }
+}
+"#;
+
+#[test]
+fn shifted_limes_view_keeps_provenance_through_wrapper_and_policy_type_args() {
+    let main = r#"
+main {
+    const tf32[] seed ← empty
+    var tf32[3] base ← seed.from_flat([1.0, 2.0, 3.0], [3])
+    var tf32[3] escaped ← true ✓ base.shift([1]).limes<ZeroGhost>() ✗ base.shift([1]).limes<ZeroGhost>()
+}
+"#;
+    let source = format!("{TENSOR_EDGE_POLICY_DECLARATIONS}{main}");
+    let result = analyze_source(&source);
+    assert!(
+        result.diagnostics.iter().any(|diagnostic| {
+            diagnostic.kind == SemanticErrorKind::ModeMismatch
+                && issue(diagnostic) == Some("tensor_view_escape")
+        }),
+        "shift→limes provenance and a stateless policy type argument must survive the wrapper: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn custom_limes_view_conflicts_with_base_write_until_last_use() {
+    let main = r#"
+main {
+    const tf32[] seed ← empty
+    var tf32[3] base ← seed.from_flat([1.0, 2.0, 3.0], [3])
+    const tf32[3] view ← base.shift([1]).limes<ZeroGhost>()
+    base.set([0], 9.0)
+    print view.get([0]) coalesce 0.0
+}
+"#;
+    let source = format!("{TENSOR_EDGE_POLICY_DECLARATIONS}{main}");
+    let result = analyze_source(&source);
+    assert!(
+        result.diagnostics.iter().any(|diagnostic| {
+            diagnostic.kind == SemanticErrorKind::MutableBorrowConflict
+                && issue(diagnostic) == Some("write_while_borrowed")
+        }),
+        "the limes view must borrow its tensor receiver, not capture its policy type argument: {:?}",
+        result.diagnostics
+    );
+}
+
 fn analyzed_region(source: &str) -> borrow_region::RegionFacts {
     let result = analyze_source(source);
     let hir = result

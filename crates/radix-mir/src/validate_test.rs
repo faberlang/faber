@@ -14,7 +14,7 @@ use crate::{
 };
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
-use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable};
+use radix_types::{IndexExpr, NumericWidth, Primitive, RuntimeExtentId, Type, TypeId, TypeTable};
 use rustc_hash::FxHashMap;
 
 // -----------------------------------------------------------------------
@@ -3869,6 +3869,370 @@ fn mlp_shape_destination_mismatch_preserves_structured_issue() {
     assert_eq!(
         messages,
         vec!["destination type mismatch", "destination type mismatch"]
+    );
+}
+
+fn runtime_shape_call_program(
+    types: &mut TypeTable,
+    guard: bool,
+    relation_axis: u32,
+    second_static_extent: Option<u64>,
+    try_call: bool,
+) -> MirProgram {
+    let element = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let formal_extent =
+        types.intern_index(IndexExpr::Runtime(RuntimeExtentId::FunctionParameterAxis {
+            parameter: 0,
+            axis: 0,
+        }));
+    let actual_first = types.intern_index(IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(
+        DefId(700),
+    )));
+    let actual_second = types.intern_index(IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(
+        DefId(701),
+    )));
+    let second_extent = types.intern_index(IndexExpr::Literal(second_static_extent.unwrap_or(2)));
+    let static_two = types.intern_index(IndexExpr::Literal(2));
+    let shape = |types: &mut TypeTable, first, second| {
+        let shape = types.intern_index(IndexExpr::Tuple(vec![first, second]));
+        MirType::semantic(types.tensor_with_shape(element, shape))
+    };
+    let formal = shape(types, formal_extent, static_two);
+    let first = shape(types, actual_first, static_two);
+    let second = shape(types, actual_second, second_extent);
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let text = MirType::semantic(types.primitive(Primitive::Textus));
+    let args = vec![
+        MirOperand::Place(MirPlace {
+            base: MirPlaceBase::Local(MirLocalId(0)),
+            projections: Vec::new(),
+        }),
+        MirOperand::Place(MirPlace {
+            base: MirPlaceBase::Local(MirLocalId(1)),
+            projections: Vec::new(),
+        }),
+    ];
+    let mut statements = Vec::new();
+    if guard {
+        let carrier = crate::MirShapeExpr::TensorAxis {
+            argument: 0,
+            axis: 0,
+        };
+        let repeated = crate::MirShapeExpr::TensorAxis {
+            argument: 1,
+            axis: relation_axis,
+        };
+        statements.push(MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination: None,
+                call: MirRuntimeCall {
+                    intrinsic: MirIntrinsic::TensorShapeCheck(crate::MirShapeCheck {
+                        relations: vec![crate::MirShapeRelation {
+                            left: carrier.clone(),
+                            right: repeated,
+                        }],
+                        size_bindings: vec![crate::MirShapeBinding {
+                            parameter: 0,
+                            witness: carrier,
+                        }],
+                    }),
+                    args: args.clone(),
+                    return_ty: vacuum,
+                },
+            },
+            span: Span::default(),
+        });
+    }
+    if !try_call {
+        statements.push(MirStatement {
+            kind: MirStatementKind::Call {
+                destination: None,
+                callee: MirCallee::Function(MirFunctionId(1)),
+                args: args.clone(),
+            },
+            span: Span::default(),
+        });
+    }
+    let caller_terminator = if try_call {
+        MirTerminatorKind::TryCall {
+            destination: None,
+            callee: MirCallee::Function(MirFunctionId(1)),
+            args,
+            ok_block: MirBlockId(1),
+            error_place: MirPlace {
+                base: MirPlaceBase::Local(MirLocalId(2)),
+                projections: Vec::new(),
+            },
+            error_block: MirBlockId(2),
+        }
+    } else {
+        MirTerminatorKind::Return(None)
+    };
+    let mut caller_blocks = vec![MirBlock {
+        id: MirBlockId(0),
+        statements,
+        terminator: MirTerminator {
+            kind: caller_terminator,
+            span: Span::default(),
+        },
+        span: Span::default(),
+    }];
+    let mut caller_locals = vec![
+        MirLocal {
+            id: MirLocalId(0),
+            name: None,
+            ty: first,
+            mutable: false,
+            span: Span::default(),
+        },
+        MirLocal {
+            id: MirLocalId(1),
+            name: None,
+            ty: second,
+            mutable: false,
+            span: Span::default(),
+        },
+    ];
+    if try_call {
+        caller_locals.push(MirLocal {
+            id: MirLocalId(2),
+            name: None,
+            ty: text,
+            mutable: false,
+            span: Span::default(),
+        });
+        for id in [MirBlockId(1), MirBlockId(2)] {
+            caller_blocks.push(MirBlock {
+                id,
+                statements: Vec::new(),
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            });
+        }
+    }
+    let caller = MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: Vec::new(),
+        locals: caller_locals,
+        temps: Vec::new(),
+        blocks: caller_blocks,
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let callee = MirFunction {
+        id: MirFunctionId(1),
+        source: None,
+        name: None,
+        params: vec![
+            MirParam {
+                local: MirLocalId(0),
+                name: None,
+                ty: formal,
+                mode: MirParamMode::Owned,
+                span: Span::default(),
+            },
+            MirParam {
+                local: MirLocalId(1),
+                name: None,
+                ty: formal,
+                mode: MirParamMode::Owned,
+                span: Span::default(),
+            },
+        ],
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        }],
+        return_ty: vacuum,
+        error_ty: try_call.then_some(text),
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    MirProgram {
+        functions: vec![caller, callee],
+    }
+}
+
+#[test]
+fn runtime_shape_check_authorizes_only_adjacent_matching_call_axes() {
+    let mut types = TypeTable::new();
+    let program = runtime_shape_call_program(&mut types, true, 0, None, false);
+    assert!(validate(&program, &types).is_empty());
+
+    let mut types = TypeTable::new();
+    let program = runtime_shape_call_program(&mut types, true, 0, None, true);
+    assert!(
+        validate(&program, &types).is_empty(),
+        "TryCall consumes its immediately preceding shape check"
+    );
+
+    let mut types = TypeTable::new();
+    let program = runtime_shape_call_program(&mut types, false, 0, None, false);
+    assert!(
+        validate(&program, &types)
+            .iter()
+            .any(|message| message.contains("call argument type mismatch"))
+    );
+
+    let mut types = TypeTable::new();
+    let program = runtime_shape_call_program(&mut types, true, 1, None, false);
+    assert!(
+        validate(&program, &types)
+            .iter()
+            .any(|message| message.contains("call argument type mismatch"))
+    );
+
+    let mut types = TypeTable::new();
+    let program = runtime_shape_call_program(&mut types, true, 0, Some(3), false);
+    assert!(
+        validate(&program, &types)
+            .iter()
+            .any(|message| message.contains("call argument type mismatch"))
+    );
+
+    let mut types = TypeTable::new();
+    let mut program = runtime_shape_call_program(&mut types, true, 0, None, false);
+    let MirStatementKind::RuntimeCall { call, .. } =
+        &mut program.functions[0].blocks[0].statements[0].kind
+    else {
+        unreachable!();
+    };
+    call.args.swap(0, 1);
+    assert!(
+        validate(&program, &types)
+            .iter()
+            .any(|message| message.contains("call argument type mismatch")),
+        "a guard for different operands cannot authorize this call"
+    );
+
+    let mut types = TypeTable::new();
+    let mut program = runtime_shape_call_program(&mut types, true, 0, None, false);
+    let block = &mut program.functions[0].blocks[0];
+    block.statements.push(block.statements[1].clone());
+    assert!(
+        validate(&program, &types)
+            .iter()
+            .any(|message| message.contains("call argument type mismatch")),
+        "the first call consumes adjacency; a later call needs its own guard"
+    );
+}
+
+#[test]
+fn runtime_affine_call_and_return_require_the_matching_derived_witness() {
+    let mut types = TypeTable::new();
+    let mut program = runtime_shape_call_program(&mut types, true, 0, None, false);
+    let first = program.functions[0].locals[0].ty;
+    let Type::Tensor(element, shape) = types.get(first.semantic_id()).clone() else {
+        unreachable!()
+    };
+    let IndexExpr::Tuple(mut dims) = types.get_index(shape).clone() else {
+        unreachable!()
+    };
+    dims[0] = types.intern_index(IndexExpr::Affine {
+        base: dims[0],
+        offset: -1,
+    });
+    let shape = types.intern_index(IndexExpr::Tuple(dims));
+    let affine = MirType::semantic(types.tensor_with_shape(element, shape));
+    program.functions[0].locals[0].ty = affine;
+    program.functions[0].locals.push(MirLocal {
+        id: MirLocalId(2),
+        name: None,
+        ty: affine,
+        mutable: false,
+        span: Span::default(),
+    });
+    let destination = MirPlace {
+        base: MirPlaceBase::Local(MirLocalId(2)),
+        projections: Vec::new(),
+    };
+    let MirStatementKind::Call {
+        destination: call_destination,
+        ..
+    } = &mut program.functions[0].blocks[0].statements[1].kind
+    else {
+        unreachable!()
+    };
+    *call_destination = Some(destination);
+    let formal = program.functions[1].params[0].ty;
+    program.functions[1].return_ty = formal;
+    program.functions[1].blocks[0].terminator.kind =
+        MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace {
+            base: MirPlaceBase::Local(MirLocalId(0)),
+            projections: Vec::new(),
+        })));
+    let MirStatementKind::RuntimeCall { call, .. } =
+        &mut program.functions[0].blocks[0].statements[0].kind
+    else {
+        unreachable!()
+    };
+    call.args.push(MirOperand::Constant(MirConstant::Int(4)));
+    let MirIntrinsic::TensorShapeCheck(check) = &mut call.intrinsic else {
+        unreachable!()
+    };
+    let witness = crate::MirShapeExpr::ScalarArgument { argument: 2 };
+    check.size_bindings[0].witness = witness.clone();
+    check.relations.push(crate::MirShapeRelation {
+        left: crate::MirShapeExpr::TensorAxis {
+            argument: 0,
+            axis: 0,
+        },
+        right: crate::MirShapeExpr::Affine {
+            base: Box::new(witness),
+            offset: -1,
+        },
+    });
+    assert!(validate(&program, &types).is_empty());
+
+    let mut unguarded = program.clone();
+    unguarded.functions[0].blocks[0].statements.remove(0);
+    assert!(
+        validate(&unguarded, &types)
+            .iter()
+            .any(|message| message.contains("call argument type mismatch"))
+    );
+
+    let mut wrong_destination = program.clone();
+    wrong_destination.functions[0].locals[2].ty = wrong_destination.functions[0].locals[1].ty;
+    assert!(
+        validate(&wrong_destination, &types)
+            .iter()
+            .any(|message| message.contains("destination type mismatch"))
+    );
+
+    let mut wrong_witness = program;
+    let MirStatementKind::RuntimeCall { call, .. } =
+        &mut wrong_witness.functions[0].blocks[0].statements[0].kind
+    else {
+        unreachable!()
+    };
+    call.args.push(MirOperand::Constant(MirConstant::Int(5)));
+    let MirIntrinsic::TensorShapeCheck(check) = &mut call.intrinsic else {
+        unreachable!()
+    };
+    check.size_bindings[0].witness = crate::MirShapeExpr::ScalarArgument { argument: 3 };
+    assert!(
+        validate(&wrong_witness, &types)
+            .iter()
+            .any(|message| message.contains("call argument type mismatch"))
     );
 }
 

@@ -586,6 +586,9 @@ fn layout_kind_for_type(
         // N7E-3 (D2): a policy-float cell has the layout of the bare float of
         // its width; the policy only matters where a value is stored.
         Type::PolicyFloat(_, width) => sized_numeric_layout(Primitive::Fractus, *width),
+        Type::TensorEdgePolicy(_) => LayoutResolution::MissingFact(
+            "tensor edge-policy marker has no runtime layout".to_owned(),
+        ),
         Type::Primitive(Primitive::Vacuum) => LayoutResolution::Resolved(MirLayoutKind::Void),
         Type::Primitive(Primitive::Numquam) => LayoutResolution::Resolved(MirLayoutKind::Never),
         Type::Alias(_, target) => layout_kind_for_type(types, *target, memo, visiting),
@@ -952,7 +955,11 @@ impl MirDeviceViewLayout {
 
 fn tensor_rank(types: &TypeTable, shape: radix_types::IndexId) -> Option<u8> {
     let rank = match types.get_index(shape) {
-        IndexExpr::Literal(_) | IndexExpr::Param(_) => 1,
+        IndexExpr::Literal(_)
+        | IndexExpr::Param(_)
+        | IndexExpr::Runtime(_)
+        | IndexExpr::Affine { .. }
+        | IndexExpr::Divide { .. } => 1,
         IndexExpr::Tuple(dims) => dims.len(),
         IndexExpr::Infer(_) | IndexExpr::Unspecified => return None,
     };

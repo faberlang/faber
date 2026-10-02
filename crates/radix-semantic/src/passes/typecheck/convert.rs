@@ -2018,6 +2018,13 @@ impl TypeChecker<'_> {
                     self.invalid_conversion(ISSUE_RECTANGULAR_LISTA_LITERAL_SPREAD, span);
                     return Some(self.error_type);
                 }
+                HirArrayElement::Infer(_) => {
+                    self.invalid_operand_types(
+                        super::aggregate::ISSUE_SHAPE_HOLE_REQUIRES_SHAPE_ARGUMENT,
+                        span,
+                    );
+                    return Some(self.error_type);
+                }
                 HirArrayElement::Expr(row_expr) => {
                     let HirExpressionKind::Array(cells) = &mut row_expr.kind else {
                         self.check_expr(row_expr);
@@ -2034,6 +2041,13 @@ impl TypeChecker<'_> {
                                 self.check_expr(expr);
                                 self.invalid_conversion(
                                     ISSUE_RECTANGULAR_LISTA_LITERAL_SPREAD,
+                                    span,
+                                );
+                                return Some(self.error_type);
+                            }
+                            HirArrayElement::Infer(_) => {
+                                self.invalid_operand_types(
+                                    super::aggregate::ISSUE_SHAPE_HOLE_REQUIRES_SHAPE_ARGUMENT,
                                     span,
                                 );
                                 return Some(self.error_type);
@@ -3338,6 +3352,12 @@ impl TypeChecker<'_> {
                         }
                     }
                 }
+                HirArrayElement::Infer(_) => {
+                    self.invalid_operand_types(
+                        super::aggregate::ISSUE_SHAPE_HOLE_REQUIRES_SHAPE_ARGUMENT,
+                        source.span,
+                    );
+                }
             }
         }
     }
@@ -3374,6 +3394,12 @@ impl TypeChecker<'_> {
                 HirArrayElement::Spread(expr) => {
                     self.check_expr(expr);
                     self.invalid_operand_types(ISSUE_VECTOR_CONSTRUCTOR_FORBIDS_SPREAD, expr.span);
+                }
+                HirArrayElement::Infer(_) => {
+                    self.invalid_operand_types(
+                        super::aggregate::ISSUE_SHAPE_HOLE_REQUIRES_SHAPE_ARGUMENT,
+                        source.span,
+                    );
                 }
             }
         }

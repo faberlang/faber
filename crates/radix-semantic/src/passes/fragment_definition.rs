@@ -356,6 +356,7 @@ impl FragmentDefinitionChecker<'_> {
                         | radix_hir::HirArrayElement::Spread(inner) => {
                             self.check_expr(inner);
                         }
+                        radix_hir::HirArrayElement::Infer(_) => {}
                     }
                 }
             }

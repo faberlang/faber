@@ -114,6 +114,9 @@ fn minimal_test_artifact() -> radix_hir_fhir::HirArtifact {
         gpu_builtins: Vec::new(),
         capability_provenance: FunctionProvenanceTableWire::default(),
         provider_units: std::collections::BTreeMap::new(),
+        shape_obligations: radix_hir_fhir::ShapeObligationTableWire::default(),
+        kernel_requirements: Default::default(),
+        tensor_edge_policies: Default::default(),
     }
 }
 

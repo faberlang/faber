@@ -38,7 +38,7 @@ use crate::file_interface::{
 };
 use crate::locale::LocalePack;
 use crate::passes::visibility_annotation::VisibilityTier;
-use radix_hir::{DefId, HirExpression};
+use radix_hir::{DefId, HirExpression, TensorEdgePolicyRequirement};
 use radix_lexer::{Span, Symbol as LexSymbol};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
@@ -256,6 +256,11 @@ pub struct ImportedSpellings {
 #[derive(Debug, Clone)]
 pub struct ImportedFileInterface {
     exports: FxHashMap<LexSymbol, ImportedFileExport>,
+    /// Generic edge-policy contracts exported with callables, keyed by their
+    /// consumer-visible member spelling. The synthetic DefId is local to this
+    /// resolver and exists only to key semantic call obligations.
+    tensor_edge_policy_requirements:
+        FxHashMap<LexSymbol, (DefId, Vec<TensorEdgePolicyRequirement>)>,
     /// Canonical source names accepted in addition to the consumer-locale
     /// spelling. The exported table stays surface-keyed for check/resolve.
     /// Target emit (Rust/TS) must write the canonical name: the generated
@@ -308,6 +313,11 @@ pub struct ImportedAdRoute {
 
 #[derive(Debug, Clone)]
 pub struct ImportedFileInterfaceMethod {
+    /// Consumer-local definition identity for this imported callback. It is
+    /// allocated while the imported method descriptor is installed so later
+    /// semantic sidecars can retain a checked callback identity without
+    /// borrowing a producer arena's `DefId`.
+    pub def_id: DefId,
     /// Canonical library method identity.
     pub name: LexSymbol,
     /// Consumer-locale spelling accepted at the source boundary.
@@ -1142,6 +1152,7 @@ impl Resolver {
                 namespace,
                 ImportedFileInterface {
                     exports,
+                    tensor_edge_policy_requirements: FxHashMap::default(),
                     canonical_exports,
                     strict_members,
                     identity,
@@ -1342,16 +1353,45 @@ impl Resolver {
                     InterfaceMemberKind::Function,
                     &canonical_member,
                 );
-                match import_interface_callable_with_resolver(callable, types, interner, self) {
-                    Ok(sig) => {
+                let requirements = callable
+                    .tensor_edge_policy_requirements
+                    .iter()
+                    .map(|requirement| {
+                        let policy_param = interner.intern(&requirement.policy_param);
+                        let policy_type = types.intern(Type::Param(policy_param));
+                        let element_type = import_interface_type_with_resolver(
+                            &requirement.element_type,
+                            types,
+                            interner,
+                            self,
+                        )?;
+                        Ok(TensorEdgePolicyRequirement {
+                            policy_type,
+                            element_type,
+                            rank: requirement.rank,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, FileInterfaceError>>();
+                match (
+                    import_interface_callable_with_resolver(callable, types, interner, self),
+                    requirements,
+                ) {
+                    (Ok(sig), Ok(requirements)) => {
                         let exported = ImportedFileExport::Function(sig);
+                        let policy_def = (!requirements.is_empty())
+                            .then(|| self.fresh_builtin_def_id());
                         for projected_member in projected_members {
-                            imported
-                                .exports
-                                .insert(interner.intern(&projected_member), exported.clone());
+                            let member = interner.intern(&projected_member);
+                            imported.exports.insert(member, exported.clone());
+                            if let Some(policy_def) = policy_def {
+                                imported.tensor_edge_policy_requirements.insert(
+                                    member,
+                                    (policy_def, requirements.clone()),
+                                );
+                            }
                         }
                     }
-                    Err(err) => {
+                    (Err(err), _) | (_, Err(err)) => {
                         skipped.push(FileInterfaceSkippedExport::from_error(
                             namespace_name,
                             export_identity.as_ref(),
@@ -1651,7 +1691,7 @@ impl Resolver {
 
     /// Import methods, skipping signatures that cannot be remapped.
     fn import_interface_methods_partial(
-        &self,
+        &mut self,
         namespace: &str,
         methods: &[InterfaceMethodExport],
         owner: &str,
@@ -1717,6 +1757,7 @@ impl Resolver {
                     .map_or(method.name.as_str(), String::as_str),
             );
             imported.push(ImportedFileInterfaceMethod {
+                def_id: self.fresh_def_id(),
                 name,
                 surface_name,
                 sig,
@@ -2026,6 +2067,29 @@ impl Resolver {
             ImportedFileExport::Function(sig) => Some(sig),
             ImportedFileExport::Type(_) | ImportedFileExport::Struct(_) => None,
         }
+    }
+
+    /// Edge-policy obligations exported by a generic namespace function.
+    ///
+    /// The returned identity is a resolver-local key, never a producer
+    /// `DefId`; requirement payload types have already been remapped into the
+    /// consumer's arena.
+    #[must_use]
+    pub fn namespace_file_tensor_edge_policy_requirements_canonical(
+        &self,
+        namespace: LexSymbol,
+        canonical: LexSymbol,
+    ) -> Option<(DefId, &[TensorEdgePolicyRequirement])> {
+        if self
+            .namespace_member_rejection_issue(namespace, canonical)
+            .is_some()
+        {
+            return None;
+        }
+        let interface = self.file_interfaces.get(&namespace)?;
+        let member = self.file_interface_export_key_for_canonical(interface, canonical)?;
+        let (def_id, requirements) = interface.tensor_edge_policy_requirements.get(&member)?;
+        Some((*def_id, requirements))
     }
 
     /// Remapped value type for a post-HIR canonical file-interface CONST member.
@@ -2514,6 +2578,44 @@ impl Resolver {
                     strukt.type_params.clone(),
                 )),
                 ImportedFileExport::Function(_) | ImportedFileExport::Type(_) => None,
+            })
+            .collect()
+    }
+
+    /// Imported callback definitions and their file-namespace route.
+    ///
+    /// Each callback `DefId` is local to this resolver. The tuple keeps the
+    /// owner nominal and imported module binding beside the exact exported
+    /// method name so consumers can route the identity without borrowing a
+    /// producer arena or guessing from a fallback spelling.
+    #[must_use]
+    pub fn imported_file_method_identities(
+        &self,
+    ) -> Vec<(DefId, DefId, LexSymbol, LexSymbol, LexSymbol)> {
+        self.file_interfaces
+            .iter()
+            .flat_map(|(namespace, interface)| {
+                interface
+                    .exports
+                    .iter()
+                    .flat_map(move |(owner_name, export)| {
+                        let ImportedFileExport::Struct(strukt) = export else {
+                            return Vec::new();
+                        };
+                        strukt
+                            .methods
+                            .iter()
+                            .map(|method| {
+                                (
+                                    method.def_id,
+                                    strukt.def_id,
+                                    *namespace,
+                                    *owner_name,
+                                    method.name,
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                    })
             })
             .collect()
     }
@@ -3763,6 +3865,7 @@ impl Resolver {
                                 def_id,
                                 ty,
                                 fields,
+                                methods,
                                 is_json,
                             } => {
                                 let imported_fields: Vec<ImportedFileStructField> = fields
@@ -3777,12 +3880,22 @@ impl Resolver {
                                         init: None,
                                     })
                                     .collect();
+                                let imported_methods = methods
+                                    .into_iter()
+                                    .map(|method| ImportedFileInterfaceMethod {
+                                        def_id: method.def_id,
+                                        name: method.name,
+                                        surface_name: method.surface_name,
+                                        sig: method.sig,
+                                        visibility: method.visibility,
+                                    })
+                                    .collect();
                                 ImportedFileExport::Struct(ImportedFileStruct {
                                     is_json,
                                     def_id,
                                     ty,
                                     fields: imported_fields,
-                                    methods: Vec::new(),
+                                    methods: imported_methods,
                                     // Artifact snapshots do not carry
                                     // declaration params; applied-projection
                                     // metadata stays degraded on this route.
@@ -3797,6 +3910,7 @@ impl Resolver {
                     ns,
                     ImportedFileInterface {
                         exports,
+                        tensor_edge_policy_requirements: FxHashMap::default(),
                         canonical_exports: FxHashMap::default(),
                         strict_members: false,
                         identity: None,
@@ -3886,6 +4000,7 @@ impl Resolver {
     pub fn to_snapshot(&self) -> radix_hir_fhir::ResolverSnapshot {
         use radix_hir_fhir::{
             FileExportSnapshot, FileInterfaceSnapshot, ResolverSnapshot, StructFieldSnapshot,
+            StructMethodSnapshot,
         };
 
         let namespace_exports = self
@@ -3924,6 +4039,17 @@ impl Resolver {
                                         required: field.required,
                                         modifier: field.modifier,
                                         visibility: field.visibility,
+                                    })
+                                    .collect(),
+                                methods: strukt
+                                    .methods
+                                    .iter()
+                                    .map(|method| StructMethodSnapshot {
+                                        def_id: method.def_id,
+                                        name: method.name,
+                                        surface_name: method.surface_name,
+                                        sig: method.sig.clone(),
+                                        visibility: method.visibility,
                                     })
                                     .collect(),
                             },

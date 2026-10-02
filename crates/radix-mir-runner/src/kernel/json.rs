@@ -201,8 +201,11 @@ fn value_to_json(value: &Value, span: Span) -> Result<serde_json::Value, RunnerE
         }
         Value::Tensor(tensor) => {
             let tensor = tensor.borrow();
-            let mut out = Vec::with_capacity(tensor.data.len());
-            for item in &tensor.data {
+            let values = tensor
+                .logical_values()
+                .ok_or_else(|| RunnerError::internal(span, "tensor json layout is invalid"))?;
+            let mut out = Vec::with_capacity(values.len());
+            for item in &values {
                 out.push(value_to_json(item, span)?);
             }
             Ok(serde_json::Value::Array(out))

@@ -13,7 +13,7 @@
 # Row fields:
 #   id        stable cell identifier (unique, never reused)
 #   family    itera | summa | bounded-conversio | annotations | casts | closures |
-#             await-assignment | membership
+#             await-assignment | membership | tensor-views | tensor-runtime-size
 #   cell      human-readable cell descriptor
 #   status    direct       — a corpus exemplum teaches the cell (run/lane proven)
 #             unit-proven  — proven only in semantic unit tests; zero corpus
@@ -1261,6 +1261,105 @@ exemplum = "await-assignment/await-assignment.fab"
 expected = true
 required = true
 note = "exemplum runs three awaited declarations and prints each resolved value"
+
+[[cells]]
+id = "tensor-views.batched-contraction"
+family = "tensor-views"
+cell = "rank-3 contraction with shared rank-2 transpose and axis-0 slice"
+status = "direct"
+exemplum = "tensor/batched-view-matmul.fab"
+expected = true
+required = true
+note = "K6: result cells are read through transpose and slice stride descriptors"
+
+[[cells]]
+id = "tensor-views.last-use-and-materialize"
+family = "tensor-views"
+cell = "view last-use releases base; materialize has independent storage"
+status = "direct"
+exemplum = "tensor/view-lifetime.fab"
+expected = true
+required = true
+
+[[cells]]
+id = "tensor-views.escape-decline"
+family = "tensor-views"
+cell = "REJECT: borrowed tensor returned or bound to mutable storage"
+status = "direct"
+exemplum = "tensor/view-escape-decline.fab"
+expected = true
+required = true
+decline = true
+note = "K6/K12: SEM057 tensor_view_escape; help names materialize()"
+
+[[cells]]
+id = "tensor-runtime-size.call-boundary"
+family = "tensor-runtime-size"
+cell = "runtime-origin extents and recoverable repeated-size mismatch before callee entry"
+status = "direct"
+exemplum = "tensor/runtime-shape-boundary.fab"
+expected = true
+required = true
+note = "K14/K15: static rank, runtime extent checks; invalid call must not print entered"
+
+[[cells]]
+id = "tensor-views.edge-policies"
+family = "tensor-views"
+cell = "shift resolved by clamp, reflect, wrap, fused coalesce, or stateless user policy"
+status = "direct"
+exemplum = "tensor/edge-views.fab"
+expected = true
+required = true
+note = "K12: custom remap plus optional edge-only transform; interior cells stay unchanged"
+
+[[cells]]
+id = "tensor-views.edge-policy-generic-forwarding"
+family = "tensor-views"
+cell = "generic functions forward built-in and zero-field custom edge providers"
+status = "direct"
+exemplum = "tensor/edge-policy-forwarding.fab"
+expected = true
+required = true
+note = "K12: inferred provider bounds and concrete generic calls preserve static dispatch"
+
+[[cells]]
+id = "tensor-runtime-size.affine"
+family = "tensor-runtime-size"
+cell = "affine generic dimensions and runtime witness formulas"
+status = "direct"
+exemplum = "tensor/affine-dimensions.fab"
+expected = true
+required = true
+note = "K12: N-1, exact D/2 and additive cancellation agree for literal and generic dimensions"
+
+[[cells]]
+id = "tensor-runtime-size.affine-inexact-decline"
+family = "tensor-runtime-size"
+cell = "REJECT: generic odd dimension cannot satisfy exact D/2"
+status = "direct"
+exemplum = "tensor/affine-dimensions-reject.fab"
+expected = true
+required = true
+decline = true
+
+[[cells]]
+id = "tensor-runtime-size.shape-holes"
+family = "tensor-runtime-size"
+cell = "shape-list holes infer from storage, source axes or expected shape"
+status = "direct"
+exemplum = "tensor/shape-holes.fab"
+expected = true
+required = true
+
+[[cells]]
+id = "tensor-runtime-size.shape-holes-decline"
+family = "tensor-runtime-size"
+cell = "REJECT: underdetermined shape holes or holes in ordinary value arrays"
+status = "direct"
+exemplum = "tensor/shape-holes-decline.fab"
+expected = true
+required = true
+decline = true
 
 [[cells]]
 id = "await-assignment.varia"

@@ -94,6 +94,10 @@ pub struct AnalyzedApplicationParts {
     pub libraries: LibraryRegistry,
     pub radix_lanes: RadixLaneMetadata,
     pub gpu_builtins: Vec<(radix_hir::DefId, radix_types::MirKernelBuiltin)>,
+    /// Resolved shifted-view policies and generic forwarding facts from this HIR run.
+    pub tensor_edge_policies: radix_hir::TensorEdgePolicyTable,
+    /// Per-target inferred device requirements from the same typed-HIR run.
+    pub kernel_requirements: crate::passes::kernel_requirements::KernelRequirementsReport,
     pub access_facts: AccessFactTable,
     /// Region facts carried from the pipeline's single region-engine run on
     /// this same analysis snapshot; `build` never re-runs the engine.
@@ -120,6 +124,8 @@ pub struct AnalyzedApplication {
     libraries: LibraryRegistry,
     radix_lanes: RadixLaneMetadata,
     gpu_builtins: Vec<(radix_hir::DefId, radix_types::MirKernelBuiltin)>,
+    tensor_edge_policies: radix_hir::TensorEdgePolicyTable,
+    kernel_requirements: crate::passes::kernel_requirements::KernelRequirementsReport,
     access_facts: AccessFactTable,
     function_facts: FunctionFactTable,
     resolved_uses: ResolvedUseIndex,
@@ -210,6 +216,8 @@ impl AnalyzedApplication {
             libraries: parts.libraries,
             radix_lanes: parts.radix_lanes,
             gpu_builtins: parts.gpu_builtins,
+            tensor_edge_policies: parts.tensor_edge_policies,
+            kernel_requirements: parts.kernel_requirements,
             access_facts,
             function_facts,
             resolved_uses,
@@ -260,6 +268,11 @@ impl AnalyzedApplication {
     }
 
     #[must_use]
+    pub fn tensor_edge_policies(&self) -> &radix_hir::TensorEdgePolicyTable {
+        &self.tensor_edge_policies
+    }
+
+    #[must_use]
     pub fn access_facts(&self) -> &AccessFactTable {
         &self.access_facts
     }
@@ -287,6 +300,14 @@ impl AnalyzedApplication {
     #[must_use]
     pub fn semantic_diagnostics(&self) -> &[SemanticError] {
         &self.semantic_diagnostics
+    }
+
+    /// Per-target device requirements inferred from this exact HIR snapshot.
+    #[must_use]
+    pub fn kernel_requirements(
+        &self,
+    ) -> &crate::passes::kernel_requirements::KernelRequirementsReport {
+        &self.kernel_requirements
     }
 
     /// Require that a borrowed subrecord carries this snapshot's stamp.
@@ -317,6 +338,8 @@ impl AnalyzedApplication {
             libraries: self.libraries,
             radix_lanes: self.radix_lanes,
             gpu_builtins: self.gpu_builtins,
+            tensor_edge_policies: self.tensor_edge_policies,
+            kernel_requirements: self.kernel_requirements,
             access_facts: self.access_facts,
             function_facts: self.function_facts,
             resolved_uses: self.resolved_uses,
@@ -337,6 +360,8 @@ pub struct AnalyzedApplicationDriverFields {
     pub libraries: LibraryRegistry,
     pub radix_lanes: RadixLaneMetadata,
     pub gpu_builtins: Vec<(radix_hir::DefId, radix_types::MirKernelBuiltin)>,
+    pub tensor_edge_policies: radix_hir::TensorEdgePolicyTable,
+    pub kernel_requirements: crate::passes::kernel_requirements::KernelRequirementsReport,
     pub access_facts: AccessFactTable,
     pub function_facts: FunctionFactTable,
     pub resolved_uses: ResolvedUseIndex,

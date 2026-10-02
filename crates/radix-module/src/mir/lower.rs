@@ -42,25 +42,29 @@ use crate::hir::{
 };
 use crate::lexer::{Interner, Span, Symbol};
 use crate::mir::{
-    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock, MirBlockId, MirCallee,
-    MirCaptureMode, MirClosureCallee, MirClosureCapture, MirClosureEnvironment, MirClosureEnvironmentId,
-    MirClosureValue, MirConstant, MirConversion, MirConversionFlavor, MirDeviceRole, MirDiagnosticKind,
-    MirFilumCoordinate, MirFilumSumOp, MirFunction, MirFunctionId, MirFunctionOrigin, MirFunctionVisibility,
-    MirGenericBindings, MirIntrinsic, MirKernelShaderStage, MirKeyValueOperand, MirLayoutTable, MirLiftOp,
-    MirLocal as MirLocalDecl, MirLocalId, MirMonomorphization, MirNamedOperand, MirOperand, MirOptionChainLink,
-    MirOptionOp, MirOptionUnwrapMode, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirProgram, MirProjection,
-    MirProvider, MirProviderKind, MirRuntimeCall, MirStatement, MirStatementKind, MirStructFieldDefaults,
-    MirSwitchCase, MirSyntheticFunctionIdentity, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType,
-    MirTypeCheckOp, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind, MirVectorOp, ValidatedMir,
-    dump_program, instantiate_existing_generic_type, type_contains_param,
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock, MirBlockId,
+    MirBuiltinEdgePolicy, MirCallee, MirCaptureMode, MirClosureCallee, MirClosureCapture, MirClosureEnvironment,
+    MirClosureEnvironmentId, MirClosureValue, MirConstant, MirConversion, MirConversionFlavor, MirDeviceRole,
+    MirDiagnosticKind, MirEdgePolicy, MirFilumCoordinate, MirFilumSumOp, MirFunction, MirFunctionId, MirFunctionOrigin,
+    MirFunctionVisibility, MirGenericBindings, MirIntrinsic, MirKernelShaderStage, MirKeyValueOperand, MirLayoutTable,
+    MirLiftOp, MirLocal as MirLocalDecl, MirLocalId, MirMonomorphization, MirNamedOperand, MirOperand,
+    MirOptionChainLink, MirOptionOp, MirOptionUnwrapMode, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirProgram,
+    MirProjection, MirProvider, MirProviderKind, MirRuntimeCall, MirShapeBinding, MirShapeCheck, MirShapeExpr,
+    MirShapeRelation, MirStatement, MirStatementKind, MirStructFieldDefaults, MirSwitchCase,
+    MirSyntheticFunctionIdentity, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType, MirTypeCheckOp,
+    MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind, MirVectorOp, ValidatedMir, dump_program,
+    instantiate_existing_generic_type, type_contains_param,
 };
-use crate::semantic::{ConversionPair, IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId, TypeTable};
+use crate::semantic::{
+    ConversionPair, IndexExpr, IndexId, NumericWidth, Primitive, RuntimeExtentId, RuntimeSizeBinding, ShapeRelation,
+    ShapeRelationBoundary, Type, TypeId, TypeTable,
+};
 use radix_mir::device::{MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, is_public_entry};
 use radix_mir::validate::PatchProgramError;
 use radix_mir::vector_expand::{expand_vector_ops, numeric_zero_constant};
 use radix_types::{MirCollectionOp, MirKernelBuiltin, SemanticMutability};
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 mod aggregate;
 mod async_surface;
@@ -91,6 +95,7 @@ pub use package_instantiate::{
     ImportedDeviceIndex, ImportedDeviceRegistration, ImportedDeviceRoute, PackageStructMetadata,
     instantiate_merged_generic_calls, instantiate_merged_generic_calls_with_devices,
     instantiate_merged_generic_calls_with_devices_and_metadata,
+    instantiate_merged_generic_calls_with_tensor_edge_policy,
 };
 
 /// Developer-facing MIR lowering diagnostic.
@@ -202,6 +207,11 @@ pub struct LoweredMirUnit<'a> {
     /// keyed by the template's `function.source` (rewritten to a synthetic
     /// def at package link). `is_shape` is `magnitudo`; otherwise `typus`.
     pub generic_params: Vec<(DefId, Vec<MirGenericParam>)>,
+    /// Portable tensor edge-policy provider facts and generic limes sites.
+    /// This contains source identities and ranks, never unit-local `TypeId`s,
+    /// so package linking can carry it across independently allocated type
+    /// arenas and resolve callbacks after function IDs are merged.
+    pub tensor_edge_policy_metadata: MirTensorEdgePolicyMetadata,
     /// Validated MIR token and sole owner of the program that passed
     /// [`validate_program`] against the enclosed context.
     pub validated: ValidatedMir<'a>,
@@ -245,6 +255,7 @@ impl<'a> LoweredMirUnit<'a> {
             device_function_metadata,
             generic_templates,
             generic_params,
+            tensor_edge_policy_metadata,
             validated,
             companions,
             imported_device_routes,
@@ -258,6 +269,7 @@ impl<'a> LoweredMirUnit<'a> {
             device_function_metadata,
             generic_templates,
             generic_params,
+            tensor_edge_policy_metadata,
             validated,
             companions,
             imported_device_routes,
@@ -276,6 +288,7 @@ impl std::fmt::Debug for LoweredMirUnit<'_> {
             .field("device_function_metadata", &self.device_function_metadata)
             .field("generic_templates", &self.generic_templates)
             .field("generic_params", &self.generic_params)
+            .field("tensor_edge_policy_metadata", &self.tensor_edge_policy_metadata)
             .field("companions", &self.companions)
             .field("imported_device_registrations", &self.imported_device_registrations)
             .finish_non_exhaustive()
@@ -287,6 +300,281 @@ impl std::fmt::Debug for LoweredMirUnit<'_> {
 pub struct MirGenericParam {
     pub name: Symbol,
     pub is_shape: bool,
+    /// Stable formal-carrier witness used to key dynamic shape parameters.
+    /// Runtime actual extents stay on call operands and never specialize the
+    /// body by their value or source origin.
+    pub runtime_witness: Option<IndexId>,
+}
+
+/// Portable selector for one semantically checked tensor edge-policy
+/// provider. Custom callbacks remain source `DefId`s until package linking
+/// has assigned final MIR function IDs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MirTensorEdgePolicySelector {
+    /// Compiler-owned shape-aware policy.
+    Builtin(MirBuiltinEdgePolicy),
+    /// Checked, zero-field custom policy and its ordinary callback methods.
+    Custom {
+        policy_def: DefId,
+        remap: DefId,
+        transform: Option<DefId>,
+    },
+}
+
+/// Arena-independent identity for a concrete policy or tensor element type.
+/// Only closed, fully resolved forms are admitted; unsupported symbolic forms
+/// stay out of the provider table and fail closed at package linking.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MirTensorEdgeTypeIdentity {
+    Primitive(Primitive),
+    BuiltinPolicy(radix_types::BuiltinTensorEdgePolicy),
+    Struct(DefId),
+    Enum(DefId),
+    Interface(DefId),
+    Applied(Box<Self>, Vec<MirTensorEdgeAppliedArg>),
+    Array(Box<Self>),
+    Option(Box<Self>),
+    Ref(SemanticMutability, Box<Self>),
+    Tensor(Box<Self>, MirTensorEdgeShapeIdentity),
+    Vector(Box<Self>, MirTensorEdgeShapeIdentity),
+    Matrix(Box<Self>, MirTensorEdgeShapeIdentity),
+    Sparsa(Box<Self>, MirTensorEdgeShapeIdentity),
+    SizedNumeric(Primitive, NumericWidth),
+    ModularWord(NumericWidth),
+    SaturatingWord(NumericWidth),
+    PolicyFloat(radix_types::FloatPolicy, NumericWidth),
+    SizedInstans(radix_types::InstansPrecision),
+    Tuple(Vec<Self>),
+    Union(Vec<Self>),
+    Intersection(Vec<Self>),
+    Record(Vec<(String, Self)>),
+}
+
+/// A statically closed shape inside a concrete tensor-valued element or
+/// policy type argument.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MirTensorEdgeShapeIdentity {
+    Literal(u64),
+    Tuple(Vec<Self>),
+}
+
+/// An applied type argument, with size terms represented by closed values.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MirTensorEdgeAppliedArg {
+    Type(MirTensorEdgeTypeIdentity),
+    Size(MirTensorEdgeShapeIdentity),
+}
+
+/// A checked policy provider available to concrete generic specializations.
+/// The callback signatures were checked against the element type during
+/// semantic discharge; package MIR rechecks the final method MIDs and tensor
+/// rank after substitution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MirTensorEdgePolicyProvider {
+    /// Concrete selector identity (builtin tag or custom source nominal).
+    pub selector: MirTensorEdgePolicySelector,
+    /// Exact custom policy type. Builtins are universal and use `None`.
+    pub policy_type: Option<MirTensorEdgeTypeIdentity>,
+    /// Exact tensor element type accepted by a custom transform. Builtins
+    /// are universal and use `None`.
+    pub element_type: Option<MirTensorEdgeTypeIdentity>,
+    /// Statically known tensor rank accepted by the semantic policy check.
+    pub rank: usize,
+}
+
+/// One symbolic `limes<P>()` site in a generic MIR template.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MirTensorLimesTemplate {
+    /// Template source identity, rewritten to the package namespace at link.
+    pub source: DefId,
+    /// Destination temporary used to locate this runtime call in a clone.
+    pub destination: MirTempId,
+    /// Zero-based index among typus arguments in the monomorphization key.
+    pub policy_type_argument: usize,
+    /// Statically known tensor rank.
+    pub rank: usize,
+}
+
+/// Cross-unit facts needed to resolve deferred generic limes sites.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MirTensorEdgePolicyMetadata {
+    /// All semantically checked concrete providers reachable in the package.
+    pub providers: Vec<MirTensorEdgePolicyProvider>,
+    /// Symbolic limes sites retained for generic templates.
+    pub generic_limes: Vec<MirTensorLimesTemplate>,
+}
+
+fn portable_tensor_edge_policy_providers(
+    policies: &radix_hir::TensorEdgePolicyTable,
+    types: &TypeTable,
+    interner: &Interner,
+) -> Vec<MirTensorEdgePolicyProvider> {
+    let mut providers = Vec::new();
+    for provider in &policies.provider_impls {
+        let (selector, policy_type, element_type) = match provider.policy {
+            radix_hir::ResolvedTensorEdgePolicy::Builtin(policy) => (
+                MirTensorEdgePolicySelector::Builtin(match policy {
+                    radix_types::BuiltinTensorEdgePolicy::Clamp => MirBuiltinEdgePolicy::Clamp,
+                    radix_types::BuiltinTensorEdgePolicy::Reflect => MirBuiltinEdgePolicy::Reflect,
+                    radix_types::BuiltinTensorEdgePolicy::Wrap => MirBuiltinEdgePolicy::Wrap,
+                }),
+                None,
+                None,
+            ),
+            radix_hir::ResolvedTensorEdgePolicy::Custom { policy_def, remap, transform } => {
+                let (Some(policy_type), Some(element_type)) = (
+                    portable_tensor_edge_type_identity(types, interner, provider.policy_type),
+                    portable_tensor_edge_type_identity(types, interner, provider.element_type),
+                ) else {
+                    continue;
+                };
+                (
+                    MirTensorEdgePolicySelector::Custom { policy_def, remap, transform },
+                    Some(policy_type),
+                    Some(element_type),
+                )
+            }
+            radix_hir::ResolvedTensorEdgePolicy::Deferred { .. } => continue,
+        };
+        let portable = MirTensorEdgePolicyProvider { selector, policy_type, element_type, rank: provider.rank };
+        if !providers.contains(&portable) {
+            providers.push(portable);
+        }
+    }
+    providers
+}
+
+fn portable_tensor_edge_type_identity(
+    types: &TypeTable,
+    interner: &Interner,
+    ty: TypeId,
+) -> Option<MirTensorEdgeTypeIdentity> {
+    use radix_types::AppliedArg;
+
+    let identity = match types.get(ty) {
+        Type::Primitive(primitive) => MirTensorEdgeTypeIdentity::Primitive(*primitive),
+        Type::TensorEdgePolicy(policy) => MirTensorEdgeTypeIdentity::BuiltinPolicy(*policy),
+        Type::Struct(definition) => MirTensorEdgeTypeIdentity::Struct(*definition),
+        Type::Enum(definition) => MirTensorEdgeTypeIdentity::Enum(*definition),
+        Type::Interface(definition) => MirTensorEdgeTypeIdentity::Interface(*definition),
+        Type::Alias(_, inner) => return portable_tensor_edge_type_identity(types, interner, *inner),
+        Type::Applied(base, args) => MirTensorEdgeTypeIdentity::Applied(
+            Box::new(portable_tensor_edge_type_identity(types, interner, *base)?),
+            args.iter()
+                .map(|argument| match argument {
+                    AppliedArg::Type(ty) => Some(MirTensorEdgeAppliedArg::Type(portable_tensor_edge_type_identity(
+                        types, interner, *ty,
+                    )?)),
+                    AppliedArg::Size(shape) => Some(MirTensorEdgeAppliedArg::Size(
+                        portable_tensor_edge_shape_identity(types, *shape)?,
+                    )),
+                })
+                .collect::<Option<Vec<_>>>()?,
+        ),
+        Type::Array(element) => {
+            MirTensorEdgeTypeIdentity::Array(Box::new(portable_tensor_edge_type_identity(types, interner, *element)?))
+        }
+        Type::Option(element) => {
+            MirTensorEdgeTypeIdentity::Option(Box::new(portable_tensor_edge_type_identity(types, interner, *element)?))
+        }
+        Type::Ref(mutability, referent) => MirTensorEdgeTypeIdentity::Ref(
+            *mutability,
+            Box::new(portable_tensor_edge_type_identity(types, interner, *referent)?),
+        ),
+        Type::Tensor(element, shape) => MirTensorEdgeTypeIdentity::Tensor(
+            Box::new(portable_tensor_edge_type_identity(types, interner, *element)?),
+            portable_tensor_edge_shape_identity(types, *shape)?,
+        ),
+        Type::Vector(element, shape) => MirTensorEdgeTypeIdentity::Vector(
+            Box::new(portable_tensor_edge_type_identity(types, interner, *element)?),
+            portable_tensor_edge_shape_identity(types, *shape)?,
+        ),
+        Type::Matrix(element, shape) => MirTensorEdgeTypeIdentity::Matrix(
+            Box::new(portable_tensor_edge_type_identity(types, interner, *element)?),
+            portable_tensor_edge_shape_identity(types, *shape)?,
+        ),
+        Type::Sparsa(element, shape) => MirTensorEdgeTypeIdentity::Sparsa(
+            Box::new(portable_tensor_edge_type_identity(types, interner, *element)?),
+            portable_tensor_edge_shape_identity(types, *shape)?,
+        ),
+        Type::SizedNumeric(primitive, width) => MirTensorEdgeTypeIdentity::SizedNumeric(*primitive, *width),
+        Type::ModularWord(width) => MirTensorEdgeTypeIdentity::ModularWord(*width),
+        Type::SaturatingWord(width) => MirTensorEdgeTypeIdentity::SaturatingWord(*width),
+        Type::PolicyFloat(policy, width) => MirTensorEdgeTypeIdentity::PolicyFloat(*policy, *width),
+        Type::SizedInstans(precision) => MirTensorEdgeTypeIdentity::SizedInstans(*precision),
+        Type::Tuple(items) => MirTensorEdgeTypeIdentity::Tuple(
+            items
+                .iter()
+                .map(|item| portable_tensor_edge_type_identity(types, interner, *item))
+                .collect::<Option<Vec<_>>>()?,
+        ),
+        Type::Union(items) => MirTensorEdgeTypeIdentity::Union(
+            items
+                .iter()
+                .map(|item| portable_tensor_edge_type_identity(types, interner, *item))
+                .collect::<Option<Vec<_>>>()?,
+        ),
+        Type::Intersection(items) => MirTensorEdgeTypeIdentity::Intersection(
+            items
+                .iter()
+                .map(|item| portable_tensor_edge_type_identity(types, interner, *item))
+                .collect::<Option<Vec<_>>>()?,
+        ),
+        Type::Record(fields) => {
+            let mut fields = fields
+                .iter()
+                .map(|(name, field_ty)| {
+                    Some((
+                        interner.resolve(*name).to_owned(),
+                        portable_tensor_edge_type_identity(types, interner, *field_ty)?,
+                    ))
+                })
+                .collect::<Option<Vec<_>>>()?;
+            fields.sort_by(|left, right| left.0.cmp(&right.0));
+            MirTensorEdgeTypeIdentity::Record(fields)
+        }
+        Type::BoundedArray { .. }
+        | Type::Queue(_)
+        | Type::BoundedQueue { .. }
+        | Type::Stack(_)
+        | Type::BoundedStack { .. }
+        | Type::BoundedTextus { .. }
+        | Type::BoundedAscii { .. }
+        | Type::BoundedOcteti { .. }
+        | Type::Map(_, _)
+        | Type::Set(_)
+        | Type::Promissum(_)
+        | Type::PromissumFailable(_, _)
+        | Type::Cursor(_)
+        | Type::AsyncCursor(_, _)
+        | Type::Atomic(_)
+        | Type::Intervallum(_)
+        | Type::Func(_)
+        | Type::Param(_)
+        | Type::Infer(_)
+        | Type::InferUnion(_)
+        | Type::MarkerHole { .. }
+        | Type::Error => return None,
+    };
+    Some(identity)
+}
+
+fn portable_tensor_edge_shape_identity(types: &TypeTable, shape: IndexId) -> Option<MirTensorEdgeShapeIdentity> {
+    match types.get_index(shape) {
+        IndexExpr::Literal(value) => Some(MirTensorEdgeShapeIdentity::Literal(*value)),
+        IndexExpr::Tuple(items) => Some(MirTensorEdgeShapeIdentity::Tuple(
+            items
+                .iter()
+                .map(|item| portable_tensor_edge_shape_identity(types, *item))
+                .collect::<Option<Vec<_>>>()?,
+        )),
+        IndexExpr::Param(_)
+        | IndexExpr::Runtime(_)
+        | IndexExpr::Affine { .. }
+        | IndexExpr::Divide { .. }
+        | IndexExpr::Infer(_)
+        | IndexExpr::Unspecified => None,
+    }
 }
 
 #[derive(Default)]
@@ -396,14 +684,20 @@ pub fn lower_analyzed_unit(
         functions: Vec::new(),
         closure_environments: Vec::new(),
         device_function_metadata: MirDeviceFunctionMetadataMap::default(),
+        pending_tensor_limes: Arc::new(Mutex::new(Vec::new())),
+        deferred_tensor_limes: Vec::new(),
         struct_field_types: None,
     };
     lowerer.lower();
 
     let lowering_errors = std::mem::take(&mut lowerer.errors);
     if lowering_errors.is_empty() {
-        let monomorphize::MonomorphizeOutput { monomorphizations, templates: generic_templates, generic_params } =
-            lowerer.monomorphize();
+        let monomorphize::MonomorphizeOutput {
+            monomorphizations,
+            templates: generic_templates,
+            generic_params,
+            tensor_limes_templates,
+        } = lowerer.monomorphize();
         let monomorphization_errors = std::mem::take(&mut lowerer.errors);
         if !monomorphization_errors.is_empty() {
             return Err(monomorphization_errors);
@@ -501,6 +795,8 @@ pub fn lower_analyzed_unit(
         // Ownership hand-off: the validation token takes the lowering-owned
         // arena, so the returned unit carries its own table and borrows
         // nothing from the lowering call itself.
+        let tensor_edge_policy_providers =
+            portable_tensor_edge_policy_providers(&unit.tensor_edge_policies, &types, &interner);
         let validation = validation.with_owned_types(types);
         let validated = ValidatedMir::new(program, validation).map_err(|errors| {
             errors
@@ -515,6 +811,10 @@ pub fn lower_analyzed_unit(
             device_function_metadata,
             generic_templates,
             generic_params,
+            tensor_edge_policy_metadata: MirTensorEdgePolicyMetadata {
+                providers: tensor_edge_policy_providers,
+                generic_limes: tensor_limes_templates,
+            },
             validated,
             companions: radix_mir::device::MirCompanionMap::default(),
             imported_device_routes,
@@ -890,9 +1190,35 @@ struct MirLowerer<'a> {
     functions: Vec<MirFunction>,
     closure_environments: Vec<MirClosureEnvironment>,
     device_function_metadata: MirDeviceFunctionMetadataMap,
+    /// Custom policy callbacks are resolved after all source callables have
+    /// MIR ids. Nested builders share this queue; final MIR carries MIDs only.
+    pending_tensor_limes: Arc<Mutex<Vec<PendingTensorLimes>>>,
+    /// Deferred generic policy selectors retained until each concrete generic
+    /// body is cloned and its typus arguments are known.
+    deferred_tensor_limes: Vec<PendingTensorLimes>,
     /// Struct field types collected during the body-lowering walk and retained
     /// for generic monomorphization, avoiding a second HIR traversal.
     struct_field_types: Option<Arc<FxHashMap<DefId, FxHashMap<Symbol, MirType>>>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PendingTensorLimes {
+    function: MirFunctionId,
+    destination: MirTempId,
+    dispatch: PendingTensorLimesDispatch,
+    span: Span,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum PendingTensorLimesDispatch {
+    Custom {
+        policy_def: DefId,
+        remap: DefId,
+        transform: Option<DefId>,
+    },
+    Deferred {
+        policy_type: TypeId,
+    },
 }
 
 /// MIR locals, CFG, and side-effect functions produced by one callable lowering pass.
@@ -913,6 +1239,7 @@ struct CallableLoweringConfig<'input> {
     parent_function_id: MirFunctionId,
     device_role: Option<MirDeviceRole>,
     target: CallableLoweringTarget<'input>,
+    def_id: DefId,
 }
 
 enum CallableLoweringTarget<'input> {
@@ -959,6 +1286,93 @@ impl<'a> MirLowerer<'a> {
 
         if let Some(entry) = &self.unit.hir.entry {
             self.lower_entry(entry, &body_ctx);
+        }
+        self.resolve_pending_tensor_limes();
+    }
+
+    /// Replace the private lowering placeholders for custom `limes` calls
+    /// with callback MIDs after all source functions have been assigned IDs.
+    /// Missing callback bodies or call destinations fail closed before MIR
+    /// validation/serialization.
+    fn resolve_pending_tensor_limes(&mut self) {
+        let pending = match self.pending_tensor_limes.lock() {
+            Ok(mut pending) => std::mem::take(&mut *pending),
+            Err(_) => {
+                self.errors.push(MirError::unsupported(
+                    Span::default(),
+                    "tensor limes callback queue was poisoned during lowering",
+                ));
+                return;
+            }
+        };
+        if pending.is_empty() {
+            return;
+        }
+
+        let functions_by_source = self
+            .functions
+            .iter()
+            .filter_map(|function| function.source.map(|source| (source, function.id)))
+            .collect::<FxHashMap<_, _>>();
+        for pending in pending {
+            let PendingTensorLimesDispatch::Custom { policy_def, remap: remap_def, transform: transform_def } =
+                pending.dispatch
+            else {
+                self.deferred_tensor_limes.push(pending);
+                continue;
+            };
+            let Some(remap) = functions_by_source.get(&remap_def).copied() else {
+                self.errors.push(MirError::unsupported(
+                    pending.span,
+                    "custom tensor limes remap callback has no lowered function",
+                ));
+                continue;
+            };
+            let transform = match transform_def {
+                Some(def_id) => match functions_by_source.get(&def_id).copied() {
+                    Some(function) => Some(function),
+                    None => {
+                        self.errors.push(MirError::unsupported(
+                            pending.span,
+                            "custom tensor limes transform callback has no lowered function",
+                        ));
+                        continue;
+                    }
+                },
+                None => None,
+            };
+            let Some(function) = self
+                .functions
+                .iter_mut()
+                .find(|function| function.id == pending.function)
+            else {
+                self.errors.push(MirError::unsupported(
+                    pending.span,
+                    "custom tensor limes call has no containing function",
+                ));
+                continue;
+            };
+            let statement = function.blocks.iter_mut().flat_map(|block| &mut block.statements).find(|statement| {
+                matches!(
+                    &statement.kind,
+                    MirStatementKind::RuntimeCall {
+                        destination: Some(place),
+                        call,
+                    } if place.base == MirPlaceBase::Temp(pending.destination)
+                        && place.projections.is_empty()
+                        && matches!(&call.intrinsic, MirIntrinsic::TensorLimes(MirEdgePolicy::Builtin(MirBuiltinEdgePolicy::Clamp)))
+                )
+            });
+            let Some(statement) = statement else {
+                self.errors.push(MirError::unsupported(
+                    pending.span,
+                    "custom tensor limes placeholder was not found in its lowered function",
+                ));
+                continue;
+            };
+            if let MirStatementKind::RuntimeCall { call, .. } = &mut statement.kind {
+                call.intrinsic = MirIntrinsic::TensorLimes(MirEdgePolicy::Custom { policy_def, remap, transform });
+            }
         }
     }
 
@@ -1072,6 +1486,7 @@ impl<'a> MirLowerer<'a> {
                 parent_function_id,
                 device_role: device_role_for_function(function),
                 target,
+                def_id,
             },
         );
         self.errors.extend(errors);
@@ -1126,7 +1541,7 @@ impl<'a> MirLowerer<'a> {
     /// maps borrow (it owns its Arc-cloned tables), so the unit lifetime `'a`
     /// is named explicitly.
     fn builder_context(&self, body_ctx: &BodyLoweringContext<'_, 'a>) -> FunctionBuilderContext<'a> {
-        body_ctx.context_maps.builder_context(
+        let mut context = body_ctx.context_maps.builder_context(
             self.interner,
             body_ctx.empty_textus,
             body_ctx.diagnostics,
@@ -1136,7 +1551,14 @@ impl<'a> MirLowerer<'a> {
             Arc::clone(&self.options.cli_record_fields_by_local),
             Arc::clone(&self.options.cli_record_fields_by_type),
             self.options.cli_adapter_active,
-        )
+        );
+        context.shape_calls = Arc::new(self.unit.shape_obligations.calls.clone());
+        context.shape_functions = Arc::new(self.unit.shape_obligations.functions.clone());
+        context.call_size_bindings = Arc::new(self.unit.shape_obligations.call_size_bindings.clone());
+        context.function_size_bindings = Arc::new(self.unit.shape_obligations.function_size_bindings.clone());
+        context.tensor_edge_policies = Arc::new(self.unit.tensor_edge_policies.clone());
+        context.pending_tensor_limes = Arc::clone(&self.pending_tensor_limes);
+        context
     }
 
     /// Lower one function or method body through a fresh [`FunctionBuilder`].
@@ -1150,6 +1572,17 @@ impl<'a> MirLowerer<'a> {
         config: CallableLoweringConfig<'_>,
     ) -> CallableLoweringParts {
         let context = self.builder_context(body_ctx);
+        let function_shape_relations = context
+            .shape_functions
+            .get(&config.def_id)
+            .cloned()
+            .unwrap_or_default();
+        let function_size_bindings = context
+            .function_size_bindings
+            .get(&config.def_id)
+            .cloned()
+            .unwrap_or_default();
+        let formal_parameter_offset = u32::from(matches!(&config.target, CallableLoweringTarget::Method { .. }));
         let shader_stage = match &config.target {
             CallableLoweringTarget::Function(function) => shader_stage_for_function(function),
             CallableLoweringTarget::Method { method, .. } => shader_stage_for_function(&method.func),
@@ -1162,10 +1595,25 @@ impl<'a> MirLowerer<'a> {
             config.device_role,
             shader_stage,
         );
+        builder.function_shape_relations = function_shape_relations;
+        builder.formal_parameter_offset = formal_parameter_offset;
         builder.size_params = match &config.target {
             CallableLoweringTarget::Function(function) => size_param_names(&function.type_params),
             CallableLoweringTarget::Method { method, .. } => size_param_names(&method.func.type_params),
         };
+        let size_type_params = match &config.target {
+            CallableLoweringTarget::Function(function) => &function.type_params,
+            CallableLoweringTarget::Method { method, .. } => &method.func.type_params,
+        };
+        for binding in function_size_bindings {
+            if let Some(parameter) = size_type_params.get(binding.parameter as usize)
+                && !parameter.is_typus()
+            {
+                builder
+                    .size_param_sources
+                    .insert(parameter.def_id, binding.witness);
+            }
+        }
         builder.bound_methods = match &config.target {
             CallableLoweringTarget::Function(function) => self.bound_method_targets(&function.type_params),
             CallableLoweringTarget::Method { method, .. } => self.bound_method_targets(&method.func.type_params),
@@ -1490,6 +1938,21 @@ fn symbolic_size_index(types: &TypeTable, name: Symbol) -> Option<IndexId> {
     })
 }
 
+fn index_contains_runtime_extent(types: &TypeTable, index: IndexId, seen: &mut FxHashSet<IndexId>) -> bool {
+    if !seen.insert(index) {
+        return false;
+    }
+    match types.get_index(index) {
+        IndexExpr::Runtime(_) => true,
+        IndexExpr::Affine { base, .. } => index_contains_runtime_extent(types, *base, seen),
+        IndexExpr::Divide { numerator, .. } => index_contains_runtime_extent(types, *numerator, seen),
+        IndexExpr::Tuple(dimensions) => dimensions
+            .iter()
+            .any(|dimension| index_contains_runtime_extent(types, *dimension, seen)),
+        IndexExpr::Literal(_) | IndexExpr::Param(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => false,
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct LocalBinding {
     local: MirLocalId,
@@ -1622,6 +2085,12 @@ struct FunctionBuilderContext<'a> {
     function_async: Arc<FxHashMap<DefId, bool>>,
     function_generator: Arc<FxHashMap<DefId, bool>>,
     function_params: Arc<FxHashMap<DefId, Vec<context::CallableParamMeta<'a>>>>,
+    tensor_edge_policies: Arc<radix_hir::TensorEdgePolicyTable>,
+    pending_tensor_limes: Arc<Mutex<Vec<PendingTensorLimes>>>,
+    shape_calls: Arc<FxHashMap<crate::hir::HirId, Vec<ShapeRelation>>>,
+    shape_functions: Arc<FxHashMap<DefId, Vec<ShapeRelation>>>,
+    call_size_bindings: Arc<FxHashMap<crate::hir::HirId, Vec<RuntimeSizeBinding>>>,
+    function_size_bindings: Arc<FxHashMap<DefId, Vec<RuntimeSizeBinding>>>,
     structs: Arc<FxHashMap<DefId, Vec<&'a HirField>>>,
     /// Producer-side defaults for imported class fields.
     imported_struct_defaults: Arc<FxHashMap<DefId, Vec<(Symbol, HirExpression)>>>,
@@ -1704,6 +2173,12 @@ impl<'a> FunctionBuilderContext<'a> {
             function_async: Arc::new(FxHashMap::default()),
             function_generator: Arc::new(FxHashMap::default()),
             function_params: Arc::new(FxHashMap::default()),
+            tensor_edge_policies: Arc::new(radix_hir::TensorEdgePolicyTable::default()),
+            pending_tensor_limes: Arc::new(Mutex::new(Vec::new())),
+            shape_calls: Arc::new(FxHashMap::default()),
+            shape_functions: Arc::new(FxHashMap::default()),
+            call_size_bindings: Arc::new(FxHashMap::default()),
+            function_size_bindings: Arc::new(FxHashMap::default()),
             structs: Arc::new(FxHashMap::default()),
             imported_struct_defaults: Arc::new(FxHashMap::default()),
             struct_field_types: Arc::new(FxHashMap::default()),
@@ -1828,6 +2303,9 @@ struct FunctionBuilder<'a> {
     /// `copy` parameters (D-6): `(param local, owned duplicate local, type,
     /// span)`. The body binds the duplicate; entry emits the deep copy.
     copy_param_entries: Vec<(MirLocalId, MirLocalId, MirType, Span)>,
+    function_shape_relations: Vec<ShapeRelation>,
+    formal_parameter_offset: u32,
+    size_param_sources: FxHashMap<DefId, IndexId>,
 }
 
 impl<'a> FunctionBuilder<'a> {
@@ -1883,6 +2361,9 @@ impl<'a> FunctionBuilder<'a> {
             device_role,
             shader_stage,
             copy_param_entries: Vec::new(),
+            function_shape_relations: Vec::new(),
+            formal_parameter_offset: 0,
+            size_param_sources: FxHashMap::default(),
         }
     }
 
@@ -2011,6 +2492,7 @@ impl<'a> FunctionBuilder<'a> {
         self.shared_bindings = radix_hir::capture::CaptureFacts::for_block(body).shared;
         let entry = self.fresh_block(body.span);
         self.switch_to(entry);
+        let _ = self.emit_function_entry_shape_check(body.span);
         self.emit_copy_param_entries();
         if let Some(cli_args) = cli_args {
             self.add_runtime_record_local(cli_args);
@@ -2601,8 +3083,34 @@ impl<'a> FunctionBuilder<'a> {
             // node — shape bindings at instantiation fold it to the concrete
             // size; AIR never sees it unsubstituted.
             if let Some(name) = self.size_params.get(&def_id).copied()
-                && let Some(shape) = symbolic_size_index(self.types, name)
+                && let Some(shape) = self
+                    .size_param_sources
+                    .get(&def_id)
+                    .copied()
+                    .or_else(|| symbolic_size_index(self.types, name))
             {
+                if index_contains_runtime_extent(self.types, shape, &mut FxHashSet::default()) {
+                    let mut arguments = Vec::new();
+                    let expression = match self.lower_shape_expr(
+                        shape,
+                        &mut arguments,
+                        None,
+                        ShapeRelationBoundary::FunctionEntry,
+                        0,
+                    ) {
+                        Ok(expression) => expression,
+                        Err(message) => {
+                            self.errors.push(MirError::unsupported(expr.span, message));
+                            return None;
+                        }
+                    };
+                    return Some(self.runtime_call_value(
+                        MirIntrinsic::TensorShapeSize(expression),
+                        arguments,
+                        MirType::semantic(self.types.primitive(Primitive::Fractus)),
+                        expr.span,
+                    ));
+                }
                 return Some(MirOperand::Constant(MirConstant::ShapeSize { shape, axis: None }));
             }
             self.errors

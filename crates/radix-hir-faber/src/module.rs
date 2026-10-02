@@ -34,6 +34,11 @@ pub struct FaberCodegen<'a> {
     pub(crate) types: &'a TypeTable,
     /// The unit's interner (symbol spelling resolution).
     pub(crate) interner: &'a Interner,
+    /// Current unit bindings used to recover source names for runtime Figura
+    /// leaves that retain a semantic `DefId` rather than a Symbol.
+    pub(crate) runtime_value_names: RefCell<FxHashMap<DefId, Symbol>>,
+    /// Enclosing function's formal names, keyed by declaration-order ordinal.
+    pub(crate) runtime_parameter_names: RefCell<FxHashMap<u32, Symbol>>,
     /// Flattened trivia attachments for the presentation being generated.
     pub(crate) trivia: TriviaIndex,
     /// `TypeId` → qualified source spelling (`base.Vector3`) for imported
@@ -143,6 +148,8 @@ impl<'a> FaberCodegen<'a> {
         Self {
             types,
             interner,
+            runtime_value_names: RefCell::new(FxHashMap::default()),
+            runtime_parameter_names: RefCell::new(FxHashMap::default()),
             trivia: TriviaIndex::default(),
             imported_type_spellings: FxHashMap::default(),
             imported_def_spellings: FxHashMap::default(),
@@ -318,6 +325,8 @@ impl FaberCodegen<'_> {
 
         let mut writer = CodeWriter::new();
         let names = self.collect_names(hir);
+        *self.runtime_value_names.borrow_mut() = names.clone();
+        self.runtime_parameter_names.borrow_mut().clear();
         self.self_def_ids = hir
             .items
             .iter()

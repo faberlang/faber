@@ -107,6 +107,7 @@ impl Walk<'_> {
             | Type::SizedNumeric(..)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
+            | Type::TensorEdgePolicy(_)
             | Type::Func(_)
             | Type::Param(_)
             | Type::Infer(_)

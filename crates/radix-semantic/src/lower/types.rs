@@ -33,7 +33,8 @@ use crate::{
     SemanticGenericParamDefault, SemanticParamMode, Type, TypeId,
 };
 use radix_syntax::{FiguraExpr, GenericArgExpr, GenericParamKind, Ident, TypeExpr, TypeExprKind};
-use radix_types::AppliedArg;
+use radix_types::{AppliedArg, BuiltinTensorEdgePolicy};
+use radix_types::{compose_index_affine_constant, divide_index_exact, evaluate_index_dimension};
 
 fn generic_type_expr(arg: &GenericArgExpr) -> Option<TypeExpr> {
     match arg {
@@ -670,6 +671,14 @@ impl Lowerer<'_> {
             return ty;
         }
 
+        // The parser canonicalizes localized policy markers to their Latin
+        // identities before HIR lowering. Resolve those identities directly
+        // into the tagged marker type, even when the source surface was
+        // localized (for example English `clamp` → canonical `clampa`).
+        if let Some(policy) = BuiltinTensorEdgePolicy::from_latin(name_str) {
+            return self.lower_tensor_edge_policy_type(policy, params);
+        }
+
         if let Some(prim) = Primitive::from_name(name_str) {
             return self.lower_primitive_type(prim, params);
         }
@@ -973,6 +982,9 @@ impl Lowerer<'_> {
                 Some(self.lower_trapping_word_type(params))
             }
             crate::locale::TypeBindingKind::ByteWord => Some(self.lower_byte_word_type(params)),
+            crate::locale::TypeBindingKind::TensorEdgePolicy(policy) => {
+                Some(self.lower_tensor_edge_policy_type(policy, params))
+            }
             // Census relational type names are reader-surface rows only in S2
             // (no HIR/MIR type yet; the real surface is S3/S4). Fall through to
             // the hardcoded name paths in `lower_named_type` (bare `series`
@@ -995,6 +1007,18 @@ impl Lowerer<'_> {
         }
         self.types
             .sized_numeric(Primitive::Numerus, crate::NumericWidth::U8)
+    }
+
+    fn lower_tensor_edge_policy_type(
+        &mut self,
+        policy: crate::BuiltinTensorEdgePolicy,
+        params: &[GenericArgExpr],
+    ) -> TypeId {
+        if !params.is_empty() {
+            self.error("primitive_params");
+            return self.types.intern(Type::Error);
+        }
+        self.types.tensor_edge_policy(policy)
     }
 
     fn lower_primitive_type(&mut self, prim: Primitive, params: &[GenericArgExpr]) -> TypeId {
@@ -1405,8 +1429,38 @@ impl Lowerer<'_> {
                 Some(radix_syntax::GenericParamKind::Typus) => {
                     Err(crate::FIGURA_TYPE_PARAM_IN_INDEX_MSG)
                 }
-                None => crate::lower_figura_expr(figura, self.resolver, self.types),
+                None => {
+                    // Runtime scalar bindings are valid extent sources in a
+                    // type's dimension position. Keep declaration identity;
+                    // the backend reads the value at the carrying boundary.
+                    let local = self
+                        .local_scopes
+                        .iter()
+                        .rev()
+                        .find_map(|scope| scope.get(&ident.name).copied());
+                    if let Some(binding) = local {
+                        let source = self.parameter_ordinals.get(&binding).copied().map_or(
+                            radix_types::RuntimeExtentId::ScalarBinding(binding),
+                            |parameter| {
+                                radix_types::RuntimeExtentId::ScalarParameter { parameter }
+                            },
+                        );
+                        Ok(self.types.intern_index(IndexExpr::Runtime(
+                            source,
+                        )))
+                    } else {
+                        crate::lower_figura_expr(figura, self.resolver, self.types)
+                    }
+                }
             },
+            FiguraExpr::Add(_, _) | FiguraExpr::Subtract(_, _) => {
+                self.lower_figura_affine_expr(figura)
+            }
+            FiguraExpr::Divide(value, divisor) => {
+                let numerator = self.lower_figura_expr(value)?;
+                divide_index_exact(self.types, numerator, *divisor)
+                    .map_err(crate::figura::figura_arithmetic_error_message)
+            }
             FiguraExpr::Tuple(dims) => {
                 let lowered = dims
                     .iter()
@@ -1414,6 +1468,21 @@ impl Lowerer<'_> {
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(self.types.intern_index(IndexExpr::Tuple(lowered)))
             }
+        }
+    }
+
+    fn lower_figura_affine_expr(&mut self, figura: &FiguraExpr) -> Result<IndexId, &'static str> {
+        let mut offset = 0i128;
+        let base_expr = crate::figura::flatten_figura_affine(figura, &mut offset)
+            .map_err(crate::figura::figura_arithmetic_error_message)?;
+        let base = self.lower_figura_expr(base_expr)?;
+        let term = compose_index_affine_constant(self.types, base, offset)
+            .map_err(crate::figura::figura_arithmetic_error_message)?;
+        match evaluate_index_dimension(term, self.types)
+            .map_err(crate::figura::figura_arithmetic_error_message)?
+        {
+            Some(value) => Ok(self.types.intern_index(IndexExpr::Literal(value))),
+            None => Ok(term),
         }
     }
 }

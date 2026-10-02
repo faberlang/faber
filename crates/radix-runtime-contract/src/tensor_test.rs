@@ -76,8 +76,48 @@ fn err_broadcast_and_matmul_constants_match_codegen_copy() {
         radix_hir_rust::runtime_contract_tensor::ERR_MATMUL_INNER_DIMENSION
     );
     assert_eq!(
+        ERR_MATMUL_BATCH_DIMENSION,
+        radix_hir_rust::runtime_contract_tensor::ERR_MATMUL_BATCH_DIMENSION
+    );
+    assert_eq!(
         ERR_TRANSPOSE_RANK,
         radix_hir_rust::runtime_contract_tensor::ERR_TRANSPOSE_RANK
+    );
+}
+
+#[test]
+fn err_tensor_edge_constants_match_codegen_copy() {
+    assert_eq!(
+        ERR_TENSOR_SHAPE_HOLE_UNDERDETERMINED,
+        radix_hir_rust::runtime_contract_tensor::ERR_TENSOR_SHAPE_HOLE_UNDERDETERMINED
+    );
+    assert_eq!(
+        ERR_TENSOR_EDGE_NOT_SHIFTED,
+        radix_hir_rust::runtime_contract_tensor::ERR_TENSOR_EDGE_NOT_SHIFTED
+    );
+    assert_eq!(
+        ERR_TENSOR_EDGE_UNRESOLVED_READ,
+        radix_hir_rust::runtime_contract_tensor::ERR_TENSOR_EDGE_UNRESOLVED_READ
+    );
+    assert_eq!(
+        ERR_TENSOR_MATERIALIZE_UNRESOLVED,
+        radix_hir_rust::runtime_contract_tensor::ERR_TENSOR_MATERIALIZE_UNRESOLVED
+    );
+    assert_eq!(
+        ERR_TENSOR_EDGE_POLICY_INVALID,
+        radix_hir_rust::runtime_contract_tensor::ERR_TENSOR_EDGE_POLICY_INVALID
+    );
+    assert_eq!(
+        ERR_TENSOR_EDGE_RANK_MISMATCH,
+        radix_hir_rust::runtime_contract_tensor::ERR_TENSOR_EDGE_RANK_MISMATCH
+    );
+    assert_eq!(
+        ERR_TENSOR_EDGE_READ_ONLY,
+        radix_hir_rust::runtime_contract_tensor::ERR_TENSOR_EDGE_READ_ONLY
+    );
+    assert_eq!(
+        ERR_TENSOR_COALESCE_REQUIRES_OPTIONAL,
+        radix_hir_rust::runtime_contract_tensor::ERR_TENSOR_COALESCE_REQUIRES_OPTIONAL
     );
 }
 

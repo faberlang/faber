@@ -929,6 +929,38 @@ impl TypeChecker<'_> {
         }
         let site = self.assignment_store_site(target);
         let value_ty = self.check_store_expr(value, target_ty, site);
+        let unresolved_edge_view = self
+            .tensor_edge_policies
+            .shifted_expressions
+            .contains(&value.id);
+        let edge_view_context = self
+            .tensor_edge_policies
+            .shifted_view_expressions
+            .get(&value.id)
+            .copied();
+        if unresolved_edge_view {
+            if let HirExpressionKind::Path(binding) = &target.kind {
+                self.tensor_edge_policies
+                    .shifted_bindings
+                    .insert(*binding);
+                if let Some(context) = edge_view_context {
+                    self.tensor_edge_policies
+                        .shifted_view_bindings
+                        .insert(*binding, context);
+                }
+            } else {
+                self.invalid_operand_types(
+                    super::intrinsics::ISSUE_TENSOR_EDGE_VIEW_REQUIRES_RESOLUTION,
+                    value.span,
+                );
+                return self.error_type;
+            }
+        } else if let HirExpressionKind::Path(binding) = &target.kind {
+            self.tensor_edge_policies.shifted_bindings.remove(binding);
+            self.tensor_edge_policies
+                .shifted_view_bindings
+                .remove(binding);
+        }
         self.unify_carrier_assign(value_ty, target_ty, value.span, ASSIGNMENT_TYPE_MISMATCH);
         if self.types.is_own_view(target_ty) {
             self.check_own_bind_rhs(value);

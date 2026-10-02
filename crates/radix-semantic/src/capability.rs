@@ -749,7 +749,19 @@ impl<'a> DerivedCapabilityQueries<'a> {
 
     fn index_solved(&self, index_id: IndexId) -> Result<(), CapabilityReason> {
         match self.types.get_index(index_id) {
-            IndexExpr::Literal(_) | IndexExpr::Param(_) => Ok(()),
+            IndexExpr::Literal(_) | IndexExpr::Param(_) | IndexExpr::Runtime(_) => Ok(()),
+            IndexExpr::Affine { base, .. } => {
+                if radix_types::evaluate_index_dimension(index_id, self.types).is_err() {
+                    return Err(CapabilityReason::UnsupportedRepresentation);
+                }
+                self.index_solved(*base)
+            }
+            IndexExpr::Divide { numerator, .. } => {
+                if radix_types::evaluate_index_dimension(index_id, self.types).is_err() {
+                    return Err(CapabilityReason::UnsupportedRepresentation);
+                }
+                self.index_solved(*numerator)
+            }
             IndexExpr::Infer(_) => Err(CapabilityReason::UnresolvedInference),
             IndexExpr::Unspecified => Err(CapabilityReason::UnspecifiedObservableIndex),
             IndexExpr::Tuple(dims) => {

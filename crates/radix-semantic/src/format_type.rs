@@ -20,6 +20,7 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
 
     match ty {
         Type::Primitive(prim) => primitive_to_faber(*prim),
+        Type::TensorEdgePolicy(policy) => policy.latin().to_owned(),
 
         Type::SizedInstans(precision) => format!("instans<{}>", precision.faber_marker()),
 

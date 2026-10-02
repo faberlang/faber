@@ -6,6 +6,45 @@ use radix_mir::MirBinOp;
 use radix_types::NumericWidth;
 
 #[test]
+fn affine_prefix_view_keeps_shared_backing_without_weakening_bounds_checks() {
+    let base = TensorValue::contiguous(
+        vec![Value::Int(1), Value::Int(2), Value::Int(3), Value::Int(4)],
+        vec![2, 2],
+    );
+    let view = base
+        .view(vec![1, 2], vec![2, 1], 0)
+        .expect("the first row is a valid shared view");
+
+    assert!(!view.has_contiguous_backing_mismatch());
+    assert_eq!(
+        view.logical_values().expect("view reads its backing"),
+        vec![Value::Int(1), Value::Int(2)]
+    );
+    let materialized = TensorValue::contiguous(
+        view.logical_values().expect("materialize logical view"),
+        view.shape.clone(),
+    );
+    base.set_value_at(0, Value::Int(9)).expect("alias write");
+    assert_eq!(
+        view.logical_values().expect("view observes alias write"),
+        vec![Value::Int(9), Value::Int(2)]
+    );
+    assert_eq!(
+        materialized
+            .logical_values()
+            .expect("owned copy stays valid"),
+        vec![Value::Int(1), Value::Int(2)]
+    );
+
+    base.data.borrow_mut().truncate(1);
+    assert!(view.has_contiguous_backing_mismatch());
+    assert!(view.logical_values().is_none());
+
+    let malformed_owner = TensorValue::contiguous(vec![Value::Int(1)], vec![2]);
+    assert!(malformed_owner.has_contiguous_backing_mismatch());
+}
+
+#[test]
 fn bitwise_mixes_signed_and_unsigned_carriers_on_infinite_twos_complement() {
     // d11-6 ruling 19b supersedes the earlier fail-closed pin: `&` is defined
     // on infinite two's-complement integers, so `5 & -1` is `5` whichever

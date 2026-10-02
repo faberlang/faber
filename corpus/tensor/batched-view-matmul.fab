@@ -1,0 +1,23 @@
++++
+term = "tensor"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "multiplicative_expr", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Batched tensor contraction reads borrowed transpose and slice layouts."
+related = ["tensor", "matmul", "ᵀ"]
+locale = "en"
++++
+
+# Each batch is multiplied by the same transposed identity matrix.
+# Transpose and slice borrow storage; materialize creates the returned copy.
+main {
+    const tf32[] seed ← empty
+    const tf32[2, 2, 2] left ← seed.from_flat([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], [2, 2, 2])
+    const tf32[2, 2] identity ← seed.from_flat([1.0, 0.0, 0.0, 1.0], [2, 2])
+    const tf32[2, 2] transposed ← identityᵀ
+    const tf32[2, 2, 2] product ← left · transposed
+    const tf32[1, 2, 2] second ← product.slice(1, 2)
+    print product.flatten()
+    print second.materialize().flatten()
+}

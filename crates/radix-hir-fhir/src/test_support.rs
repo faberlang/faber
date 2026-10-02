@@ -107,6 +107,9 @@ pub(crate) fn stub_artifact() -> HirArtifact {
         gpu_builtins: Vec::new(),
         capability_provenance: FunctionProvenanceTableWire::default(),
         provider_units: BTreeMap::new(),
+        shape_obligations: crate::artifact::ShapeObligationTableWire::default(),
+        kernel_requirements: crate::artifact::KernelRequirementsWire::default(),
+        tensor_edge_policies: crate::artifact::TensorEdgePolicyTableWire::default(),
     }
 }
 

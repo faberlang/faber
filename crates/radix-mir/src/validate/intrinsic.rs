@@ -7,6 +7,7 @@ use crate::lista_tensor_conversio::validate_lista_to_tensor_source;
 use crate::{
     MirAtomicOp, MirBinOp, MirCollectionOp, MirConstant, MirConversion, MirGradientOp,
     MirIntrinsic, MirLayoutKind, MirOperand, MirPlace, MirRuntimeCall, MirSermoOp, MirType,
+    MirShapeExpr,
 };
 use radix_lexer::Span;
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type};
@@ -251,6 +252,103 @@ impl Validator<'_, '_> {
                     "type_check runtime call does not return bivalens",
                 );
             }
+            MirIntrinsic::TensorShapeCheck(check) => {
+                self.require_exact(
+                    call.return_ty,
+                    self.primitive(Primitive::Vacuum),
+                    span,
+                    "tensor shape check does not return vacuum",
+                );
+                for relation in &check.relations {
+                    self.validate_shape_expr(call, &relation.left, span);
+                    self.validate_shape_expr(call, &relation.right, span);
+                }
+                for binding in &check.size_bindings {
+                    self.validate_shape_expr(call, &binding.witness, span);
+                }
+            }
+            MirIntrinsic::TensorShapeSize(expression) => {
+                self.validate_shape_expr(call, expression, span);
+                self.require_exact(
+                    call.return_ty,
+                    self.primitive(Primitive::Fractus),
+                    span,
+                    "tensor shape size does not return fractus",
+                );
+            }
+            MirIntrinsic::TensorLimes(policy) => {
+                self.require_arg_count(call.args.len(), 1, span, "tensor limes runtime call");
+                let Some(receiver_ty) = call
+                    .args
+                    .first()
+                    .and_then(|arg| self.validate_operand(scope, arg, span))
+                else {
+                    return;
+                };
+                self.require_tensor_type(receiver_ty, span, "tensor limes receiver is not tensor");
+                self.require_tensor_type(call.return_ty, span, "tensor limes result is not tensor");
+                if let crate::MirEdgePolicy::Custom { policy_def, remap, transform } = policy {
+                    if !self
+                        .context
+                        .struct_fields
+                        .get(policy_def)
+                        .is_some_and(|fields| fields.is_empty())
+                    {
+                        self.error(span, "tensor limes custom policy is not a zero-field class");
+                    }
+                    let Some(remap_function) = scope.functions_by_id.get(remap) else {
+                        self.error(span, "tensor limes remap callback does not resolve to a function");
+                        return;
+                    };
+                    if remap_function.params.len() != 2 {
+                        self.error(span, "tensor limes remap callback has an invalid receiver/coordinate arity");
+                    } else {
+                        if !matches!(self.type_kind(remap_function.params[0].ty), Type::Struct(def) if def == policy_def) {
+                            self.error(span, "tensor limes remap receiver does not match policy class");
+                        }
+                        if !self.context.types.equals(
+                            remap_function.params[1].ty.semantic_id(),
+                            remap_function.return_ty.semantic_id(),
+                        ) {
+                            self.error(span, "tensor limes remap coordinate type is not preserved");
+                        }
+                    }
+                    if let Some(transform_id) = transform {
+                        let Some(transform_function) = scope.functions_by_id.get(transform_id) else {
+                            self.error(span, "tensor limes transform callback does not resolve to a function");
+                            return;
+                        };
+                        if transform_function.params.len() != 3 {
+                            self.error(span, "tensor limes transform callback has an invalid receiver/coordinate/value arity");
+                        } else {
+                            if !matches!(self.type_kind(transform_function.params[0].ty), Type::Struct(def) if def == policy_def) {
+                                self.error(span, "tensor limes transform receiver does not match policy class");
+                            }
+                            if !self.context.types.equals(
+                                transform_function.params[1].ty.semantic_id(),
+                                remap_function.params[1].ty.semantic_id(),
+                            ) {
+                                self.error(span, "tensor limes transform coordinate type differs from remap");
+                            }
+                            if let Type::Tensor(element_ty, _) = self.type_kind(call.return_ty) {
+                                let element_ty = MirType::semantic(*element_ty);
+                                self.require_exact(
+                                    transform_function.params[2].ty,
+                                    element_ty,
+                                    span,
+                                    "tensor limes transform value type differs from tensor element",
+                                );
+                                self.require_exact(
+                                    transform_function.return_ty,
+                                    element_ty,
+                                    span,
+                                    "tensor limes transform result differs from tensor element",
+                                );
+                            }
+                        }
+                    }
+                }
+            }
             // SFR-5: the filum sum declaration validates its surface shape —
             // one source operand, a fractus broadcast result (the L7 f32
             // device surface). The declaration facts (term body, coordinate
@@ -314,6 +412,39 @@ impl Validator<'_, '_> {
                     DEFERRED_VECTOR_OP_SURVIVED,
                     "deferred vector op survives instantiation",
                 ));
+            }
+        }
+    }
+
+    fn validate_shape_expr(
+        &mut self,
+        call: &MirRuntimeCall,
+        expression: &MirShapeExpr,
+        span: Span,
+    ) {
+        match expression {
+            MirShapeExpr::Literal(_) => {}
+            MirShapeExpr::Product(factors) => {
+                for factor in factors {
+                    self.validate_shape_expr(call, factor, span);
+                }
+            }
+            MirShapeExpr::ScalarArgument { argument }
+            | MirShapeExpr::TensorAxis { argument, .. }
+            | MirShapeExpr::TensorFieldAxis { argument, .. } => {
+                if *argument as usize >= call.args.len() {
+                    self.error(span, "tensor shape check references a missing argument");
+                }
+            }
+            MirShapeExpr::Affine { base, .. } => self.validate_shape_expr(call, base, span),
+            MirShapeExpr::Divide {
+                numerator,
+                divisor,
+            } => {
+                if *divisor == 0 {
+                    self.error(span, "tensor shape check divides by zero");
+                }
+                self.validate_shape_expr(call, numerator, span);
             }
         }
     }
@@ -649,6 +780,8 @@ impl Validator<'_, '_> {
             | MirCollectionOp::Maximum
             | MirCollectionOp::TensorSumAxis
             | MirCollectionOp::TensorReshape
+            | MirCollectionOp::TensorExpand
+            | MirCollectionOp::TensorShift
             | MirCollectionOp::TensorGet
             | MirCollectionOp::TensorFill
             | MirCollectionOp::TensorAdd
@@ -726,6 +859,10 @@ impl Validator<'_, '_> {
                     span,
                     format!("collection {op:?} expects 1 or 2 MIR arguments"),
                 );
+            }
+        } else if matches!(op, MirCollectionOp::TensorSlice) {
+            if !(3..=4).contains(&call.args.len()) {
+                self.error(span, "collection TensorSlice expects 3 or 4 MIR arguments");
             }
         } else if matches!(op, MirCollectionOp::TensorBatchedAttention) {
             // This compiler-owned primitive has tensor peers followed by
@@ -1512,6 +1649,72 @@ impl Validator<'_, '_> {
                     "tensor materialize result is not tensor",
                 );
             }
+            MirCollectionOp::TensorExpand => {
+                let Some(receiver_ty) = first_arg_ty else {
+                    return;
+                };
+                self.require_tensor_type(
+                    receiver_ty,
+                    span,
+                    "tensor expand receiver is not tensor",
+                );
+                self.require_tensor_type(
+                    call.return_ty,
+                    span,
+                    "tensor expand result is not tensor",
+                );
+                if let Some(shape) = call.args.get(1)
+                    && let Some(shape_ty) = self.validate_operand(scope, shape, span)
+                    && !radix_types::is_integer_index_vector(
+                        self.context.types.as_table(),
+                        shape_ty.semantic_id(),
+                    )
+                {
+                    self.error(span, "tensor expand target shape is not an integer lista");
+                }
+            }
+            MirCollectionOp::TensorShift => {
+                self.require_arg_count(call.args.len(), 2, span, "tensor shift runtime call");
+                let Some(receiver_ty) = first_arg_ty else {
+                    return;
+                };
+                let (source_element, source_shape) = match self.type_kind(receiver_ty) {
+                    Type::Tensor(element, shape) => (*element, *shape),
+                    _ => {
+                        self.error(span, "tensor shift receiver is not tensor");
+                        return;
+                    }
+                };
+                let (result_element, result_shape) = match self.type_kind(call.return_ty) {
+                    Type::Tensor(element, shape) => (*element, *shape),
+                    _ => {
+                        self.error(span, "tensor shift result is not tensor");
+                        return;
+                    }
+                };
+                if matches!(self.context.types.get(source_element), Type::Option(_)) {
+                    self.error(span, "tensor shift receiver already has nullable elements");
+                }
+                let Type::Option(optional_inner) = self.context.types.get(result_element) else {
+                    self.error(span, "tensor shift result elements are not nullable");
+                    return;
+                };
+                if !self.context.types.equals(source_element, *optional_inner) {
+                    self.error(span, "tensor shift changes the receiver element type");
+                }
+                if !self.context.types.index_equals(source_shape, result_shape) {
+                    self.error(span, "tensor shift changes the receiver shape");
+                }
+                if let Some(offsets) = call.args.get(1)
+                    && let Some(offset_ty) = self.validate_operand(scope, offsets, span)
+                    && !radix_types::is_integer_index_vector(
+                        self.context.types.as_table(),
+                        offset_ty.semantic_id(),
+                    )
+                {
+                    self.error(span, "tensor shift offsets are not an integer lista");
+                }
+            }
             MirCollectionOp::ArrayAdd
             | MirCollectionOp::ArraySub
             | MirCollectionOp::ArrayMul
@@ -2137,15 +2340,19 @@ impl Validator<'_, '_> {
         // Elements past `dim` stay; only the last-axis width is a bound.
         let last_extent = match self.type_kind(receiver_ty) {
             Type::Tensor(_, shape) => match self.context.types.get_index(*shape) {
-                IndexExpr::Tuple(dims) => {
-                    dims.last()
-                        .and_then(|dim| match self.context.types.get_index(*dim) {
-                            IndexExpr::Literal(count) => i64::try_from(*count).ok(),
-                            _ => None,
-                        })
-                }
-                IndexExpr::Literal(count) => i64::try_from(*count).ok(),
-                _ => None,
+                        IndexExpr::Tuple(dims) => {
+                            dims.last()
+                                .and_then(|dim| {
+                                    radix_types::evaluate_index_dimension(*dim, &self.context.types)
+                                        .ok()
+                                        .flatten()
+                                })
+                                .and_then(|count| i64::try_from(count).ok())
+                        }
+                        _ => radix_types::evaluate_index_dimension(*shape, &self.context.types)
+                            .ok()
+                            .flatten()
+                            .and_then(|count| i64::try_from(count).ok()),
             },
             _ => None,
         };
@@ -2709,7 +2916,11 @@ impl Validator<'_, '_> {
     pub(crate) fn static_tensor_rank(&self, ty: MirType) -> Option<usize> {
         match self.type_kind(ty) {
             Type::Tensor(_, shape) => match self.context.types.get_index(*shape) {
-                IndexExpr::Literal(_) | IndexExpr::Param(_) => Some(1),
+                IndexExpr::Literal(_)
+                | IndexExpr::Param(_)
+                | IndexExpr::Runtime(_)
+                | IndexExpr::Affine { .. }
+                | IndexExpr::Divide { .. } => Some(1),
                 IndexExpr::Tuple(dims) => Some(dims.len()),
                 IndexExpr::Infer(_) | IndexExpr::Unspecified => None,
             },

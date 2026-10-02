@@ -900,6 +900,102 @@ pub struct MirRuntimeCall {
     pub return_ty: MirType,
 }
 
+/// Runtime extent equality checked at a typed tensor boundary.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MirShapeRelation {
+    pub left: MirShapeExpr,
+    pub right: MirShapeExpr,
+}
+
+/// Runtime witness for a generic dimension inferred at a call boundary. The
+/// ordinal labels the callee's generic descriptor; the value stays carried by
+/// the explicit call arguments and is never part of an instance key.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MirShapeBinding {
+    pub parameter: u32,
+    pub witness: MirShapeExpr,
+}
+
+/// A shape expression evaluated against the explicit operands of its enclosing
+/// `TensorShapeCheck` call. Argument indexes are therefore independent of
+/// source local IDs and work for call, entry, and return boundaries.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MirShapeExpr {
+    Literal(u64),
+    /// Product of tensor extents for a whole-shape element count. The empty
+    /// product is one, matching rank-zero tensors.
+    Product(Vec<Self>),
+    ScalarArgument { argument: u32 },
+    TensorAxis { argument: u32, axis: u32 },
+    TensorFieldAxis {
+        argument: u32,
+        fields: Vec<Symbol>,
+        axis: u32,
+    },
+    Affine { base: Box<Self>, offset: i128 },
+    Divide { numerator: Box<Self>, divisor: u64 },
+}
+
+/// Equalities checked against explicit runtime values before a tensor boundary
+/// is crossed. It has no success value; a mismatch follows the caller's
+/// existing recoverable-error route.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MirShapeCheck {
+    pub relations: Vec<MirShapeRelation>,
+    pub size_bindings: Vec<MirShapeBinding>,
+}
+
+impl MirShapeCheck {
+    /// Whether the checked equalities connect these two runtime witnesses.
+    /// Scalar size bindings can mediate an equality between carrier axes.
+    #[must_use]
+    pub fn proves_equal(&self, left: &MirShapeExpr, right: &MirShapeExpr) -> bool {
+        let mut reached = vec![left];
+        let mut cursor = 0;
+        while cursor < reached.len() {
+            let current = reached[cursor];
+            if current == right {
+                return true;
+            }
+            for relation in &self.relations {
+                let next = if &relation.left == current {
+                    Some(&relation.right)
+                } else if &relation.right == current {
+                    Some(&relation.left)
+                } else {
+                    None
+                };
+                if let Some(next) = next
+                    && !reached.contains(&next)
+                {
+                    reached.push(next);
+                }
+            }
+            cursor += 1;
+        }
+        false
+    }
+}
+
+/// Compiler-owned edge resolution selected by `tensor.limes<Policy>()`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MirBuiltinEdgePolicy {
+    Clamp,
+    Reflect,
+    Wrap,
+}
+
+/// Resolved edge-policy dispatch carried by a limes runtime call.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MirEdgePolicy {
+    Builtin(MirBuiltinEdgePolicy),
+    Custom {
+        policy_def: DefId,
+        remap: MirFunctionId,
+        transform: Option<MirFunctionId>,
+    },
+}
+
 /// Compiler-runtime operations that are not ordinary user calls.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MirIntrinsic {
@@ -943,6 +1039,12 @@ pub enum MirIntrinsic {
     /// variant-check surface (archived `docs/archived/est-variant-check/`);
     /// device/application lanes fail closed on it.
     TypeCheck(MirTypeCheckOp),
+    /// Runtime equality obligations for shape terms at tensor call, function
+    /// entry, or return boundaries. Other executors reject this until they
+    /// implement the same recoverable check.
+    TensorShapeCheck(MirShapeCheck),
+    /// Evaluate one runtime shape extent from explicit runtime operands.
+    TensorShapeSize(MirShapeExpr),
     /// Declared distributed sum-reduce (`summa ex … filum …`, SFR-5): the
     /// first author-stated kernel recipe. The runtime call IS the
     /// declaration site — the kernel-plan pass resolves it to
@@ -965,6 +1067,9 @@ pub enum MirIntrinsic {
     /// operands of `And`/`Or` and all three of `Select` are always evaluated.
     /// The MIR runner is the reference; every other executor fails closed.
     TensorLift(MirLiftOp),
+    /// Resolve a lazy shifted tensor edge view; the single argument is the
+    /// shifted receiver and the payload selects its built-in or user policy.
+    TensorLimes(MirEdgePolicy),
     /// A vector method deferred past lowering. Templates carry it with
     /// symbolic widths; one expander rewrites it into the unrolled lanes once
     /// the width is a literal. No executor or backend ever sees it: a

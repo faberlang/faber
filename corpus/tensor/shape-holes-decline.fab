@@ -1,0 +1,31 @@
++++
+term = "underdetermined tensor shape holes"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "return_clause", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression"]
+category = "collection"
+canonical = false
+summary = "Shape holes stay unresolved when multiple extents are underdetermined, an expanded axis has no expected witness, or `_` appears in an ordinary array."
+related = ["tensor", "magnitudo"]
+locale = "en"
++++
+
+fn dynamic_shape() → list<int> {
+    return [2, 3]
+}
+
+main {
+    const tf32[] seed ← empty
+    const tf32[2, 3] grid ← seed.from_flat([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [2, 3])
+    const tensor<f32, _> underdetermined ← grid.reshape([_, _])
+
+    const tf32[3] row ← seed.from_flat([1.0, 2.0, 3.0], [3])
+    const tensor<f32, _> missing_witness ← row.expanded([_, 3])
+
+    const tensor<f32, _> unknown_rank ← seed.from_flat([1.0, 2.0, 3.0, 4.0], dynamic_shape())
+
+    const list<int> ordinary ← [_, 3]
+    print underdetermined.length()
+    print missing_witness.length()
+    print unknown_rank.length()
+    print ordinary.length()
+}

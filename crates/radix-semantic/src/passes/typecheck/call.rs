@@ -125,6 +125,16 @@ impl TypeChecker<'_> {
     pub fn typecheck_call_arg_exprs(&mut self, args: &mut [HirCallArg]) {
         for arg in args {
             self.check_expr(&mut arg.expr);
+            if self
+                .tensor_edge_policies
+                .shifted_expressions
+                .contains(&arg.expr.id)
+            {
+                self.invalid_operand_types(
+                    super::intrinsics::ISSUE_TENSOR_EDGE_VIEW_REQUIRES_RESOLUTION,
+                    arg.span,
+                );
+            }
         }
     }
 
@@ -333,10 +343,23 @@ impl TypeChecker<'_> {
             return false;
         }
 
-        for (arg, param) in args.iter_mut().zip(sig.params.iter()) {
+        for (argument, (arg, param)) in args.iter_mut().zip(sig.params.iter()).enumerate() {
+            let previous_shape_argument = self.current_shape_argument.replace(argument as u32);
             let site = argument_site(arg.name);
             let errors_before = self.errors.len();
             let arg_ty = self.check_store_expr(&mut arg.expr, param.ty, site);
+            if self
+                .tensor_edge_policies
+                .shifted_expressions
+                .contains(&arg.expr.id)
+            {
+                self.invalid_operand_types(
+                    super::intrinsics::ISSUE_TENSOR_EDGE_VIEW_REQUIRES_RESOLUTION,
+                    arg.span,
+                );
+                self.current_shape_argument = previous_shape_argument;
+                continue;
+            }
             if user_function
                 && self.errors.len() > errors_before
                 && self
@@ -345,6 +368,7 @@ impl TypeChecker<'_> {
             {
                 self.replace_mismatch_with_lift_issue(errors_before, arg.span);
                 lifted = true;
+                self.current_shape_argument = previous_shape_argument;
                 continue;
             }
             if self.types.is_ref_view(arg_ty)
@@ -364,6 +388,7 @@ impl TypeChecker<'_> {
             if self.errors.len() == errors_before_unify {
                 self.check_mut_scalar_argument_is_exact(param, arg_ty, arg.span);
             }
+            self.current_shape_argument = previous_shape_argument;
         }
         lifted
     }
@@ -465,9 +490,23 @@ impl TypeChecker<'_> {
             .resolver
             .namespace_file_function_canonical(namespace, name)
             .cloned()?;
+        let imported_policy = self
+            .resolver
+            .namespace_file_tensor_edge_policy_requirements_canonical(namespace, name)
+            .map(|(def_id, requirements)| (def_id, requirements.to_vec()));
+        if let Some((def_id, requirements)) = &imported_policy {
+            self.tensor_edge_policy_imported_requirements
+                .insert(*def_id, requirements.clone());
+        }
         self.set_chorda_scalar_closure_context(name);
-        let ret =
-            self.check_user_function_call(&sig, explicit_type_args, args, receiver.span, expected);
+        let ret = self.check_user_function_call(
+            &sig,
+            explicit_type_args,
+            args,
+            receiver.span,
+            expected,
+            imported_policy.map(|(def_id, _)| def_id),
+        );
         self.validate_interval_bound_call_args(name, &sig, args);
         Some(ret)
     }
@@ -551,6 +590,29 @@ impl TypeChecker<'_> {
         } else {
             method_name
         };
+        if self
+            .tensor_edge_policies
+            .shifted_expressions
+            .contains(&receiver.id)
+        {
+            let edge_intrinsic = self
+                .locale_pack
+                .and_then(|pack| {
+                    pack.intrinsic_canonical(
+                        radix_intrinsics::IntrinsicReceiver::Tensor,
+                        &method_name,
+                    )
+                })
+                .unwrap_or(&method_name);
+            if !matches!(edge_intrinsic, "limes" | "disloco") {
+                self.typecheck_call_arg_exprs(args);
+                self.invalid_operand_types(
+                    super::intrinsics::ISSUE_TENSOR_EDGE_VIEW_REQUIRES_RESOLUTION,
+                    receiver.span,
+                );
+                return self.error_type;
+            }
+        }
         if let Some(result) = self.check_directional_view_method(
             receiver_ty,
             &method_name,
@@ -610,13 +672,27 @@ impl TypeChecker<'_> {
                 }
             }
             self.set_chorda_scalar_closure_context(*name);
-            let ret = self.check_instantiated_call(
-                &sig,
-                explicit_type_args,
-                args,
-                receiver.span,
-                expected,
-            );
+            let method_def = self
+                .struct_def_from_type(receiver_ty)
+                .and_then(|def| self.method_defs.get(&(def, *name)).copied());
+            let ret = if let Some(method_def) = method_def {
+                self.check_instantiated_method_call_for_callee(
+                    method_def,
+                    &sig,
+                    explicit_type_args,
+                    args,
+                    receiver.span,
+                    expected,
+                )
+            } else {
+                self.check_instantiated_call(
+                    &sig,
+                    explicit_type_args,
+                    args,
+                    receiver.span,
+                    expected,
+                )
+            };
             self.validate_interval_bound_call_args(*name, &sig, args);
             return ret;
         }

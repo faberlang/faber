@@ -351,6 +351,7 @@ fn scan_go_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
                     ArrayElement::Expr(expr) | ArrayElement::Spread(expr) => {
                         scan_go_expr(expr, file, diagnostics);
                     }
+                    ArrayElement::Infer(_) => {}
                 }
             }
         }
@@ -728,6 +729,7 @@ fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
                     ArrayElement::Expr(expr) | ArrayElement::Spread(expr) => {
                         scan_rust_expr(expr, file, diagnostics);
                     }
+                    ArrayElement::Infer(_) => {}
                 }
             }
         }

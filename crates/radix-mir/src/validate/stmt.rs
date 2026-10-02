@@ -85,13 +85,20 @@ impl Validator<'_, '_> {
 
     pub(crate) fn validate_block(&mut self, scope: &mut FunctionScope<'_, '_>, block: &MirBlock) {
         scope.values.clear();
+        let mut previous = None;
         for stmt in &block.statements {
-            self.validate_stmt(scope, stmt);
+            self.validate_stmt(scope, stmt, previous);
+            previous = Some(stmt);
         }
-        self.validate_terminator(scope, &block.terminator);
+        self.validate_terminator(scope, &block.terminator, previous);
     }
 
-    pub(crate) fn validate_stmt(&mut self, scope: &mut FunctionScope<'_, '_>, stmt: &MirStatement) {
+    pub(crate) fn validate_stmt(
+        &mut self,
+        scope: &mut FunctionScope<'_, '_>,
+        stmt: &MirStatement,
+        previous: Option<&MirStatement>,
+    ) {
         match &stmt.kind {
             MirStatementKind::Assign { place, value } => {
                 let place_ty = self.validate_place(scope, place, stmt.span);
@@ -123,18 +130,27 @@ impl Validator<'_, '_> {
                     scope,
                     sig.as_ref(),
                     args,
+                    preceding_tensor_shape_check(previous, args),
                     stmt.span,
                     &mut generic_bindings,
                     &mut shape_bindings,
                 );
-                self.validate_optional_destination_with_shapes(
+                if !self.call_destination_matches_shape_check(
                     scope,
                     destination.as_ref(),
                     sig.as_ref().map(|sig| sig.return_ty),
-                    stmt.span,
-                    &mut generic_bindings,
-                    &mut shape_bindings,
-                );
+                    args,
+                    preceding_tensor_shape_check(previous, args),
+                ) {
+                    self.validate_optional_destination_with_shapes(
+                        scope,
+                        destination.as_ref(),
+                        sig.as_ref().map(|sig| sig.return_ty),
+                        stmt.span,
+                        &mut generic_bindings,
+                        &mut shape_bindings,
+                    );
+                }
             }
             MirStatementKind::RuntimeCall { destination, call } => {
                 self.validate_runtime_call(scope, destination.as_ref(), call, stmt.span);
@@ -161,6 +177,7 @@ impl Validator<'_, '_> {
         &mut self,
         scope: &mut FunctionScope<'_, '_>,
         terminator: &MirTerminator,
+        previous: Option<&MirStatement>,
     ) {
         for target in terminator_successors(&terminator.kind) {
             self.require_block(scope, target, terminator.span);
@@ -220,18 +237,27 @@ impl Validator<'_, '_> {
                     scope,
                     sig.as_ref(),
                     args,
+                    preceding_tensor_shape_check(previous, args),
                     terminator.span,
                     &mut generic_bindings,
                     &mut shape_bindings,
                 );
-                self.validate_optional_destination_with_shapes(
+                if !self.call_destination_matches_shape_check(
                     scope,
                     destination.as_ref(),
                     sig.as_ref().map(|sig| sig.return_ty),
-                    terminator.span,
-                    &mut generic_bindings,
-                    &mut shape_bindings,
-                );
+                    args,
+                    preceding_tensor_shape_check(previous, args),
+                ) {
+                    self.validate_optional_destination_with_shapes(
+                        scope,
+                        destination.as_ref(),
+                        sig.as_ref().map(|sig| sig.return_ty),
+                        terminator.span,
+                        &mut generic_bindings,
+                        &mut shape_bindings,
+                    );
+                }
                 let error_place_ty = self.validate_place(scope, error_place, terminator.span);
                 // The failable contract is enforced whenever the callee
                 // signature is resolvable HERE. Package-MIR synthetic callees
@@ -419,4 +445,21 @@ impl Validator<'_, '_> {
             }
         }
     }
+}
+
+fn preceding_tensor_shape_check<'a>(
+    previous: Option<&'a MirStatement>,
+    arguments: &[crate::MirOperand],
+) -> Option<&'a crate::MirRuntimeCall> {
+    let Some(MirStatementKind::RuntimeCall { call, .. }) =
+        previous.map(|statement| &statement.kind)
+    else {
+        return None;
+    };
+    if !matches!(&call.intrinsic, crate::MirIntrinsic::TensorShapeCheck(_))
+        || call.args.get(..arguments.len())? != arguments
+    {
+        return None;
+    }
+    Some(call)
 }

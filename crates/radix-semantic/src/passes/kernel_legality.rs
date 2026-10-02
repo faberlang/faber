@@ -15,8 +15,12 @@
 
 use super::kernel_legality_body::{
     check_fragment_lane_ids, check_host_block, check_host_function, check_kernel_function,
+    check_policy_callback,
 };
-use crate::{Resolver, SemanticError, SemanticErrorKind, TypeId, TypeTable, WarningKind};
+use crate::{
+    ResolvedTensorEdgePolicy, Resolver, SemanticError, SemanticErrorKind, TensorEdgePolicyTable,
+    TypeId, TypeTable, WarningKind,
+};
 use radix_hir::{DefId, HirAnnotation, HirFunction, HirItemKind, HirModule, NucleumRole};
 use radix_lexer::{Interner, Span, Symbol};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -63,6 +67,10 @@ pub struct KernelLegalityReport {
     /// language-legal; whether a target may run it is a capability fact for
     /// the requirement inference, which reads this set.
     pub recursive_kernels: FxHashSet<DefId>,
+    /// Direct device-body calls collected by the same legality walk. This
+    /// includes exact custom `limes` callbacks as special roots; ordinary
+    /// unmarked callees are still rejected by the body walk.
+    pub kernel_calls: FxHashMap<DefId, Vec<DefId>>,
 }
 
 /// What the pass knows about one kernel declared in this module.
@@ -89,6 +97,7 @@ pub(super) struct Env<'a> {
     pub resolver: &'a Resolver,
     pub types: &'a TypeTable,
     pub interner: &'a Interner,
+    pub tensor_edge_policies: &'a TensorEdgePolicyTable,
 }
 
 /// Diagnostic sink that reports each violation once per span.
@@ -146,6 +155,7 @@ pub fn check(
     resolver: &Resolver,
     types: &TypeTable,
     interner: &Interner,
+    tensor_edge_policies: &TensorEdgePolicyTable,
 ) -> KernelLegalityReport {
     let facts = collect_facts(hir, interner);
     let env = Env {
@@ -153,6 +163,7 @@ pub fn check(
         resolver,
         types,
         interner,
+        tensor_edge_policies,
     };
     let mut sink = Sink::default();
     let mut edges: FxHashMap<DefId, Vec<DefId>> = FxHashMap::default();
@@ -184,14 +195,71 @@ pub fn check(
             _ => {}
         }
     }
+
+    // Custom policy methods are ordinary zero-field methods in source, not
+    // `@ nucleum` functions. Admit only exact DefIds retained by the limes
+    // sidecar and check those bodies under the same host-free device rules.
+    let callback_defs: FxHashSet<DefId> = tensor_edge_policies
+        .calls
+        .values()
+        .filter_map(|policy| match policy {
+            ResolvedTensorEdgePolicy::Custom {
+                remap, transform, ..
+            } => Some(std::iter::once(*remap).chain(transform.iter().copied())),
+            ResolvedTensorEdgePolicy::Builtin(_) | ResolvedTensorEdgePolicy::Deferred { .. } => {
+                None
+            }
+        })
+        .flatten()
+        .collect();
+    let mut callables: FxHashMap<DefId, (&HirFunction, Span)> = FxHashMap::default();
+    for item in &hir.items {
+        match &item.kind {
+            HirItemKind::Function(function) => {
+                callables.insert(item.def_id, (function.as_ref(), item.span));
+            }
+            HirItemKind::Struct(strukt) => {
+                for method in &strukt.methods {
+                    callables.insert(method.def_id, (&method.func, method.span));
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut callback_queue: Vec<DefId> = edges
+        .values()
+        .flatten()
+        .filter(|callee| callback_defs.contains(callee))
+        .copied()
+        .collect();
+    let mut checked_callbacks = FxHashSet::default();
+    while let Some(callback) = callback_queue.pop() {
+        if !checked_callbacks.insert(callback) {
+            continue;
+        }
+        let Some((function, span)) = callables.get(&callback).copied() else {
+            sink.report("nucleum_policy_callback_missing", Span::default(), &[]);
+            continue;
+        };
+        let callees = check_policy_callback(&env, &mut sink, function, span);
+        callback_queue.extend(
+            callees
+                .iter()
+                .filter(|callee| callback_defs.contains(callee))
+                .copied(),
+        );
+        edges.insert(callback, callees);
+    }
     if let Some(entry) = &hir.entry {
         check_host_block(&env, &mut sink, entry);
     }
 
+    let recursive_kernels = kernels_on_cycles(&edges);
     KernelLegalityReport {
         errors: sink.errors,
         warnings: sink.warnings,
-        recursive_kernels: kernels_on_cycles(&edges),
+        recursive_kernels,
+        kernel_calls: edges,
     }
 }
 

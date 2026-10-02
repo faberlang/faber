@@ -31,19 +31,25 @@
 
 use super::cursor::GeneratorCursor;
 use super::sermo::SermoView;
-use super::value::{
-    GradientStorage, MapKey, TensorValue, Value, format_template_shaped, modular_operand,
-    modular_word_reduce, modular_word_result, round_float, uint_width_checked_add, values_equal,
-    width_checked_add,
+use super::tensor_edge::{
+    BuiltinEdgePolicy, CustomEdgePolicyId, CustomEdgeValueError, TensorEdgeResolution,
+    resolve_custom_value,
 };
-use super::{Runner, RunnerError, gelu_f64, host::provider_identity};
+use super::value::{
+    GradientStorage, MapKey, TensorEdgeOp, TensorInverseMap, TensorValue, Value, coordinate_fits,
+    format_template_shaped, inverse_view_coordinate, modular_operand, modular_word_reduce,
+    modular_word_result, round_float, uint_width_checked_add, values_equal, width_checked_add,
+};
+use super::{CallOutcome, Runner, RunnerError, gelu_f64, host::provider_identity};
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
 use radix_mir::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlockId,
-    MirCollectionOp, MirConstant, MirConversion, MirConversionFlavor, MirGradientOp, MirIntrinsic,
-    MirOperand, MirOptionChainLink, MirOptionOp, MirOptionUnwrapMode, MirPlaceBase, MirProvider,
-    MirProviderKind, MirRuntimeCall, MirSermoOp, MirType, MirTypeCheckOp,
+    MirBuiltinEdgePolicy, MirCallee, MirCollectionOp, MirConstant, MirConversion,
+    MirConversionFlavor, MirEdgePolicy, MirFunctionId, MirGradientOp, MirIntrinsic, MirOperand,
+    MirOptionChainLink, MirOptionOp, MirOptionUnwrapMode, MirPlaceBase, MirProvider,
+    MirProviderKind, MirRuntimeCall, MirSermoOp, MirShapeCheck, MirShapeExpr, MirType,
+    MirTypeCheckOp, MirValueId,
 };
 use radix_runtime_contract::tensor::{
     ERR_ACCIPE_INVALID_INDEX, ERR_CREA_INVALID_SHAPE, ERR_ELEMENT_COUNT_OVERFLOW,
@@ -110,6 +116,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     return Err(RunnerError::internal(span, "diagnostic runtime arity"));
                 };
                 let value = self.eval_operand(arg, span)?;
+                let value = self.prepare_tensor_escape(value, span)?;
                 // 9007e12c3 follow-through: floats declared at a narrower
                 // width than f64 display at that width.
                 let float_width = self.operand_float_width(arg);
@@ -129,6 +136,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .args
                     .iter()
                     .map(|arg| self.eval_operand(arg, span))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let args = args
+                    .into_iter()
+                    .map(|value| self.prepare_tensor_escape(value, span))
                     .collect::<Result<Vec<_>, _>>()?;
                 // One value, one display: interpolation renders each argument
                 // at its declared float width, as `print` does.
@@ -163,6 +174,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     return Err(RunnerError::internal(span, "format_value runtime arity"));
                 };
                 let value = self.eval_operand(arg, span)?;
+                let value = self.prepare_tensor_escape(value, span)?;
                 let float_width = self.operand_float_width(arg);
                 let spec = self.interner.resolve(*spec);
                 format_value(&value, spec, float_width, span).map(Value::Str)
@@ -196,6 +208,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirIntrinsic::CursorStream(stream) => self.eval_cursor_stream(stream, &call.args, span),
             MirIntrinsic::Gradient(op) => self.eval_gradient(*op, &call.args, span),
             MirIntrinsic::TypeCheck(op) => self.eval_type_check(op, &call.args, span),
+            MirIntrinsic::TensorShapeCheck(check) => {
+                self.eval_tensor_shape_check(check, &call.args, span)
+            }
+            MirIntrinsic::TensorShapeSize(expression) => {
+                self.eval_tensor_shape_size(expression, &call.args, span)
+            }
+            MirIntrinsic::TensorLimes(policy) => self.tensor_limes(policy, &call.args, span),
             MirIntrinsic::TensorLift(op) => {
                 self.eval_tensor_lift(*op, &call.args, call.return_ty, span)
             }
@@ -203,7 +222,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let [source] = call.args.as_slice() else {
                     return Err(RunnerError::internal(span, "duplicate runtime arity"));
                 };
-                Ok(self.eval_operand(source, span)?.deep_copy())
+                let source = self.eval_operand(source, span)?;
+                Ok(self.prepare_tensor_escape(source, span)?.deep_copy())
             }
             other => Err(RunnerError::unsupported(
                 span,
@@ -216,9 +236,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let [route] = args else {
             return Err(RunnerError::internal(span, "sermo_open runtime arity"));
         };
-        let route =
-            self.eval_operand(route, span)?
-                .display(self.interner, self.field_order(), span)?;
+        let route = self.eval_operand(route, span)?;
+        let route = self.prepare_tensor_escape(route, span)?;
+        let route = route.display(self.interner, self.field_order(), span)?;
         self.sermo_open(route, span)
     }
 
@@ -489,32 +509,37 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let rank = self.eval_operand(rank_arg, span)?.as_index(span)?;
         let incoming_shape = gradient_shape_dims(&shape_value, rank, span)?;
         let incoming = self.eval_operand(data_arg, span)?;
-        let storage = self.gradient_handles.get_mut(&handle).ok_or_else(|| {
-            RunnerError::internal(span, format!("gradient accumulate unknown handle {handle}"))
-        })?;
-        if incoming_shape != storage.shape {
+        let stored_shape = self
+            .gradient_handles
+            .get(&handle)
+            .ok_or_else(|| {
+                RunnerError::internal(span, format!("gradient accumulate unknown handle {handle}"))
+            })?
+            .shape
+            .clone();
+        if incoming_shape != stored_shape {
             return Err(RunnerError::internal(
                 span,
                 format!(
                     "gradient accumulate shape mismatch {:?} vs stored {:?}",
-                    incoming_shape, storage.shape
+                    incoming_shape, stored_shape
                 ),
             ));
         }
-        match &incoming {
-            Value::Tensor(tensor) => {
-                accumulate_gradient_data(&mut storage.data, &tensor.borrow().data, span)?;
-            }
-            Value::Array(items) => {
-                accumulate_gradient_data(&mut storage.data, &items.borrow(), span)?;
-            }
+        let values = match &incoming {
+            Value::Tensor(tensor) => self.tensor_logical_values(tensor, span)?,
+            Value::Array(items) => items.borrow().clone(),
             _ => {
                 return Err(RunnerError::internal(
                     span,
                     "gradient accumulate data is not tensor storage",
                 ));
             }
-        }
+        };
+        let storage = self.gradient_handles.get_mut(&handle).ok_or_else(|| {
+            RunnerError::internal(span, format!("gradient accumulate unknown handle {handle}"))
+        })?;
+        accumulate_gradient_data(&mut storage.data, &values, span)?;
         Ok(Value::Unit)
     }
 
@@ -527,10 +552,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let storage = self.gradient_handles.get(&handle).ok_or_else(|| {
             RunnerError::internal(span, format!("gradient read unknown handle {handle}"))
         })?;
-        Ok(Value::Tensor(Rc::new(RefCell::new(TensorValue {
-            data: storage.data.clone(),
-            shape: storage.shape.clone(),
-        }))))
+        Ok(tensor_value(storage.data.clone(), storage.shape.clone()))
     }
 
     /// `gradient zero(handle)` — reset the gradient storage to zero.
@@ -627,10 +649,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         "tensor construct supports only vacua",
                     ));
                 }
-                Ok(Value::Tensor(Rc::new(RefCell::new(TensorValue {
-                    data: Vec::new(),
-                    shape: Vec::new(),
-                }))))
+                Ok(Value::Tensor(Rc::new(RefCell::new(
+                    TensorValue::contiguous(Vec::new(), Vec::new()),
+                ))))
             }
             MirAggregateKind::SparseTensor => {
                 let MirAggregateFields::Ordered(items) = &aggregate.fields else {
@@ -1040,18 +1061,62 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         Ok(Value::Bool(if op.positive { matches } else { !matches }))
     }
 
+    fn eval_tensor_shape_check(
+        &mut self,
+        check: &MirShapeCheck,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let arguments = args
+            .iter()
+            .map(|argument| self.eval_operand(argument, span))
+            .collect::<Result<Vec<_>, _>>()?;
+        for binding in &check.size_bindings {
+            recoverable_shape_expression_value(&binding.witness, &arguments, span)?;
+        }
+        for relation in &check.relations {
+            let left = recoverable_shape_expression_value(&relation.left, &arguments, span)?;
+            let right = recoverable_shape_expression_value(&relation.right, &arguments, span)?;
+            if left != right {
+                return Err(RunnerError::internal_with_issue(
+                    span,
+                    format!("tensor runtime shape mismatch: {left} != {right}"),
+                    "runner_tensor_shape_mismatch",
+                ));
+            }
+        }
+        Ok(Value::Unit)
+    }
+
+    fn eval_tensor_shape_size(
+        &mut self,
+        expression: &MirShapeExpr,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let arguments = args
+            .iter()
+            .map(|argument| self.eval_operand(argument, span))
+            .collect::<Result<Vec<_>, _>>()?;
+        let extent = recoverable_shape_expression_value(expression, &arguments, span)?;
+        Ok(Value::Float(extent as f64))
+    }
+
     fn eval_assert(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
         let Some(cond) = args.first() else {
             return Err(RunnerError::internal(span, "assert runtime arity"));
         };
         if !self.eval_operand(cond, span)?.as_bool(span)? {
-            let message = args
-                .get(1)
-                .map(|arg| self.eval_operand(arg, span))
-                .transpose()?
-                .map(|value| value.display(self.interner, self.field_order(), span))
-                .transpose()?
-                .unwrap_or_else(|| "assertion failed".to_owned());
+            let message = if let Some(arg) = args.get(1) {
+                let value = self.eval_operand(arg, span)?;
+                self.prepare_tensor_escape(value, span)?.display(
+                    self.interner,
+                    self.field_order(),
+                    span,
+                )?
+            } else {
+                "assertion failed".to_owned()
+            };
             self.host.abort(&message);
         }
         Ok(Value::Unit)
@@ -1061,9 +1126,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let [arg] = args else {
             return Err(RunnerError::internal(span, "panic runtime arity"));
         };
-        let message =
-            self.eval_operand(arg, span)?
-                .display(self.interner, self.field_order(), span)?;
+        let message = self.eval_operand(arg, span)?;
+        let message = self.prepare_tensor_escape(message, span)?;
+        let message = message.display(self.interner, self.field_order(), span)?;
         self.host.abort(&message);
     }
 
@@ -1105,19 +1170,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         "sparse nonzero-count receiver type mismatch",
                     ));
                 };
-                let count =
-                    tensor
-                        .borrow()
-                        .data
-                        .iter()
-                        .try_fold(0_i64, |count, value| match value {
-                            Value::Int(value) => Ok(count + i64::from(*value != 0)),
-                            Value::Float(value) => Ok(count + i64::from(*value != 0.0)),
-                            _ => Err(RunnerError::internal(
-                                span,
-                                "sparse nonzero-count element is not numeric",
-                            )),
-                        })?;
+                let values = self.tensor_logical_values(&tensor, span)?;
+                let count = values.iter().try_fold(0_i64, |count, value| match value {
+                    Value::Int(value) => Ok(count + i64::from(*value != 0)),
+                    Value::Float(value) => Ok(count + i64::from(*value != 0.0)),
+                    _ => Err(RunnerError::internal(
+                        span,
+                        "sparse nonzero-count element is not numeric",
+                    )),
+                })?;
                 Ok(Value::Int(count))
             }
             MirCollectionOp::SparseDensify => {
@@ -1539,6 +1600,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::TensorFlatten => self.tensor_flatten(args, span),
             MirCollectionOp::TensorMaterialize => self.tensor_materialize(args, span),
             MirCollectionOp::TensorSlice => self.tensor_slice(args, span),
+            MirCollectionOp::TensorExpand => self.tensor_expand(args, span),
+            MirCollectionOp::TensorShift => self.tensor_shift(args, span),
             MirCollectionOp::TensorAdd => {
                 self.tensor_elementwise_or_scalar(args, span, "tensor add", numeric_add, return_ty)
             }
@@ -1750,9 +1813,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
         let tensor = self.tensor_arg(receiver, span)?;
         let shape = self.shape_arg(shape, span, ERR_FORMA_RESHAPE_COUNT)?;
-        let data = tensor.borrow().data.clone();
-        self.ensure_tensor_element_count(&shape, data.len(), span, ERR_FORMA_ELEMENT_COUNT)?;
-        Ok(tensor_value(data, shape))
+        let borrow = tensor.borrow();
+        let count = borrow
+            .logical_len()
+            .ok_or_else(|| RunnerError::internal(span, "tensor reshape input layout is invalid"))?;
+        self.ensure_tensor_element_count(&shape, count, span, ERR_FORMA_ELEMENT_COUNT)?;
+        let view = borrow.reshaped_view(shape).ok_or_else(|| {
+            RunnerError::internal(span, "tensor reshape requires a layout-preserving view")
+        })?;
+        Ok(Value::Tensor(Rc::new(RefCell::new(view))))
     }
 
     fn tensor_get(
@@ -1767,15 +1836,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let tensor = self.tensor_arg(receiver, span)?;
         let index = self.shape_arg(index, span, ERR_ACCIPE_INVALID_INDEX)?;
         let checked = !matches!(self.types.get(return_ty.semantic_id()), Type::Option(_));
-        let borrow = tensor.borrow();
-        let Some(offset) = tensor_flat_offset(&borrow.shape, &index) else {
+        let shape = tensor.borrow().shape.clone();
+        let Some(offset) = tensor_flat_offset(&shape, &index) else {
             return if checked {
                 Err(RunnerError::internal(span, ERR_ACCIPE_INVALID_INDEX))
             } else {
                 Ok(Value::Nil)
             };
         };
-        match borrow.data.get(offset).cloned() {
+        match self.tensor_read_at(&tensor, offset, span)? {
             Some(value) => Ok(value),
             None if checked => Err(RunnerError::internal(span, ERR_ACCIPE_INVALID_INDEX)),
             None => Ok(Value::Nil),
@@ -1795,14 +1864,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
         let tensor = self.tensor_arg(receiver, span)?;
         let index = self.shape_arg(index, span, ERR_ACCIPE_INVALID_INDEX)?;
-        let borrow = tensor.borrow();
-        let Some(offset) = tensor_flat_offset(&borrow.shape, &index) else {
+        let shape = tensor.borrow().shape.clone();
+        let Some(offset) = tensor_flat_offset(&shape, &index) else {
             return Err(RunnerError::internal(span, ERR_ACCIPE_INVALID_INDEX));
         };
-        borrow
-            .data
-            .get(offset)
-            .cloned()
+        self.tensor_read_at(&tensor, offset, span)?
             .ok_or_else(|| RunnerError::internal(span, ERR_ACCIPE_INVALID_INDEX))
     }
 
@@ -1969,14 +2035,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let tensor = self.tensor_arg(receiver, span)?;
         let index = self.shape_arg(index, span, ERR_PONDE_INVALID_INDEX)?;
         let value = self.eval_operand(value, span)?;
-        let mut borrow = tensor.borrow_mut();
+        let borrow = tensor.borrow();
         let Some(offset) = tensor_flat_offset(&borrow.shape, &index) else {
             return Err(RunnerError::internal(span, ERR_PONDE_INVALID_INDEX));
         };
-        let Some(slot) = borrow.data.get_mut(offset) else {
+        if borrow.value_at(offset).is_none() {
             return Err(RunnerError::internal(span, ERR_PONDE_INVALID_INDEX));
-        };
-        *slot = value;
+        }
+        borrow
+            .set_value_at(offset, value)
+            .ok_or_else(|| RunnerError::internal(span, ERR_PONDE_INVALID_INDEX))?;
         Ok(Value::Unit)
     }
 
@@ -1988,16 +2056,18 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let value = self.eval_operand(value, span)?;
         let borrow = tensor.borrow();
         let shape = borrow.shape.clone();
-        let count = borrow.data.len();
+        let count = borrow
+            .logical_len()
+            .ok_or_else(|| RunnerError::internal(span, "tensor fill input layout is invalid"))?;
         // When the fill value is itself a tensor, broadcast/tile its elements
         // to fill the receiver shape. This supports the backward companion's
         // broadcasts: filling [B,D] with [B] (prefix repeat each element)
         // or with [D] (suffix cycle the block).
         match &value {
             Value::Tensor(fill_cell) => {
-                let fill_borrow = fill_cell.borrow();
-                let fill_count = fill_borrow.data.len();
-                let fill_shape = &fill_borrow.shape;
+                let fill_shape = fill_cell.borrow().shape.clone();
+                let fill_data = self.tensor_logical_values(fill_cell, span)?;
+                let fill_count = fill_data.len();
                 if fill_count == 0 || count % fill_count != 0 {
                     return Err(RunnerError::internal(
                         span,
@@ -2005,11 +2075,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     ));
                 }
                 let repeats = count / fill_count;
-                let data: Vec<Value> = if shape.starts_with(fill_shape) {
+                let data: Vec<Value> = if shape.starts_with(&fill_shape) {
                     // Fill shape is a prefix (e.g. [B] → [B,D]):
                     // repeat each element to fill suffix dimensions.
-                    fill_borrow
-                        .data
+                    fill_data
                         .iter()
                         .flat_map(|v| std::iter::repeat_n(v, repeats))
                         .cloned()
@@ -2017,13 +2086,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 } else {
                     // Fill shape is a suffix (e.g. [D] → [B,D])
                     // or neither prefix nor suffix: cycle the entire block.
-                    fill_borrow
-                        .data
-                        .iter()
-                        .cycle()
-                        .take(count)
-                        .cloned()
-                        .collect()
+                    fill_data.iter().cycle().take(count).cloned().collect()
                 };
                 Ok(tensor_value(data, shape))
             }
@@ -2115,7 +2178,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "tensor flatten arity"));
         };
         let tensor = self.tensor_arg(receiver, span)?;
-        let data = tensor.borrow().data.clone();
+        if tensor.borrow().has_unresolved_edge_shift() {
+            return Err(RunnerError::internal(
+                span,
+                "tensor flatten cannot escape unresolved shifted edges",
+            ));
+        }
+        let data = self.tensor_logical_values(&tensor, span)?;
         Ok(array_value(data))
     }
 
@@ -2128,41 +2197,524 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "tensor materialize arity"));
         };
         let tensor = self.tensor_arg(receiver, span)?;
+        let shape = tensor.borrow().shape.clone();
+        if tensor.borrow().has_unresolved_edge_shift() {
+            return Err(RunnerError::internal(
+                span,
+                "tensor materialize cannot escape unresolved shifted edges",
+            ));
+        }
+        let data = self.tensor_logical_values(&tensor, span)?;
+        Ok(tensor_value(data, shape))
+    }
+
+    fn tensor_expand(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver, target_shape] = args else {
+            return Err(RunnerError::internal(span, "tensor expand arity"));
+        };
+        let target_shape = self.shape_arg(target_shape, span, ERR_CREA_INVALID_SHAPE)?;
+        let tensor = self.tensor_arg(receiver, span)?;
         let borrow = tensor.borrow();
-        Ok(tensor_value(borrow.data.clone(), borrow.shape.clone()))
+        let view = borrow.expanded_view(target_shape).ok_or_else(|| {
+            RunnerError::internal(span, "tensor expanded shape is incompatible with receiver")
+        })?;
+        Ok(Value::Tensor(Rc::new(RefCell::new(view))))
+    }
+
+    fn tensor_shift(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver, offsets] = args else {
+            return Err(RunnerError::internal(span, "tensor shift arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let offsets = match self.eval_operand(offsets, span)? {
+            Value::Array(offsets) | Value::Vector(offsets) => offsets.borrow().clone(),
+            other => {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("tensor shift offsets are not an array or vector: {other:?}"),
+                ));
+            }
+        };
+        let shift = offsets
+            .into_iter()
+            .map(|offset| match offset {
+                Value::Int(offset) => Ok(i128::from(offset)),
+                other => Err(RunnerError::internal(
+                    span,
+                    format!("tensor shift offset is not numerus: {other:?}"),
+                )),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut view = tensor.borrow().clone();
+        if shift.len() != view.shape.len() {
+            return Err(RunnerError::internal(
+                span,
+                "tensor shift offset rank differs from receiver rank",
+            ));
+        }
+        view.push_edge_shift(super::tensor_edge::TensorEdgeDescriptor::shifted(shift));
+        Ok(Value::Tensor(Rc::new(RefCell::new(view))))
+    }
+
+    fn tensor_limes(
+        &mut self,
+        policy: &MirEdgePolicy,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(span, "tensor limes arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let mut view = tensor.borrow().clone();
+        let resolution = match policy {
+            MirEdgePolicy::Builtin(policy) => TensorEdgeResolution::Builtin(match policy {
+                MirBuiltinEdgePolicy::Clamp => BuiltinEdgePolicy::Clamp,
+                MirBuiltinEdgePolicy::Reflect => BuiltinEdgePolicy::Reflect,
+                MirBuiltinEdgePolicy::Wrap => BuiltinEdgePolicy::Wrap,
+            }),
+            MirEdgePolicy::Custom {
+                policy_def,
+                remap,
+                transform,
+            } => TensorEdgeResolution::Custom(CustomEdgePolicyId {
+                policy_def: *policy_def,
+                remap: *remap,
+                transform: *transform,
+            }),
+        };
+        if !view.resolve_edge_shift(resolution) {
+            return Err(RunnerError::internal(
+                span,
+                "tensor limes requires an unresolved edge descriptor",
+            ));
+        }
+        Ok(Value::Tensor(Rc::new(RefCell::new(view))))
+    }
+
+    /// Invoke an ordinary MIR function with runner values that were produced
+    /// by a lazy tensor edge callback. Arguments live in temporary caller
+    /// value slots so the normal call path preserves step budgets, deadlines,
+    /// frame accounting, and error propagation.
+    fn invoke_runtime_values(
+        &mut self,
+        function: MirFunctionId,
+        arguments: Vec<Value>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let slots = {
+            let frame = self
+                .frames
+                .last_mut()
+                .ok_or_else(|| RunnerError::internal(span, "edge callback has no caller frame"))?;
+            let mut next = frame
+                .values
+                .keys()
+                .map(|id| id.0)
+                .max()
+                .map_or(Some(0), |max| max.checked_add(1))
+                .ok_or_else(|| RunnerError::internal(span, "edge callback value id overflow"))?;
+            let mut slots = Vec::with_capacity(arguments.len());
+            for argument in arguments {
+                let id = MirValueId(next);
+                next = next.checked_add(1).ok_or_else(|| {
+                    RunnerError::internal(span, "edge callback value id overflow")
+                })?;
+                frame.values.insert(id, argument);
+                slots.push(id);
+            }
+            slots
+        };
+        let operands = slots
+            .iter()
+            .copied()
+            .map(MirOperand::Value)
+            .collect::<Vec<_>>();
+        let result = self.invoke_call(&MirCallee::Function(function), &operands, span);
+        if let Some(frame) = self.frames.last_mut() {
+            for slot in &slots {
+                frame.values.remove(slot);
+            }
+        }
+        match result? {
+            CallOutcome::Ok(value) => Ok(value),
+            CallOutcome::Err(value) => Err(RunnerError::internal(
+                span,
+                format!("tensor edge callback exited through alternate error: {value:?}"),
+            )),
+        }
+    }
+
+    /// Fallible logical read for a tensor that may carry a custom limes policy.
+    /// Ordinary, optional, and built-in views use the shared value-level path;
+    /// custom remapping and transforms execute only for displaced edge cells.
+    pub(crate) fn tensor_read_at(
+        &mut self,
+        tensor: &Rc<RefCell<TensorValue>>,
+        logical_index: usize,
+        span: Span,
+    ) -> Result<Option<Value>, RunnerError> {
+        let snapshot = tensor.borrow().clone();
+        if !snapshot.edge_ops.iter().any(|operation| {
+            matches!(
+                operation,
+                TensorEdgeOp::Shift {
+                    descriptor: super::tensor_edge::TensorEdgeDescriptor {
+                        resolution: TensorEdgeResolution::Custom(_),
+                        ..
+                    },
+                    ..
+                }
+            )
+        }) {
+            return Ok(snapshot.value_at(logical_index));
+        }
+        let Some(coordinate) = snapshot.logical_coordinates(logical_index) else {
+            return Ok(None);
+        };
+        self.tensor_read_edge_chain(&snapshot, snapshot.edge_ops.len(), coordinate, span)
+    }
+
+    fn tensor_read_edge_chain(
+        &mut self,
+        tensor: &TensorValue,
+        operation_count: usize,
+        coordinate: Vec<usize>,
+        span: Span,
+    ) -> Result<Option<Value>, RunnerError> {
+        if operation_count == 0 {
+            let base = tensor
+                .edge_base
+                .as_ref()
+                .ok_or_else(|| RunnerError::internal(span, "tensor edge base layout is missing"))?;
+            let physical = TensorValue::physical_offset_in_layout(
+                &coordinate,
+                &base.shape,
+                &base.strides,
+                base.offset,
+            )
+            .ok_or_else(|| RunnerError::internal(span, "tensor edge base offset is invalid"))?;
+            return Ok(tensor.data.borrow().get(physical).cloned());
+        }
+        let operation = tensor
+            .edge_ops
+            .get(operation_count - 1)
+            .ok_or_else(|| RunnerError::internal(span, "tensor edge operation is missing"))?;
+        match operation {
+            TensorEdgeOp::View {
+                input_shape,
+                output_shape,
+                inverse,
+            } => {
+                if !coordinate_fits(&coordinate, output_shape) {
+                    return Ok(None);
+                }
+                let mapped =
+                    inverse_view_coordinate(&coordinate, input_shape, output_shape, inverse)
+                        .ok_or_else(|| {
+                            RunnerError::internal(span, "tensor edge view mapping is invalid")
+                        })?;
+                self.tensor_read_edge_chain(tensor, operation_count - 1, mapped, span)
+            }
+            TensorEdgeOp::Shift {
+                input_shape,
+                descriptor,
+            } => {
+                let extents = tensor_extents(input_shape, span)?;
+                let coordinate = coordinates_as_i128(&coordinate, span)?;
+                match &descriptor.resolution {
+                    TensorEdgeResolution::Optional => {
+                        let Some(mapped) = super::tensor_edge::resolve_optional(
+                            &coordinate,
+                            &descriptor.shift,
+                            &extents,
+                        ) else {
+                            return Ok(Some(Value::Nil));
+                        };
+                        self.tensor_read_edge_chain(tensor, operation_count - 1, mapped, span)
+                    }
+                    TensorEdgeResolution::Builtin(policy) => {
+                        let Some(mapped) = super::tensor_edge::resolve_builtin(
+                            *policy,
+                            &coordinate,
+                            &descriptor.shift,
+                            &extents,
+                        ) else {
+                            return Ok(None);
+                        };
+                        self.tensor_read_edge_chain(tensor, operation_count - 1, mapped, span)
+                    }
+                    TensorEdgeResolution::Custom(policy) => {
+                        let receiver = Value::Struct(
+                            policy.policy_def,
+                            Rc::new(RefCell::new(FxHashMap::default())),
+                        );
+                        let runner = RefCell::new(self);
+                        let result = resolve_custom_value(
+                            &coordinate,
+                            &descriptor.shift,
+                            &extents,
+                            |displaced| {
+                                let value = runner.borrow_mut().invoke_runtime_values(
+                                    policy.remap,
+                                    vec![receiver.clone(), vector_of_i64(displaced)],
+                                    span,
+                                )?;
+                                vector_to_i64(&value, span)
+                            },
+                            |mapped| {
+                                runner
+                                    .borrow_mut()
+                                    .tensor_read_edge_chain(
+                                        tensor,
+                                        operation_count - 1,
+                                        mapped.to_vec(),
+                                        span,
+                                    )?
+                                    .ok_or_else(|| {
+                                        RunnerError::internal(
+                                            span,
+                                            "resolved tensor edge chain returned no value",
+                                        )
+                                    })
+                            },
+                            |displaced, value| {
+                                let Some(transform) = policy.transform else {
+                                    return Ok(value);
+                                };
+                                runner.borrow_mut().invoke_runtime_values(
+                                    transform,
+                                    vec![receiver.clone(), vector_of_i64(displaced), value],
+                                    span,
+                                )
+                            },
+                        );
+                        result
+                            .map(Some)
+                            .map_err(|error| custom_edge_error(error, span))
+                    }
+                }
+            }
+        }
+    }
+
+    pub(crate) fn tensor_logical_values(
+        &mut self,
+        tensor: &Rc<RefCell<TensorValue>>,
+        span: Span,
+    ) -> Result<Vec<Value>, RunnerError> {
+        let snapshot = tensor.borrow().clone();
+        if snapshot.has_contiguous_backing_mismatch() {
+            return Err(RunnerError::internal(
+                span,
+                "tensor backing-length mismatch",
+            ));
+        }
+        if !snapshot.edge_ops.iter().any(|operation| {
+            matches!(
+                operation,
+                TensorEdgeOp::Shift {
+                    descriptor: super::tensor_edge::TensorEdgeDescriptor {
+                        resolution: TensorEdgeResolution::Custom(_),
+                        ..
+                    },
+                    ..
+                }
+            )
+        }) {
+            return snapshot
+                .logical_values()
+                .ok_or_else(|| RunnerError::internal(span, "tensor logical layout is invalid"));
+        }
+        let count = snapshot
+            .logical_len()
+            .ok_or_else(|| RunnerError::internal(span, "tensor logical shape overflows"))?;
+        (0..count)
+            .map(|index| {
+                self.tensor_read_at(tensor, index, span)?.ok_or_else(|| {
+                    RunnerError::internal(span, "resolved tensor edge returned no value")
+                })
+            })
+            .collect()
+    }
+
+    /// Prepare a value for a boundary that cannot execute lazy tensor
+    /// callbacks itself (display or a host kernel). Resolved custom edge
+    /// tensors are copied at that boundary; ordinary affine and built-in
+    /// views keep their current representation because their value-level
+    /// logical reader is complete.
+    pub(crate) fn prepare_tensor_escape(
+        &mut self,
+        value: Value,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        if !value_needs_tensor_escape_preparation(&value) {
+            return Ok(value);
+        }
+        match value {
+            Value::Tensor(tensor) => {
+                let snapshot = tensor.borrow().clone();
+                if snapshot.has_unresolved_edge_shift() {
+                    return Err(RunnerError::internal(
+                        span,
+                        "unresolved shifted tensor cannot cross this boundary",
+                    ));
+                }
+                if !tensor_has_custom_edge(&snapshot) {
+                    return Ok(Value::Tensor(tensor));
+                }
+                let data = self.tensor_logical_values(&tensor, span)?;
+                Ok(Value::Tensor(Rc::new(RefCell::new(
+                    TensorValue::contiguous(data, snapshot.shape),
+                ))))
+            }
+            Value::Array(items) => {
+                let items = items.borrow().clone();
+                let items = items
+                    .into_iter()
+                    .map(|item| self.prepare_tensor_escape(item, span))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(Value::Array(Rc::new(RefCell::new(items))))
+            }
+            Value::Tuple(items) => items
+                .into_iter()
+                .map(|item| self.prepare_tensor_escape(item, span))
+                .collect::<Result<Vec<_>, _>>()
+                .map(Value::Tuple),
+            Value::Map(items) => {
+                let items = items.borrow().clone();
+                let mut prepared = FxHashMap::default();
+                for (key, item) in items {
+                    prepared.insert(key, self.prepare_tensor_escape(item, span)?);
+                }
+                Ok(Value::Map(Rc::new(RefCell::new(prepared))))
+            }
+            Value::Record(fields, order) => {
+                let fields = fields.borrow().clone();
+                let mut prepared = FxHashMap::default();
+                for (field, item) in fields {
+                    prepared.insert(field, self.prepare_tensor_escape(item, span)?);
+                }
+                Ok(Value::Record(Rc::new(RefCell::new(prepared)), order))
+            }
+            Value::Struct(def, fields) => {
+                let fields = fields.borrow().clone();
+                let mut prepared = FxHashMap::default();
+                for (field, item) in fields {
+                    prepared.insert(field, self.prepare_tensor_escape(item, span)?);
+                }
+                Ok(Value::Struct(def, Rc::new(RefCell::new(prepared))))
+            }
+            Value::EnumVariant(def, fields) => {
+                let fields = fields.borrow().clone();
+                let mut prepared = FxHashMap::default();
+                for (field, item) in fields {
+                    prepared.insert(field, self.prepare_tensor_escape(item, span)?);
+                }
+                Ok(Value::EnumVariant(def, Rc::new(RefCell::new(prepared))))
+            }
+            Value::SharedCell(cell) => {
+                let value = cell.borrow().clone();
+                Ok(Value::SharedCell(Rc::new(RefCell::new(
+                    self.prepare_tensor_escape(value, span)?,
+                ))))
+            }
+            Value::Vector(items) => {
+                let items = items.borrow().clone();
+                let items = items
+                    .into_iter()
+                    .map(|item| self.prepare_tensor_escape(item, span))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(Value::Vector(Rc::new(RefCell::new(items))))
+            }
+            Value::Matrix(matrix) => {
+                let mut matrix = matrix.borrow().clone();
+                let values = std::mem::take(&mut matrix.data)
+                    .into_iter()
+                    .map(|item| self.prepare_tensor_escape(item, span))
+                    .collect::<Result<Vec<_>, _>>()?;
+                matrix.data = values;
+                Ok(Value::Matrix(Rc::new(RefCell::new(matrix))))
+            }
+            other => Ok(other),
+        }
     }
 
     fn tensor_slice(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
-        let [receiver, start, end] = args else {
-            return Err(RunnerError::internal(span, "tensor slice arity"));
+        let (receiver, start, end, step) = match args {
+            [receiver, start, end] => (receiver, start, end, 1_usize),
+            [receiver, start, end, step] => {
+                let step = self.eval_operand(step, span)?.as_index(span)?;
+                (receiver, start, end, step)
+            }
+            _ => return Err(RunnerError::internal(span, "tensor slice arity")),
         };
+        if step == 0 {
+            return Err(RunnerError::internal(
+                span,
+                "tensor slice step must be positive",
+            ));
+        }
         let tensor = self.tensor_arg(receiver, span)?;
         let start = self.eval_operand(start, span)?.as_index(span)?;
         let end = self.eval_operand(end, span)?.as_index(span)?;
         let borrow = tensor.borrow();
-        let axis = borrow.shape.first().copied().unwrap_or(0).max(0) as usize;
+        let axis = borrow
+            .shape
+            .first()
+            .copied()
+            .and_then(|dimension| usize::try_from(dimension.max(0)).ok())
+            .unwrap_or(0);
         let end = end.min(axis);
         let start = start.min(end);
-        let stride = borrow
-            .shape
-            .iter()
-            .skip(1)
-            .try_fold(1_usize, |acc, dim| {
-                usize::try_from((*dim).max(0))
-                    .ok()
-                    .and_then(|d| acc.checked_mul(d))
-            })
-            .ok_or_else(|| RunnerError::internal(span, "tensor slice shape overflow"))?;
-        let data_start = start.saturating_mul(stride);
-        let data_end = end.saturating_mul(stride).min(borrow.data.len());
+        let Some(first_stride) = borrow.strides.first().copied() else {
+            return Err(RunnerError::internal(
+                span,
+                "tensor slice requires rank at least one",
+            ));
+        };
+        let length = if start == end {
+            0
+        } else {
+            end.checked_sub(start)
+                .and_then(|extent| extent.checked_add(step - 1))
+                .map(|extent| extent / step)
+                .ok_or_else(|| RunnerError::internal(span, "tensor slice shape overflow"))?
+        };
         let mut shape = borrow.shape.clone();
-        if let Some(first) = shape.first_mut() {
-            *first = (end - start) as i64;
-        }
-        Ok(tensor_value(
-            borrow.data[data_start..data_end].to_vec(),
-            shape,
-        ))
+        shape[0] = i64::try_from(length)
+            .map_err(|_| RunnerError::internal(span, "tensor slice shape overflow"))?;
+        let step_size = step;
+        let step = isize::try_from(step_size)
+            .map_err(|_| RunnerError::internal(span, "tensor slice step overflow"))?;
+        let offset =
+            if length == 0 {
+                borrow.offset
+            } else {
+                let start = isize::try_from(start)
+                    .map_err(|_| RunnerError::internal(span, "tensor slice offset overflow"))?;
+                borrow
+                    .offset
+                    .checked_add(start.checked_mul(first_stride).ok_or_else(|| {
+                        RunnerError::internal(span, "tensor slice offset overflow")
+                    })?)
+                    .ok_or_else(|| RunnerError::internal(span, "tensor slice offset overflow"))?
+            };
+        let mut strides = borrow.strides.clone();
+        strides[0] = first_stride
+            .checked_mul(step)
+            .ok_or_else(|| RunnerError::internal(span, "tensor slice stride overflow"))?;
+        let mut view = borrow.logical_view(shape, strides, offset).ok_or_else(|| {
+            RunnerError::internal(span, "tensor slice view exceeds backing storage")
+        })?;
+        view.push_edge_view(
+            borrow.shape.clone(),
+            TensorInverseMap::SliceAxis0 {
+                start,
+                step: step_size,
+            },
+        );
+        Ok(Value::Tensor(Rc::new(RefCell::new(view))))
     }
 
     /// Elementwise array-backed collection op with scalar broadcast. Unlike
@@ -2255,11 +2807,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let result = self.tensor_elementwise_exact(args, span, label, op)?;
         if let (Value::Tensor(cell), Some(element)) = (&result, self.tensor_element_type(return_ty))
         {
-            let mut tensor = cell.borrow_mut();
-            for slot in &mut tensor.data {
-                let value = std::mem::replace(slot, Value::Int(0));
-                *slot = self.store_tensor_element(element, value, span)?;
-            }
+            let tensor = cell.borrow();
+            let values = tensor
+                .logical_values()
+                .ok_or_else(|| RunnerError::internal(span, "tensor result layout is invalid"))?;
+            let values = values
+                .into_iter()
+                .map(|value| self.store_tensor_element(element, value, span))
+                .collect::<Result<Vec<_>, _>>()?;
+            tensor.data.borrow_mut().clone_from(&values);
         }
         Ok(result)
     }
@@ -2287,9 +2843,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let width = NumericWidth::I64;
         match (&left_val, &right_val) {
             (Value::Tensor(l_cell), Value::Tensor(r_cell)) => {
-                let l = l_cell.borrow();
-                let r = r_cell.borrow();
-                if l.shape != r.shape {
+                let left_shape = l_cell.borrow().shape.clone();
+                let right_shape = r_cell.borrow().shape.clone();
+                let left_data = self.tensor_logical_values(l_cell, span)?;
+                let right_data = self.tensor_logical_values(r_cell, span)?;
+                if left_shape != right_shape {
                     // S6-C2: the tensor-tensor elementwise family learns the
                     // bounded rank-extension broadcast (the `addita_bias`
                     // contract): the lower-rank operand is replicated across
@@ -2299,10 +2857,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     // diagnostic — the broadcast fact must be recorded, never
                     // guessed (A3).
                     let (higher_is_left, higher_shape, lower_shape, higher_data, lower_data) =
-                        if l.shape.len() >= r.shape.len() {
-                            (true, &l.shape, &r.shape, &l.data, &r.data)
+                        if left_shape.len() >= right_shape.len() {
+                            (true, &left_shape, &right_shape, &left_data, &right_data)
                         } else {
-                            (false, &r.shape, &l.shape, &r.data, &l.data)
+                            (false, &right_shape, &left_shape, &right_data, &left_data)
                         };
                     if higher_shape.len() != lower_shape.len() + 1
                         || lower_shape != &higher_shape[1..]
@@ -2311,7 +2869,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                             span,
                             format!(
                                 "{label} tensor-tensor shape pair {:?} + {:?} is neither same-shape nor a rank-extension broadcast",
-                                l.shape, r.shape
+                                left_shape, right_shape
                             ),
                             "runner_tensor_tensor_broadcast_unsupported",
                         ));
@@ -2352,39 +2910,38 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 }
                 // Equal shapes with unequal backing lengths would silently
                 // truncate via zip — reject explicitly (PRP-077).
-                if l.data.len() != r.data.len() {
+                if left_data.len() != right_data.len() {
                     return Err(RunnerError::internal(
                         span,
                         format!("{label} backing-length mismatch"),
                     ));
                 }
-                let data = l
-                    .data
+                let data = left_data
                     .iter()
-                    .zip(r.data.iter())
+                    .zip(right_data.iter())
                     .map(|(a, b)| op(a, b, width, span))
                     .collect::<Result<Vec<_>, _>>()?;
-                Ok(tensor_value(data, l.shape.clone()))
+                Ok(tensor_value(data, left_shape))
             }
             (Value::Tensor(cell), scalar) => {
-                let tensor = cell.borrow();
-                debug_assert!(!tensor.data.is_empty(), "{label} broadcast on empty tensor");
-                let data = tensor
-                    .data
+                let shape = cell.borrow().shape.clone();
+                let values = self.tensor_logical_values(cell, span)?;
+                debug_assert!(!values.is_empty(), "{label} broadcast on empty tensor");
+                let data = values
                     .iter()
                     .map(|elem| op(elem, scalar, width, span))
                     .collect::<Result<Vec<_>, _>>()?;
-                Ok(tensor_value(data, tensor.shape.clone()))
+                Ok(tensor_value(data, shape))
             }
             (scalar, Value::Tensor(cell)) => {
-                let tensor = cell.borrow();
-                debug_assert!(!tensor.data.is_empty(), "{label} broadcast on empty tensor");
-                let data = tensor
-                    .data
+                let shape = cell.borrow().shape.clone();
+                let values = self.tensor_logical_values(cell, span)?;
+                debug_assert!(!values.is_empty(), "{label} broadcast on empty tensor");
+                let data = values
                     .iter()
                     .map(|elem| op(scalar, elem, width, span))
                     .collect::<Result<Vec<_>, _>>()?;
-                Ok(tensor_value(data, tensor.shape.clone()))
+                Ok(tensor_value(data, shape))
             }
             _ => op(&left_val, &right_val, width, span),
         }
@@ -2395,15 +2952,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "tensor mean arity"));
         };
         let tensor = self.tensor_arg(receiver, span)?;
-        let borrow = tensor.borrow();
-        if borrow.data.is_empty() {
+        let values = self.tensor_logical_values(&tensor, span)?;
+        if values.is_empty() {
             return Ok(Value::Float(0.0));
         }
         let mut sum = 0.0;
-        for value in &borrow.data {
+        for value in &values {
             sum += numeric_as_f64(value, span)?;
         }
-        Ok(Value::Float(sum / borrow.data.len() as f64))
+        Ok(Value::Float(sum / values.len() as f64))
     }
 
     fn tensor_extremum(
@@ -2425,8 +2982,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             None
         };
         let tensor = self.tensor_arg(receiver, span)?;
-        let borrow = tensor.borrow();
-        let mut values = borrow.data.iter();
+        let values = self.tensor_logical_values(&tensor, span)?;
+        let mut values = values.iter();
         let Some(first) = values.next() else {
             return Ok(match identity {
                 Some(identity) => Value::Float(identity),
@@ -2443,17 +3000,18 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     #[rustfmt::skip]
     pub(super)
     fn map_tensor_unary(
-        &self,
+        &mut self,
         tensor: Rc<RefCell<TensorValue>>,
+        span: Span,
         op: &mut dyn FnMut(&Value) -> Result<Value, RunnerError>,
     ) -> Result<Value, RunnerError> {
-        let borrow = tensor.borrow();
-        let data = borrow
-            .data
+        let shape = tensor.borrow().shape.clone();
+        let values = self.tensor_logical_values(&tensor, span)?;
+        let data = values
             .iter()
             .map(&mut *op)
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(tensor_value(data, borrow.shape.clone()))
+        Ok(tensor_value(data, shape))
     }
 
     fn tensor_neg(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -2461,7 +3019,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "tensor neg arity"));
         };
         let tensor = self.tensor_arg(receiver, span)?;
-        self.map_tensor_unary(tensor, &mut |v| {
+        self.map_tensor_unary(tensor, span, &mut |v| {
             Ok(match v {
                 Value::Int(n) => Value::Int(-n),
                 Value::Float(f) => Value::Float(-f),
@@ -2500,9 +3058,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let float_width = width
             .filter(|width| width.is_float())
             .unwrap_or(NumericWidth::F64);
-        let borrow = tensor.borrow();
-        let mut data = Vec::with_capacity(borrow.data.len());
-        for value in &borrow.data {
+        let shape = tensor.borrow().shape.clone();
+        let values = self.tensor_logical_values(&tensor, span)?;
+        let mut data = Vec::with_capacity(values.len());
+        for value in &values {
             let mapped = match value {
                 Value::Float(number) => Value::Float(round_float(
                     apply_tensor_math(function, *number),
@@ -2527,7 +3086,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 None => mapped,
             });
         }
-        Ok(tensor_value(data, borrow.shape.clone()))
+        Ok(tensor_value(data, shape))
     }
 
     fn tensor_gelu(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -2535,7 +3094,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "tensor gelu arity"));
         };
         let tensor = self.tensor_arg(receiver, span)?;
-        self.map_tensor_unary(tensor, &mut |v| match v {
+        self.map_tensor_unary(tensor, span, &mut |v| match v {
             Value::Float(f) => Ok(Value::Float(gelu_f64(*f))),
             _ => Err(RunnerError::internal(
                 span,
@@ -2549,7 +3108,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "tensor relu arity"));
         };
         let tensor = self.tensor_arg(receiver, span)?;
-        self.map_tensor_unary(tensor, &mut |v| match v {
+        self.map_tensor_unary(tensor, span, &mut |v| match v {
             Value::Float(f) => Ok(Value::Float(f.max(0.0))),
             Value::Int(i) => Ok(Value::Int((*i).max(0))),
             _ => Err(RunnerError::internal(
@@ -2567,8 +3126,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "tensor softmax arity"));
         };
         let tensor = self.tensor_arg(receiver, span)?;
-        let borrow = tensor.borrow();
-        let shape = &borrow.shape;
+        let shape = tensor.borrow().shape.clone();
 
         if shape.is_empty() {
             return Err(RunnerError::internal(
@@ -2591,15 +3149,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
 
         let rank = shape.len();
         let last_dim = shape[rank - 1] as usize;
-        let batch = borrow.data.len() / last_dim;
+        let values = self.tensor_logical_values(&tensor, span)?;
+        let batch = values.len() / last_dim;
 
-        let mut out_data = Vec::with_capacity(borrow.data.len());
+        let mut out_data = Vec::with_capacity(values.len());
         for b in 0..batch {
             let base = b * last_dim;
-            let row = row_softmax(&borrow.data, base, last_dim, RowSoftmaxAccess::Safe, span)?;
+            let row = row_softmax(&values, base, last_dim, RowSoftmaxAccess::Safe, span)?;
             out_data.extend(row.into_iter().map(Value::Float));
         }
-        Ok(tensor_value(out_data, shape.clone()))
+        Ok(tensor_value(out_data, shape))
     }
 
     /// Categorical cross-entropy loss: `-sum(targets * log(softmax(logits) + ε)) / N`.
@@ -2616,10 +3175,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
         let logits = self.tensor_arg(logits, span)?;
         let targets = self.tensor_arg(targets, span)?;
-        let logits_borrow = logits.borrow();
-        let targets_borrow = targets.borrow();
+        let logits_shape = logits.borrow().shape.clone();
+        let targets_shape = targets.borrow().shape.clone();
 
-        let shape = &logits_borrow.shape;
+        let shape = &logits_shape;
         if shape.is_empty() {
             return Err(RunnerError::internal(
                 span,
@@ -2638,7 +3197,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 "tensor crux_entropia requires all dimensions to be positive",
             ));
         }
-        if logits_borrow.shape != targets_borrow.shape {
+        if logits_shape != targets_shape {
             return Err(RunnerError::internal(
                 span,
                 "tensor crux_entropia shape mismatch",
@@ -2647,14 +3206,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
 
         let rank = shape.len();
         let last_dim = shape[rank - 1] as usize;
-        let batch = logits_borrow.data.len() / last_dim;
+        let logits_values = self.tensor_logical_values(&logits, span)?;
+        let target_values = self.tensor_logical_values(&targets, span)?;
+        let batch = logits_values.len() / last_dim;
         let eps = 1e-7_f64;
 
         let mut total_loss = 0.0_f64;
         for b in 0..batch {
             let base = b * last_dim;
             let softmax = row_softmax(
-                &logits_borrow.data,
+                &logits_values,
                 base,
                 last_dim,
                 RowSoftmaxAccess::Direct,
@@ -2663,7 +3224,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             // Compute cross-entropy: -sum(targets * log(softmax + eps))
             let mut row_loss = 0.0_f64;
             for (i, softmax_val) in softmax.iter().enumerate() {
-                let target = numeric_as_f64(&targets_borrow.data[base + i], span)?;
+                let target = numeric_as_f64(&target_values[base + i], span)?;
                 row_loss -= target * (softmax_val + eps).ln();
             }
             total_loss += row_loss;
@@ -2676,11 +3237,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
 
     /// Matrix multiply / GEMV over runner `Value` tensors.
     ///
-    /// Validates rank-2 on the receiver and rank-1 or rank-2 on the argument,
-    /// enforces the matching inner dimension, and performs the O(M·K·N)
-    /// contraction. A rank-1 argument produces a rank-1 result. Integer
-    /// overflow and element width mismatch are the author's responsibility
-    /// (per v1 scope).
+    /// Rank-2 receivers support a rank-1 GEMV argument or a rank-2 matrix.
+    /// Rank-3 and rank-4 receivers contract with a rank-2+ argument whose
+    /// leading batch axes are an exact prefix of the receiver's batch axes.
+    /// Views are read in logical row-major order; each result cell is stored
+    /// under the return element type's slot policy.
     fn tensor_matmul(
         &mut self,
         args: &[MirOperand],
@@ -2695,69 +3256,128 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let element = self.tensor_element_type(return_ty);
         let left = self.tensor_arg(left, span)?;
         let right = self.tensor_arg(right, span)?;
-        let borrow = left.borrow();
-        let borrow_r = right.borrow();
-        let l_shape = &borrow.shape;
-        let r_shape = &borrow_r.shape;
-        if l_shape.len() != 2 {
+        let l_shape = left.borrow().shape.clone();
+        let r_shape = right.borrow().shape.clone();
+        let left_len = left.borrow().logical_len();
+        let right_len = right.borrow().logical_len();
+        let left_values = self.tensor_logical_values(&left, span)?;
+        let right_values = self.tensor_logical_values(&right, span)?;
+        if !(2..=4).contains(&l_shape.len()) {
             return Err(RunnerError::internal(span, ERR_MATMUL_RECEIVER_RANK));
         }
-        let rhs_rank1 = r_shape.len() == 1;
-        if !rhs_rank1 && r_shape.len() != 2 {
+        let rhs_rank1 = r_shape.len() == 1 && l_shape.len() == 2;
+        if !rhs_rank1 && !(2..=l_shape.len()).contains(&r_shape.len()) {
             return Err(RunnerError::internal(span, ERR_MATMUL_ARGUMENT_RANK));
         }
-        let k_left = l_shape[1];
-        let k_right = r_shape[0];
+        let l_batch = &l_shape[..l_shape.len() - 2];
+        let r_batch = if rhs_rank1 {
+            &[][..]
+        } else {
+            &r_shape[..r_shape.len() - 2]
+        };
+        if r_batch.len() > l_batch.len() || l_batch[..r_batch.len()] != *r_batch {
+            return Err(RunnerError::internal(span, ERR_MATMUL_INNER_DIMENSION));
+        }
+        let k_left = l_shape[l_shape.len() - 1];
+        let k_right = if rhs_rank1 {
+            r_shape[0]
+        } else {
+            r_shape[r_shape.len() - 2]
+        };
         if k_left != k_right {
             return Err(RunnerError::internal(span, ERR_MATMUL_INNER_DIMENSION));
         }
-        let m = l_shape[0];
-        let n = if rhs_rank1 { 1 } else { r_shape[1] };
-        let output_shape = if rhs_rank1 { vec![m] } else { vec![m, n] };
-        // Homogeneous numerus tensors take a typed ikj kernel: one classify
-        // walk, then a tight numeric loop with row-major right-hand access.
-        // Mixed / non-numeric tensors keep the borrowed Value fallback.
-        if !borrow.data.is_empty() && !borrow_r.data.is_empty() {
+        let m = l_shape[l_shape.len() - 2];
+        let n = if rhs_rank1 {
+            1
+        } else {
+            r_shape[r_shape.len() - 1]
+        };
+        let mut output_shape = l_batch.to_vec();
+        if rhs_rank1 {
+            output_shape.push(m);
+        } else {
+            output_shape.extend([m, n]);
+        }
+        if left_len != Some(left_values.len()) || right_len != Some(right_values.len()) {
+            return Err(RunnerError::internal(
+                span,
+                "matmul tensor layout is invalid",
+            ));
+        }
+        let batch_count = shape_product(l_batch, span)?;
+        let rhs_batch_count = shape_product(r_batch, span)?;
+        let trailing_repeat = shape_product(&l_batch[r_batch.len()..], span)?;
+        let m_usize = dimension_to_usize(m, span)?;
+        let k_usize = dimension_to_usize(k_left, span)?;
+        let n_usize = dimension_to_usize(n, span)?;
+        let left_matrix_len = m_usize
+            .checked_mul(k_usize)
+            .ok_or_else(|| RunnerError::internal(span, "matmul shape overflow"))?;
+        let right_matrix_len = k_usize
+            .checked_mul(n_usize)
+            .ok_or_else(|| RunnerError::internal(span, "matmul shape overflow"))?;
+        let mut cells = Vec::with_capacity(
+            batch_count
+                .checked_mul(m_usize)
+                .and_then(|count| count.checked_mul(n_usize))
+                .ok_or_else(|| RunnerError::internal(span, "matmul shape overflow"))?,
+        );
+        for batch in 0..batch_count {
+            let rhs_batch = if r_batch.is_empty() {
+                0
+            } else if trailing_repeat == 0 {
+                return Err(RunnerError::internal(span, "matmul batch shape is empty"));
+            } else {
+                batch / trailing_repeat
+            };
+            if rhs_batch >= rhs_batch_count {
+                return Err(RunnerError::internal(span, ERR_MATMUL_INNER_DIMENSION));
+            }
+            let left_start = batch
+                .checked_mul(left_matrix_len)
+                .ok_or_else(|| RunnerError::internal(span, "matmul offset overflow"))?;
+            let right_start = rhs_batch
+                .checked_mul(right_matrix_len)
+                .ok_or_else(|| RunnerError::internal(span, "matmul offset overflow"))?;
+            let left_matrix = &left_values[left_start..left_start + left_matrix_len];
+            let right_matrix = &right_values[right_start..right_start + right_matrix_len];
             if let (Some(left_f), Some(right_f)) =
-                (extract_f64s(&borrow.data), extract_f64s(&borrow_r.data))
+                (extract_f64s(left_matrix), extract_f64s(right_matrix))
             {
-                let cells = matmul_f64(&left_f, &right_f, m, k_left, n);
-                let cells = cells.into_iter().map(Value::Float).collect();
-                return Ok(tensor_value(
-                    self.store_matmul_cells(element, cells, span)?,
-                    output_shape,
-                ));
-            }
-            if let (Some(left_i), Some(right_i)) =
-                (extract_i64s(&borrow.data), extract_i64s(&borrow_r.data))
+                cells.extend(
+                    matmul_f64(&left_f, &right_f, m, k_left, n)
+                        .into_iter()
+                        .map(Value::Float),
+                );
+            } else if let (Some(left_i), Some(right_i)) =
+                (extract_i64s(left_matrix), extract_i64s(right_matrix))
             {
-                let cells = matmul_i64(&left_i, &right_i, m, k_left, n, span)?;
-                let cells = cells.into_iter().map(Value::Int).collect();
-                return Ok(tensor_value(
-                    self.store_matmul_cells(element, cells, span)?,
-                    output_shape,
-                ));
-            }
-            if let (Some(left_u), Some(right_u)) =
-                (extract_u64s(&borrow.data), extract_u64s(&borrow_r.data))
+                cells.extend(
+                    matmul_i64(&left_i, &right_i, m, k_left, n, span)?
+                        .into_iter()
+                        .map(Value::Int),
+                );
+            } else if let (Some(left_u), Some(right_u)) =
+                (extract_u64s(left_matrix), extract_u64s(right_matrix))
             {
-                let cells = matmul_u64(&left_u, &right_u, m, k_left, n, span)?;
-                let cells = cells.into_iter().map(Value::UInt).collect();
-                return Ok(tensor_value(
-                    self.store_matmul_cells(element, cells, span)?,
-                    output_shape,
-                ));
+                cells.extend(
+                    matmul_u64(&left_u, &right_u, m, k_left, n, span)?
+                        .into_iter()
+                        .map(Value::UInt),
+                );
+            } else {
+                cells.extend(matmul_values(
+                    left_matrix,
+                    right_matrix,
+                    m,
+                    k_left,
+                    n,
+                    NumericWidth::I64,
+                    span,
+                )?);
             }
         }
-        let cells = matmul_values(
-            &borrow.data,
-            &borrow_r.data,
-            m,
-            k_left,
-            n,
-            NumericWidth::I64,
-            span,
-        )?;
         Ok(tensor_value(
             self.store_matmul_cells(element, cells, span)?,
             output_shape,
@@ -2813,8 +3433,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
         };
         let input = self.tensor_arg(&args[0], span)?;
-        let borrow = input.borrow();
-        let shape = &borrow.shape;
+        let shape = input.borrow().shape.clone();
+        let values = self.tensor_logical_values(&input, span)?;
         if shape.is_empty() || shape.len() > 2 {
             return Err(RunnerError::internal(
                 span,
@@ -2832,7 +3452,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             // Sum over the only axis → scalar.
             let mut sum = Value::Float(0.0);
             let mut first = true;
-            for item in &borrow.data {
+            for item in &values {
                 if first {
                     sum = item.clone();
                     first = false;
@@ -2851,7 +3471,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             for (ci, slot) in result.iter_mut().enumerate() {
                 let mut first = true;
                 for ri in 0..rows {
-                    let val = &borrow.data[ri * cols + ci];
+                    let val = &values[ri * cols + ci];
                     if first {
                         *slot = val.clone();
                         first = false;
@@ -2869,7 +3489,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let mut first = true;
                 let mut sum = Value::Float(0.0);
                 for ci in 0..cols {
-                    let val = &borrow.data[ri * cols + ci];
+                    let val = &values[ri * cols + ci];
                     if first {
                         sum = val.clone();
                         first = false;
@@ -2943,8 +3563,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
 
         let input = self.tensor_arg(&args[0], span)?;
-        let borrow = input.borrow();
-        let shape = &borrow.shape;
+        let shape = input.borrow().shape.clone();
+        let input_values = self.tensor_logical_values(&input, span)?;
 
         if shape.is_empty() || shape.len() > 2 {
             return Err(RunnerError::internal(
@@ -2969,7 +3589,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             ));
         }
 
-        let total_len = borrow.data.len();
+        let total_len = input_values.len();
         if total_len == 0 {
             return Err(RunnerError::internal(
                 span,
@@ -3017,7 +3637,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             let mut sum = 0.0f64;
             let base = row * norm_dim;
             for c in 0..norm_dim {
-                sum += numeric_as_f64(&borrow.data[base + c], span)?;
+                sum += numeric_as_f64(&input_values[base + c], span)?;
             }
             *mean_slot = sum / norm_dim as f64;
         }
@@ -3027,7 +3647,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         for (row, mean) in means.iter().enumerate() {
             let base = row * norm_dim;
             for c in 0..norm_dim {
-                let val = numeric_as_f64(&borrow.data[base + c], span)?;
+                let val = numeric_as_f64(&input_values[base + c], span)?;
                 let centered = val - mean;
                 x_centered.push(Value::Float(centered));
             }
@@ -3061,15 +3681,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         // --- Apply affine transform if present ---
         let output: Vec<Value> = match (gamma, beta) {
             (Some(g), Some(b)) => {
-                let g_borrow = g.borrow();
-                let b_borrow = b.borrow();
+                let gamma_values = self.tensor_logical_values(&g, span)?;
+                let beta_values = self.tensor_logical_values(&b, span)?;
                 let mut out = Vec::with_capacity(total_len);
                 for row in 0..batch {
                     let base = row * norm_dim;
                     for c in 0..norm_dim {
                         let norm = &normalized[base + c];
-                        let g_val = &g_borrow.data[c];
-                        let b_val = &b_borrow.data[c];
+                        let g_val = &gamma_values[c];
+                        let b_val = &beta_values[c];
                         // norm * gamma + beta
                         let prod = numeric_mul(norm, g_val, width, span)?;
                         let sum = numeric_add(&prod, b_val, width, span)?;
@@ -3079,13 +3699,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 out
             }
             (Some(g), None) => {
-                let g_borrow = g.borrow();
+                let gamma_values = self.tensor_logical_values(&g, span)?;
                 let mut out = Vec::with_capacity(total_len);
                 for row in 0..batch {
                     let base = row * norm_dim;
                     for c in 0..norm_dim {
                         let norm = &normalized[base + c];
-                        let g_val = &g_borrow.data[c];
+                        let g_val = &gamma_values[c];
                         out.push(numeric_mul(norm, g_val, width, span)?);
                     }
                 }
@@ -3094,7 +3714,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             _ => normalized,
         };
 
-        Ok(tensor_value(output, shape.clone()))
+        Ok(tensor_value(output, shape))
     }
 
     fn tensor_rms_norm(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -3123,8 +3743,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
 
         let input = self.tensor_arg(input, span)?;
-        let borrow = input.borrow();
-        let shape = &borrow.shape;
+        let shape = input.borrow().shape.clone();
+        let input_values = self.tensor_logical_values(&input, span)?;
 
         if shape.is_empty() || shape.len() > 2 {
             return Err(RunnerError::internal(
@@ -3146,7 +3766,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             ));
         }
 
-        let total_len = borrow.data.len();
+        let total_len = input_values.len();
         if total_len == 0 {
             return Err(RunnerError::internal(
                 span,
@@ -3164,7 +3784,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             span,
             "tensor rms_norm gamma shape mismatch",
         )?;
-        let g_borrow = gamma.borrow();
+        let gamma_values = self.tensor_logical_values(&gamma, span)?;
 
         // rms_norm: y = x·(1/sqrt(mean(x²)+eps))·gamma, no mean subtraction.
         // f64 sum of squares → f32 mean → f32 scale (the in-repo
@@ -3174,19 +3794,19 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             let base = row * norm_dim;
             let mut sum_sq = 0.0f64;
             for c in 0..norm_dim {
-                let val = numeric_as_f64(&borrow.data[base + c], span)?;
+                let val = numeric_as_f64(&input_values[base + c], span)?;
                 sum_sq += val * val;
             }
             let mean = (sum_sq / norm_dim as f64) as f32;
             let eps_f32 = epsilon as f32;
             let scale = f64::from(1.0f32 / (mean + eps_f32).sqrt());
             for c in 0..norm_dim {
-                let x = numeric_as_f64(&borrow.data[base + c], span)?;
-                let g = numeric_as_f64(&g_borrow.data[c], span)?;
+                let x = numeric_as_f64(&input_values[base + c], span)?;
+                let g = numeric_as_f64(&gamma_values[c], span)?;
                 output.push(Value::Float(x * scale * g));
             }
         }
-        Ok(tensor_value(output, shape.clone()))
+        Ok(tensor_value(output, shape))
     }
 
     fn tensor_rope(
@@ -3221,8 +3841,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
 
         let input = self.tensor_arg(input, span)?;
-        let borrow = input.borrow();
-        let shape = &borrow.shape;
+        let shape = input.borrow().shape.clone();
+        let input_values = self.tensor_logical_values(&input, span)?;
         if shape.is_empty() || shape.len() > 2 {
             return Err(RunnerError::internal(
                 span,
@@ -3238,7 +3858,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 ),
             ));
         }
-        let batch = borrow.data.len() / last_extent;
+        let batch = input_values.len() / last_extent;
         if batch == 0 {
             return Err(RunnerError::internal(
                 span,
@@ -3247,14 +3867,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
 
         let table = self.tensor_arg(table_arg, span)?;
-        let table_borrow = table.borrow();
+        let table_shape = table.borrow().shape.clone();
+        let table_values = self.tensor_logical_values(&table, span)?;
         let expected_table_shape = vec![batch as i64, (dim / 2), 3];
-        if table_borrow.shape != expected_table_shape {
+        if table_shape != expected_table_shape {
             return Err(RunnerError::internal(
                 span,
                 format!(
                     "tensor rope table shape {:?} must be {:?}",
-                    table_borrow.shape, expected_table_shape
+                    table_shape, expected_table_shape
                 ),
             ));
         }
@@ -3262,14 +3883,14 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         // llama-arch NORM consecutive-pair, or Qwen/NeoX rotate_half. The
         // table stores [angle, cos(angle), sin(angle)] for each row/pair.
         let half = (dim / 2) as usize;
-        let mut output = Vec::with_capacity(borrow.data.len());
+        let mut output = Vec::with_capacity(input_values.len());
         for row in 0..batch {
             let base = row * last_extent;
-            let mut row_data: Vec<Value> = borrow.data[base..base + last_extent].to_vec();
+            let mut row_data: Vec<Value> = input_values[base..base + last_extent].to_vec();
             for k in 0..half {
                 let table_base = (row * half + k) * 3;
-                let cos = numeric_as_f64(&table_borrow.data[table_base + 1], span)?;
-                let sin = numeric_as_f64(&table_borrow.data[table_base + 2], span)?;
+                let cos = numeric_as_f64(&table_values[table_base + 1], span)?;
+                let sin = numeric_as_f64(&table_values[table_base + 2], span)?;
                 let (i0, i1) = if rotate_half {
                     (k, k + half)
                 } else {
@@ -3282,7 +3903,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             output.extend(row_data);
         }
-        Ok(tensor_value(output, shape.clone()))
+        Ok(tensor_value(output, shape))
     }
 
     fn tensor_gather(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -3291,8 +3912,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "tensor gather arity"));
         };
         let table = self.tensor_arg(table_arg, span)?;
-        let borrow = table.borrow();
-        let shape = &borrow.shape;
+        let shape = table.borrow().shape.clone();
         if shape.len() < 2 {
             return Err(RunnerError::internal(
                 span,
@@ -3305,16 +3925,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         // The ids are a rank-1 `tensor<u32, [n]>`; its flat data is the row
         // id per output row, so the extent is the tensor's own length.
         let ids_tensor = self.tensor_arg(ids_arg, span)?;
-        let ids_borrow = ids_tensor.borrow();
-        if ids_borrow.shape.len() != 1 {
+        if ids_tensor.borrow().shape.len() != 1 {
             return Err(RunnerError::internal(
                 span,
                 "tensor gather ids must be a rank-1 tensor",
             ));
         }
-        let ids = &ids_borrow.data;
+        let ids = self.tensor_logical_values(&ids_tensor, span)?;
         let mut indices = Vec::with_capacity(ids.len());
-        for value in ids {
+        for value in &ids {
             let Value::Int(id) = value else {
                 return Err(RunnerError::internal(
                     span,
@@ -3336,10 +3955,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             indices.push(index);
         }
         // out[t] = table[ids[t]] → [T, D]; repeated/out-of-order ids preserved.
+        let table_values = self.tensor_logical_values(&table, span)?;
         let mut output = Vec::with_capacity(indices.len() * cols);
         for index in &indices {
             let base = index * cols;
-            output.extend(borrow.data[base..base + cols].iter().cloned());
+            output.extend(table_values[base..base + cols].iter().cloned());
         }
         let result_shape = vec![indices.len() as i64, cols as i64];
         Ok(tensor_value(output, result_shape))
@@ -3351,22 +3971,19 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
         let tensor = self.tensor_arg(tensor, span)?;
         let borrow = tensor.borrow();
-        let shape = &borrow.shape;
-        if shape.len() != 2 {
-            return Err(RunnerError::internal(
-                span,
-                "tensor transpose requires rank 2",
-            ));
+        let input_shape = borrow.shape.clone();
+        let mut shape = borrow.shape.clone();
+        let mut strides = borrow.strides.clone();
+        if shape.len() >= 2 {
+            let rank = shape.len();
+            shape.swap(rank - 2, rank - 1);
+            strides.swap(rank - 2, rank - 1);
         }
-        let m = shape[0];
-        let n = shape[1];
-        let mut result_data = Vec::with_capacity((m * n) as usize);
-        for j in 0..n {
-            for i in 0..m {
-                result_data.push(borrow.data[(i * n + j) as usize].clone());
-            }
-        }
-        Ok(tensor_value(result_data, vec![n, m]))
+        let mut view = borrow
+            .logical_view(shape, strides, borrow.offset)
+            .ok_or_else(|| RunnerError::internal(span, "tensor transpose view is invalid"))?;
+        view.push_edge_view(input_shape, TensorInverseMap::TransposeLastTwo);
+        Ok(Value::Tensor(Rc::new(RefCell::new(view))))
     }
 
     // COLLECTION HELPERS
@@ -3583,9 +4200,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let idx = index.as_index(span)?;
                 tensor
                     .borrow()
-                    .data
-                    .get(idx)
-                    .cloned()
+                    .value_at(idx)
                     .ok_or_else(|| RunnerError::internal(span, "tensor index out of bounds"))
             }
             _ => Err(RunnerError::internal(span, "index receiver type mismatch")),
@@ -4052,9 +4667,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let [receiver] = args else {
             return Err(RunnerError::internal(span, "collection sum arity"));
         };
-        let values = match self.eval_operand(receiver, span)? {
+        let receiver = self.eval_operand(receiver, span)?;
+        let values = match receiver {
             Value::Array(cell) => cell.borrow().clone(),
-            Value::Tensor(cell) => cell.borrow().data.clone(),
+            Value::Tensor(cell) => self.tensor_logical_values(&cell, span)?,
             _ => return Err(RunnerError::internal(span, "sum receiver type mismatch")),
         };
 
@@ -4527,7 +5143,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         if let MirProviderKind::Kernel(module) = provider.kind {
             let mut evaluated = Vec::with_capacity(args.len());
             for arg in args {
-                evaluated.push(self.eval_operand(arg, span)?);
+                let value = self.eval_operand(arg, span)?;
+                evaluated.push(self.prepare_tensor_escape(value, span)?);
             }
             let verb = self.interner.resolve(provider.name);
             return self
@@ -4644,7 +5261,7 @@ fn array_value(items: Vec<Value>) -> Value {
 }
 
 fn tensor_value(data: Vec<Value>, shape: Vec<i64>) -> Value {
-    Value::Tensor(Rc::new(RefCell::new(TensorValue { data, shape })))
+    Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(data, shape))))
 }
 
 fn interval_value(start: Value, end: Value, inclusive: bool) -> Value {
@@ -4897,8 +5514,281 @@ fn extract_u64s(data: &[Value]) -> Option<Vec<u64>> {
     Some(out)
 }
 
+fn tensor_extents(shape: &[i64], span: Span) -> Result<Vec<usize>, RunnerError> {
+    shape
+        .iter()
+        .map(|dimension| {
+            usize::try_from(*dimension)
+                .map_err(|_| RunnerError::internal(span, "tensor edge has a negative extent"))
+        })
+        .collect()
+}
+
+fn coordinates_as_i128(coordinates: &[usize], span: Span) -> Result<Vec<i128>, RunnerError> {
+    coordinates
+        .iter()
+        .map(|coordinate| {
+            i128::try_from(*coordinate)
+                .map_err(|_| RunnerError::internal(span, "tensor edge coordinate overflow"))
+        })
+        .collect()
+}
+
+fn vector_of_i64(coordinates: &[i64]) -> Value {
+    Value::Vector(Rc::new(RefCell::new(
+        coordinates.iter().copied().map(Value::Int).collect(),
+    )))
+}
+
+fn vector_to_i64(value: &Value, span: Span) -> Result<Vec<i64>, RunnerError> {
+    let Value::Vector(values) = value else {
+        return Err(RunnerError::internal(
+            span,
+            "tensor edge remap did not return a coordinate vector",
+        ));
+    };
+    values
+        .borrow()
+        .iter()
+        .map(|coordinate| match coordinate {
+            Value::Int(coordinate) => Ok(*coordinate),
+            other => Err(RunnerError::internal(
+                span,
+                format!("tensor edge remap coordinate is not numerus: {other:?}"),
+            )),
+        })
+        .collect()
+}
+
+fn custom_edge_error(error: CustomEdgeValueError<RunnerError>, span: Span) -> RunnerError {
+    match error {
+        CustomEdgeValueError::Policy(error) => RunnerError::internal(
+            span,
+            format!("tensor edge policy mapping failed: {error:?}"),
+        ),
+        CustomEdgeValueError::Remap(error)
+        | CustomEdgeValueError::Read(error)
+        | CustomEdgeValueError::Transform(error) => error,
+    }
+}
+
+fn tensor_has_custom_edge(tensor: &TensorValue) -> bool {
+    tensor.edge_ops.iter().any(|operation| {
+        matches!(
+            operation,
+            TensorEdgeOp::Shift {
+                descriptor: super::tensor_edge::TensorEdgeDescriptor {
+                    resolution: TensorEdgeResolution::Custom(_),
+                    ..
+                },
+                ..
+            }
+        )
+    })
+}
+
+fn value_needs_tensor_escape_preparation(value: &Value) -> bool {
+    match value {
+        Value::Tensor(tensor) => {
+            let tensor = tensor.borrow();
+            tensor.has_unresolved_edge_shift() || tensor_has_custom_edge(&tensor)
+        }
+        Value::Array(items) | Value::Vector(items) => items
+            .borrow()
+            .iter()
+            .any(value_needs_tensor_escape_preparation),
+        Value::Tuple(items) => items.iter().any(value_needs_tensor_escape_preparation),
+        Value::Map(items) => items
+            .borrow()
+            .values()
+            .any(value_needs_tensor_escape_preparation),
+        Value::Record(fields, _) | Value::Struct(_, fields) | Value::EnumVariant(_, fields) => {
+            fields
+                .borrow()
+                .values()
+                .any(value_needs_tensor_escape_preparation)
+        }
+        Value::SharedCell(cell) => value_needs_tensor_escape_preparation(&cell.borrow()),
+        Value::Matrix(matrix) => matrix
+            .borrow()
+            .data
+            .iter()
+            .any(value_needs_tensor_escape_preparation),
+        Value::Int(_)
+        | Value::UInt(_)
+        | Value::Magnus(_)
+        | Value::Float(_)
+        | Value::Dec(..)
+        | Value::Bool(_)
+        | Value::Str(_)
+        | Value::Ascii(_)
+        | Value::Char(_)
+        | Value::Nil
+        | Value::Unit
+        | Value::Octeti(_)
+        | Value::Instans(_)
+        | Value::Regex(_)
+        | Value::Match(_)
+        | Value::Sermo(_)
+        | Value::Function(_)
+        | Value::Closure(_, _, _)
+        | Value::ClosureEnvironment(_, _)
+        | Value::GradientHandle(_)
+        | Value::Cursor(_)
+        | Value::Set(_) => false,
+    }
+}
+
+fn shape_expression_value(
+    expression: &MirShapeExpr,
+    arguments: &[Value],
+    span: Span,
+) -> Result<u64, RunnerError> {
+    match expression {
+        MirShapeExpr::Literal(value) => Ok(*value),
+        MirShapeExpr::ScalarArgument { argument } => {
+            shape_extent(shape_argument(arguments, *argument, span)?, span)
+        }
+        MirShapeExpr::TensorAxis { argument, axis } => {
+            shape_axis(shape_argument(arguments, *argument, span)?, *axis, span)
+        }
+        MirShapeExpr::TensorFieldAxis {
+            argument,
+            fields,
+            axis,
+        } => {
+            let mut value = shape_argument(arguments, *argument, span)?.clone();
+            for field in fields {
+                value = shape_field_value(&value, *field, span)?;
+            }
+            shape_axis(&value, *axis, span)
+        }
+        MirShapeExpr::Affine { base, offset } => {
+            let base = i128::from(shape_expression_value(base, arguments, span)?);
+            let affine = base.checked_add(*offset).ok_or_else(|| {
+                RunnerError::internal(span, "tensor shape affine expression overflow")
+            })?;
+            u64::try_from(affine).map_err(|_| {
+                RunnerError::internal(span, "tensor shape affine expression is negative")
+            })
+        }
+        MirShapeExpr::Divide { numerator, divisor } => {
+            if *divisor == 0 {
+                return Err(RunnerError::internal(
+                    span,
+                    "tensor shape expression divisor is zero",
+                ));
+            }
+            let numerator = shape_expression_value(numerator, arguments, span)?;
+            if numerator % divisor != 0 {
+                return Err(RunnerError::internal(
+                    span,
+                    "tensor shape expression division must be exact",
+                ));
+            }
+            Ok(numerator / divisor)
+        }
+        MirShapeExpr::Product(factors) => factors.iter().try_fold(1_u64, |product, factor| {
+            product
+                .checked_mul(shape_expression_value(factor, arguments, span)?)
+                .ok_or_else(|| RunnerError::internal(span, "tensor shape product overflow"))
+        }),
+    }
+}
+
+fn recoverable_shape_expression_value(
+    expression: &MirShapeExpr,
+    arguments: &[Value],
+    span: Span,
+) -> Result<u64, RunnerError> {
+    shape_expression_value(expression, arguments, span).map_err(|error| {
+        RunnerError::internal_with_issue(span, error.message, "runner_tensor_shape_invalid_extent")
+    })
+}
+
+fn shape_argument(arguments: &[Value], argument: u32, span: Span) -> Result<&Value, RunnerError> {
+    let index = usize::try_from(argument)
+        .map_err(|_| RunnerError::internal(span, "tensor shape argument index overflow"))?;
+    arguments.get(index).ok_or_else(|| {
+        RunnerError::internal(span, "tensor shape expression argument is out of range")
+    })
+}
+
+fn shape_axis(value: &Value, axis: u32, span: Span) -> Result<u64, RunnerError> {
+    let axis = usize::try_from(axis)
+        .map_err(|_| RunnerError::internal(span, "tensor shape axis index overflow"))?;
+    match value {
+        Value::Tensor(tensor) => {
+            let dimension =
+                tensor.borrow().shape.get(axis).copied().ok_or_else(|| {
+                    RunnerError::internal(span, "tensor shape axis is out of range")
+                })?;
+            u64::try_from(dimension)
+                .map_err(|_| RunnerError::internal(span, "tensor shape extent is negative"))
+        }
+        Value::Vector(values) if axis == 0 => u64::try_from(values.borrow().len())
+            .map_err(|_| RunnerError::internal(span, "tensor shape extent exceeds u64")),
+        Value::Vector(_) => Err(RunnerError::internal(
+            span,
+            "tensor shape axis is out of range",
+        )),
+        _ => Err(RunnerError::internal(
+            span,
+            "tensor shape axis argument is not a tensor or vector",
+        )),
+    }
+}
+
+fn shape_extent(value: &Value, span: Span) -> Result<u64, RunnerError> {
+    match value {
+        Value::Int(value) => u64::try_from(*value)
+            .map_err(|_| RunnerError::internal(span, "tensor shape scalar is negative")),
+        Value::UInt(value) => Ok(*value),
+        _ => Err(RunnerError::internal(
+            span,
+            "tensor shape scalar argument is not an integer",
+        )),
+    }
+}
+
+fn shape_field_value(value: &Value, field: Symbol, span: Span) -> Result<Value, RunnerError> {
+    let fields = match value {
+        Value::Record(fields, _) | Value::Struct(_, fields) | Value::EnumVariant(_, fields) => {
+            fields
+                .borrow()
+                .get(&field)
+                .cloned()
+                .ok_or_else(|| RunnerError::internal(span, "tensor shape field is missing"))?
+        }
+        Value::SharedCell(cell) => return shape_field_value(&cell.borrow(), field, span),
+        _ => {
+            return Err(RunnerError::internal(
+                span,
+                "tensor shape field path crosses a non-record value",
+            ));
+        }
+    };
+    Ok(fields)
+}
+
 fn matmul_dims(m: i64, k: i64, n: i64) -> (usize, usize, usize) {
     (m.max(0) as usize, k.max(0) as usize, n.max(0) as usize)
+}
+
+fn dimension_to_usize(dimension: i64, span: Span) -> Result<usize, RunnerError> {
+    usize::try_from(dimension)
+        .map_err(|_| RunnerError::internal(span, "matmul shape contains a negative dimension"))
+}
+
+fn shape_product(shape: &[i64], span: Span) -> Result<usize, RunnerError> {
+    shape
+        .iter()
+        .try_fold(1_usize, |count, dimension| {
+            dimension_to_usize(*dimension, span)
+                .ok()
+                .and_then(|dimension| count.checked_mul(dimension))
+        })
+        .ok_or_else(|| RunnerError::internal(span, "matmul shape overflow"))
 }
 
 fn matmul_f64(left: &[f64], right: &[f64], m: i64, k: i64, n: i64) -> Vec<f64> {

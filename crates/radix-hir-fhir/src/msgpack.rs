@@ -42,8 +42,9 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::artifact::{
     CliProgramWire, FunctionFactTableWire, FunctionFactWire, FunctionProvenanceTableWire,
-    GpuBuiltinWire, HirArtifact, ProviderCarriageEntryWire, RadixLaneEntryWire, ResolvedUseWire,
-    ResolverSnapshot, SCHEMA_VERSION, SourceIdentity,
+    GpuBuiltinWire, HirArtifact, KernelRequirementsWire, ProviderCarriageEntryWire,
+    RadixLaneEntryWire, ResolvedUseWire, ResolverSnapshot, SCHEMA_VERSION,
+    ShapeObligationTableWire, SourceIdentity, TensorEdgePolicyTableWire,
 };
 use crate::decode::{decode as decode_unit_bytes, encode as encode_unit_bytes};
 use crate::error::HirArtifactError;
@@ -1247,6 +1248,9 @@ struct HirArtifactDto {
     gpu_builtins: Vec<GpuBuiltinEntryDto>,
     capability_provenance: FunctionProvenanceTableWire,
     provider_units: BTreeMap<String, ProviderCarriageEntryWire>,
+    shape_obligations: ShapeObligationTableWire,
+    kernel_requirements: KernelRequirementsWire,
+    tensor_edge_policies: TensorEdgePolicyTableWire,
 }
 
 impl From<&HirArtifact> for HirArtifactDto {
@@ -1287,6 +1291,9 @@ impl From<&HirArtifact> for HirArtifactDto {
                 .collect(),
             capability_provenance: artifact.capability_provenance.clone(),
             provider_units: artifact.provider_units.clone(),
+            shape_obligations: artifact.shape_obligations.clone(),
+            kernel_requirements: artifact.kernel_requirements.clone(),
+            tensor_edge_policies: artifact.tensor_edge_policies.clone(),
         }
     }
 }
@@ -1323,6 +1330,9 @@ impl From<HirArtifactDto> for HirArtifact {
                 .collect(),
             capability_provenance: dto.capability_provenance,
             provider_units: dto.provider_units,
+            shape_obligations: dto.shape_obligations,
+            kernel_requirements: dto.kernel_requirements,
+            tensor_edge_policies: dto.tensor_edge_policies,
         }
     }
 }

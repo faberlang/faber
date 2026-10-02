@@ -202,6 +202,13 @@ impl FunctionBuilder<'_> {
                 HirArrayElement::Spread(expr) => {
                     fields.push(MirAggregateItem::Spread(self.lower_expr_value(expr)?));
                 }
+                HirArrayElement::Infer(span) => {
+                    self.errors.push(MirError::unsupported(
+                        *span,
+                        "unresolved shape inference hole before MIR lowering",
+                    ));
+                    return None;
+                }
             }
         }
         Some(fields)

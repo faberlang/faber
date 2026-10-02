@@ -600,6 +600,7 @@ fn validate_type_form(
                     }
                 }
                 radix_types::Type::Primitive(_)
+                | radix_types::Type::TensorEdgePolicy(_)
                 | radix_types::Type::ModularWord(_)
                 | radix_types::Type::SaturatingWord(_)
                 | radix_types::Type::PolicyFloat(_, _)
@@ -985,12 +986,20 @@ fn validate_authored_type_records(
 /// is valid iff it is a builtin (0 < d.0 < `USER_DEF_ID_BASE`) or it
 /// appears in this set. Per prep S2.
 fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId> {
+    collect_def_registry_for_parts(&artifact.hir, &artifact.libraries, &artifact.resolver)
+}
+
+fn collect_def_registry_for_parts(
+    hir: &radix_hir::HirModule,
+    libraries: &radix_hir::LibraryRegistry,
+    resolver: &crate::artifact::ResolverSnapshot,
+) -> FxHashSet<radix_types::DefId> {
     use radix_hir::HirItemKind;
 
     let mut registry = FxHashSet::default();
 
     // Walk HIR items for definition-site DefIds.
-    for item in &artifact.hir.items {
+    for item in &hir.items {
         registry.insert(item.def_id);
         for ann in &item.annotations {
             collect_annotation_defs(ann, &mut registry);
@@ -1059,12 +1068,12 @@ fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId>
     }
 
     // Entry block (if present).
-    if let Some(ref entry) = artifact.hir.entry {
+    if let Some(ref entry) = hir.entry {
         collect_block_defs(entry, &mut registry);
     }
 
     // Annotations on entry.
-    for ann in &artifact.hir.entry_annotations {
+    for ann in &hir.entry_annotations {
         if let Some(def_id) = ann.contract_id {
             registry.insert(def_id);
         }
@@ -1076,22 +1085,22 @@ fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId>
     }
 
     // LibraryRegistry keys (bindings, items, exports, reexports).
-    for def_id in artifact.libraries.bindings.keys() {
+    for def_id in libraries.bindings.keys() {
         registry.insert(*def_id);
     }
-    for binding in artifact.libraries.bindings.values() {
+    for binding in libraries.bindings.values() {
         registry.insert(binding.local_def_id);
     }
-    for def_id in artifact.libraries.items.keys() {
+    for def_id in libraries.items.keys() {
         registry.insert(*def_id);
     }
-    for item in artifact.libraries.items.values() {
+    for item in libraries.items.values() {
         registry.insert(item.def_id);
     }
-    for def_id in artifact.libraries.exports.keys() {
+    for def_id in libraries.exports.keys() {
         registry.insert(*def_id);
     }
-    for (pair, _) in artifact.libraries.reexports.keys() {
+    for (pair, _) in libraries.reexports.keys() {
         registry.insert(*pair);
     }
     // Registry conversion rows name ordinary in-tree functions; their def
@@ -1110,11 +1119,16 @@ fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId>
     // defs as `Type::Struct`/`Enum`/`Interface`, so the type-arena walk stays
     // consistent; a type-table-only DefId (no export identity anywhere) still
     // fails closed.
-    for (_, iface) in &artifact.resolver.file_interfaces {
+    for (_, iface) in &resolver.file_interfaces {
         for (_, export) in &iface.exports {
             match export {
-                crate::artifact::FileExportSnapshot::Struct { def_id, .. } => {
+                crate::artifact::FileExportSnapshot::Struct {
+                    def_id, methods, ..
+                } => {
                     registry.insert(*def_id);
+                    for method in methods {
+                        registry.insert(method.def_id);
+                    }
                 }
                 crate::artifact::FileExportSnapshot::Type {
                     def_id: Some(d), ..
@@ -1490,6 +1504,7 @@ fn collect_expr_defs(
                     radix_hir::HirArrayElement::Expr(e) | radix_hir::HirArrayElement::Spread(e) => {
                         collect_expr_defs(e, registry);
                     }
+                    radix_hir::HirArrayElement::Infer(_) => {}
                 }
             }
         }
@@ -1623,6 +1638,10 @@ fn collect_pattern_defs(pat: &radix_hir::HirPattern, registry: &mut FxHashSet<ra
 /// validation. This accounts for nested statements and expressions that
 /// have their own `HirIds` beyond the top-level items.
 fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
+    collect_hir_registry_for_hir(&artifact.hir)
+}
+
+fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_hir::HirId> {
     use radix_hir::{HirExpressionKind, HirStatementKind};
 
     let mut registry = FxHashSet::default();
@@ -1818,6 +1837,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                         | radix_hir::HirArrayElement::Spread(e) => {
                             collect_expr(e, registry);
                         }
+                        radix_hir::HirArrayElement::Infer(_) => {}
                     }
                 }
             }
@@ -1941,7 +1961,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
     }
 
     // Collect from all items and entry.
-    for item in &artifact.hir.items {
+    for item in &hir.items {
         registry.insert(item.id);
         for ann in &item.annotations {
             collect_annotation(ann, &mut registry);
@@ -1995,11 +2015,11 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
             _ => {}
         }
     }
-    if let Some(ref entry) = artifact.hir.entry {
+    if let Some(ref entry) = hir.entry {
         collect_block(entry, &mut registry);
     }
     // Entry annotations may contain expressions.
-    for ann in &artifact.hir.entry_annotations {
+    for ann in &hir.entry_annotations {
         collect_annotation(ann, &mut registry);
     }
 
@@ -2075,6 +2095,180 @@ impl IntegrityChecks<'_> {
         }
         Ok(())
     }
+}
+
+fn validate_resolved_tensor_edge_policy(
+    policy: &crate::artifact::ResolvedTensorEdgePolicyWire,
+    checks: &IntegrityChecks<'_>,
+) -> Result<(), HirArtifactError> {
+    match policy {
+        crate::artifact::ResolvedTensorEdgePolicyWire::Builtin(_) => Ok(()),
+        crate::artifact::ResolvedTensorEdgePolicyWire::Custom {
+            policy_def,
+            remap,
+            transform,
+        } => {
+            checks.check_def(*policy_def)?;
+            checks.check_def(*remap)?;
+            if let Some(transform) = transform {
+                checks.check_def(*transform)?;
+            }
+            Ok(())
+        }
+        crate::artifact::ResolvedTensorEdgePolicyWire::Deferred { policy_type } => {
+            checks.check_type(*policy_type)
+        }
+    }
+}
+
+fn validate_tensor_shift_context(
+    context: &crate::artifact::TensorShiftContextWire,
+    checks: &IntegrityChecks<'_>,
+) -> Result<(), HirArtifactError> {
+    checks.check_index(context.source_shape)?;
+    checks.check_hir(context.shift_expression)
+}
+
+fn validate_tensor_edge_policy_ids(
+    table: &crate::artifact::TensorEdgePolicyTableWire,
+    checks: &IntegrityChecks<'_>,
+) -> Result<(), HirArtifactError> {
+    for row in &table.calls {
+        checks.check_hir(row.call)?;
+        validate_resolved_tensor_edge_policy(&row.policy, checks)?;
+    }
+    for expression in &table.shifted_expressions {
+        checks.check_hir(*expression)?;
+    }
+    for (expression, context) in &table.shifted_view_expressions {
+        checks.check_hir(*expression)?;
+        validate_tensor_shift_context(context, checks)?;
+    }
+    for binding in &table.shifted_bindings {
+        checks.check_def(*binding)?;
+    }
+    for (binding, context) in &table.shifted_view_bindings {
+        checks.check_def(*binding)?;
+        validate_tensor_shift_context(context, checks)?;
+    }
+    for (call, context) in &table.limes_contexts {
+        checks.check_hir(*call)?;
+        validate_tensor_shift_context(context, checks)?;
+    }
+    for row in &table.function_requirements {
+        checks.check_def(row.function)?;
+        for requirement in &row.requirements {
+            checks.check_type(requirement.policy_type)?;
+            checks.check_type(requirement.element_type)?;
+        }
+    }
+    for provider in &table.provider_impls {
+        checks.check_type(provider.policy_type)?;
+        checks.check_type(provider.element_type)?;
+        validate_resolved_tensor_edge_policy(&provider.policy, checks)?;
+    }
+    Ok(())
+}
+
+fn validate_shape_obligation_table(
+    table: &crate::artifact::ShapeObligationTableWire,
+    checks: &IntegrityChecks<'_>,
+) -> Result<(), HirArtifactError> {
+    for row in &table.calls {
+        checks.check_hir(row.call)?;
+        for relation in &row.relations {
+            checks.check_index(relation.left)?;
+            checks.check_index(relation.right)?;
+            if relation.boundary != crate::artifact::ShapeRelationBoundaryWire::Call {
+                return Err(HirArtifactError::MalformedSnapshot {
+                    kind: "shape obligations",
+                    detail: "call row contains a non-call relation".to_owned(),
+                });
+            }
+        }
+    }
+    for row in &table.call_size_bindings {
+        checks.check_hir(row.call)?;
+        for binding in &row.bindings {
+            checks.check_index(binding.witness)?;
+        }
+    }
+    for row in &table.functions {
+        checks.check_def(row.function)?;
+        for relation in &row.relations {
+            checks.check_index(relation.left)?;
+            checks.check_index(relation.right)?;
+            if relation.boundary == crate::artifact::ShapeRelationBoundaryWire::Call {
+                return Err(HirArtifactError::MalformedSnapshot {
+                    kind: "shape obligations",
+                    detail: "function row contains a call relation".to_owned(),
+                });
+            }
+        }
+    }
+    for row in &table.function_size_bindings {
+        checks.check_def(row.function)?;
+        for binding in &row.bindings {
+            checks.check_index(binding.witness)?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_nested_provider_edge_policy_tables(
+    units: &std::collections::BTreeMap<String, crate::artifact::ProviderCarriageEntryWire>,
+) -> Result<(), HirArtifactError> {
+    use crate::artifact::ProviderCarriageEntryWire;
+
+    for entry in units.values() {
+        let ProviderCarriageEntryWire::Unit(provider) = entry else {
+            continue;
+        };
+        let provider = provider.as_ref();
+        let libraries = radix_hir::LibraryRegistry::default();
+        let def_registry =
+            collect_def_registry_for_parts(&provider.hir, &libraries, &provider.resolver);
+        let hir_registry = collect_hir_registry_for_hir(&provider.hir);
+        let checks = IntegrityChecks {
+            def_registry: &def_registry,
+            hir_registry: &hir_registry,
+            type_count: provider.types.type_count(),
+            interner_len: provider.interner.len(),
+            index_count: provider.types.indices().len(),
+        };
+        validate_tensor_edge_policy_ids(&provider.tensor_edge_policies, &checks)?;
+        validate_shape_obligation_table(&provider.shape_obligations, &checks)?;
+        validate_nested_provider_edge_policy_tables(&provider.nested)?;
+    }
+    Ok(())
+}
+
+fn validate_kernel_value_range(
+    range: &crate::artifact::KernelValueRangeWire,
+    checks: &IntegrityChecks<'_>,
+) -> Result<(), HirArtifactError> {
+    fn validate_expression(
+        expression: &crate::artifact::KernelRangeExprWire,
+        checks: &IntegrityChecks<'_>,
+    ) -> Result<(), HirArtifactError> {
+        use crate::artifact::KernelRangeExprWire as Range;
+        match expression {
+            Range::Shape(index) => checks.check_index(*index),
+            Range::Add(lhs, rhs)
+            | Range::Subtract(lhs, rhs)
+            | Range::Multiply(lhs, rhs)
+            | Range::FloorDivide(lhs, rhs)
+            | Range::Minimum(lhs, rhs)
+            | Range::Maximum(lhs, rhs) => {
+                validate_expression(lhs, checks)?;
+                validate_expression(rhs, checks)
+            }
+            Range::Constant(_) => Ok(()),
+        }
+    }
+
+    validate_expression(&range.minimum, checks)?;
+    validate_expression(&range.maximum, checks)
 }
 
 /// Validate every arena index in the deserialized artifact against its target
@@ -2732,6 +2926,7 @@ pub(crate) fn validate_referential_integrity(
                         | radix_hir::HirArrayElement::Spread(e) => {
                             validate_expr(e, checks)?;
                         }
+                        radix_hir::HirArrayElement::Infer(_) => {}
                     }
                 }
             }
@@ -3175,6 +3370,7 @@ pub(crate) fn validate_referential_integrity(
     ) -> Result<(), HirArtifactError> {
         match ty {
             radix_types::Type::Primitive(_)
+            | radix_types::Type::TensorEdgePolicy(_)
             | radix_types::Type::SizedNumeric(_, _)
             | radix_types::Type::ModularWord(_)
             | radix_types::Type::SaturatingWord(_)
@@ -3354,13 +3550,53 @@ pub(crate) fn validate_referential_integrity(
                     }
                 }
                 FileExportSnapshot::Struct {
-                    def_id, ty, fields, ..
+                    def_id,
+                    ty,
+                    fields,
+                    methods,
+                    ..
                 } => {
                     checks.check_def(*def_id)?;
                     checks.check_type(*ty)?;
                     for field in fields {
                         checks.check_symbol(field.name)?;
                         checks.check_type(field.ty)?;
+                    }
+                    for method in methods {
+                        checks.check_def(method.def_id)?;
+                        checks.check_symbol(method.name)?;
+                        checks.check_symbol(method.surface_name)?;
+                        checks.check_type(method.sig.ret)?;
+                        if let Some(error_ty) = method.sig.err {
+                            checks.check_type(error_ty)?;
+                        }
+                        for param in &method.sig.type_params {
+                            checks.check_symbol(param.name)?;
+                            match &param.constraint {
+                                radix_types::TypeParamConstraint::Any => {}
+                                radix_types::TypeParamConstraint::OneOf(types) => {
+                                    for ty in types {
+                                        checks.check_type(*ty)?;
+                                    }
+                                }
+                                radix_types::TypeParamConstraint::Implet(bounds) => {
+                                    for bound in bounds {
+                                        checks.check_def(bound.contract)?;
+                                        for ty in &bound.args {
+                                            checks.check_type(*ty)?;
+                                        }
+                                    }
+                                }
+                            }
+                            if let Some(radix_types::SemanticGenericParamDefault::Typus(ty)) =
+                                param.default
+                            {
+                                checks.check_type(ty)?;
+                            }
+                        }
+                        for param in &method.sig.params {
+                            checks.check_type(param.ty)?;
+                        }
                     }
                 }
             }
@@ -3480,15 +3716,304 @@ pub(crate) fn validate_referential_integrity(
         validate_type(ty, &checks)?;
     }
     for index in artifact.types.indices() {
-        if let radix_types::IndexExpr::Tuple(children) = index {
-            for child in children {
-                checks.check_index(*child)?;
+        match index {
+            radix_types::IndexExpr::Tuple(children) => {
+                for child in children {
+                    checks.check_index(*child)?;
+                }
             }
-        }
-        if let radix_types::IndexExpr::Param(symbol) = index {
-            checks.check_symbol(*symbol)?;
+            radix_types::IndexExpr::Param(symbol) => checks.check_symbol(*symbol)?,
+            radix_types::IndexExpr::Affine { base, .. } => checks.check_index(*base)?,
+            radix_types::IndexExpr::Divide { numerator, .. } => checks.check_index(*numerator)?,
+            radix_types::IndexExpr::Runtime(source) => match source {
+                radix_types::RuntimeExtentId::ScalarBinding(binding)
+                | radix_types::RuntimeExtentId::TensorBindingAxis { binding, .. } => {
+                    checks.check_def(*binding)?;
+                }
+                radix_types::RuntimeExtentId::TensorFieldAxis {
+                    binding, fields, ..
+                } => {
+                    checks.check_def(*binding)?;
+                    for field in fields {
+                        checks.check_symbol(*field)?;
+                    }
+                }
+                radix_types::RuntimeExtentId::FunctionParameterFieldAxis { fields, .. }
+                | radix_types::RuntimeExtentId::CallArgumentFieldAxis { fields, .. } => {
+                    for field in fields {
+                        checks.check_symbol(*field)?;
+                    }
+                }
+                radix_types::RuntimeExtentId::ExpressionFieldAxis {
+                    expression, fields, ..
+                } => {
+                    checks.check_hir(radix_hir::HirId(*expression))?;
+                    for field in fields {
+                        checks.check_symbol(*field)?;
+                    }
+                }
+                radix_types::RuntimeExtentId::ScalarExpression { expression }
+                | radix_types::RuntimeExtentId::ExpressionAxis { expression, .. } => {
+                    checks.check_hir(radix_hir::HirId(*expression))?;
+                }
+                radix_types::RuntimeExtentId::ScalarParameter { .. }
+                | radix_types::RuntimeExtentId::CallArgumentAxis { .. }
+                | radix_types::RuntimeExtentId::FunctionParameterAxis { .. } => {}
+            },
+            radix_types::IndexExpr::Literal(_)
+            | radix_types::IndexExpr::Infer(_)
+            | radix_types::IndexExpr::Unspecified => {}
         }
     }
+
+    // 8a. Runtime shape obligations (schema v31): each site and every
+    //     relation/binding index must resolve before lowering consumes it.
+    for row in &artifact.shape_obligations.calls {
+        checks.check_hir(row.call)?;
+        for relation in &row.relations {
+            checks.check_index(relation.left)?;
+            checks.check_index(relation.right)?;
+            if relation.boundary != crate::artifact::ShapeRelationBoundaryWire::Call {
+                return Err(HirArtifactError::MalformedSnapshot {
+                    kind: "shape obligations",
+                    detail: "call row contains a non-call relation".to_owned(),
+                });
+            }
+        }
+    }
+    for row in &artifact.shape_obligations.call_size_bindings {
+        checks.check_hir(row.call)?;
+        for binding in &row.bindings {
+            checks.check_index(binding.witness)?;
+        }
+    }
+    for row in &artifact.shape_obligations.functions {
+        checks.check_def(row.function)?;
+        for relation in &row.relations {
+            checks.check_index(relation.left)?;
+            checks.check_index(relation.right)?;
+            if relation.boundary == crate::artifact::ShapeRelationBoundaryWire::Call {
+                return Err(HirArtifactError::MalformedSnapshot {
+                    kind: "shape obligations",
+                    detail: "function row contains a call relation".to_owned(),
+                });
+            }
+        }
+    }
+    for row in &artifact.shape_obligations.function_size_bindings {
+        checks.check_def(row.function)?;
+        for binding in &row.bindings {
+            checks.check_index(binding.witness)?;
+        }
+    }
+
+    // 8b. Per-target kernel requirements (schema v32) retain the semantic
+    //     admission contract across FHIR loading. Every callable and symbolic
+    //     extent referenced by the report must belong to this artifact.
+    let mut requirement_kernels = FxHashSet::default();
+    for kernel in &artifact.kernel_requirements.kernels {
+        checks.check_def(kernel.def_id)?;
+        if !requirement_kernels.insert(kernel.def_id) {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "kernel requirements",
+                detail: format!("duplicate kernel row for DefId({})", kernel.def_id.0),
+            });
+        }
+        let mut targets = FxHashSet::default();
+        for report in &kernel.target_reports {
+            if !targets.insert(report.target) {
+                return Err(HirArtifactError::MalformedSnapshot {
+                    kind: "kernel requirements",
+                    detail: format!("duplicate target row for DefId({})", kernel.def_id.0),
+                });
+            }
+            for callee in &report.callees {
+                checks.check_def(*callee)?;
+            }
+            for condition in &report.extent_conditions {
+                validate_kernel_value_range(&condition.range, &checks)?;
+            }
+            for failure in &report.failures {
+                match failure {
+                    crate::artifact::KernelRequirementFailureWire::CalleeNotAdmitted { callee } => {
+                        checks.check_def(*callee)?
+                    }
+                    crate::artifact::KernelRequirementFailureWire::IntermediateOutOfRange {
+                        range,
+                        ..
+                    }
+                    | crate::artifact::KernelRequirementFailureWire::StoreOutOfRange {
+                        range,
+                        ..
+                    } => validate_kernel_value_range(range, &checks)?,
+                    crate::artifact::KernelRequirementFailureWire::RecursiveCall
+                    | crate::artifact::KernelRequirementFailureWire::UnsupportedIntegerWidth {
+                        ..
+                    }
+                    | crate::artifact::KernelRequirementFailureWire::UnsupportedFloatWidth {
+                        ..
+                    }
+                    | crate::artifact::KernelRequirementFailureWire::UnsupportedIntegerRange {
+                        ..
+                    }
+                    | crate::artifact::KernelRequirementFailureWire::DivideByZeroPossible {
+                        ..
+                    }
+                    | crate::artifact::KernelRequirementFailureWire::NegativeShiftCountPossible {
+                        ..
+                    }
+                    | crate::artifact::KernelRequirementFailureWire::TensorEdgePolicyDeferred {
+                        ..
+                    }
+                    | crate::artifact::KernelRequirementFailureWire::SaturatingLoweringDeferred {
+                        ..
+                    }
+                    | crate::artifact::KernelRequirementFailureWire::OptionFRequired { .. } => {}
+                }
+            }
+        }
+    }
+
+    // 8c. Tensor edge-policy metadata (schema v33) retains every checked
+    //     dispatch site, shifted-view provenance edge, generic obligation,
+    //     and concrete provider callback in the same HIR/type arenas.
+    let edge_policies = &artifact.tensor_edge_policies;
+    let mut policy_calls = FxHashSet::default();
+    for row in &edge_policies.calls {
+        checks.check_hir(row.call)?;
+        if !policy_calls.insert(row.call) {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "tensor edge policies",
+                detail: format!("duplicate call row for HirId({})", row.call.0),
+            });
+        }
+        validate_resolved_tensor_edge_policy(&row.policy, &checks)?;
+        if !edge_policies
+            .limes_contexts
+            .iter()
+            .any(|(call, _)| *call == row.call)
+        {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "tensor edge policies",
+                detail: format!("call row for HirId({}) has no limes context", row.call.0),
+            });
+        }
+    }
+    let mut shifted_expressions = FxHashSet::default();
+    for expression in &edge_policies.shifted_expressions {
+        checks.check_hir(*expression)?;
+        if !shifted_expressions.insert(*expression) {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "tensor edge policies",
+                detail: format!("duplicate shifted expression HirId({})", expression.0),
+            });
+        }
+        if !edge_policies
+            .shifted_view_expressions
+            .iter()
+            .any(|(id, _)| id == expression)
+        {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "tensor edge policies",
+                detail: format!(
+                    "shifted expression HirId({}) has no provenance",
+                    expression.0
+                ),
+            });
+        }
+    }
+    let mut shifted_view_expressions = FxHashSet::default();
+    for (expression, context) in &edge_policies.shifted_view_expressions {
+        checks.check_hir(*expression)?;
+        validate_tensor_shift_context(context, &checks)?;
+        if !shifted_view_expressions.insert(*expression) {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "tensor edge policies",
+                detail: format!("duplicate shifted-view expression HirId({})", expression.0),
+            });
+        }
+    }
+    let mut shifted_bindings = FxHashSet::default();
+    for binding in &edge_policies.shifted_bindings {
+        checks.check_def(*binding)?;
+        if !shifted_bindings.insert(*binding) {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "tensor edge policies",
+                detail: format!("duplicate shifted binding DefId({})", binding.0),
+            });
+        }
+        if !edge_policies
+            .shifted_view_bindings
+            .iter()
+            .any(|(id, _)| id == binding)
+        {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "tensor edge policies",
+                detail: format!("shifted binding DefId({}) has no provenance", binding.0),
+            });
+        }
+    }
+    let mut shifted_view_bindings = FxHashSet::default();
+    for (binding, context) in &edge_policies.shifted_view_bindings {
+        checks.check_def(*binding)?;
+        validate_tensor_shift_context(context, &checks)?;
+        if !shifted_view_bindings.insert(*binding) {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "tensor edge policies",
+                detail: format!("duplicate shifted-view binding DefId({})", binding.0),
+            });
+        }
+    }
+    let mut limes_contexts = FxHashSet::default();
+    for (call, context) in &edge_policies.limes_contexts {
+        checks.check_hir(*call)?;
+        validate_tensor_shift_context(context, &checks)?;
+        if !limes_contexts.insert(*call) {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "tensor edge policies",
+                detail: format!("duplicate limes context HirId({})", call.0),
+            });
+        }
+    }
+    let mut functions = FxHashSet::default();
+    for row in &edge_policies.function_requirements {
+        checks.check_def(row.function)?;
+        if !functions.insert(row.function) {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "tensor edge policies",
+                detail: format!(
+                    "duplicate function requirement row for DefId({})",
+                    row.function.0
+                ),
+            });
+        }
+        for requirement in &row.requirements {
+            checks.check_type(requirement.policy_type)?;
+            checks.check_type(requirement.element_type)?;
+        }
+    }
+    let mut providers = FxHashSet::default();
+    for provider in &edge_policies.provider_impls {
+        checks.check_type(provider.policy_type)?;
+        checks.check_type(provider.element_type)?;
+        if !providers.insert((provider.policy_type, provider.element_type, provider.rank)) {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "tensor edge policies",
+                detail: "duplicate concrete provider identity".to_owned(),
+            });
+        }
+        validate_resolved_tensor_edge_policy(&provider.policy, &checks)?;
+        if matches!(
+            provider.policy,
+            crate::artifact::ResolvedTensorEdgePolicyWire::Deferred { .. }
+        ) {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "tensor edge policies",
+                detail: "concrete provider catalog contains a deferred policy".to_owned(),
+            });
+        }
+    }
+    validate_nested_provider_edge_policy_tables(&artifact.provider_units)?;
 
     // 9. Presentation sidecar (anchors from v2, authored types from v9): every
     //    attachment anchor must name a registered owner, owner anchors must be

@@ -94,6 +94,34 @@ fn tensor_forma_infers_output_shape() {
 }
 
 #[test]
+fn expression_shape_hole_is_admitted_in_reshape_shape_slot() {
+    accepts(
+        r"incipit {
+  fixum tensor<f32, [2, 2]> grid ← vacua
+  fixum tensor<f32, _> reshaped ← grid.forma([_, 4])
+  nota reshaped.longitudo()
+}",
+    );
+}
+
+#[test]
+fn expression_shape_hole_is_rejected_outside_shape_argument_slots() {
+    rejects_with_issue(
+        r"incipit {
+  fixum _ values ← [_, 4]
+}",
+        "tensor_shape_hole_requires_shape_argument",
+    );
+    rejects_with_issue(
+        r"incipit {
+  fixum tensor<f32, [2]> grid ← vacua
+  fixum _ value ← grid.accipe([_])
+}",
+        "tensor_shape_hole_requires_shape_argument",
+    );
+}
+
+#[test]
 fn tensor_sugar_tf32_typechecks_with_inferred_shape() {
     accepts(
         r"incipit {
@@ -162,6 +190,41 @@ fn tensor_sectio_infers_axis_zero_slice_shape() {
   fixum tensor<numerus, _> slice ← grid.sectio(1, 3)
   nota slice.longitudo()
 }",
+    );
+}
+
+#[test]
+fn tensor_sectio_step_infers_strided_axis_zero_shape() {
+    accepts(
+        r"incipit {
+  fixum tensor<numerus, [8, 2]> grid ← vacua
+  fixum tensor<numerus, [4, 2]> every_other ← grid.sectio(0, 8, 2)
+  nota every_other.longitudo()
+}",
+    );
+}
+
+#[test]
+fn tensor_expande_allows_inserted_and_singleton_stretch_axes() {
+    accepts(
+        r"incipit {
+  fixum tensor<numerus, [3]> row ← vacua
+  fixum tensor<numerus, [1, 3]> inserted ← row.expande([1, 3])
+  fixum tensor<numerus, [4, 3]> broadcast ← inserted.expande([4, 3])
+  nota broadcast.longitudo()
+}",
+    );
+}
+
+#[test]
+fn tensor_expande_rejects_incompatible_non_singleton_axis() {
+    rejects_with_issue(
+        r"incipit {
+  fixum tensor<numerus, [2, 3]> grid ← vacua
+  fixum tensor<numerus, [4, 3]> invalid ← grid.expande([4, 3])
+  nota invalid.longitudo()
+}",
+        "incompatible_tensor_index",
     );
 }
 
@@ -529,6 +592,115 @@ nota "same-param elementwise body ok"
 }
 
 #[test]
+fn tensor_divide_en_surface_preserves_same_generic_shape() {
+    // Match Gradus math.fab's English surface and the real non-la intrinsic
+    // canonicalization path, not registry-direct Latin spelling.
+    let pack =
+        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("installed English locale pack should load");
+    let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
+    config.locale_pack = Some(pack);
+    let result = crate::test_support::analyze_source_with_config(
+        r#"@ kernel
+@ public
+fn divide_sym<size M, size N>(tensor<f32, [M, N]> a, tensor<f32, [M, N]> b) → tensor<f32, [M, N]> {
+    return a.divide(b)
+}
+"#,
+        config,
+    );
+    assert!(
+        result.is_ok(),
+        "Gradus' en-surface generic divide must preserve [M,N]: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn generic_tensor_call_keeps_immutable_scalar_shape_witness_and_carrier_guards() {
+    let pack =
+        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("installed English locale pack should load");
+    let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
+    config.locale_pack = Some(pack);
+    let result = crate::test_support::analyze_source_with_config(
+        r#"fn keep_first<size M, size N>(tensor<f32, [M, N]> left, tensor<f32, [M, N]> right) → tensor<f32, [M, N]> {
+    return left
+}
+
+main {
+    const tensor<f32, []> seed ← empty
+    const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
+    const int n ← data.length() / 2
+    const int m ← data.length() / 2
+    const tensor<f32, [n, n]> source ← seed.from_flat(data, [n, n])
+    const tensor<f32, [m, n]> other ← seed.from_flat(data, [m, n])
+    const tensor<f32, [n, n]> result ← keep_first(source, other)
+}
+"#,
+        config,
+    );
+    assert!(
+        result.is_ok(),
+        "generic result shape should retain immutable scalar identity: {:?}",
+        result.diagnostics
+    );
+
+    let guarded_axes: std::collections::BTreeSet<_> = result
+        .shape_obligations
+        .calls
+        .values()
+        .flatten()
+        .filter_map(|relation| {
+            let crate::index::IndexExpr::Runtime(radix_types::RuntimeExtentId::CallArgumentAxis {
+                argument,
+                axis,
+            }) = result.types.get_index(relation.left)
+            else {
+                return None;
+            };
+            matches!(
+                result.types.get_index(relation.right),
+                crate::index::IndexExpr::Runtime(radix_types::RuntimeExtentId::ScalarBinding(_))
+            )
+            .then_some((*argument, *axis))
+        })
+        .collect();
+    assert_eq!(
+        guarded_axes,
+        std::collections::BTreeSet::from([(0, 0), (0, 1), (1, 0), (1, 1)]),
+        "each runtime carrier axis must still be checked against the stable size witness"
+    );
+
+    let second_argument_axis_zero_witnesses: std::collections::BTreeSet<_> = result
+        .shape_obligations
+        .calls
+        .values()
+        .flatten()
+        .filter_map(|relation| {
+            let crate::index::IndexExpr::Runtime(radix_types::RuntimeExtentId::CallArgumentAxis {
+                argument: 1,
+                axis: 0,
+            }) = result.types.get_index(relation.left)
+            else {
+                return None;
+            };
+            match result.types.get_index(relation.right) {
+                crate::index::IndexExpr::Runtime(radix_types::RuntimeExtentId::ScalarBinding(
+                    def_id,
+                )) => Some(def_id.0),
+                _ => None,
+            }
+        })
+        .collect();
+    assert_eq!(
+        second_argument_axis_zero_witnesses.len(),
+        2,
+        "the second argument's physical extent and repeated generic extent remain separate runtime checks"
+    );
+}
+
+#[test]
 fn tensor_reduction_symbolic_returns_element_type() {
     // Scalar-return reduce over a rank-agnostic symbolic shape.
     accepts(
@@ -801,4 +973,27 @@ fn vector_runtime_lane_index_is_a_checked_lane_select() {
   redde v[i]
 }",
     );
+}
+
+#[test]
+fn tensor_constructor_shape_affine_scalar_expression_matches_annotation() {
+    let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
+    config.locale_pack = Some(
+        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("English locale pack"),
+    );
+    let result = crate::test_support::analyze_source_with_config(
+        r#"fn runtime_size(int value) → int {
+    return value
+}
+
+main {
+    const tensor<f32, []> seed ← empty
+    const int n ← runtime_size(4)
+    const tensor<f32, [n - 1]> dynamic ← seed.from_flat([1.0, 2.0, 3.0], [n - 1])
+}
+"#,
+        config,
+    );
+    assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
 }

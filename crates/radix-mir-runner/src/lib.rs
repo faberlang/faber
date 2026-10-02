@@ -21,8 +21,11 @@ pub(crate) mod shuffle;
 pub mod stats;
 pub mod store;
 mod tensor_lift;
+mod tensor_edge;
 mod textus_literal;
 pub mod value;
+#[cfg(test)]
+mod shape_size_test;
 
 pub use capability::{RunnerDispatchStatus, classify_runner_lowerability, runner_dispatch_status};
 
@@ -42,7 +45,9 @@ use radix_mir::{
     MirPlaceBase, MirProgram, MirProjection, MirStatementKind, MirTempId, MirTerminatorKind,
     MirType, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir,
 };
-use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
+use radix_types::{
+    IndexExpr, NumericWidth, Primitive, RuntimeExtentId, Type, TypeId, TypeTable,
+};
 use regex_program::RegexProgram;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
@@ -225,6 +230,29 @@ fn runner_issue(message: &str) -> String {
         }
     }
     issue.trim_end_matches('_').to_string()
+}
+
+fn is_recoverable_shape_failure(error: &RunnerError) -> bool {
+    matches!(
+        error.issue.as_str(),
+        "runner_tensor_shape_mismatch" | "runner_tensor_shape_invalid_extent"
+    )
+}
+
+fn shape_guard_precedes_try_call(
+    statement: &radix_mir::MirStatement,
+    terminator: &MirTerminatorKind,
+) -> bool {
+    let MirTerminatorKind::TryCall { args, .. } = terminator else {
+        return false;
+    };
+    let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+        return false;
+    };
+    matches!(
+        &call.intrinsic,
+        radix_mir::MirIntrinsic::TensorShapeCheck(_)
+    ) && call.args.get(..args.len()) == Some(args.as_slice())
 }
 
 #[derive(Debug, Clone)]
@@ -1229,8 +1257,12 @@ impl<H: Host + ?Sized> Runner<'_, H> {
 
             let mut frame_returned = false;
             let mut suspended = false;
+            let mut try_call_shape_failure = None;
             for (index, statement) in block_data.statements.iter().enumerate().skip(resume_at) {
-                match self.execute_statement(statement) {
+                let shape_guard_for_try_call = index + 1 == block_data.statements.len()
+                    && shape_guard_precedes_try_call(statement, &block_data.terminator.kind);
+                let result = self.execute_statement_inner(statement, shape_guard_for_try_call);
+                match result {
                     Ok(StatementOutcome::Continue) => {
                         if self.yielded.is_some() {
                             // D6.6: park the generator after its `cede`.
@@ -1245,6 +1277,11 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     Ok(StatementOutcome::FrameReturned) => {
                         frame_returned = true;
                         break;
+                    }
+                    Err(error)
+                        if shape_guard_for_try_call && is_recoverable_shape_failure(&error) =>
+                    {
+                        try_call_shape_failure = Some(error);
                     }
                     Err(error) => {
                         self.fail(error);
@@ -1295,30 +1332,54 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     ok_block,
                     error_place,
                     error_block,
-                } => match self.invoke_call(&callee, &args, terminator.span) {
-                    Ok(CallOutcome::Ok(value)) => {
-                        if let Some(destination) = destination
-                            && let Err(error) =
-                                self.write_place(&destination, value, terminator.span)
-                        {
-                            self.fail(error);
-                            continue;
+                } => {
+                    let call_result = if let Some(error) = try_call_shape_failure.take() {
+                        match self.shape_failure_try_call_route_is_textus_compatible(
+                            &callee,
+                            &error_place,
+                            terminator.span,
+                        ) {
+                            Ok(true) => Ok(CallOutcome::Err(Value::Str(error.message))),
+                            Ok(false) => {
+                                self.fail(RunnerError::internal(
+                                    terminator.span,
+                                    "recoverable runtime shape failure requires a textus-compatible TryCall error place",
+                                ));
+                                continue;
+                            }
+                            Err(route_error) => {
+                                self.fail(route_error);
+                                continue;
+                            }
                         }
-                        self.set_active_block(ok_block, terminator.span);
-                    }
-                    Ok(CallOutcome::Err(error_value)) => {
-                        if let Err(error) =
-                            self.write_place(&error_place, error_value, terminator.span)
-                        {
-                            self.fail(error);
-                            continue;
+                    } else {
+                        self.invoke_call(&callee, &args, terminator.span)
+                    };
+                    match call_result {
+                        Ok(CallOutcome::Ok(value)) => {
+                            if let Some(destination) = destination
+                                && let Err(error) =
+                                    self.write_place(&destination, value, terminator.span)
+                            {
+                                self.fail(error);
+                                continue;
+                            }
+                            self.set_active_block(ok_block, terminator.span);
                         }
-                        self.set_active_block(error_block, terminator.span);
+                        Ok(CallOutcome::Err(error_value)) => {
+                            if let Err(error) =
+                                self.write_place(&error_place, error_value, terminator.span)
+                            {
+                                self.fail(error);
+                                continue;
+                            }
+                            self.set_active_block(error_block, terminator.span);
+                        }
+                        Err(error) => {
+                            self.fail(error);
+                        }
                     }
-                    Err(error) => {
-                        self.fail(error);
-                    }
-                },
+                }
                 MirTerminatorKind::Goto(target) => {
                     self.set_active_block(target, terminator.span);
                 }
@@ -1384,9 +1445,18 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             })
     }
 
+    #[cfg(test)]
     fn execute_statement(
         &mut self,
         statement: &radix_mir::MirStatement,
+    ) -> Result<StatementOutcome, RunnerError> {
+        self.execute_statement_inner(statement, false)
+    }
+
+    fn execute_statement_inner(
+        &mut self,
+        statement: &radix_mir::MirStatement,
+        shape_failure_belongs_to_try_call: bool,
     ) -> Result<StatementOutcome, RunnerError> {
         match &statement.kind {
             MirStatementKind::Assign { place, value } => {
@@ -1421,9 +1491,18 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     _ => match self.eval_runtime_call(call, statement.span) {
                         Ok(value) => Ok(Some(value)),
                         Err(error)
+                            if shape_failure_belongs_to_try_call
+                                && is_recoverable_shape_failure(&error) =>
+                        {
+                            Err(error)
+                        }
+                        Err(error)
                             if matches!(
                                 error.issue.as_str(),
-                                "runner_collection_push_capacity" | RUNNER_JSON_PARSE_FAILED
+                                "runner_collection_push_capacity"
+                                    | RUNNER_JSON_PARSE_FAILED
+                                    | "runner_tensor_shape_mismatch"
+                                    | "runner_tensor_shape_invalid_extent"
                             ) =>
                         {
                             self.propagate_runtime_failure(error).map(|_| None)
@@ -1496,6 +1575,59 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         self.return_error = Some(Value::Str(error.message));
         self.pop_frame();
         Ok(StatementOutcome::FrameReturned)
+    }
+
+    fn shape_failure_try_call_route_is_textus_compatible(
+        &mut self,
+        callee: &MirCallee,
+        error_place: &MirPlace,
+        span: Span,
+    ) -> Result<bool, RunnerError> {
+        let callee_id = match callee {
+            MirCallee::Value(operand) => match self.eval_operand(operand, span)? {
+                Value::Function(id) | Value::Closure(id, _, _) => id,
+                _ => {
+                    return Err(RunnerError::internal(
+                        span,
+                        "call callee is not a function value",
+                    ));
+                }
+            },
+            _ => self.resolve_callee(callee, span)?,
+        };
+        let Some(callee_error_ty) = self.function_by_id(callee_id, span)?.error_ty else {
+            return Ok(false);
+        };
+        if !matches!(
+            self.types.get(callee_error_ty.semantic_id()),
+            Type::Primitive(Primitive::Textus | Primitive::Ignotum)
+        ) || !error_place.projections.is_empty()
+        {
+            return Ok(false);
+        }
+
+        let Some(frame) = self.frames.last() else {
+            return Err(RunnerError::internal(span, "no active frame"));
+        };
+        let caller = self.function_by_id(frame.function, span)?;
+        let error_place_ty = match &error_place.base {
+            MirPlaceBase::Local(id) => caller
+                .locals
+                .iter()
+                .find(|local| local.id == *id)
+                .map(|local| local.ty),
+            MirPlaceBase::Temp(id) => caller
+                .temps
+                .iter()
+                .find(|temp| temp.id == *id)
+                .map(|temp| temp.ty),
+        };
+        Ok(error_place_ty.is_some_and(|ty| {
+            matches!(
+                self.types.get(ty.semantic_id()),
+                Type::Primitive(Primitive::Textus | Primitive::Ignotum)
+            )
+        }))
     }
 
     fn invoke_call(
@@ -1872,13 +2004,8 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     return Err(RunnerError::internal(span, "malformed bignum constant"));
                 }
             },
-            // A symbolic shape-size scalar has no concrete value until
-            // Phase-4 substitution; evaluating it would be a silent guess.
-            MirConstant::ShapeSize { .. } => {
-                return Err(RunnerError::internal(
-                    span,
-                    "symbolic shape-size constant is not concretely evaluable (Phase-4 substitution)",
-                ));
+            MirConstant::ShapeSize { shape, axis } => {
+                Value::Float(self.runtime_shape_size(*shape, *axis, span)? as f64)
             }
             MirConstant::Regex { pattern, flags } => {
                 // WHY: the pattern symbol is the raw string-literal source; a
@@ -1894,6 +2021,180 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 Value::Regex(Rc::new(program))
             }
         })
+    }
+
+    fn runtime_shape_size(
+        &self,
+        shape: radix_types::IndexId,
+        axis: Option<i64>,
+        span: Span,
+    ) -> Result<u64, RunnerError> {
+        if let Some(axis) = axis {
+            let IndexExpr::Tuple(dimensions) = self.types.get_index(shape) else {
+                if axis == 0 {
+                    return self.runtime_index_value(shape, span);
+                }
+                return Err(RunnerError::internal(
+                    span,
+                    "runtime shape-size axis is outside a scalar shape",
+                ));
+            };
+            let axis = usize::try_from(axis)
+                .map_err(|_| RunnerError::internal(span, "runtime shape-size axis is negative"))?;
+            let dimension = dimensions.get(axis).copied().ok_or_else(|| {
+                RunnerError::internal(span, "runtime shape-size axis is out of range")
+            })?;
+            return self.runtime_index_value(dimension, span);
+        }
+
+        match self.types.get_index(shape) {
+            IndexExpr::Tuple(dimensions) => dimensions.iter().try_fold(1_u64, |product, dim| {
+                let extent = self.runtime_index_value(*dim, span)?;
+                product.checked_mul(extent).ok_or_else(|| {
+                    RunnerError::internal(span, "runtime tensor element count overflow")
+                })
+            }),
+            _ => self.runtime_index_value(shape, span),
+        }
+    }
+
+    fn runtime_index_value(
+        &self,
+        index: radix_types::IndexId,
+        span: Span,
+    ) -> Result<u64, RunnerError> {
+        match self.types.get_index(index) {
+            IndexExpr::Literal(value) => Ok(*value),
+            IndexExpr::Runtime(source) => self.runtime_extent_value(source, span),
+            IndexExpr::Affine { base, offset } => {
+                let base = i128::from(self.runtime_index_value(*base, span)?);
+                let adjusted = base.checked_add(*offset).ok_or_else(|| {
+                    RunnerError::internal(span, "runtime shape affine extent overflow")
+                })?;
+                u64::try_from(adjusted).map_err(|_| {
+                    RunnerError::internal(span, "runtime shape affine extent is negative or too large")
+                })
+            }
+            IndexExpr::Divide { numerator, divisor } => {
+                if *divisor == 0 {
+                    return Err(RunnerError::internal(span, "runtime shape extent divides by zero"));
+                }
+                let numerator = self.runtime_index_value(*numerator, span)?;
+                if numerator % divisor != 0 {
+                    return Err(RunnerError::internal(span, "runtime shape extent division is not exact"));
+                }
+                Ok(numerator / divisor)
+            }
+            IndexExpr::Param(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => Err(
+                RunnerError::internal(span, "runtime shape-size index remains unresolved"),
+            ),
+            IndexExpr::Tuple(_) => Err(RunnerError::internal(
+                span,
+                "runtime shape-size expected one dimension, found a tuple",
+            )),
+        }
+    }
+
+    fn runtime_extent_value(
+        &self,
+        source: &RuntimeExtentId,
+        span: Span,
+    ) -> Result<u64, RunnerError> {
+        match source {
+            RuntimeExtentId::ScalarParameter { parameter } => {
+                let value = self.function_parameter_value(*parameter, span)?;
+                match value {
+                    Value::UInt(value) => Ok(value),
+                    Value::Int(value) => u64::try_from(value)
+                        .map_err(|_| RunnerError::internal(span, "runtime scalar extent is negative")),
+                    _ => Err(RunnerError::internal(
+                        span,
+                        "runtime scalar extent parameter is not an integer",
+                    )),
+                }
+            }
+            RuntimeExtentId::FunctionParameterAxis { parameter, axis } => {
+                let value = self.function_parameter_value(*parameter, span)?;
+                Self::tensor_axis_extent(value, *axis, span)
+            }
+            RuntimeExtentId::FunctionParameterFieldAxis {
+                parameter,
+                fields,
+                axis,
+            } => {
+                let mut value = self.function_parameter_value(*parameter, span)?;
+                for field in fields {
+                    value = Self::runtime_field_value(value, *field, span)?;
+                }
+                Self::tensor_axis_extent(value, *axis, span)
+            }
+            RuntimeExtentId::ScalarBinding(_)
+            | RuntimeExtentId::TensorBindingAxis { .. }
+            | RuntimeExtentId::TensorFieldAxis { .. }
+            | RuntimeExtentId::ScalarExpression { .. }
+            | RuntimeExtentId::ExpressionAxis { .. }
+            | RuntimeExtentId::ExpressionFieldAxis { .. }
+            | RuntimeExtentId::CallArgumentAxis { .. }
+            | RuntimeExtentId::CallArgumentFieldAxis { .. } => Err(RunnerError::internal(
+                span,
+                "runtime shape-size source was not lowered to a function parameter",
+            )),
+        }
+    }
+
+    fn function_parameter_value(&self, parameter: u32, span: Span) -> Result<Value, RunnerError> {
+        let frame_index = self
+            .frames
+            .len()
+            .checked_sub(1)
+            .ok_or_else(|| RunnerError::internal(span, "runtime shape-size has no active frame"))?;
+        let frame = self.frames.get(frame_index).ok_or_else(|| {
+            RunnerError::internal(span, "runtime shape-size frame is unavailable")
+        })?;
+        let function = self.function_by_id(frame.function, span)?;
+        let parameter = usize::try_from(parameter)
+            .ok()
+            .and_then(|ordinal| function.params.get(ordinal))
+            .ok_or_else(|| {
+                RunnerError::internal(span, "runtime shape-size parameter is out of range")
+            })?;
+        self.read_local_at(frame_index, parameter.local, span)
+    }
+
+    fn runtime_field_value(value: Value, field: Symbol, span: Span) -> Result<Value, RunnerError> {
+        let fields = match value {
+            Value::Record(fields, _) | Value::Struct(_, fields) | Value::EnumVariant(_, fields) => {
+                fields
+            }
+            _ => {
+                return Err(RunnerError::internal(
+                    span,
+                    "runtime shape field source is not a record",
+                ));
+            }
+        };
+        fields.borrow().get(&field).cloned().ok_or_else(|| {
+            RunnerError::internal(span, "runtime shape field source is missing")
+        })
+    }
+
+    fn tensor_axis_extent(value: Value, axis: u32, span: Span) -> Result<u64, RunnerError> {
+        let Value::Tensor(tensor) = value else {
+            return Err(RunnerError::internal(
+                span,
+                "runtime shape axis source is not a tensor",
+            ));
+        };
+        let axis = usize::try_from(axis)
+            .map_err(|_| RunnerError::internal(span, "runtime shape axis does not fit usize"))?;
+        let extent = tensor
+            .borrow()
+            .shape
+            .get(axis)
+            .copied()
+            .ok_or_else(|| RunnerError::internal(span, "runtime tensor shape axis is out of range"))?;
+        u64::try_from(extent)
+            .map_err(|_| RunnerError::internal(span, "runtime tensor shape extent is negative"))
     }
 
     fn interned_textus(&self, symbol: Symbol) -> String {
@@ -2240,7 +2541,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 Value::Float(_) => Err(RunnerError::internal(span, "sqrt of negative float")),
                 Value::Int(v) if v >= 0 => Ok(Value::Float((v as f64).sqrt())),
                 Value::UInt(v) => Ok(Value::Float((v as f64).sqrt())),
-                Value::Tensor(tensor) => self.map_tensor_unary(tensor, &mut |v| match v {
+                Value::Tensor(tensor) => self.map_tensor_unary(tensor, span, &mut |v| match v {
                     Value::Float(f) if *f >= 0.0 => Ok(Value::Float(f.sqrt())),
                     Value::Float(_) => {
                         Err(RunnerError::internal(span, "tensor sqrt of negative float"))
@@ -2264,7 +2565,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             },
             MirUnOp::Gelu => match value {
                 Value::Float(v) => Ok(Value::Float(gelu_f64(v))),
-                Value::Tensor(tensor) => self.map_tensor_unary(tensor, &mut |v| match v {
+                Value::Tensor(tensor) => self.map_tensor_unary(tensor, span, &mut |v| match v {
                     Value::Float(f) => Ok(Value::Float(gelu_f64(*f))),
                     _ => Err(RunnerError::internal(
                         span,
@@ -2275,7 +2576,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             },
             MirUnOp::Tanh => match value {
                 Value::Float(v) => Ok(Value::Float(v.tanh())),
-                Value::Tensor(tensor) => self.map_tensor_unary(tensor, &mut |v| match v {
+                Value::Tensor(tensor) => self.map_tensor_unary(tensor, span, &mut |v| match v {
                     Value::Float(f) => Ok(Value::Float(f.tanh())),
                     _ => Err(RunnerError::internal(
                         span,
@@ -2290,7 +2591,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     Value::Int(v) => (v as f64).exp(),
                     Value::UInt(v) => (v as f64).exp(),
                     Value::Tensor(tensor) => {
-                        return self.map_tensor_unary(tensor, &mut |v| match v {
+                        return self.map_tensor_unary(tensor, span, &mut |v| match v {
                             Value::Float(f) => {
                                 let r = f.exp();
                                 if r.is_finite() {
@@ -2346,7 +2647,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     Value::Int(v) => Ok(Value::Float(f16_round_f64(v as f64))),
                     Value::UInt(v) => Ok(Value::Float(f16_round_f64(v as f64))),
                     Value::Tensor(tensor) => {
-                        self.map_tensor_unary(tensor, &mut |element| match element {
+                        self.map_tensor_unary(tensor, span, &mut |element| match element {
                             Value::Float(v) => Ok(Value::Float(f16_round_f64(*v))),
                             _ => Err(RunnerError::internal(
                                 span,

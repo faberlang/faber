@@ -12,7 +12,7 @@ use crate::{
 use radix_hir::{DefId, HirExpression};
 use radix_lexer::Interner;
 use radix_syntax::GenericParamKind;
-use radix_types::FloatPolicy;
+use radix_types::{BuiltinTensorEdgePolicy, FloatPolicy};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -288,6 +288,7 @@ pub struct InterfaceMethodExport {
 #[derive(Debug, Clone, PartialEq)]
 pub enum InterfaceTypeSnapshot {
     Primitive(Primitive),
+    TensorEdgePolicy(BuiltinTensorEdgePolicy),
     Array(Box<InterfaceTypeSnapshot>),
     Queue(Box<InterfaceTypeSnapshot>),
     BoundedQueue(Box<InterfaceTypeSnapshot>, InterfaceIndexSnapshot),
@@ -336,7 +337,22 @@ pub enum InterfaceAppliedArg {
 pub enum InterfaceIndexSnapshot {
     Literal(u64),
     Param(String),
+    Affine {
+        base: Box<InterfaceIndexSnapshot>,
+        offset: i128,
+    },
+    Divide {
+        numerator: Box<InterfaceIndexSnapshot>,
+        divisor: u64,
+    },
     Tuple(Vec<InterfaceIndexSnapshot>),
+    RuntimeTensorParameterAxis { parameter: u32, axis: u32 },
+    RuntimeTensorParameterFieldAxis {
+        parameter: u32,
+        fields: Vec<String>,
+        axis: u32,
+    },
+    RuntimeScalarParameter { parameter: u32 },
     Unspecified,
 }
 
@@ -346,6 +362,10 @@ pub struct InterfaceCallable {
     /// Ordered generic-declaration parameters (`typus`/`magnitudo`) with
     /// constraint and default.
     pub type_params: Vec<InterfaceCallableParam>,
+    /// Generic type parameters whose value is a compile-time tensor edge
+    /// policy selector in an exported body. The element type and rank keep
+    /// the obligation portable without exporting producer `TypeId`s.
+    pub tensor_edge_policy_requirements: Vec<InterfaceTensorEdgePolicyRequirement>,
     pub params: Vec<InterfaceParam>,
     pub ret: Box<InterfaceTypeSnapshot>,
     pub err: Option<Box<InterfaceTypeSnapshot>>,
@@ -357,6 +377,17 @@ pub struct InterfaceCallable {
     /// device fact exists only where an exporting declaration carries the
     /// annotation. The role fact never travels without the body channel.
     pub device: Option<InterfaceDeviceContract>,
+}
+
+/// Portable `limes<P>()` obligation on one exported generic type parameter.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InterfaceTensorEdgePolicyRequirement {
+    /// Name of the ordered generic type parameter used as the policy selector.
+    pub policy_param: String,
+    /// Tensor element type checked by the provider callbacks.
+    pub element_type: InterfaceTypeSnapshot,
+    /// Statically known tensor rank.
+    pub rank: usize,
 }
 
 /// v2 device contract for one exported `@ nucleum` callable (DFV2-3).
@@ -546,6 +577,8 @@ pub enum FileInterfaceError {
     InferenceTypeUnsupported,
     ErrorTypeUnsupported,
     IndexInferenceUnsupported,
+    TensorEdgePolicyRequirementUnsupported,
+    InvalidIndexArithmetic(radix_types::IndexArithmeticError),
 }
 
 pub type FileInterfaceResult<T> = Result<T, FileInterfaceError>;
@@ -616,6 +649,7 @@ fn snapshot_interface_type_inner(
 ) -> FileInterfaceResult<InterfaceTypeSnapshot> {
     match types.get(type_id) {
         Type::Primitive(primitive) => Ok(InterfaceTypeSnapshot::Primitive(*primitive)),
+        Type::TensorEdgePolicy(policy) => Ok(InterfaceTypeSnapshot::TensorEdgePolicy(*policy)),
         Type::Array(element) => Ok(InterfaceTypeSnapshot::Array(Box::new(
             snapshot_interface_type_inner(*element, types, interner, resolver, module_identity)?,
         ))),
@@ -936,6 +970,7 @@ fn import_interface_type_inner(
 ) -> FileInterfaceResult<TypeId> {
     match snapshot {
         InterfaceTypeSnapshot::Primitive(primitive) => Ok(types.primitive(*primitive)),
+        InterfaceTypeSnapshot::TensorEdgePolicy(policy) => Ok(types.tensor_edge_policy(*policy)),
         InterfaceTypeSnapshot::Array(element) => {
             let element = import_interface_type_inner(element, types, interner, resolver)?;
             Ok(types.array(element))
@@ -1365,6 +1400,7 @@ fn snapshot_interface_callable_inner(
                 })
             })
             .collect::<FileInterfaceResult<Vec<_>>>()?,
+        tensor_edge_policy_requirements: Vec::new(),
         params: sig
             .params
             .iter()
@@ -1450,12 +1486,63 @@ fn snapshot_interface_index(
         IndexExpr::Param(name) => Ok(InterfaceIndexSnapshot::Param(
             interner.resolve(*name).to_owned(),
         )),
+        IndexExpr::Affine { base, offset } => {
+            radix_types::evaluate_index_dimension(index_id, types)
+                .map_err(FileInterfaceError::InvalidIndexArithmetic)?;
+            Ok(InterfaceIndexSnapshot::Affine {
+                base: Box::new(snapshot_interface_index(*base, types, interner)?),
+                offset: *offset,
+            })
+        }
+        IndexExpr::Divide { numerator, divisor } => {
+            radix_types::evaluate_index_dimension(index_id, types)
+                .map_err(FileInterfaceError::InvalidIndexArithmetic)?;
+            Ok(InterfaceIndexSnapshot::Divide {
+                numerator: Box::new(snapshot_interface_index(*numerator, types, interner)?),
+                divisor: *divisor,
+            })
+        }
         IndexExpr::Tuple(dims) => dims
             .iter()
             .map(|dim| snapshot_interface_index(*dim, types, interner))
             .collect::<FileInterfaceResult<Vec<_>>>()
             .map(InterfaceIndexSnapshot::Tuple),
         IndexExpr::Infer(_) => Err(FileInterfaceError::IndexInferenceUnsupported),
+        IndexExpr::Runtime(source) => match source {
+            radix_types::RuntimeExtentId::ScalarParameter { parameter } => {
+                Ok(InterfaceIndexSnapshot::RuntimeScalarParameter {
+                    parameter: *parameter,
+                })
+            }
+            radix_types::RuntimeExtentId::FunctionParameterAxis { parameter, axis } => {
+                Ok(InterfaceIndexSnapshot::RuntimeTensorParameterAxis {
+                    parameter: *parameter,
+                    axis: *axis,
+                })
+            }
+            radix_types::RuntimeExtentId::FunctionParameterFieldAxis {
+                parameter,
+                fields,
+                axis,
+            } => Ok(InterfaceIndexSnapshot::RuntimeTensorParameterFieldAxis {
+                parameter: *parameter,
+                fields: fields
+                    .iter()
+                    .map(|field| interner.resolve(*field).to_owned())
+                    .collect(),
+                axis: *axis,
+            }),
+            radix_types::RuntimeExtentId::ScalarBinding(_)
+            | radix_types::RuntimeExtentId::TensorBindingAxis { .. }
+            | radix_types::RuntimeExtentId::TensorFieldAxis { .. }
+            | radix_types::RuntimeExtentId::ScalarExpression { .. }
+            | radix_types::RuntimeExtentId::ExpressionAxis { .. }
+            | radix_types::RuntimeExtentId::ExpressionFieldAxis { .. }
+            | radix_types::RuntimeExtentId::CallArgumentAxis { .. }
+            | radix_types::RuntimeExtentId::CallArgumentFieldAxis { .. } => {
+                Err(FileInterfaceError::IndexInferenceUnsupported)
+            }
+        },
         IndexExpr::Unspecified => Ok(InterfaceIndexSnapshot::Unspecified),
     }
 }
@@ -1471,6 +1558,42 @@ fn import_interface_index(
         }
         InterfaceIndexSnapshot::Param(name) => {
             Ok(types.intern_index(IndexExpr::Param(interner.intern(name))))
+        }
+        InterfaceIndexSnapshot::Affine { base, offset } => {
+            let base = import_interface_index(base, types, interner)?;
+            radix_types::add_index_constant(types, base, *offset)
+                .map_err(FileInterfaceError::InvalidIndexArithmetic)
+        }
+        InterfaceIndexSnapshot::Divide { numerator, divisor } => {
+            let numerator = import_interface_index(numerator, types, interner)?;
+            radix_types::divide_index_exact(types, numerator, *divisor)
+                .map_err(FileInterfaceError::InvalidIndexArithmetic)
+        }
+        InterfaceIndexSnapshot::RuntimeTensorParameterAxis { parameter, axis } => {
+            Ok(types.intern_index(IndexExpr::Runtime(
+                radix_types::RuntimeExtentId::FunctionParameterAxis {
+                    parameter: *parameter,
+                    axis: *axis,
+                },
+            )))
+        }
+        InterfaceIndexSnapshot::RuntimeTensorParameterFieldAxis {
+            parameter,
+            fields,
+            axis,
+        } => Ok(types.intern_index(IndexExpr::Runtime(
+            radix_types::RuntimeExtentId::FunctionParameterFieldAxis {
+                parameter: *parameter,
+                fields: fields.iter().map(|field| interner.intern(field)).collect(),
+                axis: *axis,
+            },
+        ))),
+        InterfaceIndexSnapshot::RuntimeScalarParameter { parameter } => {
+            Ok(types.intern_index(IndexExpr::Runtime(
+                radix_types::RuntimeExtentId::ScalarParameter {
+                    parameter: *parameter,
+                },
+            )))
         }
         InterfaceIndexSnapshot::Tuple(dims) => dims
             .iter()

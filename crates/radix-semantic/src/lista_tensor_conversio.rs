@@ -16,9 +16,8 @@ pub const LISTA_TO_TENSOR_STRUCTA_COUNT_MSG: &str =
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ListaToTensorShape {
     Literal(Vec<i64>),
-    /// Declared shape whose every dim is a literal or a `magnitudo` param
-    /// (`[T, D]`, `[3, D]`): the rank is known now, the concrete dims only
-    /// after generic instantiation.
+    /// Declared shape whose every dim is a literal, generic expression, or
+    /// runtime-origin extent: rank is known even when values are not.
     Symbolic {
         shape: IndexId,
         rank: usize,
@@ -82,17 +81,36 @@ pub fn resolve_lista_to_tensor_shape(
 /// shapes declare no rank; they stay one-dimensional inferences.
 fn symbolic_shape_rank(shape: IndexId, types: &TypeTable) -> Option<usize> {
     match types.get_index(shape) {
-        IndexExpr::Literal(_) | IndexExpr::Param(_) => Some(1),
+        IndexExpr::Literal(_)
+        | IndexExpr::Param(_)
+        | IndexExpr::Runtime(_)
+        | IndexExpr::Affine { .. }
+        | IndexExpr::Divide { .. }
+            if valid_declared_dimension(shape, types) =>
+        {
+            Some(1)
+        }
         IndexExpr::Tuple(dims) => dims
             .iter()
-            .all(|dim| {
-                matches!(
-                    types.get_index(*dim),
-                    IndexExpr::Literal(_) | IndexExpr::Param(_)
-                )
-            })
+            .all(|dim| valid_declared_dimension(*dim, types))
             .then_some(dims.len()),
         IndexExpr::Infer(_) | IndexExpr::Unspecified => None,
+        _ => None,
+    }
+}
+
+fn valid_declared_dimension(index: IndexId, types: &TypeTable) -> bool {
+    match types.get_index(index) {
+        IndexExpr::Literal(_) | IndexExpr::Param(_) | IndexExpr::Runtime(_) => true,
+        IndexExpr::Affine { base, .. } => {
+            radix_types::evaluate_index_dimension(index, types).is_ok()
+                && valid_declared_dimension(*base, types)
+        }
+        IndexExpr::Divide { numerator, .. } => {
+            radix_types::evaluate_index_dimension(index, types).is_ok()
+                && valid_declared_dimension(*numerator, types)
+        }
+        IndexExpr::Tuple(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => false,
     }
 }
 

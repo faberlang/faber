@@ -85,6 +85,8 @@ const ISSUE_UNUSED_MUT_PARAMETER: &str = "unused_mut_parameter";
 const ISSUE_USE_AFTER_MOVE: &str = "use_after_move";
 const ISSUE_USE_WHILE_MUTABLY_BORROWED: &str = "use_while_mutably_borrowed";
 const ISSUE_WRITE_WHILE_BORROWED: &str = "write_while_borrowed";
+const ISSUE_TENSOR_VIEW_ESCAPE: &str = "tensor_view_escape";
+const ISSUE_TENSOR_VIEW_READ_ONLY: &str = "tensor_view_read_only";
 
 /// Target-neutral Faber access-fact analysis.
 ///
@@ -211,6 +213,7 @@ struct BorrowState {
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct TrackedRegionBorrow {
     borrower: DefId,
+    source: DefId,
     kind: BorrowKind,
 }
 
@@ -269,6 +272,9 @@ struct BorrowChecker<'a> {
     /// read-only access, so mutation through it is rejected like direct
     /// mutation of the parameter.
     de_aliases: FxHashSet<DefId>,
+    /// Read-only tensor views and their backing place. Chained views and
+    /// immutable aliases retain the original root until materialize().
+    tensor_view_roots: FxHashMap<DefId, FxHashSet<DefId>>,
     /// Function param contracts keyed by callee `DefId` (named calls leave
     /// `callee.ty` unset; this index supplies own-param dest facts).
     func_params: FxHashMap<DefId, Vec<ParamType>>,
@@ -320,6 +326,7 @@ impl<'a> BorrowChecker<'a> {
             copy_roots: FxHashSet::default(),
             unmarked_own_binds: FxHashMap::default(),
             de_aliases: FxHashSet::default(),
+            tensor_view_roots: FxHashMap::default(),
             func_params: FxHashMap::default(),
             regions,
             stmt_node: None,
@@ -427,6 +434,7 @@ impl<'a> BorrowChecker<'a> {
         self.copy_roots.clear();
         self.unmarked_own_binds.clear();
         self.de_aliases.clear();
+        self.tensor_view_roots.clear();
         self.stmt_node = None;
     }
 
@@ -459,6 +467,44 @@ impl<'a> BorrowChecker<'a> {
                     }
                 }
                 if let Some(init) = &local.init {
+                    if self.stores_tensor_view(init) {
+                        if !self.is_tensor_view(init) {
+                            self.error(
+                                SemanticErrorKind::ModeMismatch,
+                                ISSUE_TENSOR_VIEW_ESCAPE,
+                                init.span,
+                            );
+                            self.check_expr(init);
+                            return;
+                        }
+                        if local.mutable
+                            || local.ty.is_some_and(|ty| self.types.is_mut_or_own_view(ty))
+                        {
+                            self.error(
+                                SemanticErrorKind::ModeMismatch,
+                                ISSUE_TENSOR_VIEW_ESCAPE,
+                                init.span,
+                            );
+                            self.check_expr(init);
+                            return;
+                        }
+                        let roots = self.tensor_view_origins(init);
+                        if roots.is_empty() {
+                            self.error(
+                                SemanticErrorKind::ModeMismatch,
+                                ISSUE_TENSOR_VIEW_ESCAPE,
+                                init.span,
+                            );
+                            self.check_expr(init);
+                            return;
+                        }
+                        self.tensor_view_roots.insert(local.def_id, roots.clone());
+                        self.check_expr(init);
+                        for root in roots {
+                            self.borrow_shared_with(root, Some(local.def_id), init.span);
+                        }
+                        return;
+                    }
                     // Region-routed explicit-ref bind of a marked root: the
                     // borrowing local's region releases the conflict at last
                     // use instead of the old block-exit approximation.
@@ -499,6 +545,13 @@ impl<'a> BorrowChecker<'a> {
             HirStatementKind::Expr(expr) => self.check_expr(expr),
             HirStatementKind::Redde(value) => {
                 if let Some(expr) = value {
+                    if self.stores_tensor_view(expr) {
+                        self.error(
+                            SemanticErrorKind::ModeMismatch,
+                            ISSUE_TENSOR_VIEW_ESCAPE,
+                            expr.span,
+                        );
+                    }
                     if let Some(def_id) = Self::root_def_id(expr)
                         && let Some(usage) = self.param_usage.get_mut(&def_id)
                     {
@@ -551,6 +604,46 @@ impl<'a> BorrowChecker<'a> {
             return;
         };
         let params = params.to_vec();
+        for (index, arg) in args.iter().enumerate() {
+            if !self.stores_tensor_view(&arg.expr) {
+                continue;
+            }
+            if params
+                .get(index)
+                .is_some_and(|param| self.dest_is_mut_or_own(param))
+            {
+                self.error(
+                    SemanticErrorKind::ModeMismatch,
+                    ISSUE_TENSOR_VIEW_READ_ONLY,
+                    arg.expr.span,
+                );
+            }
+            let roots = self.tensor_view_origins(&arg.expr);
+            if roots.is_empty() {
+                continue;
+            }
+            for (other_index, other) in args.iter().enumerate() {
+                if other_index == index
+                    || !params
+                        .get(other_index)
+                        .is_some_and(|param| self.dest_is_mut_or_own(param))
+                {
+                    continue;
+                }
+                let other_roots = self.tensor_view_origins(&other.expr);
+                let other_root = Self::root_def_id(&other.expr);
+                if !roots.iter().any(|root| {
+                    other_root == Some(*root) || other_roots.contains(root)
+                }) {
+                    continue;
+                }
+                self.error(
+                    SemanticErrorKind::ModeMismatch,
+                    ISSUE_TENSOR_VIEW_READ_ONLY,
+                    arg.expr.span,
+                );
+            }
+        }
         // Named function Paths leave `callee.ty` unset. Applying the retired
         // lifetime simulation to those calls would reject D-1 unmarked
         // `const` → `mut` param use. Language `mut` dest borrows are
@@ -690,6 +783,13 @@ impl<'a> BorrowChecker<'a> {
     }
 
     fn check_lvalue(&mut self, target: &HirExpression) {
+        if !self.tensor_view_origins(target).is_empty() {
+            self.error(
+                SemanticErrorKind::ModeMismatch,
+                ISSUE_TENSOR_VIEW_READ_ONLY,
+                target.span,
+            );
+        }
         if Self::is_projection(target)
             && let Some(def_id) = Self::root_def_id(target)
             && self.ref_roots.contains(&def_id)
@@ -939,6 +1039,185 @@ impl<'a> BorrowChecker<'a> {
         matches!(param.mode, SemanticParamMode::Ref) || self.types.is_ref_view(param.ty)
     }
 
+    fn tensor_view_method(
+        &self,
+        receiver: &HirExpression,
+        method: radix_lexer::Symbol,
+        arity: usize,
+    ) -> Option<&'static str> {
+        let ty = receiver.ty?;
+        let name = self.interner.strings().get(method.0 as usize)?;
+        lookup_method_for_type_id(ty, self.types, name, arity).map(|entry| entry.faber_name)
+    }
+
+    fn is_view_method(name: &str) -> bool {
+        matches!(
+            name,
+            "sectio"
+                | "disloco"
+                | "transpone"
+                | "__faber_glyph_transpose"
+                | "forma"
+                | "expande"
+                | "limes"
+        )
+    }
+
+    fn has_tensor_value_type(&self, expr: &HirExpression) -> bool {
+        expr.ty.is_some_and(|ty| {
+            let (_, inner) = self.types.peel_access_marker(ty);
+            matches!(self.types.get(inner), Type::Tensor(_, _) | Type::Matrix(_, _))
+        })
+    }
+
+    /// Whether this expression itself yields a borrowed tensor view. Element
+    /// projections are tracked by `tensor_view_origin`, not treated as views.
+    fn is_tensor_view(&self, expr: &HirExpression) -> bool {
+        match &expr.kind {
+            HirExpressionKind::Path(def_id) => self.tensor_view_roots.contains_key(def_id),
+            HirExpressionKind::MethodCall(receiver, method, _, args, _) => self
+                .tensor_view_method(receiver, *method, args.len())
+                .is_some_and(Self::is_view_method),
+            HirExpressionKind::NonNull(object, radix_hir::HirNonNullKind::Value)
+                if self.has_tensor_value_type(expr) =>
+            {
+                self.is_tensor_view(object)
+            }
+            HirExpressionKind::Block(block) if self.has_tensor_value_type(expr) => block
+                .expr
+                .as_deref()
+                .is_some_and(|expr| self.is_tensor_view(expr)),
+            HirExpressionKind::Binary(radix_hir::HirBinOp::Coalesce, left, right)
+                if self.has_tensor_value_type(expr) =>
+            {
+                self.is_tensor_view(left) || self.is_tensor_view(right)
+            }
+            HirExpressionKind::Si {
+                then_block,
+                else_block,
+                ..
+            } if self.has_tensor_value_type(expr) => {
+                then_block
+                    .expr
+                    .as_deref()
+                    .is_some_and(|expr| self.is_tensor_view(expr))
+                    || else_block.as_ref().is_some_and(|block| {
+                        block
+                            .expr
+                            .as_deref()
+                            .is_some_and(|expr| self.is_tensor_view(expr))
+                    })
+            }
+            HirExpressionKind::CallDefault { body, default, .. }
+                if self.has_tensor_value_type(expr) =>
+            {
+                body.expr
+                    .as_deref()
+                    .is_some_and(|expr| self.is_tensor_view(expr))
+                    || self.is_tensor_view(default)
+            }
+            HirExpressionKind::Verte { source, .. }
+            | HirExpressionKind::Conversio { source, .. }
+                if self.has_tensor_value_type(expr) =>
+            {
+                self.is_tensor_view(source)
+            }
+            _ => false,
+        }
+    }
+
+    fn stores_tensor_view(&self, expr: &HirExpression) -> bool {
+        match &expr.kind {
+            HirExpressionKind::Array(elements) => elements.iter().any(|element| match element {
+                radix_hir::HirArrayElement::Expr(value)
+                | radix_hir::HirArrayElement::Spread(value) => self.stores_tensor_view(value),
+                radix_hir::HirArrayElement::Infer(_) => false,
+            }),
+            HirExpressionKind::Tuple(elements, _) => {
+                elements.iter().any(|value| self.stores_tensor_view(value))
+            }
+            HirExpressionKind::Struct(_, fields) => {
+                fields.iter().any(|(_, value)| self.stores_tensor_view(value))
+            }
+            HirExpressionKind::Verte {
+                entries: Some(entries),
+                ..
+            } => entries.iter().any(|entry| {
+                entry
+                    .value
+                    .as_ref()
+                    .is_some_and(|value| self.stores_tensor_view(value))
+            }),
+            _ => self.is_tensor_view(expr),
+        }
+    }
+
+    /// Backing roots for a view expression, preserving branch alternatives.
+    fn tensor_view_origins(&self, expr: &HirExpression) -> FxHashSet<DefId> {
+        match &expr.kind {
+            HirExpressionKind::Path(def_id) => self
+                .tensor_view_roots
+                .get(def_id)
+                .cloned()
+                .unwrap_or_default(),
+            HirExpressionKind::MethodCall(receiver, method, _, args, _) => {
+                let mut roots = FxHashSet::default();
+                let Some(name) = self.tensor_view_method(receiver, *method, args.len()) else {
+                    return roots;
+                };
+                if Self::is_view_method(name) {
+                    roots = self.tensor_view_origins(receiver);
+                    if roots.is_empty()
+                        && let Some(root) = Self::root_def_id(receiver)
+                    {
+                        roots.insert(root);
+                    }
+                }
+                roots
+            }
+            HirExpressionKind::NonNull(object, radix_hir::HirNonNullKind::Value)
+            | HirExpressionKind::Block(HirBlock {
+                expr: Some(object), ..
+            }) => self.tensor_view_origins(object),
+            HirExpressionKind::Field(object, _)
+            | HirExpressionKind::Index(object, _)
+            | HirExpressionKind::Deref(object)
+            | HirExpressionKind::NonNull(object, _) => self.tensor_view_origins(object),
+            HirExpressionKind::Binary(radix_hir::HirBinOp::Coalesce, left, right) => {
+                let mut roots = self.tensor_view_origins(left);
+                roots.extend(self.tensor_view_origins(right));
+                roots
+            }
+            HirExpressionKind::Si {
+                then_block,
+                else_block,
+                ..
+            } => {
+                let mut roots = then_block
+                    .expr
+                    .as_deref()
+                    .map(|expr| self.tensor_view_origins(expr))
+                    .unwrap_or_default();
+                if let Some(expr) = else_block.as_ref().and_then(|block| block.expr.as_deref()) {
+                    roots.extend(self.tensor_view_origins(expr));
+                }
+                roots
+            }
+            HirExpressionKind::CallDefault { body, default, .. } => {
+                let mut roots = body
+                    .expr
+                    .as_deref()
+                    .map(|expr| self.tensor_view_origins(expr))
+                    .unwrap_or_default();
+                roots.extend(self.tensor_view_origins(default));
+                roots
+            }
+            HirExpressionKind::Verte { source, .. }
+            | HirExpressionKind::Conversio { source, .. } => self.tensor_view_origins(source),
+            _ => FxHashSet::default(),
+        }
+    }
+
     fn arg_is_ref_view(&self, expr: &HirExpression) -> bool {
         if let Some(ty) = expr.ty
             && self.types.is_ref_view(ty)
@@ -1100,6 +1379,7 @@ impl<'a> BorrowChecker<'a> {
         if let Some(borrower) = borrower {
             state.region_borrows.push(TrackedRegionBorrow {
                 borrower,
+                source: def_id,
                 kind: BorrowKind::Shared,
             });
             if let Some(scope) = self.scopes.last_mut() {
@@ -1148,6 +1428,7 @@ impl<'a> BorrowChecker<'a> {
         if let Some(borrower) = borrower {
             state.region_borrows.push(TrackedRegionBorrow {
                 borrower,
+                source: def_id,
                 kind: BorrowKind::Mutable,
             });
             if let Some(scope) = self.scopes.last_mut() {
@@ -1176,7 +1457,7 @@ impl<'a> BorrowChecker<'a> {
         let mut mutable_live = false;
         let mut any_live = false;
         for tracked in &state.region_borrows {
-            if self.tracked_region_live(tracked.borrower) {
+            if self.tracked_region_live(tracked.source, tracked.borrower) {
                 any_live = true;
                 if matches!(tracked.kind, BorrowKind::Mutable) {
                     mutable_live = true;
@@ -1186,11 +1467,11 @@ impl<'a> BorrowChecker<'a> {
         (mutable_live, any_live)
     }
 
-    fn tracked_region_live(&self, borrower: DefId) -> bool {
+    fn tracked_region_live(&self, source: DefId, borrower: DefId) -> bool {
         let Some(facts) = self.regions else {
             return true;
         };
-        match facts.region_for(borrower) {
+        match facts.regions_for(borrower).find(|region| region.source == source) {
             None => true,
             Some(region) => match self.stmt_node {
                 None => true,
@@ -1343,6 +1624,13 @@ impl HirVisitor for BorrowChecker<'_> {
             }
             HirExpressionKind::Assign(target, value) => {
                 self.check_lvalue(target);
+                if self.stores_tensor_view(value) {
+                    self.error(
+                        SemanticErrorKind::ModeMismatch,
+                        ISSUE_TENSOR_VIEW_ESCAPE,
+                        value.span,
+                    );
+                }
                 if target.ty.is_some_and(|ty| self.types.is_copy_view(ty))
                     || Self::root_def_id(target).is_some_and(|id| self.copy_roots.contains(&id))
                 {
@@ -1370,12 +1658,26 @@ impl HirVisitor for BorrowChecker<'_> {
                 recovery,
             } => {
                 self.check_lvalue(target);
+                if self.stores_tensor_view(source) {
+                    self.error(
+                        SemanticErrorKind::ModeMismatch,
+                        ISSUE_TENSOR_VIEW_ESCAPE,
+                        source.span,
+                    );
+                }
                 self.visit_expr(source);
                 if let Some(recovery) = recovery {
                     self.visit_expr(recovery);
                 }
             }
             HirExpressionKind::Clausura(params, _, _, body, _) => {
+                if closure_captures_tensor_view(body, &self.tensor_view_roots) {
+                    self.error(
+                        SemanticErrorKind::ModeMismatch,
+                        ISSUE_TENSOR_VIEW_ESCAPE,
+                        expr.span,
+                    );
+                }
                 self.push_scope();
                 for param in params {
                     self.ensure_state(param.def_id);
@@ -1402,6 +1704,30 @@ impl HirVisitor for BorrowChecker<'_> {
                 // but it does not keep a mutable borrow alive after the
                 // statement.
                 let is_mutating = self.method_call_writes_receiver(expr, receiver, *method, args);
+                if is_mutating && !self.tensor_view_origins(receiver).is_empty() {
+                    self.error(
+                        SemanticErrorKind::ModeMismatch,
+                        ISSUE_TENSOR_VIEW_READ_ONLY,
+                        expr.span,
+                    );
+                }
+                if is_mutating {
+                    if let Some(receiver_root) = Self::root_def_id(receiver) {
+                        for arg in args {
+                            if self.is_tensor_view(&arg.expr)
+                                && self
+                                    .tensor_view_origins(&arg.expr)
+                                    .contains(&receiver_root)
+                            {
+                                self.error(
+                                    SemanticErrorKind::ModeMismatch,
+                                    ISSUE_TENSOR_VIEW_READ_ONLY,
+                                    arg.expr.span,
+                                );
+                            }
+                        }
+                    }
+                }
                 if is_mutating {
                     if let Some(def_id) = Self::root_def_id(receiver) {
                         self.check_projection_inputs(receiver);
@@ -1426,4 +1752,31 @@ impl HirVisitor for BorrowChecker<'_> {
             _ => walk_expr(self, expr),
         }
     }
+}
+
+struct TensorViewCaptureFinder<'a> {
+    views: &'a FxHashMap<DefId, FxHashSet<DefId>>,
+    found: bool,
+}
+
+impl HirVisitor for TensorViewCaptureFinder<'_> {
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        if matches!(&expr.kind, HirExpressionKind::Path(def_id) if self.views.contains_key(def_id)) {
+            self.found = true;
+            return;
+        }
+        walk_expr(self, expr);
+    }
+}
+
+fn closure_captures_tensor_view(
+    body: &HirExpression,
+    views: &FxHashMap<DefId, FxHashSet<DefId>>,
+) -> bool {
+    let mut finder = TensorViewCaptureFinder {
+        views,
+        found: false,
+    };
+    finder.visit_expr(body);
+    finder.found
 }

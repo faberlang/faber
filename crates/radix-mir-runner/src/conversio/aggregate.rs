@@ -98,7 +98,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 struct_defaults,
                 span,
             )?,
-            Value::Tensor(cell) => cell.borrow().data.clone(),
+            Value::Tensor(cell) => self.tensor_logical_values(&cell, span)?,
             Value::Vector(cell) => self.convert_array_elements(
                 &cell.borrow(),
                 source_ty,
@@ -323,10 +323,9 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     // producers, not as a second compiler lowering path.
                     let data = cell.borrow().clone();
                     let shape = lista_to_tensor_shape(target_ty, self.types, data.len());
-                    Ok(Value::Tensor(Rc::new(RefCell::new(TensorValue {
-                        data,
-                        shape,
-                    }))))
+                    Ok(Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+                        data, shape,
+                    )))))
                 }
                 other => Err(RunnerError::internal(
                     span,
@@ -340,9 +339,10 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 Value::Array(cell) => {
                     Ok(Value::Array(Rc::new(RefCell::new(cell.borrow().clone()))))
                 }
-                Value::Tensor(cell) => Ok(Value::Array(Rc::new(RefCell::new(
-                    cell.borrow().data.clone(),
-                )))),
+                Value::Tensor(cell) => {
+                    let values = self.tensor_logical_values(&cell, span)?;
+                    Ok(Value::Array(Rc::new(RefCell::new(values))))
+                }
                 other => Err(RunnerError::internal(
                     span,
                     format!(
@@ -752,10 +752,9 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 let shape = lista_to_tensor_shape(target, self.types, data.len());
-                Ok(Value::Tensor(Rc::new(RefCell::new(TensorValue {
-                    data,
-                    shape,
-                }))))
+                Ok(Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+                    data, shape,
+                )))))
             }
             other => Err(RunnerError::internal(
                 span,

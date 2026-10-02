@@ -8,6 +8,7 @@ use super::TypeTable;
 use super::index::{IndexExpr, IndexId, IndexVar};
 use super::index_unify::{IndexUnifier, IndexUnifyError};
 use rustc_hash::FxHashMap;
+use radix_types::{IndexArithmeticError, add_index_constant, divide_index_exact};
 
 pub const MISSING_TENSOR_SHAPE_MSG: &str = "cannot infer tensor shape";
 pub const INCOMPATIBLE_INDEX_MSG: &str = "index shapes are incompatible";
@@ -96,7 +97,7 @@ impl IndexInferState {
         self.infer_var_of(types, resolved).is_some()
     }
 
-    /// Whether `id` or any nested tuple dimension remains an unresolved hole.
+    /// Whether `id` or any nested arithmetic/tuple term remains unresolved.
     pub fn contains_unresolved_hole(&mut self, types: &mut TypeTable, id: IndexId) -> bool {
         let resolved = self.resolve(types, id);
         match types.get_index(resolved).clone() {
@@ -104,6 +105,10 @@ impl IndexInferState {
             IndexExpr::Tuple(dims) => dims
                 .into_iter()
                 .any(|dim| self.contains_unresolved_hole(types, dim)),
+            IndexExpr::Affine { base, .. } => self.contains_unresolved_hole(types, base),
+            IndexExpr::Divide { numerator, .. } => {
+                self.contains_unresolved_hole(types, numerator)
+            }
             _ => false,
         }
     }
@@ -146,6 +151,18 @@ impl IndexInferState {
                     .collect();
                 types.intern_index(IndexExpr::Tuple(canonical))
             }
+            IndexExpr::Affine { base, offset } => {
+                let base = self.canonicalize(types, base);
+                add_index_constant(types, base, offset).unwrap_or_else(|_| {
+                    types.intern_index(IndexExpr::Affine { base, offset })
+                })
+            }
+            IndexExpr::Divide { numerator, divisor } => {
+                let numerator = self.canonicalize(types, numerator);
+                divide_index_exact(types, numerator, divisor).unwrap_or_else(|_| {
+                    types.intern_index(IndexExpr::Divide { numerator, divisor })
+                })
+            }
             _ => resolved,
         }
     }
@@ -163,6 +180,9 @@ impl IndexInferState {
         id: IndexId,
     ) -> Result<IndexId, IndexInferError> {
         let canonical = self.canonicalize(types, id);
+        if let Some(error) = index_arithmetic_error(canonical, types) {
+            return Err(IndexInferError::InvalidArithmetic(error));
+        }
         if self.contains_unresolved_hole(types, canonical) {
             Err(IndexInferError::UnboundHole)
         } else {
@@ -192,10 +212,24 @@ impl IndexInferState {
     }
 }
 
+fn index_arithmetic_error(id: IndexId, types: &TypeTable) -> Option<IndexArithmeticError> {
+    match types.get_index(id) {
+        IndexExpr::Tuple(dims) => dims.iter().find_map(|dim| index_arithmetic_error(*dim, types)),
+        IndexExpr::Affine { base, .. } => radix_types::evaluate_index_dimension(id, types)
+            .err()
+            .or_else(|| index_arithmetic_error(*base, types)),
+        IndexExpr::Divide { numerator, .. } => radix_types::evaluate_index_dimension(id, types)
+            .err()
+            .or_else(|| index_arithmetic_error(*numerator, types)),
+        _ => None,
+    }
+}
+
 /// Index inference failure at finalize or constraint generation time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndexInferError {
     UnboundHole,
     Mismatch,
     Occurs,
+    InvalidArithmetic(IndexArithmeticError),
 }

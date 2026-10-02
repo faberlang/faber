@@ -444,6 +444,13 @@ fn intrinsic(value: &MirIntrinsic) -> String {
             op.positive,
             op.ty.semantic_id().0
         ),
+        MirIntrinsic::TensorShapeCheck(check) => {
+            format!("tensor_shape_check relations={}", check.relations.len())
+        }
+        MirIntrinsic::TensorShapeSize(expression) => {
+            format!("tensor_shape_size {expression:?}")
+        }
+        MirIntrinsic::TensorLimes(policy) => format!("tensor_limes {}", edge_policy(policy)),
         MirIntrinsic::FilumSum(op) => format!(
             "filum_sum lane_width={} term_binder={} coordinates={}",
             op.lane_width,
@@ -453,6 +460,20 @@ fn intrinsic(value: &MirIntrinsic) -> String {
         MirIntrinsic::Duplicate => "duplicate".to_owned(),
         MirIntrinsic::TensorLift(op) => format!("tensor_lift {}", op.name()),
         MirIntrinsic::VectorOp(op) => format!("vector_op {}", op.name()),
+    }
+}
+
+fn edge_policy(policy: &crate::MirEdgePolicy) -> String {
+    match policy {
+        crate::MirEdgePolicy::Builtin(crate::MirBuiltinEdgePolicy::Clamp) => "clamp".to_owned(),
+        crate::MirEdgePolicy::Builtin(crate::MirBuiltinEdgePolicy::Reflect) => "reflect".to_owned(),
+        crate::MirEdgePolicy::Builtin(crate::MirBuiltinEdgePolicy::Wrap) => "wrap".to_owned(),
+        crate::MirEdgePolicy::Custom { policy_def, remap, transform } => format!(
+            "custom def#{} remap {} transform {}",
+            policy_def.0,
+            function_id(*remap),
+            transform.map_or_else(|| "none".to_owned(), function_id),
+        ),
     }
 }
 
@@ -647,6 +668,8 @@ fn collection_op(op: MirCollectionOp) -> &'static str {
         MirCollectionOp::TensorFlatten => "tensor_flatten",
         MirCollectionOp::TensorMaterialize => "tensor_materialize",
         MirCollectionOp::TensorSlice => "tensor_slice",
+        MirCollectionOp::TensorExpand => "tensor_expand",
+        MirCollectionOp::TensorShift => "tensor_shift",
         MirCollectionOp::TensorAdd => "tensor_add",
         MirCollectionOp::TensorSub => "tensor_sub",
         MirCollectionOp::TensorMul => "tensor_mul",

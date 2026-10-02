@@ -288,6 +288,15 @@ fn unrepresentable_type_and_index_shapes_fail_closed() {
         Err(FileInterfaceError::IndexInferenceUnsupported)
     );
 
+    let local_runtime = types.intern_index(IndexExpr::Runtime(
+        radix_types::RuntimeExtentId::ScalarBinding(radix_hir::DefId(77)),
+    ));
+    let local_tensor = types.tensor_with_shape(elem, local_runtime);
+    assert_eq!(
+        snapshot_interface_type(local_tensor, &types, &interner),
+        Err(FileInterfaceError::IndexInferenceUnsupported)
+    );
+
     // A nominal without a resolver stays unsupported rather than guessed.
     let nominal = types.intern(Type::Struct(radix_hir::DefId(1)));
     assert_eq!(
@@ -295,6 +304,75 @@ fn unrepresentable_type_and_index_shapes_fail_closed() {
         Err(FileInterfaceError::NominalTypeUnsupported {
             kind: crate::file_interface::InterfaceNominalKind::Struct
         })
+    );
+}
+
+#[test]
+fn file_interface_round_trips_portable_runtime_and_affine_indices() {
+    let interner = Interner::new();
+    let mut types = TypeTable::new();
+    let elem = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let runtime = types.intern_index(IndexExpr::Runtime(
+        radix_types::RuntimeExtentId::FunctionParameterAxis {
+            parameter: 0,
+            axis: 1,
+        },
+    ));
+    let minus_one = radix_types::add_index_constant(&mut types, runtime, -1)
+        .expect("symbolic offset remains a term");
+    let divided = radix_types::divide_index_exact(&mut types, minus_one, 2)
+        .expect("symbolic exactness remains an obligation");
+    let tensor = types.tensor_with_shape(elem, divided);
+
+    let snapshot = snapshot_interface_type(tensor, &types, &interner)
+        .expect("portable runtime index snapshot");
+    let InterfaceTypeSnapshot::Tensor(_, shape) = &snapshot else {
+        panic!("expected tensor snapshot, got {snapshot:?}");
+    };
+    assert_eq!(
+        shape,
+        &InterfaceIndexSnapshot::Divide {
+            numerator: Box::new(InterfaceIndexSnapshot::Affine {
+                base: Box::new(InterfaceIndexSnapshot::RuntimeTensorParameterAxis {
+                    parameter: 0,
+                    axis: 1,
+                }),
+                offset: -1,
+            }),
+            divisor: 2,
+        }
+    );
+
+    let mut target_types = TypeTable::new();
+    let mut target_interner = Interner::new();
+    let imported = import_interface_type(&snapshot, &mut target_types, &mut target_interner)
+        .expect("import runtime index");
+    let Type::Tensor(_, imported_shape) = target_types.get(imported) else {
+        panic!("expected imported tensor");
+    };
+    assert!(matches!(
+        target_types.get_index(*imported_shape),
+        IndexExpr::Divide { divisor: 2, .. }
+    ));
+}
+
+#[test]
+fn file_interface_rejects_known_non_integral_index_arithmetic() {
+    let interner = Interner::new();
+    let mut types = TypeTable::new();
+    let elem = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let five = types.intern_index(IndexExpr::Literal(5));
+    let invalid = types.intern_index(IndexExpr::Divide {
+        numerator: five,
+        divisor: 2,
+    });
+    let tensor = types.tensor_with_shape(elem, invalid);
+
+    assert_eq!(
+        snapshot_interface_type(tensor, &types, &interner),
+        Err(FileInterfaceError::InvalidIndexArithmetic(
+            radix_types::IndexArithmeticError::NonIntegral
+        ))
     );
 }
 

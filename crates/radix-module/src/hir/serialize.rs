@@ -9,9 +9,14 @@ use radix_hir::visit::{HirVisitor, walk_expr, walk_item, walk_method, walk_patte
 use radix_hir_fhir::{
     CaptureFactWire, CaptureModeWire, CliCommandWire, CliDefaultWire, CliExitWire, CliModeWire, CliOperandWire,
     CliOptionWire, CliProgramWire, CliTypeWire, FunctionFactTableWire, FunctionFactWire, FunctionProvenanceTableWire,
-    FunctionProvenanceWire, GpuBuiltinWire, HirArtifact, LastUseWire, RadixBackwardWire, RadixLaneEntryWire,
-    RadixLaneWire, RegionRelationshipWire, ResolvedUseKeyWire, ResolvedUseKindWire, ResolvedUseWire,
-    ReturnedBorrowWire, SCHEMA_VERSION, SourceIdentity,
+    FunctionProvenanceWire, GpuBuiltinWire, HirArtifact, KernelExtentConditionWire, KernelNumericPolicyWire,
+    KernelPrimitiveWire, KernelRangeExprWire, KernelRequirementFailureWire, KernelRequirementWire,
+    KernelRequirementsWire, KernelTargetRequirementWire, KernelTargetWire, KernelTrappingStoreWire,
+    KernelValueRangeWire, KernelWidthRequirementWire, LastUseWire, RadixBackwardWire, RadixLaneEntryWire,
+    RadixLaneWire, RegionRelationshipWire, ResolvedTensorEdgePolicyWire, ResolvedUseKeyWire, ResolvedUseKindWire,
+    ResolvedUseWire, ReturnedBorrowWire, SCHEMA_VERSION, SourceIdentity, TensorEdgePolicyCallWire,
+    TensorEdgePolicyFunctionRequirementsWire, TensorEdgePolicyProviderImplWire, TensorEdgePolicyRequirementWire,
+    TensorEdgePolicyTableWire, TensorShiftContextWire,
 };
 use radix_types::{AppliedArg, Type, TypeId, TypeTable};
 use rustc_hash::FxHashMap;
@@ -81,7 +86,317 @@ pub fn from_analyzed(unit: &AnalyzedModule, content_hash: &str, relative_path: &
             .collect(),
         capability_provenance: provenance_table_to_wire(&unit.provenance),
         provider_units: provider_units_wire(&unit.provider_units),
+        shape_obligations: shape_obligations_wire(&unit.shape_obligations),
+        kernel_requirements: kernel_requirements_wire(&unit.kernel_requirements),
+        tensor_edge_policies: tensor_edge_policies_wire(&unit.tensor_edge_policies),
     }
+}
+
+fn resolved_tensor_edge_policy_wire(policy: radix_hir::ResolvedTensorEdgePolicy) -> ResolvedTensorEdgePolicyWire {
+    match policy {
+        radix_hir::ResolvedTensorEdgePolicy::Builtin(policy) => ResolvedTensorEdgePolicyWire::Builtin(policy),
+        radix_hir::ResolvedTensorEdgePolicy::Custom { policy_def, remap, transform } => {
+            ResolvedTensorEdgePolicyWire::Custom { policy_def, remap, transform }
+        }
+        radix_hir::ResolvedTensorEdgePolicy::Deferred { policy_type } => {
+            ResolvedTensorEdgePolicyWire::Deferred { policy_type }
+        }
+    }
+}
+
+fn tensor_shift_context_wire(context: radix_hir::TensorShiftContext) -> TensorShiftContextWire {
+    TensorShiftContextWire { source_shape: context.source_shape, shift_expression: context.shift_expression }
+}
+
+fn tensor_edge_policies_wire(table: &radix_hir::TensorEdgePolicyTable) -> TensorEdgePolicyTableWire {
+    let mut calls: Vec<_> = table
+        .calls
+        .iter()
+        .map(|(call, policy)| TensorEdgePolicyCallWire {
+            call: *call,
+            policy: resolved_tensor_edge_policy_wire(*policy),
+        })
+        .collect();
+    calls.sort_by_key(|row| row.call.0);
+
+    let mut shifted_expressions: Vec<_> = table.shifted_expressions.iter().copied().collect();
+    shifted_expressions.sort_by_key(|id| id.0);
+    let mut shifted_view_expressions: Vec<_> = table
+        .shifted_view_expressions
+        .iter()
+        .map(|(id, context)| (*id, tensor_shift_context_wire(*context)))
+        .collect();
+    shifted_view_expressions.sort_by_key(|(id, _)| id.0);
+    let mut shifted_bindings: Vec<_> = table.shifted_bindings.iter().copied().collect();
+    shifted_bindings.sort_by_key(|id| id.0);
+    let mut shifted_view_bindings: Vec<_> = table
+        .shifted_view_bindings
+        .iter()
+        .map(|(id, context)| (*id, tensor_shift_context_wire(*context)))
+        .collect();
+    shifted_view_bindings.sort_by_key(|(id, _)| id.0);
+    let mut limes_contexts: Vec<_> = table
+        .limes_contexts
+        .iter()
+        .map(|(id, context)| (*id, tensor_shift_context_wire(*context)))
+        .collect();
+    limes_contexts.sort_by_key(|(id, _)| id.0);
+    let mut function_requirements: Vec<_> = table
+        .function_requirements
+        .iter()
+        .map(|(function, requirements)| TensorEdgePolicyFunctionRequirementsWire {
+            function: *function,
+            requirements: requirements
+                .iter()
+                .map(|requirement| TensorEdgePolicyRequirementWire {
+                    policy_type: requirement.policy_type,
+                    element_type: requirement.element_type,
+                    rank: requirement.rank,
+                })
+                .collect(),
+        })
+        .collect();
+    function_requirements.sort_by_key(|row| row.function.0);
+    let mut provider_impls: Vec<_> = table
+        .provider_impls
+        .iter()
+        .map(|provider| TensorEdgePolicyProviderImplWire {
+            policy_type: provider.policy_type,
+            element_type: provider.element_type,
+            rank: provider.rank,
+            policy: resolved_tensor_edge_policy_wire(provider.policy),
+        })
+        .collect();
+    provider_impls.sort_by_key(|row| (row.policy_type.0, row.element_type.0, row.rank));
+
+    TensorEdgePolicyTableWire {
+        calls,
+        shifted_expressions,
+        shifted_view_expressions,
+        shifted_bindings,
+        shifted_view_bindings,
+        limes_contexts,
+        function_requirements,
+        provider_impls,
+    }
+}
+
+fn kernel_requirements_wire(
+    requirements: &crate::semantic::passes::kernel_requirements::KernelRequirementsReport,
+) -> KernelRequirementsWire {
+    use crate::semantic::passes::kernel_requirements as live;
+
+    KernelRequirementsWire {
+        kernels: requirements
+            .kernels
+            .iter()
+            .map(|kernel| KernelRequirementWire {
+                def_id: kernel.def_id,
+                name: kernel.name.clone(),
+                target_reports: kernel
+                    .target_reports
+                    .iter()
+                    .map(|report| KernelTargetRequirementWire {
+                        target: match report.target {
+                            crate::codegen::Target::MirAmd => KernelTargetWire::MirAmd,
+                            crate::codegen::Target::MirMetal => KernelTargetWire::MirMetal,
+                            crate::codegen::Target::MirWgsl => KernelTargetWire::MirWgsl,
+                            _ => unreachable!("kernel requirements only record device targets"),
+                        },
+                        admitted: report.admitted,
+                        recursive: report.recursive,
+                        callees: report.callees.clone(),
+                        widths: report
+                            .widths
+                            .iter()
+                            .map(|width| KernelWidthRequirementWire {
+                                span: width.span,
+                                primitive: match width.primitive {
+                                    crate::semantic::Primitive::Numerus => KernelPrimitiveWire::Numerus,
+                                    crate::semantic::Primitive::Fractus => KernelPrimitiveWire::Fractus,
+                                    _ => unreachable!("kernel width reports are numeric"),
+                                },
+                                width: width.width,
+                                policy: match width.policy {
+                                    live::KernelNumericPolicy::Exact => KernelNumericPolicyWire::Exact,
+                                    live::KernelNumericPolicy::Wrapping => KernelNumericPolicyWire::Wrapping,
+                                    live::KernelNumericPolicy::Saturating => KernelNumericPolicyWire::Saturating,
+                                    live::KernelNumericPolicy::PolicyFloat => KernelNumericPolicyWire::PolicyFloat,
+                                },
+                            })
+                            .collect(),
+                        extent_conditions: report
+                            .extent_conditions
+                            .iter()
+                            .map(|condition| KernelExtentConditionWire {
+                                span: condition.span,
+                                range: kernel_value_range_wire(&condition.range),
+                                minimum: condition.minimum,
+                                maximum: condition.maximum,
+                            })
+                            .collect(),
+                        trapping_stores: report
+                            .trapping_stores
+                            .iter()
+                            .map(|store| KernelTrappingStoreWire { span: store.span, width: store.width })
+                            .collect(),
+                        failures: report
+                            .failures
+                            .iter()
+                            .map(kernel_requirement_failure_wire)
+                            .collect(),
+                    })
+                    .collect(),
+            })
+            .collect(),
+    }
+}
+
+fn kernel_value_range_wire(
+    range: &crate::semantic::passes::kernel_requirements::KernelValueRange,
+) -> KernelValueRangeWire {
+    KernelValueRangeWire {
+        minimum: kernel_range_expr_wire(&range.minimum),
+        maximum: kernel_range_expr_wire(&range.maximum),
+    }
+}
+
+fn kernel_range_expr_wire(
+    expression: &crate::semantic::passes::kernel_requirements::KernelRangeExpr,
+) -> KernelRangeExprWire {
+    use crate::semantic::passes::kernel_requirements::KernelRangeExpr as Live;
+    match expression {
+        Live::Constant(value) => KernelRangeExprWire::Constant(*value),
+        Live::Shape(index) => KernelRangeExprWire::Shape(*index),
+        Live::Add(lhs, rhs) => {
+            KernelRangeExprWire::Add(Box::new(kernel_range_expr_wire(lhs)), Box::new(kernel_range_expr_wire(rhs)))
+        }
+        Live::Subtract(lhs, rhs) => {
+            KernelRangeExprWire::Subtract(Box::new(kernel_range_expr_wire(lhs)), Box::new(kernel_range_expr_wire(rhs)))
+        }
+        Live::Multiply(lhs, rhs) => {
+            KernelRangeExprWire::Multiply(Box::new(kernel_range_expr_wire(lhs)), Box::new(kernel_range_expr_wire(rhs)))
+        }
+        Live::FloorDivide(lhs, rhs) => KernelRangeExprWire::FloorDivide(
+            Box::new(kernel_range_expr_wire(lhs)),
+            Box::new(kernel_range_expr_wire(rhs)),
+        ),
+        Live::Minimum(lhs, rhs) => {
+            KernelRangeExprWire::Minimum(Box::new(kernel_range_expr_wire(lhs)), Box::new(kernel_range_expr_wire(rhs)))
+        }
+        Live::Maximum(lhs, rhs) => {
+            KernelRangeExprWire::Maximum(Box::new(kernel_range_expr_wire(lhs)), Box::new(kernel_range_expr_wire(rhs)))
+        }
+    }
+}
+
+fn kernel_requirement_failure_wire(
+    failure: &crate::semantic::passes::kernel_requirements::KernelRequirementFailure,
+) -> KernelRequirementFailureWire {
+    use crate::semantic::passes::kernel_requirements::KernelRequirementFailure as Live;
+    match failure {
+        Live::RecursiveCall => KernelRequirementFailureWire::RecursiveCall,
+        Live::CalleeNotAdmitted { callee } => KernelRequirementFailureWire::CalleeNotAdmitted { callee: *callee },
+        Live::UnsupportedIntegerWidth { span, width } => {
+            KernelRequirementFailureWire::UnsupportedIntegerWidth { span: *span, width: *width }
+        }
+        Live::UnsupportedFloatWidth { span, width } => {
+            KernelRequirementFailureWire::UnsupportedFloatWidth { span: *span, width: *width }
+        }
+        Live::IntermediateOutOfRange { span, range } => {
+            KernelRequirementFailureWire::IntermediateOutOfRange { span: *span, range: kernel_value_range_wire(range) }
+        }
+        Live::StoreOutOfRange { span, range } => {
+            KernelRequirementFailureWire::StoreOutOfRange { span: *span, range: kernel_value_range_wire(range) }
+        }
+        Live::UnsupportedIntegerRange { span } => KernelRequirementFailureWire::UnsupportedIntegerRange { span: *span },
+        Live::DivideByZeroPossible { span } => KernelRequirementFailureWire::DivideByZeroPossible { span: *span },
+        Live::NegativeShiftCountPossible { span } => {
+            KernelRequirementFailureWire::NegativeShiftCountPossible { span: *span }
+        }
+        Live::TensorEdgePolicyDeferred { span } => {
+            KernelRequirementFailureWire::TensorEdgePolicyDeferred { span: *span }
+        }
+        Live::SaturatingLoweringDeferred { span, width } => {
+            KernelRequirementFailureWire::SaturatingLoweringDeferred { span: *span, width: *width }
+        }
+        Live::OptionFRequired { span, width } => {
+            KernelRequirementFailureWire::OptionFRequired { span: *span, width: *width }
+        }
+    }
+}
+
+fn shape_obligations_wire(
+    obligations: &crate::semantic::ShapeObligationTable,
+) -> radix_hir_fhir::ShapeObligationTableWire {
+    use radix_hir_fhir::{
+        CallSizeBindingsWire, FunctionSizeBindingsWire, RuntimeSizeBindingWire, ShapeCallObligationsWire,
+        ShapeFunctionObligationsWire, ShapeObligationTableWire, ShapeRelationBoundaryWire, ShapeRelationWire,
+    };
+
+    let map_relations = |relations: &[crate::semantic::ShapeRelation]| {
+        relations
+            .iter()
+            .map(|relation| ShapeRelationWire {
+                left: relation.left,
+                right: relation.right,
+                span: relation.span,
+                boundary: match relation.boundary {
+                    crate::semantic::ShapeRelationBoundary::Call => ShapeRelationBoundaryWire::Call,
+                    crate::semantic::ShapeRelationBoundary::FunctionEntry => ShapeRelationBoundaryWire::FunctionEntry,
+                    crate::semantic::ShapeRelationBoundary::FunctionReturn => ShapeRelationBoundaryWire::FunctionReturn,
+                },
+            })
+            .collect()
+    };
+    let mut calls: Vec<_> = obligations
+        .calls
+        .iter()
+        .map(|(call, relations)| ShapeCallObligationsWire { call: *call, relations: map_relations(relations) })
+        .collect();
+    calls.sort_by_key(|entry| entry.call.0);
+    let mut functions: Vec<_> = obligations
+        .functions
+        .iter()
+        .map(|(function, relations)| ShapeFunctionObligationsWire {
+            function: *function,
+            relations: map_relations(relations),
+        })
+        .collect();
+    functions.sort_by_key(|entry| entry.function.0);
+    let mut call_size_bindings: Vec<_> = obligations
+        .call_size_bindings
+        .iter()
+        .map(|(call, bindings)| CallSizeBindingsWire {
+            call: *call,
+            bindings: bindings
+                .iter()
+                .map(|binding| RuntimeSizeBindingWire {
+                    parameter: binding.parameter,
+                    witness: binding.witness,
+                    span: binding.span,
+                })
+                .collect(),
+        })
+        .collect();
+    call_size_bindings.sort_by_key(|entry| entry.call.0);
+    let mut function_size_bindings: Vec<_> = obligations
+        .function_size_bindings
+        .iter()
+        .map(|(function, bindings)| FunctionSizeBindingsWire {
+            function: *function,
+            bindings: bindings
+                .iter()
+                .map(|binding| RuntimeSizeBindingWire {
+                    parameter: binding.parameter,
+                    witness: binding.witness,
+                    span: binding.span,
+                })
+                .collect(),
+        })
+        .collect();
+    function_size_bindings.sort_by_key(|entry| entry.function.0);
+    ShapeObligationTableWire { calls, call_size_bindings, functions, function_size_bindings }
 }
 
 // ── Provider carriage (ARCH-U4 / schema v14) ───────────────────────────────
@@ -110,6 +425,8 @@ fn provider_units_wire(
                         resolved_generic_calls: provider.types.resolved_generic_calls.clone(),
                         interner: provider.interner.to_string_table(),
                         resolver: provider.resolver.to_snapshot(),
+                        tensor_edge_policies: tensor_edge_policies_wire(&provider.tensor_edge_policies),
+                        shape_obligations: shape_obligations_wire(&provider.shape_obligations),
                         nested: provider_units_wire(&provider.nested),
                     }))
                 }

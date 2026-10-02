@@ -267,6 +267,23 @@ fn parses_tensor_with_literal_and_infer_figura() {
 }
 
 #[test]
+fn parses_affine_tensor_dimensions_with_division_precedence() {
+    let result = parse_ok("functio f(tensor<f32, [N - 1, D / 2 + 3]> value) → vacuum {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let TypeExprKind::Tensor(_, FiguraExpr::Tuple(dims)) = &func.params[0].ty.kind else {
+        panic!("expected tensor shape tuple");
+    };
+    assert!(matches!(&dims[0], FiguraExpr::Subtract(_, 1)));
+    let FiguraExpr::Add(divided, 3) = &dims[1] else {
+        panic!("expected addition after division");
+    };
+    assert!(matches!(divided.as_ref(), FiguraExpr::Divide(_, 2)));
+}
+
+#[test]
 fn parses_atomic_with_single_element_type() {
     let result = parse_ok("functio f(atomic<i32> cell) → vacuum {}");
     let program = result.program.as_ref().expect("program");

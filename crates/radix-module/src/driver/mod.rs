@@ -119,6 +119,10 @@ pub struct ProviderUnit {
     pub interner: Interner,
     /// Resolver metadata carrying the provider's own file interfaces.
     pub resolver: Resolver,
+    /// Provider dispatch facts retained from this unit's semantic analysis.
+    pub tensor_edge_policies: radix_hir::TensorEdgePolicyTable,
+    /// Runtime tensor shape guards retained from this unit's semantic analysis.
+    pub shape_obligations: semantic::ShapeObligationTable,
     /// Warnings and informational diagnostics from the provider's analysis;
     /// emission fails closed when any is an error.
     pub diagnostics: Vec<Diagnostic>,
@@ -679,7 +683,7 @@ fn generate_output(
         }
         #[cfg(feature = "mir-metal")]
         Target::MirMetal => {
-            reject_modular_word_target(analysis, "Metal text")?;
+            reject_kernel_target_requirements(analysis, "Metal text", Target::MirMetal)?;
             reject_saturating_word_target(analysis, "Metal text")?;
             generate_metal_text_output(analysis, no_fuse)
         }
@@ -687,7 +691,7 @@ fn generate_output(
         Target::MirMetal => Err(unavailable_target_spanned(Target::MirMetal)),
         #[cfg(feature = "mir-wgsl")]
         Target::MirWgsl => {
-            reject_modular_word_target(analysis, "WGSL text")?;
+            reject_kernel_target_requirements(analysis, "WGSL text", Target::MirWgsl)?;
             reject_saturating_word_target(analysis, "WGSL text")?;
             generate_wgsl_text_output(analysis, no_fuse, target_bindings)
         }
@@ -768,16 +772,60 @@ fn generate_output(
     }
 }
 
-fn reject_modular_word_target(analysis: &AnalyzedModule, target_name: &str) -> Result<(), codegen::CodegenError> {
-    // BO-D-7: O(1) first-modular-word probe (tracked at TypeTable::intern).
-    if let Some(width) = analysis.types.first_modular_word_width() {
-        let marker = width.faber_marker();
-        return Err(codegen::CodegenError {
-            message: format!(
-                "modulus<{marker}> is not supported by the {target_name} target until modular edge-vector parity is landed"
-            ),
-            args: vec![DiagnosticArg::new("issue", "modular_word_target_unsupported")],
-        });
+fn reject_kernel_target_requirements(
+    analysis: &AnalyzedModule,
+    target_name: &str,
+    target: Target,
+) -> Result<(), codegen::CodegenError> {
+    // Kernel numerics are admitted only when the same typed-HIR snapshot
+    // carries a positive per-target requirement row. Unsupported widths and
+    // unproved stores stay closed here; conditional extent rows remain
+    // admitted for the launch boundary to evaluate.
+    for item in &analysis.hir.items {
+        let mut kernels = Vec::new();
+        match &item.kind {
+            HirItemKind::Function(function) if function.is_kernel => {
+                kernels.push((item.def_id, function.name));
+            }
+            HirItemKind::Struct(strukt) => {
+                kernels.extend(
+                    strukt
+                        .methods
+                        .iter()
+                        .filter(|method| method.func.is_kernel)
+                        .map(|method| (method.def_id, method.func.name)),
+                );
+            }
+            _ => {}
+        }
+        for (def_id, name) in kernels {
+            let Some(requirement) = analysis.kernel_requirements.target(def_id, target) else {
+                return Err(codegen::CodegenError {
+                    message: format!(
+                        "kernel `{}` has no inferred device requirements for {target_name}",
+                        analysis.interner.resolve(name)
+                    ),
+                    args: vec![
+                        DiagnosticArg::new("issue", "kernel_requirements_missing"),
+                        DiagnosticArg::new("target", target_name),
+                    ],
+                });
+            };
+            if !requirement.admitted {
+                return Err(codegen::CodegenError {
+                    message: format!(
+                        "kernel `{}` is not admitted for {target_name}: {:?}",
+                        analysis.interner.resolve(name),
+                        requirement.failures
+                    ),
+                    args: vec![
+                        DiagnosticArg::new("issue", "kernel_target_requirements_not_met"),
+                        DiagnosticArg::new("target", target_name),
+                        DiagnosticArg::new("kernel", analysis.interner.resolve(name)),
+                    ],
+                });
+            }
+        }
     }
     Ok(())
 }
@@ -2346,7 +2394,7 @@ fn carry_air_backward_templates<'a>(
             source,
             symbols
                 .into_iter()
-                .map(|name| crate::mir::MirGenericParam { name, is_shape: true })
+                .map(|name| crate::mir::MirGenericParam { name, is_shape: true, runtime_witness: None })
                 .collect(),
         ));
     }
@@ -2374,7 +2422,10 @@ fn companion_shape_symbols(
                     collect_index(types, *dim, symbols);
                 }
             }
+            crate::semantic::IndexExpr::Affine { base, .. } => collect_index(types, *base, symbols),
+            crate::semantic::IndexExpr::Divide { numerator, .. } => collect_index(types, *numerator, symbols),
             crate::semantic::IndexExpr::Literal(_)
+            | crate::semantic::IndexExpr::Runtime(_)
             | crate::semantic::IndexExpr::Infer(_)
             | crate::semantic::IndexExpr::Unspecified => {}
         }
@@ -2973,6 +3024,18 @@ pub struct AnalyzedModule {
     /// Type information produced by semantic analysis.
     pub types: semantic::TypeTable,
 
+    /// Runtime shape equalities retained by semantic analysis for MIR
+    /// boundary checks. Kept beside this unit's HIR/type arena so call-site
+    /// identities and index terms cannot drift across analysis stamps.
+    pub shape_obligations: semantic::ShapeObligationTable,
+
+    /// Per-target kernel width and range requirements inferred from this
+    /// module's semantic HIR snapshot.
+    pub kernel_requirements: semantic::passes::kernel_requirements::KernelRequirementsReport,
+
+    /// Shifted-view dispatch and generic provider facts from the same typed-HIR run.
+    pub tensor_edge_policies: radix_hir::TensorEdgePolicyTable,
+
     /// Resolver metadata produced by semantic analysis.
     pub resolver: Resolver,
 
@@ -3063,6 +3126,7 @@ impl AnalyzedModule {
         provenance: semantic::FunctionProvenanceTable,
         radix_lanes: RadixLaneMetadata,
         gpu_builtins: Vec<(crate::hir::DefId, radix_types::MirKernelBuiltin)>,
+        tensor_edge_policies: radix_hir::TensorEdgePolicyTable,
         #[cfg(feature = "mir-core")] graphics_source: GraphicsSourceFacts,
         diagnostics: Vec<Diagnostic>,
     ) -> Self {
@@ -3082,6 +3146,7 @@ impl AnalyzedModule {
             provenance,
             radix_lanes,
             gpu_builtins,
+            tensor_edge_policies,
             #[cfg(feature = "mir-core")]
             graphics_source,
             diagnostics,
@@ -3110,6 +3175,7 @@ impl AnalyzedModule {
         provenance: semantic::FunctionProvenanceTable,
         radix_lanes: RadixLaneMetadata,
         gpu_builtins: Vec<(crate::hir::DefId, radix_types::MirKernelBuiltin)>,
+        tensor_edge_policies: radix_hir::TensorEdgePolicyTable,
         #[cfg(feature = "mir-core")] graphics_source: GraphicsSourceFacts,
         diagnostics: Vec<Diagnostic>,
     ) -> Self {
@@ -3117,6 +3183,9 @@ impl AnalyzedModule {
             analysis_stamp,
             interner,
             types,
+            shape_obligations: semantic::ShapeObligationTable::default(),
+            kernel_requirements: semantic::passes::kernel_requirements::KernelRequirementsReport::default(),
+            tensor_edge_policies,
             resolver,
             hir,
             presentation,
@@ -3145,6 +3214,9 @@ impl AnalyzedModule {
             stamp: self.analysis_stamp,
             hir: &self.hir,
             types: &self.types,
+            shape_obligations: &self.shape_obligations,
+            kernel_requirements: &self.kernel_requirements,
+            tensor_edge_policies: &self.tensor_edge_policies,
             resolver: &self.resolver,
             annotation_contracts: &self.annotation_contracts,
             libraries: &self.libraries,
@@ -3223,6 +3295,9 @@ pub struct AnalyzedModuleApplicationView<'a> {
     pub stamp: semantic::AnalysisStamp,
     pub hir: &'a HirModule,
     pub types: &'a semantic::TypeTable,
+    pub shape_obligations: &'a semantic::ShapeObligationTable,
+    pub kernel_requirements: &'a semantic::passes::kernel_requirements::KernelRequirementsReport,
+    pub tensor_edge_policies: &'a radix_hir::TensorEdgePolicyTable,
     pub resolver: &'a Resolver,
     pub annotation_contracts: &'a semantic::AnnotationContractMetadata,
     pub libraries: &'a LibraryRegistry,
@@ -4142,6 +4217,9 @@ fn analyzed_unit_from_semantic(
     };
 
     let libraries = LibraryRegistry::default();
+    let shape_obligations = semantic_result.shape_obligations.clone();
+    let kernel_requirements = semantic_result.kernel_requirements.clone();
+    let tensor_edge_policies = semantic_result.tensor_edge_policies.clone();
     let parts = semantic::AnalyzedApplicationParts {
         hir,
         types: semantic_result.types,
@@ -4150,6 +4228,8 @@ fn analyzed_unit_from_semantic(
         libraries,
         radix_lanes: semantic_result.radix_lanes,
         gpu_builtins: semantic_result.gpu_builtins,
+        tensor_edge_policies: tensor_edge_policies.clone(),
+        kernel_requirements: kernel_requirements.clone(),
         access_facts,
         region_facts: semantic_result.region_facts,
         semantic_diagnostics: semantic_result.diagnostics,
@@ -4175,6 +4255,9 @@ fn analyzed_unit_from_semantic(
         analysis_stamp: fields.stamp,
         interner,
         types: fields.types,
+        shape_obligations,
+        kernel_requirements,
+        tensor_edge_policies: fields.tensor_edge_policies,
         resolver: fields.resolver,
         cli_program,
         libraries: fields.libraries,

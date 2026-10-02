@@ -15,7 +15,9 @@ use super::*;
 use radix_mir::KernelModule;
 use radix_mir::MirTerminator;
 use radix_mir::MirType;
-use radix_mir::{MirCollectionOp, MirDiagnosticKind, MirIntrinsic, MirProvider, MirRuntimeCall};
+use radix_mir::{
+    MirCollectionOp, MirDiagnosticKind, MirIntrinsic, MirLiftOp, MirProvider, MirRuntimeCall,
+};
 use radix_types::TypeId;
 
 /// Canonical test program shape: one empty function with no params, locals, or blocks.
@@ -331,10 +333,10 @@ fn tensor_layernorm_rank2_no_affine() {
         Value::Float(5.0),
         Value::Float(6.0),
     ];
-    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: input_data,
-        shape: vec![2, 3],
-    })));
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        input_data,
+        vec![2, 3],
+    ))));
 
     // --- 2. Build minimal runner context ---
     let mut host = BufferHost::default();
@@ -395,7 +397,7 @@ fn tensor_layernorm_rank2_no_affine() {
     ];
 
     for (idx, expected_val) in &expected {
-        let actual = match &out.data[*idx] {
+        let actual = match &out.logical_values().expect("valid tensor layout")[*idx] {
             Value::Float(f) => *f,
             Value::Int(i) => *i as f64,
             other => panic!("item {idx}: expected numeric, got {other:?}"),
@@ -423,10 +425,10 @@ fn tensor_softmax_rank1() {
 
     // --- 1. Build rank-1 input tensor: [1.0, 2.0, 3.0] ---
     let input_data = vec![Value::Float(1.0), Value::Float(2.0), Value::Float(3.0)];
-    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: input_data,
-        shape: vec![3],
-    })));
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        input_data,
+        vec![3],
+    ))));
 
     // --- 2. Build minimal runner context ---
     let mut host = BufferHost::default();
@@ -467,12 +469,12 @@ fn tensor_softmax_rank1() {
     };
     let out = output.borrow();
     assert_eq!(out.shape, vec![3], "output shape must match input shape");
+    let out_values = out.logical_values().expect("valid tensor layout");
 
     // softmax([1.0, 2.0, 3.0])
     // max=3.0, exp(1-3)=e^-2≈0.1353, exp(2-3)=e^-1≈0.3679, exp(3-3)=1.0
     // sum≈1.5032, normalized≈[0.0900, 0.2447, 0.6652]
-    let sum: f64 = out
-        .data
+    let sum: f64 = out_values
         .iter()
         .map(|v| match v {
             Value::Float(f) => *f,
@@ -491,7 +493,7 @@ fn tensor_softmax_rank1() {
         (2, 0.665_240_955_774_821_9),
     ];
     for (idx, expected_val) in &expected {
-        let actual = match &out.data[*idx] {
+        let actual = match &out.logical_values().expect("valid tensor layout")[*idx] {
             Value::Float(f) => *f,
             Value::Int(i) => *i as f64,
             other => panic!("item {idx}: expected numeric, got {other:?}"),
@@ -522,10 +524,10 @@ fn tensor_softmax_rank2() {
         Value::Float(2.0),
         Value::Float(3.0),
     ];
-    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: input_data,
-        shape: vec![2, 3],
-    })));
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        input_data,
+        vec![2, 3],
+    ))));
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
@@ -563,14 +565,14 @@ fn tensor_softmax_rank2() {
     assert_eq!(out.shape, vec![2, 3], "output shape must match input shape");
 
     // Each row sums to 1.0.
-    let row0_sum: f64 = out.data[0..3]
+    let row0_sum: f64 = out.logical_values().expect("valid tensor layout")[0..3]
         .iter()
         .map(|v| match v {
             Value::Float(f) => *f,
             _ => 0.0,
         })
         .sum();
-    let row1_sum: f64 = out.data[3..6]
+    let row1_sum: f64 = out.logical_values().expect("valid tensor layout")[3..6]
         .iter()
         .map(|v| match v {
             Value::Float(f) => *f,
@@ -588,7 +590,10 @@ fn tensor_softmax_rank2() {
 
     // Both rows are identical since input rows are identical.
     for i in 0..3 {
-        let diff = match (&out.data[i], &out.data[i + 3]) {
+        let diff = match (
+            &out.logical_values().expect("valid tensor layout")[i],
+            &out.logical_values().expect("valid tensor layout")[i + 3],
+        ) {
             (Value::Float(a), Value::Float(b)) => (a - b).abs(),
             _ => 1.0,
         };
@@ -615,10 +620,10 @@ fn tensor_gelu_rank1() {
     // --- 1. Build rank-1 input tensor: [-3.0, -1.0, 0.0, 1.0, 3.0] ---
     let inputs = [-3.0, -1.0, 0.0, 1.0, 3.0];
     let input_data: Vec<Value> = inputs.iter().map(|v| Value::Float(*v)).collect();
-    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: input_data,
-        shape: vec![5],
-    })));
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        input_data,
+        vec![5],
+    ))));
 
     // --- 2. Build minimal runner context ---
     let mut host = BufferHost::default();
@@ -658,11 +663,15 @@ fn tensor_gelu_rank1() {
     };
     let out = output.borrow();
     assert_eq!(out.shape, vec![5], "output shape must match input shape");
-    assert_eq!(out.data.len(), 5, "output data length must match input");
+    assert_eq!(
+        out.logical_values().expect("valid tensor layout").len(),
+        5,
+        "output data length must match input"
+    );
 
     for (idx, input) in inputs.iter().enumerate() {
         let expected = gelu_f64(*input);
-        let actual = match &out.data[idx] {
+        let actual = match &out.logical_values().expect("valid tensor layout")[idx] {
             Value::Float(f) => *f,
             other => panic!("item {idx}: expected float, got {other:?}"),
         };
@@ -690,10 +699,10 @@ fn tensor_relu_rank1() {
     // Mixed-sign input proves ReLU is not identity: negatives clamp to 0.0.
     let inputs = [-3.0, -1.0, 0.0, 1.0, 3.0];
     let input_data: Vec<Value> = inputs.iter().map(|v| Value::Float(*v)).collect();
-    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: input_data,
-        shape: vec![5],
-    })));
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        input_data,
+        vec![5],
+    ))));
 
     // --- 2. Build minimal runner context ---
     let mut host = BufferHost::default();
@@ -733,11 +742,15 @@ fn tensor_relu_rank1() {
     };
     let out = output.borrow();
     assert_eq!(out.shape, vec![5], "output shape must match input shape");
-    assert_eq!(out.data.len(), 5, "output data length must match input");
+    assert_eq!(
+        out.logical_values().expect("valid tensor layout").len(),
+        5,
+        "output data length must match input"
+    );
 
     for (idx, input) in inputs.iter().enumerate() {
         let expected = input.max(0.0);
-        let actual = match &out.data[idx] {
+        let actual = match &out.logical_values().expect("valid tensor layout")[idx] {
             Value::Float(f) => *f,
             other => panic!("item {idx}: expected float, got {other:?}"),
         };
@@ -763,10 +776,10 @@ fn mir_unop_gelu_tensor() {
 
     let inputs = [-2.0, -0.5, 0.0, 0.5, 2.0];
     let input_data: Vec<Value> = inputs.iter().map(|v| Value::Float(*v)).collect();
-    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: input_data,
-        shape: vec![5],
-    })));
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        input_data,
+        vec![5],
+    ))));
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
@@ -802,11 +815,11 @@ fn mir_unop_gelu_tensor() {
     };
     let out = output.borrow();
     assert_eq!(out.shape, vec![5], "output shape must match");
-    assert_eq!(out.data.len(), 5);
+    assert_eq!(out.logical_values().expect("valid tensor layout").len(), 5);
 
     for (idx, input) in inputs.iter().enumerate() {
         let expected = gelu_f64(*input);
-        let actual = match &out.data[idx] {
+        let actual = match &out.logical_values().expect("valid tensor layout")[idx] {
             Value::Float(f) => *f,
             other => panic!("item {idx}: expected float, got {other:?}"),
         };
@@ -833,10 +846,10 @@ fn mir_unop_tanh_tensor() {
 
     let inputs = [-2.0, -1.0, 0.0, 1.0, 2.0];
     let input_data: Vec<Value> = inputs.iter().map(|v| Value::Float(*v)).collect();
-    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: input_data,
-        shape: vec![5],
-    })));
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        input_data,
+        vec![5],
+    ))));
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
@@ -874,7 +887,7 @@ fn mir_unop_tanh_tensor() {
 
     for (idx, input) in inputs.iter().enumerate() {
         let expected = input.tanh();
-        let actual = match &out.data[idx] {
+        let actual = match &out.logical_values().expect("valid tensor layout")[idx] {
             Value::Float(f) => *f,
             other => panic!("item {idx}: expected float, got {other:?}"),
         };
@@ -901,10 +914,10 @@ fn mir_unop_exp_tensor() {
 
     let inputs = [-1.0, 0.0, 1.0, 2.0, 3.0];
     let input_data: Vec<Value> = inputs.iter().map(|v| Value::Float(*v)).collect();
-    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: input_data,
-        shape: vec![5],
-    })));
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        input_data,
+        vec![5],
+    ))));
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
@@ -942,7 +955,7 @@ fn mir_unop_exp_tensor() {
 
     for (idx, input) in inputs.iter().enumerate() {
         let expected = input.exp();
-        let actual = match &out.data[idx] {
+        let actual = match &out.logical_values().expect("valid tensor layout")[idx] {
             Value::Float(f) => *f,
             other => panic!("item {idx}: expected float, got {other:?}"),
         };
@@ -970,10 +983,10 @@ fn tensor_elementwise_or_scalar_broadcast() {
 
     // Tensor: [1.0, 2.0, 3.0], scalar: 2.0 → expected: [2.0, 4.0, 6.0]
     let input_data: Vec<Value> = vec![Value::Float(1.0), Value::Float(2.0), Value::Float(3.0)];
-    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: input_data,
-        shape: vec![3],
-    })));
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        input_data,
+        vec![3],
+    ))));
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
@@ -1022,7 +1035,7 @@ fn tensor_elementwise_or_scalar_broadcast() {
 
     let expected_values = [2.0, 4.0, 6.0];
     for (idx, expected) in expected_values.iter().enumerate() {
-        let actual = match &out.data[idx] {
+        let actual = match &out.logical_values().expect("valid tensor layout")[idx] {
             Value::Float(f) => *f,
             other => panic!("item {idx}: expected float, got {other:?}"),
         };
@@ -1050,10 +1063,10 @@ fn tensor_elementwise_or_scalar_broadcast_div_scalar_tensor() {
 
     // Scalar: 1.0, Tensor: [2.0, 4.0, 8.0] → expected: [0.5, 0.25, 0.125]
     let input_data: Vec<Value> = vec![Value::Float(2.0), Value::Float(4.0), Value::Float(8.0)];
-    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: input_data,
-        shape: vec![3],
-    })));
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        input_data,
+        vec![3],
+    ))));
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
@@ -1102,7 +1115,7 @@ fn tensor_elementwise_or_scalar_broadcast_div_scalar_tensor() {
     // 1.0 / [2.0, 4.0, 8.0] = [0.5, 0.25, 0.125]
     let expected_values = [0.5, 0.25, 0.125];
     for (idx, expected) in expected_values.iter().enumerate() {
-        let actual = match &out.data[idx] {
+        let actual = match &out.logical_values().expect("valid tensor layout")[idx] {
             Value::Float(f) => *f,
             other => panic!("item {idx}: expected float, got {other:?}"),
         };
@@ -1130,10 +1143,10 @@ fn tensor_elementwise_or_scalar_broadcast_sub_scalar_tensor() {
 
     // Scalar: 10.0, Tensor: [1.0, 2.0, 3.0] → expected: [9.0, 8.0, 7.0]
     let input_data: Vec<Value> = vec![Value::Float(1.0), Value::Float(2.0), Value::Float(3.0)];
-    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: input_data,
-        shape: vec![3],
-    })));
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        input_data,
+        vec![3],
+    ))));
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
@@ -1182,7 +1195,7 @@ fn tensor_elementwise_or_scalar_broadcast_sub_scalar_tensor() {
     // 10.0 - [1.0, 2.0, 3.0] = [9.0, 8.0, 7.0]
     let expected_values = [9.0, 8.0, 7.0];
     for (idx, expected) in expected_values.iter().enumerate() {
-        let actual = match &out.data[idx] {
+        let actual = match &out.logical_values().expect("valid tensor layout")[idx] {
             Value::Float(f) => *f,
             other => panic!("item {idx}: expected float, got {other:?}"),
         };
@@ -1213,10 +1226,10 @@ fn unop_sqrt_tensor() {
         Value::Float(16.0),
         Value::Float(25.0),
     ];
-    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: input_data,
-        shape: vec![2, 2],
-    })));
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        input_data,
+        vec![2, 2],
+    ))));
 
     // --- 2. Build minimal runner context ---
     let mut host = BufferHost::default();
@@ -1263,7 +1276,7 @@ fn unop_sqrt_tensor() {
 
     let expected = [2.0, 3.0, 4.0, 5.0];
     for (idx, expected_val) in expected.iter().enumerate() {
-        let actual = match &out.data[idx] {
+        let actual = match &out.logical_values().expect("valid tensor layout")[idx] {
             Value::Float(f) => *f,
             other => panic!("item {idx}: expected float, got {other:?}"),
         };
@@ -1290,17 +1303,17 @@ fn tensor_fill_prefix_broadcast() {
 
     // --- 1. Create receiver [2,3] tensor and fill [2] tensor ---
     let receiver_data = vec![Value::Float(0.0); 6];
-    let receiver_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: receiver_data,
-        shape: vec![2, 3],
-    })));
+    let receiver_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        receiver_data,
+        vec![2, 3],
+    ))));
 
     // Fill tensor shape [2] — prefix broadcast: each element repeats 3 times.
     let fill_data = vec![Value::Float(10.0), Value::Float(20.0)];
-    let fill_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: fill_data,
-        shape: vec![2],
-    })));
+    let fill_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        fill_data,
+        vec![2],
+    ))));
 
     // --- 2. Build minimal runner context ---
     let mut host = BufferHost::default();
@@ -1352,7 +1365,7 @@ fn tensor_fill_prefix_broadcast() {
 
     let expected = [10.0, 10.0, 10.0, 20.0, 20.0, 20.0];
     for (idx, expected_val) in expected.iter().enumerate() {
-        let actual = match &out.data[idx] {
+        let actual = match &out.logical_values().expect("valid tensor layout")[idx] {
             Value::Float(f) => *f,
             other => panic!("item {idx}: expected float, got {other:?}"),
         };
@@ -1379,10 +1392,10 @@ fn tensor_fill_suffix_broadcast() {
 
     // --- 1. Create receiver [2,3] tensor and fill [3] tensor ---
     let receiver_data = vec![Value::Float(0.0); 6];
-    let receiver_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: receiver_data,
-        shape: vec![2, 3],
-    })));
+    let receiver_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        receiver_data,
+        vec![2, 3],
+    ))));
 
     // Fill tensor shape [3] — suffix broadcast: cycle the block 2 times.
     let fill_data = vec![
@@ -1390,10 +1403,10 @@ fn tensor_fill_suffix_broadcast() {
         Value::Float(200.0),
         Value::Float(300.0),
     ];
-    let fill_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: fill_data,
-        shape: vec![3],
-    })));
+    let fill_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        fill_data,
+        vec![3],
+    ))));
 
     // --- 2. Build minimal runner context ---
     let mut host = BufferHost::default();
@@ -1445,7 +1458,7 @@ fn tensor_fill_suffix_broadcast() {
 
     let expected = [100.0, 200.0, 300.0, 100.0, 200.0, 300.0];
     for (idx, expected_val) in expected.iter().enumerate() {
-        let actual = match &out.data[idx] {
+        let actual = match &out.logical_values().expect("valid tensor layout")[idx] {
             Value::Float(f) => *f,
             other => panic!("item {idx}: expected float, got {other:?}"),
         };
@@ -1479,10 +1492,10 @@ fn tensor_crux_entropia_rank2() {
         Value::Float(2.0),
         Value::Float(1.0),
     ];
-    let logits_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: logits_data,
-        shape: vec![2, 3],
-    })));
+    let logits_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        logits_data,
+        vec![2, 3],
+    ))));
 
     // --- 2. Build rank-2 targets: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]] ---
     let targets_data = vec![
@@ -1493,10 +1506,10 @@ fn tensor_crux_entropia_rank2() {
         Value::Float(1.0),
         Value::Float(0.0),
     ];
-    let targets_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: targets_data,
-        shape: vec![2, 3],
-    })));
+    let targets_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        targets_data,
+        vec![2, 3],
+    ))));
 
     // --- 3. Build minimal runner context ---
     let mut host = BufferHost::default();
@@ -1747,17 +1760,17 @@ fn tensor_elementwise_shape_mismatch_rejected() {
 
     // [2,3] tensor (6 elements)
     let left_data: Vec<Value> = (1..=6).map(Value::Int).collect();
-    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: left_data,
-        shape: vec![2, 3],
-    })));
+    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        left_data,
+        vec![2, 3],
+    ))));
 
     // [6] tensor (6 elements — same count, different shape)
     let right_data: Vec<Value> = (10..=15).map(Value::Int).collect();
-    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: right_data,
-        shape: vec![6],
-    })));
+    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        right_data,
+        vec![6],
+    ))));
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
@@ -1818,17 +1831,17 @@ fn tensor_elementwise_backing_length_mismatch_rejected() {
 
     // Both tensors have shape [2,2] but different backing lengths.
     let left_data: Vec<Value> = (1..=4).map(Value::Int).collect();
-    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: left_data,
-        shape: vec![2, 2],
-    })));
+    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        left_data,
+        vec![2, 2],
+    ))));
 
     // Same shape [2,2], but only 3 elements (should be 4).
     let right_data: Vec<Value> = (10..=12).map(Value::Int).collect();
-    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: right_data,
-        shape: vec![2, 2],
-    })));
+    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        right_data,
+        vec![2, 2],
+    ))));
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
@@ -1892,10 +1905,10 @@ fn tensor_elementwise_same_shape_succeeds() {
         Value::Int(5),
         Value::Int(6),
     ];
-    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: left_data,
-        shape: vec![2, 3],
-    })));
+    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        left_data,
+        vec![2, 3],
+    ))));
 
     let right_data = vec![
         Value::Int(10),
@@ -1905,10 +1918,10 @@ fn tensor_elementwise_same_shape_succeeds() {
         Value::Int(50),
         Value::Int(60),
     ];
-    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: right_data,
-        shape: vec![2, 3],
-    })));
+    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        right_data,
+        vec![2, 3],
+    ))));
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
@@ -1953,11 +1966,18 @@ fn tensor_elementwise_same_shape_succeeds() {
     };
     let tensor = tensor_value.borrow();
     assert_eq!(tensor.shape, vec![2, 3]);
-    assert_eq!(tensor.data.len(), 6);
+    assert_eq!(
+        tensor.logical_values().expect("valid tensor layout").len(),
+        6
+    );
     // 1+10=11, 2+20=22, 3+30=33, 4+40=44, 5+50=55, 6+60=66
     let expected: [i64; 6] = [11, 22, 33, 44, 55, 66];
     for (i, &exp) in expected.iter().enumerate() {
-        assert_eq!(tensor.data[i], Value::Int(exp), "element {i} mismatch");
+        assert_eq!(
+            tensor.logical_values().expect("valid tensor layout")[i],
+            Value::Int(exp),
+            "element {i} mismatch"
+        );
     }
 }
 
@@ -1974,10 +1994,10 @@ fn tensor_softmax_zero_width_rejected() {
     use radix_types::TypeTable;
 
     // Shape [0] — zero-width rank-1 tensor
-    let input = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: vec![],
-        shape: vec![0],
-    })));
+    let input = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        vec![],
+        vec![0],
+    ))));
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
@@ -2024,10 +2044,10 @@ fn tensor_softmax_rank2_zero_width_rejected() {
     use radix_types::TypeTable;
 
     // Shape [2, 0] — rank-2 with zero last dim
-    let input = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: vec![],
-        shape: vec![2, 0],
-    })));
+    let input = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        vec![],
+        vec![2, 0],
+    ))));
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
@@ -2069,14 +2089,14 @@ fn tensor_crux_entropia_zero_width_rejected() {
     use radix_types::TypeTable;
 
     // Shape [3, 0] — rank-2 with zero last dim, both logits and targets
-    let logits = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: vec![],
-        shape: vec![3, 0],
-    })));
-    let targets = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: vec![],
-        shape: vec![3, 0],
-    })));
+    let logits = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        vec![],
+        vec![3, 0],
+    ))));
+    let targets = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        vec![],
+        vec![3, 0],
+    ))));
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
@@ -2300,14 +2320,14 @@ fn f029_tensor_add_u8_overflow_rejected() {
     let tensor_ty = type_table.tensor_with_shape(u8_ty, shape);
 
     // 200 + 100 = 300 > u8::MAX=255 → must overflow.
-    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: vec![Value::Int(200)],
-        shape: vec![1],
-    })));
-    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: vec![Value::Int(100)],
-        shape: vec![1],
-    })));
+    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        vec![Value::Int(200)],
+        vec![1],
+    ))));
+    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        vec![Value::Int(100)],
+        vec![1],
+    ))));
 
     let mut host = BufferHost::default();
     let interner = Interner::new();
@@ -2368,14 +2388,14 @@ fn f029_uint_tensor_add_succeeds() {
     let mut type_table = TypeTable::new();
     let u64_ty = type_table.intern(Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64));
 
-    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: vec![Value::UInt(100), Value::UInt(200)],
-        shape: vec![2],
-    })));
-    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: vec![Value::UInt(50), Value::UInt(25)],
-        shape: vec![2],
-    })));
+    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        vec![Value::UInt(100), Value::UInt(200)],
+        vec![2],
+    ))));
+    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        vec![Value::UInt(50), Value::UInt(25)],
+        vec![2],
+    ))));
 
     let mut host = BufferHost::default();
     let interner = Interner::new();
@@ -2417,10 +2437,19 @@ fn f029_uint_tensor_add_succeeds() {
         other => panic!("expected tensor, got {other:?}"),
     };
     let tensor = tensor_value.borrow();
-    assert_eq!(tensor.data.len(), 2);
+    assert_eq!(
+        tensor.logical_values().expect("valid tensor layout").len(),
+        2
+    );
     // 100+50=150, 200+25=225
-    assert_eq!(tensor.data[0], Value::UInt(150));
-    assert_eq!(tensor.data[1], Value::UInt(225));
+    assert_eq!(
+        tensor.logical_values().expect("valid tensor layout")[0],
+        Value::UInt(150)
+    );
+    assert_eq!(
+        tensor.logical_values().expect("valid tensor layout")[1],
+        Value::UInt(225)
+    );
 }
 
 /// F-029 verify: `TensorDiv` by zero must be rejected.
@@ -2437,15 +2466,15 @@ fn f029_tensor_div_zero_rejected() {
     let mut type_table = TypeTable::new();
     let i32_ty = type_table.intern(Type::SizedNumeric(Primitive::Numerus, NumericWidth::I32));
 
-    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: vec![Value::Int(42)],
-        shape: vec![1],
-    })));
+    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        vec![Value::Int(42)],
+        vec![1],
+    ))));
     // Right tensor contains zero → division by zero.
-    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: vec![Value::Int(0)],
-        shape: vec![1],
-    })));
+    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        vec![Value::Int(0)],
+        vec![1],
+    ))));
 
     let mut host = BufferHost::default();
     let interner = Interner::new();
@@ -2505,14 +2534,14 @@ fn f029_float_tensor_div_zero_allowed() {
     let mut type_table = TypeTable::new();
     let f32_ty = type_table.intern(Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32));
 
-    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: vec![Value::Float(42.0)],
-        shape: vec![1],
-    })));
-    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: vec![Value::Float(0.0)],
-        shape: vec![1],
-    })));
+    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        vec![Value::Float(42.0)],
+        vec![1],
+    ))));
+    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        vec![Value::Float(0.0)],
+        vec![1],
+    ))));
 
     let mut host = BufferHost::default();
     let interner = Interner::new();
@@ -2554,7 +2583,7 @@ fn f029_float_tensor_div_zero_allowed() {
         other => panic!("expected tensor, got {other:?}"),
     };
     let tensor = tensor_value.borrow();
-    let val = match &tensor.data[0] {
+    let val = match &tensor.logical_values().expect("valid tensor layout")[0] {
         Value::Float(f) => *f,
         other => panic!("expected float, got {other:?}"),
     };
@@ -3432,14 +3461,14 @@ fn eval_tensor_add_bias(x_data: Vec<f64>, b_data: Vec<f64>) -> Value {
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
 
-    let x_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: x_data.into_iter().map(Value::Float).collect(),
-        shape: vec![2, 8],
-    })));
-    let b_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: b_data.into_iter().map(Value::Float).collect(),
-        shape: vec![8],
-    })));
+    let x_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        x_data.into_iter().map(Value::Float).collect(),
+        vec![2, 8],
+    ))));
+    let b_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        b_data.into_iter().map(Value::Float).collect(),
+        vec![8],
+    ))));
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
@@ -3489,7 +3518,13 @@ fn tensor_add_rank_extension_broadcasts_8_bias_over_2_rows() {
         101.0, 202.0, 303.0, 404.0, 505.0, 606.0, 707.0, 808.0, // row 0 + b
         110.0, 220.0, 330.0, 440.0, 550.0, 660.0, 770.0, 880.0, // row 1 + b
     ];
-    for (index, (actual, expected)) in out.data.iter().zip(expected).enumerate() {
+    for (index, (actual, expected)) in out
+        .logical_values()
+        .expect("valid tensor layout")
+        .iter()
+        .zip(expected)
+        .enumerate()
+    {
         let Value::Float(actual) = actual else {
             panic!("expected float element at {index}");
         };
@@ -3512,14 +3547,14 @@ fn tensor_add_invalid_broadcast_pair_fails_closed() {
     use radix_types::TypeTable;
 
     // Left `[2,8]`, right `[2]` — the bias dims are not the trailing dims.
-    let x_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: vec![Value::Float(1.0); 16],
-        shape: vec![2, 8],
-    })));
-    let wrong_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: vec![Value::Float(2.0); 2],
-        shape: vec![2],
-    })));
+    let x_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        vec![Value::Float(1.0); 16],
+        vec![2, 8],
+    ))));
+    let wrong_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        vec![Value::Float(2.0); 2],
+        vec![2],
+    ))));
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
@@ -3582,7 +3617,7 @@ pub(super) fn evaluate_collection_call(
 
 fn tensor_value(data: Vec<Value>, shape: Vec<i64>) -> Value {
     use crate::value::TensorValue;
-    Value::Tensor(Rc::new(RefCell::new(TensorValue { data, shape })))
+    Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(data, shape))))
 }
 
 fn assert_numeric_close(out: &[Value], expected: &[f64], tolerance: f64) {
@@ -3645,7 +3680,7 @@ fn tensor_rms_norm_rank2_with_gamma() {
     let row0_scale = 1.0_f64 / (14.0_f64 / 3.0_f64 + 1e-5).sqrt();
     let row1_scale = 1.0_f64 / (77.0_f64 / 3.0_f64 + 1e-5).sqrt();
     assert_numeric_close(
-        &out.data,
+        &out.logical_values().expect("valid tensor layout"),
         &[
             1.0 * row0_scale * 2.0,
             2.0 * row0_scale * 1.0,
@@ -3703,7 +3738,11 @@ fn tensor_rope_rank1_norm_pairs() {
     assert_eq!(out.shape, vec![4], "output shape must match input shape");
     // The supplied table rotates the first pair by π/2 and leaves the second.
     let expected = [-2.0, 1.0, 3.0, 4.0];
-    assert_numeric_close(&out.data, &expected, 1e-4);
+    assert_numeric_close(
+        &out.logical_values().expect("valid tensor layout"),
+        &expected,
+        1e-4,
+    );
 }
 
 /// CCI-1: `rope_norm` preserves elements beyond `dim` on the last axis.
@@ -3744,7 +3783,11 @@ fn tensor_rope_preserves_remainder_beyond_dim() {
     let out = output.borrow();
     assert_eq!(out.shape, vec![6]);
     let expected = [-2.0, 1.0, 3.0, 4.0, 5.0, 6.0];
-    assert_numeric_close(&out.data, &expected, 1e-4);
+    assert_numeric_close(
+        &out.logical_values().expect("valid tensor layout"),
+        &expected,
+        1e-4,
+    );
 }
 
 /// Qwen/NeoX `rotate_half`: pairs `(x[k], x[k+dim/2])` with the same
@@ -3792,7 +3835,11 @@ fn tensor_rope_half_rank1_rotate_half_pairs() {
     let out = output.borrow();
     assert_eq!(out.shape, vec![4]);
     let expected = [0.0, 0.0, 1.0, 0.0];
-    assert_numeric_close(&out.data, &expected, 1e-4);
+    assert_numeric_close(
+        &out.logical_values().expect("valid tensor layout"),
+        &expected,
+        1e-4,
+    );
 }
 
 /// CCI-1: gather selects table rows by id, preserving repeated/out-of-order
@@ -3832,7 +3879,11 @@ fn tensor_gather_selects_rows_and_fails_closed_on_bad_id() {
     };
     let out = output.borrow();
     assert_eq!(out.shape, vec![3, 2], "result shape is [T, D]");
-    assert_numeric_close(&out.data, &[5.0, 6.0, 1.0, 2.0, 5.0, 6.0], 1e-9);
+    assert_numeric_close(
+        &out.logical_values().expect("valid tensor layout"),
+        &[5.0, 6.0, 1.0, 2.0, 5.0, 6.0],
+        1e-9,
+    );
 
     // Out-of-range id (>= table rows) fails closed.
     let bad_ids = tensor_value(vec![Value::Int(0), Value::Int(3)], vec![2]);
@@ -3911,17 +3962,17 @@ fn runner_gradient_handle_create_accumulate_read_zero_round_trip() {
         (MirValueId(2), Value::Int(1)),
         (
             MirValueId(3),
-            Value::Tensor(Rc::new(RefCell::new(TensorValue {
-                data: vec![Value::Float(1.0), Value::Float(2.0)],
-                shape: vec![2],
-            }))),
+            Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+                vec![Value::Float(1.0), Value::Float(2.0)],
+                vec![2],
+            )))),
         ),
         (
             MirValueId(4),
-            Value::Tensor(Rc::new(RefCell::new(TensorValue {
-                data: vec![Value::Float(3.0), Value::Float(4.0)],
-                shape: vec![2],
-            }))),
+            Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+                vec![Value::Float(3.0), Value::Float(4.0)],
+                vec![2],
+            )))),
         ),
     ]);
 
@@ -4370,6 +4421,21 @@ fn eval_tensor_matmul(left: Value, right: Value) -> Result<Value, RunnerError> {
     )
 }
 
+fn eval_tensor_view_op(
+    op: MirCollectionOp,
+    args: Vec<MirOperand>,
+    inputs: Vec<(MirValueId, Value)>,
+) -> Result<Value, RunnerError> {
+    evaluate_collection_call(
+        &MirRuntimeCall {
+            intrinsic: MirIntrinsic::Collection(op),
+            args,
+            return_ty: MirType::semantic(TypeId(0)),
+        },
+        inputs,
+    )
+}
+
 fn dense_float_tensor(rows: i64, cols: i64, fill: impl Fn(i64, i64) -> f64) -> Value {
     let mut data = Vec::with_capacity((rows * cols) as usize);
     for i in 0..rows {
@@ -4392,7 +4458,7 @@ fn tensor_matmul_float_2x3_by_3x4() {
     let out = cell.borrow();
     assert_eq!(out.shape, vec![2, 4]);
     assert_numeric_close(
-        &out.data,
+        &out.logical_values().expect("valid tensor layout"),
         &[38.0, 44.0, 50.0, 56.0, 83.0, 98.0, 113.0, 128.0],
         1e-9,
     );
@@ -4411,7 +4477,975 @@ fn tensor_matmul_float_2x3_by_rank1_vector() {
     };
     let out = cell.borrow();
     assert_eq!(out.shape, vec![2]);
-    assert_numeric_close(&out.data, &[14.0, 32.0], 1e-9);
+    assert_numeric_close(
+        &out.logical_values().expect("valid tensor layout"),
+        &[14.0, 32.0],
+        1e-9,
+    );
+}
+
+#[test]
+fn tensor_batched_matmul_rank3_and_rank4_prefix_rhs() {
+    let rank3_left = tensor_value(
+        (1..=8)
+            .map(|value| Value::Float(f64::from(value)))
+            .collect(),
+        vec![2, 2, 2],
+    );
+    let rank2_rhs = tensor_value(vec![Value::Float(1.0), Value::Float(1.0)], vec![2, 1]);
+    let rank3 = eval_tensor_matmul(rank3_left, rank2_rhs).expect("rank-3 batched matmul");
+    let Value::Tensor(rank3) = rank3 else {
+        panic!("expected rank-3 tensor result");
+    };
+    let rank3 = rank3.borrow();
+    assert_eq!(rank3.shape, vec![2, 2, 1]);
+    assert_numeric_close(
+        &rank3.logical_values().expect("valid tensor layout"),
+        &[3.0, 7.0, 11.0, 15.0],
+        1e-9,
+    );
+
+    // The rank-3 RHS batch `[2]` is a prefix of the rank-4 receiver's
+    // `[2,2]` batch axes, so each RHS matrix repeats across the last batch.
+    let rank4_left = tensor_value(
+        (1..=8)
+            .map(|value| Value::Float(f64::from(value)))
+            .collect(),
+        vec![2, 2, 1, 2],
+    );
+    let rank3_rhs = tensor_value(
+        vec![
+            Value::Float(1.0),
+            Value::Float(1.0),
+            Value::Float(1.0),
+            Value::Float(1.0),
+        ],
+        vec![2, 2, 1],
+    );
+    let rank4 = eval_tensor_matmul(rank4_left, rank3_rhs).expect("rank-4 batched matmul");
+    let Value::Tensor(rank4) = rank4 else {
+        panic!("expected rank-4 tensor result");
+    };
+    let rank4 = rank4.borrow();
+    assert_eq!(rank4.shape, vec![2, 2, 1, 1]);
+    assert_numeric_close(
+        &rank4.logical_values().expect("valid tensor layout"),
+        &[3.0, 7.0, 11.0, 15.0],
+        1e-9,
+    );
+}
+
+#[test]
+fn tensor_view_composition_keeps_storage_until_materialize() {
+    let base = tensor_value((0..12).map(Value::Int).collect(), vec![4, 3]);
+    let sliced = eval_tensor_view_op(
+        MirCollectionOp::TensorSlice,
+        vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Int(4)),
+            MirOperand::Constant(MirConstant::Int(2)),
+        ],
+        vec![(MirValueId(0), base.clone())],
+    )
+    .expect("strided slice view");
+    let transposed = eval_tensor_view_op(
+        MirCollectionOp::TensorTranspose,
+        vec![MirOperand::Value(MirValueId(0))],
+        vec![(MirValueId(0), sliced)],
+    )
+    .expect("transpose view");
+    let Value::Tensor(base_cell) = &base else {
+        unreachable!();
+    };
+    let Value::Tensor(transposed_cell) = &transposed else {
+        panic!("expected tensor view");
+    };
+    let base_tensor = base_cell.borrow();
+    let transposed_tensor = transposed_cell.borrow();
+    assert!(Rc::ptr_eq(&base_tensor.data, &transposed_tensor.data));
+    assert_eq!(transposed_tensor.shape, vec![3, 2]);
+    assert_eq!(transposed_tensor.strides, vec![1, 6]);
+    assert_eq!(transposed_tensor.offset, 3);
+    assert_eq!(
+        transposed_tensor
+            .logical_values()
+            .expect("valid view layout"),
+        vec![
+            Value::Int(3),
+            Value::Int(9),
+            Value::Int(4),
+            Value::Int(10),
+            Value::Int(5),
+            Value::Int(11),
+        ]
+    );
+    drop(transposed_tensor);
+    drop(base_tensor);
+
+    let materialized = eval_tensor_view_op(
+        MirCollectionOp::TensorMaterialize,
+        vec![MirOperand::Value(MirValueId(0))],
+        vec![(MirValueId(0), transposed)],
+    )
+    .expect("explicit materialize");
+    let (Value::Tensor(base_cell), Value::Tensor(materialized_cell)) = (&base, &materialized)
+    else {
+        unreachable!();
+    };
+    assert!(!Rc::ptr_eq(
+        &base_cell.borrow().data,
+        &materialized_cell.borrow().data
+    ));
+    base_cell
+        .borrow()
+        .set_value_at(4, Value::Int(400))
+        .expect("base write");
+    assert_eq!(
+        materialized_cell
+            .borrow()
+            .logical_values()
+            .expect("valid materialized layout")[2],
+        Value::Int(4)
+    );
+}
+
+#[test]
+fn tensor_expand_uses_shared_storage_and_rightmost_exact_axis_tie() {
+    let source = tensor_value(
+        vec![Value::Int(10), Value::Int(20), Value::Int(30)],
+        vec![1, 3],
+    );
+    let shape = Value::Array(Rc::new(RefCell::new(vec![
+        Value::Int(1),
+        Value::Int(1),
+        Value::Int(3),
+    ])));
+    let expanded = eval_tensor_view_op(
+        MirCollectionOp::TensorExpand,
+        vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        vec![(MirValueId(0), source.clone()), (MirValueId(1), shape)],
+    )
+    .expect("expanded view");
+    let (Value::Tensor(source), Value::Tensor(expanded)) = (&source, &expanded) else {
+        unreachable!();
+    };
+    let source = source.borrow();
+    let expanded = expanded.borrow();
+    assert!(Rc::ptr_eq(&source.data, &expanded.data));
+    assert_eq!(expanded.shape, vec![1, 1, 3]);
+    assert_eq!(expanded.strides, vec![0, 3, 1]);
+    assert_eq!(
+        expanded.logical_values().expect("valid expanded layout"),
+        vec![Value::Int(10), Value::Int(20), Value::Int(30)]
+    );
+}
+
+#[test]
+fn tensor_rank_zero_and_empty_axis_logical_reads_are_distinct() {
+    let scalar = crate::value::TensorValue::contiguous(vec![Value::Int(42)], vec![]);
+    assert_eq!(scalar.logical_len(), Some(1));
+    assert_eq!(scalar.value_at(0), Some(Value::Int(42)));
+    assert_eq!(scalar.logical_values(), Some(vec![Value::Int(42)]));
+
+    let seed = crate::value::TensorValue::contiguous(vec![], vec![]);
+    assert_eq!(seed.logical_len(), Some(0));
+    assert_eq!(seed.logical_values(), Some(Vec::new()));
+
+    let empty_axis = crate::value::TensorValue::contiguous(vec![], vec![2, 0, 3]);
+    assert_eq!(empty_axis.logical_len(), Some(0));
+    assert_eq!(empty_axis.logical_values(), Some(Vec::new()));
+
+    assert!(crate::value::TensorValue::try_contiguous(vec![], vec![i64::MAX, 3]).is_none());
+    assert!(crate::value::TensorValue::try_contiguous_strides(&[2, -1]).is_none());
+}
+
+#[test]
+fn tensor_shift_limes_composes_with_views_without_materializing() {
+    use radix_mir::{MirBuiltinEdgePolicy, MirEdgePolicy};
+
+    let base = tensor_value(
+        vec![Value::Int(10), Value::Int(20), Value::Int(30)],
+        vec![3],
+    );
+    let offsets = Value::Vector(Rc::new(RefCell::new(vec![Value::Int(1)])));
+    let shifted = eval_tensor_view_op(
+        MirCollectionOp::TensorShift,
+        vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        vec![(MirValueId(0), base.clone()), (MirValueId(1), offsets)],
+    )
+    .expect("shift view");
+    let wrapped = evaluate_collection_call(
+        &MirRuntimeCall {
+            intrinsic: MirIntrinsic::TensorLimes(MirEdgePolicy::Builtin(
+                MirBuiltinEdgePolicy::Wrap,
+            )),
+            args: vec![MirOperand::Value(MirValueId(0))],
+            return_ty: MirType::semantic(TypeId(0)),
+        },
+        vec![(MirValueId(0), shifted)],
+    )
+    .expect("resolve wrap policy");
+    let shape = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1), Value::Int(3)])));
+    let reshaped = eval_tensor_view_op(
+        MirCollectionOp::TensorReshape,
+        vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        vec![(MirValueId(0), wrapped), (MirValueId(1), shape)],
+    )
+    .expect("reshape view");
+    let transposed = eval_tensor_view_op(
+        MirCollectionOp::TensorTranspose,
+        vec![MirOperand::Value(MirValueId(0))],
+        vec![(MirValueId(0), reshaped)],
+    )
+    .expect("transpose view");
+
+    let (Value::Tensor(base_cell), Value::Tensor(transposed_cell)) = (&base, &transposed) else {
+        unreachable!();
+    };
+    {
+        let base_tensor = base_cell.borrow();
+        let transposed_tensor = transposed_cell.borrow();
+        assert!(Rc::ptr_eq(&base_tensor.data, &transposed_tensor.data));
+        assert_eq!(transposed_tensor.shape, vec![3, 1]);
+        assert_eq!(
+            transposed_tensor
+                .logical_values()
+                .expect("resolved lazy view"),
+            vec![Value::Int(20), Value::Int(30), Value::Int(10)]
+        );
+    }
+
+    let materialized = eval_tensor_view_op(
+        MirCollectionOp::TensorMaterialize,
+        vec![MirOperand::Value(MirValueId(0))],
+        vec![(MirValueId(0), transposed)],
+    )
+    .expect("explicit materialize");
+    let Value::Tensor(materialized_cell) = materialized else {
+        panic!("expected a tensor result");
+    };
+    {
+        let base_tensor = base_cell.borrow();
+        let materialized_tensor = materialized_cell.borrow();
+        assert!(!Rc::ptr_eq(&base_tensor.data, &materialized_tensor.data));
+        base_tensor
+            .set_value_at(0, Value::Int(100))
+            .expect("base storage write");
+        assert_eq!(
+            materialized_tensor
+                .logical_values()
+                .expect("materialized layout"),
+            vec![Value::Int(20), Value::Int(30), Value::Int(10)]
+        );
+    }
+}
+
+#[test]
+fn tensor_shift_accepts_integer_array_offsets_and_keeps_validation() {
+    let base = tensor_value(
+        vec![Value::Int(10), Value::Int(20), Value::Int(30)],
+        vec![3],
+    );
+    let offsets = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1)])));
+    let shifted = eval_tensor_view_op(
+        MirCollectionOp::TensorShift,
+        vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        vec![(MirValueId(0), base.clone()), (MirValueId(1), offsets)],
+    )
+    .expect("integer array offsets form a lazy shift view");
+    let (Value::Tensor(base_cell), Value::Tensor(shifted_cell)) = (&base, &shifted) else {
+        panic!("expected tensor values");
+    };
+    assert!(Rc::ptr_eq(
+        &base_cell.borrow().data,
+        &shifted_cell.borrow().data
+    ));
+    assert_eq!(
+        shifted_cell
+            .borrow()
+            .logical_values()
+            .expect("optional shifted view"),
+        vec![Value::Int(20), Value::Int(30), Value::Nil]
+    );
+
+    let wrong_rank = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1), Value::Int(2)])));
+    let error = eval_tensor_view_op(
+        MirCollectionOp::TensorShift,
+        vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        vec![(MirValueId(0), base.clone()), (MirValueId(1), wrong_rank)],
+    )
+    .expect_err("offset count must match tensor rank");
+    assert!(error.message.contains("offset rank differs"));
+
+    let wrong_element = Value::Array(Rc::new(RefCell::new(vec![Value::Float(1.0)])));
+    let error = eval_tensor_view_op(
+        MirCollectionOp::TensorShift,
+        vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        vec![(MirValueId(0), base), (MirValueId(1), wrong_element)],
+    )
+    .expect_err("offset elements must be integers");
+    assert!(error.message.contains("offset is not numerus"));
+}
+
+#[test]
+fn tensor_shift_coalesce_consumes_optional_holes_before_materialize() {
+    let base = tensor_value(
+        vec![Value::Int(10), Value::Int(20), Value::Int(30)],
+        vec![3],
+    );
+    let offsets = Value::Vector(Rc::new(RefCell::new(vec![Value::Int(1)])));
+    let shifted = eval_tensor_view_op(
+        MirCollectionOp::TensorShift,
+        vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        vec![(MirValueId(0), base), (MirValueId(1), offsets)],
+    )
+    .expect("optional shifted view");
+    let Value::Tensor(shifted_cell) = &shifted else {
+        panic!("expected a tensor view");
+    };
+    assert_eq!(
+        shifted_cell
+            .borrow()
+            .logical_values()
+            .expect("optional holes"),
+        vec![Value::Int(20), Value::Int(30), Value::Nil]
+    );
+    let materialize_error = eval_tensor_view_op(
+        MirCollectionOp::TensorMaterialize,
+        vec![MirOperand::Value(MirValueId(0))],
+        vec![(MirValueId(0), shifted.clone())],
+    )
+    .expect_err("unresolved optional view cannot escape");
+    assert!(
+        materialize_error
+            .message
+            .contains("unresolved shifted edges")
+    );
+
+    let coalesced = evaluate_collection_call(
+        &MirRuntimeCall {
+            intrinsic: MirIntrinsic::TensorLift(MirLiftOp::Coalesce),
+            args: vec![
+                MirOperand::Value(MirValueId(0)),
+                MirOperand::Constant(MirConstant::Int(99)),
+            ],
+            return_ty: MirType::semantic(TypeId(0)),
+        },
+        vec![(MirValueId(0), shifted)],
+    )
+    .expect("fused optional coalesce");
+    let Value::Tensor(coalesced) = coalesced else {
+        panic!("expected coalesced tensor");
+    };
+    assert_eq!(
+        coalesced.borrow().logical_values().expect("coalesced data"),
+        vec![Value::Int(20), Value::Int(30), Value::Int(99)]
+    );
+}
+
+#[test]
+fn tensor_edge_checked_displacement_rejects_coordinate_overflow() {
+    assert_eq!(
+        crate::tensor_edge::shifted_coordinate(&[i128::MAX], &[1]),
+        None
+    );
+}
+
+#[test]
+fn tensor_custom_policy_callback_runtime_failure_propagates() {
+    use crate::host::BufferHost;
+    use radix_hir::DefId;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_mir::{
+        MirBlock, MirEdgePolicy, MirLocal, MirParam, MirParamMode, MirShapeExpr, MirStatement,
+        MirStatementKind, MirTerminator, MirTerminatorKind,
+    };
+
+    let types = TypeTable::new();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&types);
+    let span = Span::default();
+    let callback_type = MirType::semantic(TypeId(0));
+    let callback = MirFunction {
+        id: MirFunctionId(1),
+        source: None,
+        name: None,
+        params: (0..2)
+            .map(|local| MirParam {
+                local: MirLocalId(local),
+                name: None,
+                ty: callback_type,
+                mode: MirParamMode::Owned,
+                span,
+            })
+            .collect(),
+        locals: (0..2)
+            .map(|id| MirLocal {
+                id: MirLocalId(id),
+                name: None,
+                ty: callback_type,
+                mutable: false,
+                span,
+            })
+            .collect(),
+        temps: vec![],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: None,
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::TensorShapeSize(MirShapeExpr::Divide {
+                            numerator: Box::new(MirShapeExpr::Literal(1)),
+                            divisor: 0,
+                        }),
+                        args: vec![],
+                        return_ty: callback_type,
+                    },
+                },
+                span,
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span,
+            },
+            span,
+        }],
+        return_ty: callback_type,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    };
+    let mut program = MirProgram::new();
+    program.functions.push(make_function());
+    program.functions.push(callback);
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .expect("caller frame")
+        .values
+        .insert(
+            MirValueId(0),
+            tensor_value(vec![Value::Int(7), Value::Int(8)], vec![2]),
+        );
+    runner
+        .frames
+        .last_mut()
+        .expect("caller frame")
+        .values
+        .insert(
+            MirValueId(1),
+            Value::Vector(Rc::new(RefCell::new(vec![Value::Int(-1)]))),
+        );
+    let shifted = runner
+        .eval_runtime_call(
+            &MirRuntimeCall {
+                intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorShift),
+                args: vec![
+                    MirOperand::Value(MirValueId(0)),
+                    MirOperand::Value(MirValueId(1)),
+                ],
+                return_ty: callback_type,
+            },
+            span,
+        )
+        .expect("lazy shift");
+    runner
+        .frames
+        .last_mut()
+        .expect("caller frame")
+        .values
+        .insert(MirValueId(2), shifted);
+    let resolved = runner
+        .eval_runtime_call(
+            &MirRuntimeCall {
+                intrinsic: MirIntrinsic::TensorLimes(MirEdgePolicy::Custom {
+                    policy_def: DefId(0),
+                    remap: MirFunctionId(1),
+                    transform: None,
+                }),
+                args: vec![MirOperand::Value(MirValueId(2))],
+                return_ty: callback_type,
+            },
+            span,
+        )
+        .expect("lazy custom limes");
+    let Value::Tensor(resolved) = resolved else {
+        panic!("expected custom edge view");
+    };
+    let error = runner
+        .tensor_read_at(&resolved, 0, span)
+        .expect_err("custom remap callback runtime failure");
+    assert_eq!(error.issue, "runner_tensor_shape_invalid_extent");
+}
+
+#[test]
+fn tensor_shape_check_evaluates_dynamic_axis_and_affine_terms() {
+    use radix_mir::{MirShapeCheck, MirShapeExpr, MirShapeRelation};
+
+    let tensor = tensor_value((0..12).map(Value::Int).collect(), vec![3, 4]);
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::TensorShapeCheck(MirShapeCheck {
+            relations: vec![
+                MirShapeRelation {
+                    left: MirShapeExpr::TensorAxis {
+                        argument: 0,
+                        axis: 1,
+                    },
+                    right: MirShapeExpr::ScalarArgument { argument: 1 },
+                },
+                MirShapeRelation {
+                    left: MirShapeExpr::TensorAxis {
+                        argument: 0,
+                        axis: 0,
+                    },
+                    right: MirShapeExpr::Affine {
+                        base: Box::new(MirShapeExpr::Literal(1)),
+                        offset: 2,
+                    },
+                },
+                MirShapeRelation {
+                    left: MirShapeExpr::Literal(2),
+                    right: MirShapeExpr::Divide {
+                        numerator: Box::new(MirShapeExpr::Literal(8)),
+                        divisor: 4,
+                    },
+                },
+            ],
+            size_bindings: vec![],
+        }),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    assert_eq!(
+        evaluate_collection_call(
+            &call,
+            vec![(MirValueId(0), tensor), (MirValueId(1), Value::Int(4)),],
+        )
+        .expect("matching runtime shapes"),
+        Value::Unit
+    );
+}
+
+#[test]
+fn tensor_shape_check_mismatch_has_recoverable_issue_identity() {
+    use radix_mir::{MirShapeCheck, MirShapeExpr, MirShapeRelation};
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::TensorShapeCheck(MirShapeCheck {
+            relations: vec![MirShapeRelation {
+                left: MirShapeExpr::TensorAxis {
+                    argument: 0,
+                    axis: 0,
+                },
+                right: MirShapeExpr::Literal(3),
+            }],
+            size_bindings: vec![],
+        }),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    let error = evaluate_collection_call(
+        &call,
+        vec![(MirValueId(0), tensor_value(vec![Value::Int(1); 2], vec![2]))],
+    )
+    .expect_err("runtime extent mismatch");
+    assert_eq!(error.issue, "runner_tensor_shape_mismatch");
+    assert!(error.message.contains("2 != 3"));
+}
+
+#[test]
+fn tensor_shape_guard_before_try_call_uses_the_call_error_block() {
+    use radix_mir::{
+        MirBlock, MirBlockId, MirLocal, MirParam, MirParamMode, MirShapeBinding, MirShapeCheck,
+        MirShapeExpr, MirShapeRelation, MirStatement, MirStatementKind, MirTerminator,
+        MirTerminatorKind,
+    };
+    use radix_types::{IndexExpr, NumericWidth, Primitive, TypeTable};
+
+    let mut types = TypeTable::new();
+    let element = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let two = types.intern_index(IndexExpr::Literal(2));
+    let three = types.intern_index(IndexExpr::Literal(3));
+    let first_shape = types.intern_index(IndexExpr::Tuple(vec![two]));
+    let second_shape = types.intern_index(IndexExpr::Tuple(vec![three]));
+    let first_tensor = MirType::semantic(types.tensor_with_shape(element, first_shape));
+    let second_tensor = MirType::semantic(types.tensor_with_shape(element, second_shape));
+    let text = MirType::semantic(types.primitive(Primitive::Textus));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let mut interner = Interner::new();
+    let entered = interner.intern("entered");
+    let args = vec![
+        MirOperand::Place(MirPlace::local(MirLocalId(0))),
+        MirOperand::Place(MirPlace::local(MirLocalId(1))),
+    ];
+    let first_axis = MirShapeExpr::TensorAxis {
+        argument: 0,
+        axis: 0,
+    };
+    let second_axis = MirShapeExpr::TensorAxis {
+        argument: 1,
+        axis: 0,
+    };
+    let caller = MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: Vec::new(),
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: first_tensor,
+                mutable: false,
+                span: Span::default(),
+            },
+            MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: second_tensor,
+                mutable: false,
+                span: Span::default(),
+            },
+            MirLocal {
+                id: MirLocalId(2),
+                name: None,
+                ty: text,
+                mutable: false,
+                span: Span::default(),
+            },
+            MirLocal {
+                id: MirLocalId(3),
+                name: None,
+                ty: text,
+                mutable: false,
+                span: Span::default(),
+            },
+        ],
+        temps: Vec::new(),
+        blocks: vec![
+            MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: None,
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::TensorShapeCheck(MirShapeCheck {
+                                relations: vec![MirShapeRelation {
+                                    left: first_axis.clone(),
+                                    right: second_axis,
+                                }],
+                                size_bindings: vec![MirShapeBinding {
+                                    parameter: 0,
+                                    witness: first_axis,
+                                }],
+                            }),
+                            args: args.clone(),
+                            return_ty: vacuum,
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::TryCall {
+                        destination: Some(MirPlace::local(MirLocalId(3))),
+                        callee: MirCallee::Function(MirFunctionId(1)),
+                        args,
+                        ok_block: MirBlockId(1),
+                        error_place: MirPlace::local(MirLocalId(2)),
+                        error_block: MirBlockId(2),
+                    },
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            },
+            MirBlock {
+                id: MirBlockId(1),
+                statements: Vec::new(),
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                        MirLocalId(3),
+                    )))),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            },
+            MirBlock {
+                id: MirBlockId(2),
+                statements: Vec::new(),
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                        MirLocalId(2),
+                    )))),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            },
+        ],
+        return_ty: text,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let callee = MirFunction {
+        id: MirFunctionId(1),
+        source: None,
+        name: None,
+        params: vec![
+            MirParam {
+                local: MirLocalId(0),
+                name: None,
+                ty: first_tensor,
+                mode: MirParamMode::Owned,
+                span: Span::default(),
+            },
+            MirParam {
+                local: MirLocalId(1),
+                name: None,
+                ty: second_tensor,
+                mode: MirParamMode::Owned,
+                span: Span::default(),
+            },
+        ],
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Constant(MirConstant::String(
+                    entered,
+                )))),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        }],
+        return_ty: text,
+        error_ty: Some(text),
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let program = MirProgram {
+        functions: vec![caller, callee],
+    };
+    let context = MirValidationContext::new(&types);
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    let frame = runner.frames.last_mut().expect("caller frame");
+    frame.locals.insert(
+        MirLocalId(0),
+        tensor_value(vec![Value::Int(1), Value::Int(2)], vec![2]),
+    );
+    frame.locals.insert(
+        MirLocalId(1),
+        tensor_value(vec![Value::Int(1), Value::Int(2), Value::Int(3)], vec![3]),
+    );
+
+    runner.run_until_depth(0);
+
+    assert!(
+        runner.errors.is_empty(),
+        "the call boundary catches its guard failure"
+    );
+    assert_eq!(
+        runner.return_value,
+        Some(Value::Str(
+            "tensor runtime shape mismatch: 2 != 3".to_owned()
+        ))
+    );
+    assert_eq!(runner.return_error, None);
+}
+
+#[test]
+fn tensor_shape_check_reads_vector_axis_zero_and_rejects_other_axes() {
+    use radix_mir::{MirShapeCheck, MirShapeExpr, MirShapeRelation};
+
+    let call = |axis| MirRuntimeCall {
+        intrinsic: MirIntrinsic::TensorShapeCheck(MirShapeCheck {
+            relations: vec![MirShapeRelation {
+                left: MirShapeExpr::TensorAxis { argument: 0, axis },
+                right: MirShapeExpr::Literal(1),
+            }],
+            size_bindings: vec![],
+        }),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    let vector = Value::Vector(Rc::new(RefCell::new(vec![Value::Int(7)])));
+
+    assert_eq!(
+        evaluate_collection_call(&call(0), vec![(MirValueId(0), vector.clone())])
+            .expect("vector axis zero is its lane count"),
+        Value::Unit
+    );
+
+    let error = evaluate_collection_call(&call(1), vec![(MirValueId(0), vector)])
+        .expect_err("vectors have no axis beyond zero");
+    assert_eq!(error.issue, "runner_tensor_shape_invalid_extent");
+    assert!(error.message.contains("axis is out of range"));
+}
+
+#[test]
+fn tensor_shape_check_rejects_inexact_division() {
+    use radix_mir::{MirShapeCheck, MirShapeExpr, MirShapeRelation};
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::TensorShapeCheck(MirShapeCheck {
+            relations: vec![MirShapeRelation {
+                left: MirShapeExpr::Divide {
+                    numerator: Box::new(MirShapeExpr::ScalarArgument { argument: 0 }),
+                    divisor: 2,
+                },
+                right: MirShapeExpr::Literal(2),
+            }],
+            size_bindings: vec![],
+        }),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    let error = evaluate_collection_call(&call, vec![(MirValueId(0), Value::Int(5))])
+        .expect_err("shape division must be exact");
+    assert_eq!(error.code, RUNNER_CODE_INTERNAL);
+    assert_eq!(error.issue, "runner_tensor_shape_invalid_extent");
+    assert!(error.message.contains("division must be exact"));
+}
+
+#[test]
+fn tensor_shape_check_validates_size_bindings_without_relations() {
+    use radix_mir::{MirShapeBinding, MirShapeCheck, MirShapeExpr};
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::TensorShapeCheck(MirShapeCheck {
+            relations: vec![],
+            size_bindings: vec![MirShapeBinding {
+                parameter: 17,
+                witness: MirShapeExpr::ScalarArgument { argument: 0 },
+            }],
+        }),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    let error = evaluate_collection_call(&call, vec![(MirValueId(0), Value::Int(-1))])
+        .expect_err("invalid unreferenced size binding");
+    assert_eq!(error.issue, "runner_tensor_shape_invalid_extent");
+}
+
+#[test]
+fn tensor_shape_size_evaluates_explicit_runtime_terms() {
+    use radix_mir::MirShapeExpr;
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::TensorShapeSize(MirShapeExpr::Divide {
+            numerator: Box::new(MirShapeExpr::TensorAxis {
+                argument: 0,
+                axis: 1,
+            }),
+            divisor: 2,
+        }),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    assert_eq!(
+        evaluate_collection_call(
+            &call,
+            vec![(
+                MirValueId(0),
+                tensor_value(vec![Value::Int(0); 12], vec![3, 4]),
+            )],
+        )
+        .expect("shape size runtime term"),
+        Value::Float(2.0)
+    );
+}
+
+#[test]
+fn tensor_shape_size_checked_product_preserves_rank_zero_identity() {
+    use radix_mir::MirShapeExpr;
+
+    let call = |expression| MirRuntimeCall {
+        intrinsic: MirIntrinsic::TensorShapeSize(expression),
+        args: vec![],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    assert_eq!(
+        evaluate_collection_call(
+            &call(MirShapeExpr::Product(vec![
+                MirShapeExpr::Literal(2),
+                MirShapeExpr::Literal(3),
+            ])),
+            vec![],
+        )
+        .expect("shape product"),
+        Value::Float(6.0)
+    );
+    assert_eq!(
+        evaluate_collection_call(&call(MirShapeExpr::Product(vec![])), vec![])
+            .expect("rank-zero empty product"),
+        Value::Float(1.0)
+    );
+
+    let error = evaluate_collection_call(
+        &call(MirShapeExpr::Product(vec![
+            MirShapeExpr::Literal(u64::MAX),
+            MirShapeExpr::Literal(2),
+        ])),
+        vec![],
+    )
+    .expect_err("shape product overflow");
+    assert_eq!(error.issue, "runner_tensor_shape_invalid_extent");
+}
+
+#[test]
+fn tensor_shape_size_reports_recoverable_extent_overflow() {
+    use radix_mir::MirShapeExpr;
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::TensorShapeSize(MirShapeExpr::Affine {
+            base: Box::new(MirShapeExpr::Literal(u64::MAX)),
+            offset: i128::MAX,
+        }),
+        args: vec![],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    let error = evaluate_collection_call(&call, vec![]).expect_err("checked affine overflow");
+    assert_eq!(error.code, RUNNER_CODE_INTERNAL);
+    assert_eq!(error.issue, "runner_tensor_shape_invalid_extent");
 }
 
 #[test]
@@ -4431,7 +5465,7 @@ fn tensor_matmul_int_2x2() {
     let out = cell.borrow();
     assert_eq!(out.shape, vec![2, 2]);
     assert_eq!(
-        out.data,
+        out.logical_values().expect("valid tensor layout"),
         vec![
             Value::Int(19),
             Value::Int(22),
@@ -4451,7 +5485,11 @@ fn tensor_matmul_mixed_promotes_to_float() {
     };
     let out = cell.borrow();
     assert_eq!(out.shape, vec![1, 1]);
-    assert_numeric_close(&out.data, &[7.0], 1e-9);
+    assert_numeric_close(
+        &out.logical_values().expect("valid tensor layout"),
+        &[7.0],
+        1e-9,
+    );
 }
 
 /// Evaluate a tensor collection op whose result is `tensor<element, [n]>`.
@@ -4543,7 +5581,7 @@ fn tensor_elementwise_stores_each_element_under_the_element_width() {
         panic!("expected tensor");
     };
     assert_eq!(
-        cell.borrow().data,
+        cell.borrow().logical_values().expect("valid tensor layout"),
         vec![Value::Int(100), Value::Int(20), Value::Int(3)]
     );
     let err = eval_tensor_op_typed(
@@ -4583,7 +5621,10 @@ fn tensor_sum_axis_partials_are_exact_and_the_result_is_stored() {
     let Value::Tensor(cell) = out else {
         panic!("expected tensor");
     };
-    assert_eq!(cell.borrow().data, vec![Value::Int(100)]);
+    assert_eq!(
+        cell.borrow().logical_values().expect("valid tensor layout"),
+        vec![Value::Int(100)]
+    );
     let rows = tensor_value(vec![Value::Int(100), Value::Int(100)], vec![1, 2]);
     let err = eval_tensor_op_typed(
         MirCollectionOp::TensorSumAxis,
@@ -4619,7 +5660,10 @@ fn tensor_matmul_partials_are_exact_and_each_cell_is_stored() {
     let Value::Tensor(cell) = ok else {
         panic!("expected tensor");
     };
-    assert_eq!(cell.borrow().data, vec![Value::Int(0)]);
+    assert_eq!(
+        cell.borrow().logical_values().expect("valid tensor layout"),
+        vec![Value::Int(0)]
+    );
     let err = run(
         matrix(&[100, 100, 100], vec![1, 3]),
         matrix(&[1, 1, 1], vec![3, 1]),
@@ -4649,7 +5693,13 @@ fn measure_tensor_matmul_128() {
             panic!("expected tensor");
         };
         assert_eq!(cell.borrow().shape, vec![dim, dim]);
-        assert_eq!(cell.borrow().data.len(), (dim * dim) as usize);
+        assert_eq!(
+            cell.borrow()
+                .logical_values()
+                .expect("valid tensor layout")
+                .len(),
+            (dim * dim) as usize
+        );
     }
     samples.sort();
     let median = samples[samples.len() / 2];
@@ -4785,7 +5835,7 @@ fn conversio_padded_tensor_from_flat_fills_dead_slots() {
     let tensor = tensor.borrow();
     assert_eq!(tensor.shape, vec![8]);
     assert_eq!(
-        tensor.data,
+        tensor.logical_values().expect("valid tensor layout"),
         vec![
             crate::Value::Float(1.0),
             crate::Value::Float(2.0),
@@ -5143,10 +6193,9 @@ fn eval_tensor_intrinsic(
 }
 
 fn tensor(data: Vec<Value>, shape: Vec<i64>) -> Value {
-    Value::Tensor(Rc::new(RefCell::new(crate::value::TensorValue {
-        data,
-        shape,
-    })))
+    Value::Tensor(Rc::new(RefCell::new(
+        crate::value::TensorValue::contiguous(data, shape),
+    )))
 }
 
 #[test]
@@ -5167,7 +6216,8 @@ fn pd25_row_softmax_preserves_values_and_errors() {
     let rank1 = rank1.borrow();
     assert_eq!(rank1.shape, vec![3]);
     let rank1_values: Vec<f64> = rank1
-        .data
+        .logical_values()
+        .expect("valid tensor layout")
         .iter()
         .map(|value| match value {
             Value::Float(value) => *value,
@@ -5209,7 +6259,8 @@ fn pd25_row_softmax_preserves_values_and_errors() {
     assert_eq!(rank2.shape, vec![2, 3]);
     assert_eq!(
         rank2
-            .data
+            .logical_values()
+            .expect("valid tensor layout")
             .iter()
             .map(|value| match value {
                 Value::Float(value) => value.to_bits(),
@@ -5390,7 +6441,13 @@ fn pd25_row_softmax_preserves_values_and_errors() {
     .expect("softmax short backing is outside the computed row count") else {
         panic!("softmax must return a tensor");
     };
-    assert!(softmax_short.borrow().data.is_empty());
+    assert!(
+        softmax_short
+            .borrow()
+            .logical_values()
+            .expect("valid tensor layout")
+            .is_empty()
+    );
 
     let Value::Float(entropia_short) = eval_tensor_intrinsic(
         MirCollectionOp::TensorCruxEntropia,
@@ -5413,7 +6470,7 @@ fn pd25_map_tensor_unary_preserves_values_and_errors
     use crate::value::TensorValue;
 
     fn tensor(data: Vec<Value>, shape: Vec<i64>) -> Value {
-        Value::Tensor(Rc::new(RefCell::new(TensorValue { data, shape })))
+        Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(data, shape))))
     }
 
     fn assert_tensor(result: Value, expected: Vec<Value>, shape: &[i64]) {
@@ -5422,7 +6479,7 @@ fn pd25_map_tensor_unary_preserves_values_and_errors
         };
         let output = cell.borrow();
         assert_eq!(output.shape, shape);
-        assert_eq!(output.data, expected);
+        assert_eq!(output.logical_values().expect("valid tensor layout"), expected);
     }
 
     fn assert_internal(result: Result<Value, RunnerError>, message: &'static str) {

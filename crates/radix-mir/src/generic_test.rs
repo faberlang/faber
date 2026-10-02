@@ -1,5 +1,5 @@
 use super::*;
-use radix_types::{DefId, Primitive, SemanticParamMode};
+use radix_types::{DefId, Primitive, RuntimeExtentId, SemanticParamMode};
 
 /// Build a self-referential Alias: `Alias(_, TypeId(n))` interned at index `n`.
 fn self_cyclic_alias(types: &mut TypeTable, def: u32) -> TypeId {
@@ -405,6 +405,135 @@ fn witness_binds_shape_params_from_tensor_shapes() {
     let d = shape_bindings.get(&Symbol(201)).copied().expect("D bound");
     assert_eq!(types.get_index(b), &IndexExpr::Literal(2));
     assert_eq!(types.get_index(d), &IndexExpr::Literal(8));
+}
+
+#[test]
+fn witness_inverts_exact_affine_and_divide_shape_dimensions() {
+    let mut types = TypeTable::new();
+    let element = f32_ty(&mut types);
+    let rows = Symbol(220);
+    let columns = Symbol(221);
+    let row_param = types.intern_index(IndexExpr::Param(rows));
+    let column_param = types.intern_index(IndexExpr::Param(columns));
+    let row_minus_one = types.intern_index(IndexExpr::Affine {
+        base: row_param,
+        offset: -1,
+    });
+    let column_half = types.intern_index(IndexExpr::Divide {
+        numerator: column_param,
+        divisor: 2,
+    });
+    let expected_shape = types.intern_index(IndexExpr::Tuple(vec![row_minus_one, column_half]));
+    let three = types.intern_index(IndexExpr::Literal(3));
+    let four = types.intern_index(IndexExpr::Literal(4));
+    let four_by_three_shape = types.intern_index(IndexExpr::Tuple(vec![three, four]));
+    let expected = types.intern(Type::Tensor(element, expected_shape));
+    let actual = types.intern(Type::Tensor(element, four_by_three_shape));
+    // The MIR binder reuses semantic index identities; it never creates a
+    // guessed size absent from the analyzed type table.
+    let eight = types.intern_index(IndexExpr::Literal(8));
+
+    let mut bindings = MirGenericBindings::default();
+    let mut shape_bindings = MirShapeBindings::default();
+    assert!(bind_generic_type_witness_with_shapes(
+        &types,
+        MirType::semantic(expected),
+        MirType::semantic(actual),
+        &mut bindings,
+        &mut shape_bindings,
+    ));
+    assert_eq!(shape_bindings.get(&rows), Some(&four));
+    assert_eq!(shape_bindings.get(&columns), Some(&eight));
+}
+
+#[test]
+fn witness_inverts_matching_runtime_affine_shape_without_erasing_origin() {
+    let mut types = TypeTable::new();
+    let element = f32_ty(&mut types);
+    let parameter = Symbol(222);
+    let generic_base = types.intern_index(IndexExpr::Param(parameter));
+    let runtime_base = types.intern_index(IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(
+        DefId(50),
+    )));
+    let expected_shape = types.intern_index(IndexExpr::Affine {
+        base: generic_base,
+        offset: -1,
+    });
+    let actual_shape = types.intern_index(IndexExpr::Affine {
+        base: runtime_base,
+        offset: -1,
+    });
+    let expected = types.intern(Type::Tensor(element, expected_shape));
+    let actual = types.intern(Type::Tensor(element, actual_shape));
+
+    let mut bindings = MirGenericBindings::default();
+    let mut shape_bindings = MirShapeBindings::default();
+    assert!(bind_generic_type_witness_with_shapes(
+        &types,
+        MirType::semantic(expected),
+        MirType::semantic(actual),
+        &mut bindings,
+        &mut shape_bindings,
+    ));
+    assert_eq!(shape_bindings.get(&parameter), Some(&runtime_base));
+}
+
+#[test]
+fn witness_accepts_identical_nongeneric_affine_and_divide_shapes() {
+    let mut types = TypeTable::new();
+    let literal = types.intern_index(IndexExpr::Literal(8));
+    let affine = types.intern_index(IndexExpr::Affine {
+        base: literal,
+        offset: -1,
+    });
+    let divide = types.intern_index(IndexExpr::Divide {
+        numerator: literal,
+        divisor: 2,
+    });
+    let mut shape_bindings = MirShapeBindings::default();
+
+    assert!(try_bind_index_witness(
+        &types,
+        affine,
+        affine,
+        &mut shape_bindings
+    ));
+    assert!(try_bind_index_witness(
+        &types,
+        divide,
+        divide,
+        &mut shape_bindings
+    ));
+}
+
+#[test]
+fn witness_rejects_contradictory_affine_shape_binding() {
+    let mut types = TypeTable::new();
+    let element = f32_ty(&mut types);
+    let parameter = Symbol(223);
+    let generic_base = types.intern_index(IndexExpr::Param(parameter));
+    let expected_shape = types.intern_index(IndexExpr::Affine {
+        base: generic_base,
+        offset: -1,
+    });
+    let actual_shape = types.intern_index(IndexExpr::Literal(3));
+    let four = types.intern_index(IndexExpr::Literal(4));
+    let five = types.intern_index(IndexExpr::Literal(5));
+    let expected = types.intern(Type::Tensor(element, expected_shape));
+    let actual = types.intern(Type::Tensor(element, actual_shape));
+
+    let mut bindings = MirGenericBindings::default();
+    let mut shape_bindings = MirShapeBindings::default();
+    shape_bindings.insert(parameter, five);
+    assert!(!bind_generic_type_witness_with_shapes(
+        &types,
+        MirType::semantic(expected),
+        MirType::semantic(actual),
+        &mut bindings,
+        &mut shape_bindings,
+    ));
+    assert_eq!(shape_bindings.get(&parameter), Some(&five));
+    assert_ne!(shape_bindings.get(&parameter), Some(&four));
 }
 
 #[test]

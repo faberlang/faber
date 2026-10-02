@@ -116,6 +116,7 @@ fn forma_capture(source: &str) -> (String, Vec<String>) {
                             HirArrayElement::Spread(expr) => {
                                 format!("spread:{:?}", expr.kind)
                             }
+                            HirArrayElement::Infer(_) => "shape-hole".to_owned(),
                         })
                         .collect(),
                 );

@@ -1,0 +1,4 @@
+error[SEM014:cannot_infer_tensor_shape]
+error[SEM014:cannot_infer_tensor_shape]
+error[SEM014:cannot_infer_tensor_shape]
+error[SEM011:tensor_shape_hole_requires_shape_argument]

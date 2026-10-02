@@ -23,8 +23,8 @@
 use crate::all_diagnostic_specs;
 use crate::file_interface::{InterfaceLibraryIdentity, InterfaceMemberKind};
 use crate::{
-    CollectionKind, Primitive, TensorFamilyKind, collection_type_specs, primitive_type_specs,
-    tensor_family_type_specs,
+    BuiltinTensorEdgePolicy, CollectionKind, Primitive, TensorFamilyKind,
+    collection_type_specs, primitive_type_specs, tensor_family_type_specs,
 };
 use radix_diagnostics::{Diagnostic, DiagnosticArg};
 use radix_intrinsics::{INTRINSICS, IntrinsicReceiver};
@@ -816,6 +816,11 @@ fn build_type_fallbacks(type_surfaces: &HashMap<TypeBindingKind, String>) -> Vec
         .chain(std::iter::once(TypeBindingKind::SaturatingWord))
         .chain(std::iter::once(TypeBindingKind::TrappingWord))
         .chain(std::iter::once(TypeBindingKind::ByteWord))
+        .chain(
+            BuiltinTensorEdgePolicy::ALL
+                .into_iter()
+                .map(TypeBindingKind::TensorEdgePolicy),
+        )
         .filter(|kind| !type_surfaces.contains_key(kind))
         .collect()
 }
@@ -844,6 +849,7 @@ fn latin_type_surface(kind: TypeBindingKind) -> &'static str {
         TypeBindingKind::SaturatingWord => "saturatus",
         TypeBindingKind::TrappingWord => "exactus",
         TypeBindingKind::ByteWord => "octetus",
+        TypeBindingKind::TensorEdgePolicy(policy) => policy.latin(),
         // Relational type names keep the canonical Latin spelling as the
         // Latin fallback (identity surface; all 8 packs own rows today).
         TypeBindingKind::Relational(kind) => match kind {
@@ -1009,6 +1015,8 @@ pub enum TypeBindingKind {
     /// `octetus` (en `byte`): the byte scalar, an exact alias of
     /// `numerus<u8>` (D10.4) and the element of `octeti`.
     ByteWord,
+    /// Compiler-owned, type-only selectors for `limes<Policy>()`.
+    TensorEdgePolicy(BuiltinTensorEdgePolicy),
     /// Census relational type names (`relational-views.md` §7): the inert
     /// plan type, the admitted row type, and the finite result type.
     Relational(RelationalTypeKind),
@@ -1364,6 +1372,18 @@ pub fn latin_locale_pack() -> LocalePack {
             kind: TypeBindingKind::ByteWord,
         },
     );
+    for policy in BuiltinTensorEdgePolicy::ALL {
+        let key = policy.latin().to_owned();
+        types.insert(
+            key.clone(),
+            TypeBinding {
+                key,
+                canonical: policy.latin().to_owned(),
+                aliases: Vec::new(),
+                kind: TypeBindingKind::TensorEdgePolicy(policy),
+            },
+        );
+    }
     // Identity rows so the la scaffold carries the same `[types]` keys every
     // installed pack must own (completeness gates compare key sets against
     // this scaffold).
@@ -2414,6 +2434,9 @@ fn type_binding_kind_for_key(key: &str) -> Option<TypeBindingKind> {
     }
     if key == "octetus" {
         return Some(TypeBindingKind::ByteWord);
+    }
+    if let Some(policy) = BuiltinTensorEdgePolicy::from_latin(key) {
+        return Some(TypeBindingKind::TensorEdgePolicy(policy));
     }
     // Census relational-view type names (`relational-views.md` §7). The keys
     // must be known identities so pack `[types]` rows loader-validate

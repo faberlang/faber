@@ -697,6 +697,24 @@ fn reports_non_index_figura_name_with_structured_event() {
 }
 
 #[test]
+fn resolves_local_runtime_value_as_figura_extent() {
+    let parsed = parse(lex(
+        "fn f(int value) -> int {\n    const int n ← value\n    const tf32[n, 2] shaped ← value\n    return n\n}",
+    ));
+    assert!(parsed.success(), "parse errors: {:?}", parsed.errors);
+    let program = parsed.program.as_ref().expect("program");
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    collect::collect(program, &mut resolver, &mut types).expect("collect");
+
+    let result = resolve::resolve(program, &mut resolver, &parsed.interner, &mut types);
+    assert!(
+        result.is_ok(),
+        "a runtime scalar binding supplies a Figura extent: {result:?}"
+    );
+}
+
+#[test]
 fn imports_function_export_before_struct_alphabetically() {
     // Regression: triga-style libraries export functions that name genera; BTreeMap
     // export order must not fail NominalTypeUnsupported for later-sorted structs.
@@ -734,6 +752,7 @@ fn imports_function_export_before_struct_alphabetically() {
             err: None,
             is_async: false,
             is_generator: false,
+            tensor_edge_policy_requirements: Vec::new(),
             device: None,
         }),
     });
@@ -786,6 +805,7 @@ fn projects_localized_library_members_by_identity_and_rejects_unmapped_canonical
         err: None,
         is_async: false,
         is_generator: false,
+        tensor_edge_policy_requirements: Vec::new(),
         device: None,
     };
     let mut interface = FileInterface::new().with_identity(identity.clone());
@@ -946,6 +966,7 @@ fn skipped_locale_members_keep_structured_provenance_and_sibling_exports() {
         err: None,
         is_async: false,
         is_generator: false,
+        tensor_edge_policy_requirements: Vec::new(),
         device: None,
     };
     let mut interface = FileInterface::new().with_identity(identity);
@@ -1110,6 +1131,7 @@ fn identity_row_library_members_resolve_under_strict_pack() {
         err: None,
         is_async: false,
         is_generator: false,
+        tensor_edge_policy_requirements: Vec::new(),
         device: None,
     };
     let mut interface = FileInterface::new().with_identity(identity.clone());

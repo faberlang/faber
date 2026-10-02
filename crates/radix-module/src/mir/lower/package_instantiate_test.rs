@@ -45,6 +45,10 @@ fn substitute_function_rewrites_generic_call_type_args() {
         struct_metadata: None,
         templates: FxHashMap::default(),
         generic_params: FxHashMap::default(),
+        tensor_limes_templates: FxHashMap::default(),
+        tensor_edge_policy_providers: Vec::new(),
+        function_ids_by_source: FxHashMap::default(),
+        require_tensor_edge_resolution: true,
         instance_index: FxHashMap::default(),
         monomorphizations: Vec::new(),
         next_id: MirFunctionId(1),
@@ -150,7 +154,10 @@ fn imported_device_fixture() -> (
         span: Span::default(),
     };
     let program = MirProgram { functions: vec![caller], ..MirProgram::default() };
-    let generic_params = vec![(IMPORTED_SOURCE, vec![MirGenericParam { name: symbol, is_shape: false }])];
+    let generic_params = vec![(
+        IMPORTED_SOURCE,
+        vec![MirGenericParam { name: symbol, is_shape: false, runtime_witness: None }],
+    )];
     (types, interner, program, vec![template], generic_params)
 }
 
@@ -297,7 +304,10 @@ fn unresolved_imported_device_bindings_fail_closed_with_named_reason() {
         span: Span::default(),
     };
     let mut program = MirProgram { functions: vec![caller], ..MirProgram::default() };
-    let generic_params = vec![(IMPORTED_SOURCE, vec![MirGenericParam { name: size_symbol, is_shape: true }])];
+    let generic_params = vec![(
+        IMPORTED_SOURCE,
+        vec![MirGenericParam { name: size_symbol, is_shape: true, runtime_witness: None }],
+    )];
     let index = imported_device_index(imported_device_route(InterfaceBodyChannel::Source));
 
     let errors = instantiate_merged_generic_calls_with_devices(
@@ -400,6 +410,7 @@ fn artifact_restored_signature_only_device_route_fails_closed() {
             err: None,
             is_async: false,
             is_generator: false,
+            tensor_edge_policy_requirements: Vec::new(),
             device: Some(InterfaceDeviceContract {
                 role: InterfaceDeviceRole::Kernel,
                 visibility: InterfaceDeviceVisibility::Public,
@@ -555,8 +566,14 @@ fn imported_device_pair_fixture() -> (
     };
     let program = MirProgram { functions: vec![caller], ..MirProgram::default() };
     let generic_params = vec![
-        (IMPORTED_SOURCE, vec![MirGenericParam { name: symbol, is_shape: false }]),
-        (IMPORTED_INNER_SOURCE, vec![MirGenericParam { name: symbol, is_shape: false }]),
+        (
+            IMPORTED_SOURCE,
+            vec![MirGenericParam { name: symbol, is_shape: false, runtime_witness: None }],
+        ),
+        (
+            IMPORTED_INNER_SOURCE,
+            vec![MirGenericParam { name: symbol, is_shape: false, runtime_witness: None }],
+        ),
     ];
     (types, interner, program, vec![imported_outer, imported_inner], generic_params)
 }
@@ -951,7 +968,10 @@ fn consumer_local_caller_hits_expansion_budget_identity() {
             }];
         }
         templates.push(template);
-        generic_params.push((*source, vec![MirGenericParam { name: symbol, is_shape: false }]));
+        generic_params.push((
+            *source,
+            vec![MirGenericParam { name: symbol, is_shape: false, runtime_witness: None }],
+        ));
     }
     let caller = MirFunction {
         id: MirFunctionId(90),
@@ -1186,8 +1206,8 @@ fn two_shape_instances_keep_canonical_keys_and_do_not_merge() {
     let generic_params = vec![(
         SOURCE,
         vec![
-            MirGenericParam { name: crate::lexer::Symbol(501), is_shape: true },
-            MirGenericParam { name: crate::lexer::Symbol(502), is_shape: true },
+            MirGenericParam { name: crate::lexer::Symbol(501), is_shape: true, runtime_witness: None },
+            MirGenericParam { name: crate::lexer::Symbol(502), is_shape: true, runtime_witness: None },
         ],
     )];
 
@@ -1332,8 +1352,8 @@ fn minted_instance_substitutes_shape_size_param_to_concrete_integer() {
     let generic_params = vec![(
         SOURCE,
         vec![
-            MirGenericParam { name: crate::lexer::Symbol(710), is_shape: true },
-            MirGenericParam { name: crate::lexer::Symbol(711), is_shape: true },
+            MirGenericParam { name: crate::lexer::Symbol(710), is_shape: true, runtime_witness: None },
+            MirGenericParam { name: crate::lexer::Symbol(711), is_shape: true, runtime_witness: None },
         ],
     )];
 

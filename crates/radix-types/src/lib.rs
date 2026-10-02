@@ -59,7 +59,9 @@ pub use vocabulary::{
 /// compiler crate.
 pub const USER_DEF_ID_BASE: u32 = 0x0000_1000;
 pub use index::{
-    IndexExpr, IndexId, IndexVar, compute_cotangent_reduction_axes, i64s_from_literal_index,
+    IndexArithmeticError, IndexExpr, IndexId, IndexVar, RuntimeExtentId,
+    add_index_constant, compose_index_affine_constant, compute_cotangent_reduction_axes,
+    divide_index_exact, evaluate_index_dimension, i64s_from_literal_index,
     parse_natural_capacity,
 };
 pub use instans_precision::{
@@ -84,7 +86,7 @@ pub use schema_subset::{
 };
 pub use types::{
     ATOMIC_ELEMENT_MSG, AccessMarker, AppliedArg, CollectionKind, CollectionTypeSpec, ContractRef,
-    FloatPolicy, FuncSig, GenericBindingSource, GenericParamDescriptor, GenericParamSort,
+    BuiltinTensorEdgePolicy, FloatPolicy, FuncSig, GenericBindingSource, GenericParamDescriptor, GenericParamSort,
     GenericWitness, INTERVALLUM_BOUND_MSG, InferVar, MarkerFamily, ParamType, Primitive,
     PrimitiveTypeSpec, ResolvedGenericBinding, ResolvedGenericCall, SemanticGenericParamDefault,
     SemanticMutability, SemanticParamMode, TensorFamilyKind, TensorFamilyTypeSpec, Type, TypeId,

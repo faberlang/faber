@@ -680,6 +680,7 @@ fn canonical_type_shape(analysis: &AnalyzedModule, type_id: TypeId, active: &mut
     }
     let shape = match analysis.types.get(type_id) {
         Type::Primitive(primitive) => format!("primitive:{primitive:?}"),
+        Type::TensorEdgePolicy(policy) => format!("tensor-edge-policy:{}", policy.latin()),
         Type::Array(element) => format!("array<{}>", canonical_type_shape(analysis, *element, active)),
         Type::BoundedArray { element, capacity } => format!(
             "bounded-array<{},{}>",

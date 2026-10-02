@@ -23,7 +23,8 @@
 
 use radix_lexer::{Span, Symbol};
 use radix_types::{
-    DefId, FuncSig, ResolvedGenericCall, SemanticParamMode, TypeId, TypeTableSnapshot,
+    BuiltinTensorEdgePolicy, DefId, FuncSig, IndexId, NumericWidth, ResolvedGenericCall,
+    SemanticParamMode, TypeId, TypeTableSnapshot,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -95,6 +96,7 @@ pub enum FileExportSnapshot {
         def_id: DefId,
         ty: TypeId,
         fields: Vec<StructFieldSnapshot>,
+        methods: Vec<StructMethodSnapshot>,
         is_json: bool,
     },
 }
@@ -109,6 +111,16 @@ pub struct StructFieldSnapshot {
     /// Authored genus field modifier (D16.1).
     pub modifier: Option<radix_syntax::FieldModifier>,
     /// Genus member visibility (D5.3).
+    pub visibility: radix_syntax::MemberVisibility,
+}
+
+/// Serializable imported method identity and callable contract for a struct.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StructMethodSnapshot {
+    pub def_id: DefId,
+    pub name: Symbol,
+    pub surface_name: Symbol,
+    pub sig: FuncSig,
     pub visibility: radix_syntax::MemberVisibility,
 }
 
@@ -548,7 +560,280 @@ pub struct FunctionProvenanceTableWire {
 /// converts `HirExpressionKind::Itera` from a positional tuple to named fields
 /// and adds the authored element-binder `mutable` flag to `Itera`,
 /// `IteraLockstep`, `IteraRange` and `Summa`; schema-v29 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 30;
+/// Version 31 adds runtime shape-boundary obligations so artifact loading
+/// preserves recoverable tensor extent checks; schema-v30 artifacts fail closed.
+/// Version 32 adds per-target kernel requirements so loaded artifacts retain
+/// the semantic admission contract; schema-v31 artifacts fail closed.
+/// Version 33 adds resolved tensor edge-policy facts and generic provider
+/// obligations; schema-v32 artifacts fail closed. Version 34 carries runtime
+/// shape-boundary obligations inside provider units; schema-v33 artifacts fail
+/// closed because a provider's entry, call, and return guards are required by
+/// Rust code generation just like the root unit's guards. Version 35 carries
+/// imported struct method identities and signatures; schema-v34 artifacts fail
+/// closed because policy callbacks need their imported owner/name route.
+pub const SCHEMA_VERSION: u32 = 35;
+
+/// Portable boundary where a retained runtime shape equality is checked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ShapeRelationBoundaryWire {
+    Call,
+    FunctionEntry,
+    FunctionReturn,
+}
+
+/// One runtime equality in the semantic type-index arena.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ShapeRelationWire {
+    pub left: IndexId,
+    pub right: IndexId,
+    pub span: Span,
+    pub boundary: ShapeRelationBoundaryWire,
+}
+
+/// Call-site obligations retained for portable shape checks.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ShapeCallObligationsWire {
+    pub call: radix_hir::HirId,
+    pub relations: Vec<ShapeRelationWire>,
+}
+
+/// Function-boundary obligations retained for portable shape checks.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ShapeFunctionObligationsWire {
+    pub function: DefId,
+    pub relations: Vec<ShapeRelationWire>,
+}
+
+/// One generic descriptor's runtime dimension witness at a call boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RuntimeSizeBindingWire {
+    pub parameter: u32,
+    pub witness: IndexId,
+    pub span: Span,
+}
+
+/// Call-site runtime size bindings, kept outside the generic specialization key.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CallSizeBindingsWire {
+    pub call: radix_hir::HirId,
+    pub bindings: Vec<RuntimeSizeBindingWire>,
+}
+
+/// Function formal size bindings, witnessed by runtime formal carriers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FunctionSizeBindingsWire {
+    pub function: DefId,
+    pub bindings: Vec<RuntimeSizeBindingWire>,
+}
+
+/// Runtime shape equalities retained by semantic analysis.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ShapeObligationTableWire {
+    pub calls: Vec<ShapeCallObligationsWire>,
+    pub call_size_bindings: Vec<CallSizeBindingsWire>,
+    pub functions: Vec<ShapeFunctionObligationsWire>,
+    pub function_size_bindings: Vec<FunctionSizeBindingsWire>,
+}
+
+// ---------------------------------------------------------------------------
+// Per-target kernel requirements (K15)
+// ---------------------------------------------------------------------------
+
+/// Device target recorded by the semantic kernel-requirements analysis.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum KernelTargetWire {
+    MirAmd,
+    MirMetal,
+    MirWgsl,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KernelPrimitiveWire {
+    Numerus,
+    Fractus,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KernelNumericPolicyWire {
+    Exact,
+    Wrapping,
+    Saturating,
+    PolicyFloat,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KernelWidthRequirementWire {
+    pub span: Span,
+    pub primitive: KernelPrimitiveWire,
+    pub width: NumericWidth,
+    pub policy: KernelNumericPolicyWire,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KernelRangeExprWire {
+    Constant(i128),
+    Shape(IndexId),
+    Add(Box<Self>, Box<Self>),
+    Subtract(Box<Self>, Box<Self>),
+    Multiply(Box<Self>, Box<Self>),
+    FloorDivide(Box<Self>, Box<Self>),
+    Minimum(Box<Self>, Box<Self>),
+    Maximum(Box<Self>, Box<Self>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KernelValueRangeWire {
+    pub minimum: KernelRangeExprWire,
+    pub maximum: KernelRangeExprWire,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KernelExtentConditionWire {
+    pub span: Span,
+    pub range: KernelValueRangeWire,
+    pub minimum: i128,
+    pub maximum: i128,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KernelTrappingStoreWire {
+    pub span: Span,
+    pub width: NumericWidth,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KernelRequirementFailureWire {
+    RecursiveCall,
+    CalleeNotAdmitted {
+        callee: DefId,
+    },
+    UnsupportedIntegerWidth {
+        span: Span,
+        width: NumericWidth,
+    },
+    UnsupportedFloatWidth {
+        span: Span,
+        width: NumericWidth,
+    },
+    IntermediateOutOfRange {
+        span: Span,
+        range: KernelValueRangeWire,
+    },
+    StoreOutOfRange {
+        span: Span,
+        range: KernelValueRangeWire,
+    },
+    UnsupportedIntegerRange {
+        span: Span,
+    },
+    DivideByZeroPossible {
+        span: Span,
+    },
+    NegativeShiftCountPossible {
+        span: Span,
+    },
+    TensorEdgePolicyDeferred {
+        span: Span,
+    },
+    SaturatingLoweringDeferred {
+        span: Span,
+        width: NumericWidth,
+    },
+    OptionFRequired {
+        span: Span,
+        width: NumericWidth,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KernelTargetRequirementWire {
+    pub target: KernelTargetWire,
+    pub admitted: bool,
+    pub recursive: bool,
+    pub callees: Vec<DefId>,
+    pub widths: Vec<KernelWidthRequirementWire>,
+    pub extent_conditions: Vec<KernelExtentConditionWire>,
+    pub trapping_stores: Vec<KernelTrappingStoreWire>,
+    pub failures: Vec<KernelRequirementFailureWire>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KernelRequirementWire {
+    pub def_id: DefId,
+    pub name: String,
+    pub target_reports: Vec<KernelTargetRequirementWire>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KernelRequirementsWire {
+    pub kernels: Vec<KernelRequirementWire>,
+}
+
+// ---------------------------------------------------------------------------
+// Tensor edge-policy facts (K12)
+// ---------------------------------------------------------------------------
+
+/// Resolved policy identity retained by semantic analysis.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ResolvedTensorEdgePolicyWire {
+    Builtin(BuiltinTensorEdgePolicy),
+    Custom {
+        policy_def: DefId,
+        remap: DefId,
+        transform: Option<DefId>,
+    },
+    Deferred {
+        policy_type: TypeId,
+    },
+}
+
+/// Shift shape and exact offset expression identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TensorShiftContextWire {
+    pub source_shape: IndexId,
+    pub shift_expression: radix_hir::HirId,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TensorEdgePolicyCallWire {
+    pub call: radix_hir::HirId,
+    pub policy: ResolvedTensorEdgePolicyWire,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TensorEdgePolicyRequirementWire {
+    pub policy_type: TypeId,
+    pub element_type: TypeId,
+    pub rank: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TensorEdgePolicyFunctionRequirementsWire {
+    pub function: DefId,
+    pub requirements: Vec<TensorEdgePolicyRequirementWire>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TensorEdgePolicyProviderImplWire {
+    /// Concrete policy identity, including applied generic class arguments.
+    pub policy_type: TypeId,
+    pub element_type: TypeId,
+    pub rank: usize,
+    pub policy: ResolvedTensorEdgePolicyWire,
+}
+
+/// Deterministic portable representation of the neutral HIR sidecar.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TensorEdgePolicyTableWire {
+    pub calls: Vec<TensorEdgePolicyCallWire>,
+    pub shifted_expressions: Vec<radix_hir::HirId>,
+    pub shifted_view_expressions: Vec<(radix_hir::HirId, TensorShiftContextWire)>,
+    pub shifted_bindings: Vec<DefId>,
+    pub shifted_view_bindings: Vec<(DefId, TensorShiftContextWire)>,
+    pub limes_contexts: Vec<(radix_hir::HirId, TensorShiftContextWire)>,
+    pub function_requirements: Vec<TensorEdgePolicyFunctionRequirementsWire>,
+    pub provider_impls: Vec<TensorEdgePolicyProviderImplWire>,
+}
 
 /// Serializable snapshot of one analyzed provider unit carried for HIR
 /// emission (ARCH-U4 carriage).
@@ -578,6 +863,12 @@ pub struct ProviderUnitWire {
 
     /// Resolver snapshot carrying the provider's own file interfaces.
     pub resolver: ResolverSnapshot,
+
+    /// Provider edge-policy facts from the same typed-HIR snapshot (schema v33).
+    pub tensor_edge_policies: TensorEdgePolicyTableWire,
+
+    /// Provider runtime shape guards from the same typed-HIR snapshot (schema v34).
+    pub shape_obligations: ShapeObligationTableWire,
 
     /// Carriage for the provider's own nested namespace imports
     /// (`norma:valor` → `norma:chorda` emit as sibling modules).
@@ -686,6 +977,15 @@ pub struct HirArtifact {
     /// import-path spelling (schema v14; ARCH-U4 carriage). Empty for units
     /// whose import edges carry no provider imports.
     pub provider_units: BTreeMap<String, ProviderCarriageEntryWire>,
+
+    /// Runtime shape boundary equalities (schema v31).
+    pub shape_obligations: ShapeObligationTableWire,
+
+    /// Per-target inferred device requirements (schema v32).
+    pub kernel_requirements: KernelRequirementsWire,
+
+    /// Resolved edge-policy dispatch and generic provider facts (schema v33).
+    pub tensor_edge_policies: TensorEdgePolicyTableWire,
 }
 
 // ---------------------------------------------------------------------------

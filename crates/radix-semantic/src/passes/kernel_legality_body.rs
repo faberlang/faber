@@ -14,7 +14,7 @@ use super::kernel_legality::{
     Sink,
 };
 use super::kernel_legality_types::{FAMILY_ATOMIC, FAMILY_SATURATING_FLOAT, host_only_family};
-use crate::{NumericWidth, Primitive, SymbolKind, Type, TypeId, WarningKind};
+use crate::{NumericWidth, Primitive, ResolvedTensorEdgePolicy, SymbolKind, Type, TypeId, WarningKind};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local};
 use radix_hir::{
     DefId, HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirLocal,
@@ -38,6 +38,31 @@ pub(super) fn check_kernel_function(
         function_span: span,
         callees: Vec::new(),
         quiet: 0,
+        check_lane_abi: true,
+    };
+    walk.check_signature(function);
+    if let Some(body) = &function.body {
+        walk.visit_block(body);
+    }
+    walk.callees
+}
+
+/// Check one ordinary custom tensor-edge policy method as an exact device
+/// candidate. It shares body/type/effect checks with kernels but has no kernel
+/// positional lane ABI.
+pub(super) fn check_policy_callback(
+    env: &Env<'_>,
+    sink: &mut Sink,
+    function: &HirFunction,
+    span: Span,
+) -> Vec<DefId> {
+    let mut walk = KernelWalk {
+        env,
+        sink,
+        function_span: span,
+        callees: Vec::new(),
+        quiet: 0,
+        check_lane_abi: false,
     };
     walk.check_signature(function);
     if let Some(body) = &function.body {
@@ -78,6 +103,9 @@ struct KernelWalk<'a, 'e> {
     /// Depth of subtrees whose value types are not checked: operands of a
     /// host operation (already reported) and error payloads (rule 12 point 4).
     quiet: u32,
+    /// Callback candidates use device body rules but have no kernel launch
+    /// ABI, so positional-lane and builtin-name checks do not apply.
+    check_lane_abi: bool,
 }
 
 impl KernelWalk<'_, '_> {
@@ -102,7 +130,9 @@ impl KernelWalk<'_, '_> {
         if let Some(ret) = function.ret_ty {
             self.check_type(ret, self.function_span, "return");
         }
-        self.check_lane_parameters(function);
+        if self.check_lane_abi {
+            self.check_lane_parameters(function);
+        }
     }
 
     /// Lane-id plumbing in the signature (gpu-reset rule 12.5). A parameter
@@ -293,6 +323,13 @@ impl HirVisitor for KernelWalk<'_, '_> {
     }
 
     fn visit_expr(&mut self, expr: &HirExpression) {
+        if let Some(ResolvedTensorEdgePolicy::Custom {
+            remap, transform, ..
+        }) = self.env.tensor_edge_policies.calls.get(&expr.id)
+        {
+            self.callees.push(*remap);
+            self.callees.extend(transform.iter().copied());
+        }
         match &expr.kind {
             HirExpressionKind::Scribe(..) => {
                 self.effect(expr.span, "scribe", "console");

@@ -12,11 +12,12 @@ use crate::file_interface::{
     InterfaceConstValue, InterfaceDeviceContract, InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceEnumVariant,
     InterfaceGenericParam, InterfaceGenericParamDefault, InterfaceIndexSnapshot, InterfaceLibraryIdentity,
     InterfaceMethodExport, InterfaceNominalExport, InterfaceNominalKind, InterfaceNominalType, InterfaceParam,
-    InterfaceStructExport, InterfaceStructField, InterfaceTypeParamConstraint, InterfaceTypeSnapshot,
+    InterfaceStructExport, InterfaceStructField, InterfaceTensorEdgePolicyRequirement, InterfaceTypeParamConstraint,
+    InterfaceTypeSnapshot,
 };
 use crate::hir::HirItemKind;
 use crate::semantic::passes::visibility_annotation::{VisibilityTier, member_visibility};
-use crate::semantic::{ContractFieldType, InstansPrecision, NumericWidth, Primitive, SemanticParamMode};
+use crate::semantic::{ContractFieldType, InstansPrecision, NumericWidth, Primitive, SemanticParamMode, Type};
 use crate::syntax::{
     Annotation, AnnotationFieldValue, AnnotationKind, AstParamMode, ClassDecl, ClassMemberKind, ExprKind, FiguraExpr,
     Literal, Program, Stmt, StmtKind, TypeExpr, TypeExprKind,
@@ -771,8 +772,11 @@ fn cached_import_target(
     // ST2-1: the AST-built interface carries constant types only; the folded
     // values come from the analyzed provider unit, so a consumer's `=`
     // initializer folds `module.NAME` from this run's source, never a stale one.
-    let const_values = provider_const_values(&provider_unit);
     let mut interface = cached.interface.clone();
+    if let Some(unit) = provider_unit.lock_unit() {
+        apply_tensor_edge_policy_requirements(&mut interface, &unit);
+    }
+    let const_values = provider_const_values(&provider_unit);
     apply_const_values(&mut interface, &const_values);
     {
         let mut cache = session.memos.import_targets.borrow_mut();
@@ -819,6 +823,71 @@ fn apply_const_values(interface: &mut FileInterface, values: &[(String, Interfac
         if let Some(FileExport { kind: FileExportKind::Const(_, slot), .. }) = interface.exports.get_mut(name) {
             *slot = Some(value.clone());
         }
+    }
+}
+
+/// Attach semantic `limes<P>()` requirements to the syntax-built package
+/// interface. The initial package surface is needed before target analysis;
+/// the carried provider unit is the typed authority that fills this metadata
+/// once available.
+fn apply_tensor_edge_policy_requirements(
+    interface: &mut FileInterface,
+    provider: &crate::driver::ProviderUnit,
+) {
+    let mut rejected_exports = Vec::new();
+    for item in &provider.hir.items {
+        let HirItemKind::Function(function) = &item.kind else {
+            continue;
+        };
+        let name = provider.interner.resolve(function.name).to_owned();
+        let Some(requirements) = provider.tensor_edge_policies.function_requirements.get(&item.def_id) else {
+            continue;
+        };
+        let Some(FileExport { kind: FileExportKind::Function(callable), .. }) = interface.exports.get_mut(&name) else {
+            continue;
+        };
+
+        let portable = requirements
+            .iter()
+            .map(|requirement| {
+                let mut policy_type = requirement.policy_type;
+                while let Type::Alias(_, inner) = provider.types.get(policy_type) {
+                    policy_type = *inner;
+                }
+                let Type::Param(policy_param) = provider.types.get(policy_type) else {
+                    return None;
+                };
+                let policy_param = provider.interner.resolve(*policy_param).to_owned();
+                if !callable.type_params.iter().any(|param| {
+                    param.kind == crate::syntax::GenericParamKind::Typus && param.name == policy_param
+                }) {
+                    return None;
+                }
+                let element_type = crate::file_interface::snapshot_interface_type_with_resolver(
+                    requirement.element_type,
+                    &provider.types,
+                    &provider.interner,
+                    &provider.resolver,
+                )
+                .ok()?;
+                Some(InterfaceTensorEdgePolicyRequirement {
+                    policy_param,
+                    element_type,
+                    rank: requirement.rank,
+                })
+            })
+            .collect::<Option<Vec<_>>>();
+        if let Some(portable) = portable {
+            callable.tensor_edge_policy_requirements = portable;
+        } else {
+            // A generic policy requirement without a portable type witness
+            // must not cross the package boundary as an apparently ordinary
+            // callable. The consumer then fails closed at import resolution.
+            rejected_exports.push(name);
+        }
+    }
+    for name in rejected_exports {
+        interface.exports.remove(&name);
     }
 }
 
@@ -896,13 +965,24 @@ pub fn provider_unit_for_target(
     // Reduce the analyzed unit to the facts emission maps over. The arenas
     // move as-is; the shared handle keeps `AnalyzedModule` `Send` (the
     // `faber test` budget thread sends analyzed programs across a channel).
-    let crate::driver::AnalyzedModule { hir, types, interner, resolver, diagnostics, provider_units: nested, .. } =
-        unit;
+    let crate::driver::AnalyzedModule {
+        hir,
+        types,
+        interner,
+        resolver,
+        tensor_edge_policies,
+        shape_obligations,
+        diagnostics,
+        provider_units: nested,
+        ..
+    } = unit;
     CarriedProviderUnit::Unit(std::sync::Arc::new(std::sync::Mutex::new(crate::driver::ProviderUnit {
         hir,
         types,
         interner,
         resolver,
+        tensor_edge_policies,
+        shape_obligations,
         diagnostics,
         nested,
     })))
@@ -1696,6 +1776,7 @@ fn file_export_from_stmt(
                     err,
                     is_async,
                     is_generator,
+                    tensor_edge_policy_requirements: Vec::new(),
                     device,
                 }),
             })
@@ -1784,6 +1865,7 @@ fn file_export_from_stmt(
                             err,
                             is_async,
                             is_generator,
+                            tensor_edge_policy_requirements: Vec::new(),
                             device: None,
                         },
                         visibility: match member_visibility(&member.annotations, interner) {
@@ -2208,6 +2290,7 @@ fn interface_type_from_type_expr(
                 err,
                 is_async: false,
                 is_generator: false,
+                tensor_edge_policy_requirements: Vec::new(),
                 device: None,
             }))
         }
@@ -2306,21 +2389,60 @@ fn interface_type_from_type_expr(
 
 /// Snapshot a type-level index expression (`vector` width / `matrix` shape).
 ///
-/// Mirrors the analysis-side `snapshot_interface_index`: a declared `size`
-/// parameter renders as `Param` (name identity carries through the consumer
-/// restore path), literals as `Literal`, and `[R, C]` shapes as `Tuple`.
-/// `Infer` fails the export, matching the analysis route's
-/// `IndexInferenceUnsupported` posture.
+/// Mirrors the analysis-side `snapshot_interface_index`: declared `size`
+/// parameters remain symbolic, affine offsets and exact constant division
+/// retain structured nodes, and `[R, C]` shapes remain tuples. Concrete
+/// arithmetic is folded only after natural-range and exactness checks.
 fn interface_index_snapshot(figura: &FiguraExpr, interner: &crate::lexer::Interner) -> Option<InterfaceIndexSnapshot> {
     match figura {
         FiguraExpr::Literal(value) => Some(InterfaceIndexSnapshot::Literal(*value)),
         FiguraExpr::Var(ident) => Some(InterfaceIndexSnapshot::Param(interner.resolve(ident.name).to_owned())),
+        FiguraExpr::Add(_, _) | FiguraExpr::Subtract(_, _) => {
+            let mut offset = 0i128;
+            let base = interface_figura_affine_base(figura, &mut offset)?;
+            let base = interface_index_snapshot(base, interner)?;
+            match base {
+                InterfaceIndexSnapshot::Literal(value) => {
+                    let value = i128::from(value).checked_add(offset)?;
+                    Some(InterfaceIndexSnapshot::Literal(u64::try_from(value).ok()?))
+                }
+                base if offset == 0 => Some(base),
+                base => Some(InterfaceIndexSnapshot::Affine { base: Box::new(base), offset }),
+            }
+        }
+        FiguraExpr::Divide(value, divisor) => {
+            if *divisor == 0 {
+                return None;
+            }
+            let numerator = interface_index_snapshot(value, interner)?;
+            match numerator {
+                InterfaceIndexSnapshot::Literal(value) if value % *divisor == 0 => {
+                    Some(InterfaceIndexSnapshot::Literal(value / *divisor))
+                }
+                InterfaceIndexSnapshot::Literal(_) => None,
+                numerator => Some(InterfaceIndexSnapshot::Divide { numerator: Box::new(numerator), divisor: *divisor }),
+            }
+        }
         FiguraExpr::Tuple(dims) => dims
             .iter()
             .map(|dim| interface_index_snapshot(dim, interner))
             .collect::<Option<Vec<_>>>()
             .map(InterfaceIndexSnapshot::Tuple),
         FiguraExpr::Infer => None,
+    }
+}
+
+fn interface_figura_affine_base<'a>(figura: &'a FiguraExpr, offset: &mut i128) -> Option<&'a FiguraExpr> {
+    match figura {
+        FiguraExpr::Add(value, amount) => {
+            *offset = offset.checked_add(i128::from(*amount))?;
+            interface_figura_affine_base(value, offset)
+        }
+        FiguraExpr::Subtract(value, amount) => {
+            *offset = offset.checked_sub(i128::from(*amount))?;
+            interface_figura_affine_base(value, offset)
+        }
+        _ => Some(figura),
     }
 }
 
@@ -2434,6 +2556,7 @@ fn interface_method_from_ast(
                 || annotations_include_callable_family(&method.annotations, interner, "futura"),
             is_generator: method.posture.is_stream()
                 || annotations_include_callable_family(&method.annotations, interner, "cursor"),
+            tensor_edge_policy_requirements: Vec::new(),
             device: None,
         },
         visibility: crate::syntax::MemberVisibility::Publica,

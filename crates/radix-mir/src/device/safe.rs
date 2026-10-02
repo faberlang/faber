@@ -229,6 +229,9 @@ impl<'a> DeviceSafeClassifier<'a> {
             | Type::Error => {
                 self.record_layout(SHAPE_UNRESOLVED_TYPE);
             }
+            Type::TensorEdgePolicy(_) => {
+                self.record_policy("tensor edge-policy marker is not a runtime value type");
+            }
             Type::Primitive(
                 Primitive::Textus
                 | Primitive::Ascii

@@ -13,6 +13,7 @@ use radix_module::file_interface::{
     InterfaceDeviceContract, InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceEnumVariant,
     InterfaceGenericParam, InterfaceLibraryIdentity, InterfaceMethodExport, InterfaceNominalExport,
     InterfaceQualifiedIdentity, InterfaceStructExport, InterfaceStructField,
+    InterfaceTensorEdgePolicyRequirement,
     snapshot_interface_callable_with_identity, snapshot_interface_type_with_identity,
 };
 use radix_module::hir::{
@@ -67,7 +68,7 @@ pub fn extract_callable_contracts(
             }
             Some(
                 reject_signature_only_fragment(function, &name, file_label).and_then(|()| {
-                    snapshot_function(function, &item.annotations, analysis, file_label, None).map(
+                    snapshot_function(item.def_id, function, &item.annotations, analysis, file_label, None).map(
                         |callable| AnalyzedCallableContract {
                             def_id: item.def_id,
                             span: item.span,
@@ -113,6 +114,7 @@ pub fn extract_file_interface_with_identity(
             HirItemKind::Function(func) => {
                 reject_signature_only_fragment(func, &name, file_label)?;
                 FileExportKind::Function(snapshot_function(
+                    item.def_id,
                     func,
                     &item.annotations,
                     analysis,
@@ -569,6 +571,7 @@ fn annotation_contract_export(
 }
 
 fn snapshot_function(
+    def_id: DefId,
     func: &HirFunction,
     annotations: &[radix_module::hir::HirAnnotation],
     analysis: &AnalyzedModule,
@@ -615,6 +618,38 @@ fn snapshot_function(
     if let Some(contract) = device_contract_from_hir(func, annotations, &analysis.interner) {
         callable.device = Some(contract);
     }
+    callable.tensor_edge_policy_requirements = analysis
+        .tensor_edge_policies
+        .function_requirements
+        .get(&def_id)
+        .into_iter()
+        .flatten()
+        .map(|requirement| {
+            let mut policy_type = requirement.policy_type;
+            while let Type::Alias(_, inner) = analysis.types.get(policy_type) {
+                policy_type = *inner;
+            }
+            let Type::Param(policy_param) = analysis.types.get(policy_type) else {
+                return Err(interface_error(
+                    file_label,
+                    name,
+                    FileInterfaceError::TensorEdgePolicyRequirementUnsupported,
+                ));
+            };
+            Ok(InterfaceTensorEdgePolicyRequirement {
+                policy_param: analysis.interner.resolve(*policy_param).to_owned(),
+                element_type: snapshot_interface_type_with_identity(
+                    requirement.element_type,
+                    &analysis.types,
+                    &analysis.interner,
+                    &analysis.resolver,
+                    export_identity.map(identity_for).as_ref(),
+                )
+                .map_err(|err| interface_error(file_label, name, err))?,
+                rank: requirement.rank,
+            })
+        })
+        .collect::<Result<Vec<_>, Diagnostic>>()?;
     Ok(callable)
 }
 

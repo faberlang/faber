@@ -48,10 +48,10 @@ fn eval_extremum(
         .values
         .insert(
             MirValueId(0),
-            Value::Tensor(Rc::new(RefCell::new(TensorValue {
+            Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
                 data,
-                shape: vec![3],
-            }))),
+                vec![3],
+            )))),
         );
 
     let mut args = vec![MirOperand::Value(MirValueId(0))];

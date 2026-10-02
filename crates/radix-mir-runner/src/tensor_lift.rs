@@ -46,13 +46,22 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let element = self.lift_result_element(return_ty);
         let mut data = Vec::with_capacity(count);
         for index in 0..count {
-            let picked: Vec<Value> = operands.iter().map(|value| pick(value, index)).collect();
+            let mut picked = Vec::with_capacity(operands.len());
+            for value in &operands {
+                picked.push(match value {
+                    Value::Tensor(cell) => {
+                        self.tensor_read_at(cell, index, span)?.ok_or_else(|| {
+                            RunnerError::internal(span, "tensor lift layout is invalid")
+                        })?
+                    }
+                    other => other.clone(),
+                });
+            }
             data.push(self.lift_element(op, &picked, element, span)?);
         }
-        Ok(Value::Tensor(Rc::new(RefCell::new(TensorValue {
-            data,
-            shape,
-        }))))
+        Ok(Value::Tensor(Rc::new(RefCell::new(
+            TensorValue::contiguous(data, shape),
+        ))))
     }
 
     /// The element type of the tensor result type.
@@ -150,14 +159,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     }
 }
 
-/// The element of a tensor operand, or a scalar operand itself.
-fn pick(value: &Value, index: usize) -> Value {
-    match value {
-        Value::Tensor(cell) => cell.borrow().data[index].clone(),
-        other => other.clone(),
-    }
-}
-
 /// The shared shape of the tensor operands; two tensors must agree.
 fn lift_shape(operands: &[Value], span: Span) -> Result<Vec<i64>, RunnerError> {
     let mut shape: Option<Vec<i64>> = None;
@@ -191,7 +192,16 @@ fn lift_count(operands: &[Value], span: Span) -> Result<usize, RunnerError> {
         let Value::Tensor(cell) = operand else {
             continue;
         };
-        let len = cell.borrow().data.len();
+        let tensor = cell.borrow();
+        if tensor.has_contiguous_backing_mismatch() {
+            return Err(RunnerError::internal(
+                span,
+                "tensor lift backing-length mismatch",
+            ));
+        }
+        let len = tensor
+            .logical_len()
+            .ok_or_else(|| RunnerError::internal(span, "tensor lift shape overflow"))?;
         if count.is_some_and(|seen| seen != len) {
             return Err(RunnerError::internal(
                 span,

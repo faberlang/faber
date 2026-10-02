@@ -807,10 +807,24 @@ impl Parser {
     /// reclassifies it as an index hole later.
     pub(super) fn parse_type_argument(&mut self) -> Result<GenericArgExpr, ParseError> {
         if let TokenKind::Integer(value) = self.peek().kind {
+            if matches!(
+                self.peek_at(1).kind,
+                TokenKind::Plus | TokenKind::Minus | TokenKind::Slash
+            ) {
+                return Ok(GenericArgExpr::Size(self.parse_figura()?));
+            }
             self.advance();
             return Ok(GenericArgExpr::Size(FiguraExpr::Literal(value)));
         }
         if self.check(&TokenKind::LBracket) {
+            return Ok(GenericArgExpr::Size(self.parse_figura()?));
+        }
+        if matches!(self.peek().kind, TokenKind::Ident(_))
+            && matches!(
+                self.peek_at(1).kind,
+                TokenKind::Plus | TokenKind::Minus | TokenKind::Slash
+            )
+        {
             return Ok(GenericArgExpr::Size(self.parse_figura()?));
         }
         Ok(GenericArgExpr::Type(self.parse_type()?))
@@ -824,6 +838,12 @@ impl Parser {
     /// kinded reclassification of generic heads must not swallow either.
     pub(super) fn parse_explicit_type_argument(&mut self) -> Result<GenericArgExpr, ParseError> {
         if let TokenKind::Integer(value) = self.peek().kind {
+            if matches!(
+                self.peek_at(1).kind,
+                TokenKind::Plus | TokenKind::Minus | TokenKind::Slash
+            ) {
+                return Ok(GenericArgExpr::Size(self.parse_figura()?));
+            }
             let span = self.current_span();
             self.advance();
             return Ok(GenericArgExpr::Type(TypeExpr {
@@ -838,12 +858,22 @@ impl Parser {
         if self.check(&TokenKind::LBracket) {
             return Ok(GenericArgExpr::Size(self.parse_figura()?));
         }
+        if matches!(self.peek().kind, TokenKind::Ident(_))
+            && matches!(
+                self.peek_at(1).kind,
+                TokenKind::Plus | TokenKind::Minus | TokenKind::Slash
+            )
+        {
+            return Ok(GenericArgExpr::Size(self.parse_figura()?));
+        }
         Ok(GenericArgExpr::Type(self.parse_type()?))
     }
 
     /// Parse a tensor `Figura` in type position.
     ///
-    /// GRAMMAR: figura := `_` | natural | ident | [ figura (, figura)* ]
+    /// GRAMMAR: figura := `_` | natural | ident | figura `/` natural
+    ///                       | figura (`+` | `-`) natural
+    ///                       | [ figura (, figura)* ]
     pub(super) fn parse_figura(&mut self) -> Result<FiguraExpr, ParseError> {
         if matches!(self.peek().kind, TokenKind::Underscore(_)) {
             self.advance();
@@ -864,12 +894,62 @@ impl Parser {
             return Ok(FiguraExpr::Tuple(dims));
         }
 
+        self.parse_figura_additive()
+    }
+
+    fn parse_figura_additive(&mut self) -> Result<FiguraExpr, ParseError> {
+        let mut value = self.parse_figura_product()?;
+        loop {
+            let add = if self.eat(&TokenKind::Plus) {
+                Some(true)
+            } else if self.eat(&TokenKind::Minus) {
+                Some(false)
+            } else {
+                None
+            };
+            let Some(add) = add else {
+                break;
+            };
+            let amount = self.parse_figura_natural_operand()?;
+            value = if add {
+                FiguraExpr::Add(Box::new(value), amount)
+            } else {
+                FiguraExpr::Subtract(Box::new(value), amount)
+            };
+        }
+        Ok(value)
+    }
+
+    fn parse_figura_product(&mut self) -> Result<FiguraExpr, ParseError> {
+        let mut value = self.parse_figura_atom()?;
+        while self.eat(&TokenKind::Slash) {
+            let divisor = self.parse_figura_natural_operand()?;
+            value = FiguraExpr::Divide(Box::new(value), divisor);
+        }
+        Ok(value)
+    }
+
+    fn parse_figura_atom(&mut self) -> Result<FiguraExpr, ParseError> {
+        if self.eat(&TokenKind::LParen) {
+            let value = self.parse_figura()?;
+            self.expect(&TokenKind::RParen, "expected ')'")?;
+            return Ok(value);
+        }
+
         if let TokenKind::Integer(value) = self.peek().kind {
             self.advance();
             return Ok(FiguraExpr::Literal(value));
         }
 
         Ok(FiguraExpr::Var(self.parse_ident()?))
+    }
+
+    fn parse_figura_natural_operand(&mut self) -> Result<u64, ParseError> {
+        if let TokenKind::Integer(value) = self.peek().kind {
+            self.advance();
+            return Ok(value);
+        }
+        Err(self.invalid_type_error("figura_arithmetic_requires_natural_constant"))
     }
 }
 

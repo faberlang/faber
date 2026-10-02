@@ -911,6 +911,18 @@ impl TypeChecker<'_> {
     /// Checks ordinary index syntax by synthesizing both operands first.
     pub fn check_index(&mut self, object: &mut HirExpression, index: &mut HirExpression) -> TypeId {
         let obj_ty = self.check_expr(object);
+        if self
+            .tensor_edge_policies
+            .shifted_expressions
+            .contains(&object.id)
+        {
+            self.check_expr(index);
+            self.invalid_operand_types(
+                super::intrinsics::ISSUE_TENSOR_EDGE_VIEW_REQUIRES_RESOLUTION,
+                object.span,
+            );
+            return self.error_type;
+        }
         let resolved = self.resolve_inferred_type(obj_ty);
         if let Type::Tuple(elements) = self.types.get(resolved).clone() {
             let idx_ty = self.check_expr(index);
@@ -956,9 +968,12 @@ impl TypeChecker<'_> {
             return None;
         };
         if elements.len() != parts.len()
-            || elements
-                .iter()
-                .any(|element| matches!(element, HirArrayElement::Spread(_)))
+            || elements.iter().any(|element| {
+                matches!(
+                    element,
+                    HirArrayElement::Spread(_) | HirArrayElement::Infer(_)
+                )
+            })
         {
             return None;
         }
@@ -972,6 +987,7 @@ impl TypeChecker<'_> {
             .map(|element| match element {
                 HirArrayElement::Expr(expr) => expr,
                 HirArrayElement::Spread(_) => unreachable!("spreads were excluded above"),
+                HirArrayElement::Infer(_) => unreachable!("holes were excluded above"),
             })
             .collect();
         index.kind = HirExpressionKind::Tuple(items, None);
@@ -1130,6 +1146,17 @@ impl TypeChecker<'_> {
         self.place_write = write && matches!(object.kind, HirExpressionKind::Field(..));
         let obj_ty = self.check_expr(object);
         self.place_write = false;
+        if self
+            .tensor_edge_policies
+            .shifted_expressions
+            .contains(&object.id)
+        {
+            self.invalid_operand_types(
+                super::intrinsics::ISSUE_TENSOR_EDGE_VIEW_REQUIRES_RESOLUTION,
+                object.span,
+            );
+            return self.error_type;
+        }
         if !write
             && type_name_def.is_none()
             && self.declared_field_modifier(obj_ty, name)

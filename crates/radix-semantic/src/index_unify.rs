@@ -11,6 +11,7 @@
 
 use super::TypeTable;
 use super::index::{IndexExpr, IndexId, IndexVar};
+use radix_types::{add_index_constant, divide_index_exact};
 use rustc_hash::FxHashMap;
 
 /// Result of an index unification attempt.
@@ -93,6 +94,10 @@ impl<'a> IndexUnifier<'a> {
     pub fn unify(&mut self, a: IndexId, b: IndexId) -> Result<IndexId, IndexUnifyError> {
         let a = self.resolve(a);
         let b = self.resolve(b);
+        if contains_invalid_arithmetic(a, self.types) || contains_invalid_arithmetic(b, self.types)
+        {
+            return Err(IndexUnifyError::Mismatch);
+        }
         if a == b {
             return Ok(a);
         }
@@ -106,6 +111,89 @@ impl<'a> IndexUnifier<'a> {
             (IndexExpr::Unspecified, IndexExpr::Unspecified) => Ok(a),
             (IndexExpr::Literal(la), IndexExpr::Literal(lb)) if la == lb => Ok(a),
             (IndexExpr::Param(pa), IndexExpr::Param(pb)) if pa == pb => Ok(a),
+            (IndexExpr::Runtime(ra), IndexExpr::Runtime(rb)) if ra == rb => Ok(a),
+            (IndexExpr::Affine { base, offset }, IndexExpr::Runtime(_)) => {
+                self.unify_runtime_affine(base, offset, b)
+            }
+            (IndexExpr::Runtime(_), IndexExpr::Affine { base, offset }) => {
+                self.unify_runtime_affine(base, offset, a)
+            }
+            (
+                IndexExpr::Affine {
+                    base: a_base,
+                    offset: a_offset,
+                },
+                IndexExpr::Affine {
+                    base: b_base,
+                    offset: b_offset,
+                },
+            ) if a_offset == b_offset => {
+                let base = self.unify(a_base, b_base)?;
+                add_index_constant(self.types, base, a_offset)
+                    .map_err(|_| IndexUnifyError::Mismatch)
+            }
+            (
+                IndexExpr::Divide {
+                    numerator: a_numerator,
+                    divisor: a_divisor,
+                },
+                IndexExpr::Divide {
+                    numerator: b_numerator,
+                    divisor: b_divisor,
+                },
+            ) if a_divisor == b_divisor => {
+                let numerator = self.unify(a_numerator, b_numerator)?;
+                divide_index_exact(self.types, numerator, a_divisor)
+                    .map_err(|_| IndexUnifyError::Mismatch)
+            }
+            (IndexExpr::Affine { base, offset }, IndexExpr::Literal(value)) => {
+                let base_value = i128::from(value)
+                    .checked_sub(offset)
+                    .ok_or(IndexUnifyError::Mismatch)?;
+                if base_value < 0 {
+                    return Err(IndexUnifyError::Mismatch);
+                }
+                let base_value =
+                    u64::try_from(base_value).map_err(|_| IndexUnifyError::Mismatch)?;
+                let expected = self.types.intern_index(IndexExpr::Literal(base_value));
+                self.unify(base, expected)?;
+                Ok(b)
+            }
+            (IndexExpr::Literal(value), IndexExpr::Affine { base, offset }) => {
+                let base_value = i128::from(value)
+                    .checked_sub(offset)
+                    .ok_or(IndexUnifyError::Mismatch)?;
+                if base_value < 0 {
+                    return Err(IndexUnifyError::Mismatch);
+                }
+                let base_value =
+                    u64::try_from(base_value).map_err(|_| IndexUnifyError::Mismatch)?;
+                let expected = self.types.intern_index(IndexExpr::Literal(base_value));
+                self.unify(base, expected)?;
+                Ok(a)
+            }
+            (IndexExpr::Divide { numerator, divisor }, IndexExpr::Literal(value)) => {
+                if divisor == 0 {
+                    return Err(IndexUnifyError::Mismatch);
+                }
+                let expected_value = value
+                    .checked_mul(divisor)
+                    .ok_or(IndexUnifyError::Mismatch)?;
+                let expected = self.types.intern_index(IndexExpr::Literal(expected_value));
+                self.unify(numerator, expected)?;
+                Ok(b)
+            }
+            (IndexExpr::Literal(value), IndexExpr::Divide { numerator, divisor }) => {
+                if divisor == 0 {
+                    return Err(IndexUnifyError::Mismatch);
+                }
+                let expected_value = value
+                    .checked_mul(divisor)
+                    .ok_or(IndexUnifyError::Mismatch)?;
+                let expected = self.types.intern_index(IndexExpr::Literal(expected_value));
+                self.unify(numerator, expected)?;
+                Ok(a)
+            }
             (IndexExpr::Tuple(a_dims), IndexExpr::Tuple(b_dims)) => {
                 if a_dims.len() != b_dims.len() {
                     return Err(IndexUnifyError::Mismatch);
@@ -130,6 +218,10 @@ impl<'a> IndexUnifier<'a> {
     pub fn unify_broadcast(&mut self, a: IndexId, b: IndexId) -> Result<IndexId, IndexUnifyError> {
         let a = self.resolve(a);
         let b = self.resolve(b);
+        if contains_invalid_arithmetic(a, self.types) || contains_invalid_arithmetic(b, self.types)
+        {
+            return Err(IndexUnifyError::Mismatch);
+        }
         if a == b {
             return Ok(a);
         }
@@ -158,7 +250,8 @@ impl<'a> IndexUnifier<'a> {
             (IndexExpr::Literal(la), IndexExpr::Literal(lb)) if la == lb => Ok(a),
             (IndexExpr::Literal(_), IndexExpr::Literal(_)) => Err(IndexUnifyError::Mismatch),
             (IndexExpr::Param(pa), IndexExpr::Param(pb)) if pa == pb => Ok(a),
-            _ => Err(IndexUnifyError::Mismatch),
+            (IndexExpr::Runtime(ra), IndexExpr::Runtime(rb)) if ra == rb => Ok(a),
+            _ => self.unify(a, b),
         }
     }
 
@@ -210,6 +303,26 @@ impl<'a> IndexUnifier<'a> {
         Ok(target)
     }
 
+    /// Solve `base + offset = runtime` only when `base` is an inference hole.
+    /// The inverse remains a structured runtime affine term, so K14 can check
+    /// its natural-number bound at the same call boundary as the original
+    /// shape relation.
+    fn unify_runtime_affine(
+        &mut self,
+        base: IndexId,
+        offset: i128,
+        runtime: IndexId,
+    ) -> Result<IndexId, IndexUnifyError> {
+        if !matches!(self.types.get_index(base), IndexExpr::Infer(_)) {
+            return Err(IndexUnifyError::Mismatch);
+        }
+        let inverse = offset.checked_neg().ok_or(IndexUnifyError::Mismatch)?;
+        let target = radix_types::compose_index_affine_constant(self.types, runtime, inverse)
+            .map_err(|_| IndexUnifyError::Mismatch)?;
+        self.unify(base, target)?;
+        Ok(runtime)
+    }
+
     /// BO-S-6: cache per `(IndexVar, resolved IndexId)`; no dims.clone().
     fn occurs_in(&mut self, var: IndexVar, id: IndexId) -> bool {
         let id = self.resolve(id);
@@ -222,9 +335,28 @@ impl<'a> IndexUnifier<'a> {
                 let dims = dims.clone();
                 dims.into_iter().any(|dim| self.occurs_in(var, dim))
             }
+            IndexExpr::Affine { base, .. } => self.occurs_in(var, *base),
+            IndexExpr::Divide { numerator, .. } => self.occurs_in(var, *numerator),
             _ => false,
         };
         self.occurs_cache.insert((var, id), result);
         result
+    }
+}
+
+fn contains_invalid_arithmetic(id: IndexId, types: &TypeTable) -> bool {
+    match types.get_index(id) {
+        IndexExpr::Tuple(dims) => dims
+            .iter()
+            .any(|dim| contains_invalid_arithmetic(*dim, types)),
+        IndexExpr::Affine { base, .. } => {
+            radix_types::evaluate_index_dimension(id, types).is_err()
+                || contains_invalid_arithmetic(*base, types)
+        }
+        IndexExpr::Divide { numerator, .. } => {
+            radix_types::evaluate_index_dimension(id, types).is_err()
+                || contains_invalid_arithmetic(*numerator, types)
+        }
+        _ => false,
     }
 }

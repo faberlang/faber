@@ -421,6 +421,7 @@ impl SummaBodyState {
                         HirArrayElement::Expr(inner) | HirArrayElement::Spread(inner) => {
                             self.walk_expr(checker, inner);
                         }
+                        HirArrayElement::Infer(_) => {}
                     }
                 }
             }

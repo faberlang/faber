@@ -390,6 +390,7 @@ impl HirVisitor for LiberaChecker<'_> {
                     let expr = match element {
                         radix_hir::HirArrayElement::Expr(expr)
                         | radix_hir::HirArrayElement::Spread(expr) => expr,
+                        radix_hir::HirArrayElement::Infer(_) => continue,
                     };
                     self.visit_in(KernelPosition::Other("list"), expr);
                 }

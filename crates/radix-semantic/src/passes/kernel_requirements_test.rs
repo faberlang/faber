@@ -1,0 +1,295 @@
+//! Per-target width, range, call-graph, and callback requirements.
+
+use crate::PassConfig;
+use crate::locale::LocalePack;
+use crate::passes::kernel_requirements::KernelRequirementFailure;
+use crate::test_support::{analyze_source, analyze_source_with_config};
+use radix_target::Target;
+
+fn analyze_en(source: &str) -> crate::test_support::AnalyzedFixture {
+    let mut config = PassConfig::for_target(Target::HirRust);
+    config.locale_pack = Some(
+        LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("load English locale pack"),
+    );
+    analyze_source_with_config(source, config)
+}
+
+fn target_row<'a>(
+    fixture: &'a crate::test_support::AnalyzedFixture,
+    name: &str,
+    target: Target,
+) -> &'a crate::passes::kernel_requirements::KernelTargetRequirement {
+    let kernel = fixture
+        .kernel_requirements
+        .kernels
+        .iter()
+        .find(|kernel| kernel.name == name)
+        .unwrap_or_else(|| panic!("missing kernel requirement row for {name}"));
+    kernel
+        .target_reports
+        .iter()
+        .find(|row| row.target == target)
+        .unwrap_or_else(|| panic!("missing {target:?} row for {name}"))
+}
+
+#[test]
+fn wrapping_i32_is_admitted_only_on_implemented_device_leaves() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn wrapping_sum(wrapping<i32> left, wrapping<i32> right) → wrapping<i32> {
+    return left + right
+}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+
+    for target in [Target::MirMetal, Target::MirWgsl] {
+        let report = target_row(&fixture, "wrapping_sum", target);
+        assert!(report.admitted, "{target:?}: {:?}", report.failures);
+        assert!(report.trapping_stores.is_empty());
+        assert!(report.widths.iter().any(|width| {
+            width.policy == crate::passes::kernel_requirements::KernelNumericPolicy::Wrapping
+                && width.width == crate::NumericWidth::I32
+        }));
+    }
+
+    let amd = target_row(&fixture, "wrapping_sum", Target::MirAmd);
+    assert!(!amd.admitted);
+    assert!(amd.failures.iter().any(|failure| matches!(
+        failure,
+        KernelRequirementFailure::UnsupportedIntegerWidth {
+            width: crate::NumericWidth::I32,
+            ..
+        }
+    )));
+}
+
+#[test]
+fn wrapping_word_intermediates_observed_before_store_must_fit_their_carrier() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn signed_sub(wrapping<i32> left, wrapping<i32> right) → bool {
+    return left - right < left
+}
+
+@ kernel
+@ public
+fn signed_mul(wrapping<i32> left, wrapping<i32> right) → bool {
+    return left * right > left
+}
+
+@ kernel
+@ public
+fn signed_neg(wrapping<i32> value, wrapping<i32> bound) → bool {
+    return -value > bound
+}
+
+@ kernel
+@ public
+fn unsigned_sub(wrapping<u32> left, wrapping<u32> right) → bool {
+    return left - right < left
+}
+
+@ kernel
+@ public
+fn nested_add_div(wrapping<i32> left, wrapping<i32> right) → bool {
+    return (left + right) / 2 > left
+}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+
+    let cases = [
+        ("signed_sub", -4_294_967_295, 4_294_967_295),
+        (
+            "signed_mul",
+            -4_611_686_016_279_904_256,
+            4_611_686_018_427_387_904,
+        ),
+        ("signed_neg", -2_147_483_647, 2_147_483_648),
+        ("unsigned_sub", -4_294_967_295, 4_294_967_295),
+        ("nested_add_div", -4_294_967_296, 4_294_967_294),
+    ];
+    for (name, expected_minimum, expected_maximum) in cases {
+        for target in [Target::MirMetal, Target::MirWgsl] {
+            let report = target_row(&fixture, name, target);
+            assert!(
+                !report.admitted,
+                "{target:?} admitted {name}: {:?}",
+                report.failures
+            );
+            let range = report
+                .failures
+                .iter()
+                .find_map(|failure| match failure {
+                    KernelRequirementFailure::IntermediateOutOfRange { range, .. } => Some(range),
+                    _ => None,
+                })
+                .unwrap_or_else(|| {
+                    panic!(
+                        "{target:?} missing exact {name} intermediate failure: {:?}",
+                        report.failures
+                    )
+                });
+            assert_eq!(
+                range.minimum,
+                crate::passes::kernel_requirements::KernelRangeExpr::Constant(expected_minimum),
+                "{target:?} {name}"
+            );
+            assert_eq!(
+                range.maximum,
+                crate::passes::kernel_requirements::KernelRangeExpr::Constant(expected_maximum),
+                "{target:?} {name}"
+            );
+        }
+    }
+}
+
+#[test]
+fn symbolic_apud_coordinate_is_retained_as_a_store_condition() {
+    let fixture = analyze_source(
+        r"
+@ nucleum
+@ publica
+functio copy_coordinate<magnitudo N>(
+    tensor<f32, [N]> input,
+    tensor<u32, [N]> output
+) → vacuum {
+    itera ex input apud [i] fixum value {
+        output[i] ← i
+    }
+}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+
+    let report = target_row(&fixture, "copy_coordinate", Target::MirMetal);
+    assert!(report.admitted, "{:?}", report.failures);
+    assert!(
+        report.extent_conditions.iter().any(|condition| {
+            condition.minimum == 0 && condition.maximum == i128::from(u32::MAX)
+        })
+    );
+}
+
+#[test]
+fn transitive_kernel_width_failure_closes_the_calling_kernel() {
+    let fixture = analyze_source(
+        r"
+@ nucleum
+functio wide_helper(numerus value) → vacuum {
+    tacet
+}
+
+@ nucleum
+@ publica
+functio caller(f32 value) → f32 {
+    wide_helper(1)
+    redde value
+}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+
+    let helper = target_row(&fixture, "wide_helper", Target::MirMetal);
+    assert!(!helper.admitted);
+    let caller = target_row(&fixture, "caller", Target::MirMetal);
+    assert!(!caller.admitted);
+    assert!(
+        caller
+            .failures
+            .iter()
+            .any(|failure| matches!(failure, KernelRequirementFailure::CalleeNotAdmitted { .. }))
+    );
+}
+
+#[test]
+fn tensor_division_requires_a_proof_that_each_divisor_lane_is_nonzero() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn tensor_division(
+    tensor<wrapping<i32>, [4]> dividend,
+    tensor<wrapping<i32>, [4]> divisor
+) → void {
+    const tensor<wrapping<i32>, [4]> quotient ← dividend.divide(divisor)
+}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+
+    let report = target_row(&fixture, "tensor_division", Target::MirMetal);
+    assert!(!report.admitted);
+    assert!(report.failures.iter().any(|failure| matches!(
+        failure,
+        KernelRequirementFailure::DivideByZeroPossible { .. }
+    )));
+}
+
+#[test]
+fn recursion_is_a_per_target_requirement_failure() {
+    let fixture = analyze_source(
+        r"
+@ nucleum
+@ publica
+functio recursive(f32 value) → f32 {
+    redde recursive(value)
+}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+
+    let report = target_row(&fixture, "recursive", Target::MirMetal);
+    assert!(report.recursive);
+    assert!(!report.admitted);
+    assert!(
+        report
+            .failures
+            .contains(&KernelRequirementFailure::RecursiveCall)
+    );
+}
+
+#[test]
+fn limes_callback_gets_shift_and_symbolic_extent_range_facts() {
+    let fixture = analyze_en(
+        r"
+interface EdgePolicy<C> { fn remap(C coord) → C }
+class ZeroGhost implements EdgePolicy<vector<int, 1>> {
+    fn remap(vector<int, 1> coord) → vector<int, 1> {
+        return coord
+    }
+}
+
+@ kernel
+@ public
+fn map_edges<size N>(
+    tensor<f32, [N]> input,
+    tensor<f32, [N]> output
+) → void {
+    const tensor<f32, [N]> mapped ← input.shift([1]).limes<ZeroGhost>()
+    for from mapped at [i] const value {
+        output[i] ← value
+    }
+}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+
+    let report = target_row(&fixture, "map_edges", Target::MirMetal);
+    assert!(report.admitted, "{:?}", report.failures);
+    assert!(
+        report
+            .extent_conditions
+            .iter()
+            .any(|condition| condition.minimum == i128::from(i32::MIN)
+                && condition.maximum == i128::from(i32::MAX)),
+        "limes must retain the i32 callback narrowing condition: {:?}",
+        report.extent_conditions
+    );
+}

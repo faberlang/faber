@@ -67,6 +67,7 @@ pub mod import_path;
 pub mod import_seam;
 pub mod insere_fold;
 pub mod kernel_legality;
+pub mod kernel_requirements;
 mod kernel_legality_body;
 mod kernel_legality_types;
 pub mod kernel_namespace;
@@ -204,6 +205,10 @@ mod iuncta_hole_test;
 #[cfg(test)]
 #[path = "kernel_legality_test.rs"]
 mod kernel_legality_test;
+
+#[cfg(test)]
+#[path = "kernel_requirements_test.rs"]
+mod kernel_requirements_test;
 
 #[cfg(test)]
 #[path = "kernel_namespace_test.rs"]

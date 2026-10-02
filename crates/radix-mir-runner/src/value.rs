@@ -22,6 +22,9 @@
 )]
 
 use super::RunnerError;
+use crate::tensor_edge::{
+    RunnerTensorEdgeDescriptor, TensorEdgeResolution, resolve_builtin, resolve_optional,
+};
 use crate::regex_program::RegexProgram;
 use handroll::Magnus;
 use radix_hir::DefId;
@@ -257,8 +260,705 @@ impl MatchValue {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TensorValue {
-    pub data: Vec<Value>,
+    /// Shared flat allocation. Tensor views keep this identity and carry their
+    /// own logical shape, strides, and origin.
+    pub data: Rc<RefCell<Vec<Value>>>,
     pub shape: Vec<i64>,
+    pub strides: Vec<isize>,
+    pub offset: isize,
+    is_view: bool,
+    pub(crate) edge_base: Option<TensorEdgeBase>,
+    pub(crate) edge_ops: Vec<TensorEdgeOp>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct TensorEdgeBase {
+    pub(crate) shape: Vec<i64>,
+    pub(crate) strides: Vec<isize>,
+    pub(crate) offset: isize,
+}
+
+/// A sequence of logical operations layered over the affine backing layout.
+/// Reads traverse this list backward, so views created after a shift remain
+/// lazy and preserve the coordinate space in which each shift was declared.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum TensorEdgeOp {
+    Shift {
+        input_shape: Vec<i64>,
+        descriptor: RunnerTensorEdgeDescriptor,
+    },
+    View {
+        input_shape: Vec<i64>,
+        output_shape: Vec<i64>,
+        inverse: TensorInverseMap,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum TensorInverseMap {
+    SliceAxis0 {
+        start: usize,
+        step: usize,
+    },
+    TransposeLastTwo,
+    Expand {
+        target_to_source: Vec<Option<usize>>,
+    },
+    Reshape,
+}
+
+impl TensorValue {
+    #[must_use]
+    pub fn contiguous(data: Vec<Value>, shape: Vec<i64>) -> Self {
+        Self::try_contiguous(data, shape)
+            .expect("contiguous tensor shape must have representable strides")
+    }
+
+    /// Build a contiguous tensor only when its stride products fit the
+    /// runner's signed physical-offset representation.
+    #[must_use]
+    pub fn try_contiguous(data: Vec<Value>, shape: Vec<i64>) -> Option<Self> {
+        let strides = Self::try_contiguous_strides(&shape)?;
+        Some(Self {
+            data: Rc::new(RefCell::new(data)),
+            shape,
+            strides,
+            offset: 0,
+            is_view: false,
+            edge_base: None,
+            edge_ops: Vec::new(),
+        })
+    }
+
+    #[must_use]
+    pub fn contiguous_strides(shape: &[i64]) -> Vec<isize> {
+        Self::try_contiguous_strides(shape).expect("contiguous tensor strides must fit isize")
+    }
+
+    #[must_use]
+    pub fn try_contiguous_strides(shape: &[i64]) -> Option<Vec<isize>> {
+        if shape.iter().any(|dimension| *dimension < 0) {
+            return None;
+        }
+        let mut strides = vec![0; shape.len()];
+        let mut stride = 1_isize;
+        for axis in (0..shape.len()).rev() {
+            strides[axis] = stride;
+            let dimension = isize::try_from(shape[axis]).ok()?;
+            stride = stride.checked_mul(dimension)?;
+        }
+        Some(strides)
+    }
+
+    #[must_use]
+    pub fn view(&self, shape: Vec<i64>, strides: Vec<isize>, offset: isize) -> Option<Self> {
+        if shape.len() != strides.len()
+            || !Self::layout_fits(&self.data.borrow(), &shape, &strides, offset)
+        {
+            return None;
+        }
+        Some(Self {
+            data: Rc::clone(&self.data),
+            shape,
+            strides,
+            offset,
+            is_view: true,
+            edge_base: self.edge_base.clone(),
+            edge_ops: self.edge_ops.clone(),
+        })
+    }
+
+    #[must_use]
+    pub fn view_allowing_out_of_bounds(
+        &self,
+        shape: Vec<i64>,
+        strides: Vec<isize>,
+        offset: isize,
+    ) -> Option<Self> {
+        if shape.len() != strides.len() || shape.iter().any(|dimension| *dimension < 0) {
+            return None;
+        }
+        Some(Self {
+            data: Rc::clone(&self.data),
+            shape,
+            strides,
+            offset,
+            is_view: true,
+            edge_base: self.edge_base.clone(),
+            edge_ops: self.edge_ops.clone(),
+        })
+    }
+
+    pub(crate) fn logical_view(
+        &self,
+        shape: Vec<i64>,
+        strides: Vec<isize>,
+        offset: isize,
+    ) -> Option<Self> {
+        if self.edge_base.is_some() {
+            self.view_allowing_out_of_bounds(shape, strides, offset)
+        } else {
+            self.view(shape, strides, offset)
+        }
+    }
+
+    #[must_use]
+    pub fn logical_len(&self) -> Option<usize> {
+        if self.shape.is_empty() {
+            // `[]` is the rank-zero shape (one scalar) when storage exists.
+            // The runner also uses an empty `([], [])` tensor as an unshaped
+            // seed before a shape-bearing tensor operation.
+            return Some(usize::from(!self.data.borrow().is_empty()));
+        }
+        let count = self.shape.iter().try_fold(1_usize, |count, dimension| {
+            usize::try_from(*dimension)
+                .ok()
+                .and_then(|dimension| count.checked_mul(dimension))
+        })?;
+        // An empty backing is the runner's established empty-runtime tensor
+        // representation, even when its shape is retained as metadata.
+        Some(if self.data.borrow().is_empty() {
+            0
+        } else {
+            count
+        })
+    }
+
+    /// Detect a malformed direct contiguous tensor while allowing affine views
+    /// to share a larger or non-contiguous backing allocation.
+    #[must_use]
+    pub(crate) fn has_contiguous_backing_mismatch(&self) -> bool {
+        if !self.edge_ops.is_empty() {
+            return false;
+        }
+        if self.is_view {
+            return !Self::layout_fits(
+                &self.data.borrow(),
+                &self.shape,
+                &self.strides,
+                self.offset,
+            );
+        }
+        if self.offset != 0 {
+            return false;
+        }
+        let Some(strides) = Self::try_contiguous_strides(&self.shape) else {
+            return false;
+        };
+        if self.strides != strides {
+            return false;
+        }
+        let Some(expected) = self.shape.iter().try_fold(1_usize, |count, dimension| {
+            usize::try_from(*dimension)
+                .ok()
+                .and_then(|dimension| count.checked_mul(dimension))
+        }) else {
+            return false;
+        };
+        let data_len = self.data.borrow().len();
+        data_len != 0 && data_len != expected
+    }
+
+    #[must_use]
+    pub fn physical_offset(&self, logical_index: usize) -> Option<usize> {
+        let count = self.logical_len()?;
+        if logical_index >= count || self.strides.len() != self.shape.len() {
+            return None;
+        }
+        let mut remainder = logical_index;
+        let mut coordinates = vec![0; self.shape.len()];
+        for axis in (0..self.shape.len()).rev() {
+            let dimension = usize::try_from(self.shape[axis]).ok()?;
+            if dimension == 0 {
+                return None;
+            }
+            coordinates[axis] = remainder % dimension;
+            remainder /= dimension;
+        }
+        self.physical_offset_for_coordinates(&coordinates)
+    }
+
+    /// Map a logical coordinate to the shared flat allocation. This is the
+    /// common seam for ordinary views and lazy shifted-edge reads.
+    #[must_use]
+    pub fn physical_offset_for_coordinates(&self, coordinates: &[usize]) -> Option<usize> {
+        if coordinates.len() != self.shape.len() || self.strides.len() != self.shape.len() {
+            return None;
+        }
+        let mut physical = self.offset;
+        for ((coordinate, dimension), stride) in
+            coordinates.iter().zip(&self.shape).zip(&self.strides)
+        {
+            if *coordinate >= usize::try_from(*dimension).ok()? {
+                return None;
+            }
+            physical =
+                physical.checked_add(isize::try_from(*coordinate).ok()?.checked_mul(*stride)?)?;
+        }
+        usize::try_from(physical).ok()
+    }
+
+    /// Convert a flat logical index into its row-major logical coordinate.
+    #[must_use]
+    pub fn logical_coordinates(&self, logical_index: usize) -> Option<Vec<usize>> {
+        let count = self.logical_len()?;
+        if logical_index >= count {
+            return None;
+        }
+        let mut remainder = logical_index;
+        let mut coordinates = vec![0; self.shape.len()];
+        for axis in (0..self.shape.len()).rev() {
+            let dimension = usize::try_from(self.shape[axis]).ok()?;
+            if dimension == 0 {
+                return None;
+            }
+            coordinates[axis] = remainder % dimension;
+            remainder /= dimension;
+        }
+        Some(coordinates)
+    }
+
+    pub(crate) fn push_edge_shift(&mut self, descriptor: RunnerTensorEdgeDescriptor) {
+        if self.edge_base.is_none() {
+            self.edge_base = Some(TensorEdgeBase {
+                shape: self.shape.clone(),
+                strides: self.strides.clone(),
+                offset: self.offset,
+            });
+        }
+        self.edge_ops.push(TensorEdgeOp::Shift {
+            input_shape: self.shape.clone(),
+            descriptor,
+        });
+    }
+
+    pub(crate) fn resolve_edge_shift(
+        &mut self,
+        resolution: TensorEdgeResolution<crate::tensor_edge::CustomEdgePolicyId>,
+    ) -> bool {
+        let Some(TensorEdgeOp::Shift { descriptor, .. }) =
+            self.edge_ops.iter_mut().rev().find(|operation| {
+                matches!(
+                    operation,
+                    TensorEdgeOp::Shift { descriptor, .. }
+                        if matches!(descriptor.resolution, TensorEdgeResolution::Optional)
+                )
+            })
+        else {
+            return false;
+        };
+        let Some(resolved) = descriptor.clone().limes(resolution) else {
+            return false;
+        };
+        *descriptor = resolved;
+        true
+    }
+
+    pub(crate) fn has_unresolved_edge_shift(&self) -> bool {
+        self.edge_ops.iter().any(|operation| {
+            matches!(
+                operation,
+                TensorEdgeOp::Shift { descriptor, .. }
+                    if matches!(descriptor.resolution, TensorEdgeResolution::Optional)
+            )
+        })
+    }
+
+    pub(crate) fn push_edge_view(&mut self, input_shape: Vec<i64>, inverse: TensorInverseMap) {
+        if self.edge_base.is_some() {
+            self.edge_ops.push(TensorEdgeOp::View {
+                input_shape,
+                output_shape: self.shape.clone(),
+                inverse,
+            });
+        }
+    }
+
+    /// Add broadcast axes or stretch singleton axes without copying storage.
+    /// Exact extents are preferred; ties select the rightmost target axes.
+    #[must_use]
+    pub fn expanded_view(&self, target_shape: Vec<i64>) -> Option<Self> {
+        if target_shape.len() < self.shape.len()
+            || target_shape.iter().any(|dimension| *dimension < 0)
+            || self.shape.iter().any(|dimension| *dimension < 0)
+        {
+            return None;
+        }
+        let source_rank = self.shape.len();
+        let target_rank = target_shape.len();
+        let impossible = usize::MAX;
+        let mut costs = vec![vec![impossible; target_rank + 1]; source_rank + 1];
+        costs[source_rank].fill(0);
+        for source_axis in (0..source_rank).rev() {
+            for first_target_axis in (0..target_rank).rev() {
+                let mut best = impossible;
+                for target_axis in first_target_axis..target_rank {
+                    let source_extent = self.shape[source_axis];
+                    let target_extent = target_shape[target_axis];
+                    let stretch = if source_extent == target_extent {
+                        0
+                    } else if source_extent == 1 {
+                        1
+                    } else {
+                        continue;
+                    };
+                    let suffix = costs[source_axis + 1][target_axis + 1];
+                    if suffix != impossible {
+                        best = best.min(suffix + stretch);
+                    }
+                }
+                costs[source_axis][first_target_axis] = best;
+            }
+        }
+        let Some(&minimum_stretches) = costs.first().and_then(|row| row.first()) else {
+            return None;
+        };
+        if minimum_stretches == impossible {
+            return None;
+        }
+
+        let mut target_strides = vec![0_isize; target_rank];
+        let mut target_axis_for_source = vec![0; source_rank];
+        let mut first_target_axis = 0;
+        let mut remaining_stretches = minimum_stretches;
+        for source_axis in 0..source_rank {
+            let mut selected = None;
+            for target_axis in (first_target_axis..target_rank).rev() {
+                let source_extent = self.shape[source_axis];
+                let target_extent = target_shape[target_axis];
+                let stretch = if source_extent == target_extent {
+                    0
+                } else if source_extent == 1 {
+                    1
+                } else {
+                    continue;
+                };
+                let suffix = costs[source_axis + 1][target_axis + 1];
+                if suffix != impossible && suffix + stretch == remaining_stretches {
+                    selected = Some((target_axis, stretch));
+                    break;
+                }
+            }
+            let (target_axis, stretch) = selected?;
+            target_axis_for_source[source_axis] = target_axis;
+            target_strides[target_axis] = if stretch == 0 {
+                self.strides[source_axis]
+            } else {
+                0
+            };
+            remaining_stretches -= stretch;
+            first_target_axis = target_axis + 1;
+        }
+        let mut target_to_source = vec![None; target_rank];
+        for (source_axis, target_axis) in target_axis_for_source.iter().copied().enumerate() {
+            target_to_source[target_axis] = Some(source_axis);
+        }
+        let mut view = self.logical_view(target_shape, target_strides, self.offset)?;
+        view.push_edge_view(
+            self.shape.clone(),
+            TensorInverseMap::Expand { target_to_source },
+        );
+        Some(view)
+    }
+
+    #[must_use]
+    pub fn value_at(&self, logical_index: usize) -> Option<Value> {
+        let coordinates = self.logical_coordinates(logical_index)?;
+        self.value_at_coordinates(&coordinates)
+    }
+
+    #[must_use]
+    pub fn value_at_coordinates(&self, coordinates: &[usize]) -> Option<Value> {
+        if coordinates.len() != self.shape.len()
+            || coordinates
+                .iter()
+                .zip(&self.shape)
+                .any(|(coordinate, extent)| {
+                    !usize::try_from(*extent).is_ok_and(|extent| *coordinate < extent)
+                })
+        {
+            return None;
+        }
+        if self.edge_ops.is_empty() {
+            let physical = self.physical_offset_for_coordinates(coordinates)?;
+            return self.data.borrow().get(physical).cloned();
+        }
+        let base = self.edge_base.as_ref()?;
+        let mut mapped = coordinates.to_vec();
+        for operation in self.edge_ops.iter().rev() {
+            match operation {
+                TensorEdgeOp::View {
+                    input_shape,
+                    output_shape,
+                    inverse,
+                } => {
+                    if !coordinate_fits(&mapped, output_shape) {
+                        return None;
+                    }
+                    mapped = inverse_view_coordinate(&mapped, input_shape, output_shape, inverse)?;
+                }
+                TensorEdgeOp::Shift {
+                    input_shape,
+                    descriptor,
+                } => {
+                    if !coordinate_fits(&mapped, input_shape) {
+                        return None;
+                    }
+                    let extents = input_shape
+                        .iter()
+                        .map(|dimension| usize::try_from(*dimension).ok())
+                        .collect::<Option<Vec<_>>>()?;
+                    let coordinate = mapped
+                        .iter()
+                        .map(|coordinate| i128::try_from(*coordinate).ok())
+                        .collect::<Option<Vec<_>>>()?;
+                    mapped = match &descriptor.resolution {
+                        TensorEdgeResolution::Optional => {
+                            let Some(mapped) =
+                                resolve_optional(&coordinate, &descriptor.shift, &extents)
+                            else {
+                                return Some(Value::Nil);
+                            };
+                            mapped
+                        }
+                        TensorEdgeResolution::Builtin(policy) => {
+                            resolve_builtin(*policy, &coordinate, &descriptor.shift, &extents)?
+                        }
+                        TensorEdgeResolution::Custom(_) => return None,
+                    };
+                }
+            }
+        }
+        let physical =
+            Self::physical_offset_in_layout(&mapped, &base.shape, &base.strides, base.offset)?;
+        self.data.borrow().get(physical).cloned()
+    }
+
+    pub fn set_value_at(&self, logical_index: usize, value: Value) -> Option<()> {
+        if !self.edge_ops.is_empty() {
+            return None;
+        }
+        let physical = self.physical_offset(logical_index)?;
+        *self.data.borrow_mut().get_mut(physical)? = value;
+        Some(())
+    }
+
+    #[must_use]
+    pub fn logical_values(&self) -> Option<Vec<Value>> {
+        (0..self.logical_len()?)
+            .map(|index| self.value_at(index))
+            .collect()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.logical_len().is_none_or(|count| count == 0)
+    }
+
+    #[must_use]
+    pub fn is_contiguous(&self) -> bool {
+        let Some(count) = self.logical_len() else {
+            return false;
+        };
+        if count == 0 {
+            return true;
+        }
+        let mut expected = 1_isize;
+        for axis in (0..self.shape.len()).rev() {
+            let Ok(dimension) = isize::try_from(self.shape[axis]) else {
+                return false;
+            };
+            if dimension > 1 && self.strides.get(axis) != Some(&expected) {
+                return false;
+            }
+            let Some(next) = expected.checked_mul(dimension) else {
+                return false;
+            };
+            expected = next;
+        }
+        true
+    }
+
+    #[must_use]
+    pub fn reshaped_view(&self, shape: Vec<i64>) -> Option<Self> {
+        let input_shape = self.shape.clone();
+        let current_count = self.logical_len()?;
+        let requested_count = shape.iter().try_fold(1_usize, |count, dimension| {
+            usize::try_from(*dimension)
+                .ok()
+                .and_then(|dimension| count.checked_mul(dimension))
+        })?;
+        if current_count != requested_count {
+            return None;
+        }
+        let strides = if shape == self.shape {
+            self.strides.clone()
+        } else if self.edge_base.is_some() {
+            Self::contiguous_strides(&shape)
+        } else if self.is_contiguous() {
+            Self::contiguous_strides(&shape)
+        } else {
+            return None;
+        };
+        let mut view = self.logical_view(shape, strides, self.offset)?;
+        view.push_edge_view(input_shape, TensorInverseMap::Reshape);
+        Some(view)
+    }
+
+    pub(crate) fn physical_offset_in_layout(
+        coordinates: &[usize],
+        shape: &[i64],
+        strides: &[isize],
+        offset: isize,
+    ) -> Option<usize> {
+        if coordinates.len() != shape.len() || shape.len() != strides.len() {
+            return None;
+        }
+        let mut physical = offset;
+        for ((coordinate, dimension), stride) in coordinates.iter().zip(shape).zip(strides) {
+            if *coordinate >= usize::try_from(*dimension).ok()? {
+                return None;
+            }
+            physical =
+                physical.checked_add(isize::try_from(*coordinate).ok()?.checked_mul(*stride)?)?;
+        }
+        usize::try_from(physical).ok()
+    }
+
+    #[must_use]
+    fn layout_fits(data: &[Value], shape: &[i64], strides: &[isize], offset: isize) -> bool {
+        if shape.len() != strides.len() {
+            return false;
+        }
+        if shape.is_empty() {
+            return if data.is_empty() {
+                offset == 0
+            } else {
+                usize::try_from(offset).is_ok_and(|offset| offset < data.len())
+            };
+        }
+        let Some(element_count) = shape.iter().try_fold(1_usize, |count, dimension| {
+            usize::try_from(*dimension)
+                .ok()
+                .and_then(|dimension| count.checked_mul(dimension))
+        }) else {
+            return false;
+        };
+        if element_count == 0 {
+            return usize::try_from(offset).is_ok_and(|offset| offset <= data.len());
+        }
+        let Some((lowest, highest)) = shape.iter().zip(strides).try_fold(
+            (offset, offset),
+            |(lowest, highest), (dimension, stride)| {
+                let extent = isize::try_from(*dimension)
+                    .ok()?
+                    .checked_sub(1)?
+                    .checked_mul(*stride)?;
+                if extent < 0 {
+                    Some((lowest.checked_add(extent)?, highest))
+                } else {
+                    Some((lowest, highest.checked_add(extent)?))
+                }
+            },
+        ) else {
+            return false;
+        };
+        usize::try_from(lowest).is_ok()
+            && usize::try_from(highest).is_ok_and(|highest| highest < data.len())
+    }
+}
+
+pub(crate) fn coordinate_fits(coordinate: &[usize], shape: &[i64]) -> bool {
+    coordinate.len() == shape.len()
+        && coordinate.iter().zip(shape).all(|(coordinate, extent)| {
+            usize::try_from(*extent).is_ok_and(|extent| *coordinate < extent)
+        })
+}
+
+pub(crate) fn inverse_view_coordinate(
+    output_coordinate: &[usize],
+    input_shape: &[i64],
+    output_shape: &[i64],
+    inverse: &TensorInverseMap,
+) -> Option<Vec<usize>> {
+    if !coordinate_fits(output_coordinate, output_shape) {
+        return None;
+    }
+    match inverse {
+        TensorInverseMap::SliceAxis0 { start, step } => {
+            if input_shape.len() != output_shape.len() || output_shape.is_empty() || *step == 0 {
+                return None;
+            }
+            let mut coordinate = output_coordinate.to_vec();
+            coordinate[0] = start.checked_add(coordinate[0].checked_mul(*step)?)?;
+            coordinate_fits(&coordinate, input_shape).then_some(coordinate)
+        }
+        TensorInverseMap::TransposeLastTwo => {
+            let rank = output_shape.len();
+            if rank < 2
+                || input_shape.len() != rank
+                || input_shape[..rank - 2] != output_shape[..rank - 2]
+                || input_shape[rank - 2] != output_shape[rank - 1]
+                || input_shape[rank - 1] != output_shape[rank - 2]
+            {
+                return None;
+            }
+            let mut coordinate = output_coordinate.to_vec();
+            coordinate.swap(rank - 2, rank - 1);
+            coordinate_fits(&coordinate, input_shape).then_some(coordinate)
+        }
+        TensorInverseMap::Expand { target_to_source } => {
+            if target_to_source.len() != output_shape.len()
+                || input_shape.len() != target_to_source.iter().flatten().count()
+            {
+                return None;
+            }
+            let mut coordinate = vec![0; input_shape.len()];
+            for (target_axis, source_axis) in target_to_source.iter().enumerate() {
+                if let Some(source_axis) = source_axis {
+                    coordinate[*source_axis] = output_coordinate[target_axis];
+                }
+            }
+            coordinate_fits(&coordinate, input_shape).then_some(coordinate)
+        }
+        TensorInverseMap::Reshape => {
+            let flat = flatten_coordinate(output_coordinate, output_shape)?;
+            unflatten_coordinate(flat, input_shape)
+        }
+    }
+}
+
+fn flatten_coordinate(coordinate: &[usize], shape: &[i64]) -> Option<usize> {
+    if !coordinate_fits(coordinate, shape) {
+        return None;
+    }
+    coordinate
+        .iter()
+        .zip(shape)
+        .try_fold(0_usize, |flat, (coordinate, extent)| {
+            flat.checked_mul(usize::try_from(*extent).ok()?)?
+                .checked_add(*coordinate)
+        })
+}
+
+fn unflatten_coordinate(flat: usize, shape: &[i64]) -> Option<Vec<usize>> {
+    let count = shape.iter().try_fold(1_usize, |count, extent| {
+        count.checked_mul(usize::try_from(*extent).ok()?)
+    })?;
+    if flat >= count {
+        return None;
+    }
+    let mut remainder = flat;
+    let mut coordinate = vec![0; shape.len()];
+    for axis in (0..shape.len()).rev() {
+        let extent = usize::try_from(shape[axis]).ok()?;
+        if extent == 0 {
+            return None;
+        }
+        coordinate[axis] = remainder % extent;
+        remainder /= extent;
+    }
+    Some(coordinate)
 }
 
 /// Opaque gradient-handle storage for the in-process runner.
@@ -406,14 +1106,13 @@ impl Value {
                 rc,
                 memo,
                 Value::Tensor,
-                |t, m| TensorValue {
-                    data: elements(&t.data, m),
-                    shape: t.shape.clone(),
+                |t, m| {
+                    TensorValue::contiguous(
+                        elements(&t.logical_values().unwrap_or_default(), m),
+                        t.shape.clone(),
+                    )
                 },
-                || TensorValue {
-                    data: Vec::new(),
-                    shape: Vec::new(),
-                },
+                || TensorValue::contiguous(Vec::new(), Vec::new()),
             ),
             Value::Matrix(rc) => {
                 let source = rc.borrow();
@@ -546,7 +1245,11 @@ impl Value {
                 display_list(&items.borrow(), interner, order, span, float_width)?
             }
             Value::Tensor(tensor) => {
-                display_list(&tensor.borrow().data, interner, order, span, float_width)?
+                let tensor = tensor.borrow();
+                let values = tensor.logical_values().ok_or_else(|| {
+                    RunnerError::internal(span, "tensor view has invalid storage layout")
+                })?;
+                display_list(&values, interner, order, span, float_width)?
             }
             Value::Vector(lanes) => {
                 display_list(&lanes.borrow(), interner, order, span, float_width)?
@@ -627,7 +1330,7 @@ impl Value {
     pub fn is_empty_collection(&self) -> bool {
         match self {
             Value::Array(cell) => cell.borrow().is_empty(),
-            Value::Tensor(cell) => cell.borrow().data.is_empty(),
+            Value::Tensor(cell) => cell.borrow().is_empty(),
             Value::Map(cell) => cell.borrow().is_empty(),
             Value::Set(cell) => cell.borrow().is_empty(),
             Value::Str(value) => value.is_empty(),

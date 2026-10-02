@@ -1,0 +1,40 @@
++++
+term = "tensor shape holes"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Tensor shape-list holes infer extents from flat element counts, reshape cardinality, and source or expected shape witnesses."
+related = ["tensor", "magnitudo"]
+locale = "en"
++++
+
+# A whole-shape type hole inherits static rank from the constructor's shape
+# list. A single shape-list hole in from_flat is solved from the flat count;
+# reshape solves its hole from the receiver's element count.
+main {
+    const tf32[] seed ← empty
+    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+
+    const tensor<f32, _> from_flat ← seed.from_flat(flat, [2, _])
+    const tensor<f32, _> reshaped ← from_flat.reshape([_, 2])
+
+    # The canonical generic form uses a whole-shape `_`; the shape argument
+    # supplies a tuple and therefore a static rank witness.
+    const tensor<f32, _> whole_shape ← seed.from_flat(flat, [2, 2])
+
+    # The first target hole is mapped from the source axis.
+    const tf32[2, 3] grid ← seed.from_flat([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [2, 3])
+    const tensor<f32, _> mapped ← grid.expanded([_, 3])
+
+    # The source extent maps to the exact second axis. The unmatched first
+    # target axis comes from the expected result shape.
+    const tf32[3] row ← seed.from_flat([1.0, 2.0, 3.0], [3])
+    const tf32[2, 3] witnessed ← row.expanded([_, 3])
+
+    print from_flat.shape()
+    print reshaped.shape()
+    print whole_shape.shape()
+    print mapped.shape()
+    print witnessed.shape()
+}
