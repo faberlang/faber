@@ -236,3 +236,6 @@ export function __faberDisplayTaggedValor(value: any): string {
       return __faberDisplayValor(payload);
   }
 }
+
+/** The `display` namespace (`display.value`, `display.fractus`, ...). */
+export * as display from "./display.ts";
