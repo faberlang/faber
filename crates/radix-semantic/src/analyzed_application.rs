@@ -457,6 +457,7 @@ fn target_label(target: radix_target::Target) -> &'static str {
         radix_target::Target::MirMetal => "metal-text",
         radix_target::Target::MirWgsl => "wgsl-text",
         radix_target::Target::MirSexp => "sexp",
+        radix_target::Target::MirBasic => "basic",
         radix_target::Target::MirScena => "scena",
         radix_target::Target::MirFmir => "fmir-text",
         radix_target::Target::MirFmirBinary => "fmir",

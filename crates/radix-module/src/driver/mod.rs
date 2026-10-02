@@ -504,6 +504,7 @@ impl From<codegen::CodegenError> for SpannedCodegenError {
     not(feature = "mir-llvm"),
     not(feature = "mir-metal"),
     not(feature = "mir-sexp"),
+    not(feature = "mir-basic"),
     not(feature = "mir-wasm"),
     not(feature = "mir-wgsl")
 ))]
@@ -700,6 +701,10 @@ fn generate_output(
         }
         #[cfg(not(feature = "mir-sexp"))]
         Target::MirSexp => Err(unavailable_target_spanned(Target::MirSexp)),
+        #[cfg(feature = "mir-basic")]
+        Target::MirBasic => generate_basic_output(analysis, no_fuse),
+        #[cfg(not(feature = "mir-basic"))]
+        Target::MirBasic => Err(unavailable_target_spanned(Target::MirBasic)),
         Target::MirScena => Err(codegen::CodegenError {
             message: "scena package artifacts must be built through `faber build --target scena`".to_owned(),
             args: vec![
@@ -1593,6 +1598,20 @@ fn generate_sexp_output(analysis: &mut AnalyzedModule, no_fuse: bool) -> Result<
             })?;
         Ok(crate::Output::Sexp(crate::SexpOutput { code }))
     }
+}
+
+#[cfg(feature = "mir-basic")]
+fn generate_basic_output(analysis: &mut AnalyzedModule, no_fuse: bool) -> Result<crate::Output, SpannedCodegenError> {
+    prepare_mir_lowering_interner(analysis);
+    let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
+    let code = crate::mir::emit_basic_text(&mir.validated, &mir.interner).map_err(|error| codegen::CodegenError {
+        message: error.message,
+        args: vec![
+            DiagnosticArg::new("category", error.category),
+            DiagnosticArg::new("shape", error.shape),
+        ],
+    })?;
+    Ok(crate::Output::Basic(crate::BasicOutput { code }))
 }
 
 /// Keep the cloned interner used by target emitters in lockstep with MIR-only
@@ -3741,6 +3760,7 @@ fn collect_target_policy_diagnostics(
         | Target::MirMetal
         | Target::MirScena
         | Target::MirSexp
+        | Target::MirBasic
         | Target::HirSwift
         | Target::HirPython
         | Target::HirHaskell
@@ -4414,6 +4434,7 @@ fn target_display_name(target: Target) -> &'static str {
         Target::MirMetal => "metal-text",
         Target::MirWgsl => "wgsl-text",
         Target::MirSexp => "sexp",
+        Target::MirBasic => "basic",
         Target::MirScena => "scena",
         Target::MirFmir => "fmir-text",
         Target::MirFmirBinary => "fmir",

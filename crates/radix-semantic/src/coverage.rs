@@ -94,6 +94,7 @@ pub fn from_target(target: Target) -> Option<HirCoverageTarget> {
         | Target::MirMetal
         | Target::MirWgsl
         | Target::MirSexp
+        | Target::MirBasic
         | Target::MirScena
         | Target::MirFmir
         | Target::MirFmirBinary

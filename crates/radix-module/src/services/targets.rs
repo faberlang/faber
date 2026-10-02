@@ -22,7 +22,7 @@
 /// this test until it joins this list or is named hidden — the list can no
 /// longer silently drop a backend. The order is the report's presentation
 /// order and is preserved verbatim for the printed row output.
-const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 17] = [
+const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 18] = [
     crate::codegen::Target::HirRust,
     crate::codegen::Target::MirFmir,
     crate::codegen::Target::MirFmirBinary,
@@ -39,6 +39,7 @@ const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 17] = [
     crate::codegen::Target::MirMetal,
     crate::codegen::Target::MirWgsl,
     crate::codegen::Target::MirSexp,
+    crate::codegen::Target::MirBasic,
     crate::codegen::Target::HirTypeScript,
 ];
 
@@ -90,6 +91,7 @@ pub fn target_extension(target: crate::codegen::Target) -> &'static str {
         crate::codegen::Target::MirMetal => "metal",
         crate::codegen::Target::MirWgsl => "wgsl",
         crate::codegen::Target::MirSexp => "rkt",
+        crate::codegen::Target::MirBasic => "bas",
         crate::codegen::Target::MirScena => "scena",
         crate::codegen::Target::MirFmir => "fmir.txt",
         crate::codegen::Target::MirFmirBinary => "fmir",
@@ -128,6 +130,7 @@ pub fn target_name(target: crate::codegen::Target) -> &'static str {
         crate::codegen::Target::MirMetal => "metal-text",
         crate::codegen::Target::MirWgsl => "wgsl-text",
         crate::codegen::Target::MirSexp => "sexp",
+        crate::codegen::Target::MirBasic => "basic",
         crate::codegen::Target::MirScena => "scena",
         crate::codegen::Target::MirFmir => "fmir-text",
         crate::codegen::Target::MirFmirBinary => "fmir",
@@ -273,6 +276,13 @@ fn radix_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             run: false,
             package: false,
             note: "supported MIR-backed Racket validation target (fail-closed subset); run via external racket; not a package runtime",
+        },
+        crate::codegen::Target::MirBasic => TargetCapabilities {
+            check: true,
+            build: true,
+            run: false,
+            package: false,
+            note: "novelty MIR-backed classic line-numbered BASIC listing (Commodore 64 BASIC V2 compatible scalar subset; fail-closed); default-off `mir-basic` feature",
         },
         crate::codegen::Target::MirScena => TargetCapabilities {
             check: true,

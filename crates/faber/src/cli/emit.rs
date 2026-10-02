@@ -98,6 +98,10 @@ pub enum FaberCliTarget {
     #[value(name = "sexp", alias = "racket", alias = "lisp")]
     MirSexp,
 
+    /// Novelty MIR-backed classic line-numbered BASIC listing (default-off `mir-basic` feature).
+    #[value(name = "basic", alias = "bas")]
+    MirBasic,
+
     /// Swift backend.
     #[value(name = "swift")]
     HirSwift,
@@ -147,6 +151,7 @@ impl FaberCliTarget {
             FaberCliTarget::MirMetal => radix::module::codegen::Target::MirMetal,
             FaberCliTarget::MirWgsl => radix::module::codegen::Target::MirWgsl,
             FaberCliTarget::MirSexp => radix::module::codegen::Target::MirSexp,
+            FaberCliTarget::MirBasic => radix::module::codegen::Target::MirBasic,
             FaberCliTarget::HirSwift => radix::module::codegen::Target::HirSwift,
             FaberCliTarget::HirFhir => radix::module::codegen::Target::HirFhir,
             FaberCliTarget::MirLlvmHost => radix::module::codegen::Target::MirLlvmHost,

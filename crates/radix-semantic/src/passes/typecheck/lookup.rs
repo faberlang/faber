@@ -481,6 +481,7 @@ impl TypeChecker<'_> {
             radix_target::Target::MirAmd => matches!(target, "amd"),
             radix_target::Target::MirWgsl => matches!(target, "wgsl" | "wgsl-text"),
             radix_target::Target::MirSexp => matches!(target, "sexp" | "racket" | "lisp" | "rkt"),
+            radix_target::Target::MirBasic => matches!(target, "basic" | "bas"),
             radix_target::Target::MirScena => matches!(target, "scena"),
             radix_target::Target::MirFmir => matches!(target, "fmir-text"),
             radix_target::Target::MirFmirBinary => matches!(target, "fmir"),

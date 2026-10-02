@@ -259,6 +259,9 @@ fn compiled_features() -> BTreeSet<&'static str> {
     if cfg!(feature = "mir-sexp") {
         compiled.insert("mir-sexp");
     }
+    if cfg!(feature = "mir-basic") {
+        compiled.insert("mir-basic");
+    }
     if cfg!(feature = "hir-ts") {
         compiled.insert("hir-ts");
     }

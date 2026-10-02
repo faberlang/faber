@@ -176,6 +176,7 @@ fn is_mir_backed_target(target: Target) -> bool {
             | Target::MirMetal
             | Target::MirWgsl
             | Target::MirSexp
+            | Target::MirBasic
             | Target::MirScena
             | Target::MirFmir
             | Target::MirFmirBinary

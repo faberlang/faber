@@ -178,6 +178,10 @@ pub enum Output {
     /// Experimental Racket s-expression output emitted from validated MIR.
     #[cfg(feature = "mir-sexp")]
     Sexp(SexpOutput),
+
+    /// Novelty classic line-numbered BASIC listing emitted from validated MIR.
+    #[cfg(feature = "mir-basic")]
+    Basic(BasicOutput),
 }
 
 /// Rust backend output.
@@ -259,6 +263,13 @@ pub struct WgslTextOutput {
 #[cfg(feature = "mir-sexp")]
 pub struct SexpOutput {
     /// Complete generated Racket source.
+    pub code: String,
+}
+
+/// Novelty BASIC listing output.
+#[cfg(feature = "mir-basic")]
+pub struct BasicOutput {
+    /// Complete generated line-numbered BASIC listing.
     pub code: String,
 }
 
