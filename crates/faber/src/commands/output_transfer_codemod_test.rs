@@ -218,3 +218,169 @@ incipit {
         "pre stays on println!; post uses the template path"
     );
 }
+
+const DRIFT_SOURCE: &str = "+++\nlocale = \"la\"\n+++\nincipit {\n    nota \"salve\"\n}\n";
+
+fn run_codemod(args: &[&str]) -> std::process::Output {
+    let mut full = vec!["output-transfer-codemod"];
+    full.extend_from_slice(args);
+    super::super::format_test::run_faber_capture(&full, None)
+}
+
+/// Write the codemod's own output and return it, so a second run is a no-op.
+fn already_codemodded(dir: &std::path::Path) -> (PathBuf, String) {
+    let path = dir.join("done.fab");
+    let report = codemod_single_doc(&path, DRIFT_SOURCE).expect("codemod accepted source");
+    fs::write(&path, &report.source).expect("write codemodded fixture");
+    (path, report.source)
+}
+
+#[test]
+fn cli_output_transfer_codemod_default_mode_is_report_only() {
+    let cli = crate::cli::Cli::try_parse_from(["faber", "output-transfer-codemod", "main.fab"])
+        .expect("parse output-transfer-codemod");
+    let Some(crate::cli::Command::OutputTransferCodemod(args)) = cli.command else {
+        panic!("expected output-transfer-codemod command");
+    };
+    assert!(!args.write && !args.check && !args.stdout && !args.stdin);
+}
+
+#[test]
+fn cli_output_transfer_codemod_modes_conflict() {
+    for pair in [
+        ["--write", "--check"],
+        ["--write", "--stdout"],
+        ["--check", "--stdout"],
+        ["--stdin", "--write"],
+        ["--stdin", "--stdout"],
+    ] {
+        let result =
+            crate::cli::Cli::try_parse_from(["faber", "output-transfer-codemod", pair[0], pair[1]]);
+        assert!(result.is_err(), "{pair:?} must conflict");
+    }
+}
+
+#[test]
+fn output_transfer_codemod_default_writes_nothing_and_exits_1_on_drift() {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let path = dir.path().join("drift.fab");
+    fs::write(&path, DRIFT_SOURCE).expect("write fixture");
+    let (_, _) = already_codemodded(dir.path());
+    let root = dir.path().to_str().expect("utf8 path");
+
+    for args in [vec![root], vec!["--check", root]] {
+        let output = run_codemod(&args);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert_eq!(output.status.code(), Some(1), "{args:?}: {stdout}");
+        let lines: Vec<&str> = stdout.lines().collect();
+        assert_eq!(lines.len(), 2, "{args:?}: {stdout}");
+        assert!(lines[0].starts_with("would codemod "), "{stdout}");
+        assert!(lines[0].ends_with("drift.fab"), "{stdout}");
+        assert!(
+            lines[1].starts_with("1 of 2 files would be codemodded; rerun with --write to apply"),
+            "{stdout}"
+        );
+    }
+    assert_eq!(fs::read_to_string(&path).expect("read back"), DRIFT_SOURCE);
+}
+
+#[test]
+fn output_transfer_codemod_default_exits_0_when_nothing_would_change() {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let (path, source) = already_codemodded(dir.path());
+    let output = run_codemod(&[path.to_str().expect("utf8 path")]);
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim_end(),
+        "1 files already codemodded"
+    );
+    assert_eq!(fs::read_to_string(&path).expect("read back"), source);
+}
+
+#[test]
+fn output_transfer_codemod_write_changes_only_files_that_drift() {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let drift = dir.path().join("drift.fab");
+    fs::write(&drift, DRIFT_SOURCE).expect("write fixture");
+    let (clean, clean_source) = already_codemodded(dir.path());
+    let clean_mtime = fs::metadata(&clean)
+        .and_then(|meta| meta.modified())
+        .expect("clean mtime");
+
+    let output = run_codemod(&["--write", dir.path().to_str().expect("utf8 path")]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(output.status.code(), Some(0), "{stdout}");
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert_eq!(lines.len(), 2, "{stdout}");
+    assert!(lines[0].starts_with("codemodded ") && lines[0].ends_with("drift.fab"));
+    assert_eq!(lines[1], "codemodded 1 of 2 files");
+    assert_ne!(
+        fs::read_to_string(&drift).expect("read drift"),
+        DRIFT_SOURCE
+    );
+    assert!(
+        fs::read_to_string(&drift)
+            .expect("read drift")
+            .contains("norma:console")
+    );
+    assert_eq!(
+        fs::read_to_string(&clean).expect("read clean"),
+        clean_source
+    );
+    assert_eq!(
+        fs::metadata(&clean)
+            .and_then(|meta| meta.modified())
+            .expect("clean mtime"),
+        clean_mtime,
+        "an unchanged file must not be touched"
+    );
+}
+
+#[test]
+fn output_transfer_codemod_counts_refused_files_and_never_writes_them() {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let lossy = dir.path().join("lossy.fab");
+    fs::write(&lossy, super::super::format_test::HOOK_SOURCE).expect("write lossy fixture");
+    let drift = dir.path().join("drift.fab");
+    fs::write(&drift, DRIFT_SOURCE).expect("write fixture");
+    let root = dir.path().to_str().expect("utf8 path");
+
+    let report = run_codemod(&[root]);
+    let report_out = String::from_utf8_lossy(&report.stdout);
+    assert_eq!(report.status.code(), Some(1), "{report_out}");
+    assert!(
+        report_out
+            .lines()
+            .last()
+            .is_some_and(|line| line.ends_with(", 1 refused (nothing written)")),
+        "{report_out}"
+    );
+    assert_eq!(
+        fs::read_to_string(&drift).expect("read drift"),
+        DRIFT_SOURCE
+    );
+
+    let write = run_codemod(&["--write", root]);
+    let write_out = String::from_utf8_lossy(&write.stdout);
+    assert_eq!(write.status.code(), Some(1), "{write_out}");
+    assert_eq!(
+        write_out.lines().last(),
+        Some("codemodded 1 of 2 files, 1 refused (nothing written)")
+    );
+    assert_eq!(
+        fs::read_to_string(&lossy).expect("read lossy"),
+        super::super::format_test::HOOK_SOURCE,
+        "a refused file is never written"
+    );
+}
+
+#[test]
+fn output_transfer_codemod_stdout_prints_one_document_and_writes_nothing() {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let path = dir.path().join("drift.fab");
+    fs::write(&path, DRIFT_SOURCE).expect("write fixture");
+    let output = run_codemod(&["--stdout", path.to_str().expect("utf8 path")]);
+    assert_eq!(output.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("norma:console"));
+    assert_eq!(fs::read_to_string(&path).expect("read back"), DRIFT_SOURCE);
+}
