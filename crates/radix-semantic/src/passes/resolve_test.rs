@@ -699,7 +699,7 @@ fn reports_non_index_figura_name_with_structured_event() {
 #[test]
 fn resolves_local_runtime_value_as_figura_extent() {
     let parsed = parse(lex(
-        "fn f(int value) -> int {\n    const int n ← value\n    const tf32[n, 2] shaped ← value\n    return n\n}",
+        "functio f(numerus value) → numerus {\n    fixum numerus n ← value\n    fixum tf32[n, 2] shaped ← value\n    redde n\n}",
     ));
     assert!(parsed.success(), "parse errors: {:?}", parsed.errors);
     let program = parsed.program.as_ref().expect("program");

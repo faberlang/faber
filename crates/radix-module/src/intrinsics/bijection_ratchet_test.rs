@@ -295,6 +295,11 @@ fn row_override(key: &str, dtype: &Dtype) -> Option<(Option<String>, Vec<String>
     let sugar = dtype.name;
     let (param, args): (Option<String>, Vec<String>) = match key {
         "Tensor.forma/1" => (None, vec!["[3]".into()]),
+        // A broadcast view needs a target shape the receiver `[3]` stretches to.
+        "Tensor.expande/1" => (None, vec!["[2, 3]".into()]),
+        // The axis-0 slice shape is inferred from literal `start, end, step`; a
+        // zero step has no shape (SEM014), so the probe supplies a unit stride.
+        "Tensor.sectio/3" => (None, vec!["0".into(), "3".into(), "1".into()]),
         // `strue` constructs from a rank-0 seed (corpus gather exemplar shape).
         "Tensor.strue/2" => (Some(format!("{sugar}[0] r")), vec!["flat".into(), "[3]".into()]),
         "Tensor.crea/2" => (None, vec![el.clone(), "[3]".into()]),
@@ -380,10 +385,14 @@ fn probe_source(row: &crate::intrinsics::MethodIntrinsic, dtype: &Dtype, mutable
     } else {
         override_args
     };
+    // `limes` is only defined on a shifted view and takes an edge-policy
+    // marker (not a receiver dtype) as its generic argument.
+    let is_limes = key == "Tensor.limes/0";
     let generic_args = row
         .generic
         .iter()
         .map(|generic| match generic.sort {
+            GenericParamSort::Typus if is_limes => "clampa".to_owned(),
             GenericParamSort::Typus => dtype.param.clone(),
             // The tensor probe has width three, so two is an admitted even
             // dimension for the generic RoPE row.
@@ -401,6 +410,7 @@ fn probe_source(row: &crate::intrinsics::MethodIntrinsic, dtype: &Dtype, mutable
     } else {
         "r"
     };
+    let receiver = if is_limes { "r.disloco([1])" } else { receiver };
     let call = format!("{receiver}.{}{}({})", row.faber_name, generic_suffix, args.join(", "));
     let body = if row.return_kind == IntrinsicReturnKind::Vacuum {
         format!("    {call}")
@@ -794,6 +804,10 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         MirCollectionOp::TensorFlatten,
         MirCollectionOp::TensorMaterialize,
         MirCollectionOp::TensorSlice,
+        // K6 zero-copy views: registry rows `expande` and `disloco`, probed
+        // green by the direction-1 sweep (reachable, not permanent).
+        MirCollectionOp::TensorExpand,
+        MirCollectionOp::TensorShift,
         MirCollectionOp::TensorAdd,
         MirCollectionOp::TensorSub,
         MirCollectionOp::TensorMul,
