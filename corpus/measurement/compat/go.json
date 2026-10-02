@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 347,
-    "analyzable": 376
+    "analyzable": 378
   },
   "terms": [
     {
@@ -1147,7 +1147,7 @@
       "term": "vector",
       "rule": "keyword",
       "capable": 1,
-      "analyzable": 10
+      "analyzable": 12
     },
     {
       "term": "∷",
