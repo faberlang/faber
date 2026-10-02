@@ -127,23 +127,28 @@ impl TypeChecker<'_> {
         };
         let actual_shape = self.resolve_index(actual_shape);
         let expected_shape = self.resolve_index(expected_shape);
-        // A whole-shape generic parameter (`size Shape` in
-        // `tensor<T, Shape>`) is a fresh root hole at the call site. It has
-        // no rank to preserve and nothing to relate at runtime: the ordinary
-        // unifier binds it to the actual shape.
+        // A whole-shape generic parameter (`size Shape` in `tensor<T, Shape>`)
+        // is a fresh root hole at the call site: it has no rank to preserve
+        // and nothing to relate at runtime, so the ordinary unifier binds it
+        // to the actual shape.
         if matches!(self.types.get_index(expected_shape), IndexExpr::Infer(_)) {
             return None;
         }
-        if matches!(
-            self.types.get_index(actual_shape),
-            IndexExpr::Infer(_) | IndexExpr::Unspecified
-        ) || matches!(
-            self.types.get_index(expected_shape),
-            IndexExpr::Infer(_) | IndexExpr::Unspecified
-        ) {
-            // An actual root hole (or an unspecified shape on either side)
-            // has no rank to preserve. A tuple with per-axis Infer terms
-            // remains admissible below because its rank is known.
+        // An actual root hole (an intrinsic result such as
+        // `seed.from_flat(...)`) is bound by the ordinary unifier to a
+        // whole-shape expectation, which carries no rank either. Against a
+        // ranked expectation it would have to manufacture a rank, so that
+        // case (and an unspecified shape on either side) is reported.
+        let actual_is_hole = matches!(self.types.get_index(actual_shape), IndexExpr::Infer(_));
+        if actual_is_hole && !matches!(self.types.get_index(expected_shape), IndexExpr::Tuple(_)) {
+            return None;
+        }
+        if actual_is_hole
+            || matches!(self.types.get_index(actual_shape), IndexExpr::Unspecified)
+            || matches!(self.types.get_index(expected_shape), IndexExpr::Unspecified)
+        {
+            // A tuple with per-axis Infer terms remains admissible below
+            // because its rank is known.
             self.missing_type_annotation("cannot_infer_tensor_shape", span);
             return Some(Err(()));
         }

@@ -625,3 +625,25 @@ fn rank_tuple_size_argument_records_no_entry_shape_relation() {
     checker.install_function_shape_sources(&[], &[param]);
     assert!(checker.shape_obligations.functions.is_empty());
 }
+
+#[test]
+fn unresolved_actual_shape_binds_to_a_whole_shape_expectation() {
+    // `return seed.from_flat(data, shape)` in `fn f<size Shape>(...) →
+    // tensor<T, Shape>`: the intrinsic's root hole meets the rigid whole-shape
+    // parameter, which has no rank either. Ordinary unification binds it.
+    let resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let mut interner = radix_lexer::Interner::new();
+    let shape = interner.intern("Shape");
+    let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+    checker.current_shape_return_expr = Some(HirId(44));
+    let unresolved = checker.fresh_index_hole();
+    let whole_shape = checker.types.intern_index(IndexExpr::Param(shape));
+
+    assert!(
+        checker
+            .unify_shape_at_boundary(unresolved, whole_shape, radix_lexer::Span::default())
+            .is_none()
+    );
+    assert!(checker.errors.is_empty());
+}
