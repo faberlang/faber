@@ -473,6 +473,7 @@ impl TypeChecker<'_> {
             radix_target::Target::HirSwift => matches!(target, "swift"),
             radix_target::Target::HirPython => matches!(target, "python"),
             radix_target::Target::HirHaskell => matches!(target, "haskell"),
+            radix_target::Target::HirCobol => matches!(target, "cobol" | "cob"),
             radix_target::Target::MirWasm => matches!(target, "wasm" | "wasm-text" | "wat"),
             radix_target::Target::MirLlvm | radix_target::Target::MirLlvmHost => {
                 matches!(target, "llvm" | "llvm-host" | "llvm-text")

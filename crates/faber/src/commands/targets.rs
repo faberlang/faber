@@ -241,6 +241,9 @@ fn compiled_features() -> BTreeSet<&'static str> {
     if cfg!(feature = "hir-haskell") {
         compiled.insert("hir-haskell");
     }
+    if cfg!(feature = "hir-cobol") {
+        compiled.insert("hir-cobol");
+    }
     if cfg!(feature = "hir-swift") {
         compiled.insert("hir-swift");
     }

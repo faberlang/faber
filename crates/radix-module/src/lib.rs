@@ -154,6 +154,10 @@ pub enum Output {
     /// Haskell backend output.
     Haskell(HaskellOutput),
 
+    /// Novelty GnuCOBOL free-format output emitted from checked HIR.
+    #[cfg(feature = "hir-cobol")]
+    Cobol(CobolOutput),
+
     /// Canonical Faber source output.
     Faber(FaberOutput),
 
@@ -213,6 +217,13 @@ pub struct PythonOutput {
 /// Haskell backend output.
 pub struct HaskellOutput {
     /// Complete generated Haskell source.
+    pub code: String,
+}
+
+/// Novelty COBOL backend output.
+#[cfg(feature = "hir-cobol")]
+pub struct CobolOutput {
+    /// Complete generated GnuCOBOL free-format source.
     pub code: String,
 }
 

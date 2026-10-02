@@ -86,6 +86,7 @@ pub fn from_target(target: Target) -> Option<HirCoverageTarget> {
         Target::HirSwift => None,
         Target::HirPython => None,
         Target::HirHaskell => None,
+        Target::HirCobol => None,
         Target::HirFaber => Some(HirCoverageTarget::Faber),
         Target::MirWasm
         | Target::MirLlvm

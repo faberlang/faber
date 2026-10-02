@@ -449,6 +449,7 @@ fn target_label(target: radix_target::Target) -> &'static str {
         radix_target::Target::HirSwift => "swift",
         radix_target::Target::HirPython => "python",
         radix_target::Target::HirHaskell => "haskell",
+        radix_target::Target::HirCobol => "cobol",
         radix_target::Target::HirFaber => "faber",
         radix_target::Target::MirWasm => "wasm-text",
         radix_target::Target::MirLlvm => "llvm-text",

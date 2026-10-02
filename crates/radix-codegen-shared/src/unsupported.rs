@@ -11,6 +11,7 @@ fn target_name(target: Target) -> &'static str {
         Target::HirGo => "Go",
         Target::HirSwift => "Swift",
         Target::HirHaskell => "Haskell",
+        Target::HirCobol => "COBOL",
         Target::HirPython => "Python",
         _ => "target",
     }

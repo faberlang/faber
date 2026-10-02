@@ -40,6 +40,10 @@ pub enum Target {
     /// Haskell source emitted from checked HIR.
     HirHaskell,
 
+    /// Novelty `GnuCOBOL` 3.2 free-format source emitted from checked HIR.
+    /// Default-off; scalar programs only.
+    HirCobol,
+
     /// Faber source re-emitted from analyzed HIR.
     ///
     /// Historically the "canonical Faber" surface; with reader locales this
@@ -103,6 +107,7 @@ impl fmt::Display for Target {
             Target::HirSwift => write!(f, "swift"),
             Target::HirPython => write!(f, "python"),
             Target::HirHaskell => write!(f, "haskell"),
+            Target::HirCobol => write!(f, "cobol"),
             Target::HirFaber => write!(f, "faber"),
             Target::HirFhir => write!(f, "fhir"),
             Target::MirWasm => write!(f, "wasm-text"),
@@ -137,6 +142,7 @@ impl Target {
             "swift" => Some(Self::HirSwift),
             "python" => Some(Self::HirPython),
             "haskell" => Some(Self::HirHaskell),
+            "cobol" => Some(Self::HirCobol),
             "faber" => Some(Self::HirFaber),
             "fhir" => Some(Self::HirFhir),
             "wasm-text" => Some(Self::MirWasm),
@@ -172,6 +178,7 @@ impl Target {
         Target::HirSwift,
         Target::HirPython,
         Target::HirHaskell,
+        Target::HirCobol,
         Target::HirFaber,
         Target::HirFhir,
         Target::MirWasm,
@@ -197,6 +204,7 @@ impl Target {
             Target::HirSwift => Some("hir-swift"),
             Target::HirPython => Some("hir-python"),
             Target::HirHaskell => Some("hir-haskell"),
+            Target::HirCobol => Some("hir-cobol"),
             Target::HirFaber => Some("hir-faber"),
             Target::HirFhir => Some("hir-fhir"),
             Target::MirMetal => Some("mir-metal"),
@@ -228,6 +236,7 @@ impl Target {
             Target::HirSwift => cfg!(feature = "hir-swift"),
             Target::HirPython => cfg!(feature = "hir-python"),
             Target::HirHaskell => cfg!(feature = "hir-haskell"),
+            Target::HirCobol => cfg!(feature = "hir-cobol"),
             Target::HirFaber => cfg!(feature = "hir-faber"),
             Target::HirFhir => cfg!(feature = "hir-fhir"),
             Target::MirMetal => cfg!(feature = "mir-metal"),
@@ -264,6 +273,7 @@ mod tests {
             Target::HirSwift => "swift",
             Target::HirPython => "python",
             Target::HirHaskell => "haskell",
+            Target::HirCobol => "cobol",
             Target::HirFaber => "faber",
             Target::HirFhir => "fhir",
             Target::MirWasm => "wasm-text",
@@ -295,6 +305,7 @@ mod tests {
             "swift",
             "python",
             "haskell",
+            "cobol",
             "faber",
             "fhir",
             "wasm-text",
@@ -349,7 +360,7 @@ mod tests {
             "typescript",
             "wasm",
             "llvm",
-            "cobol",
+            "fortran",
         ] {
             assert_eq!(
                 Target::from_spelling(spelling),

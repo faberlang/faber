@@ -1108,5 +1108,7 @@ fn output_code(output: Output) -> String {
         Output::Sexp(out) => out.code,
         Output::Swift(out) => out.code,
         Output::Haskell(out) => out.code,
+        #[cfg(feature = "hir-cobol")]
+        Output::Cobol(out) => out.code,
     }
 }

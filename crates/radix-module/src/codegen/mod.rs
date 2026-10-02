@@ -26,6 +26,8 @@ pub use radix_semantic::coverage;
 pub mod conversio_coverage;
 #[cfg(feature = "hir-faber")]
 pub mod faber;
+#[cfg(feature = "hir-cobol")]
+pub mod cobol;
 #[cfg(feature = "hir-go")]
 pub mod go;
 #[cfg(feature = "hir-haskell")]
@@ -411,6 +413,7 @@ pub fn generate_from_analyzed_with_options(
         Target::HirSwift => generate_swift_from_analyzed(analysis, output_mode, module_name),
         Target::HirPython => generate_python_from_analyzed(analysis),
         Target::HirHaskell => generate_haskell_from_analyzed(analysis),
+        Target::HirCobol => generate_cobol_from_analyzed(analysis),
         #[cfg(feature = "hir-faber")]
         Target::HirFaber => {
             let imported_spellings = analysis.resolver.imported_spellings(&analysis.interner);
@@ -549,6 +552,18 @@ fn generate_python_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> Re
 #[cfg(not(feature = "hir-python"))]
 fn generate_python_from_analyzed(_analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
     Err(unavailable_target_error(Target::HirPython))
+}
+
+#[cfg(feature = "hir-cobol")]
+fn generate_cobol_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
+    let r#gen = cobol::CobolCodegen::new(&analysis.hir, &analysis.interner);
+    let output = r#gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
+    Ok(crate::Output::Cobol(crate::CobolOutput { code: output.code }))
+}
+
+#[cfg(not(feature = "hir-cobol"))]
+fn generate_cobol_from_analyzed(_analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
+    Err(unavailable_target_error(Target::HirCobol))
 }
 
 #[cfg(feature = "hir-haskell")]

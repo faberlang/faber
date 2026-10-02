@@ -76,6 +76,10 @@ pub enum FaberCliTarget {
     #[value(name = "haskell")]
     HirHaskell,
 
+    /// Novelty GnuCOBOL 3.2 free-format source (default-off `hir-cobol` feature).
+    #[value(name = "cobol", alias = "cob")]
+    HirCobol,
+
     /// Experimental MIR-backed WebAssembly text target. Emits `.wat` text
     /// only; `wasm` is an alias kept for compatibility (binary conversion is
     /// an external-tool step).
@@ -142,6 +146,7 @@ impl FaberCliTarget {
             FaberCliTarget::HirGo => radix::module::codegen::Target::HirGo,
             FaberCliTarget::HirPython => radix::module::codegen::Target::HirPython,
             FaberCliTarget::HirHaskell => radix::module::codegen::Target::HirHaskell,
+            FaberCliTarget::HirCobol => radix::module::codegen::Target::HirCobol,
             FaberCliTarget::MirWasm => radix::module::codegen::Target::MirWasm,
             FaberCliTarget::MirLlvm => radix::module::codegen::Target::MirLlvm,
             FaberCliTarget::MirMetal => radix::module::codegen::Target::MirMetal,
