@@ -1167,7 +1167,9 @@ width_type_sugar := WIDTH_MARKER | LISTA_WIDTH_SUGAR
                 | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix?
                 | MATRIX_WIDTH_SUGAR shape_suffix
 shape_suffix    := '[' figura_list? ']'
-figura         := '_' | NATURAL | IDENTIFIER | '[' figura_list? ']'
+figura          := figura_product (('+' | '-') NATURAL)*
+figura_product  := figura_primary ('/' NATURAL)*
+figura_primary  := '_' | NATURAL | IDENTIFIER | '[' figura_list? ']' | '(' figura ')'
 figura_list     := figura (',' figura)*
 function_type   := '(' type_list? ')' '→' type_annotation alternate_exit_clause?
 type_list       := type_annotation (',' type_annotation)*
@@ -1388,7 +1390,9 @@ primary := IDENTIFIER | literal | 'ego'
          | '(' expression ')'
 ad_expr    := 'ad' ASCII_STRING ad_opener?
 ad_opener  := '(' expression ')'
-array_literal := '[' argument_list? ']'
+array_literal := '[' array_element_list? ']'
+array_element_list := array_element (',' array_element)* ','?
+array_element := argument | '_'
 iuncta_expr := 'iuncta' type_arguments '[' argument_list? ']'
 # Bare `{ ... }` is a JSON document literal. Keys are quoted JSON strings separated
 # by `:`; values are JSON constants. Anonymous Faber objects (`{ key = expr }`)
