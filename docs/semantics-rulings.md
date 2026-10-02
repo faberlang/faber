@@ -100,3 +100,18 @@ of write and follow one rule: a `var` binding allows both, an immutable binding
 
 Pinned by `corpus/mutabilitas/copy-param.fab` (the D-6 copy-parameter
 exemplar) and the semantic tests in `method_receiver_mutation_test.rs`.
+
+## R7. `copy` applies at the initializer only (2026-10-02)
+
+`copy` marks how a binding is initialized, never the binding afterwards.
+`var copy Point b ← a` duplicates `a`. A later `b ← c` of a class value is
+always by reference, whether or not `b` was declared with `copy`: after
+`var copy Point b ← a; b ← c; b.x ← 5`, `c.x` is 5 and `a.x` is untouched.
+
+The point of the declaration is that the reader knows at each assignment site
+whether it references or copies. A `var copy` declaration copies, and a plain
+`←` never does. If `copy` followed the object, an assignment would never say
+which one it is. To copy again, write a new `var copy` declaration.
+
+Pinned by `corpus/mutabilitas/copy-bind-deep.fab` (documentation beside the
+D-6 exemplar) and the MIR runner test `copy_duplicate_test.rs`.
