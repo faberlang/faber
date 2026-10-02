@@ -6,6 +6,14 @@
 //! [`RegexError`] whose leading token is a stable construct id (RD-4), never
 //! the engine's prose. The engine is the Rust `regex` crate (RD-8); the ids
 //! come from the `regex-syntax` error kinds of the same parser.
+//!
+//! The operations on a compiled [`Regex`] and on a [`Match`] are the free
+//! functions of this module (`faber::regex::find`, `faber::regex::split`, ...):
+//! generated code spells them through the canonical runtime-helper table. All
+//! offsets are code points, half-open; the byte-to-code-point map is one
+//! running count per bulk call.
+
+use std::sync::Arc;
 
 use regex_syntax::ast::{self, Ast, ErrorKind};
 
@@ -18,6 +26,23 @@ const MAX_REPEAT_COUNT: u32 = 1000;
 pub struct Regex {
     pattern: String,
     compiled: regex::Regex,
+    /// `(name, group index)` for every named group, shared by the matches.
+    names: Arc<[(String, usize)]>,
+}
+
+/// One match of a [`Regex`]: the matched text, its half-open code-point span,
+/// and the capture groups. The compiler gives the value no source-level type
+/// name (RD-3); programs hold it in an inferred binding and read it through
+/// [`match_text`], [`match_start`], [`match_end`], [`match_group`] and
+/// [`match_named`].
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Match {
+    text: String,
+    start: usize,
+    end: usize,
+    /// Group 0 is the whole match; a group that did not take part is `None`.
+    groups: Vec<Option<String>>,
+    names: Arc<[(String, usize)]>,
 }
 
 /// Why a pattern was rejected: a stable construct id, the code-point offset of
@@ -79,9 +104,15 @@ impl Regex {
             offset: 0,
             detail: engine_detail(&error),
         })?;
+        let names = compiled
+            .capture_names()
+            .enumerate()
+            .filter_map(|(index, name)| name.map(|name| (name.to_owned(), index)))
+            .collect();
         Ok(Self {
             pattern: pattern.to_owned(),
             compiled,
+            names,
         })
     }
 
@@ -90,19 +121,20 @@ impl Regex {
         &self.pattern
     }
 
-    /// Whether the pattern matches `textus` (the Rust `regex` crate
-    /// `is_match` semantics).
-    ///
-    /// G12 `consentit`: the pattern was validated and compiled at
-    /// construction, so the verb is total and never recompiles.
-    // The owned `String` is the generated-code calling convention:
-    // `radix/crates/radix-hir-rust/src/expr/call/intrinsics.rs::generate_regex_method`
-    // emits `{ let t: String = …; receiver.consentit(t) }`; accepting `&str`
-    // would break emitted programs.
-    #[allow(clippy::needless_pass_by_value)]
-    #[must_use]
-    pub fn consentit(&self, textus: String) -> bool {
-        self.compiled.is_match(&textus)
+    /// One engine capture set as a [`Match`] whose whole match starts at code
+    /// point `start`.
+    fn match_value(&self, captures: &regex::Captures<'_>, start: usize) -> Match {
+        let whole = captures.get(0).map_or("", |found| found.as_str());
+        Match {
+            text: whole.to_owned(),
+            start,
+            end: start + whole.chars().count(),
+            groups: captures
+                .iter()
+                .map(|group| group.map(|found| found.as_str().to_owned()))
+                .collect(),
+            names: Arc::clone(&self.names),
+        }
     }
 }
 
@@ -124,6 +156,139 @@ impl std::fmt::Display for Regex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.pattern)
     }
+}
+
+/// Whether the pattern matches somewhere in `text`.
+///
+/// G12 `consentit`: the pattern was validated and compiled at construction,
+/// so the verb is total and never recompiles.
+#[must_use]
+pub fn matches(regex: &Regex, text: &str) -> bool {
+    regex.compiled.is_match(text)
+}
+
+/// The leftmost-first match in `text`, or `None` when the pattern matches
+/// nowhere. Offsets are code points; the byte offsets the engine reports are
+/// mapped once, here.
+#[must_use]
+pub fn find(regex: &Regex, text: &str) -> Option<Match> {
+    let captures = regex.compiled.captures(text)?;
+    let start = text[..captures.get(0)?.start()].chars().count();
+    Some(regex.match_value(&captures, start))
+}
+
+/// Every non-overlapping match in `text`, left to right, in one pass.
+///
+/// The engine's iteration skips an empty match that starts where the previous
+/// match ended (RE2's rule), so `a*` over `baaac` yields the spans (0,0) (1,4)
+/// (5,5). The byte-to-code-point map is one running count over the haystack:
+/// matches arrive in ascending order, so each step counts only the characters
+/// since the previous match end.
+#[must_use]
+pub fn find_all(regex: &Regex, text: &str) -> Vec<Match> {
+    let mut found = Vec::new();
+    let mut counted_bytes = 0;
+    let mut counted_points = 0;
+    for captures in regex.compiled.captures_iter(text) {
+        let Some(whole) = captures.get(0) else {
+            continue;
+        };
+        let start = counted_points + text[counted_bytes..whole.start()].chars().count();
+        let value = regex.match_value(&captures, start);
+        counted_points = value.end;
+        counted_bytes = whole.end();
+        found.push(value);
+    }
+    found
+}
+
+/// The pieces of `text` between the iteration's matches: leading and trailing
+/// empty pieces are kept, adjacent separators give an empty piece, and capture
+/// groups in the pattern are not spliced into the output.
+#[must_use]
+pub fn split(regex: &Regex, text: &str) -> Vec<String> {
+    regex.compiled.split(text).map(str::to_owned).collect()
+}
+
+/// `text` with every non-overlapping match replaced by `replacement`, taken
+/// literally (`$1`, `${name}` and `\1` stay text), in one pass over the same
+/// iteration as [`find_all`].
+#[must_use]
+pub fn replace(regex: &Regex, text: &str, replacement: &str) -> String {
+    regex
+        .compiled
+        .replace_all(text, regex::NoExpand(replacement))
+        .into_owned()
+}
+
+/// `text` with every match of the [`find_all`] iteration replaced by what
+/// `replacer` returns for it. Each result is taken literally and is never
+/// re-scanned: the output is assembled from the unmatched text and the
+/// results only.
+#[must_use]
+pub fn replace_with<R: AsRef<str>>(
+    regex: &Regex,
+    text: &str,
+    replacer: impl Fn(Match) -> R,
+) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut last = 0;
+    let mut counted_points = 0;
+    for captures in regex.compiled.captures_iter(text) {
+        let Some(whole) = captures.get(0) else {
+            continue;
+        };
+        let start = counted_points + text[last..whole.start()].chars().count();
+        let value = regex.match_value(&captures, start);
+        counted_points = value.end;
+        out.push_str(&text[last..whole.start()]);
+        out.push_str(replacer(value).as_ref());
+        last = whole.end();
+    }
+    out.push_str(&text[last..]);
+    out
+}
+
+/// A pattern text matching `text` literally: backslash-escapes exactly the
+/// metacharacters `\ . + * ? ( ) | [ ] { } ^ $ # & - ~` and leaves every other
+/// character (including non-ASCII text) unchanged.
+#[must_use]
+pub fn escape(text: &str) -> String {
+    regex_syntax::escape(text)
+}
+
+/// The matched text.
+#[must_use]
+pub fn match_text(found: &Match) -> String {
+    found.text.clone()
+}
+
+/// The code-point offset where the match starts.
+#[must_use]
+pub fn match_start(found: &Match) -> i64 {
+    i64::try_from(found.start).unwrap_or(i64::MAX)
+}
+
+/// The code-point offset where the match ends (exclusive).
+#[must_use]
+pub fn match_end(found: &Match) -> i64 {
+    i64::try_from(found.end).unwrap_or(i64::MAX)
+}
+
+/// The text of capture group `index` (0 is the whole match); `None` when the
+/// index is out of range or the group did not take part in the match.
+#[must_use]
+pub fn match_group(found: &Match, index: i64) -> Option<String> {
+    let index = usize::try_from(index).ok()?;
+    found.groups.get(index)?.clone()
+}
+
+/// The text of the group called `name`; `None` when the name is unknown or the
+/// group did not take part in the match.
+#[must_use]
+pub fn match_named(found: &Match, name: &str) -> Option<String> {
+    let (_, index) = found.names.iter().find(|(known, _)| known == name)?;
+    found.groups.get(*index)?.clone()
 }
 
 /// The last line of the engine's multi-line message (`error: <detail>`).
