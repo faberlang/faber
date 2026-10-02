@@ -167,7 +167,7 @@ fn parse_int(string s) → int ⇥ string {
     return s ↦ int
 }
 
-fn compile_re(string s) → regex {
+fn compile_re(string s) → regex ⇥ string {
     return s ↦ regex
 }
 

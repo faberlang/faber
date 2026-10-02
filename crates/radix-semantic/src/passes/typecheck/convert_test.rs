@@ -26,7 +26,7 @@ fn textus_to_regex_conversio_typechecks() {
 
 #[test]
 fn ascii_to_regex_conversio_typechecks_via_textus_widening() {
-    test_support::assert_accepts(r"incipit { fixum _ r ← '(?g)\d+' ↦ regex }");
+    test_support::assert_accepts(r"incipit { fixum _ r ← '(?g)\\d+' ↦ regex }");
 }
 
 #[test]
@@ -38,25 +38,17 @@ fn regex_conversio_rejects_recovery_slot() {
 }
 
 #[test]
-fn regex_literal_pattern_at_cap_typechecks() {
-    // REGEX_PATTERN_MAX_BYTES = 1024; exactly at the cap is accepted.
-    let pattern = "a".repeat(1024);
+fn regex_literal_pattern_has_no_length_cap() {
+    // The conversion is the one place a pattern is compiled; there is no
+    // check-time length policy on the literal.
+    let pattern = "a".repeat(1100);
     let source = format!(r#"incipit {{ fixum _ r ← "{pattern}" ↦ regex }}"#);
     test_support::assert_accepts(&source);
 }
 
 #[test]
-fn regex_literal_pattern_over_cap_rejects() {
-    let pattern = "a".repeat(1025);
-    let source = format!(r#"incipit {{ fixum _ r ← "{pattern}" ↦ regex }}"#);
-    test_support::assert_rejects_with_issue(&source, "regex_pattern_too_long");
-}
-
-#[test]
-fn regex_conversio_dynamic_source_unaffected_by_cap() {
-    // The cap applies to folded literals only; dynamic textus sources carry no
-    // compile-time length and keep flowing.
-    test_support::assert_accepts(r"functio f(textus pat) → regex { redde pat ↦ regex }");
+fn regex_conversio_dynamic_source_with_text_channel_typechecks() {
+    test_support::assert_accepts(r"functio f(textus pat) → regex ⇥ textus { redde pat ↦ regex }");
 }
 
 #[test]
@@ -1260,7 +1252,7 @@ fn sermo_materialize_rejects_tensor() {
 
 #[test]
 fn regex_literal_pattern_empty_accepts() {
-    // Boundary: 0-byte pattern, well within REGEX_PATTERN_MAX_BYTES (1024).
+    // Boundary: 0-byte pattern.
     test_support::assert_accepts(r#"incipit { fixum _ r ← "" ↦ regex }"#);
 }
 
