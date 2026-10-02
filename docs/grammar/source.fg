@@ -759,6 +759,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Type | `copy` | copy ownership |
 # | Type | `de` | borrow / for-in keys |
 # | Type | `in` | ownership in |
+# | Type | `modulus` | modular-word policy type head (en `wrapping`) |
 # | Type | `nihil` | none (the null type; D23.2) |
 # | Type | `own` | owned |
 # | Iteration | `ab` | range iteration |
@@ -1155,7 +1156,12 @@ base_type       := hole_type | function_type | width_type_sugar | ratio_type | f
 failable_promissum_type := IDENTIFIER '<' type_annotation alternate_exit_clause '>'
 ratio_type      := 'ratio' '<' labeled_type_argument (',' labeled_type_argument)* '>'
 hole_type       := '_'
-qualified_type  := IDENTIFIER ('.' IDENTIFIER)*
+# `modulus` (en `wrapping`, the modular-word policy) is claimed as a type-name
+# head by the type parser, so `modulus<u32>` is an ordinary applied type
+# (`exactus` and `saturatus` are plain identifiers). Outside a type slot the
+# spelling is an ordinary identifier.
+qualified_type  := type_head ('.' IDENTIFIER)*
+type_head       := IDENTIFIER | 'modulus'
 # The bare numeric type words `numerus` and `fractus` (and their locale words)
 # take no type arguments: the wrapped spelling `numerus<W>` / `fractus<W>`,
 # including the holes `numerus<_>` / `fractus<_>`, is a parse error
