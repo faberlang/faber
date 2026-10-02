@@ -205,6 +205,7 @@ impl TypeTable {
             Primitive::Ignotum,
             Primitive::Octeti,
             Primitive::Regex,
+            Primitive::Match,
             Primitive::Json,
             Primitive::Valor,
             Primitive::Ascii,
@@ -378,6 +379,7 @@ impl TypeTable {
             Primitive::Ignotum,
             Primitive::Octeti,
             Primitive::Regex,
+            Primitive::Match,
             Primitive::Json,
             Primitive::Valor,
             Primitive::Ascii,
@@ -1911,6 +1913,11 @@ pub enum Primitive {
     Octeti,
 
     Regex,
+
+    /// One successful regex match (RD-3): internal only, with no source-level
+    /// type spelling. It arises from a `regex` operation and is never named in
+    /// a type position, so it has no `PrimitiveTypeSpec` row and no locale row.
+    Match,
 
     /// Object-rooted JSON document, backed by `faber::Json`.
     Json,

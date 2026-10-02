@@ -1019,6 +1019,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         Type::Primitive(Primitive::Instans) | Type::SizedInstans(_)
                     )
                     | (Value::Regex(_), Type::Primitive(Primitive::Regex))
+                    | (Value::Match(_), Type::Primitive(Primitive::Match))
                     | (Value::Unit, Type::Primitive(Primitive::Vacuum))
                     | (_, Type::Primitive(Primitive::Valor | Primitive::Ignotum))
             )

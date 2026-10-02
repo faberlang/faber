@@ -235,6 +235,7 @@ impl<'a> DeviceSafeClassifier<'a> {
                 | Primitive::Littera
                 | Primitive::Octeti
                 | Primitive::Regex
+                | Primitive::Match
                 | Primitive::Json
                 | Primitive::Valor
                 | Primitive::Ignotum

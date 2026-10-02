@@ -3185,6 +3185,11 @@ impl<'a> FunctionBuilder<'a> {
                 ));
                 None
             }
+            Type::Primitive(Primitive::Match) => {
+                self.errors
+                    .push(MirError::unsupported(span, "regex match type zero-init"));
+                None
+            }
             Type::Option(_) => Some(MirOperand::Constant(MirConstant::Nil)),
             Type::Union(members) => {
                 let nihil = self.types.primitive(Primitive::Nihil);

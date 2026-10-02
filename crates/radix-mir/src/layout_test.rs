@@ -120,6 +120,7 @@ fn intended_bucket(ty: &Type) -> Bucket {
             | Primitive::Ignotum
             | Primitive::Octeti
             | Primitive::Regex
+            | Primitive::Match
             | Primitive::Json
             | Primitive::Valor
             | Primitive::Instans,
@@ -176,7 +177,7 @@ fn intended_bucket(ty: &Type) -> Bucket {
     }
 }
 
-/// One representative `Type` per census row (50 rows: 14 Primitive-expanded
+/// One representative `Type` per census row (51 rows: 15 Primitive-expanded
 /// variants + 36 other variants; `Alias` excluded). Nested ids are interned
 /// into `types` so the rows are resolvable.
 fn census_rows(types: &mut TypeTable) -> Vec<Type> {
@@ -190,7 +191,7 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     let two = types.intern_index(IndexExpr::Literal(2));
     let matrix_shape = types.intern_index(IndexExpr::Tuple(vec![two, two]));
 
-    let mut rows = Vec::with_capacity(50);
+    let mut rows = Vec::with_capacity(51);
     // Physical (14): the five physical primitives, the sized/word numerics,
     // the device-class rows, and the physical aggregates.
     for prim in [
@@ -246,6 +247,7 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
         Primitive::Ignotum,
         Primitive::Octeti,
         Primitive::Regex,
+        Primitive::Match,
         Primitive::Json,
         Primitive::Valor,
         Primitive::Instans,
@@ -286,14 +288,14 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     rows.push(Type::Error);
     assert_eq!(
         rows.len(),
-        50,
-        "the census must stay 50 Primitive-expanded rows"
+        51,
+        "the census must stay 51 Primitive-expanded rows"
     );
     rows
 }
 
 #[test]
-fn pin_table_census_is_50_rows_across_the_four_buckets() {
+fn pin_table_census_is_51_rows_across_the_four_buckets() {
     let mut types = TypeTable::new();
     let rows = census_rows(&mut types);
 
@@ -315,8 +317,8 @@ fn pin_table_census_is_50_rows_across_the_four_buckets() {
     );
     assert_eq!(aggregate, 6, "opaque-aggregate census rows");
     assert_eq!(
-        opaque, 20,
-        "opaque-by-design census rows (MLC-4: -1 to physical)"
+        opaque, 21,
+        "opaque-by-design census rows (MLC-4: -1 to physical; RX-3a: +1 match)"
     );
     assert_eq!(internal, 5, "internal census rows");
 }
