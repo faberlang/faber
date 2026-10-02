@@ -256,6 +256,36 @@ pub const INF_KEY: RuntimeItem = inf_row("key", RuntimeKind::Fn);
 pub const INF_FROM_KEY: RuntimeItem = inf_row("from_key", RuntimeKind::Fn);
 pub const INF_PART: RuntimeItem = inf_row("part", RuntimeKind::Type);
 
+/// The targets whose runtime package carries a `format` row. Only the Go
+/// runtime (`rt.Format*`, `faber/runtime/go/format.go`) carries them on this
+/// table today.
+const FORMAT_TARGETS: &[Target] = &[Target::HirGo];
+
+const fn format_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Format,
+        name,
+        kind,
+        targets: FORMAT_TARGETS,
+    }
+}
+
+/// `format` rows (T1-G5): the `¶` format-operator renderers of the Go runtime
+/// (`rt.Format*`). `FORMAT_SPEC` is the decomposed layout spec a call site
+/// builds as a struct literal; the rest are functions. `MAGNUS` and
+/// `MAGNUS_SCI` render an unbounded `inf` (`*big.Int`). Width limits do not
+/// apply here: a renderer lays out text, it never stores into a bounded cell.
+pub const FORMAT_SPEC: RuntimeItem = format_row("Spec", RuntimeKind::Type);
+pub const FORMAT_FLOAT: RuntimeItem = format_row("float", RuntimeKind::Fn);
+pub const FORMAT_INSTANS: RuntimeItem = format_row("instans", RuntimeKind::Fn);
+pub const FORMAT_INT: RuntimeItem = format_row("int", RuntimeKind::Fn);
+pub const FORMAT_MAGNUS: RuntimeItem = format_row("magnus", RuntimeKind::Fn);
+pub const FORMAT_MAGNUS_SCI: RuntimeItem = format_row("magnus_sci", RuntimeKind::Fn);
+pub const FORMAT_PAD: RuntimeItem = format_row("pad", RuntimeKind::Fn);
+pub const FORMAT_SCI: RuntimeItem = format_row("sci", RuntimeKind::Fn);
+pub const FORMAT_SIGNED: RuntimeItem = format_row("signed", RuntimeKind::Fn);
+pub const FORMAT_TEXT: RuntimeItem = format_row("text", RuntimeKind::Fn);
+
 /// The targets whose runtime package carries each `regex` row. Rows differ by
 /// target: the Rust runtime carries the match operations as free functions in
 /// `faber::regex`, the Go runtime carries a constructor plus methods, the Swift
@@ -465,6 +495,16 @@ pub const TABLE: &[RuntimeItem] = &[
     INF_KEY,
     INF_FROM_KEY,
     INF_PART,
+    FORMAT_SPEC,
+    FORMAT_FLOAT,
+    FORMAT_INSTANS,
+    FORMAT_INT,
+    FORMAT_MAGNUS,
+    FORMAT_MAGNUS_SCI,
+    FORMAT_PAD,
+    FORMAT_SCI,
+    FORMAT_SIGNED,
+    FORMAT_TEXT,
     REGEX_MATCHES,
     REGEX_FIND,
     REGEX_FIND_ALL,

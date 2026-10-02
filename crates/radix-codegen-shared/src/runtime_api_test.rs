@@ -475,6 +475,38 @@ fn the_go_inf_rows_spell_as_the_flat_rt_names() {
 }
 
 #[test]
+fn the_go_format_rows_spell_as_the_flat_rt_names() {
+    let go_rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Format && row.targets.contains(&Target::HirGo))
+        .collect();
+    // 9 functions and the `FormatSpec` layout-spec type; none is a store row.
+    assert_eq!(go_rows.len(), 10);
+    assert_eq!(
+        go_rows
+            .iter()
+            .filter(|row| row.kind == RuntimeKind::Type)
+            .count(),
+        1
+    );
+    assert!(go_rows.iter().all(|row| row.kind != RuntimeKind::StoreFn));
+    for (row, spelled) in [
+        (&FORMAT_SPEC, "rt.FormatSpec"),
+        (&FORMAT_PAD, "rt.FormatPad"),
+        (&FORMAT_SCI, "rt.FormatSci"),
+        (&FORMAT_INT, "rt.FormatInt"),
+        (&FORMAT_SIGNED, "rt.FormatSigned"),
+        (&FORMAT_FLOAT, "rt.FormatFloat"),
+        (&FORMAT_TEXT, "rt.FormatText"),
+        (&FORMAT_INSTANS, "rt.FormatInstans"),
+        (&FORMAT_MAGNUS, "rt.FormatMagnus"),
+        (&FORMAT_MAGNUS_SCI, "rt.FormatMagnusSci"),
+    ] {
+        assert_eq!(spell_any(Target::HirGo, row), spelled);
+    }
+}
+
+#[test]
 fn the_regex_rows_spell_from_the_table_for_typescript() {
     // RX-8: the TypeScript runtime package's `regex` namespace.
     for (row, spelled) in [
