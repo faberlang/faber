@@ -47,6 +47,8 @@ main {
     const wrapping<u64> sigma0 ← dextra(a, 28 ∷ wrapping<u64>) ⊻ dextra(a, 34 ∷ wrapping<u64>) ⊻ dextra(a, 39 ∷ wrapping<u64>)
     const wrapping<u64> majority ← a ∧ b ⊻ a ∧ c ⊻ b ∧ c
     const wrapping<u64> temp2 ← sigma0 + majority
-    print temp1 + temp2
-    print d + temp1
+    const wrapping<u64> roundA ← temp1 + temp2
+    const wrapping<u64> roundE ← d + temp1
+    print roundA
+    print roundE
 }

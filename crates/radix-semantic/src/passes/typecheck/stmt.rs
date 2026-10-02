@@ -138,7 +138,7 @@ impl TypeChecker<'_> {
             (None, Some(init)) => {
                 let inferred = self.check_expr(init);
                 let site = StoreSite::new(HirStoreKind::Declaration).named(local.name);
-                let inferred = self.saturating_inferred_slot(init, inferred, site);
+                let inferred = self.word_inferred_slot(init, inferred, site);
                 self.inferred_slot_sources.insert(local.def_id, init.span);
                 super::tensor_index::record_shape_witness_from_init(self, local.def_id, init);
                 inferred

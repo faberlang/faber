@@ -274,6 +274,9 @@ impl TypeChecker<'_> {
         let store = self.pending_store.take();
         // ss1: a numeric method twin means its operator; rewrite it first.
         let in_place_twin = self.desugar_numeric_twin(expr);
+        if let (Some(_), Some(slot)) = (&store, expected) {
+            self.mark_word_ring(expr, slot);
+        }
         let ty = match &mut expr.kind {
             HirExpressionKind::Path(def_id) => self.check_path(*def_id, expr.span),
             HirExpressionKind::Literal(lit) => {
