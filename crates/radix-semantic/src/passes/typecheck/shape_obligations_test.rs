@@ -607,3 +607,21 @@ fn callers_own_size_param_binds_the_callee_hole_without_runtime_rebase() {
     assert_eq!(checker.resolve_index(dims[0]), caller_dim);
     assert!(checker.shape_obligations.calls.is_empty());
 }
+
+#[test]
+fn rank_tuple_size_argument_records_no_entry_shape_relation() {
+    // `Pondo<[D]>` passes a rank tuple where the genus expects one extent. A
+    // non-scalar term has no per-axis equation, so no entry relation (which
+    // no backend could lower) is recorded for it.
+    let resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let mut interner = radix_lexer::Interner::new();
+    let name = interner.intern("w");
+    let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+    let literal = checker.types.intern_index(IndexExpr::Literal(1));
+    let rank_tuple = checker.types.intern_index(IndexExpr::Tuple(vec![literal]));
+    let param = tensor_param(&mut checker, DefId(11), name, rank_tuple);
+    checker.current_function_def = Some(DefId(10));
+    checker.install_function_shape_sources(&[], &[param]);
+    assert!(checker.shape_obligations.functions.is_empty());
+}

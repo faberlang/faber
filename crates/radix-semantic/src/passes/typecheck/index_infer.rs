@@ -380,12 +380,15 @@ impl TypeChecker<'_> {
                         &fields,
                         axis as u32,
                     )));
-                let static_expected = radix_types::evaluate_index_dimension(expected, self.types)
-                    .ok()
-                    .flatten()
-                    .is_some();
+                // A statically known extent is a compile-time fact, and a
+                // non-scalar term (a rank tuple passed as a size argument,
+                // `Pondo<[D]>`) has no per-axis equation to check at runtime.
+                let no_entry_equation = matches!(
+                    radix_types::evaluate_index_dimension(expected, self.types),
+                    Ok(Some(_)) | Err(radix_types::IndexArithmeticError::NotScalar)
+                );
                 if !self.current_device_function
-                    && !static_expected
+                    && !no_entry_equation
                     && !self.types.index_equals(actual, expected)
                 {
                     self.record_shape_relation(
