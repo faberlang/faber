@@ -8,8 +8,6 @@
  *
  * The helpers mirror the former inline emission exactly: display formatting
  * produced by this package is byte-identical to the compiler-inlined text.
- * Only the exported names changed (`__faberDisplay` is `display.value`,
- * `__faberDisplay<Name>` is `display.<name>`).
  */
 
 /**
