@@ -87,21 +87,17 @@ func TestDisplayValorCollections(t *testing.T) {
 	}
 }
 
-// faberTensorLike mirrors the emitted carrier shape so the reflection renderer
-// can dispatch on the `faberTensor`/`faberVector` type-name convention.
-type faberTensorLike struct {
-	data []int
-}
-
-func (t faberTensorLike) Planata() []int {
-	return t.data
-}
-
-// TestDisplayValorCarrier pins the tensor/vector carrier flat-data dispatch.
+// TestDisplayValorCarrier pins the tensor/vector carrier flat-data dispatch:
+// the reflection renderer reads the carriers of this package through their
+// `Planata` / `AdLista` accessors.
 func TestDisplayValorCarrier(t *testing.T) {
-	got := DisplayValor(faberTensorLike{data: []int{1, 2}})
-	if got != "[1, 2]" {
-		t.Fatalf("DisplayValor(carrier) = %q, want [1, 2]", got)
+	tensor := TensorTensor[int]{}.Strue([]int{1, 2}, []int{2})
+	if got := DisplayValor(tensor); got != "[1, 2]" {
+		t.Fatalf("DisplayValor(tensor) = %q, want [1, 2]", got)
+	}
+	vector := VectorFromList([]int{3, 4, 5}, 3)
+	if got := DisplayValor(vector); got != "[3, 4, 5]" {
+		t.Fatalf("DisplayValor(vector) = %q, want [3, 4, 5]", got)
 	}
 }
 

@@ -123,7 +123,7 @@ func DisplayValor(value any) string {
 		return valorMapDisplay(rv)
 	case reflect.Struct:
 		name := rv.Type().Name()
-		if strings.HasPrefix(name, "faberTensor") || strings.HasPrefix(name, "faberVector") {
+		if rv.Type().PkgPath() == "faber/rt" && (strings.HasPrefix(name, "TensorTensor") || strings.HasPrefix(name, "VectorVector")) {
 			for _, methodName := range []string{"Planata", "AdLista"} {
 				method := rv.MethodByName(methodName)
 				if !method.IsValid() {
