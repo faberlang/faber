@@ -1480,6 +1480,7 @@ impl TypeChecker<'_> {
                 );
                 if !(lhs_is_nil || rhs_is_nil)
                     && !self.equality_constant_exempt(lhs, lhs_ty, rhs, rhs_ty)
+                    && !self.policy_float_constant_comparison(lhs, lhs_ty, rhs, rhs_ty)
                     && !self.saturating_pair(lhs, rhs)
                 {
                     self.exact_equality_types_for_operands(lhs, lhs_ty, rhs, rhs_ty, lhs.span);
