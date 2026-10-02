@@ -22,6 +22,19 @@ fn parse_inspection_honors_frontmatter_locale() {
 }
 
 #[test]
+fn hir_inspection_honors_frontmatter_locale() {
+    let source =
+        "+++\nlocale = \"en\"\n+++\nfn twice(int n) → int {\n    return n * 2\n}\n\nmain {\n    print twice(4)\n}\n";
+    let result = hir_inspection_for_source("en.fab", source);
+
+    assert!(result.success, "errors: {:?}", result.errors);
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    let payload = json(&result.text);
+    assert_eq!(payload["frontmatter"]["locale"], "en");
+    assert_eq!(payload["items"], 1);
+}
+
+#[test]
 fn lex_inspection_records_latin_keyword_identity_under_reader_locale() {
     let result = lex_inspection_for_source("en.fab", EN_SOURCE);
     let payload = json(&result.text);

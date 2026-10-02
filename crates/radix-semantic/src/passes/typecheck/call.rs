@@ -1489,11 +1489,18 @@ impl TypeChecker<'_> {
     /// primitive union has no honest declared-member view. The former
     /// guardrail 1 (WARN024, "narrow to recover per-member access") retired
     /// with D9.2: overlap access is plain and access outside it is an error.
+    ///
+    /// A declared enum is not a written `∪`: its variants are views for
+    /// refinement, not store-only constituents, so an annotation that names
+    /// an enum (bare or as `E ∪ none`) never draws these warnings.
     pub fn warn_union_annotation_guardrails(
         &mut self,
         annotation_ty: TypeId,
         span: radix_lexer::Span,
     ) {
+        if self.annotation_names_enum(annotation_ty) {
+            return;
+        }
         let Some(members) = self.union_members_of(annotation_ty) else {
             return;
         };
@@ -1571,6 +1578,22 @@ impl TypeChecker<'_> {
     }
 
     /// Whether a union constituent is a nominal user type (U1R guardrails).
+    /// Whether an annotation, through aliases and a `∪ none` wrapper, names a
+    /// declared enum.
+    fn annotation_names_enum(&mut self, ty: TypeId) -> bool {
+        let mut current = self.resolve_inferred_type(ty);
+        for _ in 0..8 {
+            match self.types.get(current).clone() {
+                Type::Alias(_, inner) | Type::Option(inner) => {
+                    current = self.resolve_inferred_type(inner);
+                }
+                Type::Enum(_) => return true,
+                _ => return false,
+            }
+        }
+        false
+    }
+
     fn constituent_is_nominal(&self, member: TypeId) -> bool {
         self.struct_def_from_type(member).is_some()
             || self.interface_def_from_type(member).is_some()

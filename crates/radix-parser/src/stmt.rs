@@ -726,7 +726,9 @@ impl Parser {
     /// `mori` (en `panic`) introduces the optional failure payload. Leftover
     /// `secus` / `else` on this statement is rejected — the particle names
     /// the action. A comma would collide with the grammar's homogeneous
-    /// list separator.
+    /// list separator. A string literal on the same line right after the
+    /// condition is a message missing its `mori` particle; it is rejected
+    /// rather than parsed as a separate statement that silently drops it.
     pub(super) fn parse_adfirma_stmt(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Adfirma, "expected 'adfirma'")?;
 
@@ -734,6 +736,15 @@ impl Parser {
 
         if self.check_keyword_ident(TokenKind::Secus) {
             return Err(self.expected_statement_error("adfirma_else_rejected"));
+        }
+
+        if !self.raw_newline_before_next_word()
+            && matches!(
+                self.peek().kind,
+                TokenKind::String(_) | TokenKind::AsciiString(_) | TokenKind::BacktickString(_)
+            )
+        {
+            return Err(self.expected_statement_error("adfirma_message_particle"));
         }
 
         let message = if self.eat_keyword_ident(TokenKind::Mori) {

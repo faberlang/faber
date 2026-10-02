@@ -2824,6 +2824,22 @@ fn rejects_adfirma_else() {
 }
 
 #[test]
+fn rejects_adfirma_message_without_mori() {
+    assert_parse_error_matches(
+        "adfirma 1 > 2 \"msg\"",
+        ParseExpectation::Args(&[("issue", "adfirma_message_particle")]),
+    );
+    assert_en_parse_error_issue("assert 1 > 2 \"boom\"", "adfirma_message_particle");
+}
+
+#[test]
+fn adfirma_string_on_next_line_stays_a_separate_statement() {
+    let result = parse_ok("adfirma verum\n\"msg\"");
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 2);
+}
+
+#[test]
 fn parses_nota_diagnostic() {
     let result = parse_ok("nota \"a\", \"b\"");
     let program = result
