@@ -193,7 +193,7 @@ fn load_from_repo_root_lists_canonical_terms() {
     // the registry (abstractus, sub: inheritance removal; cura, curata,
     // arena: D8.2; nexum: D16.2; sic: D4.7), two arrived (✓: D4.5; insere:
     // D8.10's missing registry row added).
-    assert_eq!(pack.term_count(), 197);
+    assert_eq!(pack.term_count(), 196);
     // 14 → 13: the `nulla` redirect retired with D23.4 (8c5cc3de4).
     assert_eq!(pack.legacy_redirects().len(), 13);
     assert!(pack.resolve_exempla_path("functio/functio.fab").is_file());
