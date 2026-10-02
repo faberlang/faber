@@ -169,8 +169,16 @@ pub enum KeywordOwner {
     ExpressionIntroducer,
 
     /// Range-operator keyword in expression position
-    /// (`intra` / `inter` / `per` / `usque` / `ante`).
+    /// (`per` / `usque` / `ante`).
     RangeOperator,
+
+    /// Retired membership-operator spelling in operator position
+    /// (`intra` / `inter`, and every reader pack's spelling of them).
+    ///
+    /// The words stay recognized only so the parser can answer them with the
+    /// migration diagnostic `membership_keyword_retired` (`∈` is the one
+    /// spelling); elsewhere they are ordinary identifiers.
+    RetiredMembership,
 
     /// Statement-initial transfer keyword (`tacet`).
     StatementIntroducer,
@@ -351,6 +359,7 @@ const DECLARATION_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::DeclarationIntro
 const CONTROL_FLOW: &[KeywordOwner] = &[KeywordOwner::ControlFlow];
 const EXPRESSION_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::ExpressionIntroducer];
 const RANGE_OPERATOR: &[KeywordOwner] = &[KeywordOwner::RangeOperator];
+const RETIRED_MEMBERSHIP: &[KeywordOwner] = &[KeywordOwner::RetiredMembership];
 const STATEMENT_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::StatementIntroducer];
 const DECLARATION_MARKER: &[KeywordOwner] = &[KeywordOwner::DeclarationMarker];
 const REDUCTION_HEAD: &[KeywordOwner] = &[KeywordOwner::ReductionHead];
@@ -1189,16 +1198,22 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(RANGE_OPERATOR),
         category: KeywordKind::Range,
     },
+    // `inter` is a retired membership operator (`∈` replaced it). Tokenless: the
+    // parser claims it only in operator position, to emit the migration
+    // diagnostic; everywhere else the spelling is an ordinary identifier.
     KeywordSpec {
         text: "inter",
-        token_kind: Some(TokenKind::Inter),
-        scope: KeywordScope::Contextual(RANGE_OPERATOR),
+        token_kind: None,
+        scope: KeywordScope::Contextual(RETIRED_MEMBERSHIP),
         category: KeywordKind::Range,
     },
+    // `intra` is a retired membership operator (`∈` replaced it). Tokenless: the
+    // parser claims it only in operator position, to emit the migration
+    // diagnostic; everywhere else the spelling is an ordinary identifier.
     KeywordSpec {
         text: "intra",
-        token_kind: Some(TokenKind::Intra),
-        scope: KeywordScope::Contextual(RANGE_OPERATOR),
+        token_kind: None,
+        scope: KeywordScope::Contextual(RETIRED_MEMBERSHIP),
         category: KeywordKind::Range,
     },
     KeywordSpec {
@@ -1611,6 +1626,7 @@ fn keyword_owner_is_identifier_like(owner: KeywordOwner) -> bool {
         | KeywordOwner::ControlFlow
         | KeywordOwner::ExpressionIntroducer
         | KeywordOwner::RangeOperator
+        | KeywordOwner::RetiredMembership
         | KeywordOwner::StatementIntroducer
         | KeywordOwner::DeclarationMarker
         | KeywordOwner::RouteExpression

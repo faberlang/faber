@@ -1210,14 +1210,13 @@ fn format_stdin_keeps_membership_glyphs_at_the_source_locale() {
 }
 
 #[test]
-fn format_stdin_prints_the_glyph_for_a_negated_keyword_membership() {
-    // `not (x between xs)` is a unary not over `∈`: the glyph is printed and the
-    // negation stays a negation (no `∉` is invented, no keyword survives).
-    let source = "+++\nlocale = \"en\"\n+++\nmain {\n    const list<int> xs ← [1, 2]\n    if not (3 between xs) {\n        print \"out\"\n    }\n}\n";
+fn format_stdin_keeps_a_negated_glyph_membership_as_a_negation() {
+    // `not (x ∈ xs)` is a unary not over `∈`: the glyph is printed and the
+    // negation stays a negation (no `∉` is invented).
+    let source = "+++\nlocale = \"en\"\n+++\nmain {\n    const list<int> xs ← [1, 2]\n    if not (3 ∈ xs) {\n        print \"out\"\n    }\n}\n";
     let (stdout, stderr, success) = run_faber_format_stdin(source);
     assert!(success, "{stderr}");
     assert!(stdout.contains("if not (3 ∈ xs) {"), "{stdout}");
-    assert!(!stdout.contains("between"), "{stdout}");
 }
 
 #[test]

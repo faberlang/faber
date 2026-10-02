@@ -2,3 +2,4 @@
 error[SEM010:membership_requires_collection]
 error[SEM010:membership_operand_unresolved]
 error[SEM010:common_type_mismatch]
+error[SEM010:membership_over_text]

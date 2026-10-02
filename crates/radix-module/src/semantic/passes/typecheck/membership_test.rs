@@ -1,4 +1,4 @@
-//! Right-operand rule of keyword membership (`inter` / `between`).
+//! Right-operand rule of collection membership (`∈` / `∉`).
 //!
 //! Tests assert diagnostic code, issue and args only, never prose.
 
@@ -38,37 +38,60 @@ fn rejects(source: &str, issue: &str, found: Option<&str>) {
 
 #[test]
 fn list_right_operand_accepts() {
-    accepts("incipit { fixum lista<numerus> xs ← [1, 2]\n nota 1 inter xs }");
+    accepts("incipit { fixum lista<numerus> xs ← [1, 2]\n nota 1 ∈ xs }");
 }
 
 #[test]
 fn set_right_operand_accepts() {
-    accepts("incipit { varia copia<numerus> xs ← vacua\n nota 1 inter xs }");
+    accepts("incipit { varia copia<numerus> xs ← vacua\n nota 1 ∈ xs }");
 }
 
 #[test]
 fn map_right_operand_tests_keys() {
-    accepts("incipit { fixum tabula<textus, numerus> m ← {\"a\": 1}\n nota \"a\" inter m }");
+    accepts("incipit { fixum tabula<textus, numerus> m ← {\"a\": 1}\n nota \"a\" ∈ m }");
 }
 
 #[test]
-fn text_right_operand_accepts_gradus_shape() {
-    accepts("incipit { fixum textus c ← \"7\"\n nota c inter \"0123456789\" }");
-}
-
-#[test]
-fn text_right_operand_requires_text_left() {
+fn text_right_operand_is_rejected_for_a_text_left() {
+    // OD-1: no membership operator over text; the text method is the spelling.
     rejects(
-        "incipit { fixum numerus n ← 5\n fixum textus t ← \"abc\"\n nota n inter t }",
-        "membership_operand_type_mismatch",
-        None,
+        "incipit { fixum textus c ← \"7\"\n nota c ∈ \"0123456789\" }",
+        "membership_over_text",
+        Some("textus"),
+    );
+}
+
+#[test]
+fn text_right_operand_is_rejected_whatever_the_left_operand() {
+    rejects(
+        "incipit { fixum numerus n ← 5\n fixum textus t ← \"abc\"\n nota n ∈ t }",
+        "membership_over_text",
+        Some("textus"),
+    );
+}
+
+#[test]
+fn negated_text_right_operand_is_rejected() {
+    rejects(
+        "incipit { fixum textus t ← \"abc\"\n nota \"a\" ∉ t }",
+        "membership_over_text",
+        Some("textus"),
+    );
+}
+
+#[test]
+fn ascii_right_operand_is_rejected() {
+    rejects(
+        "incipit { fixum ascii t ← 'abc'\n nota 'a' ∈ t }",
+        "membership_over_text",
+        Some("ascii"),
     );
 }
 
 #[test]
 fn list_element_mismatch_keeps_its_issue() {
     rejects(
-        "incipit { fixum lista<numerus> xs ← [1, 2]\n nota \"a\" inter xs }",
+        "incipit { fixum lista<numerus> xs ← [1, 2]\n nota \"a\" ∈ xs }",
         "membership_operand_type_mismatch",
         None,
     );
@@ -77,7 +100,7 @@ fn list_element_mismatch_keeps_its_issue() {
 #[test]
 fn integer_right_operand_rejects() {
     rejects(
-        "incipit { fixum numerus x ← 5\n nota x inter 5 }",
+        "incipit { fixum numerus x ← 5\n nota x ∈ 5 }",
         "membership_requires_collection",
         Some("numerus"),
     );
@@ -86,7 +109,7 @@ fn integer_right_operand_rejects() {
 #[test]
 fn bool_right_operand_rejects() {
     rejects(
-        "incipit { fixum bivalens b ← verum\n nota verum inter b }",
+        "incipit { fixum bivalens b ← verum\n nota verum ∈ b }",
         "membership_requires_collection",
         Some("bivalens"),
     );
@@ -95,7 +118,7 @@ fn bool_right_operand_rejects() {
 #[test]
 fn nullable_list_right_operand_rejects() {
     rejects(
-        "incipit { fixum lista<numerus> ∪ nihil m ← [1]\n nota 1 inter m }",
+        "incipit { fixum lista<numerus> ∪ nihil m ← [1]\n nota 1 ∈ m }",
         "membership_requires_collection",
         None,
     );
@@ -104,7 +127,7 @@ fn nullable_list_right_operand_rejects() {
 #[test]
 fn nullable_list_with_wrong_element_rejects_as_nullable() {
     rejects(
-        "incipit { fixum lista<textus> ∪ nihil m ← [\"a\"]\n nota 3 inter m }",
+        "incipit { fixum lista<textus> ∪ nihil m ← [\"a\"]\n nota 3 ∈ m }",
         "membership_requires_collection",
         None,
     );
@@ -113,7 +136,7 @@ fn nullable_list_with_wrong_element_rejects_as_nullable() {
 #[test]
 fn tuple_right_operand_rejects() {
     rejects(
-        "functio probe(iuncta<numerus, numerus> t) → bivalens { redde 1 inter t }",
+        "functio probe(iuncta<numerus, numerus> t) → bivalens { redde 1 ∈ t }",
         "membership_requires_collection",
         None,
     );
@@ -122,7 +145,7 @@ fn tuple_right_operand_rejects() {
 #[test]
 fn generic_parameter_right_operand_rejects() {
     rejects(
-        "functio probe<T>(T x) → bivalens { redde 1 inter x }",
+        "functio probe<T>(T x) → bivalens { redde 1 ∈ x }",
         "membership_requires_collection",
         None,
     );

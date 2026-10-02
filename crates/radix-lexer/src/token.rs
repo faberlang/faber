@@ -240,8 +240,6 @@ pub enum TokenKind {
     // === Keywords: Ranges ===
     Ab,
     Ante,
-    Inter,
-    Intra,
     Per,
     Usque,
     // === Keywords: Testing ===
@@ -484,8 +482,6 @@ impl TokenKind {
                 | Ut
                 | Via
                 | Ante
-                | Inter
-                | Intra
                 | Per
                 | Usque
                 | Erratur

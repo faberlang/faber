@@ -108,9 +108,11 @@ fn textus_intra_range_rejects() {
 }
 
 #[test]
-fn intra_rhs_requires_intervallum_range_issue() {
-    let source = r#"incipit { si 1 intra 2 { nota "bad" } }"#;
-    rejects_with_issue(&compile(source), "intra_requires_intervallum_range");
+fn membership_scalar_rhs_is_not_a_range() {
+    // The keyword form `1 intra 2` retired with MG-1c; its glyph form takes
+    // the collection rule, so a scalar right operand is not a range.
+    let source = r#"incipit { si 1 ∈ 2 { nota "bad" } }"#;
+    rejects_with_issue(&compile(source), "membership_requires_collection");
 }
 
 #[test]
@@ -338,6 +340,26 @@ fn intervallum_inter_overlapping_codegen() {
     accepts(&result);
     let code = rust_code(result);
     assert!(code.contains(".inter("));
+}
+
+/// The method `inter` (en `intersect`) is untouched by the retirement of the
+/// membership words: the Latin spelling checks, and the English reader knows
+/// only `intersect` (`inter` is not an en intervallum method).
+#[test]
+fn intervallum_intersection_method_spellings_survive_the_membership_retirement() {
+    let latin = r"incipit {
+  fixum intervallum<numerus> left ← 0‥10
+  fixum intervallum<numerus> right ← 5‥15
+  fixum _ hit ← left.inter(right)
+}";
+    accepts(&compile(latin));
+    let en = |method: &str| {
+        format!(
+            "+++\nlocale = \"en\"\n+++\nmain {{\n    const intervallum<int> a ← 0‥10\n    const intervallum<int> b ← 5‥15\n    const _ x ← a.{method}(b)\n    print x\n}}\n"
+        )
+    };
+    accepts(&compile(&en("intersect")));
+    rejects_with_issue(&compile(&en("inter")), "unknown_method");
 }
 
 #[cfg(feature = "hir-rust")]

@@ -668,7 +668,10 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         }
         "postfix_inc_dec_numerus_operand" => Some("apply postfix increment/decrement to numerus values".to_owned()),
         "membership_requires_collection" => Some(
-            "use a lista, copia, tabula or textus as the right operand; narrow a nullable value first".to_owned(),
+            "use a lista, copia or tabula as the right operand; narrow a nullable value first".to_owned(),
+        ),
+        "membership_over_text" => Some(
+            "membership does not apply to text; test substring containment with the text's contains method".to_owned(),
         ),
         "membership_operand_unresolved" => Some(
             "give the right operand a known type, for example annotate the list or bind it with a typed declaration".to_owned(),

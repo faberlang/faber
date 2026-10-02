@@ -615,6 +615,13 @@ fn expected_message(args: &[DiagnosticArg]) -> Option<String> {
                 let predicate = arg_value(args, "predicate")?;
                 return Some(format!("{predicate} is no longer prefix predicate syntax"));
             }
+            "membership_keyword_retired" => {
+                let keyword = quote_arg(args, "keyword")?;
+                let glyph = quote_arg(args, "glyph")?;
+                return Some(format!(
+                    "{keyword} is a retired membership operator; membership is spelled {glyph}"
+                ));
+            }
             "equality_non_missing_est" => {
                 return Some("expected 'est' after 'non' in equality expression".to_owned());
             }
@@ -715,6 +722,12 @@ fn expected_help(args: &[DiagnosticArg]) -> Option<String> {
             }
             "equality_non_missing_est" => {
                 return Some("write identity negation as non est".to_owned());
+            }
+            "membership_keyword_retired" => {
+                let glyph = quote_arg(args, "glyph")?;
+                return Some(format!(
+                    "write {glyph} (or ∉ to negate) between the element and the collection or range"
+                ));
             }
             "est_non_spelling" => return Some("use non est for identity negation".to_owned()),
             "closure_body_start" => {
