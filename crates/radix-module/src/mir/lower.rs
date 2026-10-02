@@ -851,10 +851,10 @@ struct DiagnosticSymbols {
     format_templates: [Symbol; 3],
     separator: Symbol,
     /// The rendered null-value textus used by the scribe grouping when an
-    /// option argument's payload is absent (`display_option` semantics).
+    /// option argument's payload is absent (`display::option` semantics).
     ///
     /// Keep this in lockstep with the Rust runtime carrier
-    /// (`faber::display_option`), which owns the text. D23.2 splits the null
+    /// (`faber::display::option`), which owns the text. D23.2 splits the null
     /// *value* (`nulla`) from the null *type* (`nihil`); the value display must
     /// therefore move to `nulla` on both sides together — this string, the
     /// runtime carrier, and the corpus `.expected` oracles — in the D23.2

@@ -1605,12 +1605,12 @@ fn rust_output_uses_scalar_display_helpers_for_scribe() {
 
     assert!(result.success());
     let output = super::rust_output(result);
-    assert!(output.code.contains("faber::display_fractus(f)"));
-    assert!(output.code.contains("faber::display_bivalens(b)"));
+    assert!(output.code.contains("faber::display::fractus(f)"));
+    assert!(output.code.contains("faber::display::bivalens(b)"));
     assert!(
         output
             .code
-            .contains("faber::display_text_payload((a).as_ref())")
+            .contains("faber::display::text_payload((a).as_ref())")
     );
 }
 

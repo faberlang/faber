@@ -106,7 +106,7 @@ impl Patterns {
 
 /// `__faber_[a-z0-9_]+ | __Faber[A-Z]... | __faber[A-Z]... |
 /// \bfaber(X|Big|Dec|Fmt|Tensor|Vector|Sparsa|Intervallum|Tuple|Compare|Order|
-/// ParseInstans|ValorStruct)...`
+/// ParseInstans|ValorStruct)... | faber::display_`
 fn legacy_patterns() -> Patterns {
     const SUFFIXES: [&str; 13] = [
         "X",
@@ -127,6 +127,9 @@ fn legacy_patterns() -> Patterns {
         Pattern::new("__faber_", false, Next::Snake),
         Pattern::new("__Faber", false, Next::Upper),
         Pattern::new("__faber", false, Next::Upper),
+        // The pre-namespace Rust display names (`faber::display_fractus`); the
+        // `display` rows spell `faber::display::fractus` instead (T1-R5).
+        Pattern::new("faber::display_", false, Next::Any),
     ];
     patterns.extend(
         SUFFIXES
@@ -305,18 +308,20 @@ fn emit(w: &mut W) {
     w.write("myrt.ExactStore(");
     w.write("faber::exactness::x");
     w.write("__faber_");
+    w.write("faber::display_fractus(");
+    w.write("faber::display::fractus(");
 }
 "#;
 
 #[test]
 fn scanner_counts_synthetic_source_and_a_lower_budget_fails() {
     let legacy = legacy_patterns();
-    assert_eq!(legacy.count(SYNTHETIC), 4);
+    assert_eq!(legacy.count(SYNTHETIC), 5);
     assert!(check_budget("synthetic", 4, 4).is_ok());
     assert!(check_budget("synthetic", 4, 3).is_err());
     assert!(check_budget("synthetic", 4, 5).is_err());
 
-    assert_eq!(rust_new_shape().count(SYNTHETIC), 1);
+    assert_eq!(rust_new_shape().count(SYNTHETIC), 2);
     assert_eq!(go_new_shape().count(SYNTHETIC), 1);
     assert_eq!(ts_new_shape().count(SYNTHETIC), 1);
 }

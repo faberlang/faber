@@ -59,8 +59,31 @@ pub const DISPLAY_VALOR: RuntimeItem = RuntimeItem {
     ns: Namespace::Display,
     name: "valor",
     kind: RuntimeKind::Fn,
-    targets: &[Target::HirGo],
+    targets: &[Target::HirGo, Target::HirRust],
 };
+
+/// The targets whose runtime package carries the Rust-only `display` rows.
+const DISPLAY_RUST_TARGETS: &[Target] = &[Target::HirRust];
+
+const fn display_rust_row(name: &'static str) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Display,
+        name,
+        kind: RuntimeKind::Fn,
+        targets: DISPLAY_RUST_TARGETS,
+    }
+}
+
+/// `display` rows of the Rust runtime (T1-R5, `faber::display`): scalar and
+/// option renderers a `nota`/interpolation site calls with Faber display
+/// semantics (`verum`/`falsum`, `nihil`, a `.0` marker on a whole float).
+pub const DISPLAY_BIVALENS: RuntimeItem = display_rust_row("bivalens");
+pub const DISPLAY_FRACTUS: RuntimeItem = display_rust_row("fractus");
+pub const DISPLAY_OPTION: RuntimeItem = display_rust_row("option");
+pub const DISPLAY_OPTION_BIVALENS: RuntimeItem = display_rust_row("option_bivalens");
+pub const DISPLAY_OPTION_FRACTUS: RuntimeItem = display_rust_row("option_fractus");
+pub const DISPLAY_OPTION_VACUUM: RuntimeItem = display_rust_row("option_vacuum");
+pub const DISPLAY_TEXT_PAYLOAD: RuntimeItem = display_rust_row("text_payload");
 
 /// The targets whose runtime package carries the `exact` namespace today.
 const EXACT_TARGETS: &[Target] = &[Target::HirRust];
@@ -295,7 +318,14 @@ pub const TABLE: &[RuntimeItem] = &[
     DEC_SUB,
     DEC_TRY_PARSE,
     DEC_TRY_STORE,
+    DISPLAY_BIVALENS,
+    DISPLAY_FRACTUS,
     DISPLAY_LIST,
+    DISPLAY_OPTION,
+    DISPLAY_OPTION_BIVALENS,
+    DISPLAY_OPTION_FRACTUS,
+    DISPLAY_OPTION_VACUUM,
+    DISPLAY_TEXT_PAYLOAD,
     DISPLAY_VALOR,
     DISPLAY_VERUM,
     EXACT_APPROX_INT,

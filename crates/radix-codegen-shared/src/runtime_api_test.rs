@@ -432,3 +432,29 @@ fn the_format_rows_spell_as_faber_format_functions_and_the_crate_root_fmt_type()
         assert_eq!(spell_any(Target::HirRust, row), spelled);
     }
 }
+
+#[test]
+fn the_rust_display_rows_spell_as_faber_display_functions() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Display && row.targets.contains(&Target::HirRust))
+        .collect();
+    let spelled: Vec<String> = rows
+        .iter()
+        .map(|row| spell_any(Target::HirRust, row))
+        .collect();
+    assert_eq!(
+        spelled,
+        [
+            "faber::display::bivalens",
+            "faber::display::fractus",
+            "faber::display::option",
+            "faber::display::option_bivalens",
+            "faber::display::option_fractus",
+            "faber::display::option_vacuum",
+            "faber::display::text_payload",
+            "faber::display::valor",
+        ]
+    );
+    assert!(rows.iter().all(|row| row.kind == RuntimeKind::Fn));
+}
