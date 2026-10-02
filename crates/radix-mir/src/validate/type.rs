@@ -643,11 +643,6 @@ impl Validator<'_, '_> {
             Type::InferUnion(_) => self.error(span, "MIR type is unresolved inference variable"),
             Type::MarkerHole { .. } => self.error(span, "MIR type is unresolved marker-width hole"),
             Type::Error => self.error(span, "MIR type is semantic error recovery type"),
-            // N7E-1: fail closed by name until N7E-3 lowers the cell.
-            Type::PolicyFloat(_, _) => self.error(
-                span,
-                "MIR type is a policy-float cell (policy_float_mir_unsupported)",
-            ),
             Type::Array(inner)
             | Type::Set(inner)
             | Type::Promissum(inner)
@@ -706,6 +701,7 @@ impl Validator<'_, '_> {
             | Type::SizedNumeric(_, _)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
+            | Type::PolicyFloat(_, _)
             | Type::SizedInstans(_)
             | Type::Intervallum(_)
             | Type::Tuple(_)
@@ -764,6 +760,7 @@ impl Validator<'_, '_> {
         }
         if self.integer_constant_fits(operand, expected)
             || self.littera_constant_fits(operand, expected)
+            || self.policy_float_constant_fits(operand, expected)
         {
             return;
         }
@@ -780,6 +777,15 @@ impl Validator<'_, '_> {
                 self.type_kind(expected),
                 Type::Primitive(Primitive::Littera)
             )
+    }
+
+    /// N7E-3 (D4): MIR types every float literal `fractus`, while semantic
+    /// analysis already typed the literal as the cell it lands in (ruling 20:
+    /// exactly representable and finite) — e.g. the `⊥` default of
+    /// `x ↦ trapping<f32> ⊥ 0.5`. A float constant stands for a cell value.
+    fn policy_float_constant_fits(&self, operand: &MirOperand, expected: MirType) -> bool {
+        matches!(operand, MirOperand::Constant(MirConstant::Float(_)))
+            && matches!(self.type_kind(expected), Type::PolicyFloat(_, _))
     }
 
     pub(crate) fn integer_constant_fits(&self, operand: &MirOperand, expected: MirType) -> bool {

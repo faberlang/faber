@@ -8,7 +8,7 @@
 use super::value::{
     MapKey, SermoValue, TensorValue, Value, decimal_scale_factor, float_to_numerus_width,
     float_truncation_fits_width, int_width_range, modular_word_result, round_half_even_division,
-    saturating_word_result,
+    saturating_word_result, trapping_float_store_fails,
 };
 use super::{Runner, RunnerError, runtime_regex_pattern};
 use radix_lexer::{Span, Symbol};
@@ -16,7 +16,8 @@ use radix_mir::lista_tensor_conversio::{ListaToTensorShape, resolve_lista_to_ten
 use radix_mir::{MirConversion, MirNamedOperand, MirOperand, MirStructFieldDefaults};
 use radix_runtime_contract::instans::{Instans, InstansPraecisio};
 use radix_types::{
-    InstansPrecision, NumericWidth, Primitive, Type, TypeId, TypeTable, effective_width,
+    FloatPolicy, InstansPrecision, NumericWidth, Primitive, Type, TypeId, TypeTable,
+    effective_width,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
@@ -186,12 +187,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             Type::Struct(def_id) => {
                 self.convert_to_struct(value, source_ty, *def_id, recovery, struct_defaults, span)
             }
-            // N7E-1: the policy-float cell runs only once N7E-3 lands; fail
-            // closed with its own feature name rather than the generic arm.
-            Type::PolicyFloat(_, _) => Err(RunnerError::unsupported(
-                span,
-                "runtime conversio to a policy-float cell",
-            )),
+            // N7E-3 (D1, D2, D3): a conversion into a policy-float cell is the
+            // conversion to the bare float of the cell's width; a `trapping`
+            // cell then checks the result, as the end of the conversion row.
+            Type::PolicyFloat(policy, width) => self
+                .convert_to_policy_float(value, source_ty, *policy, *width, params, recovery, span),
             other => Err(RunnerError::unsupported(
                 span,
                 &format!("runtime conversio to {other:?}"),

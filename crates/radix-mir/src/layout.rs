@@ -583,13 +583,9 @@ fn layout_kind_for_type(
         // named arm or errors loudly; nothing reaches `OpaqueHandle` silently.
         Type::SizedNumeric(prim, width) => sized_numeric_layout(*prim, *width),
         Type::ModularWord(width) | Type::SaturatingWord(width) => int_layout(*width),
-        // N7E-1: the policy-float cell has no MIR layout until N7E-3 lands its
-        // MIR semantics; fail closed by name rather than borrow the bare float.
-        Type::PolicyFloat(policy, width) => LayoutResolution::MissingFact(format!(
-            "{}<{}> has no named layout arm (policy_float_mir_unsupported)",
-            policy.word(),
-            width.faber_marker()
-        )),
+        // N7E-3 (D2): a policy-float cell has the layout of the bare float of
+        // its width; the policy only matters where a value is stored.
+        Type::PolicyFloat(_, width) => sized_numeric_layout(Primitive::Fractus, *width),
         Type::Primitive(Primitive::Vacuum) => LayoutResolution::Resolved(MirLayoutKind::Void),
         Type::Primitive(Primitive::Numquam) => LayoutResolution::Resolved(MirLayoutKind::Never),
         Type::Alias(_, target) => layout_kind_for_type(types, *target, memo, visiting),

@@ -3516,6 +3516,29 @@ functio f() → numerus {
 }
 
 #[test]
+fn lowers_policy_float_varia_zero_init_through_typed_temp() {
+    // N7E-3 (D2): a policy-float cell zero-inits like the bare float of its
+    // width: a typed temp carrying the cell type, never the unsupported
+    // "type zero-init before MIR lowering completed" diagnostic.
+    let dump = dump_source(
+        r"
+functio f() → numerus {
+    varia exactus<f32> x
+    varia saturatus<f64> y
+    redde 1
+}
+",
+    );
+
+    assert!(
+        dump.matches("const float 0.0").count() >= 2,
+        "each cell zero must go through a typed temp: {dump}"
+    );
+    assert!(!dump.contains("type zero-init before MIR lowering completed"), "{dump}");
+    assert!(dump.contains("return"), "lowering must reach return: {dump}");
+}
+
+#[test]
 fn lowers_ordo_elige_statement_continues_after_match() {
     let dump = dump_source(
         r#"

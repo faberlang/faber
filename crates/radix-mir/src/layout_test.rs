@@ -481,32 +481,6 @@ fn resolve_outcome(table: &MirLayoutTable, ty: radix_types::TypeId) -> SizedNume
     }
 }
 
-/// N7E-1: the policy-float cell has no MIR layout yet. It fails loudly with the
-/// fallthrough-law identity (naming the type), never as a silent bare float.
-#[test]
-fn policy_float_has_no_mir_layout_until_the_runner_unit_lands() {
-    for policy in [
-        radix_types::FloatPolicy::Trapping,
-        radix_types::FloatPolicy::Saturating,
-    ] {
-        for width in [
-            NumericWidth::F16,
-            NumericWidth::BF16,
-            NumericWidth::F32,
-            NumericWidth::F64,
-        ] {
-            let mut types = TypeTable::new();
-            let cell = types.intern(Type::PolicyFloat(policy, width));
-            let table = MirLayoutTable::from_types(&types);
-            let err = table
-                .layout_for_type(MirType::semantic(cell))
-                .expect_err("a policy-float cell has no layout yet");
-            assert_eq!(err.issue, "mir_layout_missing_type_fact", "{err:?}");
-            assert_eq!(err.ty, Some(cell), "{err:?}");
-        }
-    }
-}
-
 /// Every one of the 24 sized-numeric combinations matches the sub-table: a
 /// named scalar arm or a loud `mir_layout_missing_type_fact` error naming the
 /// width. This is the fallthrough law at runtime.
@@ -755,4 +729,33 @@ fn fractus_bf16_resolves_to_named_bf16_scalar_layout() {
     assert_eq!(MirScalarLayout::Bf16.spelling(), "bf16");
     assert_eq!(MirScalarLayout::Bf16.size_bits(), 16);
     assert!(MirScalarLayout::Bf16.is_float());
+}
+
+// N7E-3 (D2): a policy-float cell lays out as the bare float of its width.
+#[test]
+fn policy_float_cells_share_the_bare_float_scalar_layout() {
+    use radix_types::{FloatPolicy, NumericWidth};
+    let mut types = TypeTable::new();
+    let widths = [
+        (NumericWidth::F16, MirScalarLayout::F16),
+        (NumericWidth::BF16, MirScalarLayout::Bf16),
+        (NumericWidth::F32, MirScalarLayout::F32),
+        (NumericWidth::F64, MirScalarLayout::F64),
+    ];
+    let cells: Vec<_> = widths
+        .iter()
+        .flat_map(|&(width, scalar)| {
+            [FloatPolicy::Trapping, FloatPolicy::Saturating]
+                .into_iter()
+                .map(move |policy| (policy, width, scalar))
+        })
+        .map(|(policy, width, scalar)| (types.intern(Type::PolicyFloat(policy, width)), scalar))
+        .collect();
+    let table = MirLayoutTable::from_types(&types);
+    for (ty, scalar) in cells {
+        let layout = table
+            .layout_for_type(MirType::semantic(ty))
+            .expect("policy-float layout fact");
+        assert_eq!(layout.kind, MirLayoutKind::Scalar(scalar));
+    }
 }

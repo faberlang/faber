@@ -2678,7 +2678,9 @@ impl<'a> FunctionBuilder<'a> {
         loop {
             match self.types.get(ty) {
                 Type::Alias(_, inner) => ty = *inner,
-                Type::SizedNumeric(Primitive::Fractus, _) => return Some(MirType::semantic(ty)),
+                Type::SizedNumeric(Primitive::Fractus, _) | Type::PolicyFloat(_, _) => {
+                    return Some(MirType::semantic(ty));
+                }
                 _ => return None,
             }
         }
@@ -3161,7 +3163,8 @@ impl<'a> FunctionBuilder<'a> {
             Type::SizedNumeric(Primitive::Numerus, _) => {
                 Some(self.assign_temp(MirValueKind::Operand(MirOperand::Constant(MirConstant::Int(0))), mir_ty, span))
             }
-            Type::SizedNumeric(Primitive::Fractus, _) => Some(self.assign_temp(
+            // N7E-3: a policy-float cell zero-inits as the bare float of its width.
+            Type::SizedNumeric(Primitive::Fractus, _) | Type::PolicyFloat(_, _) => Some(self.assign_temp(
                 MirValueKind::Operand(MirOperand::Constant(MirConstant::Float(0.0))),
                 mir_ty,
                 span,
@@ -3700,10 +3703,10 @@ impl<'a> FunctionBuilder<'a> {
         }
         if matches!(
             self.normalized_type(lhs_semantic),
-            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) | Type::PolicyFloat(_, _)
         ) || matches!(
             self.normalized_type(rhs_semantic),
-            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) | Type::PolicyFloat(_, _)
         ) {
             return None;
         }

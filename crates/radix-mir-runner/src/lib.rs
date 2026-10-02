@@ -41,14 +41,14 @@ use radix_mir::{
     MirPlaceBase, MirProgram, MirProjection, MirStatementKind, MirTempId, MirTerminatorKind,
     MirType, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir,
 };
-use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable, effective_width};
+use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Instant;
 use value::{
     GradientStorage, add_values, compare_values, decimal_numeric_binop, decimal_scale_factor,
-    int_bitwise_binop, modular_word_bitnot, modular_word_bitwise_binop,
+    effective_width, int_bitwise_binop, modular_word_bitnot, modular_word_bitwise_binop,
     modular_word_compare_values, modular_word_neg, modular_word_numeric_binop, numeric_binop,
     round_float, values_equal,
 };
@@ -418,6 +418,7 @@ fn element_display_width(ty: TypeId, types: &TypeTable, depth: u8) -> Option<Num
     }
     match types.get(ty) {
         Type::SizedNumeric(_, width) if width.is_float() || width.is_decimal() => Some(*width),
+        Type::PolicyFloat(_, width) => Some(*width),
         _ => element_display_width(wrapped_element(ty, types)?, types, depth + 1),
     }
 }
@@ -2686,6 +2687,10 @@ mod value_test;
 #[cfg(test)]
 #[path = "decimal_test.rs"]
 mod decimal_test;
+
+#[cfg(test)]
+#[path = "policy_float_test.rs"]
+mod policy_float_test;
 
 #[cfg(test)]
 #[path = "narrowing_conversio_test.rs"]
