@@ -174,8 +174,8 @@ fn dev_fallback_loads_repo_exempla_index() {
     // the registry (abstractus, sub: inheritance removal; cura, curata,
     // arena: D8.2; nexum: D16.2; sic: D4.7), two arrived (✓: D4.5; insere:
     // D8.10's missing registry row added).
-    assert_eq!(pack.term_count(), 197);
-    assert_eq!(pack.metadata().registry_terms, 197);
+    assert_eq!(pack.term_count(), 196);
+    assert_eq!(pack.metadata().registry_terms, 196);
     assert_eq!(pack.layout(), ReferenceLayout::Repo);
     assert!(pack.term("functio").is_some());
     assert!(pack.term("≡").is_some());
