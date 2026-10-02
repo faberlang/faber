@@ -258,3 +258,34 @@ fn go_imports_is_one_path_or_none() {
     refs.note(Namespace::Json);
     assert_eq!(go_imports(&refs), Some("faber/rt"));
 }
+
+#[test]
+fn the_display_rows_spell_as_the_flat_go_names() {
+    let spelled: Vec<String> = [DISPLAY_VERUM, DISPLAY_LIST, DISPLAY_VALOR]
+        .iter()
+        .map(|row| spell(Target::HirGo, row).unwrap_or_default())
+        .collect();
+    assert_eq!(
+        spelled,
+        ["rt.DisplayVerum", "rt.DisplayList", "rt.DisplayValor"]
+    );
+    assert!(TABLE.contains(&DISPLAY_VERUM));
+    assert!(TABLE.contains(&DISPLAY_LIST));
+    assert!(TABLE.contains(&DISPLAY_VALOR));
+}
+
+#[test]
+fn spelling_through_the_refs_records_the_namespace_only_on_success() {
+    let refs = RuntimeRefs::new();
+    let store = item(Namespace::Exact, "store_i", RuntimeKind::StoreFn);
+    assert_eq!(
+        refs.spell(Target::HirGo, &store),
+        Err(SpellError::StoreOnly)
+    );
+    assert!(refs.used().is_empty());
+    assert_eq!(
+        refs.spell(Target::HirGo, &DISPLAY_LIST),
+        Ok("rt.DisplayList".to_owned())
+    );
+    assert_eq!(refs.used(), [Namespace::Display]);
+}
