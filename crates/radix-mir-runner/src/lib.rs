@@ -84,6 +84,22 @@ pub const RUNNER_ISSUE_STEP_BUDGET_EXHAUSTED: &str = "runner_interpreter_step_bu
 /// Stable diagnostic identity for a wall-clock deadline stop.
 pub const RUNNER_ISSUE_WALL_CLOCK_TIMEOUT: &str = "runner_wall_clock_timeout_exceeded";
 
+/// Deepest nesting of Faber calls the runner executes. A call past it stops
+/// the run with [`RUNNER_ISSUE_CALL_DEPTH_EXCEEDED`] instead of growing the
+/// stack without bound. Native stack is grown on demand up to this depth, so
+/// the limit does not depend on the host thread's stack size.
+pub const MAX_CALL_DEPTH: usize = 10_000;
+
+/// Stable diagnostic identity for a call nested deeper than
+/// [`MAX_CALL_DEPTH`].
+pub const RUNNER_ISSUE_CALL_DEPTH_EXCEEDED: &str = "runner_call_depth_exceeded";
+
+/// Native stack left, in bytes, below which a call grows the stack.
+const NATIVE_STACK_RED_ZONE: usize = 256 * 1024;
+
+/// Size, in bytes, of each native stack segment a call grows by.
+const NATIVE_STACK_SEGMENT: usize = 8 * 1024 * 1024;
+
 /// Issue stem for the unsupported family; identity comes from the structured
 /// code + feature arg, never from parsing the prose message.
 const RUNNER_ISSUE_UNSUPPORTED_STEM: &str = "runner_faberscript_unsupported";
@@ -1564,6 +1580,13 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
 
         let depth = self.frames.len();
+        if depth >= MAX_CALL_DEPTH {
+            return Err(RunnerError::internal_with_issue(
+                span,
+                format!("call depth limit of {MAX_CALL_DEPTH} exceeded"),
+                RUNNER_ISSUE_CALL_DEPTH_EXCEEDED,
+            ));
+        }
         self.return_value = None;
         self.return_error = None;
         self.push_frame(func_id, MirBlockId(0));
@@ -1597,7 +1620,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 }
             }
         }
-        self.run_until_depth(depth);
+        stacker::maybe_grow(NATIVE_STACK_RED_ZONE, NATIVE_STACK_SEGMENT, || {
+            self.run_until_depth(depth);
+        });
         if let Some(error) = self.errors.pop() {
             while self.frames.len() > depth {
                 self.pop_frame();
