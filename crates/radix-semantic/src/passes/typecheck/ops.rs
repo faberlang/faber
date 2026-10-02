@@ -1515,13 +1515,13 @@ impl TypeChecker<'_> {
                 }
                 self.bool_type()
             }
-            HirBinOp::InRange => {
+            HirBinOp::InRange | HirBinOp::NotInRange => {
                 let lhs_ty = self.check_expr(lhs);
                 let rhs_ty = self.check_expr(rhs);
                 self.check_intra_operand(lhs_ty, rhs_ty, lhs.span, rhs.span);
                 self.bool_type()
             }
-            HirBinOp::Between => {
+            HirBinOp::Between | HirBinOp::NotBetween => {
                 let lhs_ty = self.check_expr(lhs);
                 let rhs_ty = self.check_expr(rhs);
                 self.check_membership_rhs(lhs_ty, rhs_ty, lhs.span, rhs.span);
