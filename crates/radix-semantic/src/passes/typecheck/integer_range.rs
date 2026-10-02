@@ -1202,9 +1202,12 @@ impl TypeChecker<'_> {
     }
 
     /// Strict equality compares exact types, but an untyped integer constant
-    /// beside a trapping-integer operand takes part by value (rulings 12, 22):
+    /// beside an integer operand takes part by value (rulings 12, 22):
     /// `x % 2 ≡ 0` holds for every width of `x % 2`, and `a ≡ 300` with
-    /// `a: u8` compares exactly and is simply false.
+    /// `a: u8` compares exactly and is simply false. A `wrapping` or
+    /// `saturating` word is a policy cell of the same width: the constant
+    /// adopts the cell's type exactly as it does beside the bare width
+    /// (operator ruling 2026-10-02, need).
     pub(super) fn equality_constant_exempt(
         &self,
         lhs: &HirExpression,
@@ -1221,5 +1224,12 @@ impl TypeChecker<'_> {
             _ => return false,
         };
         self.plain_int_width(other).is_some()
+            || self
+                .numeric_shape(self.resolve_inferred_type(other))
+                .is_some_and(|shape| {
+                    shape.prim == Primitive::Numerus
+                        && !shape.width.is_decimal()
+                        && matches!(shape.family, IntFamily::Modular | IntFamily::Saturating)
+                })
     }
 }

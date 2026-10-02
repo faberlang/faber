@@ -3284,7 +3284,7 @@ fn lowers_tensor_bracket_access_to_tensor_runtime_ops() {
     let dump = dump_source(
         r"
 functio muta(tf32[4] input, tf32[4] output, u32 id) → f32 {
-    fixum f32 value ← input[id] vel 0.0
+    fixum f32 value ← input[id]
     output[id] ← value
     redde value
 }
