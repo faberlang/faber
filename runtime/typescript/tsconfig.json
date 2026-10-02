@@ -8,5 +8,5 @@
     "rewriteRelativeImportExtensions": true,
     "outDir": "dist"
   },
-  "include": ["index.ts", "display.ts", "regex.ts"]
+  "include": ["index.ts", "display.ts", "exact.ts", "regex.ts"]
 }

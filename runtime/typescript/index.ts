@@ -16,3 +16,5 @@
 
 // @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
 export * as display from "./display.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as exact from "./exact.ts";
