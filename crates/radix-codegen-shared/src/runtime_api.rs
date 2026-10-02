@@ -21,8 +21,7 @@
 //!
 //! A row carries no body, parameter list or trap text: bodies are target code
 //! in each runtime package. A row exists only for a helper some runtime package
-//! carries, so the real [`TABLE`] starts empty and each namespace unit adds its
-//! rows with the runtime it moves.
+//! carries, so each namespace unit adds its rows with the runtime it moves.
 //!
 //! Store-family helpers (`StoreFn`) enforce a width limit and may only be
 //! spelled at a store site: [`spell`] refuses them and [`spell_store`], which
@@ -38,9 +37,33 @@ use radix_target::Target;
 /// The Go import path of the flat runtime package (`package rt`).
 pub const GO_RUNTIME_IMPORT: &str = "faber/rt";
 
-/// The canonical helper table. Empty until a namespace unit moves a runtime
-/// and adds its rows.
-pub const TABLE: &[RuntimeItem] = &[];
+/// `display.verum`: a bivalens as `verum` / `falsum`.
+pub const DISPLAY_VERUM: RuntimeItem = RuntimeItem {
+    ns: Namespace::Display,
+    name: "verum",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirGo],
+};
+
+/// `display.list`: a list as `[a, b, c]` through an element renderer.
+pub const DISPLAY_LIST: RuntimeItem = RuntimeItem {
+    ns: Namespace::Display,
+    name: "list",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirGo],
+};
+
+/// `display.valor`: a boxed valor / json value with Faber display semantics.
+pub const DISPLAY_VALOR: RuntimeItem = RuntimeItem {
+    ns: Namespace::Display,
+    name: "valor",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirGo],
+};
+
+/// The canonical helper table: a row for every helper some runtime package
+/// carries. Each namespace unit adds its rows with the runtime it moves.
+pub const TABLE: &[RuntimeItem] = &[DISPLAY_LIST, DISPLAY_VALOR, DISPLAY_VERUM];
 
 /// One runtime namespace: a module in Rust, a namespace export in TypeScript,
 /// a name prefix in Go.
@@ -274,6 +297,19 @@ impl RuntimeRefs {
     /// Record one use of `ns`.
     pub fn note(&self, ns: Namespace) {
         self.used.borrow_mut().insert(ns);
+    }
+
+    /// Spell a non-store helper for `target` and record its namespace: the
+    /// one way an emitter writes a helper into generated source, so the file's
+    /// imports are exactly the namespaces it spelled.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`spell`]; nothing is recorded on an error.
+    pub fn spell(&self, target: Target, item: &RuntimeItem) -> Result<String, SpellError> {
+        let spelled = spell(target, item)?;
+        self.note(item.ns);
+        Ok(spelled)
     }
 
     /// The recorded namespaces, sorted by spelling, each once.

@@ -16,9 +16,9 @@
 //! - **New-shape spellings** (`faber::<ns>::`, `rt.<Ns>X`, a quoted
 //!   `"<ns>.x`) derive from [`Namespace::ALL`]. Their only allowed home is
 //!   `runtime_api.rs`, which lives outside the scanned crates, so the budget is
-//!   meant to be zero everywhere. The two exceptions recorded below were
-//!   already hand-spelled when this ratchet was added; the namespace units for
-//!   `valor` and `sermo` remove them.
+//!   meant to be zero everywhere. The one exception recorded below was
+//!   already hand-spelled when this ratchet was added; the `sermo` namespace
+//!   unit removes it.
 //!
 //! Not scanned, by design: test files and comments; `radix-hir-swift` and
 //! `radix-hir-python` (their helpers stay emitted); the MIR and LLVM crates
@@ -229,10 +229,7 @@ const EMITTERS: [Emitter; 3] = [
     Emitter {
         name: "radix-hir-go",
         legacy_budget: 610,
-        // WHY: the two `rt.ValorDisplay(` writes in expr/literal.rs were
-        // hand-spelled before this ratchet existed. The valor namespace unit
-        // removes both.
-        new_shape_budget: 2,
+        new_shape_budget: 0,
         new_shape: go_new_shape,
     },
 ];
