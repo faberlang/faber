@@ -81,8 +81,9 @@ class C {
     }
 }
 fn bumpcopy(copy C c) → void {
-    c.inc()
-    print c.n
+    var C mine ← c
+    mine.inc()
+    print mine.n
 }
 main {
     var C c ← C {}
@@ -95,6 +96,33 @@ main {
 #[test]
 fn copy_genus_param_leaves_caller_untouched() {
     assert_eq!(run("copy-genus-param.fab", COPY_GENUS_PARAM), vec!["2", "1"]);
+}
+
+/// `copy` marks how a binding is initialized, never the binding afterwards:
+/// a later `b ← c` of a class value is by reference even though `b` was
+/// declared `copy` (operator ruling 2026-10-02). `a` stays untouched, and the
+/// write through `b` lands on `c`.
+const COPY_BIND_THEN_ASSIGN: &str = r#"+++
+locale = "en"
++++
+class Point {
+    var int x
+}
+main {
+    const Point a ← Point { x = 1 }
+    const Point c ← Point { x = 2 }
+    var copy Point b ← a
+    b ← c
+    b.x ← 5
+    print a.x
+    print b.x
+    print c.x
+}
+"#;
+
+#[test]
+fn copy_applies_at_the_initializer_only_and_later_assignment_aliases() {
+    assert_eq!(run("copy-assign.fab", COPY_BIND_THEN_ASSIGN), vec!["1", "5", "5"]);
 }
 
 const GENUS_BIND_ALIAS: &str = r#"+++
@@ -151,5 +179,62 @@ fn llvm_copy_param_clones_the_lista() {
     assert!(
         code.contains("@__faber_rt_v1_array_clone("),
         "copy parameter entry must clone the lista:\n{code}"
+    );
+}
+
+const COPY_TENSOR: &str = r#"+++
+locale = "en"
++++
+main {
+    const tf32[] seed ← empty
+    var tf32[4] a ← seed.create(1.5, [4])
+    var copy tf32[4] w ← a
+    w[0] ← 9.0
+    const tf32[4] s ← w + a
+    print s[0]
+    print s[1]
+    print a[0]
+    print w[0]
+}
+"#;
+
+/// A `copy`-marked tensor keeps element write and tensor arithmetic: the
+/// marker is a binding fact, not a different carrier, and the copy stays
+/// independent of its source.
+#[test]
+fn copy_tensor_keeps_element_write_and_arithmetic() {
+    assert_eq!(run("copy-tensor.fab", COPY_TENSOR), vec!["10.5", "3.0", "1.5", "9.0"]);
+}
+
+const COPY_TENSOR_RANK2_READ: &str = r#"+++
+locale = "en"
++++
+main {
+    const tf32[] seed ← empty
+    var tf32[2, 3] a ← seed.create(1.5, [2, 3])
+    var copy tf32[2, 3] w ← a
+    a[[1, 2]] ← 7.0
+    w[[0, 1]] ← 4.0
+    const u32 r ← 1
+    const u32 c ← 2
+    const f32 lit ← w[[1, 2]]
+    const f32 var_idx ← w[[r, c]]
+    const f32 written ← w[[0, 1]]
+    const f32 source ← a[[1, 2]]
+    print lit
+    print var_idx
+    print written
+    print source
+}
+"#;
+
+/// A rank-2 `copy` tensor reads by `[[r, c]]` exactly like the unmarked
+/// binding: the list-shaped index lowers to `TensorGet`, not to a device-view
+/// index projection (which validate rejects for a non-integer index).
+#[test]
+fn copy_tensor_rank2_bracket_read_matches_unmarked() {
+    assert_eq!(
+        run("copy-tensor-rank2.fab", COPY_TENSOR_RANK2_READ),
+        vec!["1.5", "1.5", "4.0", "7.0"]
     );
 }

@@ -1480,7 +1480,8 @@ impl TypeChecker<'_> {
                 );
                 if !(lhs_is_nil || rhs_is_nil)
                     && !self.equality_constant_exempt(lhs, lhs_ty, rhs, rhs_ty)
-                    && !self.saturating_pair(lhs, rhs)
+                    && !self.policy_float_constant_comparison(lhs, lhs_ty, rhs, rhs_ty)
+                    && !self.word_pair(lhs, rhs)
                 {
                     self.exact_equality_types_for_operands(lhs, lhs_ty, rhs, rhs_ty, lhs.span);
                 }
@@ -1502,7 +1503,7 @@ impl TypeChecker<'_> {
                     // D1.6: whole-string `textus` order is Unicode code-point order.
                 } else if self.scalar_ordered_text_bin(lhs, rhs, lhs_ty, rhs_ty, lhs.span) {
                     // Single-scalar Unicode order (Seam B); not lexicographic cord compare.
-                } else if self.saturating_pair(lhs, rhs) {
+                } else if self.word_pair(lhs, rhs) {
                     // Both sides are values of one `saturating` word, computed
                     // exactly: they compare by value.
                 } else if self.word_value_comparison(lhs, lhs_ty, rhs, rhs_ty) {
@@ -1799,6 +1800,11 @@ impl TypeChecker<'_> {
     ) -> Option<TypeId> {
         let lhs_resolved = self.resolve_inferred_type(lhs);
         let rhs_resolved = self.resolve_inferred_type(rhs);
+        // An access marker (`copy`, `own`, `ref`, `mut`) is a binding fact, not
+        // part of the operand's carrier: peel it so a marked tensor adds like an
+        // unmarked one.
+        let lhs_resolved = self.types.peel_access_marker(lhs_resolved).1;
+        let rhs_resolved = self.types.peel_access_marker(rhs_resolved).1;
         match (
             self.types.get(lhs_resolved).clone(),
             self.types.get(rhs_resolved).clone(),
@@ -2417,7 +2423,7 @@ pub(super) fn is_numeric_literal(expr: &HirExpression) -> bool {
 const NUMERIC_OPERANDS_REQUIRED: &str = "numeric_operands_required";
 pub(super) const NUMERIC_ARITHMETIC_OPERANDS_IDENTICAL: &str =
     "numeric_arithmetic_operands_identical";
-const MODULAR_WORD_FAMILY_MISMATCH: &str = "modular_word_family_mismatch";
+pub(super) const MODULAR_WORD_FAMILY_MISMATCH: &str = "modular_word_family_mismatch";
 pub(super) const SATURATING_WORD_FAMILY_MISMATCH: &str = "saturating_word_family_mismatch";
 /// A typed mix of a `trapping<W>` or `saturating<W>` float cell with a bare
 /// float, the other cell, or another width (N7e D4).

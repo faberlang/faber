@@ -1770,7 +1770,16 @@ fn range_itera_stops_when_bounds_fail_to_lower() {
 
     assert!(
         builder
-            .lower_itera_expr(crate::hir::HirIteraMode::Ab, &[], DefId(0), Symbol(0), &iter, &body, &expr)
+            .lower_itera_expr(
+                crate::hir::HirIteraMode::Ab,
+                &[],
+                DefId(0),
+                Symbol(0),
+                false,
+                &iter,
+                &body,
+                &expr
+            )
             .is_none()
     );
     assert_eq!(builder.blocks.len(), 1);
@@ -3275,7 +3284,7 @@ fn lowers_tensor_bracket_access_to_tensor_runtime_ops() {
     let dump = dump_source(
         r"
 functio muta(tf32[4] input, tf32[4] output, u32 id) → f32 {
-    fixum f32 value ← input[id] vel 0.0
+    fixum f32 value ← input[id]
     output[id] ← value
     redde value
 }
@@ -4507,6 +4516,32 @@ fn lowers_lista_reducta_with_synthetic_reducer() {
     assert!(dump.contains("call f1"));
     assert!(!dump.contains("method call before runtime/provider MIR lowering"));
     assert!(!dump.contains("path that does not resolve to a local value"));
+}
+
+#[test]
+fn reducta_does_not_overwrite_its_initial_value() {
+    // The fold rewrites its accumulator every step; the initial value is a
+    // caller binding and must read the same after the call (need:
+    // gradus `kv.extend` reduced onto `c.history` and corrupted the cache).
+    let source = r"functio main2() → vacuum {
+  fixum lista<numerus> base ← [1]
+  fixum lista<numerus> folded ← [3, 4].reducta((lista<numerus> acc, numerus x) ∴ acc.addita(x), base)
+  nota folded.longitudo()
+  nota base.longitudo()
+}
+
+incipit {
+  main2()
+}";
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "reducta-initial.fab",
+        source,
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("reducta initial run must execute: {error:?}"));
+    assert_eq!(host.stdout_lines, ["3", "1"]);
 }
 
 #[test]

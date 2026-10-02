@@ -574,6 +574,9 @@ fn expected_message(args: &[DiagnosticArg]) -> Option<String> {
             "adfirma_else_rejected" => {
                 return Some("'secus' is not the particle on adfirma".to_owned());
             }
+            "adfirma_message_particle" => {
+                return Some("expected 'mori' before the adfirma message".to_owned());
+            }
             "itera_mode" | "allocator_kind" | "mutability_marker" => {
                 let expected = arg_value(args, "expected")?;
                 return Some(format!("expected {expected}"));
@@ -665,6 +668,9 @@ fn expected_help(args: &[DiagnosticArg]) -> Option<String> {
             }
             "adfirma_else_rejected" => {
                 return Some("use 'mori' for the optional panic message".to_owned());
+            }
+            "adfirma_message_particle" => {
+                return Some("write adfirma cond mori message".to_owned());
             }
             "itera_mode" => {
                 return Some("choose one iteration mode before the iterable expression".to_owned());

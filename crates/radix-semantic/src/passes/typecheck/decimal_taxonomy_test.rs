@@ -37,7 +37,7 @@ fn decimal_to_fractus_cross_family_rejects_at_assignment() {
 fn decimal_scalar_bracket_index_rejects_with_teaching_issue() {
     test_support::assert_rejects_with_issue(
         r"functio pick(tf32[16] input, d64 id) → f32 {
-    redde input[id] vel 0.0
+    redde input[id]
 }",
         "tensor_bracket_index_decimal_rejected",
     );
@@ -47,7 +47,7 @@ fn decimal_scalar_bracket_index_rejects_with_teaching_issue() {
 fn integer_scalar_bracket_index_still_accepts() {
     test_support::assert_accepts(
         r"functio pick(tf32[16] input, i32 id) → f32 {
-    redde input[id] vel 0.0
+    redde input[id]
 }",
     );
 }

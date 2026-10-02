@@ -11,6 +11,13 @@ locale = "en"
 # =============================================================================
 # mutabilitas — copy parameter (D-6)
 # =============================================================================
+# A `copy` parameter receives a deep duplicate at entry; the caller's value is
+# untouched. The callee owns the duplicate, and it may change it exactly as far
+# as an ordinary binding allows: a field write (`c.n ← 1`) and a mutating
+# method call (`c.inc()`) follow one rule. A parameter is an immutable binding
+# and has no `var` spelling, so both are rejected on the parameter itself.
+# To modify the duplicate, bind it to a `var` local first, as `take` and `bump`
+# do below.
 
 class Counter {
     var int n = 0
@@ -27,8 +34,9 @@ fn take(copy list<int> items) → int {
 }
 
 fn bump(copy Counter c) → int {
-    c.inc()
-    return c.n
+    var Counter mine ← c
+    mine.inc()
+    return mine.n
 }
 
 main {

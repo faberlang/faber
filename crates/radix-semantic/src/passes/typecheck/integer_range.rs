@@ -5,8 +5,9 @@
 //! types (`radix_types::numeric_range`). Integer constants are untyped exact
 //! values: beside a typed operand a constant takes part by value; alone it
 //! defaults to `int`, or takes an integer slot's type. `wrapping` and
-//! `saturating` words keep their ring and width, so they never reach this
-//! module's result rules. Device functions keep today's typing until N6.
+//! `saturating` words compute exactly like their width: the word reduces or
+//! clamps only where a value is stored into a slot. Device functions keep
+//! today's typing until N6.
 
 use super::ops::IntFamily;
 #[allow(clippy::wildcard_imports)]
@@ -168,12 +169,14 @@ impl TypeChecker<'_> {
     }
 
     /// Declared width of an integer that takes part in the range rule: a
-    /// trapping integer, or a `saturating` word (which computes exactly like
-    /// its width and clamps only where a value is stored into a slot).
+    /// trapping integer, or a `wrapping` or `saturating` word (which computes
+    /// exactly like its width and reduces or clamps only where a value is
+    /// stored into a slot).
     fn range_int_width(&self, ty: TypeId) -> Option<NumericWidth> {
         self.plain_int_width(ty).or_else(|| {
             let shape = self.numeric_shape(self.resolve_inferred_type(ty))?;
-            (shape.family == IntFamily::Saturating && shape.prim == Primitive::Numerus)
+            (matches!(shape.family, IntFamily::Saturating | IntFamily::Modular)
+                && shape.prim == Primitive::Numerus)
                 .then_some(shape.width)
         })
     }
@@ -277,7 +280,8 @@ impl TypeChecker<'_> {
             return self.check_expr_with_expected(expr, Some(resolved));
         }
         if resolved == self.error_type
-            || self.range_int_width(resolved).is_some()
+            || (self.range_int_width(resolved).is_some()
+                && !self.constant_joins_word_ring(expr, resolved))
             || self.numeric_shape(resolved).is_none()
         {
             return self.check_const_operand(expr);
@@ -548,11 +552,14 @@ impl TypeChecker<'_> {
         expected: Option<TypeId>,
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
+        if self.in_word_ring(lhs, &[lhs_ty, rhs_ty]) {
+            return None;
+        }
         let (l, r) = self.range_operands(lhs, rhs, lhs_ty, rhs_ty)?;
         // A `saturating` word never meets another integer family, `inf`
         // included (it is a trapping type), so the family check comes first.
         if matches!((l, r), (Operand::Plain(_), Operand::Plain(_)))
-            && !self.saturating_operands_agree(lhs, rhs, span)
+            && !self.word_operands_agree(lhs, rhs, span)
         {
             return Some(self.error_type);
         }
@@ -897,10 +904,13 @@ impl TypeChecker<'_> {
         expected: Option<TypeId>,
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
+        if self.in_word_ring(lhs, &[lhs_ty, rhs_ty]) {
+            return None;
+        }
         let (l, r) = self.range_operands(lhs, rhs, lhs_ty, rhs_ty)?;
         if matches!((l, r), (Operand::Plain(_), Operand::Plain(_)))
             && !matches!(op, HirBinOp::Shl | HirBinOp::Shr)
-            && !self.saturating_operands_agree(lhs, rhs, span)
+            && !self.word_operands_agree(lhs, rhs, span)
         {
             return Some(self.error_type);
         }
@@ -975,7 +985,10 @@ impl TypeChecker<'_> {
         operand: &HirExpression,
         operand_ty: TypeId,
     ) -> Option<TypeId> {
-        if self.current_device_function || is_const_int(operand) {
+        if self.current_device_function
+            || is_const_int(operand)
+            || self.in_word_ring(operand, &[operand_ty])
+        {
             return None;
         }
         let width = self.range_int_width(operand_ty)?;
@@ -1189,9 +1202,12 @@ impl TypeChecker<'_> {
     }
 
     /// Strict equality compares exact types, but an untyped integer constant
-    /// beside a trapping-integer operand takes part by value (rulings 12, 22):
+    /// beside an integer operand takes part by value (rulings 12, 22):
     /// `x % 2 ≡ 0` holds for every width of `x % 2`, and `a ≡ 300` with
-    /// `a: u8` compares exactly and is simply false.
+    /// `a: u8` compares exactly and is simply false. A `wrapping` or
+    /// `saturating` word is a policy cell of the same width: the constant
+    /// adopts the cell's type exactly as it does beside the bare width
+    /// (operator ruling 2026-10-02, need).
     pub(super) fn equality_constant_exempt(
         &self,
         lhs: &HirExpression,
@@ -1208,5 +1224,12 @@ impl TypeChecker<'_> {
             _ => return false,
         };
         self.plain_int_width(other).is_some()
+            || self
+                .numeric_shape(self.resolve_inferred_type(other))
+                .is_some_and(|shape| {
+                    shape.prim == Primitive::Numerus
+                        && !shape.width.is_decimal()
+                        && matches!(shape.family, IntFamily::Modular | IntFamily::Saturating)
+                })
     }
 }

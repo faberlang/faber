@@ -1,4 +1,5 @@
-//! DEFER-063: tensor bracket access is `accipe` / `ponde` sugar.
+//! Tensor bracket access: a read yields `T` or traps (like a list index);
+//! a write is `ponde` sugar.
 
 use radix_diagnostics::DiagnosticArg;
 
@@ -30,7 +31,7 @@ fn rejects_with_issue(source: &str, issue: &str) {
 fn tensor_bracket_read_accepts_rank1_scalar_index() {
     accepts(
         r"functio pick(tf32[16] input, numerus id) → f32 {
-    redde input[id] vel 0.0
+    redde input[id]
 }",
     );
 }
@@ -54,12 +55,20 @@ fn tensor_bracket_write_rhs_is_element_not_option() {
 }
 
 #[test]
-fn tensor_bracket_read_remains_nullable_for_host_arithmetic() {
-    rejects_with_issue(
+fn tensor_bracket_read_is_element_for_arithmetic() {
+    accepts(
         r"functio plus(tf32[16] input, numerus id) → f32 {
     redde input[id] + 1.0
 }",
-        "numeric_operands_required",
+    );
+}
+
+#[test]
+fn tensor_accipe_method_stays_nullable() {
+    accepts(
+        r"functio pick(tf32[16] input, numerus id) → f32 {
+    redde input.accipe([id]) vel 0.0
+}",
     );
 }
 
@@ -68,7 +77,7 @@ fn tensor_bracket_accepts_rank2_list_literal_index() {
     accepts(
         r"functio put(tf32[4, 4] grid, numerus r, numerus c, f32 value) → f32 {
     grid[[r, c]] ← value
-    redde grid[[r, c]] vel 0.0
+    redde grid[[r, c]]
 }",
     );
 }
@@ -78,7 +87,7 @@ fn tensor_bracket_accepts_bound_u32_index_list() {
     accepts(
         r"functio pick(tf32[4, 4] grid, u32 r, u32 c) → f32 {
     fixum lista<u32> origin ← [r, c]
-    redde grid[origin] vel 0.0
+    redde grid[origin]
 }",
     );
 }
@@ -87,7 +96,7 @@ fn tensor_bracket_accepts_bound_u32_index_list() {
 fn tensor_bracket_accepts_u32_scalar_on_rank1() {
     accepts(
         r"functio pick(tf32[16] input, u32 id) → f32 {
-    redde input[id] vel 0.0
+    redde input[id]
 }",
     );
 }
@@ -96,7 +105,7 @@ fn tensor_bracket_accepts_u32_scalar_on_rank1() {
 fn tensor_bracket_rejects_scalar_on_rank2() {
     rejects_with_issue(
         r"functio bad(tf32[4, 4] grid, numerus id) → f32 {
-    redde grid[id] vel 0.0
+    redde grid[id]
 }",
         "tensor_scalar_index_rank",
     );
@@ -106,7 +115,7 @@ fn tensor_bracket_rejects_scalar_on_rank2() {
 fn tensor_bracket_rejects_float_index_list() {
     rejects_with_issue(
         r"functio bad(tf32[4, 4] grid, lista<f32> origin) → f32 {
-    redde grid[origin] vel 0.0
+    redde grid[origin]
 }",
         "tensor_index_vector_integer_elements",
     );
@@ -116,7 +125,7 @@ fn tensor_bracket_rejects_float_index_list() {
 fn tensor_bracket_rejects_u64_scalar_index() {
     rejects_with_issue(
         r"functio bad(tf32[16] input, u64 id) → f32 {
-    redde input[id] vel 0.0
+    redde input[id]
 }",
         "tensor_bracket_index_integer_or_lista",
     );

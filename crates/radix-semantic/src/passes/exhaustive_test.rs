@@ -1064,3 +1064,87 @@ fn or_pattern_union_covers_each_alternative() {
         "an Or arm covers the union of its alternatives"
     );
 }
+
+fn duplicate_literal_errors(source: &str) -> Vec<SemanticError> {
+    let result = crate::test_support::analyze_source(source);
+    result
+        .diagnostics
+        .iter()
+        .cloned()
+        .filter(|err| {
+            err.kind == SemanticErrorKind::PatternDuplicate
+                && err
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "duplicate_literal")
+        })
+        .collect()
+}
+
+fn assert_duplicate_literal_value(source: &str, expected: &str) {
+    let errors = duplicate_literal_errors(source);
+    assert_eq!(
+        errors.len(),
+        1,
+        "expected one duplicate_literal: {errors:?}"
+    );
+    assert!(
+        errors[0]
+            .args
+            .iter()
+            .any(|arg| arg.name == "value" && arg.value == expected),
+        "expected value {expected:?}, got {:?}",
+        errors[0].args
+    );
+}
+
+#[test]
+fn repeated_switch_case_value_is_a_check_error_naming_the_value() {
+    assert_duplicate_literal_value(
+        r"
+functio pick(numerus x) → numerus {
+    elige x {
+        casu 1 { redde 10 }
+        casu 1 { redde 11 }
+        casu -2 { redde 20 }
+        ceterum { redde 0 }
+    }
+}
+",
+        "1",
+    );
+}
+
+#[test]
+fn repeated_negated_switch_case_value_names_the_sign() {
+    assert_duplicate_literal_value(
+        r"
+functio pick(numerus x) → numerus {
+    elige x {
+        casu -2 { redde 20 }
+        casu -2 { redde 21 }
+        ceterum { redde 0 }
+    }
+}
+",
+        "-2",
+    );
+}
+
+#[test]
+fn switch_case_values_differing_only_by_sign_are_distinct() {
+    assert!(
+        duplicate_literal_errors(
+            r"
+functio pick(numerus x) → numerus {
+    elige x {
+        casu 2 { redde 10 }
+        casu -2 { redde 20 }
+        ceterum { redde 0 }
+    }
+}
+",
+        )
+        .is_empty()
+    );
+}

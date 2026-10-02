@@ -4,22 +4,22 @@ kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "vel_expr", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "collection"
 canonical = false
-summary = "Tensor bracket access lowers to accipe and ponde."
+summary = "Tensor bracket read yields T or traps; bracket write lowers to ponde."
 syntax = "tensor[index] | tensor[index] ← value"
 related = ["tensor", "accipe", "ponde", "lista"]
 locale = "en"
 +++
 
 # =============================================================================
-# tensor — Tensor bracket access lowers to accipe and ponde.
+# tensor — Tensor bracket read yields T or traps; bracket write lowers to ponde.
 # =============================================================================
 #
 # What this teaches:
 #   • Bracket sugar — `tensor[index]` and `tensor[index] ← value` as syntactic sugar
-#   • Nullable reads — bracket access keeps `∪ nihil` semantics, so use `vel` before arithmetic
+#   • Trapping reads — a bracket read is `T` (like a list index); a bad computed index traps, a literal bad index is a compile error
 #
 # Common mistakes:
-#   • forgetting that bracket reads return T ∪ nihil and need vel before arithmetic
+#   • writing `vel` after a bracket read — it is never none; use the `get` method form for a nullable read
 #
 # See also: tensor, accipe, ponde, lista
 # =============================================================================
@@ -31,8 +31,8 @@ locale = "en"
 #
 # Rank-1 tensors accept scalar integer indices. Rank-N tensors use a list-shaped
 # bracket expression such as `[[r, c]]` or a bound `lista<integer>` value.
-# Reads keep `accipe` semantics and return `T ∪ nihil`, so ordinary source uses
-# `vel` before arithmetic.
+# A bracket read returns `T` and traps on a bad index, like a list index. The
+# `get` method form is the nullable read and takes `vel` before arithmetic.
 #
 # EXPECTED stdout:
 #   3.0
@@ -48,14 +48,14 @@ main {
 
     const u32 index ← 1
     input[index] ← 3.0
-    const f32 old ← input[index] coalesce 0.0
+    const f32 old ← input[index]
     const f32 oldMethod ← input.get([index]) coalesce 0.0
     output[index] ← old + 1.0
-    const f32 updated ← output[index] coalesce 0.0
+    const f32 updated ← output[index]
 
     var tf32[2, 2] grid ← seed.create(0.0, [2, 2])
     grid[[1, 0]] ← updated
-    const f32 elementum ← grid[[1, 0]] coalesce 0.0
+    const f32 elementum ← grid[[1, 0]]
     const f32 elementumMethod ← grid.get([1, 0]) coalesce 0.0
 
     print old

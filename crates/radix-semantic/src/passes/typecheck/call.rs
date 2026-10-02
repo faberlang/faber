@@ -32,6 +32,7 @@ enum DirectionalViewKind {
 
 const ISSUE_ASCII_LITERAL_TEMPLATE_APPLICATION: &str = "ascii_literal_template_application";
 const ISSUE_ARGUMENT_TYPE_MISMATCH: &str = "argument_type_mismatch";
+const ISSUE_MUT_ARGUMENT_TYPE_MISMATCH: &str = "mut_argument_type_mismatch";
 /// K5 (gpu-reset rule 15): a function over one number called on a tensor.
 pub(crate) const ISSUE_TENSOR_FUNCTION_NOT_LIFTED: &str = "tensor_function_not_lifted";
 const ISSUE_CALLEE_NOT_CALLABLE: &str = "callee_not_callable";
@@ -358,9 +359,50 @@ impl TypeChecker<'_> {
                     arg.span,
                 );
             }
+            let errors_before_unify = self.errors.len();
             self.unify_carrier_assign(arg_ty, param.ty, arg.span, ISSUE_ARGUMENT_TYPE_MISMATCH);
+            if self.errors.len() == errors_before_unify {
+                self.check_mut_scalar_argument_is_exact(param, arg_ty, arg.span);
+            }
         }
         lifted
+    }
+
+    /// A `mut` scalar parameter borrows the caller's cell: a store through it
+    /// lands in that cell, and the store check runs against the parameter's
+    /// type, not the cell's. A narrower numeric cell (`u8`) passed to a wider
+    /// `mut` parameter (`int`) would therefore take values it cannot hold, so
+    /// the argument must have exactly the parameter's type. (Width limits
+    /// apply at the store; this keeps the store's slot and the cell one type.)
+    fn check_mut_scalar_argument_is_exact(
+        &mut self,
+        param: &ParamType,
+        arg_ty: TypeId,
+        span: radix_lexer::Span,
+    ) {
+        if !matches!(param.mode, SemanticParamMode::MutRef) {
+            return;
+        }
+        let param_ty = self.peel_nominal_aliases(
+            self.types
+                .peel_access_marker(self.resolve_inferred_type(param.ty))
+                .1,
+        );
+        if !self.types.is_scalar_for_access_marker(param_ty) {
+            return;
+        }
+        let arg_ty = self.peel_nominal_aliases(
+            self.types
+                .peel_access_marker(self.resolve_inferred_type(arg_ty))
+                .1,
+        );
+        if !self.types.equals(arg_ty, param_ty) {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_MUT_ARGUMENT_TYPE_MISMATCH,
+                span,
+            );
+        }
     }
 
     /// Whether passing `arg_ty` for a `param_ty` slot is an attempt to lift a
@@ -1489,11 +1531,18 @@ impl TypeChecker<'_> {
     /// primitive union has no honest declared-member view. The former
     /// guardrail 1 (WARN024, "narrow to recover per-member access") retired
     /// with D9.2: overlap access is plain and access outside it is an error.
+    ///
+    /// A declared enum is not a written `∪`: its variants are views for
+    /// refinement, not store-only constituents, so an annotation that names
+    /// an enum (bare or as `E ∪ none`) never draws these warnings.
     pub fn warn_union_annotation_guardrails(
         &mut self,
         annotation_ty: TypeId,
         span: radix_lexer::Span,
     ) {
+        if self.annotation_names_enum(annotation_ty) {
+            return;
+        }
         let Some(members) = self.union_members_of(annotation_ty) else {
             return;
         };
@@ -1571,6 +1620,22 @@ impl TypeChecker<'_> {
     }
 
     /// Whether a union constituent is a nominal user type (U1R guardrails).
+    /// Whether an annotation, through aliases and a `∪ none` wrapper, names a
+    /// declared enum.
+    fn annotation_names_enum(&mut self, ty: TypeId) -> bool {
+        let mut current = self.resolve_inferred_type(ty);
+        for _ in 0..8 {
+            match self.types.get(current).clone() {
+                Type::Alias(_, inner) | Type::Option(inner) => {
+                    current = self.resolve_inferred_type(inner);
+                }
+                Type::Enum(_) => return true,
+                _ => return false,
+            }
+        }
+        false
+    }
+
     fn constituent_is_nominal(&self, member: TypeId) -> bool {
         self.struct_def_from_type(member).is_some()
             || self.interface_def_from_type(member).is_some()

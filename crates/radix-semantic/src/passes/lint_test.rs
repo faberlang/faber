@@ -915,6 +915,31 @@ incipit {
     );
 }
 
+#[test]
+fn mutating_method_call_counts_as_mutation_for_unnecessary_varia() {
+    // A user method that changes `ego` needs a `varia` receiver binding (the
+    // checker rejects it on `fixum`), so the lint must not advise `fixum`.
+    let result = crate::test_support::analyze_source(
+        r#"
+genus Contador {
+    varia numerus n
+    functio cresce() → vacuum { ego.n ← ego.n + 1 }
+}
+incipit {
+    varia Contador k ← Contador { n = 1 }
+    k.cresce()
+}
+"#,
+    );
+    let diagnostics = result.diagnostics.clone();
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|diag| !diag.is_error() && diag.issue() == Some("unnecessary_varia")),
+        "mutating method call should mark the receiver mutated: {diagnostics:?}"
+    );
+}
+
 // ---- PST-U1: PreferStringTemplate — naive string concatenation chains ----
 //
 // Threshold B (operator decision 856a3b7a): warn only on string-typed `+`

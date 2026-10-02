@@ -3,7 +3,7 @@
 //! lex payload carries each identifier's spelling plus its Latin keyword
 //! identity (the token stream the stage-5 Earley reference parser consumes).
 
-use super::{lex_inspection_for_source, parse_inspection_for_source};
+use super::{hir_inspection_for_source, lex_inspection_for_source, parse_inspection_for_source};
 
 const EN_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nfn salve() {\n    if true then return\n}\n";
 
@@ -19,6 +19,19 @@ fn parse_inspection_honors_frontmatter_locale() {
     let payload = json(&result.text);
     assert_eq!(payload["statements"], 1);
     assert_eq!(payload["ast"][0]["kind"], "Func");
+}
+
+#[test]
+fn hir_inspection_honors_frontmatter_locale() {
+    let source =
+        "+++\nlocale = \"en\"\n+++\nfn twice(int n) → int {\n    return n * 2\n}\n\nmain {\n    print twice(4)\n}\n";
+    let result = hir_inspection_for_source("en.fab", source);
+
+    assert!(result.success, "errors: {:?}", result.errors);
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    let payload = json(&result.text);
+    assert_eq!(payload["frontmatter"]["locale"], "en");
+    assert_eq!(payload["items"], 1);
 }
 
 #[test]
@@ -65,4 +78,19 @@ fn lex_inspection_latin_surface_keys_keywords_by_their_own_spelling() {
     assert_eq!(first["keyword"], "functio");
     assert_eq!(payload["tokens"][1]["text"], "salve");
     assert!(payload["tokens"][1].get("keyword").is_none());
+}
+
+/// `faber hir` resolves imports as `faber check` does: a type imported from a
+/// library module (`Orderable` from `norma:order`) is not an unknown type.
+#[test]
+fn hir_inspection_resolves_imported_library_types() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/implet/implet-orderable.fab");
+    let source = std::fs::read_to_string(&path).expect("corpus file");
+    let result = hir_inspection_for_source(&path.display().to_string(), &source);
+
+    assert!(result.success, "errors: {:?}\n{}", result.errors, result.text);
+    let payload = json(&result.text);
+    assert_eq!(payload["success"], true);
+    assert!(payload["errors"].as_array().expect("errors").is_empty());
+    assert!(payload["items"].as_u64().expect("items") > 0);
 }

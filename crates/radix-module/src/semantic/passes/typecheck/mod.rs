@@ -60,6 +60,10 @@ mod saturating_word_test;
 mod trapping_word_test;
 
 #[cfg(test)]
+#[path = "word_literal_equality_test.rs"]
+mod word_literal_equality_test;
+
+#[cfg(test)]
 #[path = "policy_float_store_test.rs"]
 mod policy_float_store_test;
 

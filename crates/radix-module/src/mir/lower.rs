@@ -383,6 +383,7 @@ pub fn lower_analyzed_unit(
         lockstep_length_mismatch: interner.intern("itera lockstep sources must have equal length"),
         ordo_no_member: interner.intern("no ordo member has this value"),
         potentia_negative_exponent: interner.intern("numerus potentia failed: negative exponent"),
+        range_step_not_positive: interner.intern("range step must be positive"),
     };
     let mut lowerer = MirLowerer {
         unit,
@@ -868,6 +869,9 @@ struct DiagnosticSymbols {
     /// Integer `potentia` with a negative exponent (ruling 28): the
     /// arithmetic trap's panic textus.
     potentia_negative_exponent: Symbol,
+    /// A range step that is zero or negative at run time (ruling 2026-10-02):
+    /// the stride guard's panic textus.
+    range_step_not_positive: Symbol,
 }
 
 struct MirLowerer<'a> {
@@ -1613,6 +1617,7 @@ struct FunctionBuilderContext<'a> {
     /// Failed `numerus ↦ Ordo` payload textus (D9.4).
     diagnostic_ordo_no_member: Symbol,
     diagnostic_potentia_negative_exponent: Symbol,
+    diagnostic_range_step_not_positive: Symbol,
     function_errors: Arc<FxHashMap<DefId, MirType>>,
     function_async: Arc<FxHashMap<DefId, bool>>,
     function_generator: Arc<FxHashMap<DefId, bool>>,
@@ -1694,6 +1699,7 @@ impl<'a> FunctionBuilderContext<'a> {
             diagnostic_lockstep_length_mismatch: Symbol(0),
             diagnostic_ordo_no_member: Symbol(0),
             diagnostic_potentia_negative_exponent: Symbol(0),
+            diagnostic_range_step_not_positive: Symbol(0),
             function_errors: Arc::new(FxHashMap::default()),
             function_async: Arc::new(FxHashMap::default()),
             function_generator: Arc::new(FxHashMap::default()),
@@ -1760,6 +1766,9 @@ struct FunctionBuilder<'a> {
     error_ty: Option<MirType>,
     context: FunctionBuilderContext<'a>,
     bindings: FxHashMap<DefId, LocalBinding>,
+    /// While lowering `casu A aut B`, every alternative binds the same
+    /// `DefId`s: payload bindings reuse the local an earlier alternative made.
+    shared_pattern_bindings: bool,
     params: Vec<MirParam>,
     locals: Vec<MirLocalDecl>,
     temps: Vec<MirTemp>,
@@ -1840,6 +1849,7 @@ impl<'a> FunctionBuilder<'a> {
             error_ty,
             context,
             bindings: FxHashMap::default(),
+            shared_pattern_bindings: false,
             params: Vec::new(),
             locals: Vec::new(),
             temps: Vec::new(),
@@ -2573,7 +2583,7 @@ impl<'a> FunctionBuilder<'a> {
                     ));
                     return None;
                 }
-                let ty = self.expr_ty(expr)?;
+                let ty = self.variant_value_ty(expr)?;
                 return Some(self.construct_temp(
                     MirAggregateKind::EnumVariant(def_id),
                     MirAggregateFields::Ordered(Vec::new()),
@@ -2953,8 +2963,19 @@ impl<'a> FunctionBuilder<'a> {
         }
         let lhs_value = self.lower_expr_value(lhs)?;
         let rhs_value = self.lower_expr_value(rhs)?;
-        let one = MirOperand::Constant(MirConstant::Int(1));
-        self.binary_temp(MirBinOp::Div, one, rhs_value.clone(), rhs_ty, expr.span);
+        // The `1 / divisor` temporary is the zero-divisor trap, not dead code:
+        // nothing reads it, but evaluating it is what fails. A nonzero
+        // constant divisor cannot trap, so only that case emits nothing.
+        if !matches!(
+            rhs_value,
+            MirOperand::Constant(MirConstant::Int(value)) if value != 0
+        ) && !matches!(
+            rhs_value,
+            MirOperand::Constant(MirConstant::UInt(value)) if value != 0
+        ) {
+            let one = MirOperand::Constant(MirConstant::Int(1));
+            self.binary_temp(MirBinOp::Div, one, rhs_value.clone(), rhs_ty, expr.span);
+        }
         // An untyped constant operand joins the typed operand's range
         // computation (ruling 12), so its HIR type can be a word type while
         // the MIR constant is a plain integer: convert from the constant's
@@ -3605,6 +3626,21 @@ impl<'a> FunctionBuilder<'a> {
         Some(MirType::semantic(ty))
     }
 
+    /// The enum type of a variant-construction expression.
+    ///
+    /// WHY: a variant stored into an optional slot (`Color ∪ none o ← Color.Green`,
+    /// a nullable class field) reaches lowering typed as the slot's `T ∪ none`,
+    /// but the value itself is a `T`; the aggregate must carry the enum type and
+    /// the store lifts it into the optional slot.
+    pub(super) fn variant_value_ty(&mut self, expr: &HirExpression) -> Option<MirType> {
+        let ty = self.expr_ty(expr)?;
+        Some(
+            self.types
+                .nullable_inner(ty.semantic_id())
+                .map_or(ty, MirType::semantic),
+        )
+    }
+
     fn is_vacuum(&self, ty: MirType) -> bool {
         ty.semantic_id() == self.types.primitive(Primitive::Vacuum)
     }
@@ -3614,7 +3650,10 @@ impl<'a> FunctionBuilder<'a> {
             return false;
         };
         matches!(
-            (self.normalized_type(lhs_ty), self.normalized_type(rhs_ty)),
+            (
+                self.normalized_type(self.types.peel_access_marker(lhs_ty).1),
+                self.normalized_type(self.types.peel_access_marker(rhs_ty).1)
+            ),
             (Type::Tensor(_, _), Type::Tensor(_, _))
                 | (Type::Vector(_, _), Type::Vector(_, _))
                 | (Type::Matrix(_, _), Type::Matrix(_, _))

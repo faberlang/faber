@@ -324,13 +324,14 @@ impl TypeChecker<'_> {
             Type::Intervallum(_)
         )
     }
-    /// DEFER-063: validate a tensor bracket index and return `T ∪ nihil`.
+    /// Validate a tensor bracket index and return the element type `T`.
     ///
-    /// Bracket access is sugar for `accipe` / `ponde`. The index may be a
-    /// scalar integer (rank-1 only) or an integer list (`lista<integer>`).
-    /// Scalar index on a statically-known rank != 1 is rejected; non-integer
-    /// indices reject with a deliberate diagnostic. Statically provable OOB is
-    /// inherited from `accipe` policy (runtime OOB is `nihil` for `accipe`).
+    /// A bracket read always yields `T` or traps, like a list index (operator
+    /// ruling 2026-10-02): a computed bad index traps at runtime and a literal
+    /// bad index is a compile error. The index may be a scalar integer (rank-1
+    /// only) or an integer list (`lista<integer>`). Scalar index on a
+    /// statically-known rank != 1 is rejected; non-integer indices reject with
+    /// a deliberate diagnostic. The nullable `.accipe(...)` method is separate.
     fn check_tensor_bracket_index(
         &mut self,
         elem: TypeId,
@@ -361,21 +362,7 @@ impl TypeChecker<'_> {
         } else {
             self.invalid_operand_types(ISSUE_TENSOR_BRACKET_INDEX_INTEGER_OR_LISTA, index_span);
         }
-        if self.systems_device_tensor_bracket_reads_element() {
-            return elem;
-        }
-        self.types.option(elem)
-    }
-
-    fn systems_device_tensor_bracket_reads_element(&self) -> bool {
-        // WHY: only systems targets consume `@ nucleum` / `@ nucleum fragment`
-        // roles as storage-buffer projections. Rust/application targets keep
-        // tensor bracket reads nullable via the host `accipe` contract.
-        self.current_device_function
-            && matches!(
-                self.target,
-                Target::MirLlvm | Target::MirLlvmHost | Target::MirMetal | Target::MirWgsl
-            )
+        elem
     }
 
     /// Statically known tensor rank from a shape index, when fully resolved.
@@ -1027,8 +1014,8 @@ impl TypeChecker<'_> {
     }
     /// Check bracket access in assignment position.
     ///
-    /// Tensor bracket writes are `ponde` sugar: reads return `T ∪ nihil`, but
-    /// writes accept a plain element `T`.
+    /// Tensor bracket writes are `ponde` sugar; reads and writes both use the
+    /// plain element `T`.
     fn check_index_lvalue(
         &mut self,
         object: &mut HirExpression,
@@ -1042,7 +1029,12 @@ impl TypeChecker<'_> {
             Some(ty) => ty,
             None => self.check_expr_allowing_direct_intervallum_step(index),
         };
-        let resolved = self.resolve_inferred_type(obj_ty);
+        // The access marker (`copy`, `own`, ...) is a binding fact: peel it so
+        // a marked tensor takes the same element write as an unmarked one.
+        let resolved = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(obj_ty))
+            .1;
         if let Type::Tensor(elem, shape) = self.types.get(resolved).clone() {
             self.check_tensor_bracket_index(elem, shape, idx_ty, object.span, index.span);
             super::tensor_index::reject_static_bounded_index_oob(self, obj_ty, index);

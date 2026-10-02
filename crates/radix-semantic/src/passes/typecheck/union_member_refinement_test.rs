@@ -296,6 +296,24 @@ fn shared_field_union_is_quiet() {
 }
 
 #[test]
+fn payload_free_enum_annotation_draws_no_union_warning() {
+    // A declared enum is not a written `∪`: neither the bare annotation nor
+    // `E ∪ nihil` draws a union guardrail warning.
+    let result = test_support::analyze_and_get_diagnostics(concat!(
+        "ordo Kind { plain, fizz }\n\n",
+        "functio f(Kind k, Kind ∪ nihil m) → numerus {\n",
+        "    fixum Kind j ← Kind.fizz\n",
+        "    redde 1\n",
+        "}",
+    ));
+    assert!(!result.iter().any(|err| !err.is_error()
+        && matches!(
+            test_support::issue(err),
+            Some("union_no_common_members" | "union_method_signature_shadowed")
+        )));
+}
+
+#[test]
 fn shadowed_method_union_warns_at_annotation() {
     // Guardrail 4: same-name method with incompatible signatures names the
     // collision at the `∪` site.

@@ -11,6 +11,13 @@ locale = "en"
 # =============================================================================
 # mutabilitas — deep copy bind (D-6)
 # =============================================================================
+# `copy` says how a binding is INITIALIZED: `var copy Holder b ← a` duplicates
+# `a`. It is not a property of `b` afterwards. A later `b ← c` of a class value
+# is always by reference, whether or not `b` was declared with `copy`: after
+# `var copy Point b ← a; b ← c; b.x ← 5`, `c.x` is 5 and `a.x` is untouched.
+# Each assignment site shows which one it is: a `var copy` declaration copies,
+# and a plain `←` never does. To copy again, write a new `var copy`
+# declaration. (Pinned by the radix-module test `copy_duplicate_test.rs`.)
 
 class Holder {
     var f64 x = 0.0

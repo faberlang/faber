@@ -47,7 +47,8 @@ main {
     a ← a + 1
     print a
     const wrapping<i8> m ← -128
-    print m / -1
+    const wrapping<i8> quotient ← m / -1
+    print quotient
     const wrapping<i8> n ← -7
     print n / 2
     print n % 2

@@ -13,6 +13,7 @@
 use super::*;
 use crate::{Primitive, Type, is_intervallum_bound_type};
 const ISSUE_RANGE_STEP_MUST_BE_NUMERIC: &str = "range_step_must_be_numeric";
+const ISSUE_RANGE_STEP_NOT_POSITIVE: &str = "range_step_not_positive";
 const ISSUE_INTERVALLUM_VALUE_STEP_UNSUPPORTED: &str = "intervallum_value_step_unsupported";
 const ISSUE_INTERVALLUM_BOUND_REQUIRED: &str = "intervallum_bound_required";
 const ISSUE_INTERVALLUM_TARGET_NOT_RANGE: &str = "intervallum_target_not_range";
@@ -59,6 +60,13 @@ impl TypeChecker<'_> {
             }
             if !self.is_numeric(step_ty) {
                 self.invalid_operand_types(ISSUE_RANGE_STEP_MUST_BE_NUMERIC, step_expr.span);
+            }
+            if constant_step_is_not_positive(step_expr) {
+                self.error_issue(
+                    SemanticErrorKind::OperandTypesInvalid,
+                    ISSUE_RANGE_STEP_NOT_POSITIVE,
+                    step_expr.span,
+                );
             }
             if !self.allow_intervallum_step {
                 self.error_issue(
@@ -177,5 +185,24 @@ impl TypeChecker<'_> {
         } else {
             self.unify_assign_issue(lhs_ty, bound, lhs_span, ISSUE_RANGE_OPERAND_TYPE_MISMATCH);
         }
+    }
+}
+
+/// A range step is a positive stride (direction comes from the bounds), so a
+/// literal zero or negative step is a compile error. A non-literal step is
+/// checked at run time by the range lowering.
+fn constant_step_is_not_positive(step: &HirExpression) -> bool {
+    use radix_hir::{HirLiteral, HirUnOp};
+    match &step.kind {
+        HirExpressionKind::Literal(HirLiteral::Int(value)) => *value == 0,
+        HirExpressionKind::Literal(HirLiteral::Float(value)) => *value <= 0.0,
+        HirExpressionKind::Literal(HirLiteral::FloatText { value, .. }) => *value <= 0.0,
+        HirExpressionKind::Unary(HirUnOp::Neg, inner) => matches!(
+            &inner.kind,
+            HirExpressionKind::Literal(
+                HirLiteral::Int(_) | HirLiteral::Float(_) | HirLiteral::FloatText { .. }
+            )
+        ),
+        _ => false,
     }
 }

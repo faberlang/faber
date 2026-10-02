@@ -315,7 +315,7 @@ impl TypeChecker<'_> {
 
     /// Peel alias wrappers (and inference substitutions) down to the payload
     /// type without touching structural wrappers.
-    fn peel_nominal_aliases(&self, ty: TypeId) -> TypeId {
+    pub(super) fn peel_nominal_aliases(&self, ty: TypeId) -> TypeId {
         let mut resolved = self.resolve_inferred_type(ty);
         loop {
             match self.types.get(resolved) {
