@@ -415,6 +415,11 @@ pub fn classify_conversio_coverage(
 /// sources, scalar/text `X ↦ textus` formatting, `vector ↦ vector`,
 /// `tabula ↦ lista`, and the scalar `valor` boxing and extraction rows.
 fn sexp_lowers_conversio(src: ConversioTypeFamily, tgt: ConversioTypeFamily) -> bool {
+    // Every regex construct is MIR-to-sexp unsupported (`regex_engine_diverges`,
+    // RX-10f): a regex source is never lowered, whatever the target.
+    if src == ConversioTypeFamily::Regex {
+        return false;
+    }
     // `tabula ↦ lista` projects the keys or the values (`map_list.rs`); scalar
     // `↦ valor` boxes by identity and `valor ↦ scalar` checks the carrier
     // (`valor.rs`), both under their own prefix rows ahead of the text rows.

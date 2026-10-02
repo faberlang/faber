@@ -3,6 +3,10 @@
 //! The eight language packs are the authoring source of truth. The `faber`
 //! binary embeds the compressed bytes and decompresses only the selected
 //! locale at runtime.
+//!
+//! It also stamps `FABER_HOSTS_PINNED_REV` from the release manifest's hosts
+//! source pin (`release-manifest.yaml`), so the rev the generated manifests
+//! emit equals the manifest pin by construction.
 
 use flate2::Compression;
 use flate2::write::GzEncoder;
@@ -25,6 +29,40 @@ fn main() {
     for locale in LOCALES {
         compress_pack(&locale_root, &artifact_dir, locale);
     }
+
+    stamp_hosts_pinned_rev(&manifest_dir.join("../../release-manifest.yaml"));
+}
+
+/// Export the hosts source pin (`pinnedInputs.source[name = hosts].commit`) as
+/// the `FABER_HOSTS_PINNED_REV` compile-time env. `commit:` rows exist only in
+/// that list, so a name-to-commit scan cannot cross into other sections.
+fn stamp_hosts_pinned_rev(manifest: &Path) {
+    println!("cargo:rerun-if-changed={}", manifest.display());
+    let text = fs::read_to_string(manifest).unwrap_or_else(|err| {
+        panic!("read release manifest {}: {err}", manifest.display());
+    });
+    let mut source_name: Option<&str> = None;
+    let mut hosts_commit: Option<&str> = None;
+    for line in text.lines() {
+        let trimmed = line.trim_start();
+        if let Some(name) = trimmed.strip_prefix("- name:") {
+            source_name = Some(name.trim().trim_matches('"'));
+        } else if let Some(commit) = trimmed.strip_prefix("commit:") {
+            if source_name == Some("hosts") {
+                hosts_commit = Some(commit.trim().trim_matches('"'));
+                break;
+            }
+        }
+    }
+    let commit = hosts_commit.unwrap_or_else(|| {
+        panic!("{} has no source row named hosts", manifest.display());
+    });
+    assert!(
+        commit.len() == 40 && commit.bytes().all(|b| b.is_ascii_hexdigit()),
+        "{}: hosts source pin {commit:?} is not a 40-hex commit",
+        manifest.display()
+    );
+    println!("cargo:rustc-env=FABER_HOSTS_PINNED_REV={commit}");
 }
 
 fn compress_pack(locale_root: &Path, artifact_dir: &Path, locale: &str) {
