@@ -544,9 +544,10 @@ pub struct VerifyLibraryArgs {
 
 /// Arguments for `faber explain`.
 #[derive(clap::Args, Debug)]
+#[command(group(clap::ArgGroup::new("json_target").args(["term", "list"]).multiple(true)))]
 pub struct ExplainArgs {
-    /// Emit a machine-readable JSON explanation
-    #[arg(long, requires = "term")]
+    /// Emit a machine-readable JSON explanation (one term, or the --list index)
+    #[arg(long, requires = "json_target")]
     pub json: bool,
 
     /// Message language for diagnostic explanation text
@@ -563,7 +564,7 @@ pub struct ExplainArgs {
     pub search: Option<String>,
 
     /// List canonical explain terms
-    #[arg(long, conflicts_with_all = ["search", "category", "term", "json"])]
+    #[arg(long, conflicts_with_all = ["search", "category", "term"])]
     pub list: bool,
 
     /// List canonical and legacy entries in a category

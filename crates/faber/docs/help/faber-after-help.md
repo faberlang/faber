@@ -19,6 +19,7 @@ LLM Guidance:
      faber explain --list
      faber explain functio
      faber explain --json functio
+     faber explain --list --json
   6. Compatibility aliases (`lex`, `parse`, `hir`, `cli-ir`, `emit`) match `radix`
      for single-file inspection; package paths still prefer explicit `faber` commands.
 
@@ -149,7 +150,7 @@ Output contract:
   - `run <path>`: interprets the input (single file, package, or archive) and
     forwards runtime args after `--`; nothing is compiled
   - `init`: manifest path on stdout
-  - `explain`: human text on stdout; `--json` for one term only
+  - `explain`: human text on stdout; `--json` for one term, or with `--list` for the index as a JSON array
   - `lex`, `parse`, `hir`, `cli-ir`: JSON on stdout (same as `radix`)
   - `targets`: capability rows on stdout
   - `doctor`: resolved library home and per-library availability as key=value on stdout

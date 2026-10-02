@@ -826,6 +826,23 @@ fn cli_parses_explain_list() {
 }
 
 #[test]
+fn cli_parses_explain_list_json() {
+    let list = Cli::try_parse_from(["faber", "explain", "--list", "--json"])
+        .expect("parse explain list json");
+    let Some(crate::cli::Command::Explain(list_args)) = list.command else {
+        panic!("expected explain subcommand");
+    };
+    assert!(list_args.list);
+    assert!(list_args.json);
+}
+
+#[test]
+fn cli_rejects_explain_json_without_term_or_list() {
+    assert!(Cli::try_parse_from(["faber", "explain", "--json"]).is_err());
+    assert!(Cli::try_parse_from(["faber", "explain", "--json", "--search", "host"]).is_err());
+}
+
+#[test]
 fn cli_parses_explain_category() {
     let category = Cli::try_parse_from(["faber", "explain", "--category", "diagnostics"])
         .expect("parse explain category");
