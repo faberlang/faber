@@ -260,6 +260,40 @@ fn go_imports_is_one_path_or_none() {
 }
 
 #[test]
+fn ts_imports_is_one_sorted_named_import_or_none() {
+    let refs = RuntimeRefs::new();
+    assert_eq!(ts_imports(&refs), None);
+    refs.note(Namespace::Json);
+    refs.note(Namespace::Display);
+    refs.note(Namespace::Json);
+    assert_eq!(
+        ts_imports(&refs).as_deref(),
+        Some("import { display, json } from \"@faber/runtime\";")
+    );
+}
+
+#[test]
+fn the_ts_display_rows_spell_as_display_namespace_members() {
+    let rows = [
+        (DISPLAY_VALUE, "display.value"),
+        (DISPLAY_NUMERUS, "display.numerus"),
+        (DISPLAY_FRACTUS, "display.fractus"),
+        (DISPLAY_LIST, "display.list"),
+        (DISPLAY_TENSOR, "display.tensor"),
+        (DISPLAY_SPARSA, "display.sparsa"),
+        (DISPLAY_MAP, "display.map"),
+        (DISPLAY_VALOR, "display.valor"),
+        (DISPLAY_TAGGED_VALOR, "display.taggedValor"),
+    ];
+    for (row, expected) in rows {
+        assert_eq!(spell(Target::HirTypeScript, &row).as_deref(), Ok(expected));
+        assert!(TABLE.contains(&row), "{expected} is a table row");
+        assert!(row.targets.contains(&Target::HirTypeScript));
+    }
+    assert!(reserved_names(Target::HirTypeScript, TABLE).contains(&"display".to_owned()));
+}
+
+#[test]
 fn the_display_rows_spell_as_the_flat_go_names() {
     let spelled: Vec<String> = [DISPLAY_VERUM, DISPLAY_LIST, DISPLAY_VALOR]
         .iter()

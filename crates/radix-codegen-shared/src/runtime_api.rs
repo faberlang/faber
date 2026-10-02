@@ -38,6 +38,10 @@ use radix_target::Target;
 /// The Go import path of the flat runtime package (`package rt`).
 pub const GO_RUNTIME_IMPORT: &str = "faber/rt";
 
+/// The TypeScript module specifier of the runtime package (`@faber/runtime`):
+/// each namespace it exports is imported by name from here.
+pub const TS_RUNTIME_IMPORT: &str = "@faber/runtime";
+
 /// `display.verum`: a bivalens as `verum` / `falsum`.
 pub const DISPLAY_VERUM: RuntimeItem = RuntimeItem {
     ns: Namespace::Display,
@@ -46,12 +50,13 @@ pub const DISPLAY_VERUM: RuntimeItem = RuntimeItem {
     targets: &[Target::HirGo],
 };
 
-/// `display.list`: a list as `[a, b, c]` through an element renderer.
+/// `display.list`: a list as `[a, b, c]` through an element renderer (an
+/// element hint in the TypeScript runtime).
 pub const DISPLAY_LIST: RuntimeItem = RuntimeItem {
     ns: Namespace::Display,
     name: "list",
     kind: RuntimeKind::Fn,
-    targets: &[Target::HirGo],
+    targets: &[Target::HirGo, Target::HirTypeScript],
 };
 
 /// `display.valor`: a boxed valor / json value with Faber display semantics.
@@ -59,7 +64,7 @@ pub const DISPLAY_VALOR: RuntimeItem = RuntimeItem {
     ns: Namespace::Display,
     name: "valor",
     kind: RuntimeKind::Fn,
-    targets: &[Target::HirGo, Target::HirRust],
+    targets: &[Target::HirGo, Target::HirRust, Target::HirTypeScript],
 };
 
 /// The targets whose runtime package carries the Rust-only `display` rows.
@@ -78,12 +83,41 @@ const fn display_rust_row(name: &'static str) -> RuntimeItem {
 /// option renderers a `nota`/interpolation site calls with Faber display
 /// semantics (`verum`/`falsum`, `nihil`, a `.0` marker on a whole float).
 pub const DISPLAY_BIVALENS: RuntimeItem = display_rust_row("bivalens");
-pub const DISPLAY_FRACTUS: RuntimeItem = display_rust_row("fractus");
+/// `display.fractus`: an f64 as text (Rust and TypeScript runtimes).
+pub const DISPLAY_FRACTUS: RuntimeItem = RuntimeItem {
+    ns: Namespace::Display,
+    name: "fractus",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirRust, Target::HirTypeScript],
+};
 pub const DISPLAY_OPTION: RuntimeItem = display_rust_row("option");
 pub const DISPLAY_OPTION_BIVALENS: RuntimeItem = display_rust_row("option_bivalens");
 pub const DISPLAY_OPTION_FRACTUS: RuntimeItem = display_rust_row("option_fractus");
 pub const DISPLAY_OPTION_VACUUM: RuntimeItem = display_rust_row("option_vacuum");
 pub const DISPLAY_TEXT_PAYLOAD: RuntimeItem = display_rust_row("text_payload");
+
+const DISPLAY_TS_TARGETS: &[Target] = &[Target::HirTypeScript];
+
+const fn display_ts_row(name: &'static str) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Display,
+        name,
+        kind: RuntimeKind::Fn,
+        targets: DISPLAY_TS_TARGETS,
+    }
+}
+
+/// `display` rows of the TypeScript runtime (T1-T1, `display` in
+/// `@faber/runtime`): `value` renders any value under a display hint and is the
+/// one call a `nota`/interpolation site spells; the other renderers it
+/// dispatches to are rows too, because the package carries them. `fractus`,
+/// `list` and `valor` are the shared rows above.
+pub const DISPLAY_VALUE: RuntimeItem = display_ts_row("value");
+pub const DISPLAY_NUMERUS: RuntimeItem = display_ts_row("numerus");
+pub const DISPLAY_TENSOR: RuntimeItem = display_ts_row("tensor");
+pub const DISPLAY_SPARSA: RuntimeItem = display_ts_row("sparsa");
+pub const DISPLAY_MAP: RuntimeItem = display_ts_row("map");
+pub const DISPLAY_TAGGED_VALOR: RuntimeItem = display_ts_row("tagged_valor");
 
 /// The targets whose runtime package carries an `exact` row: the Rust runtime
 /// carries the rows below, the Go runtime (`rt.Exact*`) carries its own rows
@@ -461,12 +495,18 @@ pub const TABLE: &[RuntimeItem] = &[
     DISPLAY_BIVALENS,
     DISPLAY_FRACTUS,
     DISPLAY_LIST,
+    DISPLAY_MAP,
+    DISPLAY_NUMERUS,
     DISPLAY_OPTION,
     DISPLAY_OPTION_BIVALENS,
     DISPLAY_OPTION_FRACTUS,
     DISPLAY_OPTION_VACUUM,
+    DISPLAY_SPARSA,
+    DISPLAY_TAGGED_VALOR,
+    DISPLAY_TENSOR,
     DISPLAY_TEXT_PAYLOAD,
     DISPLAY_VALOR,
+    DISPLAY_VALUE,
     DISPLAY_VERUM,
     EXACT_ADD,
     EXACT_APPROX_INT,
@@ -869,6 +909,22 @@ pub fn go_imports(refs: &RuntimeRefs) -> Option<&'static str> {
     } else {
         Some(GO_RUNTIME_IMPORT)
     }
+}
+
+/// The TypeScript import the recorded references need: one named import of
+/// every recorded namespace from [`TS_RUNTIME_IMPORT`], sorted by spelling, or
+/// none when nothing was recorded.
+#[must_use]
+pub fn ts_imports(refs: &RuntimeRefs) -> Option<String> {
+    let used = refs.used();
+    if used.is_empty() {
+        return None;
+    }
+    let names: Vec<&str> = used.iter().map(|ns| ns.as_str()).collect();
+    Some(format!(
+        "import {{ {} }} from \"{TS_RUNTIME_IMPORT}\";",
+        names.join(", ")
+    ))
 }
 
 /// `checked_mul` to `CheckedMul`; an already `UpperCamel` name is unchanged.
