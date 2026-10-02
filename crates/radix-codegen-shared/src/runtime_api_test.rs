@@ -326,3 +326,19 @@ fn only_the_exact_store_row_is_store_family() {
         Err(SpellError::NotStore)
     );
 }
+
+#[test]
+fn the_regex_rows_spell_from_the_table_for_typescript() {
+    // RX-8: the TypeScript runtime package's `regex` namespace.
+    for (row, spelled) in [
+        (&REGEX_REGEX, "regex.Regex"),
+        (&REGEX_MATCH, "regex.Match"),
+        (&REGEX_ERROR, "regex.RegexError"),
+        (&REGEX_ESCAPE, "regex.escape"),
+    ] {
+        assert_eq!(spell(Target::HirTypeScript, row), Ok(spelled.to_owned()));
+        assert_eq!(row.targets, [Target::HirTypeScript]);
+    }
+    assert!(reserved_names(Target::HirTypeScript, TABLE).contains(&"regex".to_owned()));
+    assert!(!reserved_names(Target::HirGo, TABLE).contains(&"regex".to_owned()));
+}

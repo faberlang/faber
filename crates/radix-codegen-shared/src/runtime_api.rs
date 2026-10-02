@@ -91,6 +91,29 @@ pub const EXACT_SHL: RuntimeItem = exact_row("shl", RuntimeKind::Fn);
 pub const EXACT_SHR: RuntimeItem = exact_row("shr", RuntimeKind::Fn);
 pub const EXACT_STORE: RuntimeItem = exact_row("store", RuntimeKind::StoreFn);
 
+/// The targets whose runtime package carries the `regex` namespace today.
+const REGEX_TARGETS: &[Target] = &[Target::HirTypeScript];
+
+const fn regex_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Regex,
+        name,
+        kind,
+        targets: REGEX_TARGETS,
+    }
+}
+
+/// `regex` rows (RX-8): the TypeScript runtime package's `regex` namespace
+/// (`@faber/runtime/regex`). `Regex` is the compiled pattern, `Match` one
+/// successful match (it has no source-level type name, RD-3), `RegexError` the
+/// rejection of a pattern a conversion throws, and `escape` the `textus`
+/// method `munita`. The operations are members of the `Regex` and `Match`
+/// types, not table rows.
+pub const REGEX_REGEX: RuntimeItem = regex_row("Regex", RuntimeKind::Type);
+pub const REGEX_MATCH: RuntimeItem = regex_row("Match", RuntimeKind::Type);
+pub const REGEX_ERROR: RuntimeItem = regex_row("RegexError", RuntimeKind::Type);
+pub const REGEX_ESCAPE: RuntimeItem = regex_row("escape", RuntimeKind::Fn);
+
 /// The canonical helper table: a row for every helper some runtime package
 /// carries. Each namespace unit adds its rows with the runtime it moves.
 pub const TABLE: &[RuntimeItem] = &[
@@ -110,6 +133,10 @@ pub const TABLE: &[RuntimeItem] = &[
     EXACT_SHL,
     EXACT_SHR,
     EXACT_STORE,
+    REGEX_ERROR,
+    REGEX_ESCAPE,
+    REGEX_MATCH,
+    REGEX_REGEX,
 ];
 
 /// One runtime namespace: a module in Rust, a namespace export in TypeScript,
