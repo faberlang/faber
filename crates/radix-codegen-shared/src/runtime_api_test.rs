@@ -333,17 +333,15 @@ fn the_store_family_is_the_exact_and_inf_rows_that_apply_a_width_limit() {
         .map(|row| (format!("{:?}", row.ns), row.name))
         .collect();
     store_rows.sort_unstable();
-    // `exact` (Rust `store` and `store_inferred`; Go `store_i`, `store_u`,
-    // `wrap`, `clamp_i`, `clamp_u`) and `inf` (Rust `store`; Go the same five).
+    // `exact` (Rust `store` and `store_inferred`; Go `store`, `wrap`, `clamp_i`,
+    // `clamp_u`) and `inf` (Rust `store`; Go the same five).
     assert_eq!(
         store_rows,
         [
             ("Exact".to_owned(), "clamp_i"),
             ("Exact".to_owned(), "clamp_u"),
             ("Exact".to_owned(), "store"),
-            ("Exact".to_owned(), "store_i"),
             ("Exact".to_owned(), "store_inferred"),
-            ("Exact".to_owned(), "store_u"),
             ("Exact".to_owned(), "wrap"),
             ("Inf".to_owned(), "clamp_i"),
             ("Inf".to_owned(), "clamp_u"),
@@ -389,8 +387,8 @@ fn the_go_exact_rows_spell_as_the_flat_rt_names() {
         .iter()
         .filter(|row| row.ns == Namespace::Exact && row.targets.contains(&Target::HirGo))
         .collect();
-    // 38 functions and the `ExactX` carrier type.
-    assert_eq!(go_rows.len(), 39);
+    // 37 functions and the `ExactX` carrier type.
+    assert_eq!(go_rows.len(), 38);
     assert_eq!(
         go_rows
             .iter()
@@ -407,16 +405,112 @@ fn the_go_exact_rows_spell_as_the_flat_rt_names() {
         (&EXACT_POW, "rt.ExactPow"),
         (&EXACT_LT_F, "rt.ExactLtF"),
         (&EXACT_FROM_W, "rt.ExactFromW"),
-        (&EXACT_STORE_I, "rt.ExactStoreI"),
         (&EXACT_CLAMP_U, "rt.ExactClampU"),
     ] {
         assert_eq!(spell_any(Target::HirGo, row), spelled);
     }
-    // The four shared rows keep their Rust spelling.
+    assert_eq!(
+        spell_store(Target::HirGo, &EXACT_STORE, &site()),
+        Ok("rt.ExactStore".to_owned())
+    );
+    // The shared rows keep their Rust spelling.
     assert_eq!(
         spell(Target::HirRust, &EXACT_DIV),
         Ok("faber::exact::div".to_owned())
     );
+}
+
+#[test]
+fn the_go_tensor_vector_and_sparsa_rows_spell_as_the_flat_rt_names() {
+    for ns in [Namespace::Tensor, Namespace::Vector, Namespace::Sparsa] {
+        let go_rows: Vec<&RuntimeItem> = TABLE
+            .iter()
+            .filter(|row| row.ns == ns && row.targets.contains(&Target::HirGo))
+            .collect();
+        // Every shaped carrier has its type row; none is a store row.
+        assert_eq!(
+            go_rows
+                .iter()
+                .filter(|row| row.kind == RuntimeKind::Type)
+                .count(),
+            1,
+            "{ns:?}"
+        );
+        assert!(go_rows.iter().all(|row| row.kind != RuntimeKind::StoreFn));
+    }
+    for (row, spelled) in [
+        (&TENSOR_TENSOR, "rt.TensorTensor"),
+        (&TENSOR_ELEMENT_COUNT, "rt.TensorElementCount"),
+        (&TENSOR_TO_SPARSA, "rt.TensorToSparsa"),
+        (&VECTOR_VECTOR, "rt.VectorVector"),
+        (&VECTOR_FROM_LIST, "rt.VectorFromList"),
+        (&SPARSA_SPARSA, "rt.SparsaSparsa"),
+        (&SPARSA_NEW, "rt.SparsaNew"),
+    ] {
+        assert_eq!(spell_any(Target::HirGo, row), spelled);
+    }
+}
+
+#[test]
+fn the_go_carrier_rows_spell_as_the_flat_rt_names() {
+    for (row, spelled) in [
+        (&ORDER_ORDER, "rt.OrderOrder"),
+        (&ORDER_COMPARE, "rt.OrderCompare"),
+        (&INTERVALLUM_INTERVALLUM, "rt.IntervallumIntervallum"),
+        (&INTERVALLUM_VALUE, "rt.IntervallumValue"),
+        (&TUPLE_KEY, "rt.TupleKey"),
+        (&TUPLE_PARTS, "rt.TupleParts"),
+        (&INSTANS_PARSE, "rt.InstansParse"),
+        (&VALOR_STRUCT, "rt.ValorStruct"),
+    ] {
+        assert_eq!(spell_any(Target::HirGo, row), spelled);
+        // Go carries these rows only; none is a store row.
+        assert_eq!(row.targets, &[Target::HirGo]);
+        assert_ne!(row.kind, RuntimeKind::StoreFn);
+    }
+    // The interval carrier is the one type among them.
+    assert_eq!(INTERVALLUM_INTERVALLUM.kind, RuntimeKind::Type);
+}
+
+#[test]
+fn the_go_sermo_rows_spell_as_the_flat_rt_names() {
+    for (row, spelled) in [
+        (&SERMO_SERMO, "rt.SermoSermo"),
+        (&SERMO_MEUS, "rt.SermoMeus"),
+        (&SERMO_TUUS, "rt.SermoTuus"),
+        (&SERMO_SCRINIUM, "rt.SermoScrinium"),
+        (&SERMO_STATUS, "rt.SermoStatus"),
+        (&SERMO_REQUEST, "rt.SermoRequest"),
+        (&SERMO_ITEM, "rt.SermoItem"),
+        (&SERMO_BYTE, "rt.SermoByte"),
+        (&SERMO_BULK, "rt.SermoBulk"),
+        (&SERMO_DONE, "rt.SermoDone"),
+        (&SERMO_ERROR, "rt.SermoError"),
+        (&SERMO_CANCEL, "rt.SermoCancel"),
+        (&SERMO_CONVERSATION, "rt.SermoConversation"),
+        (&SERMO_CONV_ITEM, "rt.SermoConvItem"),
+        (&SERMO_OPEN, "rt.SermoOpen"),
+        (&SERMO_SET_OPENER, "rt.SermoSetOpener"),
+        (&SERMO_DISPATCH, "rt.SermoDispatch"),
+        (&SERMO_INSTALL_ROUTES, "rt.SermoInstallRoutes"),
+        (&SERMO_AS_MEUS, "rt.SermoAsMeus"),
+        (&SERMO_AS_TUUS, "rt.SermoAsTuus"),
+        (&SERMO_READ_TEXT, "rt.SermoReadText"),
+        (&SERMO_READ_NUMERUS, "rt.SermoReadNumerus"),
+        (&SERMO_DRAIN, "rt.SermoDrain"),
+    ] {
+        assert_eq!(spell_any(Target::HirGo, row), spelled);
+        // Go carries these rows only; none is a store row.
+        assert_eq!(row.targets, &[Target::HirGo]);
+        assert_ne!(row.kind, RuntimeKind::StoreFn);
+    }
+    // The types: the handle, its two views, the frame, the status enum with its
+    // seven variants and the conversation record.
+    let types = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Sermo && row.kind == RuntimeKind::Type)
+        .count();
+    assert_eq!(types, 13);
 }
 
 #[test]

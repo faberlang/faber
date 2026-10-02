@@ -266,6 +266,16 @@ fn frame_statuses() -> [(&'static str, FrameStatus); 7] {
     ]
 }
 
+/// A file of the Go runtime package (`faber/runtime/go`), the sibling checkout
+/// of this repository.
+#[cfg(all(feature = "hir-go", feature = "hir-ts"))]
+fn go_runtime_source(file: &str) -> String {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../faber/runtime/go")
+        .join(file);
+    std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("{}: {error}", path.display()))
+}
+
 #[cfg(any(feature = "hir-go", feature = "hir-ts"))]
 fn pascal(tag: &str) -> String {
     let mut value = tag.to_owned();
@@ -340,7 +350,11 @@ fn intrinsic_host_abi_capabilities_have_registered_method_owners() {
 #[cfg(all(feature = "hir-go", feature = "hir-ts"))]
 #[test]
 fn go_and_typescript_frame_protocols_follow_runtime_status_semantics() {
+    // The Go frame protocol lives in the Go runtime package (T1-G9); generated
+    // Go only names its types.
     let go = compile(Target::HirGo);
+    let go_frame = go_runtime_source("frame.go");
+    let go_sermo = go_runtime_source("sermo.go");
     let typescript = compile(Target::HirTypeScript);
     let statuses = frame_statuses();
     let terminal = statuses
@@ -350,7 +364,8 @@ fn go_and_typescript_frame_protocols_follow_runtime_status_semantics() {
 
     for (tag, _) in statuses {
         assert!(
-            go.contains(&format!("radixFrame{}", pascal(tag))),
+            go_frame.contains(&format!("code{}", pascal(tag)))
+                && go_frame.contains(&format!("Sermo{} struct{{}}", pascal(tag))),
             "Go omits {tag} frame status"
         );
         assert!(
@@ -359,10 +374,15 @@ fn go_and_typescript_frame_protocols_follow_runtime_status_semantics() {
         );
     }
 
-    let go_cursor = go
-        .split("func radixSermoCursor")
+    assert!(
+        !go.contains("radixFrame") && go.contains("rt.SermoOpen"),
+        "generated Go carries a frame protocol of its own"
+    );
+
+    let go_cursor = go_sermo
+        .split("func sermoCursor")
         .nth(1)
-        .and_then(|body| body.split("func radixSermoAccipe").next())
+        .and_then(|body| body.split("func sermoAccipe").next())
         .expect("Go cursor helper");
     // Since A4/U8 (a412c062d) `nextInbound` and `nextInboundAsync` share one
     // frame-admission switch, `admit<T>`; terminal statuses finish the inbound
@@ -385,7 +405,7 @@ fn go_and_typescript_frame_protocols_follow_runtime_status_semantics() {
 
     for tag in &terminal {
         assert!(
-            go_cursor.contains(&format!("radixFrame{}", pascal(tag))),
+            go_cursor.contains(&format!("code{}", pascal(tag))),
             "Go cursor omits terminal {tag}"
         );
         assert!(
@@ -396,7 +416,7 @@ fn go_and_typescript_frame_protocols_follow_runtime_status_semantics() {
     for (tag, status) in frame_statuses() {
         if !status.is_terminal() {
             assert!(
-                !go_cursor.contains(&format!("radixFrame{}:\n\t\t\t\tsermo.incomingDrained", pascal(tag))),
+                !go_cursor.contains(&format!("code{}:\n\t\t\t\tsermo.incomingDrained", pascal(tag))),
                 "Go marks non-terminal {tag} terminal"
             );
         }

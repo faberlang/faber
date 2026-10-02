@@ -760,7 +760,7 @@ fn go_has_dedicated_conversio_arm(src: ConversioTypeFamily, tgt: ConversioTypeFa
     // Go's dedicated set: scalar/text/byte/truthiness bridges, instans
     // formatting/parsing, valor boxing (`any(...)`), valor→scalar/byte
     // extraction, and regex sources. Tensor/sparsa targets have no dedicated
-    // arm — they are representable (`faberTensor`/`faberSparsa`) but lower
+    // arm — they are representable (`rt.TensorTensor`/`rt.SparsaSparsa`) but lower
     // through the `.(T)` type-assertion fallback (Fallback tier), and
     // vector/matrix/intervallum families are not representable in Go at all
     // (NotEmitted; see `go_family_unrepresentable`).

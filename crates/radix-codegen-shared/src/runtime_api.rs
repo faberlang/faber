@@ -87,7 +87,8 @@ pub const DISPLAY_TEXT_PAYLOAD: RuntimeItem = display_rust_row("text_payload");
 
 /// The targets whose runtime package carries an `exact` row: the Rust runtime
 /// carries the rows below, the Go runtime (`rt.Exact*`) carries its own rows
-/// and shares the four whose id and meaning match (`div`, `shl`, `shr`, `pow`).
+/// and shares the rows whose id and meaning match (`add`, `sub`, `mul`, `div`,
+/// `shl`, `shr`, `pow`, `store`).
 const EXACT_TARGETS: &[Target] = &[Target::HirRust];
 const EXACT_RUST_GO: &[Target] = &[Target::HirRust, Target::HirGo];
 const EXACT_GO: &[Target] = &[Target::HirGo];
@@ -129,16 +130,17 @@ pub const EXACT_POW: RuntimeItem = exact_row_for("pow", RuntimeKind::Fn, EXACT_R
 pub const EXACT_REM: RuntimeItem = exact_row("rem", RuntimeKind::Fn);
 pub const EXACT_SHL: RuntimeItem = exact_row_for("shl", RuntimeKind::Fn, EXACT_RUST_GO);
 pub const EXACT_SHR: RuntimeItem = exact_row_for("shr", RuntimeKind::Fn, EXACT_RUST_GO);
-pub const EXACT_STORE: RuntimeItem = exact_row("store", RuntimeKind::StoreFn);
+pub const EXACT_STORE: RuntimeItem = exact_row_for("store", RuntimeKind::StoreFn, EXACT_RUST_GO);
 pub const EXACT_STORE_INFERRED: RuntimeItem = exact_row("store_inferred", RuntimeKind::StoreFn);
 pub const EXACT_SUB: RuntimeItem = exact_row_for("sub", RuntimeKind::Fn, EXACT_RUST_GO);
 
 /// `exact` rows (T1-G2): the Go carrier of the exact integer intermediate
 /// (`rt.Exact*`): the sign-magnitude `ExactX{neg, m}` over `[-2^63, 2^64 - 1]`.
-/// The Go runtime carries `div`, `shl`, `shr` and `pow` through the shared rows
-/// above. The width limit applies only in the store family (`store_i`,
-/// `store_u`, `wrap`, `clamp_i`, `clamp_u`): a value leaves the carrier into a
-/// bounded slot there and nowhere else.
+/// The Go runtime carries `div`, `shl`, `shr`, `pow` and the trapping `store`
+/// through the shared rows above (`rt.ExactStore[int64](x, pos)`: the generic
+/// instantiation names the width). The width limit applies only in the store
+/// family (`store`, `wrap`, `clamp_i`, `clamp_u`): a value leaves the carrier
+/// into a bounded slot there and nowhere else.
 pub const EXACT_X: RuntimeItem = exact_row_for("X", RuntimeKind::Type, EXACT_GO);
 pub const EXACT_MK: RuntimeItem = exact_row_for("mk", RuntimeKind::Fn, EXACT_GO);
 pub const EXACT_I: RuntimeItem = exact_row_for("i", RuntimeKind::Fn, EXACT_GO);
@@ -166,8 +168,6 @@ pub const EXACT_TRAP: RuntimeItem = exact_row_for("trap", RuntimeKind::Fn, EXACT
 pub const EXACT_FLOAT: RuntimeItem = exact_row_for("float", RuntimeKind::Fn, EXACT_GO);
 pub const EXACT_FITS_I: RuntimeItem = exact_row_for("fits_i", RuntimeKind::Fn, EXACT_GO);
 pub const EXACT_FITS_U: RuntimeItem = exact_row_for("fits_u", RuntimeKind::Fn, EXACT_GO);
-pub const EXACT_STORE_I: RuntimeItem = exact_row_for("store_i", RuntimeKind::StoreFn, EXACT_GO);
-pub const EXACT_STORE_U: RuntimeItem = exact_row_for("store_u", RuntimeKind::StoreFn, EXACT_GO);
 pub const EXACT_WRAP: RuntimeItem = exact_row_for("wrap", RuntimeKind::StoreFn, EXACT_GO);
 pub const EXACT_CLAMP_I: RuntimeItem = exact_row_for("clamp_i", RuntimeKind::StoreFn, EXACT_GO);
 pub const EXACT_CLAMP_U: RuntimeItem = exact_row_for("clamp_u", RuntimeKind::StoreFn, EXACT_GO);
@@ -405,6 +405,126 @@ pub const FORMAT_SCI: RuntimeItem = format_row("sci", RuntimeKind::Fn, FORMAT_RU
 pub const FORMAT_SIGNED: RuntimeItem = format_row("signed", RuntimeKind::Fn, FORMAT_GO);
 pub const FORMAT_TEXT: RuntimeItem = format_row("text", RuntimeKind::Fn, FORMAT_RUST_GO);
 
+/// The targets whose runtime package carries a `tensor`, `vector` or `sparsa`
+/// row. Only the Go runtime (`rt.Tensor*`, `rt.Vector*`, `rt.Sparsa*`,
+/// `faber/runtime/go/{tensor,vector,sparsa}.go`) carries them on this table
+/// today.
+const SHAPED_GO: &[Target] = &[Target::HirGo];
+
+const fn shaped_row(ns: Namespace, name: &'static str, kind: RuntimeKind) -> RuntimeItem {
+    RuntimeItem {
+        ns,
+        name,
+        kind,
+        targets: SHAPED_GO,
+    }
+}
+
+/// `tensor`, `vector` and `sparsa` rows (T1-G7): the shaped-numeric carriers of
+/// the Go runtime. A carrier is a type; its operations (`Addita`, `Matmul`,
+/// `Productum`, `Densata`, ...) are methods of that type, carrying the Latin
+/// method names the call sites already use, so they are not table rows. The
+/// rows are the three carrier types plus the four free functions a call site
+/// names: the element count a shape implies (checked before building a recovery
+/// tensor), the dense-to-sparse conversion, the width-checked vector
+/// constructor and the sparse vacua constructor. No row applies a width limit:
+/// a carrier computes in its element type and never stores into a bounded cell.
+pub const TENSOR_TENSOR: RuntimeItem = shaped_row(Namespace::Tensor, "Tensor", RuntimeKind::Type);
+pub const TENSOR_ELEMENT_COUNT: RuntimeItem =
+    shaped_row(Namespace::Tensor, "element_count", RuntimeKind::Fn);
+pub const TENSOR_TO_SPARSA: RuntimeItem =
+    shaped_row(Namespace::Tensor, "to_sparsa", RuntimeKind::Fn);
+pub const VECTOR_VECTOR: RuntimeItem = shaped_row(Namespace::Vector, "Vector", RuntimeKind::Type);
+pub const VECTOR_FROM_LIST: RuntimeItem =
+    shaped_row(Namespace::Vector, "from_list", RuntimeKind::Fn);
+pub const SPARSA_SPARSA: RuntimeItem = shaped_row(Namespace::Sparsa, "Sparsa", RuntimeKind::Type);
+pub const SPARSA_NEW: RuntimeItem = shaped_row(Namespace::Sparsa, "new", RuntimeKind::Fn);
+
+/// The targets whose runtime package carries an `order`, `intervallum`, `tuple`,
+/// `instans` or `valor` row. Only the Go runtime (`rt.Order*`, `rt.Intervallum*`,
+/// `rt.Tuple*`, `rt.Instans*`, `rt.Valor*`,
+/// `faber/runtime/go/{order,intervallum,tuple,instans,valor}.go`) carries them
+/// on this table today.
+const CARRIER_GO: &[Target] = &[Target::HirGo];
+
+const fn carrier_row(ns: Namespace, name: &'static str, kind: RuntimeKind) -> RuntimeItem {
+    RuntimeItem {
+        ns,
+        name,
+        kind,
+        targets: CARRIER_GO,
+    }
+}
+
+/// `order`, `intervallum`, `tuple`, `instans` and `valor` rows (T1-G8): the Go
+/// carriers and decoders a call site names. `order` is the generic
+/// ordering-contract entry (a genus's own `Compare`, else the built-in
+/// compare) and `compare` the built-in and tuple three-way compare. The
+/// interval carrier is a type whose operations (`Continet`, `Coercere`,
+/// `Inter`, ...) are methods carrying the Latin names the call sites use; its
+/// constructor is the one free function a call site names. `tuple` turns a
+/// tuple carrier into a comparable map key and back. `instans.parse` is the
+/// three-layout time parse, `valor.struct` the valor-to-genus decoder shell
+/// whose field extraction is supplied at the call site. No row applies a width
+/// limit: none of them stores into a bounded cell.
+pub const ORDER_ORDER: RuntimeItem = carrier_row(Namespace::Order, "order", RuntimeKind::Fn);
+pub const ORDER_COMPARE: RuntimeItem = carrier_row(Namespace::Order, "compare", RuntimeKind::Fn);
+pub const INTERVALLUM_INTERVALLUM: RuntimeItem =
+    carrier_row(Namespace::Intervallum, "Intervallum", RuntimeKind::Type);
+pub const INTERVALLUM_VALUE: RuntimeItem =
+    carrier_row(Namespace::Intervallum, "value", RuntimeKind::Fn);
+pub const TUPLE_KEY: RuntimeItem = carrier_row(Namespace::Tuple, "key", RuntimeKind::Fn);
+pub const TUPLE_PARTS: RuntimeItem = carrier_row(Namespace::Tuple, "parts", RuntimeKind::Fn);
+pub const INSTANS_PARSE: RuntimeItem = carrier_row(Namespace::Instans, "parse", RuntimeKind::Fn);
+pub const VALOR_STRUCT: RuntimeItem = carrier_row(Namespace::Valor, "struct", RuntimeKind::Fn);
+
+/// The targets whose runtime package carries a `sermo` row. Only the Go runtime
+/// (`rt.Sermo*`, `faber/runtime/go/{frame,sermo}.go`) carries them on this
+/// table today.
+const SERMO_GO: &[Target] = &[Target::HirGo];
+
+const fn sermo_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Sermo,
+        name,
+        kind,
+        targets: SERMO_GO,
+    }
+}
+
+/// `sermo` rows (T1-G9): the frame conversation runtime of the Go target. The
+/// types are the sermo handle and its directional views, the typed frame
+/// (`scrinium<T>`), the `status` enum with one struct per variant, and the
+/// conversation record a served `@ ad` handler receives. The functions open and
+/// dispatch a conversation, install the program's static route table, push an
+/// item frame from a handler, build the directional views and materialize a
+/// sermo into a text, numeric or vacuum value. The frame family has no
+/// namespace of its own: it rides the `sermo` namespace. No row applies a width
+/// limit.
+pub const SERMO_SERMO: RuntimeItem = sermo_row("Sermo", RuntimeKind::Type);
+pub const SERMO_MEUS: RuntimeItem = sermo_row("Meus", RuntimeKind::Type);
+pub const SERMO_TUUS: RuntimeItem = sermo_row("Tuus", RuntimeKind::Type);
+pub const SERMO_SCRINIUM: RuntimeItem = sermo_row("Scrinium", RuntimeKind::Type);
+pub const SERMO_STATUS: RuntimeItem = sermo_row("Status", RuntimeKind::Type);
+pub const SERMO_REQUEST: RuntimeItem = sermo_row("Request", RuntimeKind::Type);
+pub const SERMO_ITEM: RuntimeItem = sermo_row("Item", RuntimeKind::Type);
+pub const SERMO_BYTE: RuntimeItem = sermo_row("Byte", RuntimeKind::Type);
+pub const SERMO_BULK: RuntimeItem = sermo_row("Bulk", RuntimeKind::Type);
+pub const SERMO_DONE: RuntimeItem = sermo_row("Done", RuntimeKind::Type);
+pub const SERMO_ERROR: RuntimeItem = sermo_row("Error", RuntimeKind::Type);
+pub const SERMO_CANCEL: RuntimeItem = sermo_row("Cancel", RuntimeKind::Type);
+pub const SERMO_CONVERSATION: RuntimeItem = sermo_row("Conversation", RuntimeKind::Type);
+pub const SERMO_CONV_ITEM: RuntimeItem = sermo_row("conv_item", RuntimeKind::Fn);
+pub const SERMO_OPEN: RuntimeItem = sermo_row("open", RuntimeKind::Fn);
+pub const SERMO_SET_OPENER: RuntimeItem = sermo_row("set_opener", RuntimeKind::Fn);
+pub const SERMO_DISPATCH: RuntimeItem = sermo_row("dispatch", RuntimeKind::Fn);
+pub const SERMO_INSTALL_ROUTES: RuntimeItem = sermo_row("install_routes", RuntimeKind::Fn);
+pub const SERMO_AS_MEUS: RuntimeItem = sermo_row("as_meus", RuntimeKind::Fn);
+pub const SERMO_AS_TUUS: RuntimeItem = sermo_row("as_tuus", RuntimeKind::Fn);
+pub const SERMO_READ_TEXT: RuntimeItem = sermo_row("read_text", RuntimeKind::Fn);
+pub const SERMO_READ_NUMERUS: RuntimeItem = sermo_row("read_numerus", RuntimeKind::Fn);
+pub const SERMO_DRAIN: RuntimeItem = sermo_row("drain", RuntimeKind::Fn);
+
 /// The targets whose runtime package carries each `regex` row. Rows differ by
 /// target: the Rust runtime carries the match operations as free functions in
 /// `faber::regex`, the Go runtime carries a constructor plus methods, the Swift
@@ -568,8 +688,6 @@ pub const TABLE: &[RuntimeItem] = &[
     EXACT_FLOAT,
     EXACT_FITS_I,
     EXACT_FITS_U,
-    EXACT_STORE_I,
-    EXACT_STORE_U,
     EXACT_WRAP,
     EXACT_CLAMP_I,
     EXACT_CLAMP_U,
@@ -651,6 +769,44 @@ pub const TABLE: &[RuntimeItem] = &[
     FORMAT_SCI,
     FORMAT_SIGNED,
     FORMAT_TEXT,
+    TENSOR_TENSOR,
+    TENSOR_ELEMENT_COUNT,
+    TENSOR_TO_SPARSA,
+    VECTOR_VECTOR,
+    VECTOR_FROM_LIST,
+    SPARSA_SPARSA,
+    SPARSA_NEW,
+    ORDER_ORDER,
+    ORDER_COMPARE,
+    INTERVALLUM_INTERVALLUM,
+    INTERVALLUM_VALUE,
+    TUPLE_KEY,
+    TUPLE_PARTS,
+    INSTANS_PARSE,
+    VALOR_STRUCT,
+    SERMO_SERMO,
+    SERMO_MEUS,
+    SERMO_TUUS,
+    SERMO_SCRINIUM,
+    SERMO_STATUS,
+    SERMO_REQUEST,
+    SERMO_ITEM,
+    SERMO_BYTE,
+    SERMO_BULK,
+    SERMO_DONE,
+    SERMO_ERROR,
+    SERMO_CANCEL,
+    SERMO_CONVERSATION,
+    SERMO_CONV_ITEM,
+    SERMO_OPEN,
+    SERMO_SET_OPENER,
+    SERMO_DISPATCH,
+    SERMO_INSTALL_ROUTES,
+    SERMO_AS_MEUS,
+    SERMO_AS_TUUS,
+    SERMO_READ_TEXT,
+    SERMO_READ_NUMERUS,
+    SERMO_DRAIN,
     REGEX_MATCHES,
     REGEX_FIND,
     REGEX_FIND_ALL,
