@@ -4751,6 +4751,62 @@ fn tensor_shift_limes_composes_with_views_without_materializing() {
 }
 
 #[test]
+fn tensor_shift_accepts_integer_array_offsets_and_keeps_validation() {
+    let base = tensor_value(
+        vec![Value::Int(10), Value::Int(20), Value::Int(30)],
+        vec![3],
+    );
+    let offsets = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1)])));
+    let shifted = eval_tensor_view_op(
+        MirCollectionOp::TensorShift,
+        vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        vec![(MirValueId(0), base.clone()), (MirValueId(1), offsets)],
+    )
+    .expect("integer array offsets form a lazy shift view");
+    let (Value::Tensor(base_cell), Value::Tensor(shifted_cell)) = (&base, &shifted) else {
+        panic!("expected tensor values");
+    };
+    assert!(Rc::ptr_eq(
+        &base_cell.borrow().data,
+        &shifted_cell.borrow().data
+    ));
+    assert_eq!(
+        shifted_cell
+            .borrow()
+            .logical_values()
+            .expect("optional shifted view"),
+        vec![Value::Int(20), Value::Int(30), Value::Nil]
+    );
+
+    let wrong_rank = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1), Value::Int(2)])));
+    let error = eval_tensor_view_op(
+        MirCollectionOp::TensorShift,
+        vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        vec![(MirValueId(0), base.clone()), (MirValueId(1), wrong_rank)],
+    )
+    .expect_err("offset count must match tensor rank");
+    assert!(error.message.contains("offset rank differs"));
+
+    let wrong_element = Value::Array(Rc::new(RefCell::new(vec![Value::Float(1.0)])));
+    let error = eval_tensor_view_op(
+        MirCollectionOp::TensorShift,
+        vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        vec![(MirValueId(0), base), (MirValueId(1), wrong_element)],
+    )
+    .expect_err("offset elements must be integers");
+    assert!(error.message.contains("offset is not numerus"));
+}
+
+#[test]
 fn tensor_shift_coalesce_consumes_optional_holes_before_materialize() {
     let base = tensor_value(
         vec![Value::Int(10), Value::Int(20), Value::Int(30)],
@@ -5027,6 +5083,35 @@ fn tensor_shape_check_mismatch_has_recoverable_issue_identity() {
     .expect_err("runtime extent mismatch");
     assert_eq!(error.issue, "runner_tensor_shape_mismatch");
     assert!(error.message.contains("2 != 3"));
+}
+
+#[test]
+fn tensor_shape_check_reads_vector_axis_zero_and_rejects_other_axes() {
+    use radix_mir::{MirShapeCheck, MirShapeExpr, MirShapeRelation};
+
+    let call = |axis| MirRuntimeCall {
+        intrinsic: MirIntrinsic::TensorShapeCheck(MirShapeCheck {
+            relations: vec![MirShapeRelation {
+                left: MirShapeExpr::TensorAxis { argument: 0, axis },
+                right: MirShapeExpr::Literal(1),
+            }],
+            size_bindings: vec![],
+        }),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    let vector = Value::Vector(Rc::new(RefCell::new(vec![Value::Int(7)])));
+
+    assert_eq!(
+        evaluate_collection_call(&call(0), vec![(MirValueId(0), vector.clone())])
+            .expect("vector axis zero is its lane count"),
+        Value::Unit
+    );
+
+    let error = evaluate_collection_call(&call(1), vec![(MirValueId(0), vector)])
+        .expect_err("vectors have no axis beyond zero");
+    assert_eq!(error.issue, "runner_tensor_shape_invalid_extent");
+    assert!(error.message.contains("axis is out of range"));
 }
 
 #[test]

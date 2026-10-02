@@ -2227,11 +2227,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
         let tensor = self.tensor_arg(receiver, span)?;
         let offsets = match self.eval_operand(offsets, span)? {
-            Value::Vector(offsets) => offsets.borrow().clone(),
+            Value::Array(offsets) | Value::Vector(offsets) => offsets.borrow().clone(),
             other => {
                 return Err(RunnerError::internal(
                     span,
-                    format!("tensor shift offsets are not a vector: {other:?}"),
+                    format!("tensor shift offsets are not an array or vector: {other:?}"),
                 ));
             }
         };
@@ -5705,22 +5705,28 @@ fn shape_argument(arguments: &[Value], argument: u32, span: Span) -> Result<&Val
 }
 
 fn shape_axis(value: &Value, axis: u32, span: Span) -> Result<u64, RunnerError> {
-    let Value::Tensor(tensor) = value else {
-        return Err(RunnerError::internal(
-            span,
-            "tensor shape axis argument is not a tensor",
-        ));
-    };
     let axis = usize::try_from(axis)
         .map_err(|_| RunnerError::internal(span, "tensor shape axis index overflow"))?;
-    let dimension = tensor
-        .borrow()
-        .shape
-        .get(axis)
-        .copied()
-        .ok_or_else(|| RunnerError::internal(span, "tensor shape axis is out of range"))?;
-    u64::try_from(dimension)
-        .map_err(|_| RunnerError::internal(span, "tensor shape extent is negative"))
+    match value {
+        Value::Tensor(tensor) => {
+            let dimension =
+                tensor.borrow().shape.get(axis).copied().ok_or_else(|| {
+                    RunnerError::internal(span, "tensor shape axis is out of range")
+                })?;
+            u64::try_from(dimension)
+                .map_err(|_| RunnerError::internal(span, "tensor shape extent is negative"))
+        }
+        Value::Vector(values) if axis == 0 => u64::try_from(values.borrow().len())
+            .map_err(|_| RunnerError::internal(span, "tensor shape extent exceeds u64")),
+        Value::Vector(_) => Err(RunnerError::internal(
+            span,
+            "tensor shape axis is out of range",
+        )),
+        _ => Err(RunnerError::internal(
+            span,
+            "tensor shape axis argument is not a tensor or vector",
+        )),
+    }
 }
 
 fn shape_extent(value: &Value, span: Span) -> Result<u64, RunnerError> {
