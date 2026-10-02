@@ -136,7 +136,14 @@ impl HirVisitor for ExhaustiveChecker<'_> {
             exhaustive,
         } = &expr.kind
         {
-            check_match(scrutinees, arms, *exhaustive, self.types, &mut self.errors);
+            check_match(
+                scrutinees,
+                arms,
+                *exhaustive,
+                self.types,
+                self.names,
+                &mut self.errors,
+            );
             check_coverage(
                 scrutinees,
                 arms,
@@ -156,6 +163,7 @@ fn check_match(
     arms: &[HirCasuArm],
     exhaustive: bool,
     types: &TypeTable,
+    names: Option<&CoverageNames<'_>>,
     errors: &mut Vec<SemanticError>,
 ) {
     // `omnia` enforcement: the keyword is only valid over a single enum
@@ -219,6 +227,7 @@ fn check_match(
 
     let mut covered = FxHashSet::default();
     let mut covered_members = Vec::new();
+    let mut covered_literals = FxHashSet::default();
     let mut has_catchall = false;
     let mut catchall_span = None;
     let mut explicit_null_arm = false;
@@ -262,6 +271,14 @@ fn check_match(
                 }
             } else if is_null_literal_pattern(pattern) {
                 explicit_null_arm = true;
+            } else if let Some((key, spelling)) = literal_pattern_value(pattern, names) {
+                if !covered_literals.insert(key) {
+                    errors.push(
+                        SemanticError::structured(SemanticErrorKind::PatternDuplicate, arm.span)
+                            .with_arg("issue", "duplicate_literal")
+                            .with_arg("value", spelling),
+                    );
+                }
             } else if is_catchall_pattern(pattern) {
                 has_catchall = true;
                 catchall_span = Some(arm.span);
@@ -514,6 +531,36 @@ fn scrutinee_has_null_constituent(ty: TypeId, types: &TypeTable) -> bool {
         Type::Applied(base, _) => scrutinee_has_null_constituent(*base, types),
         _ => false,
     }
+}
+
+/// Identity key and source spelling of a value-literal pattern, so a repeated
+/// `case` value is rejected at check instead of reaching MIR switch lowering.
+///
+/// Only the numeric and text literals a value dispatch can switch on are
+/// keyed; boolean, null, and other literal kinds are covered by the coverage
+/// matrix.
+fn literal_pattern_value(
+    pattern: &HirPattern,
+    names: Option<&CoverageNames<'_>>,
+) -> Option<(String, String)> {
+    use radix_hir::HirLiteral;
+    let (negated, literal) = match pattern {
+        HirPattern::Literal(literal) => (false, literal),
+        HirPattern::NegatedLiteral(literal) => (true, literal),
+        _ => return None,
+    };
+    let sign = if negated { "-" } else { "" };
+    let (kind, spelling) = match literal {
+        HirLiteral::Int(value) => ("int", value.to_string()),
+        HirLiteral::BigInt(digits) => ("int", digits.to_string()),
+        HirLiteral::Float(value) => ("float", value.to_string()),
+        HirLiteral::FloatText { text, .. } => ("float", names?.interner.resolve(*text).to_owned()),
+        HirLiteral::String(symbol) => ("string", format!("{:?}", names?.interner.resolve(*symbol))),
+        HirLiteral::Ascii(symbol) => ("ascii", format!("{:?}", names?.interner.resolve(*symbol))),
+        _ => return None,
+    };
+    let spelling = format!("{sign}{spelling}");
+    Some((format!("{kind}:{spelling}"), spelling))
 }
 
 fn pattern_alternatives(pattern: &HirPattern) -> Vec<&HirPattern> {

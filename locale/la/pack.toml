@@ -3459,6 +3459,10 @@ help = "remove the duplicate pattern"
 message = "duplicate pattern"
 help = "remove the duplicate pattern"
 
+[diagnostics.SEM042.issues.duplicate_literal]
+message = "duplicate case value{?value| |}"
+help = "remove the duplicate pattern"
+
 [diagnostics.SEM043]
 message = "omnia requires an enum scrutinee"
 help = "use `omnia` only with a single enum scrutinee"
