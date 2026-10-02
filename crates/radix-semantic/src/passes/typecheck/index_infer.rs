@@ -167,6 +167,18 @@ impl TypeChecker<'_> {
         let mut unified_dims = Vec::with_capacity(actual_dims.len());
         for (axis, (actual, expected)) in actual_dims.into_iter().zip(expected_dims).enumerate() {
             let mut actual = self.resolve_index(actual);
+            // The same compile-time dimension term on both sides (a
+            // function's own `N` returned or passed as `N`) is equal by
+            // construction. It needs no runtime relation, and it keeps its
+            // symbolic identity so the value's type monomorphizes exactly like
+            // the declared type. Substituting the formal witness first would
+            // rebase it to the carrier's runtime axis and split it from the
+            // declared type. A runtime extent still guards its carrier below.
+            let declared = self.resolve_index(expected);
+            if !self.index_has_runtime_extent(actual) && self.types.index_equals(actual, declared) {
+                unified_dims.push(actual);
+                continue;
+            }
             let expected = self.runtime_substitute_shape_params(expected);
             // A symbolic shape written on an actual tensor describes its
             // carrier, but the runtime check must read the carrier passed at
