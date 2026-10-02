@@ -148,22 +148,24 @@ fn breakable_scope_emits_fallthrough_break() {
 }
 
 /// A breakable block that cannot leave early has no use for the one-shot
-/// loop. TypeScript emits a braced block and still reports `true` so the
-/// caller appends the result glue after it; the other targets keep the loop
-/// until their own units flip the style.
+/// loop. TypeScript and Go (T2-G10) emit a braced block and still report
+/// `true` so the caller appends the result glue after it; the other targets
+/// keep the loop until their own units flip the style.
 #[test]
-fn typescript_drops_the_loop_when_the_block_cannot_exit_early() {
-    let block = breakable_block(vec![]);
-    let mut writer = CodeWriter::new();
-    let wrapped = write_breakable_scope(&block, &mut writer, BreakableLoopStyle::TypeScript, |w| {
-        w.writeln("body");
-    });
-    assert!(wrapped);
-    assert_eq!(writer.finish(), "{\n    body\n}");
+fn typescript_and_go_drop_the_loop_when_the_block_cannot_exit_early() {
+    for style in [BreakableLoopStyle::TypeScript, BreakableLoopStyle::Go] {
+        let block = breakable_block(vec![]);
+        let mut writer = CodeWriter::new();
+        let wrapped = write_breakable_scope(&block, &mut writer, style, |w| {
+            w.writeln("body");
+        });
+        assert!(wrapped, "{style:?}");
+        assert_eq!(writer.finish(), "{\n    body\n}", "{style:?}");
+    }
 
+    let block = breakable_block(vec![]);
     for (style, header) in [
         (BreakableLoopStyle::Rust, "loop {"),
-        (BreakableLoopStyle::Go, "for {"),
         (BreakableLoopStyle::Swift, "repeat {"),
     ] {
         let mut writer = CodeWriter::new();
@@ -173,18 +175,22 @@ fn typescript_drops_the_loop_when_the_block_cannot_exit_early() {
     }
 }
 
-/// A `rumpe` or a routed `perge` keeps the TypeScript loop.
+/// A `rumpe` or a routed `perge` keeps the TypeScript and Go loop.
 #[test]
-fn typescript_keeps_the_loop_for_rumpe_and_perge() {
-    for statement in [rumpe_stmt(), perge_stmt()] {
-        let block = breakable_block(vec![statement]);
-        let mut writer = CodeWriter::new();
-        let wrapped =
-            write_breakable_scope(&block, &mut writer, BreakableLoopStyle::TypeScript, |w| {
+fn typescript_and_go_keep_the_loop_for_rumpe_and_perge() {
+    for (style, header) in [
+        (BreakableLoopStyle::TypeScript, "while (true) {"),
+        (BreakableLoopStyle::Go, "for {"),
+    ] {
+        for statement in [rumpe_stmt(), perge_stmt()] {
+            let block = breakable_block(vec![statement]);
+            let mut writer = CodeWriter::new();
+            let wrapped = write_breakable_scope(&block, &mut writer, style, |w| {
                 w.writeln("body");
             });
-        assert!(wrapped);
-        assert!(writer.finish().starts_with("while (true) {"));
+            assert!(wrapped);
+            assert!(writer.finish().starts_with(header), "{style:?}");
+        }
     }
 }
 

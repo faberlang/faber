@@ -64,7 +64,7 @@ impl BreakableLoopStyle {
     /// Whether this backend drops the one-shot loop from a breakable block
     /// that cannot leave early (see [`block_may_exit_early`]).
     fn drops_dead_shell(self) -> bool {
-        matches!(self, Self::TypeScript)
+        matches!(self, Self::TypeScript | Self::Go)
     }
 
     /// Swift statements carry no terminating `;`.
