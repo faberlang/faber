@@ -706,6 +706,10 @@ help = "use '{iace}' for the recoverable payload"
 message = "'{secus}' is not the particle on {adfirma}"
 help = "use '{mori}' for the optional panic message"
 
+[diagnostics.PARSE001.issues.adfirma_message_particle]
+message = "expected '{mori}' before the {adfirma} message"
+help = "write {adfirma} cond {mori} message"
+
 [diagnostics.PARSE002]
 message = "unexpected token"
 help = "remove or reposition the unexpected token"
