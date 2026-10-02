@@ -881,8 +881,8 @@ productions. It is not a second keyword authority.
 | Declarations | `आरंभasync` | async entrypoint |
 | Declarations | `आरंभ` | entrypoint |
 | Comptime | `अंतःस्थापित` | build-time file embed |
-| Iteration | `बीच` | between |
-| Iteration | `भीतर` | membership |
+| Iteration | `बीच` | collection membership |
+| Iteration | `भीतर` | range containment |
 | Control | `दोहराओ` | for |
 | Objects | `टपल` | tuple type/constructor |
 | Annotation | `लेन` | `@ radix` compiler-lane directive |

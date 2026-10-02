@@ -881,8 +881,8 @@ productions. It is not a second keyword authority.
 | Declarations | `incipiet` | async entrypoint |
 | Declarations | `incipit` | entrypoint |
 | Comptime | `insere` | build-time file embed |
-| Iteration | `inter` | between |
-| Iteration | `intra` | membership |
+| Iteration | `inter` | collection membership |
+| Iteration | `intra` | range containment |
 | Control | `itera` | for |
 | Objects | `iuncta` | tuple type/constructor |
 | Annotation | `lane` | `@ radix` compiler-lane directive |

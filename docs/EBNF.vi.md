@@ -881,8 +881,8 @@ productions. It is not a second keyword authority.
 | Declarations | `bắt_đầu_bất_đồng_bộ` | async entrypoint |
 | Declarations | `bắt_đầu` | entrypoint |
 | Comptime | `nhúng` | build-time file embed |
-| Iteration | `giữa` | between |
-| Iteration | `trong` | membership |
+| Iteration | `giữa` | collection membership |
+| Iteration | `trong` | range containment |
 | Control | `lặp` | for |
 | Objects | `bộ` | tuple type/constructor |
 | Annotation | `làn` | `@ radix` compiler-lane directive |

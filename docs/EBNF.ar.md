@@ -881,8 +881,8 @@ productions. It is not a second keyword authority.
 | Declarations | `استهلال` | async entrypoint |
 | Declarations | `بداية` | entrypoint |
 | Comptime | `تضمين` | build-time file embed |
-| Iteration | `بين` | between |
-| Iteration | `ضمن` | membership |
+| Iteration | `بين` | collection membership |
+| Iteration | `ضمن` | range containment |
 | Control | `كرر` | for |
 | Objects | `توبل` | tuple type/constructor |
 | Annotation | `مسار` | `@ radix` compiler-lane directive |

@@ -881,8 +881,8 @@ productions. It is not a second keyword authority.
 | Declarations | `非同步入口` | async entrypoint |
 | Declarations | `入口` | entrypoint |
 | Comptime | `嵌入` | build-time file embed |
-| Iteration | `之間` | between |
-| Iteration | `內含` | membership |
+| Iteration | `之間` | collection membership |
+| Iteration | `內含` | range containment |
 | Control | `遍歷` | for |
 | Objects | `元組` | tuple type/constructor |
 | Annotation | `車道` | `@ radix` compiler-lane directive |

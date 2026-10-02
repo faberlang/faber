@@ -881,8 +881,8 @@ productions. It is not a second keyword authority.
 | Declarations | `เริ่มอะซิงก์` | async entrypoint |
 | Declarations | `เริ่ม` | entrypoint |
 | Comptime | `ฝัง` | build-time file embed |
-| Iteration | `ระหว่าง` | between |
-| Iteration | `ภายใน` | membership |
+| Iteration | `ระหว่าง` | collection membership |
+| Iteration | `ภายใน` | range containment |
 | Control | `วน` | for |
 | Objects | `ทูเพิล` | tuple type/constructor |
 | Annotation | `เลน` | `@ radix` compiler-lane directive |

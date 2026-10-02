@@ -760,8 +760,8 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Iteration | `ab` | range iteration |
 # | Iteration | `ante` | range until exclusive |
 # | Iteration | `ex` | for-of / import from |
-# | Iteration | `inter` | between |
-# | Iteration | `intra` | membership |
+# | Iteration | `inter` | collection membership |
+# | Iteration | `intra` | range containment |
 # | Iteration | `per` | range step |
 # | Iteration | `usque` | range until inclusive |
 # | Params | `argumenta` | CLI arguments modifier |
