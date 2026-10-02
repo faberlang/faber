@@ -3,8 +3,8 @@
 #![allow(clippy::float_cmp)]
 
 use super::{
-    approx_f32, approx_f64, approx_int, cmp_int_float, cmp_scaled_float, div, fit, int, pow, rem,
-    shl, shr, store,
+    add, approx_f32, approx_f64, approx_int, cmp_int_float, cmp_scaled_float, div, fit, int, mul,
+    pow, rem, shl, shr, store, store_inferred, sub,
 };
 use std::cmp::Ordering;
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -120,6 +120,41 @@ fn shifts_are_unmasked_and_trap_a_negative_count() {
     assert_eq!(
         panic_text(|| shl(HIGH, 1)).as_deref(),
         Some("numerus overflow")
+    );
+}
+
+#[test]
+fn add_sub_mul_compute_exactly_and_trap_outside_the_window_like_int() {
+    assert_eq!(add(2, 3), 5);
+    assert_eq!(sub(2, 3), -1);
+    assert_eq!(mul(-4, 5), -20);
+    assert_eq!(add(HIGH, 0), HIGH);
+    assert_eq!(sub(LOW, 0), LOW);
+    // The same trap text as `int(checked_op)`, and the same window.
+    for trapped in [
+        panic_text(|| add(HIGH, 1)),
+        panic_text(|| sub(LOW, 1)),
+        panic_text(|| mul(HIGH, 2)),
+        panic_text(|| int(HIGH.checked_mul(2))),
+        // `i128` overflow (the `checked_*` `None` case) traps the same way.
+        panic_text(|| mul(i128::MAX, 2)),
+        panic_text(|| add(i128::MAX, 1)),
+        panic_text(|| sub(i128::MIN, 1)),
+    ] {
+        assert_eq!(trapped.as_deref(), Some("numerus overflow"));
+    }
+}
+
+#[test]
+fn store_inferred_appends_the_inferred_note_before_the_unsigned_note() {
+    assert_eq!(store_inferred::<u8>(255, "x", " (inferred)"), 255_u8);
+    assert_eq!(
+        panic_text(|| store_inferred::<i8>(300, "x", " (inferred)")).as_deref(),
+        Some("300 does not fit in `i8` (x) (inferred)")
+    );
+    assert_eq!(
+        panic_text(|| store_inferred::<u8>(-1, "x", "")).as_deref(),
+        Some("-1 does not fit in `u8` (x) (a negative value cannot be stored in an unsigned slot)")
     );
 }
 

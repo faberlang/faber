@@ -8,7 +8,7 @@
 //! `exact_int` module, which is the golden authority.
 //!
 //! Generated code calls these as free functions, for example
-//! `faber::exact::store::<i64>(faber::exact::int(a.checked_add(b)), "return", "")`.
+//! `faber::exact::store::<i64>(faber::exact::add(a, b), "return", "")`.
 
 // WHY: the bodies are the verbatim exact-integer prelude the compiler used to
 // emit into every generated file; the casts are the semantic ops of the exact
@@ -77,6 +77,31 @@ pub fn int(value: Option<i128>) -> i128 {
         }
         _ => panic!("numerus overflow"),
     }
+}
+
+/// Exact sum; a result outside `[-2^63, 2^64 - 1]` traps `numerus overflow`.
+#[inline]
+#[must_use]
+#[track_caller]
+pub fn add(a: i128, b: i128) -> i128 {
+    int(a.checked_add(b))
+}
+
+/// Exact difference; a result outside `[-2^63, 2^64 - 1]` traps
+/// `numerus overflow`.
+#[inline]
+#[must_use]
+#[track_caller]
+pub fn sub(a: i128, b: i128) -> i128 {
+    int(a.checked_sub(b))
+}
+
+/// Exact product; a result outside `[-2^63, 2^64 - 1]` traps `numerus overflow`.
+#[inline]
+#[must_use]
+#[track_caller]
+pub fn mul(a: i128, b: i128) -> i128 {
+    int(a.checked_mul(b))
 }
 
 /// Narrow an exact intermediate to a concrete integer type; a value outside it
@@ -173,6 +198,14 @@ pub fn shr(value: i128, count: i128) -> i128 {
 #[must_use]
 #[track_caller]
 pub fn store<T: TryFrom<i128>>(value: i128, at: &str, inferred: &str) -> T {
+    store_inferred(value, at, inferred)
+}
+
+/// [`store`] for a slot whose type was inferred: the trap text also carries
+/// the inferred-from note (`inferred`).
+#[must_use]
+#[track_caller]
+pub fn store_inferred<T: TryFrom<i128>>(value: i128, at: &str, inferred: &str) -> T {
     T::try_from(value).unwrap_or_else(|_| {
         let ty = std::any::type_name::<T>();
         let note = if value < 0 && ty.starts_with('u') {
