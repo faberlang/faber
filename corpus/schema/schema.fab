@@ -1,0 +1,42 @@
++++
+term = "schema"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "schema_decl", "schema_column", "type_annotation", "owned_type", "base_type", "qualified_type", "block_stmt", "incipit_stmt", "nota_stmt", "expression", "literal"]
+category = "declaration"
+canonical = true
+summary = "Declares an application-owned relational heading (experimental)."
+syntax = "schema <Name> { columna <type> <name> ... }"
+aliases = ["relational heading"]
+related = ["columna", "genus"]
+locale = "en"
++++
+# =============================================================================
+# schema — Declares an application-owned relational heading (experimental)
+# =============================================================================
+#
+# What this teaches:
+#   • Relational headings — `schema Name { ... }` names the columns an application reads from a database result.
+#   • Declaration only — a schema carries column metadata, not a runtime value, so a program that declares one still runs unchanged.
+#
+# Common mistakes:
+#   • Giving a schema methods or `implet` — a schema is a heading, not a genus; both are rejected at parse time.
+#
+# See also: columna, genus
+# =============================================================================
+
+# schema — relational heading declaration
+#
+# GRAMMAR:
+#   schemaDecl :← 'schema' IDENTIFIER '{' (schemaColumn (NEWLINE schemaColumn)*)? '}'
+#
+# EXPECTED OUTPUT:
+#   schema declared
+
+schema Persona {
+    column string nomen
+    column int aetas
+}
+
+main {
+    print "schema declared"
+}

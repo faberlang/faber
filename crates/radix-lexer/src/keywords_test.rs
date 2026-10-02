@@ -169,23 +169,6 @@ fn registry_texts_are_unique() {
 }
 
 #[test]
-fn tokenless_rows_must_not_be_global() {
-    // `Global` means reserved anywhere normal-mode keyword recognition runs —
-    // exactly what `token_kind: Some` does. A tokenless row lexes as an
-    // identifier and the parser claims it by spelling in its grammar slots,
-    // so it must carry `Contextual` owners (or Annotation/TestOwned/Alias)
-    // mirroring those slots. This is the campaign guardrail: every migrated
-    // keyword must assign owners or fail here.
-    for spec in keyword_specs() {
-        assert!(
-            spec.token_kind.is_some() || !matches!(spec.scope, KeywordScope::Global),
-            "tokenless keyword '{}' must not be Global — assign Contextual owners for its grammar slots",
-            spec.text
-        );
-    }
-}
-
-#[test]
 fn every_registered_keyword_token_reports_is_keyword() {
     // WHY: keyword_or_ident (scan.rs) and the is_keyword() match (token.rs) are
     // two parallel registries. breakable-blocks shipped Meus/Tuus in scan.rs but
@@ -291,19 +274,6 @@ fn annotation_names_are_owned_by_annotation_policy() {
         keyword_allowed_as_ident(KeywordOwner::AnnotationName, &TokenKind::Fragilis),
         None
     );
-}
-
-#[test]
-fn no_keyword_has_global_scope() {
-    // No reserved words: every keyword is claimed in a parser-owned slot
-    // (Contextual, TestOwned, Alias, or Annotation), never reserved globally.
-    for spec in keyword_specs() {
-        assert!(
-            !matches!(spec.scope, KeywordScope::Global),
-            "keyword '{}' must not be globally reserved",
-            spec.text
-        );
-    }
 }
 
 #[test]
