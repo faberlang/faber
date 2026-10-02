@@ -52,6 +52,7 @@ fn workspace() -> PathBuf {
 fn scanned_roots(workspace: &Path) -> Vec<PathBuf> {
     const CRATES: &[&str] = &[
         "radix-mir",
+        "radix-mir-basic",
         "radix-mir-coverage",
         "radix-mir-fmir",
         "radix-mir-llvm",
@@ -65,9 +66,12 @@ fn scanned_roots(workspace: &Path) -> Vec<PathBuf> {
         "radix-hir",
         "radix-hir-faber",
         "radix-hir-fhir",
+        "radix-hir-cobol",
+        "radix-hir-fortran",
         "radix-hir-go",
         "radix-hir-haskell",
         "radix-hir-lean",
+        "radix-hir-pascal",
         "radix-hir-python",
         "radix-hir-rust",
         "radix-hir-swift",
