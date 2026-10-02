@@ -140,12 +140,18 @@ incipit {{
     fixum modulus<{w}> zero ← 0
     fixum modulus<{w}> two ← 2
 
-    nota max + one
-    nota zero - one
-    nota max * two
-    nota -one
-    nota ¬zero
-    nota one ⇐ {shift}
+    fixum modulus<{w}> r0 ← max + one
+    nota r0
+    fixum modulus<{w}> r1 ← zero - one
+    nota r1
+    fixum modulus<{w}> r2 ← max * two
+    nota r2
+    fixum modulus<{w}> r3 ← -one
+    nota r3
+    fixum modulus<{w}> r4 ← ¬zero
+    nota r4
+    fixum modulus<{w}> r5 ← one ⇐ {shift}
+    nota r5
     nota max ⇒ {shift}
     nota max / two
     nota max % two
@@ -158,9 +164,11 @@ incipit {{
     dec ↓
     nota dec
 
-    nota max.addita(one)
+    fixum modulus<{w}> t0 ← max.addita(one)
+    nota t0
     nota max.subtrahe(one)
-    nota one.sinistrata({shift})
+    fixum modulus<{w}> t1 ← one.sinistrata({shift})
+    nota t1
     nota max.dextrata({shift})
 
     fixum modulus<{w}> roundTrip ← max ↦ {w} ↦ modulus<{w}>
@@ -234,7 +242,8 @@ incipit {
     fixum modulus<u64> w ← 18268729513060379306
     fixum modulus<u64> sum ← k + w
     nota sum
-    nota sum - w
+    fixum modulus<u64> back ← sum - w
+    nota back
 }
 ",
         &mut host,
@@ -376,7 +385,8 @@ incipit {
     fixum modulus<u64> w ← 7017280452245743616
     fixum modulus<u64> masked ← (k ∧ 255) + (w ∧ 255)
     nota masked
-    nota k ⇐ 1 ∨ k ⇒ 63
+    fixum modulus<u64> rotated ← k ⇐ 1 ∨ k ⇒ 63
+    nota rotated
 }
 ",
         &mut host,

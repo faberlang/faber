@@ -35,12 +35,18 @@ main {
     const wrapping<u32> one ← 1
     var wrapping<u32> zero ← 0
     const u32 converted ↤ one
-    print max + one
-    print zero - one
-    print max * 2
-    print -one
-    print ¬zero
-    print one ⇐ 32
+    const wrapping<u32> ring1 ← max + one
+    print ring1
+    const wrapping<u32> ring2 ← zero - one
+    print ring2
+    const wrapping<u32> ring3 ← max * 2
+    print ring3
+    const wrapping<u32> ring4 ← -one
+    print ring4
+    const wrapping<u32> ring5 ← ¬zero
+    print ring5
+    const wrapping<u32> ring6 ← one ⇐ 32
+    print ring6
     print max ⇒ 32
     print max ≻ zero
     max ↑

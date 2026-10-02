@@ -343,6 +343,13 @@ pub(crate) struct TypeChecker<'a> {
     /// consumed by the next `check_expr_with_expected` so only that node, not
     /// its operands, is treated as landing in the slot.
     pending_store: Option<store::StoreSite>,
+    /// Ring operators of a store into a `wrapping<W>` slot, keyed by the id of
+    /// their first operand and mapped to the slot's word type. Where both
+    /// operands are that word, the operator is typed in the word and reduces
+    /// per operation, which cannot be observed because the store reduces the
+    /// same value (numeric-model §8). Every other `wrapping` expression is
+    /// exact.
+    word_ring: FxHashMap<HirId, TypeId>,
     /// The synthesized type of the expression `check_expr_with_expected` last
     /// finished, before the expected-type unify replaced it with the error
     /// type on a mismatch. The K5 lifting diagnostic reads it.
@@ -647,6 +654,7 @@ impl<'a> TypeChecker<'a> {
             next_hir_id: u32::MAX / 2,
             next_synthetic_def: radix_types::HIR_SYNTHETIC_DEF_ID_BASE,
             pending_store: None,
+            word_ring: FxHashMap::default(),
             last_synthesized_type: None,
             inferred_slot_sources: FxHashMap::default(),
             source_text: None,

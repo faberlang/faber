@@ -35,12 +35,18 @@ main {
     const wrapping<u64> one ← 1
     var wrapping<u64> zero ← 0
     const u64 converted ↤ one
-    print max + one
-    print zero - one
-    print max * 2
-    print -one
-    print ¬zero
-    print one ⇐ 64
+    const wrapping<u64> ring1 ← max + one
+    print ring1
+    const wrapping<u64> ring2 ← zero - one
+    print ring2
+    const wrapping<u64> ring3 ← max * 2
+    print ring3
+    const wrapping<u64> ring4 ← -one
+    print ring4
+    const wrapping<u64> ring5 ← ¬zero
+    print ring5
+    const wrapping<u64> ring6 ← one ⇐ 64
+    print ring6
     print max ⇒ 64
     print max ≻ zero
 

@@ -156,7 +156,7 @@ fn wrapping_and_saturating_stores_apply_the_policy_at_runtime() {
 fn wrapping_shift_count_is_not_masked() {
     // ruling 10: `1 ⇐ 33` on `wrapping<u32>` is 0.
     assert_eq!(
-        ok("varia modulus<u32> a ← 1\nvaria modulus<u32> n ← 33\nnota a ⇐ n\nnota a ⇒ n"),
+        ok("varia modulus<u32> a ← 1\nvaria modulus<u32> n ← 33\nfixum modulus<u32> s ← a ⇐ n\nnota s\nnota a ⇒ n"),
         ["0", "0"]
     );
 }
@@ -371,7 +371,9 @@ fn word_slot_constants_at_the_64_bit_edges() {
         ["18446744073709551615"]
     );
     assert_eq!(
-        ok("fixum modulus<u64> m ← 5\nnota m + 18446744073709551615\nnota 18446744073709551615 + m"),
+        ok(
+            "fixum modulus<u64> m ← 5\nfixum modulus<u64> p ← m + 18446744073709551615\nfixum modulus<u64> q ← 18446744073709551615 + m\nnota p\nnota q"
+        ),
         ["4", "4"]
     );
 }
@@ -529,7 +531,12 @@ fn unary_twins_follow_the_range_rule() {
 #[test]
 fn word_twins_keep_the_word_semantics() {
     assert_eq!(ok("varia modulus<u8> w ← 200\nw.adde(100)\nnota w"), ["44"]);
-    assert_eq!(ok("fixum modulus<u8> w ← 200\nnota w.addita(100)"), ["44"]);
+    // The twin means the operator: exact until it lands in a slot (§8).
+    assert_eq!(ok("fixum modulus<u8> w ← 200\nnota w.addita(100)"), ["300"]);
+    assert_eq!(
+        ok("fixum modulus<u8> w ← 200\nfixum modulus<u8> s ← w.addita(100)\nnota s"),
+        ["44"]
+    );
 }
 
 #[test]
