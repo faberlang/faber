@@ -216,12 +216,11 @@ struct Emitter {
 const EMITTERS: [Emitter; 3] = [
     Emitter {
         name: "radix-hir-rust",
-        // WHY: after T1-R8 no runtime helper is hand-spelled. What remains is the
-        // fork F-E item names (8 lines: `__faber_lazy`, `__faber_const_`,
-        // `__faber_ad_serve_`, `__faber_unresolved_def`), the `__FaberRecord`
-        // item name (1) and the compiler temporaries (`__faber_slot`,
-        // `__faber_yield`, ... 33 lines), which T2-R8 moves to `TempScope`.
-        legacy_budget: 42,
+        // WHY: after T2-R8 no runtime helper and no compiler local is
+        // hand-spelled. What remains is the fork F-E item names (8 lines:
+        // `__faber_lazy`, `__faber_const_`, `__faber_ad_serve_`,
+        // `__faber_unresolved_def`) and the `__FaberRecord` item name (1).
+        legacy_budget: 9,
         new_shape_budget: 0,
         new_shape: rust_new_shape,
     },
