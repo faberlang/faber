@@ -39,6 +39,9 @@ impl super::FaberCodegen<'_> {
             Type::Primitive(prim) => surface
                 .type_surface(TypeBindingKind::Primitive(*prim))
                 .to_owned(),
+            Type::TensorEdgePolicy(policy) => surface
+                .type_surface(TypeBindingKind::TensorEdgePolicy(*policy))
+                .to_owned(),
 
             Type::SizedInstans(precision) => format!(
                 "{}<{}>",
@@ -587,6 +590,12 @@ impl super::FaberCodegen<'_> {
                 Self::expect_no_form_args(form)?;
                 Ok(surface
                     .type_surface(TypeBindingKind::Primitive(*prim))
+                    .to_owned())
+            }
+            Type::TensorEdgePolicy(policy) => {
+                Self::expect_no_form_args(form)?;
+                Ok(surface
+                    .type_surface(TypeBindingKind::TensorEdgePolicy(*policy))
                     .to_owned())
             }
             Type::SizedNumeric(prim, width) => {

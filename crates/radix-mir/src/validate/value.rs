@@ -671,19 +671,57 @@ fn spell_type_id(types: &TypeTable, id: TypeId, depth: u8) -> String {
 }
 
 fn spell_index(types: &TypeTable, id: IndexId, depth: u8) -> String {
+    spell_index_at_precedence(types, id, depth, 0).0
+}
+
+fn spell_index_at_precedence(
+    types: &TypeTable,
+    id: IndexId,
+    depth: u8,
+    parent_precedence: u8,
+) -> (String, u8) {
     if depth > 6 {
-        return "_".to_owned();
+        return ("_".to_owned(), 3);
     }
     match types.get_index(id) {
-        IndexExpr::Literal(n) => n.to_string(),
+        IndexExpr::Literal(n) => (n.to_string(), 3),
+        IndexExpr::Runtime(source) => (format!("<runtime:{source:?}>"), 3),
+        IndexExpr::Affine { base, offset } => {
+            let (base, _) = spell_index_at_precedence(types, *base, depth + 1, 1);
+            let text = if *offset < 0 {
+                format!("{base} - {}", offset.unsigned_abs())
+            } else if *offset > 0 {
+                format!("{base} + {offset}")
+            } else {
+                base
+            };
+            parenthesize_index(text, 1, parent_precedence)
+        }
+        IndexExpr::Divide { numerator, divisor } => {
+            let (numerator, _) =
+                spell_index_at_precedence(types, *numerator, depth + 1, 2);
+            parenthesize_index(
+                format!("{numerator} / {divisor}"),
+                2,
+                parent_precedence,
+            )
+        }
         IndexExpr::Tuple(dims) => {
             let parts = dims
                 .iter()
-                .map(|dim| spell_index(types, *dim, depth + 1))
+                .map(|dim| spell_index_at_precedence(types, *dim, depth + 1, 0).0)
                 .collect::<Vec<_>>();
-            format!("[{}]", parts.join(", "))
+            (format!("[{}]", parts.join(", ")), 3)
         }
-        IndexExpr::Param(_) => "N".to_owned(),
-        IndexExpr::Infer(_) | IndexExpr::Unspecified => "_".to_owned(),
+        IndexExpr::Param(_) => ("N".to_owned(), 3),
+        IndexExpr::Infer(_) | IndexExpr::Unspecified => ("_".to_owned(), 3),
+    }
+}
+
+fn parenthesize_index(text: String, precedence: u8, parent_precedence: u8) -> (String, u8) {
+    if precedence < parent_precedence {
+        (format!("({text})"), precedence)
+    } else {
+        (text, precedence)
     }
 }

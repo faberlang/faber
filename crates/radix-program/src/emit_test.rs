@@ -219,3 +219,88 @@ main {
         output.code
     );
 }
+
+#[test]
+fn rust_package_deduplicates_imported_tensor_edge_policy_providers() {
+    let dir = temp_dir("tensor-edge-policy-provider-dedup");
+    fs::write(
+        dir.join("main.fab"),
+        r#"+++
+locale = "en"
++++
+
+import from "./consumer_a" consumer_a
+import from "./consumer_b" consumer_b
+
+main {
+    const tf32[] seed ← empty
+    const tf32[3] source ← seed.from_flat([1.0, 2.0, 3.0], [3])
+    print consumer_a.resolve_a(source).flatten()
+    print consumer_b.resolve_b(source).flatten()
+}
+"#,
+    )
+    .expect("write entry");
+    fs::write(
+        dir.join("policy.fab"),
+        r#"
+@ public
+class ZeroGhost {
+    @ public
+    fn remap(vector<int, 1> coord) → vector<int, 1> {
+        return [0] ↦ vector<int, 1>
+    }
+}
+"#,
+    )
+    .expect("write policy");
+    for (module, function) in [("consumer_a", "resolve_a"), ("consumer_b", "resolve_b")] {
+        fs::write(
+            dir.join(format!("{module}.fab")),
+            format!(
+                r#"+++
+locale = "en"
++++
+
+import from "./policy" policy
+
+@ public
+fn {function}(tf32[3] source) → tf32[3] {{
+    return source.shift([1]).limes<policy.ZeroGhost>()
+}}
+"#
+            ),
+        )
+        .expect("write consumer module");
+    }
+
+    let result = compile_package(
+        &Config::default().with_target(Target::HirRust),
+        &dir.join("main.fab"),
+        &test_seams(),
+    );
+    assert!(
+        result.success(),
+        "expected multi-module tensor edge policy compile success, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected Rust output");
+    };
+    let provider_impl = "impl faber::TensorEdgePolicyProvider<f32, 1> for crate::policy::ZeroGhost";
+    assert_eq!(
+        output.code.matches(provider_impl).count(),
+        1,
+        "duplicate imported custom-policy uses must have one package impl:\n{}",
+        output.code
+    );
+    assert!(output.code.contains("pub mod consumer_a"));
+    assert!(output.code.contains("pub mod consumer_b"));
+    assert!(output.code.contains("fn resolve_a"));
+    assert!(output.code.contains("fn resolve_b"));
+    let _ = fs::remove_dir_all(&dir);
+}

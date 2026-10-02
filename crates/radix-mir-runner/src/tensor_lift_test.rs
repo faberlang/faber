@@ -27,10 +27,10 @@ fn function() -> MirFunction {
 }
 
 fn tensor(values: Vec<Value>, shape: &[i64]) -> Value {
-    Value::Tensor(Rc::new(RefCell::new(TensorValue {
-        data: values,
-        shape: shape.to_vec(),
-    })))
+    Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        values,
+        shape.to_vec(),
+    ))))
 }
 
 fn ints(values: &[i64], shape: &[i64]) -> Value {
@@ -45,7 +45,7 @@ fn data(value: &Value) -> Vec<Value> {
     let Value::Tensor(cell) = value else {
         panic!("expected a tensor, got {value:?}");
     };
-    cell.borrow().data.clone()
+    cell.borrow().logical_values().expect("valid tensor layout")
 }
 
 /// Run `op` over `operands` into a result tensor whose element is `element`.
@@ -233,7 +233,7 @@ fn rank_two_and_three_keep_their_shape() {
             unreachable!()
         };
         assert_eq!(cell.borrow().shape, shape);
-        assert_eq!(cell.borrow().data[3], Value::Float(8.0));
+        assert_eq!(cell.borrow().value_at(3), Some(Value::Float(8.0)));
     }
 }
 

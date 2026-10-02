@@ -65,3 +65,76 @@ fn format_figura_renders_literals_tuple_and_holes() {
         "_"
     );
 }
+
+#[test]
+fn lower_figura_arithmetic_checks_static_naturals_and_division() {
+    let mut types = TypeTable::new();
+    let resolver = Resolver::new();
+
+    let negative = lower_figura_expr(
+        &FiguraExpr::Subtract(Box::new(FiguraExpr::Literal(0)), 1),
+        &resolver,
+        &mut types,
+    );
+    assert_eq!(negative, Err(super::FIGURA_ARITHMETIC_NEGATIVE_MSG));
+
+    let non_integral = lower_figura_expr(
+        &FiguraExpr::Divide(Box::new(FiguraExpr::Literal(5)), 2),
+        &resolver,
+        &mut types,
+    );
+    assert_eq!(non_integral, Err(super::FIGURA_ARITHMETIC_NON_INTEGRAL_MSG));
+
+    let zero_divisor = lower_figura_expr(
+        &FiguraExpr::Divide(Box::new(FiguraExpr::Literal(5)), 0),
+        &resolver,
+        &mut types,
+    );
+    assert_eq!(
+        zero_divisor,
+        Err(super::FIGURA_ARITHMETIC_DIVIDE_BY_ZERO_MSG)
+    );
+
+    let exact = lower_figura_expr(
+        &FiguraExpr::Divide(Box::new(FiguraExpr::Literal(6)), 2),
+        &resolver,
+        &mut types,
+    )
+    .expect("exact static division");
+    assert!(matches!(types.get_index(exact), IndexExpr::Literal(3)));
+
+    let canceled_subtraction = FiguraExpr::Add(
+        Box::new(FiguraExpr::Subtract(Box::new(FiguraExpr::Literal(0)), 1)),
+        1,
+    );
+    let zero = lower_figura_expr(&canceled_subtraction, &resolver, &mut types)
+        .expect("the complete expression is natural");
+    assert!(matches!(types.get_index(zero), IndexExpr::Literal(0)));
+
+    let canceled_division = FiguraExpr::Add(
+        Box::new(FiguraExpr::Subtract(
+            Box::new(FiguraExpr::Divide(Box::new(FiguraExpr::Literal(5)), 2)),
+            1,
+        )),
+        1,
+    );
+    assert_eq!(
+        lower_figura_expr(&canceled_division, &resolver, &mut types),
+        Err(super::FIGURA_ARITHMETIC_NON_INTEGRAL_MSG),
+        "affine cancellation must not erase an exact-division obligation"
+    );
+}
+
+#[test]
+fn format_figura_keeps_arithmetic_precedence() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let n = types.intern_index(IndexExpr::Param(interner.intern("N")));
+    let minus_one = radix_types::add_index_constant(&mut types, n, -1).unwrap();
+    let divide = radix_types::divide_index_exact(&mut types, minus_one, 2).unwrap();
+    let divided_n = radix_types::divide_index_exact(&mut types, n, 2).unwrap();
+    let plus_three = radix_types::add_index_constant(&mut types, divided_n, 3).unwrap();
+
+    assert_eq!(format_figura(divide, &types, &interner), "(N - 1) / 2");
+    assert_eq!(format_figura(plus_three, &types, &interner), "N / 2 + 3");
+}

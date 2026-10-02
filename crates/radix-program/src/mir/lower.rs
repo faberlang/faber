@@ -9,16 +9,17 @@ use super::{
     MirBlockId, MirCallee, MirClosureCallee, MirClosureEnvironment, MirClosureEnvironmentId,
     MirClosureValue, MirConstant, MirFunction, MirFunctionId, MirIntrinsic, MirOperand,
     MirOptionChainLink, MirOptionOp, MirPlace, MirProgram, MirProjection, MirRuntimeCall,
-    MirStatement, MirStatementKind, MirSwitchCase, MirTerminator, MirTerminatorKind, MirType,
-    MirValue, MirValueKind, ModuleId, NominalImportContext, PackageMirLinks, Path, PathBuf,
-    Primitive, Resolver, SourceRewrites, Symbol, Type, TypeId, TypeTable, build_nominal_remap,
-    build_variant_remap, exported_nominal_names, extend_unmapped_library_sources,
-    import_semantic_type_with_nominal, library_cached_analysis, library_cached_file_interface,
-    lower_analyzed_unit, mir_diag, mir_issue_diag, mir_lowering_diag, push_type_rewrite,
-    record_shared_nominals, remap_function_text_symbols, remap_optional_symbol,
-    remap_program_text_symbols, rewrite_analysis_namespace_calls,
-    rewrite_closure_environment_sources, rewrite_generic_param_sources, rewrite_program_sources,
-    rewrite_templates_sources, source_nominal_names, with_library_cached_analysis_mut,
+    MirStatement, MirStatementKind, MirSwitchCase, MirTensorEdgePolicyMetadata,
+    MirTensorEdgePolicySelector, MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueKind,
+    ModuleId, NominalImportContext, PackageMirLinks, Path, PathBuf, Primitive, Resolver,
+    SourceRewrites, Symbol, Type, TypeId, TypeTable, build_nominal_remap, build_variant_remap,
+    exported_nominal_names, extend_unmapped_library_sources, import_semantic_type_with_nominal,
+    library_cached_analysis, library_cached_file_interface, lower_analyzed_unit, mir_diag,
+    mir_issue_diag, mir_lowering_diag, push_type_rewrite, record_shared_nominals,
+    remap_function_text_symbols, remap_optional_symbol, remap_program_text_symbols,
+    rewrite_analysis_namespace_calls, rewrite_closure_environment_sources,
+    rewrite_generic_param_sources, rewrite_program_sources, rewrite_templates_sources,
+    source_nominal_names, with_library_cached_analysis_mut,
 };
 use radix_module::file_interface::FileInterface;
 use radix_module::mir::{MirDeviceFunctionMetadataMap, MirFunctionSignature};
@@ -796,6 +797,7 @@ mod tests {
             device_function_metadata: MirDeviceFunctionMetadataMap::default(),
             generic_templates: Vec::new(),
             generic_params: Vec::new(),
+            tensor_edge_policy_metadata: MirTensorEdgePolicyMetadata::default(),
             validated,
             companions: Default::default(),
             imported_device_routes: Default::default(),
@@ -880,6 +882,7 @@ pub(super) fn lower_package_units<'a>(
     // below, so linked library functions are lowered only when reachable from
     // the entry's call graph (default = pruning, delivery §4.3).
     let mut reachable_seed = collect_package_synthetic_references(package);
+    collect_tensor_edge_policy_callback_references(package, &links.method_targets, &mut reachable_seed);
 
     let other_ids = package
         .nodes
@@ -1149,6 +1152,7 @@ pub(super) fn lower_package_units<'a>(
             &lowered_source_types,
             &mut entry.analysis.types,
             &param_symbols,
+            &record_field_symbols,
             &validation,
             &unit_path,
         )?;
@@ -1156,7 +1160,13 @@ pub(super) fn lower_package_units<'a>(
         lowered = rewrite_lowered_struct_defs(lowered, &nominal_def_remap, &unit_path)?;
         lowered =
             rewrite_lowered_program_sources(lowered, &unit_path, &source_rewrites, &unit_path)?;
-        lowered = rewrite_generic_identity(lowered, &unit_path, &source_rewrites);
+        lowered = rewrite_generic_identity(
+            lowered,
+            &unit_path,
+            &source_rewrites,
+            &nominal_def_remap,
+            links.method_targets.get(&unit_path),
+        );
         ensure_unique_definition_sources(lowered.validated.program(), &unit_path)?;
         extra_validation.merge(&validation);
         let dispatch_function = selected_cli_dispatch_function(
@@ -1391,6 +1401,7 @@ pub(super) fn lower_package_units<'a>(
                     &lowered_source_types,
                     &mut entry.analysis.types,
                     &param_symbols,
+                    &record_field_symbols,
                     &validation,
                     &library.path,
                 ) {
@@ -1428,7 +1439,13 @@ pub(super) fn lower_package_units<'a>(
                         return Ok(());
                     }
                 };
-                lowered = rewrite_generic_identity(lowered, &library.path, &source_rewrites);
+                lowered = rewrite_generic_identity(
+                    lowered,
+                    &library.path,
+                    &source_rewrites,
+                    &nominal_def_remap,
+                    links.method_targets.get(&library.path),
+                );
                 if let Err(errors) =
                     ensure_unique_definition_sources(lowered.validated.program(), &library.path)
                 {
@@ -1441,6 +1458,7 @@ pub(super) fn lower_package_units<'a>(
                     environments: lowered.closure_environments,
                     templates: lowered.generic_templates,
                     generic_params: lowered.generic_params,
+                    tensor_edge_policy_metadata: lowered.tensor_edge_policy_metadata,
                     device_function_metadata: lowered.device_function_metadata,
                 });
                 Ok(())
@@ -1455,6 +1473,18 @@ pub(super) fn lower_package_units<'a>(
     // S1 U3 reachability (default = pruning): linked library functions that
     // are unreachable from the package's synthetic call graph are dropped
     // before they merge into the program (delivery §4.3).
+    // A custom limes provider is a static dispatch edge rather than an
+    // ordinary MIR call in the generic template. Keep its checked callback
+    // bodies alive until package specialization replaces the template's
+    // placeholder with concrete callback MIDs.
+    for library in &library_parts {
+        for provider in &library.tensor_edge_policy_metadata.providers {
+            if let MirTensorEdgePolicySelector::Custom { remap, transform, .. } = provider.selector {
+                reachable_seed.insert(remap);
+                reachable_seed.extend(transform);
+            }
+        }
+    }
     prune_unreachable_library_functions(&mut library_parts, &mut reachable_seed);
     let Some(entry) = package.nodes.get_mut(entry_id) else {
         unreachable!("entry id selected from program nodes");
@@ -1472,6 +1502,22 @@ pub(super) fn lower_package_units<'a>(
     );
     let mut merged = lower_unit(entry, &cli_plan.entry_records, no_fuse)?;
     ensure_unique_definition_sources(&merged.validated.program(), &entry_path)?;
+    // Generic limes templates from future library units are already offered
+    // to the incremental linker below. Make their portable policy sites
+    // visible at the same time, so a template cannot be specialized with its
+    // default Clamp placeholder before the defining library is appended.
+    for library in &library_parts {
+        merge_tensor_edge_policy_metadata(
+            &mut merged.tensor_edge_policy_metadata,
+            &library.tensor_edge_policy_metadata,
+        );
+    }
+    for unit in &pending {
+        merge_tensor_edge_policy_metadata(
+            &mut merged.tensor_edge_policy_metadata,
+            &unit.lowered.tensor_edge_policy_metadata,
+        );
+    }
     // KPC-WIRE (c): the entry's module-owned route map joins the same way as
     // the siblings'; the transferred map is consumed exactly once.
     imported_device_routes.extend(joined_imported_device_routes(
@@ -1907,6 +1953,9 @@ fn transplant_expr(
                             nominal,
                             const_path_rewrites,
                         )?)
+                    }
+                    radix_module::hir::HirArrayElement::Infer(span) => {
+                        radix_module::hir::HirArrayElement::Infer(*span)
                     }
                 });
             }
@@ -2456,6 +2505,7 @@ fn rewrite_lowered_shape_size_indices<'a>(
     source_types: &TypeTable,
     target_types: &mut TypeTable,
     param_symbols: &HashMap<Symbol, Symbol>,
+    record_field_symbols: &HashMap<Symbol, Symbol>,
     remapped: &RemappedValidation,
     diagnostic_path: &Path,
 ) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
@@ -2465,7 +2515,7 @@ fn rewrite_lowered_shape_size_indices<'a>(
             let MirConstant::ShapeSize { shape, .. } = constant else {
                 return true;
             };
-            *shape = import_shape_size_index(source_types, target_types, *shape, param_symbols);
+            *shape = import_shape_size_index(source_types, target_types, *shape, param_symbols, record_field_symbols);
             true
         });
     };
@@ -2474,6 +2524,19 @@ fn rewrite_lowered_shape_size_indices<'a>(
     }
     for function in &mut lowered.generic_templates {
         rewrite_function(function);
+    }
+    for (_, params) in &mut lowered.generic_params {
+        for param in params {
+            if let Some(witness) = param.runtime_witness.as_mut() {
+                *witness = import_shape_size_index(
+                    source_types,
+                    target_types,
+                    *witness,
+                    param_symbols,
+                    record_field_symbols,
+                );
+            }
+        }
     }
     let target_snapshot = TypeTable::from_snapshot(target_types.snapshot())
         .map_err(|message| vec![mir_lowering_diag(diagnostic_path, message)])?;
@@ -2490,20 +2553,43 @@ fn import_shape_size_index(
     target_types: &mut TypeTable,
     index: radix_module::semantic::IndexId,
     param_symbols: &HashMap<Symbol, Symbol>,
+    record_field_symbols: &HashMap<Symbol, Symbol>,
 ) -> radix_module::semantic::IndexId {
     match source_types.get_index(index).clone() {
         IndexExpr::Tuple(items) => {
             let items = items
                 .into_iter()
-                .map(|item| {
-                    import_shape_size_index(source_types, target_types, item, param_symbols)
-                })
+                .map(|item| import_shape_size_index(source_types, target_types, item, param_symbols, record_field_symbols))
                 .collect();
             target_types.intern_index(IndexExpr::Tuple(items))
+        }
+        IndexExpr::Affine { base, offset } => {
+            let base = import_shape_size_index(source_types, target_types, base, param_symbols, record_field_symbols);
+            target_types.intern_index(IndexExpr::Affine { base, offset })
+        }
+        IndexExpr::Divide { numerator, divisor } => {
+            let numerator = import_shape_size_index(source_types, target_types, numerator, param_symbols, record_field_symbols);
+            target_types.intern_index(IndexExpr::Divide { numerator, divisor })
         }
         IndexExpr::Param(symbol) => target_types.intern_index(IndexExpr::Param(
             param_symbols.get(&symbol).copied().unwrap_or(symbol),
         )),
+        IndexExpr::Runtime(mut source) => {
+            use radix_types::RuntimeExtentId;
+            let fields = match &mut source {
+                RuntimeExtentId::TensorFieldAxis { fields, .. }
+                | RuntimeExtentId::ExpressionFieldAxis { fields, .. }
+                | RuntimeExtentId::CallArgumentFieldAxis { fields, .. }
+                | RuntimeExtentId::FunctionParameterFieldAxis { fields, .. } => Some(fields),
+                _ => None,
+            };
+            if let Some(fields) = fields {
+                for field in fields {
+                    *field = record_field_symbols.get(field).copied().unwrap_or(*field);
+                }
+            }
+            target_types.intern_index(IndexExpr::Runtime(source))
+        }
         other => target_types.intern_index(other),
     }
 }
@@ -2659,10 +2745,103 @@ fn rewrite_generic_identity<'a>(
     mut lowered: LoweredMirUnit<'a>,
     unit_path: &Path,
     source_rewrites: &SourceRewrites,
+    nominal_rewrites: &HashMap<DefId, DefId>,
+    method_targets: Option<&HashMap<(DefId, String), DefId>>,
 ) -> LoweredMirUnit<'a> {
     rewrite_templates_sources(&mut lowered.generic_templates, unit_path, source_rewrites);
     rewrite_generic_param_sources(&mut lowered.generic_params, unit_path, source_rewrites);
+    let rewrite_def = |source: DefId| {
+        source_rewrites
+            .get(&(unit_path.to_path_buf(), source))
+            .copied()
+            .unwrap_or(source)
+    };
+    for site in &mut lowered.tensor_edge_policy_metadata.generic_limes {
+        site.source = rewrite_def(site.source);
+    }
+    for provider in &mut lowered.tensor_edge_policy_metadata.providers {
+        if let MirTensorEdgePolicySelector::Custom {
+            policy_def,
+            remap,
+            transform,
+        } = &mut provider.selector
+        {
+            *policy_def = nominal_rewrites
+                .get(policy_def)
+                .copied()
+                .unwrap_or(*policy_def);
+            let rewrite_callback = |method: &str, callback: DefId| {
+                method_targets
+                    .and_then(|targets| targets.get(&(*policy_def, method.to_owned())).copied())
+                    .or_else(|| {
+                        source_rewrites
+                            .get(&(unit_path.to_path_buf(), callback))
+                            .copied()
+                    })
+                    .unwrap_or(callback)
+            };
+            *remap = rewrite_callback("remap", *remap);
+            *transform = transform.map(|callback| rewrite_callback("transform", callback));
+        }
+        if let Some(policy_type) = &mut provider.policy_type {
+            rewrite_tensor_edge_type_identity(policy_type, nominal_rewrites);
+        }
+        if let Some(element_type) = &mut provider.element_type {
+            rewrite_tensor_edge_type_identity(element_type, nominal_rewrites);
+        }
+    }
     lowered
+}
+
+fn rewrite_tensor_edge_type_identity(
+    identity: &mut radix_module::mir::MirTensorEdgeTypeIdentity,
+    rewrites: &HashMap<DefId, DefId>,
+) {
+    use radix_module::mir::{MirTensorEdgeAppliedArg, MirTensorEdgeTypeIdentity};
+
+    match identity {
+        MirTensorEdgeTypeIdentity::Struct(definition)
+        | MirTensorEdgeTypeIdentity::Enum(definition)
+        | MirTensorEdgeTypeIdentity::Interface(definition) => {
+            *definition = rewrites.get(definition).copied().unwrap_or(*definition);
+        }
+        MirTensorEdgeTypeIdentity::Applied(base, args) => {
+            rewrite_tensor_edge_type_identity(base, rewrites);
+            for argument in args {
+                if let MirTensorEdgeAppliedArg::Type(ty) = argument {
+                    rewrite_tensor_edge_type_identity(ty, rewrites);
+                }
+            }
+        }
+        MirTensorEdgeTypeIdentity::Array(inner)
+        | MirTensorEdgeTypeIdentity::Option(inner)
+        | MirTensorEdgeTypeIdentity::Ref(_, inner)
+        | MirTensorEdgeTypeIdentity::Tensor(inner, _)
+        | MirTensorEdgeTypeIdentity::Vector(inner, _)
+        | MirTensorEdgeTypeIdentity::Matrix(inner, _)
+        | MirTensorEdgeTypeIdentity::Sparsa(inner, _) => {
+            rewrite_tensor_edge_type_identity(inner, rewrites)
+        }
+        MirTensorEdgeTypeIdentity::Tuple(items)
+        | MirTensorEdgeTypeIdentity::Union(items)
+        | MirTensorEdgeTypeIdentity::Intersection(items) => {
+            for item in items {
+                rewrite_tensor_edge_type_identity(item, rewrites);
+            }
+        }
+        MirTensorEdgeTypeIdentity::Record(fields) => {
+            for (_, field_ty) in fields {
+                rewrite_tensor_edge_type_identity(field_ty, rewrites);
+            }
+        }
+        MirTensorEdgeTypeIdentity::Primitive(_)
+        | MirTensorEdgeTypeIdentity::BuiltinPolicy(_)
+        | MirTensorEdgeTypeIdentity::SizedNumeric(_, _)
+        | MirTensorEdgeTypeIdentity::ModularWord(_)
+        | MirTensorEdgeTypeIdentity::SaturatingWord(_)
+        | MirTensorEdgeTypeIdentity::PolicyFloat(_, _)
+        | MirTensorEdgeTypeIdentity::SizedInstans(_) => {}
+    }
 }
 
 /// Collect one package unit's own device facts for the package-seam
@@ -2748,6 +2927,22 @@ fn merge_imported_device_registrations(
     }
 }
 
+fn merge_tensor_edge_policy_metadata(
+    target: &mut MirTensorEdgePolicyMetadata,
+    incoming: &MirTensorEdgePolicyMetadata,
+) {
+    for provider in &incoming.providers {
+        if !target.providers.contains(provider) {
+            target.providers.push(provider.clone());
+        }
+    }
+    for site in &incoming.generic_limes {
+        if !target.generic_limes.contains(site) {
+            target.generic_limes.push(*site);
+        }
+    }
+}
+
 fn shift_templates(templates: &mut [MirFunction], offset: u32) {
     if offset == 0 {
         return;
@@ -2790,7 +2985,7 @@ fn instantiate_package_generics<'a>(
     // as the leaf-tail union (no second composition pass, no dual authority).
     let (mut program, prior_context) = merged.validated.into_parts();
     let (extra, registrations) =
-        radix_module::mir::instantiate_merged_generic_calls_with_devices_and_metadata(
+        radix_module::mir::instantiate_merged_generic_calls_with_tensor_edge_policy(
             &mut program,
             &templates,
             &generic_params,
@@ -2803,6 +2998,8 @@ fn instantiate_package_generics<'a>(
             &imported_devices,
             &consumer_device_roles,
             &consumer_launch_entries,
+            &merged.tensor_edge_policy_metadata,
+            true,
         )
         .map_err(|errors| {
             errors
@@ -2978,13 +3175,25 @@ fn rewrite_lowered_struct_defs<'a>(
 fn rewrite_function_struct_defs(function: &mut MirFunction, struct_remap: &HashMap<DefId, DefId>) {
     for block in &mut function.blocks {
         for statement in &mut block.statements {
-            let MirStatementKind::Construct { aggregate, .. } = &mut statement.kind else {
-                continue;
-            };
-            if let MirAggregateKind::Struct(def_id) = &mut aggregate.kind
-                && let Some(rewritten) = struct_remap.get(def_id)
-            {
-                aggregate.kind = MirAggregateKind::Struct(*rewritten);
+            match &mut statement.kind {
+                MirStatementKind::Construct { aggregate, .. } => {
+                    if let MirAggregateKind::Struct(def_id) = &mut aggregate.kind
+                        && let Some(rewritten) = struct_remap.get(def_id)
+                    {
+                        aggregate.kind = MirAggregateKind::Struct(*rewritten);
+                    }
+                }
+                MirStatementKind::RuntimeCall { call, .. } => {
+                    if let MirIntrinsic::TensorLimes(radix_module::mir::MirEdgePolicy::Custom {
+                        policy_def,
+                        ..
+                    }) = &mut call.intrinsic
+                        && let Some(rewritten) = struct_remap.get(policy_def)
+                    {
+                        *policy_def = *rewritten;
+                    }
+                }
+                MirStatementKind::Assign { .. } | MirStatementKind::Call { .. } => {}
             }
         }
     }
@@ -3312,6 +3521,7 @@ fn append_shifted_program<'merged, 'incoming>(
         environments: incoming.closure_environments,
         templates: incoming.generic_templates,
         generic_params: incoming.generic_params,
+        tensor_edge_policy_metadata: incoming.tensor_edge_policy_metadata,
         device_function_metadata: incoming.device_function_metadata,
     };
     let offset = append_shifted_parts(
@@ -3327,6 +3537,10 @@ fn append_shifted_program<'merged, 'incoming>(
         offset,
         diagnostic_path,
     )?;
+    merge_tensor_edge_policy_metadata(
+        &mut merged.tensor_edge_policy_metadata,
+        &incoming_parts.tensor_edge_policy_metadata,
+    );
     if !prior_templates.is_empty() || !incoming_parts.templates.is_empty() {
         let mut current_templates = incoming_parts.templates.clone();
         shift_templates(&mut current_templates, offset);
@@ -3337,7 +3551,7 @@ fn append_shifted_program<'merged, 'incoming>(
         let mut types = TypeTable::from_snapshot(context.types.snapshot())
             .map_err(|message| vec![mir_lowering_diag(diagnostic_path, message)])?;
         let (monomorphizations, registrations) =
-            radix_module::mir::instantiate_merged_generic_calls_with_devices_and_metadata(
+            radix_module::mir::instantiate_merged_generic_calls_with_tensor_edge_policy(
                 &mut merged_program,
                 &templates,
                 &generic_params,
@@ -3348,6 +3562,8 @@ fn append_shifted_program<'merged, 'incoming>(
                 imported_devices,
                 consumer_device_roles,
                 consumer_launch_entries,
+                &merged.tensor_edge_policy_metadata,
+                false,
             )
             .map_err(|errors| {
                 errors
@@ -3406,6 +3622,10 @@ fn append_shifted_library_parts<'a>(
         offset,
         diagnostic_path,
     )?;
+    merge_tensor_edge_policy_metadata(
+        &mut merged.tensor_edge_policy_metadata,
+        &library.tensor_edge_policy_metadata,
+    );
     if !prior_templates.is_empty() || !library.templates.is_empty() {
         let mut current_templates = library.templates.clone();
         shift_templates(&mut current_templates, offset);
@@ -3416,7 +3636,7 @@ fn append_shifted_library_parts<'a>(
         let mut types = TypeTable::from_snapshot(context.types.snapshot())
             .map_err(|message| vec![mir_lowering_diag(diagnostic_path, message)])?;
         let (monomorphizations, registrations) =
-            radix_module::mir::instantiate_merged_generic_calls_with_devices_and_metadata(
+            radix_module::mir::instantiate_merged_generic_calls_with_tensor_edge_policy(
                 &mut merged_program,
                 &templates,
                 &generic_params,
@@ -3427,6 +3647,8 @@ fn append_shifted_library_parts<'a>(
                 imported_devices,
                 consumer_device_roles,
                 consumer_launch_entries,
+                &merged.tensor_edge_policy_metadata,
+                false,
             )
             .map_err(|errors| {
                 errors
@@ -3774,6 +3996,17 @@ pub(super) fn shift_runtime_call_ids(call: &mut MirRuntimeCall, offset: u32) {
     for arg in &mut call.args {
         shift_operand_ids(arg, offset);
     }
+    if let MirIntrinsic::TensorLimes(radix_module::mir::MirEdgePolicy::Custom {
+        remap,
+        transform,
+        ..
+    }) = &mut call.intrinsic
+    {
+        shift_function_id(remap, offset);
+        if let Some(transform) = transform {
+            shift_function_id(transform, offset);
+        }
+    }
 }
 
 pub(super) fn shift_aggregate_ids(aggregate: &mut MirAggregate, offset: u32) {
@@ -3894,6 +4127,40 @@ fn collect_package_synthetic_references(package: &AnalyzedProgram) -> HashSet<De
     references
 }
 
+/// Collect static custom edge-policy callbacks as package reachability edges.
+/// A generic `limes<P>()` template has only a Deferred policy at this stage,
+/// so the ordinary MIR reference scan cannot see the callback that will be
+/// installed after cross-unit specialization. Resolve imported methods through
+/// the caller's canonical nominal map, matching the later sidecar rewrite.
+fn collect_tensor_edge_policy_callback_references(
+    package: &AnalyzedProgram,
+    method_targets: &HashMap<PathBuf, HashMap<(DefId, String), DefId>>,
+    references: &mut HashSet<DefId>,
+) {
+    for unit in package.nodes.values() {
+        let methods = method_targets.get(&unit.path);
+        for provider in &unit.analysis.tensor_edge_policies.provider_impls {
+            let radix_module::semantic::ResolvedTensorEdgePolicy::Custom {
+                policy_def,
+                remap,
+                transform,
+            } = provider.policy
+            else {
+                continue;
+            };
+            let callback = |name: &str, source: DefId| {
+                methods
+                    .and_then(|targets| targets.get(&(policy_def, name.to_owned())).copied())
+                    .unwrap_or(source)
+            };
+            references.insert(callback("remap", remap));
+            if let Some(transform) = transform {
+                references.insert(callback("transform", transform));
+            }
+        }
+    }
+}
+
 #[derive(Default)]
 struct SyntheticReferenceCollector {
     references: HashSet<DefId>,
@@ -3926,6 +4193,7 @@ struct LibraryMirParts {
     environments: Vec<MirClosureEnvironment>,
     templates: Vec<MirFunction>,
     generic_params: Vec<(DefId, Vec<radix_module::mir::MirGenericParam>)>,
+    tensor_edge_policy_metadata: MirTensorEdgePolicyMetadata,
     /// Synthetic-kernel metadata carried from the lowered unit; merged with
     /// the same id shift as the program (KCM-05).
     device_function_metadata: MirDeviceFunctionMetadataMap,
@@ -4162,6 +4430,17 @@ fn remap_statement_function_ids(
             for arg in &mut call.args {
                 remap_operand_function_ids(arg, remap);
             }
+            if let MirIntrinsic::TensorLimes(radix_module::mir::MirEdgePolicy::Custom {
+                remap: callback,
+                transform,
+                ..
+            }) = &mut call.intrinsic
+            {
+                remap_function_id(callback, remap);
+                if let Some(transform) = transform {
+                    remap_function_id(transform, remap);
+                }
+            }
         }
         MirStatementKind::Construct { aggregate, .. } => {
             remap_aggregate_function_ids(aggregate, remap);
@@ -4271,6 +4550,15 @@ fn scan_statement_references(statement: &MirStatement, scan: &mut MirReferenceSc
         MirStatementKind::RuntimeCall { call, .. } => {
             for arg in &call.args {
                 scan_operand_references(arg, scan);
+            }
+            if let MirIntrinsic::TensorLimes(radix_module::mir::MirEdgePolicy::Custom {
+                remap,
+                transform,
+                ..
+            }) = &call.intrinsic
+            {
+                scan.functions.push(*remap);
+                scan.functions.extend(*transform);
             }
         }
         MirStatementKind::Construct { aggregate, .. } => {

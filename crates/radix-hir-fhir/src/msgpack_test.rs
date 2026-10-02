@@ -40,7 +40,7 @@ fn get<'a>(value: &'a Value, path: &[&str]) -> Option<&'a Value> {
 }
 
 /// The unit's named top-level keys, in declaration order.
-const UNIT_KEYS: [&str; 17] = [
+const UNIT_KEYS: [&str; 20] = [
     "schema_version",
     "source_identity",
     "hir",
@@ -58,6 +58,9 @@ const UNIT_KEYS: [&str; 17] = [
     "gpu_builtins",
     "capability_provenance",
     "provider_units",
+    "shape_obligations",
+    "kernel_requirements",
+    "tensor_edge_policies",
 ];
 
 fn top_keys(value: &Value) -> Vec<&str> {
@@ -202,7 +205,7 @@ fn unit_wire_uses_the_named_keys_in_order() {
     assert_eq!(top_keys(&value), UNIT_KEYS);
 
     // §2 row 1: version is a uint fact.
-    assert_eq!(get(&value, &["schema_version"]), Some(&Value::Uint(30)));
+    assert_eq!(get(&value, &["schema_version"]), Some(&Value::Uint(33)));
 
     // §2 row 2: source identity map with its named keys.
     assert!(matches!(
@@ -221,6 +224,77 @@ fn unit_wire_uses_the_named_keys_in_order() {
 
     // §2 row 12: analysis stamp is a uint fact.
     assert_eq!(get(&value, &["analysis_stamp"]), Some(&Value::Uint(42)));
+}
+
+#[test]
+fn tensor_edge_policy_facts_survive_named_msgpack_round_trip() {
+    use crate::artifact::{
+        ResolvedTensorEdgePolicyWire, TensorEdgePolicyCallWire,
+        TensorEdgePolicyFunctionRequirementsWire, TensorEdgePolicyProviderImplWire,
+        TensorEdgePolicyRequirementWire, TensorShiftContextWire,
+    };
+    use radix_hir::HirId;
+    use radix_types::{BuiltinTensorEdgePolicy, DefId, IndexExpr, Primitive, Type, TypeTable};
+
+    let mut artifact = stub_artifact();
+    let mut types = TypeTable::new();
+    let policy_type = types.intern(Type::Struct(DefId(0)));
+    let element_type = types.primitive(Primitive::Fractus);
+    let builtin_policy_type = types.tensor_edge_policy(BuiltinTensorEdgePolicy::Reflect);
+    let source_shape = types.intern_index(IndexExpr::Literal(8));
+    artifact.types = types.snapshot();
+    artifact.tensor_edge_policies = crate::artifact::TensorEdgePolicyTableWire {
+        calls: vec![TensorEdgePolicyCallWire {
+            call: HirId(0),
+            policy: ResolvedTensorEdgePolicyWire::Custom {
+                policy_def: DefId(0),
+                remap: DefId(0),
+                transform: None,
+            },
+        }],
+        shifted_expressions: vec![HirId(0)],
+        shifted_view_expressions: vec![(
+            HirId(0),
+            TensorShiftContextWire {
+                source_shape,
+                shift_expression: HirId(0),
+            },
+        )],
+        shifted_bindings: vec![DefId(0)],
+        shifted_view_bindings: vec![(
+            DefId(0),
+            TensorShiftContextWire {
+                source_shape,
+                shift_expression: HirId(0),
+            },
+        )],
+        limes_contexts: vec![(
+            HirId(0),
+            TensorShiftContextWire {
+                source_shape,
+                shift_expression: HirId(0),
+            },
+        )],
+        function_requirements: vec![TensorEdgePolicyFunctionRequirementsWire {
+            function: DefId(0),
+            requirements: vec![TensorEdgePolicyRequirementWire {
+                policy_type,
+                element_type,
+                rank: 2,
+            }],
+        }],
+        provider_impls: vec![TensorEdgePolicyProviderImplWire {
+            policy_type: builtin_policy_type,
+            element_type,
+            rank: 2,
+            policy: ResolvedTensorEdgePolicyWire::Builtin(BuiltinTensorEdgePolicy::Reflect),
+        }],
+    };
+
+    let bytes = encode_msgpack(&artifact).expect("encode populated policy table");
+    let decoded = decode_msgpack(&bytes).expect("decode populated policy table");
+    assert_eq!(decoded.tensor_edge_policies, artifact.tensor_edge_policies);
+    assert_eq!(decoded.types, artifact.types);
 }
 
 #[test]
@@ -646,7 +720,7 @@ fn package_msgpack_wire_uses_named_keys_and_nested_unit_values() {
     // modules[0] is src/aux.fab; its record carries the named module keys.
     let aux = at(&value, &[Step::Key("modules"), Step::Idx(0)]).expect("modules[0]");
     assert_eq!(top_keys(aux), MODULE_KEYS);
-    assert_eq!(get(aux, &["unit_schema_version"]), Some(&Value::Uint(30)));
+    assert_eq!(get(aux, &["unit_schema_version"]), Some(&Value::Uint(33)));
 
     // The unit is a nested named map with the unit keys — not bin.
     let unit = get(aux, &["unit"]).expect("nested unit");

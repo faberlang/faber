@@ -94,6 +94,34 @@ fn tensor_forma_infers_output_shape() {
 }
 
 #[test]
+fn expression_shape_hole_is_admitted_in_reshape_shape_slot() {
+    accepts(
+        r"incipit {
+  fixum tensor<f32, [2, 2]> grid ← vacua
+  fixum tensor<f32, _> reshaped ← grid.forma([_, 4])
+  nota reshaped.longitudo()
+}",
+    );
+}
+
+#[test]
+fn expression_shape_hole_is_rejected_outside_shape_argument_slots() {
+    rejects_with_issue(
+        r"incipit {
+  fixum _ values ← [_, 4]
+}",
+        "tensor_shape_hole_requires_shape_argument",
+    );
+    rejects_with_issue(
+        r"incipit {
+  fixum tensor<f32, [2]> grid ← vacua
+  fixum _ value ← grid.accipe([_])
+}",
+        "tensor_shape_hole_requires_shape_argument",
+    );
+}
+
+#[test]
 fn tensor_sugar_tf32_typechecks_with_inferred_shape() {
     accepts(
         r"incipit {
@@ -162,6 +190,41 @@ fn tensor_sectio_infers_axis_zero_slice_shape() {
   fixum tensor<numerus, _> slice ← grid.sectio(1, 3)
   nota slice.longitudo()
 }",
+    );
+}
+
+#[test]
+fn tensor_sectio_step_infers_strided_axis_zero_shape() {
+    accepts(
+        r"incipit {
+  fixum tensor<numerus, [8, 2]> grid ← vacua
+  fixum tensor<numerus, [4, 2]> every_other ← grid.sectio(0, 8, 2)
+  nota every_other.longitudo()
+}",
+    );
+}
+
+#[test]
+fn tensor_expande_allows_inserted_and_singleton_stretch_axes() {
+    accepts(
+        r"incipit {
+  fixum tensor<numerus, [3]> row ← vacua
+  fixum tensor<numerus, [1, 3]> inserted ← row.expande([1, 3])
+  fixum tensor<numerus, [4, 3]> broadcast ← inserted.expande([4, 3])
+  nota broadcast.longitudo()
+}",
+    );
+}
+
+#[test]
+fn tensor_expande_rejects_incompatible_non_singleton_axis() {
+    rejects_with_issue(
+        r"incipit {
+  fixum tensor<numerus, [2, 3]> grid ← vacua
+  fixum tensor<numerus, [4, 3]> invalid ← grid.expande([4, 3])
+  nota invalid.longitudo()
+}",
+        "incompatible_tensor_index",
     );
 }
 

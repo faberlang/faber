@@ -24,6 +24,8 @@ use radix_hir::HirStoreKind;
 use radix_syntax::ClosureModifier;
 
 const ISSUE_ARRAY_SPREAD_REQUIRES_LISTA: &str = "array_spread_requires_lista";
+pub(super) const ISSUE_SHAPE_HOLE_REQUIRES_SHAPE_ARGUMENT: &str =
+    "tensor_shape_hole_requires_shape_argument";
 const ISSUE_CLOSURE_PARAMETER_TYPE_MISMATCH: &str = "closure_parameter_type_mismatch";
 const ISSUE_CLOSURE_RETURN_TYPE_MISMATCH: &str = "closure_return_type_mismatch";
 const ISSUE_CONSTRUCTION_SOURCE_TYPE_MISMATCH: &str = "construction_source_type_mismatch";
@@ -685,6 +687,13 @@ impl TypeChecker<'_> {
         _span: radix_lexer::Span,
         expected: Option<TypeId>,
     ) -> TypeId {
+        if let Some(span) = elements.iter().find_map(|element| match element {
+            HirArrayElement::Infer(span) => Some(*span),
+            _ => None,
+        }) {
+            self.invalid_operand_types(ISSUE_SHAPE_HOLE_REQUIRES_SHAPE_ARGUMENT, span);
+            return self.error_type;
+        }
         let expected_is_open =
             expected.is_some_and(|ty| self.is_infer(self.resolve_inferred_type(ty)));
         let expected_shape = expected.and_then(|ty| self.expected_list_shape(ty));
@@ -721,6 +730,7 @@ impl TypeChecker<'_> {
             let (expr, spread) = match element {
                 HirArrayElement::Expr(expr) => (expr, false),
                 HirArrayElement::Spread(expr) => (expr, true),
+                HirArrayElement::Infer(_) => unreachable!("shape holes rejected above"),
             };
             let ty = if spread {
                 if has_expected_element {

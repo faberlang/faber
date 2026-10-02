@@ -127,6 +127,9 @@ fn minimal_test_artifact() -> HirArtifact {
         gpu_builtins: Vec::new(),
         capability_provenance: radix_hir_fhir::FunctionProvenanceTableWire::default(),
         provider_units: BTreeMap::new(),
+        shape_obligations: radix_hir_fhir::ShapeObligationTableWire::default(),
+        kernel_requirements: radix_hir_fhir::KernelRequirementsWire::default(),
+        tensor_edge_policies: radix_hir_fhir::TensorEdgePolicyTableWire::default(),
     }
 }
 
@@ -1204,6 +1207,9 @@ fn build_artifact_from_unit(unit: &AnalyzedModule) -> HirArtifact {
             .collect(),
         capability_provenance: crate::hir::serialize::from_analyzed(unit, "x", "x").capability_provenance,
         provider_units: crate::hir::serialize::from_analyzed(unit, "x", "x").provider_units,
+        shape_obligations: crate::hir::serialize::from_analyzed(unit, "x", "x").shape_obligations,
+        kernel_requirements: crate::hir::serialize::from_analyzed(unit, "x", "x").kernel_requirements,
+        tensor_edge_policies: crate::hir::serialize::from_analyzed(unit, "x", "x").tensor_edge_policies,
     }
 }
 
@@ -1255,6 +1261,183 @@ fn hir_artifact_round_trip_acceptance() {
 
         assert_eq!(original_code, loaded_code, "round-trip mismatch for target {name}");
     }
+}
+
+#[cfg(feature = "runner")]
+#[test]
+fn runtime_tensor_shape_boundary_survives_fhir_round_trip_and_recovers() {
+    use crate::codegen::{Target, generate_from_analyzed};
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::mir::{BufferHost, run_analyzed};
+
+    let source = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../corpus/tensor/runtime-shape-boundary.fab"
+    ));
+    let session = Session::new(Config::default());
+    let mut direct = analyze_source(&session, "runtime-shape-boundary.fab", source, AnalyzeRequest::default())
+        .expect("runtime shape boundary fixture analyzes");
+    let latin = crate::locale::latin_locale_pack();
+    let surface = crate::locale::KeywordSurface::new(&latin);
+    let direct_rust =
+        generate_from_analyzed(Target::HirRust, &direct, &surface).expect("direct Rust codegen retains shape guards");
+    let direct_rust = output_code(&direct_rust).to_owned();
+    assert!(
+        direct_rust.contains("tensor runtime shape boundary check failed"),
+        "generated Rust carries the recoverable boundary error route"
+    );
+
+    let artifact = crate::hir::serialize::from_analyzed(&direct, "shape-boundary", "runtime-shape-boundary.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize shape obligations");
+    let mut loaded = load_fhir(&bytes).expect("shape obligations survive validated FHIR load");
+    let loaded_rust =
+        generate_from_analyzed(Target::HirRust, &loaded, &surface).expect("loaded Rust codegen retains shape guards");
+    assert_eq!(
+        output_code(&loaded_rust),
+        direct_rust,
+        "FHIR round-trip preserves emitted Rust shape guards"
+    );
+
+    let mut direct_host = BufferHost::default();
+    run_analyzed(&mut direct, &mut direct_host).expect("direct runtime shape check recovers");
+    let mut loaded_host = BufferHost::default();
+    run_analyzed(&mut loaded, &mut loaded_host).expect("loaded runtime shape check recovers");
+
+    let expected = ["entered", "4", "shape mismatch"];
+    assert_eq!(direct_host.stdout_lines, expected);
+    assert_eq!(loaded_host.stdout_lines, expected);
+}
+
+#[test]
+fn tensor_edge_policy_facts_survive_fhir_round_trip() {
+    use radix_hir::{
+        ResolvedTensorEdgePolicy, TensorEdgePolicyProviderImpl, TensorEdgePolicyRequirement, TensorShiftContext,
+    };
+    use radix_types::{BuiltinTensorEdgePolicy, IndexExpr, Primitive, RuntimeExtentId, Type};
+
+    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let mut unit = crate::driver::analyze_source(
+        &session,
+        "edge-policy-round-trip.fab",
+        "functio echo(numerus value) → numerus { redde value }\nincipit { }\n",
+        AnalyzeRequest::default(),
+    )
+    .expect("analyze edge-policy artifact fixture");
+    let function = unit
+        .hir
+        .items
+        .iter()
+        .find_map(|item| matches!(item.kind, radix_hir::HirItemKind::Function(_)).then_some(item))
+        .expect("function item");
+    let function_def = function.def_id;
+    let function_hir = function.id;
+    let binding = match &function.kind {
+        radix_hir::HirItemKind::Function(function) => function.params[0].def_id,
+        _ => unreachable!(),
+    };
+    let runtime_dimension = unit
+        .types
+        .intern_index(IndexExpr::Runtime(RuntimeExtentId::ScalarParameter { parameter: 0 }));
+    let fixed_dimension = unit.types.intern_index(IndexExpr::Literal(4));
+    unit.shape_obligations.functions.insert(
+        function_def,
+        vec![crate::semantic::ShapeRelation {
+            left: runtime_dimension,
+            right: fixed_dimension,
+            span: crate::lexer::Span::default(),
+            boundary: crate::semantic::ShapeRelationBoundary::FunctionEntry,
+        }],
+    );
+    let policy_type = unit.types.intern(Type::Struct(function_def));
+    let element_type = unit.types.primitive(Primitive::Fractus);
+    let builtin_policy_type = unit.types.tensor_edge_policy(BuiltinTensorEdgePolicy::Wrap);
+    let source_shape = unit.types.intern_index(IndexExpr::Literal(4));
+    let context = TensorShiftContext { source_shape, shift_expression: function_hir };
+    unit.tensor_edge_policies.calls.insert(
+        function_hir,
+        ResolvedTensorEdgePolicy::Custom {
+            policy_def: function_def,
+            remap: function_def,
+            transform: Some(function_def),
+        },
+    );
+    unit.tensor_edge_policies
+        .shifted_expressions
+        .insert(function_hir);
+    unit.tensor_edge_policies
+        .shifted_view_expressions
+        .insert(function_hir, context);
+    unit.tensor_edge_policies.shifted_bindings.insert(binding);
+    unit.tensor_edge_policies
+        .shifted_view_bindings
+        .insert(binding, context);
+    unit.tensor_edge_policies
+        .limes_contexts
+        .insert(function_hir, context);
+    unit.tensor_edge_policies.function_requirements.insert(
+        function_def,
+        vec![
+            TensorEdgePolicyRequirement { policy_type, element_type, rank: 2 },
+            TensorEdgePolicyRequirement { policy_type, element_type, rank: 3 },
+        ],
+    );
+    unit.tensor_edge_policies.provider_impls = vec![
+        TensorEdgePolicyProviderImpl {
+            policy_type,
+            element_type,
+            rank: 2,
+            policy: ResolvedTensorEdgePolicy::Custom {
+                policy_def: function_def,
+                remap: function_def,
+                transform: Some(function_def),
+            },
+        },
+        TensorEdgePolicyProviderImpl {
+            policy_type: builtin_policy_type,
+            element_type,
+            rank: 3,
+            policy: ResolvedTensorEdgePolicy::Builtin(BuiltinTensorEdgePolicy::Wrap),
+        },
+    ];
+
+    let mut provider_types = TypeTable::from_snapshot(unit.types.snapshot()).expect("provider type snapshot");
+    provider_types.resolved_generic_calls = unit.types.resolved_generic_calls.clone();
+    unit.provider_units.insert(
+        "./policy-provider",
+        crate::driver::CarriedProviderUnit::Unit(std::sync::Arc::new(std::sync::Mutex::new(
+            crate::driver::ProviderUnit {
+                hir: unit.hir.clone(),
+                types: provider_types,
+                interner: unit.interner.clone(),
+                resolver: unit.resolver.clone(),
+                tensor_edge_policies: unit.tensor_edge_policies.clone(),
+                shape_obligations: unit.shape_obligations.clone(),
+                diagnostics: Vec::new(),
+                nested: crate::driver::ProviderUnitView::default(),
+            },
+        ))),
+    );
+
+    let artifact = crate::hir::serialize::from_analyzed(&unit, "edge-policy", "edge-policy-round-trip.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize edge-policy sidecar");
+    let loaded = load_fhir(&bytes).expect("load edge-policy sidecar with checked references");
+
+    assert_eq!(loaded.tensor_edge_policies, unit.tensor_edge_policies);
+    assert_eq!(loaded.types.get(policy_type), &Type::Struct(function_def));
+    assert_eq!(loaded.shape_obligations, unit.shape_obligations);
+    let provider = loaded
+        .provider_units
+        .get("./policy-provider")
+        .and_then(crate::driver::CarriedProviderUnit::lock_unit)
+        .expect("provider unit survives artifact load");
+    assert_eq!(provider.tensor_edge_policies, unit.tensor_edge_policies);
+    assert!(
+        provider
+            .shape_obligations
+            .functions
+            .contains_key(&function_def)
+    );
+    assert_eq!(provider.shape_obligations, unit.shape_obligations);
 }
 
 /// Extract the code string from a codegen Output.
@@ -1515,4 +1698,40 @@ incipit {
     let artifact = crate::hir::serialize::from_analyzed(&unit, "deadbeef", "lane.fab");
     let loaded = load_fhir(&serialize_artifact(&artifact)).expect("load lane artifact");
     assert_eq!(loaded.radix_lanes.lane_for(lane_def), Some(crate::semantic::RadixLane::Air));
+}
+
+#[test]
+fn kernel_requirements_and_symbolic_extents_survive_fhir_round_trip() {
+    let source = r"
+@ nucleum
+@ publica
+functio copy_coordinate<magnitudo N>(
+    tensor<f32, [N]> input,
+    tensor<u32, [N]> output
+) → vacuum {
+    itera ex input apud [i] fixum value {
+        output[i] ← i
+    }
+}
+";
+    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let unit = crate::driver::analyze_source(&session, "kernel-requirements.fab", source, AnalyzeRequest::default())
+        .expect("analyze kernel requirement fixture");
+    let original = unit.kernel_requirements.clone();
+    let row = original
+        .kernels
+        .iter()
+        .find(|kernel| kernel.name == "copy_coordinate")
+        .expect("kernel report");
+    assert!(
+        row.target_reports
+            .iter()
+            .any(|target| !target.extent_conditions.is_empty()),
+        "symbolic index arithmetic must retain its launch condition"
+    );
+
+    let artifact = crate::hir::serialize::from_analyzed(&unit, "kernel-requirements", "kernel-requirements.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize kernel requirement artifact");
+    let loaded = load_fhir(&bytes).expect("validate and load kernel requirements");
+    assert_eq!(loaded.kernel_requirements, original);
 }

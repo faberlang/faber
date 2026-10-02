@@ -1188,6 +1188,7 @@ fn instantiate_type_id<W: InstantiateWalk>(
             resolve_type(types, &Type::Func(sig), span, index)
         }
         Type::Primitive(_)
+        | Type::TensorEdgePolicy(_)
         | Type::SizedNumeric(_, _)
         | Type::ModularWord(_)
         | Type::SaturatingWord(_)
@@ -1273,7 +1274,57 @@ fn substitute_existing_index_params(
             }
             find_existing_index(types, &IndexExpr::Tuple(substituted), span)
         }
-        IndexExpr::Literal(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => Ok(index_id),
+        IndexExpr::Affine { base, offset } => {
+            let substituted = substitute_existing_index_params(types, base, shape_bindings, span)?;
+            if substituted == base {
+                return Ok(index_id);
+            }
+            let candidate = match radix_types::evaluate_index_dimension(substituted, types) {
+                Ok(Some(value)) => {
+                    let value = i128::from(value)
+                        .checked_add(offset)
+                        .ok_or_else(|| MirGenericError::new(span, "invalid affine shape arithmetic"))?;
+                    if value < 0 {
+                        return Err(MirGenericError::new(span, "negative affine shape extent"));
+                    }
+                    IndexExpr::Literal(u64::try_from(value).map_err(|_| {
+                        MirGenericError::new(span, "affine shape extent exceeds the natural range")
+                    })?)
+                }
+                Ok(None) if offset == 0 => return Ok(substituted),
+                Ok(None) => IndexExpr::Affine {
+                    base: substituted,
+                    offset,
+                },
+                Err(_) => return Err(MirGenericError::new(span, "invalid affine shape arithmetic")),
+            };
+            find_existing_index(types, &candidate, span)
+        }
+        IndexExpr::Divide { numerator, divisor } => {
+            let substituted =
+                substitute_existing_index_params(types, numerator, shape_bindings, span)?;
+            if substituted == numerator {
+                return Ok(index_id);
+            }
+            let candidate = match radix_types::evaluate_index_dimension(substituted, types) {
+                Ok(Some(value)) if divisor != 0 && value % divisor == 0 => {
+                    IndexExpr::Literal(value / divisor)
+                }
+                Ok(Some(_)) | Err(_) => {
+                    return Err(MirGenericError::new(span, "invalid exact-division shape arithmetic"));
+                }
+                Ok(None) if divisor == 1 => return Ok(substituted),
+                Ok(None) => IndexExpr::Divide {
+                    numerator: substituted,
+                    divisor,
+                },
+            };
+            find_existing_index(types, &candidate, span)
+        }
+        IndexExpr::Literal(_)
+        | IndexExpr::Runtime(_)
+        | IndexExpr::Infer(_)
+        | IndexExpr::Unspecified => Ok(index_id),
     }
 }
 
@@ -1297,6 +1348,27 @@ fn index_expr_matches(types: &TypeTable, id: IndexId, candidate: &IndexExpr) -> 
     match (types.get_index(id), candidate) {
         (IndexExpr::Literal(a), IndexExpr::Literal(b)) => a == b,
         (IndexExpr::Param(a), IndexExpr::Param(b)) => a == b,
+        (IndexExpr::Runtime(a), IndexExpr::Runtime(b)) => a == b,
+        (
+            IndexExpr::Affine {
+                base: a_base,
+                offset: a_offset,
+            },
+            IndexExpr::Affine {
+                base: b_base,
+                offset: b_offset,
+            },
+        ) => a_offset == b_offset && types.index_equals(*a_base, *b_base),
+        (
+            IndexExpr::Divide {
+                numerator: a_numerator,
+                divisor: a_divisor,
+            },
+            IndexExpr::Divide {
+                numerator: b_numerator,
+                divisor: b_divisor,
+            },
+        ) => a_divisor == b_divisor && types.index_equals(*a_numerator, *b_numerator),
         (IndexExpr::Tuple(a), IndexExpr::Tuple(b)) => {
             a.len() == b.len()
                 && a.iter()
@@ -1335,7 +1407,22 @@ pub fn substitute_index_params(
                 index_id
             }
         }
-        IndexExpr::Literal(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => index_id,
+        IndexExpr::Affine { base, offset } => {
+            let base = substitute_index_params(types, base, shape_bindings);
+            radix_types::add_index_constant(types, base, offset).unwrap_or_else(|_| {
+                types.intern_index(IndexExpr::Affine { base, offset })
+            })
+        }
+        IndexExpr::Divide { numerator, divisor } => {
+            let numerator = substitute_index_params(types, numerator, shape_bindings);
+            radix_types::divide_index_exact(types, numerator, divisor).unwrap_or_else(|_| {
+                types.intern_index(IndexExpr::Divide { numerator, divisor })
+            })
+        }
+        IndexExpr::Literal(_)
+        | IndexExpr::Runtime(_)
+        | IndexExpr::Infer(_)
+        | IndexExpr::Unspecified => index_id,
     }
 }
 
@@ -1603,6 +1690,7 @@ fn type_contains_param_inner(types: &TypeTable, ty: TypeId, seen: &mut FxHashSet
             .iter()
             .any(|member| type_contains_param_inner(types, *member, seen)),
         Type::Primitive(_)
+        | Type::TensorEdgePolicy(_)
         | Type::SizedNumeric(_, _)
         | Type::ModularWord(_)
         | Type::SaturatingWord(_)
@@ -1623,7 +1711,12 @@ fn index_contains_param(types: &TypeTable, id: IndexId) -> bool {
     match types.get_index(id) {
         IndexExpr::Param(_) => true,
         IndexExpr::Tuple(dims) => dims.iter().any(|dim| index_contains_param(types, *dim)),
-        IndexExpr::Literal(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => false,
+        IndexExpr::Affine { base, .. } => index_contains_param(types, *base),
+        IndexExpr::Divide { numerator, .. } => index_contains_param(types, *numerator),
+        IndexExpr::Literal(_)
+        | IndexExpr::Runtime(_)
+        | IndexExpr::Infer(_)
+        | IndexExpr::Unspecified => false,
     }
 }
 

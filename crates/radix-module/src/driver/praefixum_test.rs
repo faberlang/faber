@@ -98,6 +98,7 @@ fn list_result_is_an_array_literal() {
         .map(|element| match element {
             HirArrayElement::Expr(expr) => int(expr),
             HirArrayElement::Spread(_) => panic!("unexpected spread"),
+            HirArrayElement::Infer(_) => panic!("unexpected shape hole"),
         })
         .collect();
     assert_eq!(values, [0, 10, 20]);
@@ -191,6 +192,7 @@ pub(super) mod imported {
                 err: None,
                 is_async: false,
                 is_generator: false,
+                tensor_edge_policy_requirements: Vec::new(),
                 device: None,
             }),
         });

@@ -1606,6 +1606,8 @@ pub enum HirScribeKind {
 pub enum HirArrayElement {
     Expr(HirExpression),
     Spread(HirExpression),
+    /// Structural expression-shape inference hole written as `_`.
+    Infer(Span),
 }
 
 /// Object/map construction field used by literals and conversion forms.

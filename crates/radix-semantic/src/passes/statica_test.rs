@@ -315,6 +315,7 @@ fn consts_interface(
             err: None,
             is_async: false,
             is_generator: false,
+            tensor_edge_policy_requirements: Vec::new(),
             device: None,
         }),
     });

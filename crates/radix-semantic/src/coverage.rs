@@ -373,6 +373,7 @@ fn type_children(ty: &Type) -> Vec<TypeId> {
         | Type::ModularWord(_)
         | Type::SaturatingWord(_)
         | Type::PolicyFloat(_, _)
+        | Type::TensorEdgePolicy(_)
         | Type::SizedInstans(_)
         | Type::Param(_)
         | Type::Infer(_)

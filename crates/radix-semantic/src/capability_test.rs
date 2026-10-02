@@ -813,6 +813,8 @@ incipit { }
         libraries: radix_hir::LibraryRegistry::default(),
         radix_lanes: result.radix_lanes,
         gpu_builtins: result.gpu_builtins,
+        tensor_edge_policies: result.tensor_edge_policies,
+        kernel_requirements: result.kernel_requirements,
         access_facts: result.access_facts.expect("access facts"),
         region_facts: result.region_facts,
         semantic_diagnostics: result.diagnostics,

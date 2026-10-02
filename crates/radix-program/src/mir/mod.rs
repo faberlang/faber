@@ -167,8 +167,9 @@ use radix_module::mir::{
     MirClosureEnvironmentId, MirClosureValue, MirConstant, MirDiagnosticKind, MirFunction,
     MirFunctionId, MirIntrinsic, MirNamedOperand, MirOperand, MirOptionChainLink, MirOptionOp,
     MirPlace, MirProgram, MirProjection, MirProviderKind, MirRuntimeCall, MirRuntimeRecordField,
-    MirRuntimeRecordValue, MirStatement, MirStatementKind, MirSwitchCase, MirTerminator,
-    MirTerminatorKind, MirType, MirValue, MirValueKind, RunnerError, RunnerStats,
+    MirRuntimeRecordValue, MirStatement, MirStatementKind, MirSwitchCase,
+    MirTensorEdgePolicyMetadata, MirTensorEdgePolicySelector, MirTerminator, MirTerminatorKind,
+    MirType, MirValue, MirValueKind, RunnerError, RunnerStats,
     lower_analyzed_unit, run_entry, run_entry_with_stats, validate_program,
 };
 use radix_module::semantic::{
@@ -727,6 +728,10 @@ mod generic_size_forwarding_tests;
 #[cfg(test)]
 #[path = "generic_pin_link_test.rs"]
 mod generic_pin_link_tests;
+
+#[cfg(test)]
+#[path = "tensor_edge_policy_link_test.rs"]
+mod tensor_edge_policy_link_tests;
 
 #[cfg(test)]
 #[path = "const_member_lane_test.rs"]

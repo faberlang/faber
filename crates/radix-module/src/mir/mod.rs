@@ -80,9 +80,12 @@ pub use llvm_text::{
 pub use lower::prepare_mir_lowering_interner;
 pub use lower::{
     ImportedDeviceIndex, ImportedDeviceRegistration, ImportedDeviceRoute, LoweredMirUnit, MirError, MirGenericParam,
-    MirLoweringOptions, MirRuntimeRecordField, MirRuntimeRecordValue, PackageStructMetadata, dump_analyzed_unit,
+    MirLoweringOptions, MirRuntimeRecordField, MirRuntimeRecordValue, MirTensorEdgeAppliedArg,
+    MirTensorEdgePolicyMetadata, MirTensorEdgePolicyProvider, MirTensorEdgePolicySelector, MirTensorEdgeShapeIdentity,
+    MirTensorEdgeTypeIdentity, MirTensorLimesTemplate, PackageStructMetadata, dump_analyzed_unit,
     instantiate_merged_generic_calls, instantiate_merged_generic_calls_with_devices,
-    instantiate_merged_generic_calls_with_devices_and_metadata, lower_analyzed_unit,
+    instantiate_merged_generic_calls_with_devices_and_metadata,
+    instantiate_merged_generic_calls_with_tensor_edge_policy, lower_analyzed_unit,
 };
 #[cfg(feature = "mir-metal")]
 pub use metal_text::{

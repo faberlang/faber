@@ -500,7 +500,13 @@ fn concrete_index(index: IndexId, types: &TypeTable, seen: &mut FxHashSet<IndexI
     match types.get_index(index) {
         IndexExpr::Literal(_) => true,
         IndexExpr::Tuple(dims) => dims.iter().all(|dim| concrete_index(*dim, types, seen)),
-        IndexExpr::Param(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => false,
+        IndexExpr::Affine { .. } | IndexExpr::Divide { .. } => {
+            radix_types::evaluate_index_dimension(index, types).is_ok_and(|value| value.is_some())
+        }
+        IndexExpr::Param(_)
+        | IndexExpr::Runtime(_)
+        | IndexExpr::Infer(_)
+        | IndexExpr::Unspecified => false,
     }
 }
 
@@ -518,6 +524,7 @@ fn contains_unresolved_type(
         | Type::ModularWord(_)
         | Type::SaturatingWord(_)
         | Type::PolicyFloat(_, _)
+        | Type::TensorEdgePolicy(_)
         | Type::SizedInstans(_)
         | Type::Struct(_)
         | Type::Enum(_)
@@ -874,6 +881,24 @@ fn substitute_index(
                 .map(|dim| substitute_index(dim, index_map, types))
                 .collect();
             types.intern_index(IndexExpr::Tuple(dims))
+        }
+        IndexExpr::Affine { base, offset } => {
+            let base = substitute_index(base, index_map, types);
+            match radix_types::compose_index_affine_constant(types, base, offset) {
+                Ok(term) => match radix_types::evaluate_index_dimension(term, types) {
+                    Ok(Some(value)) => types.intern_index(IndexExpr::Literal(value)),
+                    Ok(None) => term,
+                    Err(_) => term,
+                },
+                Err(_) => types.intern_index(IndexExpr::Affine { base, offset }),
+            }
+        }
+        IndexExpr::Divide { numerator, divisor } => {
+            let numerator = substitute_index(numerator, index_map, types);
+            match radix_types::divide_index_exact(types, numerator, divisor) {
+                Ok(term) => term,
+                Err(_) => types.intern_index(IndexExpr::Divide { numerator, divisor }),
+            }
         }
         other => types.intern_index(other),
     }

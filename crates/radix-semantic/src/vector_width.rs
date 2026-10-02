@@ -24,11 +24,15 @@ impl VectorWidthError {
     }
 
     fn from_message(message: &'static str) -> Self {
-        let issue = match message {
-            crate::FIGURA_NOT_INDEX_PARAM_MSG => "figura_not_index_param",
-            crate::FIGURA_TYPE_PARAM_IN_INDEX_MSG => "figura_type_param_in_index",
-            crate::FIGURA_UNKNOWN_INDEX_MSG => "figura_unknown_index",
-            _ => "unknown_vector_width_error",
+        let issue = if crate::figura::figura_arithmetic_reason(message).is_some() {
+            "figura_arithmetic_invalid"
+        } else {
+            match message {
+                crate::FIGURA_NOT_INDEX_PARAM_MSG => "figura_not_index_param",
+                crate::FIGURA_TYPE_PARAM_IN_INDEX_MSG => "figura_type_param_in_index",
+                crate::FIGURA_UNKNOWN_INDEX_MSG => "figura_unknown_index",
+                _ => "unknown_vector_width_error",
+            }
         };
         Self { issue, message }
     }
@@ -64,9 +68,12 @@ pub fn lower_vector_width_expr(
 #[must_use]
 pub fn literal_vector_width(index_id: IndexId, types: &TypeTable) -> Option<u8> {
     match types.get_index(index_id) {
-        IndexExpr::Literal(_) => index_literal_u8(index_id, types),
+        IndexExpr::Literal(_) | IndexExpr::Affine { .. } | IndexExpr::Divide { .. } => {
+            index_literal_u8(index_id, types)
+        }
         IndexExpr::Tuple(dims) if dims.len() == 1 => index_literal_u8(dims[0], types),
         IndexExpr::Param(_)
+        | IndexExpr::Runtime(_)
         | IndexExpr::Infer(_)
         | IndexExpr::Unspecified
         | IndexExpr::Tuple(_) => None,
@@ -74,10 +81,8 @@ pub fn literal_vector_width(index_id: IndexId, types: &TypeTable) -> Option<u8> 
 }
 
 fn index_literal_u8(index_id: IndexId, types: &TypeTable) -> Option<u8> {
-    let IndexExpr::Literal(value) = types.get_index(index_id) else {
-        return None;
-    };
-    u8::try_from(*value).ok()
+    let value = radix_types::evaluate_index_dimension(index_id, types).ok()??;
+    u8::try_from(value).ok()
 }
 
 /// Whether an index expression is a valid single-dimension vector width shape.
@@ -85,7 +90,33 @@ fn index_literal_u8(index_id: IndexId, types: &TypeTable) -> Option<u8> {
 pub fn is_vector_width_shape(index_id: IndexId, types: &TypeTable) -> bool {
     match types.get_index(index_id) {
         IndexExpr::Literal(_) | IndexExpr::Param(_) | IndexExpr::Infer(_) => true,
+        IndexExpr::Affine { base, .. } => {
+            !radix_types::evaluate_index_dimension(index_id, types).is_err()
+                && is_static_width_term(*base, types)
+        }
+        IndexExpr::Divide { numerator, .. } => {
+            !radix_types::evaluate_index_dimension(index_id, types).is_err()
+                && is_static_width_term(*numerator, types)
+        }
         IndexExpr::Tuple(dims) => dims.len() == 1,
-        IndexExpr::Unspecified => false,
+        IndexExpr::Runtime(_) | IndexExpr::Unspecified => false,
+    }
+}
+
+fn is_static_width_term(index_id: IndexId, types: &TypeTable) -> bool {
+    match types.get_index(index_id) {
+        IndexExpr::Literal(_) | IndexExpr::Param(_) => true,
+        IndexExpr::Affine { base, .. } => {
+            !radix_types::evaluate_index_dimension(index_id, types).is_err()
+                && is_static_width_term(*base, types)
+        }
+        IndexExpr::Divide { numerator, .. } => {
+            !radix_types::evaluate_index_dimension(index_id, types).is_err()
+                && is_static_width_term(*numerator, types)
+        }
+        IndexExpr::Tuple(_)
+        | IndexExpr::Runtime(_)
+        | IndexExpr::Infer(_)
+        | IndexExpr::Unspecified => false,
     }
 }

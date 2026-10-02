@@ -3798,6 +3798,7 @@ fn lowers_imported_nominal_method_to_provider_runtime_call() {
                     err: None,
                     is_async: false,
                     is_generator: false,
+                    tensor_edge_policy_requirements: Vec::new(),
                     device: None,
                 },
                 visibility: crate::syntax::MemberVisibility::Publica,
@@ -4986,6 +4987,66 @@ incipit {
 }
 
 #[test]
+fn generic_tensor_limes_resolves_builtin_and_custom_policies_in_mir_instances() {
+    let source = include_str!("../../../../corpus/tensor/edge-policy-forwarding.fab");
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit(&mut unit, MirLoweringOptions::default())
+        .expect("generic tensor edge policy calls lower to concrete MIR dispatches");
+
+    let limes = lowered
+        .validated
+        .program()
+        .functions
+        .iter()
+        .flat_map(|function| function.blocks.iter())
+        .flat_map(|block| block.statements.iter())
+        .filter_map(|statement| match &statement.kind {
+            MirStatementKind::RuntimeCall { call, .. } => match &call.intrinsic {
+                MirIntrinsic::TensorLimes(policy) => Some(policy),
+                _ => None,
+            },
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(limes.len(), 2, "both generic call sites must have an instantiated limes call");
+    assert!(
+        limes
+            .iter()
+            .any(|policy| matches!(policy, MirEdgePolicy::Builtin(MirBuiltinEdgePolicy::Clamp))),
+        "the builtin policy must resolve to its tagged MIR dispatch"
+    );
+    let custom = limes
+        .iter()
+        .find_map(|policy| match policy {
+            MirEdgePolicy::Custom { policy_def, remap, transform } => Some((*policy_def, *remap, *transform)),
+            MirEdgePolicy::Builtin(_) => None,
+        })
+        .expect("the custom policy must resolve to callback MIDs");
+    assert!(
+        lowered
+            .validated
+            .program()
+            .functions
+            .iter()
+            .any(|function| function.id == custom.1),
+        "the custom remap MID must resolve in the final program"
+    );
+    let Some(transform) = custom.2 else {
+        panic!("the fixture's custom policy has a value transform");
+    };
+    assert!(
+        lowered
+            .validated
+            .program()
+            .functions
+            .iter()
+            .any(|function| function.id == transform),
+        "the custom transform MID must resolve in the final program"
+    );
+}
+
+#[test]
 fn generic_enum_payload_binding_lowers_with_concrete_type() {
     let source = r#"
 discretio Resultatus<T> {
@@ -5599,6 +5660,121 @@ incipit {
         1,
         "two same-shape call sites share one monomorphized instance"
     );
+}
+
+#[test]
+fn runtime_shape_origins_share_generic_instance_but_keep_call_witnesses() {
+    let source = r#"+++
+locale = "en"
++++
+fn runtime_extent(int value) → int {
+    return value
+}
+
+fn require_extent<size N>(ref tf32[N] value) → int {
+    return 7
+}
+
+main {
+    const int short_extent ← runtime_extent(2)
+    const int long_extent ← runtime_extent(3)
+    const tf32[] seed ← empty
+    const tf32[short_extent] short_value ← seed.from_flat([1.0, 2.0], [short_extent])
+    const tf32[long_extent] long_value ← seed.from_flat([3.0, 4.0, 5.0], [long_extent])
+    print require_extent(short_value)
+    print require_extent(long_value)
+}
+"#;
+    let mut unit = analyze(source);
+    let (monomorphizations, program) = {
+        let lowered =
+            lower_analyzed_unit(&mut unit, MirLoweringOptions::default()).expect("runtime generic shape origins lower");
+        (lowered.monomorphizations.clone(), lowered.validated.program().clone())
+    };
+
+    assert_eq!(
+        monomorphizations.len(),
+        1,
+        "runtime values must not split the generic instance key"
+    );
+    let instance = monomorphizations[0].function;
+    let [shape_key] = monomorphizations[0].key.shape_args.as_slice() else {
+        panic!("expected one stable runtime shape key");
+    };
+    assert!(
+        matches!(
+            unit.types.get_index(*shape_key),
+            IndexExpr::Runtime(radix_types::RuntimeExtentId::FunctionParameterAxis { parameter: 0, axis: 0 })
+        ),
+        "specialization key must use the stable formal tensor axis, got {:?}",
+        unit.types.get_index(*shape_key)
+    );
+
+    let mut calls_to_instance = Vec::new();
+    let mut shape_checks = Vec::new();
+    for function in &program.functions {
+        for statement in function.blocks.iter().flat_map(|block| &block.statements) {
+            match &statement.kind {
+                MirStatementKind::Call { callee: MirCallee::Function(target), .. } if *target == instance => {
+                    calls_to_instance.push(statement);
+                }
+                MirStatementKind::RuntimeCall { call, .. }
+                    if matches!(call.intrinsic, MirIntrinsic::TensorShapeCheck(_)) =>
+                {
+                    shape_checks.push(call);
+                }
+                _ => {}
+            }
+        }
+    }
+    assert_eq!(
+        calls_to_instance.len(),
+        2,
+        "both runtime origins should call the shared instance"
+    );
+    assert_eq!(shape_checks.len(), 2, "each runtime origin keeps its own boundary check");
+    let actual_carriers = shape_checks
+        .iter()
+        .map(|call| {
+            let MirIntrinsic::TensorShapeCheck(check) = &call.intrinsic else {
+                unreachable!()
+            };
+            assert_eq!(check.size_bindings.len(), 1);
+            assert!(matches!(
+                check.size_bindings[0].witness,
+                crate::mir::MirShapeExpr::TensorAxis { argument: 0, axis: 0 }
+            ));
+            call.args[0].clone()
+        })
+        .collect::<Vec<_>>();
+    assert_ne!(
+        actual_carriers[0], actual_carriers[1],
+        "per-call shape guards must read each call's actual tensor carrier"
+    );
+}
+
+#[test]
+fn runtime_return_shape_relations_are_scoped_to_their_result_expression() {
+    let mut types = TypeTable::new();
+    let formal_axis = types.intern_index(IndexExpr::Runtime(RuntimeExtentId::FunctionParameterAxis {
+        parameter: 0,
+        axis: 0,
+    }));
+    let first_result_axis =
+        types.intern_index(IndexExpr::Runtime(RuntimeExtentId::ExpressionAxis { expression: 41, axis: 0 }));
+    let second_result_axis =
+        types.intern_index(IndexExpr::Runtime(RuntimeExtentId::ExpressionAxis { expression: 42, axis: 0 }));
+    let first_relation = ShapeRelation {
+        left: first_result_axis,
+        right: formal_axis,
+        span: Span::default(),
+        boundary: ShapeRelationBoundary::FunctionReturn,
+    };
+    let second_relation = ShapeRelation { left: second_result_axis, ..first_relation };
+
+    assert!(super::runtime::shape_relation_applies_to_return(&types, &first_relation, 41,));
+    assert!(!super::runtime::shape_relation_applies_to_return(&types, &first_relation, 42,));
+    assert!(super::runtime::shape_relation_applies_to_return(&types, &second_relation, 42,));
 }
 
 fn assert_literal_shape_arg(types: &TypeTable, shape: crate::semantic::IndexId) {

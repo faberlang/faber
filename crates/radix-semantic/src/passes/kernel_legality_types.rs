@@ -97,6 +97,7 @@ impl Walk<'_> {
             // N7E-1: plumbing only. The cell has no resolver path yet, so no
             // kernel signature can name it; N7E-2 applies the D6 rule here.
             | Type::PolicyFloat(_, _)
+            | Type::TensorEdgePolicy(_)
             | Type::Func(_)
             | Type::Param(_)
             | Type::Infer(_)

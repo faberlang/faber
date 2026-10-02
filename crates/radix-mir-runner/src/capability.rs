@@ -83,6 +83,9 @@ pub fn runner_dispatch_status(family: MirRuntimeAbiFamily) -> RunnerDispatchStat
         | MirRuntimeAbiFamily::RuntimeSermo
         | MirRuntimeAbiFamily::RuntimeGradient
         | MirRuntimeAbiFamily::RuntimeTypeCheck
+        | MirRuntimeAbiFamily::RuntimeTensorShapeCheck
+        | MirRuntimeAbiFamily::RuntimeTensorShapeSize
+        | MirRuntimeAbiFamily::RuntimeTensorLimes
         | MirRuntimeAbiFamily::RuntimeDuplicate
         | MirRuntimeAbiFamily::RuntimeTensorLift => RunnerDispatchStatus::Implement,
         MirRuntimeAbiFamily::RuntimeProvider => RunnerDispatchStatus::HostDelegate,

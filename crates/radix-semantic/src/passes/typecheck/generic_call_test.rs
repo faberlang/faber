@@ -844,6 +844,7 @@ fn math_namespace_interface() -> crate::file_interface::FileInterface {
             is_generator: false,
             // DFV2-3: an exported `@ kernel @ publica` declaration carries its
             // device contract on the callable. Typing must survive the fact.
+            tensor_edge_policy_requirements: Vec::new(),
             device: Some(InterfaceDeviceContract {
                 role: InterfaceDeviceRole::Kernel,
                 visibility: InterfaceDeviceVisibility::Public,

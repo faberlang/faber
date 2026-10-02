@@ -116,6 +116,7 @@ impl HirVisitor for FunctionBuilder<'_> {
                     return;
                 }
                 if let Some(value) = self.lower_return_expr(expr) {
+                    self.emit_function_return_shape_check(expr.id.0, value.clone(), stmt.span);
                     self.terminate_current(MirTerminatorKind::Return(Some(value)), stmt.span);
                 }
             }

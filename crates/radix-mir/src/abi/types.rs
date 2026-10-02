@@ -82,6 +82,9 @@ pub enum MirRuntimeAbiFamily {
     RuntimeCursorStream,
     RuntimeGradient,
     RuntimeTypeCheck,
+    RuntimeTensorShapeCheck,
+    RuntimeTensorShapeSize,
+    RuntimeTensorLimes,
     RuntimeFilumSum,
     RuntimeDuplicate,
     RuntimeTensorLift,
@@ -176,6 +179,21 @@ impl MirRuntimeAbi {
             ),
             MirIntrinsic::TypeCheck(_) => (
                 MirRuntimeAbiFamily::RuntimeTypeCheck,
+                MirRuntimeAbiKind::CoreSemantics,
+                false,
+            ),
+            MirIntrinsic::TensorShapeCheck(_) => (
+                MirRuntimeAbiFamily::RuntimeTensorShapeCheck,
+                MirRuntimeAbiKind::CoreSemantics,
+                true,
+            ),
+            MirIntrinsic::TensorShapeSize(_) => (
+                MirRuntimeAbiFamily::RuntimeTensorShapeSize,
+                MirRuntimeAbiKind::CoreSemantics,
+                false,
+            ),
+            MirIntrinsic::TensorLimes(_) => (
+                MirRuntimeAbiFamily::RuntimeTensorLimes,
                 MirRuntimeAbiKind::CoreSemantics,
                 false,
             ),

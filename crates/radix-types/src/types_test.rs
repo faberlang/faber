@@ -9,14 +9,37 @@ use crate::DefId;
 use crate::InstansPrecision;
 use crate::NumericWidth;
 use crate::TypeId;
-use crate::index::{IndexExpr, IndexId, i64s_from_literal_index};
+use crate::index::{
+    IndexExpr, IndexId, IndexArithmeticError, add_index_constant, divide_index_exact,
+    compose_index_affine_constant, evaluate_index_dimension, i64s_from_literal_index,
+};
 use crate::{
-    AccessMarker, AppliedArg, CollectionKind, FloatPolicy, FuncSig, GenericParamDescriptor,
+    AccessMarker, AppliedArg, BuiltinTensorEdgePolicy, CollectionKind, FloatPolicy, FuncSig, GenericParamDescriptor,
     GenericParamSort, ParamType, Primitive, SemanticGenericParamDefault, SemanticMutability,
     SemanticParamMode, TensorFamilyKind, Type, TypeParamConstraint, TypeTable,
     collection_type_specs, lookup_collection_type_spec, lookup_primitive_type_spec,
     lookup_tensor_family_type_spec, primitive_type_specs, tensor_family_type_specs,
 };
+
+#[test]
+fn tensor_edge_policy_markers_keep_compiler_identity_and_are_non_value_types() {
+    let mut types = TypeTable::new();
+    let clamp = types.tensor_edge_policy(BuiltinTensorEdgePolicy::Clamp);
+    let reflect = types.tensor_edge_policy(BuiltinTensorEdgePolicy::Reflect);
+    let wrap = types.tensor_edge_policy(BuiltinTensorEdgePolicy::Wrap);
+    assert_eq!(types.tensor_edge_policy_kind(clamp), Some(BuiltinTensorEdgePolicy::Clamp));
+    assert_eq!(types.tensor_edge_policy_kind(reflect), Some(BuiltinTensorEdgePolicy::Reflect));
+    assert_eq!(types.tensor_edge_policy_kind(wrap), Some(BuiltinTensorEdgePolicy::Wrap));
+
+    let user_type = types.intern(Type::Struct(crate::DefId(9001)));
+    assert_eq!(types.tensor_edge_policy_kind(user_type), None);
+    assert!(!types.contains_tensor_edge_policy(user_type));
+
+    let stored_marker = types.array(clamp);
+    assert!(types.contains_tensor_edge_policy(clamp));
+    assert!(types.contains_tensor_edge_policy(stored_marker));
+    assert!(!types.contains_tensor_edge_policy(types.primitive(Primitive::Numerus)));
+}
 
 /// One unconstrained, default-free `typus` descriptor for `FuncSig` tests.
 fn typus_param(symbol: radix_lexer::Symbol) -> GenericParamDescriptor {
@@ -2028,4 +2051,60 @@ fn first_policy_float_tracks_the_table_and_survives_snapshot() {
 fn policy_float_policy_words_are_the_surface_words() {
     assert_eq!(FloatPolicy::Trapping.word(), "trapping");
     assert_eq!(FloatPolicy::Saturating.word(), "saturating");
+}
+
+#[test]
+fn affine_index_arithmetic_is_structured_exact_and_natural() {
+    let mut types = TypeTable::new();
+    let parameter = types.intern_index(IndexExpr::Param(radix_lexer::Symbol(31)));
+    let minus_one = add_index_constant(&mut types, parameter, -1).expect("symbolic offset");
+    assert!(matches!(
+        types.get_index(minus_one),
+        IndexExpr::Affine { base, offset: -1 } if *base == parameter
+    ));
+    assert_eq!(evaluate_index_dimension(minus_one, &types), Ok(None));
+
+    let plus_two = add_index_constant(&mut types, minus_one, 3).expect("combine offsets");
+    assert!(matches!(
+        types.get_index(plus_two),
+        IndexExpr::Affine { base, offset: 2 } if *base == parameter
+    ));
+
+    let canceled = compose_index_affine_constant(&mut types, minus_one, 1)
+        .expect("compose affine cancellation");
+    assert_eq!(canceled, parameter, "N - 1 + 1 normalizes to N");
+    let zero = types.intern_index(IndexExpr::Literal(0));
+    let negative_intermediate = compose_index_affine_constant(&mut types, zero, -1)
+        .expect("an additive chain may carry an intermediate offset");
+    let concrete_after_cancellation =
+        compose_index_affine_constant(&mut types, negative_intermediate, 1)
+            .expect("final natural extent remains representable");
+    assert_eq!(
+        evaluate_index_dimension(concrete_after_cancellation, &types),
+        Ok(Some(0)),
+        "natural validity applies after the complete additive chain"
+    );
+
+    let five = types.intern_index(IndexExpr::Literal(5));
+    let six = types.intern_index(IndexExpr::Literal(6));
+    assert_eq!(
+        divide_index_exact(&mut types, five, 2),
+        Err(IndexArithmeticError::NonIntegral)
+    );
+    assert_eq!(
+        divide_index_exact(&mut types, six, 0),
+        Err(IndexArithmeticError::DivideByZero)
+    );
+    let three = divide_index_exact(&mut types, six, 2).expect("exact division");
+    assert!(matches!(types.get_index(three), IndexExpr::Literal(3)));
+
+    let zero = types.intern_index(IndexExpr::Literal(0));
+    assert_eq!(
+        add_index_constant(&mut types, zero, -1),
+        Err(IndexArithmeticError::Negative)
+    );
+    let shape = types.intern_index(IndexExpr::Tuple(vec![minus_one, three]));
+    assert_eq!(i64s_from_literal_index(shape, &types), None);
+    let concrete = types.intern_index(IndexExpr::Tuple(vec![three, six]));
+    assert_eq!(i64s_from_literal_index(concrete, &types), Some(vec![3, 6]));
 }

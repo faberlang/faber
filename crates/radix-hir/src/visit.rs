@@ -500,6 +500,7 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
                     HirArrayElement::Expr(expr) | HirArrayElement::Spread(expr) => {
                         visitor.visit_expr(expr);
                     }
+                    HirArrayElement::Infer(_) => {}
                 }
             }
         }
@@ -1105,6 +1106,7 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
                     HirArrayElement::Expr(expr) | HirArrayElement::Spread(expr) => {
                         visitor.visit_expr_mut(expr);
                     }
+                    HirArrayElement::Infer(_) => {}
                 }
             }
         }

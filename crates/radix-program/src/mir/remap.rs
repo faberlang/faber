@@ -6,7 +6,7 @@ use super::{
     MirRuntimeCall, MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirValue,
     MirValueKind, Symbol,
 };
-use radix_module::mir::{MirFilumSumOp, MirIntrinsic, MirSermoOp};
+use radix_module::mir::{MirFilumSumOp, MirIntrinsic, MirSermoOp, MirShapeExpr};
 
 /// Remap a name symbol from the lowering interner into the merged interner.
 /// A `Symbol` always means text in its named interner (ARCH2-2), so the
@@ -264,6 +264,16 @@ pub(super) fn remap_runtime_call_text_symbols(
         }
         MirIntrinsic::Sermo(op) => remap_sermo_text_symbols(op, source, target),
         MirIntrinsic::FilumSum(filum) => remap_filum_sum_text_symbols(filum, source, target),
+        MirIntrinsic::TensorShapeCheck(check) => {
+            for relation in &mut check.relations {
+                remap_shape_expr_text_symbols(&mut relation.left, source, target);
+                remap_shape_expr_text_symbols(&mut relation.right, source, target);
+            }
+        }
+        MirIntrinsic::TensorShapeSize(expression) => {
+            remap_shape_expr_text_symbols(expression, source, target);
+        }
+        MirIntrinsic::TensorLimes(_) => {}
         // Ids, plans, and tags only — no interner symbols to re-intern.
         MirIntrinsic::Diagnostic(_)
         | MirIntrinsic::Assert
@@ -284,6 +294,26 @@ pub(super) fn remap_runtime_call_text_symbols(
     }
     for arg in &mut call.args {
         remap_operand_text_symbols(arg, source, target);
+    }
+}
+
+fn remap_shape_expr_text_symbols(expression: &mut MirShapeExpr, source: &Interner, target: &mut Interner) {
+    match expression {
+        MirShapeExpr::TensorFieldAxis { fields, .. } => {
+            for field in fields {
+                *field = remap_symbol(*field, source, target);
+            }
+        }
+        MirShapeExpr::Product(factors) => {
+            for factor in factors {
+                remap_shape_expr_text_symbols(factor, source, target);
+            }
+        }
+        MirShapeExpr::Affine { base, .. } => remap_shape_expr_text_symbols(base, source, target),
+        MirShapeExpr::Divide { numerator, .. } => {
+            remap_shape_expr_text_symbols(numerator, source, target);
+        }
+        MirShapeExpr::Literal(_) | MirShapeExpr::ScalarArgument { .. } | MirShapeExpr::TensorAxis { .. } => {}
     }
 }
 

@@ -51,6 +51,7 @@ fn shape_namespace_interface() -> FileInterface {
             err: Some(Box::new(shape_error.clone())),
             is_async: false,
             is_generator: false,
+            tensor_edge_policy_requirements: Vec::new(),
             device: None,
         }),
     });
@@ -67,6 +68,7 @@ fn shape_namespace_interface() -> FileInterface {
             err: None,
             is_async: false,
             is_generator: false,
+            tensor_edge_policy_requirements: Vec::new(),
             device: None,
         }),
     });

@@ -318,7 +318,18 @@ pub fn generate_from_analyzed_with_options(
                     &analysis.interner,
                     &rust::ResolverImportsBridge(&analysis.resolver),
                 );
-                let provider_modules = emit_provider_modules(analysis)?;
+                let mut emitted_tensor_policy_providers = rustc_hash::FxHashSet::default();
+                let mut policy_identity_codegen =
+                    rust::RustCodegen::new_with_types(&analysis.hir, &analysis.interner, &analysis.types);
+                policy_identity_codegen.set_imported_namespace_type_paths(namespace_info.type_paths.clone());
+                for provider in &analysis.tensor_edge_policies.provider_impls {
+                    if let Some(key) =
+                        policy_identity_codegen.tensor_edge_policy_provider_key(provider, &analysis.types, None)?
+                    {
+                        emitted_tensor_policy_providers.insert(key);
+                    }
+                }
+                let provider_modules = emit_provider_modules(analysis, &mut emitted_tensor_policy_providers)?;
                 let gpu_builtins = rust::rust_gpu_builtins(&analysis.gpu_builtins);
                 let function_facts = rust::rust_function_facts(&analysis.function_facts);
                 let used_imports = rust::used_import_defs(&analysis.resolved_uses);
@@ -346,6 +357,8 @@ pub fn generate_from_analyzed_with_options(
                     }
                 }
                 let mut r#gen = rust::RustCodegen::new_with_types(&analysis.hir, &analysis.interner, &analysis.types);
+                r#gen.set_shape_obligations(rust::rust_shape_obligations(&analysis.shape_obligations));
+                r#gen.set_tensor_edge_policy_table(Some(&analysis.tensor_edge_policies));
                 r#gen.set_gpu_builtins(&gpu_builtins);
                 r#gen.set_function_facts(&function_facts);
                 r#gen.set_used_import_defs(&used_imports);
@@ -573,6 +586,7 @@ fn generate_haskell_from_analyzed(_analysis: &crate::driver::AnalyzedModule) -> 
 #[cfg(feature = "hir-rust")]
 fn emit_provider_modules(
     analysis: &crate::driver::AnalyzedModule,
+    emitted_tensor_policy_providers: &mut rustc_hash::FxHashSet<String>,
 ) -> Result<Vec<(String, String, std::collections::BTreeSet<String>)>, CodegenError> {
     use std::collections::BTreeMap;
 
@@ -582,6 +596,7 @@ fn emit_provider_modules(
         &analysis.interner,
         &analysis.resolver,
         &analysis.provider_units,
+        emitted_tensor_policy_providers,
         &mut modules,
     )?;
     Ok(modules
@@ -607,6 +622,7 @@ fn map_provider_modules(
     interner: &crate::lexer::Interner,
     resolver: &crate::semantic::Resolver,
     view: &crate::driver::ProviderUnitView,
+    emitted_tensor_policy_providers: &mut rustc_hash::FxHashSet<String>,
     modules: &mut std::collections::BTreeMap<String, (String, std::collections::BTreeSet<String>)>,
 ) -> Result<(), CodegenError> {
     use crate::hir::HirItemKind;
@@ -666,12 +682,37 @@ fn map_provider_modules(
             // norma:text) emit their own sibling modules; the provider's own
             // namespace calls then target `crate::<module>::…` paths that
             // exist. The `contains_key` guard above is the cycle brake.
-            map_provider_modules(&provider.hir, &provider.interner, &provider.resolver, &provider.nested, modules)?;
+            map_provider_modules(
+                &provider.hir,
+                &provider.interner,
+                &provider.resolver,
+                &provider.nested,
+                emitted_tensor_policy_providers,
+                modules,
+            )?;
             let namespace_info = rust::build_file_import_namespaces(
                 &provider.hir,
                 &provider.interner,
                 &rust::ResolverImportsBridge(&provider.resolver),
             );
+            let mut policy_identity_codegen =
+                rust::RustCodegen::new_with_types(&provider.hir, &provider.interner, &provider.types);
+            policy_identity_codegen.set_imported_namespace_type_paths(namespace_info.type_paths.clone());
+            let mut provider_emit_rows = Vec::new();
+            for provider_impl in &provider.tensor_edge_policies.provider_impls {
+                let Some(key) = policy_identity_codegen.tensor_edge_policy_provider_key(
+                    provider_impl,
+                    &provider.types,
+                    Some(&module_name),
+                )?
+                else {
+                    continue;
+                };
+                if emitted_tensor_policy_providers.insert(key) {
+                    provider_emit_rows.push(*provider_impl);
+                }
+            }
+            let shape_obligations = rust::rust_shape_obligations(&provider.shape_obligations);
             let module_out = radix_hir_rust::generate_with_library_registry_test_selection_and_imports(
                 radix_hir_rust::ModuleGenerationRequest {
                     hir: &provider.hir,
@@ -680,6 +721,9 @@ fn map_provider_modules(
                     libraries: &radix_hir::LibraryRegistry::default(),
                     test_selection: None,
                     function_facts: None,
+                    shape_obligations: Some(&shape_obligations),
+                    tensor_edge_policies: Some(&provider.tensor_edge_policies),
+                    tensor_edge_policy_provider_impls_to_emit: Some(&provider_emit_rows),
                     module_mode: true,
                     cli_program: None,
                     imported_function_params: None,
@@ -750,6 +794,7 @@ pub fn generate_from_loose_parts(
         crate::semantic::FunctionProvenanceTable::default(),
         crate::semantic::RadixLaneMetadata::default(),
         Vec::new(),
+        radix_hir::TensorEdgePolicyTable::default(),
         #[cfg(feature = "mir-core")]
         crate::driver::GraphicsSourceFacts::default(),
         Vec::new(),

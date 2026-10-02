@@ -31,7 +31,7 @@ locale = "en"
 # =============================================================================
 
 fn transpose_demo(tensor<f32, [2, 2]> input) → tensor<f32, [2, 2]> {
-    return inputᵀ
+    return inputᵀ.materialize()
 }
 
 main {

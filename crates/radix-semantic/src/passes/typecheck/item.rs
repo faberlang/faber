@@ -46,6 +46,9 @@ impl TypeChecker<'_> {
         func: &mut HirFunction,
     ) {
         self.reject_json_annotations_on_site(annotations, "functio");
+        let previous_function_def = self.current_function_def.replace(def_id);
+        let previous_shape_sources =
+            std::mem::take(&mut self.current_shape_param_sources);
         let func_name = self.function_display_name(def_id).unwrap_or_default();
         let previous_generic_param_kinds = std::mem::replace(
             &mut self.current_generic_param_kinds,
@@ -57,6 +60,7 @@ impl TypeChecker<'_> {
         let previous_generic_bounds = self.enter_generic_bounds(&func.type_params);
         self.push_scope();
         for (idx, param) in func.params.iter_mut().enumerate() {
+            self.reject_tensor_edge_policy_value_type(param.ty, param.span);
             if let Some(default) = &mut param.default {
                 let site = StoreSite::new(HirStoreKind::ParameterDefault).named(param.name);
                 let default_ty = self.check_store_expr(default, param.ty, site);
@@ -78,6 +82,7 @@ impl TypeChecker<'_> {
             self.record_binding_name(param.def_id, param.name);
             self.insert_binding(param.def_id, param.ty);
         }
+        self.install_function_shape_sources(&func.type_params, &func.params);
 
         let prev_return = self.current_return;
         let prev_error = self.current_error;
@@ -98,6 +103,12 @@ impl TypeChecker<'_> {
         self.current_nucleum_entry = func.is_kernel;
         self.current_shader_function = func.is_vertex || func.is_fragment;
         self.current_generator_function = func.is_generator;
+        if let Some(ret) = func.ret_ty {
+            self.reject_tensor_edge_policy_value_type(ret, radix_lexer::Span::default());
+        }
+        if let Some(err) = func.err_ty {
+            self.reject_tensor_edge_policy_value_type(err, radix_lexer::Span::default());
+        }
         self.current_await_context = func.is_async;
         self.current_await_return_context = func.is_async && !func.is_generator;
         self.inferred_return = None;
@@ -138,6 +149,8 @@ impl TypeChecker<'_> {
         self.pop_scope();
         self.current_generic_param_kinds = previous_generic_param_kinds;
         self.current_generic_bounds = previous_generic_bounds;
+        self.current_shape_param_sources = previous_shape_sources;
+        self.current_function_def = previous_function_def;
     }
 
     /// Check a constant initializer and record the resulting global type.
@@ -147,6 +160,9 @@ impl TypeChecker<'_> {
     /// lookup during the rest of typechecking reads from the table, while later
     /// phases read the annotated HIR.
     pub fn check_const(&mut self, def_id: DefId, const_item: &mut radix_hir::HirConst) {
+        if let Some(ty) = const_item.ty {
+            self.reject_tensor_edge_policy_value_type(ty, const_item.value.span);
+        }
         let ty = if let Some(annotated) = const_item.ty {
             // `const T X = e` states a compile-time fact (an `=` position);
             // a top-level `fixum T x ← e` is an ordinary store (SEM062).
@@ -250,6 +266,7 @@ impl TypeChecker<'_> {
                 let outer_owner = self.current_member_owner.replace(item.def_id);
                 self.check_json_struct_contract(item.def_id, struct_item);
                 for field in &mut struct_item.fields {
+                    self.reject_tensor_edge_policy_value_type(field.ty, item.span);
                     self.check_hashable_keys(field.ty, item.span);
                     if let Some(init) = &mut field.init {
                         let site = StoreSite::new(HirStoreKind::Field)

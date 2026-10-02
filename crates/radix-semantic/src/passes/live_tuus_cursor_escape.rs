@@ -323,6 +323,7 @@ impl HirVisitor for LiveTuusCursorEscapeChecker<'_> {
                                 checker.visit_expr(element)
                             });
                         }
+                        HirArrayElement::Infer(_) => {}
                     }
                 }
             }

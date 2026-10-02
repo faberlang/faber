@@ -18,6 +18,7 @@ use super::*;
 use crate::IndexId;
 use crate::format_faber_type;
 use radix_hir::HirCallArg;
+use radix_types::{add_index_constant, divide_index_exact};
 
 const ISSUE_GENERIC_TYPE_ARG_DOMAIN: &str = "generic_type_arg_domain";
 const ISSUE_EXPRESSION_TYPE_MISMATCH: &str = "expression_type_mismatch";
@@ -36,6 +37,30 @@ const ISSUE_INCOMPATIBLE_TENSOR_INDEX: &str = "incompatible_tensor_index";
 const ISSUE_CANNOT_INFER_TENSOR_SHAPE: &str = "cannot_infer_tensor_shape";
 
 impl TypeChecker<'_> {
+    /// Whether `ty` names one of the active function's type parameters.
+    ///
+    /// Tensor edge policies are compile-time selectors, so only a type-sorted
+    /// generic parameter can stand in for one. `Type::Param` is also used for
+    /// magnitudo witnesses; accepting those here would defer an invalid policy
+    /// until a later compiler stage.
+    pub fn is_tensor_edge_policy_type_param(&self, ty: TypeId) -> bool {
+        let mut resolved = self.resolve_inferred_type(ty);
+        let mut seen = FxHashSet::default();
+        while let Type::Alias(_, inner) = self.types.get(resolved) {
+            if !seen.insert(resolved) {
+                return false;
+            }
+            resolved = *inner;
+        }
+        match self.types.get(resolved) {
+            Type::Param(symbol) => {
+                self.current_generic_param_kinds.get(symbol)
+                    == Some(&radix_syntax::GenericParamKind::Typus)
+            }
+            _ => false,
+        }
+    }
+
     /// Typecheck arguments against a signature with generic params instantiated.
     pub fn check_instantiated_call(
         &mut self,
@@ -53,6 +78,7 @@ impl TypeChecker<'_> {
             expected,
             true,
             None,
+            None,
             false,
         )
     }
@@ -66,6 +92,7 @@ impl TypeChecker<'_> {
         args: &mut [HirCallArg],
         span: radix_lexer::Span,
         expected: Option<TypeId>,
+        policy_callee: Option<radix_hir::DefId>,
     ) -> TypeId {
         self.check_instantiated_call_impl(
             sig,
@@ -75,6 +102,7 @@ impl TypeChecker<'_> {
             expected,
             true,
             None,
+            policy_callee,
             true,
         )
     }
@@ -99,7 +127,33 @@ impl TypeChecker<'_> {
             expected,
             true,
             Some(callee),
+            Some(callee),
             true,
+        )
+    }
+
+    /// Typecheck a resolved method call while retaining the method identity
+    /// needed by deferred semantic obligations. This preserves ordinary
+    /// method-call behavior, including its non-lifting argument checks.
+    pub fn check_instantiated_method_call_for_callee(
+        &mut self,
+        callee: radix_hir::DefId,
+        sig: &FuncSig,
+        explicit_type_args: &[TypeId],
+        args: &mut [HirCallArg],
+        span: radix_lexer::Span,
+        expected: Option<TypeId>,
+    ) -> TypeId {
+        self.check_instantiated_call_impl(
+            sig,
+            explicit_type_args,
+            args,
+            span,
+            expected,
+            true,
+            None,
+            Some(callee),
+            false,
         )
     }
 
@@ -117,7 +171,7 @@ impl TypeChecker<'_> {
         args: &mut [HirCallArg],
         span: radix_lexer::Span,
     ) -> TypeId {
-        self.check_instantiated_call_impl(sig, &[], args, span, None, false, None, false)
+        self.check_instantiated_call_impl(sig, &[], args, span, None, false, None, None, false)
     }
 
     fn check_instantiated_call_impl(
@@ -129,6 +183,7 @@ impl TypeChecker<'_> {
         expected: Option<TypeId>,
         solve_shape_params: bool,
         callee: Option<radix_hir::DefId>,
+        policy_callee: Option<radix_hir::DefId>,
         user_function: bool,
     ) -> TypeId {
         // Magnitudo shape params are carried by the signature's generic
@@ -225,6 +280,28 @@ impl TypeChecker<'_> {
             }
         };
 
+        let invalid_arithmetic = sig
+            .params
+            .iter()
+            .find_map(|param| self.first_index_arithmetic_error_in_type(param.ty))
+            .or_else(|| self.first_index_arithmetic_error_in_type(sig.ret))
+            .or_else(|| {
+                sig.err
+                    .and_then(|error| self.first_index_arithmetic_error_in_type(error))
+            });
+        if let Some(error) = invalid_arithmetic {
+            let message = crate::figura::figura_arithmetic_error_message(error);
+            let reason = crate::figura::figura_arithmetic_reason(message)
+                .unwrap_or("invalid dimension arithmetic");
+            self.invalid_operand_types_with_args(
+                "figura_arithmetic_invalid",
+                span,
+                &[("reason", reason.to_owned())],
+            );
+            self.typecheck_call_arg_exprs(args);
+            return self.error_type;
+        }
+
         // A lifting attempt (a scalar user function called on a tensor) is one
         // diagnosed error. The scalar result type is not the tensor the
         // caller meant, so the call takes the type its context expects
@@ -246,7 +323,7 @@ impl TypeChecker<'_> {
         // the rejections below only fire for genuinely unresolved slots.
         if solve_shape_params
             && let Some(param_vars) = &inferred_vars
-            && let Some(bindings) = self.resolve_generic_bindings(
+            && let Some(mut bindings) = self.resolve_generic_bindings(
                 &sig,
                 param_vars,
                 &mut shape_vars,
@@ -254,11 +331,40 @@ impl TypeChecker<'_> {
                 span,
             )
         {
-            self.types.resolved_generic_calls.push(ResolvedGenericCall {
+            let runtime_size_symbols = self.capture_runtime_call_size_bindings(
+                &sig.type_params,
+                &shape_vars,
+                span,
+            );
+            // Runtime extent identity belongs in the sidecar operand map, not
+            // in the instance key. Keep the callee's formal generic symbol as
+            // the key witness while its instantiated signature above retains
+            // the caller's concrete runtime source.
+            for binding in &mut bindings {
+                if runtime_size_symbols.contains(&binding.name)
+                    && let GenericWitness::Magnitudo(_) = binding.witness
+                {
+                    binding.witness = GenericWitness::Magnitudo(
+                        self.types
+                            .intern_index(IndexExpr::Param(binding.name)),
+                    );
+                }
+            }
+            let resolved_call = ResolvedGenericCall {
                 call_span: span,
                 callee,
                 bindings,
-            });
+            };
+            if !resolved_call.bindings.is_empty() {
+                self.tensor_edge_generic_calls
+                    .push(super::tensor_edge_policy_generic::GenericPolicyCall {
+                        caller: self.current_function_def,
+                        callee: policy_callee,
+                        span,
+                        bindings: resolved_call.bindings.clone(),
+                    });
+            }
+            self.types.resolved_generic_calls.push(resolved_call);
         }
         // D6: a shape param bound by neither arguments nor the expected type is
         // an explicit error (SEM014), never a silent guess.
@@ -714,8 +820,39 @@ impl TypeChecker<'_> {
                     .collect();
                 self.types.intern_index(IndexExpr::Tuple(dims))
             }
-            other => self.types.intern_index(other),
+            IndexExpr::Affine { base, offset } => {
+                let base = self.substitute_index_params(base, Some(shape_vars));
+                add_index_constant(&mut self.types, base, offset).unwrap_or_else(|_| {
+                    self.types
+                        .intern_index(IndexExpr::Affine { base, offset })
+                })
+            }
+            IndexExpr::Divide { numerator, divisor } => {
+                let numerator = self.substitute_index_params(numerator, Some(shape_vars));
+                divide_index_exact(&mut self.types, numerator, divisor).unwrap_or_else(|_| {
+                    self.types.intern_index(IndexExpr::Divide { numerator, divisor })
+                })
+            }
+            IndexExpr::Literal(_)
+            | IndexExpr::Runtime(_)
+            | IndexExpr::Infer(_)
+            | IndexExpr::Unspecified => id,
         }
+    }
+
+    /// Find a concrete invalid affine/exact-division term anywhere inside a
+    /// substituted signature type. Symbolic parameters and runtime extents
+    /// remain obligations and return no error here.
+    pub(crate) fn first_index_arithmetic_error_in_type(
+        &self,
+        ty: TypeId,
+    ) -> Option<radix_types::IndexArithmeticError> {
+        first_index_arithmetic_error_in_type(
+            ty,
+            &self.types,
+            &mut FxHashSet::default(),
+            &mut FxHashSet::default(),
+        )
     }
 
     fn magnitudo_literal_of(&self, ty: TypeId) -> Option<u64> {
@@ -971,6 +1108,125 @@ impl TypeChecker<'_> {
     }
 }
 
+fn first_index_arithmetic_error_in_type(
+    ty: TypeId,
+    types: &TypeTable,
+    seen_types: &mut FxHashSet<TypeId>,
+    seen_indices: &mut FxHashSet<IndexId>,
+) -> Option<radix_types::IndexArithmeticError> {
+    if !seen_types.insert(ty) {
+        return None;
+    }
+    let check_type = |ty, seen_types: &mut FxHashSet<TypeId>, seen_indices: &mut FxHashSet<IndexId>| {
+        first_index_arithmetic_error_in_type(ty, types, seen_types, seen_indices)
+    };
+    let check_index = |id, seen_types: &mut FxHashSet<TypeId>, seen_indices: &mut FxHashSet<IndexId>| {
+        first_index_arithmetic_error_in_index(id, types, seen_types, seen_indices)
+    };
+
+    match types.get(ty) {
+        radix_types::Type::Array(inner)
+        | radix_types::Type::Queue(inner)
+        | radix_types::Type::Stack(inner)
+        | radix_types::Type::Set(inner)
+        | radix_types::Type::Promissum(inner)
+        | radix_types::Type::Cursor(inner)
+        | radix_types::Type::Atomic(inner)
+        | radix_types::Type::Intervallum(inner)
+        | radix_types::Type::Option(inner)
+        | radix_types::Type::Ref(_, inner)
+        | radix_types::Type::Alias(_, inner) => check_type(*inner, seen_types, seen_indices),
+        radix_types::Type::BoundedArray { element, capacity }
+        | radix_types::Type::BoundedQueue { element, capacity }
+        | radix_types::Type::BoundedStack { element, capacity } => check_index(
+            *capacity,
+            seen_types,
+            seen_indices,
+        )
+        .or_else(|| check_type(*element, seen_types, seen_indices)),
+        radix_types::Type::BoundedTextus { capacity }
+        | radix_types::Type::BoundedAscii { capacity }
+        | radix_types::Type::BoundedOcteti { capacity } => {
+            check_index(*capacity, seen_types, seen_indices)
+        }
+        radix_types::Type::Map(key, value) => check_type(*key, seen_types, seen_indices)
+            .or_else(|| check_type(*value, seen_types, seen_indices)),
+        radix_types::Type::Record(fields) => fields
+            .values()
+            .find_map(|field| check_type(*field, seen_types, seen_indices)),
+        radix_types::Type::PromissumFailable(success, alternate)
+        | radix_types::Type::AsyncCursor(success, alternate) => {
+            check_type(*success, seen_types, seen_indices)
+                .or_else(|| check_type(*alternate, seen_types, seen_indices))
+        }
+        radix_types::Type::Tensor(element, shape)
+        | radix_types::Type::Vector(element, shape)
+        | radix_types::Type::Matrix(element, shape)
+        | radix_types::Type::Sparsa(element, shape) => {
+            check_index(*shape, seen_types, seen_indices)
+                .or_else(|| check_type(*element, seen_types, seen_indices))
+        }
+        radix_types::Type::Func(signature) => signature
+            .params
+            .iter()
+            .find_map(|param| check_type(param.ty, seen_types, seen_indices))
+            .or_else(|| check_type(signature.ret, seen_types, seen_indices))
+            .or_else(|| {
+                signature
+                    .err
+                    .and_then(|err| check_type(err, seen_types, seen_indices))
+            }),
+        radix_types::Type::Applied(base, args) => check_type(*base, seen_types, seen_indices)
+            .or_else(|| {
+                args.iter().find_map(|arg| match arg {
+                    radix_types::AppliedArg::Type(ty) => check_type(*ty, seen_types, seen_indices),
+                    radix_types::AppliedArg::Size(index) => {
+                        check_index(*index, seen_types, seen_indices)
+                    }
+                })
+            }),
+        radix_types::Type::Union(members)
+        | radix_types::Type::Intersection(members)
+        | radix_types::Type::Tuple(members) => members
+            .iter()
+            .find_map(|member| check_type(*member, seen_types, seen_indices)),
+        _ => None,
+    }
+}
+
+fn first_index_arithmetic_error_in_index(
+    id: IndexId,
+    types: &TypeTable,
+    seen_types: &mut FxHashSet<TypeId>,
+    seen_indices: &mut FxHashSet<IndexId>,
+) -> Option<radix_types::IndexArithmeticError> {
+    if !seen_indices.insert(id) {
+        return None;
+    }
+    let expression = types.get_index(id);
+    match expression {
+        IndexExpr::Tuple(dims) => dims.iter().find_map(|dim| {
+            first_index_arithmetic_error_in_index(*dim, types, seen_types, seen_indices)
+        }),
+        IndexExpr::Affine { base, .. } => radix_types::evaluate_index_dimension(id, types)
+            .err()
+            .or_else(|| {
+                first_index_arithmetic_error_in_index(*base, types, seen_types, seen_indices)
+            }),
+        IndexExpr::Divide { numerator, .. } => radix_types::evaluate_index_dimension(id, types)
+            .err()
+            .or_else(|| {
+                first_index_arithmetic_error_in_index(
+                    *numerator,
+                    types,
+                    seen_types,
+                    seen_indices,
+                )
+            }),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod size_default_unify_test {
     use super::*;
@@ -1012,6 +1268,64 @@ mod size_default_unify_test {
             }),
             "expected incompatible_tensor_index diagnostic, got: {:?}",
             checker.errors
+        );
+    }
+
+    #[test]
+    fn affine_substitution_cancels_before_natural_validation() {
+        let mut types = TypeTable::new();
+        let resolver = Resolver::new();
+        let mut interner = Interner::new();
+        let n = interner.intern("N");
+        let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+        let parameter = checker.types.intern_index(IndexExpr::Param(n));
+        let minus_one = radix_types::compose_index_affine_constant(
+            &mut checker.types,
+            parameter,
+            -1,
+        )
+        .expect("symbolic offset");
+        let canceled = radix_types::compose_index_affine_constant(
+            &mut checker.types,
+            minus_one,
+            1,
+        )
+        .expect("canceled affine offset");
+        let zero = checker.types.intern_index(IndexExpr::Literal(0));
+        let mut substitutions = FxHashMap::default();
+        substitutions.insert(n, zero);
+
+        let instantiated = checker.substitute_index_params(canceled, Some(&mut substitutions));
+        assert_eq!(
+            radix_types::evaluate_index_dimension(instantiated, &checker.types),
+            Ok(Some(0))
+        );
+    }
+
+    #[test]
+    fn exact_division_substitution_preserves_non_integral_failure() {
+        let mut types = TypeTable::new();
+        let resolver = Resolver::new();
+        let mut interner = Interner::new();
+        let d = interner.intern("D");
+        let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+        let parameter = checker.types.intern_index(IndexExpr::Param(d));
+        let divided = radix_types::divide_index_exact(&mut checker.types, parameter, 2)
+            .expect("symbolic exact division");
+        let five = checker.types.intern_index(IndexExpr::Literal(5));
+        let mut substitutions = FxHashMap::default();
+        substitutions.insert(d, five);
+
+        let instantiated = checker.substitute_index_params(divided, Some(&mut substitutions));
+        assert_eq!(
+            radix_types::evaluate_index_dimension(instantiated, &checker.types),
+            Err(radix_types::IndexArithmeticError::NonIntegral)
+        );
+        let f32_ty = checker.types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+        let tensor = checker.types.tensor_with_shape(f32_ty, instantiated);
+        assert_eq!(
+            checker.first_index_arithmetic_error_in_type(tensor),
+            Some(radix_types::IndexArithmeticError::NonIntegral)
         );
     }
 }

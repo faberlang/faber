@@ -478,6 +478,7 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
                     ArrayElement::Expr(e) | ArrayElement::Spread(e) => {
                         visitor.visit_expr(e);
                     }
+                    ArrayElement::Infer(_) => {}
                 }
             }
         }
@@ -742,6 +743,9 @@ fn walk_figura_expr<V: Visitor>(visitor: &mut V, figura: &crate::FiguraExpr) {
     match figura {
         crate::FiguraExpr::Infer | crate::FiguraExpr::Literal(_) => {}
         crate::FiguraExpr::Var(ident) => visitor.visit_ident(ident),
+        crate::FiguraExpr::Add(value, _)
+        | crate::FiguraExpr::Subtract(value, _)
+        | crate::FiguraExpr::Divide(value, _) => walk_figura_expr(visitor, value),
         crate::FiguraExpr::Tuple(dims) => {
             for dim in dims {
                 walk_figura_expr(visitor, dim);

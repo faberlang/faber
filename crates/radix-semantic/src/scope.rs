@@ -38,7 +38,7 @@ use crate::file_interface::{
 };
 use crate::locale::LocalePack;
 use crate::passes::visibility_annotation::VisibilityTier;
-use radix_hir::{DefId, HirExpression};
+use radix_hir::{DefId, HirExpression, TensorEdgePolicyRequirement};
 use radix_lexer::{Span, Symbol as LexSymbol};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
@@ -256,6 +256,11 @@ pub struct ImportedSpellings {
 #[derive(Debug, Clone)]
 pub struct ImportedFileInterface {
     exports: FxHashMap<LexSymbol, ImportedFileExport>,
+    /// Generic edge-policy contracts exported with callables, keyed by their
+    /// consumer-visible member spelling. The synthetic DefId is local to this
+    /// resolver and exists only to key semantic call obligations.
+    tensor_edge_policy_requirements:
+        FxHashMap<LexSymbol, (DefId, Vec<TensorEdgePolicyRequirement>)>,
     /// Canonical source names accepted in addition to the consumer-locale
     /// spelling. The exported table stays surface-keyed for check/resolve.
     /// Target emit (Rust/TS) must write the canonical name: the generated
@@ -1142,6 +1147,7 @@ impl Resolver {
                 namespace,
                 ImportedFileInterface {
                     exports,
+                    tensor_edge_policy_requirements: FxHashMap::default(),
                     canonical_exports,
                     strict_members,
                     identity,
@@ -1342,16 +1348,45 @@ impl Resolver {
                     InterfaceMemberKind::Function,
                     &canonical_member,
                 );
-                match import_interface_callable_with_resolver(callable, types, interner, self) {
-                    Ok(sig) => {
+                let requirements = callable
+                    .tensor_edge_policy_requirements
+                    .iter()
+                    .map(|requirement| {
+                        let policy_param = interner.intern(&requirement.policy_param);
+                        let policy_type = types.intern(Type::Param(policy_param));
+                        let element_type = import_interface_type_with_resolver(
+                            &requirement.element_type,
+                            types,
+                            interner,
+                            self,
+                        )?;
+                        Ok(TensorEdgePolicyRequirement {
+                            policy_type,
+                            element_type,
+                            rank: requirement.rank,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, FileInterfaceError>>();
+                match (
+                    import_interface_callable_with_resolver(callable, types, interner, self),
+                    requirements,
+                ) {
+                    (Ok(sig), Ok(requirements)) => {
                         let exported = ImportedFileExport::Function(sig);
+                        let policy_def = (!requirements.is_empty())
+                            .then(|| self.fresh_builtin_def_id());
                         for projected_member in projected_members {
-                            imported
-                                .exports
-                                .insert(interner.intern(&projected_member), exported.clone());
+                            let member = interner.intern(&projected_member);
+                            imported.exports.insert(member, exported.clone());
+                            if let Some(policy_def) = policy_def {
+                                imported.tensor_edge_policy_requirements.insert(
+                                    member,
+                                    (policy_def, requirements.clone()),
+                                );
+                            }
                         }
                     }
-                    Err(err) => {
+                    (Err(err), _) | (_, Err(err)) => {
                         skipped.push(FileInterfaceSkippedExport::from_error(
                             namespace_name,
                             export_identity.as_ref(),
@@ -2026,6 +2061,29 @@ impl Resolver {
             ImportedFileExport::Function(sig) => Some(sig),
             ImportedFileExport::Type(_) | ImportedFileExport::Struct(_) => None,
         }
+    }
+
+    /// Edge-policy obligations exported by a generic namespace function.
+    ///
+    /// The returned identity is a resolver-local key, never a producer
+    /// `DefId`; requirement payload types have already been remapped into the
+    /// consumer's arena.
+    #[must_use]
+    pub fn namespace_file_tensor_edge_policy_requirements_canonical(
+        &self,
+        namespace: LexSymbol,
+        canonical: LexSymbol,
+    ) -> Option<(DefId, &[TensorEdgePolicyRequirement])> {
+        if self
+            .namespace_member_rejection_issue(namespace, canonical)
+            .is_some()
+        {
+            return None;
+        }
+        let interface = self.file_interfaces.get(&namespace)?;
+        let member = self.file_interface_export_key_for_canonical(interface, canonical)?;
+        let (def_id, requirements) = interface.tensor_edge_policy_requirements.get(&member)?;
+        Some((*def_id, requirements))
     }
 
     /// Remapped value type for a post-HIR canonical file-interface CONST member.
@@ -3797,6 +3855,7 @@ impl Resolver {
                     ns,
                     ImportedFileInterface {
                         exports,
+                        tensor_edge_policy_requirements: FxHashMap::default(),
                         canonical_exports: FxHashMap::default(),
                         strict_members: false,
                         identity: None,

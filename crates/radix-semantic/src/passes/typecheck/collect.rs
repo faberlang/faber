@@ -122,6 +122,11 @@ impl TypeChecker<'_> {
         for method in &struct_item.methods {
             let sig = self.function_signature(&method.func);
             methods.insert(method.func.name, sig);
+            self.method_defs
+                .insert((def_id, method.func.name), method.def_id);
+            if method.receiver != radix_hir::HirReceiver::None {
+                self.instance_method_defs.insert((def_id, method.func.name));
+            }
             let visibility = self.hir_member_visibility(&method.annotations);
             if visibility != radix_syntax::MemberVisibility::Publica {
                 method_visibility.insert(method.func.name, visibility);
@@ -140,6 +145,10 @@ impl TypeChecker<'_> {
                 .iter()
                 .map(|param| param.name)
                 .collect(),
+        );
+        self.instance_field_counts.insert(
+            def_id,
+            struct_item.fields.iter().filter(|field| !field.is_static()).count(),
         );
 
         self.struct_implements

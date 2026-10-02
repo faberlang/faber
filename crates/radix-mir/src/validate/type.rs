@@ -643,6 +643,9 @@ impl Validator<'_, '_> {
             Type::InferUnion(_) => self.error(span, "MIR type is unresolved inference variable"),
             Type::MarkerHole { .. } => self.error(span, "MIR type is unresolved marker-width hole"),
             Type::Error => self.error(span, "MIR type is semantic error recovery type"),
+            Type::TensorEdgePolicy(_) => {
+                self.error(span, "MIR type is a type-only tensor edge-policy marker")
+            }
             // N7E-1: fail closed by name until N7E-3 lowers the cell.
             Type::PolicyFloat(_, _) => self.error(
                 span,

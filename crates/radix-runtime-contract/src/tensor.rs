@@ -17,15 +17,33 @@ pub const ERR_INDEX_OUT_OF_BOUNDS: &str = "tensor index out of bounds";
 pub const ERR_ELEMENT_COUNT_OVERFLOW: &str = "tensor element count overflow";
 
 pub const ERR_FORMA_RESHAPE_COUNT: &str = "tensor forma (reshape) element count mismatch";
+pub const ERR_FORMA_LAYOUT_NOT_VIEWABLE: &str = "tensor forma layout cannot be represented as a view";
 pub const ERR_FORMA_ELEMENT_COUNT: &str = "tensor forma element count mismatch";
 pub const ERR_ACCIPE_INVALID_INDEX: &str = "tensor accipe invalid index";
 pub const ERR_PONDE_INVALID_INDEX: &str = "tensor ponde invalid index";
 pub const ERR_CREA_INVALID_SHAPE: &str = "tensor crea invalid shape";
 pub const ERR_SECTIO_INVALID_SLICE_BOUNDS: &str = "tensor sectio invalid slice bounds";
 pub const ERR_BROADCAST_SHAPE: &str = "tensor broadcast shape mismatch";
+pub const ERR_TENSOR_SHAPE_HOLE_UNDERDETERMINED: &str =
+    "tensor shape hole cannot be inferred uniquely from the available element count";
+pub const ERR_TENSOR_EDGE_NOT_SHIFTED: &str =
+    "tensor limes requires an unresolved shifted view";
+pub const ERR_TENSOR_EDGE_UNRESOLVED_READ: &str =
+    "tensor flatten cannot read an unresolved shifted optional element";
+pub const ERR_TENSOR_MATERIALIZE_UNRESOLVED: &str =
+    "tensor materialize cannot copy unresolved shifted optional elements";
+pub const ERR_TENSOR_EDGE_POLICY_INVALID: &str =
+    "tensor edge policy produced an invalid coordinate";
+pub const ERR_TENSOR_EDGE_RANK_MISMATCH: &str =
+    "tensor edge coordinate rank does not match tensor rank";
+pub const ERR_TENSOR_EDGE_READ_ONLY: &str = "tensor edge views do not support writes";
+pub const ERR_TENSOR_COALESCE_REQUIRES_OPTIONAL: &str =
+    "tensor coalesce requires an unresolved shifted optional view";
 pub const ERR_MATMUL_RECEIVER_RANK: &str = "tensor matmul requires rank-2 tensor receiver";
 pub const ERR_MATMUL_ARGUMENT_RANK: &str = "tensor matmul requires rank-2 tensor argument";
 pub const ERR_MATMUL_INNER_DIMENSION: &str = "tensor matmul inner dimension mismatch";
+pub const ERR_MATMUL_BATCH_DIMENSION: &str =
+    "tensor matmul batch dimensions do not match receiver prefix";
 pub const ERR_TRANSPOSE_RANK: &str = "tensor transpose requires rank-2 tensor";
 pub const ERR_PERMUTE_RANK: &str = "tensor permute axis count must equal tensor rank";
 pub const ERR_PERMUTE_NEGATIVE_AXIS: &str = "tensor permute axis must be non-negative";

@@ -8,7 +8,10 @@
 //! pass keeps the templates, rebuilds the shape-discriminating index, and
 //! instantiates any shape the defining unit never called.
 
-use super::{MirError, MirGenericParam};
+use super::{
+    MirError, MirGenericParam, MirTensorEdgePolicyMetadata, MirTensorEdgePolicyProvider, MirTensorEdgePolicySelector,
+    MirTensorLimesTemplate,
+};
 use crate::file_interface::{
     FileExportKind, FileInterface, InterfaceDeviceContract, InterfaceDeviceRole, InterfaceDeviceVisibility,
 };
@@ -20,11 +23,12 @@ use crate::mir::generic::{
     substitute_tensor_from_flat_shape_size_constants,
 };
 use crate::mir::{
-    MirCallee, MirDeviceFunctionMetadataMap, MirExternalFunctionIdentity, MirFunction, MirFunctionId, MirFunctionIndex,
-    MirGenericBindings, MirMonomorphization, MirMonomorphizationKey, MirOperand, MirPlace, MirPlaceBase, MirProgram,
-    MirProjection, MirStatementKind, MirTerminatorKind, MirType, type_contains_param,
+    MirBuiltinEdgePolicy, MirCallee, MirDeviceFunctionMetadataMap, MirEdgePolicy, MirExternalFunctionIdentity,
+    MirFunction, MirFunctionId, MirFunctionIndex, MirGenericBindings, MirIntrinsic, MirMonomorphization,
+    MirMonomorphizationKey, MirOperand, MirPlace, MirPlaceBase, MirProgram, MirProjection, MirStatementKind,
+    MirTerminatorKind, MirType, type_contains_param,
 };
-use crate::semantic::{IndexExpr, Primitive, Type, TypeTable};
+use crate::semantic::{IndexExpr, Primitive, Type, TypeId, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::HashMap;
 
@@ -258,6 +262,43 @@ pub fn instantiate_merged_generic_calls_with_devices_and_metadata(
     consumer_roles: &HashMap<DefId, crate::mir::MirDeviceRole>,
     consumer_launch_entries: &std::collections::HashSet<DefId>,
 ) -> Result<(Vec<MirMonomorphization>, Vec<ImportedDeviceRegistration>), Vec<MirError>> {
+    instantiate_merged_generic_calls_with_tensor_edge_policy(
+        program,
+        templates,
+        generic_params,
+        types,
+        interner,
+        struct_metadata,
+        device_function_metadata,
+        imported_devices,
+        consumer_roles,
+        consumer_launch_entries,
+        &MirTensorEdgePolicyMetadata::default(),
+        true,
+    )
+}
+
+/// Package-link instantiation with portable tensor edge-policy facts.
+///
+/// Early package append steps may defer a custom limes instance until its
+/// provider module is linked. The final package pass sets
+/// `require_tensor_edge_resolution` and fails closed if any concrete limes
+/// site still has no provider or callback target.
+#[allow(clippy::type_complexity)]
+pub fn instantiate_merged_generic_calls_with_tensor_edge_policy(
+    program: &mut MirProgram,
+    templates: &[MirFunction],
+    generic_params: &[(DefId, Vec<MirGenericParam>)],
+    types: &mut TypeTable,
+    interner: &Interner,
+    struct_metadata: Option<&PackageStructMetadata<'_>>,
+    device_function_metadata: &mut MirDeviceFunctionMetadataMap,
+    imported_devices: &ImportedDeviceIndex,
+    consumer_roles: &HashMap<DefId, crate::mir::MirDeviceRole>,
+    consumer_launch_entries: &std::collections::HashSet<DefId>,
+    tensor_edge_policy_metadata: &MirTensorEdgePolicyMetadata,
+    require_tensor_edge_resolution: bool,
+) -> Result<(Vec<MirMonomorphization>, Vec<ImportedDeviceRegistration>), Vec<MirError>> {
     if templates.is_empty() {
         return Ok((Vec::new(), Vec::new()));
     }
@@ -276,6 +317,19 @@ pub fn instantiate_merged_generic_calls_with_devices_and_metadata(
             .filter_map(|template| template.source.map(|source| (source, template.clone())))
             .collect(),
         generic_params: generic_params.iter().cloned().collect(),
+        tensor_limes_templates: tensor_edge_policy_metadata
+            .generic_limes
+            .iter()
+            .copied()
+            .map(|site| ((site.source, site.destination), site))
+            .collect(),
+        tensor_edge_policy_providers: tensor_edge_policy_metadata.providers.clone(),
+        function_ids_by_source: program
+            .functions
+            .iter()
+            .filter_map(|function| function.source.map(|source| (source, function.id)))
+            .collect(),
+        require_tensor_edge_resolution,
         instance_index: FxHashMap::default(),
         monomorphizations: Vec::new(),
         next_id,
@@ -286,6 +340,10 @@ pub fn instantiate_merged_generic_calls_with_devices_and_metadata(
         registered_device_keys: FxHashSet::default(),
     };
     state.index_existing_instances(&program.functions);
+    if !state.errors.is_empty() {
+        return Err(state.errors);
+    }
+    state.resolve_existing_tensor_limes(&mut program.functions);
     if !state.errors.is_empty() {
         return Err(state.errors);
     }
@@ -405,6 +463,10 @@ struct PackageInstantiate<'a> {
     struct_metadata: Option<&'a PackageStructMetadata<'a>>,
     templates: FxHashMap<DefId, MirFunction>,
     generic_params: FxHashMap<DefId, Vec<MirGenericParam>>,
+    tensor_limes_templates: FxHashMap<(DefId, crate::mir::MirTempId), MirTensorLimesTemplate>,
+    tensor_edge_policy_providers: Vec<MirTensorEdgePolicyProvider>,
+    function_ids_by_source: FxHashMap<DefId, MirFunctionId>,
+    require_tensor_edge_resolution: bool,
     instance_index: FxHashMap<MirMonomorphizationKey, MirFunctionId>,
     monomorphizations: Vec<MirMonomorphization>,
     next_id: MirFunctionId,
@@ -473,6 +535,35 @@ impl PackageInstantiate<'_> {
             self.instance_index.insert(key.clone(), function.id);
             self.monomorphizations
                 .push(MirMonomorphization { key, function: function.id });
+        }
+    }
+
+    fn resolve_existing_tensor_limes(&mut self, functions: &mut [MirFunction]) {
+        for function in functions {
+            let Some(source) = function.source else {
+                continue;
+            };
+            if !self
+                .tensor_limes_templates
+                .keys()
+                .any(|(template, _)| *template == source)
+                || super::monomorphize::function_contains_param(self.types, function)
+            {
+                continue;
+            }
+            let Some(key) = self.key_from_instance(function) else {
+                continue;
+            };
+            let span = function.span;
+            if !self.resolve_tensor_limes_for_instance(&key, function, span) {
+                if self.errors.is_empty() {
+                    self.errors.push(MirError::validation(
+                        span,
+                        "concrete MIR function contains a deferred tensor limes policy before package linking completed",
+                    ));
+                }
+                return;
+            }
         }
     }
 
@@ -815,9 +906,23 @@ impl PackageInstantiate<'_> {
                     unresolved(self);
                     return None;
                 };
-                let Some(concrete) =
+                let contains_runtime =
+                    super::index_contains_runtime_extent(self.types, bound, &mut FxHashSet::default());
+                let concrete = if contains_runtime {
+                    param.runtime_witness
+                } else {
                     super::monomorphize::resolve_parent_shape_binding(self.types, bound, parent_shapes)
-                else {
+                };
+                let Some(concrete) = concrete else {
+                    if contains_runtime {
+                        self.errors.push(MirError {
+                            message: "runtime generic shape has no stable formal carrier witness".to_owned(),
+                            issue: issue.clone(),
+                            span,
+                            definition_span: None,
+                        });
+                        return None;
+                    }
                     unresolved(self);
                     return None;
                 };
@@ -912,6 +1017,9 @@ impl PackageInstantiate<'_> {
         if !self.substitute_function(&mut instance, type_bindings, span) {
             return None;
         }
+        if !self.resolve_tensor_limes_for_instance(key, &mut instance, span) {
+            return None;
+        }
         let shape_bindings = self.shape_bindings_from_key(key);
         if !finalize_function(self.types, &mut instance, type_bindings, &shape_bindings, &mut self.errors) {
             return None;
@@ -929,6 +1037,138 @@ impl PackageInstantiate<'_> {
         self.created.push(instance);
         self.register_device_instance(key, id);
         Some(id)
+    }
+
+    fn resolve_tensor_limes_for_instance(
+        &mut self,
+        key: &MirMonomorphizationKey,
+        function: &mut MirFunction,
+        span: Span,
+    ) -> bool {
+        let sites = self
+            .tensor_limes_templates
+            .iter()
+            .filter(|((source, _), _)| *source == key.source)
+            .map(|(_, site)| *site)
+            .collect::<Vec<_>>();
+        for site in sites {
+            let Some(actual_policy) = key.type_args.get(site.policy_type_argument).copied() else {
+                self.errors.push(MirError::validation(
+                    span,
+                    "generic tensor limes policy argument is missing from its specialization key",
+                ));
+                return false;
+            };
+            let Some((element, rank)) = function
+                .blocks
+                .iter()
+                .flat_map(|block| &block.statements)
+                .find_map(|statement| match &statement.kind {
+                    MirStatementKind::RuntimeCall { destination: Some(place), call }
+                        if place.base == MirPlaceBase::Temp(site.destination)
+                            && place.projections.is_empty()
+                            && matches!(&call.intrinsic, MirIntrinsic::TensorLimes(_)) =>
+                    {
+                        tensor_type_element_and_rank(self.types, call.return_ty.semantic_id())
+                    }
+                    _ => None,
+                })
+            else {
+                self.errors.push(MirError::validation(
+                    span,
+                    "generic tensor limes template call is missing after specialization",
+                ));
+                return false;
+            };
+            if rank != site.rank {
+                self.errors.push(MirError::validation(
+                    span,
+                    "generic tensor limes tensor rank changed during specialization",
+                ));
+                return false;
+            }
+            let candidates = self
+                .tensor_edge_policy_providers
+                .iter()
+                .cloned()
+                .filter(|provider| {
+                    provider.rank == site.rank
+                        && tensor_edge_provider_matches(
+                            self.types,
+                            self.interner,
+                            actual_policy.semantic_id(),
+                            element,
+                            provider,
+                        )
+                })
+                .collect::<Vec<_>>();
+            let [provider] = candidates.as_slice() else {
+                if !self.require_tensor_edge_resolution && candidates.is_empty() {
+                    return false;
+                }
+                self.errors.push(MirError::validation(
+                    span,
+                    "generic tensor limes specialization has no unique checked portable policy provider",
+                ));
+                return false;
+            };
+            let dispatch = match &provider.selector {
+                MirTensorEdgePolicySelector::Builtin(policy) => MirEdgePolicy::Builtin(*policy),
+                MirTensorEdgePolicySelector::Custom { policy_def, remap, transform } => {
+                    let Some(remap) = self.function_ids_by_source.get(remap).copied() else {
+                        if !self.require_tensor_edge_resolution {
+                            return false;
+                        }
+                        self.errors.push(MirError::validation(
+                            span,
+                            "generic tensor limes remap callback is not linked into the package",
+                        ));
+                        return false;
+                    };
+                    let transform = match transform {
+                        Some(definition) => match self.function_ids_by_source.get(definition).copied() {
+                            Some(function) => Some(function),
+                            None if !self.require_tensor_edge_resolution => return false,
+                            None => {
+                                self.errors.push(MirError::validation(
+                                    span,
+                                    "generic tensor limes transform callback is not linked into the package",
+                                ));
+                                return false;
+                            }
+                        },
+                        None => None,
+                    };
+                    MirEdgePolicy::Custom { policy_def: *policy_def, remap, transform }
+                }
+            };
+            let Some(statement) = function
+                .blocks
+                .iter_mut()
+                .flat_map(|block| &mut block.statements)
+                .find(|statement| {
+                    matches!(
+                        &statement.kind,
+                        MirStatementKind::RuntimeCall {
+                            destination: Some(place),
+                            call,
+                        } if place.base == MirPlaceBase::Temp(site.destination)
+                            && place.projections.is_empty()
+                            && matches!(&call.intrinsic, MirIntrinsic::TensorLimes(_))
+                    )
+                })
+            else {
+                self.errors.push(MirError::validation(
+                    span,
+                    "generic tensor limes template call changed during specialization",
+                ));
+                return false;
+            };
+            if let MirStatementKind::RuntimeCall { call, .. } = &mut statement.kind {
+                call.intrinsic = MirIntrinsic::TensorLimes(dispatch);
+            }
+        }
+        true
     }
 
     /// Register one concrete imported device instance for the consumer
@@ -1243,6 +1483,65 @@ impl PackageInstantiate<'_> {
                 self.errors
                     .push(MirError::validation(function.span, UNRESOLVED_SHAPE_SIZE_SURVIVOR));
             }
+        }
+    }
+}
+
+fn tensor_type_element_and_rank(types: &TypeTable, mut ty: TypeId) -> Option<(TypeId, usize)> {
+    let mut seen = FxHashSet::default();
+    while let Type::Alias(_, inner) = types.get(ty) {
+        if !seen.insert(ty) {
+            return None;
+        }
+        ty = *inner;
+    }
+    let Type::Tensor(element, shape) = types.get(ty) else {
+        return None;
+    };
+    let rank = match types.get_index(*shape) {
+        IndexExpr::Tuple(dimensions) => dimensions.len(),
+        IndexExpr::Literal(_)
+        | IndexExpr::Param(_)
+        | IndexExpr::Runtime(_)
+        | IndexExpr::Affine { .. }
+        | IndexExpr::Divide { .. } => 1,
+        IndexExpr::Infer(_) | IndexExpr::Unspecified => return None,
+    };
+    Some((*element, rank))
+}
+
+fn tensor_edge_provider_matches(
+    types: &TypeTable,
+    interner: &Interner,
+    mut actual_policy: TypeId,
+    element_type: TypeId,
+    provider: &MirTensorEdgePolicyProvider,
+) -> bool {
+    let mut seen = FxHashSet::default();
+    while let Type::Alias(_, inner) = types.get(actual_policy) {
+        if !seen.insert(actual_policy) {
+            return false;
+        }
+        actual_policy = *inner;
+    }
+    match &provider.selector {
+        MirTensorEdgePolicySelector::Builtin(policy) => {
+            types.tensor_edge_policy_kind(actual_policy)
+                == Some(match *policy {
+                    MirBuiltinEdgePolicy::Clamp => radix_types::BuiltinTensorEdgePolicy::Clamp,
+                    MirBuiltinEdgePolicy::Reflect => radix_types::BuiltinTensorEdgePolicy::Reflect,
+                    MirBuiltinEdgePolicy::Wrap => radix_types::BuiltinTensorEdgePolicy::Wrap,
+                })
+        }
+        MirTensorEdgePolicySelector::Custom { .. } => {
+            super::portable_tensor_edge_type_identity(types, interner, actual_policy)
+                .as_ref()
+                .zip(provider.policy_type.as_ref())
+                .is_some_and(|(actual, expected)| actual == expected)
+                && super::portable_tensor_edge_type_identity(types, interner, element_type)
+                    .as_ref()
+                    .zip(provider.element_type.as_ref())
+                    .is_some_and(|(actual, expected)| actual == expected)
         }
     }
 }

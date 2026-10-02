@@ -27,6 +27,44 @@ use crate::semantic::lista_tensor_conversio::{
     resolve_lista_to_tensor_shape, validate_lista_to_tensor_source,
 };
 
+pub(super) fn shape_relation_applies_to_return(types: &TypeTable, relation: &ShapeRelation, expression: u32) -> bool {
+    fn mentions_expression(types: &TypeTable, index: IndexId, expression: u32) -> bool {
+        match types.get_index(index) {
+            IndexExpr::Runtime(
+                RuntimeExtentId::ScalarExpression { expression: source }
+                | RuntimeExtentId::ExpressionAxis { expression: source, .. }
+                | RuntimeExtentId::ExpressionFieldAxis { expression: source, .. },
+            ) => *source == expression,
+            IndexExpr::Affine { base, .. } => mentions_expression(types, *base, expression),
+            IndexExpr::Divide { numerator, .. } => mentions_expression(types, *numerator, expression),
+            IndexExpr::Tuple(dimensions) => dimensions
+                .iter()
+                .any(|dimension| mentions_expression(types, *dimension, expression)),
+            _ => false,
+        }
+    }
+
+    fn has_expression_source(types: &TypeTable, index: IndexId) -> bool {
+        match types.get_index(index) {
+            IndexExpr::Runtime(
+                RuntimeExtentId::ScalarExpression { .. }
+                | RuntimeExtentId::ExpressionAxis { .. }
+                | RuntimeExtentId::ExpressionFieldAxis { .. },
+            ) => true,
+            IndexExpr::Affine { base, .. } => has_expression_source(types, *base),
+            IndexExpr::Divide { numerator, .. } => has_expression_source(types, *numerator),
+            IndexExpr::Tuple(dimensions) => dimensions
+                .iter()
+                .any(|dimension| has_expression_source(types, *dimension)),
+            _ => false,
+        }
+    }
+
+    mentions_expression(types, relation.left, expression)
+        || mentions_expression(types, relation.right, expression)
+        || (!has_expression_source(types, relation.left) && !has_expression_source(types, relation.right))
+}
+
 /// Whether a `⊥` default expression is side-effecting: a call or method call
 /// whose execution has observable effects. Pure recovery expressions (literals,
 /// paths, compound values) need no deferral — evaluating them eagerly is
@@ -46,6 +84,362 @@ struct HandledConversio<'a> {
 }
 
 impl FunctionBuilder<'_> {
+    pub(super) fn emit_call_shape_check(
+        &mut self,
+        site: crate::hir::HirId,
+        arguments: &[MirOperand],
+        callee_parameter_offset: u32,
+        span: Span,
+    ) -> Option<()> {
+        let Some(relations) = self.context.shape_calls.get(&site).cloned() else {
+            let bindings = self
+                .context
+                .call_size_bindings
+                .get(&site)
+                .cloned()
+                .unwrap_or_default();
+            if bindings.is_empty() {
+                return Some(());
+            }
+            return self.emit_shape_check(
+                &[],
+                &bindings,
+                ShapeRelationBoundary::Call,
+                arguments,
+                None,
+                callee_parameter_offset,
+                span,
+            );
+        };
+        let bindings = self
+            .context
+            .call_size_bindings
+            .get(&site)
+            .cloned()
+            .unwrap_or_default();
+        self.emit_shape_check(
+            &relations,
+            &bindings,
+            ShapeRelationBoundary::Call,
+            arguments,
+            None,
+            callee_parameter_offset,
+            span,
+        )
+    }
+
+    pub(super) fn emit_function_entry_shape_check(&mut self, span: Span) -> Option<()> {
+        let relations = self.function_shape_relations.clone();
+        self.emit_shape_check(&relations, &[], ShapeRelationBoundary::FunctionEntry, &[], None, 0, span)
+    }
+
+    pub(super) fn emit_function_return_shape_check(
+        &mut self,
+        expression: u32,
+        value: MirOperand,
+        span: Span,
+    ) -> Option<()> {
+        let relations = self.function_shape_relations.clone();
+        self.emit_shape_check(
+            &relations,
+            &[],
+            ShapeRelationBoundary::FunctionReturn,
+            &[],
+            Some((expression, value)),
+            0,
+            span,
+        )
+    }
+
+    fn emit_shape_check(
+        &mut self,
+        relations: &[ShapeRelation],
+        size_bindings: &[RuntimeSizeBinding],
+        boundary: ShapeRelationBoundary,
+        arguments: &[MirOperand],
+        expression_value: Option<(u32, MirOperand)>,
+        callee_parameter_offset: u32,
+        span: Span,
+    ) -> Option<()> {
+        let retained: Vec<_> = relations
+            .iter()
+            .filter(|relation| relation.boundary == boundary)
+            .filter(|relation| {
+                boundary != ShapeRelationBoundary::FunctionReturn
+                    || expression_value.as_ref().is_none_or(|(expression, _)| {
+                        shape_relation_applies_to_return(self.types, relation, *expression)
+                    })
+            })
+            .copied()
+            .collect();
+        if retained.is_empty() && size_bindings.is_empty() {
+            return Some(());
+        }
+        let mut check_arguments = arguments.to_vec();
+        let mut lowered = Vec::with_capacity(retained.len());
+        let mut lowered_bindings = Vec::with_capacity(size_bindings.len());
+        for binding in size_bindings {
+            let witness = match self.lower_shape_expr(
+                binding.witness,
+                &mut check_arguments,
+                expression_value.as_ref(),
+                boundary,
+                callee_parameter_offset,
+            ) {
+                Ok(expression) => expression,
+                Err(message) => {
+                    self.errors
+                        .push(MirError::unsupported(binding.span, message));
+                    return None;
+                }
+            };
+            lowered_bindings.push(MirShapeBinding { parameter: binding.parameter, witness });
+        }
+        for relation in &retained {
+            let left = match self.lower_shape_expr(
+                relation.left,
+                &mut check_arguments,
+                expression_value.as_ref(),
+                boundary,
+                callee_parameter_offset,
+            ) {
+                Ok(expression) => expression,
+                Err(message) => {
+                    self.errors
+                        .push(MirError::unsupported(relation.span, message));
+                    return None;
+                }
+            };
+            let right = match self.lower_shape_expr(
+                relation.right,
+                &mut check_arguments,
+                expression_value.as_ref(),
+                boundary,
+                callee_parameter_offset,
+            ) {
+                Ok(expression) => expression,
+                Err(message) => {
+                    self.errors
+                        .push(MirError::unsupported(relation.span, message));
+                    return None;
+                }
+            };
+            lowered.push(MirShapeRelation { left, right });
+        }
+        let check_span = retained.first().map_or(span, |relation| relation.span);
+        self.runtime_call_to_place(
+            None,
+            MirIntrinsic::TensorShapeCheck(MirShapeCheck { relations: lowered, size_bindings: lowered_bindings }),
+            check_arguments,
+            MirType::semantic(self.types.primitive(Primitive::Vacuum)),
+            check_span,
+        );
+        Some(())
+    }
+
+    pub(super) fn lower_shape_expr(
+        &mut self,
+        index: IndexId,
+        arguments: &mut Vec<MirOperand>,
+        expression_value: Option<&(u32, MirOperand)>,
+        boundary: ShapeRelationBoundary,
+        callee_parameter_offset: u32,
+    ) -> Result<MirShapeExpr, String> {
+        match self.types.get_index(index).clone() {
+            IndexExpr::Literal(value) => Ok(MirShapeExpr::Literal(value)),
+            IndexExpr::Runtime(source) => {
+                self.lower_runtime_shape_source(source, arguments, expression_value, boundary, callee_parameter_offset)
+            }
+            IndexExpr::Affine { base, offset } => Ok(MirShapeExpr::Affine {
+                base: Box::new(self.lower_shape_expr(
+                    base,
+                    arguments,
+                    expression_value,
+                    boundary,
+                    callee_parameter_offset,
+                )?),
+                offset,
+            }),
+            IndexExpr::Divide { numerator, divisor } if divisor != 0 => Ok(MirShapeExpr::Divide {
+                numerator: Box::new(self.lower_shape_expr(
+                    numerator,
+                    arguments,
+                    expression_value,
+                    boundary,
+                    callee_parameter_offset,
+                )?),
+                divisor,
+            }),
+            IndexExpr::Divide { .. } => Err("runtime shape division has a zero divisor".to_owned()),
+            IndexExpr::Param(symbol) => {
+                let source = self
+                    .size_params
+                    .iter()
+                    .find_map(|(def_id, name)| {
+                        (*name == symbol)
+                            .then(|| self.size_param_sources.get(def_id).copied())
+                            .flatten()
+                    })
+                    .ok_or_else(|| "runtime shape relation retains an unbound generic dimension".to_owned())?;
+                self.lower_shape_expr(source, arguments, expression_value, boundary, callee_parameter_offset)
+            }
+            IndexExpr::Tuple(_) => Err("runtime shape relation expected a scalar dimension".to_owned()),
+            IndexExpr::Infer(_) | IndexExpr::Unspecified => {
+                Err("runtime shape relation retains an unresolved dimension".to_owned())
+            }
+        }
+    }
+
+    fn lower_runtime_shape_source(
+        &mut self,
+        source: RuntimeExtentId,
+        arguments: &mut Vec<MirOperand>,
+        expression_value: Option<&(u32, MirOperand)>,
+        boundary: ShapeRelationBoundary,
+        callee_parameter_offset: u32,
+    ) -> Result<MirShapeExpr, String> {
+        let append = |arguments: &mut Vec<MirOperand>, operand: MirOperand| -> Result<u32, String> {
+            let argument =
+                u32::try_from(arguments.len()).map_err(|_| "runtime shape check has too many operands".to_owned())?;
+            arguments.push(operand);
+            Ok(argument)
+        };
+        let formal_operand = |this: &Self, parameter: u32| -> Result<MirOperand, String> {
+            let ordinal = parameter
+                .checked_add(this.formal_parameter_offset)
+                .ok_or_else(|| "runtime shape formal parameter ordinal overflow".to_owned())?;
+            let param = this
+                .params
+                .get(
+                    usize::try_from(ordinal)
+                        .map_err(|_| "runtime shape formal ordinal is not addressable".to_owned())?,
+                )
+                .ok_or_else(|| "runtime shape formal parameter is out of range".to_owned())?;
+            Ok(MirOperand::Place(MirPlace::local(param.local)))
+        };
+        let call_operand = |arguments: &[MirOperand], parameter: u32| -> Result<u32, String> {
+            let ordinal = parameter
+                .checked_add(callee_parameter_offset)
+                .ok_or_else(|| "runtime shape call argument ordinal overflow".to_owned())?;
+            if usize::try_from(ordinal).map_or(true, |index| index >= arguments.len()) {
+                return Err("runtime shape call argument is out of range".to_owned());
+            }
+            Ok(ordinal)
+        };
+        let parameter_shape = |this: &Self,
+                               arguments: &mut Vec<MirOperand>,
+                               parameter: u32,
+                               axis: Option<(Vec<Symbol>, u32)>|
+         -> Result<MirShapeExpr, String> {
+            if boundary == ShapeRelationBoundary::Call {
+                let argument = call_operand(arguments, parameter)?;
+                return Ok(match axis {
+                    Some((fields, axis)) => MirShapeExpr::TensorFieldAxis { argument, fields, axis },
+                    None => MirShapeExpr::ScalarArgument { argument },
+                });
+            }
+            let argument = append(arguments, formal_operand(this, parameter)?)?;
+            Ok(match axis {
+                Some((fields, axis)) => MirShapeExpr::TensorFieldAxis { argument, fields, axis },
+                None => MirShapeExpr::ScalarArgument { argument },
+            })
+        };
+        let binding_operand = |this: &Self, binding: DefId| {
+            if let Some(place) = this.captured_bindings.get(&binding) {
+                Some(MirOperand::Place(place.clone()))
+            } else {
+                this.bindings
+                    .get(&binding)
+                    .map(|binding| MirOperand::Place(MirPlace::local(binding.local)))
+            }
+        };
+        match source {
+            RuntimeExtentId::CallArgumentAxis { argument, axis } => {
+                let argument = if boundary == ShapeRelationBoundary::Call {
+                    argument
+                        .checked_add(callee_parameter_offset)
+                        .ok_or_else(|| "runtime shape call-argument ordinal overflow".to_owned())?
+                } else {
+                    argument
+                };
+                if usize::try_from(argument).map_or(true, |index| index >= arguments.len()) {
+                    return Err("runtime shape call-argument axis is out of range".to_owned());
+                }
+                Ok(MirShapeExpr::TensorAxis { argument, axis })
+            }
+            RuntimeExtentId::CallArgumentFieldAxis { argument, fields, axis } => {
+                let argument = if boundary == ShapeRelationBoundary::Call {
+                    argument
+                        .checked_add(callee_parameter_offset)
+                        .ok_or_else(|| "runtime shape call-argument ordinal overflow".to_owned())?
+                } else {
+                    argument
+                };
+                if usize::try_from(argument).map_or(true, |index| index >= arguments.len()) {
+                    return Err("runtime shape call-argument field axis is out of range".to_owned());
+                }
+                Ok(MirShapeExpr::TensorFieldAxis { argument, fields, axis })
+            }
+            RuntimeExtentId::ScalarParameter { parameter } => parameter_shape(self, arguments, parameter, None),
+            RuntimeExtentId::FunctionParameterAxis { parameter, axis } => {
+                if boundary == ShapeRelationBoundary::Call {
+                    let argument = call_operand(arguments, parameter)?;
+                    Ok(MirShapeExpr::TensorAxis { argument, axis })
+                } else {
+                    let argument = append(arguments, formal_operand(self, parameter)?)?;
+                    Ok(MirShapeExpr::TensorAxis { argument, axis })
+                }
+            }
+            RuntimeExtentId::FunctionParameterFieldAxis { parameter, fields, axis } => {
+                parameter_shape(self, arguments, parameter, Some((fields, axis)))
+            }
+            RuntimeExtentId::ScalarBinding(binding) => {
+                let operand = binding_operand(self, binding)
+                    .ok_or_else(|| "runtime scalar extent binding is unavailable in MIR".to_owned())?;
+                let argument = append(arguments, operand)?;
+                Ok(MirShapeExpr::ScalarArgument { argument })
+            }
+            RuntimeExtentId::TensorBindingAxis { binding, axis } => {
+                let operand = binding_operand(self, binding)
+                    .ok_or_else(|| "runtime tensor extent binding is unavailable in MIR".to_owned())?;
+                let argument = append(arguments, operand)?;
+                Ok(MirShapeExpr::TensorAxis { argument, axis })
+            }
+            RuntimeExtentId::TensorFieldAxis { binding, fields, axis } => {
+                let operand = binding_operand(self, binding)
+                    .ok_or_else(|| "runtime tensor-field extent binding is unavailable in MIR".to_owned())?;
+                let argument = append(arguments, operand)?;
+                Ok(MirShapeExpr::TensorFieldAxis { argument, fields, axis })
+            }
+            RuntimeExtentId::ScalarExpression { expression } => {
+                let operand = expression_value
+                    .filter(|(available, _)| *available == expression)
+                    .map(|(_, operand)| operand.clone())
+                    .ok_or_else(|| "runtime scalar expression source is unavailable at this boundary".to_owned())?;
+                let argument = append(arguments, operand)?;
+                Ok(MirShapeExpr::ScalarArgument { argument })
+            }
+            RuntimeExtentId::ExpressionAxis { expression, axis } => {
+                let operand = expression_value
+                    .filter(|(available, _)| *available == expression)
+                    .map(|(_, operand)| operand.clone())
+                    .ok_or_else(|| "runtime shape expression source is unavailable at this boundary".to_owned())?;
+                let argument = append(arguments, operand)?;
+                Ok(MirShapeExpr::TensorAxis { argument, axis })
+            }
+            RuntimeExtentId::ExpressionFieldAxis { expression, fields, axis } => {
+                let operand = expression_value
+                    .filter(|(available, _)| *available == expression)
+                    .map(|(_, operand)| operand.clone())
+                    .ok_or_else(|| {
+                        "runtime tensor-field expression source is unavailable at this boundary".to_owned()
+                    })?;
+                let argument = append(arguments, operand)?;
+                Ok(MirShapeExpr::TensorFieldAxis { argument, fields, axis })
+            }
+        }
+    }
+
     pub(super) fn lower_hir_call_args(&mut self, args: &[HirCallArg]) -> Option<Vec<MirOperand>> {
         let mut lowered = Vec::with_capacity(args.len());
         for arg in args {
@@ -102,7 +496,7 @@ impl FunctionBuilder<'_> {
             let mut lowered_args = Vec::with_capacity(args.len() + 1);
             lowered_args.push(self.lower_expr_value(receiver)?);
             lowered_args.extend(self.lower_hir_call_args(args)?);
-            return self.lower_definition_call(target.def_id, Vec::new(), lowered_args, conversion, expr);
+            return self.lower_definition_call(target.def_id, Vec::new(), lowered_args, conversion, 1, expr);
         }
         if let Some(result) = self.lower_union_method_call(receiver, method, args, conversion, expr) {
             return result;
@@ -115,7 +509,7 @@ impl FunctionBuilder<'_> {
             let mut lowered_args = Vec::with_capacity(args.len() + 1);
             lowered_args.push(self.lower_expr_value(receiver)?);
             lowered_args.extend(self.lower_hir_call_args(args)?);
-            return self.lower_definition_call(target, vec![receiver_ty], lowered_args, conversion, expr);
+            return self.lower_definition_call(target, vec![receiver_ty], lowered_args, conversion, 1, expr);
         }
 
         let imported_method_target = receiver.ty.and_then(|receiver_ty| {
@@ -129,6 +523,7 @@ impl FunctionBuilder<'_> {
             let mut lowered_args = Vec::with_capacity(args.len() + 1);
             lowered_args.push(self.lower_expr_value(receiver)?);
             lowered_args.extend(self.lower_hir_call_args(args)?);
+            self.emit_call_shape_check(expr.id, &lowered_args, 1, expr.span)?;
             let ty = self.expr_ty(expr)?;
             let mut module = target.provider.module;
             module.push(target.provider.item);
@@ -154,9 +549,10 @@ impl FunctionBuilder<'_> {
                 .and_then(|functions| functions.get(&method))
             {
                 let lowered_args = self.lower_hir_call_args(args)?;
-                return self.lower_definition_call(*verb_def, Vec::new(), lowered_args, conversion, expr);
+                return self.lower_definition_call(*verb_def, Vec::new(), lowered_args, conversion, 0, expr);
             }
             let lowered_args = self.lower_hir_call_args(args)?;
+            self.emit_call_shape_check(expr.id, &lowered_args, 0, expr.span)?;
             let ty = self.expr_ty(expr)?;
             let mut module = import.module;
             module.push(import.item);
@@ -169,6 +565,14 @@ impl FunctionBuilder<'_> {
         }
 
         let method_name = self.resolve_method_name(method)?.to_owned();
+        if let Some(receiver_ty) = receiver.ty {
+            let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
+            if crate::intrinsics::lookup_method_for_type(payload, &method_name, args.len())
+                .is_some_and(|entry| matches!(entry.mir_kind, crate::intrinsics::IntrinsicMirKind::TensorLimes))
+            {
+                return self.lower_tensor_limes(receiver, args, expr);
+            }
+        }
         if method_name == "rope_norm" {
             return self.lower_tensor_rope_norm(receiver, method, generic_args, args, expr);
         }
@@ -271,6 +675,89 @@ impl FunctionBuilder<'_> {
         let value = self.runtime_call_value(MirIntrinsic::Collection(op), lowered_args, call_ty, expr.span);
         if call_ty != expr_ty && self.types.nullable_inner(expr_ty.semantic_id()) == Some(call_ty.semantic_id()) {
             return Some(self.assign_temp(MirValueKind::Option(MirOptionOp::Some(value)), expr_ty, expr.span));
+        }
+        Some(value)
+    }
+
+    fn lower_tensor_limes(
+        &mut self,
+        receiver: &HirExpression,
+        args: &[HirCallArg],
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        if !args.is_empty() {
+            self.errors
+                .push(MirError::validation(expr.span, "tensor limes does not accept value arguments"));
+            return None;
+        }
+        let Some(policy) = self
+            .context
+            .tensor_edge_policies
+            .calls
+            .get(&expr.id)
+            .copied()
+        else {
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "tensor limes policy resolution is missing from semantic analysis",
+            ));
+            return None;
+        };
+        let (mir_policy, pending) = match policy {
+            radix_hir::ResolvedTensorEdgePolicy::Builtin(policy) => (
+                MirEdgePolicy::Builtin(match policy {
+                    radix_types::BuiltinTensorEdgePolicy::Clamp => MirBuiltinEdgePolicy::Clamp,
+                    radix_types::BuiltinTensorEdgePolicy::Reflect => MirBuiltinEdgePolicy::Reflect,
+                    radix_types::BuiltinTensorEdgePolicy::Wrap => MirBuiltinEdgePolicy::Wrap,
+                }),
+                None,
+            ),
+            radix_hir::ResolvedTensorEdgePolicy::Custom { policy_def, remap, transform } => (
+                // Private staging tag only. `resolve_pending_tensor_limes`
+                // replaces this before MIR validation and no serialized MIR
+                // can contain this placeholder as the selected policy.
+                MirEdgePolicy::Builtin(MirBuiltinEdgePolicy::Clamp),
+                Some(super::PendingTensorLimesDispatch::Custom { policy_def, remap, transform }),
+            ),
+            radix_hir::ResolvedTensorEdgePolicy::Deferred { policy_type } => (
+                // A concrete instance replaces this private placeholder in
+                // the existing MIR monomorphization pass. The generic template
+                // itself is not executed by the runner.
+                MirEdgePolicy::Builtin(MirBuiltinEdgePolicy::Clamp),
+                Some(super::PendingTensorLimesDispatch::Deferred { policy_type }),
+            ),
+        };
+        let lowered_receiver = self.lower_expr_value(receiver)?;
+        let return_ty = self.expr_ty(expr)?;
+        let value = self.runtime_call_value(
+            MirIntrinsic::TensorLimes(mir_policy),
+            vec![lowered_receiver],
+            return_ty,
+            expr.span,
+        );
+        if let Some(dispatch) = pending {
+            let MirOperand::Temp(destination) = value else {
+                self.errors.push(MirError::unsupported(
+                    expr.span,
+                    "custom tensor limes did not lower to a value temporary",
+                ));
+                return None;
+            };
+            match self.context.pending_tensor_limes.lock() {
+                Ok(mut queue) => queue.push(super::PendingTensorLimes {
+                    function: self.parent_function_id,
+                    destination,
+                    dispatch,
+                    span: expr.span,
+                }),
+                Err(_) => {
+                    self.errors.push(MirError::unsupported(
+                        expr.span,
+                        "tensor limes callback queue was poisoned during lowering",
+                    ));
+                    return None;
+                }
+            }
         }
         Some(value)
     }
@@ -2060,6 +2547,7 @@ impl FunctionBuilder<'_> {
                 return None;
             }
             let lowered_args = self.lower_positional_call_args(args)?;
+            self.emit_call_shape_check(expr.id, &lowered_args, 0, expr.span)?;
             let ty = self.expr_ty(expr)?;
             if let Some(error_ty) = self.callable_error_ty(callee) {
                 return self.lower_failable_call(
@@ -2087,6 +2575,7 @@ impl FunctionBuilder<'_> {
                     .push(MirError::unsupported(expr.span, "GPU builtin call with arguments"));
                 return None;
             }
+            self.emit_call_shape_check(expr.id, &[], 0, expr.span)?;
             let ty = self.expr_ty(expr)?;
             return Some(self.runtime_call_value(MirIntrinsic::GpuBuiltin(builtin), Vec::new(), ty, expr.span));
         }
@@ -2095,6 +2584,7 @@ impl FunctionBuilder<'_> {
         let ty = self.expr_ty(expr)?;
 
         if let Some(import) = self.context.provider_imports.get(def_id).cloned() {
+            self.emit_call_shape_check(expr.id, &lowered_args, 0, expr.span)?;
             return Some(self.runtime_call_value(
                 MirIntrinsic::Provider(MirProvider { kind: import.kind, module: import.module, name: import.item }),
                 lowered_args,
@@ -2104,6 +2594,7 @@ impl FunctionBuilder<'_> {
         }
 
         if self.context.variant_parents.contains_key(def_id) {
+            self.emit_call_shape_check(expr.id, &lowered_args, 0, expr.span)?;
             let fields = self.variant_payload(*def_id, lowered_args, expr.span);
             return Some(self.construct_temp(MirAggregateKind::EnumVariant(*def_id), fields, ty, expr.span));
         }
@@ -2131,7 +2622,7 @@ impl FunctionBuilder<'_> {
             return self.lower_failable_call(callee, lowered_args, ty, error_ty, conversion, expr.span);
         }
 
-        self.lower_definition_call(*def_id, explicit_type_args, lowered_args, conversion, expr)
+        self.lower_definition_call(*def_id, explicit_type_args, lowered_args, conversion, 0, expr)
     }
 
     /// A call argument. An integer constant carries the type its HIR literal
@@ -2231,8 +2722,10 @@ impl FunctionBuilder<'_> {
         explicit_type_args: Vec<MirType>,
         lowered_args: Vec<MirOperand>,
         conversion: Option<DefId>,
+        callee_parameter_offset: u32,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        self.emit_call_shape_check(expr.id, &lowered_args, callee_parameter_offset, expr.span)?;
         let ty = self.expr_ty(expr)?;
         let callee = MirCallee::definition_with_type_args(def_id, explicit_type_args);
 
@@ -2508,6 +3001,9 @@ impl FunctionBuilder<'_> {
                 .iter()
                 .all(|dim| matches!(self.types.get_index(*dim), radix_types::IndexExpr::Literal(_))),
             radix_types::IndexExpr::Param(_)
+            | radix_types::IndexExpr::Runtime(_)
+            | radix_types::IndexExpr::Affine { .. }
+            | radix_types::IndexExpr::Divide { .. }
             | radix_types::IndexExpr::Infer(_)
             | radix_types::IndexExpr::Unspecified => false,
         }
@@ -3317,28 +3813,59 @@ impl FunctionBuilder<'_> {
             // its concrete `fractus` value; the numerus conversion keeps the
             // `lista<numerus>` shape operand type-correct through validation
             // and runner execution — the flat length is never the shape.
-            ListaToTensorShape::Symbolic { shape, rank } => (0..rank)
-                .map(|axis| {
-                    let axis = i64::try_from(axis).ok()?;
-                    let scalar = MirOperand::Constant(MirConstant::ShapeSize { shape, axis: Some(axis) });
-                    let numerus = self.types.primitive(Primitive::Numerus);
-                    let dim = self.runtime_call_value(
-                        MirIntrinsic::Convert(MirConversion {
-                            store: None,
-                            flavor: MirConversionFlavor::Runtime,
-                            source_ty: MirType::semantic(self.types.primitive(Primitive::Fractus)),
-                            target_ty: MirType::semantic(numerus),
-                            params: Vec::new(),
-                            recovery: None,
-                            struct_defaults: Vec::new(),
-                        }),
-                        vec![scalar],
-                        MirType::semantic(numerus),
-                        span,
-                    );
-                    Some(MirAggregateItem::Operand(dim))
-                })
-                .collect::<Option<Vec<_>>>()?,
+            ListaToTensorShape::Symbolic { shape, rank } => {
+                let dimensions = match self.types.get_index(shape) {
+                    IndexExpr::Tuple(dimensions) => dimensions.clone(),
+                    _ => vec![shape],
+                };
+                (0..rank)
+                    .map(|axis| {
+                        let axis_id = i64::try_from(axis).ok()?;
+                        let dimension = *dimensions.get(axis)?;
+                        let scalar = if index_contains_runtime_extent(self.types, dimension, &mut FxHashSet::default())
+                        {
+                            let mut shape_arguments = Vec::new();
+                            let expression = match self.lower_shape_expr(
+                                dimension,
+                                &mut shape_arguments,
+                                None,
+                                ShapeRelationBoundary::FunctionEntry,
+                                0,
+                            ) {
+                                Ok(expression) => expression,
+                                Err(message) => {
+                                    self.errors.push(MirError::unsupported(span, message));
+                                    return None;
+                                }
+                            };
+                            self.runtime_call_value(
+                                MirIntrinsic::TensorShapeSize(expression),
+                                shape_arguments,
+                                MirType::semantic(self.types.primitive(Primitive::Fractus)),
+                                span,
+                            )
+                        } else {
+                            MirOperand::Constant(MirConstant::ShapeSize { shape, axis: Some(axis_id) })
+                        };
+                        let numerus = self.types.primitive(Primitive::Numerus);
+                        let dim = self.runtime_call_value(
+                            MirIntrinsic::Convert(MirConversion {
+                                store: None,
+                                flavor: MirConversionFlavor::Runtime,
+                                source_ty: MirType::semantic(self.types.primitive(Primitive::Fractus)),
+                                target_ty: MirType::semantic(numerus),
+                                params: Vec::new(),
+                                recovery: None,
+                                struct_defaults: Vec::new(),
+                            }),
+                            vec![scalar],
+                            MirType::semantic(numerus),
+                            span,
+                        );
+                        Some(MirAggregateItem::Operand(dim))
+                    })
+                    .collect::<Option<Vec<_>>>()?
+            }
             ListaToTensorShape::InferOneD => {
                 let len = self.runtime_call_value(
                     MirIntrinsic::Collection(MirCollectionOp::Length),

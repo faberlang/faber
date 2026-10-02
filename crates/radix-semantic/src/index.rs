@@ -3,7 +3,7 @@
 //! This file is the re-export boundary for IndexExpr, IndexId, and IndexVar.
 //! The canonical source is the `radix-types` foundation crate.
 
-pub use radix_types::{IndexExpr, IndexId, IndexVar};
+pub use radix_types::{IndexExpr, IndexId, IndexVar, RuntimeExtentId};
 
 use crate::{Type, TypeId, TypeTable};
 

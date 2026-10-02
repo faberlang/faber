@@ -528,6 +528,7 @@ impl TypeName for Type {
             Type::ModularWord(_) => "modular",
             Type::SaturatingWord(_) => "saturating",
             Type::PolicyFloat(_, _) => "policy_float",
+            Type::TensorEdgePolicy(_) => "tensor_edge_policy",
             Type::Union(_) => "union",
             Type::Intersection(_) => "intersection",
             Type::Ref(_, _) => "ref",

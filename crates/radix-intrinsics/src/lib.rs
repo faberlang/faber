@@ -353,6 +353,7 @@ pub fn mir_collection_op(entry: &MethodIntrinsic) -> Option<MirCollectionOp> {
         | IntrinsicMirKind::HigherOrderReduce
         | IntrinsicMirKind::HigherOrderSortBy
         | IntrinsicMirKind::HigherOrderCumulata
+        | IntrinsicMirKind::TensorLimes
         | IntrinsicMirKind::CodegenOnly => None,
     }
 }
@@ -370,6 +371,7 @@ pub fn mir_atomic_op(entry: &MethodIntrinsic) -> Option<MirAtomicOp> {
         | IntrinsicMirKind::HigherOrderReduce
         | IntrinsicMirKind::HigherOrderSortBy
         | IntrinsicMirKind::HigherOrderCumulata
+        | IntrinsicMirKind::TensorLimes
         | IntrinsicMirKind::CodegenOnly => None,
     }
 }

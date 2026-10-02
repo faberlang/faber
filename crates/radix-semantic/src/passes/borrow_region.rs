@@ -11,6 +11,8 @@ use radix_hir::{
     DefId, HirBlock, HirExpression, HirExpressionKind, HirId, HirItemKind, HirLocal, HirModule,
     HirStatement, HirStatementKind,
 };
+use radix_intrinsics::lookup_method_for_type_id;
+use radix_lexer::Interner;
 use radix_lexer::Span;
 use radix_types::{RegionRelationship, ReturnedBorrowProvenance};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -83,6 +85,13 @@ impl RegionFacts {
         self.regions
             .iter()
             .find(|region| region.borrower == borrower)
+    }
+
+    #[must_use]
+    pub fn regions_for(&self, borrower: DefId) -> impl Iterator<Item = &BorrowRegion> {
+        self.regions
+            .iter()
+            .filter(move |region| region.borrower == borrower)
     }
 
     #[must_use]
@@ -341,8 +350,20 @@ pub fn analyze(
     types: &TypeTable,
     access_facts: &AccessFactTable,
 ) -> Result<RegionFacts, RegionError> {
+    analyze_with_interner(hir, types, access_facts, &Interner::new())
+}
+
+/// Interner-aware region inference. Tensor view methods are identified by
+/// their canonical intrinsic rows and receive the same last-use treatment as
+/// explicitly marked borrows.
+pub fn analyze_with_interner(
+    hir: &HirModule,
+    types: &TypeTable,
+    access_facts: &AccessFactTable,
+    interner: &Interner,
+) -> Result<RegionFacts, RegionError> {
     let cfg = build_cfg(hir)?;
-    let mut collector = EventCollector::new(&cfg, types, access_facts);
+    let mut collector = EventCollector::new(&cfg, types, access_facts, interner);
     collector.visit_program(hir);
 
     let borrows = std::mem::take(&mut collector.borrows);
@@ -410,10 +431,161 @@ struct BorrowCandidate {
     span: Span,
 }
 
+fn is_tensor_view_method(name: &str) -> bool {
+    matches!(
+        name,
+        "sectio"
+            | "disloco"
+            | "transpone"
+            | "__faber_glyph_transpose"
+            | "forma"
+            | "expande"
+            | "limes"
+    )
+}
+
+fn has_tensor_value_type(expression: &HirExpression, types: &TypeTable) -> bool {
+    expression.ty.is_some_and(|ty| {
+        let (_, inner) = types.peel_access_marker(ty);
+        matches!(types.get(inner), crate::Type::Tensor(_, _) | crate::Type::Matrix(_, _))
+    })
+}
+
+fn is_tensor_view_expr(
+    expression: &HirExpression,
+    types: &TypeTable,
+    interner: &Interner,
+    aliases: &FxHashMap<DefId, FxHashSet<DefId>>,
+) -> bool {
+    match &expression.kind {
+        HirExpressionKind::Path(def_id) => aliases.contains_key(def_id),
+        HirExpressionKind::MethodCall(receiver, method, _, args, _) => receiver
+            .ty
+            .and_then(|ty| interner.strings().get(method.0 as usize).map(|name| (ty, name)))
+            .and_then(|(ty, name)| lookup_method_for_type_id(ty, types, name, args.len()))
+            .is_some_and(|entry| is_tensor_view_method(entry.faber_name)),
+        HirExpressionKind::NonNull(object, radix_hir::HirNonNullKind::Value)
+            if has_tensor_value_type(expression, types) =>
+        {
+            is_tensor_view_expr(object, types, interner, aliases)
+        }
+        HirExpressionKind::Block(block) if has_tensor_value_type(expression, types) => block
+            .expr
+            .as_deref()
+            .is_some_and(|expr| is_tensor_view_expr(expr, types, interner, aliases)),
+        HirExpressionKind::Binary(radix_hir::HirBinOp::Coalesce, left, right)
+            if has_tensor_value_type(expression, types) =>
+        {
+            is_tensor_view_expr(left, types, interner, aliases)
+                || is_tensor_view_expr(right, types, interner, aliases)
+        }
+        HirExpressionKind::Si {
+            then_block,
+            else_block,
+            ..
+        } if has_tensor_value_type(expression, types) => {
+            then_block
+                .expr
+                .as_deref()
+                .is_some_and(|expr| is_tensor_view_expr(expr, types, interner, aliases))
+                || else_block.as_ref().is_some_and(|block| {
+                    block
+                        .expr
+                        .as_deref()
+                        .is_some_and(|expr| is_tensor_view_expr(expr, types, interner, aliases))
+                })
+        }
+        HirExpressionKind::CallDefault { body, default, .. }
+            if has_tensor_value_type(expression, types) =>
+        {
+            body.expr
+                .as_deref()
+                .is_some_and(|expr| is_tensor_view_expr(expr, types, interner, aliases))
+                || is_tensor_view_expr(default, types, interner, aliases)
+        }
+        HirExpressionKind::Verte { source, .. }
+        | HirExpressionKind::Conversio { source, .. }
+            if has_tensor_value_type(expression, types) =>
+        {
+            is_tensor_view_expr(source, types, interner, aliases)
+        }
+        _ => false,
+    }
+}
+
+fn tensor_view_roots(
+    expression: &HirExpression,
+    types: &TypeTable,
+    interner: &Interner,
+    aliases: &FxHashMap<DefId, FxHashSet<DefId>>,
+) -> FxHashSet<DefId> {
+    match &expression.kind {
+        HirExpressionKind::Path(def_id) => aliases.get(def_id).cloned().unwrap_or_default(),
+        HirExpressionKind::MethodCall(receiver, _, _, _, _) => {
+            if !is_tensor_view_expr(expression, types, interner, aliases) {
+                return FxHashSet::default();
+            }
+            let mut roots = tensor_view_roots(receiver, types, interner, aliases);
+            if roots.is_empty()
+                && let Some(root) = root_def_id(receiver)
+            {
+                roots.insert(root);
+            }
+            roots
+        }
+        HirExpressionKind::NonNull(object, radix_hir::HirNonNullKind::Value)
+        | HirExpressionKind::Block(HirBlock {
+            expr: Some(object), ..
+        }) => tensor_view_roots(object, types, interner, aliases),
+        HirExpressionKind::Field(object, _)
+        | HirExpressionKind::Index(object, _)
+        | HirExpressionKind::Deref(object)
+        | HirExpressionKind::NonNull(object, _) => {
+            tensor_view_roots(object, types, interner, aliases)
+        }
+        HirExpressionKind::Binary(radix_hir::HirBinOp::Coalesce, left, right) => {
+            let mut roots = tensor_view_roots(left, types, interner, aliases);
+            roots.extend(tensor_view_roots(right, types, interner, aliases));
+            roots
+        }
+        HirExpressionKind::Si {
+            then_block,
+            else_block,
+            ..
+        } => {
+            let mut roots = then_block
+                .expr
+                .as_deref()
+                .map(|expr| tensor_view_roots(expr, types, interner, aliases))
+                .unwrap_or_default();
+            if let Some(expr) = else_block.as_ref().and_then(|block| block.expr.as_deref()) {
+                roots.extend(tensor_view_roots(expr, types, interner, aliases));
+            }
+            roots
+        }
+        HirExpressionKind::CallDefault { body, default, .. } => {
+            let mut roots = body
+                .expr
+                .as_deref()
+                .map(|expr| tensor_view_roots(expr, types, interner, aliases))
+                .unwrap_or_default();
+            roots.extend(tensor_view_roots(default, types, interner, aliases));
+            roots
+        }
+        HirExpressionKind::Verte { source, .. }
+        | HirExpressionKind::Conversio { source, .. } => {
+            tensor_view_roots(source, types, interner, aliases)
+        }
+        _ => FxHashSet::default(),
+    }
+}
+
 struct EventCollector<'a> {
     cfg: &'a HirCfg,
     types: &'a TypeTable,
     access_facts: &'a AccessFactTable,
+    interner: &'a Interner,
+    tensor_view_roots: FxHashMap<DefId, FxHashSet<DefId>>,
     borrows: Vec<BorrowCandidate>,
     uses: FxHashMap<DefId, Vec<CfgNodeId>>,
     source_kills: FxHashMap<DefId, Vec<CfgNodeId>>,
@@ -422,7 +594,12 @@ struct EventCollector<'a> {
 }
 
 impl<'a> EventCollector<'a> {
-    fn new(cfg: &'a HirCfg, types: &'a TypeTable, access_facts: &'a AccessFactTable) -> Self {
+    fn new(
+        cfg: &'a HirCfg,
+        types: &'a TypeTable,
+        access_facts: &'a AccessFactTable,
+        interner: &'a Interner,
+    ) -> Self {
         let mut source_kills: FxHashMap<DefId, Vec<CfgNodeId>> = FxHashMap::default();
         for fact in access_facts.dead_sources() {
             if let Some(site) = fact.site
@@ -439,6 +616,8 @@ impl<'a> EventCollector<'a> {
             cfg,
             types,
             access_facts,
+            interner,
+            tensor_view_roots: FxHashMap::default(),
             borrows: Vec::new(),
             uses: FxHashMap::default(),
             source_kills,
@@ -455,10 +634,28 @@ impl<'a> EventCollector<'a> {
         let _initializer_fact = self.access_facts.expression(init.id);
         let _binding_fact = self.access_facts.binding(local.def_id);
 
-        let kind = local
-            .ty
-            .and_then(|ty| self.types.peel_access_marker(ty).0)
-            .and_then(region_kind);
+        let view_roots = if is_tensor_view_expr(
+            init,
+            self.types,
+            self.interner,
+            &self.tensor_view_roots,
+        ) {
+            tensor_view_roots(init, self.types, self.interner, &self.tensor_view_roots)
+        } else {
+            FxHashSet::default()
+        };
+        if !view_roots.is_empty() {
+            self.tensor_view_roots
+                .insert(local.def_id, view_roots.clone());
+        }
+        let kind = (!view_roots.is_empty())
+            .then_some(RegionBorrowKind::Shared)
+            .or_else(|| {
+                local
+                    .ty
+                    .and_then(|ty| self.types.peel_access_marker(ty).0)
+                    .and_then(region_kind)
+            });
         let explicit_kind = match &init.kind {
             HirExpressionKind::Ref(ref_kind, _) => Some(match ref_kind {
                 radix_hir::HirRefKind::Shared => RegionBorrowKind::Shared,
@@ -469,8 +666,13 @@ impl<'a> EventCollector<'a> {
         let Some(kind) = kind.or(explicit_kind) else {
             return;
         };
-        let Some(source) = root_def_id(init) else {
-            return;
+        let sources: Vec<DefId> = if view_roots.is_empty() {
+            let Some(source) = root_def_id(init) else {
+                return;
+            };
+            vec![source]
+        } else {
+            view_roots.into_iter().collect()
         };
         let start = self
             .cfg
@@ -479,14 +681,16 @@ impl<'a> EventCollector<'a> {
         let Some(start) = start else {
             return;
         };
-        self.borrows.push(BorrowCandidate {
-            borrower: local.def_id,
-            source,
-            kind,
-            start,
-            hir_id: init.id,
-            span: init.span,
-        });
+        for source in sources {
+            self.borrows.push(BorrowCandidate {
+                borrower: local.def_id,
+                source,
+                kind,
+                start,
+                hir_id: init.id,
+                span: init.span,
+            });
+        }
     }
 }
 

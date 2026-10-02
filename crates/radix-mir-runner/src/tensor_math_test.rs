@@ -28,7 +28,7 @@ fn function() -> MirFunction {
 
 fn tensor_value(data: Vec<Value>, shape: Vec<i64>) -> Value {
     use crate::value::TensorValue;
-    Value::Tensor(Rc::new(RefCell::new(TensorValue { data, shape })))
+    Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(data, shape))))
 }
 
 fn float_element(width: NumericWidth) -> Type {
@@ -93,7 +93,10 @@ fn elements(result: Value) -> (Vec<Value>, Vec<i64>) {
         panic!("expected a tensor, got {result:?}");
     };
     let tensor = cell.borrow();
-    (tensor.data.clone(), tensor.shape.clone())
+    (
+        tensor.logical_values().expect("valid tensor layout"),
+        tensor.shape.clone(),
+    )
 }
 
 fn float_result(

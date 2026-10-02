@@ -179,6 +179,10 @@ pub struct Lowerer<'a> {
     /// Stack of function/block-local bindings visible only during lowering.
     local_scopes: Vec<FxHashMap<Symbol, radix_hir::DefId>>,
 
+    /// Current function's scalar/value parameter ordinals, used to keep
+    /// runtime Figura references portable across file interfaces.
+    parameter_ordinals: FxHashMap<radix_hir::DefId, u32>,
+
     /// Lexical generic-parameter names visible while lowering signatures.
     type_param_scopes: Vec<FxHashMap<Symbol, (radix_hir::DefId, GenericParamKind)>>,
 
@@ -287,6 +291,7 @@ impl<'a> Lowerer<'a> {
             errors: Vec::new(),
             current_span: Span::default(),
             local_scopes: Vec::new(),
+            parameter_ordinals: FxHashMap::default(),
             type_param_scopes: Vec::new(),
             current_ego_struct: None,
             allow_bare_generic_construction: false,
@@ -1234,6 +1239,12 @@ fn prune_mixed_local_variant_paths(
 /// handles only collection arity, figura/vector/matrix/atomic, instans
 /// precision, and forma messages that still cross the boundary as strings.
 fn lowering_issue_args_from_message(message: &str) -> Vec<DiagnosticArg> {
+    if let Some(reason) = crate::figura::figura_arithmetic_reason(message) {
+        return vec![
+            DiagnosticArg::new("issue", "figura_arithmetic_invalid"),
+            DiagnosticArg::new("reason", reason),
+        ];
+    }
     match message {
         "lista requires one or two type parameters" => issue_args("lista_arity"),
         "tabula requires two type parameters" => issue_args("tabula_arity"),

@@ -357,6 +357,9 @@ impl Evaluator<'_> {
                         HirArrayElement::Spread(inner) => {
                             return Err(Fault::at(ISSUE_NOT_CONSTANT, inner.span));
                         }
+                        HirArrayElement::Infer(span) => {
+                            return Err(Fault::at(ISSUE_NOT_CONSTANT, *span));
+                        }
                     }
                 }
                 Value::Opaque

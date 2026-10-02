@@ -143,6 +143,8 @@ pub enum IntrinsicMirKind {
     HigherOrderCumulata,
     /// Lowered directly in target codegen without a MIR collection op.
     CodegenOnly,
+    /// Lowered as `MirIntrinsic::TensorLimes` with a resolved edge-policy payload.
+    TensorLimes,
 }
 
 /// Static catalog generic declaration.
@@ -280,6 +282,7 @@ macro_rules! intrinsic {
 const FORMATA_GENERIC: &[CatalogGenericParam] = &[CatalogGenericParam::typus("T")];
 const CREATA_GENERIC: &[CatalogGenericParam] = &[CatalogGenericParam::typus("T")];
 const STRUCTA_GENERIC: &[CatalogGenericParam] = &[CatalogGenericParam::typus("T")];
+const TENSOR_EDGE_POLICY_GENERIC: &[CatalogGenericParam] = &[CatalogGenericParam::typus("Policy")];
 const SERMO_VIEW_GENERIC: &[CatalogGenericParam] = &[CatalogGenericParam::typus_default_valor("T")];
 
 /// Full promoted intrinsic catalog. Keep rows sorted by receiver, then name.
@@ -972,6 +975,46 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         SameAsReceiver,
         collection TensorSlice
     ),
+    intrinsic!(
+        Tensor,
+        "sectio",
+        3,
+        &[
+            IntrinsicParamKind::NumerusIndex,
+            IntrinsicParamKind::NumerusIndex,
+            IntrinsicParamKind::NumerusIndex,
+        ],
+        SameAsReceiver,
+        collection TensorSlice
+    ),
+    intrinsic!(
+        Tensor,
+        "expande",
+        1,
+        &[IntrinsicParamKind::NumerusArray],
+        SameAsReceiver,
+        collection TensorExpand
+    ),
+    intrinsic!(
+        Tensor,
+        "disloco",
+        1,
+        &[IntrinsicParamKind::NumerusArray],
+        SameAsReceiver,
+        collection TensorShift
+    ),
+    MethodIntrinsic {
+        receiver: IntrinsicReceiver::Tensor,
+        faber_name: "limes",
+        generic: TENSOR_EDGE_POLICY_GENERIC,
+        arg_count: 0,
+        params: &[],
+        return_kind: IntrinsicReturnKind::SameAsReceiver,
+        mir_kind: IntrinsicMirKind::TensorLimes,
+        missing_generic_issue: Some("tensor_limes_policy_required"),
+        excess_generic_issue: Some("tensor_limes_policy_arity"),
+        value_arity_issue: Some("tensor_limes_value_arity"),
+    },
     // matrix
     intrinsic!(
         Matrix,

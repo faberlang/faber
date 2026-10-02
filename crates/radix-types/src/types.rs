@@ -449,6 +449,102 @@ impl TypeTable {
         self.primitives[&prim]
     }
 
+    /// Intern one compiler-owned tensor edge-policy marker type. These marker
+    /// types select `limes` behavior and have no runtime value representation.
+    pub fn tensor_edge_policy(&mut self, policy: BuiltinTensorEdgePolicy) -> TypeId {
+        self.intern(Type::TensorEdgePolicy(policy))
+    }
+
+    /// Read a builtin edge-policy marker from a type identity, peeling aliases.
+    #[must_use]
+    pub fn tensor_edge_policy_kind(&self, id: TypeId) -> Option<BuiltinTensorEdgePolicy> {
+        let mut resolved = id;
+        let mut seen = FxHashSet::default();
+        while let Type::Alias(_, inner) = self.get(resolved) {
+            if !seen.insert(resolved) {
+                return None;
+            }
+            resolved = *inner;
+        }
+        match self.get(resolved) {
+            Type::TensorEdgePolicy(policy) => Some(*policy),
+            _ => None,
+        }
+    }
+
+    /// Whether a type contains a compiler-owned policy marker anywhere in its
+    /// value shape. Such markers may select intrinsic behavior but cannot be
+    /// stored, passed as values, or nested inside runtime payloads.
+    #[must_use]
+    pub fn contains_tensor_edge_policy(&self, id: TypeId) -> bool {
+        fn visit(types: &TypeTable, id: TypeId, seen: &mut FxHashSet<TypeId>) -> bool {
+            if !seen.insert(id) {
+                return false;
+            }
+            let child = |child, seen: &mut FxHashSet<TypeId>| visit(types, child, seen);
+            match types.get(id) {
+                Type::TensorEdgePolicy(_) => true,
+                Type::Array(inner)
+                | Type::Queue(inner)
+                | Type::Stack(inner)
+                | Type::Set(inner)
+                | Type::Promissum(inner)
+                | Type::Cursor(inner)
+                | Type::Atomic(inner)
+                | Type::Intervallum(inner)
+                | Type::Option(inner)
+                | Type::Ref(_, inner)
+                | Type::Alias(_, inner) => child(*inner, seen),
+                Type::BoundedArray { element, .. }
+                | Type::BoundedQueue { element, .. }
+                | Type::BoundedStack { element, .. } => child(*element, seen),
+                Type::Map(key, value)
+                | Type::PromissumFailable(key, value)
+                | Type::AsyncCursor(key, value) => child(*key, seen) || child(*value, seen),
+                Type::Record(fields) => fields.values().any(|field| child(*field, seen)),
+                Type::Tensor(element, _)
+                | Type::Vector(element, _)
+                | Type::Matrix(element, _)
+                | Type::Sparsa(element, _) => child(*element, seen),
+                Type::Func(sig) => {
+                    child(sig.ret, seen)
+                        || sig.err.is_some_and(|err| child(err, seen))
+                        || sig.params.iter().any(|param| child(param.ty, seen))
+                        || sig.type_params.iter().any(|param| {
+                            matches!(&param.default, Some(SemanticGenericParamDefault::Typus(ty)) if child(*ty, seen))
+                        })
+                }
+                Type::Applied(base, args) => {
+                    child(*base, seen)
+                        || args.iter().any(|arg| {
+                            matches!(arg, AppliedArg::Type(ty) if child(*ty, seen))
+                        })
+                }
+                Type::Union(members) | Type::Tuple(members) | Type::Intersection(members) => {
+                    members.iter().any(|member| child(*member, seen))
+                }
+                Type::Primitive(_)
+                | Type::BoundedTextus { .. }
+                | Type::BoundedAscii { .. }
+                | Type::BoundedOcteti { .. }
+                | Type::SizedNumeric(_, _)
+                | Type::ModularWord(_)
+                | Type::SaturatingWord(_)
+                | Type::PolicyFloat(_, _)
+                | Type::SizedInstans(_)
+                | Type::Struct(_)
+                | Type::Enum(_)
+                | Type::Interface(_)
+                | Type::Param(_)
+                | Type::Infer(_)
+                | Type::InferUnion(_)
+                | Type::MarkerHole { .. }
+                | Type::Error => false,
+            }
+        }
+        visit(self, id, &mut FxHashSet::default())
+    }
+
     /// Canonical sort key for union-member dedup.
     ///
     /// `Vec::dedup_by(equals)` only removes **adjacent** equals-equal members,
@@ -893,6 +989,27 @@ impl TypeTable {
         match (self.get_index(a), self.get_index(b)) {
             (IndexExpr::Literal(la), IndexExpr::Literal(lb)) => la == lb,
             (IndexExpr::Param(pa), IndexExpr::Param(pb)) => pa == pb,
+            (IndexExpr::Runtime(a), IndexExpr::Runtime(b)) => a == b,
+            (
+                IndexExpr::Affine {
+                    base: a_base,
+                    offset: a_offset,
+                },
+                IndexExpr::Affine {
+                    base: b_base,
+                    offset: b_offset,
+                },
+            ) => a_offset == b_offset && self.index_equals(*a_base, *b_base),
+            (
+                IndexExpr::Divide {
+                    numerator: a_numerator,
+                    divisor: a_divisor,
+                },
+                IndexExpr::Divide {
+                    numerator: b_numerator,
+                    divisor: b_divisor,
+                },
+            ) => a_divisor == b_divisor && self.index_equals(*a_numerator, *b_numerator),
             (IndexExpr::Infer(va), IndexExpr::Infer(vb)) => va == vb,
             (IndexExpr::Unspecified, IndexExpr::Unspecified) => true,
             (IndexExpr::Tuple(a_dims), IndexExpr::Tuple(b_dims)) => {
@@ -1625,6 +1742,9 @@ pub enum AppliedArg {
 pub enum Type {
     Primitive(Primitive),
 
+    /// Compiler-owned type-only selector for `limes<Policy>()`.
+    TensorEdgePolicy(BuiltinTensorEdgePolicy),
+
     /// `lista<T>` collection.
     Array(TypeId),
 
@@ -1784,6 +1904,7 @@ impl Hash for Type {
         std::mem::discriminant(self).hash(state);
         match self {
             Self::Primitive(p) => p.hash(state),
+            Self::TensorEdgePolicy(policy) => policy.hash(state),
             Self::Array(t)
             | Self::Set(t)
             | Self::Promissum(t)
@@ -1859,6 +1980,35 @@ impl Hash for Type {
             }
             Self::Error => {}
         }
+    }
+}
+
+/// Builtin tensor-edge policy identities. These markers are accepted as the
+/// `limes` type argument and are never runtime values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum BuiltinTensorEdgePolicy {
+    Clamp,
+    Reflect,
+    Wrap,
+}
+
+impl BuiltinTensorEdgePolicy {
+    pub const ALL: [Self; 3] = [Self::Clamp, Self::Reflect, Self::Wrap];
+
+    /// Canonical Latin source type spelling.
+    #[must_use]
+    pub const fn latin(self) -> &'static str {
+        match self {
+            Self::Clamp => "clampa",
+            Self::Reflect => "reflexa",
+            Self::Wrap => "involuta",
+        }
+    }
+
+    /// Compiler identity for a canonical Latin source type spelling.
+    #[must_use]
+    pub fn from_latin(text: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|policy| policy.latin() == text)
     }
 }
 
@@ -2320,8 +2470,11 @@ fn index_refs_in_bounds(expr: &IndexExpr, indices_len: usize) -> bool {
     let index_in_bounds = |id: &IndexId| (id.0 as usize) < indices_len;
     match expr {
         IndexExpr::Tuple(dims) => dims.iter().all(index_in_bounds),
+        IndexExpr::Affine { base, .. } => index_in_bounds(base),
+        IndexExpr::Divide { numerator, .. } => index_in_bounds(numerator),
         IndexExpr::Literal(_)
         | IndexExpr::Param(_)
+        | IndexExpr::Runtime(_)
         | IndexExpr::Infer(_)
         | IndexExpr::Unspecified => true,
     }
@@ -2383,6 +2536,7 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
         | Type::BoundedAscii { capacity }
         | Type::BoundedOcteti { capacity } => index_in_bounds(capacity),
         Type::Primitive(_)
+        | Type::TensorEdgePolicy(_)
         | Type::SizedNumeric(_, _)
         | Type::ModularWord(_)
         | Type::SaturatingWord(_)

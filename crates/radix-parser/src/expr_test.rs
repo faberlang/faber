@@ -41,6 +41,27 @@ fn conversio_with_up_tack_default_parses() {
 }
 
 #[test]
+fn expression_array_keeps_shape_inference_holes_structural() {
+    let result = parse_ok(r"fixum _ shape ← [_, 4]");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let ExprKind::Array(array) = &var.init.as_deref().expect("initializer").kind else {
+        panic!("expected array expression");
+    };
+    assert!(matches!(
+        &array.elements[0],
+        radix_syntax::ArrayElement::Infer(_)
+    ));
+    assert!(matches!(
+        array.elements[1],
+        radix_syntax::ArrayElement::Expr(ref expr)
+            if matches!(expr.kind, ExprKind::Literal(Literal::Int(4)))
+    ));
+}
+
+#[test]
 fn conversio_capitalized_user_type_target_parses_as_type() {
     let result = parse_ok(r"fixum _ person ← payload ↦ Persona");
     let program = result.program.as_ref().expect("program");

@@ -1595,6 +1595,9 @@ pub struct ArrayExpr {
 pub enum ArrayElement {
     Expr(Box<Expr>),
     Spread(Box<Expr>),
+    /// Inference hole written as `_` in an expression shape list. Ordinary
+    /// expression `_` keeps its existing name/placeholder rules.
+    Infer(Span),
 }
 
 #[derive(Debug)]
@@ -1816,6 +1819,12 @@ pub enum FiguraExpr {
     Literal(u64),
     /// Index variable (`magnitudo N` or repetition in `[N, M]`).
     Var(Ident),
+    /// Add a natural constant to an index term (`N + 1`).
+    Add(Box<FiguraExpr>, u64),
+    /// Subtract a natural constant from an index term (`N - 1`).
+    Subtract(Box<FiguraExpr>, u64),
+    /// Divide an index term exactly by a positive natural constant (`D / 2`).
+    Divide(Box<FiguraExpr>, u64),
     /// Rank-n shape `[d0, d1, …]`; empty tuple is rank-0 `[]`.
     Tuple(Vec<FiguraExpr>),
 }

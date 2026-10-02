@@ -66,6 +66,23 @@ impl TypeChecker<'_> {
         self.error_issue(SemanticErrorKind::OperandTypesInvalid, issue, span);
     }
 
+    /// Reject compiler-only policy markers wherever a runtime value type is
+    /// required. Explicit intrinsic type arguments are validated separately.
+    pub fn reject_tensor_edge_policy_value_type(
+        &mut self,
+        ty: TypeId,
+        span: radix_lexer::Span,
+    ) {
+        self.record_tensor_edge_policy_runtime_type_use(ty);
+        if self.types.contains_tensor_edge_policy(self.resolve_inferred_type(ty)) {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                "tensor_edge_policy_marker_not_runtime_value",
+                span,
+            );
+        }
+    }
+
     pub fn invalid_operand_types_with_args(
         &mut self,
         issue: &'static str,

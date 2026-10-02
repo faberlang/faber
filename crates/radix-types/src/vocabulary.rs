@@ -367,6 +367,13 @@ pub enum MirCollectionOp {
     /// Cord walk: `ascii.cursor()` / later `textus.cursor()` → `cursor<ascii<1>>`.
     /// One buffer of one-byte ascii values; not a per-step heap slice.
     CordCursor,
+    /// Explicit zero-copy tensor broadcast view. `args` are the source tensor
+    /// followed by its target extents; axes map in order, with inserted or
+    /// stretched size-one axes carried by zero strides.
+    TensorExpand,
+    /// Lazily shifted tensor edge view. `args` are `[source, offsets]`; an
+    /// unresolvable read remains optional until `TensorLimes` or fused coalesce.
+    TensorShift,
 }
 
 /// The built-in unary math functions lifted elementwise over a tensor

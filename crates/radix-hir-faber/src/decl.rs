@@ -237,8 +237,15 @@ impl super::FaberCodegen<'_> {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
+        *self.runtime_parameter_names.borrow_mut() = func
+            .params
+            .iter()
+            .enumerate()
+            .filter_map(|(ordinal, param)| Some((u32::try_from(ordinal).ok()?, param.name)))
+            .collect();
         if func.test.is_some() {
             self.generate_proba_function(func, names, surface, writer);
+            self.runtime_parameter_names.borrow_mut().clear();
             return;
         }
 
@@ -263,6 +270,7 @@ impl super::FaberCodegen<'_> {
         }
         self.write_function_result_types(func.ret_ty, func.err_ty, owner, names, surface, writer);
         self.write_optional_block_body(func.body.as_ref(), names, surface, writer);
+        self.runtime_parameter_names.borrow_mut().clear();
     }
 
     /// Re-emit `errors e` / `options o` / `exit code` signature modifiers.

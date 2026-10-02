@@ -392,6 +392,7 @@ impl AirPurityChecker<'_> {
                         | radix_hir::HirArrayElement::Spread(expr) => {
                             self.check_expr(expr);
                         }
+                        radix_hir::HirArrayElement::Infer(_) => {}
                     }
                 }
             }

@@ -167,7 +167,7 @@ impl FunctionBuilder<'_> {
                 let mut call_args = Vec::with_capacity(lowered_args.len() + 1);
                 call_args.push(MirOperand::Place(narrowed));
                 call_args.extend(lowered_args.iter().cloned());
-                builder.lower_definition_call(target.def_id, Vec::new(), call_args, conversion, expr)
+                builder.lower_definition_call(target.def_id, Vec::new(), call_args, conversion, 1, expr)
             }),
         )
     }

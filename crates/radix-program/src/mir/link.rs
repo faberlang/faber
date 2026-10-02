@@ -2008,6 +2008,7 @@ pub(super) fn rewrite_expr(
                             diagnostics,
                         );
                     }
+                    radix_module::hir::HirArrayElement::Infer(_) => {}
                 }
             }
         }

@@ -498,6 +498,7 @@ impl Lowerer<'_> {
         let def_id = self.def_id_for(decl.name.name);
 
         let annotations = self.lower_item_annotations(def_id, &stmt.annotations);
+        let previous_parameter_ordinals = std::mem::take(&mut self.parameter_ordinals);
         let mut type_params = self.lower_type_params(&decl.type_params);
         self.push_type_params(
             type_params
@@ -506,15 +507,28 @@ impl Lowerer<'_> {
         );
         self.lower_type_param_bounds(&mut type_params, &decl.type_params);
         self.apply_type_param_constraints_from_annotations(&mut type_params, &annotations);
+        // Earlier runtime parameters may supply extents in later parameter
+        // shapes and in the return contract. Bind each one after lowering its
+        // own type so dependent positions resolve by DefId, not by spelling.
+        self.push_scope();
         let mut params = Vec::new();
         for (ordinal, param) in decl.params.iter().enumerate() {
-            params.push(self.lower_param(
+            let lowered = self.lower_param(
                 param,
                 true,
                 Some(HirTypeSlot::Parameter(ordinal as u32)),
-            ));
+            );
+            self.bind_local(lowered.name, lowered.def_id);
+            self.parameter_ordinals.insert(
+                lowered.def_id,
+                u32::try_from(ordinal).unwrap_or(u32::MAX),
+            );
+            params.push(lowered);
         }
         let cli_args = self.lower_cli_args_param(decl);
+        if let Some(param) = &cli_args {
+            self.bind_local(param.name, param.def_id);
+        }
 
         let ret_ty = decl.ret.as_ref().map(|ty| {
             self.lower_authored_type(
@@ -538,13 +552,6 @@ impl Lowerer<'_> {
                 true,
             )
         });
-        self.push_scope();
-        for param in &params {
-            self.bind_local(param.name, param.def_id);
-        }
-        if let Some(param) = &cli_args {
-            self.bind_local(param.name, param.def_id);
-        }
         let modifier_locals = self.bind_modifier_locals(&decl.modifiers);
 
         let is_vertex = stmt
@@ -577,6 +584,7 @@ impl Lowerer<'_> {
         let body = decl.body.as_ref().map(|body| self.lower_block(body));
         self.pop_scope();
         self.pop_type_params();
+        self.parameter_ordinals = previous_parameter_ordinals;
         let (nucleum_entry, nucleum_fragment) =
             Self::nucleum_role_bits(&annotations, self.interner);
         let mut body = body.map(|body| self.prepend_modifier_locals(body, modifier_locals));

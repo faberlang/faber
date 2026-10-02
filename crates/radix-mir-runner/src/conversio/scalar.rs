@@ -69,6 +69,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             return Ok(Value::Str(format_decimal_carrier(carrier, width)));
         }
         if matches!(self.types.get(source_ty), Type::Primitive(Primitive::Json)) {
+            let value = self.prepare_tensor_escape(value, span)?;
             // Render the JSON document directly from concrete `Value`, mirroring
             // the prior `value_to_runtime_json_valor` -> `faber::Json::to_wire`
             // composition without the `Valor`/`Json` middleman.
@@ -824,6 +825,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         recovery: Option<&MirOperand>,
         span: Span,
     ) -> Result<Value, RunnerError> {
+        let value = self.prepare_tensor_escape(value, span)?;
         if self.check_json_document(&value, span)? {
             self.materialize_json_value(value, span)
         } else {
@@ -840,7 +842,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     /// non-finite number anywhere in the tree), and `Err` for the structural
     /// hard errors the prior bridge raised (non-textus map key, or a variant
     /// outside the kernel valor bridge).
-    fn check_json_document(&self, value: &Value, span: Span) -> Result<bool, RunnerError> {
+    fn check_json_document(&mut self, value: &Value, span: Span) -> Result<bool, RunnerError> {
         let safe = self.json_node_is_safe(value, span)?;
         Ok(safe && self.is_json_object_root(value))
     }
@@ -849,7 +851,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         matches!(value, Value::Map(_) | Value::Record(..) | Value::Struct(..))
     }
 
-    fn materialize_json_value(&self, value: Value, span: Span) -> Result<Value, RunnerError> {
+    fn materialize_json_value(&mut self, value: Value, span: Span) -> Result<Value, RunnerError> {
         Ok(match value {
             Value::Array(items) => {
                 let items = items
@@ -861,11 +863,15 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 Value::Array(Rc::new(RefCell::new(items)))
             }
             Value::Tensor(tensor) => {
-                let tensor = tensor.borrow();
-                let items = tensor
-                    .data
-                    .iter()
-                    .cloned()
+                if tensor.borrow().has_unresolved_edge_shift() {
+                    return Err(RunnerError::internal(
+                        span,
+                        "unresolved shifted tensor cannot be converted to json",
+                    ));
+                }
+                let items = self
+                    .tensor_logical_values(&tensor, span)?
+                    .into_iter()
                     .map(|item| self.materialize_json_value(item, span))
                     .collect::<Result<Vec<_>, _>>()?;
                 Value::Array(Rc::new(RefCell::new(items)))
@@ -911,7 +917,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     }
 
     #[allow(clippy::self_only_used_in_recursion)]
-    fn json_node_is_safe(&self, value: &Value, span: Span) -> Result<bool, RunnerError> {
+    fn json_node_is_safe(&mut self, value: &Value, span: Span) -> Result<bool, RunnerError> {
         match value {
             Value::Nil
             | Value::Unit
@@ -929,9 +935,18 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Value::Array(items) => items.borrow().iter().try_fold(true, |acc, item| {
                 Ok(acc && self.json_node_is_safe(item, span)?)
             }),
-            Value::Tensor(tensor) => tensor.borrow().data.iter().try_fold(true, |acc, item| {
-                Ok(acc && self.json_node_is_safe(item, span)?)
-            }),
+            Value::Tensor(tensor) => {
+                if tensor.borrow().has_unresolved_edge_shift() {
+                    return Err(RunnerError::internal(
+                        span,
+                        "unresolved shifted tensor cannot be converted to json",
+                    ));
+                }
+                let values = self.tensor_logical_values(tensor, span)?;
+                values.iter().try_fold(true, |acc, item| {
+                    Ok(acc && self.json_node_is_safe(item, span)?)
+                })
+            }
             Value::Map(items) => items.borrow().iter().try_fold(true, |acc, (key, item)| {
                 if !matches!(key, MapKey::Str(_)) {
                     return Err(RunnerError::internal(span, "map key is not textus valor"));
@@ -969,7 +984,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     /// in sorted order (matching the prior `BTreeMap` carrier). Assumes
     /// [`check_json_document`](Self::check_json_document) already accepted the
     /// value.
-    fn value_to_json_wire(&self, value: &Value, span: Span) -> Result<String, RunnerError> {
+    fn value_to_json_wire(&mut self, value: &Value, span: Span) -> Result<String, RunnerError> {
         Ok(match value {
             Value::Nil | Value::Unit => "null".to_owned(),
             Value::Bool(v) => if *v { "true" } else { "false" }.to_owned(),
@@ -1008,9 +1023,14 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 format!("[{body}]")
             }
             Value::Tensor(tensor) => {
-                let body = tensor
-                    .borrow()
-                    .data
+                if tensor.borrow().has_unresolved_edge_shift() {
+                    return Err(RunnerError::internal(
+                        span,
+                        "unresolved shifted tensor cannot be converted to json",
+                    ));
+                }
+                let values = self.tensor_logical_values(tensor, span)?;
+                let body = values
                     .iter()
                     .map(|item| self.value_to_json_wire(item, span))
                     .collect::<Result<Vec<_>, _>>()?
@@ -1086,8 +1106,13 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         })
     }
 
-    pub(crate) fn require_json_value(&self, value: &Value, span: Span) -> Result<(), RunnerError> {
-        if self.check_json_document(value, span)? {
+    pub(crate) fn require_json_value(
+        &mut self,
+        value: &Value,
+        span: Span,
+    ) -> Result<(), RunnerError> {
+        let value = self.prepare_tensor_escape(value.clone(), span)?;
+        if self.check_json_document(&value, span)? {
             Ok(())
         } else {
             Err(RunnerError::conversion(

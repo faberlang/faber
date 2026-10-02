@@ -1304,6 +1304,7 @@ pub(super) fn import_semantic_type_with_nominal(
     }
     let imported_ty = match source.get(ty).clone() {
         Type::Primitive(primitive) => target.primitive(primitive),
+        Type::TensorEdgePolicy(policy) => target.tensor_edge_policy(policy),
         Type::Array(inner) => {
             let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
             target

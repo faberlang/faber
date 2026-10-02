@@ -139,6 +139,79 @@ fn occurs_check_rejects_cyclic_tuple_binding() {
 }
 
 #[test]
+fn affine_and_exact_division_unification_invert_only_infer_bases() {
+    let mut types = TypeTable::new();
+    let mut subs = FxHashMap::default();
+    let affine_base = infer(&mut types, 10);
+    let affine =
+        radix_types::add_index_constant(&mut types, affine_base, -1).expect("symbolic affine term");
+    let four = lit(&mut types, 4);
+    let divided_base = infer(&mut types, 11);
+    let divided = radix_types::divide_index_exact(&mut types, divided_base, 2)
+        .expect("symbolic exact division");
+    let three = lit(&mut types, 3);
+
+    {
+        let mut unifier = IndexUnifier::new(&mut types, &mut subs);
+        assert!(unifier.unify(affine, four).is_ok());
+        assert!(unifier.unify(divided, three).is_ok());
+    }
+    assert!(matches!(
+        types.get_index(subs[&IndexVar(10)]),
+        IndexExpr::Literal(5)
+    ));
+    assert!(matches!(
+        types.get_index(subs[&IndexVar(11)]),
+        IndexExpr::Literal(6)
+    ));
+}
+
+#[test]
+fn runtime_shape_unification_inverts_affine_infer_without_erasing_runtime_identity() {
+    let mut types = TypeTable::new();
+    let mut subs = FxHashMap::default();
+    let hole = infer(&mut types, 12);
+    let expected =
+        radix_types::add_index_constant(&mut types, hole, -1).expect("symbolic affine term");
+    let runtime = types.intern_index(IndexExpr::Runtime(
+        radix_types::RuntimeExtentId::FunctionParameterAxis {
+            parameter: 0,
+            axis: 0,
+        },
+    ));
+
+    {
+        let mut unifier = IndexUnifier::new(&mut types, &mut subs);
+        assert!(unifier.unify(expected, runtime).is_ok());
+    }
+    let inferred = subs[&IndexVar(12)];
+    assert!(matches!(
+        types.get_index(inferred),
+        IndexExpr::Affine { base, offset: 1 } if *base == runtime
+    ));
+    assert_eq!(
+        radix_types::evaluate_index_dimension(inferred, &types),
+        Ok(None)
+    );
+}
+
+#[test]
+fn unification_rejects_invalid_exact_division_even_when_identical() {
+    let mut types = TypeTable::new();
+    let mut subs = FxHashMap::default();
+    let five = lit(&mut types, 5);
+    let invalid = types.intern_index(IndexExpr::Divide {
+        numerator: five,
+        divisor: 2,
+    });
+    let mut unifier = IndexUnifier::new(&mut types, &mut subs);
+    assert_eq!(
+        unifier.unify(invalid, invalid),
+        Err(IndexUnifyError::Mismatch)
+    );
+}
+
+#[test]
 fn broadcast_unifies_b1_with_bd_to_bd() {
     // The Phase-2 broadcast pin at the unifier level: [B,1] + [B,D] → [B,D].
     let mut types = TypeTable::new();

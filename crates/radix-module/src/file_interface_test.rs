@@ -208,6 +208,7 @@ fn callable_snapshot_can_be_constructed_without_source_type_table() {
         err: Some(Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus))),
         is_async: false,
         is_generator: true,
+        tensor_edge_policy_requirements: Vec::new(),
         device: None,
     };
     let snapshot = InterfaceTypeSnapshot::Func(callable);
@@ -232,6 +233,7 @@ fn async_callable_import_wraps_declared_return_in_promissum() {
         err: None,
         is_async: true,
         is_generator: false,
+        tensor_edge_policy_requirements: Vec::new(),
         device: None,
     };
     let snapshot = InterfaceTypeSnapshot::Func(callable);
@@ -258,6 +260,7 @@ fn async_generator_callable_import_wraps_declared_return_in_async_cursor() {
         err: Some(Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus))),
         is_async: true,
         is_generator: true,
+        tensor_edge_policy_requirements: Vec::new(),
         device: None,
     };
     let snapshot = InterfaceTypeSnapshot::Func(callable);
@@ -507,6 +510,7 @@ fn reexported_same_module_nominal_callable_remaps_through_parent_interface() {
             err: None,
             is_async: false,
             is_generator: false,
+            tensor_edge_policy_requirements: Vec::new(),
             device: None,
         }),
     });

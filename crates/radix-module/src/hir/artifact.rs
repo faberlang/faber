@@ -47,6 +47,78 @@ fn map_gpu_builtin(wire: GpuBuiltinWire) -> radix_types::MirKernelBuiltin {
     }
 }
 
+fn map_tensor_edge_policy(wire: radix_hir_fhir::ResolvedTensorEdgePolicyWire) -> radix_hir::ResolvedTensorEdgePolicy {
+    match wire {
+        radix_hir_fhir::ResolvedTensorEdgePolicyWire::Builtin(policy) => {
+            radix_hir::ResolvedTensorEdgePolicy::Builtin(policy)
+        }
+        radix_hir_fhir::ResolvedTensorEdgePolicyWire::Custom { policy_def, remap, transform } => {
+            radix_hir::ResolvedTensorEdgePolicy::Custom { policy_def, remap, transform }
+        }
+        radix_hir_fhir::ResolvedTensorEdgePolicyWire::Deferred { policy_type } => {
+            radix_hir::ResolvedTensorEdgePolicy::Deferred { policy_type }
+        }
+    }
+}
+
+fn map_tensor_shift_context(wire: radix_hir_fhir::TensorShiftContextWire) -> radix_hir::TensorShiftContext {
+    radix_hir::TensorShiftContext { source_shape: wire.source_shape, shift_expression: wire.shift_expression }
+}
+
+fn map_tensor_edge_policy_table(wire: radix_hir_fhir::TensorEdgePolicyTableWire) -> radix_hir::TensorEdgePolicyTable {
+    radix_hir::TensorEdgePolicyTable {
+        calls: wire
+            .calls
+            .into_iter()
+            .map(|row| (row.call, map_tensor_edge_policy(row.policy)))
+            .collect(),
+        shifted_expressions: wire.shifted_expressions.into_iter().collect(),
+        shifted_view_expressions: wire
+            .shifted_view_expressions
+            .into_iter()
+            .map(|(id, context)| (id, map_tensor_shift_context(context)))
+            .collect(),
+        shifted_bindings: wire.shifted_bindings.into_iter().collect(),
+        shifted_view_bindings: wire
+            .shifted_view_bindings
+            .into_iter()
+            .map(|(id, context)| (id, map_tensor_shift_context(context)))
+            .collect(),
+        limes_contexts: wire
+            .limes_contexts
+            .into_iter()
+            .map(|(id, context)| (id, map_tensor_shift_context(context)))
+            .collect(),
+        function_requirements: wire
+            .function_requirements
+            .into_iter()
+            .map(|row| {
+                (
+                    row.function,
+                    row.requirements
+                        .into_iter()
+                        .map(|requirement| radix_hir::TensorEdgePolicyRequirement {
+                            policy_type: requirement.policy_type,
+                            element_type: requirement.element_type,
+                            rank: requirement.rank,
+                        })
+                        .collect(),
+                )
+            })
+            .collect(),
+        provider_impls: wire
+            .provider_impls
+            .into_iter()
+            .map(|provider| radix_hir::TensorEdgePolicyProviderImpl {
+                policy_type: provider.policy_type,
+                element_type: provider.element_type,
+                rank: provider.rank,
+                policy: map_tensor_edge_policy(provider.policy),
+            })
+            .collect(),
+    }
+}
+
 /// Map a wire resolved-use key to the live type (F20).
 fn map_resolved_use_key(wire: ResolvedUseKeyWire) -> ResolvedUseKey {
     match wire {
@@ -359,6 +431,7 @@ pub(crate) fn reconstruct_unit(artifact: radix_hir_fhir::HirArtifact) -> Result<
         }));
 
     let provider_units = provider_units_live(artifact.provider_units)?;
+    let tensor_edge_policies = map_tensor_edge_policy_table(artifact.tensor_edge_policies);
 
     let mut unit = AnalyzedModule::from_loaded_with_presentation(
         analysis_stamp,
@@ -376,6 +449,7 @@ pub(crate) fn reconstruct_unit(artifact: radix_hir_fhir::HirArtifact) -> Result<
         provenance,
         radix_lanes,
         gpu_builtins,
+        tensor_edge_policies,
         GraphicsSourceFacts::default(),
         Vec::new(), // diagnostics
     );
@@ -383,7 +457,217 @@ pub(crate) fn reconstruct_unit(artifact: radix_hir_fhir::HirArtifact) -> Result<
     // surface must emit provider imports from carried units exactly as the
     // direct surface does, with no disk re-derivation.
     unit.provider_units = provider_units;
+    unit.shape_obligations = map_shape_obligations(artifact.shape_obligations);
+    unit.kernel_requirements = map_kernel_requirements(artifact.kernel_requirements);
     Ok(unit)
+}
+
+fn map_kernel_requirements(
+    wire: radix_hir_fhir::KernelRequirementsWire,
+) -> crate::semantic::passes::kernel_requirements::KernelRequirementsReport {
+    use crate::semantic::passes::kernel_requirements as live;
+
+    live::KernelRequirementsReport {
+        kernels: wire
+            .kernels
+            .into_iter()
+            .map(|kernel| live::KernelRequirement {
+                def_id: kernel.def_id,
+                name: kernel.name,
+                target_reports: kernel
+                    .target_reports
+                    .into_iter()
+                    .map(|report| live::KernelTargetRequirement {
+                        target: match report.target {
+                            radix_hir_fhir::KernelTargetWire::MirAmd => crate::codegen::Target::MirAmd,
+                            radix_hir_fhir::KernelTargetWire::MirMetal => crate::codegen::Target::MirMetal,
+                            radix_hir_fhir::KernelTargetWire::MirWgsl => crate::codegen::Target::MirWgsl,
+                        },
+                        admitted: report.admitted,
+                        recursive: report.recursive,
+                        callees: report.callees,
+                        widths: report
+                            .widths
+                            .into_iter()
+                            .map(|width| live::KernelWidthRequirement {
+                                span: width.span,
+                                primitive: match width.primitive {
+                                    radix_hir_fhir::KernelPrimitiveWire::Numerus => crate::semantic::Primitive::Numerus,
+                                    radix_hir_fhir::KernelPrimitiveWire::Fractus => crate::semantic::Primitive::Fractus,
+                                },
+                                width: width.width,
+                                policy: match width.policy {
+                                    radix_hir_fhir::KernelNumericPolicyWire::Exact => live::KernelNumericPolicy::Exact,
+                                    radix_hir_fhir::KernelNumericPolicyWire::Wrapping => {
+                                        live::KernelNumericPolicy::Wrapping
+                                    }
+                                    radix_hir_fhir::KernelNumericPolicyWire::Saturating => {
+                                        live::KernelNumericPolicy::Saturating
+                                    }
+                                    radix_hir_fhir::KernelNumericPolicyWire::PolicyFloat => {
+                                        live::KernelNumericPolicy::PolicyFloat
+                                    }
+                                },
+                            })
+                            .collect(),
+                        extent_conditions: report
+                            .extent_conditions
+                            .into_iter()
+                            .map(|condition| live::KernelExtentCondition {
+                                span: condition.span,
+                                range: map_kernel_value_range(condition.range),
+                                minimum: condition.minimum,
+                                maximum: condition.maximum,
+                            })
+                            .collect(),
+                        trapping_stores: report
+                            .trapping_stores
+                            .into_iter()
+                            .map(|store| live::KernelTrappingStore { span: store.span, width: store.width })
+                            .collect(),
+                        failures: report
+                            .failures
+                            .into_iter()
+                            .map(map_kernel_requirement_failure)
+                            .collect(),
+                    })
+                    .collect(),
+            })
+            .collect(),
+    }
+}
+
+fn map_kernel_value_range(
+    wire: radix_hir_fhir::KernelValueRangeWire,
+) -> crate::semantic::passes::kernel_requirements::KernelValueRange {
+    crate::semantic::passes::kernel_requirements::KernelValueRange {
+        minimum: map_kernel_range_expr(wire.minimum),
+        maximum: map_kernel_range_expr(wire.maximum),
+    }
+}
+
+fn map_kernel_range_expr(
+    wire: radix_hir_fhir::KernelRangeExprWire,
+) -> crate::semantic::passes::kernel_requirements::KernelRangeExpr {
+    use crate::semantic::passes::kernel_requirements::KernelRangeExpr as Live;
+    match wire {
+        radix_hir_fhir::KernelRangeExprWire::Constant(value) => Live::Constant(value),
+        radix_hir_fhir::KernelRangeExprWire::Shape(index) => Live::Shape(index),
+        radix_hir_fhir::KernelRangeExprWire::Add(lhs, rhs) => {
+            Live::Add(Box::new(map_kernel_range_expr(*lhs)), Box::new(map_kernel_range_expr(*rhs)))
+        }
+        radix_hir_fhir::KernelRangeExprWire::Subtract(lhs, rhs) => {
+            Live::Subtract(Box::new(map_kernel_range_expr(*lhs)), Box::new(map_kernel_range_expr(*rhs)))
+        }
+        radix_hir_fhir::KernelRangeExprWire::Multiply(lhs, rhs) => {
+            Live::Multiply(Box::new(map_kernel_range_expr(*lhs)), Box::new(map_kernel_range_expr(*rhs)))
+        }
+        radix_hir_fhir::KernelRangeExprWire::FloorDivide(lhs, rhs) => {
+            Live::FloorDivide(Box::new(map_kernel_range_expr(*lhs)), Box::new(map_kernel_range_expr(*rhs)))
+        }
+        radix_hir_fhir::KernelRangeExprWire::Minimum(lhs, rhs) => {
+            Live::Minimum(Box::new(map_kernel_range_expr(*lhs)), Box::new(map_kernel_range_expr(*rhs)))
+        }
+        radix_hir_fhir::KernelRangeExprWire::Maximum(lhs, rhs) => {
+            Live::Maximum(Box::new(map_kernel_range_expr(*lhs)), Box::new(map_kernel_range_expr(*rhs)))
+        }
+    }
+}
+
+fn map_kernel_requirement_failure(
+    wire: radix_hir_fhir::KernelRequirementFailureWire,
+) -> crate::semantic::passes::kernel_requirements::KernelRequirementFailure {
+    use crate::semantic::passes::kernel_requirements::KernelRequirementFailure as Live;
+    match wire {
+        radix_hir_fhir::KernelRequirementFailureWire::RecursiveCall => Live::RecursiveCall,
+        radix_hir_fhir::KernelRequirementFailureWire::CalleeNotAdmitted { callee } => {
+            Live::CalleeNotAdmitted { callee }
+        }
+        radix_hir_fhir::KernelRequirementFailureWire::UnsupportedIntegerWidth { span, width } => {
+            Live::UnsupportedIntegerWidth { span, width }
+        }
+        radix_hir_fhir::KernelRequirementFailureWire::UnsupportedFloatWidth { span, width } => {
+            Live::UnsupportedFloatWidth { span, width }
+        }
+        radix_hir_fhir::KernelRequirementFailureWire::IntermediateOutOfRange { span, range } => {
+            Live::IntermediateOutOfRange { span, range: map_kernel_value_range(range) }
+        }
+        radix_hir_fhir::KernelRequirementFailureWire::StoreOutOfRange { span, range } => {
+            Live::StoreOutOfRange { span, range: map_kernel_value_range(range) }
+        }
+        radix_hir_fhir::KernelRequirementFailureWire::UnsupportedIntegerRange { span } => {
+            Live::UnsupportedIntegerRange { span }
+        }
+        radix_hir_fhir::KernelRequirementFailureWire::DivideByZeroPossible { span } => {
+            Live::DivideByZeroPossible { span }
+        }
+        radix_hir_fhir::KernelRequirementFailureWire::NegativeShiftCountPossible { span } => {
+            Live::NegativeShiftCountPossible { span }
+        }
+        radix_hir_fhir::KernelRequirementFailureWire::TensorEdgePolicyDeferred { span } => {
+            Live::TensorEdgePolicyDeferred { span }
+        }
+        radix_hir_fhir::KernelRequirementFailureWire::SaturatingLoweringDeferred { span, width } => {
+            Live::SaturatingLoweringDeferred { span, width }
+        }
+        radix_hir_fhir::KernelRequirementFailureWire::OptionFRequired { span, width } => {
+            Live::OptionFRequired { span, width }
+        }
+    }
+}
+
+fn map_shape_obligations(wire: radix_hir_fhir::ShapeObligationTableWire) -> crate::semantic::ShapeObligationTable {
+    let map_relations = |relations: Vec<radix_hir_fhir::ShapeRelationWire>| {
+        relations
+            .into_iter()
+            .map(|relation| crate::semantic::ShapeRelation {
+                left: relation.left,
+                right: relation.right,
+                span: relation.span,
+                boundary: match relation.boundary {
+                    radix_hir_fhir::ShapeRelationBoundaryWire::Call => crate::semantic::ShapeRelationBoundary::Call,
+                    radix_hir_fhir::ShapeRelationBoundaryWire::FunctionEntry => {
+                        crate::semantic::ShapeRelationBoundary::FunctionEntry
+                    }
+                    radix_hir_fhir::ShapeRelationBoundaryWire::FunctionReturn => {
+                        crate::semantic::ShapeRelationBoundary::FunctionReturn
+                    }
+                },
+            })
+            .collect()
+    };
+    let map_bindings = |bindings: Vec<radix_hir_fhir::RuntimeSizeBindingWire>| {
+        bindings
+            .into_iter()
+            .map(|binding| crate::semantic::RuntimeSizeBinding {
+                parameter: binding.parameter,
+                witness: binding.witness,
+                span: binding.span,
+            })
+            .collect()
+    };
+    crate::semantic::ShapeObligationTable {
+        calls: wire
+            .calls
+            .into_iter()
+            .map(|entry| (entry.call, map_relations(entry.relations)))
+            .collect(),
+        call_size_bindings: wire
+            .call_size_bindings
+            .into_iter()
+            .map(|entry| (entry.call, map_bindings(entry.bindings)))
+            .collect(),
+        functions: wire
+            .functions
+            .into_iter()
+            .map(|entry| (entry.function, map_relations(entry.relations)))
+            .collect(),
+        function_size_bindings: wire
+            .function_size_bindings
+            .into_iter()
+            .map(|entry| (entry.function, map_bindings(entry.bindings)))
+            .collect(),
+    }
 }
 
 /// Rebuild a live [`crate::driver::ProviderUnitView`] from its wire form,
@@ -412,6 +696,8 @@ fn provider_units_live(
                     types,
                     interner: Interner::from_string_table(fragment.interner),
                     resolver: Resolver::from_snapshot(fragment.resolver),
+                    tensor_edge_policies: map_tensor_edge_policy_table(fragment.tensor_edge_policies),
+                    shape_obligations: map_shape_obligations(fragment.shape_obligations),
                     diagnostics: Vec::new(),
                     nested,
                 })))

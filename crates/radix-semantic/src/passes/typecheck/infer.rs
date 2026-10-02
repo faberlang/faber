@@ -24,6 +24,7 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
+use super::index_infer::ISSUE_INCOMPATIBLE_TENSOR_INDEX;
 
 /// Whether unification is a symmetric inference join or a directional assignment.
 #[derive(Copy, Clone)]
@@ -505,9 +506,12 @@ impl TypeChecker<'_> {
                         self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
                         return self.error_type;
                     };
+                    self.current_shape_fields.push(name);
+                    let unified = self.unify_with_policy(from_ty, to_ty, span, issue, policy);
+                    self.current_shape_fields.pop();
                     fields.push((
                         name,
-                        self.unify_with_policy(from_ty, to_ty, span, issue, policy),
+                        unified,
                     ));
                 }
                 return self.types.record(fields);
@@ -518,11 +522,45 @@ impl TypeChecker<'_> {
             }
             (Type::Tensor(ea, sa), Type::Tensor(eb, sb)) => {
                 let elem = self.unify_with_policy(ea, eb, span, issue, policy);
-                let Ok(shape) = super::tensor_index::unify_tensor_shape_indices(self, sa, sb, span)
-                else {
-                    return self.error_type;
+                let shape = match self.unify_shape_at_boundary(sa, sb, span) {
+                    Some(Ok(shape)) => shape,
+                    Some(Err(())) => return self.error_type,
+                    None => match super::tensor_index::unify_tensor_shape_indices(self, sa, sb, span) {
+                        Ok(shape) => shape,
+                        Err(()) => return self.error_type,
+                    },
                 };
                 return self.types.tensor_with_shape(elem, shape);
+            }
+            (Type::Applied(base_a, args_a), Type::Applied(base_b, args_b))
+                if self.types.equals(base_a, base_b) && args_a.len() == args_b.len() =>
+            {
+                let mut args = Vec::with_capacity(args_a.len());
+                for (arg_a, arg_b) in args_a.into_iter().zip(args_b) {
+                    match (arg_a, arg_b) {
+                        (radix_types::AppliedArg::Type(a), radix_types::AppliedArg::Type(b)) => {
+                            args.push(radix_types::AppliedArg::Type(self.unify_with_policy(
+                                a, b, span, issue, policy,
+                            )));
+                        }
+                        (radix_types::AppliedArg::Size(actual), radix_types::AppliedArg::Size(expected)) => {
+                            args.push(radix_types::AppliedArg::Size(
+                                self.unify_size_at_boundary(actual, expected, span)
+                                    .unwrap_or_else(|| {
+                                        super::tensor_index::unify_tensor_shape_indices(
+                                            self, actual, expected, span,
+                                        )
+                                        .unwrap_or(actual)
+                                    }),
+                            ));
+                        }
+                        _ => {
+                            self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+                            return self.error_type;
+                        }
+                    }
+                }
+                return self.types.intern(Type::Applied(base_a, args));
             }
             // F-010: structural unify for Vector, Matrix, Sparsa, Atomic, Intervallum.
             (Type::Vector(ea, wa), Type::Vector(eb, wb)) => {
@@ -637,6 +675,49 @@ impl TypeChecker<'_> {
 
         self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
         self.error_type
+    }
+
+    /// Compare a nominal size argument at a call/return boundary. Unlike a
+    /// tensor axis, this witness is already a scalar index term, so keep its
+    /// actual provenance instead of fabricating an axis read from the record.
+    fn unify_size_at_boundary(
+        &mut self,
+        actual: crate::IndexId,
+        expected: crate::IndexId,
+        span: radix_lexer::Span,
+    ) -> Option<crate::IndexId> {
+        let boundary = if self.current_shape_argument.is_some() {
+            ShapeRelationBoundary::Call
+        } else if self.current_shape_return_expr.is_some() {
+            ShapeRelationBoundary::FunctionReturn
+        } else {
+            return None;
+        };
+        let actual = self.resolve_index(actual);
+        let expected = self.runtime_substitute_shape_params(expected);
+        let mut unifier = self.index_infer.unifier(self.types);
+        if let Ok(result) = unifier.unify(actual, expected) {
+            return Some(result);
+        }
+        let actual_static = radix_types::evaluate_index_dimension(actual, self.types)
+            .ok()
+            .flatten();
+        let expected_static = radix_types::evaluate_index_dimension(expected, self.types)
+            .ok()
+            .flatten();
+        if let (Some(left), Some(right)) = (actual_static, expected_static) {
+            if left != right {
+                self.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_INCOMPATIBLE_TENSOR_INDEX,
+                    span,
+                );
+                return Some(actual);
+            }
+            return Some(self.types.intern_index(IndexExpr::Literal(left)));
+        }
+        self.record_shape_relation(actual, expected, span, boundary);
+        Some(actual)
     }
 
     fn unify_function_signatures(

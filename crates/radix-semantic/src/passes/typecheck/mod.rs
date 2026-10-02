@@ -59,11 +59,14 @@
 
 use crate::locale::LocalePack;
 use crate::{
-    FuncSig, GenericBindingSource, GenericParamSort, GenericWitness, IndexExpr, IndexInferState,
+    FuncSig, GenericBindingSource, GenericParamSort, GenericWitness, IndexExpr, IndexId, IndexInferState,
     MarkerFamily, NumericWidth, ParamType, Primitive, ResolvedGenericBinding, ResolvedGenericCall,
-    Resolver, SemanticError, SemanticErrorKind, SemanticGenericParamDefault, SemanticParamMode,
-    Type, TypeId, TypeParamConstraint, TypeTable, WarningKind, types::InferVar,
+    Resolver, RuntimeSizeBinding, SemanticError, SemanticErrorKind,
+    SemanticGenericParamDefault, SemanticParamMode, ShapeObligationTable, ShapeRelation,
+    ShapeRelationBoundary, Type, TypeId, TypeParamConstraint, TypeTable, WarningKind,
+    types::InferVar,
 };
+use radix_types::RuntimeExtentId;
 use radix_hir::{
     DefId, HirArrayElement, HirAvailability, HirBinOp, HirBlock, HirCape, HirCasuArm,
     HirConversioTarget, HirExpression, HirExpressionKind, HirFunction, HirId, HirItem, HirItemKind,
@@ -79,6 +82,7 @@ use std::cell::RefCell;
 pub mod access;
 pub mod aggregate;
 pub mod call;
+mod tensor_edge_policy_generic;
 #[cfg(test)]
 #[path = "call_default_test.rs"]
 mod call_default_test;
@@ -112,6 +116,9 @@ mod non_null_mutating_receiver_test;
 #[cfg(test)]
 #[path = "register_shape_finalize_test.rs"]
 mod register_shape_finalize_test;
+#[cfg(test)]
+#[path = "shape_obligations_test.rs"]
+mod shape_obligations_test;
 
 mod closing;
 #[cfg(test)]
@@ -303,6 +310,19 @@ pub(crate) struct TypeChecker<'a> {
     /// Method nucleum roles keyed by (struct-or-interface def, method name).
     pub method_nucleum_roles: FxHashMap<(DefId, Symbol), NucleumRole>,
 
+    /// Source method identities keyed by (owning class, method name).
+    /// Intrinsic-selected callbacks such as tensor edge policies keep their
+    /// ordinary method identity without introducing a synthetic call edge.
+    pub method_defs: FxHashMap<(DefId, Symbol), DefId>,
+
+    /// Class methods that have an ordinary instance receiver. Intrinsics that
+    /// select policy callbacks must not accidentally admit static methods.
+    pub instance_method_defs: FxHashSet<(DefId, Symbol)>,
+
+    /// Number of per-instance fields on each struct. Static `generis` fields
+    /// do not occupy the runtime policy value selected by `tensor.limes`.
+    pub instance_field_counts: FxHashMap<DefId, usize>,
+
     /// Constant declaration types available to path lookup.
     pub consts: FxHashMap<DefId, TypeId>,
 
@@ -357,6 +377,33 @@ pub(crate) struct TypeChecker<'a> {
     pub(crate) air_lane_defs: FxHashSet<DefId>,
     /// Whether the function being checked is an AIR-lane function.
     pub(crate) current_air_function: bool,
+    /// Declaration currently owning the body being checked.
+    pub(crate) current_function_def: Option<DefId>,
+    /// HIR identity of the call currently checking its argument contracts.
+    pub(crate) current_shape_call: Option<HirId>,
+    /// Returned expression whose runtime shape is checked against the result contract.
+    pub(crate) current_shape_return_expr: Option<HirId>,
+    /// Zero-based value-argument ordinal currently being checked.
+    pub(crate) current_shape_argument: Option<u32>,
+    /// Field path while recursively checking a record-valued call argument.
+    pub(crate) current_shape_fields: Vec<Symbol>,
+    /// Runtime carrier axes that witness generic size symbols in this function.
+    pub(crate) current_shape_param_sources: FxHashMap<Symbol, IndexId>,
+    /// Runtime shape relations discovered by typechecking.
+    pub(crate) shape_obligations: ShapeObligationTable,
+    /// Resolved edge-policy callbacks selected by tensor `limes` calls.
+    pub(crate) tensor_edge_policies: crate::TensorEdgePolicyTable,
+    /// Generic call bindings retained until deferred edge-policy obligations
+    /// can be discharged after every local body has been checked.
+    tensor_edge_generic_calls: Vec<tensor_edge_policy_generic::GenericPolicyCall>,
+    /// Generic edge-policy obligations imported with namespace functions.
+    /// These remain separate from local HIR summaries and carry only
+    /// consumer-arena type identities.
+    tensor_edge_policy_imported_requirements:
+        FxHashMap<DefId, Vec<radix_hir::TensorEdgePolicyRequirement>>,
+    /// Generic type parameters observed in runtime type positions. Builtin
+    /// edge-policy markers may bind only parameters with no such use.
+    tensor_edge_policy_runtime_params: FxHashSet<(DefId, Symbol)>,
     /// Locals declared `fixum T x = e` (D5.10): their initializer is an `=`
     /// position, a compile-time store.
     compile_time_locals: FxHashSet<DefId>,
@@ -487,6 +534,9 @@ pub(crate) struct TypeChecker<'a> {
 
     /// Compile-time `lista<numerus>` shape witnesses for index constraint sources.
     pub shape_witnesses: FxHashMap<DefId, crate::index::IndexId>,
+    /// Statically known live lengths of list literals, retained for shape-hole
+    /// inference when a flat source is first bound to a local.
+    pub static_collection_lengths: FxHashMap<DefId, u64>,
 
     /// Lowering-produced error expressions already reported during checking.
     pub errored_exprs: FxHashSet<HirId>,
@@ -559,7 +609,20 @@ pub(crate) fn typecheck_with_interner(
     interner: Option<&Interner>,
 ) -> Result<(), Vec<SemanticError>> {
     let config = crate::PassConfig::for_target(Target::HirRust);
-    typecheck_with_config(hir, resolver, types, interner, &config, None, None, None)
+    let mut shape_obligations = crate::ShapeObligationTable::default();
+    let mut tensor_edge_policies = crate::TensorEdgePolicyTable::default();
+    typecheck_with_config(
+        hir,
+        resolver,
+        types,
+        interner,
+        &config,
+        None,
+        None,
+        None,
+        &mut shape_obligations,
+        &mut tensor_edge_policies,
+    )
 }
 
 /// Typecheck HIR with a caller-supplied [`PassConfig`].
@@ -576,6 +639,8 @@ pub(crate) fn typecheck_with_config(
     companion_signatures: Option<&crate::passes::companion_signature::CompanionSignatures>,
     presentation: Option<&mut HirPresentation>,
     lanes: Option<&crate::RadixLaneMetadata>,
+    shape_obligations: &mut crate::ShapeObligationTable,
+    tensor_edge_policies: &mut crate::TensorEdgePolicyTable,
 ) -> Result<(), Vec<SemanticError>> {
     let mut checker = TypeChecker::new(resolver, types, interner, config.target);
     checker.locale_pack = config.locale_pack.as_ref();
@@ -601,12 +666,15 @@ pub(crate) fn typecheck_with_config(
         checker.collect_ordo_members(hir, presentation);
     }
     checker.check_program(hir);
+    checker.discharge_tensor_edge_policy_obligations(hir);
     if let Some(presentation) = presentation {
         checker.finalize_authored_forms(presentation);
         presentation
             .numeric_twin_ids
             .append(&mut checker.numeric_twin_ids);
     }
+    shape_obligations.clone_from(&checker.shape_obligations);
+    tensor_edge_policies.clone_from(&checker.tensor_edge_policies);
 
     if checker.errors.is_empty() {
         Ok(())
@@ -636,6 +704,9 @@ impl<'a> TypeChecker<'a> {
             functions: FxHashMap::default(),
             nucleum_roles: FxHashMap::default(),
             method_nucleum_roles: FxHashMap::default(),
+            method_defs: FxHashMap::default(),
+            instance_method_defs: FxHashSet::default(),
+            instance_field_counts: FxHashMap::default(),
             consts: FxHashMap::default(),
             structs: FxHashMap::default(),
             json_structs: FxHashSet::default(),
@@ -652,6 +723,17 @@ impl<'a> TypeChecker<'a> {
             source_text: None,
             air_lane_defs: FxHashSet::default(),
             current_air_function: false,
+            current_function_def: None,
+            current_shape_call: None,
+            current_shape_return_expr: None,
+            current_shape_argument: None,
+            current_shape_fields: Vec::new(),
+            current_shape_param_sources: FxHashMap::default(),
+            shape_obligations: ShapeObligationTable::default(),
+            tensor_edge_policies: crate::TensorEdgePolicyTable::default(),
+            tensor_edge_generic_calls: Vec::new(),
+            tensor_edge_policy_imported_requirements: FxHashMap::default(),
+            tensor_edge_policy_runtime_params: FxHashSet::default(),
             compile_time_locals: FxHashSet::default(),
             numeric_twin_ids: Vec::new(),
             alias_type_params: FxHashMap::default(),
@@ -685,6 +767,7 @@ impl<'a> TypeChecker<'a> {
             union_members: RefCell::new(FxHashMap::default()),
             index_infer,
             shape_witnesses: FxHashMap::default(),
+            static_collection_lengths: FxHashMap::default(),
             errored_exprs: FxHashSet::default(),
             error_type,
             mark_chorda_scalar_closure_param: false,
@@ -1120,6 +1203,18 @@ mod tensor_bracket_test;
 #[cfg(test)]
 #[path = "tensor_index_test.rs"]
 mod tensor_index_test;
+
+#[cfg(test)]
+#[path = "tensor_edge_policy_type_test.rs"]
+mod tensor_edge_policy_type_test;
+
+#[cfg(test)]
+#[path = "tensor_edge_policy_call_test.rs"]
+mod tensor_edge_policy_call_test;
+
+#[cfg(test)]
+#[path = "tensor_edge_policy_generic_test.rs"]
+mod tensor_edge_policy_generic_test;
 
 #[cfg(test)]
 #[path = "tensor_index_width_test.rs"]

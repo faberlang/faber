@@ -1,0 +1,21 @@
++++
+term = "tensor view"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "varia_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "redde_stmt", "expression", "literal"]
+category = "collection"
+canonical = false
+summary = "Borrowed tensor views cannot be returned or stored in a mutable binding."
+related = ["tensor", "materialize"]
+locale = "en"
++++
+
+# Both functions deliberately omit materialize() at an ownership boundary.
+fn escape(ref tf32[2, 2] base) → tf32[2, 2] {
+    return base.transpose()
+}
+
+fn mutable_view(ref tf32[2, 2] base) → void {
+    var tf32[1, 2] view ← base.slice(0, 1)
+}
+
+main {}

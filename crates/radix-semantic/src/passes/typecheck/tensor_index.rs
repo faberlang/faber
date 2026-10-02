@@ -2,7 +2,7 @@
 //!
 //! Wires index inference to tensor intrinsics: literal shape witnesses from
 //! `lista<numerus>` initializers, output-shape rules for constructors,
-//! `sectio` axis-0 slicing, broadcast elementwise arithmetic, and rank-2
+//! `sectio` axis-0 slicing, explicit tensor expansion, broadcast elementwise arithmetic, and rank-2
 //! `matmul` contraction.
 
 use crate::index::{IndexExpr, IndexId};
@@ -22,6 +22,7 @@ const TENSOR_FORMA: &str = "forma";
 const TENSOR_CREA: &str = "crea";
 const TENSOR_GATHER: &str = "gather";
 const TENSOR_SECTIO: &str = "sectio";
+const TENSOR_EXPANDE: &str = "expande";
 pub(super) const TENSOR_TRANSPONE: &str = "transpone";
 pub(super) const GLYPH_TRANSPOSE_METHOD: &str = "__faber_glyph_transpose";
 pub(super) const ISSUE_GLYPH_TRANSPOSE_OPERANDS_UNSUPPORTED: &str =
@@ -57,6 +58,9 @@ pub(super) fn record_shape_witness_from_init(
     def_id: DefId,
     init: &HirExpression,
 ) {
+    if let Some(length) = static_collection_length(checker, init) {
+        checker.static_collection_lengths.insert(def_id, length);
+    }
     if let Some(index) = static_numerus_list_index(checker, init) {
         checker.shape_witnesses.insert(def_id, index);
     }
@@ -113,7 +117,10 @@ pub(super) fn glyph_transpose_rank_issue(
     };
     let shape = checker.resolve_index(shape);
     match checker.types.get_index(shape) {
-        IndexExpr::Literal(_) => Some(ISSUE_GLYPH_TRANSPOSE_RANK1),
+        IndexExpr::Literal(_)
+        | IndexExpr::Runtime(_)
+        | IndexExpr::Affine { .. }
+        | IndexExpr::Divide { .. } => Some(ISSUE_GLYPH_TRANSPOSE_RANK1),
         IndexExpr::Tuple(dims) => match dims.len() {
             2 => None,
             0 | 1 => Some(ISSUE_GLYPH_TRANSPOSE_RANK1),
@@ -129,7 +136,12 @@ pub(super) fn glyph_transpose_rank_issue(
 pub(super) fn tensor_intrinsic_changes_shape(method_name: &str) -> bool {
     matches!(
         method_name,
-        TENSOR_STRUE | TENSOR_FORMA | TENSOR_CREA | TENSOR_SECTIO | TENSOR_TRANSPONE
+        TENSOR_STRUE
+            | TENSOR_FORMA
+            | TENSOR_CREA
+            | TENSOR_SECTIO
+            | TENSOR_EXPANDE
+            | TENSOR_TRANSPONE
     ) || is_tensor_broadcast_elementwise(method_name)
         || is_tensor_matmul(method_name)
 }
@@ -138,6 +150,7 @@ pub(super) fn tensor_intrinsic_changes_shape(method_name: &str) -> bool {
 pub(super) fn apply_tensor_intrinsic_shape_constraints(
     checker: &mut TypeChecker<'_>,
     method_name: &str,
+    receiver: &HirExpression,
     receiver_ty: TypeId,
     ret_ty: TypeId,
     args: &[radix_hir::HirCallArg],
@@ -149,13 +162,28 @@ pub(super) fn apply_tensor_intrinsic_shape_constraints(
 
     match method_name {
         TENSOR_STRUE if args.len() >= 2 => {
-            constrain_result_from_static_list(checker, result_shape, &args[1].expr, span);
+            constrain_from_flat_result_shape(
+                checker,
+                result_shape,
+                &args[0].expr,
+                &args[1].expr,
+                span,
+            );
         }
-        TENSOR_FORMA | TENSOR_CREA if !args.is_empty() => {
+        TENSOR_FORMA if !args.is_empty() => {
+            constrain_reshape_result_shape(
+                checker,
+                receiver_ty,
+                result_shape,
+                &args[0].expr,
+                span,
+            );
+        }
+        TENSOR_CREA if args.len() >= 2 => {
             constrain_result_from_static_list(
                 checker,
                 result_shape,
-                &args[args.len() - 1].expr,
+                &args[1].expr,
                 span,
             );
         }
@@ -163,13 +191,34 @@ pub(super) fn apply_tensor_intrinsic_shape_constraints(
             let Some(input_shape) = tensor_shape_id(checker, receiver_ty) else {
                 return;
             };
-            if let (Some(start), Some(end)) = (
+            let (Some(start), Some(end)) = (
                 static_numerus_literal(&args[0].expr),
                 static_numerus_literal(&args[1].expr),
-            ) && let Some(output) = sectio_axis0_shape(checker, input_shape, start, end)
-            {
+            ) else {
+                return;
+            };
+            let step = match args.get(2) {
+                Some(step) => {
+                    let Some(step) = static_numerus_literal(&step.expr) else {
+                        return;
+                    };
+                    step
+                }
+                None => 1,
+            };
+            if let Some(output) = sectio_axis0_shape(checker, input_shape, start, end, step) {
                 checker.constrain_index_equal(result_shape, output, span);
             }
+        }
+        TENSOR_EXPANDE if args.len() == 1 => {
+            constrain_expanded_result_shape(
+                checker,
+                receiver,
+                receiver_ty,
+                result_shape,
+                &args[0].expr,
+                span,
+            );
         }
         name if is_tensor_broadcast_elementwise(name) && args.len() == 1 => {
             // WHY: the argument has been typechecked by this point, so its tensor
@@ -537,8 +586,134 @@ fn constrain_result_from_static_list(
     arg_expr: &HirExpression,
     span: Span,
 ) {
-    if let Some(arg_shape) = static_numerus_list_index(checker, arg_expr) {
+    if let Some(arg_shape) = shape_list_index(checker, arg_expr) {
         checker.constrain_index_equal(result_shape, arg_shape, span);
+    }
+}
+
+fn constrain_from_flat_result_shape(
+    checker: &mut TypeChecker<'_>,
+    result_shape: IndexId,
+    flat_expr: &HirExpression,
+    shape_expr: &HirExpression,
+    span: Span,
+) {
+    let Some(shape) = shape_list_index(checker, shape_expr) else {
+        return;
+    };
+    if let Some(count) = static_collection_length(checker, flat_expr) {
+        infer_single_shape_hole_from_count(checker, shape, count, span);
+    }
+    checker.constrain_index_equal(result_shape, shape, span);
+}
+
+fn constrain_reshape_result_shape(
+    checker: &mut TypeChecker<'_>,
+    receiver_ty: TypeId,
+    result_shape: IndexId,
+    shape_expr: &HirExpression,
+    span: Span,
+) {
+    let Some(shape) = shape_list_index(checker, shape_expr) else {
+        return;
+    };
+    if let Some(count) = static_tensor_element_count(checker, receiver_ty) {
+        infer_single_shape_hole_from_count(checker, shape, count, span);
+    }
+    checker.constrain_index_equal(result_shape, shape, span);
+}
+
+/// Resolve one structural shape-list hole when the flat element count and all
+/// other extents are statically known. Runtime constructors still validate the
+/// final count; this contributes a static result shape only when the division
+/// is unique and exact.
+fn infer_single_shape_hole_from_count(
+    checker: &mut TypeChecker<'_>,
+    shape: IndexId,
+    element_count: u64,
+    span: Span,
+) {
+    let shape = checker.resolve_index(shape);
+    let IndexExpr::Tuple(dims) = checker.types.get_index(shape).clone() else {
+        return;
+    };
+    let holes: Vec<_> = dims
+        .iter()
+        .enumerate()
+        .filter_map(|(axis, dim)| {
+            let resolved = checker.resolve_index(*dim);
+            matches!(checker.types.get_index(resolved), IndexExpr::Infer(_)).then_some(axis)
+        })
+        .collect();
+    let [hole_axis] = holes.as_slice() else {
+        return;
+    };
+    let mut known_product = 1_u64;
+    for (axis, dim) in dims.iter().enumerate() {
+        if axis == *hole_axis {
+            continue;
+        }
+        let resolved_dim = checker.resolve_index(*dim);
+        let Ok(Some(extent)) =
+            radix_types::evaluate_index_dimension(resolved_dim, checker.types)
+        else {
+            return;
+        };
+        let Some(product) = known_product.checked_mul(extent) else {
+            checker.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_INCOMPATIBLE_TENSOR_INDEX,
+                span,
+            );
+            return;
+        };
+        known_product = product;
+    }
+    if known_product == 0 {
+        return;
+    }
+    if element_count % known_product != 0 {
+        checker.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_INCOMPATIBLE_TENSOR_INDEX,
+            span,
+        );
+        return;
+    }
+    let inferred = element_count / known_product;
+    let inferred = checker
+        .types
+        .intern_index(IndexExpr::Literal(inferred));
+    checker.constrain_index_equal(dims[*hole_axis], inferred, span);
+}
+
+fn static_tensor_element_count(checker: &mut TypeChecker<'_>, ty: TypeId) -> Option<u64> {
+    let shape = tensor_shape_id(checker, ty)?;
+    let shape = checker.resolve_index(shape);
+    let dims = match checker.types.get_index(shape).clone() {
+        IndexExpr::Tuple(dims) => dims,
+        IndexExpr::Literal(_) => vec![shape],
+        _ => return None,
+    };
+    dims.into_iter().try_fold(1_u64, |count, dim| {
+        let resolved_dim = checker.resolve_index(dim);
+        let extent =
+            radix_types::evaluate_index_dimension(resolved_dim, checker.types).ok()??;
+        count.checked_mul(extent)
+    })
+}
+
+fn static_collection_length(checker: &TypeChecker<'_>, expr: &HirExpression) -> Option<u64> {
+    match &expr.kind {
+        HirExpressionKind::Array(elements)
+            if elements
+                .iter()
+                .all(|element| matches!(element, HirArrayElement::Expr(_))) =>
+        {
+            u64::try_from(elements.len()).ok()
+        }
+        HirExpressionKind::Path(def_id) => checker.static_collection_lengths.get(def_id).copied(),
+        _ => None,
     }
 }
 
@@ -604,7 +779,12 @@ fn static_tensor_bounds(checker: &mut TypeChecker<'_>, shape: IndexId) -> Vec<u6
             })
             .collect::<Option<Vec<_>>>()
             .unwrap_or_default(),
-        IndexExpr::Param(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => Vec::new(),
+        IndexExpr::Param(_)
+        | IndexExpr::Runtime(_)
+        | IndexExpr::Affine { .. }
+        | IndexExpr::Divide { .. }
+        | IndexExpr::Infer(_)
+        | IndexExpr::Unspecified => Vec::new(),
     }
 }
 
@@ -614,7 +794,7 @@ fn static_index_literals(expr: &HirExpression) -> Option<Vec<i128>> {
             .iter()
             .map(|element| match element {
                 HirArrayElement::Expr(inner) => static_signed_numerus_literal(inner),
-                HirArrayElement::Spread(_) => None,
+                HirArrayElement::Spread(_) | HirArrayElement::Infer(_) => None,
             })
             .collect(),
         _ => Some(vec![static_signed_numerus_literal(expr)?]),
@@ -657,11 +837,9 @@ fn static_numerus_list_index(
                 let HirArrayElement::Expr(inner) = element else {
                     return None;
                 };
-                dims.push(
-                    checker
-                        .types
-                        .intern_index(IndexExpr::Literal(static_numerus_literal(inner)?)),
-                );
+                dims.push(checker.types.intern_index(IndexExpr::Literal(
+                    static_numerus_literal(inner)?,
+                )));
             }
             Some(checker.types.intern_index(IndexExpr::Tuple(dims)))
         }
@@ -670,14 +848,261 @@ fn static_numerus_list_index(
     }
 }
 
-/// Output shape for axis-0 `sectio(start, end)` when input rank and bounds are static.
+/// Apply the explicit ordered-axis expansion contract when both shapes carry
+/// static witnesses. Inserted target axes do not consume a source axis. A
+/// source singleton may stretch with stride zero; all other mapped axes must
+/// have equal extents. The selected injection minimizes stretches, then picks
+/// the rightmost target axes to make singleton expansion deterministic.
+fn constrain_expanded_result_shape(
+    checker: &mut TypeChecker<'_>,
+    receiver: &HirExpression,
+    receiver_ty: TypeId,
+    result_shape: IndexId,
+    target_expr: &HirExpression,
+    span: Span,
+) {
+    let Some(source_shape) = tensor_shape_id(checker, receiver_ty) else {
+        return;
+    };
+    let Some(target_shape) = shape_list_index(checker, target_expr) else {
+        return;
+    };
+    checker.constrain_index_equal(result_shape, target_shape, span);
+
+    let source_shape = checker.resolve_index(source_shape);
+    let target_shape = checker.resolve_index(target_shape);
+    let (IndexExpr::Tuple(source_dims), IndexExpr::Tuple(target_dims)) = (
+        checker.types.get_index(source_shape).clone(),
+        checker.types.get_index(target_shape).clone(),
+    ) else {
+        checker.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_INCOMPATIBLE_TENSOR_INDEX,
+            span,
+        );
+        return;
+    };
+    let Some(mapping) = best_expanded_axis_mapping(checker, &source_dims, &target_dims) else {
+        checker.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_INCOMPATIBLE_TENSOR_INDEX,
+            span,
+        );
+        return;
+    };
+    for (source_axis, source, target, stretched) in mapping {
+        let target_resolved = checker.resolve_index(target);
+        if matches!(checker.types.get_index(target_resolved), IndexExpr::Infer(_)) {
+            let source = checker.resolve_index(source);
+            let source_term = checker.types.get_index(source).clone();
+            let source_extent = if matches!(source_term, IndexExpr::Infer(_) | IndexExpr::Unspecified)
+            {
+                checker.runtime_expression_axis(receiver.id, &[], source_axis as u32)
+            } else {
+                source
+            };
+            checker.constrain_index_equal(target, source_extent, span);
+        } else if !stretched && dimensions_provably_equal(checker, source, target) {
+            checker.constrain_index_equal(source, target, span);
+        }
+    }
+}
+
+fn dimensions_provably_equal(
+    checker: &mut TypeChecker<'_>,
+    left: IndexId,
+    right: IndexId,
+) -> bool {
+    let left = checker.resolve_index(left);
+    let right = checker.resolve_index(right);
+    left == right
+        || matches!(
+            (checker.types.get_index(left), checker.types.get_index(right)),
+            (IndexExpr::Literal(a), IndexExpr::Literal(b)) if a == b
+        )
+        || matches!(
+            (checker.types.get_index(left), checker.types.get_index(right)),
+            (IndexExpr::Param(a), IndexExpr::Param(b)) if a == b
+        )
+        || matches!(
+            (checker.types.get_index(left), checker.types.get_index(right)),
+            (IndexExpr::Runtime(a), IndexExpr::Runtime(b)) if a == b
+        )
+}
+
+/// Source-axis to target-axis choices, ranked by stretch count and then by
+/// rightmost target positions. Unknown dimensions are potential runtime matches;
+/// the carrier performs their exact-or-singleton check after selecting the same
+/// deterministic map. Static incompatible dimensions still fail here.
+fn best_expanded_axis_mapping(
+    checker: &mut TypeChecker<'_>,
+    source: &[IndexId],
+    target: &[IndexId],
+) -> Option<Vec<(usize, IndexId, IndexId, bool)>> {
+    fn visit(
+        checker: &mut TypeChecker<'_>,
+        source: &[IndexId],
+        target: &[IndexId],
+        source_axis: usize,
+        target_start: usize,
+        picked: &mut Vec<(usize, IndexId, IndexId, usize, bool)>,
+        best: &mut Option<(usize, Vec<usize>, Vec<(usize, IndexId, IndexId, usize, bool)>)>,
+    ) {
+        if source_axis == source.len() {
+            let target_axes = picked
+                .iter()
+                .map(|(_, _, _, target_axis, _)| *target_axis)
+                .collect::<Vec<_>>();
+            let stretches = picked
+                .iter()
+                .filter(|(_, _, _, _, stretched)| *stretched)
+                .count();
+            let candidate = (stretches, target_axes, picked.clone());
+            let is_better = best.as_ref().is_none_or(|current| {
+                candidate.0 < current.0
+                    || (candidate.0 == current.0 && candidate.1 > current.1)
+            });
+            if is_better {
+                *best = Some(candidate);
+            }
+            return;
+        }
+        let remaining = source.len() - source_axis;
+        if target.len().saturating_sub(target_start) < remaining {
+            return;
+        }
+        let source_id = source[source_axis];
+        let source_resolved = checker.resolve_index(source_id);
+        let source_term = checker.types.get_index(source_resolved).clone();
+        for target_axis in target_start..=target.len() - remaining {
+            let target_id = target[target_axis];
+            let target_resolved = checker.resolve_index(target_id);
+            let target_term = checker.types.get_index(target_resolved).clone();
+            let exact = source_resolved == target_resolved
+                || matches!((&source_term, &target_term),
+                    (IndexExpr::Literal(a), IndexExpr::Literal(b)) if a == b)
+                || matches!((&source_term, &target_term),
+                    (IndexExpr::Param(a), IndexExpr::Param(b)) if a == b)
+                || matches!((&source_term, &target_term),
+                    (IndexExpr::Runtime(a), IndexExpr::Runtime(b)) if a == b);
+            let stretched = !exact
+                && matches!(&source_term, IndexExpr::Literal(1))
+                && !matches!(&target_term, IndexExpr::Literal(1));
+            let unresolved = matches!(
+                (&source_term, &target_term),
+                (IndexExpr::Infer(_), _)
+                    | (_, IndexExpr::Infer(_))
+                    | (IndexExpr::Runtime(_), _)
+                    | (_, IndexExpr::Runtime(_))
+                    | (IndexExpr::Param(_), _)
+                    | (_, IndexExpr::Param(_))
+                    | (IndexExpr::Affine { .. }, _)
+                    | (_, IndexExpr::Affine { .. })
+                    | (IndexExpr::Divide { .. }, _)
+                    | (_, IndexExpr::Divide { .. })
+            );
+            if !exact && !stretched && !unresolved {
+                continue;
+            }
+            picked.push((source_axis, source_id, target_id, target_axis, stretched));
+            visit(
+                checker,
+                source,
+                target,
+                source_axis + 1,
+                target_axis + 1,
+                picked,
+                best,
+            );
+            picked.pop();
+        }
+    }
+
+    if source.len() > target.len() {
+        return None;
+    }
+    let mut picks = Vec::with_capacity(source.len());
+    let mut best = None;
+    visit(
+        checker,
+        source,
+        target,
+        0,
+        0,
+        &mut picks,
+        &mut best,
+    );
+    best.map(|(_, _, picks)| {
+        picks
+            .into_iter()
+            .map(|(source_axis, source, target, _, stretched)| {
+                (source_axis, source, target, stretched)
+            })
+            .collect()
+    })
+}
+
+fn index_term_for_shape_expression(
+    checker: &mut TypeChecker<'_>,
+    expr: &HirExpression,
+) -> Option<IndexId> {
+    if let Some(value) = static_signed_numerus_literal(expr) {
+        let value = u64::try_from(value).ok()?;
+        return Some(checker.types.intern_index(IndexExpr::Literal(value)));
+    }
+    if let HirExpressionKind::Path(def_id) = &expr.kind {
+        if let Some(symbol) = checker.resolver.get_symbol(*def_id)
+            && let Some(ty) = symbol.ty
+            && let Type::Param(param) = checker.types.get(ty)
+        {
+            return Some(checker.types.intern_index(IndexExpr::Param(*param)));
+        }
+    }
+    let ty = expr.ty?;
+    if !crate::numeric_width::is_integer_index_scalar(checker.types, checker.resolve_inferred_type(ty))
+    {
+        return None;
+    }
+    let runtime = radix_types::RuntimeExtentId::ScalarExpression {
+        expression: expr.id.0,
+    };
+    Some(checker.types.intern_index(IndexExpr::Runtime(runtime)))
+}
+
+/// Shape arguments may contain source holes and runtime extents. Keep the
+/// literal-only extractor above for initializer witnesses, where carrying an
+/// expression-local runtime id past its evaluation boundary would be unsound.
+fn shape_list_index(checker: &mut TypeChecker<'_>, expr: &HirExpression) -> Option<IndexId> {
+    match &expr.kind {
+        HirExpressionKind::Array(elements) => {
+            let mut dims = Vec::with_capacity(elements.len());
+            for element in elements {
+                let dim = match element {
+                    HirArrayElement::Expr(inner) => {
+                        index_term_for_shape_expression(checker, inner)?
+                    }
+                    HirArrayElement::Infer(_) => checker.fresh_index_hole(),
+                    HirArrayElement::Spread(_) => return None,
+                };
+                dims.push(dim);
+            }
+            Some(checker.types.intern_index(IndexExpr::Tuple(dims)))
+        }
+        HirExpressionKind::Path(def_id) => checker.shape_witnesses.get(def_id).copied(),
+        _ => None,
+    }
+}
+
+/// Output shape for axis-0 `sectio(start, end[, step])` when input rank and
+/// bounds are static.
 fn sectio_axis0_shape(
     checker: &mut TypeChecker<'_>,
     input_shape: IndexId,
     start: u64,
     end: u64,
+    step: u64,
 ) -> Option<IndexId> {
-    if end < start {
+    if end < start || step == 0 {
         return None;
     }
     let resolved = checker.resolve_index(input_shape);
@@ -687,7 +1112,8 @@ fn sectio_axis0_shape(
     if dims.is_empty() {
         return None;
     }
-    let sliced = end - start;
+    let distance = end - start;
+    let sliced = distance.div_ceil(step);
     let mut output = vec![checker.types.intern_index(IndexExpr::Literal(sliced))];
     output.extend_from_slice(&dims[1..]);
     Some(checker.types.intern_index(IndexExpr::Tuple(output)))
