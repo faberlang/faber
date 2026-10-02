@@ -390,7 +390,7 @@ pub fn cli_ir_inspection_for_source(name: &str, source: &str) -> SourceInspectio
 fn parse_inspect_program(
     source_file: &crate::driver::SourceFile,
 ) -> Result<(crate::syntax::Program, crate::lexer::Interner), Vec<String>> {
-    let lex_result = crate::lexer::lex(source_file.content.as_str());
+    let lex_result = lex_reader_surface(source_file);
     if !lex_result.success() {
         return Err(lexer_error_lines(source_file, &lex_result.errors));
     }

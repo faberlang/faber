@@ -3,7 +3,7 @@
 //! lex payload carries each identifier's spelling plus its Latin keyword
 //! identity (the token stream the stage-5 Earley reference parser consumes).
 
-use super::{lex_inspection_for_source, parse_inspection_for_source};
+use super::{hir_inspection_for_source, lex_inspection_for_source, parse_inspection_for_source};
 
 const EN_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nfn salve() {\n    if true then return\n}\n";
 
@@ -19,6 +19,19 @@ fn parse_inspection_honors_frontmatter_locale() {
     let payload = json(&result.text);
     assert_eq!(payload["statements"], 1);
     assert_eq!(payload["ast"][0]["kind"], "Func");
+}
+
+#[test]
+fn hir_inspection_honors_frontmatter_locale() {
+    let source =
+        "+++\nlocale = \"en\"\n+++\nfn twice(int n) → int {\n    return n * 2\n}\n\nmain {\n    print twice(4)\n}\n";
+    let result = hir_inspection_for_source("en.fab", source);
+
+    assert!(result.success, "errors: {:?}", result.errors);
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    let payload = json(&result.text);
+    assert_eq!(payload["frontmatter"]["locale"], "en");
+    assert_eq!(payload["items"], 1);
 }
 
 #[test]
