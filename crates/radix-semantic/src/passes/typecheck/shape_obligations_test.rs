@@ -657,16 +657,19 @@ fn functions_own_size_param_returns_with_its_identity_and_no_relation() {
     let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
     let function = DefId(8);
     let own_dim = checker.types.intern_index(IndexExpr::Param(n));
-    let formal_witness = checker
-        .types
-        .intern_index(IndexExpr::Runtime(RuntimeExtentId::FunctionParameterAxis {
-            parameter: 0,
-            axis: 0,
-        }));
+    let formal_witness =
+        checker
+            .types
+            .intern_index(IndexExpr::Runtime(RuntimeExtentId::FunctionParameterAxis {
+                parameter: 0,
+                axis: 0,
+            }));
     let shape = checker.types.intern_index(IndexExpr::Tuple(vec![own_dim]));
     checker.current_function_def = Some(function);
     checker.current_shape_return_expr = Some(HirId(45));
-    checker.current_shape_param_sources.insert(n, formal_witness);
+    checker
+        .current_shape_param_sources
+        .insert(n, formal_witness);
 
     let unified = checker
         .unify_shape_at_boundary(shape, shape, radix_lexer::Span::default())
@@ -676,7 +679,11 @@ fn functions_own_size_param_returns_with_its_identity_and_no_relation() {
     let IndexExpr::Tuple(dims) = checker.types.get_index(unified).clone() else {
         panic!("tuple shape should stay a tuple");
     };
-    assert_eq!(dims, vec![own_dim], "the returned axis keeps the symbolic N");
+    assert_eq!(
+        dims,
+        vec![own_dim],
+        "the returned axis keeps the symbolic N"
+    );
     assert!(
         checker.shape_obligations.functions.is_empty(),
         "N == N is a compile-time identity, not a runtime return relation"
