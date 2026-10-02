@@ -23,22 +23,22 @@
 //!   public [`crate::Output`] variant.
 
 pub use radix_semantic::coverage;
+#[cfg(feature = "hir-cobol")]
+pub mod cobol;
 pub mod conversio_coverage;
 #[cfg(feature = "hir-faber")]
 pub mod faber;
-#[cfg(feature = "hir-cobol")]
-pub mod cobol;
-#[cfg(feature = "hir-go")]
-pub mod go;
 #[cfg(feature = "hir-fortran")]
 pub mod fortran;
+#[cfg(feature = "hir-go")]
+pub mod go;
 #[cfg(feature = "hir-haskell")]
 pub mod haskell;
-#[cfg(feature = "hir-pascal")]
-pub mod pascal;
 pub(crate) mod hygiene;
 mod names;
 pub mod needs;
+#[cfg(feature = "hir-pascal")]
+pub mod pascal;
 #[cfg(feature = "hir-python")]
 pub mod python;
 #[cfg(feature = "hir-rust")]

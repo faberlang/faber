@@ -11,10 +11,10 @@ mod lower;
 #[cfg(feature = "device")]
 pub(crate) use lower::expand_deferred_vector_ops;
 // Emit + interpret + coverage leaves (façades re-export radix-mir-*).
-#[cfg(feature = "mir-coverage")]
-mod coverage;
 #[cfg(feature = "mir-basic")]
 mod basic_text;
+#[cfg(feature = "mir-coverage")]
+mod coverage;
 #[cfg(feature = "mir-llvm")]
 mod llvm_text;
 #[cfg(feature = "mir-metal")]
@@ -129,6 +129,8 @@ pub use radix_mir::{
 // KPC-EMIT: the imported-entry merge surface re-exported from the device
 // module (the crate-root list above predates it; `device` is public).
 // KCM-05: the synthetic-kernel metadata carrier rides the same device module.
+#[cfg(feature = "mir-basic")]
+pub use basic_text::{MirBasicError, emit_basic_text};
 pub use radix_mir::device::{
     MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, MirImportedEntryError, MirImportedEntryFact,
     merge_imported_entry_roles,
@@ -198,8 +200,6 @@ pub use runner::{
     run_function, run_function_with_limits, run_function_with_stats_and_limits, run_function_with_step_budget,
     run_source, runner_dispatch_status,
 };
-#[cfg(feature = "mir-basic")]
-pub use basic_text::{MirBasicError, emit_basic_text};
 #[cfg(feature = "mir-sexp")]
 pub use sexp_text::{MirSexpTextProbeError, classify_sexp_lowerability, emit_sexp_text};
 #[cfg(feature = "mir-wasm")]
