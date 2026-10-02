@@ -2127,6 +2127,10 @@ help = "make the expression type match the expected type"
 message = "membership requires a collection or text on the right, found {found}"
 help = "use a list, set, map or text as the right operand; narrow a nullable value first"
 
+[diagnostics.SEM010.issues.membership_operand_unresolved]
+message = "membership right operand has an unresolved type, found {found}"
+help = "give the right operand a known type, for example annotate the list or bind it with a typed declaration"
+
 [diagnostics.SEM010.issues.matmul_argument_rank_must_be_two]
 message = "matmul requires rank-2 tensor argument"
 help = "make the expression type match the expected type"

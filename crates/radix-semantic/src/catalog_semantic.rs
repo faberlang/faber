@@ -671,6 +671,9 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "membership_requires_collection" => Some(
             "use a lista, copia, tabula or textus as the right operand; narrow a nullable value first".to_owned(),
         ),
+        "membership_operand_unresolved" => Some(
+            "give the right operand a known type, for example annotate the list or bind it with a typed declaration".to_owned(),
+        ),
         "array_spread_requires_lista" => Some("spread a lista value inside lista construction".to_owned()),
         "struct_computed_key_forbidden" => Some("use declared struct field names in struct construction".to_owned()),
         "vector_constructor_forbids_spread" => {

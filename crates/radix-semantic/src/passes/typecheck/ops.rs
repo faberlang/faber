@@ -2307,16 +2307,21 @@ impl TypeChecker<'_> {
         self.bool_type()
     }
 
-    /// The right-operand rule of keyword membership (`between` / `inter`).
+    /// The right-operand rule of the collection form of membership.
     ///
     /// After peeling aliases and access markers the right operand must be a
     /// `lista` (bounded or not), a `copia`, a `tabula` (membership by key) or
     /// `textus` / `ascii` (bounded or not; substring containment, which the
     /// keyword form keeps until it retires). Every other resolved type is
     /// rejected with `membership_requires_collection`, carrying the right
-    /// operand's type as `found`. An unresolved right operand (inference
-    /// variable, union hole, marker hole, error type) is left alone: the
-    /// unresolved-operand diagnostic belongs to the unit that adds it.
+    /// operand's type as `found`.
+    ///
+    /// A right operand that is not resolved enough to test membership against
+    /// (an inference variable, union hole, marker hole, error type, or a
+    /// container whose element or key type is still unresolved, such as `[]`)
+    /// is reported once as `membership_operand_unresolved` at the right
+    /// operand, before the left operand can bind the hole: nothing guesses a
+    /// type for it and nothing unresolved reaches lowering.
     pub(super) fn check_membership_rhs(
         &mut self,
         lhs_ty: TypeId,
@@ -2328,7 +2333,29 @@ impl TypeChecker<'_> {
             .types
             .peel_access_marker(self.resolve_inferred_type(rhs_ty));
         let payload = self.resolve_inferred_type(payload);
-        match self.types.get(payload).clone() {
+        let shape = self.types.get(payload).clone();
+        let probed = match &shape {
+            Type::Array(elem) | Type::Set(elem) | Type::BoundedArray { element: elem, .. } => {
+                Some(*elem)
+            }
+            Type::Map(key, _) => Some(*key),
+            _ => None,
+        };
+        let unresolved = match probed {
+            Some(probed) => self.is_unresolved_membership_type(probed, false),
+            None => self.is_unresolved_membership_type(payload, true),
+        };
+        if unresolved {
+            let found = self.format_type_for_diagnostic(rhs_ty);
+            self.error_issue_with_args(
+                SemanticErrorKind::TypeMismatch,
+                MEMBERSHIP_OPERAND_UNRESOLVED,
+                rhs_span,
+                &[("found", found)],
+            );
+            return;
+        }
+        match shape {
             Type::Array(elem) | Type::Set(elem) | Type::BoundedArray { element: elem, .. } => {
                 self.unify_assign_issue(lhs_ty, elem, lhs_span, MEMBERSHIP_OPERAND_TYPE_MISMATCH);
             }
@@ -2341,7 +2368,6 @@ impl TypeChecker<'_> {
                 let text = self.textus_type();
                 self.unify_assign_issue(lhs_ty, text, lhs_span, MEMBERSHIP_OPERAND_TYPE_MISMATCH);
             }
-            Type::Infer(_) | Type::InferUnion(_) | Type::MarkerHole { .. } | Type::Error => {}
             _ => {
                 let found = self.format_type_for_diagnostic(rhs_ty);
                 self.error_issue_with_args(
@@ -2351,6 +2377,18 @@ impl TypeChecker<'_> {
                     &[("found", found)],
                 );
             }
+        }
+    }
+
+    /// Whether a membership right operand (or its element or key type) is an
+    /// unresolved inference state rather than a type. `error_counts` adds the
+    /// error type, which only the right operand itself reports.
+    fn is_unresolved_membership_type(&self, ty: TypeId, error_counts: bool) -> bool {
+        let resolved = self.resolve_inferred_type(ty);
+        match self.types.get(resolved) {
+            Type::Infer(_) | Type::InferUnion(_) | Type::MarkerHole { .. } => true,
+            Type::Error => error_counts,
+            _ => false,
         }
     }
 }
@@ -2422,6 +2460,7 @@ const COMMON_TYPE_MISMATCH: &str = "common_type_mismatch";
 const ASSIGNMENT_TYPE_MISMATCH: &str = "assignment_type_mismatch";
 const MEMBERSHIP_OPERAND_TYPE_MISMATCH: &str = "membership_operand_type_mismatch";
 const MEMBERSHIP_REQUIRES_COLLECTION: &str = "membership_requires_collection";
+const MEMBERSHIP_OPERAND_UNRESOLVED: &str = "membership_operand_unresolved";
 const COALESCE_FALLBACK_TYPE_MISMATCH: &str = "coalesce_fallback_type_mismatch";
 const BOOLEAN_OPERANDS_REQUIRED: &str = "boolean_operands_required";
 const INTEGER_OPERANDS_REQUIRED: &str = "integer_operands_required";

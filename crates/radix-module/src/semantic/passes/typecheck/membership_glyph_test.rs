@@ -141,3 +141,80 @@ fn mixed_value_set_fails_common_type() {
         "common_type_mismatch",
     );
 }
+
+/// The `found` arg of the first `SEM010:membership_operand_unresolved` error.
+fn unresolved_found(source: &str) -> Option<String> {
+    compile(source)
+        .diagnostics
+        .iter()
+        .filter(|diag| diag.is_error() && diag.issue() == Some("membership_operand_unresolved"))
+        .find_map(|diag| {
+            diag.args
+                .iter()
+                .find(|arg| arg.name == "found")
+                .map(|arg| arg.value.clone())
+        })
+}
+
+#[test]
+fn empty_list_right_operand_is_unresolved_in_both_polarities() {
+    for source in [
+        "incipit { nota 1 ∈ [] }",
+        "incipit { nota 1 ∉ [] }",
+        "incipit { nota 1 inter [] }",
+    ] {
+        rejects(source, "SEM010", "membership_operand_unresolved");
+        assert!(unresolved_found(source).is_some(), "no found arg: {source}");
+    }
+}
+
+#[test]
+fn unresolved_container_element_is_reported_once_at_the_right_operand() {
+    let source = "incipit { fixum _ xs ← []\n nota 1 ∈ xs }";
+    let found = issues(source);
+    let count = found
+        .iter()
+        .filter(|(_, issue)| issue.as_deref() == Some("membership_operand_unresolved"))
+        .count();
+    assert_eq!(count, 1, "{found:?}");
+}
+
+#[test]
+fn unannotated_hole_right_operand_is_unresolved() {
+    rejects("incipit { varia _ y\n nota 1 ∈ y }", "SEM010", "membership_operand_unresolved");
+}
+
+#[test]
+fn resolved_empty_collections_are_not_unresolved() {
+    assert_accepts("incipit { fixum lista<numerus> xs ← []\n nota 1 ∈ xs }");
+    assert_accepts("incipit { varia copia<numerus> xs ← vacua\n nota 1 ∉ xs }");
+}
+
+#[test]
+fn generic_right_operand_is_rejected_by_the_collection_rule_not_this_one() {
+    let source = "functio quaere<T>(T t) → bivalens { redde 1 ∈ t }\nincipit { }";
+    let found = issues(source);
+    assert!(
+        found.contains(&(Some("SEM010"), Some("membership_requires_collection".to_owned()))),
+        "{found:?}"
+    );
+    assert_eq!(unresolved_found(source), None);
+}
+
+#[test]
+fn unresolved_left_operand_still_binds_the_bound_type() {
+    for source in [
+        "incipit { fixum lista<numerus> xs ← [1]\n varia _ y\n nota y ∈ xs }",
+        "incipit { varia _ y\n nota y ∈ 0‥10 }",
+    ] {
+        assert_eq!(unresolved_found(source), None, "{source}");
+        let found = issues(source);
+        assert!(
+            found.iter().all(|(_, issue)| !matches!(
+                issue.as_deref(),
+                Some("membership_operand_type_mismatch" | "cannot_infer_expression_type")
+            )),
+            "{source}: {found:?}"
+        );
+    }
+}
