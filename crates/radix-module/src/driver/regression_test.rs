@@ -1681,7 +1681,7 @@ fn ego_field_access_no_longer_reports_non_struct_member_error() {
 }
 
 incipit {
-  fixum _ c ← Counter {}
+  varia _ c ← Counter {}
   nota c.inc()
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());

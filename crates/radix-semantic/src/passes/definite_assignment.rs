@@ -32,6 +32,7 @@
 //! - Write-once enforcement applies to `fixum` locals and non-`in` parameters;
 //!   `varia` locals and `in` parameters are exempt.
 
+use super::method_receiver_mutation::{self, MutatingMethods};
 use crate::init_state::InitState;
 use crate::{Resolver, SemanticError, SemanticErrorKind, TypeTable};
 use radix_hir::visit::{HirVisitor, walk_expr};
@@ -40,9 +41,12 @@ use radix_hir::{
     HirItemKind, HirLocal, HirModule, HirParam, HirParamMode, HirPattern, HirStatement,
     HirStatementKind,
 };
+use radix_lexer::{Interner, Symbol};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 const ISSUE_IMMUTABLE_SECOND_ASSIGNMENT: &str = "immutable_second_assignment";
+const ISSUE_MUTATING_METHOD_ON_IMMUTABLE: &str =
+    "imperativus_operator_method_requires_varia_receiver";
 const ISSUE_POSSIBLY_UNINITIALIZED: &str = "possibly_uninitialized";
 
 /// Validate definite-assignment invariants across the lowered program.
@@ -52,10 +56,12 @@ const ISSUE_POSSIBLY_UNINITIALIZED: &str = "possibly_uninitialized";
 /// Returns definite-assignment violations as a list of [`SemanticError`]s.
 pub fn analyze(
     hir: &HirModule,
-    _resolver: &Resolver,
+    resolver: &Resolver,
     types: &TypeTable,
+    interner: &Interner,
 ) -> Result<(), Vec<SemanticError>> {
-    let mut checker = DefiniteAssignmentChecker::new(types);
+    let mutating = method_receiver_mutation::collect(hir, types, interner);
+    let mut checker = DefiniteAssignmentChecker::new(types, resolver, interner, mutating);
     checker.check_program(hir);
 
     if !checker.errors.is_empty() {
@@ -73,11 +79,23 @@ struct DefiniteAssignmentChecker<'a> {
     errors: Vec<SemanticError>,
     /// Type table for tensor-index-mutation detection (bracket `ponde` sugar).
     types: &'a TypeTable,
+    resolver: &'a Resolver,
+    interner: &'a Interner,
+    /// Class methods whose body changes the receiver in place.
+    mutating_methods: MutatingMethods,
 }
 
 impl<'a> DefiniteAssignmentChecker<'a> {
-    fn new(types: &'a TypeTable) -> Self {
+    fn new(
+        types: &'a TypeTable,
+        resolver: &'a Resolver,
+        interner: &'a Interner,
+        mutating_methods: MutatingMethods,
+    ) -> Self {
         Self {
+            resolver,
+            interner,
+            mutating_methods,
             states: FxHashMap::default(),
             sponte_slots: FxHashSet::default(),
             write_once: FxHashSet::default(),
@@ -234,6 +252,46 @@ impl<'a> DefiniteAssignmentChecker<'a> {
             SemanticErrorKind::ImmutableAssignment,
             ISSUE_IMMUTABLE_SECOND_ASSIGNMENT,
             span,
+        );
+    }
+
+    /// A call to a method that changes its receiver in place is a write to the
+    /// receiver binding, so it obeys the same const/var rule as a field write:
+    /// an immutable binding (`fixum` local or non-`in` parameter, `copy`
+    /// parameters included) rejects it.
+    fn check_mutating_method_call(
+        &mut self,
+        receiver: &HirExpression,
+        method: Symbol,
+        span: radix_lexer::Span,
+    ) {
+        let HirExpressionKind::Path(def_id) =
+            &method_receiver_mutation::unwrap_non_null(receiver).kind
+        else {
+            return;
+        };
+        if !self.write_once.contains(def_id) {
+            return;
+        }
+        let Some(def) = receiver
+            .ty
+            .and_then(|ty| method_receiver_mutation::class_def(self.types, ty))
+        else {
+            return;
+        };
+        if !self.mutating_methods.contains(&(def, method)) {
+            return;
+        }
+        let binding = self
+            .resolver
+            .get_symbol(*def_id)
+            .map_or("value", |symbol| self.interner.resolve(symbol.name))
+            .to_owned();
+        self.errors.push(
+            SemanticError::structured(SemanticErrorKind::ImmutableAssignment, span)
+                .with_arg("issue", ISSUE_MUTATING_METHOD_ON_IMMUTABLE)
+                .with_arg("binding", binding)
+                .with_arg("method", self.interner.resolve(method)),
         );
     }
 
@@ -522,6 +580,10 @@ impl HirVisitor for DefiniteAssignmentChecker<'_> {
                 });
             }
             HirExpressionKind::Ref(_, inner) => self.visit_expr(inner),
+            HirExpressionKind::MethodCall(receiver, method, ..) => {
+                self.check_mutating_method_call(receiver, *method, expr.span);
+                walk_expr(self, expr);
+            }
             _ => walk_expr(self, expr),
         }
     }

@@ -81,8 +81,9 @@ class C {
     }
 }
 fn bumpcopy(copy C c) → void {
-    c.inc()
-    print c.n
+    var C mine ← c
+    mine.inc()
+    print mine.n
 }
 main {
     var C c ← C {}

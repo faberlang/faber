@@ -75,6 +75,7 @@ pub mod libera;
 pub mod lint;
 pub mod live_tuus_cursor_escape;
 pub mod local_constants;
+mod method_receiver_mutation;
 pub mod praefixum;
 pub mod resolve;
 pub mod return_path;
@@ -169,6 +170,9 @@ mod complexity_test;
 #[cfg(test)]
 #[path = "definite_assignment_test.rs"]
 mod definite_assignment_test;
+#[cfg(test)]
+#[path = "method_receiver_mutation_test.rs"]
+mod method_receiver_mutation_test;
 
 #[cfg(test)]
 #[path = "exhaustive_coverage_test.rs"]
