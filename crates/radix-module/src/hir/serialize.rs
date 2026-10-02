@@ -196,26 +196,19 @@ fn kernel_requirements_wire(
                 target_reports: kernel
                     .target_reports
                     .iter()
-                    .map(|report| KernelTargetRequirementWire {
-                        target: match report.target {
-                            crate::codegen::Target::MirAmd => KernelTargetWire::MirAmd,
-                            crate::codegen::Target::MirMetal => KernelTargetWire::MirMetal,
-                            crate::codegen::Target::MirWgsl => KernelTargetWire::MirWgsl,
-                            _ => unreachable!("kernel requirements only record device targets"),
-                        },
+                    .filter_map(|report| Some((kernel_target_wire(report.target)?, report)))
+                    .map(|(target, report)| KernelTargetRequirementWire {
+                        target,
                         admitted: report.admitted,
                         recursive: report.recursive,
                         callees: report.callees.clone(),
                         widths: report
                             .widths
                             .iter()
-                            .map(|width| KernelWidthRequirementWire {
+                            .filter_map(|width| Some((kernel_primitive_wire(width.primitive)?, width)))
+                            .map(|(primitive, width)| KernelWidthRequirementWire {
                                 span: width.span,
-                                primitive: match width.primitive {
-                                    crate::semantic::Primitive::Numerus => KernelPrimitiveWire::Numerus,
-                                    crate::semantic::Primitive::Fractus => KernelPrimitiveWire::Fractus,
-                                    _ => unreachable!("kernel width reports are numeric"),
-                                },
+                                primitive,
                                 width: width.width,
                                 policy: match width.policy {
                                     live::KernelNumericPolicy::Exact => KernelNumericPolicyWire::Exact,
@@ -249,6 +242,28 @@ fn kernel_requirements_wire(
                     .collect(),
             })
             .collect(),
+    }
+}
+
+/// Wire encoding of a kernel report target. Only device targets have one: the
+/// kernel-requirements analysis records device targets alone, so any other
+/// target has no row on the wire.
+fn kernel_target_wire(target: crate::codegen::Target) -> Option<KernelTargetWire> {
+    match target {
+        crate::codegen::Target::MirAmd => Some(KernelTargetWire::MirAmd),
+        crate::codegen::Target::MirMetal => Some(KernelTargetWire::MirMetal),
+        crate::codegen::Target::MirWgsl => Some(KernelTargetWire::MirWgsl),
+        _ => None,
+    }
+}
+
+/// Wire encoding of a kernel width primitive. Only the numeric primitives have
+/// one; the analysis reports no width for any other primitive.
+fn kernel_primitive_wire(primitive: crate::semantic::Primitive) -> Option<KernelPrimitiveWire> {
+    match primitive {
+        crate::semantic::Primitive::Numerus => Some(KernelPrimitiveWire::Numerus),
+        crate::semantic::Primitive::Fractus => Some(KernelPrimitiveWire::Fractus),
+        _ => None,
     }
 }
 

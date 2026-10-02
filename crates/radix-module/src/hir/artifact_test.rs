@@ -1844,3 +1844,37 @@ functio copy_four(tensor<f32, [4]> input, tensor<u32, [4]> output) → vacuum {
     let loaded = load_fhir(&bytes).expect("validate and load kernel requirements");
     assert_eq!(loaded.kernel_requirements, original);
 }
+
+#[test]
+fn kernel_requirements_wire_omits_rows_without_a_device_or_numeric_encoding() {
+    let source = r"
+@ nucleum
+@ publica
+functio copy_four(tensor<f32, [4]> input, tensor<u32, [4]> output) → vacuum {
+    itera ex input apud [i] fixum value {
+        output[i] ← i
+    }
+}
+";
+    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let mut unit = crate::driver::analyze_source(&session, "kernel-wire.fab", source, AnalyzeRequest::default())
+        .expect("analyze kernel wire fixture");
+    let baseline = crate::hir::serialize::from_analyzed(&unit, "kernel-wire", "kernel-wire.fab").kernel_requirements;
+
+    let kernel = &mut unit.kernel_requirements.kernels[0];
+    let device_report = kernel.target_reports[0].clone();
+    let width = device_report
+        .widths
+        .first()
+        .cloned()
+        .expect("kernel reports a width");
+    let mut host_report = device_report.clone();
+    host_report.target = crate::codegen::Target::HirRust;
+    kernel.target_reports.push(host_report);
+    let mut text_width = width;
+    text_width.primitive = crate::semantic::Primitive::Textus;
+    kernel.target_reports[0].widths.push(text_width);
+
+    let wire = crate::hir::serialize::from_analyzed(&unit, "kernel-wire", "kernel-wire.fab").kernel_requirements;
+    assert_eq!(wire, baseline);
+}

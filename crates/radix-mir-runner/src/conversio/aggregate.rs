@@ -323,9 +323,11 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     // producers, not as a second compiler lowering path.
                     let data = cell.borrow().clone();
                     let shape = lista_to_tensor_shape(target_ty, self.types, data.len());
-                    Ok(Value::Tensor(Rc::new(RefCell::new(
-                        TensorValue::contiguous(data, shape),
-                    ))))
+                    TensorValue::try_contiguous(data, shape)
+                        .map(|tensor| Value::Tensor(Rc::new(RefCell::new(tensor))))
+                        .ok_or_else(|| {
+                            RunnerError::internal(span, "tensor shape has unrepresentable strides")
+                        })
                 }
                 other => Err(RunnerError::internal(
                     span,
@@ -752,9 +754,11 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 let shape = lista_to_tensor_shape(target, self.types, data.len());
-                Ok(Value::Tensor(Rc::new(RefCell::new(
-                    TensorValue::contiguous(data, shape),
-                ))))
+                TensorValue::try_contiguous(data, shape)
+                    .map(|tensor| Value::Tensor(Rc::new(RefCell::new(tensor))))
+                    .ok_or_else(|| {
+                        RunnerError::internal(span, "tensor shape has unrepresentable strides")
+                    })
             }
             other => Err(RunnerError::internal(
                 span,

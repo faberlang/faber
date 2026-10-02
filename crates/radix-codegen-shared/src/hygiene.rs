@@ -53,6 +53,18 @@ pub const SLICE_OUT: &str = "out0";
 /// temporaries append an ordinal (`b0_1`, `b0_2`, …).
 pub const UPDATE_BASE: &str = "b0";
 
+/// Rust item-level compiler names. Unlike the temporaries above these name a
+/// generic parameter and a struct field of the emitted item, not a local, so
+/// they do not follow the `letter decimal+` scheme; they are spelled here once
+/// and the Rust emitter references them rather than typing them.
+///
+/// The generic element parameter of a tensor edge-policy provider impl.
+pub const RUST_TENSOR_ELEMENT_PARAM: &str = "__FaberTensorElement";
+
+/// The `PhantomData` marker field of a record whose type parameters are not
+/// otherwise used by a field.
+pub const RUST_STRUCT_TYPE_MARKER_FIELD: &str = "__faber_type_marker";
+
 /// Every fixed hygiene name; a [`TempScope`] never hands one out as a temporary.
 const FIXED_NAMES: [&str; 14] = [
     FAC_OK,
