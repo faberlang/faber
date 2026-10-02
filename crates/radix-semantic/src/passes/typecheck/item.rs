@@ -81,7 +81,6 @@ impl TypeChecker<'_> {
             self.record_binding_name(param.def_id, param.name);
             self.insert_binding(param.def_id, param.ty);
         }
-        self.install_function_shape_sources(&func.type_params, &func.params);
 
         let prev_return = self.current_return;
         let prev_error = self.current_error;
@@ -98,6 +97,7 @@ impl TypeChecker<'_> {
         self.current_return = func.ret_ty;
         self.current_error = func.err_ty.map(ErrorSink::Function);
         self.current_device_function = func.is_kernel || func.nucleum_fragment;
+        self.install_function_shape_sources(&func.type_params, &func.params);
         self.current_air_function = self.air_lane_defs.contains(&def_id);
         self.current_nucleum_entry = func.is_kernel;
         self.current_shader_function = func.is_vertex || func.is_fragment;

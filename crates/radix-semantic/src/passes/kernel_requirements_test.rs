@@ -293,3 +293,88 @@ fn map_edges<size N>(
         report.extent_conditions
     );
 }
+
+#[test]
+fn untyped_float_constants_adopt_the_float_width_they_meet() {
+    // K15b: `0.0` has no width of its own, so an f32 kernel that compares or
+    // scales by constants must not demand f64.
+    let fixture = analyze_source(
+        r"
+@ nucleum
+@ publica
+functio relu(f32 value) → f32 {
+    si value > 0.0 {
+        redde value * 2.0 - 1.5
+    }
+    redde -0.5
+}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+
+    for target in [Target::MirMetal, Target::MirWgsl] {
+        let report = target_row(&fixture, "relu", target);
+        assert!(report.admitted, "{target:?}: {:?}", report.failures);
+    }
+}
+
+#[test]
+fn explicit_f64_conversion_of_a_float_constant_still_requires_f64() {
+    // K15b guard: only an *untyped* constant is width-free. A conversion to
+    // a sized float carries that float's width.
+    let fixture = analyze_source(
+        r"
+@ nucleum
+@ publica
+functio widen(f32 value) → f64 {
+    redde value ↦ f64
+}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    let report = target_row(&fixture, "widen", Target::MirMetal);
+    assert!(!report.admitted, "f64 must still be rejected on Metal");
+}
+
+#[test]
+fn kernel_with_static_extents_records_no_entry_shape_relation() {
+    // K15a: a statically sized kernel parameter is checked at the typed call
+    // site; the kernel itself carries no entry relation.
+    let fixture = analyze_source(
+        r"
+@ nucleum
+@ publica
+functio scale(tensor<f32, [5]> input, tensor<f32, [5]> output) → vacuum {
+    itera ex input apud [i] fixum value {
+        output[i] ← value * 2.0
+    }
+}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    assert!(
+        fixture.result.shape_obligations.functions.is_empty(),
+        "{:?}",
+        fixture.result.shape_obligations.functions
+    );
+    let report = target_row(&fixture, "scale", Target::MirMetal);
+    assert!(report.admitted, "{:?}", report.failures);
+}
+
+#[test]
+fn host_function_with_a_repeated_size_symbol_keeps_its_entry_relation() {
+    let fixture = analyze_source(
+        r"
+functio same<magnitudo N>(tensor<f32, [N]> left, tensor<f32, [N]> right) → f32 {
+    redde left.media() + right.media()
+}
+
+incipit {
+    fixum tensor<f32, [3]> a ← vacua
+    nota same(a, a)
+}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    assert_eq!(fixture.result.shape_obligations.functions.len(), 1);
+}

@@ -923,6 +923,7 @@ impl BodyFacts<'_> {
     fn evaluate(&mut self, expr: &HirExpression) -> AbstractRange {
         if let Some(ty) = expr.ty
             && !(self.range_only_expression(expr) && is_range_narrowable_type(ty, self.types))
+            && !self.float_constant_only(expr, ty)
         {
             self.record_type(ty, expr.span);
         }
@@ -1750,6 +1751,31 @@ impl BodyFacts<'_> {
                 }
             }
             _ => {}
+        }
+    }
+
+    /// An untyped float constant (or arithmetic over only such constants) has
+    /// no width of its own: it joins the width of the float it meets, so it
+    /// places no width requirement on the kernel. Only an expression still
+    /// typed as the untyped `fractus` qualifies; an explicit conversion to a
+    /// sized float carries that float's type and is recorded as usual.
+    fn float_constant_only(&self, expr: &HirExpression, ty: TypeId) -> bool {
+        if !matches!(self.types.get(ty), Type::Primitive(Primitive::Fractus)) {
+            return false;
+        }
+        match &expr.kind {
+            HirExpressionKind::Literal(
+                radix_hir::HirLiteral::Float(_) | radix_hir::HirLiteral::FloatText { .. },
+            ) => true,
+            HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => inner
+                .ty
+                .is_some_and(|ty| self.float_constant_only(inner, ty)),
+            HirExpressionKind::Binary(_, lhs, rhs) => [lhs, rhs].into_iter().all(|operand| {
+                operand
+                    .ty
+                    .is_some_and(|ty| self.float_constant_only(operand, ty))
+            }),
+            _ => false,
         }
     }
 
