@@ -321,6 +321,24 @@ abi_string_family! {
         SYMBOL_REGEX_FROM_ASCII = "__faber_rt_v1_regex_from_ascii",
         SYMBOL_REGEX_GET_TEXT = "__faber_rt_v1_regex_get_text",
         SYMBOL_REGEX_LITERAL_1_PTR_TO_PTR = "__faber_rt_v1_regex_literal_1_ptr_to_ptr",
+        // Regex operations (RX-10d). Every row takes the runtime context
+        // first. `matches` and the `match_start`/`match_end` accessors write
+        // their scalar through a trailing out pointer and return a status; the
+        // rest return a `%FaberRtPtrResultV1` whose value is a text handle, a
+        // match handle or an array handle, or null for `none` (a miss, a group
+        // that did not take part, an unknown name). Offsets are code points.
+        SYMBOL_REGEX_MATCHES = "__faber_rt_v1_regex_matches",
+        SYMBOL_REGEX_FIND = "__faber_rt_v1_regex_find",
+        SYMBOL_REGEX_FIND_ALL = "__faber_rt_v1_regex_find_all",
+        SYMBOL_REGEX_SPLIT = "__faber_rt_v1_regex_split",
+        SYMBOL_REGEX_REPLACE = "__faber_rt_v1_regex_replace",
+        SYMBOL_REGEX_REPLACE_EACH = "__faber_rt_v1_regex_replace_each",
+        SYMBOL_REGEX_ESCAPE = "__faber_rt_v1_regex_escape",
+        SYMBOL_REGEX_MATCH_TEXT = "__faber_rt_v1_regex_match_text",
+        SYMBOL_REGEX_MATCH_START = "__faber_rt_v1_regex_match_start",
+        SYMBOL_REGEX_MATCH_END = "__faber_rt_v1_regex_match_end",
+        SYMBOL_REGEX_MATCH_GROUP = "__faber_rt_v1_regex_match_group",
+        SYMBOL_REGEX_MATCH_NAMED = "__faber_rt_v1_regex_match_named",
         SYMBOL_READ_LINE_0_TO_PTR = "__faber_rt_v1_read_line_0_to_ptr",
         // Shared cursor-stream materialization. One fixed symbol; the
         // callee-encoded `cursor_stream_{callee}` LLVM dialect is retired.
