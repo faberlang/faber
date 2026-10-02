@@ -160,29 +160,29 @@ fn store_inferred_appends_the_inferred_note_before_the_unsigned_note() {
 
 #[test]
 fn store_narrows_or_traps_with_the_slot_the_site_and_the_unsigned_note() {
-    assert_eq!(store::<u8>(255, "return", ""), 255_u8);
-    assert_eq!(store::<i64>(-5, "return", ""), -5_i64);
+    assert_eq!(store::<u8>(255, "return"), 255_u8);
+    assert_eq!(store::<i64>(-5, "return"), -5_i64);
     assert_eq!(
-        panic_text(|| store::<i8>(300, "x", "")).as_deref(),
+        panic_text(|| store::<i8>(300, "x")).as_deref(),
         Some("300 does not fit in `i8` (x)")
     );
     assert_eq!(
-        panic_text(|| store::<i8>(300, "x", " (inferred)")).as_deref(),
+        panic_text(|| store_inferred::<i8>(300, "x", " (inferred)")).as_deref(),
         Some("300 does not fit in `i8` (x) (inferred)")
     );
     assert_eq!(
-        panic_text(|| store::<u8>(-1, "x", "")).as_deref(),
+        panic_text(|| store::<u8>(-1, "x")).as_deref(),
         Some("-1 does not fit in `u8` (x) (a negative value cannot be stored in an unsigned slot)")
     );
     assert_eq!(
-        panic_text(|| store::<u8>(-1, "x", " (inferred)")).as_deref(),
+        panic_text(|| store_inferred::<u8>(-1, "x", " (inferred)")).as_deref(),
         Some(
             "-1 does not fit in `u8` (x) (inferred) (a negative value cannot be stored in an unsigned slot)"
         )
     );
     // A negative value outside a signed slot carries no unsigned note.
     assert_eq!(
-        panic_text(|| store::<i8>(-129, "x", "")).as_deref(),
+        panic_text(|| store::<i8>(-129, "x")).as_deref(),
         Some("-129 does not fit in `i8` (x)")
     );
 }
