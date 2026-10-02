@@ -22,8 +22,9 @@ path = "src/lib.rs"
 
 [features]
 default = ["regex"]
-regex = ["dep:regex"]
+regex = ["dep:regex", "dep:regex-syntax"]
 test-support = []
 
 [dependencies]
 regex = { version = "1", optional = true }
+regex-syntax = { version = "0.8", optional = true }
