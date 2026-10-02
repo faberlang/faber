@@ -15,7 +15,6 @@ use radix_lexer::Span;
 use super::*;
 
 const ISSUE_INCOMPATIBLE_TENSOR_INDEX: &str = "incompatible_tensor_index";
-const ISSUE_VECTOR_RUNTIME_INDEX_UNSUPPORTED: &str = "vector_runtime_index_unsupported";
 pub(super) const ISSUE_PROVABLY_OUT_OF_BOUNDS: &str = "index_provably_out_of_bounds";
 
 const TENSOR_STRUE: &str = "strue";
@@ -595,12 +594,11 @@ pub(super) fn reject_static_bounded_index_oob(
 
 /// Check the index of a vector lane access `v[k]`.
 ///
-/// A vector is a register value, so a lane read is a constant projection: the
-/// index must be a compile-time integer constant, and a constant outside the
-/// literal width is provably out of bounds (the shared index-bounds family).
-/// A runtime index is a named unsupported diagnostic until the checked lane
-/// select lands. A symbolic width cannot be bounds-checked here; the lowered
-/// projection is validated against the concrete width.
+/// A constant lane outside the literal width is provably out of bounds (the
+/// shared index-bounds family). A run-time index is the checked lane select:
+/// it is bounds-checked when the value runs, exactly like a `lista` index, so
+/// there is nothing to reject here. A symbolic width cannot be bounds-checked
+/// here either; the lowered projection is validated against the concrete width.
 pub(super) fn check_vector_lane_index(
     checker: &mut TypeChecker<'_>,
     receiver_ty: TypeId,
@@ -612,7 +610,6 @@ pub(super) fn check_vector_lane_index(
         return;
     };
     let Some(lane) = crate::passes::const_int_value(index) else {
-        checker.invalid_operand_types(ISSUE_VECTOR_RUNTIME_INDEX_UNSUPPORTED, index.span);
         return;
     };
     let width = checker.resolve_index(width);

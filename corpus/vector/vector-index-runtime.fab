@@ -1,0 +1,61 @@
++++
+term = "vector"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "type_arguments", "type_argument", "redde_stmt", "fixum_decl", "varia_decl", "assignment", "place", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "dum_stmt", "comparison", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "register"
+canonical = false
+summary = "A run-time index on a vector selects one lane under a bounds check: v[i] reads lane i, and an index past the width traps like a lista index."
+syntax = "<vector>[<integer expression>]"
+related = ["vector", "dot"]
+locale = "en"
++++
+# =============================================================================
+# vector — run-time lane select with v[i]
+# =============================================================================
+#
+# What this teaches:
+#   • `v[i]` on a `vector<T, N>` with a run-time integer `i` is a checked lane
+#     select: it reads lane `i` when `0 ≤ i < N`
+#   • A loop can walk the lanes: `v[i]` is typed as the element `T`
+#   • A named constant used as the index is a run-time index too: `v[k]`
+#   • A lane of a `var` vector can be written with a run-time index
+#   • An index outside `0 ≤ i < N` fails exactly like an out-of-range `lista`
+#     index: a trap that ends the run (`lane(v, 3)` here would end it), never
+#     a silent wrap or clamp. This file runs only in-range lanes so it stays
+#     a plain stdout exemplum; the trap is pinned by a runner test.
+#
+# Common mistakes:
+#   • expecting an out-of-range lane to wrap around or clamp — it traps
+#   • indexing with a constant outside the width — `v[3]` on a three-lane
+#     vector is rejected at check time, not at run time
+#
+# See also: vector, dot
+#
+# EXPECTED OUTPUT:
+#   vector-index-runtime.expected
+# =============================================================================
+
+fn lane(vector<f32, 3> v, int i) → f32 {
+    return v[i]
+}
+
+main {
+    const vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    var f32 sum ← 0.0
+    var int i ← 0
+    while i < 3 {
+        sum ← sum + v[i]
+        i ← i + 1
+    }
+    print sum
+    const int k ← 2
+    print v[k]
+    print lane(v, 1)
+    var vector<f32, 3> w ← [0.0, 0.0, 0.0] ↦ vector<f32, 3>
+    var int j ← 0
+    while j < 3 {
+        w[j] ← v[j] * 2.0
+        print w[j]
+        j ← j + 1
+    }
+}

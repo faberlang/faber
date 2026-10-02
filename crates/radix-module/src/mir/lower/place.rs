@@ -81,24 +81,19 @@ impl FunctionBuilder<'_> {
 
     /// The projection of `base[index]`.
     ///
-    /// A vector is a register value, never a storage buffer, so a lane access
-    /// is a constant `VectorLane` projection (the one swizzle uses), not an
-    /// `Index` projection. Typecheck rejects a runtime index on a vector; the
-    /// fallback here only keeps a missed form from reaching MIR validation.
+    /// A vector is a register value, never a storage buffer. A constant lane
+    /// is the `VectorLane` projection swizzle uses; a run-time index stays an
+    /// `Index` projection on the vector base, which MIR defines as the checked
+    /// lane select (the checked-index law: `0 <= i < N`, else the same failure
+    /// as an out-of-range `lista` index).
     pub(super) fn lower_index_projection(
         &mut self,
         base_ty: Option<TypeId>,
         index: &HirExpression,
     ) -> Option<MirProjection> {
-        if base_ty.is_some_and(|ty| self.is_vector_lane_base(ty)) {
-            let lane = crate::semantic::passes::const_int_value(index).and_then(|lane| u8::try_from(lane).ok());
-            let Some(lane) = lane else {
-                self.errors.push(MirError::unsupported(
-                    index.span,
-                    "vector lane index that is not a constant lane number",
-                ));
-                return None;
-            };
+        if base_ty.is_some_and(|ty| self.is_vector_lane_base(ty))
+            && let Some(lane) = crate::semantic::passes::const_int_value(index).and_then(|lane| u8::try_from(lane).ok())
+        {
             return Some(MirProjection::VectorLane(lane));
         }
         Some(MirProjection::Index(self.lower_expr_value(index)?))
