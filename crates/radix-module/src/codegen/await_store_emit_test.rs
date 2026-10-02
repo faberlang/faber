@@ -31,7 +31,7 @@ fn emit(target: Target, source: &str) -> String {
 fn rust_checks_the_awaited_value_after_the_await() {
     let code = emit(Target::HirRust, NARROWING);
     assert!(
-        code.contains("__faber_store::<u8>(fetch().await as i128, \"await-binding `v`\""),
+        code.contains("faber::exact::store::<u8>(fetch().await as i128, \"await-binding `v`\""),
         "{code}"
     );
 }

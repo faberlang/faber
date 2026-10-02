@@ -289,3 +289,40 @@ fn spelling_through_the_refs_records_the_namespace_only_on_success() {
     );
     assert_eq!(refs.used(), [Namespace::Display]);
 }
+
+#[test]
+fn the_exact_rows_spell_as_faber_exact_functions_in_rust() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Exact)
+        .collect();
+    assert_eq!(rows.len(), 13);
+    for row in rows {
+        assert_eq!(
+            spell_any(Target::HirRust, row),
+            format!("faber::exact::{}", row.name)
+        );
+    }
+}
+
+#[test]
+fn only_the_exact_store_row_is_store_family() {
+    let store_rows: Vec<&str> = TABLE
+        .iter()
+        .filter(|row| row.kind == RuntimeKind::StoreFn)
+        .map(|row| row.name)
+        .collect();
+    assert_eq!(store_rows, ["store"]);
+    assert_eq!(
+        spell(Target::HirRust, &EXACT_STORE),
+        Err(SpellError::StoreOnly)
+    );
+    assert_eq!(
+        spell_store(Target::HirRust, &EXACT_STORE, &site()),
+        Ok("faber::exact::store".to_owned())
+    );
+    assert_eq!(
+        spell_store(Target::HirRust, &EXACT_FIT, &site()),
+        Err(SpellError::NotStore)
+    );
+}

@@ -168,14 +168,15 @@ fn rust_static_field_approx_is_const_exact() {
         panic!("no Rust output");
     };
     assert!(
-        out.code
-            .contains("pub const CLOSE: bool = __faber_approx_int(9007199254740993_i128, 9007199254740992_i128);"),
+        out.code.contains(
+            "pub const CLOSE: bool = faber::exact::approx_int(9007199254740993_i128, 9007199254740992_i128);"
+        ),
         "{}",
         out.code
     );
     assert!(
         out.code
-            .contains("pub const FAR: bool = !__faber_approx_int(5_i128,"),
+            .contains("pub const FAR: bool = !faber::exact::approx_int(5_i128,"),
         "{}",
         out.code
     );
