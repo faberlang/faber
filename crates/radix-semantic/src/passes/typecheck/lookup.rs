@@ -266,7 +266,9 @@ impl TypeChecker<'_> {
             .peel_access_marker(self.resolve_inferred_type(ty));
         matches!(
             self.types.get(payload),
-            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+            Type::Primitive(Primitive::Fractus)
+                | Type::SizedNumeric(Primitive::Fractus, _)
+                | Type::PolicyFloat(_, _)
         )
     }
 
@@ -643,9 +645,9 @@ impl TypeChecker<'_> {
     fn expected_fractus_literal_type(&self, expected: Option<TypeId>) -> Option<TypeId> {
         let expected = self.resolve_inferred_type(expected?);
         match self.types.get(expected) {
-            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
-                Some(expected)
-            }
+            Type::Primitive(Primitive::Fractus)
+            | Type::SizedNumeric(Primitive::Fractus, _)
+            | Type::PolicyFloat(_, _) => Some(expected),
             _ => None,
         }
     }

@@ -410,6 +410,14 @@ fn numeric_fact(ty: &Type) -> Option<NumericFact> {
                 width: Some(*width),
             })
         }
+        // N7e D3: a conversion into or out of a float cell is the conversion
+        // of the bare float of its width, so the cell is that float here.
+        Type::PolicyFloat(_, width) => Some(NumericFact {
+            family: NumericFactFamily::Float {
+                rank: float_width_rank(*width),
+            },
+            width: Some(*width),
+        }),
         _ => None,
     }
 }
@@ -2373,9 +2381,9 @@ impl TypeChecker<'_> {
             Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {
                 PrimitiveConversioFamily::Numerus
             }
-            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
-                PrimitiveConversioFamily::Fractus
-            }
+            Type::Primitive(Primitive::Fractus)
+            | Type::SizedNumeric(Primitive::Fractus, _)
+            | Type::PolicyFloat(_, _) => PrimitiveConversioFamily::Fractus,
             Type::Primitive(Primitive::Bivalens) => PrimitiveConversioFamily::Bivalens,
             Type::Primitive(Primitive::Textus) => PrimitiveConversioFamily::Textus,
             Type::Primitive(Primitive::Ascii) => PrimitiveConversioFamily::Ascii,
@@ -3083,7 +3091,7 @@ impl TypeChecker<'_> {
         let source_expected = constructor_source.then_some(effective_target);
         let source_ty = if matches!(
             self.types.get(effective_target),
-            Type::ModularWord(_) | Type::SaturatingWord(_)
+            Type::ModularWord(_) | Type::SaturatingWord(_) | Type::PolicyFloat(_, _)
         ) {
             // WHY: modular ascription shapes integer literals so the ordinary
             // literal checker enforces the u32 range. Non-literal numerus
@@ -3117,6 +3125,7 @@ impl TypeChecker<'_> {
             }
             Type::ModularWord(_)
             | Type::SaturatingWord(_)
+            | Type::PolicyFloat(_, _)
             | Type::SizedNumeric(..)
             | Type::Primitive(Primitive::Numerus | Primitive::Fractus) => {
                 self.check_verte_numeric_fact(source, source_resolved, effective_target, span);
@@ -3223,6 +3232,14 @@ impl TypeChecker<'_> {
             if !holds {
                 self.invalid_conversion(ISSUE_NUMERIC_ASCRIPTION_REQUIRES_CONVERSION, span);
             }
+            return;
+        }
+
+        // N7e D4: a float cell is its own family. A non-literal value never
+        // enters or leaves one by ascription; it needs an authored `↦`.
+        let is_cell = |ty: TypeId| matches!(self.types.get(ty), Type::PolicyFloat(_, _));
+        if (is_cell(source_ty) || is_cell(target_ty)) && !self.types.equals(source_ty, target_ty) {
+            self.invalid_conversion(ISSUE_NUMERIC_ASCRIPTION_REQUIRES_CONVERSION, span);
             return;
         }
 

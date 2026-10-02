@@ -28,6 +28,9 @@ pub const ISSUE_ASYNC: &str = "nucleum_async";
 /// A kernel names a value type that needs the host (heap text, unbounded
 /// collections, dynamic values, host handles).
 pub const ISSUE_HOST_TYPE: &str = "nucleum_host_type";
+/// A kernel names a `saturating<float>` cell: the language admits it, but its
+/// device lowering is not built (N7e D6; removed when device lowering lands).
+pub const ISSUE_SATURATING_FLOAT_NOT_BUILT: &str = "nucleum_saturating_float_not_built";
 /// A kernel uses compiler-internal workgroup state (atomics, barriers).
 pub const ISSUE_WORKGROUP: &str = "nucleum_workgroup";
 /// A kernel calls something that is not a kernel or an approved intrinsic.

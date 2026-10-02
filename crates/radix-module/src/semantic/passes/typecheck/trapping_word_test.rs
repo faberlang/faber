@@ -1,7 +1,7 @@
 //! D11.8 `exactus<W>` (en `trapping<W>`) policy word, and the bare markers
 //! that mean the same default-policy type: `trapping<u8>` is `u8` (one type
 //! identity, not a new family), integers and `d64` are admitted, and a float
-//! width rejects as "not implemented" (cell (e)), never as an unknown type.
+//! width is the trapping float cell (N7e), its own type and its own family.
 
 use crate::driver::AnalyzeRequest;
 use crate::{Config, Target};
@@ -112,20 +112,22 @@ functio mix(exactus<u8> a, saturatus<u8> b) → u8 {
 }
 
 #[test]
-fn policy_word_on_a_float_width_is_not_implemented_not_unknown() {
+fn policy_float_cell_resolves_for_every_float_width_in_both_locales() {
     for width in ["f16", "bf16", "f32", "f64"] {
-        let diagnostics = latin(&format!(
+        assert_accepts(&latin(&format!(
             r"
-functio keep(exactus<{width}> x) → numerus {{
-    redde 0
+functio keep(exactus<{width}> x, saturatus<{width}> y) → exactus<{width}> {{
+    redde x
 }}
 "
-        ));
-        assert_issue(&diagnostics, "trapping_float_not_implemented");
-        assert!(
-            !has_issue(&diagnostics, "unknown_type"),
-            "trapping<{width}> must not report an unknown type: {diagnostics:?}"
-        );
+        )));
+        assert_accepts(&english(&format!(
+            r"
+fn keep(trapping<{width}> x, saturating<{width}> y) → saturating<{width}> {{
+    return y
+}}
+"
+        )));
     }
 }
 
@@ -158,10 +160,7 @@ fn keep(trapping<u8> x) → trapping<u8> {
 }
 ",
     ));
-    assert_issue(
-        &english("fn keep(trapping<f32> x) → int { return 0 }"),
-        "trapping_float_not_implemented",
-    );
+    assert_accepts(&english("fn keep(trapping<f32> x) → int { return 0 }"));
 }
 
 #[test]
@@ -217,4 +216,118 @@ functio par((u8, i32) → f64 g, u8 ∪ nihil forsan) → (u8, i32) → f64 {
 }
 ",
     ));
+}
+
+// N7E-2: the float cells (`trapping<W>` and `saturating<W>` over a float width)
+// type-check. Every assertion names a diagnostic code or issue, never prose.
+
+#[test]
+fn policy_float_untyped_constants_adopt_the_cell() {
+    assert_accepts(&english(
+        r"
+main {
+    var trapping<f32> x ← 1.5
+    print x + 1
+    x ← x + 2.5
+    const saturating<f32> a ← 1.5
+    print a + a * a
+    print -a
+    print a < 2
+}
+",
+    ));
+}
+
+#[test]
+fn policy_float_typed_mixes_are_rejected_with_the_mixing_issue() {
+    for body in [
+        "const trapping<f32> t ← 1.5\n const f32 b ← 2.5\n print t + b",
+        "const f32 b ← 2.5\n const saturating<f32> s ← 1.5\n print b * s",
+        "const saturating<f32> s ← 1.5\n const trapping<f32> t ← 1.5\n print s + t",
+        "const trapping<f32> t ← 1.5\n const trapping<f64> u ← 1.5\n print t - u",
+        "const saturating<f32> s ← 1.5\n const saturating<f64> u ← 1.5\n print s < u",
+    ] {
+        let diagnostics = english(&format!("main {{\n{body}\n}}\n"));
+        assert_issue(&diagnostics, "policy_float_family_mismatch");
+    }
+}
+
+#[test]
+fn policy_float_bare_float_into_a_cell_slot_needs_an_authored_conversion() {
+    for (slot, source) in [
+        ("trapping<f32>", "f32"),
+        ("saturating<f32>", "f32"),
+        ("trapping<f32>", "saturating<f32>"),
+        ("f32", "trapping<f32>"),
+    ] {
+        let diagnostics = english(&format!(
+            "fn pick({source} v) → {slot} {{\n const {slot} out ← v\n return out\n}}\n"
+        ));
+        assert_issue(&diagnostics, "expression_type_mismatch");
+    }
+}
+
+#[test]
+fn policy_float_conversion_into_and_out_of_a_cell_is_typed() {
+    assert_accepts(&english(
+        r"
+main {
+    const f32 b ← 2.5
+    const trapping<f32> t ← b ↦ trapping<f32>
+    const f64 w ← t ↦ f64
+    const saturating<f64> s ← w ↦ saturating<f64>
+    const saturating<f32> s2 ← t ↦ saturating<f32>
+    const int n ← 3
+    const trapping<f32> t2 ← n ↦ trapping<f32>
+    const f64 total ← w + (s ↦ f64) + (s2 ↦ f64) + (t2 ↦ f64)
+    print total
+}
+",
+    ));
+}
+
+#[test]
+fn policy_float_math_method_on_a_cell_names_the_interim_issue() {
+    for method in ["abs", "floor"] {
+        let diagnostics = english(&format!("main {{\n const saturating<f32> s ← 1.5\n print s.{method}()\n}}\n"));
+        assert_issue(&diagnostics, "policy_float_math_not_built");
+    }
+    // A name the bare float does not have stays an unknown method.
+    let unknown = english("main {\n const saturating<f32> s ← 1.5\n print s.nope()\n}\n");
+    assert_issue(&unknown, "unknown_method");
+    assert!(!has_issue(&unknown, "policy_float_math_not_built"));
+}
+
+#[test]
+fn policy_float_written_constants_are_range_checked_at_the_cell_width() {
+    assert_issue(
+        &english("main {\n const trapping<f32> t ← 3.5e38\n print t\n}\n"),
+        "float_constant_out_of_range",
+    );
+    assert_issue(
+        &english("main {\n const saturating<f16> s ← 70000\n print s\n}\n"),
+        "float_constant_out_of_range",
+    );
+    assert_accepts(&english("main {\n const saturating<f64> s ← 3.5e38\n print s\n}\n"));
+}
+
+#[test]
+fn policy_float_ascription_takes_a_written_constant_and_nothing_else() {
+    assert_accepts(&english("main {\n const trapping<f32> t ← 2.5 ∷ trapping<f32>\n print t\n}\n"));
+    assert_issue(
+        &english("main {\n const f32 b ← 2.5\n const trapping<f32> t ← b ∷ trapping<f32>\n print t\n}\n"),
+        "expression_type_mismatch",
+    );
+}
+
+#[test]
+fn policy_float_leaves_decimal_and_wrapping_rejections_in_place() {
+    assert_issue(
+        &english("fn keep(saturating<d64> x) → int { return 0 }"),
+        "unsupported_saturating_word_width",
+    );
+    assert_issue(
+        &english("fn keep(wrapping<f32> x) → int { return 0 }"),
+        "modular_word_unsigned_width_required",
+    );
 }

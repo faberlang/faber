@@ -2999,11 +2999,11 @@ fn width_issue_names_are_read_from_the_enum_mapping() {
     let src = include_str!("../../../radix-types/src/numeric_width.rs");
     let names = width_issue_names(src);
     assert!(
-        names.len() >= 18,
+        names.len() >= 17,
         "expected the full issue name set: {names:?}"
     );
     assert!(names.contains(&"width_marker_params".to_owned()));
-    assert!(names.contains(&"trapping_float_not_implemented".to_owned()));
+    assert!(names.contains(&"unsupported_trapping_word_width".to_owned()));
 }
 
 #[test]

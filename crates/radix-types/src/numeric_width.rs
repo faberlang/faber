@@ -5,7 +5,7 @@
 //! centralized here so resolve, typecheck, conversio, and codegen share one
 //! source of truth.
 
-use crate::{Primitive, Type, TypeId, TypeTable};
+use crate::{FloatPolicy, Primitive, Type, TypeId, TypeTable};
 use serde::{Deserialize, Serialize};
 
 /// Signed integer, unsigned integer, or float width marker.
@@ -75,8 +75,6 @@ pub enum WidthLowerIssue {
     TrappingWordShape,
     /// `exactus` marker is not an integer width or `d64`.
     TrappingWordUnsupported,
-    /// `exactus<float width>`: the trapping float cell is not built yet (D11.8).
-    TrappingFloatNotImplemented,
 }
 
 impl WidthLowerIssue {
@@ -93,7 +91,6 @@ impl WidthLowerIssue {
     pub const TRAPPING_WORD_WIDTH_REQUIRED: &str = "trapping_word_width_required";
     pub const TRAPPING_WORD_WIDTH_SHAPE: &str = "trapping_word_width_shape";
     pub const UNSUPPORTED_TRAPPING_WORD_WIDTH: &str = "unsupported_trapping_word_width";
-    pub const TRAPPING_FLOAT_NOT_IMPLEMENTED: &str = "trapping_float_not_implemented";
 
     /// Diagnostic issue identity for this failure.
     #[must_use]
@@ -111,7 +108,6 @@ impl WidthLowerIssue {
             Self::TrappingWordRequired => Self::TRAPPING_WORD_WIDTH_REQUIRED,
             Self::TrappingWordShape => Self::TRAPPING_WORD_WIDTH_SHAPE,
             Self::TrappingWordUnsupported => Self::UNSUPPORTED_TRAPPING_WORD_WIDTH,
-            Self::TrappingFloatNotImplemented => Self::TRAPPING_FLOAT_NOT_IMPLEMENTED,
         }
     }
 }
@@ -537,10 +533,12 @@ pub fn lower_modular_word(
     }
 }
 
-/// Lower the compiler-owned saturating integer family (D11.1).
+/// Lower the compiler-owned saturating family (D11.1, N7e).
 ///
-/// Admits every integer width i8…i64 / u8…u64; decimal and float markers
-/// reject. Arithmetic on the result clamps at both ends of the width.
+/// Admits every integer width i8…i64 / u8…u64 (arithmetic on the result
+/// clamps at both ends of the width) and the float widths f16, bf16, f32 and
+/// f64 (the policy-float cell, D5: IEEE arithmetic, its own type identity).
+/// Decimal markers reject.
 pub fn lower_saturating_word(
     params: &[radix_syntax::TypeExpr],
     interner: &radix_lexer::Interner,
@@ -567,6 +565,12 @@ pub fn lower_saturating_word(
         }
         // Ruling 32: `saturating<inf>` is bare `inf` (no bound to clamp at).
         Ok(NumericWidth::Inf) => types.sized_numeric(Primitive::Numerus, NumericWidth::Inf),
+        Err(WidthError::FloatOnNumerus) => {
+            policy_float_cell(FloatPolicy::Saturating, marker, types).unwrap_or_else(|| {
+                report(WidthLowerIssue::SaturatingWordUnsupported);
+                types.intern(Type::Error)
+            })
+        }
         _ => {
             report(WidthLowerIssue::SaturatingWordUnsupported);
             types.intern(Type::Error)
@@ -574,13 +578,19 @@ pub fn lower_saturating_word(
     }
 }
 
+/// The policy-float cell of a float marker (`f16`, `bf16`, `f32`, `f64`);
+/// `None` when the marker is not a float width.
+fn policy_float_cell(policy: FloatPolicy, marker: &str, types: &mut TypeTable) -> Option<TypeId> {
+    let width = NumericWidth::from_marker(marker, Primitive::Fractus).ok()?;
+    Some(types.intern(Type::PolicyFloat(policy, width)))
+}
+
 /// Lower the trapping policy word (D11.8): `exactus<W>` (en `trapping<W>`).
 ///
 /// Names the default overflow policy explicitly, so the result is the very
 /// type the bare marker `W` denotes (`trapping<u8>` is `u8`, same `TypeId`).
-/// Admits the integer widths and `d64`. A float width would be the new
-/// trapping-float cell (D11.8 cell (e)), which is not built yet and rejects
-/// with its own issue rather than as an unknown type.
+/// Admits the integer widths and `d64`. A float width is the trapping-float
+/// cell (D11.8 cell (e), N7e): its own type, checked where it is stored.
 pub fn lower_trapping_word(
     params: &[radix_syntax::TypeExpr],
     interner: &radix_lexer::Interner,
@@ -597,10 +607,11 @@ pub fn lower_trapping_word(
     };
     match NumericWidth::from_marker(marker, Primitive::Numerus) {
         Ok(width) => types.sized_numeric(Primitive::Numerus, width),
-        Err(WidthError::FloatOnNumerus) => {
-            report(WidthLowerIssue::TrappingFloatNotImplemented);
-            types.intern(Type::Error)
-        }
+        Err(WidthError::FloatOnNumerus) => policy_float_cell(FloatPolicy::Trapping, marker, types)
+            .unwrap_or_else(|| {
+                report(WidthLowerIssue::TrappingWordUnsupported);
+                types.intern(Type::Error)
+            }),
         Err(_) => {
             report(WidthLowerIssue::TrappingWordUnsupported);
             types.intern(Type::Error)

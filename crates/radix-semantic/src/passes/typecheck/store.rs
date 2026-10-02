@@ -102,6 +102,7 @@ impl IntSlot {
             IntFamily::Plain => width,
             IntFamily::Modular => format!("wrapping<{width}>"),
             IntFamily::Saturating => format!("saturating<{width}>"),
+            IntFamily::Policy(policy) => format!("{}<{width}>", policy.word()),
         }
     }
 }
