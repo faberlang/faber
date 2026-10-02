@@ -1,0 +1,44 @@
++++
+term = "columna"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "schema_decl", "schema_column", "type_annotation", "owned_type", "base_type", "qualified_type", "concrete_type", "intersection_type", "block_stmt", "incipit_stmt", "nota_stmt", "expression", "literal"]
+category = "declaration"
+canonical = true
+summary = "Declares one typed column inside a schema body (experimental)."
+syntax = "columna <type> <name> (: <sourceName>)?"
+aliases = ["column"]
+related = ["schema"]
+locale = "en"
++++
+# =============================================================================
+# columna — Declares one typed column inside a schema body (experimental)
+# =============================================================================
+#
+# What this teaches:
+#   • Column rows — each `columna` takes a type and a public name, one row per line.
+#   • Source alias — `: sourceName` maps the public column to a differently named source column.
+#   • Nullable columns — a column that may be absent is typed `T ∪ none`.
+#
+# Common mistakes:
+#   • Putting two columns on one line — each `columna` row starts on its own line.
+#
+# See also: schema
+# =============================================================================
+
+# columna — typed schema column
+#
+# GRAMMAR:
+#   schemaColumn :← 'columna' typeAnnotation IDENTIFIER (':' IDENTIFIER)?
+#
+# EXPECTED OUTPUT:
+#   columns declared
+
+schema Persona {
+    column string nomen
+    column int aetas : years
+    column string ∪ none electronica : email
+}
+
+main {
+    print "columns declared"
+}

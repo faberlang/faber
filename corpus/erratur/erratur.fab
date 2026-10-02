@@ -1,0 +1,41 @@
++++
+term = "erratur"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "proba_stmt", "proba_modifier", "adfirma_stmt", "incipit_stmt", "nota_stmt", "expression", "literal"]
+category = "testing"
+canonical = true
+summary = "Marks a test as expected to fail."
+syntax = "proba <name> erratur <block>"
+aliases = ["expect failure"]
+related = ["proba", "fragilis", "futurum"]
+locale = "en"
++++
+# =============================================================================
+# erratur — Marks a test as expected to fail
+# =============================================================================
+#
+# What this teaches:
+#   • Expected failure — `erratur` records a test whose failing assertion is a known defect, with no argument.
+#   • Modifier position — it sits between the test name and the body, like `omitte` and `fragilis`.
+#
+# Common mistakes:
+#   • Confusing erratur (expected failure) with omitte (skipped) — an erratur test still runs.
+#
+# See also: proba, fragilis, omitte
+# =============================================================================
+
+# erratur — expected-failure test modifier
+#
+# GRAMMAR:
+#   testModifier :← 'erratur'
+#
+# EXPECTED OUTPUT:
+#   erratur declared
+
+test "known defect" expect_failure {
+    assert 1 + 1 ≡ 3
+}
+
+main {
+    print "erratur declared"
+}
