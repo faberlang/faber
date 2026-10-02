@@ -22,3 +22,5 @@ export * as exact from "./exact.ts";
 export * as dec from "./dec.ts";
 // @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
 export * as inf from "./inf.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as format from "./format.ts";
