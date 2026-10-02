@@ -8,23 +8,23 @@ import (
 	"time"
 )
 
-// TestVerum pins the bivalens surface used by generated Go display calls.
-func TestVerum(t *testing.T) {
-	if got := Verum(true); got != "verum" {
-		t.Fatalf("Verum(true) = %q, want verum", got)
+// TestDisplayVerum pins the bivalens surface used by generated Go display calls.
+func TestDisplayVerum(t *testing.T) {
+	if got := DisplayVerum(true); got != "verum" {
+		t.Fatalf("DisplayVerum(true) = %q, want verum", got)
 	}
-	if got := Verum(false); got != "falsum" {
-		t.Fatalf("Verum(false) = %q, want falsum", got)
+	if got := DisplayVerum(false); got != "falsum" {
+		t.Fatalf("DisplayVerum(false) = %q, want falsum", got)
 	}
 }
 
-// TestListDisplay pins the `[a, b, c]` renderer with an element renderer.
-func TestListDisplay(t *testing.T) {
-	got := ListDisplay([]int{1, 2, 3}, func(v int) string {
-		return Verum(v%2 == 0)
+// TestDisplayList pins the `[a, b, c]` renderer with an element renderer.
+func TestDisplayList(t *testing.T) {
+	got := DisplayList([]int{1, 2, 3}, func(v int) string {
+		return DisplayVerum(v%2 == 0)
 	})
 	if got != "[falsum, verum, falsum]" {
-		t.Fatalf("ListDisplay = %q, want [falsum, verum, falsum]", got)
+		t.Fatalf("DisplayList = %q, want [falsum, verum, falsum]", got)
 	}
 }
 
@@ -45,9 +45,9 @@ func TestMapDisplay(t *testing.T) {
 	}
 }
 
-// TestValorDisplayScalars pins scalar rendering (nil, bivalens, numerus,
+// TestDisplayValorScalars pins scalar rendering (nil, bivalens, numerus,
 // fractus `.0` marker, textus, byte buffer, time.Time).
-func TestValorDisplayScalars(t *testing.T) {
+func TestDisplayValorScalars(t *testing.T) {
 	cases := []struct {
 		name  string
 		value any
@@ -67,23 +67,23 @@ func TestValorDisplayScalars(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := ValorDisplay(tc.value); got != tc.want {
-				t.Fatalf("ValorDisplay(%v) = %q, want %q", tc.value, got, tc.want)
+			if got := DisplayValor(tc.value); got != tc.want {
+				t.Fatalf("DisplayValor(%v) = %q, want %q", tc.value, got, tc.want)
 			}
 		})
 	}
 }
 
-// TestValorDisplayCollections pins map rendering (sorted quoted keys) and the
+// TestDisplayValorCollections pins map rendering (sorted quoted keys) and the
 // per-type slice rendering through a boxed collection.
-func TestValorDisplayCollections(t *testing.T) {
-	got := ValorDisplay(map[string]any{"b": 2, "a": 1})
+func TestDisplayValorCollections(t *testing.T) {
+	got := DisplayValor(map[string]any{"b": 2, "a": 1})
 	if got != `{"a": 1, "b": 2}` {
-		t.Fatalf("ValorDisplay(map) = %q, want {\"a\": 1, \"b\": 2}", got)
+		t.Fatalf("DisplayValor(map) = %q, want {\"a\": 1, \"b\": 2}", got)
 	}
-	slice := ValorDisplay([]any{1, "x", true})
+	slice := DisplayValor([]any{1, "x", true})
 	if slice != `[1, x, verum]` {
-		t.Fatalf("ValorDisplay(slice) = %q, want [1, x, verum]", slice)
+		t.Fatalf("DisplayValor(slice) = %q, want [1, x, verum]", slice)
 	}
 }
 
@@ -97,67 +97,52 @@ func (t faberTensorLike) Planata() []int {
 	return t.data
 }
 
-// TestValorDisplayCarrier pins the tensor/vector carrier flat-data dispatch.
-func TestValorDisplayCarrier(t *testing.T) {
-	got := ValorDisplay(faberTensorLike{data: []int{1, 2}})
+// TestDisplayValorCarrier pins the tensor/vector carrier flat-data dispatch.
+func TestDisplayValorCarrier(t *testing.T) {
+	got := DisplayValor(faberTensorLike{data: []int{1, 2}})
 	if got != "[1, 2]" {
-		t.Fatalf("ValorDisplay(carrier) = %q, want [1, 2]", got)
+		t.Fatalf("DisplayValor(carrier) = %q, want [1, 2]", got)
 	}
 }
 
-// TestValorDisplayStruct pins genus-record rendering with lowercased quoted
+// TestDisplayValorStruct pins genus-record rendering with lowercased quoted
 // field names.
-func TestValorDisplayStruct(t *testing.T) {
+func TestDisplayValorStruct(t *testing.T) {
 	type genus struct {
 		Nomen   string
 		Numerus int
 	}
-	got := ValorDisplay(genus{Nomen: "Marcus", Numerus: 3})
+	got := DisplayValor(genus{Nomen: "Marcus", Numerus: 3})
 	// Field names are lowercased and quoted; field values render through
-	// ValorDisplay (textus unquoted) — the frozen emit surface.
+	// DisplayValor (textus unquoted) — the frozen emit surface.
 	if !strings.Contains(got, `"nomen": Marcus`) || !strings.Contains(got, `"numerus": 3`) {
-		t.Fatalf("ValorDisplay(struct) = %q, want lowercased quoted names", got)
+		t.Fatalf("DisplayValor(struct) = %q, want lowercased quoted names", got)
 	}
 }
 
-// TestValorDisplayBigInt pins the unbounded `inf` carrier: a `*big.Int`
+// TestDisplayValorBigInt pins the unbounded `inf` carrier: a `*big.Int`
 // renders its decimal digits, on its own and inside a boxed collection or
 // record, and an unset (nil) slot reads as zero.
-func TestValorDisplayBigInt(t *testing.T) {
+func TestDisplayValorBigInt(t *testing.T) {
 	huge, _ := new(big.Int).SetString("18446744073709551616", 10)
 	negative, _ := new(big.Int).SetString("-340282366920938463463374607431768211456", 10)
-	if got := ValorDisplay(huge); got != "18446744073709551616" {
-		t.Fatalf("ValorDisplay(*big.Int) = %q, want 18446744073709551616", got)
+	if got := DisplayValor(huge); got != "18446744073709551616" {
+		t.Fatalf("DisplayValor(*big.Int) = %q, want 18446744073709551616", got)
 	}
-	if got := ValorDisplay(negative); got != "-340282366920938463463374607431768211456" {
-		t.Fatalf("ValorDisplay(negative *big.Int) = %q", got)
+	if got := DisplayValor(negative); got != "-340282366920938463463374607431768211456" {
+		t.Fatalf("DisplayValor(negative *big.Int) = %q", got)
 	}
-	if got := ValorDisplay((*big.Int)(nil)); got != "0" {
-		t.Fatalf("ValorDisplay(nil *big.Int) = %q, want 0", got)
+	if got := DisplayValor((*big.Int)(nil)); got != "0" {
+		t.Fatalf("DisplayValor(nil *big.Int) = %q, want 0", got)
 	}
-	if got := ValorDisplay([]any{huge, 1}); got != "[18446744073709551616, 1]" {
-		t.Fatalf("ValorDisplay(boxed list) = %q", got)
+	if got := DisplayValor([]any{huge, 1}); got != "[18446744073709551616, 1]" {
+		t.Fatalf("DisplayValor(boxed list) = %q", got)
 	}
-	if got := ValorDisplay([]*big.Int{huge}); got != "[18446744073709551616]" {
-		t.Fatalf("ValorDisplay([]*big.Int) = %q", got)
+	if got := DisplayValor([]*big.Int{huge}); got != "[18446744073709551616]" {
+		t.Fatalf("DisplayValor([]*big.Int) = %q", got)
 	}
 	type genus struct{ V *big.Int }
-	if got := ValorDisplay(genus{V: huge}); got != `{"v": 18446744073709551616}` {
-		t.Fatalf("ValorDisplay(record) = %q", got)
-	}
-}
-
-// TestDisplayNamesMatchTheLegacySpellings pins the namespaced names against
-// the names they replace while both exist.
-func TestDisplayNamesMatchTheLegacySpellings(t *testing.T) {
-	if DisplayVerum(true) != Verum(true) || DisplayVerum(false) != Verum(false) {
-		t.Fatalf("DisplayVerum disagrees with Verum")
-	}
-	render := strconv.Itoa
-	if DisplayList([]int{1, 2}, render) != "[1, 2]" || ListDisplay([]int{1, 2}, render) != "[1, 2]" {
-		t.Fatalf("DisplayList disagrees with ListDisplay")
-	}
-	if DisplayValor(map[string]any{"a": 1}) != ValorDisplay(map[string]any{"a": 1}) {
-		t.Fatalf("DisplayValor disagrees with ValorDisplay")
+	if got := DisplayValor(genus{V: huge}); got != `{"v": 18446744073709551616}` {
+		t.Fatalf("DisplayValor(record) = %q", got)
 	}
 }

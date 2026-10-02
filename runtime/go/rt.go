@@ -1,9 +1,9 @@
 // Package rt is the Faber Go runtime display surface for generated programs.
 //
-// The display helper family (ValorDisplay, Verum, ListDisplay, and the
-// per-type display renderers) lives here as a native Go module. Generated
-// programs import `faber/rt` and call the exported surface with `rt.`
-// qualification.
+// The display helper family (DisplayValor, DisplayVerum, DisplayList,
+// MapDisplay, and the per-type display renderers) lives here as a native Go
+// module. Generated programs import `faber/rt` and call the exported surface
+// with `rt.` qualification; an exported name is `<Namespace><Name>`.
 //
 // Package identity (inventory §7): `faber/runtime/go/` — Go module
 // `faber/rt`, materialized offline by the Faber build tool (core-support
@@ -38,14 +38,6 @@ func DisplayVerum(b bool) string {
 	return "falsum"
 }
 
-// Verum is the pre-namespace spelling of DisplayVerum.
-func Verum(b bool) string { return DisplayVerum(b) }
-
-// ListDisplay is the pre-namespace spelling of DisplayList.
-func ListDisplay[T any](values []T, render func(T) string) string {
-	return DisplayList(values, render)
-}
-
 // DisplayList renders a Faber list as `[a, b, c]` via the element renderer.
 func DisplayList[T any](values []T, render func(T) string) string {
 	parts := make([]string, 0, len(values))
@@ -66,9 +58,6 @@ func MapDisplay[K comparable, V any](entries map[K]V, renderKey func(K) string, 
 	sort.Strings(parts)
 	return "{" + strings.Join(parts, ", ") + "}"
 }
-
-// ValorDisplay is the pre-namespace spelling of DisplayValor.
-func ValorDisplay(value any) string { return DisplayValor(value) }
 
 // DisplayValor renders a boxed Faber valor/json value with Faber display
 // semantics. See the package doc for the per-type rules.
@@ -174,7 +163,7 @@ func valorByteListDisplay(values []byte) string {
 func valorSliceDisplay(rv reflect.Value) string {
 	parts := make([]string, rv.Len())
 	for i := 0; i < rv.Len(); i++ {
-		parts[i] = ValorDisplay(rv.Index(i).Interface())
+		parts[i] = DisplayValor(rv.Index(i).Interface())
 	}
 	return "[" + strings.Join(parts, ", ") + "]"
 }
@@ -184,15 +173,15 @@ func valorSliceDisplay(rv reflect.Value) string {
 func valorMapDisplay(rv reflect.Value) string {
 	keys := rv.MapKeys()
 	sort.Slice(keys, func(i, j int) bool {
-		return ValorDisplay(keys[i].Interface()) < ValorDisplay(keys[j].Interface())
+		return DisplayValor(keys[i].Interface()) < DisplayValor(keys[j].Interface())
 	})
 	parts := make([]string, 0, len(keys))
 	for _, key := range keys {
-		keyStr := ValorDisplay(key.Interface())
+		keyStr := DisplayValor(key.Interface())
 		if key.Kind() == reflect.String {
 			keyStr = strconv.Quote(key.String())
 		}
-		parts = append(parts, keyStr+": "+ValorDisplay(rv.MapIndex(key).Interface()))
+		parts = append(parts, keyStr+": "+DisplayValor(rv.MapIndex(key).Interface()))
 	}
 	return "{" + strings.Join(parts, ", ") + "}"
 }
@@ -208,7 +197,7 @@ func valorStructDisplay(rv reflect.Value) string {
 		if len(name) > 0 && name[0] >= 'A' && name[0] <= 'Z' {
 			name = string(rune(name[0])+32) + name[1:]
 		}
-		parts = append(parts, strconv.Quote(name)+": "+ValorDisplay(rv.Field(i).Interface()))
+		parts = append(parts, strconv.Quote(name)+": "+DisplayValor(rv.Field(i).Interface()))
 	}
 	return "{" + strings.Join(parts, ", ") + "}"
 }
