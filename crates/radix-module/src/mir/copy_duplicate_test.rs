@@ -217,10 +217,10 @@ main {
     w[[0, 1]] ← 4.0
     const u32 r ← 1
     const u32 c ← 2
-    const f32 lit ← w[[1, 2]] coalesce 0.0
-    const f32 var_idx ← w[[r, c]] coalesce 0.0
-    const f32 written ← w[[0, 1]] coalesce 0.0
-    const f32 source ← a[[1, 2]] coalesce 0.0
+    const f32 lit ← w[[1, 2]]
+    const f32 var_idx ← w[[r, c]]
+    const f32 written ← w[[0, 1]]
+    const f32 source ← a[[1, 2]]
     print lit
     print var_idx
     print written
