@@ -42,7 +42,9 @@ package manifest, then the product default en. --stdin has no package context
 and therefore uses en when it has no frontmatter locale. Format preserves the
 frontmatter metadata and does not translate between reader locales. For source
 conversion use `faber convert --to <LOCALE>`. A local declaration must be inside
-a complete function or `main` unit; format does not accept fragments.
+a complete function or `main` unit; format does not accept fragments. Does not
+write unless `--write` is given: the default reports each file that would change
+and exits 1 when any would.
 ";
 
 const CONVERT_LONG_ABOUT: &str = "\
@@ -240,23 +242,23 @@ pub struct FormatArgs {
     #[arg(value_name = "PATH")]
     pub paths: Vec<PathBuf>,
 
-    /// Check formatting without writing; exit 1 if any file would change
-    #[arg(long)]
+    /// Report files that would change without writing (the default; explicit
+    /// spelling); exit 1 if any file would change
+    #[arg(long, conflicts_with_all = ["write", "stdout"])]
     pub check: bool,
 
-    /// Write formatted output to stdout instead of updating files (exactly one
+    /// Write formatted output to stdout instead of reporting (exactly one
     /// input file)
-    #[arg(long, conflicts_with = "check")]
+    #[arg(long, conflicts_with_all = ["check", "write"])]
     pub stdout: bool,
 
-    /// Write formatted source back to its file (the in-place default; explicit
-    /// spelling for scripts and editors)
-    #[arg(long, conflicts_with = "stdout")]
+    /// Write formatted source back to the file (default is report-only)
+    #[arg(long, conflicts_with_all = ["check", "stdout"])]
     pub write: bool,
 
     /// Read exactly one source document from stdin and print the formatted
-    /// result to stdout (implies --stdout; incompatible with path arguments)
-    #[arg(long, conflicts_with_all = ["check", "paths"])]
+    /// result to stdout (incompatible with path arguments and the other modes)
+    #[arg(long, conflicts_with_all = ["check", "write", "stdout", "paths"])]
     pub stdin: bool,
 }
 
