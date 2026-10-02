@@ -6724,7 +6724,7 @@ fn run() args args {
     assert!(
         output
             .code
-            .contains("println!(\"{}\", faber::display_bivalens(args.verbose));")
+            .contains("println!(\"{}\", faber::display::bivalens(args.verbose));")
     );
 }
 
@@ -8070,7 +8070,7 @@ fn thai_reader_locale_example_compiles_from_manifest() {
     assert!(rust.contains("while current > 0"));
     assert!(rust.contains("let score: i64 = 82;"));
     assert!(rust.contains("let scores: Vec<i64> = vec!["));
-    assert!(rust.contains("faber::display_bivalens(ผ่าน(score))"));
+    assert!(rust.contains("faber::display::bivalens(ผ่าน(score))"));
     assert!(rust.contains("นับผ่าน(scores.clone())"));
     assert!(rust.contains("นับถอยหลัง(3)"));
 }
@@ -14675,7 +14675,7 @@ fn web4_lib_kind_package_emits_a_library_crate() {
     // Exact-integer helpers live in the `faber` crate: the module calls them
     // and carries no copy.
     assert!(
-        lib_rs.contains("faber::exact::int(") && !lib_rs.contains("fn __faber_int"),
+        lib_rs.contains("faber::exact::add(") && !lib_rs.contains("fn __faber_int"),
         "module calls faber::exact"
     );
 }

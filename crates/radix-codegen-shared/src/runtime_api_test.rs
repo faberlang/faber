@@ -296,7 +296,7 @@ fn the_exact_rows_spell_as_faber_exact_functions_in_rust() {
         .iter()
         .filter(|row| row.ns == Namespace::Exact && row.targets.contains(&Target::HirRust))
         .collect();
-    assert_eq!(rows.len(), 13);
+    assert_eq!(rows.len(), 17);
     for row in rows {
         assert_eq!(
             spell_any(Target::HirRust, row),
@@ -326,16 +326,33 @@ fn the_regex_rows_spell_as_faber_regex_functions_in_rust() {
 }
 
 #[test]
-fn the_store_family_is_the_exact_rows_that_apply_a_width_limit() {
-    let mut store_rows: Vec<&str> = TABLE
+fn the_store_family_is_the_exact_and_inf_rows_that_apply_a_width_limit() {
+    let mut store_rows: Vec<(String, &str)> = TABLE
         .iter()
         .filter(|row| row.kind == RuntimeKind::StoreFn)
-        .map(|row| row.name)
+        .map(|row| (format!("{:?}", row.ns), row.name))
         .collect();
     store_rows.sort_unstable();
     assert_eq!(
         store_rows,
-        ["clamp_i", "clamp_u", "store", "store_i", "store_u", "wrap"]
+        [
+            ("Exact".to_owned(), "clamp_i"),
+            ("Exact".to_owned(), "clamp_u"),
+            ("Exact".to_owned(), "store"),
+            ("Exact".to_owned(), "store_i"),
+            ("Exact".to_owned(), "store_inferred"),
+            ("Exact".to_owned(), "store_u"),
+            ("Exact".to_owned(), "wrap"),
+            ("Inf".to_owned(), "store")
+        ]
+    );
+    assert_eq!(
+        spell_store(Target::HirRust, &INF_STORE, &site()),
+        Ok("faber::inf::store".to_owned())
+    );
+    assert_eq!(
+        spell(Target::HirRust, &INF_STORE),
+        Err(SpellError::StoreOnly)
     );
     assert_eq!(
         spell(Target::HirRust, &EXACT_STORE),
@@ -344,6 +361,14 @@ fn the_store_family_is_the_exact_rows_that_apply_a_width_limit() {
     assert_eq!(
         spell_store(Target::HirRust, &EXACT_STORE, &site()),
         Ok("faber::exact::store".to_owned())
+    );
+    assert_eq!(
+        spell_store(Target::HirRust, &EXACT_STORE_INFERRED, &site()),
+        Ok("faber::exact::store_inferred".to_owned())
+    );
+    assert_eq!(
+        spell(Target::HirRust, &EXACT_MUL),
+        Ok("faber::exact::mul".to_owned())
     );
     assert_eq!(
         spell_store(Target::HirRust, &EXACT_FIT, &site()),
@@ -418,4 +443,72 @@ fn the_dec_rows_spell_as_faber_dec_functions_in_rust() {
             format!("faber::dec::{}", row.name)
         );
     }
+}
+
+#[test]
+fn the_inf_rows_spell_as_faber_inf_functions_in_rust() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Inf)
+        .collect();
+    assert_eq!(rows.len(), 15);
+    for row in rows {
+        // `store` is the one store-family row (spelled at a store site).
+        let kind = if row.name == "store" {
+            RuntimeKind::StoreFn
+        } else {
+            RuntimeKind::Fn
+        };
+        assert_eq!(row.kind, kind);
+        assert_eq!(row.targets, [Target::HirRust]);
+        assert_eq!(
+            spell_any(Target::HirRust, row),
+            format!("faber::inf::{}", row.name)
+        );
+    }
+}
+
+#[test]
+fn the_format_rows_spell_as_faber_format_functions_and_the_crate_root_fmt_type() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Format)
+        .collect();
+    assert_eq!(rows.len(), 9);
+    for row in rows {
+        assert_eq!(row.targets, [Target::HirRust]);
+        let (kind, spelled) = if row.name == "Fmt" {
+            (RuntimeKind::Type, "faber::Fmt".to_owned())
+        } else {
+            (RuntimeKind::Fn, format!("faber::format::{}", row.name))
+        };
+        assert_eq!(row.kind, kind);
+        assert_eq!(spell_any(Target::HirRust, row), spelled);
+    }
+}
+
+#[test]
+fn the_rust_display_rows_spell_as_faber_display_functions() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Display && row.targets.contains(&Target::HirRust))
+        .collect();
+    let spelled: Vec<String> = rows
+        .iter()
+        .map(|row| spell_any(Target::HirRust, row))
+        .collect();
+    assert_eq!(
+        spelled,
+        [
+            "faber::display::bivalens",
+            "faber::display::fractus",
+            "faber::display::option",
+            "faber::display::option_bivalens",
+            "faber::display::option_fractus",
+            "faber::display::option_vacuum",
+            "faber::display::text_payload",
+            "faber::display::valor",
+        ]
+    );
+    assert!(rows.iter().all(|row| row.kind == RuntimeKind::Fn));
 }

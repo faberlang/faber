@@ -59,8 +59,31 @@ pub const DISPLAY_VALOR: RuntimeItem = RuntimeItem {
     ns: Namespace::Display,
     name: "valor",
     kind: RuntimeKind::Fn,
-    targets: &[Target::HirGo],
+    targets: &[Target::HirGo, Target::HirRust],
 };
+
+/// The targets whose runtime package carries the Rust-only `display` rows.
+const DISPLAY_RUST_TARGETS: &[Target] = &[Target::HirRust];
+
+const fn display_rust_row(name: &'static str) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Display,
+        name,
+        kind: RuntimeKind::Fn,
+        targets: DISPLAY_RUST_TARGETS,
+    }
+}
+
+/// `display` rows of the Rust runtime (T1-R5, `faber::display`): scalar and
+/// option renderers a `nota`/interpolation site calls with Faber display
+/// semantics (`verum`/`falsum`, `nihil`, a `.0` marker on a whole float).
+pub const DISPLAY_BIVALENS: RuntimeItem = display_rust_row("bivalens");
+pub const DISPLAY_FRACTUS: RuntimeItem = display_rust_row("fractus");
+pub const DISPLAY_OPTION: RuntimeItem = display_rust_row("option");
+pub const DISPLAY_OPTION_BIVALENS: RuntimeItem = display_rust_row("option_bivalens");
+pub const DISPLAY_OPTION_FRACTUS: RuntimeItem = display_rust_row("option_fractus");
+pub const DISPLAY_OPTION_VACUUM: RuntimeItem = display_rust_row("option_vacuum");
+pub const DISPLAY_TEXT_PAYLOAD: RuntimeItem = display_rust_row("text_payload");
 
 /// The targets whose runtime package carries an `exact` row: the Rust runtime
 /// carries the rows below, the Go runtime (`rt.Exact*`) carries its own rows
@@ -87,8 +110,12 @@ const fn exact_row_for(
 }
 
 /// `exact` rows (T1-R1): the 64-bit-window integer carrier of the Rust runtime
-/// (`faber::exact`). `EXACT_STORE` is the only store-family row: the width limit
-/// applies at a store site and nowhere else.
+/// (`faber::exact`). `EXACT_STORE` and `EXACT_STORE_INFERRED` are the only
+/// store-family rows: the width limit applies at a store site and nowhere else.
+/// `EXACT_ADD`, `EXACT_SUB` and `EXACT_MUL` (T1-R6) check the representation
+/// window only, so they are plain rows (an unstored computation has no store
+/// site to witness).
+pub const EXACT_ADD: RuntimeItem = exact_row_for("add", RuntimeKind::Fn, EXACT_RUST_GO);
 pub const EXACT_APPROX_INT: RuntimeItem = exact_row("approx_int", RuntimeKind::Fn);
 pub const EXACT_APPROX_F32: RuntimeItem = exact_row("approx_f32", RuntimeKind::Fn);
 pub const EXACT_APPROX_F64: RuntimeItem = exact_row("approx_f64", RuntimeKind::Fn);
@@ -97,11 +124,14 @@ pub const EXACT_CMP_SCALED_FLOAT: RuntimeItem = exact_row("cmp_scaled_float", Ru
 pub const EXACT_DIV: RuntimeItem = exact_row_for("div", RuntimeKind::Fn, EXACT_RUST_GO);
 pub const EXACT_FIT: RuntimeItem = exact_row("fit", RuntimeKind::Fn);
 pub const EXACT_INT: RuntimeItem = exact_row("int", RuntimeKind::Fn);
+pub const EXACT_MUL: RuntimeItem = exact_row_for("mul", RuntimeKind::Fn, EXACT_RUST_GO);
 pub const EXACT_POW: RuntimeItem = exact_row_for("pow", RuntimeKind::Fn, EXACT_RUST_GO);
 pub const EXACT_REM: RuntimeItem = exact_row("rem", RuntimeKind::Fn);
 pub const EXACT_SHL: RuntimeItem = exact_row_for("shl", RuntimeKind::Fn, EXACT_RUST_GO);
 pub const EXACT_SHR: RuntimeItem = exact_row_for("shr", RuntimeKind::Fn, EXACT_RUST_GO);
 pub const EXACT_STORE: RuntimeItem = exact_row("store", RuntimeKind::StoreFn);
+pub const EXACT_STORE_INFERRED: RuntimeItem = exact_row("store_inferred", RuntimeKind::StoreFn);
+pub const EXACT_SUB: RuntimeItem = exact_row_for("sub", RuntimeKind::Fn, EXACT_RUST_GO);
 
 /// The targets whose runtime package carries the `dec` namespace today.
 const DEC_TARGETS: &[Target] = &[Target::HirRust];
@@ -153,9 +183,6 @@ pub const EXACT_I: RuntimeItem = exact_row_for("i", RuntimeKind::Fn, EXACT_GO);
 pub const EXACT_U: RuntimeItem = exact_row_for("u", RuntimeKind::Fn, EXACT_GO);
 pub const EXACT_NEG: RuntimeItem = exact_row_for("neg", RuntimeKind::Fn, EXACT_GO);
 pub const EXACT_ADD_S: RuntimeItem = exact_row_for("add_s", RuntimeKind::Fn, EXACT_GO);
-pub const EXACT_ADD: RuntimeItem = exact_row_for("add", RuntimeKind::Fn, EXACT_GO);
-pub const EXACT_SUB: RuntimeItem = exact_row_for("sub", RuntimeKind::Fn, EXACT_GO);
-pub const EXACT_MUL: RuntimeItem = exact_row_for("mul", RuntimeKind::Fn, EXACT_GO);
 pub const EXACT_MOD: RuntimeItem = exact_row_for("mod", RuntimeKind::Fn, EXACT_GO);
 pub const EXACT_W: RuntimeItem = exact_row_for("w", RuntimeKind::Fn, EXACT_GO);
 pub const EXACT_FROM_W: RuntimeItem = exact_row_for("from_w", RuntimeKind::Fn, EXACT_GO);
@@ -182,6 +209,64 @@ pub const EXACT_STORE_U: RuntimeItem = exact_row_for("store_u", RuntimeKind::Sto
 pub const EXACT_WRAP: RuntimeItem = exact_row_for("wrap", RuntimeKind::StoreFn, EXACT_GO);
 pub const EXACT_CLAMP_I: RuntimeItem = exact_row_for("clamp_i", RuntimeKind::StoreFn, EXACT_GO);
 pub const EXACT_CLAMP_U: RuntimeItem = exact_row_for("clamp_u", RuntimeKind::StoreFn, EXACT_GO);
+
+/// The targets whose runtime package carries the `inf` namespace today.
+const INF_TARGETS: &[Target] = &[Target::HirRust];
+
+const fn inf_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Inf,
+        name,
+        kind,
+        targets: INF_TARGETS,
+    }
+}
+
+/// `inf` rows (T1-R3): the wrappers over `faber::Magnus` of the Rust runtime
+/// (`faber::inf`), the traps and conversions its operators do not spell
+/// themselves. `INF_STORE` is the store-family row: the width limit of an `inf`
+/// landing in a bounded slot applies at a store site and nowhere else.
+pub const INF_BIG: RuntimeItem = inf_row("big", RuntimeKind::Fn);
+pub const INF_APPROX: RuntimeItem = inf_row("approx", RuntimeKind::Fn);
+pub const INF_CMP_DEC: RuntimeItem = inf_row("cmp_dec", RuntimeKind::Fn);
+pub const INF_CMP_FLOAT: RuntimeItem = inf_row("cmp_float", RuntimeKind::Fn);
+pub const INF_DIV: RuntimeItem = inf_row("div", RuntimeKind::Fn);
+pub const INF_F32: RuntimeItem = inf_row("f32", RuntimeKind::Fn);
+pub const INF_NARROW: RuntimeItem = inf_row("narrow", RuntimeKind::Fn);
+pub const INF_PACK: RuntimeItem = inf_row("pack", RuntimeKind::Fn);
+pub const INF_POW: RuntimeItem = inf_row("pow", RuntimeKind::Fn);
+pub const INF_REM: RuntimeItem = inf_row("rem", RuntimeKind::Fn);
+pub const INF_SHL: RuntimeItem = inf_row("shl", RuntimeKind::Fn);
+pub const INF_SHR: RuntimeItem = inf_row("shr", RuntimeKind::Fn);
+pub const INF_STORE: RuntimeItem = inf_row("store", RuntimeKind::StoreFn);
+pub const INF_TO_DEC: RuntimeItem = inf_row("to_dec", RuntimeKind::Fn);
+pub const INF_TRUE_DIV: RuntimeItem = inf_row("true_div", RuntimeKind::Fn);
+
+/// The targets whose runtime package carries the `format` namespace today.
+const FORMAT_TARGETS: &[Target] = &[Target::HirRust];
+
+const fn format_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Format,
+        name,
+        kind,
+        targets: FORMAT_TARGETS,
+    }
+}
+
+/// `format` rows (T1-R4): the `¶` format-operator renderers of the Rust runtime
+/// (`faber::format`). `FORMAT_FMT` is the decomposed spec a call site builds as
+/// a struct literal; it is a crate-root type (`faber::Fmt`), the others are
+/// free functions. `MAGNUS` and `MAGNUS_SCI` render an unbounded `inf`.
+pub const FORMAT_FMT: RuntimeItem = format_row("Fmt", RuntimeKind::Type);
+pub const FORMAT_FLOAT: RuntimeItem = format_row("float", RuntimeKind::Fn);
+pub const FORMAT_INSTANS: RuntimeItem = format_row("instans", RuntimeKind::Fn);
+pub const FORMAT_INT: RuntimeItem = format_row("int", RuntimeKind::Fn);
+pub const FORMAT_MAGNUS: RuntimeItem = format_row("magnus", RuntimeKind::Fn);
+pub const FORMAT_MAGNUS_SCI: RuntimeItem = format_row("magnus_sci", RuntimeKind::Fn);
+pub const FORMAT_PAD: RuntimeItem = format_row("pad", RuntimeKind::Fn);
+pub const FORMAT_SCI: RuntimeItem = format_row("sci", RuntimeKind::Fn);
+pub const FORMAT_TEXT: RuntimeItem = format_row("text", RuntimeKind::Fn);
 
 /// The targets whose runtime package carries each `regex` row. Rows differ by
 /// target: the Rust runtime carries the match operations as free functions in
@@ -291,9 +376,17 @@ pub const TABLE: &[RuntimeItem] = &[
     DEC_SUB,
     DEC_TRY_PARSE,
     DEC_TRY_STORE,
+    DISPLAY_BIVALENS,
+    DISPLAY_FRACTUS,
     DISPLAY_LIST,
+    DISPLAY_OPTION,
+    DISPLAY_OPTION_BIVALENS,
+    DISPLAY_OPTION_FRACTUS,
+    DISPLAY_OPTION_VACUUM,
+    DISPLAY_TEXT_PAYLOAD,
     DISPLAY_VALOR,
     DISPLAY_VERUM,
+    EXACT_ADD,
     EXACT_APPROX_INT,
     EXACT_APPROX_F32,
     EXACT_APPROX_F64,
@@ -302,6 +395,7 @@ pub const TABLE: &[RuntimeItem] = &[
     EXACT_DIV,
     EXACT_FIT,
     EXACT_INT,
+    EXACT_MUL,
     EXACT_POW,
     EXACT_REM,
     EXACT_SHL,
@@ -313,9 +407,6 @@ pub const TABLE: &[RuntimeItem] = &[
     EXACT_U,
     EXACT_NEG,
     EXACT_ADD_S,
-    EXACT_ADD,
-    EXACT_SUB,
-    EXACT_MUL,
     EXACT_MOD,
     EXACT_W,
     EXACT_FROM_W,
@@ -342,6 +433,32 @@ pub const TABLE: &[RuntimeItem] = &[
     EXACT_WRAP,
     EXACT_CLAMP_I,
     EXACT_CLAMP_U,
+    EXACT_STORE_INFERRED,
+    EXACT_SUB,
+    FORMAT_FMT,
+    FORMAT_FLOAT,
+    FORMAT_INSTANS,
+    FORMAT_INT,
+    FORMAT_MAGNUS,
+    FORMAT_MAGNUS_SCI,
+    FORMAT_PAD,
+    FORMAT_SCI,
+    FORMAT_TEXT,
+    INF_BIG,
+    INF_APPROX,
+    INF_CMP_DEC,
+    INF_CMP_FLOAT,
+    INF_DIV,
+    INF_F32,
+    INF_NARROW,
+    INF_PACK,
+    INF_POW,
+    INF_REM,
+    INF_SHL,
+    INF_SHR,
+    INF_STORE,
+    INF_TO_DEC,
+    INF_TRUE_DIV,
     REGEX_MATCHES,
     REGEX_FIND,
     REGEX_FIND_ALL,
