@@ -35,6 +35,7 @@ radix-target = { path = "../radix-target" }
 radix-intrinsics = { path = "../radix-intrinsics" }
 radix-semantic = { path = "../radix-semantic" }
 # Consumerless leaves, gated out of default builds (U7, removal-delivery-spec).
+# Novelty Fortran leaf: default-off, NOT in full-targets.
 radix-hir-faber = { path = "../radix-hir-faber", optional = true }
 radix-mir = { path = "../radix-mir", optional = true }
 radix-host-abi = { path = "../radix-host-abi" }

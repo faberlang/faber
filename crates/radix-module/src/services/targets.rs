@@ -22,7 +22,7 @@
 /// this test until it joins this list or is named hidden — the list can no
 /// longer silently drop a backend. The order is the report's presentation
 /// order and is preserved verbatim for the printed row output.
-const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 17] = [
+const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 18] = [
     crate::codegen::Target::HirRust,
     crate::codegen::Target::MirFmir,
     crate::codegen::Target::MirFmirBinary,
@@ -33,6 +33,7 @@ const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 17] = [
     crate::codegen::Target::HirSwift,
     crate::codegen::Target::HirPython,
     crate::codegen::Target::HirHaskell,
+    crate::codegen::Target::HirFortran,
     crate::codegen::Target::MirWasm,
     crate::codegen::Target::MirLlvm,
     crate::codegen::Target::MirLlvmHost,
@@ -83,6 +84,7 @@ pub fn target_extension(target: crate::codegen::Target) -> &'static str {
         crate::codegen::Target::HirSwift => "swift",
         crate::codegen::Target::HirPython => "py",
         crate::codegen::Target::HirHaskell => "hs",
+        crate::codegen::Target::HirFortran => "f90",
         crate::codegen::Target::MirWasm => "wat",
         crate::codegen::Target::MirLlvm => "ll",
         crate::codegen::Target::MirLlvmHost => "run",
@@ -121,6 +123,7 @@ pub fn target_name(target: crate::codegen::Target) -> &'static str {
         crate::codegen::Target::HirSwift => "swift",
         crate::codegen::Target::HirPython => "python",
         crate::codegen::Target::HirHaskell => "haskell",
+        crate::codegen::Target::HirFortran => "fortran",
         crate::codegen::Target::MirWasm => "wasm-text",
         crate::codegen::Target::MirLlvm => "llvm-text",
         crate::codegen::Target::MirLlvmHost => "llvm-host",
@@ -217,6 +220,13 @@ fn radix_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             run: false,
             package: false,
             note: "file emission supported; package compilation not yet supported",
+        },
+        crate::codegen::Target::HirFortran => TargetCapabilities {
+            check: true,
+            build: true,
+            run: false,
+            package: false,
+            note: "novelty HIR-backed Fortran 2008 program (scalar subset plus rank-1 fixed-shape tensors; fail-closed); default-off `hir-fortran` feature",
         },
         crate::codegen::Target::HirTypeScript => TargetCapabilities {
             check: true,

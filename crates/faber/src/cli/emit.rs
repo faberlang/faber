@@ -76,6 +76,10 @@ pub enum FaberCliTarget {
     #[value(name = "haskell")]
     HirHaskell,
 
+    /// Novelty Fortran 2008 program (default-off `hir-fortran` feature).
+    #[value(name = "fortran", alias = "f90")]
+    HirFortran,
+
     /// Experimental MIR-backed WebAssembly text target. Emits `.wat` text
     /// only; `wasm` is an alias kept for compatibility (binary conversion is
     /// an external-tool step).
@@ -142,6 +146,7 @@ impl FaberCliTarget {
             FaberCliTarget::HirGo => radix::module::codegen::Target::HirGo,
             FaberCliTarget::HirPython => radix::module::codegen::Target::HirPython,
             FaberCliTarget::HirHaskell => radix::module::codegen::Target::HirHaskell,
+            FaberCliTarget::HirFortran => radix::module::codegen::Target::HirFortran,
             FaberCliTarget::MirWasm => radix::module::codegen::Target::MirWasm,
             FaberCliTarget::MirLlvm => radix::module::codegen::Target::MirLlvm,
             FaberCliTarget::MirMetal => radix::module::codegen::Target::MirMetal,

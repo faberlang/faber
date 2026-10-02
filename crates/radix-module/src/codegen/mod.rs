@@ -28,6 +28,8 @@ pub mod conversio_coverage;
 pub mod faber;
 #[cfg(feature = "hir-go")]
 pub mod go;
+#[cfg(feature = "hir-fortran")]
+pub mod fortran;
 #[cfg(feature = "hir-haskell")]
 pub mod haskell;
 pub(crate) mod hygiene;
@@ -411,6 +413,7 @@ pub fn generate_from_analyzed_with_options(
         Target::HirSwift => generate_swift_from_analyzed(analysis, output_mode, module_name),
         Target::HirPython => generate_python_from_analyzed(analysis),
         Target::HirHaskell => generate_haskell_from_analyzed(analysis),
+        Target::HirFortran => generate_fortran_from_analyzed(analysis),
         #[cfg(feature = "hir-faber")]
         Target::HirFaber => {
             let imported_spellings = analysis.resolver.imported_spellings(&analysis.interner);
@@ -562,6 +565,18 @@ fn generate_haskell_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> R
 #[cfg(not(feature = "hir-haskell"))]
 fn generate_haskell_from_analyzed(_analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
     Err(unavailable_target_error(Target::HirHaskell))
+}
+
+#[cfg(feature = "hir-fortran")]
+fn generate_fortran_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
+    let r#gen = fortran::FortranCodegen::new(&analysis.hir, &analysis.interner);
+    let output = r#gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
+    Ok(crate::Output::Fortran(crate::FortranOutput { code: output.code }))
+}
+
+#[cfg(not(feature = "hir-fortran"))]
+fn generate_fortran_from_analyzed(_analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
+    Err(unavailable_target_error(Target::HirFortran))
 }
 
 /// Emit each distinct file-namespace provider binding as a module, mapping
