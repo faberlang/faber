@@ -29,16 +29,25 @@ import (
 	"time"
 )
 
-// Verum renders a Go bool as the Faber bivalens surface (`verum`/`falsum`).
-func Verum(b bool) string {
+// DisplayVerum renders a Go bool as the Faber bivalens surface
+// (`verum`/`falsum`).
+func DisplayVerum(b bool) string {
 	if b {
 		return "verum"
 	}
 	return "falsum"
 }
 
-// ListDisplay renders a Faber list as `[a, b, c]` via the element renderer.
+// Verum is the pre-namespace spelling of DisplayVerum.
+func Verum(b bool) string { return DisplayVerum(b) }
+
+// ListDisplay is the pre-namespace spelling of DisplayList.
 func ListDisplay[T any](values []T, render func(T) string) string {
+	return DisplayList(values, render)
+}
+
+// DisplayList renders a Faber list as `[a, b, c]` via the element renderer.
+func DisplayList[T any](values []T, render func(T) string) string {
 	parts := make([]string, 0, len(values))
 	for _, item := range values {
 		parts = append(parts, render(item))
@@ -58,9 +67,12 @@ func MapDisplay[K comparable, V any](entries map[K]V, renderKey func(K) string, 
 	return "{" + strings.Join(parts, ", ") + "}"
 }
 
-// ValorDisplay renders a boxed Faber valor/json value with Faber display
+// ValorDisplay is the pre-namespace spelling of DisplayValor.
+func ValorDisplay(value any) string { return DisplayValor(value) }
+
+// DisplayValor renders a boxed Faber valor/json value with Faber display
 // semantics. See the package doc for the per-type rules.
-func ValorDisplay(value any) string {
+func DisplayValor(value any) string {
 	if value == nil {
 		return "nihil"
 	}

@@ -146,3 +146,18 @@ func TestValorDisplayBigInt(t *testing.T) {
 		t.Fatalf("ValorDisplay(record) = %q", got)
 	}
 }
+
+// TestDisplayNamesMatchTheLegacySpellings pins the namespaced names against
+// the names they replace while both exist.
+func TestDisplayNamesMatchTheLegacySpellings(t *testing.T) {
+	if DisplayVerum(true) != Verum(true) || DisplayVerum(false) != Verum(false) {
+		t.Fatalf("DisplayVerum disagrees with Verum")
+	}
+	render := strconv.Itoa
+	if DisplayList([]int{1, 2}, render) != "[1, 2]" || ListDisplay([]int{1, 2}, render) != "[1, 2]" {
+		t.Fatalf("DisplayList disagrees with ListDisplay")
+	}
+	if DisplayValor(map[string]any{"a": 1}) != ValorDisplay(map[string]any{"a": 1}) {
+		t.Fatalf("DisplayValor disagrees with ValorDisplay")
+	}
+}
