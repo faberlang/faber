@@ -1657,9 +1657,15 @@ time.
 `saturating<u8>` with `x = 250` and `x + 200 - 100` stores 255, not the 155 that
 clamping each step would give; per-step clamping is written as separate stores
 into `saturating` slots. This departs from Rust `Saturating<T>` deliberately.
-For `môđun`, reducing once at the store equals reducing each step for
-`+ - * ⇐ ∧ ∨ ⊻ ¬`; before `⇒`, `/`, `%` and comparisons the operand is reduced
-first, so ported hash and crypto code keeps its results. Within one policy
+`môđun` reduces only at the store too (operator ruling 2026-10-02: math
+happens in the ether): `(a + b) / 2` with `wrapping<u8>` 200 and 100 is
+`300 / 2 = 150`, `a + b ≡ 44` is falsum and `print a + b` prints `300`. For
+`+ - * ⇐ ∧ ∨ ⊻ ¬` that feed a store directly, reducing once at the end equals
+reducing each step, so a backend may keep per-operation modular arithmetic
+there, where no one can observe the difference; the operand of `⇒`, `/`, `%`
+and a comparison is read, so it is exact. Ported hash and crypto code keeps its
+results by storing into a `wrapping<W>` slot before dividing, shifting right or
+comparing. Within one policy
 family a store into a narrower width applies the slot's policy
 (`wrapping<u32>` into `wrapping<u8>` reduces); crossing policy families needs
 `↦`. A constant stored with `←` follows the slot's policy
@@ -1697,8 +1703,10 @@ expression is the smallest integer type that holds every possible result,
 computed by interval arithmetic from the operands' declared types and never
 from the destination. With `u8` operands `a + b` and `a * b` are `u16`, `a - b`,
 `-a` and `¬a` are `i16`, and `a / b`, `a % b`, `a ⇒ n`, `a ∧ b` and `a ∨ b` are
-`u8`. Only trapping types grow; `môđun<W>` stays in its ring and
-`saturatus<W>` keeps `W`. Growth stops at the 64-bit containers: past them the
+`u8`. Only trapping types grow. A `môđun<W>` or `saturatus<W>`
+operand takes part by its declared width and gives the same range-rule type: the
+word reduces or clamps only where a value is stored into a slot, never
+mid-expression. Growth stops at the 64-bit containers: past them the
 type keeps the sign of the range (`i64` if it can be negative, else `u64`), so
 `u64 - u64` is `i64` (operator ruling 2026-09-30: it does not become `inf`;
 write `a ↦ inf - b` for the exact difference). `_` slots take the expression's
@@ -1762,7 +1770,7 @@ twin. The same result type applies per element on tensors.
 exact value on infinite two's-complement integers, so `¬x` is `-x - 1` (`¬250`
 is −251, which traps when stored into an unsigned slot; `flags ∧ ¬mask` still
 works). Fixed-width complement is what `wrapping<W>` is for (`¬x` on
-`wrapping<u8>` 250 is 5). `x ⇐ n` is `x * 2ⁿ` and `x ⇒ n` is `⌊x / 2ⁿ⌋`. The
+`wrapping<u8>` 250, stored into a `wrapping<u8>` slot, is 5). `x ⇐ n` is `x * 2ⁿ` and `x ⇒ n` is `⌊x / 2ⁿ⌋`. The
 count is not masked to a receiver width: `x ⇒ n` past the value's size is 0 (or
 −1 for a negative `x`) and never traps, `x ⇐ n` traps only past the 64-bit
 range (never on an `inf` operand), on `wrapping<W>` it wraps at the store, and a
