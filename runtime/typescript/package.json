@@ -1,7 +1,7 @@
 {
   "name": "@faber/runtime",
   "version": "0.1.0",
-  "description": "Faber language runtime package for generated TypeScript: the display namespace (display.value and its renderers), the exact namespace (exact-integer arithmetic and stores), the dec namespace (exact decimal arithmetic and the d64 store), and the regex namespace (@faber/runtime/regex).",
+  "description": "Faber language runtime package for generated TypeScript: the display namespace (display.value and its renderers), the exact namespace (exact-integer arithmetic and stores), the dec namespace (exact decimal arithmetic and the d64 store), the inf namespace (unbounded-integer arithmetic, comparisons, stores and conversions), and the regex namespace (@faber/runtime/regex).",
   "license": "MIT",
   "type": "module",
   "main": "index.ts",
@@ -21,12 +21,13 @@
     "dec.ts",
     "display.ts",
     "exact.ts",
+    "inf.ts",
     "regex.ts",
     "tsconfig.json",
     "package.json"
   ],
   "private": true,
   "scripts": {
-    "test": "node --test dec.test.ts display.test.ts exact.test.ts regex.test.ts"
+    "test": "node --test dec.test.ts display.test.ts exact.test.ts inf.test.ts regex.test.ts"
   }
 }
