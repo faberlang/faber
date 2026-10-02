@@ -180,6 +180,12 @@ type SermoConversation struct {
 	closed           bool
 }
 
+// Route is the route this conversation was opened for; a generated handler
+// adapter reports it when the opener has the wrong type.
+func (conv *SermoConversation) Route() string {
+	return conv.route
+}
+
 // liveConversations counts router slots held by unreleased conversations
 // (D8.3).
 var liveConversations int64

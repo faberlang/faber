@@ -87,3 +87,10 @@ func TestConversationReleaseIsASinglePoint(t *testing.T) {
 		t.Fatalf("release did not drop the task handle")
 	}
 }
+
+// TestConversationRoute pins the route accessor a generated adapter uses.
+func TestConversationRoute(t *testing.T) {
+	if got := newConversation("c", "salve:dic").Route(); got != "salve:dic" {
+		t.Fatalf("route = %q", got)
+	}
+}
