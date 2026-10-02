@@ -880,6 +880,16 @@ impl TypeChecker<'_> {
         if self.types.is_assignable(right, left) {
             return left;
         }
+        // Two tensors whose shapes are equal but interned apart (each branch
+        // of `c ✓ a.transpose() ✗ a.transpose()` carries its own derived
+        // shape index) are not assignable by id; they join by the same
+        // structural shape unification an annotated destination applies.
+        if matches!(
+            (self.types.get(left), self.types.get(right)),
+            (Type::Tensor(..), Type::Tensor(..))
+        ) {
+            return self.unify_join(a, b, span, COMMON_TYPE_MISMATCH);
+        }
         if !self.current_device_function
             && let Some(joined) = self.integer_hull_type(left, right, span)
         {

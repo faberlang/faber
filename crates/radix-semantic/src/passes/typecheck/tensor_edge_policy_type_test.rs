@@ -1,4 +1,11 @@
 //! Builtin tensor edge policies are type-only selectors, not value types.
+//!
+//! Since a08c554b9 policy names are not type symbols (they stay ordinary
+//! value identifiers so a user `fn wrap` cannot collide with one), so a bare
+//! marker as a local's declared type is rejected as `unknown_type`. A marker
+//! that reaches a runtime value type through a type argument is still
+//! `tensor_edge_policy_marker_not_runtime_value`
+//! (`tensor_edge_policy_generic_test`).
 
 fn analyze_in_locale(source: &str, locale: &str) -> crate::test_support::AnalyzedFixture {
     let pack = crate::locale::LocalePack::from_toml_path(
@@ -24,10 +31,9 @@ fn builtin_edge_policy_marker_cannot_be_stored_as_a_local_value() {
     );
     assert!(
         result.diagnostics.iter().any(|diagnostic| {
-            diagnostic.is_error()
-                && diagnostic.issue() == Some("tensor_edge_policy_marker_not_runtime_value")
+            diagnostic.is_error() && diagnostic.issue() == Some("unknown_type")
         }),
-        "expected explicit marker value-use rejection: {:?}",
+        "expected the bare marker name to be unknown in local type position: {:?}",
         result.diagnostics
     );
 }
@@ -70,10 +76,9 @@ fn localized_edge_policy_type_names_bind_to_the_same_builtin_identity() {
     );
     assert!(
         result.diagnostics.iter().any(|diagnostic| {
-            diagnostic.is_error()
-                && diagnostic.issue() == Some("tensor_edge_policy_marker_not_runtime_value")
+            diagnostic.is_error() && diagnostic.issue() == Some("unknown_type")
         }),
-        "expected localized marker value-use rejection: {:?}",
+        "expected the localized bare marker name to be unknown in local type position: {:?}",
         result.diagnostics
     );
 }

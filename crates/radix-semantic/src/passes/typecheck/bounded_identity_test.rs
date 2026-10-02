@@ -194,9 +194,28 @@ fn non_natural_n_rejects() {
 
 #[test]
 fn unbound_derived_n_plus_one_rejects() {
+    // Affine figura arithmetic parses in type-argument position since the
+    // K-series parser change (436efde75), so the rejection is semantic: the
+    // derived capacity is not a natural and its `N` has no binder.
     let parsed = parse(lex("typus X = ascii<N+1>"));
     assert!(
-        !parsed.errors.is_empty(),
-        "unbound derived N+1 must reject; parse unexpectedly succeeded"
+        parsed.errors.is_empty(),
+        "parse errors: {:?}",
+        parsed.errors
     );
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let program = parsed.program.as_ref().expect("program");
+    collect::collect(program, &mut resolver, &mut types).expect("collect");
+    let errors = resolve(program, &mut resolver, &parsed.interner, &mut types)
+        .expect_err("unbound derived N+1");
+    let has_issue = |issue: &str| {
+        errors.iter().any(|err| {
+            err.args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == issue)
+        })
+    };
+    assert!(has_issue("bounded_capacity_not_natural"), "{errors:?}");
+    assert!(has_issue("figura_unknown_index"), "{errors:?}");
 }

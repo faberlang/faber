@@ -128,6 +128,45 @@ main {
 }
 
 #[test]
+fn ternary_of_equal_shape_view_calls_joins_by_shape() {
+    // Each branch carries its own derived shape index; the join unifies them
+    // structurally, so the result has the transposed shape [3, 2].
+    let source = r#"
+main {
+    const tf32[] seed ← empty
+    var tf32[2, 3] base ← seed.from_flat([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [2, 3])
+    const tf32[3, 2] owned ← (true ✓ base.transpose() ✗ base.transpose()).materialize()
+    print owned.length()
+}
+"#;
+    let result = analyze_en(source);
+    assert!(result.is_ok(), "{:?}", result.diagnostics);
+}
+
+#[test]
+fn ternary_of_unequal_shape_views_is_rejected_at_the_join() {
+    // [2, 3] against its transpose [3, 2] share no shape: the join reports
+    // the shape mismatch instead of silently picking one side.
+    let source = r#"
+main {
+    const tf32[] seed ← empty
+    var tf32[2, 3] base ← seed.from_flat([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [2, 3])
+    const tf32[3, 2] owned ← (true ✓ base ✗ base.transpose()).materialize()
+    print owned.length()
+}
+"#;
+    let result = analyze_en(source);
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.issue() == Some("incompatible_tensor_index")),
+        "{:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
 fn expanded_transpose_chain_cannot_escape_through_mutable_binding() {
     let source = r#"
 main {
