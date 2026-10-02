@@ -97,7 +97,9 @@ pub const EXACT_STORE: RuntimeItem = exact_row("store", RuntimeKind::StoreFn);
 /// row lists exactly the targets that consume it.
 const REGEX_RUST: &[Target] = &[Target::HirRust];
 const REGEX_GO: &[Target] = &[Target::HirGo];
-const REGEX_RUST_GO: &[Target] = &[Target::HirRust, Target::HirGo];
+const REGEX_TS: &[Target] = &[Target::HirTypeScript];
+const REGEX_GO_TS: &[Target] = &[Target::HirGo, Target::HirTypeScript];
+const REGEX_RUST_GO_TS: &[Target] = &[Target::HirRust, Target::HirGo, Target::HirTypeScript];
 
 const fn regex_row(
     name: &'static str,
@@ -133,11 +135,19 @@ pub const REGEX_MATCH_NAMED: RuntimeItem = regex_row("match_named", RuntimeKind:
 /// compiled value, `Match` one successful match; the operations on them are
 /// methods of those types, so only the constructor and the two helpers with no
 /// receiver of that type are functions.
-pub const REGEX_REGEX: RuntimeItem = regex_row("Regex", RuntimeKind::Type, REGEX_GO);
-pub const REGEX_MATCH: RuntimeItem = regex_row("Match", RuntimeKind::Type, REGEX_GO);
+pub const REGEX_REGEX: RuntimeItem = regex_row("Regex", RuntimeKind::Type, REGEX_GO_TS);
+pub const REGEX_MATCH: RuntimeItem = regex_row("Match", RuntimeKind::Type, REGEX_GO_TS);
 pub const REGEX_NEW: RuntimeItem = regex_row("new", RuntimeKind::Fn, REGEX_GO);
-pub const REGEX_ESCAPE: RuntimeItem = regex_row("escape", RuntimeKind::Fn, REGEX_RUST_GO);
+pub const REGEX_ESCAPE: RuntimeItem = regex_row("escape", RuntimeKind::Fn, REGEX_RUST_GO_TS);
 pub const REGEX_REPLACE_EACH: RuntimeItem = regex_row("replace_each", RuntimeKind::Fn, REGEX_GO);
+
+/// `regex` rows (RX-8): the TypeScript runtime package's `regex` namespace
+/// (`@faber/runtime/regex`). `Regex` is the compiled pattern, `Match` one
+/// successful match (it has no source-level type name, RD-3), `RegexError` the
+/// rejection of a pattern a conversion throws, and `escape` the `textus`
+/// method `munita`. The operations are members of the `Regex` and `Match`
+/// types, not table rows.
+pub const REGEX_ERROR: RuntimeItem = regex_row("RegexError", RuntimeKind::Type, REGEX_TS);
 
 /// The canonical helper table: a row for every helper some runtime package
 /// carries. Each namespace unit adds its rows with the runtime it moves.
@@ -174,6 +184,7 @@ pub const TABLE: &[RuntimeItem] = &[
     REGEX_MATCH,
     REGEX_NEW,
     REGEX_REPLACE_EACH,
+    REGEX_ERROR,
 ];
 
 /// One runtime namespace: a module in Rust, a namespace export in TypeScript,
