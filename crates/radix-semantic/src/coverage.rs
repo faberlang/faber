@@ -85,7 +85,7 @@ pub fn from_target(target: Target) -> Option<HirCoverageTarget> {
         Target::HirGo => Some(HirCoverageTarget::Go),
         Target::HirSwift => None,
         Target::HirPython => None,
-        Target::HirHaskell | Target::HirPascal => None,
+        Target::HirHaskell | Target::HirPascal | Target::HirCobol => None,
         Target::HirFaber => Some(HirCoverageTarget::Faber),
         Target::MirWasm
         | Target::MirLlvm

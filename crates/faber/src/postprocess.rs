@@ -137,6 +137,7 @@ pub fn format_generated_code(target: Target, code: &str) -> Result<String, Strin
         Target::HirPython => Ok(code.to_string()),
         Target::HirHaskell => Ok(code.to_string()),
         Target::HirPascal => Ok(code.to_string()),
+        Target::HirCobol => Ok(code.to_string()),
         Target::HirTypeScript => format_typescript_code(code),
         Target::HirFhir => Ok(code.to_string()),
         Target::MirStepper
@@ -170,6 +171,7 @@ pub fn lint_generated_code(target: Target, code: &str) -> Result<String, String>
         | Target::HirPython
         | Target::HirHaskell
         | Target::HirPascal
+        | Target::HirCobol
         | Target::HirFhir => Ok(code.to_string()),
         Target::HirTypeScript => lint_typescript_code(code),
         Target::MirStepper
