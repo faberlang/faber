@@ -521,6 +521,54 @@ fn cli_parses_convert_target_locale() {
 }
 
 #[test]
+fn cli_convert_and_field_modifier_codemod_parse_write_flag() {
+    let convert = Cli::try_parse_from(["faber", "convert", "--to", "en", "--write", "main.fab"])
+        .expect("parse convert --write");
+    let Some(crate::cli::Command::Convert(args)) = convert.command else {
+        panic!("expected convert subcommand");
+    };
+    assert!(args.write && !args.check && !args.stdout);
+
+    let codemod = Cli::try_parse_from(["faber", "field-modifier-codemod", "--write", "main.fab"])
+        .expect("parse field-modifier-codemod --write");
+    let Some(crate::cli::Command::FieldModifierCodemod(args)) = codemod.command else {
+        panic!("expected field-modifier-codemod subcommand");
+    };
+    assert!(args.write && !args.check && !args.stdout);
+}
+
+#[test]
+fn convert_and_field_modifier_codemod_help_state_report_default_and_write_flag() {
+    let mut command = Cli::command();
+    let convert = command
+        .find_subcommand_mut("convert")
+        .expect("convert subcommand")
+        .render_long_help()
+        .to_string();
+    let words = convert.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(
+        words.contains("Does not write unless `--write` is given"),
+        "{convert}"
+    );
+    assert!(
+        words.contains("Write converted source back to the file (default is report-only)"),
+        "{convert}"
+    );
+
+    let mut command = Cli::command();
+    let codemod = command
+        .find_subcommand_mut("field-modifier-codemod")
+        .expect("field-modifier-codemod subcommand")
+        .render_long_help()
+        .to_string();
+    let words = codemod.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(
+        words.contains("Write codemodded source back to the file (default is report-only)"),
+        "{codemod}"
+    );
+}
+
+#[test]
 fn locale_command_help_states_complete_unit_and_resolution_contract() {
     let mut command = Cli::command();
     let format = command

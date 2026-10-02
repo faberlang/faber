@@ -8,7 +8,7 @@
 //! that small admitted shape is left alone and receives a machine-readable
 //! decline reason.
 
-use super::format::RewriteTally;
+use super::format::{RewriteTally, RewriteVerb};
 use radix::module::lexer::{Token, TokenKind, lex};
 use serde::Serialize;
 use std::fs;
@@ -127,7 +127,7 @@ pub fn cmd_output_transfer_codemod(command: &OutputTransferCodemodCommand) {
     }
 
     let report_only = command.check || !command.write;
-    let mut tally = RewriteTally::default();
+    let mut tally = RewriteTally::new(RewriteVerb::CODEMOD);
     for path in &files {
         let source = match fs::read_to_string(path) {
             Ok(source) => source,
@@ -156,10 +156,10 @@ pub fn cmd_output_transfer_codemod(command: &OutputTransferCodemodCommand) {
             continue;
         }
         if report_only {
-            println!("would codemod {}", path.display());
+            println!("{}", tally.would_line(path));
             tally.changed += 1;
         } else if fs::write(path, &report.source).is_ok() {
-            println!("codemodded {}", path.display());
+            println!("{}", tally.applied_line(path));
             tally.changed += 1;
         } else {
             eprintln!("error: failed to write '{}'", path.display());
@@ -175,53 +175,16 @@ pub fn cmd_output_transfer_codemod(command: &OutputTransferCodemodCommand) {
     }
     let total = files.len();
     if report_only {
-        println!("{}", report_summary(&tally, total));
+        println!("{}", tally.report_summary(total));
         if tally.changed + tally.refused > 0 {
             std::process::exit(1);
         }
         return;
     }
-    println!("{}", write_summary(&tally, total));
+    println!("{}", tally.write_summary(total));
     if tally.refused + tally.write_failed > 0 {
         std::process::exit(1);
     }
-}
-
-fn refused_clause(tally: &RewriteTally) -> String {
-    if tally.refused == 0 {
-        String::new()
-    } else {
-        format!(", {} refused (nothing written)", tally.refused)
-    }
-}
-
-/// Last stdout line of report mode (same shape as `faber format`).
-fn report_summary(tally: &RewriteTally, total: usize) -> String {
-    if tally.changed > 0 {
-        format!(
-            "{} of {total} files would be codemodded; rerun with --write to apply{}",
-            tally.changed,
-            refused_clause(tally)
-        )
-    } else if tally.refused > 0 {
-        format!("{} refused (nothing written)", tally.refused)
-    } else {
-        format!("{total} files already codemodded")
-    }
-}
-
-/// Last stdout line of `--write` mode (same shape as `faber format`).
-fn write_summary(tally: &RewriteTally, total: usize) -> String {
-    let failed = if tally.write_failed == 0 {
-        String::new()
-    } else {
-        format!(", {} failed to write", tally.write_failed)
-    };
-    format!(
-        "codemodded {} of {total} files{}{failed}",
-        tally.changed,
-        refused_clause(tally)
-    )
 }
 
 fn print_declines(path: &Path, report: &CodemodReport) {

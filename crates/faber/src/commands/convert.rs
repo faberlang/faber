@@ -4,8 +4,10 @@
 //! target reader-locale surface (HIR-backed round-trip — the machinery the
 //! former `faber format --locale` mode used). Conversion is never implicit:
 //! `--to` is required, unknown locales fail closed listing embedded packs.
+//! Report-only unless `--write` is given.
 //! See `docs/operator/convert-command.md`.
 
+use super::format::{RewriteTally, RewriteVerb};
 use faber_cli::package::available_locales;
 use std::fs;
 use std::io::Read;
@@ -19,6 +21,7 @@ pub struct ConvertCommand {
     pub from: Option<String>,
     pub check: bool,
     pub stdout: bool,
+    pub write: bool,
     pub stdin: bool,
 }
 
@@ -56,21 +59,24 @@ pub fn cmd_convert(command: &ConvertCommand) {
 
     if command.stdout && files.len() > 1 {
         eprintln!(
-            "error: --stdout accepts exactly one input file, found {}; convert one file at a time (or use the default in-place write / --check for multiple files)",
+            "error: --stdout accepts exactly one input file, found {}; use --check or --write for multiple files",
             files.len()
         );
         std::process::exit(1);
     }
 
-    let mut drift_count = 0usize;
-    let mut error_count = 0usize;
+    // Modes (mutually exclusive at the CLI parse boundary): `--stdout` prints
+    // one file; `--write` rewrites changed files; everything else (the
+    // default, spelled `--check`) reports drift and writes nothing.
+    let report_only = command.check || !command.write;
+    let mut tally = RewriteTally::new(RewriteVerb::CONVERT);
 
     for path in &files {
         let source = match fs::read_to_string(path) {
             Ok(source) => source,
             Err(err) => {
                 eprintln!("error: failed to read '{}': {err}", path.display());
-                error_count += 1;
+                tally.refused += 1;
                 continue;
             }
         };
@@ -79,47 +85,53 @@ pub fn cmd_convert(command: &ConvertCommand) {
             match convert_single_doc(path, &command.to, command.from.as_deref(), &source) {
                 Ok(converted) => converted,
                 Err(()) => {
-                    error_count += 1;
+                    tally.refused += 1;
                     continue;
                 }
             };
-
-        if command.check {
-            if converted != source {
-                eprintln!("would convert {} to '{}'", path.display(), command.to);
-                drift_count += 1;
-            }
-            continue;
-        }
 
         if command.stdout {
             print!("{converted}");
             continue;
         }
 
-        // Transactional in place: the write happens only after the target
-        // surface was emitted successfully (same contract as the corpus tool).
-        if fs::write(path, &converted).is_err() {
+        // One predicate for report and write: the file's bytes would change.
+        if converted == source {
+            continue;
+        }
+
+        if report_only {
+            println!("{}", tally.would_line(path));
+            tally.changed += 1;
+        } else if fs::write(path, &converted).is_ok() {
+            // Transactional in place: the write happens only after the target
+            // surface was emitted successfully (same contract as the corpus
+            // tool).
+            println!("{}", tally.applied_line(path));
+            tally.changed += 1;
+        } else {
             eprintln!("error: failed to write '{}'", path.display());
-            error_count += 1;
+            tally.write_failed += 1;
         }
     }
 
-    if command.check {
-        if drift_count > 0 {
-            eprintln!(
-                "{drift_count} file(s) would be converted to '{}'",
-                command.to
-            );
-            std::process::exit(1);
-        }
-        if error_count > 0 {
+    if command.stdout {
+        if tally.refused > 0 {
             std::process::exit(1);
         }
         return;
     }
 
-    if error_count > 0 {
+    let total = files.len();
+    if report_only {
+        println!("{}", tally.report_summary(total));
+        if tally.changed + tally.refused > 0 {
+            std::process::exit(1);
+        }
+        return;
+    }
+    println!("{}", tally.write_summary(total));
+    if tally.refused + tally.write_failed > 0 {
         std::process::exit(1);
     }
 }

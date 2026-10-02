@@ -66,7 +66,7 @@ pub fn cmd_format(command: &FormatCommand) {
     // one file; `--write` rewrites changed files; everything else (the
     // default, spelled `--check`) reports drift and writes nothing.
     let report_only = command.check || !command.write;
-    let mut tally = RewriteTally::default();
+    let mut tally = RewriteTally::new(RewriteVerb::FORMAT);
 
     for path in &files {
         let source = match fs::read_to_string(path) {
@@ -98,10 +98,10 @@ pub fn cmd_format(command: &FormatCommand) {
         }
 
         if report_only {
-            println!("would reformat {}", path.display());
+            println!("{}", tally.would_line(path));
             tally.changed += 1;
         } else if fs::write(path, &formatted).is_ok() {
-            println!("formatted {}", path.display());
+            println!("{}", tally.applied_line(path));
             tally.changed += 1;
         } else {
             eprintln!("error: failed to write '{}'", path.display());
@@ -130,19 +130,70 @@ pub fn cmd_format(command: &FormatCommand) {
     }
 }
 
-/// Per-run counters for the in-place rewriters (`format`; the sibling
-/// rewriters follow the same report/`--write` contract).
-#[derive(Debug, Default)]
+/// The words one in-place rewriter uses in its report and `--write` lines.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct RewriteVerb {
+    /// Per-file report line: `would <imperative> <path>`.
+    pub(super) imperative: &'static str,
+    /// Report summary: `N of M files would be <past>` (and the nothing-to-do
+    /// line `M files already <applied>`).
+    pub(super) past: &'static str,
+    /// `--write` lines: `<applied> <path>` and `<applied> N of M files`.
+    pub(super) applied: &'static str,
+}
+
+impl RewriteVerb {
+    pub(super) const FORMAT: Self = Self {
+        imperative: "reformat",
+        past: "reformatted",
+        applied: "formatted",
+    };
+    pub(super) const CONVERT: Self = Self {
+        imperative: "convert",
+        past: "converted",
+        applied: "converted",
+    };
+    pub(super) const CODEMOD: Self = Self {
+        imperative: "codemod",
+        past: "codemodded",
+        applied: "codemodded",
+    };
+}
+
+/// Per-run counters and summary lines shared by the four in-place rewriters
+/// (`format`, `convert`, `output-transfer-codemod`, `field-modifier-codemod`):
+/// report by default, `--write` applies.
+#[derive(Debug)]
 pub(super) struct RewriteTally {
+    verb: RewriteVerb,
     /// Files whose bytes would change (report) or were written (`--write`).
     pub(super) changed: usize,
     /// Files refused (unreadable, or a diagnostic was printed); never written.
     pub(super) refused: usize,
-    /// Files that formatted but could not be written.
+    /// Files that rewrote but could not be written.
     pub(super) write_failed: usize,
 }
 
 impl RewriteTally {
+    pub(super) fn new(verb: RewriteVerb) -> Self {
+        Self {
+            verb,
+            changed: 0,
+            refused: 0,
+            write_failed: 0,
+        }
+    }
+
+    /// Per-file stdout line for a file that would change (report mode).
+    pub(super) fn would_line(&self, path: &Path) -> String {
+        format!("would {} {}", self.verb.imperative, path.display())
+    }
+
+    /// Per-file stdout line for a file that was written (`--write`).
+    pub(super) fn applied_line(&self, path: &Path) -> String {
+        format!("{} {}", self.verb.applied, path.display())
+    }
+
     fn refused_clause(&self) -> String {
         if self.refused == 0 {
             String::new()
@@ -155,14 +206,15 @@ impl RewriteTally {
     pub(super) fn report_summary(&self, total: usize) -> String {
         if self.changed > 0 {
             format!(
-                "{} of {total} files would be reformatted; rerun with --write to apply{}",
+                "{} of {total} files would be {}; rerun with --write to apply{}",
                 self.changed,
+                self.verb.past,
                 self.refused_clause()
             )
         } else if self.refused > 0 {
             format!("{} refused (nothing written)", self.refused)
         } else {
-            format!("{total} files already formatted")
+            format!("{total} files already {}", self.verb.applied)
         }
     }
 
@@ -174,7 +226,8 @@ impl RewriteTally {
             format!(", {} failed to write", self.write_failed)
         };
         format!(
-            "formatted {} of {total} files{}{failed}",
+            "{} {} of {total} files{}{failed}",
+            self.verb.applied,
             self.changed,
             self.refused_clause()
         )
