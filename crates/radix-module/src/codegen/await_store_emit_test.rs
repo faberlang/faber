@@ -49,10 +49,13 @@ fn go_checks_the_awaited_value() {
 fn typescript_checks_the_value_after_await() {
     let code = emit(Target::HirTypeScript, NARROWING);
     assert!(
-        code.contains("__faberXStore(await fetch(), 0, 255, \"u8\", \"await-binding `v`\""),
+        code.contains("exact.store(await fetch(), 0, 255, \"u8\", \"await-binding `v`\""),
         "{code}"
     );
-    assert!(code.contains("if (v < lo || v > hi)"), "{code}");
+    // The range check lives in the runtime package's `exact` namespace, not
+    // inline in the file.
+    assert!(code.contains("import { "), "{code}");
+    assert!(!code.contains("v < lo || v > hi"), "{code}");
 }
 
 #[test]

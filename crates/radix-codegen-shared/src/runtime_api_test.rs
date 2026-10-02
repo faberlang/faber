@@ -260,6 +260,40 @@ fn go_imports_is_one_path_or_none() {
 }
 
 #[test]
+fn ts_imports_is_one_sorted_named_import_or_none() {
+    let refs = RuntimeRefs::new();
+    assert_eq!(ts_imports(&refs), None);
+    refs.note(Namespace::Json);
+    refs.note(Namespace::Display);
+    refs.note(Namespace::Json);
+    assert_eq!(
+        ts_imports(&refs).as_deref(),
+        Some("import { display, json } from \"@faber/runtime\";")
+    );
+}
+
+#[test]
+fn the_ts_display_rows_spell_as_display_namespace_members() {
+    let rows = [
+        (DISPLAY_VALUE, "display.value"),
+        (DISPLAY_NUMERUS, "display.numerus"),
+        (DISPLAY_FRACTUS, "display.fractus"),
+        (DISPLAY_LIST, "display.list"),
+        (DISPLAY_TENSOR, "display.tensor"),
+        (DISPLAY_SPARSA, "display.sparsa"),
+        (DISPLAY_MAP, "display.map"),
+        (DISPLAY_VALOR, "display.valor"),
+        (DISPLAY_TAGGED_VALOR, "display.taggedValor"),
+    ];
+    for (row, expected) in rows {
+        assert_eq!(spell(Target::HirTypeScript, &row).as_deref(), Ok(expected));
+        assert!(TABLE.contains(&row), "{expected} is a table row");
+        assert!(row.targets.contains(&Target::HirTypeScript));
+    }
+    assert!(reserved_names(Target::HirTypeScript, TABLE).contains(&"display".to_owned()));
+}
+
+#[test]
 fn the_display_rows_spell_as_the_flat_go_names() {
     let spelled: Vec<String> = [DISPLAY_VERUM, DISPLAY_LIST, DISPLAY_VALOR]
         .iter()
@@ -306,6 +340,157 @@ fn the_exact_rows_spell_as_faber_exact_functions_in_rust() {
 }
 
 #[test]
+fn the_exact_rows_spell_as_exact_namespace_members_in_typescript() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Exact && row.targets.contains(&Target::HirTypeScript))
+        .collect();
+    // The 24 exact-integer helpers of `exact.ts`: 16 shared with Rust or Go and
+    // 8 of the TypeScript runtime's own.
+    assert_eq!(rows.len(), 24);
+    let mut spelled: Vec<String> = rows
+        .iter()
+        .map(|row| spell_any(Target::HirTypeScript, row))
+        .collect();
+    spelled.sort_unstable();
+    let mut expected: Vec<String> = [
+        "abs",
+        "add",
+        "and",
+        "chk",
+        "clamp",
+        "div",
+        "floatRem",
+        "hi",
+        "join",
+        "lo",
+        "mod",
+        "mul",
+        "neg",
+        "not",
+        "or",
+        "pow",
+        "shl",
+        "shr",
+        "store",
+        "sub",
+        "trueDiv",
+        "trueDivF32",
+        "wrap",
+        "xor",
+    ]
+    .iter()
+    .map(|name| format!("exact.{name}"))
+    .collect();
+    expected.sort_unstable();
+    assert_eq!(spelled, expected);
+}
+
+#[test]
+fn the_dec_rows_spell_as_dec_namespace_members_in_typescript() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Dec && row.targets.contains(&Target::HirTypeScript))
+        .collect();
+    // The 18 exported helpers of `dec.ts`: 15 shared with Rust and Go, `fmt_list`
+    // shared with Rust, `float_cmp` and `to_int` shared with Go. None is
+    // store-family (a decimal store is spelled where an unstored computation is
+    // consumed, which has no store site at the call).
+    assert_eq!(rows.len(), 18);
+    assert!(rows.iter().all(|row| row.kind == RuntimeKind::Fn));
+    let mut spelled: Vec<String> = rows
+        .iter()
+        .map(|row| spell_any(Target::HirTypeScript, row))
+        .collect();
+    spelled.sort_unstable();
+    let mut expected: Vec<String> = [
+        "add", "cmp", "div", "f64", "floatCmp", "fmt", "fmtList", "int", "mul", "neg", "of",
+        "parse", "rem", "store", "sub", "toInt", "tryParse", "tryStore",
+    ]
+    .iter()
+    .map(|name| format!("dec.{name}"))
+    .collect();
+    expected.sort_unstable();
+    assert_eq!(spelled, expected);
+}
+
+#[test]
+fn the_inf_rows_spell_as_inf_namespace_members_in_typescript() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Inf && row.targets.contains(&Target::HirTypeScript))
+        .collect();
+    // The 18 exported helpers of `inf.ts`: 7 shared with Rust and Go (`div`,
+    // `shl`, `shr`, `pow`, `approx`, `pack`, `to_dec`), 6 with Go (`mod`, `abs`,
+    // `parse`, `from_valor`, `from_bytes`, `to_bytes`), 3 with Rust (`true_div`,
+    // `cmp_float`, `store`), and `to_number` and `clamp` of its own. `store` and
+    // `clamp` are the store family; every other row is plain.
+    assert_eq!(rows.len(), 18);
+    for row in &rows {
+        let store = matches!(row.name, "store" | "clamp");
+        assert_eq!(row.kind == RuntimeKind::StoreFn, store, "{}", row.name);
+    }
+    let mut spelled: Vec<String> = rows
+        .iter()
+        .map(|row| spell_any(Target::HirTypeScript, row))
+        .collect();
+    spelled.sort_unstable();
+    let mut expected: Vec<String> = [
+        "abs",
+        "approx",
+        "clamp",
+        "cmpFloat",
+        "div",
+        "fromBytes",
+        "fromValor",
+        "mod",
+        "pack",
+        "parse",
+        "pow",
+        "shl",
+        "shr",
+        "store",
+        "toBytes",
+        "toDec",
+        "toNumber",
+        "trueDiv",
+    ]
+    .iter()
+    .map(|name| format!("inf.{name}"))
+    .collect();
+    expected.sort_unstable();
+    assert_eq!(spelled, expected);
+}
+
+#[test]
+fn the_format_rows_spell_as_format_namespace_members_in_typescript() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Format && row.targets.contains(&Target::HirTypeScript))
+        .collect();
+    // The six exported renderers of `format.ts`, all shared with Rust and Go;
+    // `magnus` and `magnus_sci` are the Rust/Go `inf` renderers (TypeScript
+    // renders a `bigint` through `int`), so they are not here.
+    assert_eq!(rows.len(), 6);
+    for row in &rows {
+        assert_eq!(row.kind, RuntimeKind::Fn, "{}", row.name);
+        assert!(row.targets.contains(&Target::HirRust), "{}", row.name);
+        assert!(row.targets.contains(&Target::HirGo), "{}", row.name);
+    }
+    let mut spelled: Vec<String> = rows
+        .iter()
+        .map(|row| spell_any(Target::HirTypeScript, row))
+        .collect();
+    spelled.sort_unstable();
+    let mut expected: Vec<String> = ["float", "instans", "int", "pad", "sci", "text"]
+        .iter()
+        .map(|name| format!("format.{name}"))
+        .collect();
+    expected.sort_unstable();
+    assert_eq!(spelled, expected);
+}
+
+#[test]
 fn the_regex_rows_spell_as_faber_regex_functions_in_rust() {
     let rows: Vec<&RuntimeItem> = TABLE
         .iter()
@@ -334,15 +519,19 @@ fn the_store_family_is_the_exact_and_inf_rows_that_apply_a_width_limit() {
         .collect();
     store_rows.sort_unstable();
     // `exact` (Rust `store` and `store_inferred`; Go `store`, `wrap`, `clamp_i`,
-    // `clamp_u`) and `inf` (Rust `store`; Go the same five).
+    // `clamp_u`; TypeScript `store`, `wrap`, `clamp`) and `inf` (Rust `store`;
+    // Go `store_i`, `store_u`, `wrap`, `clamp_i`, `clamp_u`; TypeScript `store`,
+    // `clamp`).
     assert_eq!(
         store_rows,
         [
+            ("Exact".to_owned(), "clamp"),
             ("Exact".to_owned(), "clamp_i"),
             ("Exact".to_owned(), "clamp_u"),
             ("Exact".to_owned(), "store"),
             ("Exact".to_owned(), "store_inferred"),
             ("Exact".to_owned(), "wrap"),
+            ("Inf".to_owned(), "clamp"),
             ("Inf".to_owned(), "clamp_i"),
             ("Inf".to_owned(), "clamp_u"),
             ("Inf".to_owned(), "store"),
