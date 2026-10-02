@@ -680,7 +680,7 @@ phase = 4
 action = "review"
 rule = "operator-group"
 primary = "operatores/membership-collection.fab"
-paths = ["operatores/membership-collection.fab", "operatores/membership-literal-key.fab", "operatores/membership-range.fab", "operatores/membership-values.fab"]
+paths = ["operatores/membership-collection.fab", "operatores/membership-decline.fab", "operatores/membership-literal-key.fab", "operatores/membership-range.fab", "operatores/membership-values.fab"]
 
 [[terms]]
 term = "instans"
@@ -3969,6 +3969,12 @@ path = "operatores/membership-collection.fab"
 term = "∈"
 kind = "operator-group"
 category = "collection"
+
+[[files]]
+path = "operatores/membership-decline.fab"
+term = "∈"
+kind = "reject"
+category = "values"
 
 [[files]]
 path = "operatores/membership-literal-key.fab"

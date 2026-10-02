@@ -1349,30 +1349,42 @@ note = "stdout is not pinned: range containment has no MIR lowering, so the runn
 id = "membership.reject.scalar"
 family = "membership"
 cell = "REJECT: scalar right operand (x ∈ 5)"
-status = "unit-proven"
+status = "direct"
+exemplum = "operatores/membership-decline.fab"
+expected = true
 decline = true
+required = true
 note = "SEM010:membership_requires_collection; crates/radix-module/src/semantic/passes/typecheck/membership_glyph_test.rs scalar_right_operand_is_rejected_with_its_type"
 
 [[cells]]
 id = "membership.reject.nullable"
 family = "membership"
 cell = "REJECT: nullable collection right operand"
-status = "unit-proven"
+status = "direct"
+exemplum = "operatores/membership-decline.fab"
+expected = true
 decline = true
+required = true
 note = "SEM010:membership_requires_collection; crates/radix-module/src/semantic/passes/typecheck/membership_test.rs nullable_list_right_operand_rejects"
 
 [[cells]]
 id = "membership.reject.unresolved-empty"
 family = "membership"
 cell = "REJECT: unresolved empty list right operand (x ∈ [])"
-status = "unit-proven"
+status = "direct"
+exemplum = "operatores/membership-decline.fab"
+expected = true
 decline = true
+required = true
 note = "SEM010:membership_operand_unresolved; membership_glyph_test.rs empty_list_right_operand_is_unresolved_in_both_polarities"
 
 [[cells]]
 id = "membership.reject.mixed-list"
 family = "membership"
 cell = "REJECT: mixed enum/scalar value set"
-status = "unit-proven"
+status = "direct"
+exemplum = "operatores/membership-decline.fab"
+expected = true
 decline = true
+required = true
 note = "SEM010:common_type_mismatch; membership_glyph_test.rs mixed_value_set_fails_common_type"
