@@ -1916,6 +1916,8 @@ pub enum HirBinOp {
     IsNot,
     InRange,
     Between,
+    NotInRange,
+    NotBetween,
 }
 
 impl HirBinOp {

@@ -32,6 +32,8 @@ fn non_glyph_ops_do_not_classify_as_glyph_products() {
         HirBinOp::Coalesce,
         HirBinOp::InRange,
         HirBinOp::Between,
+        HirBinOp::NotInRange,
+        HirBinOp::NotBetween,
     ] {
         assert!(
             !op.is_glyph_product(),
