@@ -276,6 +276,9 @@ mod infinity_literal_tests;
 #[path = "layout_test.rs"]
 mod layout_tests;
 #[cfg(test)]
+#[path = "membership_test.rs"]
+mod membership_tests;
+#[cfg(test)]
 #[path = "narrowing_conversio_test.rs"]
 mod narrowing_conversio_tests;
 #[cfg(test)]

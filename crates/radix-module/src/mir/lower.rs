@@ -2826,16 +2826,21 @@ impl<'a> FunctionBuilder<'a> {
         {
             return Some(predicate);
         }
-        if matches!(op, HirBinOp::Between) {
+        if matches!(op, HirBinOp::Between | HirBinOp::NotBetween) {
             let collection = self.lower_expr_value(rhs)?;
             let value = self.lower_expr_value(lhs)?;
             let ty = self.expr_ty(expr)?;
-            return Some(self.runtime_call_value(
+            let contained = self.runtime_call_value(
                 MirIntrinsic::Collection(MirCollectionOp::Contains),
                 vec![collection, value],
                 ty,
                 expr.span,
-            ));
+            );
+            if op == HirBinOp::Between {
+                return Some(contained);
+            }
+            // `∉` is the existing boolean negation of the same `Contains` call.
+            return Some(self.assign_temp(MirValueKind::Unary { op: MirUnOp::Not, operand: contained }, ty, expr.span));
         }
         // TENSOR-GLYPHS-3A: glyph products dispatch by operand family before
         // the primitive `mir_bin_op` fallback (which fails them closed).
@@ -3854,9 +3859,10 @@ fn mir_bin_op(op: HirBinOp) -> Option<MirBinOp> {
         HirBinOp::Shr => Some(MirBinOp::Shr),
         HirBinOp::Is => Some(MirBinOp::Eq),
         HirBinOp::IsNot => Some(MirBinOp::NotEq),
-        HirBinOp::InRange | HirBinOp::Between => None,
-        // Negated membership lowers in unit 3a (membership-glyph); fail closed until then.
-        HirBinOp::NotInRange | HirBinOp::NotBetween => None,
+        // Collection membership (`Between`, `NotBetween`) is intercepted by
+        // `lower_binary` before this point; range containment has no MIR
+        // primitive (membership-glyph OD-4), so both range forms fail closed.
+        HirBinOp::InRange | HirBinOp::Between | HirBinOp::NotInRange | HirBinOp::NotBetween => None,
         // Glyph products are intercepted by `lower_binary` before this point;
         // keep the explicit fail-closed arm for any future caller.
         HirBinOp::Dot | HirBinOp::Cross | HirBinOp::TensorProduct | HirBinOp::Hadamard | HirBinOp::HadamardDiv => None,

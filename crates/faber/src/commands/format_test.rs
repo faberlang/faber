@@ -1181,3 +1181,62 @@ fn format_usage_errors_exit_two() {
     let output = run_faber_capture(&["format", "--write", "--check", "x.fab"], None);
     assert_eq!(output.status.code(), Some(2));
 }
+
+// ── membership-glyph 3a: `∈` / `∉` survive the format round trip ──────────
+
+const MEMBERSHIP_EN_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nmain {\n    const list<int> xs ← [1, 2]\n    if 1 ∈ xs {\n        print \"in\"\n    }\n    if 3 ∉ xs {\n        print \"out\"\n    }\n    if 5 ∉ 0‥10 {\n        print \"outside\"\n    }\n}\n";
+
+#[test]
+fn format_stdin_keeps_membership_glyphs_at_the_source_locale() {
+    let (stdout, stderr, success) = run_faber_format_stdin(MEMBERSHIP_EN_SOURCE);
+    assert!(success, "faber format --stdin must accept ∈/∉: {stderr}");
+    let body = radix::module::driver::split_frontmatter(&stdout)
+        .expect("split")
+        .body;
+    assert!(body.contains("if 1 ∈ xs {"), "∈ must be kept:\n{stdout}");
+    assert!(body.contains("if 3 ∉ xs {"), "∉ must be kept:\n{stdout}");
+    assert!(
+        body.contains("if 5 ∉ 0‥10 {"),
+        "range ∉ must be kept:\n{stdout}"
+    );
+    assert!(
+        !body.contains("inter") && !body.contains("between"),
+        "no keyword spelling may appear:\n{stdout}"
+    );
+    assert_eq!(
+        assert_format_fixed_point(MEMBERSHIP_EN_SOURCE, "membership glyphs"),
+        stdout
+    );
+}
+
+#[test]
+fn format_stdin_prints_the_glyph_for_a_negated_keyword_membership() {
+    // `not (x between xs)` is a unary not over `∈`: the glyph is printed and the
+    // negation stays a negation (no `∉` is invented, no keyword survives).
+    let source = "+++\nlocale = \"en\"\n+++\nmain {\n    const list<int> xs ← [1, 2]\n    if not (3 between xs) {\n        print \"out\"\n    }\n}\n";
+    let (stdout, stderr, success) = run_faber_format_stdin(source);
+    assert!(success, "{stderr}");
+    assert!(stdout.contains("if not (3 ∈ xs) {"), "{stdout}");
+    assert!(!stdout.contains("between"), "{stdout}");
+}
+
+#[test]
+fn convert_keeps_membership_glyphs_across_locales() {
+    let (stdout, stderr, success) = run_faber_capture_stdout(
+        &["convert", "--from", "en", "--to", "la", "--stdin"],
+        MEMBERSHIP_EN_SOURCE,
+    );
+    assert!(success, "{stderr}");
+    assert!(stdout.contains("si 1 ∈ xs {"), "{stdout}");
+    assert!(stdout.contains("si 3 ∉ xs {"), "{stdout}");
+    assert!(stdout.contains("si 5 ∉ 0‥10 {"), "{stdout}");
+}
+
+fn run_faber_capture_stdout(args: &[&str], stdin: &str) -> (String, String, bool) {
+    let output = run_faber_capture(args, Some(stdin));
+    (
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+        String::from_utf8_lossy(&output.stderr).into_owned(),
+        output.status.success(),
+    )
+}
