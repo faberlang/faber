@@ -351,6 +351,9 @@ impl<'a> Lexer<'a> {
             '∴' => TokenKind::Therefore,
             '∪' => TokenKind::Cup,
             '∩' => TokenKind::Cap,
+            // Membership `x ∈ xs` / `x ∉ xs`. One spelling in every locale, no ASCII alias.
+            '∈' => TokenKind::ElementOf,
+            '∉' => TokenKind::NotElementOf,
             '+' => TokenKind::Plus,
             '*' => TokenKind::Star,
             '%' => TokenKind::Percent,
