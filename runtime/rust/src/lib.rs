@@ -55,7 +55,7 @@ pub use or_recovery::{
 };
 pub use queue_stack::{Queue, QueueN, QueueStackError, QueueStackOverflow, Stack, StackN};
 #[cfg(feature = "regex")]
-pub use regex::{Regex, RegexError};
+pub use regex::{Match, Regex, RegexError};
 pub use sparsa::Sparsa;
 pub use tensor::Tensor;
 pub use textus::unicode_scalar_value;
