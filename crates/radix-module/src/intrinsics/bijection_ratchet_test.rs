@@ -833,6 +833,8 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         MirCollectionOp::Values,
         MirCollectionOp::RegexMatches,
         MirCollectionOp::RegexFind,
+        MirCollectionOp::RegexFindAll,
+        MirCollectionOp::RegexSplit,
         MirCollectionOp::MatchText,
         MirCollectionOp::MatchStart,
         MirCollectionOp::MatchEnd,

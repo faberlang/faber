@@ -434,9 +434,10 @@ inter = "intersect"
 # identity in grammar slots, so a member call `interval.union(...)` parses.
 union = "union"
 
-# regex (2) and match (5)
+# regex (3; divide shared with textus above) and match (5)
 consentit = "matches"
 inventa = "find"
+collecta = "find_all"
 inventum = "text"
 principium = "start"
 terminus = "end"

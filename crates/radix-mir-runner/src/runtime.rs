@@ -1433,6 +1433,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 Ok(Value::Bool(program.is_match(&text)))
             }
             MirCollectionOp::RegexFind => self.eval_regex_find(args, span),
+            MirCollectionOp::RegexFindAll | MirCollectionOp::RegexSplit => {
+                self.eval_regex_bulk(op, args, span)
+            }
             MirCollectionOp::MatchText
             | MirCollectionOp::MatchStart
             | MirCollectionOp::MatchEnd
@@ -3705,6 +3708,34 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         Ok(program
             .find(&text)
             .map_or(Value::Nil, |found| Value::Match(Rc::new(found))))
+    }
+
+    /// `regex.collecta(text)` and `regex.divide(text)`: one pass over the text.
+    fn eval_regex_bulk(
+        &mut self,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [receiver, text] = args else {
+            return Err(RunnerError::internal(span, "regex bulk operation arity"));
+        };
+        let Value::Regex(program) = self.eval_operand(receiver, span)? else {
+            return Err(RunnerError::internal(span, "bulk receiver is not regex"));
+        };
+        let Value::Str(text) = self.eval_operand(text, span)? else {
+            return Err(RunnerError::internal(span, "bulk argument is not textus"));
+        };
+        let items = if matches!(op, MirCollectionOp::RegexFindAll) {
+            program
+                .find_all(&text)
+                .into_iter()
+                .map(|found| Value::Match(Rc::new(found)))
+                .collect()
+        } else {
+            program.split(&text).into_iter().map(Value::Str).collect()
+        };
+        Ok(Value::Array(Rc::new(RefCell::new(items))))
     }
 
     /// The five `match` accessors; offsets are code points.

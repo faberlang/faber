@@ -659,6 +659,8 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorDiv
             | MirCollectionOp::RegexMatches
             | MirCollectionOp::RegexFind
+            | MirCollectionOp::RegexFindAll
+            | MirCollectionOp::RegexSplit
             | MirCollectionOp::MatchGroup
             | MirCollectionOp::MatchNamed
             | MirCollectionOp::SparseGet
@@ -1220,6 +1222,8 @@ impl Validator<'_, '_> {
                 }
             }
             MirCollectionOp::RegexFind
+            | MirCollectionOp::RegexFindAll
+            | MirCollectionOp::RegexSplit
             | MirCollectionOp::MatchText
             | MirCollectionOp::MatchStart
             | MirCollectionOp::MatchEnd
@@ -2144,9 +2148,10 @@ impl Validator<'_, '_> {
         }
     }
 
-    /// RX-3b: `regex.inventa` and the `match` accessors. The receiver is a
-    /// `regex` (find) or a `match` (accessors); results are `match ∪ nihil`,
-    /// `textus`, `numerus`, or `textus ∪ nihil` per accessor.
+    /// RX-3b/RX-4a: `regex.inventa`, `regex.collecta`, `regex.divide` and the
+    /// `match` accessors. The receiver is a `regex` (find, find_all, split) or
+    /// a `match` (accessors); results are `match ∪ nihil`, `lista<match>`,
+    /// `lista<textus>`, `textus`, `numerus`, or `textus ∪ nihil` per op.
     fn validate_regex_match_call(
         &mut self,
         scope: &FunctionScope<'_, '_>,
@@ -2155,7 +2160,12 @@ impl Validator<'_, '_> {
         call: &MirRuntimeCall,
         span: Span,
     ) {
-        let receiver = if matches!(op, MirCollectionOp::RegexFind) {
+        let receiver = if matches!(
+            op,
+            MirCollectionOp::RegexFind
+                | MirCollectionOp::RegexFindAll
+                | MirCollectionOp::RegexSplit
+        ) {
             Primitive::Regex
         } else {
             Primitive::Match
@@ -2168,31 +2178,52 @@ impl Validator<'_, '_> {
                 "regex/match operation receiver type mismatch",
             );
         }
-        let (result_inner, optional) = match op {
-            MirCollectionOp::RegexFind => (Primitive::Match, true),
-            MirCollectionOp::MatchText => (Primitive::Textus, false),
-            MirCollectionOp::MatchStart | MirCollectionOp::MatchEnd => (Primitive::Numerus, false),
-            _ => (Primitive::Textus, true),
-        };
-        let expected = self.primitive(result_inner);
-        if optional {
+        if let MirCollectionOp::RegexFindAll | MirCollectionOp::RegexSplit = op {
+            let element = if matches!(op, MirCollectionOp::RegexFindAll) {
+                Primitive::Match
+            } else {
+                Primitive::Textus
+            };
+            let expected = self.primitive(element).semantic_id();
             let ok = matches!(
                 self.type_kind(call.return_ty),
-                Type::Option(inner) if self.context.types.equals(*inner, expected.semantic_id())
+                Type::Array(inner) if *inner == expected
             );
             if !ok {
                 self.error(
                     span,
-                    "regex/match operation result is not the expected option",
+                    "regex bulk operation result is not the expected lista",
                 );
             }
         } else {
-            self.require_exact(
-                call.return_ty,
-                expected,
-                span,
-                "regex/match operation result type mismatch",
-            );
+            let (result_inner, optional) = match op {
+                MirCollectionOp::RegexFind => (Primitive::Match, true),
+                MirCollectionOp::MatchText => (Primitive::Textus, false),
+                MirCollectionOp::MatchStart | MirCollectionOp::MatchEnd => {
+                    (Primitive::Numerus, false)
+                }
+                _ => (Primitive::Textus, true),
+            };
+            let expected = self.primitive(result_inner);
+            if optional {
+                let ok = matches!(
+                    self.type_kind(call.return_ty),
+                    Type::Option(inner) if self.context.types.equals(*inner, expected.semantic_id())
+                );
+                if !ok {
+                    self.error(
+                        span,
+                        "regex/match operation result is not the expected option",
+                    );
+                }
+            } else {
+                self.require_exact(
+                    call.return_ty,
+                    expected,
+                    span,
+                    "regex/match operation result type mismatch",
+                );
+            }
         }
         let Some(arg) = call.args.get(1) else {
             return;

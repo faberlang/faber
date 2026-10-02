@@ -56,9 +56,45 @@ impl RegexProgram {
     /// byte offsets the engine reports are mapped once, here.
     pub fn find(&self, text: &str) -> Option<MatchValue> {
         let captures = self.compiled.captures(text)?;
-        let whole = captures.get(0)?;
-        let start = text[..whole.start()].chars().count();
-        let end = start + whole.as_str().chars().count();
+        let start = text[..captures.get(0)?.start()].chars().count();
+        Some(self.match_value(&captures, start))
+    }
+
+    /// Every non-overlapping match in `text`, left to right, in one pass. The
+    /// engine's iteration skips an empty match that starts where the previous
+    /// match ended (RE2's rule, `PIN-EMPTY`), so `a*` over `baaac` yields the
+    /// spans (0,0) (1,4) (5,5). The byte-to-code-point map is one running
+    /// count over the haystack: matches arrive in ascending order, so each
+    /// step counts only the characters since the previous match end.
+    pub fn find_all(&self, text: &str) -> Vec<MatchValue> {
+        let mut found = Vec::new();
+        let mut counted_bytes = 0;
+        let mut counted_points = 0;
+        for captures in self.compiled.captures_iter(text) {
+            let Some(whole) = captures.get(0) else {
+                continue;
+            };
+            let start = counted_points + text[counted_bytes..whole.start()].chars().count();
+            let value = self.match_value(&captures, start);
+            counted_points = value.end;
+            counted_bytes = whole.end();
+            found.push(value);
+        }
+        found
+    }
+
+    /// The pieces of `text` between the iteration's matches: leading and
+    /// trailing empty pieces are kept, adjacent separators give an empty piece,
+    /// and capture groups in the pattern are not spliced into the output
+    /// (`PIN-SPLIT`). Byte slices only: no code-point map is needed.
+    pub fn split(&self, text: &str) -> Vec<String> {
+        self.compiled.split(text).map(str::to_owned).collect()
+    }
+
+    /// One engine capture set as a `MatchValue` whose whole match starts at
+    /// code point `start`.
+    fn match_value(&self, captures: &regex::Captures<'_>, start: usize) -> MatchValue {
+        let whole = captures.get(0).map_or("", |found| found.as_str());
         let groups = captures
             .iter()
             .map(|group| group.map(|found| found.as_str().to_owned()))
@@ -69,13 +105,13 @@ impl RegexProgram {
             .enumerate()
             .filter_map(|(index, name)| name.map(|name| (name.to_owned(), index)))
             .collect();
-        Some(MatchValue {
-            text: whole.as_str().to_owned(),
+        MatchValue {
+            text: whole.to_owned(),
             start,
-            end,
+            end: start + whole.chars().count(),
             groups,
             names,
-        })
+        }
     }
 }
 

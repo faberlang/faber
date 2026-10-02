@@ -940,6 +940,10 @@ fn resolve_return_type(
             let textus = checker.textus_type();
             checker.types.array(textus)
         }
+        IntrinsicReturnKind::MatchArray => {
+            let found = checker.types.primitive(Primitive::Match);
+            checker.types.array(found)
+        }
         IntrinsicReturnKind::OptionMatch => {
             let found = checker.types.primitive(Primitive::Match);
             checker.types.option(found)

@@ -126,6 +126,9 @@ pub enum IntrinsicReturnKind {
     /// `match ∪ nihil` — the `regex.inventa` result (RD-3: the match type has
     /// no source name; it is only ever read through this option and inference).
     OptionMatch,
+    /// `lista<match>` — the `regex.collecta` result (RD-3: no source name for
+    /// the element type).
+    MatchArray,
     /// `textus ∪ nihil` — a capture group's text, or `nihil` when the group did
     /// not participate or does not exist.
     OptionTextus,
@@ -1126,6 +1129,10 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     // (ruled), then the accepted defaults `inventum`, `principium`, `terminus`,
     // `coetus`, `nominatus`.
     intrinsic!(Regex, "inventa", 1, &[IntrinsicParamKind::Textus], OptionMatch, collection RegexFind),
+    // RX-4a: the two bulk ops. `collecta` is the accepted default; `divide` is
+    // the existing Latin name on a new receiver.
+    intrinsic!(Regex, "collecta", 1, &[IntrinsicParamKind::Textus], MatchArray, collection RegexFindAll),
+    intrinsic!(Regex, "divide", 1, &[IntrinsicParamKind::Textus], TextusArray, collection RegexSplit),
     intrinsic!(Match, "inventum", 0, &[], Textus, collection MatchText),
     intrinsic!(Match, "principium", 0, &[], Numerus, collection MatchStart),
     intrinsic!(Match, "terminus", 0, &[], Numerus, collection MatchEnd),

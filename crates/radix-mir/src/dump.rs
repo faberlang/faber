@@ -687,6 +687,8 @@ fn collection_op(op: MirCollectionOp) -> &'static str {
         MirCollectionOp::Values => "values",
         MirCollectionOp::RegexMatches => "regex_matches",
         MirCollectionOp::RegexFind => "regex_find",
+        MirCollectionOp::RegexFindAll => "regex_find_all",
+        MirCollectionOp::RegexSplit => "regex_split",
         MirCollectionOp::MatchText => "match_text",
         MirCollectionOp::MatchStart => "match_start",
         MirCollectionOp::MatchEnd => "match_end",

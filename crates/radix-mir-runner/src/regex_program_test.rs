@@ -107,3 +107,49 @@ fn find_groups_are_indexed_named_and_optional() {
     assert_eq!(found.named("second"), Some("b"));
     assert_eq!(found.named("missing"), None);
 }
+
+fn spans(pattern: &str, text: &str) -> Vec<(usize, usize)> {
+    RegexProgram::compile(pattern)
+        .expect("valid pattern")
+        .find_all(text)
+        .iter()
+        .map(|found| (found.start, found.end))
+        .collect()
+}
+
+#[test]
+fn find_all_follows_the_empty_match_rule_in_code_points() {
+    assert_eq!(spans("a*", "baaac"), [(0, 0), (1, 4), (5, 5)]);
+    assert_eq!(spans("a*", "aa"), [(0, 2)]);
+    assert_eq!(spans("", "ab"), [(0, 0), (1, 1), (2, 2)]);
+    assert_eq!(spans("a*", "😀aa😀"), [(0, 0), (1, 3), (4, 4)]);
+    assert_eq!(spans("[a-z]+", "😀é abc d"), [(3, 6), (7, 8)]);
+    assert!(spans("x", "abc").is_empty());
+}
+
+#[test]
+fn find_all_keeps_groups_and_names_per_match() {
+    let program = RegexProgram::compile("(?P<k>[a-z])(\\d)?").expect("valid pattern");
+    let found = program.find_all("a1 b");
+    assert_eq!(found.len(), 2);
+    assert_eq!(found[0].named("k"), Some("a"));
+    assert_eq!(found[0].group(2), Some("1"));
+    assert_eq!(found[1].named("k"), Some("b"));
+    assert_eq!(found[1].group(2), None);
+}
+
+#[test]
+fn split_keeps_edges_and_never_splices_groups() {
+    let pieces = |pattern: &str, text: &str| {
+        RegexProgram::compile(pattern)
+            .expect("valid pattern")
+            .split(text)
+    };
+    assert_eq!(pieces(",", ",a,"), ["", "a", ""]);
+    assert_eq!(pieces(",", "a,,b"), ["a", "", "b"]);
+    assert_eq!(pieces("(,)", "a,b"), ["a", "b"]);
+    assert_eq!(pieces("", "abc"), ["", "a", "b", "c", ""]);
+    assert_eq!(pieces("a*", "baaac"), ["", "b", "c", ""]);
+    assert_eq!(pieces(",", ""), [""]);
+    assert_eq!(pieces("x", "abc"), ["abc"]);
+}

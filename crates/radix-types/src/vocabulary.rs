@@ -380,6 +380,14 @@ pub enum MirCollectionOp {
     /// Match `nominatus` (en `named`): text of a `(?P<name>…)` group; `nihil`
     /// for a non-participating or unknown name.
     MatchNamed,
+    /// Regex `collecta` (en `find_all`): every non-overlapping match of the
+    /// `regex` receiver in a `textus` argument, as `lista<match>`, in one pass
+    /// with RE2's empty-match iteration rule (RX-4a).
+    RegexFindAll,
+    /// Regex `divide` (en `split`): the pieces of a `textus` argument between
+    /// the iteration's matches, as `lista<textus>`; leading and trailing empty
+    /// pieces are kept and capture groups are not spliced (RX-4a).
+    RegexSplit,
     /// Cord walk: `ascii.cursor()` / later `textus.cursor()` → `cursor<ascii<1>>`.
     /// One buffer of one-byte ascii values; not a per-step heap slice.
     CordCursor,

@@ -58,6 +58,15 @@ fn regex_find_and_match_accessors_resolve() {
     assert_eq!(find.return_kind, super::IntrinsicReturnKind::OptionMatch);
     assert_eq!(mir_collection_op(find), Some(MirCollectionOp::RegexFind));
 
+    let find_all = lookup_method_for_type(regex, "collecta", 1).expect("regex collecta");
+    assert_eq!(find_all.return_kind, super::IntrinsicReturnKind::MatchArray);
+    assert_eq!(mir_collection_op(find_all), Some(MirCollectionOp::RegexFindAll));
+
+    let split = lookup_method_for_type(regex, "divide", 1).expect("regex divide");
+    assert_eq!(split.receiver, IntrinsicReceiver::Regex);
+    assert_eq!(split.return_kind, super::IntrinsicReturnKind::TextusArray);
+    assert_eq!(mir_collection_op(split), Some(MirCollectionOp::RegexSplit));
+
     assert_eq!(receivers_for_type(found), &[IntrinsicReceiver::Match]);
     let accessors = [
         ("inventum", 0, super::IntrinsicReturnKind::Textus, MirCollectionOp::MatchText),
