@@ -316,3 +316,29 @@ fn rejects_bare_sparsa() {
         "expected sparsa incomplete diagnostic fact, got: {diags:?}"
     );
 }
+
+// =============================================================================
+// Retired `sic` conditional: migration diagnostic keyed on structure
+// =============================================================================
+
+#[test]
+fn retired_sic_conditional_reports_conditional_sic_removed() {
+    let source = "fixum _ v ← c sic 1 secus 2";
+    let result = parse(lex(source));
+    let err = result
+        .errors
+        .iter()
+        .find(|err| {
+            err.args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "conditional_sic_removed")
+        })
+        .expect("conditional_sic_removed diagnostic");
+    let diagnostic = Diagnostic::from_parse_error("test.fab", source, err);
+    assert_eq!(diagnostic.code, Some("PARSE030"));
+    assert_eq!(diagnostic.issue(), Some("conditional_sic_removed"));
+    assert!(
+        args_have_no_legacy_message(&err.args),
+        "migrated diagnostic should not choose prose at emit site"
+    );
+}

@@ -251,9 +251,6 @@ pub enum KeywordKind {
     /// Test declaration or test modifier syntax.
     Testing,
 
-    /// Nullability or predicate helper.
-    Nullability,
-
     /// Annotation metadata.
     Annotation,
 }
@@ -336,10 +333,6 @@ const ALIAS_MARKER: &[KeywordOwner] = &[KeywordOwner::AliasMarker];
 const ITERATION_MODE: &[KeywordOwner] = &[KeywordOwner::IterationMode];
 const SPREAD_EXPRESSION: &[KeywordOwner] = &[KeywordOwner::SpreadExpression];
 const PREDICATE_OPERATOR: &[KeywordOwner] = &[KeywordOwner::PredicateOperator];
-const PREDICATE_OR_MEMBER: &[KeywordOwner] = &[
-    KeywordOwner::PredicateOperator,
-    KeywordOwner::MemberIdentifier,
-];
 const CALLABLE_POSTURE: &[KeywordOwner] = &[KeywordOwner::CallablePosture];
 const CONTROL_OPERATION: &[KeywordOwner] = &[KeywordOwner::ControlOperation];
 const TYPE_NAME: &[KeywordOwner] = &[KeywordOwner::TypeName];
@@ -582,12 +575,6 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         category: KeywordKind::Modifier,
     },
     KeywordSpec {
-        text: "prae",
-        token_kind: Some(TokenKind::Prae),
-        scope: KeywordScope::Contextual(TYPE_PARAMETER),
-        category: KeywordKind::Modifier,
-    },
-    KeywordSpec {
         text: "privata",
         token_kind: Some(TokenKind::Privata),
         scope: KeywordScope::Contextual(IMPORT_VISIBILITY_ANNOTATION_OR_MEMBER),
@@ -682,12 +669,6 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "si",
         token_kind: Some(TokenKind::Si),
-        scope: KeywordScope::Contextual(CONTROL_FLOW),
-        category: KeywordKind::ControlFlow,
-    },
-    KeywordSpec {
-        text: "sic",
-        token_kind: Some(TokenKind::Sic),
         scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordKind::ControlFlow,
     },
@@ -1319,34 +1300,9 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::TestOwned,
         category: KeywordKind::Testing,
     },
-    // === Keywords: Nullability ===
-    KeywordSpec {
-        text: "negativum",
-        token_kind: Some(TokenKind::Negativum),
-        scope: KeywordScope::Contextual(PREDICATE_OPERATOR),
-        category: KeywordKind::Nullability,
-    },
-    KeywordSpec {
-        text: "nonnihil",
-        token_kind: Some(TokenKind::Nonnihil),
-        scope: KeywordScope::Contextual(PREDICATE_OR_MEMBER),
-        category: KeywordKind::Nullability,
-    },
-    KeywordSpec {
-        text: "nonnulla",
-        token_kind: Some(TokenKind::Nonnulla),
-        scope: KeywordScope::Contextual(PREDICATE_OPERATOR),
-        category: KeywordKind::Nullability,
-    },
-    // The retired `nulla` prefix predicate row was removed with D23.4:
-    // `nulla` is now the null value literal (the row in the Boolean/null
-    // group above), not a predicate operator.
-    KeywordSpec {
-        text: "positivum",
-        token_kind: Some(TokenKind::Positivum),
-        scope: KeywordScope::Contextual(PREDICATE_OPERATOR),
-        category: KeywordKind::Nullability,
-    },
+    // The prefix-predicate rows (`nulla` with D23.4; `positivum`, `negativum`,
+    // `nonnihil`, `nonnulla` with KW-1) are gone: `nulla` is the null value
+    // literal (the row in the Boolean/null group above).
     // === Keywords: Annotation ===
     KeywordSpec {
         text: "brevis",

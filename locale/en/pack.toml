@@ -28,7 +28,6 @@ interna = "internal"
 magnitudo = "size"
 iuncta = "tuple"
 optiones = "options"
-prae = "prae"
 praefixum = "comptime"
 insere = "embed"
 privata = "private"
@@ -48,7 +47,6 @@ itera = "for"
 apud = "at"
 secus = "else"
 si = "if"
-sic = "yields"
 sin = "elif"
 perge = "continue"
 redde = "return"
@@ -139,13 +137,6 @@ solum = "only"
 solum_in = "only_in"
 tag = "tag"
 temporis = "timeout"
-# Legacy predicates
-# D23.4 dropped the retired `nulla` predicate row: `nulla` is now the null
-# value literal declared in the Values-and-logic group above.
-negativum = "negative"
-nonnihil = "some"
-nonnulla = "nonnulla"
-positivum = "positive"
 # Annotation families (wave 1 — see docs/factory/annotation-locale)
 # Collision policy: fiet already owns "async"; fiunt owns "generator".
 cli = "cli"
@@ -999,7 +990,7 @@ message = "'c ? a : b' was removed; write 'c ✓ a ✗ b'"
 help = "the value conditional is 'c ✓ a ✗ b' (U+2713, U+2717) in every locale"
 
 [diagnostics.PARSE030.issues.conditional_sic_removed]
-message = "'c {sic} a {secus} b' was removed; write 'c ✓ a ✗ b'"
+message = "'c yields a else b' was removed; write 'c ✓ a ✗ b'"
 help = "the value conditional is 'c ✓ a ✗ b' (U+2713, U+2717) in every locale"
 
 [diagnostics.PARSE030.issues.recovery_uses_exit_arrow]

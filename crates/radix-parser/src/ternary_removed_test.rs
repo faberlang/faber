@@ -24,6 +24,52 @@ fn sic_secus_reports_migration_to_check_ballot() {
     );
 }
 
+/// Pins the migration diagnostic by structure: error kind, code-bearing issue
+/// key and the exact arg list, never prose.
+fn assert_sic_migration_args(source: &str) {
+    let result = crate::test_support::parse_program(source);
+    let error = result
+        .errors
+        .iter()
+        .find(|error| {
+            error
+                .args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "conditional_sic_removed")
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "expected conditional_sic_removed for {source:?}: {:?}",
+                result.errors
+            )
+        });
+    assert_eq!(error.kind, crate::ParseErrorKind::ExpressionInvalid);
+    assert_eq!(
+        error.args.len(),
+        1,
+        "issue is the only arg: {:?}",
+        error.args
+    );
+}
+
+#[test]
+fn sic_migration_diagnostic_keeps_kind_issue_and_args() {
+    assert_sic_migration_args("fixum _ v ← c sic 1 secus 2");
+    assert_sic_migration_args("fixum _ v ← a ∧ b sic 1 secus 2");
+}
+
+#[test]
+fn retired_words_are_ordinary_identifiers() {
+    // KW-1: `sic` and the retired predicate words left the registry. Only the
+    // exact `c sic <value>` shape on one line reports the migration; a binding
+    // or reference by that name parses.
+    let _ = parse_ok("fixum _ sic ← 1\nfixum _ v ← sic");
+    let _ = parse_ok(
+        "fixum _ v ← c\nfixum _ w ← 2\nfixum _ positivum ← 3\nfixum _ nonnulla ← positivum",
+    );
+    let _ = parse_ok("fixum _ v ← a\nsic ← 2");
+}
+
 #[test]
 fn optional_chain_forms_survive_the_removal() {
     let _ = parse_ok("fixum _ v ← a?.b\nfixum _ w ← a?[0]\nfixum _ x ← a?(1)");

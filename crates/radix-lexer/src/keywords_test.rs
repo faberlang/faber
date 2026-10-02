@@ -308,19 +308,22 @@ fn identifier_like_owner_policy_is_shared_across_keyword_scopes() {
 }
 
 #[test]
-fn nonnihil_remains_predicate_and_member_identifier() {
-    assert_eq!(
-        keyword_allowed_as_ident(KeywordOwner::PredicateOperator, &TokenKind::Nonnihil),
-        Some("nonnihil")
-    );
-    assert_eq!(
-        keyword_allowed_as_ident(KeywordOwner::MemberIdentifier, &TokenKind::Nonnihil),
-        Some("nonnihil")
-    );
-    assert_eq!(
-        keyword_allowed_as_ident(KeywordOwner::DeclarationName, &TokenKind::Nonnihil),
-        Some("nonnihil")
-    );
+fn retired_predicate_sic_and_prae_words_are_not_registry_rows() {
+    // KW-1: the six retired words left the registry; they lex as identifiers.
+    for word in [
+        "positivum",
+        "negativum",
+        "nonnihil",
+        "nonnulla",
+        "prae",
+        "sic",
+    ] {
+        assert!(
+            lookup_keyword_spec(word).is_none(),
+            "{word} must not be a keyword row"
+        );
+        assert_eq!(keyword_token_kind(word), None, "{word} must not be a token");
+    }
 }
 
 #[test]
