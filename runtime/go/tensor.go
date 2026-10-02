@@ -304,6 +304,16 @@ func (t TensorTensor[T]) Accipe(indices any) *T {
 	return &t.data[*offset]
 }
 
+// ReadAt is the bracket read: `T` or a trap (like a lista index); `Accipe` stays
+// the optional `*T` method form.
+func (t TensorTensor[T]) ReadAt(indices any) T {
+	p := t.Accipe(indices)
+	if p == nil {
+		panic("tensor accipe invalid index")
+	}
+	return *p
+}
+
 func (t *TensorTensor[T]) Ponde(indices any, value T) {
 	offset := tensorOffset(t.shape, indices)
 	if offset == nil || *offset < 0 || *offset >= len(t.data) {

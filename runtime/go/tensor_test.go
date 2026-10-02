@@ -94,6 +94,10 @@ func TestTensorAccess(t *testing.T) {
 		t.Fatalf("an out-of-bounds or wrong-rank index must read nil")
 	}
 	wantPanic(t, "tensor index must be a numeric list", func() { m.Accipe("no") })
+	if m.ReadAt([]int{2, 1}) != 6 {
+		t.Fatalf("ReadAt([2 1]) must read the element")
+	}
+	wantPanic(t, "tensor accipe invalid index", func() { m.ReadAt([]int{3, 0}) })
 	m.Ponde([]int{0, 1}, 20)
 	if m.Planata()[1] != 20 {
 		t.Fatalf("Ponde did not store")
