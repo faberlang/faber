@@ -2,8 +2,8 @@
 //!
 //! Both sit in the comparison tier, left-associative with `≺ ≻ ≤ ≥`. The
 //! parser only builds `BinOp::Member` / `BinOp::NotMember`; the checker picks
-//! range or collection semantics from the right operand. The keyword forms
-//! `intra` / `inter` keep parsing until unit 1c.
+//! range or collection semantics from the right operand. The retired keyword
+//! forms `intra` / `inter` are pinned in `membership_retired_test.rs`.
 
 use crate::test_support::{parse_ok, parse_program};
 use radix_syntax::{BinOp, Expr, ExprKind, StmtKind};
@@ -67,14 +67,6 @@ fn membership_binds_tighter_than_logical_and() {
     assert!(
         matches!(bin.rhs.kind, ExprKind::Binary(ref rhs) if matches!(rhs.op, BinOp::NotMember))
     );
-}
-
-#[test]
-fn keyword_forms_still_parse_as_range_operators() {
-    let bin = binary("fixum _ v ← x inter xs");
-    assert!(matches!(bin.op, BinOp::Between));
-    let bin = binary("fixum _ v ← n intra 0‥10");
-    assert!(matches!(bin.op, BinOp::InRange));
 }
 
 #[test]

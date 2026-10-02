@@ -17,7 +17,7 @@ fn dump(source: &str) -> String {
     dump_analyzed_unit(&analyze(source)).expect("MIR lowering succeeds")
 }
 
-/// The dump with interned-symbol ids blanked: a keyword spelling interns one
+/// The dump with interned-symbol ids blanked: the `non (…)` spelling interns one
 /// more source word than the glyph does, which shifts every later `sym#N`.
 fn shape(source: &str) -> String {
     dump(source)
@@ -56,11 +56,6 @@ fn member_lowers_to_one_contains_call_with_no_negation() {
 }
 
 #[test]
-fn member_glyph_dump_equals_the_keyword_spelling() {
-    assert_eq!(shape(&program("1 ∈ xs")), shape(&program("1 inter xs")));
-}
-
-#[test]
 fn not_member_is_contains_followed_by_not() {
     let dump = dump(&program("3 ∉ xs"));
     assert_eq!(
@@ -75,7 +70,6 @@ fn not_member_is_contains_followed_by_not() {
 #[test]
 fn not_member_dump_equals_the_negated_positive_form() {
     assert_eq!(shape(&program("3 ∉ xs")), shape(&program("non (3 ∈ xs)")));
-    assert_eq!(shape(&program("3 ∉ xs")), shape(&program("non (3 inter xs)")));
 }
 
 #[test]

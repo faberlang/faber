@@ -1623,6 +1623,10 @@ mod lt_divert_regression_test;
 mod membership_glyph_test;
 
 #[cfg(test)]
+#[path = "membership_retired_test.rs"]
+mod membership_retired_test;
+
+#[cfg(test)]
 #[path = "first_match_test.rs"]
 mod first_match_test;
 

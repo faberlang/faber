@@ -1379,6 +1379,17 @@ required = true
 note = "SEM010:membership_operand_unresolved; membership_glyph_test.rs empty_list_right_operand_is_unresolved_in_both_polarities"
 
 [[cells]]
+id = "membership.reject.text"
+family = "membership"
+cell = "REJECT: text right operand (x ∈ \"abc\"); use contains"
+status = "direct"
+exemplum = "operatores/membership-decline.fab"
+expected = true
+decline = true
+required = true
+note = "SEM010:membership_over_text; membership_glyph_test.rs text_right_operand_is_rejected_in_both_polarities"
+
+[[cells]]
 id = "membership.reject.mixed-list"
 family = "membership"
 cell = "REJECT: mixed enum/scalar value set"

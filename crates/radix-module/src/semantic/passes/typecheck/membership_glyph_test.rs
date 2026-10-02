@@ -82,12 +82,26 @@ fn range_held_in_a_binding_resolves_by_its_type() {
 }
 
 #[test]
-fn keyword_forms_resolve_through_the_same_path() {
-    // `inter` over a range now takes the range rule; `intra` is unchanged.
-    let ops = resolved_ops(
-        "incipit { fixum numerus x ← 5\n fixum lista<numerus> xs ← [1]\n fixum bivalens a ← x inter 0‥10\n fixum bivalens b ← x intra 0‥10\n fixum bivalens c ← x inter xs }",
-    );
-    assert_eq!(ops, [HirBinOp::InRange, HirBinOp::InRange, HirBinOp::Between]);
+fn retired_keyword_spellings_fail_at_parse_with_the_migration_diagnostic() {
+    // `intra` / `inter` are not operators any more; `∈` is the one spelling.
+    for source in [
+        "incipit { fixum numerus x ← 5\n fixum lista<numerus> xs ← [1]\n nota x inter xs }",
+        "incipit { fixum numerus x ← 5\n nota x intra 0‥10 }",
+    ] {
+        rejects(source, "PARSE001", "membership_keyword_retired");
+    }
+}
+
+#[test]
+fn text_right_operand_is_rejected_in_both_polarities() {
+    // OD-1: membership never applies to text; the text method does.
+    for source in [
+        "incipit { fixum textus t ← \"abc\"\n nota \"a\" ∈ t }",
+        "incipit { fixum textus t ← \"abc\"\n nota \"a\" ∉ t }",
+        "incipit { nota \"a\" ∈ \"abc\" }",
+    ] {
+        rejects(source, "SEM010", "membership_over_text");
+    }
 }
 
 #[test]
@@ -158,11 +172,7 @@ fn unresolved_found(source: &str) -> Option<String> {
 
 #[test]
 fn empty_list_right_operand_is_unresolved_in_both_polarities() {
-    for source in [
-        "incipit { nota 1 ∈ [] }",
-        "incipit { nota 1 ∉ [] }",
-        "incipit { nota 1 inter [] }",
-    ] {
+    for source in ["incipit { nota 1 ∈ [] }", "incipit { nota 1 ∉ [] }"] {
         rejects(source, "SEM010", "membership_operand_unresolved");
         assert!(unresolved_found(source).is_some(), "no found arg: {source}");
     }

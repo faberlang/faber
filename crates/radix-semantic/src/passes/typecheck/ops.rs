@@ -2277,8 +2277,7 @@ impl TypeChecker<'_> {
 }
 
 impl TypeChecker<'_> {
-    /// The unified membership operator (`∈` / `∉`, and the keyword forms that
-    /// still lower to `Between`).
+    /// The unified membership operator (`∈` / `∉`).
     ///
     /// The parser cannot tell a range from a collection, so it records the
     /// placeholder `Between` / `NotBetween`. The right operand's static type
@@ -2310,10 +2309,11 @@ impl TypeChecker<'_> {
     /// The right-operand rule of the collection form of membership.
     ///
     /// After peeling aliases and access markers the right operand must be a
-    /// `lista` (bounded or not), a `copia`, a `tabula` (membership by key) or
-    /// `textus` / `ascii` (bounded or not; substring containment, which the
-    /// keyword form keeps until it retires). Every other resolved type is
-    /// rejected with `membership_requires_collection`, carrying the right
+    /// `lista` (bounded or not), a `copia` or a `tabula` (membership by key).
+    /// A `textus` / `ascii` right operand (bounded or not) is rejected with
+    /// `membership_over_text`: membership never applies to text (operator
+    /// ruling OD-1), the text method does. Every other resolved type is
+    /// rejected with `membership_requires_collection`. Both carry the right
     /// operand's type as `found`.
     ///
     /// A right operand that is not resolved enough to test membership against
@@ -2365,8 +2365,15 @@ impl TypeChecker<'_> {
             Type::Primitive(Primitive::Textus | Primitive::Ascii)
             | Type::BoundedTextus { .. }
             | Type::BoundedAscii { .. } => {
-                let text = self.textus_type();
-                self.unify_assign_issue(lhs_ty, text, lhs_span, MEMBERSHIP_OPERAND_TYPE_MISMATCH);
+                // OD-1: no membership operator over text; the text method is
+                // the one spelling for substring containment.
+                let found = self.format_type_for_diagnostic(rhs_ty);
+                self.error_issue_with_args(
+                    SemanticErrorKind::TypeMismatch,
+                    MEMBERSHIP_OVER_TEXT,
+                    rhs_span,
+                    &[("found", found)],
+                );
             }
             _ => {
                 let found = self.format_type_for_diagnostic(rhs_ty);
@@ -2461,6 +2468,7 @@ const ASSIGNMENT_TYPE_MISMATCH: &str = "assignment_type_mismatch";
 const MEMBERSHIP_OPERAND_TYPE_MISMATCH: &str = "membership_operand_type_mismatch";
 const MEMBERSHIP_REQUIRES_COLLECTION: &str = "membership_requires_collection";
 const MEMBERSHIP_OPERAND_UNRESOLVED: &str = "membership_operand_unresolved";
+const MEMBERSHIP_OVER_TEXT: &str = "membership_over_text";
 const COALESCE_FALLBACK_TYPE_MISMATCH: &str = "coalesce_fallback_type_mismatch";
 const BOOLEAN_OPERANDS_REQUIRED: &str = "boolean_operands_required";
 const INTEGER_OPERANDS_REQUIRED: &str = "integer_operands_required";

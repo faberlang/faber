@@ -638,6 +638,10 @@ help = "remove the extra type parameter; use atomic<T>"
 message = "{predicate} is no longer prefix predicate syntax"
 help = "rewrite with {replacement}"
 
+[diagnostics.PARSE001.issues.membership_keyword_retired]
+message = "`{keyword}` is a retired membership operator; membership is spelled `{glyph}`"
+help = "write `{glyph}` (or `∉` to negate) between the element and the collection or range"
+
 [diagnostics.PARSE001.issues.equality_non_missing_est]
 message = "expected '{est}' after '{non}' in equality expression"
 help = "write identity negation as non est"
@@ -2343,8 +2347,12 @@ message = "membership operand type mismatch"
 help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.membership_requires_collection]
-message = "membership requires a collection or text on the right, found {found}"
-help = "use a list, set, map or text as the right operand; narrow a nullable value first"
+message = "membership requires a collection or range on the right, found {found}"
+help = "use a list, set, map or range as the right operand; narrow a nullable value first"
+
+[diagnostics.SEM010.issues.membership_over_text]
+message = "membership does not apply to text, found {found}"
+help = "test substring containment with the text method: haystack.contains(needle)"
 
 [diagnostics.SEM010.issues.membership_operand_unresolved]
 message = "membership right operand has an unresolved type, found {found}"
