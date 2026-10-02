@@ -63,7 +63,7 @@ const NON_NULL_CHAIN: PostfixChainPrefixes = PostfixChainPrefixes {
 
 /// Binder keyword of a loop header: `varia` when the authored binder is
 /// mutable, `fixum` otherwise, spelled in the source's own locale.
-fn loop_binder_keyword<'s>(mutable: bool, surface: &'s impl KeywordSurface) -> &'s str {
+fn loop_binder_keyword(mutable: bool, surface: &impl KeywordSurface) -> &str {
     surface.contextual_keyword(if mutable { "varia" } else { "fixum" })
 }
 
