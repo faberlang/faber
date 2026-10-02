@@ -7,6 +7,11 @@ fn small_compiled() -> BTreeSet<&'static str> {
     ["hir-rust"].into_iter().collect()
 }
 
+/// Features of the experimental, default-off novelty targets (BASIC, Pascal,
+/// COBOL, Fortran). They are outside `full-targets`, so the default test build
+/// lists their rows as `available=no`.
+const EXPERIMENTAL_DEFAULT_OFF: [&str; 4] = ["mir-basic", "hir-pascal", "hir-cobol", "hir-fortran"];
+
 fn row<'a>(rows: &'a [TargetRow], name: &str) -> &'a TargetRow {
     rows.iter()
         .find(|r| r.name == name)
@@ -167,11 +172,17 @@ fn default_build_reports_full_surface() {
     assert_eq!(rows.len(), specs.len());
 
     for spec in &specs {
-        assert!(
-            row(&rows, &spec.name).available,
-            "{} must be available",
-            spec.name
-        );
+        let available = row(&rows, &spec.name).available;
+        if EXPERIMENTAL_DEFAULT_OFF.contains(&spec.feature) {
+            assert_eq!(
+                available,
+                compiled_features().contains(spec.feature),
+                "{} availability must follow its default-off feature",
+                spec.name
+            );
+        } else {
+            assert!(available, "{} must be available", spec.name);
+        }
     }
     for name in ["device-runtime", "host-macos-arm64"] {
         assert!(
@@ -230,6 +241,9 @@ fn every_row_feature_is_compiled_in_the_default_test_build() {
     // hid `swift` (P6-2).
     let compiled = compiled_features();
     for spec in faber_target_row_specs() {
+        if EXPERIMENTAL_DEFAULT_OFF.contains(&spec.feature) {
+            continue;
+        }
         assert!(
             compiled.contains(spec.feature),
             "row {} names feature {}, which the default \
