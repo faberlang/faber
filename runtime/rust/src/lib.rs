@@ -10,6 +10,7 @@ pub mod ascii_bounded;
 pub mod contract;
 pub mod cursor_stream;
 pub mod display;
+pub mod exact;
 pub mod failable;
 pub mod frame;
 pub mod instans;
