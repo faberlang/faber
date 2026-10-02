@@ -1415,6 +1415,9 @@ pub enum BinOp {
     // Range
     InRange,
     Between,
+    // Membership glyphs: `∈` / `∉` (the checker picks range or collection)
+    Member,
+    NotMember,
 }
 
 #[derive(Debug)]

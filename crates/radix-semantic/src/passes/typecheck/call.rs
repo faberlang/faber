@@ -148,6 +148,20 @@ impl TypeChecker<'_> {
             .collect()
     }
 
+    /// Whether `method` (canonical or the active locale's surface spelling) is
+    /// on the registry surface of the bare float of `width`.
+    fn is_float_registry_method(&self, width: NumericWidth, method: &str) -> bool {
+        let bare = Type::SizedNumeric(Primitive::Fractus, width);
+        radix_intrinsics::receivers_for_type(&bare)
+            .iter()
+            .any(|family| {
+                radix_intrinsics::lookup_method_named(*family, method).is_some()
+                    || self
+                        .locale_pack
+                        .is_some_and(|pack| pack.intrinsic_canonical(*family, method).is_some())
+            })
+    }
+
     fn method_display_name(&self, name: Symbol) -> String {
         self.interner.map_or_else(
             || "method".to_owned(),
@@ -725,6 +739,15 @@ impl TypeChecker<'_> {
         );
         let tensor_higher_order_method = matches!(resolved_receiver, Type::Tensor(_, _))
             && super::super::air_closure_lift::is_higher_order_method(&method_name);
+        // N7e D3 (interim): a method of the bare float's registry surface on a
+        // float cell is not built yet. Other names keep the unknown-method miss.
+        if let Type::PolicyFloat(_, width) = *resolved_receiver
+            && self.is_float_registry_method(width, &method_name)
+        {
+            self.typecheck_call_arg_exprs(args);
+            self.invalid_operand_types(super::ops::POLICY_FLOAT_MATH_NOT_BUILT, receiver.span);
+            return self.error_type;
+        }
         if super::intrinsics::receiver_supports_intrinsics(resolved_receiver) {
             if let Some(result) = super::intrinsics::check_intrinsic_method_call(
                 self,

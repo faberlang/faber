@@ -238,7 +238,7 @@ kind = "bin"
     // A default (HIR-direct) config resolves to the manifest target: the
     // package's declared `fmir` is propagated to the analysis target.
     assert_eq!(
-        super::executed_lane_analysis_target(&Config::default(), dir.path()),
+        super::executed_lane_analysis_target(&Config::default(), dir.path()).unwrap(),
         Target::MirFmirBinary,
         "manifest `[build] target = \"fmir\"` must propagate to the analysis target"
     );
@@ -248,7 +248,8 @@ kind = "bin"
         super::executed_lane_analysis_target(
             &Config::default().with_target(Target::MirFmir),
             dir.path()
-        ),
+        )
+        .unwrap(),
         Target::MirFmir,
         "explicit MIR-backed target must stay authoritative over the manifest"
     );
@@ -272,7 +273,7 @@ entry = "main.fab"
     )
     .expect("manifest");
     assert_eq!(
-        super::executed_lane_analysis_target(&Config::default(), bare.path()),
+        super::executed_lane_analysis_target(&Config::default(), bare.path()).unwrap(),
         Target::MirFmirBinary,
         "the executed-lane default for an un-targeted package must be `fmir`"
     );
@@ -6723,7 +6724,7 @@ fn run() args args {
     assert!(
         output
             .code
-            .contains("println!(\"{}\", faber::display_bivalens(args.verbose));")
+            .contains("println!(\"{}\", faber::display::bivalens(args.verbose));")
     );
 }
 
@@ -8069,7 +8070,7 @@ fn thai_reader_locale_example_compiles_from_manifest() {
     assert!(rust.contains("while current > 0"));
     assert!(rust.contains("let score: i64 = 82;"));
     assert!(rust.contains("let scores: Vec<i64> = vec!["));
-    assert!(rust.contains("faber::display_bivalens(ผ่าน(score))"));
+    assert!(rust.contains("faber::display::bivalens(ผ่าน(score))"));
     assert!(rust.contains("นับผ่าน(scores.clone())"));
     assert!(rust.contains("นับถอยหลัง(3)"));
 }
@@ -8103,6 +8104,59 @@ target = "cobol"
         diag,
         "package_build_target_unsupported"
     ) && diagnostic_has_arg(diag, "target", "cobol")));
+}
+
+#[test]
+fn every_target_resolver_fails_closed_on_unsupported_library_target() {
+    // S09-1: `build.kind = "lib"` validators skip the singular `build.target`,
+    // so check, build and the executed lane each resolved it separately with
+    // different fallbacks. All of them now share one resolver and report the
+    // unsupported target.
+    let dir = test_temp_dir("lib-target-resolvers");
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create src");
+    fs::write(src.join("lib.fab"), "fn one() -> numerus { redde 1 }\n").expect("write source");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "lib-target"
+
+[build]
+kind = "lib"
+target = "cobol"
+targets = ["rust"]
+
+[library]
+provider = "lib-target"
+"#,
+    )
+    .expect("write manifest");
+
+    let package_err = super::manifest_package_build_target(dir.path())
+        .expect_err("package target resolver must fail closed");
+    assert!(diagnostic_has_issue(
+        &package_err,
+        "package_build_target_unsupported"
+    ));
+    let lane_err = super::executed_lane_analysis_target(&Config::default(), dir.path())
+        .expect_err("executed lane resolver must fail closed");
+    assert!(diagnostic_has_issue(
+        &lane_err,
+        "package_build_target_unsupported"
+    ));
+
+    // No manifest: every resolver reports "no manifest" and the caller picks
+    // its own named default.
+    let bare = test_temp_dir("lib-target-resolvers-bare");
+    assert_eq!(
+        super::manifest_package_build_target(bare.path()).expect("no manifest"),
+        None
+    );
+    assert_eq!(
+        super::executed_lane_analysis_target(&Config::default(), bare.path()).expect("no manifest"),
+        Target::MirFmirBinary
+    );
 }
 
 #[test]
@@ -14618,10 +14672,11 @@ fn web4_lib_kind_package_emits_a_library_crate() {
     assert!(!code.contains("fn main"), "a library crate carries no main");
     let lib_rs = fs::read_to_string(src.join("lib.rs")).expect("lib.rs");
     assert!(lib_rs.contains("pub struct Span"), "public item is exposed");
-    // Exact-integer helpers live in the package module that uses them.
+    // Exact-integer helpers live in the `faber` crate: the module calls them
+    // and carries no copy.
     assert!(
-        lib_rs.contains("fn __faber_int"),
-        "module carries its helper"
+        lib_rs.contains("faber::exact::add(") && !lib_rs.contains("fn __faber_int"),
+        "module calls faber::exact"
     );
 }
 

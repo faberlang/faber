@@ -647,6 +647,7 @@ fn spell_type_id(types: &TypeTable, id: TypeId, depth: u8) -> String {
             Primitive::Ignotum => "ignotum",
             Primitive::Octeti => "octeti",
             Primitive::Regex => "regex",
+            Primitive::Match => "match",
             Primitive::Json => "json",
             Primitive::Valor => "valor",
             Primitive::Instans => "instans",

@@ -49,6 +49,10 @@ pub struct Entry {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub examples: Vec<String>,
 
+    /// Grammar production ids the exemplum exercises, from its front matter.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub grammar: Vec<String>,
+
     /// Alternate query terms that resolve to this entry without legacy status.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub aliases: Vec<String>,
@@ -514,16 +518,7 @@ pub fn render_list(registry: &Registry) -> String {
         .max()
         .unwrap_or(0);
 
-    for kind in [
-        Kind::Keyword,
-        Kind::Operator,
-        Kind::Annotation,
-        Kind::Literal,
-        Kind::Modifier,
-        Kind::Type,
-        Kind::Concept,
-        Kind::Conversio,
-    ] {
+    for kind in LIST_KIND_ORDER {
         let group = entries
             .iter()
             .copied()
@@ -550,6 +545,31 @@ pub fn render_list(registry: &Registry) -> String {
         }
     }
     out
+}
+
+/// Render the canonical explain terms as a JSON array of records.
+///
+/// Records carry `term`, `kind`, `category`, and `summary` in the same order as
+/// [`render_list`] (kind groups, then registry order), so a consumer gets the
+/// plain list without parsing fixed-width text. Legacy entries are omitted.
+pub fn render_list_json(registry: &Registry) -> Result<String, ExplainError> {
+    let rows = LIST_KIND_ORDER
+        .iter()
+        .flat_map(|kind| {
+            registry
+                .entries()
+                .iter()
+                .filter(move |entry| entry.canonical && entry.kind == *kind)
+        })
+        .map(|entry| JsonListRow {
+            term: &entry.term,
+            kind: entry.kind,
+            category: &entry.category,
+            summary: &entry.summary,
+        })
+        .collect::<Vec<_>>();
+    serde_json::to_string_pretty(&rows)
+        .map_err(|err| ExplainError::new(format!("failed to render JSON: {err}")))
 }
 
 /// Render all entries in one category.
@@ -585,6 +605,26 @@ fn push_padded(out: &mut String, value: &str, width: usize) {
 
 fn display_width(value: &str) -> usize {
     value.chars().count()
+}
+
+/// Group order shared by the plain and JSON list renderings.
+const LIST_KIND_ORDER: [Kind; 8] = [
+    Kind::Keyword,
+    Kind::Operator,
+    Kind::Annotation,
+    Kind::Literal,
+    Kind::Modifier,
+    Kind::Type,
+    Kind::Concept,
+    Kind::Conversio,
+];
+
+#[derive(Serialize)]
+struct JsonListRow<'a> {
+    term: &'a str,
+    kind: Kind,
+    category: &'a str,
+    summary: &'a str,
 }
 
 #[derive(Serialize)]

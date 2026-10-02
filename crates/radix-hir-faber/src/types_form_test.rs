@@ -298,6 +298,52 @@ fn policy_float_cells_re_emit_in_both_locales() {
     );
 }
 
+/// N7E-2c: the authored POLICY level over a policy-float witness spells the
+/// cell as authored (`trapping<f32>` / `saturating<f32>`) in both locales; a
+/// recorded argument is still malformed.
+#[test]
+fn policy_float_cells_re_emit_through_the_policy_level() {
+    let mut fx = fixture();
+    let trapping_f32 = fx.types.intern(Type::PolicyFloat(
+        radix_types::FloatPolicy::Trapping,
+        NumericWidth::F32,
+    ));
+    let saturating_f32 = fx.types.intern(Type::PolicyFloat(
+        radix_types::FloatPolicy::Saturating,
+        NumericWidth::F32,
+    ));
+    let codegen = codegen_with_forms(
+        &fx,
+        vec![
+            (
+                declared_site(1),
+                semantic_form(TypeFormLevel::POLICY, trapping_f32, Vec::new()),
+            ),
+            (
+                declared_site(2),
+                semantic_form(TypeFormLevel::POLICY, saturating_f32, Vec::new()),
+            ),
+        ],
+    );
+
+    assert_eq!(
+        render_at(&codegen, &declared_site(1), trapping_f32, &LaSurface),
+        "exactus<f32>"
+    );
+    assert_eq!(
+        render_at(&codegen, &declared_site(1), trapping_f32, &EnSurface),
+        "trapping<f32>"
+    );
+    assert_eq!(
+        render_at(&codegen, &declared_site(2), saturating_f32, &LaSurface),
+        "saturatus<f32>"
+    );
+    assert_eq!(
+        render_at(&codegen, &declared_site(2), saturating_f32, &EnSurface),
+        "saturating<f32>"
+    );
+}
+
 #[test]
 fn list_three_way_keeps_root_and_child_levels_exact() {
     let fx = fixture();

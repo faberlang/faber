@@ -441,8 +441,16 @@ inter = "intersect"
 # identity in grammar slots, so a member call `interval.union(...)` parses.
 union = "union"
 
-# regex (1)
+# regex (3; divide and muta shared with textus above), match (5) and textus escape (munita)
 consentit = "matches"
+inventa = "find"
+collecta = "find_all"
+inventum = "text"
+principium = "start"
+terminus = "end"
+coetus = "group"
+nominatus = "named"
+munita = "escape"
 
 # -----------------------------------------------------------------------------
 # [diagnostics.*] — materialized from la (S0-U3 flat-pack materialization).
@@ -644,6 +652,10 @@ help = "remove the extra type parameter; use atomic<T>"
 [diagnostics.PARSE001.issues.retired_prefix_predicate]
 message = "{predicate} is no longer prefix predicate syntax"
 help = "rewrite with {replacement}"
+
+[diagnostics.PARSE001.issues.membership_keyword_retired]
+message = "`{keyword}` is a retired membership operator; membership is spelled `{glyph}`"
+help = "write `{glyph}` (or `∉` to negate) between the element and the collection or range"
 
 [diagnostics.PARSE001.issues.equality_non_missing_est]
 message = "expected '{est}' after '{non}' in equality expression"
@@ -1457,10 +1469,6 @@ help = "write the trapping type with one width, such as trapping<u8> or trapping
 message = "trapping width must be a bare width marker"
 help = "use a bare width marker such as u8 or i64"
 
-[diagnostics.SEM008.issues.trapping_float_not_implemented]
-message = "trapping floats are not implemented yet"
-help = "write the bare float width (f16, bf16, f32, or f64) for IEEE arithmetic; trapping floats are not implemented yet"
-
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "callable annotation posture '{annotation_posture}' conflicts with written posture '{written_posture}'"
 help = "fix the AST construct for lowering"
@@ -1716,6 +1724,10 @@ help = "drop the parameter and bind the iteration coordinate with `{apud}` on a 
 [diagnostics.SEM008.issues.nucleum_recovery]
 message = "a kernel body cannot install a local handler ('{construct}')"
 help = "let the error reach the launching call, where the host handles it"
+
+[diagnostics.SEM008.issues.nucleum_saturating_float_not_built]
+message = "a kernel cannot use a saturating float yet ({site}); device lowering of saturating floats is not built"
+help = "use the bare float width in the kernel and convert at the host boundary with `↦`"
 
 [diagnostics.SEM008.issues.nucleum_workgroup]
 message = "a kernel cannot name '{construct}' ({site}); workgroup state is compiler-internal"
@@ -2357,6 +2369,18 @@ help = "make the expression type match the expected type"
 message = "membership operand type mismatch"
 help = "make the expression type match the expected type"
 
+[diagnostics.SEM010.issues.membership_requires_collection]
+message = "membership requires a collection or range on the right, found {found}"
+help = "use a list, set, map or range as the right operand; narrow a nullable value first"
+
+[diagnostics.SEM010.issues.membership_over_text]
+message = "membership does not apply to text, found {found}"
+help = "test substring containment with the text method: haystack.contains(needle)"
+
+[diagnostics.SEM010.issues.membership_operand_unresolved]
+message = "membership right operand has an unresolved type, found {found}"
+help = "give the right operand a known type, for example annotate the list or bind it with a typed declaration"
+
 [diagnostics.SEM010.issues.matmul_argument_rank_must_be_two]
 message = "matmul requires rank-2 tensor argument"
 help = "make the expression type match the expected type"
@@ -2608,6 +2632,14 @@ help = "convert one side with `↦` so both operands are u64 or both are signed 
 [diagnostics.SEM011.issues.saturating_word_family_mismatch]
 message = "saturating integers cannot mix with other integer families in arithmetic"
 help = "convert the other operand to the same saturating width with `↦`; saturating, wrapping, and trapping integers never mix implicitly"
+
+[diagnostics.SEM011.issues.policy_float_family_mismatch]
+message = "trapping and saturating floats cannot mix with other floats in arithmetic"
+help = "convert the other operand to the same float cell with `↦`; a trapping or saturating float never mixes with a bare float, another cell, or another width implicitly"
+
+[diagnostics.SEM011.issues.policy_float_math_not_built]
+message = "math methods on trapping and saturating floats are not built yet"
+help = "convert the cell to the bare float width with `↦`, call the method on that, and convert back"
 
 [diagnostics.SEM011.issues.numeric_family_crossing_requires_conversio]
 message = "integer, decimal and float operands cannot mix implicitly"
@@ -3396,10 +3428,6 @@ help = "use literal scalar leaves in the nested {lista}"
 [diagnostics.SEM016.issues.bivalens_recovery_unsupported]
 message = "a conversion to {bivalens} cannot fail, so it takes no `⊥` default"
 help = "remove the recovery arm; use the truthiness result directly"
-
-[diagnostics.SEM016.issues.regex_pattern_too_long]
-message = "regex literal pattern is {length} bytes; the maximum is {max}"
-help = "shorten the literal pattern or build it dynamically"
 
 [diagnostics.SEM017]
 message = "unavailable declaration"

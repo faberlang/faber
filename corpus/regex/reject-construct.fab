@@ -1,0 +1,106 @@
++++
+term = "reject-construct"
+kind = "conformance"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "conversio_expr", "fac_stmt", "cape_clause", "si_stmt", "call_expr", "call_suffix", "member_suffix", "non_null_suffix", "argument_list", "argument", "expression", "ternary", "literal", "nota_stmt", "additive_expr", "equality", "equality_tail", "assignment", "place", "itera_stmt", "dum_stmt", "comparison", "vel_expr", "vel_rhs", "sit_decl", "expr_stmt"]
+category = "regex"
+canonical = false
+summary = "Every other construct the dialect does not have fails with a stable id: `atomic_group`, `possessive`, `recursion`, `conditional`, or `syntax` for malformed patterns and the reference engine's extras."
+syntax = "<textus> ↦ regex"
+related = ["regex", "↦", "find", "find_all", "split", "replace"]
+locale = "en"
++++
+# =============================================================================
+# reject-construct — regex conformance cell
+# =============================================================================
+#
+# Pins: PIN-REJECT, PIN-NAME (docs/design/regex-dialect.md). One line per probe cell;
+# the label is the cell id of the dialect's Appendix B, and the value is the reference
+# engine's answer. A target whose engine disagrees fails the line, never the dialect.
+#
+# What this teaches:
+#   • `(?>a)` fails with `atomic_group`; `a++` and `a*+` fail with `possessive`; `(?R)` and `(?1)` fail with `recursion`; `(?(1)a|b)` fails with `conditional`
+#   • malformed patterns (an unclosed group or class, a repeat with nothing to repeat, a trailing backslash, an unknown escape, an unknown `\p{..}` property) fail with `syntax`
+#   • constructs the reference engine accepts but the portable dialect does not fail with `syntax` as well: `a**`, class set operations and nested classes, `\<`, `\b{start}`, `\u0041`, and a repeat count over 1000
+#   • valid look-alikes are accepted: `[[:^alpha:]]`, `\x41`, `\x{1F600}`, lazy and counted repeats, `()`, `(|a)`, `#`, `$`
+#
+# Common mistakes:
+#   • relying on the text after the id: only the leading id is stable
+#   • expecting a construct the reference engine tolerates to be portable
+#
+# See also: regex, ↦, find, find_all, split, replace.
+# =============================================================================
+
+# reject-construct — probes, one line each
+#
+# <textus> ↦ regex, then the operation the pin is about
+#
+# EXPECTED OUTPUT:
+#   One `<cell id>: <value>` line per probe, in the order below.
+
+# The one-letter text for a code point: characters that are invisible or look like another
+# letter are written by number, never as a literal.
+fn u(int n) → string {
+    const char c ← n ↦ char via Code ⊥ '?'
+    return c ↦ string
+}
+
+# `accepted` when the conversion takes the pattern; otherwise the leading construct id of the
+# rejection payload (the text before the first colon). The engine's prose is never printed.
+fn verdict(string pat) → string {
+    do {
+        pat ↦ regex
+        return "accepted"
+    }
+    catch err {
+        const list<string> parts ← err.split(":")
+        return parts[0]
+    }
+}
+
+main {
+    print "k-atomic: " + verdict("(?>a)")
+    print "k-possessive-plus: " + verdict("a++")
+    print "k-possessive-star: " + verdict("a*+")
+    print "k-recursion-R: " + verdict("(?R)")
+    print "k-recursion-1: " + verdict("(a)(?1)")
+    print "k-conditional: " + verdict("(?(1)a|b)")
+    print "k-unclosed-group: " + verdict("(")
+    print "k-unopened-group: " + verdict("a)")
+    print "k-unclosed-class: " + verdict("[")
+    print "k-repeat-range-order: " + verdict("a{2,1}")
+    print "k-repeat-nothing: " + verdict("*a")
+    print "k-repeat-twice: " + verdict("a**")
+    print "k-trailing-backslash: " + verdict("\\")
+    print "k-unknown-escape-z: " + verdict("\\Z")
+    print "k-unknown-escape-G: " + verdict("\\G")
+    print "k-quote-QE: " + verdict("\\Qa.b\\E")
+    print "k-unknown-escape-h: " + verdict("\\h")
+    print "k-unknown-escape-R: " + verdict("\\R")
+    print "k-unknown-escape-K: " + verdict("\\K")
+    print "k-unknown-prop: " + verdict("\\p{Foo}")
+    print "k-repeat-huge: " + verdict("a{100000}")
+    print "k-class-empty: " + verdict("[]")
+    print "k-class-reversed: " + verdict("[z-a]")
+    print "k-unicode-u4: " + verdict("\\u0041")
+    print "k-unicode-u-brace: " + verdict("\\u{41}")
+    print "k-class-intersect: " + verdict("[a-z&&[^m]]")
+    print "k-class-nested: " + verdict("[a[bc]]")
+    print "k-class-subtract: " + verdict("[a-z--m]")
+    print "k-word-start: " + verdict("\\<")
+    print "k-word-start-brace: " + verdict("\\b{start}")
+    print "k-named-empty: " + verdict("(?P<>a)")
+    print "k-comment-group: " + verdict("(?§c)a"(u(35)))
+    print "name-quote: " + verdict("(?'n'a)")
+    print "name-dup: " + verdict("(?P<n>a)(?P<n>b)")
+    print "name-digit-start: " + verdict("(?P<1a>a)")
+    print "k-posix-neg: " + verdict("[[:^alpha:]]")
+    print "k-hex-brace: " + verdict("\\x{1F600}")
+    print "k-hex-2: " + verdict("\\x41")
+    print "k-quant-lazy: " + verdict("a+?")
+    print "k-quant-counted: " + verdict("a{2,3}")
+    print "k-quant-open: " + verdict("a{2,}")
+    print "k-empty-group: " + verdict("()")
+    print "k-empty-alt-group: " + verdict("(|a)")
+    print "k-hash-literal: " + verdict(u(35))
+    print "k-dollar-alone: " + verdict("$")
+}

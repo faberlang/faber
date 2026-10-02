@@ -174,8 +174,8 @@ fn dev_fallback_loads_repo_exempla_index() {
     // the registry (abstractus, sub: inheritance removal; cura, curata,
     // arena: D8.2; nexum: D16.2; sic: D4.7), two arrived (✓: D4.5; insere:
     // D8.10's missing registry row added).
-    assert_eq!(pack.term_count(), 197);
-    assert_eq!(pack.metadata().registry_terms, 197);
+    assert_eq!(pack.term_count(), 196);
+    assert_eq!(pack.metadata().registry_terms, 196);
     assert_eq!(pack.layout(), ReferenceLayout::Repo);
     assert!(pack.term("functio").is_some());
     assert!(pack.term("≡").is_some());
@@ -193,7 +193,7 @@ fn load_from_repo_root_lists_canonical_terms() {
     // the registry (abstractus, sub: inheritance removal; cura, curata,
     // arena: D8.2; nexum: D16.2; sic: D4.7), two arrived (✓: D4.5; insere:
     // D8.10's missing registry row added).
-    assert_eq!(pack.term_count(), 197);
+    assert_eq!(pack.term_count(), 196);
     // 14 → 13: the `nulla` redirect retired with D23.4 (8c5cc3de4).
     assert_eq!(pack.legacy_redirects().len(), 13);
     assert!(pack.resolve_exempla_path("functio/functio.fab").is_file());
@@ -263,8 +263,8 @@ fn build_registry_loads_canonical_and_legacy_entries() {
     let registry = pack.build_registry().expect("build registry");
     // 216 → 210 → 211 → 210: the registry follows the canonical term count
     // (197) plus the legacy redirects (13). The `nulla` redirect retired with
-    // D23.4 (8c5cc3de4), so 197 + 13 = 210; see reference_test for history.
-    assert_eq!(registry.entries().len(), 210);
+    // D23.4 (8c5cc3de4), so 196 + 13 = 209 (mg5a folds inter+intra into one term); see reference_test for history.
+    assert_eq!(registry.entries().len(), 209);
     assert!(registry.reference_root().is_some());
     assert!(registry.lookup("functio").is_some());
     assert!(matches!(registry.lookup("=="), Some(Lookup::Legacy { .. })));
@@ -342,8 +342,8 @@ fn load_from_disk_builds_explain_registry() {
     let registry = Registry::load_from_disk().expect("disk registry");
     // 216 → 210 → 211 → 210: the registry follows the canonical term count
     // (197) plus the legacy redirects (13). The `nulla` redirect retired with
-    // D23.4 (8c5cc3de4), so 197 + 13 = 210; see reference_test for history.
-    assert_eq!(registry.entries().len(), 210);
+    // D23.4 (8c5cc3de4), so 196 + 13 = 209 (mg5a folds inter+intra into one term); see reference_test for history.
+    assert_eq!(registry.entries().len(), 209);
     let list = render_list(&registry);
     assert!(list.contains("reference:"));
 

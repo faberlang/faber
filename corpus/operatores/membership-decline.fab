@@ -1,0 +1,62 @@
++++
+term = "∈"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "hole_type", "si_stmt", "arm", "comparison", "array_literal", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "values"
+summary = "Membership reject harness: a scalar, nullable, unresolved empty list, text, or mixed value-set right operand is rejected."
+syntax = "1 ∈ 5"
+related = ["‥", "…"]
+locale = "en"
++++
+# =============================================================================
+# ∈ — membership decline (MG-6b)
+# =============================================================================
+# This exemplum intentionally fails to compile. The sibling .expected file
+# pins only the stable diagnostic identities, not paths or rendered prose.
+#
+# Each statement below is one reject cell:
+#   • scalar right operand            1 ∈ 5
+#   • nullable collection right       n ∈ maybe
+#   • unresolved empty list right     1 ∈ []
+#   • mixed enum/scalar value set     c ∈ [Color.rubrum, 3]
+#   • text right operand              "a" ∈ "abc" (membership never applies to
+#                                     text; use contains)
+
+enum Color {
+    rubrum,
+    viridis
+}
+
+fn scalar() → void {
+    if 1 ∈ 5 {
+        print "scalar"
+    }
+}
+
+fn nullable(list<int> ∪ none maybe) → void {
+    if 1 ∈ maybe {
+        print "nullable"
+    }
+}
+
+fn unresolved() → void {
+    if 1 ∈ [] {
+        print "unresolved"
+    }
+}
+
+fn mixed(Color c) → void {
+    if c ∈ [Color.rubrum, 3] {
+        print "mixed"
+    }
+}
+
+fn text() → void {
+    if "a" ∈ "abc" {
+        print "text"
+    }
+}
+
+main {
+    scalar()
+}

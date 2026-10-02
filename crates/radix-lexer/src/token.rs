@@ -240,8 +240,6 @@ pub enum TokenKind {
     // === Keywords: Ranges ===
     Ab,
     Ante,
-    Inter,
-    Intra,
     Per,
     Usque,
     // === Keywords: Testing ===
@@ -288,6 +286,10 @@ pub enum TokenKind {
     Cup,       // ∪ inline union
     Cap,       // ∩ inline intersection
     At,        // @
+
+    // === Membership glyphs (no ASCII or word spelling) ===
+    ElementOf,    // ∈ membership over a range or collection
+    NotElementOf, // ∉ non-membership over a range or collection
 
     // === Operators ===
     Plus,       // +
@@ -480,8 +482,6 @@ impl TokenKind {
                 | Ut
                 | Via
                 | Ante
-                | Inter
-                | Intra
                 | Per
                 | Usque
                 | Erratur

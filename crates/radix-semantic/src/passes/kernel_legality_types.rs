@@ -9,6 +9,7 @@
 use super::kernel_legality::ModuleFacts;
 use crate::{Primitive, Type, TypeId, TypeTable};
 use radix_hir::DefId;
+use radix_types::FloatPolicy;
 use rustc_hash::FxHashSet;
 
 /// Family label of an atomic cell: compiler-internal workgroup state, not a
@@ -17,6 +18,14 @@ pub(super) const FAMILY_ATOMIC: &str = "atomic";
 
 /// Family label of the unbounded integer `inf`: host-only (ruling 39(b)).
 pub(super) const FAMILY_INF: &str = "inf";
+
+/// Family label of a `trapping<float>` cell: host-only by language rule
+/// (ruling 18(b), N7e D6; a device has no trap).
+pub(super) const FAMILY_TRAPPING_FLOAT: &str = "trapping<float>";
+
+/// Family label of a `saturating<float>` cell: admitted by the language, but
+/// its device lowering is not built (N7e D6, temporary refusal).
+pub(super) const FAMILY_SATURATING_FLOAT: &str = "saturating<float>";
 
 /// First host-only family found inside `ty`, or `None` when the whole type is
 /// legal in a kernel.
@@ -69,6 +78,10 @@ impl Walk<'_> {
             | Type::Option(element)
             | Type::Ref(_, element)
             | Type::Alias(_, element) => self.family(*element),
+            // N7e D6: `trapping<float>` is a language rule (a device has no
+            // trap); `saturating<float>` is a temporary refusal.
+            Type::PolicyFloat(FloatPolicy::Trapping, _) => Some(FAMILY_TRAPPING_FLOAT),
+            Type::PolicyFloat(FloatPolicy::Saturating, _) => Some(FAMILY_SATURATING_FLOAT),
             Type::Struct(def) => self.nominal(*def, false),
             Type::Enum(def) => self.nominal(*def, true),
             Type::Applied(base, args) => self.family(*base).or_else(|| {
@@ -94,9 +107,6 @@ impl Walk<'_> {
             | Type::SizedNumeric(..)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
-            // N7E-1: plumbing only. The cell has no resolver path yet, so no
-            // kernel signature can name it; N7E-2 applies the D6 rule here.
-            | Type::PolicyFloat(_, _)
             | Type::TensorEdgePolicy(_)
             | Type::Func(_)
             | Type::Param(_)
@@ -129,6 +139,7 @@ fn primitive_family(primitive: Primitive) -> Option<&'static str> {
         Primitive::Textus => Some("textus"),
         Primitive::Octeti => Some("octeti"),
         Primitive::Regex => Some("regex"),
+        Primitive::Match => Some("match"),
         Primitive::Json => Some("json"),
         Primitive::Valor => Some("valor"),
         Primitive::Ignotum => Some("ignotum"),

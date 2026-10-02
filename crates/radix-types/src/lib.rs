@@ -130,6 +130,7 @@ mod smoke_tests {
             Primitive::Ignotum,
             Primitive::Octeti,
             Primitive::Regex,
+            Primitive::Match,
             Primitive::Json,
             Primitive::Valor,
             Primitive::Ascii,

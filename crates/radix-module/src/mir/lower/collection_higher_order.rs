@@ -435,6 +435,49 @@ impl FunctionBuilder<'_> {
         Some(MirOperand::Place(result))
     }
 
+    /// Closure `regex.muta(text, closure)` (RX-5): the closure runs once per
+    /// match, left to right, over `RegexFindAll`'s matches with the ordinary
+    /// map loop; `RegexReplaceEach` then joins the results into the text. The
+    /// results are taken literally and never re-scanned. Same shape as the
+    /// keyed sort: map, then one collection op over the mapped `lista`.
+    pub(super) fn lower_regex_replace_closure(
+        &mut self,
+        receiver: &HirExpression,
+        text: &HirExpression,
+        closure: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let found = self.types.primitive(Primitive::Match);
+        let textus = self.types.primitive(Primitive::Textus);
+        // WHY: typecheck interns both carriers when it admits the closure form,
+        // so they exist in the read-only type table here.
+        let (Some(matches_ty), Some(texts_ty)) = (self.types.find_array(found), self.types.find_array(textus)) else {
+            self.errors
+                .push(MirError::missing_type(expr.span, "regex replace closure carriers"));
+            return None;
+        };
+        let matches_ty = MirType::semantic(matches_ty);
+        let texts_ty = MirType::semantic(texts_ty);
+        let textus_ty = self.expr_ty(expr)?;
+        let regex = self.lower_expr_value(receiver)?;
+        let text = self.lower_expr_value(text)?;
+        let callback = self.lower_closure_function(closure, MirType::semantic(textus))?;
+        let found_all = self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::RegexFindAll),
+            vec![regex.clone(), text.clone()],
+            matches_ty,
+            expr.span,
+        );
+        let found_all = self.materialize_operand_place(found_all, matches_ty, expr.span);
+        let replacements = self.lower_transform_over(found_all, callback, TransformKind::Map, texts_ty, expr.span)?;
+        Some(self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::RegexReplaceEach),
+            vec![regex, text, replacements],
+            textus_ty,
+            expr.span,
+        ))
+    }
+
     /// `ordina(key)` / `ordinata(key)` (D1.7): map the receiver to a key
     /// `lista` with the ordinary map loop, then `SortByKeys` reorders the
     /// receiver stably by those keys. The receiver is evaluated once.

@@ -107,7 +107,7 @@ pub(crate) use manifest::manifest_device_inputs;
 pub(crate) use manifest::validate_manifest;
 pub use manifest::{
     FaberManifest, ManifestProduct, ManifestProductEmit, ManifestProductKind,
-    ManifestProductShaders, read_manifest,
+    ManifestProductShaders, manifest_package_build_target, read_manifest,
 };
 #[cfg(feature = "runner")]
 pub use mir::run_fmir_image_bytes_with_stdio;
@@ -147,14 +147,18 @@ pub use test_route::{analyze_package_for_tests, test_source_filter_for_input};
 /// from the same source, so the two targets cannot diverge (ABI source-of-
 /// truth invariant). The radix-side TARGETLANE001 guard is unchanged — this
 /// only fixes the executed route's target selection.
-pub fn executed_lane_analysis_target(config: &Config, input: &Path) -> Target {
+///
+/// # Errors
+/// A manifest naming an unreadable or unsupported target is an error, never a
+/// fallback to the default: `faber check`, `build` and `test` agree on it.
+pub fn executed_lane_analysis_target(
+    config: &Config,
+    input: &Path,
+) -> Result<Target, Box<Diagnostic>> {
     if is_mir_backed_target(config.target) {
-        return config.target;
+        return Ok(config.target);
     }
-    manifest::manifest_build_target_for_input(input)
-        .ok()
-        .flatten()
-        .unwrap_or(Target::MirFmirBinary)
+    Ok(manifest::manifest_build_target_for_input(input)?.unwrap_or(Target::MirFmirBinary))
 }
 
 /// Whether a compiler target is MIR-backed (the executed-lane positive set;

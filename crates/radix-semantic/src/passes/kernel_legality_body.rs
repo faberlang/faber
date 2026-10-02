@@ -10,12 +10,11 @@ use super::fragment_definition::struct_def_from_type;
 use super::kernel_legality::{
     Env, ISSUE_ASYNC, ISSUE_HOST_CALL, ISSUE_HOST_EFFECT, ISSUE_HOST_TYPE,
     ISSUE_POSITIONAL_LANE_PARAM, ISSUE_PRIVATE_HOST_CALL, ISSUE_RAW_LANE_ID,
-    ISSUE_RAW_LANE_ID_PARAM, ISSUE_RECOVERY, ISSUE_WORKGROUP, Sink,
+    ISSUE_RAW_LANE_ID_PARAM, ISSUE_RECOVERY, ISSUE_SATURATING_FLOAT_NOT_BUILT, ISSUE_WORKGROUP,
+    Sink,
 };
-use super::kernel_legality_types::{FAMILY_ATOMIC, host_only_family};
-use crate::{
-    NumericWidth, Primitive, ResolvedTensorEdgePolicy, SymbolKind, Type, TypeId, WarningKind,
-};
+use super::kernel_legality_types::{FAMILY_ATOMIC, FAMILY_SATURATING_FLOAT, host_only_family};
+use crate::{NumericWidth, Primitive, ResolvedTensorEdgePolicy, SymbolKind, Type, TypeId, WarningKind};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local};
 use radix_hir::{
     DefId, HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirLocal,
@@ -187,6 +186,9 @@ impl KernelWalk<'_, '_> {
                 span,
                 &[("construct", family), ("site", site)],
             );
+        } else if family == FAMILY_SATURATING_FLOAT {
+            self.sink
+                .report(ISSUE_SATURATING_FLOAT_NOT_BUILT, span, &[("site", site)]);
         } else {
             self.sink
                 .report(ISSUE_HOST_TYPE, span, &[("family", family), ("site", site)]);

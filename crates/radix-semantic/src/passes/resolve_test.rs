@@ -605,6 +605,27 @@ fn reports_unknown_type_with_structured_event() {
     expect_structured_error(&errors, SemanticErrorKind::TypeUndefined, "unknown_type");
 }
 
+/// RD-3: the regex match carrier (`Primitive::Match`) has no source-level
+/// type spelling, so a type position that says `match` is an unknown type.
+#[test]
+fn match_carrier_has_no_source_type_name() {
+    let parsed = parse(lex("functio f(match value) → vacuum {}"));
+    assert!(
+        parsed.errors.is_empty(),
+        "parse errors: {:?}",
+        parsed.errors
+    );
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let program = parsed.program.as_ref().expect("program");
+    collect::collect(program, &mut resolver, &mut types).expect("collect");
+
+    let errors = resolve::resolve(program, &mut resolver, &parsed.interner, &mut types)
+        .expect_err("resolve should fail");
+
+    expect_structured_error(&errors, SemanticErrorKind::TypeUndefined, "unknown_type");
+}
+
 // NOTE: The AST is built by hand: the parser rejects the wrapped numeric
 // spelling `numerus<W>` / `fractus<W>` whole (`numeric_wrapper_retired`, N7d)
 // and recovers it to the bare word, so no source reaches the lowerer with a
@@ -3021,11 +3042,11 @@ fn width_issue_names_are_read_from_the_enum_mapping() {
     let src = include_str!("../../../radix-types/src/numeric_width.rs");
     let names = width_issue_names(src);
     assert!(
-        names.len() >= 18,
+        names.len() >= 17,
         "expected the full issue name set: {names:?}"
     );
     assert!(names.contains(&"width_marker_params".to_owned()));
-    assert!(names.contains(&"trapping_float_not_implemented".to_owned()));
+    assert!(names.contains(&"unsupported_trapping_word_width".to_owned()));
 }
 
 #[test]

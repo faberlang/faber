@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 261,
-    "analyzable": 362
+    "capable": 263,
+    "analyzable": 371
   },
   "terms": [
     {
@@ -211,7 +211,7 @@
       "term": "↦",
       "rule": "operator-group",
       "capable": 10,
-      "analyzable": 23
+      "analyzable": 24
     },
     {
       "term": "copia",
@@ -409,7 +409,7 @@
       "term": "functio",
       "rule": "keyword",
       "capable": 5,
-      "analyzable": 8
+      "analyzable": 10
     },
     {
       "term": "futura",
@@ -486,8 +486,8 @@
     {
       "term": "importa",
       "rule": "keyword",
-      "capable": 2,
-      "analyzable": 4
+      "capable": 4,
+      "analyzable": 6
     },
     {
       "term": "in",
@@ -514,16 +514,10 @@
       "analyzable": 3
     },
     {
-      "term": "inter",
-      "rule": "keyword",
-      "capable": 0,
-      "analyzable": 1
-    },
-    {
-      "term": "intra",
-      "rule": "keyword",
+      "term": "∈",
+      "rule": "operator-group",
       "capable": 1,
-      "analyzable": 1
+      "analyzable": 3
     },
     {
       "term": "instans",
@@ -565,7 +559,7 @@
       "term": "lista",
       "rule": "keyword",
       "capable": 2,
-      "analyzable": 7
+      "analyzable": 8
     },
     {
       "term": "manifest",
@@ -1153,7 +1147,7 @@
       "term": "vector",
       "rule": "keyword",
       "capable": 4,
-      "analyzable": 8
+      "analyzable": 10
     },
     {
       "term": "∷",

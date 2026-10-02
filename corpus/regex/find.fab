@@ -1,0 +1,89 @@
++++
+term = "find"
+kind = "method"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "conversio_expr", "si_stmt", "call_expr", "call_suffix", "member_suffix", "non_null_suffix", "argument_list", "argument", "vel_expr", "vel_rhs", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
+category = "regex"
+canonical = false
+summary = "regex.find(text) returns the leftmost match or none; a match is read through text, start, end, group and named."
+syntax = "<regex>.find(<textus>)"
+related = ["regex", "↦", "vel", "!."]
+locale = "en"
++++
+# =============================================================================
+# find — the leftmost regex match, and the accessors that read it
+# =============================================================================
+#
+# What this teaches:
+#   • `r.find(text)` returns `match ∪ none`: the leftmost match (RE2 rules,
+#     leftmost-first) or `none` when the pattern matches nowhere
+#   • a match has no source-level type name; hold it in an inferred binding
+#     (`const _ m ← …`) and read it with `m!.text()`, `m!.start()`,
+#     `m!.end()`, `m!.group(n)` and `m!.named(name)`
+#   • `start` and `end` are code point offsets, half-open, never bytes: the
+#     emoji and the accented letter below each count as one
+#   • `group(0)` is the whole match; a group that did not take part in the
+#     match, an index past the last group and an unknown name are all `none`
+#
+# Common mistakes:
+#   • reading offsets as UTF-8 bytes or UTF-16 units
+#   • calling an accessor on the `match ∪ none` result without `!.` (the
+#     result is `none` on a miss)
+#   • spelling a lookahead or a backreference in the pattern: `↦ regex`
+#     rejects it before `find` runs
+#
+# See also: regex, ↦, vel, !.
+# =============================================================================
+
+# find — leftmost match and the five accessors
+#
+# <regex>.find(<textus>)   -- match ∪ none
+#
+# EXPECTED OUTPUT:
+#   A hit with its text, code point span, groups and a named group, then a
+#   miss, a group that did not participate, an unknown name, an index past the
+#   last group, and a span over a string with non-BMP and accented characters.
+
+main {
+    const regex pair ← "(?P<key>[a-z]+)=(?P<val>[0-9]+)" ↦ regex
+
+    # hit
+    const _ hit ← pair.find("x: size=42;")
+    print hit!.text()
+    print hit!.start()
+    print hit!.end()
+    print hit!.group(0)
+    print hit!.group(1)
+    print hit!.group(2)
+    print hit!.named("key")
+    print hit!.named("val")
+
+    # miss
+    const _ miss ← pair.find("no pairs here")
+    if miss ≡ null {
+        print "miss: none"
+    }
+
+    # a group that did not take part in the match
+    const regex either ← "(a)|(b)" ↦ regex
+    const _ second ← either.find("xb")
+    if second!.group(1) ≡ null {
+        print "group 1: none"
+    }
+    print second!.group(2)
+    print second!.group(1) coalesce "unset"
+
+    # an unknown name and an index past the last group
+    if hit!.named("nope") ≡ null {
+        print "named nope: none"
+    }
+    if hit!.group(9) ≡ null {
+        print "group 9: none"
+    }
+
+    # offsets count code points: the emoji and the accented letter are one each
+    const regex word ← "[a-z]+" ↦ regex
+    const _ wide ← word.find("😀é abc")
+    print wide!.text()
+    print wide!.start()
+    print wide!.end()
+}

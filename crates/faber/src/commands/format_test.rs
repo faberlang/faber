@@ -544,14 +544,18 @@ fn format_stdout_rejects_multiple_files() {
         "the rejection must name the single-file contract: {stderr}"
     );
     assert!(
+        stderr.contains("use --check or --write for multiple files")
+            && !stderr.contains("in-place"),
+        "the rejection must point at --check/--write, not an in-place default: {stderr}"
+    );
+    assert!(
         !stderr.contains("==="),
         "no separator output may survive the tightening: {stderr}"
     );
 }
 
-/// `--write` is the explicit spelling of the in-place default — it writes
-/// the formatted source back to the file, byte-identical to what `--stdout`
-/// would print for the same file.
+/// `--write` writes the formatted source back to the file, byte-identical to
+/// what `--stdout` would print for the same file.
 #[test]
 fn format_write_flag_writes_in_place() {
     let fixture = std::env::temp_dir().join("faber-format-write-flag.fab");
@@ -775,7 +779,7 @@ pub(crate) const HOOK_SOURCE: &str = "+++\nlocale = \"en\"\n+++\ndescribe \"hook
 
 /// A top-level statement beside an explicit `main`: analysis rejects it
 /// (`SEM008:top_level_statement_beside_entry`) before format can drop it.
-const BESIDE_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nconst int aetas = 25\n\nif aetas within 0‥100 {\n    print \"in range\"\n}\n\nmain {\n    print \"main\"\n}\n";
+const BESIDE_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nconst int aetas = 25\n\nif aetas ∈ 0‥100 {\n    print \"in range\"\n}\n\nmain {\n    print \"main\"\n}\n";
 
 /// The hook fixture without the hook: nothing is lost, so format succeeds.
 const CONTROL_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nconst int aetas = 25\n\ndescribe \"plain\" {\n    test \"sample\" {\n        assert true\n    }\n}\n\nmain {\n    print \"main\"\n}\n";
@@ -797,22 +801,26 @@ pub(crate) fn run_faber_capture(args: &[&str], stdin: Option<&str>) -> std::proc
 }
 
 /// Every format mode on a lossy file: non-zero exit, the loss named on stderr,
-/// empty stdout, and the file on disk untouched.
+/// the file on disk untouched. Text modes (`--stdout`, `--stdin`) print nothing
+/// to stdout; report and write modes print only their summary line (the refusal
+/// is counted, never the source).
 fn assert_format_refuses(label: &str, source: &str, construct: &str) {
     let dir = tempfile::tempdir().expect("create scratch");
     let path = dir.path().join("lossy.fab");
     let path_arg = path.to_str().expect("utf8 path");
     fs::write(&path, source).expect("write fixture");
 
-    let in_place = run_faber_capture(&["format", path_arg], None);
+    let default_mode = run_faber_capture(&["format", path_arg], None);
+    let write_mode = run_faber_capture(&["format", "--write", path_arg], None);
     let stdout_mode = run_faber_capture(&["format", "--stdout", path_arg], None);
     let stdin_mode = run_faber_capture(&["format", "--stdin"], Some(source));
     let check_mode = run_faber_capture(&["format", "--check", path_arg], None);
-    for (mode, output) in [
-        ("in place", &in_place),
-        ("--stdout", &stdout_mode),
-        ("--stdin", &stdin_mode),
-        ("--check", &check_mode),
+    for (mode, output, prints_summary) in [
+        ("default", &default_mode, true),
+        ("--write", &write_mode, true),
+        ("--stdout", &stdout_mode, false),
+        ("--stdin", &stdin_mode, false),
+        ("--check", &check_mode, true),
     ] {
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(
@@ -825,10 +833,18 @@ fn assert_format_refuses(label: &str, source: &str, construct: &str) {
                 && stderr.contains(construct),
             "{label}: format {mode} must name the loss `{construct}`:\n{stderr}"
         );
-        assert!(
-            output.stdout.is_empty(),
-            "{label}: format {mode} must print nothing to stdout"
-        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if prints_summary {
+            assert!(
+                stdout.lines().count() == 1 && stdout.contains("1 refused (nothing written)"),
+                "{label}: format {mode} must print only the refusal count:\n{stdout}"
+            );
+        } else {
+            assert!(
+                output.stdout.is_empty(),
+                "{label}: format {mode} must print nothing to stdout"
+            );
+        }
     }
     assert_eq!(
         fs::read_to_string(&path).expect("read back"),
@@ -849,11 +865,12 @@ fn format_refuses_top_level_statement_loss() {
     let path_arg = path.to_str().expect("utf8 path");
     fs::write(&path, BESIDE_SOURCE).expect("write fixture");
 
-    for (mode, args) in [
-        ("in place", vec!["format", path_arg]),
-        ("--stdout", vec!["format", "--stdout", path_arg]),
-        ("--check", vec!["format", "--check", path_arg]),
-        ("check", vec!["check", path_arg]),
+    for (mode, args, prints_summary) in [
+        ("default", vec!["format", path_arg], true),
+        ("--write", vec!["format", "--write", path_arg], true),
+        ("--stdout", vec!["format", "--stdout", path_arg], false),
+        ("--check", vec!["format", "--check", path_arg], true),
+        ("check", vec!["check", path_arg], false),
     ] {
         let output = run_faber_capture(&args, None);
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -865,10 +882,18 @@ fn format_refuses_top_level_statement_loss() {
             stderr.contains("SEM008") && stderr.contains("top_level_statement_beside_entry"),
             "beside: {mode} must name the SEM008 issue:\n{stderr}"
         );
-        assert!(
-            output.stdout.is_empty(),
-            "beside: {mode} must print nothing to stdout"
-        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if prints_summary {
+            assert!(
+                stdout.lines().count() == 1 && stdout.contains("1 refused (nothing written)"),
+                "beside: {mode} must print only the refusal count:\n{stdout}"
+            );
+        } else {
+            assert!(
+                output.stdout.is_empty(),
+                "beside: {mode} must print nothing to stdout"
+            );
+        }
     }
     assert_eq!(
         fs::read_to_string(&path).expect("read back"),
@@ -892,7 +917,7 @@ fn format_control_file_unchanged() {
     );
     assert_eq!(String::from_utf8_lossy(&stdout_mode.stdout), CONTROL_SOURCE);
 
-    let in_place = run_faber_capture(&["format", path_arg], None);
+    let in_place = run_faber_capture(&["format", "--write", path_arg], None);
     assert!(in_place.status.success(), "control must format in place");
     assert_eq!(
         fs::read_to_string(&path).expect("read back"),
@@ -951,4 +976,266 @@ fn format_cli_keeps_the_in_place_numeric_twin() {
     );
     assert_canonical_reparses_with(body, "numeric twin CLI --stdout", Some(&english_pack()))
         .expect("reparse");
+}
+
+// ── FMT-1: report by default, `--write` applies ───────────────────────────
+
+/// Drifted source: formats to a different (canonical) layout.
+const DRIFT_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nmain {\n  print \"ok\"\n}\n";
+
+fn run_faber_in(dir: &Path, args: &[&str]) -> std::process::Output {
+    Command::new(faber_binary())
+        .args(args)
+        .current_dir(dir)
+        .stdin(Stdio::null())
+        .output()
+        .expect("run faber")
+}
+
+fn stdout_lines(output: &std::process::Output) -> Vec<String> {
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(str::to_owned)
+        .collect()
+}
+
+/// Back-date a file so a later write is observable through its mtime.
+fn backdate(path: &Path) -> std::time::SystemTime {
+    let past = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+    fs::OpenOptions::new()
+        .write(true)
+        .open(path)
+        .expect("open for mtime")
+        .set_modified(past)
+        .expect("set mtime");
+    fs::metadata(path)
+        .expect("metadata")
+        .modified()
+        .expect("mtime")
+}
+
+#[test]
+fn format_default_reports_drift_and_writes_nothing() {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let path = dir.path().join("drift.fab");
+    fs::write(&path, DRIFT_SOURCE).expect("write fixture");
+    let before = backdate(&path);
+    let path_arg = path.to_str().expect("utf8 path");
+
+    let output = run_faber_capture(&["format", path_arg], None);
+    assert_eq!(output.status.code(), Some(1), "drift exits 1");
+    assert_eq!(
+        stdout_lines(&output),
+        vec![
+            format!("would reformat {path_arg}"),
+            "1 of 1 files would be reformatted; rerun with --write to apply".to_owned(),
+        ]
+    );
+    assert_eq!(fs::read_to_string(&path).expect("read"), DRIFT_SOURCE);
+    assert_eq!(
+        fs::metadata(&path)
+            .expect("metadata")
+            .modified()
+            .expect("mtime"),
+        before,
+        "report mode must not touch the file"
+    );
+
+    // `--check` is the explicit spelling of the default.
+    let checked = run_faber_capture(&["format", "--check", path_arg], None);
+    assert_eq!(checked.status.code(), Some(1));
+    assert_eq!(stdout_lines(&checked), stdout_lines(&output));
+}
+
+#[test]
+fn format_default_on_formatted_file_exits_zero() {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let path = dir.path().join("clean.fab");
+    fs::write(&path, CONTROL_SOURCE).expect("write fixture");
+
+    let output = run_faber_capture(&["format", path.to_str().expect("utf8 path")], None);
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(stdout_lines(&output), vec!["1 files already formatted"]);
+}
+
+#[test]
+fn format_write_writes_only_changed_files() {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let drift = dir.path().join("a-drift.fab");
+    let clean = dir.path().join("b-clean.fab");
+    fs::write(&drift, DRIFT_SOURCE).expect("write drift");
+    fs::write(&clean, CONTROL_SOURCE).expect("write clean");
+    let clean_mtime = backdate(&clean);
+    let drift_arg = drift.to_str().expect("utf8 path");
+    let clean_arg = clean.to_str().expect("utf8 path");
+
+    let output = run_faber_capture(&["format", "--write", drift_arg, clean_arg], None);
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        stdout_lines(&output),
+        vec![
+            format!("formatted {drift_arg}"),
+            "formatted 1 of 2 files".to_owned(),
+        ]
+    );
+    assert_ne!(fs::read_to_string(&drift).expect("read"), DRIFT_SOURCE);
+    assert_eq!(fs::read_to_string(&clean).expect("read"), CONTROL_SOURCE);
+    assert_eq!(
+        fs::metadata(&clean)
+            .expect("metadata")
+            .modified()
+            .expect("mtime"),
+        clean_mtime,
+        "an unchanged file must not be touched"
+    );
+
+    // A second run has nothing left to do.
+    let again = run_faber_capture(&["format", "--write", drift_arg, clean_arg], None);
+    assert_eq!(again.status.code(), Some(0));
+    assert_eq!(stdout_lines(&again), vec!["formatted 0 of 2 files"]);
+}
+
+#[test]
+fn format_without_paths_reports_the_current_directory() {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let path = dir.path().join("drift.fab");
+    fs::write(&path, DRIFT_SOURCE).expect("write fixture");
+
+    let output = run_faber_in(dir.path(), &["format"]);
+    assert_eq!(output.status.code(), Some(1));
+    let lines = stdout_lines(&output);
+    assert_eq!(lines.len(), 2, "{lines:?}");
+    assert!(lines[0].starts_with("would reformat ") && lines[0].ends_with("drift.fab"));
+    assert_eq!(fs::read_to_string(&path).expect("read"), DRIFT_SOURCE);
+
+    let written = run_faber_in(dir.path(), &["format", "--write"]);
+    assert_eq!(written.status.code(), Some(0));
+    assert_ne!(fs::read_to_string(&path).expect("read"), DRIFT_SOURCE);
+}
+
+#[test]
+fn format_write_counts_refused_files_and_never_writes_them() {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let refused = dir.path().join("a-lossy.fab");
+    let drift = dir.path().join("b-drift.fab");
+    fs::write(&refused, HOOK_SOURCE).expect("write lossy");
+    fs::write(&drift, DRIFT_SOURCE).expect("write drift");
+    let refused_arg = refused.to_str().expect("utf8 path");
+    let drift_arg = drift.to_str().expect("utf8 path");
+
+    let report = run_faber_capture(&["format", refused_arg, drift_arg], None);
+    assert_eq!(report.status.code(), Some(1));
+    assert_eq!(
+        stdout_lines(&report).last().map(String::as_str),
+        Some(
+            "1 of 2 files would be reformatted; rerun with --write to apply, 1 refused (nothing written)"
+        )
+    );
+
+    let written = run_faber_capture(&["format", "--write", refused_arg, drift_arg], None);
+    assert_eq!(
+        written.status.code(),
+        Some(1),
+        "a refused file fails the run"
+    );
+    assert_eq!(
+        stdout_lines(&written),
+        vec![
+            format!("formatted {drift_arg}"),
+            "formatted 1 of 2 files, 1 refused (nothing written)".to_owned(),
+        ]
+    );
+    assert_eq!(fs::read_to_string(&refused).expect("read"), HOOK_SOURCE);
+    assert_ne!(
+        fs::read_to_string(&drift).expect("read"),
+        DRIFT_SOURCE,
+        "the formattable file is still written"
+    );
+}
+
+#[test]
+fn format_text_modes_print_no_summary() {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let path = dir.path().join("drift.fab");
+    fs::write(&path, DRIFT_SOURCE).expect("write fixture");
+
+    let stdout_mode = run_faber_capture(
+        &["format", "--stdout", path.to_str().expect("utf8 path")],
+        None,
+    );
+    assert_eq!(stdout_mode.status.code(), Some(0));
+    let text = String::from_utf8_lossy(&stdout_mode.stdout);
+    assert!(
+        text.starts_with("+++") && !text.contains("reformat"),
+        "{text}"
+    );
+    assert_eq!(fs::read_to_string(&path).expect("read"), DRIFT_SOURCE);
+
+    let stdin_mode = run_faber_capture(&["format", "--stdin"], Some(DRIFT_SOURCE));
+    assert_eq!(stdin_mode.status.code(), Some(0));
+    assert_eq!(stdin_mode.stdout, stdout_mode.stdout);
+}
+
+#[test]
+fn format_usage_errors_exit_two() {
+    let output = run_faber_capture(&["format", "--write", "--check", "x.fab"], None);
+    assert_eq!(output.status.code(), Some(2));
+}
+
+// ── membership-glyph 3a: `∈` / `∉` survive the format round trip ──────────
+
+const MEMBERSHIP_EN_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nmain {\n    const list<int> xs ← [1, 2]\n    if 1 ∈ xs {\n        print \"in\"\n    }\n    if 3 ∉ xs {\n        print \"out\"\n    }\n    if 5 ∉ 0‥10 {\n        print \"outside\"\n    }\n}\n";
+
+#[test]
+fn format_stdin_keeps_membership_glyphs_at_the_source_locale() {
+    let (stdout, stderr, success) = run_faber_format_stdin(MEMBERSHIP_EN_SOURCE);
+    assert!(success, "faber format --stdin must accept ∈/∉: {stderr}");
+    let body = radix::module::driver::split_frontmatter(&stdout)
+        .expect("split")
+        .body;
+    assert!(body.contains("if 1 ∈ xs {"), "∈ must be kept:\n{stdout}");
+    assert!(body.contains("if 3 ∉ xs {"), "∉ must be kept:\n{stdout}");
+    assert!(
+        body.contains("if 5 ∉ 0‥10 {"),
+        "range ∉ must be kept:\n{stdout}"
+    );
+    assert!(
+        !body.contains("inter") && !body.contains("between"),
+        "no keyword spelling may appear:\n{stdout}"
+    );
+    assert_eq!(
+        assert_format_fixed_point(MEMBERSHIP_EN_SOURCE, "membership glyphs"),
+        stdout
+    );
+}
+
+#[test]
+fn format_stdin_keeps_a_negated_glyph_membership_as_a_negation() {
+    // `not (x ∈ xs)` is a unary not over `∈`: the glyph is printed and the
+    // negation stays a negation (no `∉` is invented).
+    let source = "+++\nlocale = \"en\"\n+++\nmain {\n    const list<int> xs ← [1, 2]\n    if not (3 ∈ xs) {\n        print \"out\"\n    }\n}\n";
+    let (stdout, stderr, success) = run_faber_format_stdin(source);
+    assert!(success, "{stderr}");
+    assert!(stdout.contains("if not (3 ∈ xs) {"), "{stdout}");
+}
+
+#[test]
+fn convert_keeps_membership_glyphs_across_locales() {
+    let (stdout, stderr, success) = run_faber_capture_stdout(
+        &["convert", "--from", "en", "--to", "la", "--stdin"],
+        MEMBERSHIP_EN_SOURCE,
+    );
+    assert!(success, "{stderr}");
+    assert!(stdout.contains("si 1 ∈ xs {"), "{stdout}");
+    assert!(stdout.contains("si 3 ∉ xs {"), "{stdout}");
+    assert!(stdout.contains("si 5 ∉ 0‥10 {"), "{stdout}");
+}
+
+fn run_faber_capture_stdout(args: &[&str], stdin: &str) -> (String, String, bool) {
+    let output = run_faber_capture(args, Some(stdin));
+    (
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+        String::from_utf8_lossy(&output.stderr).into_owned(),
+        output.status.success(),
+    )
 }

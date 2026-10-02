@@ -996,10 +996,6 @@ help = "write the trapping type with one width, such as trapping<u8> or trapping
 message = "trapping width must be a bare width marker"
 help = "use a bare width marker such as u8 or i64"
 
-[diagnostics.SEM008.issues.trapping_float_not_implemented]
-message = "trapping floats are not implemented yet"
-help = "write the bare float width (f16, bf16, f32, or f64) for IEEE arithmetic; trapping floats are not implemented yet"
-
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "รูปแบบ callable ใน annotation '{annotation_posture}' ขัดกับรูปแบบที่เขียนไว้ '{written_posture}'"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
@@ -3165,6 +3161,14 @@ coercere = "จํากัดค่า"
 inter = "ตัดกัน"
 union = "ส่วนรวม"
 consentit = "ตรงกับ"
+inventa = "ค้นหา"
+collecta = "ค้นหาทั้งหมด"
+inventum = "ข้อความ"
+principium = "เริ่มต้น"
+terminus = "สิ้นสุด"
+coetus = "กลุ่ม"
+nominatus = "กลุ่มชื่อ"
+munita = "เอสเคป"
 
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "ทางเลือกของรูปแบบ or ต้องผูกชื่อและชนิดเดียวกัน"

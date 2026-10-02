@@ -3871,3 +3871,96 @@ fn mlp_shape_destination_mismatch_preserves_structured_issue() {
         vec!["destination type mismatch", "destination type mismatch"]
     );
 }
+
+// -----------------------------------------------------------------------
+// N7E-3 – policy-float cells are numeric float types in MIR
+// -----------------------------------------------------------------------
+
+/// `trapping<W>` and `saturating<W>` slots validate: a MIR type that is a cell
+/// is accepted, arithmetic and negation over it are numeric, and a float
+/// constant stands for a cell value (semantic analysis already checked it).
+#[test]
+fn policy_float_cell_arithmetic_validates() {
+    for policy in [
+        radix_types::FloatPolicy::Trapping,
+        radix_types::FloatPolicy::Saturating,
+    ] {
+        let mut types = TypeTable::new();
+        let cell = types.intern(Type::PolicyFloat(policy, NumericWidth::F32));
+        let cell_mty = MirType::semantic(cell);
+        let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+        let local = |id: u32| MirLocal {
+            id: MirLocalId(id),
+            ty: cell_mty,
+            name: None,
+            mutable: true,
+            span: Span::default(),
+        };
+        let place = |id: u32| MirPlace {
+            base: MirPlaceBase::Local(MirLocalId(id)),
+            projections: vec![],
+        };
+        let assign = |value_id: u32, target: u32, kind: MirValueKind| MirStatement {
+            kind: MirStatementKind::Assign {
+                place: place(target),
+                value: MirValue {
+                    id: MirValueId(value_id),
+                    kind,
+                    ty: cell_mty,
+                    span: Span::default(),
+                },
+            },
+            span: Span::default(),
+        };
+        let program = MirProgram {
+            functions: vec![MirFunction {
+                id: MirFunctionId(0),
+                source: None,
+                name: None,
+                params: vec![],
+                locals: vec![local(0), local(1)],
+                temps: vec![],
+                blocks: vec![MirBlock {
+                    id: MirBlockId(0),
+                    statements: vec![
+                        assign(
+                            0,
+                            0,
+                            MirValueKind::Operand(MirOperand::Constant(MirConstant::Float(1.5))),
+                        ),
+                        assign(
+                            1,
+                            1,
+                            MirValueKind::Binary {
+                                op: MirBinOp::Mul,
+                                lhs: MirOperand::Place(place(0)),
+                                rhs: MirOperand::Place(place(0)),
+                            },
+                        ),
+                        assign(
+                            2,
+                            1,
+                            MirValueKind::Unary {
+                                op: MirUnOp::Neg,
+                                operand: MirOperand::Place(place(1)),
+                            },
+                        ),
+                    ],
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Return(None),
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
+                }],
+                return_ty: vacuum,
+                error_ty: None,
+                is_async: false,
+                is_generator: false,
+                shader_stage: None,
+                span: Span::default(),
+            }],
+        };
+        let errors = validate(&program, &types);
+        assert!(errors.is_empty(), "{policy:?}: {errors:?}");
+    }
+}

@@ -85,7 +85,11 @@ impl TypeChecker<'_> {
         }
         match self.types.get(ty).clone() {
             Type::Primitive(
-                Primitive::Fractus | Primitive::Valor | Primitive::Json | Primitive::Regex,
+                Primitive::Fractus
+                | Primitive::Valor
+                | Primitive::Json
+                | Primitive::Regex
+                | Primitive::Match,
             )
             | Type::SizedNumeric(Primitive::Fractus, _) => false,
             Type::Array(_)

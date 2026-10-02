@@ -316,6 +316,21 @@ fn primitive_from_name_maps_builtin_aliases() {
     assert_eq!(Primitive::from_name("incognitus"), None);
 }
 
+/// RD-3: `Primitive::Match` is internal only: no source spelling resolves to
+/// it and no type-surface row names it, yet the table seeds the primitive.
+#[test]
+fn match_primitive_has_no_source_spelling() {
+    assert_eq!(Primitive::from_name("match"), None);
+    assert!(
+        primitive_type_specs()
+            .iter()
+            .all(|spec| spec.primitive != Primitive::Match)
+    );
+    let types = TypeTable::new();
+    let id = types.primitive(Primitive::Match);
+    assert_eq!(types.get(id), &Type::Primitive(Primitive::Match));
+}
+
 #[test]
 fn primitive_type_surface_tracks_canonical_rows_and_aliases() {
     let canonical = primitive_type_specs()

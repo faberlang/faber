@@ -514,6 +514,16 @@ pub(super) fn check_intrinsic_method_call(
         return Some(check_sort_by_key(checker, entry, ctx.inner, args, span));
     }
 
+    // RX-5 (RD-5): a closure in the replacement slot selects the closure form;
+    // any other argument is checked as the literal `textus` replacement below.
+    if entry.params.contains(&IntrinsicParamKind::TextusOrReplacer)
+        && args
+            .get(1)
+            .is_some_and(|arg| matches!(arg.expr.kind, HirExpressionKind::Clausura(..)))
+    {
+        return Some(check_regex_replace_closure(checker, args, span));
+    }
+
     match entry.return_kind {
         IntrinsicReturnKind::MapperArray | IntrinsicReturnKind::MapperSet => {
             let Some(inner) = ctx.inner else {
@@ -624,6 +634,27 @@ pub(super) fn check_intrinsic_method_call(
             Some(result)
         }
     }
+}
+
+/// `regex.muta(text, closure)` (RX-5): the closure takes the match and returns
+/// the replacement `textus`, taken literally. The match type has no source
+/// name (RD-3), so the closure's parameter is typed from this signature.
+fn check_regex_replace_closure(
+    checker: &mut TypeChecker<'_>,
+    args: &mut [HirCallArg],
+    span: radix_lexer::Span,
+) -> TypeId {
+    let found = checker.types.primitive(Primitive::Match);
+    let textus = checker.textus_type();
+    // WHY: MIR lowering runs the closure over `lista<match>` and joins a
+    // `lista<textus>` through a read-only type table; intern both carriers
+    // here where the form is admitted.
+    checker.types.array(found);
+    checker.types.array(textus);
+    let replacer = checker.types.function(simple_sig(vec![found], textus));
+    let sig = simple_sig(vec![textus, replacer], textus);
+    checker.check_call_args(&sig, args, span);
+    textus
 }
 
 /// `ordina(key)` / `ordinata(key)` (D1.7): the key selector maps an element
@@ -798,7 +829,7 @@ fn resolve_param_kind(
                 .intern_index(crate::IndexExpr::Tuple(vec![extent]));
             checker.types.tensor_with_shape(u32_ty, shape)
         }
-        IntrinsicParamKind::Textus => checker.textus_type(),
+        IntrinsicParamKind::Textus | IntrinsicParamKind::TextusOrReplacer => checker.textus_type(),
         IntrinsicParamKind::SetInner => {
             let Some(inner) = ctx.inner else {
                 return checker.error_type;
@@ -978,6 +1009,18 @@ fn resolve_return_type(
         IntrinsicReturnKind::TextusArray => {
             let textus = checker.textus_type();
             checker.types.array(textus)
+        }
+        IntrinsicReturnKind::MatchArray => {
+            let found = checker.types.primitive(Primitive::Match);
+            checker.types.array(found)
+        }
+        IntrinsicReturnKind::OptionMatch => {
+            let found = checker.types.primitive(Primitive::Match);
+            checker.types.option(found)
+        }
+        IntrinsicReturnKind::OptionTextus => {
+            let textus = checker.textus_type();
+            checker.types.option(textus)
         }
         IntrinsicReturnKind::CursorLittera => {
             let element = checker.text_element_type();

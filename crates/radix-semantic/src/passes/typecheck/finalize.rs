@@ -709,6 +709,15 @@ impl HirVisitorMut for TypeChecker<'_> {
     /// Finalize expression type annotations after inference has converged.
     fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
         self.finalize_expr_type(&mut expr.ty, expr.span);
+        // WHY: a closure parameter written with a hole type (`_ m`) is solved
+        // from the expected signature (the regex `muta` closure, whose `match`
+        // type has no source name, RD-3); write the solved type back so MIR
+        // sees the concrete parameter, as for a function parameter.
+        if let HirExpressionKind::Clausura(params, ..) = &mut expr.kind {
+            for param in params {
+                self.finalize_param_type(param);
+            }
+        }
 
         walk_expr_mut(self, expr);
     }

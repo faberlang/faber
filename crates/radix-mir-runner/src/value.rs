@@ -25,6 +25,7 @@ use super::RunnerError;
 use crate::tensor_edge::{
     RunnerTensorEdgeDescriptor, TensorEdgeResolution, resolve_builtin, resolve_optional,
 };
+use crate::regex_program::RegexProgram;
 use handroll::Magnus;
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span, Symbol};
@@ -32,7 +33,7 @@ use radix_mir::MirClosureEnvironmentId;
 use radix_mir::{MirBinOp, MirFunctionId};
 use radix_runtime_contract::display::{display_bivalens, display_fractus, display_text_payload};
 use radix_runtime_contract::instans::Instans;
-use radix_types::NumericWidth;
+use radix_types::{FloatPolicy, NumericWidth, Type, TypeId, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -194,7 +195,9 @@ pub enum Value {
     Unit,
     Octeti(Vec<u8>),
     Instans(Instans),
-    Regex(String),
+    Regex(Rc<RegexProgram>),
+    /// One successful regex match (RD-3: internal only, no source spelling).
+    Match(Rc<MatchValue>),
     Sermo(Rc<RefCell<SermoValue>>),
     Function(MirFunctionId),
     Closure(MirFunctionId, MirClosureEnvironmentId, Box<Value>),
@@ -227,6 +230,32 @@ pub enum Value {
     /// Suspended `fiunt`/`fient` generator read by a stepped `itera ex` walk
     /// (D6.6); never observed outside that walk's `length`/index reads.
     Cursor(crate::cursor::GeneratorCursor),
+}
+
+/// A regex match: the matched text and its half-open span in code points of
+/// the haystack (offsets are code points, never bytes), plus the text of each
+/// capture group (`0` the whole match; `None` for a group that did not
+/// participate) and the `(?P<name>…)` group names with their indices.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MatchValue {
+    pub text: String,
+    pub start: usize,
+    pub end: usize,
+    pub groups: Vec<Option<String>>,
+    pub names: Vec<(String, usize)>,
+}
+
+impl MatchValue {
+    /// Text of group `index`; `None` when out of range or not participating.
+    pub fn group(&self, index: usize) -> Option<&str> {
+        self.groups.get(index)?.as_deref()
+    }
+
+    /// Text of the group named `name`; `None` when unknown or not participating.
+    pub fn named(&self, name: &str) -> Option<&str> {
+        let (_, index) = self.names.iter().find(|(known, _)| known == name)?;
+        self.group(*index)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1183,7 +1212,8 @@ impl Value {
             Value::Unit => String::new(),
             Value::Octeti(bytes) => String::from_utf8_lossy(bytes).into_owned(),
             Value::Instans(value) => value.to_rfc3339(),
-            Value::Regex(pattern) => pattern.clone(),
+            Value::Regex(program) => program.pattern().to_owned(),
+            Value::Match(found) => found.text.clone(),
             Value::Sermo(sermo) => {
                 format!("sermo({})", sermo.borrow().conversation.borrow().route)
             }
@@ -2092,6 +2122,55 @@ pub fn uint_width_checked_rem(
         return Err(RunnerError::internal(span, "numerus division failed"));
     }
     check_uint_width((a % b) as u128, width, span, "numerus division failed")
+}
+
+/// Declared numeric width of `ty`, seeing a policy-float cell as the bare
+/// float of its width (D2: the cell adds no behavior of its own to evaluation,
+/// display or arithmetic; only a `trapping` store checks it, `store.rs`).
+///
+/// This wraps [`radix_types::effective_width`] rather than extending it: that
+/// function also answers the type checker's widening predicates, where a bare
+/// float must not read as widening into a cell (D4).
+pub(crate) fn effective_width(types: &TypeTable, ty: TypeId) -> Option<NumericWidth> {
+    match types.get(ty) {
+        Type::PolicyFloat(_, width) => Some(*width),
+        Type::Alias(_, inner) => effective_width(types, *inner),
+        _ => radix_types::effective_width(types, ty),
+    }
+}
+
+/// The overflow policy and width of a policy-float cell, alias-peeled.
+pub(crate) fn policy_float_cell(
+    types: &TypeTable,
+    ty: TypeId,
+) -> Option<(FloatPolicy, NumericWidth)> {
+    match types.get(ty) {
+        Type::PolicyFloat(policy, width) => Some((*policy, *width)),
+        Type::Alias(_, inner) => policy_float_cell(types, *inner),
+        _ => None,
+    }
+}
+
+/// D1: whether storing `value` into a `trapping<width>` cell traps. NaN and
+/// both infinities trap. A bare `f16` or `bf16` slot is not rounded at a store
+/// (ruling 26(d) is not built), so those widths test whether the value rounds
+/// to infinity in the format, nearest-even: `|v|` at or past the midpoint
+/// between the largest finite value and the next power of two. Nothing clamps.
+#[must_use]
+pub(crate) fn trapping_float_store_fails(value: f64, width: NumericWidth) -> bool {
+    if value.is_nan() {
+        return true;
+    }
+    let rounds_to_infinity_at = match width {
+        // 65504 is the largest finite binary16; 65520 is the tie that rounds up.
+        NumericWidth::F16 => 65_520.0,
+        // The largest finite bfloat16 is (2 - 2^-7) * 2^127; the tie that
+        // rounds up to infinity is (2 - 2^-8) * 2^127.
+        NumericWidth::BF16 => (2.0 - 2f64.powi(-8)) * 2f64.powi(127),
+        NumericWidth::F32 => return !f64::from(value as f32).is_finite(),
+        _ => return !value.is_finite(),
+    };
+    value.abs() >= rounds_to_infinity_at
 }
 
 /// Round a scalar float to the runner's declared arithmetic width.

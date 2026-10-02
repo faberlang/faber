@@ -137,9 +137,10 @@ incipit {
 }
 
 #[test]
-fn rust_regex_conversio_is_carrier_not_engine_compile() {
-    // G2 S4: pattern conversion builds a carrier; MustCompile-style validation is not
-    // the conversion's job (engine ops own that).
+fn rust_regex_conversio_compiles_through_the_runtime_constructor() {
+    // RD-1/RD-9: the conversion is the one compile point and it is failable;
+    // the emitted program calls `faber::Regex::new` (never the engine crate
+    // directly, never a `MustCompile`-style wrapper) and consumes its `Result`.
     let session = Session::new(Config::default().with_target(Target::HirRust));
     let unit = analyze_source(
         &session,
@@ -147,28 +148,32 @@ fn rust_regex_conversio_is_carrier_not_engine_compile() {
         r#"
 incipit {
   fixum textus s ← "\\d+"
-  fixum regularene r ← s ↦ regularene
+  fixum regex r ← s ↦ regex
   nota r
 }
 "#,
         AnalyzeRequest::default(),
+    )
+    .expect("analyze");
+    let latin = crate::locale::latin_locale_pack();
+    let surface = crate::locale::KeywordSurface::new(&latin);
+    let out = crate::codegen::generate_from_analyzed(Target::HirRust, &unit, &surface).expect("emit");
+    let crate::Output::Rust(rust) = out else {
+        panic!("expected rust");
+    };
+    assert!(
+        rust.code.contains("faber::Regex::new(s.as_str()).unwrap()"),
+        "regex conversion must consume the runtime constructor's result: {}",
+        rust.code
     );
-    // If grammar uses `regex` rather than regularene, accept either green or typed fail.
-    if let Ok(unit) = unit {
-        let latin = crate::locale::latin_locale_pack();
-        let surface = crate::locale::KeywordSurface::new(&latin);
-        let out = crate::codegen::generate_from_analyzed(Target::HirRust, &unit, &surface).expect("emit");
-        if let crate::Output::Rust(rust) = out {
-            assert!(
-                !rust.code.contains("regex::Regex::new") || rust.code.contains("faber::Regex::new"),
-                "regex conversion should use carrier construction: {}",
-                rust.code
-            );
-            assert!(
-                !rust.code.contains("MustCompile"),
-                "conversion must not MustCompile: {}",
-                rust.code
-            );
-        }
-    }
+    assert!(
+        !rust.code.contains("regex::Regex::new(") || rust.code.contains("faber::Regex::new("),
+        "regex conversion must not call the engine crate directly: {}",
+        rust.code
+    );
+    assert!(
+        !rust.code.contains("MustCompile"),
+        "conversion must not MustCompile: {}",
+        rust.code
+    );
 }

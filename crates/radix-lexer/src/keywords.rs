@@ -20,7 +20,7 @@
 //!   token. It is never emitted by the lexer (there are no reserved words);
 //!   the parser references keywords by this identity.
 //! - `scope` records where a keyword is claimed (parser-owned slots, test
-//!   surface, annotation names, or aliases). `Global` does not exist — no
+//!   surface, annotation names, or aliases). There is no global scope — no
 //!   keyword is reserved everywhere.
 //! - `Alias` entries name their canonical spelling; the alias spelling is
 //!   claimed by identity in the canonical keyword's slots.
@@ -38,16 +38,10 @@ use super::token::TokenKind;
 /// Where a keyword spelling is valid or intended to be owned.
 ///
 /// Scope is policy metadata, not automatic lexer behavior. It tells tools and
-/// parser work whether a spelling is globally reserved, context-owned,
-/// annotation-only, test-owned, or an alias.
+/// parser work whether a spelling is context-owned, annotation-only,
+/// test-owned, or an alias.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeywordScope {
-    /// Reserved anywhere normal-mode keyword recognition runs.
-    ///
-    /// Legacy: no keyword carries `Global` scope — there are no reserved
-    /// words. The variant remains for API compatibility.
-    Global,
-
     /// Intended for one or more parser contexts.
     Contextual(&'static [KeywordOwner]),
 
@@ -169,8 +163,16 @@ pub enum KeywordOwner {
     ExpressionIntroducer,
 
     /// Range-operator keyword in expression position
-    /// (`intra` / `inter` / `per` / `usque` / `ante`).
+    /// (`per` / `usque` / `ante`).
     RangeOperator,
+
+    /// Retired membership-operator spelling in operator position
+    /// (`intra` / `inter`, and every reader pack's spelling of them).
+    ///
+    /// The words stay recognized only so the parser can answer them with the
+    /// migration diagnostic `membership_keyword_retired` (`∈` is the one
+    /// spelling); elsewhere they are ordinary identifiers.
+    RetiredMembership,
 
     /// Statement-initial transfer keyword (`tacet`).
     StatementIntroducer,
@@ -351,6 +353,7 @@ const DECLARATION_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::DeclarationIntro
 const CONTROL_FLOW: &[KeywordOwner] = &[KeywordOwner::ControlFlow];
 const EXPRESSION_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::ExpressionIntroducer];
 const RANGE_OPERATOR: &[KeywordOwner] = &[KeywordOwner::RangeOperator];
+const RETIRED_MEMBERSHIP: &[KeywordOwner] = &[KeywordOwner::RetiredMembership];
 const STATEMENT_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::StatementIntroducer];
 const DECLARATION_MARKER: &[KeywordOwner] = &[KeywordOwner::DeclarationMarker];
 const REDUCTION_HEAD: &[KeywordOwner] = &[KeywordOwner::ReductionHead];
@@ -879,8 +882,8 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     },
     // Empty-collection expression marker. Tokenless (lexes as an identifier):
     // the parser claims `vacua` by spelling in its expression slot, so the
-    // keyword registry only needs the emit surface for packs. Non-Global
-    // keeps the strict EBNF vocabulary audit green.
+    // keyword registry only needs the emit surface for packs. Tokenless rows
+    // are inactive, so the strict EBNF vocabulary audit does not require them.
     KeywordSpec {
         text: "vacua",
         token_kind: None,
@@ -1189,16 +1192,22 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(RANGE_OPERATOR),
         category: KeywordKind::Range,
     },
+    // `inter` is a retired membership operator (`∈` replaced it). Tokenless: the
+    // parser claims it only in operator position, to emit the migration
+    // diagnostic; everywhere else the spelling is an ordinary identifier.
     KeywordSpec {
         text: "inter",
-        token_kind: Some(TokenKind::Inter),
-        scope: KeywordScope::Contextual(RANGE_OPERATOR),
+        token_kind: None,
+        scope: KeywordScope::Contextual(RETIRED_MEMBERSHIP),
         category: KeywordKind::Range,
     },
+    // `intra` is a retired membership operator (`∈` replaced it). Tokenless: the
+    // parser claims it only in operator position, to emit the migration
+    // diagnostic; everywhere else the spelling is an ordinary identifier.
     KeywordSpec {
         text: "intra",
-        token_kind: Some(TokenKind::Intra),
-        scope: KeywordScope::Contextual(RANGE_OPERATOR),
+        token_kind: None,
+        scope: KeywordScope::Contextual(RETIRED_MEMBERSHIP),
         category: KeywordKind::Range,
     },
     KeywordSpec {
@@ -1611,6 +1620,7 @@ fn keyword_owner_is_identifier_like(owner: KeywordOwner) -> bool {
         | KeywordOwner::ControlFlow
         | KeywordOwner::ExpressionIntroducer
         | KeywordOwner::RangeOperator
+        | KeywordOwner::RetiredMembership
         | KeywordOwner::StatementIntroducer
         | KeywordOwner::DeclarationMarker
         | KeywordOwner::RouteExpression
@@ -1628,7 +1638,7 @@ fn keyword_owner_allows_spec(owner: KeywordOwner, spec: &KeywordSpec) -> bool {
     }
     match spec.scope {
         KeywordScope::Contextual(owners) => owners.contains(&owner),
-        KeywordScope::TestOwned | KeywordScope::Alias { .. } | KeywordScope::Global => false,
+        KeywordScope::TestOwned | KeywordScope::Alias { .. } => false,
         KeywordScope::Annotation => owner == KeywordOwner::AnnotationName,
     }
 }

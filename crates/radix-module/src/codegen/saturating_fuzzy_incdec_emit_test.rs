@@ -57,9 +57,8 @@ fn emit(target: Target, source: &str) -> String {
 #[test]
 fn rust_saturating_division_is_exact_floor_division() {
     let code = emit(Target::HirRust, SATURATING);
-    assert!(code.contains("__faber_div(a as i128, two as i128)"), "{code}");
-    assert!(code.contains("__faber_rem(a as i128, two as i128)"), "{code}");
-    assert!(code.contains("panic!(\"numerus division failed\")"), "{code}");
+    assert!(code.contains("faber::exact::div(a as i128, two as i128)"), "{code}");
+    assert!(code.contains("faber::exact::rem(a as i128, two as i128)"), "{code}");
     assert!(!code.contains("saturatus division failed"), "{code}");
 }
 
@@ -74,26 +73,29 @@ fn swift_saturating_division_is_exact_floor_division() {
 #[test]
 fn go_saturating_division_by_zero_uses_the_integer_text() {
     let code = emit(Target::HirGo, SATURATING);
-    assert!(code.contains("faberXDiv(faberXI(int64(a)), faberXI(int64(two)))"), "{code}");
-    assert!(code.contains("panic(\"numerus division failed\")"), "{code}");
+    assert!(
+        code.contains("rt.ExactDiv(rt.ExactI(int64(a)), rt.ExactI(int64(two)))"),
+        "{code}"
+    );
+    // The integer trap text lives in `rt.ExactDiv` (`faber/runtime/go/exact_test.go`).
     assert!(!code.contains("saturatus division failed"), "{code}");
 }
 
 #[test]
 fn decimal_fuzzy_operand_is_unscaled_on_every_backend() {
     let rust = emit(Target::HirRust, FUZZY);
-    assert!(rust.contains("__faber_dec_f64(__faber_dec_of("), "{rust}");
+    assert!(rust.contains("faber::dec::f64(faber::dec::of("), "{rust}");
     let swift = emit(Target::HirSwift, FUZZY);
     assert!(swift.contains("faberDecF64(faberDecOf("), "{swift}");
     let go = emit(Target::HirGo, FUZZY);
-    assert!(go.contains("faberDecF64(faberDecOf("), "{go}");
+    assert!(go.contains("rt.DecF64(rt.DecOf("), "{go}");
 }
 
 #[test]
 fn rust_list_element_inc_dec_is_one_checked_store() {
     let code = emit(Target::HirRust, INC_DEC);
     assert!(
-        code.contains("__faber_store::<u8>((*") && code.contains(" as i128) + 1, \"assignment\", \"\")"),
+        code.contains("faber::exact::store::<u8>((*") && code.contains(" as i128) + 1, \"assignment\")"),
         "{code}"
     );
     assert!(!code.contains(").cloned().expect(\"lista index trap\") += 1"), "{code}");

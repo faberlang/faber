@@ -1151,10 +1151,10 @@ struct DiagnosticSymbols {
     format_templates: [Symbol; 3],
     separator: Symbol,
     /// The rendered null-value textus used by the scribe grouping when an
-    /// option argument's payload is absent (`display_option` semantics).
+    /// option argument's payload is absent (`display::option` semantics).
     ///
     /// Keep this in lockstep with the Rust runtime carrier
-    /// (`faber::display_option`), which owns the text. D23.2 splits the null
+    /// (`faber::display::option`), which owns the text. D23.2 splits the null
     /// *value* (`nulla`) from the null *type* (`nihil`); the value display must
     /// therefore move to `nulla` on both sides together — this string, the
     /// runtime carrier, and the corpus `.expected` oracles — in the D23.2
@@ -3186,7 +3186,9 @@ impl<'a> FunctionBuilder<'a> {
         loop {
             match self.types.get(ty) {
                 Type::Alias(_, inner) => ty = *inner,
-                Type::SizedNumeric(Primitive::Fractus, _) => return Some(MirType::semantic(ty)),
+                Type::SizedNumeric(Primitive::Fractus, _) | Type::PolicyFloat(_, _) => {
+                    return Some(MirType::semantic(ty));
+                }
                 _ => return None,
             }
         }
@@ -3332,16 +3334,21 @@ impl<'a> FunctionBuilder<'a> {
         {
             return Some(predicate);
         }
-        if matches!(op, HirBinOp::Between) {
+        if matches!(op, HirBinOp::Between | HirBinOp::NotBetween) {
             let collection = self.lower_expr_value(rhs)?;
             let value = self.lower_expr_value(lhs)?;
             let ty = self.expr_ty(expr)?;
-            return Some(self.runtime_call_value(
+            let contained = self.runtime_call_value(
                 MirIntrinsic::Collection(MirCollectionOp::Contains),
                 vec![collection, value],
                 ty,
                 expr.span,
-            ));
+            );
+            if op == HirBinOp::Between {
+                return Some(contained);
+            }
+            // `∉` is the existing boolean negation of the same `Contains` call.
+            return Some(self.assign_temp(MirValueKind::Unary { op: MirUnOp::Not, operand: contained }, ty, expr.span));
         }
         // TENSOR-GLYPHS-3A: glyph products dispatch by operand family before
         // the primitive `mir_bin_op` fallback (which fails them closed).
@@ -3669,7 +3676,8 @@ impl<'a> FunctionBuilder<'a> {
             Type::SizedNumeric(Primitive::Numerus, _) => {
                 Some(self.assign_temp(MirValueKind::Operand(MirOperand::Constant(MirConstant::Int(0))), mir_ty, span))
             }
-            Type::SizedNumeric(Primitive::Fractus, _) => Some(self.assign_temp(
+            // N7E-3: a policy-float cell zero-inits as the bare float of its width.
+            Type::SizedNumeric(Primitive::Fractus, _) | Type::PolicyFloat(_, _) => Some(self.assign_temp(
                 MirValueKind::Operand(MirOperand::Constant(MirConstant::Float(0.0))),
                 mir_ty,
                 span,
@@ -3683,6 +3691,11 @@ impl<'a> FunctionBuilder<'a> {
                     span,
                     "regex type zero-init before MIR lowering completed",
                 ));
+                None
+            }
+            Type::Primitive(Primitive::Match) => {
+                self.errors
+                    .push(MirError::unsupported(span, "regex match type zero-init"));
                 None
             }
             Type::Option(_) => Some(MirOperand::Constant(MirConstant::Nil)),
@@ -4208,10 +4221,10 @@ impl<'a> FunctionBuilder<'a> {
         }
         if matches!(
             self.normalized_type(lhs_semantic),
-            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) | Type::PolicyFloat(_, _)
         ) || matches!(
             self.normalized_type(rhs_semantic),
-            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) | Type::PolicyFloat(_, _)
         ) {
             return None;
         }
@@ -4359,7 +4372,10 @@ fn mir_bin_op(op: HirBinOp) -> Option<MirBinOp> {
         HirBinOp::Shr => Some(MirBinOp::Shr),
         HirBinOp::Is => Some(MirBinOp::Eq),
         HirBinOp::IsNot => Some(MirBinOp::NotEq),
-        HirBinOp::InRange | HirBinOp::Between => None,
+        // Collection membership (`Between`, `NotBetween`) is intercepted by
+        // `lower_binary` before this point; range containment has no MIR
+        // primitive (membership-glyph OD-4), so both range forms fail closed.
+        HirBinOp::InRange | HirBinOp::Between | HirBinOp::NotInRange | HirBinOp::NotBetween => None,
         // Glyph products are intercepted by `lower_binary` before this point;
         // keep the explicit fail-closed arm for any future caller.
         HirBinOp::Dot | HirBinOp::Cross | HirBinOp::TensorProduct | HirBinOp::Hadamard | HirBinOp::HadamardDiv => None,

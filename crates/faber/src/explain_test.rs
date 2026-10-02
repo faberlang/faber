@@ -1,4 +1,6 @@
-use crate::explain::{Lookup, Registry, render_json, render_plain, render_search};
+use crate::explain::{
+    Lookup, Registry, render_json, render_list, render_list_json, render_plain, render_search,
+};
 use crate::reference::ReferencePack;
 use crate::reference_pack_test_support::{env_lock, repo_exempla_root};
 use serde::Deserialize;
@@ -69,8 +71,8 @@ fn all_entries_validate() {
     let registry = disk_registry();
     // 216 → 210 → 211 → 210: the registry follows the canonical term count
     // (197) plus the legacy redirects (13). The `nulla` redirect retired with
-    // D23.4 (8c5cc3de4), so 197 + 13 = 210; see reference_test for history.
-    assert_eq!(registry.entries().len(), 210);
+    // D23.4 (8c5cc3de4), so 196 + 13 = 209 (mg5a folds inter+intra into one term); see reference_test for history.
+    assert_eq!(registry.entries().len(), 209);
 
     for entry in registry.entries() {
         assert!(!entry.term.is_empty());
@@ -136,6 +138,51 @@ fn render_json_is_valid() {
 }
 
 #[test]
+fn render_json_carries_exemplum_grammar_ids() {
+    let registry = disk_registry();
+    let lookup = registry.lookup("ab").expect("lookup ab");
+    let rendered = render_json(&lookup).expect("json renders");
+    let value: serde_json::Value = serde_json::from_str(&rendered).expect("valid json");
+    let grammar = value["grammar"].as_array().expect("grammar array");
+    let ids: Vec<&str> = grammar.iter().filter_map(|id| id.as_str()).collect();
+    assert_eq!(ids.first(), Some(&"fab_file"));
+    assert!(ids.contains(&"itera_stmt"));
+    assert!(ids.contains(&"range_expr"));
+}
+
+#[test]
+fn render_json_omits_grammar_when_entry_has_none() {
+    let registry = disk_registry();
+    // The legacy redirect entry has no exemplum, so it declares no grammar ids;
+    // its canonical target still does.
+    let lookup = registry.lookup("==").expect("lookup legacy equality");
+    let rendered = render_json(&lookup).expect("json renders");
+    let value: serde_json::Value = serde_json::from_str(&rendered).expect("valid json");
+    assert!(value["entry"].get("grammar").is_none());
+    assert!(value["canonical"].get("grammar").is_some());
+}
+
+#[test]
+fn render_list_json_matches_plain_list_rows() {
+    let registry = disk_registry();
+    let rendered = render_list_json(&registry).expect("list json renders");
+    let rows: Vec<serde_json::Value> = serde_json::from_str(&rendered).expect("valid json array");
+    let canonical = registry.entries().iter().filter(|e| e.canonical).count();
+    assert_eq!(rows.len(), canonical);
+
+    let plain = render_list(&registry);
+    for row in &rows {
+        for field in ["term", "kind", "category", "summary"] {
+            assert!(row[field].is_string(), "row missing {field}: {row}");
+        }
+        let summary = row["summary"].as_str().expect("summary");
+        assert!(plain.contains(summary), "plain list lacks {summary}");
+    }
+    // Plain list ignores --json: still the sectioned fixed-width text.
+    assert!(plain.contains("\nKEYWORDS\n"));
+}
+
+#[test]
 fn load_aliases_disk_registry_entry_point() {
     let _guard = env_lock();
     let previous = std::env::var(crate::reference::REFERENCE_ROOT_ENV).ok();
@@ -147,8 +194,8 @@ fn load_aliases_disk_registry_entry_point() {
     let registry = Registry::load().expect("load via disk entry point");
     // 216 → 210 → 211 → 210: the registry follows the canonical term count
     // (197) plus the legacy redirects (13). The `nulla` redirect retired with
-    // D23.4 (8c5cc3de4), so 197 + 13 = 210; see reference_test for history.
-    assert_eq!(registry.entries().len(), 210);
+    // D23.4 (8c5cc3de4), so 196 + 13 = 209 (mg5a folds inter+intra into one term); see reference_test for history.
+    assert_eq!(registry.entries().len(), 209);
 
     if let Some(value) = previous {
         // SAFETY: serialized by env_lock(); edition 2024 marks env mutation unsafe.

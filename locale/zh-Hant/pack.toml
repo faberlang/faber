@@ -984,10 +984,6 @@ help = "write the trapping type with one width, such as trapping<u8> or trapping
 message = "trapping width must be a bare width marker"
 help = "use a bare width marker such as u8 or i64"
 
-[diagnostics.SEM008.issues.trapping_float_not_implemented]
-message = "trapping floats are not implemented yet"
-help = "write the bare float width (f16, bf16, f32, or f64) for IEEE arithmetic; trapping floats are not implemented yet"
-
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "可呼叫項的註記姿態「{annotation_posture}」與書寫的姿態「{written_posture}」衝突"
 help = "修正用於降階的 AST 結構"
@@ -3153,6 +3149,14 @@ coercere = "限幅"
 inter = "相交"
 union = "聯集"
 consentit = "比對"
+inventa = "尋找"
+collecta = "尋找全部"
+inventum = "文字"
+principium = "起始"
+terminus = "結束"
+coetus = "分組"
+nominatus = "命名分組"
+munita = "跳脫"
 
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "或模式的各分支必須繫結相同的名稱和型別"

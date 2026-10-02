@@ -1,0 +1,63 @@
++++
+term = "trapping"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "multiplicative_expr", "conversio_expr", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "A float cell fixes what happens where a float is stored: `saturating<f32>` keeps what IEEE gives, `trapping<f32>` aborts a store of infinity or NaN. Nothing clamps and no operation traps."
+syntax = "trapping<f32> | saturating<f32>"
+related = ["f32", "f64", "inf", "↦", "numerus-overflow"]
+locale = "en"
++++
+# =============================================================================
+# trapping, saturating — float cells: the width limit lives at the store
+# =============================================================================
+#
+# What this teaches:
+#   • `saturating<f32>` is the bare `f32` with its own type: arithmetic is IEEE,
+#     an overflow gives infinity, `0.0 / 0.0` gives NaN, and a store keeps what
+#     IEEE gives. Nothing clamps to the largest finite value.
+#   • `trapping<f32>` is the same float, and it checks only where a value is
+#     stored into it. `print t * t` is unstored, so it prints `inf`; the store
+#     `const trapping<f32> u ← t * t` aborts with "inf does not fit in `f32`".
+#   • A conversion into a cell is the conversion to the bare float of its width.
+#     `huge ↦ saturating<f64>` and `wide ↦ saturating<f32>` give infinity; the
+#     same conversion into a `trapping` cell raises the trapping overflow error.
+#
+# Common mistakes:
+#   • Expecting `t * t` to trap where it is computed: only the store traps.
+#   • Expecting `saturating` to clamp to the largest finite float: it never does.
+#   • Expecting the store trap to be recoverable with `fac … cape`: an implicit
+#     store trap is not in the `⇥` channel (use `↦ … ⊥` for a recoverable check).
+#
+# See also: numerus-overflow, inf
+# =============================================================================
+
+# policy-float — float cells, checked at the store
+#
+# POLICY:
+#   The first five prints are the bare-float program with the cells added: a
+#   saturating cell behaves as the bare float. The sixth is an unstored product
+#   over a trapping cell. The run then ends on the store of that product.
+#
+# EXPECTED OUTPUT:
+#   policy-float.expected — the six printed lines (stdout only; the store trap
+#   goes to stderr and the exit status is 1).
+
+main {
+    const f32 m ← 3.4028235e38
+    const saturating<f32> s ← m ↦ saturating<f32>
+    print s * s
+    const saturating<f32> p ← s * s
+    print p
+    const saturating<f32> zero ← 0.0
+    print zero / zero
+    const inf huge ← 2 ⇐ 2000
+    print huge ↦ saturating<f64>
+    const f64 wide ← 1.0e300
+    print wide ↦ saturating<f32>
+    const trapping<f32> t ← m ↦ trapping<f32>
+    print t * t
+    const trapping<f32> u ← t * t
+    print u
+}

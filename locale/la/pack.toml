@@ -422,6 +422,10 @@ help = "remove the extra type parameter; use atomic<T>"
 message = "{predicate} is no longer prefix predicate syntax"
 help = "rewrite with {replacement}"
 
+[diagnostics.PARSE001.issues.membership_keyword_retired]
+message = "`{keyword}` is a retired membership operator; membership is spelled `{glyph}`"
+help = "write `{glyph}` (or `∉` to negate) between the element and the collection or range"
+
 [diagnostics.PARSE001.issues.equality_non_missing_est]
 message = "expected '{est}' after '{non}' in equality expression"
 help = "write identity negation as non est"
@@ -1234,10 +1238,6 @@ help = "scribe exactus cum una latitudine, ut exactus<u8> aut exactus<i64>"
 message = "latitudo exacti signum latitudinis nudum esse debet"
 help = "utere signo latitudinis nudo, ut u8 aut i64"
 
-[diagnostics.SEM008.issues.trapping_float_not_implemented]
-message = "exactus cum latitudine fractionis nondum efficitur"
-help = "scribe latitudinem fractionis nudam (f16, bf16, f32 aut f64) pro arithmetica IEEE; fracta exacta nondum efficiuntur"
-
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "habitus annotationis functionis '{annotation_posture}' cum habitu scripto '{written_posture}' pugnat"
 help = "emenda structuram AST ad demittendum"
@@ -1493,6 +1493,10 @@ help = "parametrum omitte et coordinatam iterationis per `{apud}` in ansa `{filu
 [diagnostics.SEM008.issues.nucleum_recovery]
 message = "corpus nuclei tractatorem localem ('{construct}') ponere non potest"
 help = "errorem ad vocationem lancientem perveniat, ubi hospes eum tractat"
+
+[diagnostics.SEM008.issues.nucleum_saturating_float_not_built]
+message = "nucleum fractum saturatum nondum adhibere potest ({site}); nucleorum structio fractorum saturatorum nondum efficitur"
+help = "in nucleo latitudinem fractionis nudam adhibe et ad limitem hospitis per `↦` muta"
 
 [diagnostics.SEM008.issues.nucleum_workgroup]
 message = "nucleum '{construct}' ({site}) nominare non potest; status greigis internus compilatoris est"
@@ -2134,6 +2138,18 @@ help = "make the expression type match the expected type"
 message = "membership operand type mismatch"
 help = "make the expression type match the expected type"
 
+[diagnostics.SEM010.issues.membership_requires_collection]
+message = "membership requires a collection or range on the right, found {found}"
+help = "use a list, set, map or range as the right operand; narrow a nullable value first"
+
+[diagnostics.SEM010.issues.membership_over_text]
+message = "membership does not apply to text, found {found}"
+help = "test substring containment with the text method: haystack.continet(needle)"
+
+[diagnostics.SEM010.issues.membership_operand_unresolved]
+message = "membership right operand has an unresolved type, found {found}"
+help = "give the right operand a known type, for example annotate the list or bind it with a typed declaration"
+
 [diagnostics.SEM010.issues.matmul_argument_rank_must_be_two]
 message = "matmul requires rank-2 tensor argument"
 help = "make the expression type match the expected type"
@@ -2385,6 +2401,14 @@ help = "convert one side with `↦` so both operands are u64 or both are signed 
 [diagnostics.SEM011.issues.saturating_word_family_mismatch]
 message = "numeri saturatus cum aliis generibus integrorum in arithmetica misceri non possunt"
 help = "muta alterum operandum ad eandem latitudinem saturati per `↦`; integri saturatus, modulus et numerus numquam tacite miscentur"
+
+[diagnostics.SEM011.issues.policy_float_family_mismatch]
+message = "fracta exacta et saturata cum aliis fractis in arithmetica misceri non possunt"
+help = "muta alterum operandum ad eandem cellam fractionis per `↦`; fractum exactum vel saturatum numquam tacite miscetur cum fracto nudo, alia cella, vel alia latitudine"
+
+[diagnostics.SEM011.issues.policy_float_math_not_built]
+message = "methodi mathematici in fractis exactis et saturatis nondum efficiuntur"
+help = "muta cellam ad latitudinem fractionis nudam per `↦`, methodum in ea voca, et retro muta"
 
 [diagnostics.SEM011.issues.numeric_family_crossing_requires_conversio]
 message = "integer, decimal and float operands cannot mix implicitly"
@@ -3173,10 +3197,6 @@ help = "use literal scalar leaves in the nested {lista}"
 [diagnostics.SEM016.issues.bivalens_recovery_unsupported]
 message = "a conversion to {bivalens} cannot fail, so it takes no `⊥` default"
 help = "remove the recovery arm; use the truthiness result directly"
-
-[diagnostics.SEM016.issues.regex_pattern_too_long]
-message = "regex literal pattern is {length} bytes; the maximum is {max}"
-help = "shorten the literal pattern or build it dynamically"
 
 [diagnostics.SEM017]
 message = "unavailable declaration"

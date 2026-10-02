@@ -1619,6 +1619,14 @@ mod infinity_literal_test;
 mod lt_divert_regression_test;
 
 #[cfg(test)]
+#[path = "membership_glyph_test.rs"]
+mod membership_glyph_test;
+
+#[cfg(test)]
+#[path = "membership_retired_test.rs"]
+mod membership_retired_test;
+
+#[cfg(test)]
 #[path = "first_match_test.rs"]
 mod first_match_test;
 

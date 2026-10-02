@@ -70,10 +70,9 @@ impl TypeChecker<'_> {
 
         let lhs_shape = self.numeric_shape(self.resolve_inferred_type(lhs));
         let rhs_shape = self.numeric_shape(self.resolve_inferred_type(rhs));
-        if lhs_shape
-            .zip(rhs_shape)
-            .is_some_and(|(lhs, rhs)| lhs.family != rhs.family)
-        {
+        if lhs_shape.zip(rhs_shape).is_some_and(|(lhs, rhs)| {
+            lhs.family != rhs.family || (either_policy(lhs, rhs) && lhs.width != rhs.width)
+        }) {
             let issue = family_mismatch_issue(lhs_shape, rhs_shape);
             self.invalid_operand_types(issue, span);
             return self.error_type;
@@ -97,6 +96,12 @@ impl TypeChecker<'_> {
         rhs_ty: TypeId,
         expected: Option<TypeId>,
     ) -> TypeId {
+        if !self.trapping_float_operands_agree(lhs, rhs, lhs.span) {
+            return self.error_type;
+        }
+        if let Some(result) = self.trapping_float_join(lhs, rhs) {
+            return result;
+        }
         if let Some(result) =
             self.arithmetic_range_type(op, lhs, rhs, lhs_ty, rhs_ty, expected, lhs.span)
         {
@@ -182,7 +187,14 @@ impl TypeChecker<'_> {
             }
         }
         if lhs_shape.prim != rhs_shape.prim || lhs_shape.width != rhs_shape.width {
-            self.invalid_operand_types(NUMERIC_ARITHMETIC_OPERANDS_IDENTICAL, span);
+            // D4: a typed mix of a float cell with another float (a bare
+            // float, the other cell, another width) names the cell family.
+            let issue = if lhs_shape.prim == rhs_shape.prim && either_policy(lhs_shape, rhs_shape) {
+                POLICY_FLOAT_FAMILY_MISMATCH
+            } else {
+                NUMERIC_ARITHMETIC_OPERANDS_IDENTICAL
+            };
+            self.invalid_operand_types(issue, span);
             return self.error_type;
         }
         if lhs_shape.family != rhs_shape.family {
@@ -483,6 +495,11 @@ impl TypeChecker<'_> {
                 width: *width,
                 family: IntFamily::Saturating,
             }),
+            Type::PolicyFloat(policy, width) => Some(NumericShape {
+                prim: Primitive::Fractus,
+                width: *width,
+                family: IntFamily::Policy(*policy),
+            }),
             Type::Alias(_, target) => self.numeric_shape(*target),
             _ => None,
         }
@@ -494,15 +511,31 @@ impl TypeChecker<'_> {
         rhs: TypeId,
         shape: NumericShape,
     ) -> TypeId {
+        // N7e D4: arithmetic over `trapping<W>` operands is the bare float
+        // `W`, an expression's value rather than a slot's; the cell it came
+        // from is tracked by `trapping_float_origin` and checked at the store.
+        if let Some(Type::PolicyFloat(radix_types::FloatPolicy::Trapping, width)) = [lhs, rhs]
+            .into_iter()
+            .map(|ty| self.types.get(ty).clone())
+            .find(|ty| matches!(ty, Type::PolicyFloat(radix_types::FloatPolicy::Trapping, _)))
+        {
+            return self.bare_float_type(width);
+        }
         if matches!(
             self.types.get(lhs),
-            Type::SizedNumeric(_, _) | Type::ModularWord(_) | Type::SaturatingWord(_)
+            Type::SizedNumeric(_, _)
+                | Type::ModularWord(_)
+                | Type::SaturatingWord(_)
+                | Type::PolicyFloat(_, _)
         ) {
             return lhs;
         }
         if matches!(
             self.types.get(rhs),
-            Type::SizedNumeric(_, _) | Type::ModularWord(_) | Type::SaturatingWord(_)
+            Type::SizedNumeric(_, _)
+                | Type::ModularWord(_)
+                | Type::SaturatingWord(_)
+                | Type::PolicyFloat(_, _)
         ) {
             return rhs;
         }
@@ -623,6 +656,26 @@ impl TypeChecker<'_> {
         let is_word = |f: IntFamily| f != IntFamily::Plain;
         let other_ok = |f: IntFamily, c: bool| f == IntFamily::Plain || c;
         (is_word(lf) && !lc && other_ok(rf, rc)) || (is_word(rf) && !rc && other_ok(lf, lc))
+    }
+
+    /// A float cell beside an untyped numeric constant in an ordering or a
+    /// value comparison: the comparison stores nothing and compares exact
+    /// values, and a written constant stands beside any number (N7e D4).
+    fn policy_float_constant_comparison(
+        &self,
+        lhs: &HirExpression,
+        lhs_ty: TypeId,
+        rhs: &HirExpression,
+        rhs_ty: TypeId,
+    ) -> bool {
+        if self.current_device_function {
+            return false;
+        }
+        let is_cell = |ty: TypeId| {
+            self.numeric_shape(self.resolve_inferred_type(ty))
+                .is_some_and(|shape| matches!(shape.family, IntFamily::Policy(_)))
+        };
+        (is_cell(lhs_ty) && is_numeric_literal(rhs)) || (is_cell(rhs_ty) && is_numeric_literal(lhs))
     }
 
     /// Enforce the numeric-equality admission law for `≅`/`≇` and `≈`/`≉`.
@@ -1100,6 +1153,7 @@ impl TypeChecker<'_> {
                     return self.numerus_type();
                 }
                 let expected = self.unary_operand_expected(operand, expected);
+                let expected = self.unary_float_cell_expected(operand, expected);
                 let operand_ty = self.check_expr_with_expected(operand, expected);
                 if self.is_error(operand_ty) {
                     return self.error_type;
@@ -1405,6 +1459,12 @@ impl TypeChecker<'_> {
                 if let Some(result) = self.check_tensor_lift_arith(op, lhs, rhs, lhs_ty, rhs_ty) {
                     return result;
                 }
+                if !self.trapping_float_operands_agree(lhs, rhs, lhs.span) {
+                    return self.error_type;
+                }
+                if let Some(result) = self.trapping_float_join(lhs, rhs) {
+                    return result;
+                }
                 self.true_division_type(lhs, rhs, lhs_ty, rhs_ty, lhs.span)
             }
             HirBinOp::ApproxEq
@@ -1422,7 +1482,9 @@ impl TypeChecker<'_> {
                 if let Some(result) = self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty) {
                     return result;
                 }
-                if !self.word_value_comparison(lhs, lhs_ty, rhs, rhs_ty) {
+                if !self.word_value_comparison(lhs, lhs_ty, rhs, rhs_ty)
+                    && !self.policy_float_constant_comparison(lhs, lhs_ty, rhs, rhs_ty)
+                {
                     self.numeric_value_equality_types(lhs_ty, rhs_ty, lhs.span);
                 }
                 self.bool_type()
@@ -1478,40 +1540,21 @@ impl TypeChecker<'_> {
                 } else if self.word_value_comparison(lhs, lhs_ty, rhs, rhs_ty) {
                     // A `wrapping`/`saturating` word beside a constant or a
                     // plain integer: exact values (rulings 12, 22).
+                } else if self.policy_float_constant_comparison(lhs, lhs_ty, rhs, rhs_ty) {
+                    // A float cell beside a written constant: exact values.
                 } else {
                     self.numeric_ordering_bin(lhs_ty, rhs_ty, lhs.span);
                 }
                 self.bool_type()
             }
-            HirBinOp::InRange => {
+            HirBinOp::InRange | HirBinOp::NotInRange => {
                 let lhs_ty = self.check_expr(lhs);
                 let rhs_ty = self.check_expr(rhs);
                 self.check_intra_operand(lhs_ty, rhs_ty, lhs.span, rhs.span);
                 self.bool_type()
             }
-            HirBinOp::Between => {
-                let lhs_ty = self.check_expr(lhs);
-                let rhs_ty = self.check_expr(rhs);
-                match self.types.get(self.resolve_inferred_type(rhs_ty)) {
-                    Type::Array(elem) | Type::Set(elem) => {
-                        self.unify_assign_issue(
-                            lhs_ty,
-                            *elem,
-                            lhs.span,
-                            MEMBERSHIP_OPERAND_TYPE_MISMATCH,
-                        );
-                    }
-                    Type::Map(key, _) => {
-                        self.unify_assign_issue(
-                            lhs_ty,
-                            *key,
-                            lhs.span,
-                            MEMBERSHIP_OPERAND_TYPE_MISMATCH,
-                        );
-                    }
-                    _ => {}
-                }
-                self.bool_type()
+            HirBinOp::Between | HirBinOp::NotBetween => {
+                unreachable!("membership is resolved by check_membership before check_binary")
             }
             HirBinOp::Coalesce => unreachable!("coalesce is handled before eager rhs checking"),
             HirBinOp::And | HirBinOp::Or => {
@@ -2265,7 +2308,131 @@ impl TypeChecker<'_> {
     }
 }
 
-fn is_numeric_literal(expr: &HirExpression) -> bool {
+impl TypeChecker<'_> {
+    /// The unified membership operator (`∈` / `∉`).
+    ///
+    /// The parser cannot tell a range from a collection, so it records the
+    /// placeholder `Between` / `NotBetween`. The right operand's static type
+    /// decides: an `intervallum` retargets the node in place to `InRange` /
+    /// `NotInRange` and takes the range rule (numeric left, element unified
+    /// with the bound); every other right operand keeps the collection variant
+    /// and takes [`Self::check_membership_rhs`]. The recorded operator is the
+    /// resolved one, which is what MIR, AIR and every emitter read.
+    pub(super) fn check_membership(
+        &mut self,
+        op: &mut HirBinOp,
+        lhs: &mut HirExpression,
+        rhs: &mut HirExpression,
+    ) -> TypeId {
+        let lhs_ty = self.check_expr(lhs);
+        let rhs_ty = self.check_expr(rhs);
+        if self.intervallum_bound_type(rhs_ty).is_some() {
+            *op = match *op {
+                HirBinOp::NotBetween => HirBinOp::NotInRange,
+                _ => HirBinOp::InRange,
+            };
+            self.check_intra_operand(lhs_ty, rhs_ty, lhs.span, rhs.span);
+        } else {
+            self.check_membership_rhs(lhs_ty, rhs_ty, lhs.span, rhs.span);
+        }
+        self.bool_type()
+    }
+
+    /// The right-operand rule of the collection form of membership.
+    ///
+    /// After peeling aliases and access markers the right operand must be a
+    /// `lista` (bounded or not), a `copia` or a `tabula` (membership by key).
+    /// A `textus` / `ascii` right operand (bounded or not) is rejected with
+    /// `membership_over_text`: membership never applies to text (operator
+    /// ruling OD-1), the text method does. Every other resolved type is
+    /// rejected with `membership_requires_collection`. Both carry the right
+    /// operand's type as `found`.
+    ///
+    /// A right operand that is not resolved enough to test membership against
+    /// (an inference variable, union hole, marker hole, error type, or a
+    /// container whose element or key type is still unresolved, such as `[]`)
+    /// is reported once as `membership_operand_unresolved` at the right
+    /// operand, before the left operand can bind the hole: nothing guesses a
+    /// type for it and nothing unresolved reaches lowering.
+    pub(super) fn check_membership_rhs(
+        &mut self,
+        lhs_ty: TypeId,
+        rhs_ty: TypeId,
+        lhs_span: radix_lexer::Span,
+        rhs_span: radix_lexer::Span,
+    ) {
+        let (_, payload) = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(rhs_ty));
+        let payload = self.resolve_inferred_type(payload);
+        let shape = self.types.get(payload).clone();
+        let probed = match &shape {
+            Type::Array(elem) | Type::Set(elem) | Type::BoundedArray { element: elem, .. } => {
+                Some(*elem)
+            }
+            Type::Map(key, _) => Some(*key),
+            _ => None,
+        };
+        let unresolved = match probed {
+            Some(probed) => self.is_unresolved_membership_type(probed, false),
+            None => self.is_unresolved_membership_type(payload, true),
+        };
+        if unresolved {
+            let found = self.format_type_for_diagnostic(rhs_ty);
+            self.error_issue_with_args(
+                SemanticErrorKind::TypeMismatch,
+                MEMBERSHIP_OPERAND_UNRESOLVED,
+                rhs_span,
+                &[("found", found)],
+            );
+            return;
+        }
+        match shape {
+            Type::Array(elem) | Type::Set(elem) | Type::BoundedArray { element: elem, .. } => {
+                self.unify_assign_issue(lhs_ty, elem, lhs_span, MEMBERSHIP_OPERAND_TYPE_MISMATCH);
+            }
+            Type::Map(key, _) => {
+                self.unify_assign_issue(lhs_ty, key, lhs_span, MEMBERSHIP_OPERAND_TYPE_MISMATCH);
+            }
+            Type::Primitive(Primitive::Textus | Primitive::Ascii)
+            | Type::BoundedTextus { .. }
+            | Type::BoundedAscii { .. } => {
+                // OD-1: no membership operator over text; the text method is
+                // the one spelling for substring containment.
+                let found = self.format_type_for_diagnostic(rhs_ty);
+                self.error_issue_with_args(
+                    SemanticErrorKind::TypeMismatch,
+                    MEMBERSHIP_OVER_TEXT,
+                    rhs_span,
+                    &[("found", found)],
+                );
+            }
+            _ => {
+                let found = self.format_type_for_diagnostic(rhs_ty);
+                self.error_issue_with_args(
+                    SemanticErrorKind::TypeMismatch,
+                    MEMBERSHIP_REQUIRES_COLLECTION,
+                    rhs_span,
+                    &[("found", found)],
+                );
+            }
+        }
+    }
+
+    /// Whether a membership right operand (or its element or key type) is an
+    /// unresolved inference state rather than a type. `error_counts` adds the
+    /// error type, which only the right operand itself reports.
+    fn is_unresolved_membership_type(&self, ty: TypeId, error_counts: bool) -> bool {
+        let resolved = self.resolve_inferred_type(ty);
+        match self.types.get(resolved) {
+            Type::Infer(_) | Type::InferUnion(_) | Type::MarkerHole { .. } => true,
+            Type::Error => error_counts,
+            _ => false,
+        }
+    }
+}
+
+pub(super) fn is_numeric_literal(expr: &HirExpression) -> bool {
     match &expr.kind {
         HirExpressionKind::Literal(
             HirLiteral::Int(_)
@@ -2284,10 +2451,29 @@ pub(super) const NUMERIC_ARITHMETIC_OPERANDS_IDENTICAL: &str =
     "numeric_arithmetic_operands_identical";
 const MODULAR_WORD_FAMILY_MISMATCH: &str = "modular_word_family_mismatch";
 pub(super) const SATURATING_WORD_FAMILY_MISMATCH: &str = "saturating_word_family_mismatch";
+/// A typed mix of a `trapping<W>` or `saturating<W>` float cell with a bare
+/// float, the other cell, or another width (N7e D4).
+pub(super) const POLICY_FLOAT_FAMILY_MISMATCH: &str = "policy_float_family_mismatch";
+/// A method call on a float cell: the cell's math surface is not built yet
+/// (N7e D3, interim fail-closed).
+pub(super) const POLICY_FLOAT_MATH_NOT_BUILT: &str = "policy_float_math_not_built";
+
+fn either_policy(lhs: NumericShape, rhs: NumericShape) -> bool {
+    [lhs, rhs]
+        .iter()
+        .any(|shape| matches!(shape.family, IntFamily::Policy(_)))
+}
 
 /// Mixed integer families name the saturating family when it is involved,
 /// otherwise the modular family (both require an explicit `↦`).
 fn family_mismatch_issue(lhs: Option<NumericShape>, rhs: Option<NumericShape>) -> &'static str {
+    if [lhs, rhs]
+        .into_iter()
+        .flatten()
+        .any(|shape| matches!(shape.family, IntFamily::Policy(_)))
+    {
+        return POLICY_FLOAT_FAMILY_MISMATCH;
+    }
     let saturating = [lhs, rhs]
         .into_iter()
         .flatten()
@@ -2312,6 +2498,9 @@ const EQUALITY_EXACT_TYPES_REQUIRED: &str = "equality_exact_types_required";
 const COMMON_TYPE_MISMATCH: &str = "common_type_mismatch";
 const ASSIGNMENT_TYPE_MISMATCH: &str = "assignment_type_mismatch";
 const MEMBERSHIP_OPERAND_TYPE_MISMATCH: &str = "membership_operand_type_mismatch";
+const MEMBERSHIP_REQUIRES_COLLECTION: &str = "membership_requires_collection";
+const MEMBERSHIP_OPERAND_UNRESOLVED: &str = "membership_operand_unresolved";
+const MEMBERSHIP_OVER_TEXT: &str = "membership_over_text";
 const COALESCE_FALLBACK_TYPE_MISMATCH: &str = "coalesce_fallback_type_mismatch";
 const BOOLEAN_OPERANDS_REQUIRED: &str = "boolean_operands_required";
 const INTEGER_OPERANDS_REQUIRED: &str = "integer_operands_required";
@@ -2336,12 +2525,16 @@ pub(super) struct NumericShape {
     pub(super) family: IntFamily,
 }
 
-/// Overflow policy family of an integer shape (D11.1): trap, wrap, or clamp.
+/// Overflow policy family of a numeric shape: trap, wrap, or clamp for an
+/// integer (D11.1), or the policy of a `trapping<W>` / `saturating<W>` float
+/// cell (N7e D5). A cell is never `Plain`, so every range rule that is keyed
+/// on the plain family leaves it alone.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum IntFamily {
     Plain,
     Modular,
     Saturating,
+    Policy(radix_types::FloatPolicy),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

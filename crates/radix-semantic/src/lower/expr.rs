@@ -417,6 +417,9 @@ impl Lowerer<'_> {
             radix_syntax::BinOp::IsNot => HirBinOp::IsNot,
             radix_syntax::BinOp::InRange => HirBinOp::InRange,
             radix_syntax::BinOp::Between => HirBinOp::Between,
+            // WHY: placeholders; the checker retargets `Between` / `NotBetween` to the range forms by right-operand type.
+            radix_syntax::BinOp::Member => HirBinOp::Between,
+            radix_syntax::BinOp::NotMember => HirBinOp::NotBetween,
             radix_syntax::BinOp::Maximum | radix_syntax::BinOp::Minimum => {
                 unreachable!("minmax infix nodes normalize to method calls above")
             }
@@ -1421,17 +1424,6 @@ impl Lowerer<'_> {
         if let Some(via) = &conversio.via {
             self.lower_via_hint(via, &target, &mut params);
         }
-        // Fold constant literal sources to `HirLiteral::Regex` so regex values
-        // share one HIR shape with future slash literals (Part B). Guard on the
-        // absence of recovery: typecheck rejects `↦ regex ⊥ …`, but lowering
-        // may still run after error recovery. Never silently drop recovery.
-        let regex_ty = self.types.primitive(Primitive::Regex);
-        if matches!(target, HirConversioTarget::Type(ty) if ty == regex_ty)
-            && conversio.recovery.is_none()
-            && let Some(pattern) = regex_pattern_symbol(&source)
-        {
-            return HirExpressionKind::Literal(HirLiteral::Regex(pattern, None));
-        }
         let recovery = conversio
             .recovery
             .as_ref()
@@ -1916,12 +1908,5 @@ fn conversio_hint_symbol(arg: &GenericArgExpr) -> Option<radix_lexer::Symbol> {
             _ => None,
         },
         GenericArgExpr::Size(_) => None,
-    }
-}
-
-fn regex_pattern_symbol(expr: &HirExpression) -> Option<radix_lexer::Symbol> {
-    match &expr.kind {
-        HirExpressionKind::Literal(HirLiteral::String(sym) | HirLiteral::Ascii(sym)) => Some(*sym),
-        _ => None,
     }
 }

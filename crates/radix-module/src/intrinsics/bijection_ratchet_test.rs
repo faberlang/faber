@@ -244,6 +244,20 @@ fn dtypes_for(receiver: IntrinsicReceiver) -> Vec<Dtype> {
             "textus",
             "0",
         )],
+        // A match has no source type name (RD-3): the receiver is the result
+        // of `find`, held in an inferred binding and asserted non-null at the
+        // call (`r!.method()`, see `probe_source`). The `regex` parameter
+        // survives into the mutable probe through `extra_param`.
+        IntrinsicReceiver::Match => vec![dtype(
+            "match",
+            "regex rx",
+            "",
+            "regex rx",
+            "fixum _ r ← rx.inventa(\"xy\")",
+            "\"xy\"",
+            "textus",
+            "0",
+        )],
     }
 }
 
@@ -309,7 +323,7 @@ fn arg_expr(kind: IntrinsicParamKind, dtype: &Dtype, receiver_expr: &str) -> Str
         IntrinsicParamKind::Key => "\"k\"".into(),
         IntrinsicParamKind::Value => dtype.el.clone(),
         IntrinsicParamKind::NumerusIndex => "0".into(),
-        IntrinsicParamKind::Textus => "\"xy\"".into(),
+        IntrinsicParamKind::Textus | IntrinsicParamKind::TextusOrReplacer => "\"xy\"".into(),
         IntrinsicParamKind::SetInner => "altera".into(),
         IntrinsicParamKind::Predicate => format!("{} x ∴ x > {}", dtype.el_ty, dtype.el),
         IntrinsicParamKind::Mapper => format!("{} x ∴ x * 2", dtype.el_ty),
@@ -381,7 +395,13 @@ fn probe_source(row: &crate::intrinsics::MethodIntrinsic, dtype: &Dtype, mutable
     } else {
         format!("<{}>", generic_args.join(", "))
     };
-    let call = format!("r.{}{}({})", row.faber_name, generic_suffix, args.join(", "));
+    // The `match ∪ nihil` binding is asserted non-null at the call.
+    let receiver = if row.receiver == IntrinsicReceiver::Match {
+        "r!"
+    } else {
+        "r"
+    };
+    let call = format!("{receiver}.{}{}({})", row.faber_name, generic_suffix, args.join(", "));
     let body = if row.return_kind == IntrinsicReturnKind::Vacuum {
         format!("    {call}")
     } else if key == "Tensor.gather/1" {
@@ -541,6 +561,7 @@ const FAMILY_CONTROLS: &[(&str, &str)] = &[
     ("Sparsa", "longitudo/0"),
     ("Intervallum", "longitudo/0"),
     ("Regex", "consentit/1"),
+    ("Match", "inventum/0"),
 ];
 
 fn run_family_controls(session: &Session) {
@@ -811,6 +832,17 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         MirCollectionOp::Keys,
         MirCollectionOp::Values,
         MirCollectionOp::RegexMatches,
+        MirCollectionOp::RegexFind,
+        MirCollectionOp::RegexFindAll,
+        MirCollectionOp::RegexSplit,
+        MirCollectionOp::RegexReplace,
+        MirCollectionOp::TextEscape,
+        MirCollectionOp::RegexReplaceEach,
+        MirCollectionOp::MatchText,
+        MirCollectionOp::MatchStart,
+        MirCollectionOp::MatchEnd,
+        MirCollectionOp::MatchGroup,
+        MirCollectionOp::MatchNamed,
         MirCollectionOp::CordCursor,
     ];
     // K5: one payload variant per lifted math function, all registry rows.
@@ -825,6 +857,10 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         MirCollectionOp::ArrayDiv,
         // Conversion surface (intervallum → tensor materialization).
         MirCollectionOp::IntervalMaterialize,
+        // Lowering composite: the closure form of regex `muta` maps its closure
+        // over the matches in a lowered loop, then joins the results (RX-5);
+        // the registry row of `muta` names the literal op, not this one.
+        MirCollectionOp::RegexReplaceEach,
         // Internal device vocabulary (target-lane owned).
         MirCollectionOp::TensorRopeHalf,
         MirCollectionOp::TensorCausalMaskedSoftmax,

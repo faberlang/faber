@@ -62,19 +62,15 @@ functio add(saturatus<{width}> x, saturatus<{width}> y) → saturatus<{width}> {
 }
 
 #[test]
-fn saturating_word_rejects_float_decimal_and_missing_widths() {
-    for width in ["f32", "f64", "d64"] {
-        analysis_rejects_with_issue(
-            &format!(
-                r"
-functio keep(saturatus<{width}> x) → saturatus<{width}> {{
+fn saturating_word_rejects_decimal_and_missing_widths() {
+    analysis_rejects_with_issue(
+        r"
+functio keep(saturatus<d64> x) → saturatus<d64> {
     redde x
-}}
-"
-            ),
-            "unsupported_saturating_word_width",
-        );
-    }
+}
+",
+        "unsupported_saturating_word_width",
+    );
     analysis_rejects_with_issue(
         r"
 functio keep(saturatus<u8, u8> x) → numerus {

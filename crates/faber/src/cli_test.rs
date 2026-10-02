@@ -521,6 +521,54 @@ fn cli_parses_convert_target_locale() {
 }
 
 #[test]
+fn cli_convert_and_field_modifier_codemod_parse_write_flag() {
+    let convert = Cli::try_parse_from(["faber", "convert", "--to", "en", "--write", "main.fab"])
+        .expect("parse convert --write");
+    let Some(crate::cli::Command::Convert(args)) = convert.command else {
+        panic!("expected convert subcommand");
+    };
+    assert!(args.write && !args.check && !args.stdout);
+
+    let codemod = Cli::try_parse_from(["faber", "field-modifier-codemod", "--write", "main.fab"])
+        .expect("parse field-modifier-codemod --write");
+    let Some(crate::cli::Command::FieldModifierCodemod(args)) = codemod.command else {
+        panic!("expected field-modifier-codemod subcommand");
+    };
+    assert!(args.write && !args.check && !args.stdout);
+}
+
+#[test]
+fn convert_and_field_modifier_codemod_help_state_report_default_and_write_flag() {
+    let mut command = Cli::command();
+    let convert = command
+        .find_subcommand_mut("convert")
+        .expect("convert subcommand")
+        .render_long_help()
+        .to_string();
+    let words = convert.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(
+        words.contains("Does not write unless `--write` is given"),
+        "{convert}"
+    );
+    assert!(
+        words.contains("Write converted source back to the file (default is report-only)"),
+        "{convert}"
+    );
+
+    let mut command = Cli::command();
+    let codemod = command
+        .find_subcommand_mut("field-modifier-codemod")
+        .expect("field-modifier-codemod subcommand")
+        .render_long_help()
+        .to_string();
+    let words = codemod.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(
+        words.contains("Write codemodded source back to the file (default is report-only)"),
+        "{codemod}"
+    );
+}
+
+#[test]
 fn locale_command_help_states_complete_unit_and_resolution_contract() {
     let mut command = Cli::command();
     let format = command
@@ -634,6 +682,67 @@ fn cli_rejects_format_write_with_stdout() {
 }
 
 #[test]
+fn cli_format_default_mode_is_report_only() {
+    let format = Cli::try_parse_from(["faber", "format", "main.fab"]).expect("parse format");
+    let Some(crate::cli::Command::Format(args)) = format.command else {
+        panic!("expected format subcommand");
+    };
+    assert!(!args.write);
+    assert!(!args.check);
+    assert!(!args.stdout);
+    assert!(!args.stdin);
+}
+
+#[test]
+fn cli_parses_format_check_flag() {
+    let format = Cli::try_parse_from(["faber", "format", "--check"]).expect("parse format --check");
+    let Some(crate::cli::Command::Format(args)) = format.command else {
+        panic!("expected format subcommand");
+    };
+    assert!(args.check);
+    assert!(!args.write);
+}
+
+#[test]
+fn cli_rejects_format_write_with_check() {
+    let error = Cli::try_parse_from(["faber", "format", "--write", "--check", "main.fab"])
+        .expect_err("format --write conflicts with --check");
+    let rendered = error.to_string();
+    assert!(rendered.contains("--write"));
+    assert!(rendered.contains("--check"));
+}
+
+#[test]
+fn cli_rejects_format_stdin_with_write_or_stdout() {
+    for other in ["--write", "--stdout"] {
+        let error = Cli::try_parse_from(["faber", "format", "--stdin", other])
+            .expect_err("format --stdin conflicts with the other modes");
+        let rendered = error.to_string();
+        assert!(rendered.contains("--stdin"), "{rendered}");
+        assert!(rendered.contains(other), "{rendered}");
+    }
+}
+
+#[test]
+fn format_help_states_report_default_and_write_flag() {
+    let mut command = Cli::command();
+    let format = command
+        .find_subcommand_mut("format")
+        .expect("format subcommand")
+        .render_long_help()
+        .to_string();
+    let words = format.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(
+        words.contains("Does not write unless `--write` is given"),
+        "{format}"
+    );
+    assert!(
+        words.contains("Write formatted source back to the file (default is report-only)"),
+        "{format}"
+    );
+}
+
+#[test]
 fn cli_parses_format_stdin_flag() {
     let format = Cli::try_parse_from(["faber", "format", "--stdin"]).expect("parse format --stdin");
     let Some(crate::cli::Command::Format(args)) = format.command else {
@@ -714,6 +823,23 @@ fn cli_parses_explain_list() {
     };
     assert!(list_args.list);
     assert!(list_args.term.is_none());
+}
+
+#[test]
+fn cli_parses_explain_list_json() {
+    let list = Cli::try_parse_from(["faber", "explain", "--list", "--json"])
+        .expect("parse explain list json");
+    let Some(crate::cli::Command::Explain(list_args)) = list.command else {
+        panic!("expected explain subcommand");
+    };
+    assert!(list_args.list);
+    assert!(list_args.json);
+}
+
+#[test]
+fn cli_rejects_explain_json_without_term_or_list() {
+    assert!(Cli::try_parse_from(["faber", "explain", "--json"]).is_err());
+    assert!(Cli::try_parse_from(["faber", "explain", "--json", "--search", "host"]).is_err());
 }
 
 #[test]
@@ -808,7 +934,8 @@ fn cli_rejects_explain_json_without_term() {
         Cli::try_parse_from(["faber", "explain", "--json"]).expect_err("json requires a term");
     let rendered = error.to_string();
     assert!(rendered.contains("--json"));
-    assert!(rendered.contains("<TERM>") || rendered.contains("<term>"));
+    // NEED-5 (f4f9ca943): usage is now `<TERM|--list>`; `<TERM` is the stable prefix.
+    assert!(rendered.contains("<TERM") || rendered.contains("<term"));
 }
 
 #[test]

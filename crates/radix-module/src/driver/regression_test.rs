@@ -520,8 +520,8 @@ fn compile_supports_extended_binary_operators() {
   nota a ≡ b
   nota a ≠ b
   nota maybe est nihil
-  nota a intra 0‥3
-  nota a inter [1, 2, 3]
+  nota a ∈ 0‥3
+  nota a ∈ [1, 2, 3]
   nota maybe vel 0
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1605,12 +1605,12 @@ fn rust_output_uses_scalar_display_helpers_for_scribe() {
 
     assert!(result.success());
     let output = super::rust_output(result);
-    assert!(output.code.contains("faber::display_fractus(f)"));
-    assert!(output.code.contains("faber::display_bivalens(b)"));
+    assert!(output.code.contains("faber::display::fractus(f)"));
+    assert!(output.code.contains("faber::display::bivalens(b)"));
     assert!(
         output
             .code
-            .contains("faber::display_text_payload((a).as_ref())")
+            .contains("faber::display::text_payload((a).as_ref())")
     );
 }
 

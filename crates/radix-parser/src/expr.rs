@@ -400,8 +400,12 @@ impl Parser {
                 TokenKind::Gt | TokenKind::GtAscii => BinOp::Gt,
                 TokenKind::LtEq => BinOp::LtEq,
                 TokenKind::GtEq => BinOp::GtEq,
-                _ if self.check_keyword_ident(TokenKind::Intra) => BinOp::InRange,
-                _ if self.check_keyword_ident(TokenKind::Inter) => BinOp::Between,
+                TokenKind::ElementOf => BinOp::Member,
+                TokenKind::NotElementOf => BinOp::NotMember,
+                _ if self.check_keyword_in_owner(KeywordOwner::RetiredMembership) => {
+                    self.record_retired_membership_keyword();
+                    BinOp::Member
+                }
                 _ => break,
             };
             self.advance();
@@ -410,6 +414,39 @@ impl Parser {
         }
 
         Ok(left)
+    }
+
+    /// Record the migration diagnostic for a retired membership word
+    /// (`intra` / `inter` and every reader pack's spelling of them) sitting in
+    /// operator position: `PARSE001 membership_keyword_retired`, args `keyword`
+    /// (as written) and `glyph` (`∈`).
+    ///
+    /// The caller still parses the operand as `Member`, so recovery continues
+    /// past the word and nothing downstream runs on a recorded error (the
+    /// `static_decl_retired` pattern). The words stay ordinary identifiers
+    /// everywhere else; only this operator slot claims them.
+    fn record_retired_membership_keyword(&mut self) {
+        let span = self.current_span();
+        let keyword = match self.peek().kind {
+            TokenKind::Ident(sym) => self.interner.resolve(sym).to_owned(),
+            _ => String::new(),
+        };
+        // A speculative sub-parse that is re-run must not report the same word twice.
+        if self.errors.iter().any(|err| {
+            err.span == span
+                && err
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "membership_keyword_retired")
+        }) {
+            return;
+        }
+        self.errors.push(
+            ParseError::structured(ParseErrorKind::Expected, span)
+                .with_arg("issue", "membership_keyword_retired")
+                .with_arg("keyword", keyword)
+                .with_arg("glyph", "∈"),
+        );
     }
 
     /// Parse the format tier.

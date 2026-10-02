@@ -21,7 +21,7 @@ fn library_home() -> PathBuf {
 fn analyze(dir: &Path) -> AnalyzedProgram {
     let seams = test_mir_seams();
     let config = Config::default()
-        .with_target((seams.executed_lane_target)(&Config::default(), dir))
+        .with_target((seams.executed_lane_target)(&Config::default(), dir).unwrap())
         .with_library_home(library_home());
     analyze_package(&config, dir, &seams.analysis).unwrap()
 }

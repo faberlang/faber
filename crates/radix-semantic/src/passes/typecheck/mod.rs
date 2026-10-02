@@ -1307,6 +1307,9 @@ mod format_test;
 #[cfg(test)]
 #[path = "failable_conversio_handler_test.rs"]
 mod failable_conversio_handler_test;
+#[cfg(test)]
+#[path = "regex_conversio_failable_test.rs"]
+mod regex_conversio_failable_test;
 
 #[cfg(test)]
 #[path = "float_constant_conversio_bounds_test.rs"]

@@ -1,0 +1,59 @@
++++
+term = "reject-flag"
+kind = "conformance"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "conversio_expr", "fac_stmt", "cape_clause", "si_stmt", "call_expr", "call_suffix", "member_suffix", "non_null_suffix", "argument_list", "argument", "expression", "ternary", "literal", "nota_stmt", "additive_expr", "equality", "equality_tail", "assignment", "place", "itera_stmt", "dum_stmt", "comparison", "vel_expr", "vel_rhs", "sit_decl", "expr_stmt"]
+category = "regex"
+canonical = false
+summary = "Flag letters other than `i m s x` are not in the dialect: `(?g)`, `(?y)`, `(?U)`, `(?u)` and `(?-u)` fail with the leading id `unsupported_flag`."
+syntax = "<textus> ↦ regex"
+related = ["regex", "↦", "find", "find_all", "split", "replace"]
+locale = "en"
++++
+# =============================================================================
+# reject-flag — regex conformance cell
+# =============================================================================
+#
+# Pins: PIN-REJECT, PIN-FLAGS (docs/design/regex-dialect.md). One line per probe cell;
+# the label is the cell id of the dialect's Appendix B, and the value is the reference
+# engine's answer. A target whose engine disagrees fails the line, never the dialect.
+#
+# What this teaches:
+#   • `(?g)a`, `(?y)a`, `(?U)a+`, `(?u)a` and `(?-u)a` fail with `unsupported_flag`
+#   • the accepted flags are exactly `i m s x`, alone, combined or scoped to a group
+#
+# Common mistakes:
+#   • expecting a flag the reference engine tolerates, such as `(?U)` or `(?u)`, to work: the dialect is the portable core
+#
+# See also: regex, ↦, find, find_all, split, replace.
+# =============================================================================
+
+# reject-flag — probes, one line each
+#
+# <textus> ↦ regex, then the operation the pin is about
+#
+# EXPECTED OUTPUT:
+#   One `<cell id>: <value>` line per probe, in the order below.
+
+# `accepted` when the conversion takes the pattern; otherwise the leading construct id of the
+# rejection payload (the text before the first colon). The engine's prose is never printed.
+fn verdict(string pat) → string {
+    do {
+        pat ↦ regex
+        return "accepted"
+    }
+    catch err {
+        const list<string> parts ← err.split(":")
+        return parts[0]
+    }
+}
+
+main {
+    print "flag-g: " + verdict("(?g)a")
+    print "flag-unknown-letter: " + verdict("(?y)a")
+    print "flag-U: " + verdict("(?U)a+")
+    print "flag-u: " + verdict("(?u)a")
+    print "flag-neg-u: " + verdict("(?-u)a")
+    print "ok-i: " + verdict("(?i)a")
+    print "ok-ims: " + verdict("(?ims)a")
+    print "ok-x-scoped: " + verdict("(?x:a b)")
+}

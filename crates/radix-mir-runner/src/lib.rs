@@ -14,6 +14,7 @@ mod exact_int;
 mod host;
 pub mod inf;
 pub mod kernel;
+mod regex_program;
 mod runtime;
 pub mod sermo;
 pub(crate) mod shuffle;
@@ -46,15 +47,15 @@ use radix_mir::{
 };
 use radix_types::{
     IndexExpr, NumericWidth, Primitive, RuntimeExtentId, Type, TypeId, TypeTable,
-    effective_width,
 };
+use regex_program::RegexProgram;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Instant;
 use value::{
     GradientStorage, add_values, compare_values, decimal_numeric_binop, decimal_scale_factor,
-    int_bitwise_binop, modular_word_bitnot, modular_word_bitwise_binop,
+    effective_width, int_bitwise_binop, modular_word_bitnot, modular_word_bitwise_binop,
     modular_word_compare_values, modular_word_neg, modular_word_numeric_binop, numeric_binop,
     round_float, values_equal,
 };
@@ -424,6 +425,7 @@ fn element_display_width(ty: TypeId, types: &TypeTable, depth: u8) -> Option<Num
     }
     match types.get(ty) {
         Type::SizedNumeric(_, width) if width.is_float() || width.is_decimal() => Some(*width),
+        Type::PolicyFloat(_, width) => Some(*width),
         _ => element_display_width(wrapped_element(ty, types)?, types, depth + 1),
     }
 }
@@ -1864,7 +1866,10 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     &crate::textus_literal::decode_textus_literal(self.interner.resolve(*pattern)),
                     flags.map(|flags| self.interner.resolve(flags)),
                 );
-                Value::Regex(runtime_regex_pattern(&pattern))
+                let program = RegexProgram::compile(&pattern).map_err(|payload| {
+                    RunnerError::internal(span, format!("constant regex is invalid: {payload}"))
+                })?;
+                Value::Regex(Rc::new(program))
             }
         })
     }
@@ -2687,7 +2692,7 @@ fn constant_equals_value(constant: &MirConstant, value: &Value, interner: &Inter
             regex_pattern(
                 &crate::textus_literal::decode_textus_literal(interner.resolve(*pattern)),
                 flags.map(|flags| interner.resolve(flags)),
-            ) == *right
+            ) == right.pattern()
         }
         (MirConstant::Nil, Value::Nil) => true,
         (MirConstant::Unit, Value::Unit) => true,
@@ -2798,13 +2803,6 @@ fn regex_pattern(pattern: &str, flags: Option<&str>) -> String {
     }
 }
 
-pub(crate) fn runtime_regex_pattern(pattern: &str) -> String {
-    // The runtime's `faber::Regex` is a compile-time literal carrier today:
-    // `Regex::new(pattern).pattern()` returns the input unchanged. Mirror that
-    // identity here without the runtime dependency.
-    pattern.to_owned()
-}
-
 #[cfg(test)]
 #[path = "lib_test.rs"]
 mod lib_test;
@@ -2864,6 +2862,10 @@ mod value_test;
 #[cfg(test)]
 #[path = "decimal_test.rs"]
 mod decimal_test;
+
+#[cfg(test)]
+#[path = "policy_float_test.rs"]
+mod policy_float_test;
 
 #[cfg(test)]
 #[path = "narrowing_conversio_test.rs"]

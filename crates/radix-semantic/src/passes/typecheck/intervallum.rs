@@ -1,7 +1,8 @@
-//! Type rules for `intervallum<T>` construction and `intra` consumption.
+//! Type rules for `intervallum<T>` construction and range-membership
+//! (`∈` / `∉` and the `intra` keyword) consumption.
 //!
 //! COMPILER PHASE: Semantic typecheck
-//! INPUT: HIR `Intervallum` expressions (start, end, optional step) and `intra`
+//! INPUT: HIR `Intervallum` expressions (start, end, optional step) and range-membership
 //! operands with resolved bound and step types
 //! OUTPUT: Checked `intervallum<T>` expressions with validated numeric bound
 //! types; diagnostics for non-numeric steps, unsupported bound types, range
@@ -149,6 +150,9 @@ impl TypeChecker<'_> {
         false
     }
 
+    /// The range rule of membership: the right operand is an `intervallum` and
+    /// the left is a numeric value of its bound type. Reached by the `intra`
+    /// keyword and by `check_membership` once it has resolved a range.
     pub fn check_intra_operand(
         &mut self,
         lhs_ty: TypeId,

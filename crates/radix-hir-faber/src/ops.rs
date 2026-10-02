@@ -92,7 +92,9 @@ impl super::FaberCodegen<'_> {
             | HirBinOp::LtEq
             | HirBinOp::GtEq
             | HirBinOp::InRange
-            | HirBinOp::Between => 5,
+            | HirBinOp::Between
+            | HirBinOp::NotInRange
+            | HirBinOp::NotBetween => 5,
             HirBinOp::BitOr => 6,
             HirBinOp::BitXor => 7,
             HirBinOp::BitAnd => 8,
@@ -156,8 +158,10 @@ impl super::FaberCodegen<'_> {
                 surface.keyword(TokenKind::Non),
                 surface.keyword(TokenKind::Est)
             ),
-            HirBinOp::InRange => surface.keyword(TokenKind::Intra).to_owned(),
-            HirBinOp::Between => surface.keyword(TokenKind::Inter).to_owned(),
+            // WHY: membership is locale-invariant glyph surface (ruling 4); the
+            // keyword spellings `intra`/`inter` are parse-only until unit 1c retires them.
+            HirBinOp::InRange | HirBinOp::Between => "∈".to_owned(),
+            HirBinOp::NotInRange | HirBinOp::NotBetween => "∉".to_owned(),
         }
     }
 }

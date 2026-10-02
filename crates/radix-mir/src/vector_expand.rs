@@ -225,10 +225,10 @@ fn expand_site(
             return Ok(Expansion::Split);
         }
     };
-    if let Some(destination) = &site.destination {
-        if direct.is_none() || !head.retarget(&result, destination) {
-            head.assign(destination.clone(), result, site.return_ty);
-        }
+    if let Some(destination) = &site.destination
+        && (direct.is_none() || !head.retarget(&result, destination))
+    {
+        head.assign(destination.clone(), result, site.return_ty);
     }
     let statements = head.statements;
     let count = statements.len();

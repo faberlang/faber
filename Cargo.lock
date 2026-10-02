@@ -318,7 +318,7 @@ dependencies = [
 
 [[package]]
 name = "faber"
-version = "1.10.0"
+version = "1.11.0"
 dependencies = [
  "clap",
  "flate2",
@@ -830,6 +830,7 @@ dependencies = [
  "radix-runtime-contract",
  "radix-types",
  "regex",
+ "regex-syntax",
  "rustc-hash",
  "serde_json",
  "tempfile",

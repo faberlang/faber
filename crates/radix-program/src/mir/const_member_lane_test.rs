@@ -4,13 +4,13 @@
 //! Two faces of one hole, plus the already-green same-unit control that the
 //! need's done-when names:
 //!   * face 1 — a SIBLING unit's function body reads another unit's exported
-//!     module const (`k between keys.KEYS`). The namespace member rewrite
+//!     module const (`k ∈ keys.KEYS`). The namespace member rewrite
 //!     turned the read into `Path(synthetic)`, but the synthetic const item
 //!     only existed in the entry analysis, so the sibling lowered
 //!     "path that does not resolve to a local value".
 //!   * face 2 — a linked const initializer carries the conversion shape
 //!     (`[…] ↦ set<string>`); `transplant_expr` failed closed on it.
-//! The standalone `inter` glyph is not under test here (radix-module owns
+//! The standalone `∈` operator is not under test here (radix-module owns
 //! that proof); this lane pins the package transplant/link seam only.
 
 use super::*;
@@ -131,11 +131,11 @@ const list<string> KEYS = ["a", "b"]
 
 @ public
 fn admits(string k) → bool {
-    return k between KEYS
+    return k ∈ KEYS
 }
 "#;
 
-/// Need done-when shape (control): module const + same-unit `between`
+/// Need done-when shape (control): module const + same-unit `∈`
 /// fn + proba true/false asserts already run on this lane; pinned here so the
 /// two red faces below cannot regress the seam they ride.
 #[test]
@@ -162,7 +162,7 @@ test "module const list membership" {
     assert_eq!(
         output,
         vec!["verum".to_owned(), "falsum".to_owned()],
-        "same-unit module list const must answer between from the proba lane"
+        "same-unit module list const must answer ∈ from the proba lane"
     );
 }
 
@@ -185,7 +185,7 @@ import from "keyslane:keys" keys
 
 @ public
 fn admits_via_module(string k) → bool {
-    return k between keys.KEYS
+    return k ∈ keys.KEYS
 }
 "#,
         ),
@@ -241,7 +241,7 @@ const set<string> KEYS ← ["a", "b"] ↦ set<string>
 
 @ public
 fn admits(string k) → bool {
-    return k between KEYS
+    return k ∈ KEYS
 }
 "#,
         None,

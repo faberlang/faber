@@ -748,6 +748,10 @@ impl Validator<'_, '_> {
             | MirCollectionOp::Keys
             | MirCollectionOp::Values
             | MirCollectionOp::CordCursor
+            | MirCollectionOp::TextEscape
+            | MirCollectionOp::MatchText
+            | MirCollectionOp::MatchStart
+            | MirCollectionOp::MatchEnd
             | MirCollectionOp::TensorCausalMaskedSoftmax => 1,
             MirCollectionOp::ArrayAdd
             | MirCollectionOp::ArraySub
@@ -788,6 +792,11 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorSsmScan
             | MirCollectionOp::TensorDiv
             | MirCollectionOp::RegexMatches
+            | MirCollectionOp::RegexFind
+            | MirCollectionOp::RegexFindAll
+            | MirCollectionOp::RegexSplit
+            | MirCollectionOp::MatchGroup
+            | MirCollectionOp::MatchNamed
             | MirCollectionOp::SparseGet
             | MirCollectionOp::IntervalIntersect
             | MirCollectionOp::IntervalUnion
@@ -797,6 +806,8 @@ impl Validator<'_, '_> {
             MirCollectionOp::Put
             | MirCollectionOp::Slice
             | MirCollectionOp::Replace
+            | MirCollectionOp::RegexReplace
+            | MirCollectionOp::RegexReplaceEach
             | MirCollectionOp::TensorSet
             | MirCollectionOp::TensorCreate
             | MirCollectionOp::TensorSlice
@@ -1349,6 +1360,22 @@ impl Validator<'_, '_> {
                         "regex consentit argument is not textus",
                     );
                 }
+            }
+            MirCollectionOp::RegexFind
+            | MirCollectionOp::RegexFindAll
+            | MirCollectionOp::RegexSplit
+            | MirCollectionOp::MatchText
+            | MirCollectionOp::MatchStart
+            | MirCollectionOp::MatchEnd
+            | MirCollectionOp::MatchGroup
+            | MirCollectionOp::MatchNamed => {
+                self.validate_regex_match_call(scope, op, first_arg_ty, call, span);
+            }
+            MirCollectionOp::RegexReplace | MirCollectionOp::TextEscape => {
+                self.validate_regex_text_call(scope, op, first_arg_ty, call, span);
+            }
+            MirCollectionOp::RegexReplaceEach => {
+                self.validate_regex_replace_each_call(scope, first_arg_ty, call, span);
             }
             MirCollectionOp::Uppercase | MirCollectionOp::Lowercase | MirCollectionOp::Trim => {
                 self.require_exact(
@@ -2337,6 +2364,194 @@ impl Validator<'_, '_> {
         }
     }
 
+    /// RX-3b/RX-4a: `regex.inventa`, `regex.collecta`, `regex.divide` and the
+    /// `match` accessors. The receiver is a `regex` (find, find_all, split) or
+    /// a `match` (accessors); results are `match ∪ nihil`, `lista<match>`,
+    /// `lista<textus>`, `textus`, `numerus`, or `textus ∪ nihil` per op.
+    fn validate_regex_match_call(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        op: MirCollectionOp,
+        first_arg_ty: Option<MirType>,
+        call: &MirRuntimeCall,
+        span: Span,
+    ) {
+        let receiver = if matches!(
+            op,
+            MirCollectionOp::RegexFind
+                | MirCollectionOp::RegexFindAll
+                | MirCollectionOp::RegexSplit
+        ) {
+            Primitive::Regex
+        } else {
+            Primitive::Match
+        };
+        if let Some(receiver_ty) = first_arg_ty {
+            self.require_exact(
+                receiver_ty,
+                self.primitive(receiver),
+                span,
+                "regex/match operation receiver type mismatch",
+            );
+        }
+        if let MirCollectionOp::RegexFindAll | MirCollectionOp::RegexSplit = op {
+            let element = if matches!(op, MirCollectionOp::RegexFindAll) {
+                Primitive::Match
+            } else {
+                Primitive::Textus
+            };
+            let expected = self.primitive(element).semantic_id();
+            let ok = matches!(
+                self.type_kind(call.return_ty),
+                Type::Array(inner) if *inner == expected
+            );
+            if !ok {
+                self.error(
+                    span,
+                    "regex bulk operation result is not the expected lista",
+                );
+            }
+        } else {
+            let (result_inner, optional) = match op {
+                MirCollectionOp::RegexFind => (Primitive::Match, true),
+                MirCollectionOp::MatchText => (Primitive::Textus, false),
+                MirCollectionOp::MatchStart | MirCollectionOp::MatchEnd => {
+                    (Primitive::Numerus, false)
+                }
+                _ => (Primitive::Textus, true),
+            };
+            let expected = self.primitive(result_inner);
+            if optional {
+                let ok = matches!(
+                    self.type_kind(call.return_ty),
+                    Type::Option(inner) if self.context.types.equals(*inner, expected.semantic_id())
+                );
+                if !ok {
+                    self.error(
+                        span,
+                        "regex/match operation result is not the expected option",
+                    );
+                }
+            } else {
+                self.require_exact(
+                    call.return_ty,
+                    expected,
+                    span,
+                    "regex/match operation result type mismatch",
+                );
+            }
+        }
+        let Some(arg) = call.args.get(1) else {
+            return;
+        };
+        let Some(arg_ty) = self.validate_operand(scope, arg, span) else {
+            return;
+        };
+        if matches!(op, MirCollectionOp::MatchGroup) {
+            if !self.is_numeric_type(arg_ty) {
+                self.error(span, "match group index is not numerus");
+            }
+        } else {
+            self.require_exact(
+                arg_ty,
+                self.primitive(Primitive::Textus),
+                span,
+                "regex/match operation argument is not textus",
+            );
+        }
+    }
+
+    /// RX-4b: `regex.muta(text, replacement)` (`textus` result from a `regex`
+    /// receiver and two `textus` arguments) and `textus.munita()` (`textus`
+    /// result from a `textus` receiver, no further argument).
+    fn validate_regex_text_call(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        op: MirCollectionOp,
+        first_arg_ty: Option<MirType>,
+        call: &MirRuntimeCall,
+        span: Span,
+    ) {
+        let receiver = if matches!(op, MirCollectionOp::RegexReplace) {
+            Primitive::Regex
+        } else {
+            Primitive::Textus
+        };
+        if let Some(receiver_ty) = first_arg_ty {
+            self.require_exact(
+                receiver_ty,
+                self.primitive(receiver),
+                span,
+                "regex text operation receiver type mismatch",
+            );
+        }
+        self.require_exact(
+            call.return_ty,
+            self.primitive(Primitive::Textus),
+            span,
+            "regex text operation result is not textus",
+        );
+        for arg in call.args.iter().skip(1) {
+            if let Some(arg_ty) = self.validate_operand(scope, arg, span) {
+                self.require_exact(
+                    arg_ty,
+                    self.primitive(Primitive::Textus),
+                    span,
+                    "regex text operation argument is not textus",
+                );
+            }
+        }
+    }
+
+    /// RX-5: closure `muta` joins `[regex, text, lista<textus>]` into a `textus`.
+    fn validate_regex_replace_each_call(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        first_arg_ty: Option<MirType>,
+        call: &MirRuntimeCall,
+        span: Span,
+    ) {
+        if let Some(receiver_ty) = first_arg_ty {
+            self.require_exact(
+                receiver_ty,
+                self.primitive(Primitive::Regex),
+                span,
+                "regex replace-each receiver type mismatch",
+            );
+        }
+        self.require_exact(
+            call.return_ty,
+            self.primitive(Primitive::Textus),
+            span,
+            "regex replace-each result is not textus",
+        );
+        if let Some(text) = call.args.get(1)
+            && let Some(text_ty) = self.validate_operand(scope, text, span)
+        {
+            self.require_exact(
+                text_ty,
+                self.primitive(Primitive::Textus),
+                span,
+                "regex replace-each text is not textus",
+            );
+        }
+        if let Some(replacements) = call.args.get(2)
+            && let Some(replacements_ty) = self.validate_operand(scope, replacements, span)
+        {
+            let textus = self.primitive(Primitive::Textus);
+            let ok = matches!(
+                self.type_kind(replacements_ty),
+                Type::Array(inner) if self.context.types.equals(*inner, textus.semantic_id())
+            );
+            if !ok {
+                self.error(
+                    span,
+                    "regex replace-each replacements are not lista<textus>",
+                );
+            }
+        }
+    }
+
     pub(crate) fn validate_tensor_layernorm(
         &mut self,
         scope: &FunctionScope<'_, '_>,
@@ -2720,6 +2935,7 @@ impl Validator<'_, '_> {
                 | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
                 | Type::ModularWord(_)
                 | Type::SaturatingWord(_)
+                | Type::PolicyFloat(_, _)
         )
     }
 
@@ -2736,14 +2952,18 @@ impl Validator<'_, '_> {
     pub(crate) fn is_float_type(&self, ty: MirType) -> bool {
         matches!(
             self.type_kind(ty),
-            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+            Type::Primitive(Primitive::Fractus)
+                | Type::SizedNumeric(Primitive::Fractus, _)
+                | Type::PolicyFloat(_, _)
         )
     }
 
     /// True for scalar float types and tensors whose element type is float.
     pub(crate) fn is_float_operand_type(&self, ty: MirType) -> bool {
         match self.type_kind(ty) {
-            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => true,
+            Type::Primitive(Primitive::Fractus)
+            | Type::SizedNumeric(Primitive::Fractus, _)
+            | Type::PolicyFloat(_, _) => true,
             Type::Tensor(inner, _) => self.is_float_type(MirType::semantic(*inner)),
             _ => false,
         }

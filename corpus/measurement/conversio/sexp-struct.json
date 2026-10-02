@@ -5,10 +5,10 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "dedicated": 45,
+    "dedicated": 43,
     "fallback": 0,
     "rejected": 208,
-    "not-emitted": 188
+    "not-emitted": 190
   },
   "cells": [
     {
@@ -788,7 +788,7 @@
     {
       "src": "regex",
       "tgt": "textus",
-      "tier": "dedicated",
+      "tier": "not-emitted",
       "measured": true
     },
     {
@@ -860,7 +860,7 @@
     {
       "src": "regex",
       "tgt": "tensor",
-      "tier": "dedicated",
+      "tier": "not-emitted",
       "measured": true
     },
     {

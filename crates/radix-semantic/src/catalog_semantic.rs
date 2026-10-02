@@ -485,7 +485,6 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
             "remove the `⊥` default; a conversion into wrapping or saturating cannot fail".to_owned(),
         ),
         "regex_operand_unsupported" => Some("convert textus or ascii values to regex".to_owned()),
-        "regex_pattern_too_long" => Some("shorten the literal pattern or build it dynamically".to_owned()),
         "record_conversion_requires_reconstruction" => {
             Some("reconstruct by writing `Type { field = value, … }` instead of converting with `↦`".to_owned())
         }
@@ -579,8 +578,11 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         WidthLowerIssue::UNSUPPORTED_TRAPPING_WORD_WIDTH => Some(
             "use an integer width or d64 for exactus: i8, i16, i32, i64, u8, u16, u32, u64, or d64".to_owned(),
         ),
-        WidthLowerIssue::TRAPPING_FLOAT_NOT_IMPLEMENTED => Some(
-            "write the bare float width (f16, bf16, f32, or f64) for IEEE arithmetic; trapping floats are not implemented yet".to_owned(),
+        "policy_float_family_mismatch" => Some(
+            "convert the other operand to the same float cell with `↦`; a trapping or saturating float never mixes with a bare float, another cell, or another width implicitly".to_owned(),
+        ),
+        "policy_float_math_not_built" => Some(
+            "convert the cell to the bare float width with `↦`, call the method on that, and convert back".to_owned(),
         ),
         "saturating_word_family_mismatch" => Some(
             "convert the other operand to the same saturatus width with `↦`; saturating, wrapping, and trapping integers never mix implicitly".to_owned(),
@@ -665,6 +667,15 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             Some("convert integer operands to the same width before applying this operator".to_owned())
         }
         "postfix_inc_dec_numerus_operand" => Some("apply postfix increment/decrement to numerus values".to_owned()),
+        "membership_requires_collection" => Some(
+            "use a lista, copia or tabula as the right operand; narrow a nullable value first".to_owned(),
+        ),
+        "membership_over_text" => Some(
+            "membership does not apply to text; test substring containment with the text's contains method".to_owned(),
+        ),
+        "membership_operand_unresolved" => Some(
+            "give the right operand a known type, for example annotate the list or bind it with a typed declaration".to_owned(),
+        ),
         "array_spread_requires_lista" => Some("spread a lista value inside lista construction".to_owned()),
         "struct_computed_key_forbidden" => Some("use declared struct field names in struct construction".to_owned()),
         "vector_constructor_forbids_spread" => {

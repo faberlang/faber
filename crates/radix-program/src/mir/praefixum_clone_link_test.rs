@@ -19,8 +19,8 @@ fn cloned_closure_links_and_runs_imported_call() {
     )
     .unwrap();
     let seams = crate::test_support::test_mir_seams();
-    let config =
-        Config::default().with_target((seams.executed_lane_target)(&Config::default(), dir));
+    let config = Config::default()
+        .with_target((seams.executed_lane_target)(&Config::default(), dir).unwrap());
     let package = crate::analyze::analyze_package(&config, dir, &seams.analysis).unwrap();
     let (entry_id, entry_node) = package.node_by_path(&dir.join("main.fab")).unwrap();
     let (entry_id, entry_path) = (entry_id.clone(), entry_node.path.clone());

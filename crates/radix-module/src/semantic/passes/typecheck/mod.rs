@@ -24,6 +24,14 @@ mod scalar_numeric_width_test;
 mod intervallum_test;
 
 #[cfg(test)]
+#[path = "membership_test.rs"]
+mod membership_test;
+
+#[cfg(test)]
+#[path = "membership_glyph_test.rs"]
+mod membership_glyph_test;
+
+#[cfg(test)]
 #[path = "bounded_textus_test.rs"]
 mod bounded_textus_test;
 
@@ -50,6 +58,10 @@ mod saturating_word_test;
 #[cfg(test)]
 #[path = "trapping_word_test.rs"]
 mod trapping_word_test;
+
+#[cfg(test)]
+#[path = "policy_float_store_test.rs"]
+mod policy_float_store_test;
 
 #[cfg(test)]
 #[path = "via_hint_test.rs"]

@@ -102,6 +102,7 @@ impl IntSlot {
             IntFamily::Plain => width,
             IntFamily::Modular => format!("wrapping<{width}>"),
             IntFamily::Saturating => format!("saturating<{width}>"),
+            IntFamily::Policy(policy) => format!("{}<{width}>", policy.word()),
         }
     }
 }
@@ -177,6 +178,7 @@ impl TypeChecker<'_> {
                 .store_narrowing_target(ty, slot_ty)
                 .or_else(|| self.capped_store_target(expr, ty, slot_ty))
                 .or_else(|| self.saturating_store_target(expr, ty, slot_ty))
+                .or_else(|| self.trapping_float_store_target(expr, ty, slot_ty))
                 .or_else(|| self.decimal_store_target(expr, ty, slot_ty))
             {
                 return self.wrap_implicit_store(expr, ty, target, site);
@@ -200,6 +202,7 @@ impl TypeChecker<'_> {
             .store_narrowing_target(ty, slot_ty)
             .or_else(|| self.capped_store_target(expr, ty, slot_ty))
             .or_else(|| self.saturating_store_target(expr, ty, slot_ty))
+            .or_else(|| self.trapping_float_store_target(expr, ty, slot_ty))
             .or_else(|| self.decimal_store_target(expr, ty, slot_ty))
         {
             Some(target) => self.wrap_implicit_store(expr, ty, target, site),
@@ -384,7 +387,222 @@ impl TypeChecker<'_> {
             .is_some_and(|(_, slot)| slot.family == IntFamily::Plain);
         match self.saturating_origin(init) {
             Some(word) if is_arithmetic && plain => self.wrap_implicit_store(init, ty, word, site),
-            _ => self.capped_inferred_slot(init, ty, site),
+            _ => match self.trapping_float_origin(init) {
+                // Arithmetic over a `trapping` float is a bare float until it
+                // is stored; an inferred slot keeps the cell, so the
+                // declaration is the store that checks it (N7e D1, D4).
+                Some(cell) if is_arithmetic && self.is_plain_float(ty) => {
+                    self.wrap_implicit_store(init, ty, cell, site)
+                }
+                _ => self.capped_inferred_slot(init, ty, site),
+            },
+        }
+    }
+
+    /// The `trapping<W>` float cell whose arithmetic `expr` is, if any: the
+    /// first `trapping` operand of a `+ - * / % ÷` / unary `-` tree. Such an
+    /// expression is a number, not a slot, so its type is the bare float `W`
+    /// and its value may be non-finite; the cell is what a store checks it
+    /// against (N7e D1, D4: no operation traps).
+    pub(super) fn trapping_float_origin(&self, expr: &HirExpression) -> Option<TypeId> {
+        if let Some(cell) = expr.ty.and_then(|ty| self.trapping_cell(ty)) {
+            return Some(cell);
+        }
+        match &expr.kind {
+            HirExpressionKind::Binary(
+                radix_hir::HirBinOp::Add
+                | radix_hir::HirBinOp::Sub
+                | radix_hir::HirBinOp::Mul
+                | radix_hir::HirBinOp::Div
+                | radix_hir::HirBinOp::Mod
+                | radix_hir::HirBinOp::TrueDiv,
+                lhs,
+                rhs,
+            ) => self
+                .trapping_float_origin(lhs)
+                .or_else(|| self.trapping_float_origin(rhs)),
+            HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, operand) => {
+                self.trapping_float_origin(operand)
+            }
+            _ => None,
+        }
+    }
+
+    /// The `trapping<W>` cell a type is, aliases and access markers peeled.
+    fn trapping_cell(&self, ty: TypeId) -> Option<TypeId> {
+        let mut ty = self.resolve_inferred_type(ty);
+        ty = self.types.peel_access_marker(ty).1;
+        while let Type::Alias(_, inner) = self.types.get(ty) {
+            ty = self.resolve_inferred_type(*inner);
+        }
+        matches!(
+            self.types.get(ty),
+            Type::PolicyFloat(radix_types::FloatPolicy::Trapping, _)
+        )
+        .then_some(ty)
+    }
+
+    /// Whether `ty` is a bare float (no policy cell): the type of arithmetic
+    /// over a `trapping` operand.
+    fn is_plain_float(&self, ty: TypeId) -> bool {
+        self.numeric_shape(self.resolve_inferred_type(ty))
+            .is_some_and(|shape| {
+                shape.prim == Primitive::Fractus && shape.family == IntFamily::Plain
+            })
+    }
+
+    /// The `trapping<W>` slot a store lands in: the slot itself, or the single
+    /// numeric member of an optional or union (as for an integer slot).
+    fn trapping_float_slot(&self, slot_ty: TypeId) -> Option<TypeId> {
+        if let Some(cell) = self.trapping_cell(slot_ty) {
+            return Some(cell);
+        }
+        let resolved = self.resolve_inferred_type(slot_ty);
+        let members: Vec<TypeId> = match self.types.get(self.types.peel_access_marker(resolved).1) {
+            Type::Union(members) => members.clone(),
+            Type::Option(inner) => vec![*inner],
+            _ => return None,
+        };
+        let mut numeric = members.into_iter().filter(|member| {
+            self.numeric_shape(self.resolve_inferred_type(*member))
+                .is_some()
+        });
+        let only = numeric.next()?;
+        if numeric.next().is_some() {
+            return None;
+        }
+        self.trapping_cell(only)
+    }
+
+    /// The `trapping<W>` slot a computed float lands in: arithmetic over
+    /// `trapping<W>` operands is a bare `W`, and the slot checks the value is
+    /// finite where it is stored (N7e D1). A `trapping<W>` leaf stored into
+    /// its own cell is finite by construction and needs no node, a bare float
+    /// or another cell never lands in a `trapping` slot without an authored
+    /// `↦`, and a `saturating` slot never gets a node.
+    fn trapping_float_store_target(
+        &self,
+        expr: &HirExpression,
+        ty: TypeId,
+        slot_ty: TypeId,
+    ) -> Option<TypeId> {
+        if !self.is_plain_float(ty) {
+            return None;
+        }
+        let target = self.trapping_float_slot(slot_ty)?;
+        // Arithmetic over written constants alone (`-(1.5 + 2.5)`) is typed
+        // at the slot's width and has no cell of its own: the slot is its
+        // cell, and the store checks the folded value.
+        let origin = self.trapping_float_origin(expr).or_else(|| {
+            (Self::is_untyped_float_constant(expr)
+                && !super::ops::is_numeric_literal(expr)
+                && self
+                    .numeric_shape(self.resolve_inferred_type(ty))
+                    .map(|s| s.width)
+                    == self.numeric_shape(target).map(|s| s.width))
+            .then_some(target)
+        })?;
+        self.types.equals(origin, target).then_some(target)
+    }
+
+    /// The expected type handed to the operand of a unary `-` whose own
+    /// expected type is a `trapping<W>` cell. A written constant keeps the
+    /// cell (it adopts it, ruling 20); constant arithmetic is hinted the bare
+    /// `W` it will have; any other operand is a value of its own type, so the
+    /// cell is no hint for it (N7e D4).
+    pub(super) fn unary_float_cell_expected(
+        &mut self,
+        operand: &HirExpression,
+        expected: Option<TypeId>,
+    ) -> Option<TypeId> {
+        let Some(cell) = expected.and_then(|ty| self.trapping_cell(ty)) else {
+            return expected;
+        };
+        if super::ops::is_numeric_literal(operand) {
+            return expected;
+        }
+        if !Self::is_untyped_float_constant(operand) {
+            return None;
+        }
+        let Type::PolicyFloat(_, width) = *self.types.get(cell) else {
+            return expected;
+        };
+        Some(self.bare_float_type(width))
+    }
+
+    /// The bare float type of a width.
+    pub(super) fn bare_float_type(&mut self, width: NumericWidth) -> TypeId {
+        if width == NumericWidth::F64 {
+            self.fractus_type()
+        } else {
+            self.types.sized_numeric(Primitive::Fractus, width)
+        }
+    }
+
+    /// Both operands of a float operator agree on the `trapping` cell: an
+    /// operand that is `trapping` arithmetic (a bare float of the cell's
+    /// width) never meets a bare float variable or another cell. An untyped
+    /// constant joins either side. Reports and returns `false` otherwise.
+    pub(super) fn trapping_float_operands_agree(
+        &mut self,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+        span: radix_lexer::Span,
+    ) -> bool {
+        let bare = |checker: &Self, expr: &HirExpression| {
+            expr.ty.is_some_and(|ty| checker.is_plain_float(ty))
+                && !Self::is_untyped_float_constant(expr)
+        };
+        let agree = match (
+            self.trapping_float_origin(lhs),
+            self.trapping_float_origin(rhs),
+        ) {
+            (Some(a), Some(b)) => self.types.equals(a, b),
+            (Some(_), None) => !bare(self, rhs),
+            (None, Some(_)) => !bare(self, lhs),
+            (None, None) => true,
+        };
+        if !agree {
+            self.invalid_operand_types(super::ops::POLICY_FLOAT_FAMILY_MISMATCH, span);
+        }
+        agree
+    }
+
+    /// The type of arithmetic whose operands both come from one `trapping<W>`
+    /// cell (agreement is checked by [`Self::trapping_float_operands_agree`]):
+    /// the bare float `W`, whichever operand is the leaf cell and whichever is
+    /// already bare arithmetic over it. `None` when an operand has no cell.
+    pub(super) fn trapping_float_join(
+        &mut self,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+    ) -> Option<TypeId> {
+        let cell = self.trapping_float_origin(lhs)?;
+        self.trapping_float_origin(rhs)?;
+        let Type::PolicyFloat(_, width) = *self.types.get(cell) else {
+            return None;
+        };
+        Some(self.bare_float_type(width))
+    }
+
+    /// A written numeric constant, or arithmetic over written constants: it
+    /// takes the type of whatever it stands beside (ruling 20).
+    fn is_untyped_float_constant(expr: &HirExpression) -> bool {
+        match &expr.kind {
+            HirExpressionKind::Binary(
+                radix_hir::HirBinOp::Add
+                | radix_hir::HirBinOp::Sub
+                | radix_hir::HirBinOp::Mul
+                | radix_hir::HirBinOp::Div
+                | radix_hir::HirBinOp::Mod
+                | radix_hir::HirBinOp::TrueDiv,
+                lhs,
+                rhs,
+            ) => Self::is_untyped_float_constant(lhs) && Self::is_untyped_float_constant(rhs),
+            HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, operand) => {
+                Self::is_untyped_float_constant(operand)
+            }
+            _ => super::ops::is_numeric_literal(expr),
         }
     }
 

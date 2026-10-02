@@ -1,0 +1,36 @@
++++
+term = "∈"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "hole_type", "si_stmt", "arm", "comparison", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "values"
+canonical = false
+summary = "Tests map-key membership with a text literal on the left."
+syntax = "<text literal> ∈ <tabula> | <text literal> ∉ <tabula>"
+related = ["∈"]
+locale = "en"
++++
+# =============================================================================
+# ∈ — Map-key membership with a literal key
+# =============================================================================
+#
+# What this teaches:
+#   • A text literal may be the left operand of `∈` / `∉` over a map; the test is on the keys.
+#
+# See also: ∈
+# =============================================================================
+
+# EXPECTED OUTPUT:
+#   literal key in
+#   literal key out
+
+main {
+    var map<string, int> puncta ← empty
+    puncta["alpha"] ← 1
+    puncta["beta"] ← 2
+    if "beta" ∈ puncta {
+        print "literal key in"
+    }
+    if "gamma" ∉ puncta {
+        print "literal key out"
+    }
+}

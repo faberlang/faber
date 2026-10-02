@@ -1,0 +1,11 @@
+b-leading-e-acute: y
+b-inside-word: n
+B-inside-word: y
+b-empty-text: n
+B-empty-text: y
+b-space-x: y
+b-both-sides: y
+b-before-combining: n
+b-astral-letter: y
+b-iter-ab: (0,0) (2,2)
+b-iter-unicode: (0,0) (2,2) (3,3) (4,4)

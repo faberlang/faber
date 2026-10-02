@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "range"
 canonical = true
 summary = "Clamp, materialize, and contain via conversio and continet."
-related = ["intra", "↦", "lista"]
+related = ["∈", "↦", "lista"]
 locale = "en"
 +++
 # =============================================================================
@@ -14,12 +14,12 @@ locale = "en"
 #
 # What this teaches:
 #   • Clamp, materialize, and contain via conversio and continet.
-#   • Related keywords: intra, ↦, lista
+#   • Related keywords: ∈, ↦, lista
 #
 # Common mistakes:
 #   • Confusing `‥` (exclusive end) with `…` (inclusive end) — `15 ↦ 0‥10` clamps to 9, while `15 ↦ 0…10` clamps to 10.
 #
-# See also: intra, ↦, lista
+# See also: ∈, ↦, lista
 # =============================================================================
 
 # intervallum — conversio clamp, materialize, and continet
@@ -54,7 +54,7 @@ main {
     const intervallum<int> narrow ← wide ↦ 10…50
     assert narrow.length() ≡ 41
 
-    # --- stored containment via continet (intra desugars to the same surface) ---
+    # --- stored containment via continet (`∈` over a range tests the same containment) ---
     const intervallum<int> fines ← 0‥10
     const bool inside ← fines.contains(5)
     assert inside

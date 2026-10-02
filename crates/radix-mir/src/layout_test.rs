@@ -120,6 +120,7 @@ fn intended_bucket(ty: &Type) -> Bucket {
             | Primitive::Ignotum
             | Primitive::Octeti
             | Primitive::Regex
+            | Primitive::Match
             | Primitive::Json
             | Primitive::Valor
             | Primitive::Instans,
@@ -176,7 +177,7 @@ fn intended_bucket(ty: &Type) -> Bucket {
     }
 }
 
-/// One representative `Type` per census row (50 rows: 14 Primitive-expanded
+/// One representative `Type` per census row (51 rows: 15 Primitive-expanded
 /// variants + 36 other variants; `Alias` excluded). Nested ids are interned
 /// into `types` so the rows are resolvable.
 fn census_rows(types: &mut TypeTable) -> Vec<Type> {
@@ -190,7 +191,7 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     let two = types.intern_index(IndexExpr::Literal(2));
     let matrix_shape = types.intern_index(IndexExpr::Tuple(vec![two, two]));
 
-    let mut rows = Vec::with_capacity(50);
+    let mut rows = Vec::with_capacity(51);
     // Physical (14): the five physical primitives, the sized/word numerics,
     // the device-class rows, and the physical aggregates.
     for prim in [
@@ -246,6 +247,7 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
         Primitive::Ignotum,
         Primitive::Octeti,
         Primitive::Regex,
+        Primitive::Match,
         Primitive::Json,
         Primitive::Valor,
         Primitive::Instans,
@@ -286,14 +288,14 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     rows.push(Type::Error);
     assert_eq!(
         rows.len(),
-        50,
-        "the census must stay 50 Primitive-expanded rows"
+        51,
+        "the census must stay 51 Primitive-expanded rows"
     );
     rows
 }
 
 #[test]
-fn pin_table_census_is_50_rows_across_the_four_buckets() {
+fn pin_table_census_is_51_rows_across_the_four_buckets() {
     let mut types = TypeTable::new();
     let rows = census_rows(&mut types);
 
@@ -315,8 +317,8 @@ fn pin_table_census_is_50_rows_across_the_four_buckets() {
     );
     assert_eq!(aggregate, 6, "opaque-aggregate census rows");
     assert_eq!(
-        opaque, 20,
-        "opaque-by-design census rows (MLC-4: -1 to physical)"
+        opaque, 21,
+        "opaque-by-design census rows (MLC-4: -1 to physical; RX-3a: +1 match)"
     );
     assert_eq!(internal, 5, "internal census rows");
 }
@@ -477,32 +479,6 @@ fn resolve_outcome(table: &MirLayoutTable, ty: radix_types::TypeId) -> SizedNume
                 "fallthrough error names the type: {err:?}"
             );
             SizedNumericOutcome::LoudError
-        }
-    }
-}
-
-/// N7E-1: the policy-float cell has no MIR layout yet. It fails loudly with the
-/// fallthrough-law identity (naming the type), never as a silent bare float.
-#[test]
-fn policy_float_has_no_mir_layout_until_the_runner_unit_lands() {
-    for policy in [
-        radix_types::FloatPolicy::Trapping,
-        radix_types::FloatPolicy::Saturating,
-    ] {
-        for width in [
-            NumericWidth::F16,
-            NumericWidth::BF16,
-            NumericWidth::F32,
-            NumericWidth::F64,
-        ] {
-            let mut types = TypeTable::new();
-            let cell = types.intern(Type::PolicyFloat(policy, width));
-            let table = MirLayoutTable::from_types(&types);
-            let err = table
-                .layout_for_type(MirType::semantic(cell))
-                .expect_err("a policy-float cell has no layout yet");
-            assert_eq!(err.issue, "mir_layout_missing_type_fact", "{err:?}");
-            assert_eq!(err.ty, Some(cell), "{err:?}");
         }
     }
 }
@@ -755,4 +731,33 @@ fn fractus_bf16_resolves_to_named_bf16_scalar_layout() {
     assert_eq!(MirScalarLayout::Bf16.spelling(), "bf16");
     assert_eq!(MirScalarLayout::Bf16.size_bits(), 16);
     assert!(MirScalarLayout::Bf16.is_float());
+}
+
+// N7E-3 (D2): a policy-float cell lays out as the bare float of its width.
+#[test]
+fn policy_float_cells_share_the_bare_float_scalar_layout() {
+    use radix_types::{FloatPolicy, NumericWidth};
+    let mut types = TypeTable::new();
+    let widths = [
+        (NumericWidth::F16, MirScalarLayout::F16),
+        (NumericWidth::BF16, MirScalarLayout::Bf16),
+        (NumericWidth::F32, MirScalarLayout::F32),
+        (NumericWidth::F64, MirScalarLayout::F64),
+    ];
+    let cells: Vec<_> = widths
+        .iter()
+        .flat_map(|&(width, scalar)| {
+            [FloatPolicy::Trapping, FloatPolicy::Saturating]
+                .into_iter()
+                .map(move |policy| (policy, width, scalar))
+        })
+        .map(|(policy, width, scalar)| (types.intern(Type::PolicyFloat(policy, width)), scalar))
+        .collect();
+    let table = MirLayoutTable::from_types(&types);
+    for (ty, scalar) in cells {
+        let layout = table
+            .layout_for_type(MirType::semantic(ty))
+            .expect("policy-float layout fact");
+        assert_eq!(layout.kind, MirLayoutKind::Scalar(scalar));
+    }
 }

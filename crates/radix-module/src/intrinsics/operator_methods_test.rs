@@ -141,7 +141,7 @@ incipit {
     assert!(code.contains('!'));
     // ss1: `acc.coniunge(8)` is the assignment `acc ← acc ∧ 8`.
     assert!(
-        code.contains("acc = __faber_fit::<i64>(__faber_int(Some((acc as i128) & 8_i128)))"),
+        code.contains("acc = faber::exact::fit::<i64>(faber::exact::int(Some((acc as i128) & 8_i128)))"),
         "{code}"
     );
     assert!(!code.contains(".coniuncta("));
@@ -213,7 +213,7 @@ fn numerus_potentia_codegen_uses_integer_pow_without_float_guard() {
 }";
     let code = compile_rust("potentia-numerus.fab", source);
     assert!(
-        code.contains("__faber_pow(base as i128, 3_i128)"),
+        code.contains("faber::exact::pow(base as i128, 3_i128)"),
         "integer potentia must use the exact i128 power helper:\n{code}"
     );
     assert!(
@@ -243,12 +243,13 @@ incipit {
 ";
 
     let code = compile_rust("shift-operator-methods.fab", source);
-    assert!(code.contains("<<"));
-    assert!(code.contains(">>"));
+    // The exact shifts are `faber::exact::shl` / `shr` (their bodies live in
+    // the runtime crate); `sinistrata`/`sinistra` and `dextrata`/`dextra` each
+    // emit one call.
     // ss1: `acc.sinistra(1)` is the assignment `acc ← acc ⇐ 1`.
     assert!(code.contains("acc = "), "{code}");
-    assert!(code.matches("<<").count() >= 2, "{code}");
-    assert!(code.matches(">>").count() >= 2, "{code}");
+    assert!(code.matches("faber::exact::shl(").count() >= 2, "{code}");
+    assert!(code.matches("faber::exact::shr(").count() >= 2, "{code}");
     assert!(!code.contains(".sinistrata("));
     assert!(!code.contains(".sinistra("));
 }
@@ -312,11 +313,11 @@ fn sized_integer_absolutum_and_potentia_emit_exact_i128_values() {
 }";
     let code = compile_rust("abs-power-sized.fab", source);
     assert!(
-        code.contains("__faber_fit::<u8>(__faber_int(Some((n as i128).abs())))"),
+        code.contains("faber::exact::fit::<u8>(faber::exact::int(Some((n as i128).abs())))"),
         "sized absolutum must compute |x| exactly in i128:\n{code}"
     );
     assert!(
-        code.contains("__faber_pow(p as i128, 2_i128)"),
+        code.contains("faber::exact::pow(p as i128, 2_i128)"),
         "sized potentia must use the exact i128 power helper:\n{code}"
     );
     assert!(

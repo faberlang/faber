@@ -746,3 +746,66 @@ fn kernel_diagnostics_carry_the_offending_span() {
         err.span
     );
 }
+
+// N7e D6: `trapping<float>` is a language rule through the host-type family
+// mechanism; `saturating<float>` is a temporary named refusal.
+
+#[test]
+fn policy_float_trapping_cell_is_a_host_only_family_in_a_kernel() {
+    for width in ["f16", "bf16", "f32", "f64"] {
+        expect_kernel_error(
+            &format!(
+                r"
+@ nucleum
+@ publica
+functio k(exactus<{width}> x) → vacuum {{
+    tacet
+}}
+"
+            ),
+            HOST_TYPE,
+            &[("family", "trapping<float>"), ("site", "parameter")],
+        );
+    }
+}
+
+#[test]
+fn policy_float_saturating_cell_in_a_kernel_names_the_temporary_issue() {
+    for site in ["parameter", "return", "local"] {
+        let source = match site {
+            "parameter" => {
+                r"
+@ nucleum
+@ publica
+functio k(saturatus<f32> x) → vacuum {
+    tacet
+}
+"
+            }
+            "return" => {
+                r"
+@ nucleum
+@ publica
+functio k() → saturatus<f32> {
+    redde 1.0
+}
+"
+            }
+            _ => {
+                r"
+@ nucleum
+@ publica
+functio k(f32 x) → f32 {
+    fixum saturatus<f32> y ← 1.0
+    redde x
+}
+"
+            }
+        };
+        expect_kernel_error(
+            source,
+            "nucleum_saturating_float_not_built",
+            &[("site", site)],
+        );
+    }
+}

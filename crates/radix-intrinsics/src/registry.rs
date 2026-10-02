@@ -38,6 +38,9 @@ pub enum IntrinsicReceiver {
     Stack,
     /// `regex` pattern carrier (compile-time literal; `consentit` match verb).
     Regex,
+    /// One regex match (RD-3: no source type name; reached only through
+    /// `regex.inventa` results). Owns the accessor family.
+    Match,
 }
 
 /// Parameter slot shape relative to the receiver's element/key/value types.
@@ -48,6 +51,10 @@ pub enum IntrinsicParamKind {
     Value,
     NumerusIndex,
     Textus,
+    /// A `textus` or a one-parameter closure from the receiver's match to
+    /// `textus` (RX-5, RD-5): the regex `muta` replacement slot. Typecheck picks
+    /// the form by the argument expression; both forms return `textus`.
+    TextusOrReplacer,
     SetInner,
     Predicate,
     Mapper,
@@ -120,6 +127,15 @@ pub enum IntrinsicReturnKind {
     /// `lista` of prefix results for a serial higher-order scan.
     ReducerArray,
     TextusArray,
+    /// `match ∪ nihil` — the `regex.inventa` result (RD-3: the match type has
+    /// no source name; it is only ever read through this option and inference).
+    OptionMatch,
+    /// `lista<match>` — the `regex.collecta` result (RD-3: no source name for
+    /// the element type).
+    MatchArray,
+    /// `textus ∪ nihil` — a capture group's text, or `nihil` when the group did
+    /// not participate or does not exist.
+    OptionTextus,
     /// `cursor<littera>` — the `ascii.cursor()` / `textus.cursor()` scalar walk (D10.1).
     CursorLittera,
     /// The bound type of the first Typus generic (`formata`).
@@ -455,6 +471,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Textus, "longitudo", 0, &[], Numerus, collection Length),
     intrinsic!(Textus, "maiuscula", 0, &[], Textus, collection Uppercase),
     intrinsic!(Textus, "minuscula", 0, &[], Textus, collection Lowercase),
+    intrinsic!(Textus, "munita", 0, &[], Textus, collection TextEscape),
     intrinsic!(Textus, "muta", 2, &[IntrinsicParamKind::Textus, IntrinsicParamKind::Textus], Textus, collection Replace),
     intrinsic!(Textus, "recide", 0, &[], Textus, collection Trim),
     intrinsic!(Textus, "sectio", 2, &[IntrinsicParamKind::NumerusIndex, IntrinsicParamKind::NumerusIndex], Textus, collection Slice),
@@ -1156,6 +1173,24 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     // (`continet`/`initium`/`finis`). Spelling recorded in the G12-U1 unit
     // report (Open Q #3 default).
     intrinsic!(Regex, "consentit", 1, &[IntrinsicParamKind::Textus], Bool, collection RegexMatches),
+    // RX-3b: `find` and the match accessors. Latin names per L-6: `inventa`
+    // (ruled), then the accepted defaults `inventum`, `principium`, `terminus`,
+    // `coetus`, `nominatus`.
+    intrinsic!(Regex, "inventa", 1, &[IntrinsicParamKind::Textus], OptionMatch, collection RegexFind),
+    // RX-4a: the two bulk ops. `collecta` is the accepted default; `divide` is
+    // the existing Latin name on a new receiver.
+    intrinsic!(Regex, "collecta", 1, &[IntrinsicParamKind::Textus], MatchArray, collection RegexFindAll),
+    intrinsic!(Regex, "divide", 1, &[IntrinsicParamKind::Textus], TextusArray, collection RegexSplit),
+    // RX-4b: literal replace on the `regex` receiver (the existing Latin name
+    // `muta` on a new receiver). RX-5 (RD-5): the second slot also accepts a
+    // `(match) → textus` closure; one row, the form is picked by the argument.
+    // `escape` is a method on `textus` (RD-6), the accepted default `munita`.
+    intrinsic!(Regex, "muta", 2, &[IntrinsicParamKind::Textus, IntrinsicParamKind::TextusOrReplacer], Textus, collection RegexReplace),
+    intrinsic!(Match, "inventum", 0, &[], Textus, collection MatchText),
+    intrinsic!(Match, "principium", 0, &[], Numerus, collection MatchStart),
+    intrinsic!(Match, "terminus", 0, &[], Numerus, collection MatchEnd),
+    intrinsic!(Match, "coetus", 1, &[IntrinsicParamKind::NumerusIndex], OptionTextus, collection MatchGroup),
+    intrinsic!(Match, "nominatus", 1, &[IntrinsicParamKind::Textus], OptionTextus, collection MatchNamed),
 ];
 
 /// How a namespace/struct catalog row publishes its result after generic binding.

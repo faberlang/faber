@@ -42,7 +42,9 @@ package manifest, then the product default en. --stdin has no package context
 and therefore uses en when it has no frontmatter locale. Format preserves the
 frontmatter metadata and does not translate between reader locales. For source
 conversion use `faber convert --to <LOCALE>`. A local declaration must be inside
-a complete function or `main` unit; format does not accept fragments.
+a complete function or `main` unit; format does not accept fragments. Does not
+write unless `--write` is given: the default reports each file that would change
+and exits 1 when any would.
 ";
 
 const CONVERT_LONG_ABOUT: &str = "\
@@ -53,7 +55,9 @@ is one command-wide target pack. Successful output replaces or inserts
 frontmatter `locale = \"<target>\"` while preserving unrelated metadata. Use a
 wrapper such as `main { const list<u32> values ← empty }` when probing a
 local declaration; fragments are not accepted. --stdout and --stdin emit one
-complete converted document, and --check writes nothing.
+complete converted document. Does not write unless `--write` is given: the
+default (spelled `--check`) reports files that would change and exits 1 if any
+would.
 ";
 
 const CHECK_LIBRARY_LONG_ABOUT: &str = "\
@@ -193,16 +197,19 @@ pub enum Command {
     Doc(DocArgs),
 
     /// Convert source between reader-locale surfaces (en, la, zh-Hans, …) —
-    /// HIR-backed round-trip; not a formatter (see `faber convert --help`)
+    /// HIR-backed round-trip; not a formatter; report-only unless `--write`
+    /// is given (see `faber convert --help`)
     #[command(long_about = CONVERT_LONG_ABOUT)]
     Convert(ConvertArgs),
 
     /// Rewrite admitted print/nota statements to imported `⇇` transfers
+    /// (report-only unless `--write` is given)
     #[command(name = "output-transfer-codemod")]
     OutputTransferCodemod(OutputTransferCodemodArgs),
 
     /// Insert `var`/`varia` before every unmarked genus field (D16.1 migration;
-    /// span-based, every other byte unchanged)
+    /// span-based, every other byte unchanged; report-only unless `--write`
+    /// is given)
     #[command(name = "field-modifier-codemod")]
     FieldModifierCodemod(FieldModifierCodemodArgs),
 
@@ -240,23 +247,23 @@ pub struct FormatArgs {
     #[arg(value_name = "PATH")]
     pub paths: Vec<PathBuf>,
 
-    /// Check formatting without writing; exit 1 if any file would change
-    #[arg(long)]
+    /// Report files that would change without writing (the default; explicit
+    /// spelling); exit 1 if any file would change
+    #[arg(long, conflicts_with_all = ["write", "stdout"])]
     pub check: bool,
 
-    /// Write formatted output to stdout instead of updating files (exactly one
+    /// Write formatted output to stdout instead of reporting (exactly one
     /// input file)
-    #[arg(long, conflicts_with = "check")]
+    #[arg(long, conflicts_with_all = ["check", "write"])]
     pub stdout: bool,
 
-    /// Write formatted source back to its file (the in-place default; explicit
-    /// spelling for scripts and editors)
-    #[arg(long, conflicts_with = "stdout")]
+    /// Write formatted source back to the file (default is report-only)
+    #[arg(long, conflicts_with_all = ["check", "stdout"])]
     pub write: bool,
 
     /// Read exactly one source document from stdin and print the formatted
-    /// result to stdout (implies --stdout; incompatible with path arguments)
-    #[arg(long, conflicts_with_all = ["check", "paths"])]
+    /// result to stdout (incompatible with path arguments and the other modes)
+    #[arg(long, conflicts_with_all = ["check", "write", "stdout", "paths"])]
     pub stdin: bool,
 }
 
@@ -277,19 +284,23 @@ pub struct ConvertArgs {
     #[arg(long = "from", value_name = "LOCALE")]
     pub from: Option<String>,
 
-    /// Report pending conversions without writing files; exit 1 if any
-    /// file would change
-    #[arg(long)]
+    /// Report files that would change without writing (the default; explicit
+    /// spelling); exit 1 if any file would change
+    #[arg(long, conflicts_with_all = ["write", "stdout"])]
     pub check: bool,
 
-    /// Write converted output to stdout instead of updating files (exactly
-    /// one input file)
-    #[arg(long, conflicts_with = "check")]
+    /// Write converted output to stdout instead of reporting (exactly one
+    /// input file)
+    #[arg(long, conflicts_with_all = ["check", "write"])]
     pub stdout: bool,
 
+    /// Write converted source back to the file (default is report-only)
+    #[arg(long, conflicts_with_all = ["check", "stdout"])]
+    pub write: bool,
+
     /// Read exactly one source document from stdin and print the converted
-    /// result to stdout
-    #[arg(long, conflicts_with_all = ["check", "stdout", "paths"])]
+    /// result to stdout (incompatible with path arguments and the other modes)
+    #[arg(long, conflicts_with_all = ["check", "write", "stdout", "paths"])]
     pub stdin: bool,
 }
 
@@ -300,15 +311,19 @@ pub struct FieldModifierCodemodArgs {
     #[arg(value_name = "PATH")]
     pub paths: Vec<PathBuf>,
 
-    /// Dry run: report per-file insertion counts without writing; exit 1 if
-    /// any file would change
-    #[arg(long)]
+    /// Report files that would change without writing (the default; explicit
+    /// spelling); exit 1 if any file would change
+    #[arg(long, conflicts_with_all = ["write", "stdout"])]
     pub check: bool,
 
-    /// Write the codemodded source to stdout instead of updating the file
-    /// (exactly one input file)
-    #[arg(long, conflicts_with = "check")]
+    /// Write the codemodded source to stdout instead of reporting (exactly
+    /// one input file)
+    #[arg(long, conflicts_with_all = ["check", "write"])]
     pub stdout: bool,
+
+    /// Write codemodded source back to the file (default is report-only)
+    #[arg(long, conflicts_with_all = ["check", "stdout"])]
+    pub write: bool,
 }
 
 /// Arguments for `faber output-transfer-codemod`.
@@ -318,23 +333,23 @@ pub struct OutputTransferCodemodArgs {
     #[arg(value_name = "PATH")]
     pub paths: Vec<PathBuf>,
 
-    /// Report pending codemods without writing files; exit 1 if any file
-    /// would change
-    #[arg(long)]
+    /// Report files that would change without writing (the default; explicit
+    /// spelling); exit 1 if any file would change
+    #[arg(long, conflicts_with_all = ["write", "stdout"])]
     pub check: bool,
 
-    /// Write codemodded output to stdout instead of updating files (exactly
-    /// one input file)
-    #[arg(long, conflicts_with = "check")]
+    /// Write codemodded output to stdout instead of reporting (exactly one
+    /// input file)
+    #[arg(long, conflicts_with_all = ["check", "write"])]
     pub stdout: bool,
 
-    /// Write codemodded source back to its file (the in-place default)
-    #[arg(long, conflicts_with = "stdout")]
+    /// Write codemodded source back to the file (default is report-only)
+    #[arg(long, conflicts_with_all = ["check", "stdout"])]
     pub write: bool,
 
     /// Read exactly one source document from stdin and print the codemodded
-    /// result to stdout
-    #[arg(long, conflicts_with_all = ["check", "paths"])]
+    /// result to stdout (incompatible with path arguments and the other modes)
+    #[arg(long, conflicts_with_all = ["check", "write", "stdout", "paths"])]
     pub stdin: bool,
 }
 
@@ -529,9 +544,10 @@ pub struct VerifyLibraryArgs {
 
 /// Arguments for `faber explain`.
 #[derive(clap::Args, Debug)]
+#[command(group(clap::ArgGroup::new("json_target").args(["term", "list"]).multiple(true)))]
 pub struct ExplainArgs {
-    /// Emit a machine-readable JSON explanation
-    #[arg(long, requires = "term")]
+    /// Emit a machine-readable JSON explanation (one term, or the --list index)
+    #[arg(long, requires = "json_target")]
     pub json: bool,
 
     /// Message language for diagnostic explanation text
@@ -548,7 +564,7 @@ pub struct ExplainArgs {
     pub search: Option<String>,
 
     /// List canonical explain terms
-    #[arg(long, conflicts_with_all = ["search", "category", "term", "json"])]
+    #[arg(long, conflicts_with_all = ["search", "category", "term"])]
     pub list: bool,
 
     /// List canonical and legacy entries in a category
