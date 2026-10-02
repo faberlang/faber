@@ -337,7 +337,7 @@ equality ::= comparison equality_tail*
 # [163] equality_tail
 equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉') comparison | ('है' | 'नहीं' 'है') type_annotation
 # [164] comparison
-comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | 'भीतर' | 'बीच') format_expr)*
+comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | '∈' | '∉') format_expr)*
 # [165] format_expr
 format_expr ::= bitwise_or_expr ('¶' STRING)?
 # [166] bitwise_or_expr
@@ -881,8 +881,6 @@ productions. It is not a second keyword authority.
 | Declarations | `आरंभasync` | async entrypoint |
 | Declarations | `आरंभ` | entrypoint |
 | Comptime | `अंतःस्थापित` | build-time file embed |
-| Iteration | `बीच` | collection membership |
-| Iteration | `भीतर` | range containment |
 | Control | `दोहराओ` | for |
 | Objects | `टपल` | tuple type/constructor |
 | Annotation | `लेन` | `@ radix` compiler-lane directive |
@@ -2185,6 +2183,15 @@ The legacy ASCII spellings `<` and `>` are not productions of this grammar — b
 Ordering comparisons (`≺`, `≻`, `≤`, `≥`) between two `textus` values compare
 the whole strings in Unicode code-point order. They do not use locale
 collation.
+
+**Membership (`∈`, `∉`).** `x ∈ xs` tests whether `x` is an element of the
+right operand and `x ∉ xs` is its first-class negation (not sugar over `नहीं`);
+both sit in the comparison tier with `≺ ≻ ≤ ≥`. One operator covers two
+meanings, chosen by the type of the right operand: a collection (key
+membership for a `tabula`) or a range. The glyphs have no ASCII spelling, and
+they never apply to text: a `textus` right operand is rejected with a
+diagnostic that points to the `contains` method. The former keywords `intra`
+and `inter` are retired from the grammar.
 
 **Format operator (`¶`, U+00B6, D2.1–D2.5, D2.7):** `value ¶ "spec"` renders a
 built-in value as `textus`. It pairs with `§`: `§` marks *where* a value

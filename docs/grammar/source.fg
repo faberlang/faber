@@ -414,6 +414,20 @@ role = "comparison"
 claiming_slots = ["comparison"]
 
 [[glyphs]]
+glyph = "∈"
+codepoint = "U+2208"
+unicode_name = "ELEMENT OF"
+role = "comparison"
+claiming_slots = ["comparison"]
+
+[[glyphs]]
+glyph = "∉"
+codepoint = "U+2209"
+unicode_name = "NOT AN ELEMENT OF"
+role = "comparison"
+claiming_slots = ["comparison"]
+
+[[glyphs]]
 glyph = "≺"
 codepoint = "U+227A"
 unicode_name = "PRECEDES"
@@ -504,16 +518,6 @@ source = "radix/corpus/**/*.fab"
 occurrences = 22
 status = "not-claimed"
 note = "Corpus prose uses ↔ for bidirectional conversion; no EBNF production claims it."
-
-[[findings]]
-kind = "corpus-stray"
-glyph = "∈"
-codepoint = "U+2208"
-unicode_name = "ELEMENT OF"
-source = "radix/corpus/itera/nidificatus.fab"
-occurrences = 2
-status = "not-claimed"
-note = "Comment-only mathematical notation; EBNF.md explicitly says ∈ is not an active glyph alias."
 
 [[findings]]
 kind = "corpus-stray"
@@ -760,8 +764,6 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Iteration | `ab` | range iteration |
 # | Iteration | `ante` | range until exclusive |
 # | Iteration | `ex` | for-of / import from |
-# | Iteration | `inter` | collection membership |
-# | Iteration | `intra` | range containment |
 # | Iteration | `per` | range step |
 # | Iteration | `usque` | range until inclusive |
 # | Params | `argumenta` | CLI arguments modifier |
@@ -1277,10 +1279,12 @@ equality   := comparison equality_tail*
 # type test (`est` / `non est`) with a *type* on the right.
 equality_tail := ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉') comparison
                | ('est' | 'non' 'est') type_annotation
-comparison := format_expr (('≺' | '≻' | '≤' | '≥' | 'intra' | 'inter') format_expr)*
+comparison := format_expr (('≺' | '≻' | '≤' | '≥' | '∈' | '∉') format_expr)*
 # Ordering operators use the canonical Unicode glyphs `≺`/`≻`/`≤`/`≥`;
-# membership uses Latin keywords `intra`/`inter` (Faber prose identity).
-# Glyph aliases such as `∈` are not in the active contract.
+# membership uses the glyphs `∈`/`∉` (element of / not an element of). One
+# operator covers collection membership and range containment; the semantic
+# pass dispatches on the right operand's type, not on the spelling. `∉` is the
+# first-class negation (not sugar over `non`), and there is no ASCII spelling.
 # `¶` (D2.1) is looser than arithmetic and tighter than comparison, so both
 # operands of a comparison see the format tier first: `a + b ¶ ".2" ≤ 100 ¶ ".2"`
 # is `(a + b ¶ ".2") ≤ (100 ¶ ".2")`. The spec must be a string literal
