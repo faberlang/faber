@@ -934,7 +934,8 @@ fn cli_rejects_explain_json_without_term() {
         Cli::try_parse_from(["faber", "explain", "--json"]).expect_err("json requires a term");
     let rendered = error.to_string();
     assert!(rendered.contains("--json"));
-    assert!(rendered.contains("<TERM>") || rendered.contains("<term>"));
+    // NEED-5 (f4f9ca943): usage is now `<TERM|--list>`; `<TERM` is the stable prefix.
+    assert!(rendered.contains("<TERM") || rendered.contains("<term"));
 }
 
 #[test]
