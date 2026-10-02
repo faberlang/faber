@@ -3326,10 +3326,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         for batch in 0..batch_count {
             let rhs_batch = if r_batch.is_empty() {
                 0
-            } else if trailing_repeat == 0 {
-                return Err(RunnerError::internal(span, "matmul batch shape is empty"));
             } else {
-                batch / trailing_repeat
+                batch
+                    .checked_div(trailing_repeat)
+                    .ok_or_else(|| RunnerError::internal(span, "matmul batch shape is empty"))?
             };
             if rhs_batch >= rhs_batch_count {
                 return Err(RunnerError::internal(span, ERR_MATMUL_INNER_DIMENSION));

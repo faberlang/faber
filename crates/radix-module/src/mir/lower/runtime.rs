@@ -717,11 +717,11 @@ impl FunctionBuilder<'_> {
         let mut lowered_args = Vec::with_capacity(args.len() + 1);
         lowered_args.push(lowered_receiver);
         for (index, arg) in args.iter().enumerate() {
-            if Some(index) == shape_arg {
-                if let Some(shape) = &lowered_shape {
-                    lowered_args.push(shape.clone());
-                    continue;
-                }
+            if Some(index) == shape_arg
+                && let Some(shape) = &lowered_shape
+            {
+                lowered_args.push(shape.clone());
+                continue;
             }
             if index == 0
                 && let Some(flat) = &lowered_flat

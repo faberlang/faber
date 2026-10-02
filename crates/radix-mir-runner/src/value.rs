@@ -610,9 +610,7 @@ impl TensorValue {
                 costs[source_axis][first_target_axis] = best;
             }
         }
-        let Some(&minimum_stretches) = costs.first().and_then(|row| row.first()) else {
-            return None;
-        };
+        let &minimum_stretches = costs.first().and_then(|row| row.first())?;
         if minimum_stretches == impossible {
             return None;
         }
@@ -793,9 +791,7 @@ impl TensorValue {
         }
         let strides = if shape == self.shape {
             self.strides.clone()
-        } else if self.edge_base.is_some() {
-            Self::contiguous_strides(&shape)
-        } else if self.is_contiguous() {
+        } else if self.edge_base.is_some() || self.is_contiguous() {
             Self::contiguous_strides(&shape)
         } else {
             return None;

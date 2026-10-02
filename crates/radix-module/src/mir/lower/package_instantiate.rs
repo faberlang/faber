@@ -1090,7 +1090,6 @@ impl PackageInstantiate<'_> {
             let candidates = self
                 .tensor_edge_policy_providers
                 .iter()
-                .cloned()
                 .filter(|provider| {
                     provider.rank == site.rank
                         && tensor_edge_provider_matches(
@@ -1101,6 +1100,7 @@ impl PackageInstantiate<'_> {
                             provider,
                         )
                 })
+                .cloned()
                 .collect::<Vec<_>>();
             let [provider] = candidates.as_slice() else {
                 if !self.require_tensor_edge_resolution && candidates.is_empty() {
