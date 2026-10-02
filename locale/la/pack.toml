@@ -2359,6 +2359,10 @@ help = "ad valores comparandos utere aequalitatis signo: `≡`, vel `≠` pro `n
 message = "range step must be numeric"
 help = "use a numeric range step"
 
+[diagnostics.SEM011.issues.range_step_not_positive]
+message = "gradus intervalli positivus esse debet"
+help = "gradum positivum scribe; fines intervalli directionem monstrant (10‥0 per 2 descendit)"
+
 [diagnostics.SEM011.issues.intervallum_bound_required]
 message = "intervallum bound type must be numerus or instans"
 help = "use numerus, fractus, instans, or sized scalar bounds"
