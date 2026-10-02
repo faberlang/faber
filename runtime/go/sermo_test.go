@@ -8,7 +8,7 @@ import (
 
 // installRoutes installs a static route table for one test and restores the
 // previous table and host hook on cleanup.
-func installRoutes(t *testing.T, table func(string) func(*FrameConversation, interface{}) interface{}) {
+func installRoutes(t *testing.T, table func(string) func(*SermoConversation, interface{}) interface{}) {
 	t.Helper()
 	previousRoutes, previousHost := staticRoutes, SermoHostDispatch
 	t.Cleanup(func() {
@@ -31,7 +31,7 @@ func TestSermoEchoRoundTrip(t *testing.T) {
 	s := openWith("runtime:echo", "salve")
 	out := SermoAsMeus[string](&s)
 	out.Da("ping")
-	if _, ok := out.Fini().(FrameDone); !ok {
+	if _, ok := out.Fini().(SermoDone); !ok {
 		t.Fatalf("meus fini is not done")
 	}
 	in := SermoAsTuus[string](&s)
@@ -39,7 +39,7 @@ func TestSermoEchoRoundTrip(t *testing.T) {
 	if len(frames) != 1 || frames[0].Data != "salve" {
 		t.Fatalf("echo frames = %v", frames)
 	}
-	if _, ok := in.Fini().(FrameDone); !ok {
+	if _, ok := in.Fini().(SermoDone); !ok {
 		t.Fatalf("tuus fini is not done")
 	}
 	second := openWith("runtime:echo", "salve")
@@ -52,10 +52,10 @@ func TestSermoEchoRoundTrip(t *testing.T) {
 // TestSermoRouterOrder pins the router order: static table, then builtin, then
 // host hook, then fail closed.
 func TestSermoRouterOrder(t *testing.T) {
-	installRoutes(t, func(route string) func(*FrameConversation, interface{}) interface{} {
+	installRoutes(t, func(route string) func(*SermoConversation, interface{}) interface{} {
 		if route == "runtime:echo" || route == "salve:dic" {
-			return func(conv *FrameConversation, opener interface{}) interface{} {
-				FrameConvItem(conv, "static:"+opener.(string))
+			return func(conv *SermoConversation, opener interface{}) interface{} {
+				SermoConvItem(conv, "static:"+opener.(string))
 				return nil
 			}
 		}
@@ -71,8 +71,8 @@ func TestSermoRouterOrder(t *testing.T) {
 		t.Fatalf("builtin tier = %q", got)
 	}
 	// The host hook answers what the program does not serve.
-	SermoHostDispatch = func(conv *FrameConversation, opener interface{}) bool {
-		FrameConvItem(conv, "host")
+	SermoHostDispatch = func(conv *SermoConversation, opener interface{}) bool {
+		SermoConvItem(conv, "host")
 		convTerminal(conv, codeDone, nil)
 		convRelease(conv)
 		return true
@@ -97,15 +97,15 @@ func ptr[T any](value T) *T { return &value }
 // is its own frame, and the opener is deep copied across the boundary.
 func TestSermoHandlerRunsAsGoroutineAndStreams(t *testing.T) {
 	opener := []int{1, 2, 3}
-	installRoutes(t, func(route string) func(*FrameConversation, interface{}) interface{} {
+	installRoutes(t, func(route string) func(*SermoConversation, interface{}) interface{} {
 		if route != "num:numeros" {
 			return nil
 		}
-		return func(conv *FrameConversation, got interface{}) interface{} {
+		return func(conv *SermoConversation, got interface{}) interface{} {
 			list := got.([]int)
 			list[0] = 99 // writes the copy, never the caller's slice
 			for _, n := range list {
-				FrameConvItem(conv, n)
+				SermoConvItem(conv, n)
 			}
 			return nil
 		}
@@ -123,12 +123,12 @@ func TestSermoHandlerRunsAsGoroutineAndStreams(t *testing.T) {
 // TestSermoFailureBecomesErrorTerminal pins a handler failure payload and a
 // handler panic as an error terminal; ReadNumerus reports it as an error.
 func TestSermoFailureBecomesErrorTerminal(t *testing.T) {
-	installRoutes(t, func(route string) func(*FrameConversation, interface{}) interface{} {
+	installRoutes(t, func(route string) func(*SermoConversation, interface{}) interface{} {
 		switch route {
 		case "x:div":
-			return func(conv *FrameConversation, opener interface{}) interface{} { return "nulla" }
+			return func(conv *SermoConversation, opener interface{}) interface{} { return "nulla" }
 		case "x:boom":
-			return func(conv *FrameConversation, opener interface{}) interface{} { panic("boom") }
+			return func(conv *SermoConversation, opener interface{}) interface{} { panic("boom") }
 		}
 		return nil
 	})
@@ -145,21 +145,21 @@ func TestSermoFailureBecomesErrorTerminal(t *testing.T) {
 // undrained stream cancels the answering task and reports a cancel status.
 func TestSermoCancelReachesTheHandler(t *testing.T) {
 	stopped := make(chan struct{})
-	installRoutes(t, func(route string) func(*FrameConversation, interface{}) interface{} {
+	installRoutes(t, func(route string) func(*SermoConversation, interface{}) interface{} {
 		if route != "num:endless" {
 			return nil
 		}
-		return func(conv *FrameConversation, opener interface{}) interface{} {
+		return func(conv *SermoConversation, opener interface{}) interface{} {
 			defer close(stopped)
 			for i := 0; ; i++ {
-				FrameConvItem(conv, i)
+				SermoConvItem(conv, i)
 			}
 		}
 	})
 	s := openWith("num:endless", nil)
 	status := SermoAsTuus[int](&s).Fini()
-	if _, ok := status.(FrameCancel); !ok {
-		t.Fatalf("fini status = %T, want FrameCancel", status)
+	if _, ok := status.(SermoCancel); !ok {
+		t.Fatalf("fini status = %T, want SermoCancel", status)
 	}
 	select {
 	case <-stopped:
@@ -189,9 +189,9 @@ func TestSermoMaterializers(t *testing.T) {
 // TestSermoClose pins close(): a finished handle reports true once, a second
 // close reports false, and a failed handler's error is returned.
 func TestSermoClose(t *testing.T) {
-	installRoutes(t, func(route string) func(*FrameConversation, interface{}) interface{} {
+	installRoutes(t, func(route string) func(*SermoConversation, interface{}) interface{} {
 		if route == "x:div" {
-			return func(conv *FrameConversation, opener interface{}) interface{} { return "nulla" }
+			return func(conv *SermoConversation, opener interface{}) interface{} { return "nulla" }
 		}
 		return nil
 	})

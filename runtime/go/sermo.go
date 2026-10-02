@@ -25,7 +25,7 @@ import (
 type SermoSermo struct {
 	conversationID string
 	route          string
-	conv           *FrameConversation
+	conv           *SermoConversation
 	caller         *frameCaller
 	outgoing       []frameRecord
 	meusClosed     bool
@@ -53,7 +53,7 @@ func (view SermoMeus[T]) Da(data T) {
 	view.sermo.outgoing = append(view.sermo.outgoing, frameRecord{id: frameNextID(), parentID: view.sermo.conversationID, call: view.sermo.route, code: codeItem, data: data})
 }
 
-func (view SermoMeus[T]) Fini() FrameStatus {
+func (view SermoMeus[T]) Fini() SermoStatus {
 	if view.sermo == nil {
 		panic("meus view has no sermo")
 	}
@@ -64,27 +64,27 @@ func (view SermoMeus[T]) Fini() FrameStatus {
 			convCloseOutbound(view.sermo.conv)
 		}
 	}
-	return FrameDone{}
+	return SermoDone{}
 }
 
-func (view SermoTuus[T]) Cursor() []FrameScrinium[T] {
+func (view SermoTuus[T]) Cursor() []SermoScrinium[T] {
 	return sermoCursor[T](view.sermo)
 }
 
-func (view SermoTuus[T]) Accipe() *FrameScrinium[T] {
+func (view SermoTuus[T]) Accipe() *SermoScrinium[T] {
 	return sermoAccipe[T](view.sermo)
 }
 
-func (view SermoTuus[T]) Fini() FrameStatus {
+func (view SermoTuus[T]) Fini() SermoStatus {
 	return sermoFini(view.sermo)
 }
 
-func sermoTypedFrame[T any](frame frameRecord) *FrameScrinium[T] {
+func sermoTypedFrame[T any](frame frameRecord) *SermoScrinium[T] {
 	data, ok := frame.data.(T)
 	if !ok {
 		panic("tuus frame payload has the wrong type")
 	}
-	return &FrameScrinium[T]{Data: data}
+	return &SermoScrinium[T]{Data: data}
 }
 
 // sermoNext receives the next inbound frame, blocking until the answering tier
@@ -102,11 +102,11 @@ func sermoNext(sermo *SermoSermo) (frameRecord, bool) {
 	return frame, true
 }
 
-func sermoCursor[T any](sermo *SermoSermo) []FrameScrinium[T] {
+func sermoCursor[T any](sermo *SermoSermo) []SermoScrinium[T] {
 	if sermo == nil {
 		panic("tuus view has no sermo")
 	}
-	frames := make([]FrameScrinium[T], 0)
+	frames := make([]SermoScrinium[T], 0)
 	for {
 		frame, ok := sermoNext(sermo)
 		if !ok {
@@ -121,7 +121,7 @@ func sermoCursor[T any](sermo *SermoSermo) []FrameScrinium[T] {
 	}
 }
 
-func sermoAccipe[T any](sermo *SermoSermo) *FrameScrinium[T] {
+func sermoAccipe[T any](sermo *SermoSermo) *SermoScrinium[T] {
 	if sermo == nil {
 		panic("tuus view has no sermo")
 	}
@@ -141,12 +141,12 @@ func sermoAccipe[T any](sermo *SermoSermo) *FrameScrinium[T] {
 
 // sermoFini closes the inbound direction. On an undrained stream it cancels the
 // answering task first, then drains to the terminal.
-func sermoFini(sermo *SermoSermo) FrameStatus {
+func sermoFini(sermo *SermoSermo) SermoStatus {
 	if sermo == nil {
 		panic("tuus view has no sermo")
 	}
 	if sermo.conv == nil {
-		return FrameError{}
+		return SermoError{}
 	}
 	if !sermo.conv.incomingDrained {
 		convCancel(sermo.conv)
@@ -154,13 +154,13 @@ func sermoFini(sermo *SermoSermo) FrameStatus {
 	}
 	switch sermo.conv.incomingTerminal {
 	case codeError:
-		return FrameError{}
+		return SermoError{}
 	case codeCancel:
-		return FrameCancel{}
+		return SermoCancel{}
 	case codeRequest:
-		return FrameError{}
+		return SermoError{}
 	default:
-		return FrameDone{}
+		return SermoDone{}
 	}
 }
 
@@ -215,17 +215,17 @@ func SermoSetOpener(sermo *SermoSermo, data interface{}) {
 
 // staticRoutes is tier 1: the program's route table, installed by the
 // generated program when it serves `@ ad` handlers.
-var staticRoutes func(route string) func(*FrameConversation, interface{}) interface{}
+var staticRoutes func(route string) func(*SermoConversation, interface{}) interface{}
 
 // SermoInstallRoutes installs the program's static route table: the handler
 // adapter for a route, or nil when the program does not serve it.
-func SermoInstallRoutes(table func(route string) func(*FrameConversation, interface{}) interface{}) {
+func SermoInstallRoutes(table func(route string) func(*SermoConversation, interface{}) interface{}) {
 	staticRoutes = table
 }
 
 // SermoHostDispatch is tier 3: a Go host installs it to answer routes the
 // program does not serve. It reports whether it took the conversation.
-var SermoHostDispatch func(conv *FrameConversation, opener interface{}) bool
+var SermoHostDispatch func(conv *SermoConversation, opener interface{}) bool
 
 func SermoDispatch(sermo *SermoSermo) {
 	if len(sermo.outgoing) == 0 || sermo.outgoing[0].code != codeRequest {
@@ -243,7 +243,7 @@ func SermoDispatch(sermo *SermoSermo) {
 	switch sermo.route {
 	case "runtime:echo":
 		convSetTier(conv, tierBuiltin, false)
-		FrameConvItem(conv, request.data)
+		SermoConvItem(conv, request.data)
 		convTerminal(conv, codeDone, nil)
 		convRelease(conv)
 		return

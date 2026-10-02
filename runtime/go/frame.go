@@ -37,7 +37,7 @@ func frameNextID() string {
 	return fmt.Sprintf("frame-%d", atomic.AddUint64(&frameSeq, 1))
 }
 
-// frameCode is the internal tag of a frame; `FrameStatus` is the user-visible
+// frameCode is the internal tag of a frame; `SermoStatus` is the user-visible
 // status enum it maps to.
 type frameCode int
 
@@ -55,43 +55,43 @@ func frameIsTerminal(code frameCode) bool {
 	return code == codeDone || code == codeError || code == codeCancel
 }
 
-// FrameStatus is the `status` enum a sermo view reports; one struct per
+// SermoStatus is the `status` enum a sermo view reports; one struct per
 // variant, in the shape the Go emitter gives any Faber enum.
-type FrameStatus interface{ isStatus() }
-type FrameRequest struct{}
+type SermoStatus interface{ isStatus() }
+type SermoRequest struct{}
 
-func (FrameRequest) isStatus() {}
+func (SermoRequest) isStatus() {}
 
-type FrameItem struct{}
+type SermoItem struct{}
 
-func (FrameItem) isStatus() {}
+func (SermoItem) isStatus() {}
 
-type FrameByte struct{}
+type SermoByte struct{}
 
-func (FrameByte) isStatus() {}
+func (SermoByte) isStatus() {}
 
-type FrameBulk struct{}
+type SermoBulk struct{}
 
-func (FrameBulk) isStatus() {}
+func (SermoBulk) isStatus() {}
 
-type FrameDone struct{}
+type SermoDone struct{}
 
-func (FrameDone) isStatus() {}
+func (SermoDone) isStatus() {}
 
-type FrameError struct{}
+type SermoError struct{}
 
-func (FrameError) isStatus() {}
+func (SermoError) isStatus() {}
 
-type FrameCancel struct{}
+type SermoCancel struct{}
 
-func (FrameCancel) isStatus() {}
+func (SermoCancel) isStatus() {}
 
-// FrameScrinium is the typed frame (`scrinium<T>`) a tuus view yields.
-type FrameScrinium[T any] struct {
+// SermoScrinium is the typed frame (`scrinium<T>`) a tuus view yields.
+type SermoScrinium[T any] struct {
 	Id        *string
 	Parent_id *interface{}
 	Call      *string
-	Status    FrameStatus
+	Status    SermoStatus
 	Data      T
 }
 
@@ -103,28 +103,28 @@ type frameRecord struct {
 	data     interface{}
 }
 
-func frameStatusToCode(s FrameStatus) frameCode {
+func frameStatusToCode(s SermoStatus) frameCode {
 	switch s.(type) {
-	case FrameRequest:
+	case SermoRequest:
 		return codeRequest
-	case FrameItem:
+	case SermoItem:
 		return codeItem
-	case FrameByte:
+	case SermoByte:
 		return codeByte
-	case FrameBulk:
+	case SermoBulk:
 		return codeBulk
-	case FrameDone:
+	case SermoDone:
 		return codeDone
-	case FrameError:
+	case SermoError:
 		return codeError
-	case FrameCancel:
+	case SermoCancel:
 		return codeCancel
 	default:
 		return codeItem
 	}
 }
 
-func frameRecordFromUser[T any](frame FrameScrinium[T]) frameRecord {
+func frameRecordFromUser[T any](frame SermoScrinium[T]) frameRecord {
 	id := ""
 	if frame.Id != nil {
 		id = *frame.Id
@@ -157,10 +157,10 @@ const (
 	tierHost
 )
 
-// FrameConversation is the record shared by every copy of one sermo and by the
+// SermoConversation is the record shared by every copy of one sermo and by the
 // goroutine answering it. The frame queue is a buffered channel; the record
 // fields under mu are the facts A7 closes over.
-type FrameConversation struct {
+type SermoConversation struct {
 	id               string
 	route            string
 	frames           chan frameRecord
@@ -188,9 +188,9 @@ const frameQueueDepth = 64
 
 type frameCancelled struct{}
 
-func newConversation(id string, route string) *FrameConversation {
+func newConversation(id string, route string) *SermoConversation {
 	atomic.AddInt64(&liveConversations, 1)
-	return &FrameConversation{
+	return &SermoConversation{
 		id:               id,
 		route:            route,
 		frames:           make(chan frameRecord, frameQueueDepth),
@@ -200,7 +200,7 @@ func newConversation(id string, route string) *FrameConversation {
 	}
 }
 
-func convSetTier(conv *FrameConversation, tier frameTier, task bool) {
+func convSetTier(conv *SermoConversation, tier frameTier, task bool) {
 	conv.mu.Lock()
 	conv.tier = tier
 	conv.task = task
@@ -208,13 +208,13 @@ func convSetTier(conv *FrameConversation, tier frameTier, task bool) {
 }
 
 // convCancel signals the answering task; it is idempotent.
-func convCancel(conv *FrameConversation) {
+func convCancel(conv *SermoConversation) {
 	conv.cancelOnce.Do(func() { close(conv.cancelled) })
 }
 
-// FrameConvItem pushes one deep-copied item frame. When the caller has
+// SermoConvItem pushes one deep-copied item frame. When the caller has
 // cancelled, it unwinds the handler task with frameCancelled instead.
-func FrameConvItem(conv *FrameConversation, data interface{}) {
+func SermoConvItem(conv *SermoConversation, data interface{}) {
 	frame := frameRecord{id: frameNextID(), parentID: conv.id, call: conv.route, code: codeItem, data: deepCopy(data)}
 	select {
 	case <-conv.cancelled:
@@ -230,7 +230,7 @@ func FrameConvItem(conv *FrameConversation, data interface{}) {
 
 // convTerminal sends the single inbound terminal; a done after a cancel
 // becomes a cancel terminal.
-func convTerminal(conv *FrameConversation, code frameCode, data interface{}) {
+func convTerminal(conv *SermoConversation, code frameCode, data interface{}) {
 	conv.mu.Lock()
 	if conv.finished {
 		conv.mu.Unlock()
@@ -253,7 +253,7 @@ func convTerminal(conv *FrameConversation, code frameCode, data interface{}) {
 
 // convRelease is the single release point: it drops the task handle and gives
 // the router slot back.
-func convRelease(conv *FrameConversation) {
+func convRelease(conv *SermoConversation) {
 	conv.releaseOnce.Do(func() {
 		conv.mu.Lock()
 		conv.task = false
@@ -266,7 +266,7 @@ func convRelease(conv *FrameConversation) {
 // convDiscard ends the inbound direction for a caller that will read no more:
 // a live handler is cancelled, and the remaining frames are drained in the
 // background so the handler never blocks on a full queue.
-func convDiscard(conv *FrameConversation) {
+func convDiscard(conv *SermoConversation) {
 	convCancel(conv)
 	conv.incomingDrained = true
 	go func() {
@@ -282,7 +282,7 @@ func convDiscard(conv *FrameConversation) {
 // of the sermo. The handler goroutine never holds it, so its finalizer is the
 // last-reference net (D8.3): eventual, with no timing promise.
 type frameCaller struct {
-	conv *FrameConversation
+	conv *SermoConversation
 }
 
 func callerAbandoned(caller *frameCaller) {
@@ -299,7 +299,7 @@ func callerAbandoned(caller *frameCaller) {
 	}
 }
 
-func convCloseOutbound(conv *FrameConversation) {
+func convCloseOutbound(conv *SermoConversation) {
 	conv.mu.Lock()
 	conv.outboundClosed = true
 	conv.mu.Unlock()
@@ -307,7 +307,7 @@ func convCloseOutbound(conv *FrameConversation) {
 
 // convStartTask runs a tier-1 handler as its own goroutine. A panic becomes an
 // error terminal, a cancel unwinds to a cancel terminal.
-func convStartTask(conv *FrameConversation, opener interface{}, handler func(*FrameConversation, interface{}) interface{}) {
+func convStartTask(conv *SermoConversation, opener interface{}, handler func(*SermoConversation, interface{}) interface{}) {
 	convSetTier(conv, tierStatic, true)
 	go func() {
 		defer convRelease(conv)

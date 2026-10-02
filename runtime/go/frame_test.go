@@ -9,17 +9,17 @@ import (
 // terminal set (done, error, cancel).
 func TestFrameStatusCodes(t *testing.T) {
 	cases := []struct {
-		status   FrameStatus
+		status   SermoStatus
 		code     frameCode
 		terminal bool
 	}{
-		{FrameRequest{}, codeRequest, false},
-		{FrameItem{}, codeItem, false},
-		{FrameByte{}, codeByte, false},
-		{FrameBulk{}, codeBulk, false},
-		{FrameDone{}, codeDone, true},
-		{FrameError{}, codeError, true},
-		{FrameCancel{}, codeCancel, true},
+		{SermoRequest{}, codeRequest, false},
+		{SermoItem{}, codeItem, false},
+		{SermoByte{}, codeByte, false},
+		{SermoBulk{}, codeBulk, false},
+		{SermoDone{}, codeDone, true},
+		{SermoError{}, codeError, true},
+		{SermoCancel{}, codeCancel, true},
 	}
 	for _, c := range cases {
 		if got := frameStatusToCode(c.status); got != c.code {
@@ -36,12 +36,12 @@ func TestFrameStatusCodes(t *testing.T) {
 func TestFrameRecordFromUser(t *testing.T) {
 	id, call := "a", "route"
 	var parent interface{} = "p"
-	record := frameRecordFromUser(FrameScrinium[int]{Id: &id, Parent_id: &parent, Call: &call, Status: FrameDone{}, Data: 4})
+	record := frameRecordFromUser(SermoScrinium[int]{Id: &id, Parent_id: &parent, Call: &call, Status: SermoDone{}, Data: 4})
 	if record.id != "a" || record.parentID != "p" || record.call != "route" || record.code != codeDone || record.data != 4 {
 		t.Fatalf("record = %+v", record)
 	}
 	var number interface{} = 3
-	record = frameRecordFromUser(FrameScrinium[int]{Parent_id: &number})
+	record = frameRecordFromUser(SermoScrinium[int]{Parent_id: &number})
 	if record.id != "" || record.parentID != "" || record.call != "" {
 		t.Fatalf("empty record = %+v", record)
 	}
