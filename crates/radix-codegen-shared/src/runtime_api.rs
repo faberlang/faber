@@ -307,6 +307,34 @@ pub const INF_REM: RuntimeItem = inf_row("rem", RuntimeKind::Fn, INF_RUST);
 pub const INF_STORE: RuntimeItem = inf_row("store", RuntimeKind::StoreFn, INF_RUST);
 pub const INF_TRUE_DIV: RuntimeItem = inf_row("true_div", RuntimeKind::Fn, INF_RUST);
 
+/// `gen` rows (T1-R7): the lazy sync-generator carrier of the Rust runtime
+/// (`faber::Gen`, `faber::Yield`, crate-root types per fork F-A; the module is
+/// `faber::r#gen` because `gen` is reserved in edition 2024). A generator body
+/// is an `async` block rustc lowers to a state machine; `cede` parks the item
+/// through `Yield` and `Gen` is the iterator the consumer pulls.
+pub const GEN_GEN: RuntimeItem = RuntimeItem {
+    ns: Namespace::Gen,
+    name: "Gen",
+    kind: RuntimeKind::Type,
+    targets: &[Target::HirRust],
+};
+pub const GEN_YIELD: RuntimeItem = RuntimeItem {
+    ns: Namespace::Gen,
+    name: "Yield",
+    kind: RuntimeKind::Type,
+    targets: &[Target::HirRust],
+};
+
+/// `float` row (T1-R7, fork F-D): the half-float bit decode of the Rust runtime
+/// (`faber::float::f16_bits_to_f32`). The Rust target has no std half-float
+/// carrier, so `fractus<f16>` is a decoded-`f32` conversion intermediate.
+pub const FLOAT_F16_BITS_TO_F32: RuntimeItem = RuntimeItem {
+    ns: Namespace::Float,
+    name: "f16_bits_to_f32",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirRust],
+};
+
 /// The targets whose runtime package carries each `format` row: the Rust
 /// runtime (`faber::format`) and the Go runtime (`rt.Format*`) share the
 /// renderers whose id and meaning match.
@@ -575,6 +603,9 @@ pub const TABLE: &[RuntimeItem] = &[
     INF_REM,
     INF_STORE,
     INF_TRUE_DIV,
+    GEN_GEN,
+    GEN_YIELD,
+    FLOAT_F16_BITS_TO_F32,
     FORMAT_FMT,
     FORMAT_SPEC,
     FORMAT_FLOAT,

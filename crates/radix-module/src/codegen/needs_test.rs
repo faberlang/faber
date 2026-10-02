@@ -133,6 +133,29 @@ incipit {
 }
 
 #[test]
+#[cfg(feature = "hir-rust")]
+fn rust_needs_faber_runtime_for_a_sync_generator_program() {
+    // The lazy sync-generator carrier lives in `faber::Gen` / `faber::Yield`,
+    // so a program that declares a `fiunt` function depends on the runtime crate.
+    let (hir, types) = analyze_hir(
+        r"
+functio tres() fiunt → numerus {
+  cede 1
+  cede 2
+}
+
+incipit {
+  itera ex tres() fixum n {
+    nota n
+  }
+}
+",
+    );
+    let needs = collect_rust_needs(&hir, &types, BTreeSet::new(), None);
+    assert!(needs.needs_faber_runtime, "a sync generator requires the faber runtime crate");
+}
+
+#[test]
 fn rust_prelude_policy_no_longer_scans_body_for_hashmap() {
     let prelude = include_str!("../../../radix-hir-rust/src/prelude.rs");
     assert!(!prelude.contains("code.contains(\"HashMap\""));

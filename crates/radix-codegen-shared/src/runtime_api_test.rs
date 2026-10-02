@@ -633,3 +633,26 @@ fn the_rust_display_rows_spell_as_faber_display_functions() {
     );
     assert!(rows.iter().all(|row| row.kind == RuntimeKind::Fn));
 }
+
+#[test]
+fn the_rust_gen_and_float_rows_spell_as_the_crate_root_types_and_a_float_function() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| {
+            matches!(row.ns, Namespace::Gen | Namespace::Float)
+                && row.targets.contains(&Target::HirRust)
+        })
+        .collect();
+    let spelled: Vec<(String, RuntimeKind)> = rows
+        .iter()
+        .map(|row| (spell_any(Target::HirRust, row), row.kind))
+        .collect();
+    assert_eq!(
+        spelled,
+        [
+            ("faber::Gen".to_owned(), RuntimeKind::Type),
+            ("faber::Yield".to_owned(), RuntimeKind::Type),
+            ("faber::float::f16_bits_to_f32".to_owned(), RuntimeKind::Fn),
+        ]
+    );
+}
