@@ -33,23 +33,23 @@ pages of the documentation site.
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| rust | 360 | 364 | 99% |
-| go | 337 | 364 | 93% |
-| ts | 364 | 364 | 100% |
-| faber | 364 | 364 | 100% |
+| rust | 373 | 378 | 99% |
+| go | 347 | 378 | 92% |
+| ts | 378 | 378 | 100% |
+| faber | 378 | 378 | 100% |
 
 **Systems lane (MIR → device/IR artifacts)**
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| llvm-text | 323 | 359 | 90% |
-| wasm-text | 259 | 359 | 72% |
-| wasm | 259 | 359 | 72% |
-| metal-text | 6 | 359 | 2% |
-| wgsl-text | 6 | 359 | 2% |
-| sexp-struct | 287 | 359 | 80% |
-| sexp | 286 | 359 | 80% |
-| runner | 303 | 359 | 84% |
+| llvm-text | 334 | 373 | 90% |
+| wasm-text | 263 | 373 | 71% |
+| wasm | 263 | 373 | 71% |
+| metal-text | 6 | 373 | 2% |
+| wgsl-text | 6 | 373 | 2% |
+| sexp-struct | 300 | 373 | 80% |
+| sexp | 299 | 373 | 80% |
+| runner | 317 | 373 | 85% |
 
 ## Keywords — application lane
 
@@ -110,8 +110,6 @@ pages of the documentation site.
 | <a id="insere"></a>`insere` | ✓ | ✓ | ✓ | ✓ |
 | <a id="incipiet"></a>`incipiet` | ✓ | ✓ | ✓ | ✓ |
 | <a id="incipit"></a>`incipit` | ✓ | ✓ | ✓ | ✓ |
-| <a id="inter"></a>`inter` | ✓ | ✓ | ✓ | ✓ |
-| <a id="intra"></a>`intra` | ✓ | ✓ | ✓ | ✓ |
 | <a id="instans"></a>`instans` | ✓ | ✓ | ✓ | ✓ |
 | <a id="itera"></a>`itera` | ✓ | ◐ | ✓ | ✓ |
 | <a id="lege"></a>`lege` | ✓ | ✓ | ✓ | ✓ |
@@ -205,7 +203,7 @@ pages of the documentation site.
 | <a id=""></a>`≠` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`!(` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`⊻` | ✓ | ✓ | ✓ | ✓ |
-| <a id=""></a>`↦` | ✓ | ✓ | ✓ | ✓ |
+| <a id=""></a>`↦` | ◐ | ✓ | ✓ | ✓ |
 | <a id=""></a>`⇒` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`‥` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`…` | ✓ | ✓ | ✓ | ✓ |
@@ -213,6 +211,7 @@ pages of the documentation site.
 | <a id=""></a>`=` | ✓ | ✓ | ✓ | ✓ |
 | <a id="et"></a>`et` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`≥` | ✓ | ✓ | ✓ | ✓ |
+| <a id=""></a>`∈` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`≤` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`↓` | ✓ | ✓ | ✓ | ✓ |
 | <a id="modulus-u16"></a>`modulus<u16>` | ✓ | ✕ | ✓ | ✓ |
@@ -269,7 +268,7 @@ pages of the documentation site.
 | <a id="ego"></a>`ego` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="elige"></a>`elige` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="errata"></a>`errata` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
-| <a id="est"></a>`est` | ✓ | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✓ |
+| <a id="est"></a>`est` | ✓ | ✕ | ✕ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="ex"></a>`ex` | ◐ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
 | <a id="exitus"></a>`exitus` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="fac"></a>`fac` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
@@ -297,8 +296,6 @@ pages of the documentation site.
 | <a id="insere"></a>`insere` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="incipiet"></a>`incipiet` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="incipit"></a>`incipit` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id="inter"></a>`inter` | ✓ | ✕ | ✕ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id="intra"></a>`intra` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="instans"></a>`instans` | ✓ | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ◐ |
 | <a id="itera"></a>`itera` | ◐ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
 | <a id="lege"></a>`lege` | ✓ | ✓ | ✓ | ✕ | ✕ | ✕ | ✕ | ✓ |
@@ -364,7 +361,7 @@ pages of the documentation site.
 | <a id="ut"></a>`ut` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="varia"></a>`varia` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="variandum"></a>`variandum` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id="vector"></a>`vector` | ✓ | ◐ | ◐ | ◐ | ◐ | ✓ | ✓ | ✕ |
+| <a id="vector"></a>`vector` | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ |
 | <a id="vacuum"></a>`vacuum` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="verum"></a>`verum` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="vide"></a>`vide` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
@@ -400,6 +397,7 @@ pages of the documentation site.
 | <a id=""></a>`=` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="et"></a>`et` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`≥` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id=""></a>`∈` | ✓ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`≤` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`↓` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="modulus-u16"></a>`modulus<u16>` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
