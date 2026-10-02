@@ -302,3 +302,27 @@ fn text_into_i64_keeps_its_bounds() {
     let past = parse_text(NumericWidth::I64, "9223372036854775808").expect_err("2^63 > i64::MAX");
     assert_eq!(past.issue, TEXT_OUT_OF_RANGE);
 }
+
+/// `int ↦ f32` rounds once, nearest-even, from the integer itself. 2^60 +
+/// 2^36 + 1 sits just above the midpoint of two f32 values, so a detour
+/// through `f64` (which drops the `+ 1`) lands on the tie and picks 2^60.
+#[test]
+fn int_to_f32_rounds_once() {
+    let f32_ty = Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32);
+    let big = (1_i64 << 60) + (1_i64 << 36) + 1;
+    let once = (1_u64 << 60) + (1_u64 << 37);
+    assert_eq!(
+        run_conversion(int(), f32_ty.clone(), Value::Int(big), None).expect("int to f32"),
+        Value::Float(once as f64)
+    );
+    assert_eq!(
+        run_conversion(
+            integer(NumericWidth::U64),
+            f32_ty,
+            Value::UInt(big as u64),
+            None
+        )
+        .expect("u64 to f32"),
+        Value::Float(once as f64)
+    );
+}
