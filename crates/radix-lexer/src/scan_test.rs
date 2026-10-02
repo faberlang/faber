@@ -2608,3 +2608,35 @@ fn lexes_pilcrow_format_operator() {
     assert_eq!(result.tokens[1].kind, TokenKind::Pilcrow);
     assert!(result.reader_keyword_latin_keys.is_empty());
 }
+
+#[test]
+fn lexes_element_of_membership_glyph() {
+    // `x ∈ xs` uses U+2208; one spelling in every locale, no word twin.
+    let result = lex("x ∈ xs");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    assert_eq!(result.tokens[1].kind, TokenKind::ElementOf);
+    assert!(result.reader_keyword_latin_keys.is_empty());
+}
+
+#[test]
+fn lexes_not_element_of_membership_glyph() {
+    // `x ∉ xs` uses U+2209; one spelling in every locale, no word twin.
+    let result = lex("x ∉ xs");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    assert_eq!(result.tokens[1].kind, TokenKind::NotElementOf);
+    assert!(result.reader_keyword_latin_keys.is_empty());
+}
+
+#[test]
+fn membership_glyphs_in_comment_and_string_are_not_scanned() {
+    let result = lex("# a ∈ b ∉ c\n\"∈ ∉\"");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    assert!(
+        result
+            .tokens
+            .iter()
+            .all(|t| !matches!(t.kind, TokenKind::ElementOf | TokenKind::NotElementOf)),
+        "{:?}",
+        result.tokens
+    );
+}

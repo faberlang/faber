@@ -289,6 +289,10 @@ pub enum TokenKind {
     Cap,       // ∩ inline intersection
     At,        // @
 
+    // === Membership glyphs (no ASCII or word spelling) ===
+    ElementOf,    // ∈ membership over a range or collection
+    NotElementOf, // ∉ non-membership over a range or collection
+
     // === Operators ===
     Plus,       // +
     Minus,      // -
