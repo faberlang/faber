@@ -1,8 +1,19 @@
 //! Per-target width, range, call-graph, and callback requirements.
 
+use crate::PassConfig;
+use crate::locale::LocalePack;
 use crate::passes::kernel_requirements::KernelRequirementFailure;
-use crate::test_support::analyze_source;
+use crate::test_support::{analyze_source, analyze_source_with_config};
 use radix_target::Target;
+
+fn analyze_en(source: &str) -> crate::test_support::AnalyzedFixture {
+    let mut config = PassConfig::for_target(Target::HirRust);
+    config.locale_pack = Some(
+        LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("load English locale pack"),
+    );
+    analyze_source_with_config(source, config)
+}
 
 fn target_row<'a>(
     fixture: &'a crate::test_support::AnalyzedFixture,
@@ -24,12 +35,12 @@ fn target_row<'a>(
 
 #[test]
 fn wrapping_i32_is_admitted_only_on_implemented_device_leaves() {
-    let fixture = analyze_source(
+    let fixture = analyze_en(
         r"
-@ nucleum
-@ publica
-functio wrapping_sum(wrapping<i32> left, wrapping<i32> right) → wrapping<i32> {
-    redde left + right
+@ kernel
+@ public
+fn wrapping_sum(wrapping<i32> left, wrapping<i32> right) → wrapping<i32> {
+    return left + right
 }
 ",
     );
@@ -54,6 +65,89 @@ functio wrapping_sum(wrapping<i32> left, wrapping<i32> right) → wrapping<i32> 
             ..
         }
     )));
+}
+
+#[test]
+fn wrapping_word_intermediates_observed_before_store_must_fit_their_carrier() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn signed_sub(wrapping<i32> left, wrapping<i32> right) → bool {
+    return left - right < left
+}
+
+@ kernel
+@ public
+fn signed_mul(wrapping<i32> left, wrapping<i32> right) → bool {
+    return left * right > left
+}
+
+@ kernel
+@ public
+fn signed_neg(wrapping<i32> value, wrapping<i32> bound) → bool {
+    return -value > bound
+}
+
+@ kernel
+@ public
+fn unsigned_sub(wrapping<u32> left, wrapping<u32> right) → bool {
+    return left - right < left
+}
+
+@ kernel
+@ public
+fn nested_add_div(wrapping<i32> left, wrapping<i32> right) → bool {
+    return (left + right) / 2 > left
+}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+
+    let cases = [
+        ("signed_sub", -4_294_967_295, 4_294_967_295),
+        (
+            "signed_mul",
+            -4_611_686_016_279_904_256,
+            4_611_686_018_427_387_904,
+        ),
+        ("signed_neg", -2_147_483_647, 2_147_483_648),
+        ("unsigned_sub", -4_294_967_295, 4_294_967_295),
+        ("nested_add_div", -4_294_967_296, 4_294_967_294),
+    ];
+    for (name, expected_minimum, expected_maximum) in cases {
+        for target in [Target::MirMetal, Target::MirWgsl] {
+            let report = target_row(&fixture, name, target);
+            assert!(
+                !report.admitted,
+                "{target:?} admitted {name}: {:?}",
+                report.failures
+            );
+            let range = report
+                .failures
+                .iter()
+                .find_map(|failure| match failure {
+                    KernelRequirementFailure::IntermediateOutOfRange { range, .. } => Some(range),
+                    _ => None,
+                })
+                .unwrap_or_else(|| {
+                    panic!(
+                        "{target:?} missing exact {name} intermediate failure: {:?}",
+                        report.failures
+                    )
+                });
+            assert_eq!(
+                range.minimum,
+                crate::passes::kernel_requirements::KernelRangeExpr::Constant(expected_minimum),
+                "{target:?} {name}"
+            );
+            assert_eq!(
+                range.maximum,
+                crate::passes::kernel_requirements::KernelRangeExpr::Constant(expected_maximum),
+                "{target:?} {name}"
+            );
+        }
+    }
 }
 
 #[test]
@@ -88,7 +182,7 @@ fn transitive_kernel_width_failure_closes_the_calling_kernel() {
     let fixture = analyze_source(
         r"
 @ nucleum
-functio wide_helper(int value) → vacuum {
+functio wide_helper(numerus value) → vacuum {
     tacet
 }
 
@@ -116,15 +210,15 @@ functio caller(f32 value) → f32 {
 
 #[test]
 fn tensor_division_requires_a_proof_that_each_divisor_lane_is_nonzero() {
-    let fixture = analyze_source(
+    let fixture = analyze_en(
         r"
-@ nucleum
-@ publica
-functio tensor_division(
+@ kernel
+@ public
+fn tensor_division(
     tensor<wrapping<i32>, [4]> dividend,
     tensor<wrapping<i32>, [4]> divisor
-) → vacuum {
-    fixum tensor<wrapping<i32>, [4]> quotient ← dividend.divisio(divisor)
+) → void {
+    const tensor<wrapping<i32>, [4]> quotient ← dividend.divide(divisor)
 }
 ",
     );
@@ -163,7 +257,7 @@ functio recursive(f32 value) → f32 {
 
 #[test]
 fn limes_callback_gets_shift_and_symbolic_extent_range_facts() {
-    let fixture = analyze_source(
+    let fixture = analyze_en(
         r"
 interface EdgePolicy<C> { fn remap(C coord) → C }
 class ZeroGhost implements EdgePolicy<vector<int, 1>> {
@@ -172,14 +266,14 @@ class ZeroGhost implements EdgePolicy<vector<int, 1>> {
     }
 }
 
-@ nucleum
-@ publica
-functio map_edges<magnitudo N>(
+@ kernel
+@ public
+fn map_edges<size N>(
     tensor<f32, [N]> input,
     tensor<f32, [N]> output
-) → vacuum {
-    fixum tensor<f32, [N]> mapped ← input.shift([1]).limes<ZeroGhost>()
-    itera ex mapped apud [i] fixum value {
+) → void {
+    const tensor<f32, [N]> mapped ← input.shift([1]).limes<ZeroGhost>()
+    for from mapped at [i] const value {
         output[i] ← value
     }
 }

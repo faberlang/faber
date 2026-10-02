@@ -993,6 +993,22 @@ impl BodyFacts<'_> {
                 output
             }
             HirExpressionKind::Binary(op, lhs, rhs) => {
+                if is_non_homomorphic_observer(*op) {
+                    self.check_observed_modular_intermediates(lhs);
+                    self.check_observed_modular_intermediates(rhs);
+                    if *op == HirBinOp::Div
+                        && let Some((carrier_min, carrier_max)) =
+                            modular_carrier_bounds(expr.ty, self.types)
+                    {
+                        let exact = binary_range(*op, self.peek_range(lhs), self.peek_range(rhs));
+                        self.check_intermediate_with_bounds(
+                            expr.span,
+                            exact,
+                            carrier_min,
+                            carrier_max,
+                        );
+                    }
+                }
                 let left = self.evaluate(lhs);
                 let right = self.evaluate(rhs);
                 if is_integer_value_type(expr.ty, self.types) {
@@ -1399,6 +1415,38 @@ impl BodyFacts<'_> {
         }
     }
 
+    /// Homomorphic modular chains may flow to a wrapping store. A comparison,
+    /// division, remainder, or right shift observes an exact value instead, so
+    /// every modular arithmetic node in its operand tree must fit its carrier.
+    fn check_observed_modular_intermediates(&mut self, expr: &HirExpression) {
+        match &expr.kind {
+            HirExpressionKind::Unary(op, operand) => {
+                self.check_observed_modular_intermediates(operand);
+                if matches!(op, HirUnOp::Neg | HirUnOp::BitNot)
+                    && let Some((carrier_min, carrier_max)) =
+                        modular_carrier_bounds(expr.ty, self.types)
+                {
+                    let exact = unary_range(*op, self.peek_range(operand));
+                    self.check_intermediate_with_bounds(expr.span, exact, carrier_min, carrier_max);
+                }
+            }
+            HirExpressionKind::Binary(op, lhs, rhs) => {
+                self.check_observed_modular_intermediates(lhs);
+                self.check_observed_modular_intermediates(rhs);
+                if matches!(
+                    *op,
+                    HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Shl | HirBinOp::Div
+                ) && let Some((carrier_min, carrier_max)) =
+                    modular_carrier_bounds(expr.ty, self.types)
+                {
+                    let exact = binary_range(*op, self.peek_range(lhs), self.peek_range(rhs));
+                    self.check_intermediate_with_bounds(expr.span, exact, carrier_min, carrier_max);
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn range_binding(&self, expr: &HirExpression) -> AbstractRange {
         let HirExpressionKind::Intervallum {
             start,
@@ -1495,6 +1543,16 @@ impl BodyFacts<'_> {
     }
 
     fn check_intermediate(&mut self, span: Span, range: AbstractRange) {
+        self.check_intermediate_with_bounds(span, range, DEVICE_INTEGER_MIN, DEVICE_INTEGER_MAX);
+    }
+
+    fn check_intermediate_with_bounds(
+        &mut self,
+        span: Span,
+        range: AbstractRange,
+        carrier_min: i128,
+        carrier_max: i128,
+    ) {
         let Some(range) = range.0 else {
             self.failures
                 .push(KernelRequirementFailure::UnsupportedIntegerRange { span });
@@ -1502,24 +1560,23 @@ impl BodyFacts<'_> {
         };
         let minimum = symbolic_bounds(&range.minimum);
         let maximum = symbolic_bounds(&range.maximum);
-        let allowed_max = if self.has_signed_coordinate_input {
+        let allowed_min = carrier_min.max(DEVICE_INTEGER_MIN);
+        let allowed_max = carrier_max.min(if self.has_signed_coordinate_input {
             2_147_483_647
         } else {
             DEVICE_INTEGER_MAX
-        };
+        });
         let fixed_endpoint_out_of_range = constant(&range.minimum)
-            .is_some_and(|minimum| minimum < DEVICE_INTEGER_MIN)
+            .is_some_and(|minimum| minimum < allowed_min)
             || constant(&range.maximum).is_some_and(|maximum| maximum > allowed_max);
         let impossible = minimum.minimum.is_some_and(|minimum| minimum > allowed_max)
-            || maximum
-                .maximum
-                .is_some_and(|maximum| maximum < DEVICE_INTEGER_MIN);
+            || maximum.maximum.is_some_and(|maximum| maximum < allowed_min);
         if impossible || fixed_endpoint_out_of_range {
             self.failures
                 .push(KernelRequirementFailure::IntermediateOutOfRange { span, range });
         } else if minimum
             .minimum
-            .is_some_and(|minimum| minimum >= DEVICE_INTEGER_MIN)
+            .is_some_and(|minimum| minimum >= allowed_min)
             && maximum
                 .maximum
                 .is_some_and(|maximum| maximum <= allowed_max)
@@ -1529,7 +1586,7 @@ impl BodyFacts<'_> {
             self.conditions.push(KernelExtentCondition {
                 span,
                 range,
-                minimum: DEVICE_INTEGER_MIN,
+                minimum: allowed_min,
                 maximum: allowed_max,
             });
         } else {
@@ -1856,6 +1913,15 @@ fn is_modular_type(ty: Option<TypeId>, types: &TypeTable) -> bool {
     })
 }
 
+fn modular_carrier_bounds(ty: Option<TypeId>, types: &TypeTable) -> Option<(i128, i128)> {
+    let ty = numeric_scalar_type(ty?, types);
+    match types.get(ty) {
+        Type::ModularWord(NumericWidth::I32) => Some((i128::from(i32::MIN), i128::from(i32::MAX))),
+        Type::ModularWord(NumericWidth::U32) => Some((0, i128::from(u32::MAX))),
+        _ => None,
+    }
+}
+
 fn is_tensor_type(ty: TypeId, types: &TypeTable) -> bool {
     match types.get(ty) {
         Type::Tensor(..) => true,
@@ -1879,6 +1945,31 @@ fn numeric_scalar_type(ty: TypeId, types: &TypeTable) -> TypeId {
         | Type::Ref(_, element) => numeric_scalar_type(*element, types),
         _ => ty,
     }
+}
+
+fn is_non_homomorphic_observer(op: HirBinOp) -> bool {
+    matches!(
+        op,
+        HirBinOp::Eq
+            | HirBinOp::NotEq
+            | HirBinOp::ApproxEq
+            | HirBinOp::ApproxNotEq
+            | HirBinOp::FuzzyEq
+            | HirBinOp::FuzzyNotEq
+            | HirBinOp::StrictEq
+            | HirBinOp::StrictNotEq
+            | HirBinOp::Lt
+            | HirBinOp::LtEq
+            | HirBinOp::Gt
+            | HirBinOp::GtEq
+            | HirBinOp::InRange
+            | HirBinOp::Between
+            | HirBinOp::NotInRange
+            | HirBinOp::NotBetween
+            | HirBinOp::Div
+            | HirBinOp::Mod
+            | HirBinOp::Shr
+    )
 }
 
 fn is_integer_value_operator(op: HirBinOp) -> bool {
