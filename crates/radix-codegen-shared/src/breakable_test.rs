@@ -147,6 +147,47 @@ fn breakable_scope_emits_fallthrough_break() {
     assert_eq!(writer.finish(), "for {\n    body\nbreak;\n}");
 }
 
+/// A breakable block that cannot leave early has no use for the one-shot
+/// loop. TypeScript emits a braced block and still reports `true` so the
+/// caller appends the result glue after it; the other targets keep the loop
+/// until their own units flip the style.
+#[test]
+fn typescript_drops_the_loop_when_the_block_cannot_exit_early() {
+    let block = breakable_block(vec![]);
+    let mut writer = CodeWriter::new();
+    let wrapped = write_breakable_scope(&block, &mut writer, BreakableLoopStyle::TypeScript, |w| {
+        w.writeln("body");
+    });
+    assert!(wrapped);
+    assert_eq!(writer.finish(), "{\n    body\n}");
+
+    for (style, header) in [
+        (BreakableLoopStyle::Rust, "loop {"),
+        (BreakableLoopStyle::Go, "for {"),
+        (BreakableLoopStyle::Swift, "repeat {"),
+    ] {
+        let mut writer = CodeWriter::new();
+        let wrapped = write_breakable_scope(&block, &mut writer, style, |w| w.writeln("body"));
+        assert!(wrapped, "{style:?}");
+        assert!(writer.finish().starts_with(header), "{style:?}");
+    }
+}
+
+/// A `rumpe` or a routed `perge` keeps the TypeScript loop.
+#[test]
+fn typescript_keeps_the_loop_for_rumpe_and_perge() {
+    for statement in [rumpe_stmt(), perge_stmt()] {
+        let block = breakable_block(vec![statement]);
+        let mut writer = CodeWriter::new();
+        let wrapped =
+            write_breakable_scope(&block, &mut writer, BreakableLoopStyle::TypeScript, |w| {
+                w.writeln("body");
+            });
+        assert!(wrapped);
+        assert!(writer.finish().starts_with("while (true) {"));
+    }
+}
+
 /// Plain blocks wrap in braces except Swift, which emits inline.
 #[test]
 fn plain_block_wraps_except_swift() {
