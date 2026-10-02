@@ -37,6 +37,7 @@ fn emit(target: Target) -> String {
         crate::Output::Go(out) => out.code,
         crate::Output::TypeScript(out) => out.code,
         crate::Output::Faber(out) => out.code,
+        crate::Output::Swift(out) => out.code,
         _ => panic!("unexpected output for {target}"),
     }
 }
@@ -87,6 +88,17 @@ fn go_emits_method_calls_through_the_pointer_storage() {
 }
 
 #[test]
+fn swift_emits_the_assertion_as_a_force_unwrap() {
+    // Operator ruling 2026-10-02: an explicit source assertion is Swift's `!`,
+    // including a mutating receiver (`xs!.append(3)` mutates in place).
+    let code = emit(Target::HirSwift);
+    assert!(code.contains("xs!.append(3)"), "{code}");
+    assert!(code.contains("xs!.count"), "{code}");
+    assert!(code.contains("xs![0]"), "{code}");
+    assert!(code.contains("t!.unicodeScalars.count"), "{code}");
+}
+
+#[test]
 fn faber_round_trips_the_non_null_method_spelling() {
     let code = emit(Target::HirFaber);
     assert!(code.contains("xs!.appende(3)"), "{code}");
@@ -122,7 +134,6 @@ incipit {
 fn unsupported_targets_reject_the_assertion_by_name() {
     for (target, issue) in [
         (Target::HirPython, "python_target_unsupported"),
-        (Target::HirSwift, "swift_force_unwrap_unsupported"),
         (Target::HirHaskell, "haskell_target_unsupported"),
     ] {
         let result = compile(target);
