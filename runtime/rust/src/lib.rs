@@ -13,6 +13,7 @@ pub mod dec;
 pub mod display;
 pub mod exact;
 pub mod failable;
+pub mod format;
 pub mod frame;
 pub mod inf;
 pub mod instans;
@@ -39,6 +40,7 @@ pub use display::{
     FractusDisplay, display_bivalens, display_fractus, display_option, display_option_bivalens,
     display_option_fractus, display_option_vacuum, display_text_payload, display_valor,
 };
+pub use format::Fmt;
 pub use frame::{
     AnsweringTier, Cancellation, DispatchError, FrameStatus, HostDispatch, IntoFrameStatus,
     IntoScrinium, Meus, ResponseSender, Scrinium, Sermo, SermoRequest, StaticRoute, Tuus,
