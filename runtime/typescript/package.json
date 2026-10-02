@@ -1,7 +1,7 @@
 {
   "name": "@faber/runtime",
   "version": "0.1.0",
-  "description": "Faber language runtime package for generated TypeScript: display helpers, FaberDisplayHint value types, and collection formatting.",
+  "description": "Faber language runtime package for generated TypeScript: display helpers, FaberDisplayHint value types, collection formatting, and the regex namespace (@faber/runtime/regex).",
   "license": "MIT",
   "type": "module",
   "main": "index.ts",
@@ -10,12 +10,20 @@
     ".": {
       "types": "./index.ts",
       "default": "./index.ts"
+    },
+    "./regex": {
+      "types": "./regex.ts",
+      "default": "./regex.ts"
     }
   },
   "files": [
     "index.ts",
+    "regex.ts",
     "tsconfig.json",
     "package.json"
   ],
-  "private": true
+  "private": true,
+  "scripts": {
+    "test": "node --test display.test.ts regex.test.ts"
+  }
 }

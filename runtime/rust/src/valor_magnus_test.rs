@@ -1,6 +1,6 @@
 //! `Valor::Magnus` carrier tests: canonical form, extraction, display and JSON wire.
 
-use crate::display::display_valor;
+use crate::display;
 use crate::valor::{FromValor, Valor};
 use crate::{Json, Magnus};
 
@@ -31,7 +31,10 @@ fn from_valor_extracts_magnus_from_either_integer_carrier() {
 
 #[test]
 fn display_renders_the_decimal_digits() {
-    assert_eq!(display_valor(&Valor::Magnus(big())), "18446744073709551616");
+    assert_eq!(
+        display::valor(&Valor::Magnus(big())),
+        "18446744073709551616"
+    );
 }
 
 #[test]

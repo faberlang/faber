@@ -9,10 +9,13 @@ pub mod ascii;
 pub mod ascii_bounded;
 pub mod contract;
 pub mod cursor_stream;
+pub mod dec;
 pub mod display;
 pub mod exact;
 pub mod failable;
+pub mod format;
 pub mod frame;
+pub mod inf;
 pub mod instans;
 pub mod intervallum;
 pub mod json;
@@ -35,10 +38,8 @@ pub use arena::{Arena, ArenaHandle};
 pub use ascii::Ascii;
 pub use ascii_bounded::{AsciiN, AsciiNOverflow};
 pub use cursor_stream::{CursorStreamSink, materialize_cursor_stream};
-pub use display::{
-    FractusDisplay, display_bivalens, display_fractus, display_option, display_option_bivalens,
-    display_option_fractus, display_option_vacuum, display_text_payload, display_valor,
-};
+pub use display::FractusDisplay;
+pub use format::Fmt;
 pub use frame::{
     AnsweringTier, Cancellation, DispatchError, FrameStatus, HostDispatch, IntoFrameStatus,
     IntoScrinium, Meus, ResponseSender, Scrinium, Sermo, SermoRequest, StaticRoute, Tuus,
@@ -57,7 +58,7 @@ pub use or_recovery::{
 };
 pub use queue_stack::{Queue, QueueN, QueueStackError, QueueStackOverflow, Stack, StackN};
 #[cfg(feature = "regex")]
-pub use regex::Regex;
+pub use regex::{Match, Regex, RegexError};
 pub use sparsa::Sparsa;
 pub use tensor::{Tensor, TensorEdgePolicy};
 pub use tensor_edge_policy::{
