@@ -211,14 +211,12 @@ product_path_default!(default_product_public, "public");
 product_path_default!(default_product_assets_manifest, "assets.json");
 product_path_default!(default_product_controllers_json, "controllers.json");
 
-/// Resolve the manifest `[build] target` for an input path, returning `None`
-/// when no package layout is discoverable and when the manifest names no
-/// target. A readable manifest naming an unsupported target propagates (fail
-/// closed): the package's declared target is authoritative for the executed
-/// lane and is never silently ignored in favor of the default.
-pub(crate) fn manifest_build_target_for_input(
+/// Read the manifest governing an input path. `Ok(None)` only when no package
+/// layout is discoverable or no `faber.toml` exists; a manifest that exists but
+/// cannot be read is an error (fail closed).
+fn input_manifest(
     input: &Path,
-) -> Result<Option<Target>, Box<Diagnostic>> {
+) -> Result<Option<(FaberManifest, std::path::PathBuf)>, Box<Diagnostic>> {
     let Ok(layout) = super::discover_build_layout(input) else {
         return Ok(None);
     };
@@ -226,8 +224,34 @@ pub(crate) fn manifest_build_target_for_input(
         return Ok(None);
     }
     let manifest = read_manifest(&layout.manifest_path)?;
+    Ok(Some((manifest, layout.manifest_path)))
+}
+
+/// The one resolver for "what `Target` does this package's `faber.toml`
+/// declare?", shared by `faber build`, `faber check`, `faber check-library`
+/// and the executed lane. `Ok(None)` means there is no manifest, and each
+/// caller then applies its own named no-manifest default. A manifest that
+/// names an unreadable or unsupported target is always an error: the declared
+/// target is never silently ignored in favor of a default. A manifest naming
+/// no target resolves to the implicit portable default.
+pub fn manifest_package_build_target(input: &Path) -> Result<Option<Target>, Box<Diagnostic>> {
+    let Some((manifest, path)) = input_manifest(input)? else {
+        return Ok(None);
+    };
+    manifest_build_target(manifest.build.target.as_deref(), &path).map(Some)
+}
+
+/// Like [`manifest_package_build_target`], but `Ok(None)` also when the
+/// manifest names no `[build] target`: the executed lane applies its own
+/// default (`fmir`) to an un-targeted package rather than the portable one.
+pub(crate) fn manifest_build_target_for_input(
+    input: &Path,
+) -> Result<Option<Target>, Box<Diagnostic>> {
+    let Some((manifest, path)) = input_manifest(input)? else {
+        return Ok(None);
+    };
     match manifest.build.target.as_deref() {
-        Some(target) => manifest_build_target(Some(target), &layout.manifest_path).map(Some),
+        Some(target) => manifest_build_target(Some(target), &path).map(Some),
         None => Ok(None),
     }
 }

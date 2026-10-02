@@ -231,9 +231,8 @@ pub(super) fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
     let effective_config;
     let config = match consumer {
         PackageMirConsumer::Interpreted => {
-            effective_config = config
-                .clone()
-                .with_target((seams.executed_lane_target)(config, input));
+            let target = (seams.executed_lane_target)(config, input).map_err(|diag| vec![*diag])?;
+            effective_config = config.clone().with_target(target);
             &effective_config
         }
         PackageMirConsumer::ExternalTarget => config,

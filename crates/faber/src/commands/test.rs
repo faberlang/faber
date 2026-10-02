@@ -125,7 +125,14 @@ pub(super) fn cmd_test(args: &TestArgs) {
     // `lane_requires_mir_backed_target` under the old HIR-direct placeholder.
     // The runner never emits product targets; the target only selects the
     // analysis lane-policy posture.
-    let analysis_target = package::executed_lane_analysis_target(&Config::default(), &input_path);
+    let analysis_target =
+        match package::executed_lane_analysis_target(&Config::default(), &input_path) {
+            Ok(target) => target,
+            Err(diag) => {
+                eprintln!("error: {}", diag.message);
+                std::process::exit(1);
+            }
+        };
     let config = match package::config_with_locale(
         analysis_target,
         &input_path,
