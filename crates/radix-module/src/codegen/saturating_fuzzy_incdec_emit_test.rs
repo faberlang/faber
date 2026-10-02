@@ -57,9 +57,8 @@ fn emit(target: Target, source: &str) -> String {
 #[test]
 fn rust_saturating_division_is_exact_floor_division() {
     let code = emit(Target::HirRust, SATURATING);
-    assert!(code.contains("__faber_div(a as i128, two as i128)"), "{code}");
-    assert!(code.contains("__faber_rem(a as i128, two as i128)"), "{code}");
-    assert!(code.contains("panic!(\"numerus division failed\")"), "{code}");
+    assert!(code.contains("faber::exact::div(a as i128, two as i128)"), "{code}");
+    assert!(code.contains("faber::exact::rem(a as i128, two as i128)"), "{code}");
     assert!(!code.contains("saturatus division failed"), "{code}");
 }
 
@@ -93,7 +92,7 @@ fn decimal_fuzzy_operand_is_unscaled_on_every_backend() {
 fn rust_list_element_inc_dec_is_one_checked_store() {
     let code = emit(Target::HirRust, INC_DEC);
     assert!(
-        code.contains("__faber_store::<u8>((*") && code.contains(" as i128) + 1, \"assignment\", \"\")"),
+        code.contains("faber::exact::store::<u8>((*") && code.contains(" as i128) + 1, \"assignment\", \"\")"),
         "{code}"
     );
     assert!(!code.contains(").cloned().expect(\"lista index trap\") += 1"), "{code}");

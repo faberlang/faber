@@ -14618,10 +14618,11 @@ fn web4_lib_kind_package_emits_a_library_crate() {
     assert!(!code.contains("fn main"), "a library crate carries no main");
     let lib_rs = fs::read_to_string(src.join("lib.rs")).expect("lib.rs");
     assert!(lib_rs.contains("pub struct Span"), "public item is exposed");
-    // Exact-integer helpers live in the package module that uses them.
+    // Exact-integer helpers live in the `faber` crate: the module calls them
+    // and carries no copy.
     assert!(
-        lib_rs.contains("fn __faber_int"),
-        "module carries its helper"
+        lib_rs.contains("faber::exact::int(") && !lib_rs.contains("fn __faber_int"),
+        "module calls faber::exact"
     );
 }
 

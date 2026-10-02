@@ -21,8 +21,8 @@
 //!
 //! A row carries no body, parameter list or trap text: bodies are target code
 //! in each runtime package. A row exists only for a helper some runtime package
-//! carries, so the real [`TABLE`] starts empty and each namespace unit adds its
-//! rows with the runtime it moves.
+//! carries, so each namespace unit adds its rows to the real [`TABLE`] with the
+//! runtime it moves.
 //!
 //! Store-family helpers (`StoreFn`) enforce a width limit and may only be
 //! spelled at a store site: [`spell`] refuses them and [`spell_store`], which
@@ -38,9 +38,52 @@ use radix_target::Target;
 /// The Go import path of the flat runtime package (`package rt`).
 pub const GO_RUNTIME_IMPORT: &str = "faber/rt";
 
-/// The canonical helper table. Empty until a namespace unit moves a runtime
-/// and adds its rows.
-pub const TABLE: &[RuntimeItem] = &[];
+/// The targets whose runtime package carries the `exact` namespace today.
+const EXACT_TARGETS: &[Target] = &[Target::HirRust];
+
+const fn exact_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Exact,
+        name,
+        kind,
+        targets: EXACT_TARGETS,
+    }
+}
+
+/// `exact` rows (T1-R1): the 64-bit-window integer carrier of the Rust runtime
+/// (`faber::exact`). `EXACT_STORE` is the only store-family row: the width limit
+/// applies at a store site and nowhere else.
+pub const EXACT_APPROX_INT: RuntimeItem = exact_row("approx_int", RuntimeKind::Fn);
+pub const EXACT_APPROX_F32: RuntimeItem = exact_row("approx_f32", RuntimeKind::Fn);
+pub const EXACT_APPROX_F64: RuntimeItem = exact_row("approx_f64", RuntimeKind::Fn);
+pub const EXACT_CMP_INT_FLOAT: RuntimeItem = exact_row("cmp_int_float", RuntimeKind::Fn);
+pub const EXACT_CMP_SCALED_FLOAT: RuntimeItem = exact_row("cmp_scaled_float", RuntimeKind::Fn);
+pub const EXACT_DIV: RuntimeItem = exact_row("div", RuntimeKind::Fn);
+pub const EXACT_FIT: RuntimeItem = exact_row("fit", RuntimeKind::Fn);
+pub const EXACT_INT: RuntimeItem = exact_row("int", RuntimeKind::Fn);
+pub const EXACT_POW: RuntimeItem = exact_row("pow", RuntimeKind::Fn);
+pub const EXACT_REM: RuntimeItem = exact_row("rem", RuntimeKind::Fn);
+pub const EXACT_SHL: RuntimeItem = exact_row("shl", RuntimeKind::Fn);
+pub const EXACT_SHR: RuntimeItem = exact_row("shr", RuntimeKind::Fn);
+pub const EXACT_STORE: RuntimeItem = exact_row("store", RuntimeKind::StoreFn);
+
+/// The canonical helper table. Each namespace unit adds its rows with the
+/// runtime it moves.
+pub const TABLE: &[RuntimeItem] = &[
+    EXACT_APPROX_INT,
+    EXACT_APPROX_F32,
+    EXACT_APPROX_F64,
+    EXACT_CMP_INT_FLOAT,
+    EXACT_CMP_SCALED_FLOAT,
+    EXACT_DIV,
+    EXACT_FIT,
+    EXACT_INT,
+    EXACT_POW,
+    EXACT_REM,
+    EXACT_SHL,
+    EXACT_SHR,
+    EXACT_STORE,
+];
 
 /// One runtime namespace: a module in Rust, a namespace export in TypeScript,
 /// a name prefix in Go.

@@ -258,3 +258,40 @@ fn go_imports_is_one_path_or_none() {
     refs.note(Namespace::Json);
     assert_eq!(go_imports(&refs), Some("faber/rt"));
 }
+
+#[test]
+fn the_exact_rows_spell_as_faber_exact_functions_in_rust() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Exact)
+        .collect();
+    assert_eq!(rows.len(), 13);
+    for row in rows {
+        assert_eq!(
+            spell_any(Target::HirRust, row),
+            format!("faber::exact::{}", row.name)
+        );
+    }
+}
+
+#[test]
+fn only_the_exact_store_row_is_store_family() {
+    let store_rows: Vec<&str> = TABLE
+        .iter()
+        .filter(|row| row.kind == RuntimeKind::StoreFn)
+        .map(|row| row.name)
+        .collect();
+    assert_eq!(store_rows, ["store"]);
+    assert_eq!(
+        spell(Target::HirRust, &EXACT_STORE),
+        Err(SpellError::StoreOnly)
+    );
+    assert_eq!(
+        spell_store(Target::HirRust, &EXACT_STORE, &site()),
+        Ok("faber::exact::store".to_owned())
+    );
+    assert_eq!(
+        spell_store(Target::HirRust, &EXACT_FIT, &site()),
+        Err(SpellError::NotStore)
+    );
+}
