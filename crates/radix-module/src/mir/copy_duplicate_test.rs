@@ -153,3 +153,60 @@ fn llvm_copy_param_clones_the_lista() {
         "copy parameter entry must clone the lista:\n{code}"
     );
 }
+
+const COPY_TENSOR: &str = r#"+++
+locale = "en"
++++
+main {
+    const tf32[] seed ← empty
+    var tf32[4] a ← seed.create(1.5, [4])
+    var copy tf32[4] w ← a
+    w[0] ← 9.0
+    const tf32[4] s ← w + a
+    print s[0]
+    print s[1]
+    print a[0]
+    print w[0]
+}
+"#;
+
+/// A `copy`-marked tensor keeps element write and tensor arithmetic: the
+/// marker is a binding fact, not a different carrier, and the copy stays
+/// independent of its source.
+#[test]
+fn copy_tensor_keeps_element_write_and_arithmetic() {
+    assert_eq!(run("copy-tensor.fab", COPY_TENSOR), vec!["10.5", "3.0", "1.5", "9.0"]);
+}
+
+const COPY_TENSOR_RANK2_READ: &str = r#"+++
+locale = "en"
++++
+main {
+    const tf32[] seed ← empty
+    var tf32[2, 3] a ← seed.create(1.5, [2, 3])
+    var copy tf32[2, 3] w ← a
+    a[[1, 2]] ← 7.0
+    w[[0, 1]] ← 4.0
+    const u32 r ← 1
+    const u32 c ← 2
+    const f32 lit ← w[[1, 2]] coalesce 0.0
+    const f32 var_idx ← w[[r, c]] coalesce 0.0
+    const f32 written ← w[[0, 1]] coalesce 0.0
+    const f32 source ← a[[1, 2]] coalesce 0.0
+    print lit
+    print var_idx
+    print written
+    print source
+}
+"#;
+
+/// A rank-2 `copy` tensor reads by `[[r, c]]` exactly like the unmarked
+/// binding: the list-shaped index lowers to `TensorGet`, not to a device-view
+/// index projection (which validate rejects for a non-integer index).
+#[test]
+fn copy_tensor_rank2_bracket_read_matches_unmarked() {
+    assert_eq!(
+        run("copy-tensor-rank2.fab", COPY_TENSOR_RANK2_READ),
+        vec!["1.5", "1.5", "4.0", "7.0"]
+    );
+}

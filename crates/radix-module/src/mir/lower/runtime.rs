@@ -541,8 +541,13 @@ impl FunctionBuilder<'_> {
                 .push(MirError::missing_type(expr.span, "glyph product rhs operand"));
             return None;
         };
-        let lhs_ty = self.normalized_type(lhs_ty_id).clone();
-        let rhs_ty = self.normalized_type(rhs_ty_id).clone();
+        // An access marker is a binding fact, not part of the carrier.
+        let lhs_ty = self
+            .normalized_type(self.types.peel_access_marker(lhs_ty_id).1)
+            .clone();
+        let rhs_ty = self
+            .normalized_type(self.types.peel_access_marker(rhs_ty_id).1)
+            .clone();
 
         // `⊗` outer: vector⊗vector builds the matrix-register aggregate; the
         // Kronecker forms (matrix⊗matrix / tensor⊗tensor) stay fail-closed —
@@ -617,7 +622,7 @@ impl FunctionBuilder<'_> {
                 .push(MirError::missing_type(expr.span, "glyph collection receiver"));
             return None;
         };
-        let receiver_ty = self.normalized_type(receiver_ty);
+        let receiver_ty = self.normalized_type(self.method_receiver_payload_id(receiver_ty));
         let entry = crate::intrinsics::lookup_method_for_type(receiver_ty, method_name, 1)?;
         let op = crate::intrinsics::mir_collection_op(entry)?;
         let lowered_args = vec![self.lower_expr_value(lhs)?, self.lower_expr_value(rhs)?];
