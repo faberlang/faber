@@ -1,0 +1,97 @@
++++
+term = "∈"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "hole_type", "si_stmt", "arm", "comparison", "array_literal", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "values"
+canonical = true
+summary = "Checks whether a value is in a list, set, map key set, or enum value set."
+syntax = "<expression> ∈ <collection> | <expression> ∉ <collection>"
+related = ["‥", "…"]
+locale = "en"
++++
+# =============================================================================
+# ∈ — Membership over lists, sets, map keys, and enum value sets (∈ and ∉)
+# =============================================================================
+#
+# What this teaches:
+#   • `∈` is true when the left value is in the right collection; `∉` is its negation.
+#   • The right operand may be a list, a set, or a map (the test is on the keys).
+#   • An enum value set is a list of enum members: `c ∈ [Color.rubrum, Color.viridis]`.
+#
+# Common mistakes:
+#   • Using `∈` or `∉` with text on the right — they never apply to text; use `contains` for a substring test.
+#   • Using `∈` with a scalar, nullable, or unresolved empty `[]` right operand — each is rejected.
+#
+# See also: ‥, …
+# =============================================================================
+
+# ∈ / ∉ — membership in list, set, map key, and enum value set
+#
+# <expr> ∈ <lista | copia | tabula | [enum members]>
+# <expr> ∉ <lista | copia | tabula | [enum members]>
+#
+# GRAMMAR:
+#   membershipExpr :← expr ('∈' | '∉') expr
+#
+# EXPECTED OUTPUT:
+#   list in
+#   list out
+#   set in
+#   set out
+#   map key in
+#   map key out
+#   enum in
+#   enum out
+
+enum Color {
+    rubrum,
+    viridis,
+    caeruleum
+}
+
+fn classify(Color c) → void {
+    if c ∈ [Color.rubrum, Color.viridis] {
+        print "enum in"
+    }
+    if c ∉ [Color.rubrum, Color.caeruleum] {
+        print "enum out"
+    }
+}
+
+main {
+    # list
+    const list<int> primi ← [2, 3, 5, 7]
+    if 5 ∈ primi {
+        print "list in"
+    }
+    if 4 ∉ primi {
+        print "list out"
+    }
+
+    # set
+    var set<string> visi ← empty
+    visi.add("alpha")
+    visi.add("beta")
+    if "alpha" ∈ visi {
+        print "set in"
+    }
+    if "gamma" ∉ visi {
+        print "set out"
+    }
+
+    # map: the test is on the keys
+    var map<string, int> puncta ← empty
+    puncta["alpha"] ← 1
+    puncta["beta"] ← 2
+    const string present ← "beta"
+    const string absent ← "gamma"
+    if present ∈ puncta {
+        print "map key in"
+    }
+    if absent ∉ puncta {
+        print "map key out"
+    }
+
+    # enum value set: a list of enum members
+    classify(Color.viridis)
+}

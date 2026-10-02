@@ -1,7 +1,8 @@
 # corpus/variant-cells.toml — claimable variant-cell ledger (hand-maintained).
 #
-# One row per claimable variant cell across the six high-arity families
-# (itera / summa / bounded-conversio / annotations / casts / closures).
+# One row per claimable variant cell across the high-arity families
+# (itera / summa / bounded-conversio / annotations / casts / closures /
+# await-assignment / membership).
 # Enumeration sourced from the 2026-08-25 variant-level corpus census
 # (24b52ef3) and verified against live corpus state (413 .fab / 279 .expected
 # at landing, 2026-08-26). The 441-cell conversio family×family matrix
@@ -11,7 +12,8 @@
 #
 # Row fields:
 #   id        stable cell identifier (unique, never reused)
-#   family    itera | summa | bounded-conversio | annotations | casts | closures
+#   family    itera | summa | bounded-conversio | annotations | casts | closures |
+#             await-assignment | membership
 #   cell      human-readable cell descriptor
 #   status    direct       — a corpus exemplum teaches the cell (run/lane proven)
 #             unit-proven  — proven only in semantic unit tests; zero corpus
@@ -1279,3 +1281,98 @@ exemplum = "await-assignment/await-assignment.fab"
 expected = true
 required = true
 note = "exemplum runs three awaited declarations and prints each resolved value"
+
+# =============================================================================
+# membership (∈ / ∉ over lists, sets, map keys, enum value sets, ranges)
+# =============================================================================
+
+[[cells]]
+id = "membership.lista"
+family = "membership"
+cell = "x ∈ lista<T>"
+status = "direct"
+exemplum = "operatores/membership-values.fab"
+expected = true
+required = true
+note = "membership-values.fab pins the in-list case"
+
+[[cells]]
+id = "membership.copia"
+family = "membership"
+cell = "x ∈ copia<T> (set)"
+status = "direct"
+exemplum = "operatores/membership-values.fab"
+expected = true
+required = true
+note = "membership-values.fab pins the in-set case"
+
+[[cells]]
+id = "membership.tabula-key"
+family = "membership"
+cell = "k ∈ tabula<K,V> (key test)"
+status = "direct"
+exemplum = "operatores/membership-values.fab"
+expected = true
+required = true
+note = "membership-values.fab pins the map-key case"
+
+[[cells]]
+id = "membership.enum-value-set"
+family = "membership"
+cell = "c ∈ [Color.a, Color.b] (enum value set)"
+status = "direct"
+exemplum = "operatores/membership-values.fab"
+expected = true
+required = true
+note = "membership-values.fab pins the enum value set through a function parameter"
+
+[[cells]]
+id = "membership.negated"
+family = "membership"
+cell = "x ∉ collection (list, set, map key, enum value set)"
+status = "direct"
+exemplum = "operatores/membership-values.fab"
+expected = true
+required = true
+note = "membership-values.fab pins the negated form over each collection shape"
+
+[[cells]]
+id = "membership.range"
+family = "membership"
+cell = "x ∈ lo‥hi / lo…hi / lo before hi (range containment)"
+status = "direct"
+exemplum = "operatores/membership-range.fab"
+expected = false
+note = "stdout is not pinned: range containment has no MIR lowering, so the runner rejects it (OD-4, want)"
+
+[[cells]]
+id = "membership.reject.scalar"
+family = "membership"
+cell = "REJECT: scalar right operand (x ∈ 5)"
+status = "unit-proven"
+decline = true
+note = "SEM010:membership_requires_collection; crates/radix-module/src/semantic/passes/typecheck/membership_glyph_test.rs scalar_right_operand_is_rejected_with_its_type"
+
+[[cells]]
+id = "membership.reject.nullable"
+family = "membership"
+cell = "REJECT: nullable collection right operand"
+status = "unit-proven"
+decline = true
+note = "SEM010:membership_requires_collection; crates/radix-module/src/semantic/passes/typecheck/membership_test.rs nullable_list_right_operand_rejects"
+
+[[cells]]
+id = "membership.reject.unresolved-empty"
+family = "membership"
+cell = "REJECT: unresolved empty list right operand (x ∈ [])"
+status = "unit-proven"
+decline = true
+note = "SEM010:membership_operand_unresolved; membership_glyph_test.rs empty_list_right_operand_is_unresolved_in_both_polarities"
+
+[[cells]]
+id = "membership.reject.mixed-list"
+family = "membership"
+cell = "REJECT: mixed enum/scalar value set"
+status = "unit-proven"
+decline = true
+note = "SEM010:common_type_mismatch; membership_glyph_test.rs mixed_value_set_fails_common_type"

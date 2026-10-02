@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 295,
-    "analyzable": 368
+    "capable": 296,
+    "analyzable": 369
   },
   "terms": [
     {
@@ -516,8 +516,8 @@
     {
       "term": "∈",
       "rule": "operator-group",
-      "capable": 0,
-      "analyzable": 0
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "instans",

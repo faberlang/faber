@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 262,
-    "analyzable": 368
+    "analyzable": 369
   },
   "terms": [
     {
@@ -517,7 +517,7 @@
       "term": "∈",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 0
+      "analyzable": 1
     },
     {
       "term": "instans",
