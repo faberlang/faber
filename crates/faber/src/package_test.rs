@@ -8093,7 +8093,7 @@ name = "bad-target"
 entry = "main.fab"
 
 [build]
-target = "cobol"
+target = "ada"
 "#,
     )
     .expect("write manifest");
@@ -8103,7 +8103,7 @@ target = "cobol"
     assert!(result.diagnostics.iter().any(|diag| diagnostic_has_issue(
         diag,
         "package_build_target_unsupported"
-    ) && diagnostic_has_arg(diag, "target", "cobol")));
+    ) && diagnostic_has_arg(diag, "target", "ada")));
 }
 
 #[test]
@@ -8124,7 +8124,7 @@ name = "lib-target"
 
 [build]
 kind = "lib"
-target = "cobol"
+target = "ada"
 targets = ["rust"]
 
 [library]

@@ -183,6 +183,14 @@ fn cli_parses_emit_external_target_names() {
         ("metal-text", FaberCliTarget::MirMetal),
         ("wgsl-text", FaberCliTarget::MirWgsl),
         ("sexp", FaberCliTarget::MirSexp),
+        ("basic", FaberCliTarget::MirBasic),
+        ("bas", FaberCliTarget::MirBasic),
+        ("pascal", FaberCliTarget::HirPascal),
+        ("pas", FaberCliTarget::HirPascal),
+        ("cobol", FaberCliTarget::HirCobol),
+        ("cob", FaberCliTarget::HirCobol),
+        ("fortran", FaberCliTarget::HirFortran),
+        ("f90", FaberCliTarget::HirFortran),
     ] {
         let cli = Cli::try_parse_from(["faber", "emit", "-t", name, "main.fab"])
             .unwrap_or_else(|err| panic!("parse emit target {name}: {err}"));

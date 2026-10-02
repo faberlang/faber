@@ -227,7 +227,7 @@ fn build_target_trims_spelling() {
 
 #[test]
 fn build_target_rejects_unsupported_spelling() {
-    let err = manifest_build_target(Some("cobol"), Path::new("faber.toml"))
+    let err = manifest_build_target(Some("ada"), Path::new("faber.toml"))
         .expect_err("unsupported value must fail closed");
     assert_eq!(err.code, Some("PKG001"));
     assert_eq!(err.issue(), Some("package_build_target_unsupported"));
@@ -236,7 +236,7 @@ fn build_target_rejects_unsupported_spelling() {
             .iter()
             .find(|arg| arg.name == "target")
             .map(|arg| arg.value.as_str()),
-        Some("cobol")
+        Some("ada")
     );
     // The diagnostic names the accepted vocabulary (S09-7): a rejected
     // spelling must tell the declarer what the manifest does accept.
@@ -268,6 +268,10 @@ fn build_target_accepts_the_cli_vocabulary() {
         ("metal-text", Target::MirMetal),
         ("wgsl-text", Target::MirWgsl),
         ("sexp", Target::MirSexp),
+        ("basic", Target::MirBasic),
+        ("pascal", Target::HirPascal),
+        ("cobol", Target::HirCobol),
+        ("fortran", Target::HirFortran),
     ] {
         assert_eq!(
             manifest_build_target(Some(spelling), Path::new("faber.toml"))
