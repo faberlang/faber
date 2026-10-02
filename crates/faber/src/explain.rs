@@ -49,6 +49,10 @@ pub struct Entry {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub examples: Vec<String>,
 
+    /// Grammar production ids the exemplum exercises, from its front matter.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub grammar: Vec<String>,
+
     /// Alternate query terms that resolve to this entry without legacy status.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub aliases: Vec<String>,

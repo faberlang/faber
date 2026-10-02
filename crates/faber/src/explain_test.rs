@@ -136,6 +136,31 @@ fn render_json_is_valid() {
 }
 
 #[test]
+fn render_json_carries_exemplum_grammar_ids() {
+    let registry = disk_registry();
+    let lookup = registry.lookup("ab").expect("lookup ab");
+    let rendered = render_json(&lookup).expect("json renders");
+    let value: serde_json::Value = serde_json::from_str(&rendered).expect("valid json");
+    let grammar = value["grammar"].as_array().expect("grammar array");
+    let ids: Vec<&str> = grammar.iter().filter_map(|id| id.as_str()).collect();
+    assert_eq!(ids.first(), Some(&"fab_file"));
+    assert!(ids.contains(&"itera_stmt"));
+    assert!(ids.contains(&"range_expr"));
+}
+
+#[test]
+fn render_json_omits_grammar_when_entry_has_none() {
+    let registry = disk_registry();
+    // The legacy redirect entry has no exemplum, so it declares no grammar ids;
+    // its canonical target still does.
+    let lookup = registry.lookup("==").expect("lookup legacy equality");
+    let rendered = render_json(&lookup).expect("json renders");
+    let value: serde_json::Value = serde_json::from_str(&rendered).expect("valid json");
+    assert!(value["entry"].get("grammar").is_none());
+    assert!(value["canonical"].get("grammar").is_some());
+}
+
+#[test]
 fn load_aliases_disk_registry_entry_point() {
     let _guard = env_lock();
     let previous = std::env::var(crate::reference::REFERENCE_ROOT_ENV).ok();

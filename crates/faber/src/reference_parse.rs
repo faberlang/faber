@@ -15,6 +15,8 @@ struct ExemplaFrontmatter {
     summary: Option<String>,
     syntax: Option<String>,
     #[serde(default)]
+    grammar: Vec<String>,
+    #[serde(default)]
     aliases: Vec<String>,
     #[serde(default)]
     related: Vec<String>,
@@ -68,6 +70,7 @@ pub fn entry_from_exempla(
         summary,
         syntax,
         examples: Vec::new(),
+        grammar: fm.grammar,
         aliases,
         legacy: Vec::new(),
         canonical_term: fm.canonical_term,
@@ -97,6 +100,7 @@ pub fn legacy_entry_from_redirect(
         summary: normalize_summary(message.to_owned()),
         syntax: canonical_entry.syntax.clone(),
         examples: Vec::new(),
+        grammar: Vec::new(),
         aliases: Vec::new(),
         legacy: Vec::new(),
         canonical_term: Some(canonical.to_owned()),
