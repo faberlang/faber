@@ -56,6 +56,10 @@ mod await_store_emit_test;
 #[path = "indexed_apud_emit_test.rs"]
 mod indexed_apud_emit_test;
 
+#[cfg(all(test, feature = "hir-rust"))]
+#[path = "rust_half_float_cell_test.rs"]
+mod rust_half_float_cell_test;
+
 #[cfg(test)]
 #[path = "saturating_fuzzy_incdec_emit_test.rs"]
 mod saturating_fuzzy_incdec_emit_test;
@@ -819,17 +823,21 @@ fn reject_rust_unsupported_types(types: &TypeTable) -> Result<(), CodegenError> 
             reason = "TypeId is u32 by design; type_count is bounded by u32::MAX"
         )]
         let ty = TypeId(index as u32);
-        if matches!(types.get(ty), Type::SizedNumeric(Primitive::Fractus, NumericWidth::F16)) {
+        // N7e: a float cell is the bare float of its width, so a half-width
+        // cell fails closed with the bare half float's named issue.
+        if let Type::SizedNumeric(Primitive::Fractus, width) | Type::PolicyFloat(_, width) = types.get(ty)
+            && matches!(width, NumericWidth::F16 | NumericWidth::BF16)
+        {
+            let issue = match width {
+                NumericWidth::F16 => "rust_target_fractus_f16_unsupported",
+                _ => "rust_target_fractus_bf16_unsupported",
+            };
             return Err(CodegenError {
-                message: "Rust target does not support f16 until a half-float runtime representation exists".to_owned(),
-                args: vec![DiagnosticArg::new("issue", "rust_target_fractus_f16_unsupported")],
-            });
-        }
-        if matches!(types.get(ty), Type::SizedNumeric(Primitive::Fractus, NumericWidth::BF16)) {
-            return Err(CodegenError {
-                message: "Rust target does not support bf16 until a half-float runtime representation exists"
-                    .to_owned(),
-                args: vec![DiagnosticArg::new("issue", "rust_target_fractus_bf16_unsupported")],
+                message: format!(
+                    "Rust target does not support {} until a half-float runtime representation exists",
+                    width.faber_marker()
+                ),
+                args: vec![DiagnosticArg::new("issue", issue)],
             });
         }
         if matches!(types.get(ty), Type::Atomic(_)) {
