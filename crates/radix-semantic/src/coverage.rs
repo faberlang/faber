@@ -185,7 +185,7 @@ fn classify_rust(_hir: &HirModule, types: &TypeTable) -> Lowerability {
 /// ad expression; Rust-only feature" }`). It also rejects matrix and vector
 /// types that have no Go representation (`types::type_to_go` returns
 /// `unsupported` for both). Tensor and sparsa are representable in Go
-/// (`faberTensor[...]` / `faberSparsa[...]`) and are not rejected here.
+/// (`rt.TensorTensor[...]` / `rt.SparsaSparsa[...]`) and are not rejected here.
 fn classify_go(hir: &HirModule, types: &TypeTable) -> Lowerability {
     let mut gaps = Vec::new();
 
