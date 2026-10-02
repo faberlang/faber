@@ -463,6 +463,34 @@ fn the_inf_rows_spell_as_inf_namespace_members_in_typescript() {
 }
 
 #[test]
+fn the_format_rows_spell_as_format_namespace_members_in_typescript() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Format && row.targets.contains(&Target::HirTypeScript))
+        .collect();
+    // The six exported renderers of `format.ts`, all shared with Rust and Go;
+    // `magnus` and `magnus_sci` are the Rust/Go `inf` renderers (TypeScript
+    // renders a `bigint` through `int`), so they are not here.
+    assert_eq!(rows.len(), 6);
+    for row in &rows {
+        assert_eq!(row.kind, RuntimeKind::Fn, "{}", row.name);
+        assert!(row.targets.contains(&Target::HirRust), "{}", row.name);
+        assert!(row.targets.contains(&Target::HirGo), "{}", row.name);
+    }
+    let mut spelled: Vec<String> = rows
+        .iter()
+        .map(|row| spell_any(Target::HirTypeScript, row))
+        .collect();
+    spelled.sort_unstable();
+    let mut expected: Vec<String> = ["float", "instans", "int", "pad", "sci", "text"]
+        .iter()
+        .map(|name| format!("format.{name}"))
+        .collect();
+    expected.sort_unstable();
+    assert_eq!(spelled, expected);
+}
+
+#[test]
 fn the_regex_rows_spell_as_faber_regex_functions_in_rust() {
     let rows: Vec<&RuntimeItem> = TABLE
         .iter()

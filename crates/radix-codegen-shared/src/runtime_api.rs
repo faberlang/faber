@@ -389,11 +389,13 @@ pub const INF_TO_NUMBER: RuntimeItem = inf_row("to_number", RuntimeKind::Fn, INF
 pub const INF_CLAMP: RuntimeItem = inf_row("clamp", RuntimeKind::StoreFn, INF_TS);
 
 /// The targets whose runtime package carries each `format` row: the Rust
-/// runtime (`faber::format`) and the Go runtime (`rt.Format*`) share the
-/// renderers whose id and meaning match.
+/// runtime (`faber::format`), the Go runtime (`rt.Format*`) and the TypeScript
+/// runtime (`format` in `@faber/runtime`, T1-T5) share the renderers whose id
+/// and meaning match.
 const FORMAT_RUST: &[Target] = &[Target::HirRust];
 const FORMAT_GO: &[Target] = &[Target::HirGo];
 const FORMAT_RUST_GO: &[Target] = &[Target::HirRust, Target::HirGo];
+const FORMAT_RUST_GO_TS: &[Target] = &[Target::HirRust, Target::HirTypeScript, Target::HirGo];
 
 const fn format_row(
     name: &'static str,
@@ -412,21 +414,24 @@ const fn format_row(
 /// runtime (`faber::format`) and the Go runtime (`rt.Format*`). The decomposed
 /// layout spec a call site builds as a struct literal is a type: `FORMAT_FMT`
 /// (`faber::Fmt`, crate-root) in Rust and `FORMAT_SPEC` (`rt.FormatSpec`) in Go;
-/// the rest are functions. `MAGNUS` and `MAGNUS_SCI` render an unbounded `inf`.
+/// the rest are functions. `MAGNUS` and `MAGNUS_SCI` render an unbounded `inf`
+/// (TypeScript renders a `bigint` through `int`, so it has no such rows). The
+/// TypeScript runtime also declares a structural `format.Spec` type; generated
+/// TypeScript passes an object literal and never names it, so it has no row.
 /// Width limits do not apply here: a renderer lays out text, it never stores
 /// into a bounded cell.
 pub const FORMAT_FMT: RuntimeItem = format_row("Fmt", RuntimeKind::Type, FORMAT_RUST);
 pub const FORMAT_SPEC: RuntimeItem = format_row("Spec", RuntimeKind::Type, FORMAT_GO);
-pub const FORMAT_FLOAT: RuntimeItem = format_row("float", RuntimeKind::Fn, FORMAT_RUST_GO);
-pub const FORMAT_INSTANS: RuntimeItem = format_row("instans", RuntimeKind::Fn, FORMAT_RUST_GO);
-pub const FORMAT_INT: RuntimeItem = format_row("int", RuntimeKind::Fn, FORMAT_RUST_GO);
+pub const FORMAT_FLOAT: RuntimeItem = format_row("float", RuntimeKind::Fn, FORMAT_RUST_GO_TS);
+pub const FORMAT_INSTANS: RuntimeItem = format_row("instans", RuntimeKind::Fn, FORMAT_RUST_GO_TS);
+pub const FORMAT_INT: RuntimeItem = format_row("int", RuntimeKind::Fn, FORMAT_RUST_GO_TS);
 pub const FORMAT_MAGNUS: RuntimeItem = format_row("magnus", RuntimeKind::Fn, FORMAT_RUST_GO);
 pub const FORMAT_MAGNUS_SCI: RuntimeItem =
     format_row("magnus_sci", RuntimeKind::Fn, FORMAT_RUST_GO);
-pub const FORMAT_PAD: RuntimeItem = format_row("pad", RuntimeKind::Fn, FORMAT_RUST_GO);
-pub const FORMAT_SCI: RuntimeItem = format_row("sci", RuntimeKind::Fn, FORMAT_RUST_GO);
+pub const FORMAT_PAD: RuntimeItem = format_row("pad", RuntimeKind::Fn, FORMAT_RUST_GO_TS);
+pub const FORMAT_SCI: RuntimeItem = format_row("sci", RuntimeKind::Fn, FORMAT_RUST_GO_TS);
 pub const FORMAT_SIGNED: RuntimeItem = format_row("signed", RuntimeKind::Fn, FORMAT_GO);
-pub const FORMAT_TEXT: RuntimeItem = format_row("text", RuntimeKind::Fn, FORMAT_RUST_GO);
+pub const FORMAT_TEXT: RuntimeItem = format_row("text", RuntimeKind::Fn, FORMAT_RUST_GO_TS);
 
 /// The targets whose runtime package carries each `regex` row. Rows differ by
 /// target: the Rust runtime carries the match operations as free functions in
