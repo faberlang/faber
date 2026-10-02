@@ -36,7 +36,6 @@ impl KeywordSurface for TestSurface {
             TokenKind::Incipit => "incipit",
             TokenKind::Functio => "functio",
             TokenKind::Redde => "redde",
-            TokenKind::Sic => "sic",
             TokenKind::Secus => "secus",
             TokenKind::Si => "si",
             TokenKind::Ergo => "ergo",

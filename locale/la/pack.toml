@@ -27,7 +27,6 @@ immutata = "immutata"
 interna = "interna"
 magnitudo = "magnitudo"
 optiones = "optiones"
-prae = "prae"
 privata = "privata"
 protecta = "protecta"
 publica = "publica"
@@ -44,7 +43,6 @@ itera = "itera"
 apud = "apud"
 secus = "secus"
 si = "si"
-sic = "sic"
 sin = "sin"
 perge = "perge"
 redde = "redde"
@@ -121,10 +119,6 @@ tag = "tag"
 temporis = "temporis"
 # D23.4 dropped the retired `nulla` predicate row: `nulla` is now the null
 # value literal declared in the Values-and-logic group above.
-negativum = "negativum"
-nonnihil = "nonnihil"
-nonnulla = "nonnulla"
-positivum = "positivum"
 # Contextual keywords (token_kind: None): recognized by spelling in parser-owned
 # grammar slots; not globally reserved lexer tokens.
 ab = "ab"
@@ -772,7 +766,7 @@ message = "'c ? a : b' was removed; write 'c ✓ a ✗ b'"
 help = "the value conditional is 'c ✓ a ✗ b' (U+2713, U+2717) in every locale"
 
 [diagnostics.PARSE030.issues.conditional_sic_removed]
-message = "'c {sic} a {secus} b' was removed; write 'c ✓ a ✗ b'"
+message = "'c sic a secus b' was removed; write 'c ✓ a ✗ b'"
 help = "the value conditional is 'c ✓ a ✗ b' (U+2713, U+2717) in every locale"
 
 [diagnostics.PARSE030.issues.recovery_uses_exit_arrow]

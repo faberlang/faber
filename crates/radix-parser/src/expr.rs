@@ -237,7 +237,7 @@ impl Parser {
     /// recurses through this tier so a chained `✗ d ✓ …` reaches that named
     /// diagnostic instead of a leftover-token error. The removed spellings
     /// `? :` and `sic … secus` (D4.7) get migration diagnostics here; `sic`
-    /// stays a reserved word that carries it.
+    /// is an ordinary identifier recognised by its text alone.
     fn parse_ternary(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         let first_inner_id = self.next_node_id;
@@ -249,11 +249,31 @@ impl Parser {
         if self.check(&TokenKind::Question) {
             return Err(self.invalid_expression_error("conditional_question_colon_removed"));
         }
-        if self.check_keyword_ident(TokenKind::Sic) {
+        if self.at_retired_sic_conditional() {
             return Err(self.invalid_expression_error("conditional_sic_removed"));
         }
 
         Ok(cond)
+    }
+
+    /// Whether the current word is the retired `sic` of `c sic a secus b`.
+    ///
+    /// FABER-2-SUNSET: delete with the retired-word diagnostics.
+    ///
+    /// `sic` left the keyword registry (KW-1), so it is recognised by identifier
+    /// text, in the spelling each reader pack gave it. The shape guard keeps a
+    /// variable that happens to be named `sic` legal: the word must sit on the
+    /// operand's line and be followed by a token that starts a value.
+    fn at_retired_sic_conditional(&self) -> bool {
+        // FABER-2-SUNSET: delete with the retired-word diagnostics.
+        const RETIRED_SIC_SPELLINGS: [&str; 8] =
+            ["sic", "yields", "乃", "如此", "thế", "فإذا", "ऐसा", "เช่นนั้น"];
+        let TokenKind::Ident(sym) = self.peek().kind else {
+            return false;
+        };
+        RETIRED_SIC_SPELLINGS.contains(&self.interner.resolve(sym))
+            && !self.raw_newline_before_next_word()
+            && Self::can_start_expression(&self.peek_at(1).kind)
     }
 
     /// Finish `cond ✓ then ✗ else` after the `✓` (D4.5, D4.6).
@@ -850,9 +870,6 @@ impl Parser {
                 | TokenKind::Minus
                 | TokenKind::BitwiseNot
                 | TokenKind::Nulla
-                | TokenKind::Nonnulla
-                | TokenKind::Negativum
-                | TokenKind::Positivum
                 | TokenKind::Cede
         )
     }

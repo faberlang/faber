@@ -131,7 +131,6 @@ pub enum TokenKind {
     Immutata,
     Interna,
     Optiones,
-    Prae,
     Privata,
     Protecta,
     Publica,
@@ -148,7 +147,6 @@ pub enum TokenKind {
     Itera,
     Secus,
     Si,
-    Sic,
     Sin,
     // === Keywords: Transfer ===
     Perge,
@@ -257,12 +255,8 @@ pub enum TokenKind {
     SolumIn,
     Tag,
     Temporis,
-    // === Keywords: Nullability ===
-    Negativum,
-    Nonnihil,
-    Nonnulla,
+    // === Keywords: Null literal ===
     Nulla,
-    Positivum,
     // === Declaration markers (post-name) ===
     Sponte,
 
@@ -411,7 +405,6 @@ impl TokenKind {
                 | Immutata
                 | Interna
                 | Optiones
-                | Prae
                 | Privata
                 | Protecta
                 | Publica
@@ -427,7 +420,6 @@ impl TokenKind {
                 | Itera
                 | Secus
                 | Si
-                | Sic
                 | Sin
                 | Perge
                 | Redde
@@ -498,11 +490,7 @@ impl TokenKind {
                 | SolumIn
                 | Tag
                 | Temporis
-                | Negativum
-                | Nonnihil
-                | Nonnulla
                 | Nulla
-                | Positivum
                 | Sponte
                 | Ab
                 | Fiet

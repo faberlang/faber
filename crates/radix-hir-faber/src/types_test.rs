@@ -25,7 +25,6 @@ impl KeywordSurface for LatinSurface {
             TokenKind::Copy => "copy",
             TokenKind::Functio => "functio",
             TokenKind::Redde => "redde",
-            TokenKind::Sic => "sic",
             TokenKind::Secus => "secus",
             TokenKind::Si => "si",
             TokenKind::Sin => "sin",
