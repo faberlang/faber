@@ -98,8 +98,12 @@ const fn exact_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
 }
 
 /// `exact` rows (T1-R1): the 64-bit-window integer carrier of the Rust runtime
-/// (`faber::exact`). `EXACT_STORE` is the only store-family row: the width limit
-/// applies at a store site and nowhere else.
+/// (`faber::exact`). `EXACT_STORE` and `EXACT_STORE_INFERRED` are the only
+/// store-family rows: the width limit applies at a store site and nowhere else.
+/// `EXACT_ADD`, `EXACT_SUB` and `EXACT_MUL` (T1-R6) check the representation
+/// window only, so they are plain rows (an unstored computation has no store
+/// site to witness).
+pub const EXACT_ADD: RuntimeItem = exact_row("add", RuntimeKind::Fn);
 pub const EXACT_APPROX_INT: RuntimeItem = exact_row("approx_int", RuntimeKind::Fn);
 pub const EXACT_APPROX_F32: RuntimeItem = exact_row("approx_f32", RuntimeKind::Fn);
 pub const EXACT_APPROX_F64: RuntimeItem = exact_row("approx_f64", RuntimeKind::Fn);
@@ -108,11 +112,14 @@ pub const EXACT_CMP_SCALED_FLOAT: RuntimeItem = exact_row("cmp_scaled_float", Ru
 pub const EXACT_DIV: RuntimeItem = exact_row("div", RuntimeKind::Fn);
 pub const EXACT_FIT: RuntimeItem = exact_row("fit", RuntimeKind::Fn);
 pub const EXACT_INT: RuntimeItem = exact_row("int", RuntimeKind::Fn);
+pub const EXACT_MUL: RuntimeItem = exact_row("mul", RuntimeKind::Fn);
 pub const EXACT_POW: RuntimeItem = exact_row("pow", RuntimeKind::Fn);
 pub const EXACT_REM: RuntimeItem = exact_row("rem", RuntimeKind::Fn);
 pub const EXACT_SHL: RuntimeItem = exact_row("shl", RuntimeKind::Fn);
 pub const EXACT_SHR: RuntimeItem = exact_row("shr", RuntimeKind::Fn);
 pub const EXACT_STORE: RuntimeItem = exact_row("store", RuntimeKind::StoreFn);
+pub const EXACT_STORE_INFERRED: RuntimeItem = exact_row("store_inferred", RuntimeKind::StoreFn);
+pub const EXACT_SUB: RuntimeItem = exact_row("sub", RuntimeKind::Fn);
 
 /// The targets whose runtime package carries the `dec` namespace today.
 const DEC_TARGETS: &[Target] = &[Target::HirRust];
@@ -328,6 +335,7 @@ pub const TABLE: &[RuntimeItem] = &[
     DISPLAY_TEXT_PAYLOAD,
     DISPLAY_VALOR,
     DISPLAY_VERUM,
+    EXACT_ADD,
     EXACT_APPROX_INT,
     EXACT_APPROX_F32,
     EXACT_APPROX_F64,
@@ -336,11 +344,14 @@ pub const TABLE: &[RuntimeItem] = &[
     EXACT_DIV,
     EXACT_FIT,
     EXACT_INT,
+    EXACT_MUL,
     EXACT_POW,
     EXACT_REM,
     EXACT_SHL,
     EXACT_SHR,
     EXACT_STORE,
+    EXACT_STORE_INFERRED,
+    EXACT_SUB,
     FORMAT_FMT,
     FORMAT_FLOAT,
     FORMAT_INSTANS,

@@ -92,7 +92,7 @@ fn decimal_fuzzy_operand_is_unscaled_on_every_backend() {
 fn rust_list_element_inc_dec_is_one_checked_store() {
     let code = emit(Target::HirRust, INC_DEC);
     assert!(
-        code.contains("faber::exact::store::<u8>((*") && code.contains(" as i128) + 1, \"assignment\", \"\")"),
+        code.contains("faber::exact::store::<u8>((*") && code.contains(" as i128) + 1, \"assignment\")"),
         "{code}"
     );
     assert!(!code.contains(").cloned().expect(\"lista index trap\") += 1"), "{code}");

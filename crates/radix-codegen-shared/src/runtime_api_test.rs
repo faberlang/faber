@@ -296,7 +296,7 @@ fn the_exact_rows_spell_as_faber_exact_functions_in_rust() {
         .iter()
         .filter(|row| row.ns == Namespace::Exact)
         .collect();
-    assert_eq!(rows.len(), 13);
+    assert_eq!(rows.len(), 17);
     for row in rows {
         assert_eq!(
             spell_any(Target::HirRust, row),
@@ -334,7 +334,11 @@ fn only_the_exact_and_inf_store_rows_are_store_family() {
         .collect();
     assert_eq!(
         store_rows,
-        [(Namespace::Exact, "store"), (Namespace::Inf, "store")]
+        [
+            (Namespace::Exact, "store"),
+            (Namespace::Exact, "store_inferred"),
+            (Namespace::Inf, "store")
+        ]
     );
     assert_eq!(
         spell_store(Target::HirRust, &INF_STORE, &site()),
@@ -351,6 +355,14 @@ fn only_the_exact_and_inf_store_rows_are_store_family() {
     assert_eq!(
         spell_store(Target::HirRust, &EXACT_STORE, &site()),
         Ok("faber::exact::store".to_owned())
+    );
+    assert_eq!(
+        spell_store(Target::HirRust, &EXACT_STORE_INFERRED, &site()),
+        Ok("faber::exact::store_inferred".to_owned())
+    );
+    assert_eq!(
+        spell(Target::HirRust, &EXACT_MUL),
+        Ok("faber::exact::mul".to_owned())
     );
     assert_eq!(
         spell_store(Target::HirRust, &EXACT_FIT, &site()),

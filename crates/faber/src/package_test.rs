@@ -14675,7 +14675,7 @@ fn web4_lib_kind_package_emits_a_library_crate() {
     // Exact-integer helpers live in the `faber` crate: the module calls them
     // and carries no copy.
     assert!(
-        lib_rs.contains("faber::exact::int(") && !lib_rs.contains("fn __faber_int"),
+        lib_rs.contains("faber::exact::add(") && !lib_rs.contains("fn __faber_int"),
         "module calls faber::exact"
     );
 }
