@@ -147,8 +147,8 @@ fn load_aliases_disk_registry_entry_point() {
     let registry = Registry::load().expect("load via disk entry point");
     // 216 → 210 → 211 → 210: the registry follows the canonical term count
     // (197) plus the legacy redirects (13). The `nulla` redirect retired with
-    // D23.4 (8c5cc3de4), so 197 + 13 = 210; see reference_test for history.
-    assert_eq!(registry.entries().len(), 210);
+    // D23.4 (8c5cc3de4), so 196 + 13 = 209 (mg5a folds inter+intra into one term); see reference_test for history.
+    assert_eq!(registry.entries().len(), 209);
 
     if let Some(value) = previous {
         // SAFETY: serialized by env_lock(); edition 2024 marks env mutation unsafe.
