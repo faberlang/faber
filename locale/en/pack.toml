@@ -2074,6 +2074,10 @@ help = "make the expression type match the expected type"
 message = "argument type mismatch"
 help = "make the expression type match the expected type"
 
+[diagnostics.SEM010.issues.mut_argument_type_mismatch]
+message = "argument type differs from the mutable parameter type"
+help = "a store through a mutable parameter lands in the caller's cell, so pass a variable of exactly the parameter's type"
+
 [diagnostics.SEM010.issues.callee_not_callable]
 message = "callee is not callable"
 help = "make the expression type match the expected type"

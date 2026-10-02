@@ -358,3 +358,46 @@ incipit {
         result.diagnostics
     );
 }
+
+#[test]
+fn narrower_cell_passed_to_wider_mut_param_is_rejected() {
+    let source = r"
+functio setit(in numerus x) → vacuum {
+    x ← 300
+}
+incipit {
+    varia u8 small ← 7
+    setit(small)
+    nota small
+}
+";
+    assert_rejects_with_issue(source, "mut_argument_type_mismatch");
+}
+
+#[test]
+fn exact_width_cell_passed_to_mut_param_is_accepted() {
+    let _ = analyze_ok(
+        r"
+functio setit(in u8 x) → vacuum {
+    x ← 200
+}
+incipit {
+    varia u8 small ← 7
+    setit(small)
+    nota small
+}
+",
+    );
+    let _ = analyze_ok(
+        r"
+functio setit(in numerus x) → vacuum {
+    x ← 300
+}
+incipit {
+    varia numerus big ← 7
+    setit(big)
+    nota big
+}
+",
+    );
+}
