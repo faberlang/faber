@@ -81,8 +81,9 @@ class C {
     }
 }
 fn bumpcopy(copy C c) → void {
-    c.inc()
-    print c.n
+    var C mine ← c
+    mine.inc()
+    print mine.n
 }
 main {
     var C c ← C {}
@@ -95,6 +96,33 @@ main {
 #[test]
 fn copy_genus_param_leaves_caller_untouched() {
     assert_eq!(run("copy-genus-param.fab", COPY_GENUS_PARAM), vec!["2", "1"]);
+}
+
+/// `copy` marks how a binding is initialized, never the binding afterwards:
+/// a later `b ← c` of a class value is by reference even though `b` was
+/// declared `copy` (operator ruling 2026-10-02). `a` stays untouched, and the
+/// write through `b` lands on `c`.
+const COPY_BIND_THEN_ASSIGN: &str = r#"+++
+locale = "en"
++++
+class Point {
+    var int x
+}
+main {
+    const Point a ← Point { x = 1 }
+    const Point c ← Point { x = 2 }
+    var copy Point b ← a
+    b ← c
+    b.x ← 5
+    print a.x
+    print b.x
+    print c.x
+}
+"#;
+
+#[test]
+fn copy_applies_at_the_initializer_only_and_later_assignment_aliases() {
+    assert_eq!(run("copy-assign.fab", COPY_BIND_THEN_ASSIGN), vec!["1", "5", "5"]);
 }
 
 const GENUS_BIND_ALIAS: &str = r#"+++

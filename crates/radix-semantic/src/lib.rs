@@ -778,7 +778,7 @@ pub fn analyze_with_cli(
         diagnostics.extend(e);
     }
 
-    if let Err(e) = passes::definite_assignment::analyze(&hir, &resolver, &types) {
+    if let Err(e) = passes::definite_assignment::analyze(&hir, &resolver, &types, interner) {
         diagnostics.extend(e);
     }
 

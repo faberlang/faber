@@ -25,6 +25,7 @@
 //! - Warnings produced here should not block compilation unless the surrounding
 //!   diagnostic policy promotes warning-kind diagnostics.
 
+use super::method_receiver_mutation::{self, MutatingMethods};
 use crate::{
     Primitive, Resolver, SemanticError, SemanticErrorKind, SemanticParamMode, Type, TypeTable,
     error::WarningKind, locale::LocalePack,
@@ -69,6 +70,7 @@ pub fn lint(
     locale_pack: Option<&LocalePack>,
 ) -> Vec<SemanticError> {
     let mut ctx = LintContext::new(resolver, types, interner, locale_pack);
+    ctx.mutating_methods = method_receiver_mutation::collect(hir, types, interner);
     ctx.collect_items(hir);
     ctx.check_program(hir);
 
@@ -134,6 +136,8 @@ struct LintContext<'a> {
     defs: Vec<(radix_hir::DefId, Span, WarningKind)>,
     mutable_locals: Vec<(radix_hir::DefId, Span)>,
     mutable_local_defs: FxHashSet<radix_hir::DefId>,
+    /// Class methods whose body changes the receiver in place.
+    mutating_methods: MutatingMethods,
     /// Per declared function: which parameter positions are `mut` (`in`).
     mut_param_positions: rustc_hash::FxHashMap<radix_hir::DefId, Vec<bool>>,
     imports: Vec<(radix_hir::DefId, Span)>,
@@ -179,6 +183,7 @@ impl<'a> LintContext<'a> {
             defs: Vec::new(),
             mutable_locals: Vec::new(),
             mutable_local_defs: FxHashSet::default(),
+            mutating_methods: MutatingMethods::default(),
             mut_param_positions: rustc_hash::FxHashMap::default(),
             imports: Vec::new(),
             functions: Vec::new(),
@@ -519,12 +524,11 @@ impl<'a> LintContext<'a> {
         }
     }
 
-    /// D16.4(2): WARN013 means "never reassigned". `fixum` is shallow
-    /// (mutability-engine D-1), so a user method writing `ego` is legal on a
-    /// `fixum` local and does not count. A mutating intrinsic
-    /// (`is_mutating_receiver`) rewrites the receiver's contents in place and
-    /// typecheck rejects it on an immutable binding receiver, so it counts as
-    /// a reassignment (`n.adde(1)`, `xs.appende(3)`, `xs.ordina()`).
+    /// WARN013 means "never modified". A mutating call is a write to its
+    /// receiver binding, so it counts: a mutating intrinsic
+    /// (`is_mutating_receiver`: `n.adde(1)`, `xs.appende(3)`, `xs.ordina()`) and
+    /// a user method whose body changes `ego` both need a `varia` binding, and
+    /// the checker rejects either on an immutable one.
     fn mark_receiver_reassigned_if_needed(
         &mut self,
         receiver: &HirExpression,
@@ -545,7 +549,11 @@ impl<'a> LintContext<'a> {
             .ty
             .and_then(|ty| lookup_method_for_type(self.types.get(ty), method_name, arg_count))
             .is_some_and(is_mutating_receiver);
-        if reassigns {
+        let user_mutator = receiver
+            .ty
+            .and_then(|ty| method_receiver_mutation::class_def(self.types, ty))
+            .is_some_and(|class| self.mutating_methods.contains(&(class, method)));
+        if reassigns || user_mutator {
             self.mutated.insert(def_id);
         }
     }
