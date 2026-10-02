@@ -40,6 +40,10 @@ pub enum Target {
     /// Haskell source emitted from checked HIR.
     HirHaskell,
 
+    /// Novelty Free Pascal source emitted from checked HIR (scalar subset).
+    /// Default-off; fails closed outside the subset.
+    HirPascal,
+
     /// Faber source re-emitted from analyzed HIR.
     ///
     /// Historically the "canonical Faber" surface; with reader locales this
@@ -107,6 +111,7 @@ impl fmt::Display for Target {
             Target::HirSwift => write!(f, "swift"),
             Target::HirPython => write!(f, "python"),
             Target::HirHaskell => write!(f, "haskell"),
+            Target::HirPascal => write!(f, "pascal"),
             Target::HirFaber => write!(f, "faber"),
             Target::HirFhir => write!(f, "fhir"),
             Target::MirWasm => write!(f, "wasm-text"),
@@ -142,6 +147,7 @@ impl Target {
             "swift" => Some(Self::HirSwift),
             "python" => Some(Self::HirPython),
             "haskell" => Some(Self::HirHaskell),
+            "pascal" => Some(Self::HirPascal),
             "faber" => Some(Self::HirFaber),
             "fhir" => Some(Self::HirFhir),
             "wasm-text" => Some(Self::MirWasm),
@@ -178,6 +184,7 @@ impl Target {
         Target::HirSwift,
         Target::HirPython,
         Target::HirHaskell,
+        Target::HirPascal,
         Target::HirFaber,
         Target::HirFhir,
         Target::MirWasm,
@@ -204,6 +211,7 @@ impl Target {
             Target::HirSwift => Some("hir-swift"),
             Target::HirPython => Some("hir-python"),
             Target::HirHaskell => Some("hir-haskell"),
+            Target::HirPascal => Some("hir-pascal"),
             Target::HirFaber => Some("hir-faber"),
             Target::HirFhir => Some("hir-fhir"),
             Target::MirMetal => Some("mir-metal"),
@@ -236,6 +244,7 @@ impl Target {
             Target::HirSwift => cfg!(feature = "hir-swift"),
             Target::HirPython => cfg!(feature = "hir-python"),
             Target::HirHaskell => cfg!(feature = "hir-haskell"),
+            Target::HirPascal => cfg!(feature = "hir-pascal"),
             Target::HirFaber => cfg!(feature = "hir-faber"),
             Target::HirFhir => cfg!(feature = "hir-fhir"),
             Target::MirMetal => cfg!(feature = "mir-metal"),
@@ -273,6 +282,7 @@ mod tests {
             Target::HirSwift => "swift",
             Target::HirPython => "python",
             Target::HirHaskell => "haskell",
+            Target::HirPascal => "pascal",
             Target::HirFaber => "faber",
             Target::HirFhir => "fhir",
             Target::MirWasm => "wasm-text",
@@ -305,6 +315,7 @@ mod tests {
             "swift",
             "python",
             "haskell",
+            "pascal",
             "faber",
             "fhir",
             "wasm-text",

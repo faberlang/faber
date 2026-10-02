@@ -755,6 +755,7 @@ fn generate_output(
         | Target::HirFaber
         | Target::HirSwift
         | Target::HirHaskell
+        | Target::HirPascal
         | Target::HirTypeScript
         | Target::HirGo
         // D11.6 py4: Python ints are exact; the clamp runs at the store.
@@ -3764,6 +3765,7 @@ fn collect_target_policy_diagnostics(
         | Target::HirSwift
         | Target::HirPython
         | Target::HirHaskell
+        | Target::HirPascal
         | Target::HirTypeScript
         | Target::MirWasm
         | Target::MirWgsl => {}
@@ -4427,6 +4429,7 @@ fn target_display_name(target: Target) -> &'static str {
         Target::HirSwift => "swift",
         Target::HirPython => "python",
         Target::HirHaskell => "haskell",
+        Target::HirPascal => "pascal",
         Target::MirWasm => "wasm-text",
         Target::MirLlvm => "llvm-text",
         Target::MirLlvmHost => "llvm-host",
