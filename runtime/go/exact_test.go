@@ -164,6 +164,56 @@ func TestExactTextAndFloat(t *testing.T) {
 	}
 }
 
+// TestExactStoreWidthText pins the mapping from a Go sized type to the Faber
+// width text a store trap names and to its bounds: `int64` reads `i64`, never
+// Go `int`, and every width traps one past its bound.
+func TestExactStoreWidthText(t *testing.T) {
+	check := func(ty string, lo int64, hi uint64, gotLo int64, gotHi uint64, gotTy string) {
+		t.Helper()
+		if gotTy != ty || gotLo != lo || gotHi != hi {
+			t.Fatalf("%s: got (%d, %d, %q), want (%d, %d, %q)", ty, gotLo, gotHi, gotTy, lo, hi, ty)
+		}
+	}
+	lo, hi, ty := exactRange[int8]()
+	check("i8", math.MinInt8, math.MaxInt8, lo, hi, ty)
+	lo, hi, ty = exactRange[int16]()
+	check("i16", math.MinInt16, math.MaxInt16, lo, hi, ty)
+	lo, hi, ty = exactRange[int32]()
+	check("i32", math.MinInt32, math.MaxInt32, lo, hi, ty)
+	lo, hi, ty = exactRange[int64]()
+	check("i64", math.MinInt64, math.MaxInt64, lo, hi, ty)
+	lo, hi, ty = exactRange[uint8]()
+	check("u8", 0, math.MaxUint8, lo, hi, ty)
+	lo, hi, ty = exactRange[uint16]()
+	check("u16", 0, math.MaxUint16, lo, hi, ty)
+	lo, hi, ty = exactRange[uint32]()
+	check("u32", 0, math.MaxUint32, lo, hi, ty)
+	lo, hi, ty = exactRange[uint64]()
+	check("u64", 0, math.MaxUint64, lo, hi, ty)
+
+	if got := ExactStore[int64](ExactI(math.MinInt64), "declaration"); got != math.MinInt64 {
+		t.Fatalf("Store[int64](min) = %d", got)
+	}
+	if got := ExactStore[uint64](ExactU(math.MaxUint64), "declaration"); got != math.MaxUint64 {
+		t.Fatalf("Store[uint64](max) = %d", got)
+	}
+	if got := ExactStore[int32](ExactI(math.MaxInt32), "declaration"); got != math.MaxInt32 {
+		t.Fatalf("Store[int32](max) = %d", got)
+	}
+	wantPanic(t, "9223372036854775808 does not fit in `i64` (return)", func() {
+		ExactStore[int64](ExactU(1<<63), "return")
+	})
+	wantPanic(t, "-1 does not fit in `u64` (return) (a negative value cannot be stored in an unsigned slot)", func() {
+		ExactStore[uint64](ExactI(-1), "return")
+	})
+	wantPanic(t, "65536 does not fit in `u16` (field `f`)", func() {
+		ExactStore[uint16](ExactI(65536), "field `f`")
+	})
+	wantPanic(t, "2147483648 does not fit in `i32` (assignment)", func() {
+		ExactStore[int32](ExactI(1<<31), "assignment")
+	})
+}
+
 // TestExactStoreAndClamp pins the store family: the width limit applies only at
 // the store, with the trap texts of the runner.
 func TestExactStoreAndClamp(t *testing.T) {
@@ -173,23 +223,23 @@ func TestExactStoreAndClamp(t *testing.T) {
 	if !ExactFitsU(ExactI(255), 255) || ExactFitsU(ExactI(256), 255) || ExactFitsU(ExactI(-1), 255) {
 		t.Fatal("ExactFitsU")
 	}
-	if got := ExactStoreI(ExactI(-128), -128, 127, "i8", "declaration of `x`", ""); got != -128 {
-		t.Fatalf("StoreI = %d", got)
+	if got := ExactStore[int8](ExactI(-128), "declaration of `x`"); got != -128 {
+		t.Fatalf("Store[int8] = %d", got)
 	}
-	if got := ExactStoreU(ExactU(255), 255, "u8", "declaration of `x`", ""); got != 255 {
-		t.Fatalf("StoreU = %d", got)
+	if got := ExactStore[uint8](ExactU(255), "declaration of `x`"); got != 255 {
+		t.Fatalf("Store[uint8] = %d", got)
 	}
 	wantPanic(t, "128 does not fit in `i8` (assignment to `x`)", func() {
-		ExactStoreI(ExactI(128), -128, 127, "i8", "assignment to `x`", "")
+		ExactStore[int8](ExactI(128), "assignment to `x`")
 	})
 	wantPanic(t, "-129 does not fit in `i8` (return); `x` was inferred as `i8` from `f()`, declare its type", func() {
-		ExactStoreI(ExactI(-129), -128, 127, "i8", "return", "; `x` was inferred as `i8` from `f()`, declare its type")
+		ExactStore[int8](ExactI(-129), "return", "; `x` was inferred as `i8` from `f()`, declare its type")
 	})
 	wantPanic(t, "256 does not fit in `u8` (argument `a`)", func() {
-		ExactStoreU(ExactI(256), 255, "u8", "argument `a`", "")
+		ExactStore[uint8](ExactI(256), "argument `a`")
 	})
 	wantPanic(t, "-1 does not fit in `u8` (field `f`) (a negative value cannot be stored in an unsigned slot)", func() {
-		ExactStoreU(ExactI(-1), 255, "u8", "field `f`", "")
+		ExactStore[uint8](ExactI(-1), "field `f`")
 	})
 	if got := ExactWrap(ExactI(-1)); got != math.MaxUint64 {
 		t.Fatalf("Wrap(-1) = %d", got)
