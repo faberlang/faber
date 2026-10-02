@@ -1417,7 +1417,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let [receiver, text] = args else {
                     return Err(RunnerError::internal(span, "regex consentit arity"));
                 };
-                let Value::Regex(pattern) = self.eval_operand(receiver, span)? else {
+                let Value::Regex(program) = self.eval_operand(receiver, span)? else {
                     return Err(RunnerError::internal(
                         span,
                         "consentit receiver is not regex",
@@ -1429,10 +1429,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         "consentit argument is not textus",
                     ));
                 };
-                let regex = regex::Regex::new(&pattern).map_err(|err| {
-                    RunnerError::internal(span, format!("regex compile failed: {err}"))
-                })?;
-                Ok(Value::Bool(regex.is_match(&text)))
+                Ok(Value::Bool(program.is_match(&text)))
             }
             MirCollectionOp::Split => {
                 let [receiver, delim] = args else {

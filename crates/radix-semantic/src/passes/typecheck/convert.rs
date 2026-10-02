@@ -92,7 +92,6 @@ const ISSUE_CONVERSIO_FAILURE_CHANNEL_TEXTUS_REQUIRED: &str =
 const ISSUE_FAILABLE_CONVERSIO_REQUIRES_HANDLER: &str = "failable_conversio_requires_handler";
 const ISSUE_REGEX_OPERAND_UNSUPPORTED: &str = "regex_operand_unsupported";
 const ISSUE_REGEX_RECOVERY_UNSUPPORTED: &str = "regex_recovery_unsupported";
-const ISSUE_REGEX_PATTERN_TOO_LONG: &str = "regex_pattern_too_long";
 const ISSUE_UNSUPPORTED_CONVERSIO: &str = "unsupported_conversio";
 const ISSUE_RECORD_CONVERSION_REQUIRES_RECONSTRUCTION: &str =
     "record_conversion_requires_reconstruction";
@@ -142,16 +141,6 @@ const ISSUE_JSON_GENUS_CONVERSION_REQUIRES_JSON: &str =
     "json_genus_conversion_requires_json_annotation";
 const ISSUE_CONVERSION_REGISTRY_DUPLICATE_PAIR: &str = "conversio_registry_duplicate_pair";
 const ISSUE_CONVERSION_REGISTRY_BUILTIN_SHADOW: &str = "conversio_registry_builtin_shadow";
-
-/// Byte cap for literal regex patterns.
-///
-/// The runtime carrier is infallible and no regex engine exists yet, so this is
-/// a policy boundary ahead of executable matching: it bounds the pattern bytes
-/// a literal `↦ regex` (or folded `HirLiteral::Regex`) can carry. Measured on
-/// the interned literal payload — the exact bytes codegen stores in
-/// `faber::Regex::new(...)` — excluding inline flags. Dynamic (non-literal)
-/// textus sources are unaffected. The complexity/ReDoS guard remains deferred.
-pub(super) const REGEX_PATTERN_MAX_BYTES: usize = 1024;
 
 enum PrimitiveConversioFamily {
     Numerus,
@@ -2832,6 +2821,10 @@ impl TypeChecker<'_> {
                 PrimitiveConversioFamily::Textus | PrimitiveConversioFamily::Octeti,
                 PrimitiveConversioFamily::Ascii,
             )
+            | (
+                PrimitiveConversioFamily::Textus | PrimitiveConversioFamily::Ascii,
+                PrimitiveConversioFamily::Regex,
+            )
             | (PrimitiveConversioFamily::Octeti, PrimitiveConversioFamily::Textus) => true,
             _ => matches!(
                 (self.types.get(source), self.types.get(target)),
@@ -3015,37 +3008,22 @@ impl TypeChecker<'_> {
         // WHY: the `⊥` default slot is structurally empty for `↦ regex`.
         // Every coherent `↦ T ⊥ <value>` form requires a recovery of type T
         // (e.g. `"bad" ↦ numerus ⊥ 0`). `regex` has no literal form; its
-        // only constructor is the fallible conversion itself, so a recovery
+        // only constructor is the failable conversion itself, so a recovery
         // would have to be another `pat ↦ regex` — recursion with no base.
-        // Pattern validity is a downstream target-engine concern, not a
-        // Faber-level conversion failure. A typed fallible regex channel
-        // (`⇥`) is a separate, future decision.
+        // The conversion itself is failable (an invalid pattern fails to
+        // compile at run time): a bare `↦ regex` follows the ordinary text
+        // failure channel, see `conversio_can_propagate_failure`.
         if recovery_present {
             self.invalid_conversion(ISSUE_REGEX_RECOVERY_UNSUPPORTED, span);
         }
         None
     }
 
-    /// Enforce the byte-length cap on literal regex patterns.
+    /// Type of a `HirLiteral::Regex` (the shape of the future slash literal).
     ///
-    /// Only folded `HirLiteral::Regex` values reach this check, so dynamic
-    /// textus sources keep flowing unchecked. The cap is a policy boundary
-    /// ahead of any executable regex engine; it does not make `↦ regex`
-    /// fallible and does not inspect pattern shape.
-    pub fn check_regex_literal(&mut self, sym: Symbol, span: radix_lexer::Span) -> TypeId {
-        let Some(payload) = self.interned_literal_payload(sym) else {
-            return self.regex_type();
-        };
-        let length = payload.len();
-        if length > REGEX_PATTERN_MAX_BYTES {
-            self.errors.push(
-                SemanticError::structured(SemanticErrorKind::ConversionInvalid, span)
-                    .with_arg("issue", ISSUE_REGEX_PATTERN_TOO_LONG)
-                    .with_arg("length", length.to_string())
-                    .with_arg("max", REGEX_PATTERN_MAX_BYTES.to_string()),
-            );
-            return self.error_type;
-        }
+    /// No pattern validation happens at check time: only the failable
+    /// `↦ regex` conversion compiles a pattern, at run time.
+    pub fn check_regex_literal(&mut self, _sym: Symbol, _span: radix_lexer::Span) -> TypeId {
         self.regex_type()
     }
 

@@ -830,6 +830,7 @@ dependencies = [
  "radix-runtime-contract",
  "radix-types",
  "regex",
+ "regex-syntax",
  "rustc-hash",
  "serde_json",
  "tempfile",

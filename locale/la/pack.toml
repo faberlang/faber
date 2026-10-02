@@ -3159,10 +3159,6 @@ help = "use literal scalar leaves in the nested {lista}"
 message = "a conversion to {bivalens} cannot fail, so it takes no `⊥` default"
 help = "remove the recovery arm; use the truthiness result directly"
 
-[diagnostics.SEM016.issues.regex_pattern_too_long]
-message = "regex literal pattern is {length} bytes; the maximum is {max}"
-help = "shorten the literal pattern or build it dynamically"
-
 [diagnostics.SEM017]
 message = "unavailable declaration"
 help = "use an available declaration or implement the marked surface"
