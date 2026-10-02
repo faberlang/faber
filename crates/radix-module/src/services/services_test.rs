@@ -5,10 +5,11 @@
 
 use super::*;
 use crate::driver::AnalyzeRequest;
+use crate::program::{compile_cli_path, compile_cli_source, compile_cli_source_with_locale_pack};
 use crate::services::{
     TargetCommandSurface, check_diagnostics_for_source, check_diagnostics_for_source_with_locale_pack,
-    compile_cli_path, compile_cli_source, compile_cli_source_with_locale_pack, discoverable_targets,
-    target_capabilities, target_capabilities_for_surface, target_extension, target_name, verify_source,
+    discoverable_targets, target_capabilities, target_capabilities_for_surface, target_extension, target_name,
+    verify_source,
 };
 use std::path::PathBuf;
 

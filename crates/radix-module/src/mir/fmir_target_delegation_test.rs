@@ -5,7 +5,7 @@
 //! are exercised by exempla (`tensor_package_*`), not here.
 
 use crate::codegen::Target;
-use crate::services::compile_cli_source;
+use crate::program::compile_cli_source;
 
 /// Minimal single-file unit — no package graph, no faber.toml, no sibling fixtures.
 const SMOKE: &str = r#"

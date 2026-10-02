@@ -1177,7 +1177,7 @@ incipit {
     .expect("app");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::services::compile_cli_path(&app, false, crate::codegen::Target::HirRust);
+    let result = crate::program::compile_cli_path(&app, false, crate::codegen::Target::HirRust);
 
     assert!(
         result.success(),
@@ -2571,7 +2571,7 @@ incipit {
     .expect("app");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::services::compile_cli_path(&app, false, crate::codegen::Target::HirRust);
+    let result = crate::program::compile_cli_path(&app, false, crate::codegen::Target::HirRust);
 
     assert!(
         result.success(),
@@ -2675,7 +2675,7 @@ incipit {
     .expect("app");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::services::compile_cli_path(&app, false, crate::codegen::Target::HirRust);
+    let result = crate::program::compile_cli_path(&app, false, crate::codegen::Target::HirRust);
 
     assert!(
         result.success(),
@@ -2742,7 +2742,7 @@ main {
     .expect("write entry");
 
     let config = english_config();
-    let identities = crate::services::package_identity_facts_for_path(&entry, &config)
+    let identities = crate::program::package_identity_facts_for_path(&entry, &config)
         .expect("en-surface local imports must register identity facts");
     assert_eq!(identities.product, "geminus", "product derives from the package root");
     assert_eq!(
@@ -2797,7 +2797,7 @@ incipit {
     .expect("write entry");
 
     let config = crate::driver::Config::default();
-    let identities = crate::services::package_identity_facts_for_path(&entry, &config)
+    let identities = crate::program::package_identity_facts_for_path(&entry, &config)
         .expect("Latin local imports must register identity facts under the la pack");
     assert_eq!(identities.product, "adiutorium", "product derives from the package root");
     assert_eq!(
