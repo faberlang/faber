@@ -101,6 +101,8 @@ Common flows:
     faber check crates/exempla/corpus/salve-munde.fab
 
   Format and convert complete Faber source units:
+    faber format path/to/file.fab           (report drift, writes nothing; exit 1)
+    faber format path/to/file.fab --write
     faber format path/to/file.fab --stdout
     faber convert path/to/file.fab --to la --stdout
     faber convert path/to/file.fab --from en --to la --stdout

@@ -39,11 +39,6 @@ pub fn cmd_format(command: &FormatCommand) {
         }
     }
 
-    // --write is the explicit spelling of the in-place default; the default
-    // branch below already writes in place (the `--write`/`--stdout` conflict
-    // is enforced at the CLI parse boundary).
-    let _write = command.write;
-
     let files = match resolve_format_paths(&command.paths) {
         Ok(files) => files,
         Err(message) => {
@@ -61,21 +56,24 @@ pub fn cmd_format(command: &FormatCommand) {
     // `--stdout` fail clearly instead of concatenating.
     if command.stdout && files.len() > 1 {
         eprintln!(
-            "error: --stdout accepts exactly one input file, found {}; format one file at a time (or use the default in-place write / --check for multiple files)",
+            "error: --stdout accepts exactly one input file, found {}; use --check or --write for multiple files",
             files.len()
         );
         std::process::exit(1);
     }
 
-    let mut drift_count = 0usize;
-    let mut error_count = 0usize;
+    // Modes (mutually exclusive at the CLI parse boundary): `--stdout` prints
+    // one file; `--write` rewrites changed files; everything else (the
+    // default, spelled `--check`) reports drift and writes nothing.
+    let report_only = command.check || !command.write;
+    let mut tally = RewriteTally::default();
 
     for path in &files {
         let source = match fs::read_to_string(path) {
             Ok(source) => source,
             Err(err) => {
                 eprintln!("error: failed to read '{}': {err}", path.display());
-                error_count += 1;
+                tally.refused += 1;
                 continue;
             }
         };
@@ -83,19 +81,10 @@ pub fn cmd_format(command: &FormatCommand) {
         let formatted = match format_single_doc(path, &source) {
             Ok(formatted) => formatted,
             Err(()) => {
-                error_count += 1;
+                tally.refused += 1;
                 continue;
             }
         };
-
-        if command.check {
-            let original = normalize_trailing_newline(&source_for_compare(path, &source));
-            if formatted != original {
-                eprintln!("would reformat {}", path.display());
-                drift_count += 1;
-            }
-            continue;
-        }
 
         if command.stdout {
             // Exactly one file here (multi-file `--stdout` rejected above).
@@ -103,25 +92,92 @@ pub fn cmd_format(command: &FormatCommand) {
             continue;
         }
 
-        if fs::write(path, &formatted).is_err() {
+        // One predicate for report and write: the file's bytes would change.
+        if formatted == source_for_compare(path, &source) {
+            continue;
+        }
+
+        if report_only {
+            println!("would reformat {}", path.display());
+            tally.changed += 1;
+        } else if fs::write(path, &formatted).is_ok() {
+            println!("formatted {}", path.display());
+            tally.changed += 1;
+        } else {
             eprintln!("error: failed to write '{}'", path.display());
-            error_count += 1;
+            tally.write_failed += 1;
         }
     }
 
-    if command.check {
-        if drift_count > 0 {
-            eprintln!("{drift_count} file(s) would be reformatted");
-            std::process::exit(1);
-        }
-        if error_count > 0 {
+    if command.stdout {
+        if tally.refused > 0 {
             std::process::exit(1);
         }
         return;
     }
 
-    if error_count > 0 {
+    let total = files.len();
+    if report_only {
+        println!("{}", tally.report_summary(total));
+        if tally.changed + tally.refused > 0 {
+            std::process::exit(1);
+        }
+        return;
+    }
+    println!("{}", tally.write_summary(total));
+    if tally.refused + tally.write_failed > 0 {
         std::process::exit(1);
+    }
+}
+
+/// Per-run counters for the in-place rewriters (`format`; the sibling
+/// rewriters follow the same report/`--write` contract).
+#[derive(Debug, Default)]
+pub(super) struct RewriteTally {
+    /// Files whose bytes would change (report) or were written (`--write`).
+    pub(super) changed: usize,
+    /// Files refused (unreadable, or a diagnostic was printed); never written.
+    pub(super) refused: usize,
+    /// Files that formatted but could not be written.
+    pub(super) write_failed: usize,
+}
+
+impl RewriteTally {
+    fn refused_clause(&self) -> String {
+        if self.refused == 0 {
+            String::new()
+        } else {
+            format!(", {} refused (nothing written)", self.refused)
+        }
+    }
+
+    /// Last stdout line of report mode.
+    pub(super) fn report_summary(&self, total: usize) -> String {
+        if self.changed > 0 {
+            format!(
+                "{} of {total} files would be reformatted; rerun with --write to apply{}",
+                self.changed,
+                self.refused_clause()
+            )
+        } else if self.refused > 0 {
+            format!("{} refused (nothing written)", self.refused)
+        } else {
+            format!("{total} files already formatted")
+        }
+    }
+
+    /// Last stdout line of `--write` mode.
+    pub(super) fn write_summary(&self, total: usize) -> String {
+        let failed = if self.write_failed == 0 {
+            String::new()
+        } else {
+            format!(", {} failed to write", self.write_failed)
+        };
+        format!(
+            "formatted {} of {total} files{}{failed}",
+            self.changed,
+            self.refused_clause()
+        )
     }
 }
 

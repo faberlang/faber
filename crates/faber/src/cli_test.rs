@@ -634,6 +634,67 @@ fn cli_rejects_format_write_with_stdout() {
 }
 
 #[test]
+fn cli_format_default_mode_is_report_only() {
+    let format = Cli::try_parse_from(["faber", "format", "main.fab"]).expect("parse format");
+    let Some(crate::cli::Command::Format(args)) = format.command else {
+        panic!("expected format subcommand");
+    };
+    assert!(!args.write);
+    assert!(!args.check);
+    assert!(!args.stdout);
+    assert!(!args.stdin);
+}
+
+#[test]
+fn cli_parses_format_check_flag() {
+    let format = Cli::try_parse_from(["faber", "format", "--check"]).expect("parse format --check");
+    let Some(crate::cli::Command::Format(args)) = format.command else {
+        panic!("expected format subcommand");
+    };
+    assert!(args.check);
+    assert!(!args.write);
+}
+
+#[test]
+fn cli_rejects_format_write_with_check() {
+    let error = Cli::try_parse_from(["faber", "format", "--write", "--check", "main.fab"])
+        .expect_err("format --write conflicts with --check");
+    let rendered = error.to_string();
+    assert!(rendered.contains("--write"));
+    assert!(rendered.contains("--check"));
+}
+
+#[test]
+fn cli_rejects_format_stdin_with_write_or_stdout() {
+    for other in ["--write", "--stdout"] {
+        let error = Cli::try_parse_from(["faber", "format", "--stdin", other])
+            .expect_err("format --stdin conflicts with the other modes");
+        let rendered = error.to_string();
+        assert!(rendered.contains("--stdin"), "{rendered}");
+        assert!(rendered.contains(other), "{rendered}");
+    }
+}
+
+#[test]
+fn format_help_states_report_default_and_write_flag() {
+    let mut command = Cli::command();
+    let format = command
+        .find_subcommand_mut("format")
+        .expect("format subcommand")
+        .render_long_help()
+        .to_string();
+    let words = format.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(
+        words.contains("Does not write unless `--write` is given"),
+        "{format}"
+    );
+    assert!(
+        words.contains("Write formatted source back to the file (default is report-only)"),
+        "{format}"
+    );
+}
+
+#[test]
 fn cli_parses_format_stdin_flag() {
     let format = Cli::try_parse_from(["faber", "format", "--stdin"]).expect("parse format --stdin");
     let Some(crate::cli::Command::Format(args)) = format.command else {
