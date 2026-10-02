@@ -602,7 +602,7 @@ fn plan_rust_artifacts(
     );
 
     // Tokio is selected from HIR async facts (same rule as RustRuntimePlan), not
-    // from scanning generated text for `tokio::` / `__faber_block_on`.
+    // from scanning generated text for `tokio::` or the `block_on` spelling.
     let needs_tokio = package.nodes.values().any(|unit| {
         unit.analysis.hir.entry_is_async
             || unit.analysis.hir.items.iter().any(|item| {

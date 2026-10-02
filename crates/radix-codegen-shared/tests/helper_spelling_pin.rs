@@ -216,13 +216,17 @@ struct Emitter {
 const EMITTERS: [Emitter; 3] = [
     Emitter {
         name: "radix-hir-rust",
-        legacy_budget: 82,
+        // WHY: after T2-R8 no runtime helper and no compiler local is
+        // hand-spelled. What remains is the fork F-E item names (8 lines:
+        // `__faber_lazy`, `__faber_const_`, `__faber_ad_serve_`,
+        // `__faber_unresolved_def`) and the `__FaberRecord` item name (1).
+        legacy_budget: 9,
         new_shape_budget: 0,
         new_shape: rust_new_shape,
     },
     Emitter {
         name: "radix-hir-ts",
-        legacy_budget: 238,
+        legacy_budget: 46,
         // WHY: `sermo.open(` (write_ad_expr) and the `sermo.close accepts no
         // arguments` message in expr/access.rs were hand-spelled before this
         // ratchet existed. The sermo namespace unit removes both.
@@ -231,7 +235,7 @@ const EMITTERS: [Emitter; 3] = [
     },
     Emitter {
         name: "radix-hir-go",
-        legacy_budget: 153,
+        legacy_budget: 0,
         new_shape_budget: 0,
         new_shape: go_new_shape,
     },

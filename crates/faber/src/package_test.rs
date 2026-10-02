@@ -6012,7 +6012,7 @@ async_main {
         panic!("expected rust output");
     };
     assert!(output.code.contains("crate::http::get"));
-    assert!(output.code.contains("fn __faber_block_on"));
+    assert!(output.code.contains("faber::r#gen::block_on"));
     assert!(
         output.code.contains("crate::http::response::Response"),
         "expected leaf Response path crate::http::response::Response, got:\n{}",
@@ -9916,7 +9916,7 @@ async_main {{
     let generated_main = fs::read_to_string(&layout.generated_rust_entry).expect("main");
     assert!(generated_main.contains("host_register::install_or_exit();"));
     assert!(
-        generated_main.contains("__faber_block_on") || generated_main.contains("tokio::"),
+        generated_main.contains("faber::r#gen::block_on") || generated_main.contains("tokio::"),
         "expected async runtime wiring in generated main"
     );
 
