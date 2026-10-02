@@ -266,6 +266,7 @@ pub struct TensorValue {
     pub shape: Vec<i64>,
     pub strides: Vec<isize>,
     pub offset: isize,
+    is_view: bool,
     pub(crate) edge_base: Option<TensorEdgeBase>,
     pub(crate) edge_ops: Vec<TensorEdgeOp>,
 }
@@ -323,6 +324,7 @@ impl TensorValue {
             shape,
             strides,
             offset: 0,
+            is_view: false,
             edge_base: None,
             edge_ops: Vec::new(),
         })
@@ -360,6 +362,7 @@ impl TensorValue {
             shape,
             strides,
             offset,
+            is_view: true,
             edge_base: self.edge_base.clone(),
             edge_ops: self.edge_ops.clone(),
         })
@@ -380,6 +383,7 @@ impl TensorValue {
             shape,
             strides,
             offset,
+            is_view: true,
             edge_base: self.edge_base.clone(),
             edge_ops: self.edge_ops.clone(),
         })
@@ -424,7 +428,18 @@ impl TensorValue {
     /// to share a larger or non-contiguous backing allocation.
     #[must_use]
     pub(crate) fn has_contiguous_backing_mismatch(&self) -> bool {
-        if !self.edge_ops.is_empty() || self.offset != 0 {
+        if !self.edge_ops.is_empty() {
+            return false;
+        }
+        if self.is_view {
+            return !Self::layout_fits(
+                &self.data.borrow(),
+                &self.shape,
+                &self.strides,
+                self.offset,
+            );
+        }
+        if self.offset != 0 {
             return false;
         }
         let Some(strides) = Self::try_contiguous_strides(&self.shape) else {

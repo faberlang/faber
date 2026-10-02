@@ -154,3 +154,21 @@ fn custom_policy_parameter_cannot_carry_a_runtime_value() {
         "tensor_limes_policy_invalid",
     );
 }
+
+#[test]
+fn policy_type_names_do_not_reserve_value_function_names() {
+    let result = analyze(&format!(
+        "fn wrap(list<int> values) → list<int> ∪ none {{ return values }}\nmain {{\n{}\nconst list<int> ∪ none values ← wrap([1, 2])\nprint values!.length()\nconst tf32[3] mapped ← base.shift([1]).limes<wrap>()\n}}",
+        tensor_seed()
+    ));
+    assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
+    assert!(
+        result
+            .tensor_edge_policies
+            .provider_impls
+            .iter()
+            .any(|provider| {
+                provider.policy == ResolvedTensorEdgePolicy::Builtin(BuiltinTensorEdgePolicy::Wrap)
+            })
+    );
+}

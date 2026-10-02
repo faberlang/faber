@@ -121,6 +121,80 @@ fn static_call_shape_mismatch_remains_a_type_error() {
 }
 
 #[test]
+fn affine_call_shape_keeps_actual_dimension_after_solving_generic_base() {
+    let resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let mut checker = TypeChecker::new(&resolver, &mut types, None, Target::HirRust);
+    checker.current_shape_call = Some(HirId(46));
+    checker.current_shape_argument = Some(0);
+    let size = checker.fresh_index_hole();
+    let expected_dim = radix_types::add_index_constant(&mut checker.types, size, -1)
+        .expect("affine generic dimension");
+    let actual_dim = checker.types.intern_index(IndexExpr::Literal(3));
+    let actual = checker
+        .types
+        .intern_index(IndexExpr::Tuple(vec![actual_dim]));
+    let expected = checker
+        .types
+        .intern_index(IndexExpr::Tuple(vec![expected_dim]));
+
+    let unified = checker
+        .unify_shape_at_boundary(actual, expected, radix_lexer::Span::default())
+        .expect("call context should use the runtime shape path")
+        .expect("N - 1 should infer N from a concrete actual shape");
+    let IndexExpr::Tuple(dims) = checker.types.get_index(unified) else {
+        panic!("expected a rank-one shape");
+    };
+    assert!(matches!(
+        checker.types.get_index(dims[0]),
+        IndexExpr::Literal(3)
+    ));
+    let inferred_size = checker.canonicalize_index(size);
+    assert!(matches!(
+        checker.types.get_index(inferred_size),
+        IndexExpr::Literal(4)
+    ));
+}
+
+#[test]
+fn concrete_inexact_generic_division_rejects_instead_of_becoming_runtime_relation() {
+    let resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let mut checker = TypeChecker::new(&resolver, &mut types, None, Target::HirRust);
+    let size = checker.fresh_index_hole();
+    let five = checker.types.intern_index(IndexExpr::Literal(5));
+    {
+        let mut unifier = checker.index_infer.unifier(checker.types);
+        unifier
+            .unify(size, five)
+            .expect("first argument binds D = 5");
+    }
+    let divided = radix_types::divide_index_exact(checker.types, size, 2)
+        .expect("symbolic exact-divide term");
+    let actual_dim = checker.types.intern_index(IndexExpr::Literal(2));
+    let actual = checker
+        .types
+        .intern_index(IndexExpr::Tuple(vec![actual_dim]));
+    let expected = checker.types.intern_index(IndexExpr::Tuple(vec![divided]));
+    checker.current_shape_call = Some(HirId(47));
+    checker.current_shape_argument = Some(1);
+
+    assert!(
+        checker
+            .unify_shape_at_boundary(actual, expected, radix_lexer::Span::default())
+            .expect("call context should use the runtime shape path")
+            .is_err()
+    );
+    assert!(checker.shape_obligations.calls.is_empty());
+    assert!(checker.errors.iter().any(|error| {
+        error
+            .args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == "incompatible_tensor_index")
+    }));
+}
+
+#[test]
 fn same_runtime_local_extent_keeps_declared_tensor_shape_consistent() {
     let resolver = Resolver::new();
     let mut types = TypeTable::new();
@@ -204,7 +278,12 @@ main {
     print same_shape.shape()
 }
 "#;
-    let result = crate::test_support::analyze_source(source);
+    let mut config = crate::PassConfig::for_target(Target::HirRust);
+    config.locale_pack = Some(
+        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("English locale pack"),
+    );
+    let result = crate::test_support::analyze_source_with_config(source, config);
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
 }
 
@@ -223,7 +302,12 @@ main {
     print invalid.shape()
 }
 "#;
-    let result = crate::test_support::analyze_source(source);
+    let mut config = crate::PassConfig::for_target(Target::HirRust);
+    config.locale_pack = Some(
+        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("English locale pack"),
+    );
+    let result = crate::test_support::analyze_source_with_config(source, config);
     assert!(
         !result.is_ok(),
         "source with unrelated extents was accepted"

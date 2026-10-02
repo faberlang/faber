@@ -216,6 +216,29 @@ fn runner_issue(message: &str) -> String {
     issue.trim_end_matches('_').to_string()
 }
 
+fn is_recoverable_shape_failure(error: &RunnerError) -> bool {
+    matches!(
+        error.issue.as_str(),
+        "runner_tensor_shape_mismatch" | "runner_tensor_shape_invalid_extent"
+    )
+}
+
+fn shape_guard_precedes_try_call(
+    statement: &radix_mir::MirStatement,
+    terminator: &MirTerminatorKind,
+) -> bool {
+    let MirTerminatorKind::TryCall { args, .. } = terminator else {
+        return false;
+    };
+    let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+        return false;
+    };
+    matches!(
+        &call.intrinsic,
+        radix_mir::MirIntrinsic::TensorShapeCheck(_)
+    ) && call.args.get(..args.len()) == Some(args.as_slice())
+}
+
 #[derive(Debug, Clone)]
 struct PlaceAlias {
     /// Frame containing the caller place. The caller remains on the stack for
@@ -1218,8 +1241,12 @@ impl<H: Host + ?Sized> Runner<'_, H> {
 
             let mut frame_returned = false;
             let mut suspended = false;
+            let mut try_call_shape_failure = None;
             for (index, statement) in block_data.statements.iter().enumerate().skip(resume_at) {
-                match self.execute_statement(statement) {
+                let shape_guard_for_try_call = index + 1 == block_data.statements.len()
+                    && shape_guard_precedes_try_call(statement, &block_data.terminator.kind);
+                let result = self.execute_statement_inner(statement, shape_guard_for_try_call);
+                match result {
                     Ok(StatementOutcome::Continue) => {
                         if self.yielded.is_some() {
                             // D6.6: park the generator after its `cede`.
@@ -1234,6 +1261,11 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     Ok(StatementOutcome::FrameReturned) => {
                         frame_returned = true;
                         break;
+                    }
+                    Err(error)
+                        if shape_guard_for_try_call && is_recoverable_shape_failure(&error) =>
+                    {
+                        try_call_shape_failure = Some(error);
                     }
                     Err(error) => {
                         self.fail(error);
@@ -1284,30 +1316,54 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     ok_block,
                     error_place,
                     error_block,
-                } => match self.invoke_call(&callee, &args, terminator.span) {
-                    Ok(CallOutcome::Ok(value)) => {
-                        if let Some(destination) = destination
-                            && let Err(error) =
-                                self.write_place(&destination, value, terminator.span)
-                        {
-                            self.fail(error);
-                            continue;
+                } => {
+                    let call_result = if let Some(error) = try_call_shape_failure.take() {
+                        match self.shape_failure_try_call_route_is_textus_compatible(
+                            &callee,
+                            &error_place,
+                            terminator.span,
+                        ) {
+                            Ok(true) => Ok(CallOutcome::Err(Value::Str(error.message))),
+                            Ok(false) => {
+                                self.fail(RunnerError::internal(
+                                    terminator.span,
+                                    "recoverable runtime shape failure requires a textus-compatible TryCall error place",
+                                ));
+                                continue;
+                            }
+                            Err(route_error) => {
+                                self.fail(route_error);
+                                continue;
+                            }
                         }
-                        self.set_active_block(ok_block, terminator.span);
-                    }
-                    Ok(CallOutcome::Err(error_value)) => {
-                        if let Err(error) =
-                            self.write_place(&error_place, error_value, terminator.span)
-                        {
-                            self.fail(error);
-                            continue;
+                    } else {
+                        self.invoke_call(&callee, &args, terminator.span)
+                    };
+                    match call_result {
+                        Ok(CallOutcome::Ok(value)) => {
+                            if let Some(destination) = destination
+                                && let Err(error) =
+                                    self.write_place(&destination, value, terminator.span)
+                            {
+                                self.fail(error);
+                                continue;
+                            }
+                            self.set_active_block(ok_block, terminator.span);
                         }
-                        self.set_active_block(error_block, terminator.span);
+                        Ok(CallOutcome::Err(error_value)) => {
+                            if let Err(error) =
+                                self.write_place(&error_place, error_value, terminator.span)
+                            {
+                                self.fail(error);
+                                continue;
+                            }
+                            self.set_active_block(error_block, terminator.span);
+                        }
+                        Err(error) => {
+                            self.fail(error);
+                        }
                     }
-                    Err(error) => {
-                        self.fail(error);
-                    }
-                },
+                }
                 MirTerminatorKind::Goto(target) => {
                     self.set_active_block(target, terminator.span);
                 }
@@ -1373,9 +1429,18 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             })
     }
 
+    #[cfg(test)]
     fn execute_statement(
         &mut self,
         statement: &radix_mir::MirStatement,
+    ) -> Result<StatementOutcome, RunnerError> {
+        self.execute_statement_inner(statement, false)
+    }
+
+    fn execute_statement_inner(
+        &mut self,
+        statement: &radix_mir::MirStatement,
+        shape_failure_belongs_to_try_call: bool,
     ) -> Result<StatementOutcome, RunnerError> {
         match &statement.kind {
             MirStatementKind::Assign { place, value } => {
@@ -1409,6 +1474,12 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     }
                     _ => match self.eval_runtime_call(call, statement.span) {
                         Ok(value) => Ok(Some(value)),
+                        Err(error)
+                            if shape_failure_belongs_to_try_call
+                                && is_recoverable_shape_failure(&error) =>
+                        {
+                            Err(error)
+                        }
                         Err(error)
                             if matches!(
                                 error.issue.as_str(),
@@ -1488,6 +1559,59 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         self.return_error = Some(Value::Str(error.message));
         self.pop_frame();
         Ok(StatementOutcome::FrameReturned)
+    }
+
+    fn shape_failure_try_call_route_is_textus_compatible(
+        &mut self,
+        callee: &MirCallee,
+        error_place: &MirPlace,
+        span: Span,
+    ) -> Result<bool, RunnerError> {
+        let callee_id = match callee {
+            MirCallee::Value(operand) => match self.eval_operand(operand, span)? {
+                Value::Function(id) | Value::Closure(id, _, _) => id,
+                _ => {
+                    return Err(RunnerError::internal(
+                        span,
+                        "call callee is not a function value",
+                    ));
+                }
+            },
+            _ => self.resolve_callee(callee, span)?,
+        };
+        let Some(callee_error_ty) = self.function_by_id(callee_id, span)?.error_ty else {
+            return Ok(false);
+        };
+        if !matches!(
+            self.types.get(callee_error_ty.semantic_id()),
+            Type::Primitive(Primitive::Textus | Primitive::Ignotum)
+        ) || !error_place.projections.is_empty()
+        {
+            return Ok(false);
+        }
+
+        let Some(frame) = self.frames.last() else {
+            return Err(RunnerError::internal(span, "no active frame"));
+        };
+        let caller = self.function_by_id(frame.function, span)?;
+        let error_place_ty = match &error_place.base {
+            MirPlaceBase::Local(id) => caller
+                .locals
+                .iter()
+                .find(|local| local.id == *id)
+                .map(|local| local.ty),
+            MirPlaceBase::Temp(id) => caller
+                .temps
+                .iter()
+                .find(|temp| temp.id == *id)
+                .map(|temp| temp.ty),
+        };
+        Ok(error_place_ty.is_some_and(|ty| {
+            matches!(
+                self.types.get(ty.semantic_id()),
+                Type::Primitive(Primitive::Textus | Primitive::Ignotum)
+            )
+        }))
     }
 
     fn invoke_call(

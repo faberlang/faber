@@ -945,6 +945,38 @@ pub struct MirShapeCheck {
     pub size_bindings: Vec<MirShapeBinding>,
 }
 
+impl MirShapeCheck {
+    /// Whether the checked equalities connect these two runtime witnesses.
+    /// Scalar size bindings can mediate an equality between carrier axes.
+    #[must_use]
+    pub fn proves_equal(&self, left: &MirShapeExpr, right: &MirShapeExpr) -> bool {
+        let mut reached = vec![left];
+        let mut cursor = 0;
+        while cursor < reached.len() {
+            let current = reached[cursor];
+            if current == right {
+                return true;
+            }
+            for relation in &self.relations {
+                let next = if &relation.left == current {
+                    Some(&relation.right)
+                } else if &relation.right == current {
+                    Some(&relation.left)
+                } else {
+                    None
+                };
+                if let Some(next) = next
+                    && !reached.contains(&next)
+                {
+                    reached.push(next);
+                }
+            }
+            cursor += 1;
+        }
+        false
+    }
+}
+
 /// Compiler-owned edge resolution selected by `tensor.limes<Policy>()`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirBuiltinEdgePolicy {

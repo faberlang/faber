@@ -5765,14 +5765,25 @@ main {
             assert_eq!(check.size_bindings.len(), 1);
             assert!(matches!(
                 check.size_bindings[0].witness,
-                crate::mir::MirShapeExpr::TensorAxis { argument: 0, axis: 0 }
+                crate::mir::MirShapeExpr::ScalarArgument { argument: 1 }
             ));
-            call.args[0].clone()
+            assert!(
+                check.proves_equal(
+                    &check.size_bindings[0].witness,
+                    &crate::mir::MirShapeExpr::TensorAxis { argument: 0, axis: 0 },
+                ),
+                "the stable scalar witness must still guard the physical tensor extent"
+            );
+            (call.args[0].clone(), call.args[1].clone())
         })
         .collect::<Vec<_>>();
     assert_ne!(
-        actual_carriers[0], actual_carriers[1],
+        actual_carriers[0].0, actual_carriers[1].0,
         "per-call shape guards must read each call's actual tensor carrier"
+    );
+    assert_ne!(
+        actual_carriers[0].1, actual_carriers[1].1,
+        "each origin retains its own immutable scalar witness"
     );
 }
 

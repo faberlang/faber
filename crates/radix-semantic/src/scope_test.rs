@@ -516,6 +516,7 @@ fn resolver_snapshot_round_trips_imported_json_opt_in() {
                         def_id: DefId(7),
                         ty: TypeId(8),
                         fields: Vec::new(),
+                        methods: Vec::new(),
                         is_json: true,
                     },
                 )],

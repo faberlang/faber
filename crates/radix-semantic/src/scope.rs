@@ -313,6 +313,11 @@ pub struct ImportedAdRoute {
 
 #[derive(Debug, Clone)]
 pub struct ImportedFileInterfaceMethod {
+    /// Consumer-local definition identity for this imported callback. It is
+    /// allocated while the imported method descriptor is installed so later
+    /// semantic sidecars can retain a checked callback identity without
+    /// borrowing a producer arena's `DefId`.
+    pub def_id: DefId,
     /// Canonical library method identity.
     pub name: LexSymbol,
     /// Consumer-locale spelling accepted at the source boundary.
@@ -1686,7 +1691,7 @@ impl Resolver {
 
     /// Import methods, skipping signatures that cannot be remapped.
     fn import_interface_methods_partial(
-        &self,
+        &mut self,
         namespace: &str,
         methods: &[InterfaceMethodExport],
         owner: &str,
@@ -1752,6 +1757,7 @@ impl Resolver {
                     .map_or(method.name.as_str(), String::as_str),
             );
             imported.push(ImportedFileInterfaceMethod {
+                def_id: self.fresh_def_id(),
                 name,
                 surface_name,
                 sig,
@@ -2572,6 +2578,44 @@ impl Resolver {
                     strukt.type_params.clone(),
                 )),
                 ImportedFileExport::Function(_) | ImportedFileExport::Type(_) => None,
+            })
+            .collect()
+    }
+
+    /// Imported callback definitions and their file-namespace route.
+    ///
+    /// Each callback `DefId` is local to this resolver. The tuple keeps the
+    /// owner nominal and imported module binding beside the exact exported
+    /// method name so consumers can route the identity without borrowing a
+    /// producer arena or guessing from a fallback spelling.
+    #[must_use]
+    pub fn imported_file_method_identities(
+        &self,
+    ) -> Vec<(DefId, DefId, LexSymbol, LexSymbol, LexSymbol)> {
+        self.file_interfaces
+            .iter()
+            .flat_map(|(namespace, interface)| {
+                interface
+                    .exports
+                    .iter()
+                    .flat_map(move |(owner_name, export)| {
+                        let ImportedFileExport::Struct(strukt) = export else {
+                            return Vec::new();
+                        };
+                        strukt
+                            .methods
+                            .iter()
+                            .map(|method| {
+                                (
+                                    method.def_id,
+                                    strukt.def_id,
+                                    *namespace,
+                                    *owner_name,
+                                    method.name,
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                    })
             })
             .collect()
     }
@@ -3821,6 +3865,7 @@ impl Resolver {
                                 def_id,
                                 ty,
                                 fields,
+                                methods,
                                 is_json,
                             } => {
                                 let imported_fields: Vec<ImportedFileStructField> = fields
@@ -3835,12 +3880,22 @@ impl Resolver {
                                         init: None,
                                     })
                                     .collect();
+                                let imported_methods = methods
+                                    .into_iter()
+                                    .map(|method| ImportedFileInterfaceMethod {
+                                        def_id: method.def_id,
+                                        name: method.name,
+                                        surface_name: method.surface_name,
+                                        sig: method.sig,
+                                        visibility: method.visibility,
+                                    })
+                                    .collect();
                                 ImportedFileExport::Struct(ImportedFileStruct {
                                     is_json,
                                     def_id,
                                     ty,
                                     fields: imported_fields,
-                                    methods: Vec::new(),
+                                    methods: imported_methods,
                                     // Artifact snapshots do not carry
                                     // declaration params; applied-projection
                                     // metadata stays degraded on this route.
@@ -3945,6 +4000,7 @@ impl Resolver {
     pub fn to_snapshot(&self) -> radix_hir_fhir::ResolverSnapshot {
         use radix_hir_fhir::{
             FileExportSnapshot, FileInterfaceSnapshot, ResolverSnapshot, StructFieldSnapshot,
+            StructMethodSnapshot,
         };
 
         let namespace_exports = self
@@ -3983,6 +4039,17 @@ impl Resolver {
                                         required: field.required,
                                         modifier: field.modifier,
                                         visibility: field.visibility,
+                                    })
+                                    .collect(),
+                                methods: strukt
+                                    .methods
+                                    .iter()
+                                    .map(|method| StructMethodSnapshot {
+                                        def_id: method.def_id,
+                                        name: method.name,
+                                        surface_name: method.surface_name,
+                                        sig: method.sig.clone(),
+                                        visibility: method.visibility,
                                     })
                                     .collect(),
                             },

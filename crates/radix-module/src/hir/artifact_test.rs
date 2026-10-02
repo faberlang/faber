@@ -3,6 +3,23 @@ use crate::driver::AnalyzeRequest;
 use radix_hir_fhir::HirArtifact;
 use std::collections::BTreeMap;
 use std::error::Error;
+use std::path::{Path, PathBuf};
+
+struct LibraryHomeOverride(Option<PathBuf>);
+
+impl LibraryHomeOverride {
+    fn set(home: &Path) -> Self {
+        let previous =
+            crate::import_resolve::library_home_test_support::set_thread_library_home(Some(home.to_path_buf()));
+        Self(previous)
+    }
+}
+
+impl Drop for LibraryHomeOverride {
+    fn drop(&mut self) {
+        crate::import_resolve::library_home_test_support::set_thread_library_home(self.0.take());
+    }
+}
 
 #[test]
 fn error_display_messages() {
@@ -1304,7 +1321,8 @@ fn runtime_tensor_shape_boundary_survives_fhir_round_trip_and_recovers() {
     let mut loaded_host = BufferHost::default();
     run_analyzed(&mut loaded, &mut loaded_host).expect("loaded runtime shape check recovers");
 
-    let expected = ["entered", "4", "shape mismatch"];
+    // Tensor length reports rank; the mismatch must prevent the second entry.
+    let expected = ["entered", "2", "shape mismatch"];
     assert_eq!(direct_host.stdout_lines, expected);
     assert_eq!(loaded_host.stdout_lines, expected);
 }
@@ -1439,6 +1457,90 @@ fn tensor_edge_policy_facts_survive_fhir_round_trip() {
             .contains_key(&function_def)
     );
     assert_eq!(provider.shape_obligations, unit.shape_obligations);
+}
+
+#[test]
+fn imported_tensor_policy_callback_identity_survives_fhir_round_trip() {
+    use crate::codegen::{Target, generate_from_analyzed};
+    use crate::driver::{Config, Session};
+    use crate::locale::{KeywordSurface, latin_locale_pack};
+    use std::fs;
+
+    let temp = crate::test_support::test_temp_dir("artifact-imported-tensor-policy");
+    let home = temp.path().to_path_buf();
+    let package = home.join("demo");
+    fs::create_dir_all(package.join("src")).expect("demo src");
+    fs::write(
+        package.join("faber.toml"),
+        r#"[package]
+name = "demo"
+[library]
+provider = "demo"
+[reader]
+locale = "en"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        package.join("src/policy.fab"),
+        r#"@ public
+class ZeroGhost {
+    @ public
+    fn remap(vector<int, 1> coord) → vector<int, 1> {
+        return coord - coord
+    }
+}
+"#,
+    )
+    .expect("policy module");
+
+    let consumer_source = r#"+++
+locale = "en"
++++
+
+import from "demo:policy" policy
+
+@ public
+fn resolve(tf32[3] source) → f32 ⇥ string {
+    return source.shift([1]).limes<policy.ZeroGhost>().materialize().get([2]) coalesce 0.0
+}
+"#;
+    let consumer_path = home.join("consumer.fab");
+    fs::write(&consumer_path, consumer_source).expect("consumer module");
+
+    let _library_home = LibraryHomeOverride::set(&home);
+    let session = Session::new(Config::default().with_library_home(home.clone()));
+    let direct = crate::program::analyze_prepared_program_path(&session, &consumer_path, consumer_source)
+        .expect("analyze imported custom-policy consumer");
+    assert!(
+        direct.provider_units.get("demo:policy").is_some(),
+        "analysis must carry the imported policy provider unit"
+    );
+
+    let latin = latin_locale_pack();
+    let surface = KeywordSurface::new(&latin);
+    let direct_output =
+        generate_from_analyzed(Target::HirRust, &direct, &surface).expect("generate Rust before FHIR round-trip");
+    let direct_code = output_code(&direct_output).to_owned();
+    assert!(direct_code.contains("impl faber::TensorEdgePolicyProvider<f32, 1> for crate::policy::ZeroGhost"));
+    assert!(direct_code.contains("crate::policy::ZeroGhost {}.remap"));
+
+    let artifact = crate::hir::serialize::from_analyzed(&direct, "policy-round-trip", "consumer.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize imported-policy consumer");
+    let loaded = load_fhir(&bytes).expect("load imported-policy consumer");
+    let loaded_output =
+        generate_from_analyzed(Target::HirRust, &loaded, &surface).expect("generate Rust after FHIR round-trip");
+
+    assert_eq!(
+        output_code(&loaded_output),
+        direct_code,
+        "FHIR round-trip must retain the imported callback identity used by the provider impl"
+    );
 }
 
 /// Extract the code string from a codegen Output.

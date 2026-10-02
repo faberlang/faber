@@ -27,7 +27,7 @@ class ZeroGhost implements EdgePolicy<vector<int, 1>> ∩ EdgeTransform<vector<i
 }
 
 fn resolve_shift<P>(tf32[3] source) → tf32[3] {
-    return source.shift([1]).limes<P>()
+    return source.shift([1]).limes<P>().materialize()
 }
 
 main {

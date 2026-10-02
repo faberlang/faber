@@ -33,18 +33,18 @@ main {
 
     const tensor<f32, [3]> three ← three_values ↦ tensor<f32, [3]>
     const tensor<f32, [3]> tail ← drop_one(three)
-    print tail.length()
+    print tail.shape()[0]
 
     const tensor<f32, [4]> four_lanes ← four ↦ tensor<f32, [4]>
     const tensor<f32, [4]> half ← half_width(four_lanes)
-    print half.length()
+    print half.shape()[0]
 
     const tensor<f32, [0]> zero ← seed.from_flat([], [0])
     const tensor<f32, [0]> canceled ← cancel_offset(zero)
-    print canceled.length()
+    print canceled.shape()[0]
 
     const int n ← runtime_size(4)
-    const tensor<f32, [n]> dynamic ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [n])
+    const tensor<f32, [n - 1]> dynamic ← seed.from_flat([1.0, 2.0, 3.0], [n - 1])
     const tensor<f32, [n - 1]> dynamic_tail ← drop_one(dynamic)
-    print dynamic_tail.length()
+    print dynamic_tail.shape()[0]
 }

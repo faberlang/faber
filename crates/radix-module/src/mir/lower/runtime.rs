@@ -272,16 +272,41 @@ impl FunctionBuilder<'_> {
             }),
             IndexExpr::Divide { .. } => Err("runtime shape division has a zero divisor".to_owned()),
             IndexExpr::Param(symbol) => {
-                let source = self
-                    .size_params
-                    .iter()
-                    .find_map(|(def_id, name)| {
-                        (*name == symbol)
-                            .then(|| self.size_param_sources.get(def_id).copied())
-                            .flatten()
-                    })
-                    .ok_or_else(|| "runtime shape relation retains an unbound generic dimension".to_owned())?;
-                self.lower_shape_expr(source, arguments, expression_value, boundary, callee_parameter_offset)
+                let source = self.size_params.iter().find_map(|(def_id, name)| {
+                    (*name == symbol)
+                        .then(|| self.size_param_sources.get(def_id).copied())
+                        .flatten()
+                });
+                if let Some(source) = source {
+                    return self.lower_shape_expr(
+                        source,
+                        arguments,
+                        expression_value,
+                        boundary,
+                        callee_parameter_offset,
+                    );
+                }
+
+                let known_size_parameter = self.size_params.iter().any(|(_, name)| *name == symbol);
+                if !known_size_parameter {
+                    return Err("runtime shape relation retains an unbound generic dimension".to_owned());
+                }
+
+                // A formal tensor axis can witness a direct shape parameter,
+                // but not the inverse of an affine expression such as D / 2.
+                // Preserve D as the existing compiler-owned placeholder so
+                // generic monomorphization can substitute a concrete call's
+                // size argument before its survivor check.
+                let operand = MirOperand::Constant(MirConstant::ShapeSize { shape: index, axis: None });
+                let argument = if let Some(position) = arguments.iter().position(|existing| existing == &operand) {
+                    u32::try_from(position).map_err(|_| "runtime shape check has too many operands".to_owned())?
+                } else {
+                    let position = u32::try_from(arguments.len())
+                        .map_err(|_| "runtime shape check has too many operands".to_owned())?;
+                    arguments.push(operand);
+                    position
+                };
+                Ok(MirShapeExpr::ScalarArgument { argument })
             }
             IndexExpr::Tuple(_) => Err("runtime shape relation expected a scalar dimension".to_owned()),
             IndexExpr::Infer(_) | IndexExpr::Unspecified => {
@@ -299,6 +324,9 @@ impl FunctionBuilder<'_> {
         callee_parameter_offset: u32,
     ) -> Result<MirShapeExpr, String> {
         let append = |arguments: &mut Vec<MirOperand>, operand: MirOperand| -> Result<u32, String> {
+            if let Some(position) = arguments.iter().position(|existing| existing == &operand) {
+                return u32::try_from(position).map_err(|_| "runtime shape check has too many operands".to_owned());
+            }
             let argument =
                 u32::try_from(arguments.len()).map_err(|_| "runtime shape check has too many operands".to_owned())?;
             arguments.push(operand);
@@ -664,10 +692,45 @@ impl FunctionBuilder<'_> {
             return None;
         };
 
-        let mut lowered_args = Vec::with_capacity(args.len() + 1);
-        lowered_args.push(self.lower_expr_value(receiver)?);
-        lowered_args.extend(self.lower_hir_call_args(args)?);
+        let lowered_receiver = self.lower_expr_value(receiver)?;
         let expr_ty = self.expr_ty(expr)?;
+        let shape_arg = tensor_shape_hole_argument(op, args);
+        let mut lowered_flat = None;
+        let lowered_shape = if shape_arg.is_some() {
+            let flat = if op == MirCollectionOp::TensorFromFlat {
+                let flat = self.lower_expr_value(&args[0].expr)?;
+                lowered_flat = Some(flat.clone());
+                flat
+            } else {
+                lowered_receiver.clone()
+            };
+            let expression_value = (receiver.id.0, lowered_receiver.clone());
+            Some(self.lower_lista_to_tensor_shape_with_expression(
+                flat,
+                expr_ty.semantic_id(),
+                Some(&expression_value),
+                expr.span,
+            )?)
+        } else {
+            None
+        };
+        let mut lowered_args = Vec::with_capacity(args.len() + 1);
+        lowered_args.push(lowered_receiver);
+        for (index, arg) in args.iter().enumerate() {
+            if Some(index) == shape_arg {
+                if let Some(shape) = &lowered_shape {
+                    lowered_args.push(shape.clone());
+                    continue;
+                }
+            }
+            if index == 0
+                && let Some(flat) = &lowered_flat
+            {
+                lowered_args.push(flat.clone());
+                continue;
+            }
+            lowered_args.push(self.lower_call_arg_value(&arg.expr)?);
+        }
         // WHY: semantic expected-type unification can annotate a scalar
         // collection intrinsic with its nullable enclosing type at the call
         // site. The MIR operation contract remains scalar; adapt the value at
@@ -3806,6 +3869,16 @@ impl FunctionBuilder<'_> {
     }
 
     fn lower_lista_to_tensor_shape(&mut self, flat: MirOperand, target: TypeId, span: Span) -> Option<MirOperand> {
+        self.lower_lista_to_tensor_shape_with_expression(flat, target, None, span)
+    }
+
+    fn lower_lista_to_tensor_shape_with_expression(
+        &mut self,
+        flat: MirOperand,
+        target: TypeId,
+        expression_value: Option<&(u32, MirOperand)>,
+        span: Span,
+    ) -> Option<MirOperand> {
         let shape_type = lista_numerus_type(self.types).or_else(|| {
             self.errors.push(MirError::unsupported(
                 span,
@@ -3840,7 +3913,7 @@ impl FunctionBuilder<'_> {
                             let expression = match self.lower_shape_expr(
                                 dimension,
                                 &mut shape_arguments,
-                                None,
+                                expression_value,
                                 ShapeRelationBoundary::FunctionEntry,
                                 0,
                             ) {
@@ -4127,6 +4200,24 @@ fn vector_swizzle_lane(ch: char) -> Option<u8> {
         'w' => Some(3),
         _ => None,
     }
+}
+
+/// Position of the structural shape argument for the tensor operations whose
+/// source shape list may contain `_`. The resolved result type is the runtime
+/// operand source after semantic shape inference has finished.
+fn tensor_shape_hole_argument(op: MirCollectionOp, args: &[HirCallArg]) -> Option<usize> {
+    let index = match op {
+        MirCollectionOp::TensorReshape | MirCollectionOp::TensorExpand => 0,
+        MirCollectionOp::TensorCreate | MirCollectionOp::TensorFromFlat => 1,
+        _ => return None,
+    };
+    let HirExpressionKind::Array(elements) = &args.get(index)?.expr.kind else {
+        return None;
+    };
+    elements
+        .iter()
+        .any(|element| matches!(element, HirArrayElement::Infer(_)))
+        .then_some(index)
 }
 
 fn projected_operand(place: &MirPlace, projection: MirProjection) -> MirOperand {

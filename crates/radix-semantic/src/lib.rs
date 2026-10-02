@@ -1119,20 +1119,17 @@ fn register_locale_pack_type_spellings(
         interner.intern(canonical);
     }
     for binding in pack.types.values() {
-        // Conversation-family spellings (`channel`, `frame`, `send`, `recv`)
-        // resolve only through the parser's canonical type ident. They are
-        // never symbols: the words stay ordinary identifiers (a user `fn send`
-        // must not collide with a type alias).
-        if matches!(binding.kind, TypeBindingKind::Frame(_)) {
+        // Frame and edge-policy names resolve in type position through the
+        // parser/lowerer. They stay ordinary value identifiers: a user
+        // `fn send` or `fn wrap` must not collide with a type alias.
+        if matches!(
+            binding.kind,
+            TypeBindingKind::Frame(_) | TypeBindingKind::TensorEdgePolicy(_)
+        ) {
             continue;
         }
-        let canonical_policy_identity = match binding.kind {
-            TypeBindingKind::TensorEdgePolicy(policy) => Some(policy.latin()),
-            _ => None,
-        };
         let spellings = std::iter::once(binding.canonical.as_str())
-            .chain(binding.aliases.iter().map(String::as_str))
-            .chain(canonical_policy_identity);
+            .chain(binding.aliases.iter().map(String::as_str));
         for spelling in spellings {
             let name = interner.intern(spelling);
             if resolver.lookup_type(name).is_some() {

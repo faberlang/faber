@@ -96,6 +96,7 @@ pub enum FileExportSnapshot {
         def_id: DefId,
         ty: TypeId,
         fields: Vec<StructFieldSnapshot>,
+        methods: Vec<StructMethodSnapshot>,
         is_json: bool,
     },
 }
@@ -110,6 +111,16 @@ pub struct StructFieldSnapshot {
     /// Authored genus field modifier (D16.1).
     pub modifier: Option<radix_syntax::FieldModifier>,
     /// Genus member visibility (D5.3).
+    pub visibility: radix_syntax::MemberVisibility,
+}
+
+/// Serializable imported method identity and callable contract for a struct.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StructMethodSnapshot {
+    pub def_id: DefId,
+    pub name: Symbol,
+    pub surface_name: Symbol,
+    pub sig: FuncSig,
     pub visibility: radix_syntax::MemberVisibility,
 }
 
@@ -557,8 +568,10 @@ pub struct FunctionProvenanceTableWire {
 /// obligations; schema-v32 artifacts fail closed. Version 34 carries runtime
 /// shape-boundary obligations inside provider units; schema-v33 artifacts fail
 /// closed because a provider's entry, call, and return guards are required by
-/// Rust code generation just like the root unit's guards.
-pub const SCHEMA_VERSION: u32 = 34;
+/// Rust code generation just like the root unit's guards. Version 35 carries
+/// imported struct method identities and signatures; schema-v34 artifacts fail
+/// closed because policy callbacks need their imported owner/name route.
+pub const SCHEMA_VERSION: u32 = 35;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

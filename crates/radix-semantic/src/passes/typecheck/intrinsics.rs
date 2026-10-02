@@ -1228,6 +1228,12 @@ fn check_tensor_method_args(
     if args.len() < required || args.len() > params.len() {
         checker.wrong_arity("wrong_number_of_arguments", span);
     }
+    // The active call/return shape boundary belongs to the method expression
+    // as a whole. Its peer operands are checked against intrinsic parameter
+    // types, so inheriting that boundary would reject a fresh TensorPeer shape
+    // hole before the intrinsic can relate it to the receiver.
+    let previous_shape_argument = checker.current_shape_argument.take();
+    let previous_shape_return_expr = checker.current_shape_return_expr.take();
     for (arg_index, ((arg, kind), param)) in args
         .iter_mut()
         .zip(entry.params.iter())
@@ -1263,6 +1269,8 @@ fn check_tensor_method_args(
             checker.unify_assign_issue(arg_ty, param.ty, arg.span, ISSUE_ARGUMENT_TYPE_MISMATCH);
         }
     }
+    checker.current_shape_argument = previous_shape_argument;
+    checker.current_shape_return_expr = previous_shape_return_expr;
     ret
 }
 

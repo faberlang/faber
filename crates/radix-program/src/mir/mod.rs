@@ -736,6 +736,10 @@ mod generic_pin_link_tests;
 mod tensor_edge_policy_link_tests;
 
 #[cfg(test)]
+#[path = "gradus_typed_consumer_test.rs"]
+mod gradus_typed_consumer_tests;
+
+#[cfg(test)]
 #[path = "const_member_lane_test.rs"]
 mod const_member_lane_tests;
 

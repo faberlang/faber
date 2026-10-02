@@ -6,12 +6,13 @@ use super::{
 };
 use crate::generic::MirShapeBindings;
 use crate::{
-    MirBinOp, MirCallee, MirClosureCallee, MirConstant, MirOperand, MirOptionChainLink,
-    MirOptionOp, MirPlace, MirPlaceBase, MirProjection, MirType, MirUnOp, MirValue, MirValueKind,
+    MirBinOp, MirCallee, MirClosureCallee, MirConstant, MirIntrinsic, MirOperand,
+    MirOptionChainLink, MirOptionOp, MirPlace, MirPlaceBase, MirProjection, MirRuntimeCall,
+    MirShapeExpr, MirType, MirUnOp, MirValue, MirValueKind,
 };
 use radix_hir::DefId;
 use radix_lexer::Span;
-use radix_types::{IndexExpr, IndexId, Primitive, Type, TypeId, TypeTable};
+use radix_types::{IndexExpr, IndexId, Primitive, RuntimeExtentId, Type, TypeId, TypeTable};
 
 impl Validator<'_, '_> {
     pub(crate) fn validate_value(&mut self, scope: &FunctionScope<'_, '_>, value: &MirValue) {
@@ -299,6 +300,7 @@ impl Validator<'_, '_> {
                     scope,
                     sig.as_ref(),
                     args,
+                    None,
                     span,
                     &mut generic_bindings,
                     &mut shape_bindings,
@@ -399,11 +401,13 @@ impl Validator<'_, '_> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn validate_call_args(
         &mut self,
         scope: &FunctionScope<'_, '_>,
         sig: Option<&MirFunctionSignature>,
         args: &[MirOperand],
+        shape_check: Option<&MirRuntimeCall>,
         span: Span,
         generic_bindings: &mut GenericTypeBindings,
         shape_bindings: &mut MirShapeBindings,
@@ -435,6 +439,15 @@ impl Validator<'_, '_> {
             };
             if let Some(arg_ty) = arg_ty {
                 if expected.optional && matches!(arg, MirOperand::Constant(MirConstant::Nil)) {
+                    continue;
+                }
+                if self.call_argument_matches_shape_check(
+                    scope,
+                    expected.ty,
+                    arg_ty,
+                    u32::try_from(index).unwrap_or(u32::MAX),
+                    shape_check,
+                ) {
                     continue;
                 }
                 self.bind_generic_type_witness(
@@ -470,6 +483,169 @@ impl Validator<'_, '_> {
                 }
             }
         }
+    }
+
+    fn call_argument_matches_shape_check(
+        &self,
+        scope: &FunctionScope<'_, '_>,
+        expected: MirType,
+        actual: MirType,
+        argument: u32,
+        shape_check: Option<&MirRuntimeCall>,
+    ) -> bool {
+        let Some(shape_check) = shape_check else {
+            return false;
+        };
+        let MirIntrinsic::TensorShapeCheck(check) = &shape_check.intrinsic else {
+            return false;
+        };
+        let types = self.context.types.as_table();
+        if crate::generic::type_contains_param(types, expected.semantic_id()) {
+            return false;
+        }
+        let Some((expected_element, expected_dims)) =
+            tensor_type_dims(types, expected.semantic_id())
+        else {
+            return false;
+        };
+        let Some((actual_element, actual_dims)) = tensor_type_dims(types, actual.semantic_id())
+        else {
+            return false;
+        };
+        if !types.equals(expected_element, actual_element)
+            || expected_dims.len() != actual_dims.len()
+        {
+            return false;
+        }
+
+        let mut authorized_runtime_axis = false;
+        for (axis, (expected_dim, actual_dim)) in expected_dims.iter().zip(&actual_dims).enumerate()
+        {
+            if types.index_equals(*expected_dim, *actual_dim) {
+                continue;
+            }
+            let IndexExpr::Runtime(RuntimeExtentId::FunctionParameterAxis {
+                parameter,
+                axis: formal_axis,
+            }) = types.get_index(*expected_dim)
+            else {
+                return false;
+            };
+            let carrier = MirShapeExpr::TensorAxis {
+                argument: *parameter,
+                axis: *formal_axis,
+            };
+            if !check.size_bindings.iter().any(|binding| {
+                check.proves_equal(&binding.witness, &carrier)
+                    || check.relations.iter().any(|relation| {
+                        [&relation.left, &relation.right]
+                            .into_iter()
+                            .any(|endpoint| {
+                                shape_expr_uses_witness(endpoint, &binding.witness)
+                                    && check.proves_equal(endpoint, &carrier)
+                            })
+                    })
+            }) {
+                return false;
+            }
+            let Ok(axis) = u32::try_from(axis) else {
+                return false;
+            };
+            let current = MirShapeExpr::TensorAxis { argument, axis };
+            if current == carrier {
+                authorized_runtime_axis = true;
+                continue;
+            }
+            let Some(carrier_operand) = shape_check.args.get(*parameter as usize) else {
+                return false;
+            };
+            let Some(carrier_ty) = direct_operand_type(scope, carrier_operand) else {
+                return false;
+            };
+            let Some((_, carrier_dims)) = tensor_type_dims(types, carrier_ty.semantic_id()) else {
+                return false;
+            };
+            let Some(carrier_dim) = carrier_dims.get(*formal_axis as usize) else {
+                return false;
+            };
+            if types.index_equals(*carrier_dim, *actual_dim) {
+                authorized_runtime_axis = true;
+                continue;
+            }
+            if !index_has_runtime_extent(types, *carrier_dim)
+                || !index_has_runtime_extent(types, *actual_dim)
+            {
+                return false;
+            }
+            if !check.proves_equal(&carrier, &current) {
+                return false;
+            }
+            authorized_runtime_axis = true;
+        }
+        authorized_runtime_axis
+    }
+
+    pub(crate) fn call_destination_matches_shape_check(
+        &self,
+        scope: &FunctionScope<'_, '_>,
+        destination: Option<&MirPlace>,
+        expected: Option<MirType>,
+        args: &[MirOperand],
+        shape_check: Option<&MirRuntimeCall>,
+    ) -> bool {
+        let (Some(destination), Some(expected), Some(_)) = (destination, expected, shape_check)
+        else {
+            return false;
+        };
+        let Some(actual) = direct_operand_type(scope, &MirOperand::Place(destination.clone()))
+        else {
+            return false;
+        };
+        let types = self.context.types.as_table();
+        let (Some((element, expected_dims)), Some((actual_element, actual_dims))) = (
+            tensor_type_dims(types, expected.semantic_id()),
+            tensor_type_dims(types, actual.semantic_id()),
+        ) else {
+            return false;
+        };
+        if !types.equals(element, actual_element) || expected_dims.len() != actual_dims.len() {
+            return false;
+        }
+        let mut mapped_runtime_axis = false;
+        for (expected_dim, actual_dim) in expected_dims.iter().zip(&actual_dims) {
+            if types.index_equals(*expected_dim, *actual_dim) {
+                continue;
+            }
+            let IndexExpr::Runtime(RuntimeExtentId::FunctionParameterAxis { parameter, axis }) =
+                types.get_index(*expected_dim)
+            else {
+                return false;
+            };
+            let Some(carrier_ty) = args
+                .get(*parameter as usize)
+                .and_then(|arg| direct_operand_type(scope, arg))
+            else {
+                return false;
+            };
+            let Some((_, carrier_dims)) = tensor_type_dims(types, carrier_ty.semantic_id()) else {
+                return false;
+            };
+            if !carrier_dims
+                .get(*axis as usize)
+                .is_some_and(|dim| types.index_equals(*dim, *actual_dim))
+                || !self.call_argument_matches_shape_check(
+                    scope,
+                    expected,
+                    carrier_ty,
+                    *parameter,
+                    shape_check,
+                )
+            {
+                return false;
+            }
+            mapped_runtime_axis = true;
+        }
+        mapped_runtime_axis
     }
 
     pub(crate) fn bind_generic_type_witness(
@@ -612,6 +788,58 @@ impl Validator<'_, '_> {
     }
 }
 
+fn shape_expr_uses_witness(expression: &MirShapeExpr, witness: &MirShapeExpr) -> bool {
+    expression == witness
+        || match expression {
+            MirShapeExpr::Affine { base, .. } => shape_expr_uses_witness(base, witness),
+            MirShapeExpr::Divide { numerator, divisor } if *divisor != 0 => {
+                shape_expr_uses_witness(numerator, witness)
+            }
+            _ => false,
+        }
+}
+
+fn index_has_runtime_extent(types: &TypeTable, mut index: IndexId) -> bool {
+    for _ in 0..types.index_count() {
+        index = match types.get_index(index) {
+            IndexExpr::Runtime(_) => return true,
+            IndexExpr::Affine { base, .. } => *base,
+            IndexExpr::Divide { numerator, divisor } if *divisor != 0 => *numerator,
+            _ => return false,
+        };
+    }
+    false
+}
+
+fn direct_operand_type(scope: &FunctionScope<'_, '_>, operand: &MirOperand) -> Option<MirType> {
+    match operand {
+        MirOperand::Place(place) if place.projections.is_empty() => match &place.base {
+            MirPlaceBase::Local(id) => scope.locals.get(id).copied(),
+            MirPlaceBase::Temp(id) => scope.temps.get(id).copied(),
+        },
+        MirOperand::Temp(id) => scope.temps.get(id).copied(),
+        MirOperand::Value(id) => scope.values.get(id).copied(),
+        _ => None,
+    }
+}
+
+fn tensor_type_dims(types: &TypeTable, mut ty: TypeId) -> Option<(TypeId, Vec<IndexId>)> {
+    loop {
+        match types.get(ty) {
+            Type::Alias(_, inner) | Type::Ref(_, inner) => ty = *inner,
+            Type::Tensor(element, shape) => {
+                let dimensions = match types.get_index(*shape) {
+                    IndexExpr::Tuple(dimensions) => dimensions.clone(),
+                    IndexExpr::Unspecified => return None,
+                    _ => vec![*shape],
+                };
+                return Some((*element, dimensions));
+            }
+            _ => return None,
+        }
+    }
+}
+
 fn call_argument_mismatch(
     types: &TypeTable,
     index: usize,
@@ -699,13 +927,8 @@ fn spell_index_at_precedence(
             parenthesize_index(text, 1, parent_precedence)
         }
         IndexExpr::Divide { numerator, divisor } => {
-            let (numerator, _) =
-                spell_index_at_precedence(types, *numerator, depth + 1, 2);
-            parenthesize_index(
-                format!("{numerator} / {divisor}"),
-                2,
-                parent_precedence,
-            )
+            let (numerator, _) = spell_index_at_precedence(types, *numerator, depth + 1, 2);
+            parenthesize_index(format!("{numerator} / {divisor}"), 2, parent_precedence)
         }
         IndexExpr::Tuple(dims) => {
             let parts = dims

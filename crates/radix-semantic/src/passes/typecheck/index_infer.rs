@@ -162,14 +162,25 @@ impl TypeChecker<'_> {
             // generic sizes and retained equations have a concrete value
             // source even when the tensor was constructed from a scalar
             // local or an imported generic parameter.
+            let immutable_scalar_binding = boundary == ShapeRelationBoundary::Call
+                && self.index_has_immutable_scalar_witness(actual);
             if radix_types::evaluate_index_dimension(actual, self.types)
                 .ok()
                 .flatten()
                 .is_none()
                 && !matches!(self.types.get_index(actual), IndexExpr::Infer(_))
-                && let Some((runtime_axis, _)) = self.runtime_boundary_axis(axis as u32)
             {
-                actual = runtime_axis;
+                if immutable_scalar_binding {
+                    // Keep a stable immutable scalar witness for generic
+                    // shape inference, but still guard the physical carrier
+                    // axis against it for every argument at this call.
+                    if let Some((runtime_axis, boundary)) = self.runtime_boundary_axis(axis as u32)
+                    {
+                        self.record_shape_relation(runtime_axis, actual, span, boundary);
+                    }
+                } else if let Some((runtime_axis, _)) = self.runtime_boundary_axis(axis as u32) {
+                    actual = runtime_axis;
+                }
             }
             let unified = {
                 let mut unifier = self.index_infer.unifier(self.types);
@@ -178,6 +189,26 @@ impl TypeChecker<'_> {
             match unified {
                 Ok(index) => unified_dims.push(index),
                 Err(_) => {
+                    // The unifier can have already bound this dimension's
+                    // original inference hole while checking an earlier
+                    // argument. Resolve that binding before retaining a
+                    // recoverable relation; otherwise the backend receives
+                    // an Infer node instead of the first argument's witness.
+                    let expected = self.canonicalize_index(expected);
+                    // A concrete arithmetic failure is a contradiction, not
+                    // an unknown runtime relation. In particular, after an
+                    // earlier argument binds D=5, `D / 2` cannot match a
+                    // tensor of width 2: exactness must reject at this call.
+                    if radix_types::evaluate_index_dimension(actual, self.types).is_err()
+                        || radix_types::evaluate_index_dimension(expected, self.types).is_err()
+                    {
+                        self.error_issue(
+                            SemanticErrorKind::TypeMismatch,
+                            ISSUE_INCOMPATIBLE_TENSOR_INDEX,
+                            span,
+                        );
+                        return Some(Err(()));
+                    }
                     let actual_static = radix_types::evaluate_index_dimension(actual, self.types)
                         .ok()
                         .flatten();
@@ -469,9 +500,31 @@ impl TypeChecker<'_> {
             Type::Alias(_, inner) => {
                 self.collect_tensor_shapes(parameter, inner, fields, seen, out, span);
             }
+            Type::Ref(_, inner) => {
+                self.collect_tensor_shapes(parameter, inner, fields, seen, out, span);
+            }
             _ => {}
         }
         seen.remove(&ty);
+    }
+
+    fn index_has_immutable_scalar_witness(&self, index: IndexId) -> bool {
+        match self.types.get_index(index) {
+            IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(def_id)) => {
+                self.lookup_binding(*def_id).is_some_and(|binding| {
+                    !binding.mutable
+                        && crate::numeric_width::is_integer_index_scalar(
+                            self.types,
+                            self.resolve_inferred_type(binding.ty),
+                        )
+                })
+            }
+            IndexExpr::Affine { base, .. } => self.index_has_immutable_scalar_witness(*base),
+            IndexExpr::Divide { numerator, .. } => {
+                self.index_has_immutable_scalar_witness(*numerator)
+            }
+            _ => false,
+        }
     }
 
     pub fn fresh_index_hole(&mut self) -> IndexId {

@@ -7,7 +7,7 @@
 
 use crate::index::{IndexExpr, IndexId};
 use crate::{SemanticErrorKind, Type, TypeId};
-use radix_hir::{DefId, HirArrayElement, HirExpression, HirExpressionKind, HirLiteral};
+use radix_hir::{DefId, HirArrayElement, HirBinOp, HirExpression, HirExpressionKind, HirLiteral};
 use radix_lexer::Span;
 
 #[allow(clippy::wildcard_imports)]
@@ -33,6 +33,7 @@ pub(super) const ISSUE_GLYPH_TRANSPOSE_RANK_REQUIRED: &str = "glyph_transpose_st
 const TENSOR_ADDITA: &str = "addita";
 const TENSOR_SUBTRAHE: &str = "subtrahe";
 const TENSOR_MULTIPLICA: &str = "multiplica";
+const TENSOR_DIVISIO: &str = "divisio";
 const TENSOR_MATMUL: &str = "matmul";
 const ISSUE_MATMUL_RECEIVER_SHAPE_MUST_BE_TUPLE: &str = "matmul_receiver_shape_must_be_tuple";
 const ISSUE_MATMUL_ARGUMENT_SHAPE_MUST_BE_TUPLE: &str = "matmul_argument_shape_must_be_tuple";
@@ -43,7 +44,7 @@ const ISSUE_MATMUL_ARGUMENT_RANK_MUST_BE_TWO: &str = "matmul_argument_rank_must_
 fn is_tensor_broadcast_elementwise(method_name: &str) -> bool {
     matches!(
         method_name,
-        TENSOR_ADDITA | TENSOR_SUBTRAHE | TENSOR_MULTIPLICA
+        TENSOR_ADDITA | TENSOR_SUBTRAHE | TENSOR_MULTIPLICA | TENSOR_DIVISIO
     )
 }
 
@@ -1050,12 +1051,43 @@ fn index_term_for_shape_expression(
         let value = u64::try_from(value).ok()?;
         return Some(checker.types.intern_index(IndexExpr::Literal(value)));
     }
+    if let HirExpressionKind::Binary(HirBinOp::Div, numerator, divisor) = &expr.kind
+        && let Some(divisor) = static_signed_numerus_literal(divisor)
+    {
+        let divisor = u64::try_from(divisor).ok().filter(|divisor| *divisor > 0)?;
+        let numerator = index_term_for_shape_expression(checker, numerator)?;
+        return radix_types::divide_index_exact(&mut checker.types, numerator, divisor).ok();
+    }
+    let mut offset = 0_i128;
+    let base = flatten_shape_affine_expression(expr, &mut offset);
+    if !std::ptr::eq(base, expr) {
+        let base = index_term_for_shape_expression(checker, base)?;
+        let term =
+            radix_types::compose_index_affine_constant(&mut checker.types, base, offset).ok()?;
+        return match radix_types::evaluate_index_dimension(term, checker.types) {
+            Ok(Some(value)) => Some(checker.types.intern_index(IndexExpr::Literal(value))),
+            Ok(None) => Some(term),
+            Err(_) => None,
+        };
+    }
     if let HirExpressionKind::Path(def_id) = &expr.kind {
         if let Some(symbol) = checker.resolver.get_symbol(*def_id)
             && let Some(ty) = symbol.ty
             && let Type::Param(param) = checker.types.get(ty)
         {
             return Some(checker.types.intern_index(IndexExpr::Param(*param)));
+        }
+        if let Some(binding) = checker.lookup_binding(*def_id) {
+            let ty = checker.resolve_inferred_type(binding.ty);
+            if crate::numeric_width::is_integer_index_scalar(checker.types, ty) {
+                // The same scalar binding can occur in both a tensor type
+                // annotation and a constructor shape list. Preserve its
+                // binding identity so the constructor result witnesses the
+                // annotation exactly; an expression-local identity would
+                // make these equal values appear to have unrelated extents.
+                let source = radix_types::RuntimeExtentId::ScalarBinding(*def_id);
+                return Some(checker.types.intern_index(IndexExpr::Runtime(source)));
+            }
         }
     }
     let ty = expr.ty?;
@@ -1067,6 +1099,42 @@ fn index_term_for_shape_expression(
         expression: expr.id.0,
     };
     Some(checker.types.intern_index(IndexExpr::Runtime(runtime)))
+}
+
+/// Flatten a chain of addition/subtraction by signed integer literals, just
+/// as type-position Figura lowering does. Other binary forms remain one
+/// expression and use the scalar-expression fallback below.
+fn flatten_shape_affine_expression<'a>(
+    expr: &'a HirExpression,
+    offset: &mut i128,
+) -> &'a HirExpression {
+    match &expr.kind {
+        HirExpressionKind::Binary(HirBinOp::Add, value, amount) => {
+            if let Some(amount) = static_signed_numerus_literal(amount) {
+                if let Some(total) = offset.checked_add(amount) {
+                    *offset = total;
+                    return flatten_shape_affine_expression(value, offset);
+                }
+            }
+            if let Some(literal) = static_signed_numerus_literal(value)
+                && let Some(total) = offset.checked_add(literal)
+            {
+                *offset = total;
+                return flatten_shape_affine_expression(amount, offset);
+            }
+            expr
+        }
+        HirExpressionKind::Binary(HirBinOp::Sub, value, amount) => {
+            if let Some(amount) = static_signed_numerus_literal(amount)
+                && let Some(total) = offset.checked_sub(amount)
+            {
+                *offset = total;
+                return flatten_shape_affine_expression(value, offset);
+            }
+            expr
+        }
+        _ => expr,
+    }
 }
 
 /// Shape arguments may contain source holes and runtime extents. Keep the

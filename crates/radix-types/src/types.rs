@@ -499,15 +499,15 @@ impl TypeTable {
                 | Type::Alias(_, inner) => child(*inner, seen),
                 Type::BoundedArray { element, .. }
                 | Type::BoundedQueue { element, .. }
-                | Type::BoundedStack { element, .. } => child(*element, seen),
+                | Type::BoundedStack { element, .. }
+                | Type::Tensor(element, _)
+                | Type::Vector(element, _)
+                | Type::Matrix(element, _)
+                | Type::Sparsa(element, _) => child(*element, seen),
                 Type::Map(key, value)
                 | Type::PromissumFailable(key, value)
                 | Type::AsyncCursor(key, value) => child(*key, seen) || child(*value, seen),
                 Type::Record(fields) => fields.values().any(|field| child(*field, seen)),
-                Type::Tensor(element, _)
-                | Type::Vector(element, _)
-                | Type::Matrix(element, _)
-                | Type::Sparsa(element, _) => child(*element, seen),
                 Type::Func(sig) => {
                     child(sig.ret, seen)
                         || sig.err.is_some_and(|err| child(err, seen))

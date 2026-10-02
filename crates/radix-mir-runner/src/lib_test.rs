@@ -5086,6 +5086,213 @@ fn tensor_shape_check_mismatch_has_recoverable_issue_identity() {
 }
 
 #[test]
+fn tensor_shape_guard_before_try_call_uses_the_call_error_block() {
+    use radix_mir::{
+        MirBlock, MirBlockId, MirLocal, MirParam, MirParamMode, MirShapeBinding, MirShapeCheck,
+        MirShapeExpr, MirShapeRelation, MirStatement, MirStatementKind, MirTerminator,
+        MirTerminatorKind,
+    };
+    use radix_types::{IndexExpr, NumericWidth, Primitive, TypeTable};
+
+    let mut types = TypeTable::new();
+    let element = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let two = types.intern_index(IndexExpr::Literal(2));
+    let three = types.intern_index(IndexExpr::Literal(3));
+    let first_shape = types.intern_index(IndexExpr::Tuple(vec![two]));
+    let second_shape = types.intern_index(IndexExpr::Tuple(vec![three]));
+    let first_tensor = MirType::semantic(types.tensor_with_shape(element, first_shape));
+    let second_tensor = MirType::semantic(types.tensor_with_shape(element, second_shape));
+    let text = MirType::semantic(types.primitive(Primitive::Textus));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let mut interner = Interner::new();
+    let entered = interner.intern("entered");
+    let args = vec![
+        MirOperand::Place(MirPlace::local(MirLocalId(0))),
+        MirOperand::Place(MirPlace::local(MirLocalId(1))),
+    ];
+    let first_axis = MirShapeExpr::TensorAxis {
+        argument: 0,
+        axis: 0,
+    };
+    let second_axis = MirShapeExpr::TensorAxis {
+        argument: 1,
+        axis: 0,
+    };
+    let caller = MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: Vec::new(),
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: first_tensor,
+                mutable: false,
+                span: Span::default(),
+            },
+            MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: second_tensor,
+                mutable: false,
+                span: Span::default(),
+            },
+            MirLocal {
+                id: MirLocalId(2),
+                name: None,
+                ty: text,
+                mutable: false,
+                span: Span::default(),
+            },
+            MirLocal {
+                id: MirLocalId(3),
+                name: None,
+                ty: text,
+                mutable: false,
+                span: Span::default(),
+            },
+        ],
+        temps: Vec::new(),
+        blocks: vec![
+            MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: None,
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::TensorShapeCheck(MirShapeCheck {
+                                relations: vec![MirShapeRelation {
+                                    left: first_axis.clone(),
+                                    right: second_axis,
+                                }],
+                                size_bindings: vec![MirShapeBinding {
+                                    parameter: 0,
+                                    witness: first_axis,
+                                }],
+                            }),
+                            args: args.clone(),
+                            return_ty: vacuum,
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::TryCall {
+                        destination: Some(MirPlace::local(MirLocalId(3))),
+                        callee: MirCallee::Function(MirFunctionId(1)),
+                        args,
+                        ok_block: MirBlockId(1),
+                        error_place: MirPlace::local(MirLocalId(2)),
+                        error_block: MirBlockId(2),
+                    },
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            },
+            MirBlock {
+                id: MirBlockId(1),
+                statements: Vec::new(),
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                        MirLocalId(3),
+                    )))),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            },
+            MirBlock {
+                id: MirBlockId(2),
+                statements: Vec::new(),
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                        MirLocalId(2),
+                    )))),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            },
+        ],
+        return_ty: text,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let callee = MirFunction {
+        id: MirFunctionId(1),
+        source: None,
+        name: None,
+        params: vec![
+            MirParam {
+                local: MirLocalId(0),
+                name: None,
+                ty: first_tensor,
+                mode: MirParamMode::Owned,
+                span: Span::default(),
+            },
+            MirParam {
+                local: MirLocalId(1),
+                name: None,
+                ty: second_tensor,
+                mode: MirParamMode::Owned,
+                span: Span::default(),
+            },
+        ],
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Constant(MirConstant::String(
+                    entered,
+                )))),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        }],
+        return_ty: text,
+        error_ty: Some(text),
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let program = MirProgram {
+        functions: vec![caller, callee],
+    };
+    let context = MirValidationContext::new(&types);
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    let frame = runner.frames.last_mut().expect("caller frame");
+    frame.locals.insert(
+        MirLocalId(0),
+        tensor_value(vec![Value::Int(1), Value::Int(2)], vec![2]),
+    );
+    frame.locals.insert(
+        MirLocalId(1),
+        tensor_value(vec![Value::Int(1), Value::Int(2), Value::Int(3)], vec![3]),
+    );
+
+    runner.run_until_depth(0);
+
+    assert!(
+        runner.errors.is_empty(),
+        "the call boundary catches its guard failure"
+    );
+    assert_eq!(
+        runner.return_value,
+        Some(Value::Str(
+            "tensor runtime shape mismatch: 2 != 3".to_owned()
+        ))
+    );
+    assert_eq!(runner.return_error, None);
+}
+
+#[test]
 fn tensor_shape_check_reads_vector_axis_zero_and_rejects_other_axes() {
     use radix_mir::{MirShapeCheck, MirShapeExpr, MirShapeRelation};
 

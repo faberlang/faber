@@ -1122,8 +1122,13 @@ fn collect_def_registry_for_parts(
     for (_, iface) in &resolver.file_interfaces {
         for (_, export) in &iface.exports {
             match export {
-                crate::artifact::FileExportSnapshot::Struct { def_id, .. } => {
+                crate::artifact::FileExportSnapshot::Struct {
+                    def_id, methods, ..
+                } => {
                     registry.insert(*def_id);
+                    for method in methods {
+                        registry.insert(method.def_id);
+                    }
                 }
                 crate::artifact::FileExportSnapshot::Type {
                     def_id: Some(d), ..
@@ -3545,13 +3550,53 @@ pub(crate) fn validate_referential_integrity(
                     }
                 }
                 FileExportSnapshot::Struct {
-                    def_id, ty, fields, ..
+                    def_id,
+                    ty,
+                    fields,
+                    methods,
+                    ..
                 } => {
                     checks.check_def(*def_id)?;
                     checks.check_type(*ty)?;
                     for field in fields {
                         checks.check_symbol(field.name)?;
                         checks.check_type(field.ty)?;
+                    }
+                    for method in methods {
+                        checks.check_def(method.def_id)?;
+                        checks.check_symbol(method.name)?;
+                        checks.check_symbol(method.surface_name)?;
+                        checks.check_type(method.sig.ret)?;
+                        if let Some(error_ty) = method.sig.err {
+                            checks.check_type(error_ty)?;
+                        }
+                        for param in &method.sig.type_params {
+                            checks.check_symbol(param.name)?;
+                            match &param.constraint {
+                                radix_types::TypeParamConstraint::Any => {}
+                                radix_types::TypeParamConstraint::OneOf(types) => {
+                                    for ty in types {
+                                        checks.check_type(*ty)?;
+                                    }
+                                }
+                                radix_types::TypeParamConstraint::Implet(bounds) => {
+                                    for bound in bounds {
+                                        checks.check_def(bound.contract)?;
+                                        for ty in &bound.args {
+                                            checks.check_type(*ty)?;
+                                        }
+                                    }
+                                }
+                            }
+                            if let Some(radix_types::SemanticGenericParamDefault::Typus(ty)) =
+                                param.default
+                            {
+                                checks.check_type(ty)?;
+                            }
+                        }
+                        for param in &method.sig.params {
+                            checks.check_type(param.ty)?;
+                        }
                     }
                 }
             }

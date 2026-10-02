@@ -801,6 +801,10 @@ impl<'a> TypeChecker<'a> {
         self.cross_package_structs
             .extend(self.resolver.imported_cross_package_structs());
         for (def_id, fields, methods, type_params) in self.resolver.imported_file_structs() {
+            let instance_field_count = fields
+                .iter()
+                .filter(|field| field.modifier != Some(radix_syntax::FieldModifier::Generis))
+                .count();
             // Imported generic structs substitute construction size args into
             // field types exactly like local ones (S0-G1); without this entry
             // `check_struct_fields` leaves `tensor<f32, [D]>` rigid and every
@@ -829,6 +833,10 @@ impl<'a> TypeChecker<'a> {
                 .filter(|method| method.visibility != radix_syntax::MemberVisibility::Publica)
                 .map(|method| (method.name, method.visibility))
                 .collect();
+            for method in &methods {
+                self.method_defs
+                    .insert((def_id, method.name), method.def_id);
+            }
             let methods = methods
                 .into_iter()
                 .map(|method| (method.name, method.sig))
@@ -841,6 +849,8 @@ impl<'a> TypeChecker<'a> {
                     method_visibility,
                 },
             );
+            self.instance_field_counts
+                .insert(def_id, instance_field_count);
         }
     }
 

@@ -172,6 +172,50 @@ incipit {
 }
 
 #[test]
+fn affine_and_exact_division_generic_calls_preserve_the_matched_shape() {
+    accepts(
+        r"functio drop_one<magnitudo N>(tensor<f32, [N - 1]> value) → tensor<f32, [N - 1]> {
+    redde value
+}
+
+functio half_width<magnitudo D>(tensor<f32, [D / 2]> value) → tensor<f32, [D / 2]> {
+    redde value
+}
+
+functio cancel_offset<magnitudo N>(tensor<f32, [N - 1 + 1]> value) → tensor<f32, [N - 1 + 1]> {
+    redde value
+}
+
+incipit {
+    fixum tensor<f32, [3]> three ← vacua
+    fixum tensor<f32, [3]> tail ← drop_one(three)
+    fixum tensor<f32, [4]> four ← vacua
+    fixum tensor<f32, [4]> half ← half_width(four)
+    fixum tensor<f32, [0]> zero ← vacua
+    fixum tensor<f32, [0]> canceled ← cancel_offset(zero)
+    nota tail
+    nota half
+    nota canceled
+}",
+    );
+}
+
+#[test]
+fn odd_generic_extent_rejects_an_inexact_exact_division_argument() {
+    rejects_with_issue(
+        r"functio pair_widths<magnitudo D>(tensor<f32, [D]> full, tensor<f32, [D / 2]> half) → vacuum {
+}
+
+incipit {
+    fixum tensor<f32, [5]> full ← vacua
+    fixum tensor<f32, [2]> half ← vacua
+    pair_widths(full, half)
+}",
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
 fn generic_call_symbolic_forwarding_rejects_typus_param_in_size_slot() {
     // Wrong-kind stays closed: a caller typus param is a type witness, so
     // binding it into a magnitudo slot mismatches the callee signature.

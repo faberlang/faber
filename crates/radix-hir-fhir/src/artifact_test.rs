@@ -128,7 +128,7 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // carries runtime shape-boundary obligations; schema 32 carries inferred
     // per-target kernel requirements; schema 33 carries tensor edge policies;
     // schema 34 carries runtime shape guards in provider units.
-    assert_eq!(SCHEMA_VERSION, 34);
+    assert_eq!(SCHEMA_VERSION, 35);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────

@@ -156,7 +156,8 @@ impl<'a> IndexUnifier<'a> {
                 let base_value =
                     u64::try_from(base_value).map_err(|_| IndexUnifyError::Mismatch)?;
                 let expected = self.types.intern_index(IndexExpr::Literal(base_value));
-                self.unify(base, expected)
+                self.unify(base, expected)?;
+                Ok(b)
             }
             (IndexExpr::Literal(value), IndexExpr::Affine { base, offset }) => {
                 let base_value = i128::from(value)
@@ -168,7 +169,8 @@ impl<'a> IndexUnifier<'a> {
                 let base_value =
                     u64::try_from(base_value).map_err(|_| IndexUnifyError::Mismatch)?;
                 let expected = self.types.intern_index(IndexExpr::Literal(base_value));
-                self.unify(base, expected)
+                self.unify(base, expected)?;
+                Ok(a)
             }
             (IndexExpr::Divide { numerator, divisor }, IndexExpr::Literal(value)) => {
                 if divisor == 0 {
@@ -178,7 +180,8 @@ impl<'a> IndexUnifier<'a> {
                     .checked_mul(divisor)
                     .ok_or(IndexUnifyError::Mismatch)?;
                 let expected = self.types.intern_index(IndexExpr::Literal(expected_value));
-                self.unify(numerator, expected)
+                self.unify(numerator, expected)?;
+                Ok(b)
             }
             (IndexExpr::Literal(value), IndexExpr::Divide { numerator, divisor }) => {
                 if divisor == 0 {
@@ -188,7 +191,8 @@ impl<'a> IndexUnifier<'a> {
                     .checked_mul(divisor)
                     .ok_or(IndexUnifyError::Mismatch)?;
                 let expected = self.types.intern_index(IndexExpr::Literal(expected_value));
-                self.unify(numerator, expected)
+                self.unify(numerator, expected)?;
+                Ok(a)
             }
             (IndexExpr::Tuple(a_dims), IndexExpr::Tuple(b_dims)) => {
                 if a_dims.len() != b_dims.len() {
@@ -315,7 +319,8 @@ impl<'a> IndexUnifier<'a> {
         let inverse = offset.checked_neg().ok_or(IndexUnifyError::Mismatch)?;
         let target = radix_types::compose_index_affine_constant(self.types, runtime, inverse)
             .map_err(|_| IndexUnifyError::Mismatch)?;
-        self.unify(base, target)
+        self.unify(base, target)?;
+        Ok(runtime)
     }
 
     /// BO-S-6: cache per `(IndexVar, resolved IndexId)`; no dims.clone().

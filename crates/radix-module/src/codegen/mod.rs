@@ -268,6 +268,23 @@ fn failable_facts(facts: &crate::semantic::FunctionFactTable) -> radix_hir::Fail
     radix_hir::FailableFacts { failable: facts.failable_defs(), err_tys, async_defs: facts.async_defs() }
 }
 
+#[cfg(feature = "hir-rust")]
+fn imported_tensor_edge_policy_callback_identities(
+    resolver: &crate::semantic::Resolver,
+    interner: &crate::lexer::Interner,
+) -> Vec<(radix_hir::DefId, radix_hir::DefId, String, String)> {
+    resolver
+        .imported_file_method_identities()
+        .into_iter()
+        .map(|(callback, owner, namespace, owner_name, method)| {
+            let namespace = interner.resolve(namespace);
+            let owner_name = interner.resolve(owner_name);
+            let method = interner.resolve(method).to_owned();
+            (callback, owner, format!("{namespace}::{owner_name}::{method}"), method)
+        })
+        .collect()
+}
+
 /// Dispatch the analyzed `HIR` program to the selected target backend.
 ///
 /// The shared entrypoint rejects `HIR` recovery artifacts before backend code can
@@ -322,6 +339,8 @@ pub fn generate_from_analyzed_with_options(
                     &analysis.interner,
                     &rust::ResolverImportsBridge(&analysis.resolver),
                 );
+                let callback_identities =
+                    imported_tensor_edge_policy_callback_identities(&analysis.resolver, &analysis.interner);
                 let mut emitted_tensor_policy_providers = rustc_hash::FxHashSet::default();
                 let mut policy_identity_codegen =
                     rust::RustCodegen::new_with_types(&analysis.hir, &analysis.interner, &analysis.types);
@@ -363,6 +382,7 @@ pub fn generate_from_analyzed_with_options(
                 let mut r#gen = rust::RustCodegen::new_with_types(&analysis.hir, &analysis.interner, &analysis.types);
                 r#gen.set_shape_obligations(rust::rust_shape_obligations(&analysis.shape_obligations));
                 r#gen.set_tensor_edge_policy_table(Some(&analysis.tensor_edge_policies));
+                r#gen.set_tensor_edge_policy_callback_identities(callback_identities.iter().cloned());
                 r#gen.set_gpu_builtins(&gpu_builtins);
                 r#gen.set_function_facts(&function_facts);
                 r#gen.set_used_import_defs(&used_imports);
@@ -699,6 +719,8 @@ fn map_provider_modules(
                 &provider.interner,
                 &rust::ResolverImportsBridge(&provider.resolver),
             );
+            let callback_identities =
+                imported_tensor_edge_policy_callback_identities(&provider.resolver, &provider.interner);
             let mut policy_identity_codegen =
                 rust::RustCodegen::new_with_types(&provider.hir, &provider.interner, &provider.types);
             policy_identity_codegen.set_imported_namespace_type_paths(namespace_info.type_paths.clone());
@@ -728,6 +750,7 @@ fn map_provider_modules(
                     shape_obligations: Some(&shape_obligations),
                     tensor_edge_policies: Some(&provider.tensor_edge_policies),
                     tensor_edge_policy_provider_impls_to_emit: Some(&provider_emit_rows),
+                    tensor_edge_policy_callback_identities: &callback_identities,
                     module_mode: true,
                     cli_program: None,
                     imported_function_params: None,

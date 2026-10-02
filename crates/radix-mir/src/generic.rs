@@ -370,6 +370,59 @@ fn try_bind_index_witness(
         return bind_shape_param(types, *sym, actual, shape_bindings);
     }
     match (types.get_index(expected), types.get_index(actual)) {
+        (
+            IndexExpr::Affine { base, offset },
+            IndexExpr::Affine {
+                base: actual_base,
+                offset: actual_offset,
+            },
+        ) if offset == actual_offset => {
+            if let IndexExpr::Param(parameter) = types.get_index(*base) {
+                bind_shape_param(types, *parameter, *actual_base, shape_bindings)
+            } else {
+                try_bind_index_witness(types, *base, *actual_base, shape_bindings)
+            }
+        }
+        (IndexExpr::Affine { base, offset }, IndexExpr::Literal(value)) => {
+            let IndexExpr::Param(parameter) = types.get_index(*base) else {
+                return false;
+            };
+            let Some(base_value) = i128::from(*value)
+                .checked_sub(*offset)
+                .and_then(|value| u64::try_from(value).ok())
+            else {
+                return false;
+            };
+            let Some(witness) = existing_literal_index(types, base_value) else {
+                return false;
+            };
+            bind_shape_param(types, *parameter, witness, shape_bindings)
+        }
+        (
+            IndexExpr::Divide { numerator, divisor },
+            IndexExpr::Divide {
+                numerator: actual_numerator,
+                divisor: actual_divisor,
+            },
+        ) if divisor == actual_divisor && *divisor != 0 => {
+            if let IndexExpr::Param(parameter) = types.get_index(*numerator) {
+                bind_shape_param(types, *parameter, *actual_numerator, shape_bindings)
+            } else {
+                try_bind_index_witness(types, *numerator, *actual_numerator, shape_bindings)
+            }
+        }
+        (IndexExpr::Divide { numerator, divisor }, IndexExpr::Literal(value)) if *divisor != 0 => {
+            let IndexExpr::Param(parameter) = types.get_index(*numerator) else {
+                return false;
+            };
+            let Some(numerator_value) = value.checked_mul(*divisor) else {
+                return false;
+            };
+            let Some(witness) = existing_literal_index(types, numerator_value) else {
+                return false;
+            };
+            bind_shape_param(types, *parameter, witness, shape_bindings)
+        }
         (IndexExpr::Tuple(expected_dims), IndexExpr::Tuple(actual_dims)) => {
             expected_dims.len() == actual_dims.len()
                 && expected_dims
@@ -381,6 +434,13 @@ fn try_bind_index_witness(
         }
         _ => types.index_equals(expected, actual),
     }
+}
+
+fn existing_literal_index(types: &TypeTable, value: u64) -> Option<IndexId> {
+    (0..types.index_count()).find_map(|ordinal| {
+        let id = u32::try_from(ordinal).ok().map(IndexId)?;
+        matches!(types.get_index(id), IndexExpr::Literal(found) if *found == value).then_some(id)
+    })
 }
 
 /// Bind a shape parameter to a concrete index node.
@@ -1281,9 +1341,9 @@ fn substitute_existing_index_params(
             }
             let candidate = match radix_types::evaluate_index_dimension(substituted, types) {
                 Ok(Some(value)) => {
-                    let value = i128::from(value)
-                        .checked_add(offset)
-                        .ok_or_else(|| MirGenericError::new(span, "invalid affine shape arithmetic"))?;
+                    let value = i128::from(value).checked_add(offset).ok_or_else(|| {
+                        MirGenericError::new(span, "invalid affine shape arithmetic")
+                    })?;
                     if value < 0 {
                         return Err(MirGenericError::new(span, "negative affine shape extent"));
                     }
@@ -1296,7 +1356,12 @@ fn substitute_existing_index_params(
                     base: substituted,
                     offset,
                 },
-                Err(_) => return Err(MirGenericError::new(span, "invalid affine shape arithmetic")),
+                Err(_) => {
+                    return Err(MirGenericError::new(
+                        span,
+                        "invalid affine shape arithmetic",
+                    ));
+                }
             };
             find_existing_index(types, &candidate, span)
         }
@@ -1311,7 +1376,10 @@ fn substitute_existing_index_params(
                     IndexExpr::Literal(value / divisor)
                 }
                 Ok(Some(_)) | Err(_) => {
-                    return Err(MirGenericError::new(span, "invalid exact-division shape arithmetic"));
+                    return Err(MirGenericError::new(
+                        span,
+                        "invalid exact-division shape arithmetic",
+                    ));
                 }
                 Ok(None) if divisor == 1 => return Ok(substituted),
                 Ok(None) => IndexExpr::Divide {
@@ -1409,15 +1477,13 @@ pub fn substitute_index_params(
         }
         IndexExpr::Affine { base, offset } => {
             let base = substitute_index_params(types, base, shape_bindings);
-            radix_types::add_index_constant(types, base, offset).unwrap_or_else(|_| {
-                types.intern_index(IndexExpr::Affine { base, offset })
-            })
+            radix_types::add_index_constant(types, base, offset)
+                .unwrap_or_else(|_| types.intern_index(IndexExpr::Affine { base, offset }))
         }
         IndexExpr::Divide { numerator, divisor } => {
             let numerator = substitute_index_params(types, numerator, shape_bindings);
-            radix_types::divide_index_exact(types, numerator, divisor).unwrap_or_else(|_| {
-                types.intern_index(IndexExpr::Divide { numerator, divisor })
-            })
+            radix_types::divide_index_exact(types, numerator, divisor)
+                .unwrap_or_else(|_| types.intern_index(IndexExpr::Divide { numerator, divisor }))
         }
         IndexExpr::Literal(_)
         | IndexExpr::Runtime(_)

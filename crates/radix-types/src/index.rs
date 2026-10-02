@@ -113,6 +113,10 @@ pub enum IndexArithmeticError {
 ///
 /// Returns `Ok(None)` for parameters, runtime extents, and inference holes.
 /// Exact division and natural-number range are checked for concrete terms.
+///
+/// # Errors
+/// Returns an error for non-scalar terms, negative or overflowing extents,
+/// division by zero, or a non-integral quotient.
 pub fn evaluate_index_dimension(
     index_id: IndexId,
     types: &crate::TypeTable,
@@ -152,6 +156,10 @@ pub fn evaluate_index_dimension(
 
 /// Add a signed constant to an index term, folding known values and combining
 /// adjacent affine offsets.
+///
+/// # Errors
+/// Returns an error for non-scalar terms or invalid concrete arithmetic,
+/// including negative or overflowing results.
 pub fn add_index_constant(
     types: &mut crate::TypeTable,
     base: IndexId,
@@ -171,6 +179,9 @@ pub fn add_index_constant(
 /// Lowerers use this helper across a complete additive chain, then call
 /// [`evaluate_index_dimension`] once at the expression boundary. Division
 /// remains a separate exactness boundary.
+///
+/// # Errors
+/// Returns an error for non-scalar terms or an overflowing combined offset.
 pub fn compose_index_affine_constant(
     types: &mut crate::TypeTable,
     base: IndexId,
@@ -206,6 +217,10 @@ pub fn compose_index_affine_constant(
 
 /// Divide an index term by a positive constant, folding known values and
 /// retaining a structured exact-division obligation for symbolic terms.
+///
+/// # Errors
+/// Returns an error for zero divisors, non-integral quotients, or invalid
+/// concrete numerator arithmetic.
 pub fn divide_index_exact(
     types: &mut crate::TypeTable,
     numerator: IndexId,
