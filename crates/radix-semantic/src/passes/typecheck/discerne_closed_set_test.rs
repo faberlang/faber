@@ -22,6 +22,19 @@ fn bounded_list_pattern_over_unbounded_list_is_rejected() {
 }
 
 #[test]
+fn derived_width_list_pattern_is_rejected() {
+    test_support::assert_rejects_with_issue(
+        r"functio probe(lista<numerus> values) → vacuum {
+    discerne values {
+        casu lista<numerus, N+1> { tacet }
+        casu lista<numerus> { tacet }
+    }
+}",
+        ISSUE,
+    );
+}
+
+#[test]
 fn numeric_width_pattern_over_numerus_is_rejected() {
     test_support::assert_rejects_with_issue(
         r"functio probe(numerus values) → vacuum {

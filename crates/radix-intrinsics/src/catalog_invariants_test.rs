@@ -39,8 +39,11 @@ fn empty_generic_rows_reject_angle_brackets_and_declared_rows_are_explicit() {
     let formata = lookup_method(IntrinsicReceiver::Tensor, "formata", 0).expect("formata");
     assert_eq!(formata.generic_arity(), 1);
     assert_eq!(formata.generic[0].sort, GenericParamSort::Typus);
+    let limes = lookup_method(IntrinsicReceiver::Tensor, "limes", 0).expect("limes");
+    assert_eq!(limes.generic_arity(), 1);
+    assert_eq!(limes.generic[0].sort, GenericParamSort::Typus);
     for entry in INTRINSICS {
-        if matches!(entry.faber_name, "formata" | "rope_norm") {
+        if matches!(entry.faber_name, "formata" | "rope_norm" | "limes") {
             continue;
         }
         assert!(

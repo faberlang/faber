@@ -134,14 +134,32 @@ incipit {
 }
 
 #[test]
-fn rejects_derived_width_pattern_bounds() {
-    let result = parse(lex(
-        "incipit { discerne value { casu lista<numerus, N+1> ergo tacet } }",
+fn derived_width_pattern_bounds_parse_for_semantic_rejection() {
+    // Affine figure arithmetic is a generic-argument form (tensor shapes), so
+    // the parser carries `N+1` as a size term; width patterns are rejected over
+    // a closed set by `discerne_pattern_not_in_closed_set` (radix-semantic
+    // `derived_width_list_pattern_is_rejected`).
+    let result = parse_ok("incipit { discerne value { casu lista<numerus, N+1> ergo tacet } }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Incipit(stmt) = &program.statements[0].kind else {
+        panic!("expected incipit");
+    };
+    let IfBody::Block(block) = &stmt.body else {
+        panic!("expected incipit block");
+    };
+    let radix_syntax::StmtKind::Discerne(discerne) = &block.statements[0].kind else {
+        panic!("expected discerne statement");
+    };
+    let Pattern::Type(ty, None) = &discerne.arms[0].patterns[0] else {
+        panic!("expected lista type pattern");
+    };
+    let TypeExprKind::Named(_, args) = &ty.kind else {
+        panic!("expected named lista type");
+    };
+    assert!(matches!(
+        args[1],
+        GenericArgExpr::Size(FiguraExpr::Add(_, 1))
     ));
-    assert!(
-        !result.errors.is_empty(),
-        "symbolic arithmetic in a width pattern must fail at parse/lowering boundary"
-    );
 }
 
 #[test]
