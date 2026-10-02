@@ -261,7 +261,8 @@ impl Validator<'_, '_> {
         } else {
             self.error(span, "variant field projection base is not enum");
         }
-        self.context
+        let raw_field_ty = self
+            .context
             .variant_fields
             .get(&variant)
             .and_then(|fields| fields.get(&field))
@@ -269,7 +270,8 @@ impl Validator<'_, '_> {
             .or_else(|| {
                 self.error(span, "variant field projection is missing field metadata");
                 None
-            })
+            })?;
+        self.instantiate_variant_field_ty(base_ty, raw_field_ty, span)
     }
 
     pub(crate) fn validate_variant_parent(&mut self, variant: DefId, enum_def: DefId, span: Span) {

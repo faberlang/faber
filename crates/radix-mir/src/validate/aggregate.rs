@@ -4,7 +4,8 @@ use super::{FunctionScope, GenericTypeBindings, Validator};
 use crate::generic::MirShapeBindings;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirClosureEnvironmentId,
-    MirClosureValue, MirConstant, MirNamedOperand, MirOperand, MirPlace, MirType,
+    MirClosureValue, MirConstant, MirGenericBindings, MirNamedOperand, MirOperand, MirPlace,
+    MirType, instantiate_existing_generic_type,
 };
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
@@ -328,7 +329,14 @@ impl Validator<'_, '_> {
                 } else {
                     self.error(span, "enum variant aggregate type is not enum");
                 }
-                self.validate_named_aggregate_fields(scope, *def_id, None, items, false, span);
+                self.validate_named_aggregate_fields(
+                    scope,
+                    *def_id,
+                    Some(aggregate.ty),
+                    items,
+                    false,
+                    span,
+                );
             }
             (MirAggregateKind::EnumVariant(def_id), MirAggregateFields::Ordered(items)) => {
                 if let Some(enum_def) = self.enum_def_from_type(aggregate.ty) {
@@ -537,6 +545,14 @@ impl Validator<'_, '_> {
                         None => continue,
                     }
                 }
+                (Some(aggregate_ty), false)
+                    if matches!(self.type_kind(aggregate_ty), Type::Applied(..)) =>
+                {
+                    match self.instantiate_variant_field_ty(aggregate_ty, expected_ty, span) {
+                        Some(ty) => ty,
+                        None => continue,
+                    }
+                }
                 _ => expected_ty,
             };
             if is_struct
@@ -578,6 +594,53 @@ impl Validator<'_, '_> {
                 self.error(span, "named aggregate is missing required field");
             }
         }
+    }
+
+    /// A generic variant construction's payload field types instantiate at
+    /// the aggregate's applied arguments (`Opt<numerus>` makes `T` a
+    /// `numerus`); the raw metadata still carries the declaration's params.
+    pub(crate) fn instantiate_variant_field_ty(
+        &mut self,
+        aggregate_ty: MirType,
+        raw_field_ty: MirType,
+        span: Span,
+    ) -> Option<MirType> {
+        let Type::Applied(base, args) = self.type_kind(aggregate_ty).clone() else {
+            return Some(raw_field_ty);
+        };
+        let Type::Enum(enum_def) = self.context.types.get(base) else {
+            return Some(raw_field_ty);
+        };
+        let Some(params) = self.context.enum_type_params.get(enum_def) else {
+            return Some(raw_field_ty);
+        };
+        if params.len() != args.len() {
+            self.error(
+                span,
+                "applied enum variant aggregate type argument count mismatch",
+            );
+            return None;
+        }
+        let type_args = args
+            .into_iter()
+            .map(|arg| match arg {
+                radix_types::AppliedArg::Type(id) => Some(id),
+                radix_types::AppliedArg::Size(_) => None,
+            })
+            .collect::<Option<Vec<_>>>()?;
+        let bindings = params
+            .iter()
+            .copied()
+            .zip(type_args.into_iter().map(MirType::semantic))
+            .collect::<MirGenericBindings>();
+        instantiate_existing_generic_type(
+            self.context.types.as_table(),
+            raw_field_ty,
+            &bindings,
+            span,
+        )
+        .map_err(|error| self.error(error.span, error.message))
+        .ok()
     }
 
     pub(crate) fn validate_optional_destination(
