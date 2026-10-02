@@ -306,6 +306,27 @@ fn the_exact_rows_spell_as_faber_exact_functions_in_rust() {
 }
 
 #[test]
+fn the_regex_rows_spell_as_faber_regex_functions_in_rust() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Regex)
+        .collect();
+    assert_eq!(rows.len(), 12);
+    for row in rows {
+        assert_eq!(row.kind, RuntimeKind::Fn);
+        assert_eq!(row.targets, [Target::HirRust]);
+        assert_eq!(
+            spell_any(Target::HirRust, row),
+            format!("faber::regex::{}", row.name)
+        );
+    }
+    assert_eq!(
+        spell(Target::HirRust, &REGEX_FIND_ALL),
+        Ok("faber::regex::find_all".to_owned())
+    );
+}
+
+#[test]
 fn only_the_exact_store_row_is_store_family() {
     let store_rows: Vec<&str> = TABLE
         .iter()
