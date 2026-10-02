@@ -2455,26 +2455,27 @@ xs[i] ← v
 ```
 
 Lista bracket access is **plain**, not nullable: it returns the bare element
-`T` and traps on out-of-bounds. This differs from `tensor`, whose bracket read
-is `accipe` sugar and returns `T ∪ nihil`. For nullable list access, use
-`xs.accipe(i) → T ∪ nihil` with `或取`.
+`T` and traps on out-of-bounds. A `tensor` bracket read is plain in the same
+way. For nullable list access, use `xs.accipe(i) → T ∪ nihil` with `或取`.
 
-For `tensor<T, Figura>`, bracket indexing is sugar over the tensor intrinsic
-surface:
+For `tensor<T, Figura>`, a bracket read returns the bare element `T` and traps
+on a bad index, like a list index; a literal index that is provably out of
+range is a compile error. Bracket indexing is sugar over the tensor intrinsic
+surface (the nullable read is the `accipe` method, not the bracket):
 
 ```fab
-# vector.accipe([id])
+# trapping vector.accipe([id])
 vector[id]
 # vector.ponde([id], v)
 vector[id] ← v
-# grid.accipe([r, c])
+# trapping grid.accipe([r, c])
 grid[[r, c]]
 # grid.ponde([r, c], v)
 grid[[r, c]] ← v
 ```
 
-Reads return `T ∪ nihil`, matching `accipe`; use `或取` or another ordinary
-option-handling form before arithmetic. Rank-1 tensors accept scalar integer
+Reads return `T` (no `或取` is needed); use the `accipe` method for a nullable
+read. Rank-1 tensors accept scalar integer
 indices that fit the tensor `i64` runtime boundary (`u64` is rejected).
 Rank-N tensors use a list-shaped index expression such as `[[r, c]]` or a
 bound `lista<integer>` value. `grid[r, c]` is not syntax; `memberSuffix` still
