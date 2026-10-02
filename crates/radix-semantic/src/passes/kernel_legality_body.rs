@@ -14,7 +14,9 @@ use super::kernel_legality::{
     Sink,
 };
 use super::kernel_legality_types::{FAMILY_ATOMIC, FAMILY_SATURATING_FLOAT, host_only_family};
-use crate::{NumericWidth, Primitive, ResolvedTensorEdgePolicy, SymbolKind, Type, TypeId, WarningKind};
+use crate::{
+    NumericWidth, Primitive, ResolvedTensorEdgePolicy, SymbolKind, Type, TypeId, WarningKind,
+};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local};
 use radix_hir::{
     DefId, HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirLocal,

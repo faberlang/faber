@@ -23,8 +23,8 @@
 use crate::all_diagnostic_specs;
 use crate::file_interface::{InterfaceLibraryIdentity, InterfaceMemberKind};
 use crate::{
-    BuiltinTensorEdgePolicy, CollectionKind, Primitive, TensorFamilyKind,
-    collection_type_specs, primitive_type_specs, tensor_family_type_specs,
+    BuiltinTensorEdgePolicy, CollectionKind, Primitive, TensorFamilyKind, collection_type_specs,
+    primitive_type_specs, tensor_family_type_specs,
 };
 use radix_diagnostics::{Diagnostic, DiagnosticArg};
 use radix_intrinsics::{INTRINSICS, IntrinsicReceiver};

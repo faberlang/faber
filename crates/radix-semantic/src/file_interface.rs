@@ -346,13 +346,18 @@ pub enum InterfaceIndexSnapshot {
         divisor: u64,
     },
     Tuple(Vec<InterfaceIndexSnapshot>),
-    RuntimeTensorParameterAxis { parameter: u32, axis: u32 },
+    RuntimeTensorParameterAxis {
+        parameter: u32,
+        axis: u32,
+    },
     RuntimeTensorParameterFieldAxis {
         parameter: u32,
         fields: Vec<String>,
         axis: u32,
     },
-    RuntimeScalarParameter { parameter: u32 },
+    RuntimeScalarParameter {
+        parameter: u32,
+    },
     Unspecified,
 }
 
@@ -1569,14 +1574,13 @@ fn import_interface_index(
             radix_types::divide_index_exact(types, numerator, *divisor)
                 .map_err(FileInterfaceError::InvalidIndexArithmetic)
         }
-        InterfaceIndexSnapshot::RuntimeTensorParameterAxis { parameter, axis } => {
-            Ok(types.intern_index(IndexExpr::Runtime(
+        InterfaceIndexSnapshot::RuntimeTensorParameterAxis { parameter, axis } => Ok(types
+            .intern_index(IndexExpr::Runtime(
                 radix_types::RuntimeExtentId::FunctionParameterAxis {
                     parameter: *parameter,
                     axis: *axis,
                 },
-            )))
-        }
+            ))),
         InterfaceIndexSnapshot::RuntimeTensorParameterFieldAxis {
             parameter,
             fields,
@@ -1588,13 +1592,11 @@ fn import_interface_index(
                 axis: *axis,
             },
         ))),
-        InterfaceIndexSnapshot::RuntimeScalarParameter { parameter } => {
-            Ok(types.intern_index(IndexExpr::Runtime(
-                radix_types::RuntimeExtentId::ScalarParameter {
-                    parameter: *parameter,
-                },
-            )))
-        }
+        InterfaceIndexSnapshot::RuntimeScalarParameter { parameter } => Ok(types.intern_index(
+            IndexExpr::Runtime(radix_types::RuntimeExtentId::ScalarParameter {
+                parameter: *parameter,
+            }),
+        )),
         InterfaceIndexSnapshot::Tuple(dims) => dims
             .iter()
             .map(|dim| import_interface_index(dim, types, interner))

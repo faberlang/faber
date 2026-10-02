@@ -10,13 +10,13 @@ use crate::InstansPrecision;
 use crate::NumericWidth;
 use crate::TypeId;
 use crate::index::{
-    IndexExpr, IndexId, IndexArithmeticError, add_index_constant, divide_index_exact,
-    compose_index_affine_constant, evaluate_index_dimension, i64s_from_literal_index,
+    IndexArithmeticError, IndexExpr, IndexId, add_index_constant, compose_index_affine_constant,
+    divide_index_exact, evaluate_index_dimension, i64s_from_literal_index,
 };
 use crate::{
-    AccessMarker, AppliedArg, BuiltinTensorEdgePolicy, CollectionKind, FloatPolicy, FuncSig, GenericParamDescriptor,
-    GenericParamSort, ParamType, Primitive, SemanticGenericParamDefault, SemanticMutability,
-    SemanticParamMode, TensorFamilyKind, Type, TypeParamConstraint, TypeTable,
+    AccessMarker, AppliedArg, BuiltinTensorEdgePolicy, CollectionKind, FloatPolicy, FuncSig,
+    GenericParamDescriptor, GenericParamSort, ParamType, Primitive, SemanticGenericParamDefault,
+    SemanticMutability, SemanticParamMode, TensorFamilyKind, Type, TypeParamConstraint, TypeTable,
     collection_type_specs, lookup_collection_type_spec, lookup_primitive_type_spec,
     lookup_tensor_family_type_spec, primitive_type_specs, tensor_family_type_specs,
 };
@@ -27,9 +27,18 @@ fn tensor_edge_policy_markers_keep_compiler_identity_and_are_non_value_types() {
     let clamp = types.tensor_edge_policy(BuiltinTensorEdgePolicy::Clamp);
     let reflect = types.tensor_edge_policy(BuiltinTensorEdgePolicy::Reflect);
     let wrap = types.tensor_edge_policy(BuiltinTensorEdgePolicy::Wrap);
-    assert_eq!(types.tensor_edge_policy_kind(clamp), Some(BuiltinTensorEdgePolicy::Clamp));
-    assert_eq!(types.tensor_edge_policy_kind(reflect), Some(BuiltinTensorEdgePolicy::Reflect));
-    assert_eq!(types.tensor_edge_policy_kind(wrap), Some(BuiltinTensorEdgePolicy::Wrap));
+    assert_eq!(
+        types.tensor_edge_policy_kind(clamp),
+        Some(BuiltinTensorEdgePolicy::Clamp)
+    );
+    assert_eq!(
+        types.tensor_edge_policy_kind(reflect),
+        Some(BuiltinTensorEdgePolicy::Reflect)
+    );
+    assert_eq!(
+        types.tensor_edge_policy_kind(wrap),
+        Some(BuiltinTensorEdgePolicy::Wrap)
+    );
 
     let user_type = types.intern(Type::Struct(crate::DefId(9001)));
     assert_eq!(types.tensor_edge_policy_kind(user_type), None);

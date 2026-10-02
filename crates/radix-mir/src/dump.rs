@@ -468,7 +468,11 @@ fn edge_policy(policy: &crate::MirEdgePolicy) -> String {
         crate::MirEdgePolicy::Builtin(crate::MirBuiltinEdgePolicy::Clamp) => "clamp".to_owned(),
         crate::MirEdgePolicy::Builtin(crate::MirBuiltinEdgePolicy::Reflect) => "reflect".to_owned(),
         crate::MirEdgePolicy::Builtin(crate::MirBuiltinEdgePolicy::Wrap) => "wrap".to_owned(),
-        crate::MirEdgePolicy::Custom { policy_def, remap, transform } => format!(
+        crate::MirEdgePolicy::Custom {
+            policy_def,
+            remap,
+            transform,
+        } => format!(
             "custom def#{} remap {} transform {}",
             policy_def.0,
             function_id(*remap),

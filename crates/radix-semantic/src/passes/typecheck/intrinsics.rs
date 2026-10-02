@@ -11,8 +11,8 @@
 use super::TypeChecker;
 use crate::tensor_type_directed::{complete_tensor_type, is_tensor_type};
 use crate::{
-    FuncSig, GenericParamDescriptor, IndexExpr, IndexId, NumericWidth, ParamType,
-    Primitive, SemanticErrorKind, SemanticGenericParamDefault, SemanticParamMode, Type, TypeId,
+    FuncSig, GenericParamDescriptor, IndexExpr, IndexId, NumericWidth, ParamType, Primitive,
+    SemanticErrorKind, SemanticGenericParamDefault, SemanticParamMode, Type, TypeId,
     TypeParamConstraint,
 };
 use radix_hir::{HirArrayElement, HirCallArg, HirExpression, HirExpressionKind};
@@ -49,8 +49,7 @@ const ISSUE_TENSOR_SHIFT_NULLABLE_SOURCE_UNSUPPORTED: &str =
     "tensor_shift_nullable_source_unsupported";
 pub(super) const ISSUE_TENSOR_EDGE_VIEW_REQUIRES_RESOLUTION: &str =
     "tensor_edge_view_requires_resolution";
-const ISSUE_TENSOR_LIMES_REQUIRES_SHIFTED_VIEW: &str =
-    "tensor_limes_requires_shifted_view";
+const ISSUE_TENSOR_LIMES_REQUIRES_SHIFTED_VIEW: &str = "tensor_limes_requires_shifted_view";
 const ISSUE_TENSOR_LIMES_POLICY_INVALID: &str = "tensor_limes_policy_invalid";
 const ISSUE_TENSOR_SHIFT_OFFSET_RANK_MISMATCH: &str = "tensor_shift_offset_rank_mismatch";
 pub(super) const ISSUE_ATOMIC_METHOD_REQUIRES_ATOMIC_RECEIVER: &str =
@@ -369,7 +368,13 @@ pub(super) fn check_intrinsic_method_call(
         let params = resolve_param_types(checker, entry, &ctx);
         let ret = resolve_return_type(checker, entry, &ctx, span);
         check_tensor_method_args(checker, entry, &params, args, ret, span);
-        return Some(check_tensor_shift(checker, receiver, receiver_ty, args, span));
+        return Some(check_tensor_shift(
+            checker,
+            receiver,
+            receiver_ty,
+            args,
+            span,
+        ));
     }
     if checker
         .tensor_edge_policies
@@ -1310,13 +1315,16 @@ fn check_tensor_shift(
         return checker.error_type;
     };
     if let Some(HirCallArg {
-        expr: HirExpression {
-            kind: HirExpressionKind::Array(elements),
-            ..
-        },
+        expr:
+            HirExpression {
+                kind: HirExpressionKind::Array(elements),
+                ..
+            },
         ..
     }) = args.first()
-        && elements.iter().all(|element| matches!(element, HirArrayElement::Expr(_)))
+        && elements
+            .iter()
+            .all(|element| matches!(element, HirArrayElement::Expr(_)))
         && elements.len() != rank
     {
         checker.invalid_operand_types(ISSUE_TENSOR_SHIFT_OFFSET_RANK_MISMATCH, span);
@@ -1470,13 +1478,8 @@ pub(super) fn check_custom_tensor_edge_policy(
     let remap_def = *checker.method_defs.get(&(def, remap_name))?;
     let remap_sig = checker.structs.get(&def)?.methods.get(&remap_name)?.clone();
     let remap_sig = instantiate_edge_policy_method(checker, nominal, def, &remap_sig)?;
-    let coordinate = validate_edge_policy_callback_signature(
-        checker,
-        &remap_sig,
-        element,
-        rank,
-        false,
-    )?;
+    let coordinate =
+        validate_edge_policy_callback_signature(checker, &remap_sig, element, rank, false)?;
 
     let transform = if let Some(name) = transform_name
         && let Some(def_id) = checker.method_defs.get(&(def, name)).copied()
@@ -1505,7 +1508,11 @@ fn instantiate_edge_policy_method(
     if !signature.type_params.is_empty() {
         return None;
     }
-    let names = checker.type_params_by_def.get(&def).cloned().unwrap_or_default();
+    let names = checker
+        .type_params_by_def
+        .get(&def)
+        .cloned()
+        .unwrap_or_default();
     let applied = match checker.types.get(nominal).clone() {
         Type::Applied(_, args) => args,
         Type::Struct(_) => Vec::new(),
@@ -1526,11 +1533,7 @@ fn instantiate_edge_policy_method(
             }
         }
     }
-    Some(checker.substitute_func_sig(
-        signature,
-        &mut type_vars,
-        Some(&mut shape_vars),
-    ))
+    Some(checker.substitute_func_sig(signature, &mut type_vars, Some(&mut shape_vars)))
 }
 
 fn validate_edge_policy_callback_signature(
@@ -1566,8 +1569,7 @@ fn validate_edge_policy_callback_signature(
     }
     if transform {
         let value = checker.resolve_inferred_type(signature.params[1].ty);
-        if !checker.types.equals(value, element) || !checker.types.equals(signature.ret, element)
-        {
+        if !checker.types.equals(value, element) || !checker.types.equals(signature.ret, element) {
             return None;
         }
         // Transform's result is the tensor element, while its first argument
@@ -1614,10 +1616,8 @@ fn check_tensor_shape_hole_argument(checker: &mut TypeChecker<'_>, arg: &mut Hir
             }
             HirArrayElement::Spread(expr) => {
                 checker.check_expr(expr);
-                checker.invalid_operand_types(
-                    ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS,
-                    expr.span,
-                );
+                checker
+                    .invalid_operand_types(ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS, expr.span);
             }
             HirArrayElement::Infer(_) => {}
         }

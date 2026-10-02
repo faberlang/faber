@@ -1441,13 +1441,9 @@ impl Lowerer<'_> {
                     if let Some(binding) = local {
                         let source = self.parameter_ordinals.get(&binding).copied().map_or(
                             radix_types::RuntimeExtentId::ScalarBinding(binding),
-                            |parameter| {
-                                radix_types::RuntimeExtentId::ScalarParameter { parameter }
-                            },
+                            |parameter| radix_types::RuntimeExtentId::ScalarParameter { parameter },
                         );
-                        Ok(self.types.intern_index(IndexExpr::Runtime(
-                            source,
-                        )))
+                        Ok(self.types.intern_index(IndexExpr::Runtime(source)))
                     } else {
                         crate::lower_figura_expr(figura, self.resolver, self.types)
                     }

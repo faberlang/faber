@@ -788,11 +788,7 @@ impl TypeChecker<'_> {
             _ => resolved,
         };
         if let HirExpressionKind::Path(binding) = &expr.kind {
-            if self
-                .tensor_edge_policies
-                .shifted_bindings
-                .contains(binding)
-            {
+            if self.tensor_edge_policies.shifted_bindings.contains(binding) {
                 self.tensor_edge_policies
                     .shifted_expressions
                     .insert(expr.id);

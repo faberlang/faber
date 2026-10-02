@@ -6,8 +6,8 @@
 //! semantic callers keep one path.
 
 pub use radix_types::{
-    ATOMIC_ELEMENT_MSG, AccessMarker, BuiltinTensorEdgePolicy, CollectionKind, CollectionTypeSpec, FuncSig,
-    GenericBindingSource, GenericParamDescriptor, GenericParamSort, GenericWitness,
+    ATOMIC_ELEMENT_MSG, AccessMarker, BuiltinTensorEdgePolicy, CollectionKind, CollectionTypeSpec,
+    FuncSig, GenericBindingSource, GenericParamDescriptor, GenericParamSort, GenericWitness,
     INTERVALLUM_BOUND_MSG, InferVar, MarkerFamily, ParamType, Primitive, PrimitiveTypeSpec,
     ResolvedGenericBinding, ResolvedGenericCall, SemanticGenericParamDefault, SemanticMutability,
     SemanticParamMode, TensorFamilyKind, TensorFamilyTypeSpec, Type, TypeId, TypeParamConstraint,

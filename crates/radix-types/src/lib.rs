@@ -59,10 +59,9 @@ pub use vocabulary::{
 /// compiler crate.
 pub const USER_DEF_ID_BASE: u32 = 0x0000_1000;
 pub use index::{
-    IndexArithmeticError, IndexExpr, IndexId, IndexVar, RuntimeExtentId,
-    add_index_constant, compose_index_affine_constant, compute_cotangent_reduction_axes,
-    divide_index_exact, evaluate_index_dimension, i64s_from_literal_index,
-    parse_natural_capacity,
+    IndexArithmeticError, IndexExpr, IndexId, IndexVar, RuntimeExtentId, add_index_constant,
+    compose_index_affine_constant, compute_cotangent_reduction_axes, divide_index_exact,
+    evaluate_index_dimension, i64s_from_literal_index, parse_natural_capacity,
 };
 pub use instans_precision::{
     InstansPrecision, InstansPrecisionError, InstansPrecisionRank, effective_instans_precision,
@@ -85,15 +84,15 @@ pub use schema_subset::{
     SchemaSubsetError, extra_input_columns, schema_column_count, schema_subset,
 };
 pub use types::{
-    ATOMIC_ELEMENT_MSG, AccessMarker, AppliedArg, CollectionKind, CollectionTypeSpec, ContractRef,
-    BuiltinTensorEdgePolicy, FloatPolicy, FuncSig, GenericBindingSource, GenericParamDescriptor, GenericParamSort,
-    GenericWitness, INTERVALLUM_BOUND_MSG, InferVar, MarkerFamily, ParamType, Primitive,
-    PrimitiveTypeSpec, ResolvedGenericBinding, ResolvedGenericCall, SemanticGenericParamDefault,
-    SemanticMutability, SemanticParamMode, TensorFamilyKind, TensorFamilyTypeSpec, Type, TypeId,
-    TypeParamConstraint, TypeTable, TypeTableSnapshot, collection_type_specs,
-    is_atomic_element_type, is_intervallum_bound_type, lookup_collection_type_spec,
-    lookup_primitive_type_spec, lookup_tensor_family_type_spec, primitive_type_specs,
-    tensor_family_type_specs,
+    ATOMIC_ELEMENT_MSG, AccessMarker, AppliedArg, BuiltinTensorEdgePolicy, CollectionKind,
+    CollectionTypeSpec, ContractRef, FloatPolicy, FuncSig, GenericBindingSource,
+    GenericParamDescriptor, GenericParamSort, GenericWitness, INTERVALLUM_BOUND_MSG, InferVar,
+    MarkerFamily, ParamType, Primitive, PrimitiveTypeSpec, ResolvedGenericBinding,
+    ResolvedGenericCall, SemanticGenericParamDefault, SemanticMutability, SemanticParamMode,
+    TensorFamilyKind, TensorFamilyTypeSpec, Type, TypeId, TypeParamConstraint, TypeTable,
+    TypeTableSnapshot, collection_type_specs, is_atomic_element_type, is_intervallum_bound_type,
+    lookup_collection_type_spec, lookup_primitive_type_spec, lookup_tensor_family_type_spec,
+    primitive_type_specs, tensor_family_type_specs,
 };
 
 #[cfg(test)]

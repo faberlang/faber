@@ -882,7 +882,11 @@ pub(super) fn lower_package_units<'a>(
     // below, so linked library functions are lowered only when reachable from
     // the entry's call graph (default = pruning, delivery §4.3).
     let mut reachable_seed = collect_package_synthetic_references(package);
-    collect_tensor_edge_policy_callback_references(package, &links.method_targets, &mut reachable_seed);
+    collect_tensor_edge_policy_callback_references(
+        package,
+        &links.method_targets,
+        &mut reachable_seed,
+    );
 
     let other_ids = package
         .nodes
@@ -1479,7 +1483,10 @@ pub(super) fn lower_package_units<'a>(
     // placeholder with concrete callback MIDs.
     for library in &library_parts {
         for provider in &library.tensor_edge_policy_metadata.providers {
-            if let MirTensorEdgePolicySelector::Custom { remap, transform, .. } = provider.selector {
+            if let MirTensorEdgePolicySelector::Custom {
+                remap, transform, ..
+            } = provider.selector
+            {
                 reachable_seed.insert(remap);
                 reachable_seed.extend(transform);
             }
@@ -2515,7 +2522,13 @@ fn rewrite_lowered_shape_size_indices<'a>(
             let MirConstant::ShapeSize { shape, .. } = constant else {
                 return true;
             };
-            *shape = import_shape_size_index(source_types, target_types, *shape, param_symbols, record_field_symbols);
+            *shape = import_shape_size_index(
+                source_types,
+                target_types,
+                *shape,
+                param_symbols,
+                record_field_symbols,
+            );
             true
         });
     };
@@ -2559,16 +2572,36 @@ fn import_shape_size_index(
         IndexExpr::Tuple(items) => {
             let items = items
                 .into_iter()
-                .map(|item| import_shape_size_index(source_types, target_types, item, param_symbols, record_field_symbols))
+                .map(|item| {
+                    import_shape_size_index(
+                        source_types,
+                        target_types,
+                        item,
+                        param_symbols,
+                        record_field_symbols,
+                    )
+                })
                 .collect();
             target_types.intern_index(IndexExpr::Tuple(items))
         }
         IndexExpr::Affine { base, offset } => {
-            let base = import_shape_size_index(source_types, target_types, base, param_symbols, record_field_symbols);
+            let base = import_shape_size_index(
+                source_types,
+                target_types,
+                base,
+                param_symbols,
+                record_field_symbols,
+            );
             target_types.intern_index(IndexExpr::Affine { base, offset })
         }
         IndexExpr::Divide { numerator, divisor } => {
-            let numerator = import_shape_size_index(source_types, target_types, numerator, param_symbols, record_field_symbols);
+            let numerator = import_shape_size_index(
+                source_types,
+                target_types,
+                numerator,
+                param_symbols,
+                record_field_symbols,
+            );
             target_types.intern_index(IndexExpr::Divide { numerator, divisor })
         }
         IndexExpr::Param(symbol) => target_types.intern_index(IndexExpr::Param(

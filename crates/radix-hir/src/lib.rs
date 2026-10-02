@@ -23,11 +23,11 @@ pub mod visit;
 
 pub use nodes::*;
 pub use radix_types::{DefId, TypeId};
+use rustc_hash::{FxHashMap, FxHashSet};
 pub use tensor_edge_policy::{
     ResolvedTensorEdgePolicy, TensorEdgePolicyProviderImpl, TensorEdgePolicyRequirement,
     TensorEdgePolicyTable, TensorShiftContext,
 };
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Function facts installed by analyzed HIR consumers at the codegen boundary.
 ///

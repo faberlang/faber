@@ -7,8 +7,8 @@
 use super::TypeTable;
 use super::index::{IndexExpr, IndexId, IndexVar};
 use super::index_unify::{IndexUnifier, IndexUnifyError};
-use rustc_hash::FxHashMap;
 use radix_types::{IndexArithmeticError, add_index_constant, divide_index_exact};
+use rustc_hash::FxHashMap;
 
 pub const MISSING_TENSOR_SHAPE_MSG: &str = "cannot infer tensor shape";
 pub const INCOMPATIBLE_INDEX_MSG: &str = "index shapes are incompatible";
@@ -106,9 +106,7 @@ impl IndexInferState {
                 .into_iter()
                 .any(|dim| self.contains_unresolved_hole(types, dim)),
             IndexExpr::Affine { base, .. } => self.contains_unresolved_hole(types, base),
-            IndexExpr::Divide { numerator, .. } => {
-                self.contains_unresolved_hole(types, numerator)
-            }
+            IndexExpr::Divide { numerator, .. } => self.contains_unresolved_hole(types, numerator),
             _ => false,
         }
     }
@@ -153,9 +151,8 @@ impl IndexInferState {
             }
             IndexExpr::Affine { base, offset } => {
                 let base = self.canonicalize(types, base);
-                add_index_constant(types, base, offset).unwrap_or_else(|_| {
-                    types.intern_index(IndexExpr::Affine { base, offset })
-                })
+                add_index_constant(types, base, offset)
+                    .unwrap_or_else(|_| types.intern_index(IndexExpr::Affine { base, offset }))
             }
             IndexExpr::Divide { numerator, divisor } => {
                 let numerator = self.canonicalize(types, numerator);
@@ -214,7 +211,9 @@ impl IndexInferState {
 
 fn index_arithmetic_error(id: IndexId, types: &TypeTable) -> Option<IndexArithmeticError> {
     match types.get_index(id) {
-        IndexExpr::Tuple(dims) => dims.iter().find_map(|dim| index_arithmetic_error(*dim, types)),
+        IndexExpr::Tuple(dims) => dims
+            .iter()
+            .find_map(|dim| index_arithmetic_error(*dim, types)),
         IndexExpr::Affine { base, .. } => radix_types::evaluate_index_dimension(id, types)
             .err()
             .or_else(|| index_arithmetic_error(*base, types)),

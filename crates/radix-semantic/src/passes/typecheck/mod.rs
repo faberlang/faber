@@ -59,14 +59,13 @@
 
 use crate::locale::LocalePack;
 use crate::{
-    FuncSig, GenericBindingSource, GenericParamSort, GenericWitness, IndexExpr, IndexId, IndexInferState,
-    MarkerFamily, NumericWidth, ParamType, Primitive, ResolvedGenericBinding, ResolvedGenericCall,
-    Resolver, RuntimeSizeBinding, SemanticError, SemanticErrorKind,
+    FuncSig, GenericBindingSource, GenericParamSort, GenericWitness, IndexExpr, IndexId,
+    IndexInferState, MarkerFamily, NumericWidth, ParamType, Primitive, ResolvedGenericBinding,
+    ResolvedGenericCall, Resolver, RuntimeSizeBinding, SemanticError, SemanticErrorKind,
     SemanticGenericParamDefault, SemanticParamMode, ShapeObligationTable, ShapeRelation,
     ShapeRelationBoundary, Type, TypeId, TypeParamConstraint, TypeTable, WarningKind,
     types::InferVar,
 };
-use radix_types::RuntimeExtentId;
 use radix_hir::{
     DefId, HirArrayElement, HirAvailability, HirBinOp, HirBlock, HirCape, HirCasuArm,
     HirConversioTarget, HirExpression, HirExpressionKind, HirFunction, HirId, HirItem, HirItemKind,
@@ -76,13 +75,13 @@ use radix_hir::{
 };
 use radix_lexer::{Interner, Symbol};
 use radix_target::Target;
+use radix_types::RuntimeExtentId;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 
 pub mod access;
 pub mod aggregate;
 pub mod call;
-mod tensor_edge_policy_generic;
 #[cfg(test)]
 #[path = "call_default_test.rs"]
 mod call_default_test;
@@ -119,6 +118,7 @@ mod register_shape_finalize_test;
 #[cfg(test)]
 #[path = "shape_obligations_test.rs"]
 mod shape_obligations_test;
+mod tensor_edge_policy_generic;
 
 mod closing;
 #[cfg(test)]

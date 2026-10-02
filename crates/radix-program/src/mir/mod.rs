@@ -171,8 +171,8 @@ use radix_module::mir::{
     MirPlace, MirProgram, MirProjection, MirProviderKind, MirRuntimeCall, MirRuntimeRecordField,
     MirRuntimeRecordValue, MirStatement, MirStatementKind, MirSwitchCase,
     MirTensorEdgePolicyMetadata, MirTensorEdgePolicySelector, MirTerminator, MirTerminatorKind,
-    MirType, MirValue, MirValueKind, RunnerError, RunnerStats,
-    lower_analyzed_unit, run_entry, run_entry_with_stats, validate_program,
+    MirType, MirValue, MirValueKind, RunnerError, RunnerStats, lower_analyzed_unit, run_entry,
+    run_entry_with_stats, validate_program,
 };
 use radix_module::semantic::{
     IndexExpr, Primitive, Resolver, SymbolKind, Type, TypeId, TypeTable, TypeTableSnapshot,

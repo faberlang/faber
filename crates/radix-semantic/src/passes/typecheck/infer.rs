@@ -21,10 +21,10 @@
 //! - The occurs check prevents recursive inference substitutions from creating
 //!   an infinite semantic type.
 
+use super::index_infer::ISSUE_INCOMPATIBLE_TENSOR_INDEX;
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
-use super::index_infer::ISSUE_INCOMPATIBLE_TENSOR_INDEX;
 
 /// Whether unification is a symmetric inference join or a directional assignment.
 #[derive(Copy, Clone)]
@@ -516,10 +516,7 @@ impl TypeChecker<'_> {
                     self.current_shape_fields.push(name);
                     let unified = self.unify_with_policy(from_ty, to_ty, span, issue, policy);
                     self.current_shape_fields.pop();
-                    fields.push((
-                        name,
-                        unified,
-                    ));
+                    fields.push((name, unified));
                 }
                 return self.types.record(fields);
             }
@@ -532,10 +529,12 @@ impl TypeChecker<'_> {
                 let shape = match self.unify_shape_at_boundary(sa, sb, span) {
                     Some(Ok(shape)) => shape,
                     Some(Err(())) => return self.error_type,
-                    None => match super::tensor_index::unify_tensor_shape_indices(self, sa, sb, span) {
-                        Ok(shape) => shape,
-                        Err(()) => return self.error_type,
-                    },
+                    None => {
+                        match super::tensor_index::unify_tensor_shape_indices(self, sa, sb, span) {
+                            Ok(shape) => shape,
+                            Err(()) => return self.error_type,
+                        }
+                    }
                 };
                 return self.types.tensor_with_shape(elem, shape);
             }
@@ -546,11 +545,14 @@ impl TypeChecker<'_> {
                 for (arg_a, arg_b) in args_a.into_iter().zip(args_b) {
                     match (arg_a, arg_b) {
                         (radix_types::AppliedArg::Type(a), radix_types::AppliedArg::Type(b)) => {
-                            args.push(radix_types::AppliedArg::Type(self.unify_with_policy(
-                                a, b, span, issue, policy,
-                            )));
+                            args.push(radix_types::AppliedArg::Type(
+                                self.unify_with_policy(a, b, span, issue, policy),
+                            ));
                         }
-                        (radix_types::AppliedArg::Size(actual), radix_types::AppliedArg::Size(expected)) => {
+                        (
+                            radix_types::AppliedArg::Size(actual),
+                            radix_types::AppliedArg::Size(expected),
+                        ) => {
                             args.push(radix_types::AppliedArg::Size(
                                 self.unify_size_at_boundary(actual, expected, span)
                                     .unwrap_or_else(|| {

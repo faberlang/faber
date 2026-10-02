@@ -47,8 +47,7 @@ impl TypeChecker<'_> {
     ) {
         self.reject_json_annotations_on_site(annotations, "functio");
         let previous_function_def = self.current_function_def.replace(def_id);
-        let previous_shape_sources =
-            std::mem::take(&mut self.current_shape_param_sources);
+        let previous_shape_sources = std::mem::take(&mut self.current_shape_param_sources);
         let func_name = self.function_display_name(def_id).unwrap_or_default();
         let previous_generic_param_kinds = std::mem::replace(
             &mut self.current_generic_param_kinds,

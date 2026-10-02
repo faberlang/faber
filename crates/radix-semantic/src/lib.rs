@@ -60,10 +60,10 @@ pub mod radix_lane;
 pub mod resolved_use;
 pub mod scope;
 pub mod shape_obligations;
-pub mod tensor_edge_policy;
 pub mod target_qualification;
 pub mod template_holes;
 pub mod tensor_bracket;
+pub mod tensor_edge_policy;
 pub mod tensor_element_lattice;
 pub mod tensor_type_directed;
 pub mod tuple_labels;
@@ -216,11 +216,11 @@ pub use scope::{
 pub use shape_obligations::{
     RuntimeSizeBinding, ShapeObligationTable, ShapeRelation, ShapeRelationBoundary,
 };
-pub use tensor_edge_policy::{ResolvedTensorEdgePolicy, TensorEdgePolicyTable, TensorShiftContext};
 use std::collections::BTreeMap;
+pub use tensor_edge_policy::{ResolvedTensorEdgePolicy, TensorEdgePolicyTable, TensorShiftContext};
 pub use types::{
-    ATOMIC_ELEMENT_MSG, AccessMarker, BuiltinTensorEdgePolicy, CollectionKind, CollectionTypeSpec, FuncSig,
-    GenericBindingSource, GenericParamDescriptor, GenericParamSort, GenericWitness,
+    ATOMIC_ELEMENT_MSG, AccessMarker, BuiltinTensorEdgePolicy, CollectionKind, CollectionTypeSpec,
+    FuncSig, GenericBindingSource, GenericParamDescriptor, GenericParamSort, GenericWitness,
     INTERVALLUM_BOUND_MSG, ISSUE_ASSIGN_THROUGH_REF, ISSUE_DEREF_INTO_OWN, ISSUE_FIELD_INTO_OWN,
     ISSUE_INDEX_INTO_OWN, ISSUE_MUT_INTO_OWN, ISSUE_MUT_LOCAL, ISSUE_MUTATING_RECEIVER_THROUGH_REF,
     ISSUE_PROJECTION_INTO_OWN, ISSUE_REF_INTO_OWN, ISSUE_REF_TO_MUT_OR_OWN_POSITION,
@@ -783,13 +783,8 @@ pub fn analyze_with_cli(
     // forward for the analyzed-application snapshot. Unsupported HIR shapes
     // leave region facts unavailable rather than receiving an approximation.
     let access_facts = analyze_access_facts_with_types(&hir, &types);
-    let region_facts = passes::borrow_region::analyze_with_interner(
-        &hir,
-        &types,
-        &access_facts,
-        interner,
-    )
-    .ok();
+    let region_facts =
+        passes::borrow_region::analyze_with_interner(&hir, &types, &access_facts, interner).ok();
 
     diagnostics
         .extend(passes::fragment_definition::check(&hir, &resolver, &types, interner).errors);

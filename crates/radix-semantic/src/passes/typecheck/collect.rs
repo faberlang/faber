@@ -148,7 +148,11 @@ impl TypeChecker<'_> {
         );
         self.instance_field_counts.insert(
             def_id,
-            struct_item.fields.iter().filter(|field| !field.is_static()).count(),
+            struct_item
+                .fields
+                .iter()
+                .filter(|field| !field.is_static())
+                .count(),
         );
 
         self.struct_implements

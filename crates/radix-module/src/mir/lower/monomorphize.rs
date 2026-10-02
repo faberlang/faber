@@ -391,22 +391,19 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 .iter()
                 .flat_map(|block| &block.statements)
                 .find_map(|statement| match &statement.kind {
-                    MirStatementKind::RuntimeCall {
-                        destination: Some(place),
-                        call,
-                    } if place.base == MirPlaceBase::Temp(pending.destination)
-                        && place.projections.is_empty()
-                        && matches!(
-                            &call.intrinsic,
-                            MirIntrinsic::TensorLimes(MirEdgePolicy::Builtin(MirBuiltinEdgePolicy::Clamp))
-                        ) =>
+                    MirStatementKind::RuntimeCall { destination: Some(place), call }
+                        if place.base == MirPlaceBase::Temp(pending.destination)
+                            && place.projections.is_empty()
+                            && matches!(
+                                &call.intrinsic,
+                                MirIntrinsic::TensorLimes(MirEdgePolicy::Builtin(MirBuiltinEdgePolicy::Clamp))
+                            ) =>
                     {
                         Some(call.return_ty)
                     }
                     _ => None,
                 });
-            let Some((_, rank)) = call_return_ty
-                .and_then(|ty| tensor_element_and_rank(self.types(), ty.semantic_id()))
+            let Some((_, rank)) = call_return_ty.and_then(|ty| tensor_element_and_rank(self.types(), ty.semantic_id()))
             else {
                 self.lowerer.errors.push(MirError::unsupported(
                     pending.span,

@@ -13,8 +13,8 @@ use radix_module::file_interface::{
     InterfaceDeviceContract, InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceEnumVariant,
     InterfaceGenericParam, InterfaceLibraryIdentity, InterfaceMethodExport, InterfaceNominalExport,
     InterfaceQualifiedIdentity, InterfaceStructExport, InterfaceStructField,
-    InterfaceTensorEdgePolicyRequirement,
-    snapshot_interface_callable_with_identity, snapshot_interface_type_with_identity,
+    InterfaceTensorEdgePolicyRequirement, snapshot_interface_callable_with_identity,
+    snapshot_interface_type_with_identity,
 };
 use radix_module::hir::{
     DefId, HirConst, HirEnum, HirFunction, HirInterface, HirInterfaceMethod, HirItemKind,
@@ -68,16 +68,22 @@ pub fn extract_callable_contracts(
             }
             Some(
                 reject_signature_only_fragment(function, &name, file_label).and_then(|()| {
-                    snapshot_function(item.def_id, function, &item.annotations, analysis, file_label, None).map(
-                        |callable| AnalyzedCallableContract {
-                            def_id: item.def_id,
-                            span: item.span,
-                            name,
-                            callable,
-                            has_body: function.body.is_some(),
-                            nucleum_role: function.nucleum_role(),
-                        },
+                    snapshot_function(
+                        item.def_id,
+                        function,
+                        &item.annotations,
+                        analysis,
+                        file_label,
+                        None,
                     )
+                    .map(|callable| AnalyzedCallableContract {
+                        def_id: item.def_id,
+                        span: item.span,
+                        name,
+                        callable,
+                        has_body: function.body.is_some(),
+                        nucleum_role: function.nucleum_role(),
+                    })
                 }),
             )
         })

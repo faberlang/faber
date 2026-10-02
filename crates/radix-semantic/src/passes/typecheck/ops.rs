@@ -940,9 +940,7 @@ impl TypeChecker<'_> {
             .copied();
         if unresolved_edge_view {
             if let HirExpressionKind::Path(binding) = &target.kind {
-                self.tensor_edge_policies
-                    .shifted_bindings
-                    .insert(*binding);
+                self.tensor_edge_policies.shifted_bindings.insert(*binding);
                 if let Some(context) = edge_view_context {
                     self.tensor_edge_policies
                         .shifted_view_bindings

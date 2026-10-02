@@ -22,10 +22,10 @@
 )]
 
 use super::RunnerError;
+use crate::regex_program::RegexProgram;
 use crate::tensor_edge::{
     RunnerTensorEdgeDescriptor, TensorEdgeResolution, resolve_builtin, resolve_optional,
 };
-use crate::regex_program::RegexProgram;
 use handroll::Magnus;
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span, Symbol};

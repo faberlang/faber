@@ -248,8 +248,7 @@ fn map_axis(policy: BuiltinEdgePolicy, coordinate: i128, extent: usize) -> Optio
 mod tests {
     use super::{
         BuiltinEdgePolicy, CustomEdgePolicyError, CustomEdgeValueError, TensorEdgeDescriptor,
-        TensorEdgeResolution, resolve_builtin, resolve_custom_value,
-        resolve_optional,
+        TensorEdgeResolution, resolve_builtin, resolve_custom_value, resolve_optional,
     };
 
     #[test]

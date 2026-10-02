@@ -331,11 +331,8 @@ impl TypeChecker<'_> {
                 span,
             )
         {
-            let runtime_size_symbols = self.capture_runtime_call_size_bindings(
-                &sig.type_params,
-                &shape_vars,
-                span,
-            );
+            let runtime_size_symbols =
+                self.capture_runtime_call_size_bindings(&sig.type_params, &shape_vars, span);
             // Runtime extent identity belongs in the sidecar operand map, not
             // in the instance key. Keep the callee's formal generic symbol as
             // the key witness while its instantiated signature above retains
@@ -345,8 +342,7 @@ impl TypeChecker<'_> {
                     && let GenericWitness::Magnitudo(_) = binding.witness
                 {
                     binding.witness = GenericWitness::Magnitudo(
-                        self.types
-                            .intern_index(IndexExpr::Param(binding.name)),
+                        self.types.intern_index(IndexExpr::Param(binding.name)),
                     );
                 }
             }
@@ -356,13 +352,14 @@ impl TypeChecker<'_> {
                 bindings,
             };
             if !resolved_call.bindings.is_empty() {
-                self.tensor_edge_generic_calls
-                    .push(super::tensor_edge_policy_generic::GenericPolicyCall {
+                self.tensor_edge_generic_calls.push(
+                    super::tensor_edge_policy_generic::GenericPolicyCall {
                         caller: self.current_function_def,
                         callee: policy_callee,
                         span,
                         bindings: resolved_call.bindings.clone(),
-                    });
+                    },
+                );
             }
             self.types.resolved_generic_calls.push(resolved_call);
         }
@@ -822,15 +819,14 @@ impl TypeChecker<'_> {
             }
             IndexExpr::Affine { base, offset } => {
                 let base = self.substitute_index_params(base, Some(shape_vars));
-                add_index_constant(&mut self.types, base, offset).unwrap_or_else(|_| {
-                    self.types
-                        .intern_index(IndexExpr::Affine { base, offset })
-                })
+                add_index_constant(&mut self.types, base, offset)
+                    .unwrap_or_else(|_| self.types.intern_index(IndexExpr::Affine { base, offset }))
             }
             IndexExpr::Divide { numerator, divisor } => {
                 let numerator = self.substitute_index_params(numerator, Some(shape_vars));
                 divide_index_exact(&mut self.types, numerator, divisor).unwrap_or_else(|_| {
-                    self.types.intern_index(IndexExpr::Divide { numerator, divisor })
+                    self.types
+                        .intern_index(IndexExpr::Divide { numerator, divisor })
                 })
             }
             IndexExpr::Literal(_)
@@ -1117,12 +1113,14 @@ fn first_index_arithmetic_error_in_type(
     if !seen_types.insert(ty) {
         return None;
     }
-    let check_type = |ty, seen_types: &mut FxHashSet<TypeId>, seen_indices: &mut FxHashSet<IndexId>| {
-        first_index_arithmetic_error_in_type(ty, types, seen_types, seen_indices)
-    };
-    let check_index = |id, seen_types: &mut FxHashSet<TypeId>, seen_indices: &mut FxHashSet<IndexId>| {
-        first_index_arithmetic_error_in_index(id, types, seen_types, seen_indices)
-    };
+    let check_type =
+        |ty, seen_types: &mut FxHashSet<TypeId>, seen_indices: &mut FxHashSet<IndexId>| {
+            first_index_arithmetic_error_in_type(ty, types, seen_types, seen_indices)
+        };
+    let check_index =
+        |id, seen_types: &mut FxHashSet<TypeId>, seen_indices: &mut FxHashSet<IndexId>| {
+            first_index_arithmetic_error_in_index(id, types, seen_types, seen_indices)
+        };
 
     match types.get(ty) {
         radix_types::Type::Array(inner)
@@ -1138,12 +1136,10 @@ fn first_index_arithmetic_error_in_type(
         | radix_types::Type::Alias(_, inner) => check_type(*inner, seen_types, seen_indices),
         radix_types::Type::BoundedArray { element, capacity }
         | radix_types::Type::BoundedQueue { element, capacity }
-        | radix_types::Type::BoundedStack { element, capacity } => check_index(
-            *capacity,
-            seen_types,
-            seen_indices,
-        )
-        .or_else(|| check_type(*element, seen_types, seen_indices)),
+        | radix_types::Type::BoundedStack { element, capacity } => {
+            check_index(*capacity, seen_types, seen_indices)
+                .or_else(|| check_type(*element, seen_types, seen_indices))
+        }
         radix_types::Type::BoundedTextus { capacity }
         | radix_types::Type::BoundedAscii { capacity }
         | radix_types::Type::BoundedOcteti { capacity } => {
@@ -1216,12 +1212,7 @@ fn first_index_arithmetic_error_in_index(
         IndexExpr::Divide { numerator, .. } => radix_types::evaluate_index_dimension(id, types)
             .err()
             .or_else(|| {
-                first_index_arithmetic_error_in_index(
-                    *numerator,
-                    types,
-                    seen_types,
-                    seen_indices,
-                )
+                first_index_arithmetic_error_in_index(*numerator, types, seen_types, seen_indices)
             }),
         _ => None,
     }
@@ -1279,18 +1270,11 @@ mod size_default_unify_test {
         let n = interner.intern("N");
         let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
         let parameter = checker.types.intern_index(IndexExpr::Param(n));
-        let minus_one = radix_types::compose_index_affine_constant(
-            &mut checker.types,
-            parameter,
-            -1,
-        )
-        .expect("symbolic offset");
-        let canceled = radix_types::compose_index_affine_constant(
-            &mut checker.types,
-            minus_one,
-            1,
-        )
-        .expect("canceled affine offset");
+        let minus_one =
+            radix_types::compose_index_affine_constant(&mut checker.types, parameter, -1)
+                .expect("symbolic offset");
+        let canceled = radix_types::compose_index_affine_constant(&mut checker.types, minus_one, 1)
+            .expect("canceled affine offset");
         let zero = checker.types.intern_index(IndexExpr::Literal(0));
         let mut substitutions = FxHashMap::default();
         substitutions.insert(n, zero);
@@ -1321,7 +1305,9 @@ mod size_default_unify_test {
             radix_types::evaluate_index_dimension(instantiated, &checker.types),
             Err(radix_types::IndexArithmeticError::NonIntegral)
         );
-        let f32_ty = checker.types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+        let f32_ty = checker
+            .types
+            .sized_numeric(Primitive::Fractus, NumericWidth::F32);
         let tensor = checker.types.tensor_with_shape(f32_ty, instantiated);
         assert_eq!(
             checker.first_index_arithmetic_error_in_type(tensor),

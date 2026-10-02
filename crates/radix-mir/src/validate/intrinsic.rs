@@ -6,8 +6,8 @@ use super::{
 use crate::lista_tensor_conversio::validate_lista_to_tensor_source;
 use crate::{
     MirAtomicOp, MirBinOp, MirCollectionOp, MirConstant, MirConversion, MirGradientOp,
-    MirIntrinsic, MirLayoutKind, MirOperand, MirPlace, MirRuntimeCall, MirSermoOp, MirType,
-    MirShapeExpr,
+    MirIntrinsic, MirLayoutKind, MirOperand, MirPlace, MirRuntimeCall, MirSermoOp, MirShapeExpr,
+    MirType,
 };
 use radix_lexer::Span;
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type};
@@ -287,7 +287,12 @@ impl Validator<'_, '_> {
                 };
                 self.require_tensor_type(receiver_ty, span, "tensor limes receiver is not tensor");
                 self.require_tensor_type(call.return_ty, span, "tensor limes result is not tensor");
-                if let crate::MirEdgePolicy::Custom { policy_def, remap, transform } = policy {
+                if let crate::MirEdgePolicy::Custom {
+                    policy_def,
+                    remap,
+                    transform,
+                } = policy
+                {
                     if !self
                         .context
                         .struct_fields
@@ -297,14 +302,24 @@ impl Validator<'_, '_> {
                         self.error(span, "tensor limes custom policy is not a zero-field class");
                     }
                     let Some(remap_function) = scope.functions_by_id.get(remap) else {
-                        self.error(span, "tensor limes remap callback does not resolve to a function");
+                        self.error(
+                            span,
+                            "tensor limes remap callback does not resolve to a function",
+                        );
                         return;
                     };
                     if remap_function.params.len() != 2 {
-                        self.error(span, "tensor limes remap callback has an invalid receiver/coordinate arity");
+                        self.error(
+                            span,
+                            "tensor limes remap callback has an invalid receiver/coordinate arity",
+                        );
                     } else {
-                        if !matches!(self.type_kind(remap_function.params[0].ty), Type::Struct(def) if def == policy_def) {
-                            self.error(span, "tensor limes remap receiver does not match policy class");
+                        if !matches!(self.type_kind(remap_function.params[0].ty), Type::Struct(def) if def == policy_def)
+                        {
+                            self.error(
+                                span,
+                                "tensor limes remap receiver does not match policy class",
+                            );
                         }
                         if !self.context.types.equals(
                             remap_function.params[1].ty.semantic_id(),
@@ -314,21 +329,32 @@ impl Validator<'_, '_> {
                         }
                     }
                     if let Some(transform_id) = transform {
-                        let Some(transform_function) = scope.functions_by_id.get(transform_id) else {
-                            self.error(span, "tensor limes transform callback does not resolve to a function");
+                        let Some(transform_function) = scope.functions_by_id.get(transform_id)
+                        else {
+                            self.error(
+                                span,
+                                "tensor limes transform callback does not resolve to a function",
+                            );
                             return;
                         };
                         if transform_function.params.len() != 3 {
                             self.error(span, "tensor limes transform callback has an invalid receiver/coordinate/value arity");
                         } else {
-                            if !matches!(self.type_kind(transform_function.params[0].ty), Type::Struct(def) if def == policy_def) {
-                                self.error(span, "tensor limes transform receiver does not match policy class");
+                            if !matches!(self.type_kind(transform_function.params[0].ty), Type::Struct(def) if def == policy_def)
+                            {
+                                self.error(
+                                    span,
+                                    "tensor limes transform receiver does not match policy class",
+                                );
                             }
                             if !self.context.types.equals(
                                 transform_function.params[1].ty.semantic_id(),
                                 remap_function.params[1].ty.semantic_id(),
                             ) {
-                                self.error(span, "tensor limes transform coordinate type differs from remap");
+                                self.error(
+                                    span,
+                                    "tensor limes transform coordinate type differs from remap",
+                                );
                             }
                             if let Type::Tensor(element_ty, _) = self.type_kind(call.return_ty) {
                                 let element_ty = MirType::semantic(*element_ty);
@@ -437,10 +463,7 @@ impl Validator<'_, '_> {
                 }
             }
             MirShapeExpr::Affine { base, .. } => self.validate_shape_expr(call, base, span),
-            MirShapeExpr::Divide {
-                numerator,
-                divisor,
-            } => {
+            MirShapeExpr::Divide { numerator, divisor } => {
                 if *divisor == 0 {
                     self.error(span, "tensor shape check divides by zero");
                 }
@@ -1653,11 +1676,7 @@ impl Validator<'_, '_> {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;
                 };
-                self.require_tensor_type(
-                    receiver_ty,
-                    span,
-                    "tensor expand receiver is not tensor",
-                );
+                self.require_tensor_type(receiver_ty, span, "tensor expand receiver is not tensor");
                 self.require_tensor_type(
                     call.return_ty,
                     span,
@@ -2340,19 +2359,18 @@ impl Validator<'_, '_> {
         // Elements past `dim` stay; only the last-axis width is a bound.
         let last_extent = match self.type_kind(receiver_ty) {
             Type::Tensor(_, shape) => match self.context.types.get_index(*shape) {
-                        IndexExpr::Tuple(dims) => {
-                            dims.last()
-                                .and_then(|dim| {
-                                    radix_types::evaluate_index_dimension(*dim, &self.context.types)
-                                        .ok()
-                                        .flatten()
-                                })
-                                .and_then(|count| i64::try_from(count).ok())
-                        }
-                        _ => radix_types::evaluate_index_dimension(*shape, &self.context.types)
+                IndexExpr::Tuple(dims) => dims
+                    .last()
+                    .and_then(|dim| {
+                        radix_types::evaluate_index_dimension(*dim, &self.context.types)
                             .ok()
                             .flatten()
-                            .and_then(|count| i64::try_from(count).ok()),
+                    })
+                    .and_then(|count| i64::try_from(count).ok()),
+                _ => radix_types::evaluate_index_dimension(*shape, &self.context.types)
+                    .ok()
+                    .flatten()
+                    .and_then(|count| i64::try_from(count).ok()),
             },
             _ => None,
         };

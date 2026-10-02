@@ -632,9 +632,10 @@ impl<'a> BorrowChecker<'a> {
                 }
                 let other_roots = self.tensor_view_origins(&other.expr);
                 let other_root = Self::root_def_id(&other.expr);
-                if !roots.iter().any(|root| {
-                    other_root == Some(*root) || other_roots.contains(root)
-                }) {
+                if !roots
+                    .iter()
+                    .any(|root| other_root == Some(*root) || other_roots.contains(root))
+                {
                     continue;
                 }
                 self.error(
@@ -1066,7 +1067,10 @@ impl<'a> BorrowChecker<'a> {
     fn has_tensor_value_type(&self, expr: &HirExpression) -> bool {
         expr.ty.is_some_and(|ty| {
             let (_, inner) = self.types.peel_access_marker(ty);
-            matches!(self.types.get(inner), Type::Tensor(_, _) | Type::Matrix(_, _))
+            matches!(
+                self.types.get(inner),
+                Type::Tensor(_, _) | Type::Matrix(_, _)
+            )
         })
     }
 
@@ -1136,9 +1140,9 @@ impl<'a> BorrowChecker<'a> {
             HirExpressionKind::Tuple(elements, _) => {
                 elements.iter().any(|value| self.stores_tensor_view(value))
             }
-            HirExpressionKind::Struct(_, fields) => {
-                fields.iter().any(|(_, value)| self.stores_tensor_view(value))
-            }
+            HirExpressionKind::Struct(_, fields) => fields
+                .iter()
+                .any(|(_, value)| self.stores_tensor_view(value)),
             HirExpressionKind::Verte {
                 entries: Some(entries),
                 ..
@@ -1471,7 +1475,10 @@ impl<'a> BorrowChecker<'a> {
         let Some(facts) = self.regions else {
             return true;
         };
-        match facts.regions_for(borrower).find(|region| region.source == source) {
+        match facts
+            .regions_for(borrower)
+            .find(|region| region.source == source)
+        {
             None => true,
             Some(region) => match self.stmt_node {
                 None => true,
@@ -1715,9 +1722,7 @@ impl HirVisitor for BorrowChecker<'_> {
                     if let Some(receiver_root) = Self::root_def_id(receiver) {
                         for arg in args {
                             if self.is_tensor_view(&arg.expr)
-                                && self
-                                    .tensor_view_origins(&arg.expr)
-                                    .contains(&receiver_root)
+                                && self.tensor_view_origins(&arg.expr).contains(&receiver_root)
                             {
                                 self.error(
                                     SemanticErrorKind::ModeMismatch,
@@ -1761,7 +1766,8 @@ struct TensorViewCaptureFinder<'a> {
 
 impl HirVisitor for TensorViewCaptureFinder<'_> {
     fn visit_expr(&mut self, expr: &HirExpression) {
-        if matches!(&expr.kind, HirExpressionKind::Path(def_id) if self.views.contains_key(def_id)) {
+        if matches!(&expr.kind, HirExpressionKind::Path(def_id) if self.views.contains_key(def_id))
+        {
             self.found = true;
             return;
         }

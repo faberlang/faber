@@ -447,7 +447,10 @@ fn is_tensor_view_method(name: &str) -> bool {
 fn has_tensor_value_type(expression: &HirExpression, types: &TypeTable) -> bool {
     expression.ty.is_some_and(|ty| {
         let (_, inner) = types.peel_access_marker(ty);
-        matches!(types.get(inner), crate::Type::Tensor(_, _) | crate::Type::Matrix(_, _))
+        matches!(
+            types.get(inner),
+            crate::Type::Tensor(_, _) | crate::Type::Matrix(_, _)
+        )
     })
 }
 
@@ -461,7 +464,12 @@ fn is_tensor_view_expr(
         HirExpressionKind::Path(def_id) => aliases.contains_key(def_id),
         HirExpressionKind::MethodCall(receiver, method, _, args, _) => receiver
             .ty
-            .and_then(|ty| interner.strings().get(method.0 as usize).map(|name| (ty, name)))
+            .and_then(|ty| {
+                interner
+                    .strings()
+                    .get(method.0 as usize)
+                    .map(|name| (ty, name))
+            })
             .and_then(|(ty, name)| lookup_method_for_type_id(ty, types, name, args.len()))
             .is_some_and(|entry| is_tensor_view_method(entry.faber_name)),
         HirExpressionKind::NonNull(object, radix_hir::HirNonNullKind::Value)
@@ -503,8 +511,7 @@ fn is_tensor_view_expr(
                 .is_some_and(|expr| is_tensor_view_expr(expr, types, interner, aliases))
                 || is_tensor_view_expr(default, types, interner, aliases)
         }
-        HirExpressionKind::Verte { source, .. }
-        | HirExpressionKind::Conversio { source, .. }
+        HirExpressionKind::Verte { source, .. } | HirExpressionKind::Conversio { source, .. }
             if has_tensor_value_type(expression, types) =>
         {
             is_tensor_view_expr(source, types, interner, aliases)
@@ -572,8 +579,7 @@ fn tensor_view_roots(
             roots.extend(tensor_view_roots(default, types, interner, aliases));
             roots
         }
-        HirExpressionKind::Verte { source, .. }
-        | HirExpressionKind::Conversio { source, .. } => {
+        HirExpressionKind::Verte { source, .. } | HirExpressionKind::Conversio { source, .. } => {
             tensor_view_roots(source, types, interner, aliases)
         }
         _ => FxHashSet::default(),
@@ -634,16 +640,12 @@ impl<'a> EventCollector<'a> {
         let _initializer_fact = self.access_facts.expression(init.id);
         let _binding_fact = self.access_facts.binding(local.def_id);
 
-        let view_roots = if is_tensor_view_expr(
-            init,
-            self.types,
-            self.interner,
-            &self.tensor_view_roots,
-        ) {
-            tensor_view_roots(init, self.types, self.interner, &self.tensor_view_roots)
-        } else {
-            FxHashSet::default()
-        };
+        let view_roots =
+            if is_tensor_view_expr(init, self.types, self.interner, &self.tensor_view_roots) {
+                tensor_view_roots(init, self.types, self.interner, &self.tensor_view_roots)
+            } else {
+                FxHashSet::default()
+            };
         if !view_roots.is_empty() {
             self.tensor_view_roots
                 .insert(local.def_id, view_roots.clone());

@@ -38,12 +38,11 @@ fn tensor_parameter_function(tensor_ty: TypeId) -> MirFunction {
 fn shape_size_reads_runtime_formal_axes_and_checks_affine_division() {
     let mut types = TypeTable::new();
     let element = types.primitive(Primitive::Fractus);
-    let runtime_axis = types.intern_index(IndexExpr::Runtime(
-        RuntimeExtentId::FunctionParameterAxis {
+    let runtime_axis =
+        types.intern_index(IndexExpr::Runtime(RuntimeExtentId::FunctionParameterAxis {
             parameter: 0,
             axis: 1,
-        },
-    ));
+        }));
     let plus_one = types.intern_index(IndexExpr::Affine {
         base: runtime_axis,
         offset: 1,
@@ -71,11 +70,20 @@ fn shape_size_reads_runtime_formal_axes_and_checks_affine_division() {
     );
 
     let total = runner
-        .eval_constant(&MirConstant::ShapeSize { shape, axis: None }, Span::default())
+        .eval_constant(
+            &MirConstant::ShapeSize { shape, axis: None },
+            Span::default(),
+        )
         .expect("dynamic dimensions produce the element count");
     assert_eq!(total, Value::Float(14.0));
     let second = runner
-        .eval_constant(&MirConstant::ShapeSize { shape, axis: Some(1) }, Span::default())
+        .eval_constant(
+            &MirConstant::ShapeSize {
+                shape,
+                axis: Some(1),
+            },
+            Span::default(),
+        )
         .expect("axis extent evaluates from its formal tensor");
     assert_eq!(second, Value::Float(2.0));
 }
@@ -84,12 +92,11 @@ fn shape_size_reads_runtime_formal_axes_and_checks_affine_division() {
 fn shape_size_rejects_non_integral_runtime_dimension_division() {
     let mut types = TypeTable::new();
     let element = types.primitive(Primitive::Fractus);
-    let runtime_axis = types.intern_index(IndexExpr::Runtime(
-        RuntimeExtentId::FunctionParameterAxis {
+    let runtime_axis =
+        types.intern_index(IndexExpr::Runtime(RuntimeExtentId::FunctionParameterAxis {
             parameter: 0,
             axis: 0,
-        },
-    ));
+        }));
     let divide_by_two = types.intern_index(IndexExpr::Divide {
         numerator: runtime_axis,
         divisor: 2,
@@ -121,5 +128,8 @@ fn shape_size_rejects_non_integral_runtime_dimension_division() {
             Span::default(),
         )
         .expect_err("non-integral natural-number division must not truncate");
-    assert_eq!(error.issue, "runner_runtime_shape_extent_division_is_not_exact");
+    assert_eq!(
+        error.issue,
+        "runner_runtime_shape_extent_division_is_not_exact"
+    );
 }

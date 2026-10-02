@@ -513,16 +513,11 @@ impl Lowerer<'_> {
         self.push_scope();
         let mut params = Vec::new();
         for (ordinal, param) in decl.params.iter().enumerate() {
-            let lowered = self.lower_param(
-                param,
-                true,
-                Some(HirTypeSlot::Parameter(ordinal as u32)),
-            );
+            let lowered =
+                self.lower_param(param, true, Some(HirTypeSlot::Parameter(ordinal as u32)));
             self.bind_local(lowered.name, lowered.def_id);
-            self.parameter_ordinals.insert(
-                lowered.def_id,
-                u32::try_from(ordinal).unwrap_or(u32::MAX),
-            );
+            self.parameter_ordinals
+                .insert(lowered.def_id, u32::try_from(ordinal).unwrap_or(u32::MAX));
             params.push(lowered);
         }
         let cli_args = self.lower_cli_args_param(decl);

@@ -17,7 +17,8 @@ pub const ERR_INDEX_OUT_OF_BOUNDS: &str = "tensor index out of bounds";
 pub const ERR_ELEMENT_COUNT_OVERFLOW: &str = "tensor element count overflow";
 
 pub const ERR_FORMA_RESHAPE_COUNT: &str = "tensor forma (reshape) element count mismatch";
-pub const ERR_FORMA_LAYOUT_NOT_VIEWABLE: &str = "tensor forma layout cannot be represented as a view";
+pub const ERR_FORMA_LAYOUT_NOT_VIEWABLE: &str =
+    "tensor forma layout cannot be represented as a view";
 pub const ERR_FORMA_ELEMENT_COUNT: &str = "tensor forma element count mismatch";
 pub const ERR_ACCIPE_INVALID_INDEX: &str = "tensor accipe invalid index";
 pub const ERR_PONDE_INVALID_INDEX: &str = "tensor ponde invalid index";
@@ -26,8 +27,7 @@ pub const ERR_SECTIO_INVALID_SLICE_BOUNDS: &str = "tensor sectio invalid slice b
 pub const ERR_BROADCAST_SHAPE: &str = "tensor broadcast shape mismatch";
 pub const ERR_TENSOR_SHAPE_HOLE_UNDERDETERMINED: &str =
     "tensor shape hole cannot be inferred uniquely from the available element count";
-pub const ERR_TENSOR_EDGE_NOT_SHIFTED: &str =
-    "tensor limes requires an unresolved shifted view";
+pub const ERR_TENSOR_EDGE_NOT_SHIFTED: &str = "tensor limes requires an unresolved shifted view";
 pub const ERR_TENSOR_EDGE_UNRESOLVED_READ: &str =
     "tensor flatten cannot read an unresolved shifted optional element";
 pub const ERR_TENSOR_MATERIALIZE_UNRESOLVED: &str =

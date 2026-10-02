@@ -925,15 +925,26 @@ pub enum MirShapeExpr {
     /// Product of tensor extents for a whole-shape element count. The empty
     /// product is one, matching rank-zero tensors.
     Product(Vec<Self>),
-    ScalarArgument { argument: u32 },
-    TensorAxis { argument: u32, axis: u32 },
+    ScalarArgument {
+        argument: u32,
+    },
+    TensorAxis {
+        argument: u32,
+        axis: u32,
+    },
     TensorFieldAxis {
         argument: u32,
         fields: Vec<Symbol>,
         axis: u32,
     },
-    Affine { base: Box<Self>, offset: i128 },
-    Divide { numerator: Box<Self>, divisor: u64 },
+    Affine {
+        base: Box<Self>,
+        offset: i128,
+    },
+    Divide {
+        numerator: Box<Self>,
+        divisor: u64,
+    },
 }
 
 /// Equalities checked against explicit runtime values before a tensor boundary

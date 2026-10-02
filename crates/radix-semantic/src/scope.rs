@@ -1378,16 +1378,15 @@ impl Resolver {
                 ) {
                     (Ok(sig), Ok(requirements)) => {
                         let exported = ImportedFileExport::Function(sig);
-                        let policy_def = (!requirements.is_empty())
-                            .then(|| self.fresh_builtin_def_id());
+                        let policy_def =
+                            (!requirements.is_empty()).then(|| self.fresh_builtin_def_id());
                         for projected_member in projected_members {
                             let member = interner.intern(&projected_member);
                             imported.exports.insert(member, exported.clone());
                             if let Some(policy_def) = policy_def {
-                                imported.tensor_edge_policy_requirements.insert(
-                                    member,
-                                    (policy_def, requirements.clone()),
-                                );
+                                imported
+                                    .tensor_edge_policy_requirements
+                                    .insert(member, (policy_def, requirements.clone()));
                             }
                         }
                     }

@@ -830,17 +830,18 @@ fn apply_const_values(interface: &mut FileInterface, values: &[(String, Interfac
 /// interface. The initial package surface is needed before target analysis;
 /// the carried provider unit is the typed authority that fills this metadata
 /// once available.
-fn apply_tensor_edge_policy_requirements(
-    interface: &mut FileInterface,
-    provider: &crate::driver::ProviderUnit,
-) {
+fn apply_tensor_edge_policy_requirements(interface: &mut FileInterface, provider: &crate::driver::ProviderUnit) {
     let mut rejected_exports = Vec::new();
     for item in &provider.hir.items {
         let HirItemKind::Function(function) = &item.kind else {
             continue;
         };
         let name = provider.interner.resolve(function.name).to_owned();
-        let Some(requirements) = provider.tensor_edge_policies.function_requirements.get(&item.def_id) else {
+        let Some(requirements) = provider
+            .tensor_edge_policies
+            .function_requirements
+            .get(&item.def_id)
+        else {
             continue;
         };
         let Some(FileExport { kind: FileExportKind::Function(callable), .. }) = interface.exports.get_mut(&name) else {
@@ -858,9 +859,11 @@ fn apply_tensor_edge_policy_requirements(
                     return None;
                 };
                 let policy_param = provider.interner.resolve(*policy_param).to_owned();
-                if !callable.type_params.iter().any(|param| {
-                    param.kind == crate::syntax::GenericParamKind::Typus && param.name == policy_param
-                }) {
+                if !callable
+                    .type_params
+                    .iter()
+                    .any(|param| param.kind == crate::syntax::GenericParamKind::Typus && param.name == policy_param)
+                {
                     return None;
                 }
                 let element_type = crate::file_interface::snapshot_interface_type_with_resolver(
@@ -870,11 +873,7 @@ fn apply_tensor_edge_policy_requirements(
                     &provider.resolver,
                 )
                 .ok()?;
-                Some(InterfaceTensorEdgePolicyRequirement {
-                    policy_param,
-                    element_type,
-                    rank: requirement.rank,
-                })
+                Some(InterfaceTensorEdgePolicyRequirement { policy_param, element_type, rank: requirement.rank })
             })
             .collect::<Option<Vec<_>>>();
         if let Some(portable) = portable {

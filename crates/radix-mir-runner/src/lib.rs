@@ -17,15 +17,15 @@ pub mod kernel;
 mod regex_program;
 mod runtime;
 pub mod sermo;
+#[cfg(test)]
+mod shape_size_test;
 pub(crate) mod shuffle;
 pub mod stats;
 pub mod store;
-mod tensor_lift;
 mod tensor_edge;
+mod tensor_lift;
 mod textus_literal;
 pub mod value;
-#[cfg(test)]
-mod shape_size_test;
 
 pub use capability::{RunnerDispatchStatus, classify_runner_lowerability, runner_dispatch_status};
 
@@ -45,9 +45,7 @@ use radix_mir::{
     MirPlaceBase, MirProgram, MirProjection, MirStatementKind, MirTempId, MirTerminatorKind,
     MirType, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir,
 };
-use radix_types::{
-    IndexExpr, NumericWidth, Primitive, RuntimeExtentId, Type, TypeId, TypeTable,
-};
+use radix_types::{IndexExpr, NumericWidth, Primitive, RuntimeExtentId, Type, TypeId, TypeTable};
 use regex_program::RegexProgram;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
@@ -2072,16 +2070,25 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     RunnerError::internal(span, "runtime shape affine extent overflow")
                 })?;
                 u64::try_from(adjusted).map_err(|_| {
-                    RunnerError::internal(span, "runtime shape affine extent is negative or too large")
+                    RunnerError::internal(
+                        span,
+                        "runtime shape affine extent is negative or too large",
+                    )
                 })
             }
             IndexExpr::Divide { numerator, divisor } => {
                 if *divisor == 0 {
-                    return Err(RunnerError::internal(span, "runtime shape extent divides by zero"));
+                    return Err(RunnerError::internal(
+                        span,
+                        "runtime shape extent divides by zero",
+                    ));
                 }
                 let numerator = self.runtime_index_value(*numerator, span)?;
                 if numerator % divisor != 0 {
-                    return Err(RunnerError::internal(span, "runtime shape extent division is not exact"));
+                    return Err(RunnerError::internal(
+                        span,
+                        "runtime shape extent division is not exact",
+                    ));
                 }
                 Ok(numerator / divisor)
             }
@@ -2105,8 +2112,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 let value = self.function_parameter_value(*parameter, span)?;
                 match value {
                     Value::UInt(value) => Ok(value),
-                    Value::Int(value) => u64::try_from(value)
-                        .map_err(|_| RunnerError::internal(span, "runtime scalar extent is negative")),
+                    Value::Int(value) => u64::try_from(value).map_err(|_| {
+                        RunnerError::internal(span, "runtime scalar extent is negative")
+                    }),
                     _ => Err(RunnerError::internal(
                         span,
                         "runtime scalar extent parameter is not an integer",
@@ -2143,11 +2151,10 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     }
 
     fn function_parameter_value(&self, parameter: u32, span: Span) -> Result<Value, RunnerError> {
-        let frame_index = self
-            .frames
-            .len()
-            .checked_sub(1)
-            .ok_or_else(|| RunnerError::internal(span, "runtime shape-size has no active frame"))?;
+        let frame_index =
+            self.frames.len().checked_sub(1).ok_or_else(|| {
+                RunnerError::internal(span, "runtime shape-size has no active frame")
+            })?;
         let frame = self.frames.get(frame_index).ok_or_else(|| {
             RunnerError::internal(span, "runtime shape-size frame is unavailable")
         })?;
@@ -2173,9 +2180,11 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 ));
             }
         };
-        fields.borrow().get(&field).cloned().ok_or_else(|| {
-            RunnerError::internal(span, "runtime shape field source is missing")
-        })
+        fields
+            .borrow()
+            .get(&field)
+            .cloned()
+            .ok_or_else(|| RunnerError::internal(span, "runtime shape field source is missing"))
     }
 
     fn tensor_axis_extent(value: Value, axis: u32, span: Span) -> Result<u64, RunnerError> {
@@ -2187,12 +2196,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         };
         let axis = usize::try_from(axis)
             .map_err(|_| RunnerError::internal(span, "runtime shape axis does not fit usize"))?;
-        let extent = tensor
-            .borrow()
-            .shape
-            .get(axis)
-            .copied()
-            .ok_or_else(|| RunnerError::internal(span, "runtime tensor shape axis is out of range"))?;
+        let extent = tensor.borrow().shape.get(axis).copied().ok_or_else(|| {
+            RunnerError::internal(span, "runtime tensor shape axis is out of range")
+        })?;
         u64::try_from(extent)
             .map_err(|_| RunnerError::internal(span, "runtime tensor shape extent is negative"))
     }

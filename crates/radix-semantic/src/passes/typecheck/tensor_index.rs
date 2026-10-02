@@ -172,21 +172,10 @@ pub(super) fn apply_tensor_intrinsic_shape_constraints(
             );
         }
         TENSOR_FORMA if !args.is_empty() => {
-            constrain_reshape_result_shape(
-                checker,
-                receiver_ty,
-                result_shape,
-                &args[0].expr,
-                span,
-            );
+            constrain_reshape_result_shape(checker, receiver_ty, result_shape, &args[0].expr, span);
         }
         TENSOR_CREA if args.len() >= 2 => {
-            constrain_result_from_static_list(
-                checker,
-                result_shape,
-                &args[1].expr,
-                span,
-            );
+            constrain_result_from_static_list(checker, result_shape, &args[1].expr, span);
         }
         TENSOR_SECTIO if args.len() >= 2 => {
             let Some(input_shape) = tensor_shape_id(checker, receiver_ty) else {
@@ -655,8 +644,7 @@ fn infer_single_shape_hole_from_count(
             continue;
         }
         let resolved_dim = checker.resolve_index(*dim);
-        let Ok(Some(extent)) =
-            radix_types::evaluate_index_dimension(resolved_dim, checker.types)
+        let Ok(Some(extent)) = radix_types::evaluate_index_dimension(resolved_dim, checker.types)
         else {
             return;
         };
@@ -682,9 +670,7 @@ fn infer_single_shape_hole_from_count(
         return;
     }
     let inferred = element_count / known_product;
-    let inferred = checker
-        .types
-        .intern_index(IndexExpr::Literal(inferred));
+    let inferred = checker.types.intern_index(IndexExpr::Literal(inferred));
     checker.constrain_index_equal(dims[*hole_axis], inferred, span);
 }
 
@@ -698,8 +684,7 @@ fn static_tensor_element_count(checker: &mut TypeChecker<'_>, ty: TypeId) -> Opt
     };
     dims.into_iter().try_fold(1_u64, |count, dim| {
         let resolved_dim = checker.resolve_index(dim);
-        let extent =
-            radix_types::evaluate_index_dimension(resolved_dim, checker.types).ok()??;
+        let extent = radix_types::evaluate_index_dimension(resolved_dim, checker.types).ok()??;
         count.checked_mul(extent)
     })
 }
@@ -876,9 +861,11 @@ fn static_numerus_list_index(
                 let HirArrayElement::Expr(inner) = element else {
                     return None;
                 };
-                dims.push(checker.types.intern_index(IndexExpr::Literal(
-                    static_numerus_literal(inner)?,
-                )));
+                dims.push(
+                    checker
+                        .types
+                        .intern_index(IndexExpr::Literal(static_numerus_literal(inner)?)),
+                );
             }
             Some(checker.types.intern_index(IndexExpr::Tuple(dims)))
         }
@@ -931,15 +918,18 @@ fn constrain_expanded_result_shape(
     };
     for (source_axis, source, target, stretched) in mapping {
         let target_resolved = checker.resolve_index(target);
-        if matches!(checker.types.get_index(target_resolved), IndexExpr::Infer(_)) {
+        if matches!(
+            checker.types.get_index(target_resolved),
+            IndexExpr::Infer(_)
+        ) {
             let source = checker.resolve_index(source);
             let source_term = checker.types.get_index(source).clone();
-            let source_extent = if matches!(source_term, IndexExpr::Infer(_) | IndexExpr::Unspecified)
-            {
-                checker.runtime_expression_axis(receiver.id, &[], source_axis as u32)
-            } else {
-                source
-            };
+            let source_extent =
+                if matches!(source_term, IndexExpr::Infer(_) | IndexExpr::Unspecified) {
+                    checker.runtime_expression_axis(receiver.id, &[], source_axis as u32)
+                } else {
+                    source
+                };
             checker.constrain_index_equal(target, source_extent, span);
         } else if !stretched && dimensions_provably_equal(checker, source, target) {
             checker.constrain_index_equal(source, target, span);
@@ -947,11 +937,7 @@ fn constrain_expanded_result_shape(
     }
 }
 
-fn dimensions_provably_equal(
-    checker: &mut TypeChecker<'_>,
-    left: IndexId,
-    right: IndexId,
-) -> bool {
+fn dimensions_provably_equal(checker: &mut TypeChecker<'_>, left: IndexId, right: IndexId) -> bool {
     let left = checker.resolve_index(left);
     let right = checker.resolve_index(right);
     left == right
@@ -985,7 +971,11 @@ fn best_expanded_axis_mapping(
         source_axis: usize,
         target_start: usize,
         picked: &mut Vec<(usize, IndexId, IndexId, usize, bool)>,
-        best: &mut Option<(usize, Vec<usize>, Vec<(usize, IndexId, IndexId, usize, bool)>)>,
+        best: &mut Option<(
+            usize,
+            Vec<usize>,
+            Vec<(usize, IndexId, IndexId, usize, bool)>,
+        )>,
     ) {
         if source_axis == source.len() {
             let target_axes = picked
@@ -998,8 +988,7 @@ fn best_expanded_axis_mapping(
                 .count();
             let candidate = (stretches, target_axes, picked.clone());
             let is_better = best.as_ref().is_none_or(|current| {
-                candidate.0 < current.0
-                    || (candidate.0 == current.0 && candidate.1 > current.1)
+                candidate.0 < current.0 || (candidate.0 == current.0 && candidate.1 > current.1)
             });
             if is_better {
                 *best = Some(candidate);
@@ -1062,15 +1051,7 @@ fn best_expanded_axis_mapping(
     }
     let mut picks = Vec::with_capacity(source.len());
     let mut best = None;
-    visit(
-        checker,
-        source,
-        target,
-        0,
-        0,
-        &mut picks,
-        &mut best,
-    );
+    visit(checker, source, target, 0, 0, &mut picks, &mut best);
     best.map(|(_, _, picks)| {
         picks
             .into_iter()
@@ -1129,8 +1110,10 @@ fn index_term_for_shape_expression(
         }
     }
     let ty = expr.ty?;
-    if !crate::numeric_width::is_integer_index_scalar(checker.types, checker.resolve_inferred_type(ty))
-    {
+    if !crate::numeric_width::is_integer_index_scalar(
+        checker.types,
+        checker.resolve_inferred_type(ty),
+    ) {
         return None;
     }
     let runtime = radix_types::RuntimeExtentId::ScalarExpression {

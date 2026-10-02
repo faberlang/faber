@@ -297,7 +297,11 @@ pub(super) fn remap_runtime_call_text_symbols(
     }
 }
 
-fn remap_shape_expr_text_symbols(expression: &mut MirShapeExpr, source: &Interner, target: &mut Interner) {
+fn remap_shape_expr_text_symbols(
+    expression: &mut MirShapeExpr,
+    source: &Interner,
+    target: &mut Interner,
+) {
     match expression {
         MirShapeExpr::TensorFieldAxis { fields, .. } => {
             for field in fields {
@@ -313,7 +317,9 @@ fn remap_shape_expr_text_symbols(expression: &mut MirShapeExpr, source: &Interne
         MirShapeExpr::Divide { numerator, .. } => {
             remap_shape_expr_text_symbols(numerator, source, target);
         }
-        MirShapeExpr::Literal(_) | MirShapeExpr::ScalarArgument { .. } | MirShapeExpr::TensorAxis { .. } => {}
+        MirShapeExpr::Literal(_)
+        | MirShapeExpr::ScalarArgument { .. }
+        | MirShapeExpr::TensorAxis { .. } => {}
     }
 }
 
