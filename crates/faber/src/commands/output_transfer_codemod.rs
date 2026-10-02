@@ -8,6 +8,7 @@
 //! that small admitted shape is left alone and receives a machine-readable
 //! decline reason.
 
+use super::format::RewriteTally;
 use radix::module::lexer::{Token, TokenKind, lex};
 use serde::Serialize;
 use std::fs;
@@ -81,12 +82,12 @@ struct Replacement {
     text: String,
 }
 
-/// Run the codemod command over files, matching the `format` command's
-/// stdout/check/in-place contract.
+/// Run the codemod command over files. Modes (mutually exclusive at the CLI
+/// parse boundary): `--stdin` and `--stdout` print one rewritten document;
+/// `--write` rewrites files whose bytes change; everything else (the default,
+/// spelled `--check`) reports drift and writes nothing. Report and summary lines
+/// go to stdout; diagnostics and declines stay on stderr.
 pub fn cmd_output_transfer_codemod(command: &OutputTransferCodemodCommand) {
-    // `--write` is the explicit spelling of the in-place default. Keeping the
-    // field here makes the command shape parallel `faber format`.
-    let _write = command.write;
     if command.stdin {
         let mut source = String::new();
         if let Err(err) = std::io::stdin().read_to_string(&mut source) {
@@ -119,20 +120,20 @@ pub fn cmd_output_transfer_codemod(command: &OutputTransferCodemodCommand) {
     }
     if command.stdout && files.len() > 1 {
         eprintln!(
-            "error: --stdout accepts exactly one input file, found {}; codemod one file at a time",
+            "error: --stdout accepts exactly one input file, found {}; use --check or --write for multiple files",
             files.len()
         );
         std::process::exit(1);
     }
 
-    let mut drift_count = 0usize;
-    let mut error_count = 0usize;
+    let report_only = command.check || !command.write;
+    let mut tally = RewriteTally::default();
     for path in &files {
         let source = match fs::read_to_string(path) {
             Ok(source) => source,
             Err(err) => {
                 eprintln!("error: failed to read '{}': {err}", path.display());
-                error_count += 1;
+                tally.refused += 1;
                 continue;
             }
         };
@@ -140,45 +141,87 @@ pub fn cmd_output_transfer_codemod(command: &OutputTransferCodemodCommand) {
             Ok(report) => report,
             Err(message) => {
                 eprintln!("error: {}: {message}", path.display());
-                error_count += 1;
+                tally.refused += 1;
                 continue;
             }
         };
         print_declines(path, &report);
 
-        if command.check {
-            if report.source != source {
-                eprintln!("would codemod {}", path.display());
-                drift_count += 1;
-            }
-            continue;
-        }
         if command.stdout {
             print!("{}", report.source);
             continue;
         }
-        if fs::write(path, &report.source).is_err() {
-            eprintln!(
-                "error: failed to write '{}': codemod output",
-                path.display()
-            );
-            error_count += 1;
+        // One predicate for report and write: the file's bytes would change.
+        if report.source == source {
+            continue;
+        }
+        if report_only {
+            println!("would codemod {}", path.display());
+            tally.changed += 1;
+        } else if fs::write(path, &report.source).is_ok() {
+            println!("codemodded {}", path.display());
+            tally.changed += 1;
+        } else {
+            eprintln!("error: failed to write '{}'", path.display());
+            tally.write_failed += 1;
         }
     }
 
-    if command.check {
-        if drift_count > 0 {
-            eprintln!("{drift_count} file(s) would be codemodded");
-            std::process::exit(1);
-        }
-        if error_count > 0 {
+    if command.stdout {
+        if tally.refused > 0 {
             std::process::exit(1);
         }
         return;
     }
-    if error_count > 0 {
+    let total = files.len();
+    if report_only {
+        println!("{}", report_summary(&tally, total));
+        if tally.changed + tally.refused > 0 {
+            std::process::exit(1);
+        }
+        return;
+    }
+    println!("{}", write_summary(&tally, total));
+    if tally.refused + tally.write_failed > 0 {
         std::process::exit(1);
     }
+}
+
+fn refused_clause(tally: &RewriteTally) -> String {
+    if tally.refused == 0 {
+        String::new()
+    } else {
+        format!(", {} refused (nothing written)", tally.refused)
+    }
+}
+
+/// Last stdout line of report mode (same shape as `faber format`).
+fn report_summary(tally: &RewriteTally, total: usize) -> String {
+    if tally.changed > 0 {
+        format!(
+            "{} of {total} files would be codemodded; rerun with --write to apply{}",
+            tally.changed,
+            refused_clause(tally)
+        )
+    } else if tally.refused > 0 {
+        format!("{} refused (nothing written)", tally.refused)
+    } else {
+        format!("{total} files already codemodded")
+    }
+}
+
+/// Last stdout line of `--write` mode (same shape as `faber format`).
+fn write_summary(tally: &RewriteTally, total: usize) -> String {
+    let failed = if tally.write_failed == 0 {
+        String::new()
+    } else {
+        format!(", {} failed to write", tally.write_failed)
+    };
+    format!(
+        "codemodded {} of {total} files{}{failed}",
+        tally.changed,
+        refused_clause(tally)
+    )
 }
 
 fn print_declines(path: &Path, report: &CodemodReport) {

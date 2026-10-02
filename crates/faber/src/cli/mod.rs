@@ -200,6 +200,7 @@ pub enum Command {
     Convert(ConvertArgs),
 
     /// Rewrite admitted print/nota statements to imported `⇇` transfers
+    /// (report-only unless `--write` is given)
     #[command(name = "output-transfer-codemod")]
     OutputTransferCodemod(OutputTransferCodemodArgs),
 
@@ -320,23 +321,23 @@ pub struct OutputTransferCodemodArgs {
     #[arg(value_name = "PATH")]
     pub paths: Vec<PathBuf>,
 
-    /// Report pending codemods without writing files; exit 1 if any file
-    /// would change
-    #[arg(long)]
+    /// Report files that would change without writing (the default; explicit
+    /// spelling); exit 1 if any file would change
+    #[arg(long, conflicts_with_all = ["write", "stdout"])]
     pub check: bool,
 
-    /// Write codemodded output to stdout instead of updating files (exactly
-    /// one input file)
-    #[arg(long, conflicts_with = "check")]
+    /// Write codemodded output to stdout instead of reporting (exactly one
+    /// input file)
+    #[arg(long, conflicts_with_all = ["check", "write"])]
     pub stdout: bool,
 
-    /// Write codemodded source back to its file (the in-place default)
-    #[arg(long, conflicts_with = "stdout")]
+    /// Write codemodded source back to the file (default is report-only)
+    #[arg(long, conflicts_with_all = ["check", "stdout"])]
     pub write: bool,
 
     /// Read exactly one source document from stdin and print the codemodded
-    /// result to stdout
-    #[arg(long, conflicts_with_all = ["check", "paths"])]
+    /// result to stdout (incompatible with path arguments and the other modes)
+    #[arg(long, conflicts_with_all = ["check", "write", "stdout", "paths"])]
     pub stdin: bool,
 }
 
