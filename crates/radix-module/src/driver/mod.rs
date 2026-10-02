@@ -4530,6 +4530,10 @@ mod amd_target_tests;
 mod closure_shared_capture_tests;
 
 #[cfg(test)]
+#[path = "enum_variant_slot_test.rs"]
+mod enum_variant_slot_tests;
+
+#[cfg(test)]
 #[path = "print_text_kind_test.rs"]
 mod print_text_kind_tests;
 

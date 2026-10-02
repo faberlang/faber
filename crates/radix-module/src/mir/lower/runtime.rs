@@ -2122,6 +2122,7 @@ impl FunctionBuilder<'_> {
 
         if self.context.variant_parents.contains_key(def_id) {
             let fields = self.variant_payload(*def_id, lowered_args, expr.span);
+            let ty = self.variant_value_ty(expr)?;
             return Some(self.construct_temp(MirAggregateKind::EnumVariant(*def_id), fields, ty, expr.span));
         }
 

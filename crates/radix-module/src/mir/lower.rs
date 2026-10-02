@@ -2583,7 +2583,7 @@ impl<'a> FunctionBuilder<'a> {
                     ));
                     return None;
                 }
-                let ty = self.expr_ty(expr)?;
+                let ty = self.variant_value_ty(expr)?;
                 return Some(self.construct_temp(
                     MirAggregateKind::EnumVariant(def_id),
                     MirAggregateFields::Ordered(Vec::new()),
@@ -3624,6 +3624,21 @@ impl<'a> FunctionBuilder<'a> {
             return None;
         };
         Some(MirType::semantic(ty))
+    }
+
+    /// The enum type of a variant-construction expression.
+    ///
+    /// WHY: a variant stored into an optional slot (`Color ∪ none o ← Color.Green`,
+    /// a nullable class field) reaches lowering typed as the slot's `T ∪ none`,
+    /// but the value itself is a `T`; the aggregate must carry the enum type and
+    /// the store lifts it into the optional slot.
+    pub(super) fn variant_value_ty(&mut self, expr: &HirExpression) -> Option<MirType> {
+        let ty = self.expr_ty(expr)?;
+        Some(
+            self.types
+                .nullable_inner(ty.semantic_id())
+                .map_or(ty, MirType::semantic),
+        )
     }
 
     fn is_vacuum(&self, ty: MirType) -> bool {
