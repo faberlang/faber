@@ -3156,6 +3156,7 @@ principium = "bắt_đầu"
 terminus = "kết_thúc"
 coetus = "nhóm"
 nominatus = "đặt_tên"
+munita = "thoát_ký_tự"
 
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "các lựa chọn mẫu or phải liên kết cùng tên và kiểu"

@@ -617,6 +617,7 @@ impl Validator<'_, '_> {
             | MirCollectionOp::Keys
             | MirCollectionOp::Values
             | MirCollectionOp::CordCursor
+            | MirCollectionOp::TextEscape
             | MirCollectionOp::MatchText
             | MirCollectionOp::MatchStart
             | MirCollectionOp::MatchEnd
@@ -672,6 +673,7 @@ impl Validator<'_, '_> {
             MirCollectionOp::Put
             | MirCollectionOp::Slice
             | MirCollectionOp::Replace
+            | MirCollectionOp::RegexReplace
             | MirCollectionOp::TensorSet
             | MirCollectionOp::TensorCreate
             | MirCollectionOp::TensorSlice
@@ -1230,6 +1232,9 @@ impl Validator<'_, '_> {
             | MirCollectionOp::MatchGroup
             | MirCollectionOp::MatchNamed => {
                 self.validate_regex_match_call(scope, op, first_arg_ty, call, span);
+            }
+            MirCollectionOp::RegexReplace | MirCollectionOp::TextEscape => {
+                self.validate_regex_text_call(scope, op, first_arg_ty, call, span);
             }
             MirCollectionOp::Uppercase | MirCollectionOp::Lowercase | MirCollectionOp::Trim => {
                 self.require_exact(
@@ -2242,6 +2247,48 @@ impl Validator<'_, '_> {
                 span,
                 "regex/match operation argument is not textus",
             );
+        }
+    }
+
+    /// RX-4b: `regex.muta(text, replacement)` (`textus` result from a `regex`
+    /// receiver and two `textus` arguments) and `textus.munita()` (`textus`
+    /// result from a `textus` receiver, no further argument).
+    fn validate_regex_text_call(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        op: MirCollectionOp,
+        first_arg_ty: Option<MirType>,
+        call: &MirRuntimeCall,
+        span: Span,
+    ) {
+        let receiver = if matches!(op, MirCollectionOp::RegexReplace) {
+            Primitive::Regex
+        } else {
+            Primitive::Textus
+        };
+        if let Some(receiver_ty) = first_arg_ty {
+            self.require_exact(
+                receiver_ty,
+                self.primitive(receiver),
+                span,
+                "regex text operation receiver type mismatch",
+            );
+        }
+        self.require_exact(
+            call.return_ty,
+            self.primitive(Primitive::Textus),
+            span,
+            "regex text operation result is not textus",
+        );
+        for arg in call.args.iter().skip(1) {
+            if let Some(arg_ty) = self.validate_operand(scope, arg, span) {
+                self.require_exact(
+                    arg_ty,
+                    self.primitive(Primitive::Textus),
+                    span,
+                    "regex text operation argument is not textus",
+                );
+            }
         }
     }
 

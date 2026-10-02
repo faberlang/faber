@@ -91,6 +91,16 @@ impl RegexProgram {
         self.compiled.split(text).map(str::to_owned).collect()
     }
 
+    /// `text` with every non-overlapping match replaced by `replacement`, taken
+    /// literally (`$1`, `${name}` and `\1` stay text), in one pass over the
+    /// engine's iteration (the same empty-match rule as `find_all`). Byte
+    /// slices only: no code-point map is needed.
+    pub fn replace_all_literal(&self, text: &str, replacement: &str) -> String {
+        self.compiled
+            .replace_all(text, regex::NoExpand(replacement))
+            .into_owned()
+    }
+
     /// One engine capture set as a `MatchValue` whose whole match starts at
     /// code point `start`.
     fn match_value(&self, captures: &regex::Captures<'_>, start: usize) -> MatchValue {
@@ -113,6 +123,13 @@ impl RegexProgram {
             names,
         }
     }
+}
+
+/// A pattern text matching `text` literally: the engine's own escaper, which
+/// backslash-escapes exactly the metacharacters `\ . + * ? ( ) | [ ] { } ^ $ # & - ~`
+/// and leaves every other character (including non-ASCII text) unchanged.
+pub fn escape(text: &str) -> String {
+    regex_syntax::escape(text)
 }
 
 /// A rejected construct: a stable id (RD-4) and engine detail.

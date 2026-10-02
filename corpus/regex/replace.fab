@@ -1,0 +1,71 @@
++++
+term = "replace"
+kind = "method"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "conversio_expr", "call_expr", "call_suffix", "member_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "regex"
+canonical = false
+summary = "regex.replace(text, replacement) replaces every non-overlapping match with the replacement, taken literally: $1, ${name} and \\1 stay plain text."
+syntax = "<regex>.replace(<textus>, <textus>)"
+related = ["regex", "↦", "find_all", "split", "escape"]
+locale = "en"
++++
+# =============================================================================
+# replace — every regex match, replaced by literal text
+# =============================================================================
+#
+# What this teaches:
+#   • `r.replace(text, replacement)` replaces every non-overlapping match, not
+#     only the first, and returns the new text; the input is not changed
+#   • the replacement is plain text: `$1`, `${name}` and `\1` are not group
+#     references, they are copied as written (there is no template dialect;
+#     read a group with `find` or `find_all` and build the text yourself)
+#   • the empty-match rule of `find_all` applies: `a*` over `baaac` matches at
+#     (0,0) (1,4) (5,5), so replacing with `-` gives `-b-c-`
+#   • no match returns the text unchanged; an empty replacement deletes the
+#     matches
+#   • the whole text is walked once
+#
+# Common mistakes:
+#   • expecting `$1` or `${name}` to insert the group's text
+#   • expecting only the first match to change
+#   • confusing this with `textus.replace`, which replaces a literal
+#     substring and takes no pattern
+#
+# See also: regex, ↦, find_all, split, escape.
+# =============================================================================
+
+# replace — all matches, literal replacement, empty matches
+#
+# <regex>.replace(<textus>, <textus>)   -- textus
+#
+# EXPECTED OUTPUT:
+#   One printed text per cell, in the order below.
+
+main {
+    # every match changes: the run `aa` is one match
+    const regex run ← "a+" ↦ regex
+    print run.replace("caab aa", "x")
+
+    # the replacement is literal: no group is substituted
+    const regex pair ← "(?P<n>[a-z])([0-9])" ↦ regex
+    print pair.replace("a1 b2", "$1")
+    print pair.replace("a1 b2", "${n}-$2")
+    print pair.replace("a1 b2", "\\1\\2")
+
+    # the empty-match rule: matches at (0,0) (1,4) (5,5)
+    const regex stars ← "a*" ↦ regex
+    print stars.replace("baaac", "-")
+
+    # the empty pattern matches before each character and at the end
+    const regex nothing ← "" ↦ regex
+    print nothing.replace("ab", "-")
+
+    # no match is the text unchanged; an empty replacement deletes
+    const regex digits ← "[0-9]+" ↦ regex
+    print digits.replace("none here", "#")
+    print digits.replace("a12b3", "")
+
+    # non-ASCII text passes through untouched around the matches
+    const regex word ← "[a-z]+" ↦ regex
+    print word.replace("😀é abc d", "_")
+}

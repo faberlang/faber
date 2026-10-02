@@ -464,6 +464,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Textus, "longitudo", 0, &[], Numerus, collection Length),
     intrinsic!(Textus, "maiuscula", 0, &[], Textus, collection Uppercase),
     intrinsic!(Textus, "minuscula", 0, &[], Textus, collection Lowercase),
+    intrinsic!(Textus, "munita", 0, &[], Textus, collection TextEscape),
     intrinsic!(Textus, "muta", 2, &[IntrinsicParamKind::Textus, IntrinsicParamKind::Textus], Textus, collection Replace),
     intrinsic!(Textus, "recide", 0, &[], Textus, collection Trim),
     intrinsic!(Textus, "sectio", 2, &[IntrinsicParamKind::NumerusIndex, IntrinsicParamKind::NumerusIndex], Textus, collection Slice),
@@ -1133,6 +1134,10 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     // the existing Latin name on a new receiver.
     intrinsic!(Regex, "collecta", 1, &[IntrinsicParamKind::Textus], MatchArray, collection RegexFindAll),
     intrinsic!(Regex, "divide", 1, &[IntrinsicParamKind::Textus], TextusArray, collection RegexSplit),
+    // RX-4b: literal replace on the `regex` receiver (the existing Latin name
+    // `muta` on a new receiver; the closure form is RX-5). `escape` is a method
+    // on `textus` (RD-6), the accepted default `munita`.
+    intrinsic!(Regex, "muta", 2, &[IntrinsicParamKind::Textus, IntrinsicParamKind::Textus], Textus, collection RegexReplace),
     intrinsic!(Match, "inventum", 0, &[], Textus, collection MatchText),
     intrinsic!(Match, "principium", 0, &[], Numerus, collection MatchStart),
     intrinsic!(Match, "terminus", 0, &[], Numerus, collection MatchEnd),

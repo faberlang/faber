@@ -153,3 +153,51 @@ fn split_keeps_edges_and_never_splices_groups() {
     assert_eq!(pieces(",", ""), [""]);
     assert_eq!(pieces("x", "abc"), ["abc"]);
 }
+
+#[test]
+fn replace_all_literal_never_expands_the_replacement() {
+    let replace = |pattern: &str, text: &str, with: &str| {
+        RegexProgram::compile(pattern)
+            .expect("valid pattern")
+            .replace_all_literal(text, with)
+    };
+    assert_eq!(replace("a+", "caab aa", "x"), "cxb x");
+    assert_eq!(replace("(?P<n>[a-z])(\\d)", "a1 b2", "$1"), "$1 $1");
+    assert_eq!(replace("(?P<n>[a-z])(\\d)", "a1", "${n}-$2"), "${n}-$2");
+    assert_eq!(replace("(?P<n>[a-z])(\\d)", "a1", "\\1\\2"), "\\1\\2");
+    assert_eq!(replace("a*", "baaac", "-"), "-b-c-");
+    assert_eq!(replace("", "ab", "-"), "-a-b-");
+    assert_eq!(replace("x", "abc", "#"), "abc");
+    assert_eq!(replace("[0-9]+", "a12b3", ""), "ab");
+}
+
+#[test]
+fn escape_covers_exactly_the_metacharacters_and_round_trips() {
+    let metacharacters = "\\.+*?()|[]{}^$#&-~";
+    for meta in metacharacters.chars() {
+        assert_eq!(super::escape(&meta.to_string()), format!("\\{meta}"));
+    }
+    assert_eq!(
+        super::escape("é😀 plain 日本語\t\n"),
+        "é😀 plain 日本語\t\n"
+    );
+    let probes = [
+        "",
+        "a.b",
+        "x+y*z",
+        "(a|b)",
+        "[a-z]{2}",
+        "^start$",
+        "a\\d",
+        "naïve café 😀",
+        metacharacters,
+    ];
+    for probe in probes {
+        let program = RegexProgram::compile(&format!("^{}$", super::escape(probe)))
+            .expect("an escaped pattern is accepted by the dialect");
+        let found = program.find(probe).expect("the escaped pattern matches");
+        assert_eq!(found.text, probe);
+        assert_eq!(found.start, 0);
+        assert_eq!(found.end, probe.chars().count());
+    }
+}

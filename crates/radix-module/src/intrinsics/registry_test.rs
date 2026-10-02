@@ -414,3 +414,27 @@ fn cci1_additive_rows_preserve_existing_tensor_rows() {
     let activatio_softmax = lookup_method_for_type(tensor_ty, "activatio_softmax", 0).expect("tensor softmax");
     assert_eq!(mir_collection_op(activatio_softmax), Some(MirCollectionOp::TensorSoftmax));
 }
+
+#[test]
+fn regex_replace_and_text_escape_resolve_by_receiver() {
+    let types = TypeTable::new();
+    let regex = types.get(types.primitive(Primitive::Regex));
+    let text = types.get(types.primitive(Primitive::Textus));
+
+    // `muta` is one Latin name on two receivers: the regex row replaces
+    // matches, the textus row replaces a literal substring. Receiver type picks
+    // the operation; the two never share a row.
+    let regex_replace = lookup_method_for_type(regex, "muta", 2).expect("regex muta");
+    assert_eq!(regex_replace.receiver, IntrinsicReceiver::Regex);
+    assert_eq!(regex_replace.return_kind, super::IntrinsicReturnKind::Textus);
+    assert_eq!(mir_collection_op(regex_replace), Some(MirCollectionOp::RegexReplace));
+    let text_replace = lookup_method_for_type(text, "muta", 2).expect("textus muta");
+    assert_eq!(text_replace.receiver, IntrinsicReceiver::Textus);
+    assert_eq!(mir_collection_op(text_replace), Some(MirCollectionOp::Replace));
+
+    let escape = lookup_method_for_type(text, "munita", 0).expect("textus munita");
+    assert_eq!(escape.receiver, IntrinsicReceiver::Textus);
+    assert_eq!(escape.return_kind, super::IntrinsicReturnKind::Textus);
+    assert_eq!(mir_collection_op(escape), Some(MirCollectionOp::TextEscape));
+    assert!(lookup_method_for_type(regex, "munita", 0).is_none());
+}

@@ -1,0 +1,73 @@
++++
+term = "escape"
+kind = "method"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "conversio_expr", "call_expr", "call_suffix", "member_suffix", "non_null_suffix", "argument_list", "argument", "itera_stmt", "si_stmt", "array_literal", "assignment", "place", "arm", "equality", "equality_tail", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "regex"
+canonical = false
+summary = "text.escape() returns a pattern text that matches the text literally: it backslash-escapes the regex metacharacters and nothing else."
+syntax = "<textus>.escape()"
+related = ["regex", "↦", "find", "replace"]
+locale = "en"
++++
+# =============================================================================
+# escape — a pattern that matches the text literally
+# =============================================================================
+#
+# What this teaches:
+#   • `text.escape()` returns a pattern text; converting `^` + the escaped
+#     text + `$` with `↦ regex` gives a regex that matches exactly `text`
+#   • exactly these characters are escaped, each with one backslash:
+#     `\ . + * ? ( ) | [ ] { } ^ $ # & - ~`; every other character, including
+#     letters, digits, spaces and non-ASCII text, is copied unchanged
+#   • use it to put user text inside a larger pattern, for example an
+#     alternation built from a list of words
+#
+# Common mistakes:
+#   • escaping text that is already a pattern: the result matches the pattern
+#     characters themselves, not what they mean
+#   • expecting `escape` to be a regex method: it is a method of text
+#
+# See also: regex, ↦, find, replace.
+# =============================================================================
+
+# escape — the metacharacters, and the round trip
+#
+# <textus>.escape()   -- textus
+#
+# EXPECTED OUTPUT:
+#   Three escaped texts, a line for any probe whose anchored escaped pattern
+#   misses or matches only part of it (none expected), the count of probes
+#   matched whole, then the count of probes tried (the two counts agree).
+
+main {
+    # the metacharacters are escaped; everything else is copied
+    print "a.b*c".escape()
+    print "(1+1)=[2]{3}|?^$".escape()
+    print "\\#&-~ é😀 x".escape()
+
+    # round trip: ^ + escaped + $ matches the whole probe
+    const list<string> probes ← [
+        "\\", ".", "+", "*", "?", "(", ")", "|", "[", "]", "{", "}", "^", "$", "#", "&", "-", "~",
+        "a.b", "x+y*z", "(a|b)", "[a-z]{2}", "^start$", "a\\d", "tab\there", "line\nbreak",
+        "é", "😀", "naïve café 😀", "日本語", "", "plain"
+    ]
+    var int tried ← 0
+    var int whole ← 0
+    for from probes const probe {
+        tried ← tried + 1
+        const string head ← "^" + probe.escape()
+        const regex anchored ← (head + "$") ↦ regex
+        const _ hit ← anchored.find(probe)
+        if hit ≡ null {
+            print "miss"
+        } else {
+            if hit!.text() ≡ probe {
+                whole ← whole + 1
+            } else {
+                print "partial"
+            }
+        }
+    }
+    print whole
+    print tried
+}

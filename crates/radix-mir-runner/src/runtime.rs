@@ -1436,6 +1436,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::RegexFindAll | MirCollectionOp::RegexSplit => {
                 self.eval_regex_bulk(op, args, span)
             }
+            MirCollectionOp::RegexReplace => self.eval_regex_replace(args, span),
+            MirCollectionOp::TextEscape => {
+                self.map_str_arg(args, span, |text| super::regex_program::escape(&text))
+            }
             MirCollectionOp::MatchText
             | MirCollectionOp::MatchStart
             | MirCollectionOp::MatchEnd
@@ -3736,6 +3740,31 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             program.split(&text).into_iter().map(Value::Str).collect()
         };
         Ok(Value::Array(Rc::new(RefCell::new(items))))
+    }
+
+    /// `regex.muta(text, replacement)`: every non-overlapping match replaced by
+    /// the literal replacement, in one pass.
+    fn eval_regex_replace(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [receiver, text, replacement] = args else {
+            return Err(RunnerError::internal(span, "regex replace arity"));
+        };
+        let Value::Regex(program) = self.eval_operand(receiver, span)? else {
+            return Err(RunnerError::internal(span, "replace receiver is not regex"));
+        };
+        let Value::Str(text) = self.eval_operand(text, span)? else {
+            return Err(RunnerError::internal(span, "replace text is not textus"));
+        };
+        let Value::Str(replacement) = self.eval_operand(replacement, span)? else {
+            return Err(RunnerError::internal(
+                span,
+                "replace replacement is not textus",
+            ));
+        };
+        Ok(Value::Str(program.replace_all_literal(&text, &replacement)))
     }
 
     /// The five `match` accessors; offsets are code points.

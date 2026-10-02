@@ -388,6 +388,14 @@ pub enum MirCollectionOp {
     /// the iteration's matches, as `lista<textus>`; leading and trailing empty
     /// pieces are kept and capture groups are not spliced (RX-4a).
     RegexSplit,
+    /// Regex `muta` (en `replace`): every non-overlapping match of the `regex`
+    /// receiver in a `textus` argument replaced by a `textus` replacement taken
+    /// literally (`$1`, `${name}` and `\1` stay text), as `textus` (RX-4b).
+    RegexReplace,
+    /// Text `munita` (en `escape`): the `textus` receiver as a pattern text that
+    /// matches it literally, escaping exactly the dialect's metacharacters
+    /// (RX-4b).
+    TextEscape,
     /// Cord walk: `ascii.cursor()` / later `textus.cursor()` → `cursor<ascii<1>>`.
     /// One buffer of one-byte ascii values; not a per-step heap slice.
     CordCursor,
