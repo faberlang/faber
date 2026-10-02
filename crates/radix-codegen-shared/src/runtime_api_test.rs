@@ -326,13 +326,24 @@ fn the_regex_rows_spell_as_faber_regex_functions_in_rust() {
 }
 
 #[test]
-fn only_the_exact_store_row_is_store_family() {
-    let store_rows: Vec<&str> = TABLE
+fn only_the_exact_and_inf_store_rows_are_store_family() {
+    let store_rows: Vec<(Namespace, &str)> = TABLE
         .iter()
         .filter(|row| row.kind == RuntimeKind::StoreFn)
-        .map(|row| row.name)
+        .map(|row| (row.ns, row.name))
         .collect();
-    assert_eq!(store_rows, ["store"]);
+    assert_eq!(
+        store_rows,
+        [(Namespace::Exact, "store"), (Namespace::Inf, "store")]
+    );
+    assert_eq!(
+        spell_store(Target::HirRust, &INF_STORE, &site()),
+        Ok("faber::inf::store".to_owned())
+    );
+    assert_eq!(
+        spell(Target::HirRust, &INF_STORE),
+        Err(SpellError::StoreOnly)
+    );
     assert_eq!(
         spell(Target::HirRust, &EXACT_STORE),
         Err(SpellError::StoreOnly)
@@ -376,6 +387,29 @@ fn the_dec_rows_spell_as_faber_dec_functions_in_rust() {
         assert_eq!(
             spell_any(Target::HirRust, row),
             format!("faber::dec::{}", row.name)
+        );
+    }
+}
+
+#[test]
+fn the_inf_rows_spell_as_faber_inf_functions_in_rust() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Inf)
+        .collect();
+    assert_eq!(rows.len(), 15);
+    for row in rows {
+        // `store` is the one store-family row (spelled at a store site).
+        let kind = if row.name == "store" {
+            RuntimeKind::StoreFn
+        } else {
+            RuntimeKind::Fn
+        };
+        assert_eq!(row.kind, kind);
+        assert_eq!(row.targets, [Target::HirRust]);
+        assert_eq!(
+            spell_any(Target::HirRust, row),
+            format!("faber::inf::{}", row.name)
         );
     }
 }

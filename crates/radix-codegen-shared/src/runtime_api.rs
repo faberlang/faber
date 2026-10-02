@@ -129,6 +129,38 @@ pub const DEC_SUB: RuntimeItem = dec_row("sub");
 pub const DEC_TRY_PARSE: RuntimeItem = dec_row("try_parse");
 pub const DEC_TRY_STORE: RuntimeItem = dec_row("try_store");
 
+/// The targets whose runtime package carries the `inf` namespace today.
+const INF_TARGETS: &[Target] = &[Target::HirRust];
+
+const fn inf_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Inf,
+        name,
+        kind,
+        targets: INF_TARGETS,
+    }
+}
+
+/// `inf` rows (T1-R3): the wrappers over `faber::Magnus` of the Rust runtime
+/// (`faber::inf`), the traps and conversions its operators do not spell
+/// themselves. `INF_STORE` is the store-family row: the width limit of an `inf`
+/// landing in a bounded slot applies at a store site and nowhere else.
+pub const INF_BIG: RuntimeItem = inf_row("big", RuntimeKind::Fn);
+pub const INF_APPROX: RuntimeItem = inf_row("approx", RuntimeKind::Fn);
+pub const INF_CMP_DEC: RuntimeItem = inf_row("cmp_dec", RuntimeKind::Fn);
+pub const INF_CMP_FLOAT: RuntimeItem = inf_row("cmp_float", RuntimeKind::Fn);
+pub const INF_DIV: RuntimeItem = inf_row("div", RuntimeKind::Fn);
+pub const INF_F32: RuntimeItem = inf_row("f32", RuntimeKind::Fn);
+pub const INF_NARROW: RuntimeItem = inf_row("narrow", RuntimeKind::Fn);
+pub const INF_PACK: RuntimeItem = inf_row("pack", RuntimeKind::Fn);
+pub const INF_POW: RuntimeItem = inf_row("pow", RuntimeKind::Fn);
+pub const INF_REM: RuntimeItem = inf_row("rem", RuntimeKind::Fn);
+pub const INF_SHL: RuntimeItem = inf_row("shl", RuntimeKind::Fn);
+pub const INF_SHR: RuntimeItem = inf_row("shr", RuntimeKind::Fn);
+pub const INF_STORE: RuntimeItem = inf_row("store", RuntimeKind::StoreFn);
+pub const INF_TO_DEC: RuntimeItem = inf_row("to_dec", RuntimeKind::Fn);
+pub const INF_TRUE_DIV: RuntimeItem = inf_row("true_div", RuntimeKind::Fn);
+
 /// The targets whose runtime package carries each `regex` row. Rows differ by
 /// target: the Rust runtime carries the match operations as free functions in
 /// `faber::regex`, the Go runtime carries a constructor plus methods, the Swift
@@ -253,6 +285,21 @@ pub const TABLE: &[RuntimeItem] = &[
     EXACT_SHL,
     EXACT_SHR,
     EXACT_STORE,
+    INF_BIG,
+    INF_APPROX,
+    INF_CMP_DEC,
+    INF_CMP_FLOAT,
+    INF_DIV,
+    INF_F32,
+    INF_NARROW,
+    INF_PACK,
+    INF_POW,
+    INF_REM,
+    INF_SHL,
+    INF_SHR,
+    INF_STORE,
+    INF_TO_DEC,
+    INF_TRUE_DIV,
     REGEX_MATCHES,
     REGEX_FIND,
     REGEX_FIND_ALL,
