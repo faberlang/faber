@@ -9,6 +9,7 @@ pub mod ascii;
 pub mod ascii_bounded;
 pub mod contract;
 pub mod cursor_stream;
+pub mod dec;
 pub mod display;
 pub mod exact;
 pub mod failable;
