@@ -1,0 +1,69 @@
++++
+term = "capture-groups"
+kind = "conformance"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "conversio_expr", "fac_stmt", "cape_clause", "si_stmt", "call_expr", "call_suffix", "member_suffix", "non_null_suffix", "argument_list", "argument", "expression", "ternary", "literal", "nota_stmt", "additive_expr", "equality", "equality_tail", "assignment", "place", "itera_stmt", "dum_stmt", "comparison", "vel_expr", "vel_rhs", "sit_decl", "expr_stmt"]
+category = "regex"
+canonical = false
+summary = "Capture indexing: group numbering counts every capturing group, a non-participating group is none, alternation is leftmost-first."
+syntax = "<textus> ↦ regex"
+related = ["regex", "↦", "find", "find_all", "split", "replace"]
+locale = "en"
++++
+# =============================================================================
+# capture-groups — regex conformance cell
+# =============================================================================
+#
+# Pins: PIN-GROUP (docs/design/regex-dialect.md). One line per probe cell;
+# the label is the cell id of the dialect's Appendix B, and the value is the reference
+# engine's answer. A target whose engine disagrees fails the line, never the dialect.
+#
+# What this teaches:
+#   • `(a)|(b)` over `b` gives the whole match `b`, group 1 `none` and group 2 `b`
+#   • a non-capturing group does not count: `(?:a)(b)` has one group
+#   • alternation is leftmost-first, not longest: `(a|ab)(c|bcd)(d*)` over `abcd` gives abcd, a, bcd and an empty third group
+#
+# Common mistakes:
+#   • expecting the longest alternative to win
+#   • counting a `(?:...)` group
+#
+# See also: regex, ↦, find, find_all, split, replace.
+# =============================================================================
+
+# capture-groups — probes, one line each
+#
+# <textus> ↦ regex, then the operation the pin is about
+#
+# EXPECTED OUTPUT:
+#   One `<cell id>: <value>` line per probe, in the order below.
+
+# Groups 0..n of the first match, each as `|text`, `none` for a group that did not take part;
+# `nomatch` for no match.
+fn groups(string pat, string text, int n) → string {
+    do {
+        const regex r ← pat ↦ regex
+        const _ h ← r.find(text)
+        if h ≡ null {
+            return "nomatch"
+        }
+        var string out ← ""
+        var int i ← 0
+        while i ≤ n {
+            out ← out + "|§"(h!.group(i) coalesce "none")
+            i ← i + 1
+        }
+        return out
+    }
+    catch err {
+        return "error"
+    }
+}
+
+main {
+    print "grp-alternation:" + groups("(a)|(b)", "b", 2)
+    print "grp-optional:" + groups("(a)?b", "b", 1)
+    print "grp-noncapture:" + groups("(?:a)(b)", "ab", 1)
+    print "grp-nested-alt:" + groups("(a)(?:(b)|c)", "ac", 2)
+    print "grp-leftmost-first:" + groups("(a|ab)(c|bcd)(d*)", "abcd", 3)
+    print "grp-lazy:" + groups("(a+?)(a*)", "aaa", 2)
+    print "grp-count-24:" + groups("(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)(k)", "abcdefghijk", 11)
+}

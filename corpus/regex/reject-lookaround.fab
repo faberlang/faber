@@ -1,0 +1,59 @@
++++
+term = "reject-lookaround"
+kind = "conformance"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "conversio_expr", "fac_stmt", "cape_clause", "si_stmt", "call_expr", "call_suffix", "member_suffix", "non_null_suffix", "argument_list", "argument", "expression", "ternary", "literal", "nota_stmt", "additive_expr", "equality", "equality_tail", "assignment", "place", "itera_stmt", "dum_stmt", "comparison", "vel_expr", "vel_rhs", "sit_decl", "expr_stmt"]
+category = "regex"
+canonical = false
+summary = "Lookahead and lookbehind are not in the dialect: the conversion fails with the leading id `lookahead` or `lookbehind`."
+syntax = "<textus> ↦ regex"
+related = ["regex", "↦", "find", "find_all", "split", "replace"]
+locale = "en"
++++
+# =============================================================================
+# reject-lookaround — regex conformance cell
+# =============================================================================
+#
+# Pins: PIN-REJECT (docs/design/regex-dialect.md). One line per probe cell;
+# the label is the cell id of the dialect's Appendix B, and the value is the reference
+# engine's answer. A target whose engine disagrees fails the line, never the dialect.
+#
+# What this teaches:
+#   • `a(?=b)` and `a(?!b)` fail with `lookahead`; `(?<=a)b` and `(?<!a)b` fail with `lookbehind`
+#   • `(?<n>a)` is a named group, not a lookbehind, and is accepted
+#   • only the id before the first colon of the failure payload is part of the contract; the detail text after it is the engine's own words
+#
+# Common mistakes:
+#   • matching on the whole failure payload: only the leading id is stable
+#   • using lookaround to anchor a match: capture the context and read it with `group` instead
+#
+# See also: regex, ↦, find, find_all, split, replace.
+# =============================================================================
+
+# reject-lookaround — probes, one line each
+#
+# <textus> ↦ regex, then the operation the pin is about
+#
+# EXPECTED OUTPUT:
+#   One `<cell id>: <value>` line per probe, in the order below.
+
+# `accepted` when the conversion takes the pattern; otherwise the leading construct id of the
+# rejection payload (the text before the first colon). The engine's prose is never printed.
+fn verdict(string pat) → string {
+    do {
+        pat ↦ regex
+        return "accepted"
+    }
+    catch err {
+        const list<string> parts ← err.split(":")
+        return parts[0]
+    }
+}
+
+main {
+    print "k-lookahead: " + verdict("a(?=b)")
+    print "k-neg-lookahead: " + verdict("a(?!b)")
+    print "k-lookbehind: " + verdict("(?<=a)b")
+    print "k-neg-lookbehind: " + verdict("(?<!a)b")
+    print "ok-noncapture: " + verdict("(?:a)b")
+    print "ok-named-angle: " + verdict("(?<n>a)b")
+}

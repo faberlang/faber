@@ -1,0 +1,56 @@
++++
+term = "anchors"
+kind = "conformance"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "conversio_expr", "fac_stmt", "cape_clause", "si_stmt", "call_expr", "call_suffix", "member_suffix", "non_null_suffix", "argument_list", "argument", "expression", "ternary", "literal", "nota_stmt", "additive_expr", "equality", "equality_tail", "assignment", "place", "itera_stmt", "dum_stmt", "comparison", "vel_expr", "vel_rhs", "sit_decl", "expr_stmt"]
+category = "regex"
+canonical = false
+summary = "`^ $ \\A \\z` over text: by default `^` and `$` are text anchors, `\\A` and `\\z` always are, and `$` does not allow a trailing line feed."
+syntax = "<textus> ↦ regex"
+related = ["regex", "↦", "find", "find_all", "split", "replace"]
+locale = "en"
++++
+# =============================================================================
+# anchors — regex conformance cell
+# =============================================================================
+#
+# Pins: PIN-ANCHOR (docs/design/regex-dialect.md). One line per probe cell;
+# the label is the cell id of the dialect's Appendix B, and the value is the reference
+# engine's answer. A target whose engine disagrees fails the line, never the dialect.
+#
+# What this teaches:
+#   • `\A` and `\z` are the start and the end of the text, even under `(?m)`
+#   • `a$` over `a⏎` is false: `$` does not skip a trailing line feed, and `a\z` over `a⏎` is false as well
+#
+# Common mistakes:
+#   • expecting `$` to match before a final line feed
+#   • expecting `\A` to move to a line start under `(?m)`
+#
+# See also: regex, ↦, find, find_all, split, replace.
+# =============================================================================
+
+# anchors — probes, one line each
+#
+# <textus> ↦ regex, then the operation the pin is about
+#
+# EXPECTED OUTPUT:
+#   One `<cell id>: <value>` line per probe, in the order below.
+
+# y when the pattern matches somewhere in the text, n when it does not; `error` when the
+# conversion rejects the pattern.
+fn hits(string pat, string text) → string {
+    do {
+        const regex r ← pat ↦ regex
+        return r.matches(text) ✓ "y" ✗ "n"
+    }
+    catch err {
+        return "error"
+    }
+}
+
+main {
+    print "anch-dollar-trailing-nl: " + hits("a$", "a\n")
+    print "anch-A: " + hits("\\Aa", "a")
+    print "anch-A-multi: " + hits("(?m)\\Ab", "a\nb")
+    print "anch-z: " + hits("a\\z", "a")
+    print "anch-z-trailing-nl: " + hits("a\\z", "a\n")
+}

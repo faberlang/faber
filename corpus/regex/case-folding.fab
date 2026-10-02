@@ -1,0 +1,73 @@
++++
+term = "case-folding"
+kind = "conformance"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "conversio_expr", "fac_stmt", "cape_clause", "si_stmt", "call_expr", "call_suffix", "member_suffix", "non_null_suffix", "argument_list", "argument", "expression", "ternary", "literal", "nota_stmt", "additive_expr", "equality", "equality_tail", "assignment", "place", "itera_stmt", "dum_stmt", "comparison", "vel_expr", "vel_rhs", "sit_decl", "expr_stmt"]
+category = "regex"
+canonical = false
+summary = "`(?i)` is Unicode simple case folding: `σ` `ς` `Σ` agree, full folding and Turkic folding are not applied, and `(?i)` scopes by group."
+syntax = "<textus> ↦ regex"
+related = ["regex", "↦", "find", "find_all", "split", "replace"]
+locale = "en"
++++
+# =============================================================================
+# case-folding — regex conformance cell
+# =============================================================================
+#
+# Pins: PIN-FOLD (docs/design/regex-dialect.md). One line per probe cell;
+# the label is the cell id of the dialect's Appendix B, and the value is the reference
+# engine's answer. A target whose engine disagrees fails the line, never the dialect.
+#
+# What this teaches:
+#   • `(?i)` folds with Unicode simple case folding: `σ ς Σ`, `ß ẞ`, `k K` (the Kelvin sign), `ǆ ǅ` and `µ Μ` match each other
+#   • there is no full folding and no Turkic folding: `ß` does not match `SS` and `i` does not match `İ`; `(?i)[a-z]` matches the long s `ſ`
+#   • a flag scopes to its group: `(?i)a(?-i)b` and `(?i:a)b` fold only the `a`
+#
+# Common mistakes:
+#   • expecting `ß` to match `SS` or `i` to match `İ`
+#   • expecting `(?i)` to reach past `(?-i)` or out of a `(?i: )` group
+#
+# See also: regex, ↦, find, find_all, split, replace.
+# =============================================================================
+
+# case-folding — probes, one line each
+#
+# <textus> ↦ regex, then the operation the pin is about
+#
+# EXPECTED OUTPUT:
+#   One `<cell id>: <value>` line per probe, in the order below.
+
+# The one-letter text for a code point: characters that are invisible or look like another
+# letter are written by number, never as a literal.
+fn u(int n) → string {
+    const char c ← n ↦ char via Code ⊥ '?'
+    return c ↦ string
+}
+
+# y when the pattern matches somewhere in the text, n when it does not; `error` when the
+# conversion rejects the pattern.
+fn hits(string pat, string text) → string {
+    do {
+        const regex r ← pat ↦ regex
+        return r.matches(text) ✓ "y" ✗ "n"
+    }
+    catch err {
+        return "error"
+    }
+}
+
+main {
+    print "f-sigma: " + hits("(?i)^σ$", "ς")
+    print "f-sharp-s-capital: " + hits("(?i)^ß$", "ẞ")
+    print "f-sharp-s-SS: " + hits("(?i)^ß$", "SS")
+    print "f-kelvin: " + hits("(?i)^k$", u(8490))
+    print "f-dotted-I: " + hits("(?i)^i$", u(304))
+    print "f-dz-title: " + hits("(?i)^ǆ$", "ǅ")
+    print "f-micro-mu: " + hits("(?i)^§$"(u(181)), u(924))
+    print "f-range-long-s: " + hits("(?i)^[a-z]+$", u(383))
+    print "f-e-acute: " + hits("(?i)^É$", "é")
+    print "f-neg-flag-after: " + hits("(?i)a(?-i)b", "Ab")
+    print "f-neg-flag-after-no: " + hits("(?i)a(?-i)b", "AB")
+    print "f-scoped-yes: " + hits("(?i:a)b", "Ab")
+    print "f-scoped-no: " + hits("(?i:a)b", "AB")
+    print "f-ascii: " + hits("(?i)^hello$", "HELLO")
+}

@@ -101,6 +101,28 @@ impl RegexProgram {
             .into_owned()
     }
 
+    /// `text` with the i-th match of the iteration replaced by `replacements[i]`
+    /// (the closure form of `muta`, RX-5). Each replacement is taken literally
+    /// and is never re-scanned: the output is assembled from the unmatched text
+    /// and the replacements only. `None` when the counts disagree, which the
+    /// lowering (one replacement per match of the same iteration) never
+    /// produces.
+    pub fn replace_each(&self, text: &str, replacements: &[String]) -> Option<String> {
+        let mut out = String::with_capacity(text.len());
+        let mut last = 0;
+        let mut taken = replacements.iter();
+        for found in self.compiled.find_iter(text) {
+            out.push_str(&text[last..found.start()]);
+            out.push_str(taken.next()?);
+            last = found.end();
+        }
+        if taken.next().is_some() {
+            return None;
+        }
+        out.push_str(&text[last..]);
+        Some(out)
+    }
+
     /// One engine capture set as a `MatchValue` whose whole match starts at
     /// code point `start`.
     fn match_value(&self, captures: &regex::Captures<'_>, start: usize) -> MatchValue {

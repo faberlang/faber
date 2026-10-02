@@ -323,7 +323,7 @@ fn arg_expr(kind: IntrinsicParamKind, dtype: &Dtype, receiver_expr: &str) -> Str
         IntrinsicParamKind::Key => "\"k\"".into(),
         IntrinsicParamKind::Value => dtype.el.clone(),
         IntrinsicParamKind::NumerusIndex => "0".into(),
-        IntrinsicParamKind::Textus => "\"xy\"".into(),
+        IntrinsicParamKind::Textus | IntrinsicParamKind::TextusOrReplacer => "\"xy\"".into(),
         IntrinsicParamKind::SetInner => "altera".into(),
         IntrinsicParamKind::Predicate => format!("{} x ∴ x > {}", dtype.el_ty, dtype.el),
         IntrinsicParamKind::Mapper => format!("{} x ∴ x * 2", dtype.el_ty),
@@ -837,6 +837,7 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         MirCollectionOp::RegexSplit,
         MirCollectionOp::RegexReplace,
         MirCollectionOp::TextEscape,
+        MirCollectionOp::RegexReplaceEach,
         MirCollectionOp::MatchText,
         MirCollectionOp::MatchStart,
         MirCollectionOp::MatchEnd,
@@ -856,6 +857,10 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         MirCollectionOp::ArrayDiv,
         // Conversion surface (intervallum → tensor materialization).
         MirCollectionOp::IntervalMaterialize,
+        // Lowering composite: the closure form of regex `muta` maps its closure
+        // over the matches in a lowered loop, then joins the results (RX-5);
+        // the registry row of `muta` names the literal op, not this one.
+        MirCollectionOp::RegexReplaceEach,
         // Internal device vocabulary (target-lane owned).
         MirCollectionOp::TensorRopeHalf,
         MirCollectionOp::TensorCausalMaskedSoftmax,

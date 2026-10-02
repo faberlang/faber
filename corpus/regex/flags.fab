@@ -1,0 +1,86 @@
++++
+term = "flags"
+kind = "conformance"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "conversio_expr", "fac_stmt", "cape_clause", "si_stmt", "call_expr", "call_suffix", "member_suffix", "non_null_suffix", "argument_list", "argument", "expression", "ternary", "literal", "nota_stmt", "additive_expr", "equality", "equality_tail", "assignment", "place", "itera_stmt", "dum_stmt", "comparison", "vel_expr", "vel_rhs", "sit_decl", "expr_stmt"]
+category = "regex"
+canonical = false
+summary = "The inline flags `i m s x`: acceptance, the `x` extended mode, scoped flags, and a bare flag that applies to the rest of its group."
+syntax = "<textus> ↦ regex"
+related = ["regex", "↦", "find", "find_all", "split", "replace"]
+locale = "en"
++++
+# =============================================================================
+# flags — regex conformance cell
+# =============================================================================
+#
+# Pins: PIN-FLAGS (docs/design/regex-dialect.md). One line per probe cell;
+# the label is the cell id of the dialect's Appendix B, and the value is the reference
+# engine's answer. A target whose engine disagrees fails the line, never the dialect.
+#
+# What this teaches:
+#   • `(?i)`, `(?m)`, `(?s)` and `(?x)` are accepted, with negation (`(?-i)`, `(?i-s)`) and a combination (`(?ims)`)
+#   • `(?x)` ignores white space and `#` comments to the end of the line, including inside a class; `\ ` is a literal space
+#   • a bare flag in the middle of a pattern applies to the rest of its group: `(a(?i)b)c` over `aBc` is true and over `aBC` is false
+#
+# Common mistakes:
+#   • expecting `(?x)` to keep a space inside a class
+#   • expecting a bare mid-pattern flag to leave its group
+#
+# See also: regex, ↦, find, find_all, split, replace.
+# =============================================================================
+
+# flags — probes, one line each
+#
+# <textus> ↦ regex, then the operation the pin is about
+#
+# EXPECTED OUTPUT:
+#   One `<cell id>: <value>` line per probe, in the order below.
+
+# The one-letter text for a code point: characters that are invisible or look like another
+# letter are written by number, never as a literal.
+fn u(int n) → string {
+    const char c ← n ↦ char via Code ⊥ '?'
+    return c ↦ string
+}
+
+# `accepted` when the conversion takes the pattern; otherwise the leading construct id of the
+# rejection payload (the text before the first colon). The engine's prose is never printed.
+fn verdict(string pat) → string {
+    do {
+        pat ↦ regex
+        return "accepted"
+    }
+    catch err {
+        const list<string> parts ← err.split(":")
+        return parts[0]
+    }
+}
+
+# y when the pattern matches somewhere in the text, n when it does not; `error` when the
+# conversion rejects the pattern.
+fn hits(string pat, string text) → string {
+    do {
+        const regex r ← pat ↦ regex
+        return r.matches(text) ✓ "y" ✗ "n"
+    }
+    catch err {
+        return "error"
+    }
+}
+
+main {
+    print "flag-i: " + verdict("(?i)a")
+    print "flag-m: " + verdict("(?m)a")
+    print "flag-s: " + verdict("(?s)a")
+    print "flag-x: " + verdict("(?x)a b")
+    print "flag-neg-i: " + verdict("(?-i)a")
+    print "flag-combo: " + verdict("(?ims)a")
+    print "flag-combo-neg: " + verdict("(?i-s)a")
+    print "flag-x-match: " + hits("(?x)a b § comment\n c"(u(35)), "abc")
+    print "flag-x-space-lit: " + hits("(?x)a\\ b", "a b")
+    print "flag-x-class-space: " + hits("(?x)[a ]b", " b")
+    print "flag-scoped-m: " + hits("(?m:^b)", "a\nb")
+    print "flag-mid-pattern: " + hits("a(?i)b", "aB")
+    print "flag-mid-group: " + hits("(a(?i)b)c", "aBc")
+    print "flag-mid-group-leak: " + hits("(a(?i)b)c", "aBC")
+}

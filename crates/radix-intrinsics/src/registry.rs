@@ -51,6 +51,10 @@ pub enum IntrinsicParamKind {
     Value,
     NumerusIndex,
     Textus,
+    /// A `textus` or a one-parameter closure from the receiver's match to
+    /// `textus` (RX-5, RD-5): the regex `muta` replacement slot. Typecheck picks
+    /// the form by the argument expression; both forms return `textus`.
+    TextusOrReplacer,
     SetInner,
     Predicate,
     Mapper,
@@ -1135,9 +1139,10 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Regex, "collecta", 1, &[IntrinsicParamKind::Textus], MatchArray, collection RegexFindAll),
     intrinsic!(Regex, "divide", 1, &[IntrinsicParamKind::Textus], TextusArray, collection RegexSplit),
     // RX-4b: literal replace on the `regex` receiver (the existing Latin name
-    // `muta` on a new receiver; the closure form is RX-5). `escape` is a method
-    // on `textus` (RD-6), the accepted default `munita`.
-    intrinsic!(Regex, "muta", 2, &[IntrinsicParamKind::Textus, IntrinsicParamKind::Textus], Textus, collection RegexReplace),
+    // `muta` on a new receiver). RX-5 (RD-5): the second slot also accepts a
+    // `(match) → textus` closure; one row, the form is picked by the argument.
+    // `escape` is a method on `textus` (RD-6), the accepted default `munita`.
+    intrinsic!(Regex, "muta", 2, &[IntrinsicParamKind::Textus, IntrinsicParamKind::TextusOrReplacer], Textus, collection RegexReplace),
     intrinsic!(Match, "inventum", 0, &[], Textus, collection MatchText),
     intrinsic!(Match, "principium", 0, &[], Numerus, collection MatchStart),
     intrinsic!(Match, "terminus", 0, &[], Numerus, collection MatchEnd),

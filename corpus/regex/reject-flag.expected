@@ -1,0 +1,8 @@
+flag-g: unsupported_flag
+flag-unknown-letter: unsupported_flag
+flag-U: unsupported_flag
+flag-u: unsupported_flag
+flag-neg-u: unsupported_flag
+ok-i: accepted
+ok-ims: accepted
+ok-x-scoped: accepted

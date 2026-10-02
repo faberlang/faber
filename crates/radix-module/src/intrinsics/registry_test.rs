@@ -432,9 +432,82 @@ fn regex_replace_and_text_escape_resolve_by_receiver() {
     assert_eq!(text_replace.receiver, IntrinsicReceiver::Textus);
     assert_eq!(mir_collection_op(text_replace), Some(MirCollectionOp::Replace));
 
+    // RX-5 (RD-5): the closure form is the same row, not a second one: the
+    // replacement slot accepts a `textus` or a `(match) → textus` closure, so
+    // the registry holds exactly one regex `muta` of arity two.
+    assert_eq!(
+        regex_replace.params,
+        &[
+            super::IntrinsicParamKind::Textus,
+            super::IntrinsicParamKind::TextusOrReplacer
+        ]
+    );
+    let regex_muta_rows = INTRINSICS
+        .iter()
+        .filter(|row| row.receiver == IntrinsicReceiver::Regex && row.faber_name == "muta" && row.arg_count == 2)
+        .count();
+    assert_eq!(regex_muta_rows, 1);
+
     let escape = lookup_method_for_type(text, "munita", 0).expect("textus munita");
     assert_eq!(escape.receiver, IntrinsicReceiver::Textus);
     assert_eq!(escape.return_kind, super::IntrinsicReturnKind::Textus);
     assert_eq!(mir_collection_op(escape), Some(MirCollectionOp::TextEscape));
     assert!(lookup_method_for_type(regex, "munita", 0).is_none());
+}
+
+fn analyze_regex_replace(source: &str) -> Result<crate::driver::AnalyzedModule, Vec<radix_diagnostics::Diagnostic>> {
+    let session = Session::new(Config::default());
+    analyze_source(&session, "regex-muta.fab", source, AnalyzeRequest::default())
+}
+
+#[test]
+fn regex_muta_closure_typechecks_from_the_match_signature() {
+    // The closure parameter is a hole: the match type has no source name (RD-3),
+    // so the intrinsic's signature types it. The literal form is unchanged.
+    let closure = r#"
+incipit {
+  fixum regex r ← "a+" ↦ regex
+  fixum textus out ← r.muta("caab", _ m ∴ m.inventum())
+  nota out
+}
+"#;
+    let result = analyze_regex_replace(closure);
+    assert!(result.is_ok(), "closure muta must typecheck: {:?}", result.err());
+    let literal = r#"
+incipit {
+  fixum regex r ← "a+" ↦ regex
+  fixum textus out ← r.muta("caab", "x")
+  nota out
+}
+"#;
+    let result = analyze_regex_replace(literal);
+    assert!(result.is_ok(), "literal muta must typecheck: {:?}", result.err());
+}
+
+#[test]
+fn regex_muta_rejects_a_closure_that_does_not_return_textus() {
+    let source = r#"
+incipit {
+  fixum regex r ← "a+" ↦ regex
+  nota r.muta("caab", _ m ∴ m.principium())
+}
+"#;
+    let Err(diagnostics) = analyze_regex_replace(source) else {
+        panic!("a numerus result is not a replacement");
+    };
+    crate::test_support::assert_has_error_issue(&diagnostics, "SEM010", "expression_type_mismatch");
+}
+
+#[test]
+fn regex_muta_rejects_a_closure_parameter_that_is_not_the_match() {
+    let source = r#"
+incipit {
+  fixum regex r ← "a+" ↦ regex
+  nota r.muta("caab", numerus m ∴ "x")
+}
+"#;
+    let Err(diagnostics) = analyze_regex_replace(source) else {
+        panic!("the parameter is the match");
+    };
+    crate::test_support::assert_has_error_issue(&diagnostics, "SEM010", "closure_parameter_type_mismatch");
 }

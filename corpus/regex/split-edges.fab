@@ -1,0 +1,66 @@
++++
+term = "split-edges"
+kind = "conformance"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "conversio_expr", "fac_stmt", "cape_clause", "si_stmt", "call_expr", "call_suffix", "member_suffix", "non_null_suffix", "argument_list", "argument", "expression", "ternary", "literal", "nota_stmt", "additive_expr", "equality", "equality_tail", "assignment", "place", "itera_stmt", "dum_stmt", "comparison", "vel_expr", "vel_rhs", "sit_decl", "expr_stmt"]
+category = "regex"
+canonical = false
+summary = "split at the edges: leading and trailing separators keep empty pieces, adjacent separators leave an empty piece, a capture group is not spliced in."
+syntax = "<textus> ↦ regex"
+related = ["regex", "↦", "find", "find_all", "split", "replace"]
+locale = "en"
++++
+# =============================================================================
+# split-edges — regex conformance cell
+# =============================================================================
+#
+# Pins: PIN-SPLIT (docs/design/regex-dialect.md). One line per probe cell;
+# the label is the cell id of the dialect's Appendix B, and the value is the reference
+# engine's answer. A target whose engine disagrees fails the line, never the dialect.
+#
+# What this teaches:
+#   • `,` over `,a,` gives the pieces empty, a, empty; over `a,,b` it gives a, empty, b; over empty text it gives one empty piece
+#   • the empty pattern over `abc` gives empty, a, b, c, empty; `a*` over `baaac` gives empty, b, c, empty; a pattern equal to the whole text gives two empty pieces
+#   • a capture group only groups: `(,)` over `a,b` gives a and b, not the comma
+#
+# Common mistakes:
+#   • expecting the leading or trailing empty piece to be dropped
+#   • expecting a captured separator in the result
+#
+# See also: regex, ↦, find, find_all, split, replace.
+# =============================================================================
+
+# split-edges — probes, one line each
+#
+# <textus> ↦ regex, then the operation the pin is about
+#
+# EXPECTED OUTPUT:
+#   One `<cell id>: <value>` line per probe, in the order below.
+
+# The pieces of split, each as `<piece>`.
+fn pieces(string pat, string text) → string {
+    do {
+        const regex r ← pat ↦ regex
+        var string out ← ""
+        for from r.split(text) const piece {
+            out ← out + "<§>"(piece)
+        }
+        return out
+    }
+    catch err {
+        return "error"
+    }
+}
+
+main {
+    print "split-basic: " + pieces(",", "a,b,c")
+    print "split-leading-trailing: " + pieces(",", ",a,")
+    print "split-adjacent: " + pieces(",", "a,,b")
+    print "split-empty-pattern: " + pieces("", "abc")
+    print "split-empty-text: " + pieces(",", "")
+    print "split-capture-not-spliced: " + pieces("(,)", "a,b")
+    print "split-a-star: " + pieces("a*", "baaac")
+    print "split-spaces: " + pieces("\\s+", " a b ")
+    print "split-no-match: " + pieces("x", "abc")
+    print "split-astral: " + pieces(",", "😀,a")
+    print "split-whole: " + pieces("abc", "abc")
+}

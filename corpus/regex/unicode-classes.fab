@@ -1,0 +1,133 @@
++++
+term = "unicode-classes"
+kind = "conformance"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "conversio_expr", "fac_stmt", "cape_clause", "si_stmt", "call_expr", "call_suffix", "member_suffix", "non_null_suffix", "argument_list", "argument", "expression", "ternary", "literal", "nota_stmt", "additive_expr", "equality", "equality_tail", "assignment", "place", "itera_stmt", "dum_stmt", "comparison", "vel_expr", "vel_rhs", "sit_decl", "expr_stmt"]
+category = "regex"
+canonical = false
+summary = "Unicode `\\w \\d \\s` and the class syntax over non-ASCII text: the shorthand classes are Unicode, `[[:alpha:]]` is ASCII only, `\\p{..}` is Unicode."
+syntax = "<textus> ↦ regex"
+related = ["regex", "↦", "find", "find_all", "split", "replace"]
+locale = "en"
++++
+# =============================================================================
+# unicode-classes — regex conformance cell
+# =============================================================================
+#
+# Pins: PIN-W, PIN-D, PIN-S, PIN-CLASS (docs/design/regex-dialect.md). One line per probe cell;
+# the label is the cell id of the dialect's Appendix B, and the value is the reference
+# engine's answer. A target whose engine disagrees fails the line, never the dialect.
+#
+# What this teaches:
+#   • `\w` is the Unicode word class (letters, marks, decimal digits, connector punctuation, join controls), so `é`, `𝐀`, a lone combining mark and the zero-width joiner match it
+#   • `\d` is Unicode decimal digits (`٣`, `𝟘`, fullwidth `３`), and `²` or `Ⅷ` are not digits; `\s` is Unicode white space, and U+200B, U+FEFF and U+001C are not
+#   • `[[:alpha:]]` is ASCII only, while `\p{L}`, `\pL`, `\p{Greek}` and `\p{Alphabetic}` are Unicode; `[\w-]` and `[^\W\d]` evaluate as sets
+#
+# Common mistakes:
+#   • assuming `\w` is `[A-Za-z0-9_]`: it matches every letter in every script
+#   • using `[[:alpha:]]` for non-English text: it never matches `é`
+#
+# See also: regex, ↦, find, find_all, split, replace.
+# =============================================================================
+
+# unicode-classes — probes, one line each
+#
+# <textus> ↦ regex, then the operation the pin is about
+#
+# EXPECTED OUTPUT:
+#   One `<cell id>: <value>` line per probe, in the order below.
+
+# The one-letter text for a code point: characters that are invisible or look like another
+# letter are written by number, never as a literal.
+fn u(int n) → string {
+    const char c ← n ↦ char via Code ⊥ '?'
+    return c ↦ string
+}
+
+# y when the pattern matches somewhere in the text, n when it does not; `error` when the
+# conversion rejects the pattern.
+fn hits(string pat, string text) → string {
+    do {
+        const regex r ← pat ↦ regex
+        return r.matches(text) ✓ "y" ✗ "n"
+    }
+    catch err {
+        return "error"
+    }
+}
+
+# The code point span of every match, left to right, as ` (start,end)`; ` none` for no match.
+fn spans(string pat, string text) → string {
+    do {
+        const regex r ← pat ↦ regex
+        var string out ← ""
+        for from r.find_all(text) const h {
+            out ← out + " (§,§)"(h.start(), h.end())
+        }
+        if out ≡ "" {
+            return " none"
+        }
+        return out
+    }
+    catch err {
+        return "error"
+    }
+}
+
+# The pieces of split, each as `<piece>`.
+fn pieces(string pat, string text) → string {
+    do {
+        const regex r ← pat ↦ regex
+        var string out ← ""
+        for from r.split(text) const piece {
+            out ← out + "<§>"(piece)
+        }
+        return out
+    }
+    catch err {
+        return "error"
+    }
+}
+
+main {
+    print "w-latin: " + hits("^\\w+$", "héllo")
+    print "w-astral-letter: " + hits("^\\w$", "𝐀")
+    print "w-combining: " + hits("^\\w+$", "e§"(u(769)))
+    print "w-combining-alone: " + hits("^\\w$", u(769))
+    print "w-zwj: " + hits("^\\w$", u(8205))
+    print "w-undertie: " + hits("^\\w$", "‿")
+    print "w-superscript2: " + hits("^\\w$", "²")
+    print "w-roman-numeral: " + hits("^\\w$", "Ⅷ")
+    print "w-underscore: " + hits("^\\w$", "_")
+    print "w-arabic-digit: " + hits("^\\w$", "٣")
+    print "W-neg-latin: " + hits("^\\W$", "é")
+    print "W-neg-nbsp: " + hits("^\\W$", u(160))
+    print "w-find-plus:" + spans("\\w+", "héllo wörld")
+    print "d-arabic-indic: " + hits("^\\d+$", "٣")
+    print "d-astral: " + hits("^\\d$", "𝟘")
+    print "d-superscript2: " + hits("^\\d$", "²")
+    print "d-roman-numeral: " + hits("^\\d$", "Ⅷ")
+    print "d-fullwidth: " + hits("^\\d$", "３")
+    print "D-neg-arabic-indic: " + hits("^\\D$", "٣")
+    print "d-find-plus:" + spans("\\d+", "a٣٤b12")
+    print "s-nbsp: " + hits("^\\s$", u(160))
+    print "s-emspace: " + hits("^\\s$", u(8195))
+    print "s-nel: " + hits("^\\s$", u(133))
+    print "s-lsep: " + hits("^\\s$", u(8232))
+    print "s-ideographic: " + hits("^\\s$", u(12288))
+    print "s-zwsp: " + hits("^\\s$", u(8203))
+    print "s-bom: " + hits("^\\s$", u(65279))
+    print "s-mongolian-vs: " + hits("^\\s$", u(6158))
+    print "s-fs: " + hits("^\\s$", u(28))
+    print "s-vt: " + hits("^\\s$", u(11))
+    print "S-neg-nbsp: " + hits("^\\S$", u(160))
+    print "s-split-plus: " + pieces("\\s+", "a§b§c d"(u(160), u(8195)))
+    print "cls-posix-alpha: " + hits("^[[:alpha:]]+$", "héllo")
+    print "cls-posix-alpha-ascii: " + hits("^[[:alpha:]]+$", "hello")
+    print "cls-p-L: " + hits("^\\p{L}+$", "héllo")
+    print "cls-pL-short: " + hits("^\\pL+$", "héllo")
+    print "cls-greek-script: " + hits("^\\p{Greek}+$", "αβγ")
+    print "cls-Lu: " + hits("^\\p{Lu}$", "É")
+    print "cls-bracket-w-dash: " + hits("^[\\w-]+$", "hé-llo")
+    print "cls-neg-w-d: " + hits("^[^\\W\\d]+$", "héllo")
+    print "cls-p-Alphabetic: " + hits("^\\p{Alphabetic}$", "Ⅷ")
+}

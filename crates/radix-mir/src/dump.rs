@@ -691,6 +691,7 @@ fn collection_op(op: MirCollectionOp) -> &'static str {
         MirCollectionOp::RegexSplit => "regex_split",
         MirCollectionOp::RegexReplace => "regex_replace",
         MirCollectionOp::TextEscape => "text_escape",
+        MirCollectionOp::RegexReplaceEach => "regex_replace_each",
         MirCollectionOp::MatchText => "match_text",
         MirCollectionOp::MatchStart => "match_start",
         MirCollectionOp::MatchEnd => "match_end",
