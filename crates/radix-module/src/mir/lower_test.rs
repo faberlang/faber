@@ -3982,7 +3982,7 @@ incipit {
     fixum tf32[] seed ← vacua
     varia tf32[2, 2] grid ← seed.strue(flat, [2, 2])
     nota grid.magnitudines()
-    fixum tf32[4] reshaped ← grid.forma([4])
+    fixum tf32[4] reshaped ← grid.forma([4]).materialize()
     grid.ponde([0, 0], 9.0)
     fixum f32 corner ← grid.accipe([0, 0]) vel 0.0
     varia tf32[2, 2] filler ← grid.crea(1.0, [2, 2])

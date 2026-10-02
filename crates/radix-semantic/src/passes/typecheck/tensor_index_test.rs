@@ -502,7 +502,7 @@ fn tensor_transpone_symbolic_swaps_rank_two_dims() {
     // [R,C] → [C,R] with Param dims.
     accepts(
         r#"functio transpose_sym<magnitudo R, magnitudo C>(tensor<f32, [R, C]> grid) → tensor<f32, [C, R]> {
-    redde grid.transpone()
+    redde grid.transpone().materialize()
 }
 
 nota "symbolic transpose body ok"
@@ -515,7 +515,7 @@ fn tensor_transpone_rank_one_symbolic_is_identity() {
     // Rank-1 transpose is identity: [R] → [R].
     accepts(
         r#"functio transpose_rank1_sym<magnitudo R>(tensor<f32, [R]> v) → tensor<f32, [R]> {
-    redde v.transpone()
+    redde v.transpone().materialize()
 }
 
 nota "rank-one transpose body ok"
@@ -529,7 +529,7 @@ fn batched_transpose_decode_shape_typechecks() {
     // leading head axis stays, the trailing [M, N] pair swaps.
     accepts(
         r#"functio key_transpose_decode(tensor<f32, [5, 76, 64]> keys) → tensor<f32, [5, 64, 76]> {
-    redde keys.transpone()
+    redde keys.transpone().materialize()
 }
 
 nota "batched transpose decode body ok"
@@ -542,7 +542,7 @@ fn batched_transpose_prefill_shape_typechecks() {
     // U3 head-axis prefill fixture: K [5,36,64] → Kᵀ [5,64,36].
     accepts(
         r#"functio key_transpose_prefill(tensor<f32, [5, 36, 64]> keys) → tensor<f32, [5, 64, 36]> {
-    redde keys.transpone()
+    redde keys.transpone().materialize()
 }
 
 nota "batched transpose prefill body ok"
