@@ -45,7 +45,7 @@ pub use frame::{
     IntoScrinium, Meus, ResponseSender, Scrinium, Sermo, SermoRequest, StaticRoute, Tuus,
     install_host_dispatch, install_static_routes, sermo_open_with_dispatch,
 };
-pub use r#gen::{Gen, Yield};
+pub use r#gen::{AsyncCursor, AsyncCursorNext, AsyncCursorShared, Gen, Yield};
 pub use instans::{Instans, InstansPraecisio};
 pub use intervallum::{Intervallum, IntervallumKind, IntervallumNumeric, IntervallumWalk};
 pub use json::{Json, JsonError, JsonErrorKind};

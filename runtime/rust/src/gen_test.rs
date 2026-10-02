@@ -56,3 +56,80 @@ fn gen_debug_drains_the_remaining_items() {
     assert_eq!(format!("{generator:?}"), "[1, 2]");
     assert_eq!(generator.next(), None);
 }
+
+mod async_cursor {
+    use super::super::{AsyncCursor, AsyncCursorShared, block_on};
+    use std::convert::Infallible;
+    use std::sync::Arc;
+    use std::thread;
+
+    /// The producer shape generated code builds: a body answering each queued
+    /// request through the shared state, then `finish`.
+    fn counting_cursor(n: i64) -> (AsyncCursor<i64, Infallible>, thread::JoinHandle<()>) {
+        let shared = Arc::new(AsyncCursorShared::<i64, Infallible>::new());
+        let producer = Arc::clone(&shared);
+        let body = thread::spawn(move || {
+            for i in 0..n {
+                let Some(request) = producer.next_request() else {
+                    return;
+                };
+                let _ = request.send(Ok(Some(i)));
+            }
+            producer.finish(Ok(()));
+        });
+        (AsyncCursor::new(shared), body)
+    }
+
+    #[test]
+    fn async_cursor_yields_items_in_order_then_ends() {
+        let (cursor, body) = counting_cursor(3);
+        for expected in 0..3 {
+            assert_eq!(block_on(cursor.next()), Ok(Some(expected)));
+        }
+        assert_eq!(block_on(cursor.next()), Ok(None));
+        assert_eq!(block_on(cursor.next()), Ok(None));
+        body.join().expect("producer thread");
+    }
+
+    #[test]
+    fn async_cursor_surfaces_the_error_once_then_ends() {
+        let shared = Arc::new(AsyncCursorShared::<i64, String>::new());
+        shared.finish(Err("boom".to_owned()));
+        let cursor = AsyncCursor::new(shared);
+        assert_eq!(block_on(cursor.next()), Err("boom".to_owned()));
+        assert_eq!(block_on(cursor.next()), Ok(None));
+    }
+
+    #[test]
+    fn dropping_the_cursor_closes_the_producer() {
+        let (cursor, body) = counting_cursor(100);
+        assert_eq!(block_on(cursor.next()), Ok(Some(0)));
+        drop(cursor);
+        body.join().expect("producer thread");
+    }
+}
+
+#[test]
+fn block_on_returns_the_value_of_an_immediately_ready_future() {
+    assert_eq!(super::block_on(async { 7_i64 }), 7);
+}
+
+#[test]
+fn block_on_polls_a_pending_future_until_it_is_ready() {
+    let mut polls = 0;
+    let value = super::block_on(std::future::poll_fn(|_cx| {
+        polls += 1;
+        if polls < 3 {
+            std::task::Poll::Pending
+        } else {
+            std::task::Poll::Ready(polls)
+        }
+    }));
+    assert_eq!(value, 3);
+}
+
+#[cfg(feature = "tokio")]
+#[test]
+fn block_on_tokio_runs_the_future_on_a_runtime() {
+    assert_eq!(super::block_on_tokio(async { 11_i64 }), 11);
+}
