@@ -113,7 +113,10 @@ pub fn test_analysis_seams() -> AnalysisSeams {
 /// The executed-lane target resolution used by the moved mir tests: an
 /// explicit MIR-backed config target wins, otherwise the caller's target is
 /// kept (the tests never read a product manifest `[build] target`).
-fn test_executed_lane_target(config: &Config, _input: &Path) -> radix_module::codegen::Target {
+fn test_executed_lane_target(
+    config: &Config,
+    _input: &Path,
+) -> Result<radix_module::codegen::Target, Box<radix_module::Diagnostic>> {
     use radix_module::codegen::Target;
     if matches!(
         config.target,
@@ -129,12 +132,12 @@ fn test_executed_lane_target(config: &Config, _input: &Path) -> radix_module::co
             | Target::MirFmirBinary
             | Target::MirFmirBundle
     ) {
-        return config.target;
+        return Ok(config.target);
     }
     // The mir tests analyze through the executed-lane default (`fmir`), the
     // same default faber's product resolution produces for manifestless
     // inputs and manifests without `[build] target`.
-    radix_module::codegen::Target::MirFmirBinary
+    Ok(radix_module::codegen::Target::MirFmirBinary)
 }
 
 /// A config-rooted library resolver: an explicit `library_home` becomes the

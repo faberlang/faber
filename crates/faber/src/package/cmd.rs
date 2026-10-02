@@ -18,7 +18,7 @@ use super::cargo::{
 };
 #[cfg(feature = "hir-go")]
 use super::go_build::{GoBuildLayout, emit_go_module_with_postprocess, invoke_go_build};
-use super::manifest::FaberManifest;
+use super::manifest::{FaberManifest, manifest_package_build_target};
 #[cfg(feature = "mir-llvm")]
 use super::{LlvmHostProfile, build_host_program};
 use super::{
@@ -26,7 +26,6 @@ use super::{
     read_manifest,
 };
 use radix::program::discovery::BuildLayout;
-use radix::program::manifest::manifest_build_target;
 
 /// Print `message` and terminate.
 fn fail(message: &str) -> ! {
@@ -650,42 +649,16 @@ fn single_file_rust_runtime_plan(
 }
 
 /// Resolve the build target: an explicit CLI target wins, otherwise the
-/// package manifest's `build.target`. Unlike [`resolve_check_target`], a
-/// manifest read failure is fatal here rather than silently falling back.
+/// package manifest's `build.target`. A manifest read failure or unsupported
+/// target is fatal.
 fn resolve_build_target(command: &radix::services::BuildCommand, input_path: &Path) -> Target {
     if command.target_explicit {
         return command.target;
     }
 
-    let Ok(layout) = discover_build_layout(input_path) else {
-        return command.target;
-    };
-    if !layout.manifest_path.exists() {
-        return command.target;
-    }
-
-    let manifest =
-        read_manifest(&layout.manifest_path).unwrap_or_else(|diag| fail_with_diagnostic(&diag));
-    manifest_build_target(manifest.build.target.as_deref(), &layout.manifest_path)
+    manifest_package_build_target(input_path)
         .unwrap_or_else(|diag| fail_with_diagnostic(&diag))
-}
-
-/// Resolve the target for `faber check` from the package manifest.
-///
-/// Falls back to `Target::HirRust` when the manifest cannot be read or the
-/// input is not a package — same safe default as the pre-manifest behaviour.
-fn resolve_check_target(input_path: &Path) -> Target {
-    let Ok(layout) = discover_build_layout(input_path) else {
-        return Target::HirRust;
-    };
-    if !layout.manifest_path.exists() {
-        return Target::HirRust;
-    }
-    let Ok(manifest) = read_manifest(&layout.manifest_path) else {
-        return Target::HirRust;
-    };
-    manifest_build_target(manifest.build.target.as_deref(), &layout.manifest_path)
-        .unwrap_or(Target::HirRust)
+        .unwrap_or(command.target)
 }
 
 /// Decide whether an input path should enter package-mode command handling.
@@ -785,7 +758,12 @@ pub fn cmd_check_package(
 
     // Resolve target from faber.toml so AIR-lane exempla with MIR-backed
     // targets (e.g. fmir-text) do not trigger TARGETLANE001.
-    let check_target = resolve_check_target(&input_path);
+    // A manifest that cannot be read or names an unsupported target is fatal,
+    // exactly as in `faber build`; a package with no manifest checks as
+    // `Target::HirRust`.
+    let check_target = manifest_package_build_target(&input_path)
+        .unwrap_or_else(|diag| fail_with_diagnostic(&diag))
+        .unwrap_or(Target::HirRust);
 
     let (config, locale_pack) = match config_with_locale(
         check_target,

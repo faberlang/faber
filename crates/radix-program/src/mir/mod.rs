@@ -65,8 +65,10 @@ use crate::library::{
 /// Executed-lane analysis target resolution (TARGETLANE001 executed-lane
 /// routing). Faber's product resolves the effective MIR-backed target from the
 /// config and the manifest `[build] target`; the compiler subset receives the
-/// resolved target.
-pub type ExecutedLaneTarget = fn(&Config, &Path) -> radix_module::codegen::Target;
+/// resolved target. A manifest that names an unsupported or unreadable target
+/// is an error, never a silent default.
+pub type ExecutedLaneTarget =
+    fn(&Config, &Path) -> Result<radix_module::codegen::Target, Box<radix_module::Diagnostic>>;
 
 /// Library-resolver construction from a driver config. `FABER_LIBRARY_HOME`
 /// and workspace probing stay faber-side; analysis/lowering receives the

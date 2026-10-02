@@ -179,19 +179,17 @@ pub(crate) fn render_checkout(checkout: &DevLibraryCheckout) -> String {
     )
 }
 
-fn check_target(provider_repo: &Path, root_rule: LibraryRootRule) -> Target {
+fn check_target(
+    provider_repo: &Path,
+    root_rule: LibraryRootRule,
+) -> Result<Target, Box<Diagnostic>> {
     if root_rule != LibraryRootRule::FaberToml {
-        return Target::HirRust;
+        return Ok(Target::HirRust);
     }
-    let manifest_path = provider_repo.join("faber.toml");
-    let Ok(manifest) = faber_cli::package::read_manifest(&manifest_path) else {
-        return Target::HirRust;
-    };
-    radix::program::manifest::manifest_build_target(
-        manifest.build.target.as_deref(),
-        &manifest_path,
+    Ok(
+        faber_cli::package::manifest_package_build_target(provider_repo)?
+            .unwrap_or(Target::HirRust),
     )
-    .unwrap_or(Target::HirRust)
 }
 
 /// Analyze the library interface graph. Does not include `.proba`.
@@ -200,7 +198,10 @@ pub(crate) fn check_dev_library(checkout: &DevLibraryCheckout) -> Vec<Diagnostic
         LibraryRootRule::FaberToml => checkout.provider_repo.as_path(),
         LibraryRootRule::SrcFallback => checkout.source_root.as_path(),
     };
-    let target = check_target(&checkout.provider_repo, checkout.root_rule);
+    let target = match check_target(&checkout.provider_repo, checkout.root_rule) {
+        Ok(target) => target,
+        Err(diag) => return vec![*diag],
+    };
     let (config, _locale_pack) =
         match faber_cli::package::config_with_locale(target, locale_input, None, None) {
             Ok(pair) => pair,
