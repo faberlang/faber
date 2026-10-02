@@ -27,6 +27,9 @@ pub const ERR_ELEMENT_COUNT_OVERFLOW: &str = "tensor element count overflow";
 pub const ERR_FORMA_RESHAPE_COUNT: &str = "tensor forma (reshape) element count mismatch";
 /// `forma` element count mismatch.
 pub const ERR_FORMA_ELEMENT_COUNT: &str = "tensor forma element count mismatch";
+/// `forma` cannot express this logical order as a stride-only view.
+pub const ERR_FORMA_LAYOUT_NOT_VIEWABLE: &str =
+    "tensor forma layout cannot be represented as a view";
 /// `accipe` (get) invalid index.
 pub const ERR_ACCIPE_INVALID_INDEX: &str = "tensor accipe invalid index";
 /// `ponde` (set) invalid index.
@@ -37,14 +40,19 @@ pub const ERR_CREA_INVALID_SHAPE: &str = "tensor crea invalid shape";
 pub const ERR_SECTIO_INVALID_SLICE_BOUNDS: &str = "tensor sectio invalid slice bounds";
 /// Broadcast shape mismatch.
 pub const ERR_BROADCAST_SHAPE: &str = "tensor broadcast shape mismatch";
-/// `matmul` receiver must be rank-2.
-pub const ERR_MATMUL_RECEIVER_RANK: &str = "tensor matmul requires rank-2 tensor receiver";
-/// `matmul` argument must be rank-2.
-pub const ERR_MATMUL_ARGUMENT_RANK: &str = "tensor matmul requires rank-2 tensor argument";
+/// `matmul` receiver has two contraction axes and up to two batch axes.
+pub const ERR_MATMUL_RECEIVER_RANK: &str =
+    "tensor matmul requires rank-2, rank-3 or rank-4 tensor receiver";
+/// The right operand rank is compatible with the receiver's batch axes.
+pub const ERR_MATMUL_ARGUMENT_RANK: &str =
+    "tensor matmul argument rank is incompatible with receiver rank";
 /// `matmul` inner dimension mismatch.
 pub const ERR_MATMUL_INNER_DIMENSION: &str = "tensor matmul inner dimension mismatch";
-/// `transpose` requires rank-2.
-pub const ERR_TRANSPOSE_RANK: &str = "tensor transpose requires rank-2 tensor";
+/// `matmul` right-operand batch axes must equal a receiver batch prefix.
+pub const ERR_MATMUL_BATCH_DIMENSION: &str =
+    "tensor matmul batch dimensions do not match receiver prefix";
+/// `transpose` supports rank-2, rank-3, or rank-4 tensors.
+pub const ERR_TRANSPOSE_RANK: &str = "tensor transpose requires rank-2, rank-3 or rank-4 tensor";
 /// `permute` axis count must equal rank.
 pub const ERR_PERMUTE_RANK: &str = "tensor permute axis count must equal tensor rank";
 /// `permute` axis must be non-negative.

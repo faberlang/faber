@@ -22,13 +22,14 @@ pub struct Tensor<T> {
 pub use crate::contract::tensor::{
     ERR_ACCIPE_INVALID_INDEX, ERR_BROADCAST_SHAPE, ERR_CREA_INVALID_SHAPE,
     ERR_DIVIDE_NON_FINITE_INPUT, ERR_DIVIDE_NON_FINITE_RESULT, ERR_DIVIDE_ZERO_DENOMINATOR,
-    ERR_ELEMENT_COUNT_OVERFLOW, ERR_FORMA_ELEMENT_COUNT, ERR_FORMA_RESHAPE_COUNT,
-    ERR_INDEX_OUT_OF_BOUNDS, ERR_INVALID_SLICE_RANGE, ERR_MATMUL_ARGUMENT_RANK,
-    ERR_MATMUL_INNER_DIMENSION, ERR_MATMUL_RECEIVER_RANK, ERR_MEDIA_EMPTY, ERR_NEGATIVE_DIM,
-    ERR_NEGATIVE_INDEX, ERR_NEGATIVE_SLICE, ERR_PERMUTE_AXIS_OUT_OF_RANGE,
-    ERR_PERMUTE_DUPLICATE_AXIS, ERR_PERMUTE_NEGATIVE_AXIS, ERR_PERMUTE_RANK,
-    ERR_PONDE_INVALID_INDEX, ERR_SECTIO_INVALID_SLICE_BOUNDS, ERR_TRANSPOSE_RANK,
-    tensor_dim_non_negative, tensor_flat_offset, tensor_shape_element_count,
+    ERR_ELEMENT_COUNT_OVERFLOW, ERR_FORMA_ELEMENT_COUNT, ERR_FORMA_LAYOUT_NOT_VIEWABLE,
+    ERR_FORMA_RESHAPE_COUNT, ERR_INDEX_OUT_OF_BOUNDS, ERR_INVALID_SLICE_RANGE,
+    ERR_MATMUL_ARGUMENT_RANK, ERR_MATMUL_BATCH_DIMENSION, ERR_MATMUL_INNER_DIMENSION,
+    ERR_MATMUL_RECEIVER_RANK, ERR_MEDIA_EMPTY, ERR_NEGATIVE_DIM, ERR_NEGATIVE_INDEX,
+    ERR_NEGATIVE_SLICE, ERR_PERMUTE_AXIS_OUT_OF_RANGE, ERR_PERMUTE_DUPLICATE_AXIS,
+    ERR_PERMUTE_NEGATIVE_AXIS, ERR_PERMUTE_RANK, ERR_PONDE_INVALID_INDEX,
+    ERR_SECTIO_INVALID_SLICE_BOUNDS, ERR_TRANSPOSE_RANK, tensor_dim_non_negative,
+    tensor_flat_offset, tensor_shape_element_count,
 };
 
 // Local domain messages, grouped by op so each kernel's error surface is
@@ -204,18 +205,26 @@ impl<T: Clone + Default> Tensor<T> {
             .collect()
     }
 
-    /// Reshape the tensor.
+    /// Reshape the tensor without copying its backing storage.
     ///
     /// # Errors
     ///
-    /// Returns `Err` if any dimension is negative or if the element count does
-    /// not match the new shape.
+    /// Returns `Err` if any dimension is negative, if the element count does
+    /// not match the new shape, or if the logical order cannot be represented
+    /// by strides alone.
     pub fn forma(&self, shape: &[i64]) -> Result<Self, &'static str> {
         let dims = shape_dims(shape)?;
         if !tensor_shape_has_element_count(shape, self.element_count()) {
             return Err(ERR_FORMA_RESHAPE_COUNT);
         }
-        Ok(Self::from_contiguous(self.planata(), dims))
+        let strides = reshape_view_strides(&self.shape, &self.strides, &dims)
+            .ok_or(ERR_FORMA_LAYOUT_NOT_VIEWABLE)?;
+        Ok(Self {
+            data: Arc::clone(&self.data),
+            shape: dims,
+            strides,
+            offset: self.offset,
+        })
     }
 
     /// Read the value at the given indices.
@@ -293,6 +302,69 @@ impl<T: Clone + Default> Tensor<T> {
         })
     }
 
+    /// View an axis-0 slice with a positive step.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if bounds are negative, `end < start`, the range exceeds
+    /// the first dimension, or `step` is not positive.
+    pub fn sectio_strided(&self, start: i64, end: i64, step: i64) -> Result<Self, &'static str> {
+        if step <= 0 {
+            return Err(ERR_SECTIO_INVALID_SLICE_BOUNDS);
+        }
+        let (start, end) = slice_bounds(start, end)?;
+        if self.shape.is_empty() || end > self.shape[0] {
+            return Err(ERR_INDEX_OUT_OF_BOUNDS);
+        }
+        let step = usize::try_from(step).map_err(|_| ERR_ELEMENT_COUNT_OVERFLOW)?;
+        let range_len = end - start;
+        let first_dim = range_len / step + usize::from(range_len % step != 0);
+        let stride = self.strides[0]
+            .checked_mul(step)
+            .ok_or(ERR_ELEMENT_COUNT_OVERFLOW)?;
+        let offset = self
+            .offset
+            .checked_add(
+                start
+                    .checked_mul(self.strides[0])
+                    .ok_or(ERR_ELEMENT_COUNT_OVERFLOW)?,
+            )
+            .ok_or(ERR_ELEMENT_COUNT_OVERFLOW)?;
+        let mut shape = self.shape.clone();
+        shape[0] = first_dim;
+        let mut strides = self.strides.clone();
+        strides[0] = stride;
+        Ok(Self {
+            data: Arc::clone(&self.data),
+            shape,
+            strides,
+            offset,
+        })
+    }
+
+    /// Explicitly expand or insert axes as a zero-copy broadcast view.
+    ///
+    /// Source axes are matched to target axes in order. Exact extents are
+    /// preferred; source extents of one may stretch with a zero stride, and
+    /// unmatched target axes are inserted with a zero stride. If several
+    /// exact mappings are possible, the rightmost mapping is chosen.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if a dimension is negative, the target element count
+    /// overflows, or no ordered source-axis mapping satisfies the target shape.
+    pub fn expanded(&self, shape: &[i64]) -> Result<Self, &'static str> {
+        let shape = shape_dims(shape)?;
+        checked_element_count_usize(&shape).ok_or(ERR_ELEMENT_COUNT_OVERFLOW)?;
+        let strides = expanded_view_strides(&self.shape, &self.strides, &shape)?;
+        Ok(Self {
+            data: Arc::clone(&self.data),
+            shape,
+            strides,
+            offset: self.offset,
+        })
+    }
+
     #[must_use]
     /// # Errors
     /// Returns an error when the requested operation cannot be completed.
@@ -300,25 +372,26 @@ impl<T: Clone + Default> Tensor<T> {
         Self::from_contiguous(self.planata(), self.shape.clone())
     }
 
-    /// Materialized rank-2 transpose.
+    /// Transpose the trailing two axes as a zero-copy view.
     ///
     /// # Errors
     ///
-    /// Returns `Err` if the tensor is not rank-2 or the element count overflows.
+    /// Returns `Err` if the tensor rank is outside 2–4.
     pub fn transpose_rank2(&self) -> Result<Self, &'static str> {
-        if self.shape.len() != 2 {
+        if !(2..=4).contains(&self.shape.len()) {
             return Err(ERR_TRANSPOSE_RANK);
         }
-        let rows = self.shape[0];
-        let cols = self.shape[1];
-        let count = checked_allocation_count::<T>(&[cols, rows])?;
-        let mut data = Vec::with_capacity(count);
-        for col in 0..cols {
-            for row in 0..rows {
-                data.push(self.value_at_logical(&[row, col]));
-            }
-        }
-        Ok(Self::from_contiguous(data, vec![cols, rows]))
+        let mut shape = self.shape.clone();
+        let mut strides = self.strides.clone();
+        let last_axis = shape.len() - 1;
+        shape.swap(last_axis - 1, last_axis);
+        strides.swap(last_axis - 1, last_axis);
+        Ok(Self {
+            data: Arc::clone(&self.data),
+            shape,
+            strides,
+            offset: self.offset,
+        })
     }
 
     /// Materialized axis permutation. The result is a copy with row-major strides.
@@ -419,6 +492,160 @@ fn row_major_strides(shape: &[usize]) -> Vec<usize> {
         next = next.saturating_mul(*dim);
     }
     strides
+}
+
+fn reshape_view_strides(
+    source_shape: &[usize],
+    source_strides: &[usize],
+    target_shape: &[usize],
+) -> Option<Vec<usize>> {
+    let element_count = checked_element_count_usize(source_shape)?;
+    if element_count != checked_element_count_usize(target_shape)? {
+        return None;
+    }
+    if element_count == 0 {
+        return Some(row_major_strides(target_shape));
+    }
+
+    // Divide the source layout into maximal physically contiguous chunks,
+    // ignoring singleton axes whose stride cannot affect logical iteration.
+    let mut chunks = Vec::new();
+    let mut source_axis = 0;
+    while source_axis < source_shape.len() {
+        if source_shape[source_axis] <= 1 {
+            source_axis += 1;
+            continue;
+        }
+        let mut last_axis = source_axis;
+        let mut chunk_count = source_shape[source_axis];
+        let mut next_axis = source_axis + 1;
+        while next_axis < source_shape.len() {
+            if source_shape[next_axis] <= 1 {
+                next_axis += 1;
+                continue;
+            }
+            let contiguous_stride =
+                source_strides[next_axis].checked_mul(source_shape[next_axis])?;
+            if source_strides[last_axis] != contiguous_stride {
+                break;
+            }
+            chunk_count = chunk_count.checked_mul(source_shape[next_axis])?;
+            last_axis = next_axis;
+            next_axis += 1;
+        }
+        chunks.push((chunk_count, source_strides[last_axis]));
+        source_axis = next_axis;
+    }
+
+    if chunks.is_empty() {
+        return Some(row_major_strides(target_shape));
+    }
+
+    let target_axes: Vec<usize> = target_shape
+        .iter()
+        .enumerate()
+        .filter_map(|(axis, &extent)| (extent > 1).then_some(axis))
+        .collect();
+    let mut target_strides = row_major_strides(target_shape);
+    let mut target_cursor = 0;
+    for (chunk_count, innermost_stride) in chunks {
+        let first_target_cursor = target_cursor;
+        let mut target_chunk_count = 1_usize;
+        while target_chunk_count < chunk_count {
+            let axis = *target_axes.get(target_cursor)?;
+            target_chunk_count = target_chunk_count.checked_mul(target_shape[axis])?;
+            if target_chunk_count > chunk_count {
+                return None;
+            }
+            target_cursor += 1;
+        }
+        if target_chunk_count != chunk_count {
+            return None;
+        }
+
+        let mut stride = innermost_stride;
+        for target_position in (first_target_cursor..target_cursor).rev() {
+            let axis = target_axes[target_position];
+            target_strides[axis] = stride;
+            stride = stride.checked_mul(target_shape[axis])?;
+        }
+    }
+    if target_cursor != target_axes.len() {
+        return None;
+    }
+    Some(target_strides)
+}
+
+fn expanded_view_strides(
+    source_shape: &[usize],
+    source_strides: &[usize],
+    target_shape: &[usize],
+) -> Result<Vec<usize>, &'static str> {
+    const IMPOSSIBLE: usize = usize::MAX;
+
+    let source_rank = source_shape.len();
+    let target_rank = target_shape.len();
+    let mut costs = vec![vec![IMPOSSIBLE; target_rank + 1]; source_rank + 1];
+    costs[source_rank].fill(0);
+    for source_axis in (0..source_rank).rev() {
+        for target_axis in (0..target_rank).rev() {
+            let skip_target = costs[source_axis][target_axis + 1];
+            let stretch_cost = if source_shape[source_axis] == target_shape[target_axis] {
+                0
+            } else if source_shape[source_axis] == 1 {
+                1
+            } else {
+                IMPOSSIBLE
+            };
+            let map_target = if stretch_cost == IMPOSSIBLE
+                || costs[source_axis + 1][target_axis + 1] == IMPOSSIBLE
+            {
+                IMPOSSIBLE
+            } else {
+                costs[source_axis + 1][target_axis + 1] + stretch_cost
+            };
+            costs[source_axis][target_axis] = skip_target.min(map_target);
+        }
+    }
+    if costs[0][0] == IMPOSSIBLE {
+        return Err(ERR_BROADCAST_SHAPE);
+    }
+
+    let mut source_to_target = vec![0; source_rank];
+    let (mut source_axis, mut target_axis) = (0, 0);
+    while source_axis < source_rank {
+        let skip_target = costs[source_axis][target_axis + 1];
+        let exact_match = source_shape[source_axis] == target_shape[target_axis];
+        let stretch_cost = if exact_match {
+            0
+        } else if source_shape[source_axis] == 1 {
+            1
+        } else {
+            IMPOSSIBLE
+        };
+        let map_target = if stretch_cost == IMPOSSIBLE
+            || costs[source_axis + 1][target_axis + 1] == IMPOSSIBLE
+        {
+            IMPOSSIBLE
+        } else {
+            costs[source_axis + 1][target_axis + 1] + stretch_cost
+        };
+        if skip_target <= map_target {
+            target_axis += 1;
+        } else {
+            source_to_target[source_axis] = target_axis;
+            source_axis += 1;
+            target_axis += 1;
+        }
+    }
+
+    let mut target_strides = vec![0; target_rank];
+    for (source_axis, &target_axis) in source_to_target.iter().enumerate() {
+        if source_shape[source_axis] == target_shape[target_axis] {
+            target_strides[target_axis] = source_strides[source_axis];
+        }
+    }
+    Ok(target_strides)
 }
 
 fn unravel_index(mut ordinal: usize, shape: &[usize]) -> Vec<usize> {
@@ -1098,43 +1325,106 @@ impl<T> Tensor<T>
 where
     T: Clone + Default + std::ops::Add<Output = T> + std::ops::Mul<Output = T>,
 {
-    /// Rank-2 matrix multiply `self × other`.
+    /// Matrix multiply `self × other`, including leading batched axes.
     ///
     /// # Errors
     ///
-    /// Returns `Err` if either tensor is not rank-2, the inner dimensions do
-    /// not match, or the result element count overflows.
+    /// A rank-2 receiver accepts a rank-1 vector or rank-2 matrix argument.
+    /// Rank-3 and rank-4 receivers accept a rank-2-or-higher argument whose
+    /// leading batch axes exactly match a prefix of the receiver's batch axes.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the receiver or argument rank is unsupported, the
+    /// argument's batch prefix or contraction dimension does not match, or the
+    /// result element count overflows.
     pub fn matmul(&self, other: &Tensor<T>) -> Result<Tensor<T>, &'static str> {
-        let dims = &self.shape;
-        if dims.len() != 2 {
+        let receiver_rank = self.shape.len();
+        if !(2..=4).contains(&receiver_rank) {
             return Err(ERR_MATMUL_RECEIVER_RANK);
         }
-        let other_dims = &other.shape;
-        if other_dims.len() != 2 {
-            return Err(ERR_MATMUL_ARGUMENT_RANK);
-        }
-        let m = dims[0];
-        let k1 = dims[1];
-        let k2 = other_dims[0];
-        let n = other_dims[1];
-        if k1 != k2 {
-            return Err(ERR_MATMUL_INNER_DIMENSION);
-        }
-        // WHY: explicit O(M*K*N) contraction loop keeps the kernel readable and
-        // works for materialized tensors and views through descriptor offsets.
-        let result_count = checked_allocation_count::<T>(&[m, n])?;
-        let mut result = Vec::with_capacity(result_count);
-        for i in 0..m {
-            for j in 0..n {
+
+        let argument_rank = other.shape.len();
+        if receiver_rank == 2 && argument_rank == 1 {
+            let rows = self.shape[0];
+            let inner = self.shape[1];
+            if inner != other.shape[0] {
+                return Err(ERR_MATMUL_INNER_DIMENSION);
+            }
+            let result_count = checked_allocation_count::<T>(&[rows])?;
+            let mut result = Vec::with_capacity(result_count);
+            for row in 0..rows {
                 let mut acc = T::default();
-                for k in 0..k1 {
-                    let prod = self.value_at_logical(&[i, k]) * other.value_at_logical(&[k, j]);
-                    acc = acc + prod;
+                for k in 0..inner {
+                    acc = acc + self.value_at_logical(&[row, k]) * other.value_at_logical(&[k]);
                 }
                 result.push(acc);
             }
+            return Ok(Tensor::from_contiguous(result, vec![rows]));
         }
-        Ok(Tensor::from_contiguous(result, vec![m, n]))
+
+        if argument_rank < 2 || argument_rank > receiver_rank {
+            return Err(ERR_MATMUL_ARGUMENT_RANK);
+        }
+
+        let receiver_batch_rank = receiver_rank - 2;
+        let argument_batch_rank = argument_rank - 2;
+        for axis in 0..argument_batch_rank {
+            if self.shape[axis] != other.shape[axis] {
+                return Err(ERR_MATMUL_BATCH_DIMENSION);
+            }
+        }
+
+        let rows = self.shape[receiver_rank - 2];
+        let inner = self.shape[receiver_rank - 1];
+        let argument_inner = other.shape[argument_rank - 2];
+        let columns = other.shape[argument_rank - 1];
+        if inner != argument_inner {
+            return Err(ERR_MATMUL_INNER_DIMENSION);
+        }
+
+        let mut result_shape = self.shape[..receiver_batch_rank].to_vec();
+        result_shape.push(rows);
+        result_shape.push(columns);
+        let result_count = checked_allocation_count::<T>(&result_shape)?;
+        let mut result = Vec::with_capacity(result_count);
+
+        // WHY: explicit O(batch*M*K*N) contraction uses logical indices, so
+        // materialized tensors and stride/offset views share one path. RHS
+        // batch axes use the matching receiver prefix; any trailing receiver
+        // batch axes broadcast the RHS matrix across them.
+        if result_count == 0 {
+            return Ok(Tensor::from_contiguous(result, result_shape));
+        }
+        let receiver_batch_shape = &self.shape[..receiver_batch_rank];
+        let batch_count =
+            checked_element_count_usize(receiver_batch_shape).ok_or(ERR_ELEMENT_COUNT_OVERFLOW)?;
+        for batch_ordinal in 0..batch_count {
+            let receiver_batch = unravel_index(batch_ordinal, receiver_batch_shape);
+            let mut lhs_index = receiver_batch.clone();
+            lhs_index.push(0);
+            lhs_index.push(0);
+            let mut rhs_index = receiver_batch[..argument_batch_rank].to_vec();
+            rhs_index.push(0);
+            rhs_index.push(0);
+            for row in 0..rows {
+                lhs_index[receiver_batch_rank] = row;
+                for column in 0..columns {
+                    rhs_index[argument_batch_rank] = 0;
+                    rhs_index[argument_batch_rank + 1] = column;
+                    let mut acc = T::default();
+                    for k in 0..inner {
+                        lhs_index[receiver_batch_rank + 1] = k;
+                        rhs_index[argument_batch_rank] = k;
+                        acc = acc
+                            + self.value_at_logical(&lhs_index)
+                                * other.value_at_logical(&rhs_index);
+                    }
+                    result.push(acc);
+                }
+            }
+        }
+        Ok(Tensor::from_contiguous(result, result_shape))
     }
 }
 
