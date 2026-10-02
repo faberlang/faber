@@ -3149,6 +3149,12 @@ coercere = "giới_hạn"
 inter = "giao_với"
 union = "hợp"
 consentit = "khớp"
+inventa = "tìm"
+inventum = "văn_bản"
+principium = "bắt_đầu"
+terminus = "kết_thúc"
+coetus = "nhóm"
+nominatus = "đặt_tên"
 
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "các lựa chọn mẫu or phải liên kết cùng tên và kiểu"

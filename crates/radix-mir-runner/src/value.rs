@@ -230,12 +230,29 @@ pub enum Value {
 }
 
 /// A regex match: the matched text and its half-open span in code points of
-/// the haystack (offsets are code points, never bytes).
+/// the haystack (offsets are code points, never bytes), plus the text of each
+/// capture group (`0` the whole match; `None` for a group that did not
+/// participate) and the `(?P<name>…)` group names with their indices.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MatchValue {
     pub text: String,
     pub start: usize,
     pub end: usize,
+    pub groups: Vec<Option<String>>,
+    pub names: Vec<(String, usize)>,
+}
+
+impl MatchValue {
+    /// Text of group `index`; `None` when out of range or not participating.
+    pub fn group(&self, index: usize) -> Option<&str> {
+        self.groups.get(index)?.as_deref()
+    }
+
+    /// Text of the group named `name`; `None` when unknown or not participating.
+    pub fn named(&self, name: &str) -> Option<&str> {
+        let (_, index) = self.names.iter().find(|(known, _)| known == name)?;
+        self.group(*index)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

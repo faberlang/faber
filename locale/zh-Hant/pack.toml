@@ -3149,6 +3149,12 @@ coercere = "限幅"
 inter = "相交"
 union = "聯集"
 consentit = "比對"
+inventa = "尋找"
+inventum = "文字"
+principium = "起始"
+terminus = "結束"
+coetus = "分組"
+nominatus = "命名分組"
 
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "或模式的各分支必須繫結相同的名稱和型別"

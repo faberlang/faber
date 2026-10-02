@@ -244,6 +244,20 @@ fn dtypes_for(receiver: IntrinsicReceiver) -> Vec<Dtype> {
             "textus",
             "0",
         )],
+        // A match has no source type name (RD-3): the receiver is the result
+        // of `find`, held in an inferred binding and asserted non-null at the
+        // call (`r!.method()`, see `probe_source`). The `regex` parameter
+        // survives into the mutable probe through `extra_param`.
+        IntrinsicReceiver::Match => vec![dtype(
+            "match",
+            "regex rx",
+            "",
+            "regex rx",
+            "fixum _ r ← rx.inventa(\"xy\")",
+            "\"xy\"",
+            "textus",
+            "0",
+        )],
     }
 }
 
@@ -381,7 +395,13 @@ fn probe_source(row: &crate::intrinsics::MethodIntrinsic, dtype: &Dtype, mutable
     } else {
         format!("<{}>", generic_args.join(", "))
     };
-    let call = format!("r.{}{}({})", row.faber_name, generic_suffix, args.join(", "));
+    // The `match ∪ nihil` binding is asserted non-null at the call.
+    let receiver = if row.receiver == IntrinsicReceiver::Match {
+        "r!"
+    } else {
+        "r"
+    };
+    let call = format!("{receiver}.{}{}({})", row.faber_name, generic_suffix, args.join(", "));
     let body = if row.return_kind == IntrinsicReturnKind::Vacuum {
         format!("    {call}")
     } else if key == "Tensor.gather/1" {
@@ -541,6 +561,7 @@ const FAMILY_CONTROLS: &[(&str, &str)] = &[
     ("Sparsa", "longitudo/0"),
     ("Intervallum", "longitudo/0"),
     ("Regex", "consentit/1"),
+    ("Match", "inventum/0"),
 ];
 
 fn run_family_controls(session: &Session) {
@@ -811,6 +832,12 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         MirCollectionOp::Keys,
         MirCollectionOp::Values,
         MirCollectionOp::RegexMatches,
+        MirCollectionOp::RegexFind,
+        MirCollectionOp::MatchText,
+        MirCollectionOp::MatchStart,
+        MirCollectionOp::MatchEnd,
+        MirCollectionOp::MatchGroup,
+        MirCollectionOp::MatchNamed,
         MirCollectionOp::CordCursor,
     ];
     // K5: one payload variant per lifted math function, all registry rows.

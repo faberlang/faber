@@ -3161,6 +3161,12 @@ coercere = "सीमित_करो"
 inter = "प्रतिच्छेद"
 union = "सम्मिलन"
 consentit = "मेल_खाता_है"
+inventa = "खोज"
+inventum = "पाठ"
+principium = "आरंभ"
+terminus = "अंत"
+coetus = "समूह"
+nominatus = "नामित"
 
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "or-pattern विकल्पों को समान नाम और प्रकार बाँधने चाहिए"

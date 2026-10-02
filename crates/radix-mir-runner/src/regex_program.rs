@@ -11,6 +11,7 @@
 //! pattern's payload starts with a stable construct id (RD-4), followed by
 //! `: ` and detail text. Callers and tests rely on the id, never the detail.
 
+use crate::value::MatchValue;
 use regex_syntax::ast::{self, Ast, ClassSetItem, Flag, FlagsItemKind, LiteralKind, Visitor};
 
 /// RE2's repetition count cap; counts above it are `syntax`.
@@ -49,6 +50,32 @@ impl RegexProgram {
 
     pub fn is_match(&self, text: &str) -> bool {
         self.compiled.is_match(text)
+    }
+
+    /// The leftmost-first match in `text`, with offsets in code points. The
+    /// byte offsets the engine reports are mapped once, here.
+    pub fn find(&self, text: &str) -> Option<MatchValue> {
+        let captures = self.compiled.captures(text)?;
+        let whole = captures.get(0)?;
+        let start = text[..whole.start()].chars().count();
+        let end = start + whole.as_str().chars().count();
+        let groups = captures
+            .iter()
+            .map(|group| group.map(|found| found.as_str().to_owned()))
+            .collect();
+        let names = self
+            .compiled
+            .capture_names()
+            .enumerate()
+            .filter_map(|(index, name)| name.map(|name| (name.to_owned(), index)))
+            .collect();
+        Some(MatchValue {
+            text: whole.as_str().to_owned(),
+            start,
+            end,
+            groups,
+            names,
+        })
     }
 }
 

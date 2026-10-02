@@ -86,3 +86,24 @@ fn accepted_patterns_compile_and_match() {
         assert_eq!(program.is_match(text), expected, "pattern {pattern:?}");
     }
 }
+
+#[test]
+fn find_reports_code_point_offsets_not_bytes() {
+    let program = RegexProgram::compile("[a-z]+").expect("valid pattern");
+    let found = program.find("😀é abc").expect("a match");
+    assert_eq!(found.text, "abc");
+    assert_eq!((found.start, found.end), (3, 6));
+    assert!(program.find("123").is_none());
+}
+
+#[test]
+fn find_groups_are_indexed_named_and_optional() {
+    let program = RegexProgram::compile("(a)|(?P<second>b)").expect("valid pattern");
+    let found = program.find("xb").expect("a match");
+    assert_eq!(found.group(0), Some("b"));
+    assert_eq!(found.group(1), None);
+    assert_eq!(found.group(2), Some("b"));
+    assert_eq!(found.group(9), None);
+    assert_eq!(found.named("second"), Some("b"));
+    assert_eq!(found.named("missing"), None);
+}

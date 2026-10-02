@@ -617,6 +617,9 @@ impl Validator<'_, '_> {
             | MirCollectionOp::Keys
             | MirCollectionOp::Values
             | MirCollectionOp::CordCursor
+            | MirCollectionOp::MatchText
+            | MirCollectionOp::MatchStart
+            | MirCollectionOp::MatchEnd
             | MirCollectionOp::TensorCausalMaskedSoftmax => 1,
             MirCollectionOp::ArrayAdd
             | MirCollectionOp::ArraySub
@@ -655,6 +658,9 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorSsmScan
             | MirCollectionOp::TensorDiv
             | MirCollectionOp::RegexMatches
+            | MirCollectionOp::RegexFind
+            | MirCollectionOp::MatchGroup
+            | MirCollectionOp::MatchNamed
             | MirCollectionOp::SparseGet
             | MirCollectionOp::IntervalIntersect
             | MirCollectionOp::IntervalUnion
@@ -1212,6 +1218,14 @@ impl Validator<'_, '_> {
                         "regex consentit argument is not textus",
                     );
                 }
+            }
+            MirCollectionOp::RegexFind
+            | MirCollectionOp::MatchText
+            | MirCollectionOp::MatchStart
+            | MirCollectionOp::MatchEnd
+            | MirCollectionOp::MatchGroup
+            | MirCollectionOp::MatchNamed => {
+                self.validate_regex_match_call(scope, op, first_arg_ty, call, span);
             }
             MirCollectionOp::Uppercase | MirCollectionOp::Lowercase | MirCollectionOp::Trim => {
                 self.require_exact(
@@ -2126,6 +2140,76 @@ impl Validator<'_, '_> {
             self.error(
                 span,
                 format!("tensor rope dim {dim_val} exceeds the last-axis extent {last_extent:?}"),
+            );
+        }
+    }
+
+    /// RX-3b: `regex.inventa` and the `match` accessors. The receiver is a
+    /// `regex` (find) or a `match` (accessors); results are `match ∪ nihil`,
+    /// `textus`, `numerus`, or `textus ∪ nihil` per accessor.
+    fn validate_regex_match_call(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        op: MirCollectionOp,
+        first_arg_ty: Option<MirType>,
+        call: &MirRuntimeCall,
+        span: Span,
+    ) {
+        let receiver = if matches!(op, MirCollectionOp::RegexFind) {
+            Primitive::Regex
+        } else {
+            Primitive::Match
+        };
+        if let Some(receiver_ty) = first_arg_ty {
+            self.require_exact(
+                receiver_ty,
+                self.primitive(receiver),
+                span,
+                "regex/match operation receiver type mismatch",
+            );
+        }
+        let (result_inner, optional) = match op {
+            MirCollectionOp::RegexFind => (Primitive::Match, true),
+            MirCollectionOp::MatchText => (Primitive::Textus, false),
+            MirCollectionOp::MatchStart | MirCollectionOp::MatchEnd => (Primitive::Numerus, false),
+            _ => (Primitive::Textus, true),
+        };
+        let expected = self.primitive(result_inner);
+        if optional {
+            let ok = matches!(
+                self.type_kind(call.return_ty),
+                Type::Option(inner) if self.context.types.equals(*inner, expected.semantic_id())
+            );
+            if !ok {
+                self.error(
+                    span,
+                    "regex/match operation result is not the expected option",
+                );
+            }
+        } else {
+            self.require_exact(
+                call.return_ty,
+                expected,
+                span,
+                "regex/match operation result type mismatch",
+            );
+        }
+        let Some(arg) = call.args.get(1) else {
+            return;
+        };
+        let Some(arg_ty) = self.validate_operand(scope, arg, span) else {
+            return;
+        };
+        if matches!(op, MirCollectionOp::MatchGroup) {
+            if !self.is_numeric_type(arg_ty) {
+                self.error(span, "match group index is not numerus");
+            }
+        } else {
+            self.require_exact(
+                arg_ty,
+                self.primitive(Primitive::Textus),
+                span,
+                "regex/match operation argument is not textus",
             );
         }
     }

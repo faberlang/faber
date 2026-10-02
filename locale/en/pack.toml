@@ -434,8 +434,14 @@ inter = "intersect"
 # identity in grammar slots, so a member call `interval.union(...)` parses.
 union = "union"
 
-# regex (1)
+# regex (2) and match (5)
 consentit = "matches"
+inventa = "find"
+inventum = "text"
+principium = "start"
+terminus = "end"
+coetus = "group"
+nominatus = "named"
 
 # -----------------------------------------------------------------------------
 # [diagnostics.*] — materialized from la (S0-U3 flat-pack materialization).

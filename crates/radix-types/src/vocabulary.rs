@@ -364,6 +364,22 @@ pub enum MirCollectionOp {
     /// Regex `consentit`: whether the `regex` receiver's pattern matches a
     /// `textus` argument (the Rust `regex` crate `is_match` semantics).
     RegexMatches,
+    /// Regex `inventa` (en `find`): the leftmost-first match of the `regex`
+    /// receiver in a `textus` argument, as `match ∪ nihil`. Offsets are code
+    /// points (RX-3b).
+    RegexFind,
+    /// Match `inventum` (en `text`): the matched text.
+    MatchText,
+    /// Match `principium` (en `start`): inclusive start, in code points.
+    MatchStart,
+    /// Match `terminus` (en `end`): exclusive end, in code points.
+    MatchEnd,
+    /// Match `coetus` (en `group`): capture group `n` text, `0` the whole
+    /// match; `nihil` for a non-participating or out-of-range group.
+    MatchGroup,
+    /// Match `nominatus` (en `named`): text of a `(?P<name>…)` group; `nihil`
+    /// for a non-participating or unknown name.
+    MatchNamed,
     /// Cord walk: `ascii.cursor()` / later `textus.cursor()` → `cursor<ascii<1>>`.
     /// One buffer of one-byte ascii values; not a per-step heap slice.
     CordCursor,

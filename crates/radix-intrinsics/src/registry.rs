@@ -38,6 +38,9 @@ pub enum IntrinsicReceiver {
     Stack,
     /// `regex` pattern carrier (compile-time literal; `consentit` match verb).
     Regex,
+    /// One regex match (RD-3: no source type name; reached only through
+    /// `regex.inventa` results). Owns the accessor family.
+    Match,
 }
 
 /// Parameter slot shape relative to the receiver's element/key/value types.
@@ -120,6 +123,12 @@ pub enum IntrinsicReturnKind {
     /// `lista` of prefix results for a serial higher-order scan.
     ReducerArray,
     TextusArray,
+    /// `match ∪ nihil` — the `regex.inventa` result (RD-3: the match type has
+    /// no source name; it is only ever read through this option and inference).
+    OptionMatch,
+    /// `textus ∪ nihil` — a capture group's text, or `nihil` when the group did
+    /// not participate or does not exist.
+    OptionTextus,
     /// `cursor<littera>` — the `ascii.cursor()` / `textus.cursor()` scalar walk (D10.1).
     CursorLittera,
     /// The bound type of the first Typus generic (`formata`).
@@ -1113,6 +1122,15 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     // (`continet`/`initium`/`finis`). Spelling recorded in the G12-U1 unit
     // report (Open Q #3 default).
     intrinsic!(Regex, "consentit", 1, &[IntrinsicParamKind::Textus], Bool, collection RegexMatches),
+    // RX-3b: `find` and the match accessors. Latin names per L-6: `inventa`
+    // (ruled), then the accepted defaults `inventum`, `principium`, `terminus`,
+    // `coetus`, `nominatus`.
+    intrinsic!(Regex, "inventa", 1, &[IntrinsicParamKind::Textus], OptionMatch, collection RegexFind),
+    intrinsic!(Match, "inventum", 0, &[], Textus, collection MatchText),
+    intrinsic!(Match, "principium", 0, &[], Numerus, collection MatchStart),
+    intrinsic!(Match, "terminus", 0, &[], Numerus, collection MatchEnd),
+    intrinsic!(Match, "coetus", 1, &[IntrinsicParamKind::NumerusIndex], OptionTextus, collection MatchGroup),
+    intrinsic!(Match, "nominatus", 1, &[IntrinsicParamKind::Textus], OptionTextus, collection MatchNamed),
 ];
 
 /// How a namespace/struct catalog row publishes its result after generic binding.

@@ -3149,6 +3149,12 @@ coercere = "قيد"
 inter = "تقاطع"
 union = "اتحاد"
 consentit = "يطابق"
+inventa = "ابحث"
+inventum = "النص"
+principium = "البداية"
+terminus = "النهاية"
+coetus = "مجموعة"
+nominatus = "مسماة"
 
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "يجب أن تربط بدائل نمط أو الأسماء والأنواع نفسها"

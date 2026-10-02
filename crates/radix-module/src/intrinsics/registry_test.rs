@@ -49,6 +49,47 @@ fn regex_consentit_resolves_on_regex_receiver() {
 }
 
 #[test]
+fn regex_find_and_match_accessors_resolve() {
+    let types = TypeTable::new();
+    let regex = types.get(types.primitive(Primitive::Regex));
+    let found = types.get(types.primitive(Primitive::Match));
+
+    let find = lookup_method_for_type(regex, "inventa", 1).expect("regex inventa");
+    assert_eq!(find.return_kind, super::IntrinsicReturnKind::OptionMatch);
+    assert_eq!(mir_collection_op(find), Some(MirCollectionOp::RegexFind));
+
+    assert_eq!(receivers_for_type(found), &[IntrinsicReceiver::Match]);
+    let accessors = [
+        ("inventum", 0, super::IntrinsicReturnKind::Textus, MirCollectionOp::MatchText),
+        (
+            "principium",
+            0,
+            super::IntrinsicReturnKind::Numerus,
+            MirCollectionOp::MatchStart,
+        ),
+        ("terminus", 0, super::IntrinsicReturnKind::Numerus, MirCollectionOp::MatchEnd),
+        (
+            "coetus",
+            1,
+            super::IntrinsicReturnKind::OptionTextus,
+            MirCollectionOp::MatchGroup,
+        ),
+        (
+            "nominatus",
+            1,
+            super::IntrinsicReturnKind::OptionTextus,
+            MirCollectionOp::MatchNamed,
+        ),
+    ];
+    for (name, arity, return_kind, op) in accessors {
+        let row = lookup_method_for_type(found, name, arity).expect("match accessor");
+        assert_eq!(row.receiver, IntrinsicReceiver::Match);
+        assert_eq!(row.return_kind, return_kind);
+        assert_eq!(mir_collection_op(row), Some(op));
+    }
+}
+
+#[test]
 fn tabula_claves_is_registered_as_keys() {
     let mut types = TypeTable::new();
     let map = types.map(types.primitive(Primitive::Textus), types.primitive(Primitive::Numerus));
