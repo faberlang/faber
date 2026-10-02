@@ -3,6 +3,63 @@
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use crate::tensor_edge::{
+    BuiltinEdgePolicy, CustomEdgePolicyError, CustomEdgeValueError, TensorEdgeDescriptor,
+    TensorEdgeResolution, resolve_builtin, resolve_custom_value, resolve_optional,
+};
+
+/// The edge rule used to resolve a shifted tensor view.
+#[derive(Debug)]
+pub enum TensorEdgePolicy<T> {
+    Clamp,
+    Reflect,
+    Wrap,
+    Custom {
+        remap: fn(&[i64]) -> Vec<i64>,
+        transform: Option<fn(&[i64], T) -> T>,
+    },
+}
+
+impl<T> Copy for TensorEdgePolicy<T> {}
+
+impl<T> Clone for TensorEdgePolicy<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+#[derive(Clone, Debug)]
+struct TensorLogicalView<P> {
+    base_shape: Vec<usize>,
+    base_strides: Vec<usize>,
+    base_offset: usize,
+    layers: Vec<TensorViewLayer<P>>,
+}
+
+#[derive(Clone, Debug)]
+enum TensorViewLayer<P> {
+    Shift {
+        shape: Vec<usize>,
+        descriptor: TensorEdgeDescriptor<P>,
+    },
+    Reshape {
+        input_shape: Vec<usize>,
+        output_shape: Vec<usize>,
+    },
+    SliceAxisZero {
+        input_shape: Vec<usize>,
+        start: usize,
+        step: usize,
+    },
+    TransposeTrailingAxes {
+        input_shape: Vec<usize>,
+    },
+    Expanded {
+        input_shape: Vec<usize>,
+        target_to_source: Vec<Option<usize>>,
+    },
+}
+
 /// Homogeneous numeric buffer with runtime shape metadata.
 #[derive(Clone, Debug)]
 pub struct Tensor<T> {
@@ -10,6 +67,7 @@ pub struct Tensor<T> {
     shape: Vec<usize>,
     strides: Vec<usize>,
     offset: usize,
+    logical_view: Option<TensorLogicalView<TensorEdgePolicy<T>>>,
 }
 
 // ── Error messages ─────────────────────────────────────────────────────────
@@ -28,7 +86,10 @@ pub use crate::contract::tensor::{
     ERR_MATMUL_RECEIVER_RANK, ERR_MEDIA_EMPTY, ERR_NEGATIVE_DIM, ERR_NEGATIVE_INDEX,
     ERR_NEGATIVE_SLICE, ERR_PERMUTE_AXIS_OUT_OF_RANGE, ERR_PERMUTE_DUPLICATE_AXIS,
     ERR_PERMUTE_NEGATIVE_AXIS, ERR_PERMUTE_RANK, ERR_PONDE_INVALID_INDEX,
-    ERR_SECTIO_INVALID_SLICE_BOUNDS, ERR_TRANSPOSE_RANK, tensor_dim_non_negative,
+    ERR_SECTIO_INVALID_SLICE_BOUNDS, ERR_TENSOR_COALESCE_REQUIRES_OPTIONAL,
+    ERR_TENSOR_EDGE_NOT_SHIFTED, ERR_TENSOR_EDGE_POLICY_INVALID, ERR_TENSOR_EDGE_RANK_MISMATCH,
+    ERR_TENSOR_EDGE_READ_ONLY, ERR_TENSOR_EDGE_UNRESOLVED_READ, ERR_TENSOR_MATERIALIZE_UNRESOLVED,
+    ERR_TENSOR_SHAPE_HOLE_UNDERDETERMINED, ERR_TRANSPOSE_RANK, tensor_dim_non_negative,
     tensor_flat_offset, tensor_shape_element_count,
 };
 
@@ -90,6 +151,60 @@ fn shape_dims(shape: &[i64]) -> Result<Vec<usize>, &'static str> {
     shape
         .iter()
         .map(|&dim| parse_non_negative(dim, ERR_NEGATIVE_DIM))
+        .collect()
+}
+
+fn infer_shape_hole(
+    shape: &[Option<i64>],
+    element_count: usize,
+    mismatch: &'static str,
+) -> Result<Vec<i64>, &'static str> {
+    let holes: Vec<usize> = shape
+        .iter()
+        .enumerate()
+        .filter_map(|(axis, dimension)| dimension.is_none().then_some(axis))
+        .collect();
+    if shape.iter().flatten().any(|dimension| *dimension < 0) {
+        return Err(ERR_NEGATIVE_DIM);
+    }
+    if holes.is_empty() {
+        return shape
+            .iter()
+            .map(|dimension| dimension.ok_or(ERR_TENSOR_SHAPE_HOLE_UNDERDETERMINED))
+            .collect();
+    }
+    if holes.len() != 1 {
+        return Err(ERR_TENSOR_SHAPE_HOLE_UNDERDETERMINED);
+    }
+
+    let hole = holes[0];
+    let known_product = shape
+        .iter()
+        .enumerate()
+        .filter_map(|(axis, dimension)| (axis != hole).then_some(*dimension))
+        .try_fold(1_usize, |product, dimension| {
+            let dimension = usize::try_from(dimension?).ok()?;
+            product.checked_mul(dimension)
+        })
+        .ok_or(ERR_ELEMENT_COUNT_OVERFLOW)?;
+    if known_product == 0 {
+        return Err(ERR_TENSOR_SHAPE_HOLE_UNDERDETERMINED);
+    }
+    if !element_count.is_multiple_of(known_product) {
+        return Err(mismatch);
+    }
+    let inferred =
+        i64::try_from(element_count / known_product).map_err(|_| ERR_ELEMENT_COUNT_OVERFLOW)?;
+    shape
+        .iter()
+        .enumerate()
+        .map(|(axis, dimension)| {
+            if axis == hole {
+                Ok(inferred)
+            } else {
+                dimension.ok_or(ERR_TENSOR_SHAPE_HOLE_UNDERDETERMINED)
+            }
+        })
         .collect()
 }
 
@@ -196,13 +311,45 @@ impl<T: Clone + Default> Tensor<T> {
         Ok(Self::from_contiguous(data, dims))
     }
 
-    #[must_use]
-    pub fn planata(&self) -> Vec<T> {
-        let data = tensor_data(&self.data);
-        self.logical_offsets()
-            .into_iter()
-            .map(|offset| data[offset].clone())
-            .collect()
+    /// Create a tensor from a flat buffer while resolving at most one shape hole.
+    ///
+    /// A hole is inferred only when the supplied element count determines an
+    /// exact, unique non-negative extent. Multiple holes and zero known product
+    /// remain ambiguous, including an empty buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for negative dimensions, an ambiguous hole, or a data
+    /// count that does not match the resolved shape.
+    pub fn structa_with_holes(data: Vec<T>, shape: &[Option<i64>]) -> Result<Self, &'static str> {
+        let resolved = infer_shape_hole(
+            shape,
+            data.len(),
+            "tensor element count does not match shape",
+        )?;
+        Self::structa(data, &resolved)
+    }
+
+    /// Flatten logical values in row-major order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an unresolved shifted optional element or an
+    /// invalid custom edge-policy coordinate would become a plain value.
+    pub fn planata(&self) -> Result<Vec<T>, &'static str> {
+        if self.has_unresolved_edge() {
+            return Err(ERR_TENSOR_EDGE_UNRESOLVED_READ);
+        }
+        let count = self.element_count();
+        let mut values = Vec::with_capacity(count);
+        for ordinal in 0..count {
+            let index = unravel_index(ordinal, &self.shape);
+            values.push(
+                self.read_logical_index(&index)?
+                    .ok_or(ERR_TENSOR_EDGE_UNRESOLVED_READ)?,
+            );
+        }
+        Ok(values)
     }
 
     /// Reshape the tensor without copying its backing storage.
@@ -219,12 +366,28 @@ impl<T: Clone + Default> Tensor<T> {
         }
         let strides = reshape_view_strides(&self.shape, &self.strides, &dims)
             .ok_or(ERR_FORMA_LAYOUT_NOT_VIEWABLE)?;
-        Ok(Self {
-            data: Arc::clone(&self.data),
-            shape: dims,
+        let logical_view = self.append_view_layer(TensorViewLayer::Reshape {
+            input_shape: self.shape.clone(),
+            output_shape: dims.clone(),
+        });
+        Ok(Self::view(
+            Arc::clone(&self.data),
+            dims,
             strides,
-            offset: self.offset,
-        })
+            self.offset,
+            logical_view,
+        ))
+    }
+
+    /// Reshape after inferring a single extent from this tensor's element count.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for negative dimensions, an ambiguous hole, a count
+    /// mismatch, or a layout that cannot represent the requested view.
+    pub fn forma_with_holes(&self, shape: &[Option<i64>]) -> Result<Self, &'static str> {
+        let resolved = infer_shape_hole(shape, self.element_count(), ERR_FORMA_RESHAPE_COUNT)?;
+        self.forma(&resolved)
     }
 
     /// Read the value at the given indices.
@@ -236,10 +399,7 @@ impl<T: Clone + Default> Tensor<T> {
     /// Returns `Err` if any index is negative.
     pub fn accipe(&self, indices: &[i64]) -> Result<Option<T>, &'static str> {
         let index = index_dims(indices)?;
-        let Some(offset) = self.offset_for_index(&index) else {
-            return Ok(None);
-        };
-        Ok(tensor_data(&self.data).get(offset).cloned())
+        self.read_logical_index(&index)
     }
 
     /// Write a value at the given indices.
@@ -248,6 +408,9 @@ impl<T: Clone + Default> Tensor<T> {
     ///
     /// Returns `Err` if any index is negative or out of bounds.
     pub fn ponde(&mut self, indices: &[i64], value: T) -> Result<(), &'static str> {
+        if self.logical_view.is_some() {
+            return Err(ERR_TENSOR_EDGE_READ_ONLY);
+        }
         let index = index_dims(indices)?;
         let Some(offset) = self.offset_for_index(&index) else {
             return Err(ERR_INDEX_OUT_OF_BOUNDS);
@@ -256,29 +419,44 @@ impl<T: Clone + Default> Tensor<T> {
         Ok(())
     }
 
-    pub fn reple(&mut self, value: T) {
-        let offsets = self.logical_offsets();
+    /// Replace every element in the tensor with one value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the logical offsets are invalid or the tensor is
+    /// a shifted or resolved edge view, which is read-only.
+    pub fn reple(&mut self, value: T) -> Result<(), &'static str> {
+        if self.logical_view.is_some() {
+            return Err(ERR_TENSOR_EDGE_READ_ONLY);
+        }
+        let offsets = self.logical_offsets()?;
         let Some((&last_offset, preceding_offsets)) = offsets.split_last() else {
-            return;
+            return Ok(());
         };
         let mut data = tensor_data(&self.data);
         for &offset in preceding_offsets {
             data[offset] = value.clone();
         }
         data[last_offset] = value;
+        Ok(())
     }
 
     /// Element-wise conversion preserving shape metadata.
     ///
     /// Codegen supplies the per-element map so tensor `↦` mirrors scalar conversio
     /// rules (widening casts, fractus→numerus truncation, and so on).
-    pub fn convert_elements<B, F>(&self, map: F) -> Tensor<B>
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source view contains an unresolved optional
+    /// element or a custom edge policy produces an invalid coordinate.
+    pub fn convert_elements<B, F>(&self, map: F) -> Result<Tensor<B>, &'static str>
     where
         B: Clone + Default,
         F: Fn(T) -> B,
     {
-        let elems: Vec<B> = self.planata().into_iter().map(map).collect();
-        Tensor::from_contiguous(elems, self.shape.clone())
+        let elems: Vec<B> = self.planata()?.into_iter().map(map).collect();
+        Ok(Tensor::from_contiguous(elems, self.shape.clone()))
     }
 
     /// View a contiguous slice along axis 0 from `start` (inclusive) to `end` (exclusive).
@@ -288,18 +466,7 @@ impl<T: Clone + Default> Tensor<T> {
     /// Returns `Err` if bounds are negative, `end < start`, or `end` exceeds
     /// the first dimension.
     pub fn sectio(&self, start: i64, end: i64) -> Result<Self, &'static str> {
-        let (start, end) = slice_bounds(start, end)?;
-        if self.shape.is_empty() || end > self.shape[0] {
-            return Err(ERR_INDEX_OUT_OF_BOUNDS);
-        }
-        let mut shape = self.shape.clone();
-        shape[0] = end - start;
-        Ok(Self {
-            data: Arc::clone(&self.data),
-            shape,
-            strides: self.strides.clone(),
-            offset: self.offset + start * self.strides[0],
-        })
+        self.sectio_strided(start, end, 1)
     }
 
     /// View an axis-0 slice with a positive step.
@@ -334,12 +501,18 @@ impl<T: Clone + Default> Tensor<T> {
         shape[0] = first_dim;
         let mut strides = self.strides.clone();
         strides[0] = stride;
-        Ok(Self {
-            data: Arc::clone(&self.data),
+        let logical_view = self.append_view_layer(TensorViewLayer::SliceAxisZero {
+            input_shape: self.shape.clone(),
+            start,
+            step,
+        });
+        Ok(Self::view(
+            Arc::clone(&self.data),
             shape,
             strides,
             offset,
-        })
+            logical_view,
+        ))
     }
 
     /// Explicitly expand or insert axes as a zero-copy broadcast view.
@@ -356,29 +529,170 @@ impl<T: Clone + Default> Tensor<T> {
     pub fn expanded(&self, shape: &[i64]) -> Result<Self, &'static str> {
         let shape = shape_dims(shape)?;
         checked_element_count_usize(&shape).ok_or(ERR_ELEMENT_COUNT_OVERFLOW)?;
-        let strides = expanded_view_strides(&self.shape, &self.strides, &shape)?;
-        Ok(Self {
-            data: Arc::clone(&self.data),
+        let (strides, target_to_source) = expanded_view_layout(&self.shape, &self.strides, &shape)?;
+        let logical_view = self.append_view_layer(TensorViewLayer::Expanded {
+            input_shape: self.shape.clone(),
+            target_to_source,
+        });
+        Ok(Self::view(
+            Arc::clone(&self.data),
             shape,
             strides,
-            offset: self.offset,
-        })
+            self.offset,
+            logical_view,
+        ))
     }
 
-    #[must_use]
+    /// Expand a view with holes filled from the statically resolved result shape.
+    ///
     /// # Errors
-    /// Returns an error when the requested operation cannot be completed.
-    pub fn materialize(&self) -> Self {
-        Self::from_contiguous(self.planata(), self.shape.clone())
+    ///
+    /// Returns an error when a requested extent disagrees with the witness,
+    /// either shape contains a negative extent, or the expansion is invalid.
+    pub fn expanded_with_witness(
+        &self,
+        shape: &[Option<i64>],
+        expected_shape: &[i64],
+    ) -> Result<Self, &'static str> {
+        if shape.len() != expected_shape.len() {
+            return Err(ERR_BROADCAST_SHAPE);
+        }
+        let resolved: Vec<i64> = shape
+            .iter()
+            .zip(expected_shape)
+            .map(|(requested, &expected)| {
+                if expected < 0 {
+                    return Err(ERR_NEGATIVE_DIM);
+                }
+                match requested {
+                    Some(requested) if *requested < 0 => Err(ERR_NEGATIVE_DIM),
+                    Some(requested) if *requested != expected => Err(ERR_BROADCAST_SHAPE),
+                    Some(requested) => Ok(*requested),
+                    None => Ok(expected),
+                }
+            })
+            .collect::<Result<_, _>>()?;
+        self.expanded(&resolved)
+    }
+
+    /// Displace each logical read coordinate while retaining the same storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the offset rank differs from the tensor rank.
+    pub fn shift(&self, offsets: &[i64]) -> Result<Self, &'static str> {
+        if offsets.len() != self.shape.len() {
+            return Err(ERR_TENSOR_EDGE_RANK_MISMATCH);
+        }
+        let descriptor =
+            TensorEdgeDescriptor::shifted(offsets.iter().copied().map(i128::from).collect());
+        let mut logical_view = self
+            .logical_view
+            .clone()
+            .unwrap_or_else(|| TensorLogicalView {
+                base_shape: self.shape.clone(),
+                base_strides: self.strides.clone(),
+                base_offset: self.offset,
+                layers: Vec::new(),
+            });
+        logical_view.layers.push(TensorViewLayer::Shift {
+            shape: self.shape.clone(),
+            descriptor,
+        });
+        Ok(Self::view(
+            Arc::clone(&self.data),
+            self.shape.clone(),
+            self.strides.clone(),
+            self.offset,
+            Some(logical_view),
+        ))
+    }
+
+    /// Resolve the latest shifted optional view without copying its storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no unresolved shifted view is available.
+    pub fn limes(&self, policy: TensorEdgePolicy<T>) -> Result<Self, &'static str> {
+        let Some(mut logical_view) = self.logical_view.clone() else {
+            return Err(ERR_TENSOR_EDGE_NOT_SHIFTED);
+        };
+        let resolution = match policy {
+            TensorEdgePolicy::Clamp => TensorEdgeResolution::Builtin(BuiltinEdgePolicy::Clamp),
+            TensorEdgePolicy::Reflect => TensorEdgeResolution::Builtin(BuiltinEdgePolicy::Reflect),
+            TensorEdgePolicy::Wrap => TensorEdgeResolution::Builtin(BuiltinEdgePolicy::Wrap),
+            custom @ TensorEdgePolicy::Custom { .. } => TensorEdgeResolution::Custom(custom),
+        };
+        let Some(TensorViewLayer::Shift { descriptor, .. }) =
+            logical_view.layers.iter_mut().rev().find(|layer| {
+                matches!(
+                    layer,
+                    TensorViewLayer::Shift {
+                        descriptor: TensorEdgeDescriptor {
+                            resolution: TensorEdgeResolution::Optional,
+                            ..
+                        },
+                        ..
+                    }
+                )
+            })
+        else {
+            return Err(ERR_TENSOR_EDGE_NOT_SHIFTED);
+        };
+        *descriptor = descriptor
+            .clone()
+            .limes(resolution)
+            .ok_or(ERR_TENSOR_EDGE_NOT_SHIFTED)?;
+        Ok(Self::view(
+            Arc::clone(&self.data),
+            self.shape.clone(),
+            self.strides.clone(),
+            self.offset,
+            Some(logical_view),
+        ))
+    }
+
+    /// # Errors
+    /// Returns an error for unresolved optional elements or invalid custom
+    /// edge-policy mappings.
+    pub fn materialize(&self) -> Result<Self, &'static str> {
+        if self.has_unresolved_edge() {
+            return Err(ERR_TENSOR_MATERIALIZE_UNRESOLVED);
+        }
+        Ok(Self::from_contiguous(self.planata()?, self.shape.clone()))
+    }
+
+    /// Resolve optional shifted reads with a fallback in one logical pass.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no unresolved shifted optional view exists or a
+    /// resolved custom edge policy produces an invalid coordinate.
+    // The owned fallback is cloned only for optional cells; one input can
+    // replace any number of missing logical values.
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn coalesce(&self, fallback: T) -> Result<Self, &'static str> {
+        if !self.has_unresolved_edge() {
+            return Err(ERR_TENSOR_COALESCE_REQUIRES_OPTIONAL);
+        }
+        let mut values = Vec::with_capacity(self.element_count());
+        for ordinal in 0..self.element_count() {
+            let index = unravel_index(ordinal, &self.shape);
+            values.push(
+                self.read_logical_index(&index)?
+                    .unwrap_or_else(|| fallback.clone()),
+            );
+        }
+        Ok(Self::from_contiguous(values, self.shape.clone()))
     }
 
     /// Transpose the trailing two axes as a zero-copy view.
     ///
     /// # Errors
     ///
-    /// Returns `Err` if the tensor rank is outside 2–4.
+    /// Returns `Err` if the tensor rank is less than 2.
     pub fn transpose_rank2(&self) -> Result<Self, &'static str> {
-        if !(2..=4).contains(&self.shape.len()) {
+        if self.shape.len() < 2 {
             return Err(ERR_TRANSPOSE_RANK);
         }
         let mut shape = self.shape.clone();
@@ -386,12 +700,16 @@ impl<T: Clone + Default> Tensor<T> {
         let last_axis = shape.len() - 1;
         shape.swap(last_axis - 1, last_axis);
         strides.swap(last_axis - 1, last_axis);
-        Ok(Self {
-            data: Arc::clone(&self.data),
+        let logical_view = self.append_view_layer(TensorViewLayer::TransposeTrailingAxes {
+            input_shape: self.shape.clone(),
+        });
+        Ok(Self::view(
+            Arc::clone(&self.data),
             shape,
             strides,
-            offset: self.offset,
-        })
+            self.offset,
+            logical_view,
+        ))
     }
 
     /// Materialized axis permutation. The result is a copy with row-major strides.
@@ -412,7 +730,10 @@ impl<T: Clone + Default> Tensor<T> {
             for (output_axis, &input_axis) in axes.iter().enumerate() {
                 input_index[input_axis] = output_index[output_axis];
             }
-            data.push(self.value_at_logical(&input_index));
+            data.push(
+                self.read_logical_index(&input_index)?
+                    .ok_or(ERR_TENSOR_EDGE_UNRESOLVED_READ)?,
+            );
         }
         Ok(Self::from_contiguous(data, shape))
     }
@@ -423,45 +744,236 @@ impl<T: Clone + Default> Tensor<T> {
             strides: row_major_strides(&shape),
             shape,
             offset: 0,
+            logical_view: None,
+        }
+    }
+
+    fn view(
+        data: Arc<Mutex<Vec<T>>>,
+        shape: Vec<usize>,
+        strides: Vec<usize>,
+        offset: usize,
+        logical_view: Option<TensorLogicalView<TensorEdgePolicy<T>>>,
+    ) -> Self {
+        Self {
+            data,
+            shape,
+            strides,
+            offset,
+            logical_view,
+        }
+    }
+
+    fn append_view_layer(
+        &self,
+        layer: TensorViewLayer<TensorEdgePolicy<T>>,
+    ) -> Option<TensorLogicalView<TensorEdgePolicy<T>>> {
+        let mut logical_view = self.logical_view.clone()?;
+        logical_view.layers.push(layer);
+        Some(logical_view)
+    }
+
+    fn has_unresolved_edge(&self) -> bool {
+        self.logical_view.as_ref().is_some_and(|view| {
+            view.layers.iter().any(|layer| {
+                matches!(
+                    layer,
+                    TensorViewLayer::Shift {
+                        descriptor: TensorEdgeDescriptor {
+                            resolution: TensorEdgeResolution::Optional,
+                            ..
+                        },
+                        ..
+                    }
+                )
+            })
+        })
+    }
+
+    fn read_logical_index(&self, index: &[usize]) -> Result<Option<T>, &'static str> {
+        if !index_is_in_bounds(index, &self.shape) {
+            return Ok(None);
+        }
+        let Some(logical_view) = &self.logical_view else {
+            let Some(offset) = self.offset_for_index(index) else {
+                return Ok(None);
+            };
+            return Ok(tensor_data(&self.data).get(offset).cloned());
+        };
+        self.read_through_layers(logical_view, logical_view.layers.len(), index)
+    }
+
+    fn read_through_layers(
+        &self,
+        logical_view: &TensorLogicalView<TensorEdgePolicy<T>>,
+        layer_count: usize,
+        index: &[usize],
+    ) -> Result<Option<T>, &'static str> {
+        if layer_count == 0 {
+            if !index_is_in_bounds(index, &logical_view.base_shape) {
+                return Ok(None);
+            }
+            return self.base_value_at(logical_view, index).map(Some);
+        }
+
+        match &logical_view.layers[layer_count - 1] {
+            TensorViewLayer::Shift { shape, descriptor } => {
+                self.read_shift_layer(logical_view, layer_count - 1, index, shape, descriptor)
+            }
+            TensorViewLayer::Reshape {
+                input_shape,
+                output_shape,
+            } => {
+                if !index_is_in_bounds(index, output_shape) {
+                    return Ok(None);
+                }
+                let ordinal =
+                    row_major_ordinal(index, output_shape).ok_or(ERR_ELEMENT_COUNT_OVERFLOW)?;
+                let input_index = unravel_index(ordinal, input_shape);
+                self.read_through_layers(logical_view, layer_count - 1, &input_index)
+            }
+            TensorViewLayer::SliceAxisZero {
+                input_shape,
+                start,
+                step,
+            } => {
+                if index.len() != input_shape.len() {
+                    return Ok(None);
+                }
+                let mut input_index = index.to_vec();
+                let Some(first) = input_index.first_mut() else {
+                    return Ok(None);
+                };
+                *first = start
+                    .checked_add(first.checked_mul(*step).ok_or(ERR_ELEMENT_COUNT_OVERFLOW)?)
+                    .ok_or(ERR_ELEMENT_COUNT_OVERFLOW)?;
+                self.read_through_layers(logical_view, layer_count - 1, &input_index)
+            }
+            TensorViewLayer::TransposeTrailingAxes { input_shape } => {
+                if index.len() != input_shape.len() || input_shape.len() < 2 {
+                    return Ok(None);
+                }
+                let mut input_index = index.to_vec();
+                let last = input_index.len() - 1;
+                input_index.swap(last - 1, last);
+                self.read_through_layers(logical_view, layer_count - 1, &input_index)
+            }
+            TensorViewLayer::Expanded {
+                input_shape,
+                target_to_source,
+            } => {
+                if index.len() != target_to_source.len() {
+                    return Ok(None);
+                }
+                let mut input_index = vec![0; input_shape.len()];
+                for (target_axis, source_axis) in target_to_source.iter().enumerate() {
+                    if let Some(source_axis) = source_axis {
+                        input_index[*source_axis] = if input_shape[*source_axis] == 1 {
+                            0
+                        } else {
+                            index[target_axis]
+                        };
+                    }
+                }
+                self.read_through_layers(logical_view, layer_count - 1, &input_index)
+            }
+        }
+    }
+
+    fn read_shift_layer(
+        &self,
+        logical_view: &TensorLogicalView<TensorEdgePolicy<T>>,
+        prior_layer_count: usize,
+        index: &[usize],
+        shape: &[usize],
+        descriptor: &TensorEdgeDescriptor<TensorEdgePolicy<T>>,
+    ) -> Result<Option<T>, &'static str> {
+        let coordinate: Vec<i128> = index
+            .iter()
+            .map(|&value| i128::try_from(value).map_err(|_| ERR_ELEMENT_COUNT_OVERFLOW))
+            .collect::<Result<_, _>>()?;
+        match &descriptor.resolution {
+            TensorEdgeResolution::Optional => {
+                let Some(mapped) = resolve_optional(&coordinate, &descriptor.shift, shape) else {
+                    return Ok(None);
+                };
+                self.read_through_layers(logical_view, prior_layer_count, &mapped)
+            }
+            TensorEdgeResolution::Builtin(policy) => {
+                let Some(mapped) = resolve_builtin(*policy, &coordinate, &descriptor.shift, shape)
+                else {
+                    return Ok(None);
+                };
+                self.read_through_layers(logical_view, prior_layer_count, &mapped)
+            }
+            TensorEdgeResolution::Custom(TensorEdgePolicy::Custom { remap, transform }) => {
+                resolve_custom_value(
+                    &coordinate,
+                    &descriptor.shift,
+                    shape,
+                    *remap,
+                    |mapped| {
+                        self.read_through_layers(logical_view, prior_layer_count, mapped)?
+                            .ok_or(ERR_TENSOR_EDGE_UNRESOLVED_READ)
+                    },
+                    |coordinate, value| match *transform {
+                        Some(apply) => apply(coordinate, value),
+                        None => value,
+                    },
+                )
+                .map(Some)
+                .map_err(map_custom_edge_error)
+            }
+            TensorEdgeResolution::Custom(_) => Err(ERR_TENSOR_EDGE_POLICY_INVALID),
         }
     }
 
     fn offset_for_index(&self, index: &[usize]) -> Option<usize> {
-        if index.len() != self.shape.len() {
-            return None;
-        }
-        let mut offset = self.offset;
-        for ((idx, dim), stride) in index.iter().zip(self.shape.iter()).zip(self.strides.iter()) {
-            if idx >= dim {
-                return None;
-            }
-            offset = offset.checked_add(idx.checked_mul(*stride)?)?;
-        }
-        Some(offset)
+        offset_for_layout(index, &self.shape, &self.strides, self.offset)
     }
 
-    fn logical_offsets(&self) -> Vec<usize> {
+    fn logical_offsets(&self) -> Result<Vec<usize>, &'static str> {
         let count = self.element_count();
         (0..count)
             .map(|ordinal| {
                 let index = unravel_index(ordinal, &self.shape);
-                self.logical_offset_for_index(&index)
+                self.offset_for_index(&index).ok_or(ERR_INDEX_OUT_OF_BOUNDS)
             })
             .collect()
     }
 
-    fn value_at_logical(&self, index: &[usize]) -> T {
-        let offset = self.logical_offset_for_index(index);
-        tensor_data(&self.data)[offset].clone()
+    fn value_at_logical(&self, index: &[usize]) -> Result<T, &'static str> {
+        self.read_logical_index(index)?
+            .ok_or(ERR_TENSOR_EDGE_UNRESOLVED_READ)
     }
 
-    fn logical_offset_for_index(&self, index: &[usize]) -> usize {
-        self.offset
-            + index
-                .iter()
-                .zip(self.strides.iter())
-                .map(|(idx, stride)| idx * stride)
-                .sum::<usize>()
+    fn base_value_at(
+        &self,
+        logical_view: &TensorLogicalView<TensorEdgePolicy<T>>,
+        index: &[usize],
+    ) -> Result<T, &'static str> {
+        let offset = offset_for_layout(
+            index,
+            &logical_view.base_shape,
+            &logical_view.base_strides,
+            logical_view.base_offset,
+        )
+        .ok_or(ERR_INDEX_OUT_OF_BOUNDS)?;
+        tensor_data(&self.data)
+            .get(offset)
+            .cloned()
+            .ok_or(ERR_INDEX_OUT_OF_BOUNDS)
+    }
+}
+
+fn map_custom_edge_error(error: CustomEdgeValueError<&'static str>) -> &'static str {
+    match error {
+        CustomEdgeValueError::Policy(
+            CustomEdgePolicyError::CoordinateRankMismatch
+            | CustomEdgePolicyError::MappedCoordinateRankMismatch,
+        ) => ERR_TENSOR_EDGE_RANK_MISMATCH,
+        CustomEdgeValueError::Policy(_) => ERR_TENSOR_EDGE_POLICY_INVALID,
+        CustomEdgeValueError::Read(error) => error,
     }
 }
 
@@ -576,11 +1088,11 @@ fn reshape_view_strides(
     Some(target_strides)
 }
 
-fn expanded_view_strides(
+fn expanded_view_layout(
     source_shape: &[usize],
     source_strides: &[usize],
     target_shape: &[usize],
-) -> Result<Vec<usize>, &'static str> {
+) -> Result<(Vec<usize>, Vec<Option<usize>>), &'static str> {
     const IMPOSSIBLE: usize = usize::MAX;
 
     let source_rank = source_shape.len();
@@ -640,12 +1152,56 @@ fn expanded_view_strides(
     }
 
     let mut target_strides = vec![0; target_rank];
+    let mut target_to_source = vec![None; target_rank];
     for (source_axis, &target_axis) in source_to_target.iter().enumerate() {
+        target_to_source[target_axis] = Some(source_axis);
         if source_shape[source_axis] == target_shape[target_axis] {
             target_strides[target_axis] = source_strides[source_axis];
         }
     }
-    Ok(target_strides)
+    Ok((target_strides, target_to_source))
+}
+
+fn index_is_in_bounds(index: &[usize], shape: &[usize]) -> bool {
+    index.len() == shape.len()
+        && index
+            .iter()
+            .zip(shape)
+            .all(|(index, extent)| index < extent)
+}
+
+fn offset_for_layout(
+    index: &[usize],
+    shape: &[usize],
+    strides: &[usize],
+    base_offset: usize,
+) -> Option<usize> {
+    if index.len() != shape.len() || shape.len() != strides.len() {
+        return None;
+    }
+    let mut offset = base_offset;
+    for ((index, extent), stride) in index.iter().zip(shape).zip(strides) {
+        if index >= extent {
+            return None;
+        }
+        offset = offset.checked_add(index.checked_mul(*stride)?)?;
+    }
+    Some(offset)
+}
+
+fn row_major_ordinal(index: &[usize], shape: &[usize]) -> Option<usize> {
+    if index.len() != shape.len() {
+        return None;
+    }
+    index
+        .iter()
+        .zip(shape)
+        .try_fold(0_usize, |ordinal, (&index, &extent)| {
+            if index >= extent {
+                return None;
+            }
+            ordinal.checked_mul(extent)?.checked_add(index)
+        })
 }
 
 fn unravel_index(mut ordinal: usize, shape: &[usize]) -> Vec<usize> {
@@ -735,8 +1291,8 @@ where
         let lhs_index = broadcast_index(&index, &lhs.shape);
         let rhs_index = broadcast_index(&index, &rhs.shape);
         data.push(op(
-            lhs.value_at_logical(&lhs_index),
-            rhs.value_at_logical(&rhs_index),
+            lhs.value_at_logical(&lhs_index)?,
+            rhs.value_at_logical(&rhs_index)?,
         ));
     }
     Ok(Tensor::from_contiguous(data, shape))
@@ -760,11 +1316,16 @@ where
 
     /// Sum of all elements. Integer overflow is the author's responsibility
     /// (per the tensor arithmetic goal non-goals); widen with `↦` first if needed.
-    #[must_use]
-    pub fn summa(&self) -> T {
-        self.planata()
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a logical read is unresolved or a custom edge
+    /// policy produces an invalid coordinate.
+    pub fn summa(&self) -> Result<T, &'static str> {
+        Ok(self
+            .planata()?
             .into_iter()
-            .fold(T::default(), |acc, value| acc + value)
+            .fold(T::default(), |acc, value| acc + value))
     }
 }
 
@@ -800,12 +1361,16 @@ where
 
 impl Tensor<f32> {
     /// Elementwise negation preserving tensor shape.
-    #[must_use]
-    pub fn neg(&self) -> Tensor<f32> {
-        Tensor::from_contiguous(
-            self.planata().into_iter().map(|value| -value).collect(),
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a logical read is unresolved or a custom edge
+    /// policy produces an invalid coordinate.
+    pub fn neg(&self) -> Result<Tensor<f32>, &'static str> {
+        Ok(Tensor::from_contiguous(
+            self.planata()?.into_iter().map(|value| -value).collect(),
             self.shape.clone(),
-        )
+        ))
     }
 
     /// Elementwise rectified linear unit: max(0, x).
@@ -817,16 +1382,14 @@ impl Tensor<f32> {
     ///
     /// Returns `Err` if any element is NaN or infinite.
     pub fn relu(&self) -> Result<Tensor<f32>, &'static str> {
-        for &value in &self.planata() {
+        let flat = self.planata()?;
+        for &value in &flat {
             if !value.is_finite() {
                 return Err(ERR_RELU_NON_FINITE_INPUT);
             }
         }
         Ok(Tensor::from_contiguous(
-            self.planata()
-                .into_iter()
-                .map(|value| value.max(0.0))
-                .collect(),
+            flat.into_iter().map(|value| value.max(0.0)).collect(),
             self.shape.clone(),
         ))
     }
@@ -841,7 +1404,8 @@ impl Tensor<f32> {
     ///
     /// Returns `Err` if any element is NaN, infinite, or negative.
     pub fn sqrt(&self) -> Result<Tensor<f32>, &'static str> {
-        for &value in &self.planata() {
+        let flat = self.planata()?;
+        for &value in &flat {
             if !value.is_finite() {
                 return Err(ERR_SQRT_NON_FINITE_INPUT);
             }
@@ -850,7 +1414,7 @@ impl Tensor<f32> {
             }
         }
         Ok(Tensor::from_contiguous(
-            self.planata().into_iter().map(f32::sqrt).collect(),
+            flat.into_iter().map(f32::sqrt).collect(),
             self.shape.clone(),
         ))
     }
@@ -866,7 +1430,8 @@ impl Tensor<f32> {
     ///
     /// Returns `Err` if any element is NaN or infinite.
     pub fn gelu(&self) -> Result<Tensor<f32>, &'static str> {
-        for &value in &self.planata() {
+        let flat = self.planata()?;
+        for &value in &flat {
             if !value.is_finite() {
                 return Err(ERR_GELU_NON_FINITE_INPUT);
             }
@@ -874,8 +1439,7 @@ impl Tensor<f32> {
         let alpha = (2.0 / std::f32::consts::PI).sqrt();
         let beta = 0.044_715;
         Ok(Tensor::from_contiguous(
-            self.planata()
-                .into_iter()
+            flat.into_iter()
                 .map(|x| {
                     let cube = x * x * x;
                     0.5 * x * (1.0 + (alpha * (x + beta * cube)).tanh())
@@ -895,13 +1459,14 @@ impl Tensor<f32> {
     /// Returns `Err` if any input element is NaN or infinite, or if any
     /// result overflows to a non-finite value.
     pub fn exp(&self) -> Result<Tensor<f32>, &'static str> {
-        for &value in &self.planata() {
+        let flat = self.planata()?;
+        for &value in &flat {
             if !value.is_finite() {
                 return Err(ERR_EXP_NON_FINITE_INPUT);
             }
         }
         let mut data = Vec::with_capacity(self.element_count());
-        for &value in &self.planata() {
+        for value in flat {
             let result = value.exp();
             if !result.is_finite() {
                 return Err(ERR_EXP_OVERFLOW);
@@ -921,7 +1486,8 @@ impl Tensor<f32> {
     /// Returns `Err` if any input element is NaN, infinite, or zero/negative,
     /// or if any result is non-finite.
     pub fn log(&self) -> Result<Tensor<f32>, &'static str> {
-        for &value in &self.planata() {
+        let flat = self.planata()?;
+        for &value in &flat {
             if !value.is_finite() {
                 return Err(ERR_LOG_NON_FINITE_INPUT);
             }
@@ -930,7 +1496,7 @@ impl Tensor<f32> {
             }
         }
         let mut data = Vec::with_capacity(self.element_count());
-        for &value in &self.planata() {
+        for value in flat {
             let result = value.ln();
             if !result.is_finite() {
                 return Err(ERR_LOG_NON_FINITE_RESULT);
@@ -958,7 +1524,7 @@ impl Tensor<f32> {
         }
         // Materialize once; the flat buffer feeds both the domain check and
         // every batch slice below.
-        let flat = self.planata();
+        let flat = self.planata()?;
         for &value in &flat {
             if !value.is_finite() {
                 return Err(ERR_SOFTMAX_NON_FINITE_INPUT);
@@ -1012,12 +1578,14 @@ impl Tensor<f32> {
         if self.element_count() == 0 {
             return Err(ERR_CRUX_ENTROPIA_EMPTY_TENSOR);
         }
-        for &value in &self.planata() {
+        let logits_data = self.planata()?;
+        let targets_data = targets.planata()?;
+        for &value in &logits_data {
             if !value.is_finite() {
                 return Err(ERR_CRUX_ENTROPIA_NON_FINITE_INPUT);
             }
         }
-        for &value in &targets.planata() {
+        for &value in &targets_data {
             if !value.is_finite() {
                 return Err(ERR_CRUX_ENTROPIA_TARGET_NON_FINITE);
             }
@@ -1041,8 +1609,7 @@ impl Tensor<f32> {
         let last_dim = self.shape[rank - 1] as f32;
 
         let mut sum = 0.0_f32;
-        let softmax_data = softmax.planata();
-        let targets_data = targets.planata();
+        let softmax_data = softmax.planata()?;
         for (s, &t) in softmax_data.iter().zip(targets_data.iter()) {
             sum -= t * (s + eps).ln();
         }
@@ -1053,15 +1620,19 @@ impl Tensor<f32> {
     }
 
     /// Elementwise scalar multiplication preserving tensor shape.
-    #[must_use]
-    pub fn scala(&self, factor: f32) -> Tensor<f32> {
-        Tensor::from_contiguous(
-            self.planata()
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a logical read is unresolved or a custom edge
+    /// policy produces an invalid coordinate.
+    pub fn scala(&self, factor: f32) -> Result<Tensor<f32>, &'static str> {
+        Ok(Tensor::from_contiguous(
+            self.planata()?
                 .into_iter()
                 .map(|value| value * factor)
                 .collect(),
             self.shape.clone(),
-        )
+        ))
     }
 
     /// Elementwise checked division after NumPy-style broadcast unification.
@@ -1080,8 +1651,8 @@ impl Tensor<f32> {
             let lhs_index = broadcast_index(&index, &self.shape);
             let rhs_index = broadcast_index(&index, &other.shape);
             data.push(checked_divide_f32(
-                self.value_at_logical(&lhs_index),
-                other.value_at_logical(&rhs_index),
+                self.value_at_logical(&lhs_index)?,
+                other.value_at_logical(&rhs_index)?,
             )?);
         }
         Ok(Tensor::from_contiguous(data, shape))
@@ -1095,7 +1666,7 @@ impl Tensor<f32> {
     /// produces a non-finite result.
     pub fn reciproca(&self) -> Result<Tensor<f32>, &'static str> {
         let data = self
-            .planata()
+            .planata()?
             .into_iter()
             .map(|value| checked_divide_f32(1.0, value))
             .collect::<Result<Vec<_>, _>>()?;
@@ -1114,7 +1685,7 @@ impl Tensor<f32> {
         }
         // SAFETY: intentional f32 mean; precision loss acceptable for large element counts.
         #[allow(clippy::cast_precision_loss)]
-        Ok(self.summa() / count as f32)
+        Ok(self.summa()? / count as f32)
     }
 
     /// Layer normalization over a specified axis.
@@ -1156,7 +1727,7 @@ impl Tensor<f32> {
             return Err(ERR_LAYERNORM_AXIS_OUT_OF_RANGE);
         }
 
-        let input_data = self.planata();
+        let input_data = self.planata()?;
         for &value in &input_data {
             if !value.is_finite() {
                 return Err(ERR_LAYERNORM_NON_FINITE_INPUT);
@@ -1165,7 +1736,7 @@ impl Tensor<f32> {
 
         // Validate gamma
         if let Some(g) = gamma {
-            let g_data = g.planata();
+            let g_data = g.planata()?;
             if g.shape.len() != 1 || g.shape[0] != self.shape[axis_usize] {
                 return Err(ERR_LAYERNORM_GAMMA_SHAPE_MISMATCH);
             }
@@ -1178,7 +1749,7 @@ impl Tensor<f32> {
 
         // Validate beta
         if let Some(b) = beta {
-            let b_data = b.planata();
+            let b_data = b.planata()?;
             if b.shape.len() != 1 || b.shape[0] != self.shape[axis_usize] {
                 return Err(ERR_LAYERNORM_BETA_SHAPE_MISMATCH);
             }
@@ -1189,8 +1760,8 @@ impl Tensor<f32> {
             }
         }
 
-        let gamma_data = gamma.map(Tensor::planata);
-        let beta_data = beta.map(Tensor::planata);
+        let gamma_data = gamma.map(Tensor::planata).transpose()?;
+        let beta_data = beta.map(Tensor::planata).transpose()?;
         if rank == 1 {
             Ok(layernorm_rank1(
                 &input_data,
@@ -1356,7 +1927,7 @@ where
             for row in 0..rows {
                 let mut acc = T::default();
                 for k in 0..inner {
-                    acc = acc + self.value_at_logical(&[row, k]) * other.value_at_logical(&[k]);
+                    acc = acc + self.value_at_logical(&[row, k])? * other.value_at_logical(&[k])?;
                 }
                 result.push(acc);
             }
@@ -1417,8 +1988,8 @@ where
                         lhs_index[receiver_batch_rank + 1] = k;
                         rhs_index[argument_batch_rank] = k;
                         acc = acc
-                            + self.value_at_logical(&lhs_index)
-                                * other.value_at_logical(&rhs_index);
+                            + self.value_at_logical(&lhs_index)?
+                                * other.value_at_logical(&rhs_index)?;
                     }
                     result.push(acc);
                 }

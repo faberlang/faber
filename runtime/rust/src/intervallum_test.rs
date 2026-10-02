@@ -90,7 +90,7 @@ fn ad_tensor_materializes_one_dimensional_half_open() {
     let range = Intervallum::exclusive(0, 3);
     let tensor: Tensor<i64> = range.ad_tensor();
     assert_eq!(tensor.magnitudines(), vec![3]);
-    assert_eq!(tensor.planata(), vec![0, 1, 2]);
+    assert_eq!(tensor.planata().unwrap(), vec![0, 1, 2]);
 }
 
 #[test]
@@ -329,7 +329,7 @@ fn ad_tensor_descending_preserves_order() {
     let range = Intervallum::exclusive(5, 0);
     let tensor: Tensor<i64> = range.ad_tensor();
     assert_eq!(tensor.magnitudines(), vec![5]);
-    assert_eq!(tensor.planata(), vec![5, 4, 3, 2, 1]);
+    assert_eq!(tensor.planata().unwrap(), vec![5, 4, 3, 2, 1]);
 }
 
 // ===========================================================================
@@ -428,7 +428,7 @@ fn i16_coercere_exclusive() {
 fn i16_ad_tensor() {
     let r = Intervallum::exclusive(0_i16, 4);
     let t: Tensor<i16> = r.ad_tensor();
-    assert_eq!(t.planata(), vec![0, 1, 2, 3]);
+    assert_eq!(t.planata().unwrap(), vec![0, 1, 2, 3]);
 }
 
 #[test]
@@ -593,7 +593,7 @@ fn u64_coercere() {
 fn u64_ad_tensor() {
     let r = Intervallum::exclusive(0_u64, 4);
     let t: Tensor<u64> = r.ad_tensor();
-    assert_eq!(t.planata(), vec![0, 1, 2, 3]);
+    assert_eq!(t.planata().unwrap(), vec![0, 1, 2, 3]);
 }
 
 // ===========================================================================

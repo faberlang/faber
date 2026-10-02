@@ -25,6 +25,7 @@ pub mod queue_stack;
 pub mod regex;
 pub mod sparsa;
 pub mod tensor;
+mod tensor_edge;
 pub mod textus;
 pub mod textus_bounded;
 pub mod valor;
@@ -57,7 +58,7 @@ pub use queue_stack::{Queue, QueueN, QueueStackError, QueueStackOverflow, Stack,
 #[cfg(feature = "regex")]
 pub use regex::Regex;
 pub use sparsa::Sparsa;
-pub use tensor::Tensor;
+pub use tensor::{Tensor, TensorEdgePolicy};
 pub use textus::unicode_scalar_value;
 pub use textus_bounded::{TextusN, TextusNOverflow};
 pub use valor::{FromValor, Valor};
