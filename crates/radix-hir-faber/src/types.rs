@@ -478,6 +478,14 @@ impl super::FaberCodegen<'_> {
                     width.faber_marker()
                 ))
             }
+            Type::PolicyFloat(policy, width) => {
+                Self::expect_no_form_args(form)?;
+                Ok(format!(
+                    "{}<{}>",
+                    surface.type_surface(policy_word_binding(*policy)),
+                    width.faber_marker()
+                ))
+            }
             _ => Err(malformed_type_form(
                 "authored POLICY level is illegal for this constructor".to_owned(),
             )),
