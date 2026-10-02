@@ -153,3 +153,27 @@ fn llvm_copy_param_clones_the_lista() {
         "copy parameter entry must clone the lista:\n{code}"
     );
 }
+
+const COPY_TENSOR: &str = r#"+++
+locale = "en"
++++
+main {
+    const tf32[] seed ← empty
+    var tf32[4] a ← seed.create(1.5, [4])
+    var copy tf32[4] w ← a
+    w[0] ← 9.0
+    const tf32[4] s ← w + a
+    print s[0]
+    print s[1]
+    print a[0]
+    print w[0]
+}
+"#;
+
+/// A `copy`-marked tensor keeps element write and tensor arithmetic: the
+/// marker is a binding fact, not a different carrier, and the copy stays
+/// independent of its source.
+#[test]
+fn copy_tensor_keeps_element_write_and_arithmetic() {
+    assert_eq!(run("copy-tensor.fab", COPY_TENSOR), vec!["10.5", "3.0", "1.5", "9.0"]);
+}

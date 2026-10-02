@@ -3614,7 +3614,10 @@ impl<'a> FunctionBuilder<'a> {
             return false;
         };
         matches!(
-            (self.normalized_type(lhs_ty), self.normalized_type(rhs_ty)),
+            (
+                self.normalized_type(self.types.peel_access_marker(lhs_ty).1),
+                self.normalized_type(self.types.peel_access_marker(rhs_ty).1)
+            ),
             (Type::Tensor(_, _), Type::Tensor(_, _))
                 | (Type::Vector(_, _), Type::Vector(_, _))
                 | (Type::Matrix(_, _), Type::Matrix(_, _))

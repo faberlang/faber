@@ -13,14 +13,14 @@ pub const TENSOR_SCALAR_INDEX_RANK_MSG: &str =
 pub const TENSOR_BRACKET_INDEX_MSG: &str =
     "tensor bracket index requires an integer or lista<integer>";
 
-/// Whether `ty` is a tensor type (including through type aliases).
+/// Whether `ty` is a tensor type (including through type aliases and an access
+/// marker: `copy`, `own`, `ref` and `mut` are binding facts, not a carrier).
 #[must_use]
 pub fn is_tensor_type(types: &TypeTable, ty: TypeId) -> bool {
-    match types.get(ty) {
-        Type::Tensor(_, _) => true,
-        Type::Alias(_, inner) => is_tensor_type(types, *inner),
-        _ => false,
-    }
+    matches!(
+        types.get(types.peel_access_marker(ty).1),
+        Type::Tensor(_, _)
+    )
 }
 
 /// Whether `ty` is a list-shaped bracket index (`lista<…>`).

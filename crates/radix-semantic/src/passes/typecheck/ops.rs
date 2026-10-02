@@ -1799,6 +1799,11 @@ impl TypeChecker<'_> {
     ) -> Option<TypeId> {
         let lhs_resolved = self.resolve_inferred_type(lhs);
         let rhs_resolved = self.resolve_inferred_type(rhs);
+        // An access marker (`copy`, `own`, `ref`, `mut`) is a binding fact, not
+        // part of the operand's carrier: peel it so a marked tensor adds like an
+        // unmarked one.
+        let lhs_resolved = self.types.peel_access_marker(lhs_resolved).1;
+        let rhs_resolved = self.types.peel_access_marker(rhs_resolved).1;
         match (
             self.types.get(lhs_resolved).clone(),
             self.types.get(rhs_resolved).clone(),

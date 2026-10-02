@@ -1037,7 +1037,12 @@ impl TypeChecker<'_> {
             Some(ty) => ty,
             None => self.check_expr_allowing_direct_intervallum_step(index),
         };
-        let resolved = self.resolve_inferred_type(obj_ty);
+        // The access marker (`copy`, `own`, ...) is a binding fact: peel it so
+        // a marked tensor takes the same element write as an unmarked one.
+        let resolved = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(obj_ty))
+            .1;
         if let Type::Tensor(elem, shape) = self.types.get(resolved).clone() {
             self.check_tensor_bracket_index(elem, shape, idx_ty, object.span, index.span);
             super::tensor_index::reject_static_bounded_index_oob(self, obj_ty, index);
