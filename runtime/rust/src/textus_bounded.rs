@@ -196,7 +196,7 @@ impl<const N: usize> TryFrom<&String> for TextusN<N> {
 
 impl<const N: usize> std::fmt::Display for TextusN<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(crate::display_text_payload(&self.to_textus()))
+        f.write_str(crate::display::text_payload(&self.to_textus()))
     }
 }
 

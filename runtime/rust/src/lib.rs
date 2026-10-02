@@ -13,7 +13,9 @@ pub mod dec;
 pub mod display;
 pub mod exact;
 pub mod failable;
+pub mod format;
 pub mod frame;
+pub mod inf;
 pub mod instans;
 pub mod intervallum;
 pub mod json;
@@ -34,10 +36,13 @@ pub use arena::{Arena, ArenaHandle};
 pub use ascii::Ascii;
 pub use ascii_bounded::{AsciiN, AsciiNOverflow};
 pub use cursor_stream::{CursorStreamSink, materialize_cursor_stream};
+pub use display::FractusDisplay;
+// Transitional root spellings for `hosts/llvm`, which still imports them; they go
+// when that crate migrates to `faber::display::*` (T1-R5 follow-up).
 pub use display::{
-    FractusDisplay, display_bivalens, display_fractus, display_option, display_option_bivalens,
-    display_option_fractus, display_option_vacuum, display_text_payload, display_valor,
+    bivalens as display_bivalens, fractus as display_fractus, valor as display_valor,
 };
+pub use format::Fmt;
 pub use frame::{
     AnsweringTier, Cancellation, DispatchError, FrameStatus, HostDispatch, IntoFrameStatus,
     IntoScrinium, Meus, ResponseSender, Scrinium, Sermo, SermoRequest, StaticRoute, Tuus,
