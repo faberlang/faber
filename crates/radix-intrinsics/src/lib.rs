@@ -211,6 +211,7 @@ pub fn receivers_for_type(ty: &Type) -> &'static [IntrinsicReceiver] {
         // not just the registry row lookup.
         Type::BoundedAscii { .. } => &[IntrinsicReceiver::Ascii, IntrinsicReceiver::Textus],
         Type::Primitive(Primitive::Regex) => &[IntrinsicReceiver::Regex],
+        Type::Primitive(Primitive::Match) => &[IntrinsicReceiver::Match],
         Type::Primitive(Primitive::Numerus) => &[IntrinsicReceiver::Numeric],
         Type::Primitive(Primitive::Fractus) => {
             &[IntrinsicReceiver::Fractus, IntrinsicReceiver::Numeric]

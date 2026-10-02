@@ -246,6 +246,7 @@ fn value_to_toml(value: &Value, span: Span) -> Result<toml::Value, RunnerError> 
         | Value::ClosureEnvironment(_, _)
         | Value::SharedCell(_)
         | Value::Regex(_)
+        | Value::Match(_)
         | Value::Sermo(_)
         | Value::Set(_)
         | Value::EnumVariant(_, _)

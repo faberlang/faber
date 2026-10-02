@@ -636,6 +636,7 @@ fn layout_kind_for_type(
             | Primitive::Ignotum
             | Primitive::Octeti
             | Primitive::Regex
+            | Primitive::Match
             | Primitive::Json
             | Primitive::Valor
             | Primitive::Instans,

@@ -192,6 +192,7 @@ fn loader_type_table_caches_rebuilt() {
         radix_types::Primitive::Ignotum,
         radix_types::Primitive::Octeti,
         radix_types::Primitive::Regex,
+        radix_types::Primitive::Match,
         radix_types::Primitive::Json,
         radix_types::Primitive::Valor,
         radix_types::Primitive::Ascii,

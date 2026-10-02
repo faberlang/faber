@@ -49,6 +49,56 @@ fn regex_consentit_resolves_on_regex_receiver() {
 }
 
 #[test]
+fn regex_find_and_match_accessors_resolve() {
+    let types = TypeTable::new();
+    let regex = types.get(types.primitive(Primitive::Regex));
+    let found = types.get(types.primitive(Primitive::Match));
+
+    let find = lookup_method_for_type(regex, "inventa", 1).expect("regex inventa");
+    assert_eq!(find.return_kind, super::IntrinsicReturnKind::OptionMatch);
+    assert_eq!(mir_collection_op(find), Some(MirCollectionOp::RegexFind));
+
+    let find_all = lookup_method_for_type(regex, "collecta", 1).expect("regex collecta");
+    assert_eq!(find_all.return_kind, super::IntrinsicReturnKind::MatchArray);
+    assert_eq!(mir_collection_op(find_all), Some(MirCollectionOp::RegexFindAll));
+
+    let split = lookup_method_for_type(regex, "divide", 1).expect("regex divide");
+    assert_eq!(split.receiver, IntrinsicReceiver::Regex);
+    assert_eq!(split.return_kind, super::IntrinsicReturnKind::TextusArray);
+    assert_eq!(mir_collection_op(split), Some(MirCollectionOp::RegexSplit));
+
+    assert_eq!(receivers_for_type(found), &[IntrinsicReceiver::Match]);
+    let accessors = [
+        ("inventum", 0, super::IntrinsicReturnKind::Textus, MirCollectionOp::MatchText),
+        (
+            "principium",
+            0,
+            super::IntrinsicReturnKind::Numerus,
+            MirCollectionOp::MatchStart,
+        ),
+        ("terminus", 0, super::IntrinsicReturnKind::Numerus, MirCollectionOp::MatchEnd),
+        (
+            "coetus",
+            1,
+            super::IntrinsicReturnKind::OptionTextus,
+            MirCollectionOp::MatchGroup,
+        ),
+        (
+            "nominatus",
+            1,
+            super::IntrinsicReturnKind::OptionTextus,
+            MirCollectionOp::MatchNamed,
+        ),
+    ];
+    for (name, arity, return_kind, op) in accessors {
+        let row = lookup_method_for_type(found, name, arity).expect("match accessor");
+        assert_eq!(row.receiver, IntrinsicReceiver::Match);
+        assert_eq!(row.return_kind, return_kind);
+        assert_eq!(mir_collection_op(row), Some(op));
+    }
+}
+
+#[test]
 fn tabula_claves_is_registered_as_keys() {
     let mut types = TypeTable::new();
     let map = types.map(types.primitive(Primitive::Textus), types.primitive(Primitive::Numerus));
@@ -363,4 +413,28 @@ fn cci1_additive_rows_preserve_existing_tensor_rows() {
 
     let activatio_softmax = lookup_method_for_type(tensor_ty, "activatio_softmax", 0).expect("tensor softmax");
     assert_eq!(mir_collection_op(activatio_softmax), Some(MirCollectionOp::TensorSoftmax));
+}
+
+#[test]
+fn regex_replace_and_text_escape_resolve_by_receiver() {
+    let types = TypeTable::new();
+    let regex = types.get(types.primitive(Primitive::Regex));
+    let text = types.get(types.primitive(Primitive::Textus));
+
+    // `muta` is one Latin name on two receivers: the regex row replaces
+    // matches, the textus row replaces a literal substring. Receiver type picks
+    // the operation; the two never share a row.
+    let regex_replace = lookup_method_for_type(regex, "muta", 2).expect("regex muta");
+    assert_eq!(regex_replace.receiver, IntrinsicReceiver::Regex);
+    assert_eq!(regex_replace.return_kind, super::IntrinsicReturnKind::Textus);
+    assert_eq!(mir_collection_op(regex_replace), Some(MirCollectionOp::RegexReplace));
+    let text_replace = lookup_method_for_type(text, "muta", 2).expect("textus muta");
+    assert_eq!(text_replace.receiver, IntrinsicReceiver::Textus);
+    assert_eq!(mir_collection_op(text_replace), Some(MirCollectionOp::Replace));
+
+    let escape = lookup_method_for_type(text, "munita", 0).expect("textus munita");
+    assert_eq!(escape.receiver, IntrinsicReceiver::Textus);
+    assert_eq!(escape.return_kind, super::IntrinsicReturnKind::Textus);
+    assert_eq!(mir_collection_op(escape), Some(MirCollectionOp::TextEscape));
+    assert!(lookup_method_for_type(regex, "munita", 0).is_none());
 }

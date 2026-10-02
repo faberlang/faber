@@ -686,6 +686,16 @@ fn collection_op(op: MirCollectionOp) -> &'static str {
         MirCollectionOp::Keys => "keys",
         MirCollectionOp::Values => "values",
         MirCollectionOp::RegexMatches => "regex_matches",
+        MirCollectionOp::RegexFind => "regex_find",
+        MirCollectionOp::RegexFindAll => "regex_find_all",
+        MirCollectionOp::RegexSplit => "regex_split",
+        MirCollectionOp::RegexReplace => "regex_replace",
+        MirCollectionOp::TextEscape => "text_escape",
+        MirCollectionOp::MatchText => "match_text",
+        MirCollectionOp::MatchStart => "match_start",
+        MirCollectionOp::MatchEnd => "match_end",
+        MirCollectionOp::MatchGroup => "match_group",
+        MirCollectionOp::MatchNamed => "match_named",
         MirCollectionOp::CordCursor => "cord_cursor",
     }
 }

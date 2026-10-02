@@ -79,6 +79,9 @@ fn namespace_catalog_rows_are_unique_and_generic() {
 fn lookup_resolves_registered_rows() {
     assert!(lookup_method(IntrinsicReceiver::Tabula, "claves", 0).is_some());
     assert!(lookup_method(IntrinsicReceiver::Regex, "consentit", 1).is_some());
+    assert!(lookup_method(IntrinsicReceiver::Regex, "inventa", 1).is_some());
+    assert!(lookup_method(IntrinsicReceiver::Match, "inventum", 0).is_some());
+    assert!(lookup_method(IntrinsicReceiver::Match, "coetus", 1).is_some());
     assert!(
         lookup_method(IntrinsicReceiver::Tabula, "claves", 1).is_none(),
         "arity must be exact"

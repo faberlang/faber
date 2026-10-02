@@ -1019,6 +1019,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         Type::Primitive(Primitive::Instans) | Type::SizedInstans(_)
                     )
                     | (Value::Regex(_), Type::Primitive(Primitive::Regex))
+                    | (Value::Match(_), Type::Primitive(Primitive::Match))
                     | (Value::Unit, Type::Primitive(Primitive::Vacuum))
                     | (_, Type::Primitive(Primitive::Valor | Primitive::Ignotum))
             )
@@ -1431,6 +1432,19 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 };
                 Ok(Value::Bool(program.is_match(&text)))
             }
+            MirCollectionOp::RegexFind => self.eval_regex_find(args, span),
+            MirCollectionOp::RegexFindAll | MirCollectionOp::RegexSplit => {
+                self.eval_regex_bulk(op, args, span)
+            }
+            MirCollectionOp::RegexReplace => self.eval_regex_replace(args, span),
+            MirCollectionOp::TextEscape => {
+                self.map_str_arg(args, span, |text| super::regex_program::escape(&text))
+            }
+            MirCollectionOp::MatchText
+            | MirCollectionOp::MatchStart
+            | MirCollectionOp::MatchEnd
+            | MirCollectionOp::MatchGroup
+            | MirCollectionOp::MatchNamed => self.eval_match_accessor(op, args, span),
             MirCollectionOp::Split => {
                 let [receiver, delim] = args else {
                     return Err(RunnerError::internal(span, "collection split arity"));
@@ -3678,6 +3692,125 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 span,
                 "contains receiver type mismatch",
             )),
+        }
+    }
+
+    /// `regex.inventa(text)`: the leftmost-first match, or `nihil`.
+    fn eval_regex_find(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver, text] = args else {
+            return Err(RunnerError::internal(span, "regex inventa arity"));
+        };
+        let Value::Regex(program) = self.eval_operand(receiver, span)? else {
+            return Err(RunnerError::internal(span, "inventa receiver is not regex"));
+        };
+        let Value::Str(text) = self.eval_operand(text, span)? else {
+            return Err(RunnerError::internal(
+                span,
+                "inventa argument is not textus",
+            ));
+        };
+        Ok(program
+            .find(&text)
+            .map_or(Value::Nil, |found| Value::Match(Rc::new(found))))
+    }
+
+    /// `regex.collecta(text)` and `regex.divide(text)`: one pass over the text.
+    fn eval_regex_bulk(
+        &mut self,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [receiver, text] = args else {
+            return Err(RunnerError::internal(span, "regex bulk operation arity"));
+        };
+        let Value::Regex(program) = self.eval_operand(receiver, span)? else {
+            return Err(RunnerError::internal(span, "bulk receiver is not regex"));
+        };
+        let Value::Str(text) = self.eval_operand(text, span)? else {
+            return Err(RunnerError::internal(span, "bulk argument is not textus"));
+        };
+        let items = if matches!(op, MirCollectionOp::RegexFindAll) {
+            program
+                .find_all(&text)
+                .into_iter()
+                .map(|found| Value::Match(Rc::new(found)))
+                .collect()
+        } else {
+            program.split(&text).into_iter().map(Value::Str).collect()
+        };
+        Ok(Value::Array(Rc::new(RefCell::new(items))))
+    }
+
+    /// `regex.muta(text, replacement)`: every non-overlapping match replaced by
+    /// the literal replacement, in one pass.
+    fn eval_regex_replace(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [receiver, text, replacement] = args else {
+            return Err(RunnerError::internal(span, "regex replace arity"));
+        };
+        let Value::Regex(program) = self.eval_operand(receiver, span)? else {
+            return Err(RunnerError::internal(span, "replace receiver is not regex"));
+        };
+        let Value::Str(text) = self.eval_operand(text, span)? else {
+            return Err(RunnerError::internal(span, "replace text is not textus"));
+        };
+        let Value::Str(replacement) = self.eval_operand(replacement, span)? else {
+            return Err(RunnerError::internal(
+                span,
+                "replace replacement is not textus",
+            ));
+        };
+        Ok(Value::Str(program.replace_all_literal(&text, &replacement)))
+    }
+
+    /// The five `match` accessors; offsets are code points.
+    fn eval_match_accessor(
+        &mut self,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let Some(receiver) = args.first() else {
+            return Err(RunnerError::internal(span, "match accessor arity"));
+        };
+        let Value::Match(found) = self.eval_operand(receiver, span)? else {
+            return Err(RunnerError::internal(
+                span,
+                "accessor receiver is not match",
+            ));
+        };
+        let position = |value: usize| {
+            i64::try_from(value)
+                .map(Value::Int)
+                .map_err(|_| RunnerError::internal(span, "match offset exceeds numerus"))
+        };
+        let optional_text =
+            |text: Option<&str>| text.map_or(Value::Nil, |text| Value::Str(text.to_owned()));
+        match (op, args) {
+            (MirCollectionOp::MatchText, [_]) => Ok(Value::Str(found.text.clone())),
+            (MirCollectionOp::MatchStart, [_]) => position(found.start),
+            (MirCollectionOp::MatchEnd, [_]) => position(found.end),
+            (MirCollectionOp::MatchGroup, [_, index]) => {
+                let index = match self.eval_operand(index, span)? {
+                    Value::Int(index) => usize::try_from(index).ok(),
+                    Value::UInt(index) => usize::try_from(index).ok(),
+                    _ => {
+                        return Err(RunnerError::internal(span, "group index is not numerus"));
+                    }
+                };
+                Ok(optional_text(index.and_then(|index| found.group(index))))
+            }
+            (MirCollectionOp::MatchNamed, [_, name]) => {
+                let Value::Str(name) = self.eval_operand(name, span)? else {
+                    return Err(RunnerError::internal(span, "group name is not textus"));
+                };
+                Ok(optional_text(found.named(&name)))
+            }
+            _ => Err(RunnerError::internal(span, "match accessor arity")),
         }
     }
 

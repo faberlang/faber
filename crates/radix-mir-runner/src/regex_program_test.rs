@@ -86,3 +86,118 @@ fn accepted_patterns_compile_and_match() {
         assert_eq!(program.is_match(text), expected, "pattern {pattern:?}");
     }
 }
+
+#[test]
+fn find_reports_code_point_offsets_not_bytes() {
+    let program = RegexProgram::compile("[a-z]+").expect("valid pattern");
+    let found = program.find("😀é abc").expect("a match");
+    assert_eq!(found.text, "abc");
+    assert_eq!((found.start, found.end), (3, 6));
+    assert!(program.find("123").is_none());
+}
+
+#[test]
+fn find_groups_are_indexed_named_and_optional() {
+    let program = RegexProgram::compile("(a)|(?P<second>b)").expect("valid pattern");
+    let found = program.find("xb").expect("a match");
+    assert_eq!(found.group(0), Some("b"));
+    assert_eq!(found.group(1), None);
+    assert_eq!(found.group(2), Some("b"));
+    assert_eq!(found.group(9), None);
+    assert_eq!(found.named("second"), Some("b"));
+    assert_eq!(found.named("missing"), None);
+}
+
+fn spans(pattern: &str, text: &str) -> Vec<(usize, usize)> {
+    RegexProgram::compile(pattern)
+        .expect("valid pattern")
+        .find_all(text)
+        .iter()
+        .map(|found| (found.start, found.end))
+        .collect()
+}
+
+#[test]
+fn find_all_follows_the_empty_match_rule_in_code_points() {
+    assert_eq!(spans("a*", "baaac"), [(0, 0), (1, 4), (5, 5)]);
+    assert_eq!(spans("a*", "aa"), [(0, 2)]);
+    assert_eq!(spans("", "ab"), [(0, 0), (1, 1), (2, 2)]);
+    assert_eq!(spans("a*", "😀aa😀"), [(0, 0), (1, 3), (4, 4)]);
+    assert_eq!(spans("[a-z]+", "😀é abc d"), [(3, 6), (7, 8)]);
+    assert!(spans("x", "abc").is_empty());
+}
+
+#[test]
+fn find_all_keeps_groups_and_names_per_match() {
+    let program = RegexProgram::compile("(?P<k>[a-z])(\\d)?").expect("valid pattern");
+    let found = program.find_all("a1 b");
+    assert_eq!(found.len(), 2);
+    assert_eq!(found[0].named("k"), Some("a"));
+    assert_eq!(found[0].group(2), Some("1"));
+    assert_eq!(found[1].named("k"), Some("b"));
+    assert_eq!(found[1].group(2), None);
+}
+
+#[test]
+fn split_keeps_edges_and_never_splices_groups() {
+    let pieces = |pattern: &str, text: &str| {
+        RegexProgram::compile(pattern)
+            .expect("valid pattern")
+            .split(text)
+    };
+    assert_eq!(pieces(",", ",a,"), ["", "a", ""]);
+    assert_eq!(pieces(",", "a,,b"), ["a", "", "b"]);
+    assert_eq!(pieces("(,)", "a,b"), ["a", "b"]);
+    assert_eq!(pieces("", "abc"), ["", "a", "b", "c", ""]);
+    assert_eq!(pieces("a*", "baaac"), ["", "b", "c", ""]);
+    assert_eq!(pieces(",", ""), [""]);
+    assert_eq!(pieces("x", "abc"), ["abc"]);
+}
+
+#[test]
+fn replace_all_literal_never_expands_the_replacement() {
+    let replace = |pattern: &str, text: &str, with: &str| {
+        RegexProgram::compile(pattern)
+            .expect("valid pattern")
+            .replace_all_literal(text, with)
+    };
+    assert_eq!(replace("a+", "caab aa", "x"), "cxb x");
+    assert_eq!(replace("(?P<n>[a-z])(\\d)", "a1 b2", "$1"), "$1 $1");
+    assert_eq!(replace("(?P<n>[a-z])(\\d)", "a1", "${n}-$2"), "${n}-$2");
+    assert_eq!(replace("(?P<n>[a-z])(\\d)", "a1", "\\1\\2"), "\\1\\2");
+    assert_eq!(replace("a*", "baaac", "-"), "-b-c-");
+    assert_eq!(replace("", "ab", "-"), "-a-b-");
+    assert_eq!(replace("x", "abc", "#"), "abc");
+    assert_eq!(replace("[0-9]+", "a12b3", ""), "ab");
+}
+
+#[test]
+fn escape_covers_exactly_the_metacharacters_and_round_trips() {
+    let metacharacters = "\\.+*?()|[]{}^$#&-~";
+    for meta in metacharacters.chars() {
+        assert_eq!(super::escape(&meta.to_string()), format!("\\{meta}"));
+    }
+    assert_eq!(
+        super::escape("é😀 plain 日本語\t\n"),
+        "é😀 plain 日本語\t\n"
+    );
+    let probes = [
+        "",
+        "a.b",
+        "x+y*z",
+        "(a|b)",
+        "[a-z]{2}",
+        "^start$",
+        "a\\d",
+        "naïve café 😀",
+        metacharacters,
+    ];
+    for probe in probes {
+        let program = RegexProgram::compile(&format!("^{}$", super::escape(probe)))
+            .expect("an escaped pattern is accepted by the dialect");
+        let found = program.find(probe).expect("the escaped pattern matches");
+        assert_eq!(found.text, probe);
+        assert_eq!(found.start, 0);
+        assert_eq!(found.end, probe.chars().count());
+    }
+}

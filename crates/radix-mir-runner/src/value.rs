@@ -193,6 +193,8 @@ pub enum Value {
     Octeti(Vec<u8>),
     Instans(Instans),
     Regex(Rc<RegexProgram>),
+    /// One successful regex match (RD-3: internal only, no source spelling).
+    Match(Rc<MatchValue>),
     Sermo(Rc<RefCell<SermoValue>>),
     Function(MirFunctionId),
     Closure(MirFunctionId, MirClosureEnvironmentId, Box<Value>),
@@ -225,6 +227,32 @@ pub enum Value {
     /// Suspended `fiunt`/`fient` generator read by a stepped `itera ex` walk
     /// (D6.6); never observed outside that walk's `length`/index reads.
     Cursor(crate::cursor::GeneratorCursor),
+}
+
+/// A regex match: the matched text and its half-open span in code points of
+/// the haystack (offsets are code points, never bytes), plus the text of each
+/// capture group (`0` the whole match; `None` for a group that did not
+/// participate) and the `(?P<name>…)` group names with their indices.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MatchValue {
+    pub text: String,
+    pub start: usize,
+    pub end: usize,
+    pub groups: Vec<Option<String>>,
+    pub names: Vec<(String, usize)>,
+}
+
+impl MatchValue {
+    /// Text of group `index`; `None` when out of range or not participating.
+    pub fn group(&self, index: usize) -> Option<&str> {
+        self.groups.get(index)?.as_deref()
+    }
+
+    /// Text of the group named `name`; `None` when unknown or not participating.
+    pub fn named(&self, name: &str) -> Option<&str> {
+        let (_, index) = self.names.iter().find(|(known, _)| known == name)?;
+        self.group(*index)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -501,6 +529,7 @@ impl Value {
             Value::Octeti(bytes) => String::from_utf8_lossy(bytes).into_owned(),
             Value::Instans(value) => value.to_rfc3339(),
             Value::Regex(program) => program.pattern().to_owned(),
+            Value::Match(found) => found.text.clone(),
             Value::Sermo(sermo) => {
                 format!("sermo({})", sermo.borrow().conversation.borrow().route)
             }

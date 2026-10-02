@@ -364,6 +364,38 @@ pub enum MirCollectionOp {
     /// Regex `consentit`: whether the `regex` receiver's pattern matches a
     /// `textus` argument (the Rust `regex` crate `is_match` semantics).
     RegexMatches,
+    /// Regex `inventa` (en `find`): the leftmost-first match of the `regex`
+    /// receiver in a `textus` argument, as `match ∪ nihil`. Offsets are code
+    /// points (RX-3b).
+    RegexFind,
+    /// Match `inventum` (en `text`): the matched text.
+    MatchText,
+    /// Match `principium` (en `start`): inclusive start, in code points.
+    MatchStart,
+    /// Match `terminus` (en `end`): exclusive end, in code points.
+    MatchEnd,
+    /// Match `coetus` (en `group`): capture group `n` text, `0` the whole
+    /// match; `nihil` for a non-participating or out-of-range group.
+    MatchGroup,
+    /// Match `nominatus` (en `named`): text of a `(?P<name>…)` group; `nihil`
+    /// for a non-participating or unknown name.
+    MatchNamed,
+    /// Regex `collecta` (en `find_all`): every non-overlapping match of the
+    /// `regex` receiver in a `textus` argument, as `lista<match>`, in one pass
+    /// with RE2's empty-match iteration rule (RX-4a).
+    RegexFindAll,
+    /// Regex `divide` (en `split`): the pieces of a `textus` argument between
+    /// the iteration's matches, as `lista<textus>`; leading and trailing empty
+    /// pieces are kept and capture groups are not spliced (RX-4a).
+    RegexSplit,
+    /// Regex `muta` (en `replace`): every non-overlapping match of the `regex`
+    /// receiver in a `textus` argument replaced by a `textus` replacement taken
+    /// literally (`$1`, `${name}` and `\1` stay text), as `textus` (RX-4b).
+    RegexReplace,
+    /// Text `munita` (en `escape`): the `textus` receiver as a pattern text that
+    /// matches it literally, escaping exactly the dialect's metacharacters
+    /// (RX-4b).
+    TextEscape,
     /// Cord walk: `ascii.cursor()` / later `textus.cursor()` → `cursor<ascii<1>>`.
     /// One buffer of one-byte ascii values; not a per-step heap slice.
     CordCursor,

@@ -279,6 +279,8 @@ fn primitive_to_faber(prim: Primitive) -> String {
         Primitive::Valor => "valor",
         Primitive::Octeti => "octeti",
         Primitive::Regex => "regex",
+        // RD-3: internal display name only; there is no source spelling.
+        Primitive::Match => "match",
         Primitive::Instans => "instans",
     }
     .to_owned()

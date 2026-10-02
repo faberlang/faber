@@ -1842,6 +1842,7 @@ impl super::FaberCodegen<'_> {
                                 Primitive::Octeti
                                     | Primitive::Textus
                                     | Primitive::Regex
+                                    | Primitive::Match
                                     | Primitive::Numerus
                                     | Primitive::Fractus
                             )
