@@ -65,7 +65,7 @@ pub mod abi;
 pub mod air;
 pub use radix_lexer::ascii_literal;
 pub mod aspect;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub mod backend_smoke;
 pub use radix_semantic::builtins;
 pub mod cli;
@@ -96,7 +96,7 @@ pub mod runtime_contract;
 pub mod semantic;
 pub mod services;
 pub mod syntax;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub mod test_support;
 pub use radix_lexer::textus_literal;
 
