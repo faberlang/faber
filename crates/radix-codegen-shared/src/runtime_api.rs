@@ -93,13 +93,22 @@ pub const EXACT_STORE: RuntimeItem = exact_row("store", RuntimeKind::StoreFn);
 
 /// The targets whose runtime package carries each `regex` row. Rows differ by
 /// target: the Rust runtime carries the match operations as free functions in
-/// `faber::regex`, the Go runtime carries a constructor plus methods, so each
-/// row lists exactly the targets that consume it.
+/// `faber::regex`, the Go runtime carries a constructor plus methods, the Swift
+/// runtime a `Regex` namespace, so each row lists exactly the targets that
+/// consume it.
+const REGEX_RUST_SWIFT: &[Target] = &[Target::HirRust, Target::HirSwift];
 const REGEX_RUST: &[Target] = &[Target::HirRust];
 const REGEX_GO: &[Target] = &[Target::HirGo];
+const REGEX_GO_SWIFT: &[Target] = &[Target::HirGo, Target::HirSwift];
 const REGEX_TS: &[Target] = &[Target::HirTypeScript];
-const REGEX_GO_TS: &[Target] = &[Target::HirGo, Target::HirTypeScript];
-const REGEX_RUST_GO_TS: &[Target] = &[Target::HirRust, Target::HirGo, Target::HirTypeScript];
+const REGEX_SWIFT: &[Target] = &[Target::HirSwift];
+const REGEX_GO_TS_SWIFT: &[Target] = &[Target::HirGo, Target::HirTypeScript, Target::HirSwift];
+const REGEX_ALL: &[Target] = &[
+    Target::HirRust,
+    Target::HirGo,
+    Target::HirTypeScript,
+    Target::HirSwift,
+];
 
 const fn regex_row(
     name: &'static str,
@@ -119,27 +128,32 @@ const fn regex_row(
 /// match are the `faber::Regex` / `faber::Match` carriers; every operation is
 /// total because the conversion `↦ regex` is the one place a pattern is
 /// compiled or rejected. Offsets are code points.
-pub const REGEX_MATCHES: RuntimeItem = regex_row("matches", RuntimeKind::Fn, REGEX_RUST);
-pub const REGEX_FIND: RuntimeItem = regex_row("find", RuntimeKind::Fn, REGEX_RUST);
-pub const REGEX_FIND_ALL: RuntimeItem = regex_row("find_all", RuntimeKind::Fn, REGEX_RUST);
-pub const REGEX_SPLIT: RuntimeItem = regex_row("split", RuntimeKind::Fn, REGEX_RUST);
-pub const REGEX_REPLACE: RuntimeItem = regex_row("replace", RuntimeKind::Fn, REGEX_RUST);
+pub const REGEX_MATCHES: RuntimeItem = regex_row("matches", RuntimeKind::Fn, REGEX_RUST_SWIFT);
+pub const REGEX_FIND: RuntimeItem = regex_row("find", RuntimeKind::Fn, REGEX_RUST_SWIFT);
+pub const REGEX_FIND_ALL: RuntimeItem = regex_row("find_all", RuntimeKind::Fn, REGEX_RUST_SWIFT);
+pub const REGEX_SPLIT: RuntimeItem = regex_row("split", RuntimeKind::Fn, REGEX_RUST_SWIFT);
+pub const REGEX_REPLACE: RuntimeItem = regex_row("replace", RuntimeKind::Fn, REGEX_RUST_SWIFT);
 pub const REGEX_REPLACE_WITH: RuntimeItem = regex_row("replace_with", RuntimeKind::Fn, REGEX_RUST);
-pub const REGEX_MATCH_TEXT: RuntimeItem = regex_row("match_text", RuntimeKind::Fn, REGEX_RUST);
-pub const REGEX_MATCH_START: RuntimeItem = regex_row("match_start", RuntimeKind::Fn, REGEX_RUST);
-pub const REGEX_MATCH_END: RuntimeItem = regex_row("match_end", RuntimeKind::Fn, REGEX_RUST);
-pub const REGEX_MATCH_GROUP: RuntimeItem = regex_row("match_group", RuntimeKind::Fn, REGEX_RUST);
-pub const REGEX_MATCH_NAMED: RuntimeItem = regex_row("match_named", RuntimeKind::Fn, REGEX_RUST);
+pub const REGEX_MATCH_TEXT: RuntimeItem =
+    regex_row("match_text", RuntimeKind::Fn, REGEX_RUST_SWIFT);
+pub const REGEX_MATCH_START: RuntimeItem =
+    regex_row("match_start", RuntimeKind::Fn, REGEX_RUST_SWIFT);
+pub const REGEX_MATCH_END: RuntimeItem = regex_row("match_end", RuntimeKind::Fn, REGEX_RUST_SWIFT);
+pub const REGEX_MATCH_GROUP: RuntimeItem =
+    regex_row("match_group", RuntimeKind::Fn, REGEX_RUST_SWIFT);
+pub const REGEX_MATCH_NAMED: RuntimeItem =
+    regex_row("match_named", RuntimeKind::Fn, REGEX_RUST_SWIFT);
 
 /// `regex` rows (RX-9): the Go carrier of the RE2-dialect regex. `Regex` is the
 /// compiled value, `Match` one successful match; the operations on them are
 /// methods of those types, so only the constructor and the two helpers with no
 /// receiver of that type are functions.
-pub const REGEX_REGEX: RuntimeItem = regex_row("Regex", RuntimeKind::Type, REGEX_GO_TS);
-pub const REGEX_MATCH: RuntimeItem = regex_row("Match", RuntimeKind::Type, REGEX_GO_TS);
+pub const REGEX_REGEX: RuntimeItem = regex_row("Regex", RuntimeKind::Type, REGEX_GO_TS_SWIFT);
+pub const REGEX_MATCH: RuntimeItem = regex_row("Match", RuntimeKind::Type, REGEX_GO_TS_SWIFT);
 pub const REGEX_NEW: RuntimeItem = regex_row("new", RuntimeKind::Fn, REGEX_GO);
-pub const REGEX_ESCAPE: RuntimeItem = regex_row("escape", RuntimeKind::Fn, REGEX_RUST_GO_TS);
-pub const REGEX_REPLACE_EACH: RuntimeItem = regex_row("replace_each", RuntimeKind::Fn, REGEX_GO);
+pub const REGEX_ESCAPE: RuntimeItem = regex_row("escape", RuntimeKind::Fn, REGEX_ALL);
+pub const REGEX_REPLACE_EACH: RuntimeItem =
+    regex_row("replace_each", RuntimeKind::Fn, REGEX_GO_SWIFT);
 
 /// `regex` rows (RX-8): the TypeScript runtime package's `regex` namespace
 /// (`@faber/runtime/regex`). `Regex` is the compiled pattern, `Match` one
@@ -148,6 +162,12 @@ pub const REGEX_REPLACE_EACH: RuntimeItem = regex_row("replace_each", RuntimeKin
 /// method `munita`. The operations are members of the `Regex` and `Match`
 /// types, not table rows.
 pub const REGEX_ERROR: RuntimeItem = regex_row("RegexError", RuntimeKind::Type, REGEX_TS);
+
+/// `regex` rows (RX-10a): the Swift runtime (`Regex.Regex`, `Regex.Match`,
+/// `Regex.compile`, ...). Swift consumes the same operation rows as the Rust
+/// target (as free functions of the `Regex` namespace) plus the carrier types,
+/// `replace_each` and `escape`; `compile` is its constructor.
+pub const REGEX_COMPILE: RuntimeItem = regex_row("compile", RuntimeKind::Fn, REGEX_SWIFT);
 
 /// The canonical helper table: a row for every helper some runtime package
 /// carries. Each namespace unit adds its rows with the runtime it moves.
@@ -185,6 +205,7 @@ pub const TABLE: &[RuntimeItem] = &[
     REGEX_NEW,
     REGEX_REPLACE_EACH,
     REGEX_ERROR,
+    REGEX_COMPILE,
 ];
 
 /// One runtime namespace: a module in Rust, a namespace export in TypeScript,
