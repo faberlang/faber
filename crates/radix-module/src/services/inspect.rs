@@ -226,11 +226,26 @@ pub fn hir_inspection_for_source(name: &str, source: &str) -> SourceInspection {
         Ok(file) => file,
         Err(error) => return SourceInspection { text: String::new(), success: false, errors: vec![error] },
     };
-    let (program, mut interner) = match parse_inspect_program(&source_file) {
+    let (mut program, mut interner) = match parse_inspect_program(&source_file) {
         Ok(parsed) => parsed,
         Err(errors) => return SourceInspection { text: String::new(), success: false, errors },
     };
-    let (mut resolver, mut types) = match prepare_hir_prerequisites(&source_file, &program, &mut interner) {
+    // Imports resolve as check does: the program layer discovers the import
+    // contract for an on-disk source (in-memory names keep an empty one).
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_dev_locale_root());
+    let prepared = match crate::program::prepare_program_module_for_name(&source_file.name, source, &session) {
+        Ok(prepared) => prepared,
+        Err(diagnostic) => {
+            return SourceInspection {
+                text: String::new(),
+                success: false,
+                errors: vec![format!("error: {}", diagnostic.message)],
+            };
+        }
+    };
+    let contract = prepared.contract;
+    crate::program::apply_default_import_names(&mut program, &mut interner, &contract.default_import_names);
+    let (mut resolver, mut types) = match prepare_hir_prerequisites(&source_file, &program, &mut interner, &contract) {
         Ok(ready) => ready,
         Err(errors) => return SourceInspection { text: String::new(), success: false, errors },
     };
@@ -390,7 +405,7 @@ pub fn cli_ir_inspection_for_source(name: &str, source: &str) -> SourceInspectio
 fn parse_inspect_program(
     source_file: &crate::driver::SourceFile,
 ) -> Result<(crate::syntax::Program, crate::lexer::Interner), Vec<String>> {
-    let lex_result = crate::lexer::lex(source_file.content.as_str());
+    let lex_result = lex_reader_surface(source_file);
     if !lex_result.success() {
         return Err(lexer_error_lines(source_file, &lex_result.errors));
     }
@@ -441,11 +456,15 @@ fn prepare_hir_prerequisites(
     source_file: &crate::driver::SourceFile,
     program: &crate::syntax::Program,
     interner: &mut crate::lexer::Interner,
+    contract: &crate::driver::ModuleImportContract,
 ) -> Result<(crate::semantic::Resolver, crate::semantic::TypeTable), Vec<String>> {
     let mut resolver = crate::semantic::Resolver::new();
     let mut types = crate::semantic::TypeTable::new();
     crate::builtins::register(&mut resolver, &mut types, interner);
     crate::builtins::register_frame_types_if_needed(program, &mut resolver, &mut types, interner, None);
+    resolver.set_namespace_exports_from_strings(&contract.namespace_exports, interner);
+    resolver.set_namespace_seams_from_strings(&contract.namespace_seams, interner);
+    resolver.set_namespace_declarations_from_strings(&contract.namespace_declarations, interner);
 
     if let Err(errors) = crate::semantic::passes::collect::collect(program, &mut resolver, &mut types) {
         let mut lines = vec!["collection errors:".to_owned()];
@@ -453,6 +472,17 @@ fn prepare_hir_prerequisites(
             lines.push(format!("  {:?}: {}", err.kind, semantic_error_message(source_file, &err)));
         }
         return Err(lines);
+    }
+    // Import bindings install after collection (as in the full pipeline) and
+    // under the source's own reader locale; an unsupported export is skipped.
+    let pack = crate::program::compile::frontmatter_locale_pack_from_frontmatter(source_file.frontmatter.as_ref());
+    if let Err(error) = resolver.set_file_interfaces_from_snapshots_with_locale(
+        &contract.file_interfaces,
+        interner,
+        &mut types,
+        pack.as_ref(),
+    ) {
+        return Err(vec![format!("import errors:\n  file interface install failed: {error:?}")]);
     }
     if let Err(errors) = crate::semantic::passes::resolve::resolve(program, &mut resolver, interner, &mut types) {
         let mut lines = vec!["resolution errors:".to_owned()];
