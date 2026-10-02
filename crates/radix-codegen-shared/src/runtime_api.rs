@@ -91,6 +91,28 @@ pub const EXACT_SHL: RuntimeItem = exact_row("shl", RuntimeKind::Fn);
 pub const EXACT_SHR: RuntimeItem = exact_row("shr", RuntimeKind::Fn);
 pub const EXACT_STORE: RuntimeItem = exact_row("store", RuntimeKind::StoreFn);
 
+/// The targets whose runtime package carries the `regex` namespace today.
+const REGEX_TARGETS: &[Target] = &[Target::HirGo];
+
+const fn regex_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Regex,
+        name,
+        kind,
+        targets: REGEX_TARGETS,
+    }
+}
+
+/// `regex` rows (RX-9): the Go carrier of the RE2-dialect regex. `Regex` is the
+/// compiled value, `Match` one successful match; the operations on them are
+/// methods of those types, so only the constructor and the two helpers with no
+/// receiver of that type are functions.
+pub const REGEX_REGEX: RuntimeItem = regex_row("Regex", RuntimeKind::Type);
+pub const REGEX_MATCH: RuntimeItem = regex_row("Match", RuntimeKind::Type);
+pub const REGEX_NEW: RuntimeItem = regex_row("new", RuntimeKind::Fn);
+pub const REGEX_ESCAPE: RuntimeItem = regex_row("escape", RuntimeKind::Fn);
+pub const REGEX_REPLACE_EACH: RuntimeItem = regex_row("replace_each", RuntimeKind::Fn);
+
 /// The canonical helper table: a row for every helper some runtime package
 /// carries. Each namespace unit adds its rows with the runtime it moves.
 pub const TABLE: &[RuntimeItem] = &[
@@ -110,6 +132,11 @@ pub const TABLE: &[RuntimeItem] = &[
     EXACT_SHL,
     EXACT_SHR,
     EXACT_STORE,
+    REGEX_REGEX,
+    REGEX_MATCH,
+    REGEX_NEW,
+    REGEX_ESCAPE,
+    REGEX_REPLACE_EACH,
 ];
 
 /// One runtime namespace: a module in Rust, a namespace export in TypeScript,
