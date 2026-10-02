@@ -652,6 +652,10 @@ fn the_rust_gen_and_float_rows_spell_as_the_crate_root_types_and_a_float_functio
         [
             ("faber::Gen".to_owned(), RuntimeKind::Type),
             ("faber::Yield".to_owned(), RuntimeKind::Type),
+            ("faber::AsyncCursor".to_owned(), RuntimeKind::Type),
+            ("faber::AsyncCursorShared".to_owned(), RuntimeKind::Type),
+            ("faber::r#gen::block_on".to_owned(), RuntimeKind::Fn),
+            ("faber::r#gen::block_on_tokio".to_owned(), RuntimeKind::Fn),
             ("faber::float::f16_bits_to_f32".to_owned(), RuntimeKind::Fn),
         ]
     );

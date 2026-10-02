@@ -325,6 +325,36 @@ pub const GEN_YIELD: RuntimeItem = RuntimeItem {
     targets: &[Target::HirRust],
 };
 
+/// `gen` rows (T1-R8): the async-generator cursor (`fient`) and `block_on` of the
+/// Rust runtime. The cursor types are crate-root (fork F-A) and `block_on` is a
+/// free function of the `gen` module (`faber::r#gen::block_on`, the std form).
+/// `block_on_tokio` is the Tokio form, behind the crate's optional `tokio`
+/// feature; the emitter picks it by the library-binding fact it already had.
+pub const GEN_ASYNC_CURSOR: RuntimeItem = RuntimeItem {
+    ns: Namespace::Gen,
+    name: "AsyncCursor",
+    kind: RuntimeKind::Type,
+    targets: &[Target::HirRust],
+};
+pub const GEN_ASYNC_CURSOR_SHARED: RuntimeItem = RuntimeItem {
+    ns: Namespace::Gen,
+    name: "AsyncCursorShared",
+    kind: RuntimeKind::Type,
+    targets: &[Target::HirRust],
+};
+pub const GEN_BLOCK_ON: RuntimeItem = RuntimeItem {
+    ns: Namespace::Gen,
+    name: "block_on",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirRust],
+};
+pub const GEN_BLOCK_ON_TOKIO: RuntimeItem = RuntimeItem {
+    ns: Namespace::Gen,
+    name: "block_on_tokio",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirRust],
+};
+
 /// `float` row (T1-R7, fork F-D): the half-float bit decode of the Rust runtime
 /// (`faber::float::f16_bits_to_f32`). The Rust target has no std half-float
 /// carrier, so `fractus<f16>` is a decoded-`f32` conversion intermediate.
@@ -605,6 +635,10 @@ pub const TABLE: &[RuntimeItem] = &[
     INF_TRUE_DIV,
     GEN_GEN,
     GEN_YIELD,
+    GEN_ASYNC_CURSOR,
+    GEN_ASYNC_CURSOR_SHARED,
+    GEN_BLOCK_ON,
+    GEN_BLOCK_ON_TOKIO,
     FLOAT_F16_BITS_TO_F32,
     FORMAT_FMT,
     FORMAT_SPEC,
@@ -812,7 +846,7 @@ fn spelling(target: Target, item: &RuntimeItem) -> Result<String, SpellError> {
     let is_type = item.kind == RuntimeKind::Type;
     match target {
         Target::HirRust if is_type => Ok(format!("faber::{}", upper_camel(item.name))),
-        Target::HirRust => Ok(format!("faber::{ns}::{}", item.name)),
+        Target::HirRust => Ok(format!("faber::{}::{}", rust_module(ns), item.name)),
         Target::HirTypeScript | Target::HirPython if is_type => {
             Ok(format!("{ns}.{}", upper_camel(item.name)))
         }
@@ -824,6 +858,15 @@ fn spelling(target: Target, item: &RuntimeItem) -> Result<String, SpellError> {
         Target::HirSwift => Ok(format!("{}.{}", upper_camel(ns), lower_camel(item.name))),
         Target::HirPython => Ok(format!("{ns}.{}", item.name)),
         _ => Err(SpellError::NoRuntime(target)),
+    }
+}
+
+/// A namespace as a Rust module path segment: `gen` is a reserved keyword of the
+/// 2024 edition, so the crate's module is `r#gen` and the path spells it raw.
+fn rust_module(ns: &str) -> String {
+    match ns {
+        "gen" => format!("r#{ns}"),
+        _ => ns.to_owned(),
     }
 }
 

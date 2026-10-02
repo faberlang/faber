@@ -156,6 +156,48 @@ incipit {
 }
 
 #[test]
+#[cfg(feature = "hir-rust")]
+fn rust_needs_faber_runtime_for_an_async_generator_program() {
+    // The async-generator cursor lives in `faber::AsyncCursor`.
+    let (hir, types) = analyze_hir(
+        r"
+functio tres() fient → numerus {
+  cede 1
+}
+
+incipit {
+  itera ex tres() fixum n {
+    nota n
+  }
+}
+",
+    );
+    let needs = collect_rust_needs(&hir, &types, BTreeSet::new(), None);
+    assert!(needs.needs_faber_runtime, "an async generator requires the faber runtime crate");
+}
+
+#[test]
+#[cfg(feature = "hir-rust")]
+fn rust_needs_faber_runtime_for_an_entry_that_runs_under_block_on() {
+    // `block_on` lives in `faber::r#gen`: an entry that awaits calls it.
+    let (hir, types) = analyze_hir(
+        r#"
+@ futura
+functio fetchData() → textus {
+  redde "data"
+}
+
+incipiet {
+  figendum _ data ← fetchData()
+  nota data
+}
+"#,
+    );
+    let needs = collect_rust_needs(&hir, &types, BTreeSet::new(), None);
+    assert!(needs.needs_faber_runtime, "an awaiting entry requires the faber runtime crate");
+}
+
+#[test]
 fn rust_prelude_policy_no_longer_scans_body_for_hashmap() {
     let prelude = include_str!("../../../radix-hir-rust/src/prelude.rs");
     assert!(!prelude.contains("code.contains(\"HashMap\""));
