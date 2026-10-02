@@ -1760,6 +1760,9 @@ struct FunctionBuilder<'a> {
     error_ty: Option<MirType>,
     context: FunctionBuilderContext<'a>,
     bindings: FxHashMap<DefId, LocalBinding>,
+    /// While lowering `casu A aut B`, every alternative binds the same
+    /// `DefId`s: payload bindings reuse the local an earlier alternative made.
+    shared_pattern_bindings: bool,
     params: Vec<MirParam>,
     locals: Vec<MirLocalDecl>,
     temps: Vec<MirTemp>,
@@ -1840,6 +1843,7 @@ impl<'a> FunctionBuilder<'a> {
             error_ty,
             context,
             bindings: FxHashMap::default(),
+            shared_pattern_bindings: false,
             params: Vec::new(),
             locals: Vec::new(),
             temps: Vec::new(),

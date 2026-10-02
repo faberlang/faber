@@ -39,6 +39,40 @@ fn arm_body_returns(arm: &HirCasuArm) -> bool {
     )
 }
 
+fn is_literal_alternatives(alternatives: &[HirPattern]) -> bool {
+    !alternatives.is_empty()
+        && alternatives
+            .iter()
+            .all(|alternative| matches!(alternative, HirPattern::Literal(_) | HirPattern::NegatedLiteral(_)))
+}
+
+/// Variant alternatives (`casu A aut B`): every alternative is a variant
+/// pattern (optionally aliased), so one arm body serves them all.
+fn is_variant_alternatives(alternatives: &[HirPattern]) -> bool {
+    !alternatives.is_empty()
+        && alternatives.iter().all(|alternative| match alternative {
+            HirPattern::Variant(_, _) => true,
+            HirPattern::Alias(_, _, inner) => matches!(inner.as_ref(), HirPattern::Variant(_, _)),
+            _ => false,
+        })
+}
+
+fn collect_pattern_binding_defs(pattern: &HirPattern, defs: &mut Vec<DefId>) {
+    match pattern {
+        HirPattern::Binding(def_id, _) => defs.push(*def_id),
+        HirPattern::Alias(def_id, _, inner) => {
+            defs.push(*def_id);
+            collect_pattern_binding_defs(inner, defs);
+        }
+        HirPattern::Variant(_, fields) => {
+            for field in fields {
+                collect_pattern_binding_defs(field, defs);
+            }
+        }
+        _ => {}
+    }
+}
+
 struct RangeIteraLowering<'a> {
     binding: DefId,
     name: Symbol,
@@ -816,16 +850,22 @@ impl FunctionBuilder<'_> {
         for arm in arms {
             let pattern = self.discerne_switch_arm_pattern(arm)?;
             match pattern {
-                HirPattern::Literal(literal) | HirPattern::NegatedLiteral(literal) => {
+                HirPattern::Literal(_) | HirPattern::NegatedLiteral(_) => {
                     let scrutinee_ty = self.expr_ty(scrutinee).map(|ty| ty.semantic_id());
-                    let constant = self.literal_switch_constant(literal, scrutinee_ty, arm.span)?;
-                    let constant = if matches!(pattern, HirPattern::NegatedLiteral(_)) {
-                        self.negated_switch_constant(constant, arm.span)?
-                    } else {
-                        constant
-                    };
+                    let constant = self.literal_pattern_switch_constant(pattern, scrutinee_ty, arm.span)?;
                     let target = self.fresh_block(arm.span);
                     cases.push(MirSwitchCase { value: constant, target });
+                    bodies.push((target, &arm.body, arm.span));
+                }
+                // `casu 1 aut 2`: every alternative is a case value of the same switch
+                // target, so one arm body serves them all.
+                HirPattern::Or(alternatives) if is_literal_alternatives(alternatives) => {
+                    let scrutinee_ty = self.expr_ty(scrutinee).map(|ty| ty.semantic_id());
+                    let target = self.fresh_block(arm.span);
+                    for alternative in alternatives {
+                        let constant = self.literal_pattern_switch_constant(alternative, scrutinee_ty, arm.span)?;
+                        cases.push(MirSwitchCase { value: constant, target });
+                    }
                     bodies.push((target, &arm.body, arm.span));
                 }
                 HirPattern::Wildcard if default_body.is_none() => {
@@ -1064,6 +1104,17 @@ impl FunctionBuilder<'_> {
                         &mut reaches_join,
                     )?;
                 }
+                HirPattern::Or(alternatives) if is_variant_alternatives(alternatives) => {
+                    self.lower_variant_alternatives_arm(
+                        alternatives,
+                        &value,
+                        &scrutinee_place,
+                        scrutinee_ty,
+                        join_id,
+                        arm,
+                        &mut reaches_join,
+                    )?;
+                }
                 HirPattern::Wildcard if default_body.is_none() => {
                     default_body = Some((&arm.body, arm.span));
                     break;
@@ -1131,20 +1182,10 @@ impl FunctionBuilder<'_> {
         arm: &HirCasuArm,
         reaches_join: &mut bool,
     ) -> Option<()> {
-        let bool_ty = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         let then_id = self.fresh_block(arm.span);
         let else_id = self.fresh_block(arm.span);
-        let fields = if fields.is_empty() {
-            MirAggregateFields::Ordered(Vec::new())
-        } else {
-            self.variant_pattern_probe_fields(variant, scrutinee_place, arm.span)?
-        };
-        let variant = self.construct_temp(MirAggregateKind::EnumVariant(variant), fields, scrutinee_ty, arm.span);
-        let condition = self.assign_temp(
-            MirValueKind::Binary { op: MirBinOp::Eq, lhs: value.clone(), rhs: variant },
-            bool_ty,
-            arm.span,
-        );
+        let condition =
+            self.variant_probe_condition(variant, fields, value, scrutinee_place, scrutinee_ty, arm.span)?;
         self.terminate_current(
             MirTerminatorKind::Branch { condition, then_block: then_id, else_block: else_id },
             arm.span,
@@ -1157,6 +1198,87 @@ impl FunctionBuilder<'_> {
 
         self.switch_to(else_id);
         Some(())
+    }
+
+    /// Lower an `aut` arm of unit-variant alternatives: each alternative
+    /// probes the scrutinee in turn and a hit jumps to the one shared body.
+    fn lower_variant_alternatives_arm(
+        &mut self,
+        alternatives: &[HirPattern],
+        value: &MirOperand,
+        scrutinee_place: &MirPlace,
+        scrutinee_ty: MirType,
+        join_id: MirBlockId,
+        arm: &HirCasuArm,
+        reaches_join: &mut bool,
+    ) -> Option<()> {
+        let body_id = self.fresh_block(arm.span);
+        let else_id = self.fresh_block(arm.span);
+        let mut stale = Vec::new();
+        for alternative in alternatives {
+            collect_pattern_binding_defs(alternative, &mut stale);
+        }
+        for def_id in stale {
+            self.bindings.remove(&def_id);
+        }
+        let previous_shared = std::mem::replace(&mut self.shared_pattern_bindings, true);
+        for (index, alternative) in alternatives.iter().enumerate() {
+            let variant_pattern = match alternative {
+                HirPattern::Alias(_, _, inner) => inner.as_ref(),
+                other => other,
+            };
+            let HirPattern::Variant(variant, fields) = variant_pattern else {
+                unreachable!("variant alternatives are checked before lowering");
+            };
+            let hit_id = self.fresh_block(arm.span);
+            let miss_id = if index + 1 == alternatives.len() {
+                else_id
+            } else {
+                self.fresh_block(arm.span)
+            };
+            let condition =
+                self.variant_probe_condition(*variant, fields, value, scrutinee_place, scrutinee_ty, arm.span)?;
+            self.terminate_current(
+                MirTerminatorKind::Branch { condition, then_block: hit_id, else_block: miss_id },
+                arm.span,
+            );
+            self.switch_to(hit_id);
+            self.bind_variant_payload(alternative, scrutinee_place, scrutinee_ty, arm.span)?;
+            self.terminate_current(MirTerminatorKind::Goto(body_id), arm.span);
+            self.switch_to(miss_id);
+        }
+        self.shared_pattern_bindings = previous_shared;
+
+        self.switch_to(body_id);
+        self.lower_expr_value(&arm.body);
+        *reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), arm.span);
+
+        self.switch_to(else_id);
+        Some(())
+    }
+
+    /// Branch condition for "the scrutinee is this variant".
+    fn variant_probe_condition(
+        &mut self,
+        variant: DefId,
+        fields: &[HirPattern],
+        value: &MirOperand,
+        scrutinee_place: &MirPlace,
+        scrutinee_ty: MirType,
+        span: Span,
+    ) -> Option<MirOperand> {
+        let bool_ty = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let fields = if fields.is_empty() {
+            MirAggregateFields::Ordered(Vec::new())
+        } else {
+            self.variant_pattern_probe_fields(variant, scrutinee_place, span)?
+        };
+        let variant = self.construct_temp(MirAggregateKind::EnumVariant(variant), fields, scrutinee_ty, span);
+        Some(self.assign_temp(
+            MirValueKind::Binary { op: MirBinOp::Eq, lhs: value.clone(), rhs: variant },
+            bool_ty,
+            span,
+        ))
     }
 
     fn variant_pattern_probe_fields(
@@ -1197,16 +1319,7 @@ impl FunctionBuilder<'_> {
                 self.bind_variant_fields(*variant, fields, scrutinee, scrutinee_ty, span)
             }
             HirPattern::Alias(alias_def, alias_name, inner) => {
-                let alias = self.next_local_id();
-                self.locals.push(MirLocalDecl {
-                    id: alias,
-                    name: Some(*alias_name),
-                    ty: scrutinee_ty,
-                    mutable: false,
-                    span,
-                });
-                self.bindings
-                    .insert(*alias_def, LocalBinding { local: alias, ty: scrutinee_ty });
+                let alias = self.pattern_binding_local(*alias_def, *alias_name, scrutinee_ty, span);
                 self.assign(MirPlace::local(alias), MirOperand::Place(scrutinee.clone()), scrutinee_ty, span);
                 self.bind_variant_payload(inner, scrutinee, scrutinee_ty, span)
             }
@@ -1305,6 +1418,21 @@ impl FunctionBuilder<'_> {
             .ok()
     }
 
+    /// The local a pattern binding lives in: a fresh one, or (inside
+    /// `casu A aut B`) the one the first alternative already declared.
+    fn pattern_binding_local(&mut self, def_id: DefId, name: Symbol, ty: MirType, span: Span) -> MirLocalId {
+        if self.shared_pattern_bindings
+            && let Some(existing) = self.bindings.get(&def_id)
+        {
+            return existing.local;
+        }
+        let local = self.next_local_id();
+        self.locals
+            .push(MirLocalDecl { id: local, name: Some(name), ty, mutable: false, span });
+        self.bindings.insert(def_id, LocalBinding { local, ty });
+        local
+    }
+
     fn bind_variant_field_payload(
         &mut self,
         def_id: DefId,
@@ -1320,16 +1448,31 @@ impl FunctionBuilder<'_> {
                 .push(MirError::missing_type(span, "variant payload pattern field"));
             return None;
         };
-        let local = self.next_local_id();
-        self.locals
-            .push(MirLocalDecl { id: local, name: Some(name), ty, mutable: false, span });
-        self.bindings.insert(def_id, LocalBinding { local, ty });
+        let local = self.pattern_binding_local(def_id, name, ty, span);
         let mut place = scrutinee.clone();
         place
             .projections
             .push(MirProjection::VariantField { variant, field });
         self.assign(MirPlace::local(local), MirOperand::Place(place), ty, span);
         Some(())
+    }
+
+    /// The switch constant for one literal or negated-literal pattern.
+    fn literal_pattern_switch_constant(
+        &mut self,
+        pattern: &HirPattern,
+        scrutinee_ty: Option<TypeId>,
+        span: Span,
+    ) -> Option<MirConstant> {
+        let (HirPattern::Literal(literal) | HirPattern::NegatedLiteral(literal)) = pattern else {
+            unreachable!("literal alternatives are checked before constant lowering");
+        };
+        let constant = self.literal_switch_constant(literal, scrutinee_ty, span)?;
+        if matches!(pattern, HirPattern::NegatedLiteral(_)) {
+            self.negated_switch_constant(constant, span)
+        } else {
+            Some(constant)
+        }
     }
 
     fn literal_switch_constant(
