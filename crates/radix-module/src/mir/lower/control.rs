@@ -42,6 +42,9 @@ fn arm_body_returns(arm: &HirCasuArm) -> bool {
 struct RangeIteraLowering<'a> {
     binding: DefId,
     name: Symbol,
+    /// Source declared the binder `varia`: the body gets a fresh
+    /// per-iteration copy, so a write to it never steers the loop.
+    mutable: bool,
     start: &'a HirExpression,
     end: &'a HirExpression,
     step: Option<&'a HirExpression>,
@@ -56,6 +59,9 @@ struct RangeIteraLowering<'a> {
 /// [`FunctionBuilder::lower_range_product_level`].
 struct RangeProductAxis {
     index: MirLocalId,
+    /// The body-visible binder: the counter itself for a `fixum` binder, a
+    /// per-iteration copy of it for a `varia` binder.
+    binder: MirLocalId,
     start: MirLocalId,
     bound: MirLocalId,
     step: MirLocalId,
@@ -499,6 +505,7 @@ impl FunctionBuilder<'_> {
         coordinates: &[(DefId, Symbol)],
         binding: DefId,
         name: Symbol,
+        mutable: bool,
         iter: &HirExpression,
         body: &HirBlock,
         expr: &HirExpression,
@@ -520,6 +527,7 @@ impl FunctionBuilder<'_> {
                 self.lower_range_itera(RangeIteraLowering {
                     binding,
                     name,
+                    mutable,
                     start,
                     end,
                     step: step.as_deref(),
@@ -1736,13 +1744,14 @@ impl FunctionBuilder<'_> {
         let index = self.next_local_id();
         self.locals.push(MirLocalDecl {
             id: index,
-            name: Some(range.name),
+            name: (!range.mutable).then_some(range.name),
             ty: index_ty,
             mutable: true,
             span: range.span,
         });
+        let binder = self.range_binder_local(index, range.mutable, range.name, index_ty, range.span);
         self.bindings
-            .insert(range.binding, LocalBinding { local: index, ty: index_ty });
+            .insert(range.binding, LocalBinding { local: binder, ty: index_ty });
 
         let end_local = self.next_local_id();
         self.locals
@@ -1761,7 +1770,10 @@ impl FunctionBuilder<'_> {
         match range.step {
             Some(step) => {
                 self.lower_expr_to_destination(step, MirPlace::local(step_local), index_ty)?;
-                self.terminate_open_current(MirTerminatorKind::Goto(cond_id), range.span);
+                if !self.current_is_open() {
+                    return None;
+                }
+                self.lower_range_stride(index, end_local, step_local, cond_id, bivalens, index_ty, range.span);
             }
             None => {
                 self.lower_default_range_step(index, end_local, step_local, cond_id, bivalens, index_ty, range.span)
@@ -1849,6 +1861,7 @@ impl FunctionBuilder<'_> {
             rumpe_used: false,
         });
         self.switch_to(body_id);
+        self.copy_range_binder(binder, index, index_ty, range.span);
         self.visit_block(range.body);
         self.breakables.pop();
         self.terminate_open_current(MirTerminatorKind::Goto(increment_id), range.span);
@@ -1883,6 +1896,7 @@ impl FunctionBuilder<'_> {
         &mut self,
         ranges: &[HirExpression],
         bindings: &[(DefId, Symbol)],
+        mutable: bool,
         body: &HirBlock,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
@@ -1931,10 +1945,16 @@ impl FunctionBuilder<'_> {
         for (position, ((start, end, step, kind), (binding, name))) in members.iter().zip(bindings).enumerate() {
             let index_ty = self.range_index_ty(&[Some(*start), Some(*end), *step]);
             let index = self.next_local_id();
-            self.locals
-                .push(MirLocalDecl { id: index, name: Some(*name), ty: index_ty, mutable: true, span });
+            self.locals.push(MirLocalDecl {
+                id: index,
+                name: (!mutable).then_some(*name),
+                ty: index_ty,
+                mutable: true,
+                span,
+            });
+            let binder = self.range_binder_local(index, mutable, *name, index_ty, span);
             self.bindings
-                .insert(*binding, LocalBinding { local: index, ty: index_ty });
+                .insert(*binding, LocalBinding { local: binder, ty: index_ty });
             // The extent values are loop-invariant (no extent can reference
             // a binder), so each pass re-assigns the index from `start`
             // instead of re-evaluating the extent expressions.
@@ -1964,11 +1984,22 @@ impl FunctionBuilder<'_> {
             match step {
                 Some(step) => {
                     self.lower_expr_to_destination(step, MirPlace::local(step_local), index_ty)?;
-                    self.terminate_open_current(MirTerminatorKind::Goto(exit), span);
+                    if !self.current_is_open() {
+                        return None;
+                    }
+                    self.lower_range_stride(start_local, bound, step_local, exit, bivalens, index_ty, span);
                 }
                 None => self.lower_default_range_step(start_local, bound, step_local, exit, bivalens, index_ty, span),
             }
-            axes.push(RangeProductAxis { index, start: start_local, bound, step: step_local, kind: *kind, index_ty });
+            axes.push(RangeProductAxis {
+                index,
+                binder,
+                start: start_local,
+                bound,
+                step: step_local,
+                kind: *kind,
+                index_ty,
+            });
         }
 
         let after_id = self.fresh_block(span);
@@ -2095,18 +2126,21 @@ impl FunctionBuilder<'_> {
             span,
         );
 
+        self.switch_to(then_target);
+        self.copy_range_binder(axis.binder, axis.index, numerus, span);
         if innermost {
             self.breakables.push(BreakableContext {
                 perge_target: Some(increment_id),
                 rumpe_target: loop_after_id,
                 rumpe_used: false,
             });
-            self.switch_to(then_target);
             self.visit_block(body);
             self.breakables.pop();
             self.terminate_open_current(MirTerminatorKind::Goto(increment_id), span);
         } else {
-            self.lower_range_product_level(axes, body, level + 1, then_target, increment_id, span)?;
+            let next_entry = self.fresh_block(span);
+            self.terminate_current(MirTerminatorKind::Goto(next_entry), span);
+            self.lower_range_product_level(axes, body, level + 1, next_entry, increment_id, span)?;
         }
 
         self.switch_to(increment_id);
@@ -3316,6 +3350,101 @@ impl FunctionBuilder<'_> {
                 || MirType::semantic(self.types.primitive(Primitive::Numerus)),
                 MirType::semantic,
             )
+    }
+
+    /// The body-visible local of a range binder: the counter itself for a
+    /// `fixum` binder; for a `varia` binder a fresh local that every
+    /// iteration copies the counter into (ruling 2026-10-02), so a write to
+    /// the binder never steers the loop.
+    fn range_binder_local(
+        &mut self,
+        counter: MirLocalId,
+        mutable: bool,
+        name: Symbol,
+        ty: MirType,
+        span: Span,
+    ) -> MirLocalId {
+        if !mutable {
+            return counter;
+        }
+        let binder = self.next_local_id();
+        self.locals
+            .push(MirLocalDecl { id: binder, name: Some(name), ty, mutable: true, span });
+        binder
+    }
+
+    /// Refresh a `varia` range binder from the loop counter at the top of an
+    /// iteration; a `fixum` binder is the counter and needs no copy.
+    fn copy_range_binder(&mut self, binder: MirLocalId, counter: MirLocalId, ty: MirType, span: Span) {
+        if binder != counter {
+            self.assign(MirPlace::local(binder), MirOperand::Place(MirPlace::local(counter)), ty, span);
+        }
+    }
+
+    /// Turn an explicit range step into the signed stride the walk adds.
+    ///
+    /// The written step is a positive stride (ruling 2026-10-02): zero or
+    /// negative traps at run time (a literal one is a compile error), and
+    /// the direction comes from the bounds alone, so a descending range
+    /// negates the stride once, before the walk. Ends by jumping to `exit`.
+    fn lower_range_stride(
+        &mut self,
+        start: MirLocalId,
+        end: MirLocalId,
+        step: MirLocalId,
+        exit: MirBlockId,
+        bivalens: MirType,
+        index_ty: MirType,
+        span: Span,
+    ) {
+        let positive = self.binary_temp(
+            MirBinOp::Gt,
+            MirOperand::Place(MirPlace::local(step)),
+            MirOperand::Constant(MirConstant::Int(0)),
+            bivalens,
+            span,
+        );
+        let direction_id = self.fresh_block(span);
+        let trap_id = self.fresh_block(span);
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition: positive, then_block: direction_id, else_block: trap_id },
+            span,
+        );
+
+        self.switch_to(trap_id);
+        let message = MirOperand::Constant(MirConstant::String(self.context.diagnostic_range_step_not_positive));
+        let numquam = MirType::semantic(self.types.primitive(Primitive::Numquam));
+        self.append_stmt(MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination: None,
+                call: MirRuntimeCall { intrinsic: MirIntrinsic::Panic, args: vec![message], return_ty: numquam },
+            },
+            span,
+        });
+        self.terminate_current(MirTerminatorKind::Unreachable, span);
+
+        self.switch_to(direction_id);
+        let ascends = self.binary_temp(
+            MirBinOp::LtEq,
+            MirOperand::Place(MirPlace::local(start)),
+            MirOperand::Place(MirPlace::local(end)),
+            bivalens,
+            span,
+        );
+        let descend_id = self.fresh_block(span);
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition: ascends, then_block: exit, else_block: descend_id },
+            span,
+        );
+
+        self.switch_to(descend_id);
+        let negated = self.assign_temp(
+            MirValueKind::Unary { op: MirUnOp::Neg, operand: MirOperand::Place(MirPlace::local(step)) },
+            index_ty,
+            span,
+        );
+        self.assign(MirPlace::local(step), negated, index_ty, span);
+        self.terminate_current(MirTerminatorKind::Goto(exit), span);
     }
 
     fn lower_default_range_step(

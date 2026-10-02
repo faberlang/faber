@@ -24,6 +24,10 @@ mod ad_serve_tests;
 mod itera_inf_tests;
 
 #[cfg(test)]
+#[path = "range_step_test.rs"]
+mod range_step_tests;
+
+#[cfg(test)]
 #[path = "kernel_ban_test.rs"]
 mod kernel_ban_tests;
 

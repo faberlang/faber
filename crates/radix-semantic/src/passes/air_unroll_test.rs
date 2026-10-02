@@ -501,6 +501,36 @@ fn concrete_range_loop_admits_after_unroll() {
     );
 }
 
+/// Range step ruling (2026-10-02): the step is a positive stride and the
+/// bounds pick the direction, so `10‥0 per 2` unrolls to the same five lanes
+/// as `0‥10 per 2`; a non-positive step never unrolls.
+#[test]
+fn stepped_range_unrolls_in_the_direction_of_its_bounds() {
+    let lanes = |range: &str| {
+        let source = format!(
+            r#"
+@ radix lane "air"
+@ radix backward "range_backward"
+functio loop_count() → f32 {{
+    varia f32 total ← 0.0
+    itera ab {range} fixum i {{
+        total ← total + 1.0
+    }}
+    redde total
+}}
+"#
+        );
+        let result = analyze(&source);
+        let hir = result.hir.as_ref().expect("typed HIR");
+        let mut steps = CountBinaryInits(0);
+        walk_program(&mut steps, hir);
+        (has_itera(hir), steps.0)
+    };
+    assert_eq!(lanes("0‥10 per 2"), (false, 5));
+    assert_eq!(lanes("10‥0 per 2"), (false, 5));
+    assert_eq!(lanes("10…0 per 5"), (false, 3));
+}
+
 #[test]
 fn full_prefix_tensor_loop_is_guard_free_straight_line() {
     let result = analyze(FULL_PREFIX_TENSOR_LOOP);

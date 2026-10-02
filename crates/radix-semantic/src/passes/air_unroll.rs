@@ -1453,13 +1453,15 @@ fn concrete_range_values(source: &HirExpression) -> Option<Vec<i64>> {
     };
     let start = as_i64(start)?;
     let end = as_i64(end)?;
-    let step = match step {
+    let stride = match step {
         Some(step) => as_i64(step)?,
         None => 1,
     };
-    if step == 0 {
+    // The step is a positive stride; the bounds pick the direction.
+    if stride <= 0 {
         return None;
     }
+    let step = if start <= end { stride } else { -stride };
     let mut values = Vec::new();
     let mut current = start;
     while range_holds(current, end, step, *kind) {

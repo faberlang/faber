@@ -1770,7 +1770,16 @@ fn range_itera_stops_when_bounds_fail_to_lower() {
 
     assert!(
         builder
-            .lower_itera_expr(crate::hir::HirIteraMode::Ab, &[], DefId(0), Symbol(0), &iter, &body, &expr)
+            .lower_itera_expr(
+                crate::hir::HirIteraMode::Ab,
+                &[],
+                DefId(0),
+                Symbol(0),
+                false,
+                &iter,
+                &body,
+                &expr
+            )
             .is_none()
     );
     assert_eq!(builder.blocks.len(), 1);

@@ -2577,6 +2577,10 @@ help = "compare values with the equality operator: `≡`, or `≠` for `non est`
 message = "range step must be numeric"
 help = "use a numeric range step"
 
+[diagnostics.SEM011.issues.range_step_not_positive]
+message = "range step must be positive"
+help = "write a positive step; the range bounds pick the direction (10‥0 step 2 counts down)"
+
 [diagnostics.SEM011.issues.intervallum_bound_required]
 message = "intervallum bound type must be int or instant"
 help = "use int, float, instant, or sized scalar bounds"

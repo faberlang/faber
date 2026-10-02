@@ -16,11 +16,11 @@ locale = "en"
 #
 # What this teaches:
 #   • range iteration with a step value using `per` — controls stride between elements
-#   • descending ranges with negative step values
+#   • descending ranges: the step is a positive stride, the bounds pick the direction
 #   • exclusive (`‥`) vs inclusive (`…`) range bounds with step
 #
 # Common mistakes:
-#   • Using a step value that never reaches the end bound — ensure the step direction matches the range direction.
+#   • Using a step value that never reaches the end bound — the step is always a positive stride (zero or negative is an error); the bounds alone decide whether the range counts up or down.
 #
 # See also: ex, de, ab
 # =============================================================================
@@ -34,7 +34,7 @@ locale = "en"
 #   forRangeStmt :← 'itera' 'ab' rangeExpr 'per' expr ('fixum' | 'varia') ident block
 #
 # EXPECTED OUTPUT:
-#   intervallum-gradus.expected — positive-step, inclusive, and negative-step
+#   intervallum-gradus.expected — positive-step, inclusive, and descending
 #   range values pinned from runner stdout.
 
 main {
@@ -53,13 +53,13 @@ main {
         print i
     }
 
-    # Descending with negative step
-    for range 10‥0 step -1 const i {
+    # Descending: the bounds pick the direction, the step stays positive
+    for range 10‥0 step 1 const i {
         print i
     }
 
     # Descending by 2
-    for range 10‥0 step -2 const i {
+    for range 10‥0 step 2 const i {
         print i
     }
 }
