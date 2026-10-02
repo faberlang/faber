@@ -213,7 +213,7 @@ struct Emitter {
 const EMITTERS: [Emitter; 3] = [
     Emitter {
         name: "radix-hir-rust",
-        legacy_budget: 210,
+        legacy_budget: 136,
         new_shape_budget: 0,
         new_shape: rust_new_shape,
     },
