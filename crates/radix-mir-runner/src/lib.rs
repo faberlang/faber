@@ -14,6 +14,7 @@ mod exact_int;
 mod host;
 pub mod inf;
 pub mod kernel;
+mod regex_program;
 mod runtime;
 pub mod sermo;
 pub(crate) mod shuffle;
@@ -42,6 +43,7 @@ use radix_mir::{
     MirType, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir,
 };
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
+use regex_program::RegexProgram;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -1861,7 +1863,10 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     &crate::textus_literal::decode_textus_literal(self.interner.resolve(*pattern)),
                     flags.map(|flags| self.interner.resolve(flags)),
                 );
-                Value::Regex(runtime_regex_pattern(&pattern))
+                let program = RegexProgram::compile(&pattern).map_err(|payload| {
+                    RunnerError::internal(span, format!("constant regex is invalid: {payload}"))
+                })?;
+                Value::Regex(Rc::new(program))
             }
         })
     }
@@ -2510,7 +2515,7 @@ fn constant_equals_value(constant: &MirConstant, value: &Value, interner: &Inter
             regex_pattern(
                 &crate::textus_literal::decode_textus_literal(interner.resolve(*pattern)),
                 flags.map(|flags| interner.resolve(flags)),
-            ) == *right
+            ) == right.pattern()
         }
         (MirConstant::Nil, Value::Nil) => true,
         (MirConstant::Unit, Value::Unit) => true,
@@ -2619,13 +2624,6 @@ fn regex_pattern(pattern: &str, flags: Option<&str>) -> String {
     } else {
         format!("(?{mapped}){pattern}")
     }
-}
-
-pub(crate) fn runtime_regex_pattern(pattern: &str) -> String {
-    // The runtime's `faber::Regex` is a compile-time literal carrier today:
-    // `Regex::new(pattern).pattern()` returns the input unchanged. Mirror that
-    // identity here without the runtime dependency.
-    pattern.to_owned()
 }
 
 #[cfg(test)]
