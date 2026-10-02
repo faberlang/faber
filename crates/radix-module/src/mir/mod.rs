@@ -26,7 +26,7 @@ mod wasm_text;
 #[cfg(feature = "mir-wgsl")]
 mod wgsl_text;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 #[path = "test_support.rs"]
 pub mod test_support;
 

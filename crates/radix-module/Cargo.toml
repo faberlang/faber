@@ -57,6 +57,8 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1"
 toml = "1.1.2"
 wait-timeout = "0.2"
+# Optional: only the `test-support` feature pulls it into a non-test build.
+tempfile = { version = "3", optional = true }
 
 [dev-dependencies]
 hygiene-ratchet = { path = "../hygiene-ratchet" }
@@ -74,4 +76,5 @@ hir-fhir = ["dep:radix-hir-fhir", "radix-target/hir-fhir", "radix-semantic/hir-f
 mir-fmir = ["mir-core"]
 mir-core = ["dep:radix-mir"]
 runner = ["mir-core", "dep:radix-mir-runner"]
+test-support = ["dep:tempfile"]
 

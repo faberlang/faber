@@ -5,6 +5,7 @@
 //! assertions stay in each `*_text_test.rs` module.
 
 use crate::codegen::Target;
+use crate::device_export::export_device_instance;
 use crate::diagnostics::Diagnostic;
 use crate::driver::ModuleCompileRequest;
 use crate::driver::compile;
@@ -94,6 +95,21 @@ pub fn compile_wgsl_text(source: &str) -> Result<String, String> {
 /// Returns joined diagnostic facts as a string when compilation fails.
 pub fn compile_metal_text_output(source: &str) -> Result<MetalTextOutput, String> {
     compile_target_typed_output(Target::MirMetal, "metal.fab", source)
+}
+
+/// Compile source to Metal text through the device-export surface.
+///
+/// Unlike [`compile_metal_text_output`], the reflection rows carry the
+/// widened shape vectors (the exported contract), so descriptor checks
+/// consume what a host actually receives.
+///
+/// # Errors
+///
+/// Returns joined diagnostic facts as a string when compilation fails.
+pub fn compile_metal_text_export_output(source: &str) -> Result<MetalTextOutput, String> {
+    let export = export_device_instance(&test_session(Target::MirMetal), "metal.fab", source, &[])
+        .map_err(|diagnostics| diagnostic_facts_message(&diagnostics))?;
+    Ok(MetalTextOutput { code: export.code, reflection: Some(export.reflection) })
 }
 
 /// Compile source to Metal text.
