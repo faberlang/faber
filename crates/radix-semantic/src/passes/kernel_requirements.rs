@@ -173,17 +173,6 @@ impl KernelRequirementsReport {
             .iter()
             .find(|report| report.target == target)
     }
-
-    #[must_use]
-    pub fn all_admitted_for(&self, target: Target) -> bool {
-        self.kernels.iter().all(|kernel| {
-            kernel
-                .target_reports
-                .iter()
-                .find(|report| report.target == target)
-                .is_some_and(|report| report.admitted)
-        })
-    }
 }
 
 /// Infer kernel requirements from a typed module. `recursive_kernels` comes
