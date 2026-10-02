@@ -2019,6 +2019,23 @@ prefer sugar. Choose per module or file.
 - `วน จาก...คงที่`/`วน จาก...แปร` = for-in (keys)
 - `วน ช่วง range คงที่/แปร i` = range iteration (e.g. `วน ช่วง 0‥10 ต่อ 2 คงที่ i { บันทึก i }`; `ต่อ` belongs to the range expression)
 
+**Range step and direction (`range_tail`, `ต่อ`).** The bounds alone pick the
+direction of a range: `a‥b` and `a…b` count up when `a <= b` and count down
+when `a > b`. The optional `ต่อ` step is a *positive stride* applied in
+whatever direction the range moves, so `10‥0 ต่อ 2` yields `10 8 6 4 2`, `0‥10
+ต่อ 2` yields `0 2 4 6 8`, and `10…0 ต่อ 5` yields `10 5 0`. A step is never
+signed: a zero or negative step is an error, a compile error
+(`range_step_not_positive`) when the step is a literal and a run-time trap
+otherwise. Equal bounds walk the ascending way (`5‥5` is empty, `5…5` is the
+single value `5`). The step never changes which endpoint a range includes:
+`…` includes its end only when the progression reaches it.
+
+A range binder declared `แปร` is a fresh per-iteration copy of the walk's
+counter. A write to it inside the body (`วน ช่วง 0‥6 แปร i { i ← i + 1 }`)
+changes only the body's copy and never steers the loop, so the example visits
+`0 1 2 3 4 5`. In an `วน ช่วง` product each binder is refreshed once per
+iteration of its own axis.
+
 **Iteration order.** A type whose order is part of its value iterates in that
 order. `lista` iterates by index. `textus` iterates its characters in order.
 `tensor`, `vector`, and `matrix` iterate by index, outer axis first
