@@ -8,7 +8,17 @@ use faber_cli::explain::{self, Registry};
 pub(super) fn cmd_explain(args: ExplainArgs) {
     if args.list {
         let registry = load_registry();
-        print!("{}", explain::render_list(&registry));
+        if args.json {
+            match explain::render_list_json(&registry) {
+                Ok(json) => println!("{json}"),
+                Err(err) => {
+                    eprintln!("error: {err}");
+                    std::process::exit(1);
+                }
+            }
+        } else {
+            print!("{}", explain::render_list(&registry));
+        }
         return;
     }
 

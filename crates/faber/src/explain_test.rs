@@ -1,4 +1,6 @@
-use crate::explain::{Lookup, Registry, render_json, render_plain, render_search};
+use crate::explain::{
+    Lookup, Registry, render_json, render_list, render_list_json, render_plain, render_search,
+};
 use crate::reference::ReferencePack;
 use crate::reference_pack_test_support::{env_lock, repo_exempla_root};
 use serde::Deserialize;
@@ -158,6 +160,26 @@ fn render_json_omits_grammar_when_entry_has_none() {
     let value: serde_json::Value = serde_json::from_str(&rendered).expect("valid json");
     assert!(value["entry"].get("grammar").is_none());
     assert!(value["canonical"].get("grammar").is_some());
+}
+
+#[test]
+fn render_list_json_matches_plain_list_rows() {
+    let registry = disk_registry();
+    let rendered = render_list_json(&registry).expect("list json renders");
+    let rows: Vec<serde_json::Value> = serde_json::from_str(&rendered).expect("valid json array");
+    let canonical = registry.entries().iter().filter(|e| e.canonical).count();
+    assert_eq!(rows.len(), canonical);
+
+    let plain = render_list(&registry);
+    for row in &rows {
+        for field in ["term", "kind", "category", "summary"] {
+            assert!(row[field].is_string(), "row missing {field}: {row}");
+        }
+        let summary = row["summary"].as_str().expect("summary");
+        assert!(plain.contains(summary), "plain list lacks {summary}");
+    }
+    // Plain list ignores --json: still the sectioned fixed-width text.
+    assert!(plain.contains("\nKEYWORDS\n"));
 }
 
 #[test]
