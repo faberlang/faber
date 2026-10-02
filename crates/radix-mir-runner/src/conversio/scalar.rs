@@ -1216,11 +1216,21 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    pub(crate) fn convert_to_regex(&self, value: Value, span: Span) -> Result<Value, RunnerError> {
+    /// `textus ↦ regex`: validate and compile the pattern once, here. A pattern
+    /// that fails to compile fails the conversion with the construct-id payload
+    /// of RD-4 (`regex_program`).
+    pub(crate) fn convert_to_regex(
+        &mut self,
+        value: Value,
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
         match value {
-            Value::Regex(pattern) | Value::Str(pattern) => {
-                Ok(Value::Regex(runtime_regex_pattern(&pattern)))
-            }
+            Value::Regex(program) => Ok(Value::Regex(program)),
+            Value::Str(pattern) => match RegexProgram::compile(&pattern) {
+                Ok(program) => Ok(Value::Regex(Rc::new(program))),
+                Err(payload) => self.recover_or_fail(recovery, span, &payload),
+            },
             other => Err(RunnerError::internal(
                 span,
                 format!("unsupported conversio to regex from {other:?}"),

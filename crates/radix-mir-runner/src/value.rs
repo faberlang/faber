@@ -22,6 +22,7 @@
 )]
 
 use super::RunnerError;
+use crate::regex_program::RegexProgram;
 use handroll::Magnus;
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span, Symbol};
@@ -191,7 +192,7 @@ pub enum Value {
     Unit,
     Octeti(Vec<u8>),
     Instans(Instans),
-    Regex(String),
+    Regex(Rc<RegexProgram>),
     Sermo(Rc<RefCell<SermoValue>>),
     Function(MirFunctionId),
     Closure(MirFunctionId, MirClosureEnvironmentId, Box<Value>),
@@ -499,7 +500,7 @@ impl Value {
             Value::Unit => String::new(),
             Value::Octeti(bytes) => String::from_utf8_lossy(bytes).into_owned(),
             Value::Instans(value) => value.to_rfc3339(),
-            Value::Regex(pattern) => pattern.clone(),
+            Value::Regex(program) => program.pattern().to_owned(),
             Value::Sermo(sermo) => {
                 format!("sermo({})", sermo.borrow().conversation.borrow().route)
             }

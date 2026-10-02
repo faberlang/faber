@@ -5,12 +5,13 @@
 //! WHY: MIR validation proves `MirConversion.target_ty`; guessing from the
 //! source `Value` shape disagrees with typed contracts (e.g. `textus ↦ bivalens`).
 
+use super::regex_program::RegexProgram;
 use super::value::{
     MapKey, SermoValue, TensorValue, Value, decimal_scale_factor, float_to_numerus_width,
     float_truncation_fits_width, int_width_range, modular_word_result, round_half_even_division,
     saturating_word_result,
 };
-use super::{Runner, RunnerError, runtime_regex_pattern};
+use super::{Runner, RunnerError};
 use radix_lexer::{Span, Symbol};
 use radix_mir::lista_tensor_conversio::{ListaToTensorShape, resolve_lista_to_tensor_shape};
 use radix_mir::{MirConversion, MirNamedOperand, MirOperand, MirStructFieldDefaults};
@@ -161,7 +162,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     ))
                 }
             }
-            Type::Primitive(Primitive::Regex) => self.convert_to_regex(value, span),
+            Type::Primitive(Primitive::Regex) => self.convert_to_regex(value, recovery, span),
             Type::Primitive(Primitive::Json) => self.convert_to_json(value, recovery, span),
             Type::Primitive(Primitive::Valor) => self.convert_to_valor(value, source_ty, span),
             Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => {

@@ -1,7 +1,7 @@
 +++
 term = "regex"
 kind = "conversio"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "expression", "literal"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "fac_stmt", "cape_clause", "si_stmt", "call_expr", "call_suffix", "member_suffix", "argument_list", "argument", "expression", "literal"]
 category = "conversion"
 canonical = false
 summary = "Regex carrier construction from textus and ascii."
@@ -15,10 +15,11 @@ locale = "en"
 #
 # What this teaches:
 #   • Regex carrier creation — `textus ↦ regex` and `ascii ↦ regex` construct a regex pattern carrier from text inputs.
-#   • v1 behavior — v1 regex conversio does not validate pattern syntax; invalid-looking patterns are preserved identically.
+#   • Failable conversion — the conversion compiles the pattern, so a pattern the RE2 dialect rejects fails with a textus payload that starts with a stable construct id (`syntax`, `lookahead`, …); `fac`/`cape` (or a `⇥ textus` function) handles it.
 #
 # Common mistakes:
-#   • Assuming the compiler validates regex syntax at compile time — v1 constructs a carrier without engine validation.
+#   • Assuming an invalid pattern is preserved — the conversion fails at the `↦`, not at the first match.
+#   • Matching on the engine's prose — only the leading construct id is stable.
 #
 # See also: ↦, regex, textus, ascii
 # =============================================================================
@@ -26,9 +27,10 @@ locale = "en"
 
 # conversio — regex carrier construction
 #
-# WHY: v1 regex conversio constructs a pattern carrier and does not validate
-# pattern syntax against a regex engine. Invalid-looking pattern text is still
-# preserved identically by the Rust route and the MIR stepper route.
+# WHY: `↦ regex` is failable. A pattern that does not compile fails the
+# conversion itself with a payload that starts with a stable construct id, then
+# detail text. Only the id is a contract: `syntax` for a malformed pattern,
+# `lookahead` for a construct the RE2 dialect does not have.
 
 main {
     const string digitsWire ← "\d+"
@@ -38,6 +40,23 @@ main {
     const regex word ← wordWire ↦ regex
     print word
     const string brokenWire ← "\d["
-    const regex broken ← brokenWire ↦ regex
-    print broken
+    do {
+        const regex broken ← brokenWire ↦ regex
+        print broken
+    }
+    catch err {
+        if err.starts_with("syntax") {
+            print "rejected: syntax"
+        }
+    }
+    const string lookaheadWire ← "a(?=b)"
+    do {
+        const regex lookahead ← lookaheadWire ↦ regex
+        print lookahead
+    }
+    catch err {
+        if err.starts_with("lookahead") {
+            print "rejected: lookahead"
+        }
+    }
 }
