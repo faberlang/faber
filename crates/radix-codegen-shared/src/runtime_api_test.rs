@@ -415,6 +415,54 @@ fn the_dec_rows_spell_as_dec_namespace_members_in_typescript() {
 }
 
 #[test]
+fn the_inf_rows_spell_as_inf_namespace_members_in_typescript() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Inf && row.targets.contains(&Target::HirTypeScript))
+        .collect();
+    // The 18 exported helpers of `inf.ts`: 7 shared with Rust and Go (`div`,
+    // `shl`, `shr`, `pow`, `approx`, `pack`, `to_dec`), 6 with Go (`mod`, `abs`,
+    // `parse`, `from_valor`, `from_bytes`, `to_bytes`), 3 with Rust (`true_div`,
+    // `cmp_float`, `store`), and `to_number` and `clamp` of its own. `store` and
+    // `clamp` are the store family; every other row is plain.
+    assert_eq!(rows.len(), 18);
+    for row in &rows {
+        let store = matches!(row.name, "store" | "clamp");
+        assert_eq!(row.kind == RuntimeKind::StoreFn, store, "{}", row.name);
+    }
+    let mut spelled: Vec<String> = rows
+        .iter()
+        .map(|row| spell_any(Target::HirTypeScript, row))
+        .collect();
+    spelled.sort_unstable();
+    let mut expected: Vec<String> = [
+        "abs",
+        "approx",
+        "clamp",
+        "cmpFloat",
+        "div",
+        "fromBytes",
+        "fromValor",
+        "mod",
+        "pack",
+        "parse",
+        "pow",
+        "shl",
+        "shr",
+        "store",
+        "toBytes",
+        "toDec",
+        "toNumber",
+        "trueDiv",
+    ]
+    .iter()
+    .map(|name| format!("inf.{name}"))
+    .collect();
+    expected.sort_unstable();
+    assert_eq!(spelled, expected);
+}
+
+#[test]
 fn the_regex_rows_spell_as_faber_regex_functions_in_rust() {
     let rows: Vec<&RuntimeItem> = TABLE
         .iter()
@@ -444,7 +492,7 @@ fn the_store_family_is_the_exact_and_inf_rows_that_apply_a_width_limit() {
     store_rows.sort_unstable();
     // `exact` (Rust `store` and `store_inferred`; Go `store_i`, `store_u`,
     // `wrap`, `clamp_i`, `clamp_u`; TypeScript `store`, `wrap`, `clamp`) and
-    // `inf` (Rust `store`; Go the same five).
+    // `inf` (Rust `store`; Go the same five; TypeScript `store`, `clamp`).
     assert_eq!(
         store_rows,
         [
@@ -456,6 +504,7 @@ fn the_store_family_is_the_exact_and_inf_rows_that_apply_a_width_limit() {
             ("Exact".to_owned(), "store_inferred"),
             ("Exact".to_owned(), "store_u"),
             ("Exact".to_owned(), "wrap"),
+            ("Inf".to_owned(), "clamp"),
             ("Inf".to_owned(), "clamp_i"),
             ("Inf".to_owned(), "clamp_u"),
             ("Inf".to_owned(), "store"),

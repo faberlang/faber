@@ -287,11 +287,16 @@ pub const DEC_TRY_PARSE: RuntimeItem = dec_row("try_parse", RuntimeKind::Fn, DEC
 pub const DEC_TRY_STORE: RuntimeItem = dec_row("try_store", RuntimeKind::Fn, DEC_RUST_GO_TS);
 
 /// The targets whose runtime package carries each `inf` row: the Rust runtime
-/// (`faber::inf`) and the Go runtime (`rt.Inf*`) share the rows whose id and
-/// meaning match.
+/// (`faber::inf`), the Go runtime (`rt.Inf*`) and the TypeScript runtime
+/// (`inf` in `@faber/runtime`, T1-T4) share the rows whose id and meaning
+/// match.
 const INF_RUST: &[Target] = &[Target::HirRust];
 const INF_GO: &[Target] = &[Target::HirGo];
+const INF_TS: &[Target] = &[Target::HirTypeScript];
 const INF_RUST_GO: &[Target] = &[Target::HirRust, Target::HirGo];
+const INF_RUST_TS: &[Target] = &[Target::HirRust, Target::HirTypeScript];
+const INF_GO_TS: &[Target] = &[Target::HirTypeScript, Target::HirGo];
+const INF_RUST_GO_TS: &[Target] = &[Target::HirRust, Target::HirTypeScript, Target::HirGo];
 
 const fn inf_row(name: &'static str, kind: RuntimeKind, targets: &'static [Target]) -> RuntimeItem {
     RuntimeItem {
@@ -317,16 +322,16 @@ pub const INF_ADD: RuntimeItem = inf_row("add", RuntimeKind::Fn, INF_GO);
 pub const INF_SUB: RuntimeItem = inf_row("sub", RuntimeKind::Fn, INF_GO);
 pub const INF_MUL: RuntimeItem = inf_row("mul", RuntimeKind::Fn, INF_GO);
 pub const INF_NEG: RuntimeItem = inf_row("neg", RuntimeKind::Fn, INF_GO);
-pub const INF_ABS: RuntimeItem = inf_row("abs", RuntimeKind::Fn, INF_GO);
+pub const INF_ABS: RuntimeItem = inf_row("abs", RuntimeKind::Fn, INF_GO_TS);
 pub const INF_NOT: RuntimeItem = inf_row("not", RuntimeKind::Fn, INF_GO);
 pub const INF_AND: RuntimeItem = inf_row("and", RuntimeKind::Fn, INF_GO);
 pub const INF_OR: RuntimeItem = inf_row("or", RuntimeKind::Fn, INF_GO);
 pub const INF_XOR: RuntimeItem = inf_row("xor", RuntimeKind::Fn, INF_GO);
-pub const INF_DIV: RuntimeItem = inf_row("div", RuntimeKind::Fn, INF_RUST_GO);
-pub const INF_MOD: RuntimeItem = inf_row("mod", RuntimeKind::Fn, INF_GO);
-pub const INF_SHL: RuntimeItem = inf_row("shl", RuntimeKind::Fn, INF_RUST_GO);
-pub const INF_SHR: RuntimeItem = inf_row("shr", RuntimeKind::Fn, INF_RUST_GO);
-pub const INF_POW: RuntimeItem = inf_row("pow", RuntimeKind::Fn, INF_RUST_GO);
+pub const INF_DIV: RuntimeItem = inf_row("div", RuntimeKind::Fn, INF_RUST_GO_TS);
+pub const INF_MOD: RuntimeItem = inf_row("mod", RuntimeKind::Fn, INF_GO_TS);
+pub const INF_SHL: RuntimeItem = inf_row("shl", RuntimeKind::Fn, INF_RUST_GO_TS);
+pub const INF_SHR: RuntimeItem = inf_row("shr", RuntimeKind::Fn, INF_RUST_GO_TS);
+pub const INF_POW: RuntimeItem = inf_row("pow", RuntimeKind::Fn, INF_RUST_GO_TS);
 pub const INF_SUM: RuntimeItem = inf_row("sum", RuntimeKind::Fn, INF_GO);
 pub const INF_SIGNUM: RuntimeItem = inf_row("signum", RuntimeKind::Fn, INF_GO);
 pub const INF_MAX: RuntimeItem = inf_row("max", RuntimeKind::Fn, INF_GO);
@@ -338,16 +343,16 @@ pub const INF_LE_F: RuntimeItem = inf_row("le_f", RuntimeKind::Fn, INF_GO);
 pub const INF_GT_F: RuntimeItem = inf_row("gt_f", RuntimeKind::Fn, INF_GO);
 pub const INF_GE_F: RuntimeItem = inf_row("ge_f", RuntimeKind::Fn, INF_GO);
 pub const INF_EQ_F: RuntimeItem = inf_row("eq_f", RuntimeKind::Fn, INF_GO);
-pub const INF_APPROX: RuntimeItem = inf_row("approx", RuntimeKind::Fn, INF_RUST_GO);
+pub const INF_APPROX: RuntimeItem = inf_row("approx", RuntimeKind::Fn, INF_RUST_GO_TS);
 pub const INF_F64: RuntimeItem = inf_row("f64", RuntimeKind::Fn, INF_GO);
 pub const INF_F32: RuntimeItem = inf_row("f32", RuntimeKind::Fn, INF_RUST_GO);
 pub const INF_FROM_F: RuntimeItem = inf_row("from_f", RuntimeKind::Fn, INF_GO);
-pub const INF_PARSE: RuntimeItem = inf_row("parse", RuntimeKind::Fn, INF_GO);
+pub const INF_PARSE: RuntimeItem = inf_row("parse", RuntimeKind::Fn, INF_GO_TS);
 pub const INF_STR: RuntimeItem = inf_row("str", RuntimeKind::Fn, INF_GO);
-pub const INF_FROM_VALOR: RuntimeItem = inf_row("from_valor", RuntimeKind::Fn, INF_GO);
-pub const INF_FROM_BYTES: RuntimeItem = inf_row("from_bytes", RuntimeKind::Fn, INF_GO);
-pub const INF_TO_BYTES: RuntimeItem = inf_row("to_bytes", RuntimeKind::Fn, INF_GO);
-pub const INF_PACK: RuntimeItem = inf_row("pack", RuntimeKind::Fn, INF_RUST_GO);
+pub const INF_FROM_VALOR: RuntimeItem = inf_row("from_valor", RuntimeKind::Fn, INF_GO_TS);
+pub const INF_FROM_BYTES: RuntimeItem = inf_row("from_bytes", RuntimeKind::Fn, INF_GO_TS);
+pub const INF_TO_BYTES: RuntimeItem = inf_row("to_bytes", RuntimeKind::Fn, INF_GO_TS);
+pub const INF_PACK: RuntimeItem = inf_row("pack", RuntimeKind::Fn, INF_RUST_GO_TS);
 pub const INF_FITS_I: RuntimeItem = inf_row("fits_i", RuntimeKind::Fn, INF_GO);
 pub const INF_FITS_U: RuntimeItem = inf_row("fits_u", RuntimeKind::Fn, INF_GO);
 pub const INF_STORE_I: RuntimeItem = inf_row("store_i", RuntimeKind::StoreFn, INF_GO);
@@ -355,7 +360,7 @@ pub const INF_STORE_U: RuntimeItem = inf_row("store_u", RuntimeKind::StoreFn, IN
 pub const INF_WRAP: RuntimeItem = inf_row("wrap", RuntimeKind::StoreFn, INF_GO);
 pub const INF_CLAMP_I: RuntimeItem = inf_row("clamp_i", RuntimeKind::StoreFn, INF_GO);
 pub const INF_CLAMP_U: RuntimeItem = inf_row("clamp_u", RuntimeKind::StoreFn, INF_GO);
-pub const INF_TO_DEC: RuntimeItem = inf_row("to_dec", RuntimeKind::Fn, INF_RUST_GO);
+pub const INF_TO_DEC: RuntimeItem = inf_row("to_dec", RuntimeKind::Fn, INF_RUST_GO_TS);
 pub const INF_KEY: RuntimeItem = inf_row("key", RuntimeKind::Fn, INF_GO);
 pub const INF_FROM_KEY: RuntimeItem = inf_row("from_key", RuntimeKind::Fn, INF_GO);
 pub const INF_PART: RuntimeItem = inf_row("part", RuntimeKind::Type, INF_GO);
@@ -367,11 +372,21 @@ pub const INF_PART: RuntimeItem = inf_row("part", RuntimeKind::Type, INF_GO);
 /// and nowhere else.
 pub const INF_BIG: RuntimeItem = inf_row("big", RuntimeKind::Fn, INF_RUST);
 pub const INF_CMP_DEC: RuntimeItem = inf_row("cmp_dec", RuntimeKind::Fn, INF_RUST);
-pub const INF_CMP_FLOAT: RuntimeItem = inf_row("cmp_float", RuntimeKind::Fn, INF_RUST);
+pub const INF_CMP_FLOAT: RuntimeItem = inf_row("cmp_float", RuntimeKind::Fn, INF_RUST_TS);
 pub const INF_NARROW: RuntimeItem = inf_row("narrow", RuntimeKind::Fn, INF_RUST);
 pub const INF_REM: RuntimeItem = inf_row("rem", RuntimeKind::Fn, INF_RUST);
-pub const INF_STORE: RuntimeItem = inf_row("store", RuntimeKind::StoreFn, INF_RUST);
-pub const INF_TRUE_DIV: RuntimeItem = inf_row("true_div", RuntimeKind::Fn, INF_RUST);
+pub const INF_STORE: RuntimeItem = inf_row("store", RuntimeKind::StoreFn, INF_RUST_TS);
+pub const INF_TRUE_DIV: RuntimeItem = inf_row("true_div", RuntimeKind::Fn, INF_RUST_TS);
+
+/// `inf` rows (T1-T4): the TypeScript runtime (`inf`) carries an `inf` as a
+/// native `bigint`. The rows it shares with Rust and Go are marked above
+/// (`div`, `mod`, `shl`, `shr`, `pow`, `abs`, `approx`, `pack`, `to_dec`,
+/// `parse`, `from_valor`, `from_bytes`, `to_bytes`, `true_div`, `cmp_float`,
+/// `store`); `to_number` and `clamp` exist only there. `to_number` is the
+/// `number` image of a `bigint` (it traps past 2^53 - 1); `clamp` is the
+/// saturating store, with `store`, the only place a width limit applies.
+pub const INF_TO_NUMBER: RuntimeItem = inf_row("to_number", RuntimeKind::Fn, INF_TS);
+pub const INF_CLAMP: RuntimeItem = inf_row("clamp", RuntimeKind::StoreFn, INF_TS);
 
 /// The targets whose runtime package carries each `format` row: the Rust
 /// runtime (`faber::format`) and the Go runtime (`rt.Format*`) share the
@@ -655,6 +670,8 @@ pub const TABLE: &[RuntimeItem] = &[
     INF_REM,
     INF_STORE,
     INF_TRUE_DIV,
+    INF_TO_NUMBER,
+    INF_CLAMP,
     FORMAT_FMT,
     FORMAT_SPEC,
     FORMAT_FLOAT,
