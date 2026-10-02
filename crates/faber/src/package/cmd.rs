@@ -4,8 +4,8 @@
 //! MIR images, Go, Wasm, …) while single-file and stdin paths keep legacy
 //! emit behaviour. Target availability follows compile-time feature gates.
 
+use radix::module::CompileResult;
 use radix::module::codegen::Target;
-use radix::module::{CompileResult, Output};
 use radix::services::DiagnosticMode;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -400,7 +400,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                 Err(d) => fail_with_diagnostic(&d),
             };
             let go_layout = GoBuildLayout::from_package(&layout);
-            let code = output_code(output);
+            let code = radix::services::output_code(output);
             if let Err(d) = emit_go_module_with_postprocess(
                 &go_layout,
                 &code,
@@ -489,8 +489,12 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                 "library dependency graph failed",
             ),
         }
-        let package_code =
-            crate::postprocess::postprocess_code(output_code(output), target, format, linter);
+        let package_code = crate::postprocess::postprocess_code(
+            radix::services::output_code(output),
+            target,
+            format,
+            linter,
+        );
         let binary_path = emit_crate_and_build(
             &layout,
             &package_code,
@@ -502,7 +506,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
         return;
     }
 
-    let code = output_code(output);
+    let code = radix::services::output_code(output);
 
     // Single-file Rust builds that need the `faber` runtime / tokio (from HIR facts,
     // not emitted-text sniffing) emit a generated Cargo crate under
@@ -961,8 +965,12 @@ pub fn cmd_emit_package(command: radix::services::EmitCommand, format: bool, lin
         return;
     }
 
-    let code =
-        crate::postprocess::postprocess_code(output_code(output), command.target, format, linter);
+    let code = crate::postprocess::postprocess_code(
+        radix::services::output_code(output),
+        command.target,
+        format,
+        linter,
+    );
     print!("{code}");
 }
 
@@ -1065,34 +1073,4 @@ fn is_permissive_check_code(code: Option<&'static str>) -> bool {
         code,
         Some("SEM001" | "SEM002" | "SEM003" | "SEM004" | "SEM006")
     )
-}
-
-fn output_code(output: Output) -> String {
-    match output {
-        Output::Rust(out) => out.code,
-        Output::Faber(out) => out.code,
-        Output::TypeScript(out) => out.code,
-        Output::Go(out) => out.code,
-        Output::Python(out) => out.code,
-        #[cfg(feature = "mir-wasm")]
-        Output::WasmText(out) => out.code,
-        #[cfg(feature = "mir-llvm")]
-        Output::LlvmText(out) => out.code,
-        #[cfg(feature = "mir-metal")]
-        Output::MetalText(out) => out.code,
-        #[cfg(feature = "mir-wgsl")]
-        Output::WgslText(out) => out.code,
-        #[cfg(feature = "mir-sexp")]
-        Output::Sexp(out) => out.code,
-        #[cfg(feature = "mir-basic")]
-        Output::Basic(out) => out.code,
-        Output::Swift(out) => out.code,
-        Output::Haskell(out) => out.code,
-        #[cfg(feature = "hir-pascal")]
-        Output::Pascal(out) => out.code,
-        #[cfg(feature = "hir-cobol")]
-        Output::Cobol(out) => out.code,
-        #[cfg(feature = "hir-fortran")]
-        Output::Fortran(out) => out.code,
-    }
 }
