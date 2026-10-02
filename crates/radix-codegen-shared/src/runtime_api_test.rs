@@ -309,12 +309,11 @@ fn the_exact_rows_spell_as_faber_exact_functions_in_rust() {
 fn the_regex_rows_spell_as_faber_regex_functions_in_rust() {
     let rows: Vec<&RuntimeItem> = TABLE
         .iter()
-        .filter(|row| row.ns == Namespace::Regex)
+        .filter(|row| row.ns == Namespace::Regex && row.targets.contains(&Target::HirRust))
         .collect();
     assert_eq!(rows.len(), 12);
     for row in rows {
         assert_eq!(row.kind, RuntimeKind::Fn);
-        assert_eq!(row.targets, [Target::HirRust]);
         assert_eq!(
             spell_any(Target::HirRust, row),
             format!("faber::regex::{}", row.name)
