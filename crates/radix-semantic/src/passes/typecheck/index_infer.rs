@@ -127,15 +127,28 @@ impl TypeChecker<'_> {
         };
         let actual_shape = self.resolve_index(actual_shape);
         let expected_shape = self.resolve_index(expected_shape);
-        if matches!(
-            self.types.get_index(actual_shape),
-            IndexExpr::Infer(_) | IndexExpr::Unspecified
-        ) || matches!(
-            self.types.get_index(expected_shape),
-            IndexExpr::Infer(_) | IndexExpr::Unspecified
-        ) {
-            // A root hole has no rank to preserve. A tuple with per-axis
-            // Infer terms remains admissible below because its rank is known.
+        // A whole-shape generic parameter (`size Shape` in `tensor<T, Shape>`)
+        // is a fresh root hole at the call site: it has no rank to preserve
+        // and nothing to relate at runtime, so the ordinary unifier binds it
+        // to the actual shape.
+        if matches!(self.types.get_index(expected_shape), IndexExpr::Infer(_)) {
+            return None;
+        }
+        // An actual root hole (an intrinsic result such as
+        // `seed.from_flat(...)`) is bound by the ordinary unifier to a
+        // whole-shape expectation, which carries no rank either. Against a
+        // ranked expectation it would have to manufacture a rank, so that
+        // case (and an unspecified shape on either side) is reported.
+        let actual_is_hole = matches!(self.types.get_index(actual_shape), IndexExpr::Infer(_));
+        if actual_is_hole && !matches!(self.types.get_index(expected_shape), IndexExpr::Tuple(_)) {
+            return None;
+        }
+        if actual_is_hole
+            || matches!(self.types.get_index(actual_shape), IndexExpr::Unspecified)
+            || matches!(self.types.get_index(expected_shape), IndexExpr::Unspecified)
+        {
+            // A tuple with per-axis Infer terms remains admissible below
+            // because its rank is known.
             self.missing_type_annotation("cannot_infer_tensor_shape", span);
             return Some(Err(()));
         }
@@ -161,14 +174,20 @@ impl TypeChecker<'_> {
             // (or returned expression) axis before unification so inferred
             // generic sizes and retained equations have a concrete value
             // source even when the tensor was constructed from a scalar
-            // local or an imported generic parameter.
+            // local or an imported generic parameter. The caller's own rigid
+            // size parameters are not dynamic: they are the symbolic names
+            // the caller's annotations are written in, so they keep their
+            // identity instead of becoming the argument's runtime axis.
             let immutable_scalar_binding = boundary == ShapeRelationBoundary::Call
                 && self.index_has_immutable_scalar_witness(actual);
             if radix_types::evaluate_index_dimension(actual, self.types)
                 .ok()
                 .flatten()
                 .is_none()
-                && !matches!(self.types.get_index(actual), IndexExpr::Infer(_))
+                && !matches!(
+                    self.types.get_index(actual),
+                    IndexExpr::Infer(_) | IndexExpr::Param(_)
+                )
             {
                 if immutable_scalar_binding {
                     // Keep a stable immutable scalar witness for generic
@@ -280,6 +299,12 @@ impl TypeChecker<'_> {
 
     /// Install the size witnesses carried by a function's formal tensor axes,
     /// then retain repeated-symbol/affine consistency checks at entry.
+    ///
+    /// Entry checks are only for host-callable functions whose extents are not
+    /// statically known. A statically known extent is a compile-time fact
+    /// proven at every typed call site, and a device function (kernel or
+    /// nucleum fragment) has no runtime shape-check call to emit: its extents
+    /// are checked at the typed call site and the host launch boundary.
     pub(crate) fn install_function_shape_sources(
         &mut self,
         type_params: &[radix_hir::HirTypeParam],
@@ -360,7 +385,17 @@ impl TypeChecker<'_> {
                         &fields,
                         axis as u32,
                     )));
-                if !self.types.index_equals(actual, expected) {
+                // A statically known extent is a compile-time fact, and a
+                // non-scalar term (a rank tuple passed as a size argument,
+                // `Pondo<[D]>`) has no per-axis equation to check at runtime.
+                let no_entry_equation = matches!(
+                    radix_types::evaluate_index_dimension(expected, self.types),
+                    Ok(Some(_)) | Err(radix_types::IndexArithmeticError::NotScalar)
+                );
+                if !self.current_device_function
+                    && !no_entry_equation
+                    && !self.types.index_equals(actual, expected)
+                {
                     self.record_shape_relation(
                         actual,
                         expected,

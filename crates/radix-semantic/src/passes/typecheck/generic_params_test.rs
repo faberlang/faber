@@ -515,3 +515,45 @@ fn vector_scalar_multiplica_rejects_foreign_element() {
         "argument_type_mismatch",
     );
 }
+
+#[test]
+fn whole_shape_generic_accepts_a_callers_own_size_params() {
+    // K14a: `size Shape` is a root hole and must bind from the argument.
+    // K14b: the argument's `[M, N]` names the caller's own rigid size
+    // parameters, which must survive the call boundary so the caller's
+    // `[M, N]` return annotation still matches.
+    accepts(
+        r"functio keep<magnitudo Shape>(tensor<f32, Shape> value) → tensor<f32, Shape> {
+    redde value
+}
+
+functio caller<magnitudo M, magnitudo N>(tensor<f32, [M, N]> value) → tensor<f32, [M, N]> {
+    redde keep(value)
+}
+
+incipit {
+    fixum tensor<f32, [2, 3]> value ← vacua
+    nota caller(value).longitudo()
+}",
+    );
+}
+
+#[test]
+fn per_axis_generic_binds_to_a_callers_own_size_params() {
+    // K14b: the callee's per-axis holes bind to the caller's `M`/`N`, not to
+    // the argument's runtime axes.
+    accepts(
+        r"functio pass<magnitudo A, magnitudo B>(tensor<f32, [A, B]> value) → tensor<f32, [A, B]> {
+    redde value
+}
+
+functio caller<magnitudo M, magnitudo N>(tensor<f32, [M, N]> value) → tensor<f32, [M, N]> {
+    redde pass(value)
+}
+
+incipit {
+    fixum tensor<f32, [2, 3]> value ← vacua
+    nota caller(value).longitudo()
+}",
+    );
+}

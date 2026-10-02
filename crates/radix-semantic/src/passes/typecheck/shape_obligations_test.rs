@@ -475,3 +475,175 @@ fn affine_record_field_size_binding_uses_formal_axes_and_checks_repeats() {
         }) if fields.as_slice() == &[grid]
     ));
 }
+
+fn tensor_param(
+    checker: &mut TypeChecker<'_>,
+    def_id: DefId,
+    name: radix_lexer::Symbol,
+    dim: IndexId,
+) -> HirParam {
+    let element = checker
+        .types
+        .sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let shape = checker.types.intern_index(IndexExpr::Tuple(vec![dim]));
+    HirParam {
+        def_id,
+        name,
+        ty: checker.types.tensor_with_shape(element, shape),
+        mode: radix_hir::HirParamMode::In,
+        optional: false,
+        sponte: false,
+        default: None,
+        span: radix_lexer::Span::default(),
+    }
+}
+
+fn magnitudo_param(def_id: DefId, name: radix_lexer::Symbol) -> radix_hir::HirTypeParam {
+    radix_hir::HirTypeParam {
+        def_id,
+        kind: radix_syntax::GenericParamKind::Magnitudo,
+        name,
+        span: radix_lexer::Span::default(),
+        constraint: radix_hir::HirTypeParamConstraint::Any,
+        default: None,
+    }
+}
+
+fn entry_relation_count(device_function: bool, static_extent: bool) -> usize {
+    let resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let mut interner = radix_lexer::Interner::new();
+    let n = interner.intern("N");
+    let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+    let dim = if static_extent {
+        checker.types.intern_index(IndexExpr::Literal(5))
+    } else {
+        checker.types.intern_index(IndexExpr::Param(n))
+    };
+    let first = tensor_param(&mut checker, DefId(11), n, dim);
+    let second = tensor_param(&mut checker, DefId(12), n, dim);
+    checker.current_function_def = Some(DefId(10));
+    checker.current_device_function = device_function;
+    let generics = if static_extent {
+        vec![]
+    } else {
+        vec![magnitudo_param(DefId(9), n)]
+    };
+    checker.install_function_shape_sources(&generics, &[first, second]);
+    checker
+        .shape_obligations
+        .functions
+        .get(&DefId(10))
+        .map_or(0, Vec::len)
+}
+
+#[test]
+fn host_function_keeps_the_repeated_size_entry_check() {
+    assert_eq!(entry_relation_count(false, false), 1);
+}
+
+#[test]
+fn device_function_records_no_entry_shape_relation() {
+    // Q3: kernels and nucleum fragments are checked at the typed call site
+    // and the host launch boundary, never by a runtime call at entry.
+    assert_eq!(entry_relation_count(true, false), 0);
+}
+
+#[test]
+fn statically_known_extent_records_no_entry_shape_relation() {
+    // A literal extent is a compile-time fact proven at each typed call site.
+    assert_eq!(entry_relation_count(false, true), 0);
+    assert_eq!(entry_relation_count(true, true), 0);
+}
+
+#[test]
+fn whole_shape_generic_hole_is_left_to_the_ordinary_unifier() {
+    let resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let mut checker = TypeChecker::new(&resolver, &mut types, None, Target::HirRust);
+    let actual_dim = checker.types.intern_index(IndexExpr::Literal(2));
+    let actual_shape = checker
+        .types
+        .intern_index(IndexExpr::Tuple(vec![actual_dim, actual_dim]));
+    let hole = checker.fresh_index_hole();
+    checker.current_shape_call = Some(HirId(41));
+    checker.current_shape_argument = Some(0);
+
+    assert!(
+        checker
+            .unify_shape_at_boundary(actual_shape, hole, radix_lexer::Span::default())
+            .is_none(),
+        "a root `size Shape` hole must fall through to ordinary unification"
+    );
+    assert!(checker.shape_obligations.calls.is_empty());
+}
+
+#[test]
+fn callers_own_size_param_binds_the_callee_hole_without_runtime_rebase() {
+    let resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let mut interner = radix_lexer::Interner::new();
+    let m = interner.intern("M");
+    let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+    let caller_dim = checker.types.intern_index(IndexExpr::Param(m));
+    let actual_shape = checker
+        .types
+        .intern_index(IndexExpr::Tuple(vec![caller_dim]));
+    let hole_dim = checker.fresh_index_hole();
+    let expected_shape = checker.types.intern_index(IndexExpr::Tuple(vec![hole_dim]));
+    checker.current_shape_call = Some(HirId(42));
+    checker.current_shape_argument = Some(0);
+
+    let unified = checker
+        .unify_shape_at_boundary(actual_shape, expected_shape, radix_lexer::Span::default())
+        .expect("call context should use the runtime shape path")
+        .expect("a rigid caller size parameter should unify with a hole");
+
+    let IndexExpr::Tuple(dims) = checker.types.get_index(unified).clone() else {
+        panic!("tuple shape should stay a tuple");
+    };
+    let bound = checker.resolve_index(hole_dim);
+    assert_eq!(bound, caller_dim, "hole binds the caller's own parameter");
+    assert_eq!(checker.resolve_index(dims[0]), caller_dim);
+    assert!(checker.shape_obligations.calls.is_empty());
+}
+
+#[test]
+fn rank_tuple_size_argument_records_no_entry_shape_relation() {
+    // `Pondo<[D]>` passes a rank tuple where the genus expects one extent. A
+    // non-scalar term has no per-axis equation, so no entry relation (which
+    // no backend could lower) is recorded for it.
+    let resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let mut interner = radix_lexer::Interner::new();
+    let name = interner.intern("w");
+    let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+    let literal = checker.types.intern_index(IndexExpr::Literal(1));
+    let rank_tuple = checker.types.intern_index(IndexExpr::Tuple(vec![literal]));
+    let param = tensor_param(&mut checker, DefId(11), name, rank_tuple);
+    checker.current_function_def = Some(DefId(10));
+    checker.install_function_shape_sources(&[], &[param]);
+    assert!(checker.shape_obligations.functions.is_empty());
+}
+
+#[test]
+fn unresolved_actual_shape_binds_to_a_whole_shape_expectation() {
+    // `return seed.from_flat(data, shape)` in `fn f<size Shape>(...) →
+    // tensor<T, Shape>`: the intrinsic's root hole meets the rigid whole-shape
+    // parameter, which has no rank either. Ordinary unification binds it.
+    let resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let mut interner = radix_lexer::Interner::new();
+    let shape = interner.intern("Shape");
+    let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+    checker.current_shape_return_expr = Some(HirId(44));
+    let unresolved = checker.fresh_index_hole();
+    let whole_shape = checker.types.intern_index(IndexExpr::Param(shape));
+
+    assert!(
+        checker
+            .unify_shape_at_boundary(unresolved, whole_shape, radix_lexer::Span::default())
+            .is_none()
+    );
+    assert!(checker.errors.is_empty());
+}

@@ -923,6 +923,7 @@ impl BodyFacts<'_> {
     fn evaluate(&mut self, expr: &HirExpression) -> AbstractRange {
         if let Some(ty) = expr.ty
             && !(self.range_only_expression(expr) && is_range_narrowable_type(ty, self.types))
+            && !self.float_constant_only(expr, ty)
         {
             self.record_type(ty, expr.span);
         }
@@ -1750,6 +1751,51 @@ impl BodyFacts<'_> {
                 }
             }
             _ => {}
+        }
+    }
+
+    /// An untyped float constant (or arithmetic over only such constants) has
+    /// no width of its own: it joins the width of the float it meets, so it
+    /// places no width requirement on the kernel. Only an expression still
+    /// typed as the untyped `fractus` qualifies; an explicit conversion to a
+    /// sized float carries that float's type and is recorded as usual.
+    ///
+    /// A list literal over untyped floats (`[x, 2.0, 3.0] ↦ vf32[3]`) is the
+    /// same case one level up: its elements carry their own requirements and
+    /// the conversion target carries the vector's width, so the literal's
+    /// own array-of-`fractus` type adds none.
+    fn float_constant_only(&self, expr: &HirExpression, ty: TypeId) -> bool {
+        match (&expr.kind, self.types.get(ty)) {
+            (
+                HirExpressionKind::Array(elements),
+                Type::Array(element) | Type::BoundedArray { element, .. },
+            ) => {
+                matches!(
+                    self.types.get(*element),
+                    Type::Primitive(Primitive::Fractus)
+                ) && elements
+                    .iter()
+                    .all(|element| matches!(element, HirArrayElement::Expr(_)))
+            }
+            (_, Type::Primitive(Primitive::Fractus)) => self.untyped_float_expression(expr),
+            _ => false,
+        }
+    }
+
+    fn untyped_float_expression(&self, expr: &HirExpression) -> bool {
+        let untyped = |operand: &HirExpression| {
+            operand
+                .ty
+                .is_some_and(|ty| matches!(self.types.get(ty), Type::Primitive(Primitive::Fractus)))
+                && self.untyped_float_expression(operand)
+        };
+        match &expr.kind {
+            HirExpressionKind::Literal(
+                radix_hir::HirLiteral::Float(_) | radix_hir::HirLiteral::FloatText { .. },
+            ) => true,
+            HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => untyped(inner),
+            HirExpressionKind::Binary(_, lhs, rhs) => untyped(lhs) && untyped(rhs),
+            _ => false,
         }
     }
 
