@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 378,
-    "analyzable": 378
+    "capable": 379,
+    "analyzable": 379
   },
   "terms": [
     {
@@ -1068,8 +1068,8 @@
     {
       "term": "tensor",
       "rule": "keyword",
-      "capable": 13,
-      "analyzable": 13
+      "capable": 14,
+      "analyzable": 14
     },
     {
       "term": "targets",

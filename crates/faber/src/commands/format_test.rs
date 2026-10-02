@@ -930,7 +930,7 @@ fn format_control_file_unchanged() {
 /// to the `.transpose()` method form.
 #[test]
 fn format_cli_keeps_the_transpose_glyph() {
-    let source = "+++\nlocale = \"en\"\n+++\nfn product_transposed(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]> {\n    return (a · b)ᵀ\n}\n\nfn flipped(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> {\n    return aᵀ\n}\n";
+    let source = "+++\nlocale = \"en\"\n+++\nfn product_transposed(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]> {\n    return (a · b)ᵀ.materialize()\n}\n\nfn flipped(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> {\n    return aᵀ.materialize()\n}\n";
     let fixture = std::env::temp_dir().join("faber-format-glyph-transpose-cli.fab");
     fs::write(&fixture, source).expect("write glyph transpose fixture");
 
