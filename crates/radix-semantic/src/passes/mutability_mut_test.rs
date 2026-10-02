@@ -26,6 +26,15 @@ fn assert_language_rejects(source: &str, expected: &str) {
     );
 }
 
+fn assert_language_accepts(source: &str) {
+    let result = analyze_source_with_config(source, PassConfig::base());
+    assert!(
+        result.is_ok(),
+        "language analysis expected acceptance, got: {:?}",
+        result.diagnostics
+    );
+}
+
 fn assert_has_issue(source: &str, expected: &str) {
     let result = analyze_source(source);
     assert!(
@@ -251,4 +260,144 @@ incipit {
         .find(|err| issue(err) == Some(ISSUE_MUT_LOCAL))
         .expect("mut_local warning");
     assert_eq!(crate::semantic_spec(warning.kind).code, "WARN019");
+}
+
+const MUT_SCALAR_SWAP: &str = r"
+functio swap(in numerus a, in numerus b) → vacuum {
+    fixum numerus held ← a
+    a ← b
+    b ← held
+}
+incipit {
+    varia numerus x ← 1
+    varia numerus y ← 2
+    swap(x, y)
+    nota x
+    nota y
+}
+";
+
+#[test]
+fn scalar_assignment_between_mut_params_retains_no_borrow() {
+    let _ = analyze_ok(MUT_SCALAR_SWAP);
+    assert_language_accepts(MUT_SCALAR_SWAP);
+    let source = r"
+functio copy_then_set(in numerus a, in numerus b) → vacuum {
+    a ← b
+    b ← 9
+}
+incipit {
+    varia numerus x ← 1
+    varia numerus y ← 2
+    copy_then_set(x, y)
+}
+";
+    let _ = analyze_ok(source);
+    assert_language_accepts(source);
+}
+
+#[test]
+fn three_mut_scalar_param_rotation_retains_no_borrow() {
+    let source = r"
+functio rotate(in numerus a, in numerus b, in numerus c) → vacuum {
+    fixum numerus held ← a
+    a ← b
+    b ← c
+    c ← held
+}
+incipit {
+    varia numerus x ← 1
+    varia numerus y ← 2
+    varia numerus z ← 3
+    rotate(x, y, z)
+}
+";
+    let _ = analyze_ok(source);
+    assert_language_accepts(source);
+}
+
+#[test]
+fn passing_one_scalar_variable_to_two_mut_params_still_conflicts() {
+    let source = r"
+functio swap(in numerus a, in numerus b) → vacuum {
+    fixum numerus held ← a
+    a ← b
+    b ← held
+}
+incipit {
+    varia numerus x ← 1
+    swap(x, x)
+}
+";
+    assert_rejects_with_issue(source, "mutable_borrow_conflict");
+    assert_language_rejects(source, "mutable_borrow_conflict");
+}
+
+#[test]
+fn borrow_conflict_names_the_place_whose_borrow_is_live() {
+    let result = analyze_source(
+        r"
+functio swap(in numerus a, in numerus b) → vacuum {
+    a ← b
+}
+incipit {
+    varia numerus x ← 1
+    swap(x, x)
+}
+",
+    );
+    assert!(
+        result.diagnostics.iter().any(|err| {
+            issue(err) == Some("mutable_borrow_conflict")
+                && err
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "name" && arg.value == "x")
+        }),
+        "expected the conflict to name `x`, got: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn narrower_cell_passed_to_wider_mut_param_is_rejected() {
+    let source = r"
+functio setit(in numerus x) → vacuum {
+    x ← 300
+}
+incipit {
+    varia u8 small ← 7
+    setit(small)
+    nota small
+}
+";
+    assert_rejects_with_issue(source, "mut_argument_type_mismatch");
+}
+
+#[test]
+fn exact_width_cell_passed_to_mut_param_is_accepted() {
+    let _ = analyze_ok(
+        r"
+functio setit(in u8 x) → vacuum {
+    x ← 200
+}
+incipit {
+    varia u8 small ← 7
+    setit(small)
+    nota small
+}
+",
+    );
+    let _ = analyze_ok(
+        r"
+functio setit(in numerus x) → vacuum {
+    x ← 300
+}
+incipit {
+    varia numerus big ← 7
+    setit(big)
+    nota big
+}
+",
+    );
 }
