@@ -166,7 +166,7 @@ impl Ascii {
 
 impl std::fmt::Display for Ascii {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(crate::display_text_payload(self.as_ref()))
+        f.write_str(crate::display::text_payload(self.as_ref()))
     }
 }
 

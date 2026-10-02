@@ -2,8 +2,8 @@
 //!
 //! ## Contract authority
 //!
-//! [`FractusDisplay`], [`display_fractus`], [`display_bivalens`] and
-//! [`display_text_payload`] mirror the definitions in
+//! [`FractusDisplay`], [`fractus`], [`bivalens`] and
+//! [`text_payload`] mirror the definitions in
 //! `radix-runtime-contract/src/display.rs`.  The contract is the canonical
 //! authority; the runtime copy must stay in sync.
 //!
@@ -44,7 +44,7 @@ impl FractusDisplay for f64 {
     }
 }
 
-pub fn display_fractus<T: FractusDisplay>(value: T) -> String {
+pub fn fractus<T: FractusDisplay>(value: T) -> String {
     if value.has_zero_fraction() {
         value.display_whole()
     } else {
@@ -53,36 +53,32 @@ pub fn display_fractus<T: FractusDisplay>(value: T) -> String {
 }
 
 #[must_use]
-pub fn display_bivalens(value: bool) -> &'static str {
+pub fn bivalens(value: bool) -> &'static str {
     if value { "verum" } else { "falsum" }
 }
 
 #[must_use]
-pub fn display_text_payload(value: &str) -> &str {
+pub fn text_payload(value: &str) -> &str {
     value
 }
 
-pub fn display_valor(value: &Valor) -> String {
+pub fn valor(value: &Valor) -> String {
     match value {
         Valor::Nihil => "nihil".to_owned(),
-        Valor::Bivalens(value) => display_bivalens(*value).to_owned(),
+        Valor::Bivalens(value) => bivalens(*value).to_owned(),
         Valor::Numerus(value) => value.to_string(),
         Valor::Magnus(value) => value.to_string(),
-        Valor::Fractus(value) => display_fractus(*value),
+        Valor::Fractus(value) => fractus(*value),
         Valor::Textus(value) | Valor::Instans(value) => value.clone(),
         Valor::Octeti(bytes) => format!("<{} bytes>", bytes.len()),
         Valor::Lista(items) => {
-            let inner = items
-                .iter()
-                .map(display_valor)
-                .collect::<Vec<_>>()
-                .join(", ");
+            let inner = items.iter().map(valor).collect::<Vec<_>>().join(", ");
             format!("[{inner}]")
         }
         Valor::Tabula(items) => {
             let inner = items
                 .iter()
-                .map(|(key, value)| format!("{key:?}: {}", display_valor(value)))
+                .map(|(key, value)| format!("{key:?}: {}", valor(value)))
                 .collect::<Vec<_>>()
                 .join(", ");
             format!("{{{inner}}}")
@@ -90,18 +86,18 @@ pub fn display_valor(value: &Valor) -> String {
     }
 }
 
-pub fn display_option<T: Display>(value: Option<&T>) -> String {
+pub fn option<T: Display>(value: Option<&T>) -> String {
     value.map_or_else(|| "nihil".to_owned(), ToString::to_string)
 }
 
-pub fn display_option_bivalens(value: Option<bool>) -> &'static str {
-    value.map_or("nihil", display_bivalens)
+pub fn option_bivalens(value: Option<bool>) -> &'static str {
+    value.map_or("nihil", bivalens)
 }
 
-pub fn display_option_fractus<T: FractusDisplay>(value: Option<T>) -> String {
-    value.map_or_else(|| "nihil".to_owned(), display_fractus)
+pub fn option_fractus<T: FractusDisplay>(value: Option<T>) -> String {
+    value.map_or_else(|| "nihil".to_owned(), fractus)
 }
 
-pub fn display_option_vacuum<T>(value: Option<T>) -> &'static str {
+pub fn option_vacuum<T>(value: Option<T>) -> &'static str {
     value.map_or("nihil", |_| "vacuum")
 }
