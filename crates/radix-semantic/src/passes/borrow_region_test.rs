@@ -16,7 +16,7 @@
 use super::borrow_region;
 use super::borrow_region_cfg::{CfgEdgeKind, CfgNodeKind};
 use crate::SemanticErrorKind;
-use crate::test_support::{analyze_ok, analyze_source, issue};
+use crate::test_support::{analyze_ok, analyze_source, analyze_source_with_config, issue};
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{HirBlock, HirExpression, HirExpressionKind, HirId};
 
@@ -39,21 +39,31 @@ fn assert_region_accepted(source: &str, label: &str) {
     );
 }
 
+/// The tensor-view fixtures are written in the English surface.
+fn analyze_en(source: &str) -> crate::test_support::AnalyzedFixture {
+    let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
+    config.locale_pack = Some(
+        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("load English locale pack"),
+    );
+    analyze_source_with_config(source, config)
+}
+
 const TENSOR_VIEW_LAST_USE_SOURCE: &str = r#"
 main {
     const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
-    const tensor<f32, []> seed ← vacua
-    var tensor<f32, [2, 2]> base ← seed.strue(data, [2, 2])
-    const tensor<f32, [2, 2]> view ← base.transpone()
-    const int dimensions ← view.longitudo()
-    base.ponde([0, 0], 9.0)
+    const tf32[] seed ← empty
+    var tensor<f32, [2, 2]> base ← seed.from_flat(data, [2, 2])
+    const tensor<f32, [2, 2]> view ← base.transpose()
+    const int dimensions ← view.length()
+    base.set([0, 0], 9.0)
     print dimensions
 }
 "#;
 
 #[test]
 fn tensor_view_base_write_is_allowed_after_last_view_use() {
-    let result = analyze_source(TENSOR_VIEW_LAST_USE_SOURCE);
+    let result = analyze_en(TENSOR_VIEW_LAST_USE_SOURCE);
     assert!(
         result.is_ok(),
         "base write after the view's final dimensions query should be accepted: {:?}",
@@ -64,10 +74,10 @@ fn tensor_view_base_write_is_allowed_after_last_view_use() {
 #[test]
 fn tensor_view_base_write_is_rejected_before_later_view_use() {
     let source = TENSOR_VIEW_LAST_USE_SOURCE.replace(
-        "    const int dimensions ← view.longitudo()\n    base.ponde([0, 0], 9.0)\n    print dimensions",
-        "    base.ponde([0, 0], 9.0)\n    const int dimensions ← view.longitudo()\n    print dimensions",
+        "    const int dimensions ← view.length()\n    base.set([0, 0], 9.0)\n    print dimensions",
+        "    base.set([0, 0], 9.0)\n    const int dimensions ← view.length()\n    print dimensions",
     );
-    let result = analyze_source(&source);
+    let result = analyze_en(&source);
     assert!(
         result.diagnostics.iter().any(|diagnostic| {
             diagnostic.kind == SemanticErrorKind::MutableBorrowConflict
@@ -87,7 +97,7 @@ main {
     var tf32[2, 2] view ← true ✓ base.transpose() ✗ base.transpose()
 }
 "#;
-    let result = analyze_source(source);
+    let result = analyze_en(source);
     assert!(
         result.diagnostics.iter().any(|diagnostic| {
             diagnostic.kind == SemanticErrorKind::ModeMismatch
@@ -106,10 +116,10 @@ main {
     var tf32[2, 2] base ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [2, 2])
     const tf32[2, 2] owned ← (true ✓ base.transpose() ✗ base.transpose()).materialize()
     base.set([0, 0], 9.0)
-    print owned.get([0, 0]) coalesce 0.0
+    print owned.length()
 }
 "#;
-    let result = analyze_source(source);
+    let result = analyze_en(source);
     assert!(
         result.is_ok(),
         "materialize must end ternary view provenance before a later base write: {:?}",
@@ -126,7 +136,7 @@ main {
     var tf32[2, 1] escaped ← base.expanded([1, 2]).transpose()
 }
 "#;
-    let result = analyze_source(source);
+    let result = analyze_en(source);
     assert!(
         result.diagnostics.iter().any(|diagnostic| {
             diagnostic.kind == SemanticErrorKind::ModeMismatch
@@ -164,7 +174,7 @@ main {
 }
 "#;
     let source = format!("{TENSOR_EDGE_POLICY_DECLARATIONS}{main}");
-    let result = analyze_source(&source);
+    let result = analyze_en(&source);
     assert!(
         result.diagnostics.iter().any(|diagnostic| {
             diagnostic.kind == SemanticErrorKind::ModeMismatch
@@ -183,11 +193,11 @@ main {
     var tf32[3] base ← seed.from_flat([1.0, 2.0, 3.0], [3])
     const tf32[3] view ← base.shift([1]).limes<ZeroGhost>()
     base.set([0], 9.0)
-    print view.get([0]) coalesce 0.0
+    print view.length()
 }
 "#;
     let source = format!("{TENSOR_EDGE_POLICY_DECLARATIONS}{main}");
-    let result = analyze_source(&source);
+    let result = analyze_en(&source);
     assert!(
         result.diagnostics.iter().any(|diagnostic| {
             diagnostic.kind == SemanticErrorKind::MutableBorrowConflict
@@ -758,4 +768,84 @@ incipit {
         "borrow read by the dum condition must be live at a write before perge; diagnostics: {:?}",
         result.diagnostics
     );
+}
+
+fn has_tensor_view_escape(source: &str) -> (bool, Vec<crate::SemanticError>) {
+    let result = analyze_source(source);
+    let escaped = result.diagnostics.iter().any(|diagnostic| {
+        diagnostic.kind == SemanticErrorKind::ModeMismatch
+            && issue(diagnostic) == Some("tensor_view_escape")
+    });
+    (escaped, result.diagnostics.clone())
+}
+
+#[test]
+fn text_slice_is_not_a_tensor_view() {
+    for (label, source) in [
+        (
+            "returned",
+            "functio f(textus s) → textus { redde s.sectio(0, 2) }\nincipit { nota f(\"abcd\") }",
+        ),
+        (
+            "literal receiver",
+            "functio f(numerus d) → textus { redde \"0123456789abcdef\".sectio(d, d + 1) }\nincipit { nota f(3) }",
+        ),
+        (
+            "bound then returned",
+            "functio f(textus s) → textus {\n    fixum textus head ← s.sectio(0, 2)\n    redde head\n}\nincipit { nota f(\"abcd\") }",
+        ),
+    ] {
+        let (escaped, diagnostics) = has_tensor_view_escape(source);
+        assert!(
+            !escaped,
+            "text slice ({label}) is not a view: {diagnostics:?}"
+        );
+    }
+}
+
+#[test]
+fn list_slice_is_not_a_tensor_view() {
+    for (label, source) in [
+        (
+            "returned",
+            "functio f(lista<numerus> xs) → lista<numerus> { redde xs.sectio(0, 1) }\nincipit { nota f([1, 2]) }",
+        ),
+        (
+            "bound then returned",
+            "functio f(lista<numerus> xs) → lista<numerus> {\n    fixum lista<numerus> head ← xs.sectio(0, 1)\n    redde head\n}\nincipit { nota f([1, 2]) }",
+        ),
+    ] {
+        let (escaped, diagnostics) = has_tensor_view_escape(source);
+        assert!(
+            !escaped,
+            "list slice ({label}) is not a view: {diagnostics:?}"
+        );
+    }
+}
+
+#[test]
+fn matrix_transpose_is_not_a_tensor_view() {
+    let source = "functio f(mf32[2, 2] m) → mf32[2, 2] { redde m.transpone() }\nincipit { }";
+    let (escaped, diagnostics) = has_tensor_view_escape(source);
+    assert!(!escaped, "matrix transpone is a copy: {diagnostics:?}");
+}
+
+#[test]
+fn tensor_receiver_view_methods_still_escape() {
+    for (label, source) in [
+        (
+            "returned",
+            "functio f(tf32[2, 2] x) → tf32[2, 2] { redde x.transpone() }\nincipit { }",
+        ),
+        (
+            "bound then returned",
+            "functio f(tf32[2, 2] x) → tf32[2, 2] {\n    fixum tf32[2, 2] v ← x.transpone()\n    redde v\n}\nincipit { }",
+        ),
+    ] {
+        let (escaped, diagnostics) = has_tensor_view_escape(source);
+        assert!(
+            escaped,
+            "tensor view ({label}) must still escape-decline: {diagnostics:?}"
+        );
+    }
 }

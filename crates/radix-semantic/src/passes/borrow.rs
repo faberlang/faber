@@ -1047,6 +1047,13 @@ impl<'a> BorrowChecker<'a> {
         arity: usize,
     ) -> Option<&'static str> {
         let ty = receiver.ty?;
+        // Only a tensor receiver can yield a borrowed view: text and list
+        // slices and matrix transposes are fresh values, whatever the method
+        // is named.
+        let (_, inner) = self.types.peel_access_marker(ty);
+        if !matches!(self.types.get(inner), Type::Tensor(_, _)) {
+            return None;
+        }
         let name = self.interner.strings().get(method.0 as usize)?;
         lookup_method_for_type_id(ty, self.types, name, arity).map(|entry| entry.faber_name)
     }
