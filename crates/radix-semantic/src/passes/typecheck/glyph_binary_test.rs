@@ -368,7 +368,7 @@ fn glyph_dot_symbolic_transpose_chain_typechecks() {
 fn glyph_transpose_rank2_typechecks_and_swaps_shape() {
     accepts(
         r"functio transpose(tensor<f32, [2, 3]> grid) → tensor<f32, [3, 2]> {
-    redde gridᵀ
+    redde gridᵀ.materialize()
 }",
     );
 }
@@ -389,7 +389,7 @@ fn glyph_transpose_rank3_typechecks_as_batched_transpose() {
     // consumer — leading batch axes stay, the trailing [M, N] pair swaps.
     accepts(
         r"functio transpose(tensor<f32, [2, 3, 4]> batch) → tensor<f32, [2, 4, 3]> {
-    redde batchᵀ
+    redde batchᵀ.materialize()
 }",
     );
 }

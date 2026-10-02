@@ -73,7 +73,7 @@ fn lowers_glyph_transpose_to_tensor_transpose_collection_op() {
     let dump = dump_source(
         r"
 functio transpose(tensor<f32, [2, 3]> input) → tensor<f32, [3, 2]> {
-    redde inputᵀ
+    redde inputᵀ.materialize()
 }
 ",
     );
