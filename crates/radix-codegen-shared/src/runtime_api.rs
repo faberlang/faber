@@ -185,6 +185,77 @@ pub const DEC_TO_INT: RuntimeItem = dec_row("to_int", RuntimeKind::Fn);
 pub const DEC_TRY_PARSE: RuntimeItem = dec_row("try_parse", RuntimeKind::Fn);
 pub const DEC_TRY_STORE: RuntimeItem = dec_row("try_store", RuntimeKind::Fn);
 
+/// The targets whose runtime package carries an `inf` row. Only the Go runtime
+/// (`rt.Inf*`, `faber/runtime/go/inf.go`) carries them on this table today.
+const INF_TARGETS: &[Target] = &[Target::HirGo];
+
+const fn inf_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Inf,
+        name,
+        kind,
+        targets: INF_TARGETS,
+    }
+}
+
+/// `inf` rows (T1-G4): the unbounded-integer (`*big.Int`) carrier of the Go
+/// runtime (`rt.Inf*`). An `inf` is a `*big.Int` treated as immutable; a nil
+/// pointer reads as zero through `INF_Z`. The width limit applies only in the
+/// store family (`store_i`, `store_u`, `wrap`, `clamp_i`, `clamp_u`): a value
+/// leaves the carrier into a bounded slot there and nowhere else. `INF_PART` is
+/// the type an `inf` rides inside a composite (tuple) map key.
+pub const INF_Z: RuntimeItem = inf_row("z", RuntimeKind::Fn);
+pub const INF_I: RuntimeItem = inf_row("i", RuntimeKind::Fn);
+pub const INF_U: RuntimeItem = inf_row("u", RuntimeKind::Fn);
+pub const INF_S: RuntimeItem = inf_row("s", RuntimeKind::Fn);
+pub const INF_SIGN: RuntimeItem = inf_row("sign", RuntimeKind::Fn);
+pub const INF_ADD: RuntimeItem = inf_row("add", RuntimeKind::Fn);
+pub const INF_SUB: RuntimeItem = inf_row("sub", RuntimeKind::Fn);
+pub const INF_MUL: RuntimeItem = inf_row("mul", RuntimeKind::Fn);
+pub const INF_NEG: RuntimeItem = inf_row("neg", RuntimeKind::Fn);
+pub const INF_ABS: RuntimeItem = inf_row("abs", RuntimeKind::Fn);
+pub const INF_NOT: RuntimeItem = inf_row("not", RuntimeKind::Fn);
+pub const INF_AND: RuntimeItem = inf_row("and", RuntimeKind::Fn);
+pub const INF_OR: RuntimeItem = inf_row("or", RuntimeKind::Fn);
+pub const INF_XOR: RuntimeItem = inf_row("xor", RuntimeKind::Fn);
+pub const INF_DIV: RuntimeItem = inf_row("div", RuntimeKind::Fn);
+pub const INF_MOD: RuntimeItem = inf_row("mod", RuntimeKind::Fn);
+pub const INF_SHL: RuntimeItem = inf_row("shl", RuntimeKind::Fn);
+pub const INF_SHR: RuntimeItem = inf_row("shr", RuntimeKind::Fn);
+pub const INF_POW: RuntimeItem = inf_row("pow", RuntimeKind::Fn);
+pub const INF_SUM: RuntimeItem = inf_row("sum", RuntimeKind::Fn);
+pub const INF_SIGNUM: RuntimeItem = inf_row("signum", RuntimeKind::Fn);
+pub const INF_MAX: RuntimeItem = inf_row("max", RuntimeKind::Fn);
+pub const INF_MIN: RuntimeItem = inf_row("min", RuntimeKind::Fn);
+pub const INF_LIST_EQ: RuntimeItem = inf_row("list_eq", RuntimeKind::Fn);
+pub const INF_CMP: RuntimeItem = inf_row("cmp", RuntimeKind::Fn);
+pub const INF_LT_F: RuntimeItem = inf_row("lt_f", RuntimeKind::Fn);
+pub const INF_LE_F: RuntimeItem = inf_row("le_f", RuntimeKind::Fn);
+pub const INF_GT_F: RuntimeItem = inf_row("gt_f", RuntimeKind::Fn);
+pub const INF_GE_F: RuntimeItem = inf_row("ge_f", RuntimeKind::Fn);
+pub const INF_EQ_F: RuntimeItem = inf_row("eq_f", RuntimeKind::Fn);
+pub const INF_APPROX: RuntimeItem = inf_row("approx", RuntimeKind::Fn);
+pub const INF_F64: RuntimeItem = inf_row("f64", RuntimeKind::Fn);
+pub const INF_F32: RuntimeItem = inf_row("f32", RuntimeKind::Fn);
+pub const INF_FROM_F: RuntimeItem = inf_row("from_f", RuntimeKind::Fn);
+pub const INF_PARSE: RuntimeItem = inf_row("parse", RuntimeKind::Fn);
+pub const INF_STR: RuntimeItem = inf_row("str", RuntimeKind::Fn);
+pub const INF_FROM_VALOR: RuntimeItem = inf_row("from_valor", RuntimeKind::Fn);
+pub const INF_FROM_BYTES: RuntimeItem = inf_row("from_bytes", RuntimeKind::Fn);
+pub const INF_TO_BYTES: RuntimeItem = inf_row("to_bytes", RuntimeKind::Fn);
+pub const INF_PACK: RuntimeItem = inf_row("pack", RuntimeKind::Fn);
+pub const INF_FITS_I: RuntimeItem = inf_row("fits_i", RuntimeKind::Fn);
+pub const INF_FITS_U: RuntimeItem = inf_row("fits_u", RuntimeKind::Fn);
+pub const INF_STORE_I: RuntimeItem = inf_row("store_i", RuntimeKind::StoreFn);
+pub const INF_STORE_U: RuntimeItem = inf_row("store_u", RuntimeKind::StoreFn);
+pub const INF_WRAP: RuntimeItem = inf_row("wrap", RuntimeKind::StoreFn);
+pub const INF_CLAMP_I: RuntimeItem = inf_row("clamp_i", RuntimeKind::StoreFn);
+pub const INF_CLAMP_U: RuntimeItem = inf_row("clamp_u", RuntimeKind::StoreFn);
+pub const INF_TO_DEC: RuntimeItem = inf_row("to_dec", RuntimeKind::Fn);
+pub const INF_KEY: RuntimeItem = inf_row("key", RuntimeKind::Fn);
+pub const INF_FROM_KEY: RuntimeItem = inf_row("from_key", RuntimeKind::Fn);
+pub const INF_PART: RuntimeItem = inf_row("part", RuntimeKind::Type);
+
 /// The targets whose runtime package carries each `regex` row. Rows differ by
 /// target: the Rust runtime carries the match operations as free functions in
 /// `faber::regex`, the Go runtime carries a constructor plus methods, the Swift
@@ -343,6 +414,57 @@ pub const TABLE: &[RuntimeItem] = &[
     EXACT_WRAP,
     EXACT_CLAMP_I,
     EXACT_CLAMP_U,
+    INF_Z,
+    INF_I,
+    INF_U,
+    INF_S,
+    INF_SIGN,
+    INF_ADD,
+    INF_SUB,
+    INF_MUL,
+    INF_NEG,
+    INF_ABS,
+    INF_NOT,
+    INF_AND,
+    INF_OR,
+    INF_XOR,
+    INF_DIV,
+    INF_MOD,
+    INF_SHL,
+    INF_SHR,
+    INF_POW,
+    INF_SUM,
+    INF_SIGNUM,
+    INF_MAX,
+    INF_MIN,
+    INF_LIST_EQ,
+    INF_CMP,
+    INF_LT_F,
+    INF_LE_F,
+    INF_GT_F,
+    INF_GE_F,
+    INF_EQ_F,
+    INF_APPROX,
+    INF_F64,
+    INF_F32,
+    INF_FROM_F,
+    INF_PARSE,
+    INF_STR,
+    INF_FROM_VALOR,
+    INF_FROM_BYTES,
+    INF_TO_BYTES,
+    INF_PACK,
+    INF_FITS_I,
+    INF_FITS_U,
+    INF_STORE_I,
+    INF_STORE_U,
+    INF_WRAP,
+    INF_CLAMP_I,
+    INF_CLAMP_U,
+    INF_TO_DEC,
+    INF_KEY,
+    INF_FROM_KEY,
+    INF_PART,
     REGEX_MATCHES,
     REGEX_FIND,
     REGEX_FIND_ALL,

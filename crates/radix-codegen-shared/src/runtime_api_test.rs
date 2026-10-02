@@ -333,9 +333,14 @@ fn the_store_family_is_the_exact_rows_that_apply_a_width_limit() {
         .map(|row| row.name)
         .collect();
     store_rows.sort_unstable();
+    // `exact` (Rust `store`; Go `store_i`, `store_u`, `wrap`, `clamp_i`,
+    // `clamp_u`) and `inf` (Go, the same five).
     assert_eq!(
         store_rows,
-        ["clamp_i", "clamp_u", "store", "store_i", "store_u", "wrap"]
+        [
+            "clamp_i", "clamp_i", "clamp_u", "clamp_u", "store", "store_i", "store_i", "store_u",
+            "store_u", "wrap", "wrap"
+        ]
     );
     assert_eq!(
         spell(Target::HirRust, &EXACT_STORE),
@@ -418,6 +423,55 @@ fn the_go_dec_rows_spell_as_the_flat_rt_names() {
     ] {
         assert_eq!(spell_any(Target::HirGo, row), spelled);
     }
+}
+
+#[test]
+fn the_go_inf_rows_spell_as_the_flat_rt_names() {
+    let go_rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Inf && row.targets.contains(&Target::HirGo))
+        .collect();
+    // 50 functions and the `InfPart` composite-key type.
+    assert_eq!(go_rows.len(), 51);
+    assert_eq!(
+        go_rows
+            .iter()
+            .filter(|row| row.kind == RuntimeKind::Type)
+            .count(),
+        1
+    );
+    // The width limit applies only in the store family.
+    let mut store: Vec<&str> = go_rows
+        .iter()
+        .filter(|row| row.kind == RuntimeKind::StoreFn)
+        .map(|row| row.name)
+        .collect();
+    store.sort_unstable();
+    assert_eq!(store, ["clamp_i", "clamp_u", "store_i", "store_u", "wrap"]);
+    assert_eq!(spell_any(Target::HirGo, &INF_PART), "rt.InfPart");
+    for (row, spelled) in [
+        (&INF_Z, "rt.InfZ"),
+        (&INF_I, "rt.InfI"),
+        (&INF_ADD, "rt.InfAdd"),
+        (&INF_LIST_EQ, "rt.InfListEq"),
+        (&INF_LT_F, "rt.InfLtF"),
+        (&INF_F64, "rt.InfF64"),
+        (&INF_FROM_VALOR, "rt.InfFromValor"),
+        (&INF_TO_BYTES, "rt.InfToBytes"),
+        (&INF_FITS_U, "rt.InfFitsU"),
+        (&INF_TO_DEC, "rt.InfToDec"),
+        (&INF_FROM_KEY, "rt.InfFromKey"),
+    ] {
+        assert_eq!(spell_any(Target::HirGo, row), spelled);
+    }
+    assert_eq!(
+        spell_store(Target::HirGo, &INF_STORE_I, &site()),
+        Ok("rt.InfStoreI".to_owned())
+    );
+    assert_eq!(
+        spell(Target::HirGo, &INF_STORE_I),
+        Err(SpellError::StoreOnly)
+    );
 }
 
 #[test]
