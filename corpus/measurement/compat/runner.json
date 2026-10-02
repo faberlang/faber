@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 317,
-    "analyzable": 373
+    "capable": 318,
+    "analyzable": 374
   },
   "terms": [
     {
@@ -1068,8 +1068,8 @@
     {
       "term": "tensor",
       "rule": "keyword",
-      "capable": 12,
-      "analyzable": 13
+      "capable": 13,
+      "analyzable": 14
     },
     {
       "term": "targets",
