@@ -15,6 +15,8 @@ import PackageDescription
 
 let package = Package(
     name: "FaberRuntime",
+    // The regex namespace runs on Swift's native `Regex` (macOS 13).
+    platforms: [.macOS(.v13)],
     products: [
         .library(name: "FaberRuntime", targets: ["FaberRuntime"])
     ],
