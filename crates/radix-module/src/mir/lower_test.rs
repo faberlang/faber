@@ -5619,6 +5619,21 @@ incipit {
         assert_tensor_dims_literal(types, param.ty);
     }
     assert_tensor_dims_literal(types, instance.return_ty);
+    // R6 / Q3: the literal instance's sizes were proven at the typed call
+    // site, so it carries no runtime shape check at entry or return.
+    let shape_checks = instance
+        .blocks
+        .iter()
+        .flat_map(|block| block.statements.iter())
+        .filter(|statement| {
+            matches!(
+                &statement.kind,
+                MirStatementKind::RuntimeCall { call, .. }
+                    if matches!(call.intrinsic, MirIntrinsic::TensorShapeCheck(_))
+            )
+        })
+        .count();
+    assert_eq!(shape_checks, 0, "a literal instance has no runtime shape check");
 }
 
 #[test]

@@ -1923,6 +1923,7 @@ fn finalize_function_shapes(
     // the post-finalize survivor net (one stable diagnostic).
     let _ = substitute_tensor_from_flat_shape_size_constants(types, function, shape_bindings);
     let _ = substitute_shape_size_constants(types, function, shape_bindings);
+    fold_static_shape_checks(types, function);
     true
 }
 
@@ -2002,6 +2003,107 @@ fn finalize_type_shapes(
             errors.push(MirError::validation(error.span, error.message));
             None
         }
+    }
+}
+
+/// Drop the shape relations that a finalized instance proves statically.
+///
+/// A template's entry and return checks relate formal carrier axes because
+/// its sizes are symbolic. Once an instance binds those sizes to literals, an
+/// axis read from an operand whose type has a literal extent is a compile-time
+/// fact, already proven at the typed call site that created the instance (Q3:
+/// fixed sizes are checked at the typed call site, never at function entry).
+/// Equal static relations are removed; a check left with no relation and no
+/// size binding is removed. Relations that read a runtime extent, and static
+/// relations that disagree, stay for the runtime check.
+pub(super) fn fold_static_shape_checks(types: &TypeTable, function: &mut MirFunction) {
+    let scope = FunctionTypeScope::from_function(function);
+    for block in &mut function.blocks {
+        block.statements.retain_mut(|statement| {
+            let MirStatementKind::RuntimeCall { destination: None, call } = &mut statement.kind else {
+                return true;
+            };
+            let MirIntrinsic::TensorShapeCheck(check) = &mut call.intrinsic else {
+                return true;
+            };
+            let args = &call.args;
+            check.relations.retain(|relation| {
+                let left = static_shape_value(types, &scope, args, &relation.left);
+                let right = static_shape_value(types, &scope, args, &relation.right);
+                !matches!((left, right), (Some(left), Some(right)) if left == right)
+            });
+            !check.relations.is_empty() || !check.size_bindings.is_empty()
+        });
+    }
+}
+
+/// The value of a shape expression when the check's operand types fix it.
+fn static_shape_value(
+    types: &TypeTable,
+    scope: &FunctionTypeScope,
+    args: &[MirOperand],
+    expr: &MirShapeExpr,
+) -> Option<u64> {
+    match expr {
+        MirShapeExpr::Literal(value) => Some(*value),
+        MirShapeExpr::Product(factors) => factors.iter().try_fold(1u64, |product, factor| {
+            product.checked_mul(static_shape_value(types, scope, args, factor)?)
+        }),
+        MirShapeExpr::ScalarArgument { argument } => match args.get(usize::try_from(*argument).ok()?)? {
+            MirOperand::Constant(MirConstant::Int(value)) => u64::try_from(*value).ok(),
+            MirOperand::Constant(MirConstant::UInt(value)) => Some(*value),
+            // A substituted shape-size constant is an integral extent carried
+            // as a float scalar.
+            MirOperand::Constant(MirConstant::Float(value))
+                if value.is_finite() && *value >= 0.0 && value.fract() == 0.0 && *value <= u64::MAX as f64 =>
+            {
+                Some(*value as u64)
+            }
+            _ => None,
+        },
+        MirShapeExpr::TensorAxis { argument, axis } => {
+            let MirOperand::Place(place) = args.get(usize::try_from(*argument).ok()?)? else {
+                return None;
+            };
+            if !place.projections.is_empty() {
+                return None;
+            }
+            let ty = match place.base {
+                MirPlaceBase::Local(local) => scope.locals.get(&local)?,
+                MirPlaceBase::Temp(temp) => scope.temps.get(&temp)?,
+            };
+            static_axis_extent(types, ty.semantic_id(), *axis)
+        }
+        MirShapeExpr::TensorFieldAxis { .. } => None,
+        MirShapeExpr::Affine { base, offset } => {
+            let base = i128::from(static_shape_value(types, scope, args, base)?);
+            u64::try_from(base.checked_add(*offset)?).ok()
+        }
+        MirShapeExpr::Divide { numerator, divisor } => {
+            let numerator = static_shape_value(types, scope, args, numerator)?;
+            (*divisor != 0 && numerator % divisor == 0).then(|| numerator / divisor)
+        }
+    }
+}
+
+/// The literal extent of one axis of a tensor-like type, when it has one.
+fn static_axis_extent(types: &TypeTable, mut ty: TypeId, axis: u32) -> Option<u64> {
+    while let Type::Ref(_, inner) | Type::Alias(_, inner) = types.get(ty) {
+        ty = *inner;
+    }
+    let (Type::Tensor(_, shape) | Type::Matrix(_, shape) | Type::Vector(_, shape) | Type::Sparsa(_, shape)) =
+        types.get(ty)
+    else {
+        return None;
+    };
+    let dim = match types.get_index(*shape) {
+        IndexExpr::Tuple(dims) => *dims.get(usize::try_from(axis).ok()?)?,
+        _ if axis == 0 => *shape,
+        _ => return None,
+    };
+    match types.get_index(dim) {
+        IndexExpr::Literal(value) => Some(*value),
+        _ => None,
     }
 }
 

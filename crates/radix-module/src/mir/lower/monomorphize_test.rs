@@ -320,3 +320,148 @@ functio dense_qkv<magnitudo T, magnitudo D, magnitudo Q, magnitudo K>(tensor<f32
         &["T", "Q"],
     );
 }
+
+// ── R6: static shape checks in finalized instances ───────────────────────
+
+/// A tensor type whose axes are the given index terms.
+fn tensor_of(types: &mut TypeTable, dims: &[IndexExpr]) -> MirType {
+    let dims = dims
+        .iter()
+        .map(|dim| types.intern_index(dim.clone()))
+        .collect();
+    let shape = types.intern_index(IndexExpr::Tuple(dims));
+    let element = types.primitive(Primitive::Fractus);
+    MirType::semantic(types.tensor_with_shape(element, shape))
+}
+
+fn local_decl(id: u32, ty: MirType) -> MirLocalDecl {
+    MirLocalDecl { id: MirLocalId(id), name: None, ty, mutable: false, span: Span::default() }
+}
+
+fn axis(argument: u32, axis: u32) -> MirShapeExpr {
+    MirShapeExpr::TensorAxis { argument, axis }
+}
+
+/// One instance whose body is a single shape check over locals `_0` and `_1`.
+fn shape_check_instance(
+    left_ty: MirType,
+    right_ty: MirType,
+    relations: Vec<MirShapeRelation>,
+    size_bindings: Vec<MirShapeBinding>,
+) -> MirFunction {
+    let mut instance = stub_function(0);
+    instance.locals = vec![local_decl(0, left_ty), local_decl(1, right_ty)];
+    instance.blocks = vec![MirBlock {
+        id: MirBlockId(0),
+        statements: vec![MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination: None,
+                call: MirRuntimeCall {
+                    intrinsic: MirIntrinsic::TensorShapeCheck(MirShapeCheck { relations, size_bindings }),
+                    args: vec![
+                        MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                        MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                    ],
+                    return_ty: MirType::semantic(TypeId(0)),
+                },
+            },
+            span: Span::default(),
+        }],
+        terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: Span::default() },
+        span: Span::default(),
+    }];
+    instance
+}
+
+fn remaining_relations(function: &MirFunction) -> Option<Vec<MirShapeRelation>> {
+    function.blocks[0]
+        .statements
+        .iter()
+        .find_map(|statement| match &statement.kind {
+            MirStatementKind::RuntimeCall { call, .. } => match &call.intrinsic {
+                MirIntrinsic::TensorShapeCheck(check) => Some(check.relations.clone()),
+                _ => None,
+            },
+            _ => None,
+        })
+}
+
+#[test]
+fn literal_instance_entry_check_is_removed() {
+    let mut types = TypeTable::new();
+    let ty = tensor_of(&mut types, &[IndexExpr::Literal(2), IndexExpr::Literal(8)]);
+    let mut instance = shape_check_instance(
+        ty,
+        ty,
+        vec![
+            MirShapeRelation { left: axis(1, 0), right: axis(0, 0) },
+            MirShapeRelation { left: axis(1, 1), right: axis(0, 1) },
+        ],
+        Vec::new(),
+    );
+
+    fold_static_shape_checks(&types, &mut instance);
+
+    assert!(
+        instance.blocks[0].statements.is_empty(),
+        "a check every relation of which the instance types prove is a compile-time fact"
+    );
+}
+
+#[test]
+fn runtime_extent_relation_survives_the_static_fold() {
+    let mut types = TypeTable::new();
+    let runtime = IndexExpr::Runtime(RuntimeExtentId::FunctionParameterAxis { parameter: 0, axis: 0 });
+    let left = tensor_of(&mut types, &[runtime, IndexExpr::Literal(8)]);
+    let right = tensor_of(&mut types, &[IndexExpr::Literal(2), IndexExpr::Literal(8)]);
+    let runtime_relation = MirShapeRelation { left: axis(1, 0), right: axis(0, 0) };
+    let mut instance = shape_check_instance(
+        left,
+        right,
+        vec![
+            runtime_relation.clone(),
+            MirShapeRelation { left: axis(1, 1), right: axis(0, 1) },
+        ],
+        Vec::new(),
+    );
+
+    fold_static_shape_checks(&types, &mut instance);
+
+    assert_eq!(remaining_relations(&instance), Some(vec![runtime_relation]));
+}
+
+#[test]
+fn disagreeing_static_relation_stays_for_the_runtime_check() {
+    let mut types = TypeTable::new();
+    let left = tensor_of(&mut types, &[IndexExpr::Literal(2)]);
+    let right = tensor_of(&mut types, &[IndexExpr::Literal(3)]);
+    let relation = MirShapeRelation { left: axis(1, 0), right: axis(0, 0) };
+    let mut instance = shape_check_instance(left, right, vec![relation.clone()], Vec::new());
+
+    fold_static_shape_checks(&types, &mut instance);
+
+    assert_eq!(remaining_relations(&instance), Some(vec![relation]));
+}
+
+#[test]
+fn shape_check_with_size_bindings_keeps_its_statement() {
+    let mut types = TypeTable::new();
+    let ty = tensor_of(&mut types, &[IndexExpr::Literal(4)]);
+    let mut instance = shape_check_instance(
+        ty,
+        ty,
+        vec![MirShapeRelation {
+            left: MirShapeExpr::Affine { base: Box::new(axis(1, 0)), offset: -2 },
+            right: MirShapeExpr::Divide { numerator: Box::new(axis(0, 0)), divisor: 2 },
+        }],
+        vec![MirShapeBinding { parameter: 0, witness: axis(0, 0) }],
+    );
+
+    fold_static_shape_checks(&types, &mut instance);
+
+    assert_eq!(
+        remaining_relations(&instance),
+        Some(Vec::new()),
+        "the static relation folds; the size binding keeps the check"
+    );
+}
