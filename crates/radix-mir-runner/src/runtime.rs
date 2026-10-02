@@ -1437,6 +1437,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 self.eval_regex_bulk(op, args, span)
             }
             MirCollectionOp::RegexReplace => self.eval_regex_replace(args, span),
+            MirCollectionOp::RegexReplaceEach => self.eval_regex_replace_each(args, span),
             MirCollectionOp::TextEscape => {
                 self.map_str_arg(args, span, |text| super::regex_program::escape(&text))
             }
@@ -3765,6 +3766,51 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             ));
         };
         Ok(Value::Str(program.replace_all_literal(&text, &replacement)))
+    }
+
+    /// Closure `regex.muta(text, closure)`, after the lowered loop has run the
+    /// closure once per match: the text with the i-th match replaced by the
+    /// i-th result, literally.
+    fn eval_regex_replace_each(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [receiver, text, replacements] = args else {
+            return Err(RunnerError::internal(span, "regex replace-each arity"));
+        };
+        let Value::Regex(program) = self.eval_operand(receiver, span)? else {
+            return Err(RunnerError::internal(
+                span,
+                "replace-each receiver is not regex",
+            ));
+        };
+        let Value::Str(text) = self.eval_operand(text, span)? else {
+            return Err(RunnerError::internal(
+                span,
+                "replace-each text is not textus",
+            ));
+        };
+        let Value::Array(items) = self.eval_operand(replacements, span)? else {
+            return Err(RunnerError::internal(
+                span,
+                "replace-each replacements are not a lista",
+            ));
+        };
+        let mut pieces = Vec::new();
+        for item in items.borrow().iter() {
+            let Value::Str(piece) = item else {
+                return Err(RunnerError::internal(
+                    span,
+                    "replace-each replacement is not textus",
+                ));
+            };
+            pieces.push(piece.clone());
+        }
+        program
+            .replace_each(&text, &pieces)
+            .map(Value::Str)
+            .ok_or_else(|| RunnerError::internal(span, "replace-each count mismatch"))
     }
 
     /// The five `match` accessors; offsets are code points.

@@ -1,0 +1,79 @@
++++
+term = "replace"
+kind = "method"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "conversio_expr", "call_expr", "call_suffix", "member_suffix", "argument_list", "argument", "compact_clausura_expr", "clausura_signature", "clausura_joint", "clausura_params", "clausura_param", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "regex"
+canonical = false
+summary = "regex.replace(text, closure) replaces every match with the closure's result, taken literally; the closure receives the match."
+syntax = "<regex>.replace(<textus>, <closure>)"
+related = ["regex", "↦", "find", "find_all", "replace", "escape"]
+locale = "en"
++++
+# =============================================================================
+# replace (closure) — every regex match, replaced by computed text
+# =============================================================================
+#
+# What this teaches:
+#   • `r.replace(text, _ m ∴ …)` runs the closure once per match, left to
+#     right, and puts each result where its match was; the closure's
+#     parameter is the match, with the same five accessors `find` returns
+#     (`text`, `start`, `end`, `group`, `named`)
+#   • the parameter is written `_ m`: the match type has no source name, the
+#     compiler types it from the call
+#   • the result is plain text, like the literal form: `$1` in a closure
+#     result stays `$1`, and a result is never searched again, even when it
+#     would match the pattern
+#   • the same one-name `replace` takes a plain text or a closure; both
+#     return the new text and leave the input unchanged
+#   • the empty-match rule of `find_all` applies, so `a*` over `baaac` runs
+#     the closure for the spans (0,0) (1,4) (5,5)
+#
+# Common mistakes:
+#   • expecting `$1` in the closure result to insert a group: read it with
+#     `m.group(1)` and build the text
+#   • expecting a result that matches the pattern to be replaced again
+#
+# See also: regex, ↦, find, find_all, replace, escape.
+# =============================================================================
+
+# replace — a closure computes each replacement
+#
+# <regex>.replace(<textus>, <closure>)   -- textus
+#
+# EXPECTED OUTPUT:
+#   One printed text per cell, in the order below.
+
+main {
+    # upper-case every word: the match text, changed
+    const regex word ← "[a-z]+" ↦ regex
+    print word.replace("ab cd e", _ m ∴ m.text().uppercase())
+
+    # every accessor: text, start, end, a group and a named group
+    const regex pair ← "(?P<key>[a-z]+)=(?P<val>[0-9]+)" ↦ regex
+    print pair.replace("x=1 yy=22", _ m ∴ "[§ §-§ §=§]"(m.text(), m.start(), m.end(), m.group(1) coalesce "?", m.named("val") coalesce "?"))
+
+    # a group that did not take part reads as none
+    const regex either ← "(a)|(b)" ↦ regex
+    print either.replace("abc", _ m ∴ (m.group(1) coalesce "-") + (m.group(2) coalesce "-"))
+
+    # the result is literal: `$1` and `${key}` are copied, not expanded
+    print pair.replace("x=1", _ m ∴ "$1 ${key}")
+
+    # a result is never searched again: each `a` becomes `aa`, once
+    const regex a ← "a" ↦ regex
+    print a.replace("banana", _ m ∴ "aa")
+
+    # the empty-match rule: the closure runs for (0,0) (1,4) (5,5)
+    const regex stars ← "a*" ↦ regex
+    print stars.replace("baaac", _ m ∴ "<§-§>"(m.start(), m.end()))
+
+    # no match is the text unchanged
+    const regex digits ← "[0-9]+" ↦ regex
+    print digits.replace("none here", _ m ∴ "#")
+
+    # offsets count code points
+    print word.replace("😀é abc", _ m ∴ "§@§"(m.text(), m.start()))
+
+    # the literal form still works on the same name
+    print word.replace("ab cd", "x")
+}

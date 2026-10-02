@@ -396,6 +396,13 @@ pub enum MirCollectionOp {
     /// matches it literally, escaping exactly the dialect's metacharacters
     /// (RX-4b).
     TextEscape,
+    /// Regex closure `muta` (RX-5): operands `[regex, text, replacements]`
+    /// where `replacements` is the `lista<textus>` of closure results, one per
+    /// match of the receiver in the text in left-to-right order (the same
+    /// iteration as `RegexFindAll`); returns the text with the i-th match
+    /// replaced by the i-th replacement, each taken literally and never
+    /// re-scanned. The closure itself runs in the lowered loop, not here.
+    RegexReplaceEach,
     /// Cord walk: `ascii.cursor()` / later `textus.cursor()` → `cursor<ascii<1>>`.
     /// One buffer of one-byte ascii values; not a per-step heap slice.
     CordCursor,

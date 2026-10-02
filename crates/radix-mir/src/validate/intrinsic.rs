@@ -674,6 +674,7 @@ impl Validator<'_, '_> {
             | MirCollectionOp::Slice
             | MirCollectionOp::Replace
             | MirCollectionOp::RegexReplace
+            | MirCollectionOp::RegexReplaceEach
             | MirCollectionOp::TensorSet
             | MirCollectionOp::TensorCreate
             | MirCollectionOp::TensorSlice
@@ -1235,6 +1236,9 @@ impl Validator<'_, '_> {
             }
             MirCollectionOp::RegexReplace | MirCollectionOp::TextEscape => {
                 self.validate_regex_text_call(scope, op, first_arg_ty, call, span);
+            }
+            MirCollectionOp::RegexReplaceEach => {
+                self.validate_regex_replace_each_call(scope, first_arg_ty, call, span);
             }
             MirCollectionOp::Uppercase | MirCollectionOp::Lowercase | MirCollectionOp::Trim => {
                 self.require_exact(
@@ -2287,6 +2291,55 @@ impl Validator<'_, '_> {
                     self.primitive(Primitive::Textus),
                     span,
                     "regex text operation argument is not textus",
+                );
+            }
+        }
+    }
+
+    /// RX-5: closure `muta` joins `[regex, text, lista<textus>]` into a `textus`.
+    fn validate_regex_replace_each_call(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        first_arg_ty: Option<MirType>,
+        call: &MirRuntimeCall,
+        span: Span,
+    ) {
+        if let Some(receiver_ty) = first_arg_ty {
+            self.require_exact(
+                receiver_ty,
+                self.primitive(Primitive::Regex),
+                span,
+                "regex replace-each receiver type mismatch",
+            );
+        }
+        self.require_exact(
+            call.return_ty,
+            self.primitive(Primitive::Textus),
+            span,
+            "regex replace-each result is not textus",
+        );
+        if let Some(text) = call.args.get(1)
+            && let Some(text_ty) = self.validate_operand(scope, text, span)
+        {
+            self.require_exact(
+                text_ty,
+                self.primitive(Primitive::Textus),
+                span,
+                "regex replace-each text is not textus",
+            );
+        }
+        if let Some(replacements) = call.args.get(2)
+            && let Some(replacements_ty) = self.validate_operand(scope, replacements, span)
+        {
+            let textus = self.primitive(Primitive::Textus);
+            let ok = matches!(
+                self.type_kind(replacements_ty),
+                Type::Array(inner) if self.context.types.equals(*inner, textus.semantic_id())
+            );
+            if !ok {
+                self.error(
+                    span,
+                    "regex replace-each replacements are not lista<textus>",
                 );
             }
         }

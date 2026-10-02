@@ -172,6 +172,32 @@ fn replace_all_literal_never_expands_the_replacement() {
 }
 
 #[test]
+fn replace_each_joins_one_result_per_match_literally() {
+    let join = |pattern: &str, text: &str, results: &[&str]| {
+        let results: Vec<String> = results.iter().map(|piece| (*piece).to_owned()).collect();
+        RegexProgram::compile(pattern)
+            .expect("valid pattern")
+            .replace_each(text, &results)
+    };
+    assert_eq!(join("a+", "caab aa", &["X", "Y"]).as_deref(), Some("cXb Y"));
+    // A result is never expanded or searched again.
+    assert_eq!(
+        join("a", "banana", &["aa", "$1", "a"]).as_deref(),
+        Some("baan$1na")
+    );
+    // The same empty-match rule as `find_all`: spans (0,0) (1,4) (5,5).
+    assert_eq!(
+        join("a*", "baaac", &["<", "-", ">"]).as_deref(),
+        Some("<b-c>")
+    );
+    assert_eq!(join("x", "abc", &[]).as_deref(), Some("abc"));
+    assert_eq!(join("é", "é😀é", &["e", "E"]).as_deref(), Some("e😀E"));
+    // One result per match: a count mismatch is refused, never padded.
+    assert_eq!(join("a", "aa", &["x"]), None);
+    assert_eq!(join("a", "aa", &["x", "y", "z"]), None);
+}
+
+#[test]
 fn escape_covers_exactly_the_metacharacters_and_round_trips() {
     let metacharacters = "\\.+*?()|[]{}^$#&-~";
     for meta in metacharacters.chars() {

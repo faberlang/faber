@@ -240,6 +240,18 @@ impl FunctionBuilder<'_> {
             }
         }
 
+        if let Some(receiver_ty) = receiver.ty {
+            let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
+            if let Some(entry) = crate::intrinsics::lookup_method_for_type(payload, &method_name, args.len())
+                && entry
+                    .params
+                    .contains(&crate::intrinsics::IntrinsicParamKind::TextusOrReplacer)
+                && matches!(args[1].expr.kind, HirExpressionKind::Clausura(..))
+            {
+                return self.lower_regex_replace_closure(receiver, &args[0].expr, &args[1].expr, expr);
+            }
+        }
+
         let Some(op) = self.collection_method_op(receiver, method, args, expr.span) else {
             self.errors.push(MirError::unsupported(
                 expr.span,
