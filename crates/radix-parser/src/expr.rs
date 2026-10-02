@@ -400,6 +400,8 @@ impl Parser {
                 TokenKind::Gt | TokenKind::GtAscii => BinOp::Gt,
                 TokenKind::LtEq => BinOp::LtEq,
                 TokenKind::GtEq => BinOp::GtEq,
+                TokenKind::ElementOf => BinOp::Member,
+                TokenKind::NotElementOf => BinOp::NotMember,
                 _ if self.check_keyword_ident(TokenKind::Intra) => BinOp::InRange,
                 _ if self.check_keyword_ident(TokenKind::Inter) => BinOp::Between,
                 _ => break,

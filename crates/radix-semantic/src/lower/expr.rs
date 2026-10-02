@@ -417,6 +417,9 @@ impl Lowerer<'_> {
             radix_syntax::BinOp::IsNot => HirBinOp::IsNot,
             radix_syntax::BinOp::InRange => HirBinOp::InRange,
             radix_syntax::BinOp::Between => HirBinOp::Between,
+            // WHY: placeholders; the checker retargets `Between` / `NotBetween` to the range forms by right-operand type.
+            radix_syntax::BinOp::Member => HirBinOp::Between,
+            radix_syntax::BinOp::NotMember => HirBinOp::NotBetween,
             radix_syntax::BinOp::Maximum | radix_syntax::BinOp::Minimum => {
                 unreachable!("minmax infix nodes normalize to method calls above")
             }

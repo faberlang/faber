@@ -3855,6 +3855,8 @@ fn mir_bin_op(op: HirBinOp) -> Option<MirBinOp> {
         HirBinOp::Is => Some(MirBinOp::Eq),
         HirBinOp::IsNot => Some(MirBinOp::NotEq),
         HirBinOp::InRange | HirBinOp::Between => None,
+        // Negated membership lowers in unit 3a (membership-glyph); fail closed until then.
+        HirBinOp::NotInRange | HirBinOp::NotBetween => None,
         // Glyph products are intercepted by `lower_binary` before this point;
         // keep the explicit fail-closed arm for any future caller.
         HirBinOp::Dot | HirBinOp::Cross | HirBinOp::TensorProduct | HirBinOp::Hadamard | HirBinOp::HadamardDiv => None,
