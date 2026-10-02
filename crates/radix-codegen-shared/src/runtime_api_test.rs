@@ -473,6 +473,47 @@ fn the_go_carrier_rows_spell_as_the_flat_rt_names() {
 }
 
 #[test]
+fn the_go_sermo_rows_spell_as_the_flat_rt_names() {
+    for (row, spelled) in [
+        (&SERMO_SERMO, "rt.SermoSermo"),
+        (&SERMO_MEUS, "rt.SermoMeus"),
+        (&SERMO_TUUS, "rt.SermoTuus"),
+        (&SERMO_SCRINIUM, "rt.SermoScrinium"),
+        (&SERMO_STATUS, "rt.SermoStatus"),
+        (&SERMO_REQUEST, "rt.SermoRequest"),
+        (&SERMO_ITEM, "rt.SermoItem"),
+        (&SERMO_BYTE, "rt.SermoByte"),
+        (&SERMO_BULK, "rt.SermoBulk"),
+        (&SERMO_DONE, "rt.SermoDone"),
+        (&SERMO_ERROR, "rt.SermoError"),
+        (&SERMO_CANCEL, "rt.SermoCancel"),
+        (&SERMO_CONVERSATION, "rt.SermoConversation"),
+        (&SERMO_CONV_ITEM, "rt.SermoConvItem"),
+        (&SERMO_OPEN, "rt.SermoOpen"),
+        (&SERMO_SET_OPENER, "rt.SermoSetOpener"),
+        (&SERMO_DISPATCH, "rt.SermoDispatch"),
+        (&SERMO_INSTALL_ROUTES, "rt.SermoInstallRoutes"),
+        (&SERMO_AS_MEUS, "rt.SermoAsMeus"),
+        (&SERMO_AS_TUUS, "rt.SermoAsTuus"),
+        (&SERMO_READ_TEXT, "rt.SermoReadText"),
+        (&SERMO_READ_NUMERUS, "rt.SermoReadNumerus"),
+        (&SERMO_DRAIN, "rt.SermoDrain"),
+    ] {
+        assert_eq!(spell_any(Target::HirGo, row), spelled);
+        // Go carries these rows only; none is a store row.
+        assert_eq!(row.targets, &[Target::HirGo]);
+        assert_ne!(row.kind, RuntimeKind::StoreFn);
+    }
+    // The types: the handle, its two views, the frame, the status enum with its
+    // seven variants and the conversation record.
+    let types = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Sermo && row.kind == RuntimeKind::Type)
+        .count();
+    assert_eq!(types, 13);
+}
+
+#[test]
 fn the_go_dec_rows_spell_as_the_flat_rt_names() {
     let go_rows: Vec<&RuntimeItem> = TABLE
         .iter()

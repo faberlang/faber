@@ -420,6 +420,53 @@ pub const TUPLE_PARTS: RuntimeItem = carrier_row(Namespace::Tuple, "parts", Runt
 pub const INSTANS_PARSE: RuntimeItem = carrier_row(Namespace::Instans, "parse", RuntimeKind::Fn);
 pub const VALOR_STRUCT: RuntimeItem = carrier_row(Namespace::Valor, "struct", RuntimeKind::Fn);
 
+/// The targets whose runtime package carries a `sermo` row. Only the Go runtime
+/// (`rt.Sermo*`, `faber/runtime/go/{frame,sermo}.go`) carries them on this
+/// table today.
+const SERMO_GO: &[Target] = &[Target::HirGo];
+
+const fn sermo_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Sermo,
+        name,
+        kind,
+        targets: SERMO_GO,
+    }
+}
+
+/// `sermo` rows (T1-G9): the frame conversation runtime of the Go target. The
+/// types are the sermo handle and its directional views, the typed frame
+/// (`scrinium<T>`), the `status` enum with one struct per variant, and the
+/// conversation record a served `@ ad` handler receives. The functions open and
+/// dispatch a conversation, install the program's static route table, push an
+/// item frame from a handler, build the directional views and materialize a
+/// sermo into a text, numeric or vacuum value. The frame family has no
+/// namespace of its own: it rides the `sermo` namespace. No row applies a width
+/// limit.
+pub const SERMO_SERMO: RuntimeItem = sermo_row("Sermo", RuntimeKind::Type);
+pub const SERMO_MEUS: RuntimeItem = sermo_row("Meus", RuntimeKind::Type);
+pub const SERMO_TUUS: RuntimeItem = sermo_row("Tuus", RuntimeKind::Type);
+pub const SERMO_SCRINIUM: RuntimeItem = sermo_row("Scrinium", RuntimeKind::Type);
+pub const SERMO_STATUS: RuntimeItem = sermo_row("Status", RuntimeKind::Type);
+pub const SERMO_REQUEST: RuntimeItem = sermo_row("Request", RuntimeKind::Type);
+pub const SERMO_ITEM: RuntimeItem = sermo_row("Item", RuntimeKind::Type);
+pub const SERMO_BYTE: RuntimeItem = sermo_row("Byte", RuntimeKind::Type);
+pub const SERMO_BULK: RuntimeItem = sermo_row("Bulk", RuntimeKind::Type);
+pub const SERMO_DONE: RuntimeItem = sermo_row("Done", RuntimeKind::Type);
+pub const SERMO_ERROR: RuntimeItem = sermo_row("Error", RuntimeKind::Type);
+pub const SERMO_CANCEL: RuntimeItem = sermo_row("Cancel", RuntimeKind::Type);
+pub const SERMO_CONVERSATION: RuntimeItem = sermo_row("Conversation", RuntimeKind::Type);
+pub const SERMO_CONV_ITEM: RuntimeItem = sermo_row("conv_item", RuntimeKind::Fn);
+pub const SERMO_OPEN: RuntimeItem = sermo_row("open", RuntimeKind::Fn);
+pub const SERMO_SET_OPENER: RuntimeItem = sermo_row("set_opener", RuntimeKind::Fn);
+pub const SERMO_DISPATCH: RuntimeItem = sermo_row("dispatch", RuntimeKind::Fn);
+pub const SERMO_INSTALL_ROUTES: RuntimeItem = sermo_row("install_routes", RuntimeKind::Fn);
+pub const SERMO_AS_MEUS: RuntimeItem = sermo_row("as_meus", RuntimeKind::Fn);
+pub const SERMO_AS_TUUS: RuntimeItem = sermo_row("as_tuus", RuntimeKind::Fn);
+pub const SERMO_READ_TEXT: RuntimeItem = sermo_row("read_text", RuntimeKind::Fn);
+pub const SERMO_READ_NUMERUS: RuntimeItem = sermo_row("read_numerus", RuntimeKind::Fn);
+pub const SERMO_DRAIN: RuntimeItem = sermo_row("drain", RuntimeKind::Fn);
+
 /// The targets whose runtime package carries each `regex` row. Rows differ by
 /// target: the Rust runtime carries the match operations as free functions in
 /// `faber::regex`, the Go runtime carries a constructor plus methods, the Swift
@@ -672,6 +719,29 @@ pub const TABLE: &[RuntimeItem] = &[
     TUPLE_PARTS,
     INSTANS_PARSE,
     VALOR_STRUCT,
+    SERMO_SERMO,
+    SERMO_MEUS,
+    SERMO_TUUS,
+    SERMO_SCRINIUM,
+    SERMO_STATUS,
+    SERMO_REQUEST,
+    SERMO_ITEM,
+    SERMO_BYTE,
+    SERMO_BULK,
+    SERMO_DONE,
+    SERMO_ERROR,
+    SERMO_CANCEL,
+    SERMO_CONVERSATION,
+    SERMO_CONV_ITEM,
+    SERMO_OPEN,
+    SERMO_SET_OPENER,
+    SERMO_DISPATCH,
+    SERMO_INSTALL_ROUTES,
+    SERMO_AS_MEUS,
+    SERMO_AS_TUUS,
+    SERMO_READ_TEXT,
+    SERMO_READ_NUMERUS,
+    SERMO_DRAIN,
     REGEX_MATCHES,
     REGEX_FIND,
     REGEX_FIND_ALL,
