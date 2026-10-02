@@ -121,10 +121,15 @@ pub const DISPLAY_TAGGED_VALOR: RuntimeItem = display_ts_row("tagged_valor");
 
 /// The targets whose runtime package carries an `exact` row: the Rust runtime
 /// carries the rows below, the Go runtime (`rt.Exact*`) carries its own rows
-/// and shares the four whose id and meaning match (`div`, `shl`, `shr`, `pow`).
+/// and shares the four whose id and meaning match (`div`, `shl`, `shr`, `pow`),
+/// and the TypeScript runtime (`exact` in `@faber/runtime`, T1-T2) shares every
+/// row whose id and meaning match and carries the rest as its own.
 const EXACT_TARGETS: &[Target] = &[Target::HirRust];
-const EXACT_RUST_GO: &[Target] = &[Target::HirRust, Target::HirGo];
+const EXACT_RUST_GO_TS: &[Target] = &[Target::HirRust, Target::HirTypeScript, Target::HirGo];
+const EXACT_RUST_TS: &[Target] = &[Target::HirRust, Target::HirTypeScript];
+const EXACT_GO_TS: &[Target] = &[Target::HirTypeScript, Target::HirGo];
 const EXACT_GO: &[Target] = &[Target::HirGo];
+const EXACT_TS: &[Target] = &[Target::HirTypeScript];
 
 const fn exact_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
     exact_row_for(name, kind, EXACT_TARGETS)
@@ -149,23 +154,23 @@ const fn exact_row_for(
 /// `EXACT_ADD`, `EXACT_SUB` and `EXACT_MUL` (T1-R6) check the representation
 /// window only, so they are plain rows (an unstored computation has no store
 /// site to witness).
-pub const EXACT_ADD: RuntimeItem = exact_row_for("add", RuntimeKind::Fn, EXACT_RUST_GO);
+pub const EXACT_ADD: RuntimeItem = exact_row_for("add", RuntimeKind::Fn, EXACT_RUST_GO_TS);
 pub const EXACT_APPROX_INT: RuntimeItem = exact_row("approx_int", RuntimeKind::Fn);
 pub const EXACT_APPROX_F32: RuntimeItem = exact_row("approx_f32", RuntimeKind::Fn);
 pub const EXACT_APPROX_F64: RuntimeItem = exact_row("approx_f64", RuntimeKind::Fn);
 pub const EXACT_CMP_INT_FLOAT: RuntimeItem = exact_row("cmp_int_float", RuntimeKind::Fn);
 pub const EXACT_CMP_SCALED_FLOAT: RuntimeItem = exact_row("cmp_scaled_float", RuntimeKind::Fn);
-pub const EXACT_DIV: RuntimeItem = exact_row_for("div", RuntimeKind::Fn, EXACT_RUST_GO);
+pub const EXACT_DIV: RuntimeItem = exact_row_for("div", RuntimeKind::Fn, EXACT_RUST_GO_TS);
 pub const EXACT_FIT: RuntimeItem = exact_row("fit", RuntimeKind::Fn);
 pub const EXACT_INT: RuntimeItem = exact_row("int", RuntimeKind::Fn);
-pub const EXACT_MUL: RuntimeItem = exact_row_for("mul", RuntimeKind::Fn, EXACT_RUST_GO);
-pub const EXACT_POW: RuntimeItem = exact_row_for("pow", RuntimeKind::Fn, EXACT_RUST_GO);
+pub const EXACT_MUL: RuntimeItem = exact_row_for("mul", RuntimeKind::Fn, EXACT_RUST_GO_TS);
+pub const EXACT_POW: RuntimeItem = exact_row_for("pow", RuntimeKind::Fn, EXACT_RUST_GO_TS);
 pub const EXACT_REM: RuntimeItem = exact_row("rem", RuntimeKind::Fn);
-pub const EXACT_SHL: RuntimeItem = exact_row_for("shl", RuntimeKind::Fn, EXACT_RUST_GO);
-pub const EXACT_SHR: RuntimeItem = exact_row_for("shr", RuntimeKind::Fn, EXACT_RUST_GO);
-pub const EXACT_STORE: RuntimeItem = exact_row("store", RuntimeKind::StoreFn);
+pub const EXACT_SHL: RuntimeItem = exact_row_for("shl", RuntimeKind::Fn, EXACT_RUST_GO_TS);
+pub const EXACT_SHR: RuntimeItem = exact_row_for("shr", RuntimeKind::Fn, EXACT_RUST_GO_TS);
+pub const EXACT_STORE: RuntimeItem = exact_row_for("store", RuntimeKind::StoreFn, EXACT_RUST_TS);
 pub const EXACT_STORE_INFERRED: RuntimeItem = exact_row("store_inferred", RuntimeKind::StoreFn);
-pub const EXACT_SUB: RuntimeItem = exact_row_for("sub", RuntimeKind::Fn, EXACT_RUST_GO);
+pub const EXACT_SUB: RuntimeItem = exact_row_for("sub", RuntimeKind::Fn, EXACT_RUST_GO_TS);
 
 /// `exact` rows (T1-G2): the Go carrier of the exact integer intermediate
 /// (`rt.Exact*`): the sign-magnitude `ExactX{neg, m}` over `[-2^63, 2^64 - 1]`.
@@ -177,16 +182,16 @@ pub const EXACT_X: RuntimeItem = exact_row_for("X", RuntimeKind::Type, EXACT_GO)
 pub const EXACT_MK: RuntimeItem = exact_row_for("mk", RuntimeKind::Fn, EXACT_GO);
 pub const EXACT_I: RuntimeItem = exact_row_for("i", RuntimeKind::Fn, EXACT_GO);
 pub const EXACT_U: RuntimeItem = exact_row_for("u", RuntimeKind::Fn, EXACT_GO);
-pub const EXACT_NEG: RuntimeItem = exact_row_for("neg", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_NEG: RuntimeItem = exact_row_for("neg", RuntimeKind::Fn, EXACT_GO_TS);
 pub const EXACT_ADD_S: RuntimeItem = exact_row_for("add_s", RuntimeKind::Fn, EXACT_GO);
-pub const EXACT_MOD: RuntimeItem = exact_row_for("mod", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_MOD: RuntimeItem = exact_row_for("mod", RuntimeKind::Fn, EXACT_GO_TS);
 pub const EXACT_W: RuntimeItem = exact_row_for("w", RuntimeKind::Fn, EXACT_GO);
 pub const EXACT_FROM_W: RuntimeItem = exact_row_for("from_w", RuntimeKind::Fn, EXACT_GO);
-pub const EXACT_AND: RuntimeItem = exact_row_for("and", RuntimeKind::Fn, EXACT_GO);
-pub const EXACT_OR: RuntimeItem = exact_row_for("or", RuntimeKind::Fn, EXACT_GO);
-pub const EXACT_XOR: RuntimeItem = exact_row_for("xor", RuntimeKind::Fn, EXACT_GO);
-pub const EXACT_NOT: RuntimeItem = exact_row_for("not", RuntimeKind::Fn, EXACT_GO);
-pub const EXACT_ABS: RuntimeItem = exact_row_for("abs", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_AND: RuntimeItem = exact_row_for("and", RuntimeKind::Fn, EXACT_GO_TS);
+pub const EXACT_OR: RuntimeItem = exact_row_for("or", RuntimeKind::Fn, EXACT_GO_TS);
+pub const EXACT_XOR: RuntimeItem = exact_row_for("xor", RuntimeKind::Fn, EXACT_GO_TS);
+pub const EXACT_NOT: RuntimeItem = exact_row_for("not", RuntimeKind::Fn, EXACT_GO_TS);
+pub const EXACT_ABS: RuntimeItem = exact_row_for("abs", RuntimeKind::Fn, EXACT_GO_TS);
 pub const EXACT_CMP: RuntimeItem = exact_row_for("cmp", RuntimeKind::Fn, EXACT_GO);
 pub const EXACT_APPROX: RuntimeItem = exact_row_for("approx", RuntimeKind::Fn, EXACT_GO);
 pub const EXACT_CMP_F: RuntimeItem = exact_row_for("cmp_f", RuntimeKind::Fn, EXACT_GO);
@@ -202,9 +207,29 @@ pub const EXACT_FITS_I: RuntimeItem = exact_row_for("fits_i", RuntimeKind::Fn, E
 pub const EXACT_FITS_U: RuntimeItem = exact_row_for("fits_u", RuntimeKind::Fn, EXACT_GO);
 pub const EXACT_STORE_I: RuntimeItem = exact_row_for("store_i", RuntimeKind::StoreFn, EXACT_GO);
 pub const EXACT_STORE_U: RuntimeItem = exact_row_for("store_u", RuntimeKind::StoreFn, EXACT_GO);
-pub const EXACT_WRAP: RuntimeItem = exact_row_for("wrap", RuntimeKind::StoreFn, EXACT_GO);
+pub const EXACT_WRAP: RuntimeItem = exact_row_for("wrap", RuntimeKind::StoreFn, EXACT_GO_TS);
 pub const EXACT_CLAMP_I: RuntimeItem = exact_row_for("clamp_i", RuntimeKind::StoreFn, EXACT_GO);
 pub const EXACT_CLAMP_U: RuntimeItem = exact_row_for("clamp_u", RuntimeKind::StoreFn, EXACT_GO);
+
+/// `exact` rows (T1-T2): the TypeScript carrier of the exact integer
+/// (`exact` in `@faber/runtime`), a JS `number` held exact within
+/// ±(2^53 - 1). The rows shared above (`add`, `sub`, `mul`, `div`, `mod`, `shl`,
+/// `shr`, `pow`, `neg`, `not`, `abs`, `and`, `or`, `xor`, `store`, `wrap`) are
+/// spelled the same way; the rows below exist only in the TypeScript runtime.
+/// `chk` is the range check every checked helper ends in, `hi`, `lo` and `join`
+/// are the split the bitwise operators go through, `float_rem` is the float
+/// floor remainder, and `true_div` / `true_div_f32` are integer `÷`. `clamp` is
+/// the saturating store: with `store` and `wrap`, the only place a width limit
+/// applies.
+pub const EXACT_CHK: RuntimeItem = exact_row_for("chk", RuntimeKind::Fn, EXACT_TS);
+pub const EXACT_HI: RuntimeItem = exact_row_for("hi", RuntimeKind::Fn, EXACT_TS);
+pub const EXACT_LO: RuntimeItem = exact_row_for("lo", RuntimeKind::Fn, EXACT_TS);
+pub const EXACT_JOIN: RuntimeItem = exact_row_for("join", RuntimeKind::Fn, EXACT_TS);
+pub const EXACT_FLOAT_REM: RuntimeItem = exact_row_for("float_rem", RuntimeKind::Fn, EXACT_TS);
+pub const EXACT_TRUE_DIV: RuntimeItem = exact_row_for("true_div", RuntimeKind::Fn, EXACT_TS);
+pub const EXACT_TRUE_DIV_F32: RuntimeItem =
+    exact_row_for("true_div_f32", RuntimeKind::Fn, EXACT_TS);
+pub const EXACT_CLAMP: RuntimeItem = exact_row_for("clamp", RuntimeKind::StoreFn, EXACT_TS);
 
 /// The targets whose runtime package carries each `dec` row. The Rust runtime
 /// (`faber::dec`) and the Go runtime (`rt.Dec*`) share the rows whose id and
@@ -557,6 +582,14 @@ pub const TABLE: &[RuntimeItem] = &[
     EXACT_CLAMP_U,
     EXACT_STORE_INFERRED,
     EXACT_SUB,
+    EXACT_CHK,
+    EXACT_HI,
+    EXACT_LO,
+    EXACT_JOIN,
+    EXACT_FLOAT_REM,
+    EXACT_TRUE_DIV,
+    EXACT_TRUE_DIV_F32,
+    EXACT_CLAMP,
     INF_Z,
     INF_I,
     INF_U,

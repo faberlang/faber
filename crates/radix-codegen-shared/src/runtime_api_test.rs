@@ -340,6 +340,53 @@ fn the_exact_rows_spell_as_faber_exact_functions_in_rust() {
 }
 
 #[test]
+fn the_exact_rows_spell_as_exact_namespace_members_in_typescript() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Exact && row.targets.contains(&Target::HirTypeScript))
+        .collect();
+    // The 24 exact-integer helpers of `exact.ts`: 16 shared with Rust or Go and
+    // 8 of the TypeScript runtime's own.
+    assert_eq!(rows.len(), 24);
+    let mut spelled: Vec<String> = rows
+        .iter()
+        .map(|row| spell_any(Target::HirTypeScript, row))
+        .collect();
+    spelled.sort_unstable();
+    let mut expected: Vec<String> = [
+        "abs",
+        "add",
+        "and",
+        "chk",
+        "clamp",
+        "div",
+        "floatRem",
+        "hi",
+        "join",
+        "lo",
+        "mod",
+        "mul",
+        "neg",
+        "not",
+        "or",
+        "pow",
+        "shl",
+        "shr",
+        "store",
+        "sub",
+        "trueDiv",
+        "trueDivF32",
+        "wrap",
+        "xor",
+    ]
+    .iter()
+    .map(|name| format!("exact.{name}"))
+    .collect();
+    expected.sort_unstable();
+    assert_eq!(spelled, expected);
+}
+
+#[test]
 fn the_regex_rows_spell_as_faber_regex_functions_in_rust() {
     let rows: Vec<&RuntimeItem> = TABLE
         .iter()
@@ -368,10 +415,12 @@ fn the_store_family_is_the_exact_and_inf_rows_that_apply_a_width_limit() {
         .collect();
     store_rows.sort_unstable();
     // `exact` (Rust `store` and `store_inferred`; Go `store_i`, `store_u`,
-    // `wrap`, `clamp_i`, `clamp_u`) and `inf` (Rust `store`; Go the same five).
+    // `wrap`, `clamp_i`, `clamp_u`; TypeScript `store`, `wrap`, `clamp`) and
+    // `inf` (Rust `store`; Go the same five).
     assert_eq!(
         store_rows,
         [
+            ("Exact".to_owned(), "clamp"),
             ("Exact".to_owned(), "clamp_i"),
             ("Exact".to_owned(), "clamp_u"),
             ("Exact".to_owned(), "store"),
