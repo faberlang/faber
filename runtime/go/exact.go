@@ -292,22 +292,61 @@ func ExactFitsI(a ExactX, lo int64, hi int64) bool {
 
 func ExactFitsU(a ExactX, hi uint64) bool { return !a.neg && a.m <= hi }
 
-func ExactStoreI(a ExactX, lo int64, hi int64, ty string, pos string, extra string) int64 {
-	if !a.neg && a.m <= uint64(hi) {
-		return int64(a.m)
-	}
-	if a.neg && a.m <= -uint64(lo) {
-		return -int64(a.m)
-	}
-	ExactTrap(a, ty, pos, extra, false)
-	return 0
+// ExactInt is the set of Go sized integer types a store lands in. The set holds
+// the exact types only (no `~`): the instantiation names the Faber width, and
+// Go's own `int` is never one of them.
+type ExactInt interface {
+	int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64
 }
 
-func ExactStoreU(a ExactX, hi uint64, ty string, pos string, extra string) uint64 {
-	if !a.neg && a.m <= hi {
-		return a.m
+// exactRange is the width of a Go sized integer type: its inclusive bounds and
+// the Faber width text a trap names (`int64` is `i64`, never Go `int`). The
+// bounds of a signed type are `[lo, hi]`, of an unsigned type `[0, hi]`.
+func exactRange[T ExactInt]() (lo int64, hi uint64, ty string) {
+	var zero T
+	switch any(zero).(type) {
+	case int8:
+		return math.MinInt8, math.MaxInt8, "i8"
+	case int16:
+		return math.MinInt16, math.MaxInt16, "i16"
+	case int32:
+		return math.MinInt32, math.MaxInt32, "i32"
+	case int64:
+		return math.MinInt64, math.MaxInt64, "i64"
+	case uint8:
+		return 0, math.MaxUint8, "u8"
+	case uint16:
+		return 0, math.MaxUint16, "u16"
+	case uint32:
+		return 0, math.MaxUint32, "u32"
+	default:
+		return 0, math.MaxUint64, "u64"
 	}
-	ExactTrap(a, ty, pos, extra, true)
+}
+
+// ExactStore leaves the carrier into a slot of Go type T under the trapping
+// policy: the value must fit T's width, otherwise it panics naming the value,
+// the Faber width text of T, the position and an optional inferred-slot note.
+func ExactStore[T ExactInt](a ExactX, pos string, extra ...string) T {
+	lo, hi, ty := exactRange[T]()
+	note := ""
+	if len(extra) > 0 {
+		note = extra[0]
+	}
+	if lo < 0 {
+		if !a.neg && a.m <= hi {
+			return T(int64(a.m))
+		}
+		if a.neg && a.m <= -uint64(lo) {
+			return T(-int64(a.m))
+		}
+		ExactTrap(a, ty, pos, note, false)
+		return 0
+	}
+	if !a.neg && a.m <= hi {
+		return T(a.m)
+	}
+	ExactTrap(a, ty, pos, note, true)
 	return 0
 }
 

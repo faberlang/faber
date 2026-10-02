@@ -13,8 +13,10 @@ pub mod dec;
 pub mod display;
 pub mod exact;
 pub mod failable;
+pub mod float;
 pub mod format;
 pub mod frame;
+pub mod r#gen;
 pub mod inf;
 pub mod instans;
 pub mod intervallum;
@@ -43,6 +45,7 @@ pub use frame::{
     IntoScrinium, Meus, ResponseSender, Scrinium, Sermo, SermoRequest, StaticRoute, Tuus,
     install_host_dispatch, install_static_routes, sermo_open_with_dispatch,
 };
+pub use r#gen::{AsyncCursor, AsyncCursorNext, AsyncCursorShared, Gen, Yield};
 pub use instans::{Instans, InstansPraecisio};
 pub use intervallum::{Intervallum, IntervallumKind, IntervallumNumeric, IntervallumWalk};
 pub use json::{Json, JsonError, JsonErrorKind};
