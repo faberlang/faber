@@ -266,7 +266,7 @@ import from "./policy" policy
 
 @ public
 fn {function}(tf32[3] source) → tf32[3] {{
-    return source.shift([1]).limes<policy.ZeroGhost>()
+    return source.shift([1]).limes<policy.ZeroGhost>().materialize()
 }}
 "#
             ),
