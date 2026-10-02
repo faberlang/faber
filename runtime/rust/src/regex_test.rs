@@ -49,6 +49,19 @@ fn rejected_constructs_carry_their_stable_ids() {
         ("\\p{Foo}", "syntax"),
         ("(?'n'a)", "syntax"),
         ("(?#c)a", "syntax"),
+        // Reference extras the engine accepts but the dialect does not.
+        ("(?R)", "recursion"),
+        ("(?U)a+", "unsupported_flag"),
+        ("(?u)a", "unsupported_flag"),
+        ("a++", "possessive"),
+        ("a*+", "possessive"),
+        ("a**", "syntax"),
+        ("a{1001}", "syntax"),
+        ("\\u0041", "syntax"),
+        ("[a[bc]]", "syntax"),
+        ("[a-z&&[^m]]", "syntax"),
+        ("\\b{start}", "syntax"),
+        ("\\<", "syntax"),
     ];
     for (pattern, id) in cells {
         assert_eq!(rejected(pattern).construct(), id, "pattern {pattern:?}");

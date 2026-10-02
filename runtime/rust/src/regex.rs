@@ -7,7 +7,10 @@
 //! the engine's prose. The engine is the Rust `regex` crate (RD-8); the ids
 //! come from the `regex-syntax` error kinds of the same parser.
 
-use regex_syntax::ast::{self, ErrorKind};
+use regex_syntax::ast::{self, Ast, ErrorKind};
+
+/// RE2's repetition count cap; counts above it are `syntax`.
+const MAX_REPEAT_COUNT: u32 = 1000;
 
 /// Pattern carrier for Faber `regex`: the pattern text and its compiled
 /// program, built once at construction.
@@ -67,9 +70,10 @@ impl Regex {
     /// Returns a [`RegexError`] carrying the construct id when the pattern is
     /// outside the dialect or does not compile.
     pub fn new(pattern: &str) -> Result<Self, RegexError> {
-        if let Err(error) = ast::parse::Parser::new().parse(pattern) {
-            return Err(from_ast_error(pattern, &error));
-        }
+        let parsed = ast::parse::Parser::new()
+            .parse(pattern)
+            .map_err(|error| from_ast_error(pattern, &error))?;
+        ast::visit(&parsed, DialectVisitor { pattern })?;
         let compiled = regex::Regex::new(pattern).map_err(|error| RegexError {
             construct: "syntax",
             offset: 0,
@@ -129,61 +133,202 @@ fn engine_detail(error: &regex::Error) -> String {
     last.strip_prefix("error: ").unwrap_or(last).to_owned()
 }
 
-fn from_ast_error(pattern: &str, error: &ast::Error) -> RegexError {
-    let start = error.span().start.offset;
-    let end = error.span().end.offset;
+/// Reject at byte offset `start` of `pattern` with construct `id`.
+fn reject(pattern: &str, id: &'static str, start: usize, detail: impl Into<String>) -> RegexError {
     RegexError {
-        construct: construct_id(pattern, error.kind(), start, end),
+        construct: id,
         offset: pattern.get(..start).map_or(0, |head| head.chars().count()),
-        detail: error.kind().to_string(),
+        detail: detail.into(),
     }
 }
 
-/// Map a `regex-syntax` error kind to its stable construct id. The parser
-/// reports atomic groups, conditionals, numbered recursion and named
-/// backreferences as unrecognized flags or escapes; the id is recovered from
-/// the character at the error span (a peek, no parse).
-fn construct_id(pattern: &str, kind: &ErrorKind, start: usize, end: usize) -> &'static str {
-    let at = pattern.get(start..).and_then(|rest| rest.chars().next());
-    match kind {
+/// Map a `regex-syntax` AST parse error to a construct id. Lookaround and
+/// backreferences have their own error kinds; atomic groups, conditionals,
+/// recursion and named backreferences surface as unrecognized flags or
+/// escapes, so the id comes from the character at the error span (a peek, no
+/// parse). The MIR runner maps the same kinds the same way.
+fn from_ast_error(pattern: &str, error: &ast::Error) -> RegexError {
+    let offset = error.span().start.offset;
+    let rest = pattern.get(offset..).unwrap_or("");
+    let id = match error.kind() {
         ErrorKind::UnsupportedBackreference => "backreference",
         ErrorKind::UnsupportedLookAround => {
-            if pattern
-                .get(start..end)
-                .is_some_and(|token| token.contains('<'))
-            {
+            if rest.starts_with("(?<") {
                 "lookbehind"
             } else {
                 "lookahead"
             }
         }
-        ErrorKind::FlagUnrecognized => match at {
+        ErrorKind::EscapeUnrecognized if rest.starts_with("\\k") => "backreference",
+        ErrorKind::FlagUnrecognized if rest.starts_with("P=") => "backreference",
+        ErrorKind::FlagUnrecognized if rest.starts_with("P>") => "recursion",
+        ErrorKind::FlagUnrecognized => match rest.chars().next() {
             Some('>') => "atomic_group",
             Some('(') => "conditional",
-            Some(digit) if digit.is_ascii_digit() => "recursion",
-            Some('P')
-                if pattern
-                    .get(start + 1..)
-                    .is_some_and(|rest| rest.starts_with('=')) =>
-            {
-                "backreference"
-            }
-            Some(letter) if letter.is_alphabetic() => "unsupported_flag",
+            Some(c) if c.is_ascii_digit() || c == '&' || c == '+' => "recursion",
+            Some(c) if c.is_ascii_alphabetic() => "unsupported_flag",
             _ => "syntax",
         },
-        ErrorKind::EscapeUnrecognized => {
-            let named_backreference = pattern
-                .get(start..end)
-                .is_some_and(|escape| escape.ends_with('k'))
-                && pattern
-                    .get(end..)
-                    .is_some_and(|rest| rest.starts_with(['<', '{', '\'']));
-            if named_backreference {
-                "backreference"
-            } else {
-                "syntax"
+        _ => "syntax",
+    };
+    reject(pattern, id, offset, error.kind().to_string())
+}
+
+/// Rejects the constructs the AST accepts but the dialect does not (the
+/// portable core of the reference syntax): the `R` and `U` and `u` flags,
+/// `\\u` escapes, a repetition of a repetition (possessive quantifiers),
+/// counts above 1000, nested classes, class set operations and the
+/// non-simple word boundaries.
+struct DialectVisitor<'p> {
+    pattern: &'p str,
+}
+
+impl DialectVisitor<'_> {
+    fn check_flags(&self, flags: &ast::Flags) -> Result<(), RegexError> {
+        for item in &flags.items {
+            let ast::FlagsItemKind::Flag(flag) = &item.kind else {
+                continue;
+            };
+            let start = item.span.start.offset;
+            match flag {
+                ast::Flag::CaseInsensitive
+                | ast::Flag::MultiLine
+                | ast::Flag::DotMatchesNewLine
+                | ast::Flag::IgnoreWhitespace => {}
+                // `R` is a CRLF flag letter to the Rust parser and the
+                // recursion spelling `(?R)` to the dialect.
+                ast::Flag::CRLF => {
+                    return Err(reject(
+                        self.pattern,
+                        "recursion",
+                        start,
+                        "recursion is not supported",
+                    ));
+                }
+                ast::Flag::SwapGreed | ast::Flag::Unicode => {
+                    return Err(reject(
+                        self.pattern,
+                        "unsupported_flag",
+                        start,
+                        format!("flag {flag:?} is not supported"),
+                    ));
+                }
             }
         }
-        _ => "syntax",
+        Ok(())
+    }
+
+    fn check_literal(&self, literal: &ast::Literal) -> Result<(), RegexError> {
+        use ast::{
+            HexLiteralKind::{UnicodeLong, UnicodeShort},
+            LiteralKind,
+        };
+        match literal.kind {
+            LiteralKind::HexFixed(UnicodeShort | UnicodeLong)
+            | LiteralKind::HexBrace(UnicodeShort | UnicodeLong) => Err(reject(
+                self.pattern,
+                "syntax",
+                literal.span.start.offset,
+                "\\u and \\U escapes are not supported",
+            )),
+            _ => Ok(()),
+        }
+    }
+
+    fn check_repetition(&self, repetition: &ast::Repetition) -> Result<(), RegexError> {
+        let start = repetition.span.start.offset;
+        if matches!(&*repetition.ast, Ast::Repetition(_)) {
+            let possessive =
+                matches!(repetition.op.kind, ast::RepetitionKind::OneOrMore) && repetition.greedy;
+            return Err(if possessive {
+                reject(
+                    self.pattern,
+                    "possessive",
+                    start,
+                    "possessive quantifiers are not supported",
+                )
+            } else {
+                reject(self.pattern, "syntax", start, "repetition of a repetition")
+            });
+        }
+        let over = match &repetition.op.kind {
+            ast::RepetitionKind::Range(
+                ast::RepetitionRange::Exactly(n) | ast::RepetitionRange::AtLeast(n),
+            ) => *n > MAX_REPEAT_COUNT,
+            ast::RepetitionKind::Range(ast::RepetitionRange::Bounded(m, n)) => {
+                *m > MAX_REPEAT_COUNT || *n > MAX_REPEAT_COUNT
+            }
+            _ => false,
+        };
+        if over {
+            return Err(reject(
+                self.pattern,
+                "syntax",
+                start,
+                "repetition count exceeds 1000",
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl ast::Visitor for DialectVisitor<'_> {
+    type Output = ();
+    type Err = RegexError;
+
+    fn finish(self) -> Result<(), RegexError> {
+        Ok(())
+    }
+
+    fn visit_pre(&mut self, node: &Ast) -> Result<(), RegexError> {
+        match node {
+            Ast::Flags(set) => self.check_flags(&set.flags),
+            Ast::Group(group) => match &group.kind {
+                ast::GroupKind::NonCapturing(flags) => self.check_flags(flags),
+                _ => Ok(()),
+            },
+            Ast::Repetition(repetition) => self.check_repetition(repetition),
+            Ast::Literal(literal) => self.check_literal(literal),
+            Ast::Assertion(assertion) => match assertion.kind {
+                ast::AssertionKind::StartLine
+                | ast::AssertionKind::EndLine
+                | ast::AssertionKind::StartText
+                | ast::AssertionKind::EndText
+                | ast::AssertionKind::WordBoundary
+                | ast::AssertionKind::NotWordBoundary => Ok(()),
+                _ => Err(reject(
+                    self.pattern,
+                    "syntax",
+                    assertion.span.start.offset,
+                    "word boundary variant is not supported",
+                )),
+            },
+            _ => Ok(()),
+        }
+    }
+
+    fn visit_class_set_item_pre(&mut self, item: &ast::ClassSetItem) -> Result<(), RegexError> {
+        match item {
+            ast::ClassSetItem::Bracketed(class) => Err(reject(
+                self.pattern,
+                "syntax",
+                class.span.start.offset,
+                "nested character class",
+            )),
+            ast::ClassSetItem::Literal(literal) => self.check_literal(literal),
+            _ => Ok(()),
+        }
+    }
+
+    fn visit_class_set_binary_op_pre(
+        &mut self,
+        op: &ast::ClassSetBinaryOp,
+    ) -> Result<(), RegexError> {
+        Err(reject(
+            self.pattern,
+            "syntax",
+            op.span.start.offset,
+            "character class set operation",
+        ))
     }
 }
