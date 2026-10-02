@@ -2027,6 +2027,23 @@ prefer sugar. Choose per module or file.
 - `遍歷 從...定值`/`遍歷 從...變值` = for-in (keys)
 - `遍歷 範圍 range 定值/變值 i` = range iteration (e.g. `遍歷 範圍 0‥10 每 2 定值 i { 註記 i }`; `每` belongs to the range expression)
 
+**Range step and direction (`range_tail`, `每`).** The bounds alone pick the
+direction of a range: `a‥b` and `a…b` count up when `a <= b` and count down
+when `a > b`. The optional `每` step is a *positive stride* applied in
+whatever direction the range moves, so `10‥0 每 2` yields `10 8 6 4 2`, `0‥10
+每 2` yields `0 2 4 6 8`, and `10…0 每 5` yields `10 5 0`. A step is never
+signed: a zero or negative step is an error, a compile error
+(`range_step_not_positive`) when the step is a literal and a run-time trap
+otherwise. Equal bounds walk the ascending way (`5‥5` is empty, `5…5` is the
+single value `5`). The step never changes which endpoint a range includes:
+`…` includes its end only when the progression reaches it.
+
+A range binder declared `變值` is a fresh per-iteration copy of the walk's
+counter. A write to it inside the body (`遍歷 範圍 0‥6 變值 i { i ← i + 1 }`)
+changes only the body's copy and never steers the loop, so the example visits
+`0 1 2 3 4 5`. In an `遍歷 範圍` product each binder is refreshed once per
+iteration of its own axis.
+
 **Iteration order.** A type whose order is part of its value iterates in that
 order. `lista` iterates by index. `textus` iterates its characters in order.
 `tensor`, `vector`, and `matrix` iterate by index, outer axis first
