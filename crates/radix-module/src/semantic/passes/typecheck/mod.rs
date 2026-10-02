@@ -28,6 +28,10 @@ mod intervallum_test;
 mod membership_test;
 
 #[cfg(test)]
+#[path = "membership_glyph_test.rs"]
+mod membership_glyph_test;
+
+#[cfg(test)]
 #[path = "bounded_textus_test.rs"]
 mod bounded_textus_test;
 

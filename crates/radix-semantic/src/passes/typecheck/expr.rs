@@ -282,6 +282,13 @@ impl TypeChecker<'_> {
                 ty
             }
             HirExpressionKind::Vacua => self.check_vacua(expected, expr.span),
+            HirExpressionKind::Binary(op, lhs, rhs)
+                if matches!(*op, HirBinOp::Between | HirBinOp::NotBetween) =>
+            {
+                // The unified membership operator: the right operand's type
+                // picks range or collection, and the node records the pick.
+                self.check_membership(op, lhs, rhs)
+            }
             HirExpressionKind::Binary(op, lhs, rhs) => self.check_binary(*op, lhs, rhs, expected),
             HirExpressionKind::Unary(op, operand) => self.check_unary(*op, operand, expected),
             HirExpressionKind::Call(callee, type_args, args, conversion) => {

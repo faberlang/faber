@@ -1522,10 +1522,7 @@ impl TypeChecker<'_> {
                 self.bool_type()
             }
             HirBinOp::Between | HirBinOp::NotBetween => {
-                let lhs_ty = self.check_expr(lhs);
-                let rhs_ty = self.check_expr(rhs);
-                self.check_membership_rhs(lhs_ty, rhs_ty, lhs.span, rhs.span);
-                self.bool_type()
+                unreachable!("membership is resolved by check_membership before check_binary")
             }
             HirBinOp::Coalesce => unreachable!("coalesce is handled before eager rhs checking"),
             HirBinOp::And | HirBinOp::Or => {
@@ -2280,6 +2277,36 @@ impl TypeChecker<'_> {
 }
 
 impl TypeChecker<'_> {
+    /// The unified membership operator (`∈` / `∉`, and the keyword forms that
+    /// still lower to `Between`).
+    ///
+    /// The parser cannot tell a range from a collection, so it records the
+    /// placeholder `Between` / `NotBetween`. The right operand's static type
+    /// decides: an `intervallum` retargets the node in place to `InRange` /
+    /// `NotInRange` and takes the range rule (numeric left, element unified
+    /// with the bound); every other right operand keeps the collection variant
+    /// and takes [`Self::check_membership_rhs`]. The recorded operator is the
+    /// resolved one, which is what MIR, AIR and every emitter read.
+    pub(super) fn check_membership(
+        &mut self,
+        op: &mut HirBinOp,
+        lhs: &mut HirExpression,
+        rhs: &mut HirExpression,
+    ) -> TypeId {
+        let lhs_ty = self.check_expr(lhs);
+        let rhs_ty = self.check_expr(rhs);
+        if self.intervallum_bound_type(rhs_ty).is_some() {
+            *op = match *op {
+                HirBinOp::NotBetween => HirBinOp::NotInRange,
+                _ => HirBinOp::InRange,
+            };
+            self.check_intra_operand(lhs_ty, rhs_ty, lhs.span, rhs.span);
+        } else {
+            self.check_membership_rhs(lhs_ty, rhs_ty, lhs.span, rhs.span);
+        }
+        self.bool_type()
+    }
+
     /// The right-operand rule of keyword membership (`between` / `inter`).
     ///
     /// After peeling aliases and access markers the right operand must be a
