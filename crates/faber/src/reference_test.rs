@@ -342,8 +342,8 @@ fn load_from_disk_builds_explain_registry() {
     let registry = Registry::load_from_disk().expect("disk registry");
     // 216 → 210 → 211 → 210: the registry follows the canonical term count
     // (197) plus the legacy redirects (13). The `nulla` redirect retired with
-    // D23.4 (8c5cc3de4), so 197 + 13 = 210; see reference_test for history.
-    assert_eq!(registry.entries().len(), 210);
+    // D23.4 (8c5cc3de4), so 196 + 13 = 209 (mg5a folds inter+intra into one term); see reference_test for history.
+    assert_eq!(registry.entries().len(), 209);
     let list = render_list(&registry);
     assert!(list.contains("reference:"));
 
