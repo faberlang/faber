@@ -43,7 +43,7 @@ main {
     const vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
     var f32 sum ← 0.0
     var int i ← 0
-    while i < 3 {
+    while i ≺ 3 {
         sum ← sum + v[i]
         i ← i + 1
     }
@@ -53,7 +53,7 @@ main {
     print lane(v, 1)
     var vector<f32, 3> w ← [0.0, 0.0, 0.0] ↦ vector<f32, 3>
     var int j ← 0
-    while j < 3 {
+    while j ≺ 3 {
         w[j] ← v[j] * 2.0
         print w[j]
         j ← j + 1
