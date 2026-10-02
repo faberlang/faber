@@ -73,8 +73,11 @@ fn swift_saturating_division_is_exact_floor_division() {
 #[test]
 fn go_saturating_division_by_zero_uses_the_integer_text() {
     let code = emit(Target::HirGo, SATURATING);
-    assert!(code.contains("faberXDiv(faberXI(int64(a)), faberXI(int64(two)))"), "{code}");
-    assert!(code.contains("panic(\"numerus division failed\")"), "{code}");
+    assert!(
+        code.contains("rt.ExactDiv(rt.ExactI(int64(a)), rt.ExactI(int64(two)))"),
+        "{code}"
+    );
+    // The integer trap text lives in `rt.ExactDiv` (`faber/runtime/go/exact_test.go`).
     assert!(!code.contains("saturatus division failed"), "{code}");
 }
 

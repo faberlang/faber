@@ -90,7 +90,12 @@ fn rust_prints_the_runner_verdicts() {
 /// through the container-local runtime checkout (as the Go e2e lane does).
 fn go_mod(code: &str) -> String {
     let mut content = "module smoke\n\ngo 1.22\n".to_owned();
-    let runtime = crate::paths::faberlang_home().map(|home| home.join("faber/runtime/go"));
+    // `FABER_SUPPORT_PATH_OVERRIDE` names a root holding `faber/runtime/go`, so
+    // a lane packet proves generated Go against its own runtime.
+    let overridden = std::env::var_os("FABER_SUPPORT_PATH_OVERRIDE")
+        .map(|root| std::path::PathBuf::from(root).join("faber/runtime/go"))
+        .filter(|runtime| runtime.is_dir());
+    let runtime = overridden.or_else(|| crate::paths::faberlang_home().map(|home| home.join("faber/runtime/go")));
     if let Some(runtime) = runtime
         .filter(|runtime| runtime.is_dir())
         .filter(|_| code.contains("\"faber/rt\""))
