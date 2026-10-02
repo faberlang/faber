@@ -699,6 +699,15 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     self.recover_or_fail(recovery, span, "textus to fractus conversion failed")
                 }
             },
+            // `int ↦ f32` rounds once, nearest-even, straight from the
+            // integer: going through `f64` first would round twice and can
+            // land on a tie that the exact value is not on.
+            Value::Int(v) if matches!(width, NumericWidth::F32) => {
+                Ok(Value::Float(f64::from(v as f32)))
+            }
+            Value::UInt(v) if matches!(width, NumericWidth::F32) => {
+                Ok(Value::Float(f64::from(v as f32)))
+            }
             Value::Int(v) => Ok(Value::Float(v as f64)),
             Value::UInt(v) => Ok(Value::Float(v as f64)),
             Value::Bool(v) => Ok(Value::Float(if v { 1.0 } else { 0.0 })),

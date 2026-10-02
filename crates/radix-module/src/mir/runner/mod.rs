@@ -28,6 +28,10 @@ mod itera_inf_tests;
 mod range_step_tests;
 
 #[cfg(test)]
+#[path = "call_depth_test.rs"]
+mod call_depth_tests;
+
+#[cfg(test)]
 #[path = "kernel_ban_test.rs"]
 mod kernel_ban_tests;
 

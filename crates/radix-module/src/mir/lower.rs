@@ -2959,8 +2959,19 @@ impl<'a> FunctionBuilder<'a> {
         }
         let lhs_value = self.lower_expr_value(lhs)?;
         let rhs_value = self.lower_expr_value(rhs)?;
-        let one = MirOperand::Constant(MirConstant::Int(1));
-        self.binary_temp(MirBinOp::Div, one, rhs_value.clone(), rhs_ty, expr.span);
+        // The `1 / divisor` temporary is the zero-divisor trap, not dead code:
+        // nothing reads it, but evaluating it is what fails. A nonzero
+        // constant divisor cannot trap, so only that case emits nothing.
+        if !matches!(
+            rhs_value,
+            MirOperand::Constant(MirConstant::Int(value)) if value != 0
+        ) && !matches!(
+            rhs_value,
+            MirOperand::Constant(MirConstant::UInt(value)) if value != 0
+        ) {
+            let one = MirOperand::Constant(MirConstant::Int(1));
+            self.binary_temp(MirBinOp::Div, one, rhs_value.clone(), rhs_ty, expr.span);
+        }
         // An untyped constant operand joins the typed operand's range
         // computation (ruling 12), so its HIR type can be a word type while
         // the MIR constant is a plain integer: convert from the constant's
