@@ -1106,6 +1106,8 @@ fn output_code(output: Output) -> String {
         Output::WgslText(out) => out.code,
         #[cfg(feature = "mir-sexp")]
         Output::Sexp(out) => out.code,
+        #[cfg(feature = "mir-basic")]
+        Output::Basic(out) => out.code,
         Output::Swift(out) => out.code,
         Output::Haskell(out) => out.code,
     }

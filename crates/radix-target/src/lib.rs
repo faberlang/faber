@@ -80,6 +80,10 @@ pub enum Target {
     /// Supported-with-limitations `MIR`-backed Racket validation target.
     MirSexp,
 
+    /// Novelty `MIR`-backed classic line-numbered BASIC target (Commodore 64
+    /// BASIC V2 compatible subset). Default-off; scalar programs only.
+    MirBasic,
+
     /// `MIR` package artifact executed by the `scena` runtime.
     MirScena,
 
@@ -112,6 +116,7 @@ impl fmt::Display for Target {
             Target::MirMetal => write!(f, "metal-text"),
             Target::MirWgsl => write!(f, "wgsl-text"),
             Target::MirSexp => write!(f, "sexp"),
+            Target::MirBasic => write!(f, "basic"),
             Target::MirScena => write!(f, "scena"),
             Target::MirFmir => write!(f, "fmir-text"),
             Target::MirFmirBinary => write!(f, "fmir"),
@@ -146,6 +151,7 @@ impl Target {
             "metal-text" => Some(Self::MirMetal),
             "wgsl-text" => Some(Self::MirWgsl),
             "sexp" => Some(Self::MirSexp),
+            "basic" => Some(Self::MirBasic),
             "scena" => Some(Self::MirScena),
             "fmir-text" => Some(Self::MirFmir),
             "fmir" => Some(Self::MirFmirBinary),
@@ -181,6 +187,7 @@ impl Target {
         Target::MirMetal,
         Target::MirWgsl,
         Target::MirSexp,
+        Target::MirBasic,
         Target::MirScena,
         Target::MirFmir,
         Target::MirFmirBinary,
@@ -201,6 +208,7 @@ impl Target {
             Target::HirFhir => Some("hir-fhir"),
             Target::MirMetal => Some("mir-metal"),
             Target::MirSexp => Some("mir-sexp"),
+            Target::MirBasic => Some("mir-basic"),
             Target::MirAmd => Some("mir-amd"),
             Target::MirWasm => Some("mir-wasm"),
             Target::MirWgsl => Some("mir-wgsl"),
@@ -232,6 +240,7 @@ impl Target {
             Target::HirFhir => cfg!(feature = "hir-fhir"),
             Target::MirMetal => cfg!(feature = "mir-metal"),
             Target::MirSexp => cfg!(feature = "mir-sexp"),
+            Target::MirBasic => cfg!(feature = "mir-basic"),
             Target::MirAmd => cfg!(feature = "mir-amd"),
             Target::MirWasm => cfg!(feature = "mir-wasm"),
             Target::MirWgsl => cfg!(feature = "mir-wgsl"),
@@ -273,6 +282,7 @@ mod tests {
             Target::MirMetal => "metal-text",
             Target::MirWgsl => "wgsl-text",
             Target::MirSexp => "sexp",
+            Target::MirBasic => "basic",
             Target::MirScena => "scena",
             Target::MirFmir => "fmir-text",
             Target::MirFmirBinary => "fmir",
@@ -304,6 +314,7 @@ mod tests {
             "metal-text",
             "wgsl-text",
             "sexp",
+            "basic",
             "scena",
             "fmir-text",
             "fmir",

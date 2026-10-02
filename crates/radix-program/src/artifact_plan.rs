@@ -458,6 +458,7 @@ pub(crate) fn target_name(target: Target) -> &'static str {
         Target::MirMetal => "metal-text",
         Target::MirWgsl => "wgsl-text",
         Target::MirSexp => "sexp",
+        Target::MirBasic => "basic",
         Target::MirScena => "scena",
         Target::MirFmir => "fmir-text",
         Target::MirFmirBinary => "fmir",

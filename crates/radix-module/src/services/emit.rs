@@ -44,5 +44,7 @@ pub fn output_code(output: crate::Output) -> String {
         crate::Output::WgslText(out) => out.code,
         #[cfg(feature = "mir-sexp")]
         crate::Output::Sexp(out) => out.code,
+        #[cfg(feature = "mir-basic")]
+        crate::Output::Basic(out) => out.code,
     }
 }

@@ -145,6 +145,7 @@ pub fn format_generated_code(target: Target, code: &str) -> Result<String, Strin
         | Target::MirMetal
         | Target::MirWgsl
         | Target::MirSexp
+        | Target::MirBasic
         | Target::MirScena
         | Target::MirFmir
         | Target::MirFmirBinary
@@ -176,6 +177,7 @@ pub fn lint_generated_code(target: Target, code: &str) -> Result<String, String>
         | Target::MirMetal
         | Target::MirWgsl
         | Target::MirSexp
+        | Target::MirBasic
         | Target::MirScena
         | Target::MirFmir
         | Target::MirFmirBinary
