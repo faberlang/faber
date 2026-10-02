@@ -3727,19 +3727,19 @@ message = "mutable borrow conflict"
 help = "avoid overlapping mutable borrows"
 
 [diagnostics.SEM052.issues.mutable_borrow_conflict]
-message = "mutable borrow conflicts with existing borrow"
+message = "mutable borrow{?name| of '|'} conflicts with existing borrow"
 help = "avoid overlapping mutable borrows"
 
 [diagnostics.SEM052.issues.shared_borrow_conflict]
-message = "shared borrow conflicts with mutable borrow"
+message = "shared borrow{?name| of '|'} conflicts with mutable borrow"
 help = "avoid overlapping mutable borrows"
 
 [diagnostics.SEM052.issues.use_while_mutably_borrowed]
-message = "use while mutably borrowed"
+message = "use{?name| of '|'} while mutably borrowed"
 help = "avoid overlapping mutable borrows"
 
 [diagnostics.SEM052.issues.write_while_borrowed]
-message = "write while borrowed"
+message = "write{?name| to '|'} while borrowed"
 help = "avoid overlapping mutable borrows"
 
 [diagnostics.SEM053]

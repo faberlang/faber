@@ -251,6 +251,9 @@ struct BorrowChecker<'a> {
     states: FxHashMap<DefId, BorrowState>,
     scopes: Vec<BorrowScope>,
     param_usage: FxHashMap<DefId, ParamUsage>,
+    /// Source names of parameters and locals, so conflict diagnostics can name
+    /// the place whose borrow is live.
+    names: FxHashMap<DefId, radix_lexer::Symbol>,
     /// Bindings whose declared type carries a `ref` access fact.
     ref_roots: FxHashSet<DefId>,
     /// Bindings whose declared type carries a `mut` access fact.
@@ -310,6 +313,7 @@ impl<'a> BorrowChecker<'a> {
             states: FxHashMap::default(),
             scopes: Vec::new(),
             param_usage: FxHashMap::default(),
+            names: FxHashMap::default(),
             ref_roots: FxHashSet::default(),
             mut_roots: FxHashSet::default(),
             own_roots: FxHashSet::default(),
@@ -386,6 +390,7 @@ impl<'a> BorrowChecker<'a> {
     fn check_function(&mut self, func: &HirFunction) {
         self.reset();
         for param in &func.params {
+            self.names.insert(param.def_id, param.name);
             self.ensure_state(param.def_id);
             self.note_ref_root(param.def_id, param.ty);
             self.note_mut_root(param.def_id, param.ty);
@@ -415,6 +420,7 @@ impl<'a> BorrowChecker<'a> {
         self.states.clear();
         self.scopes.clear();
         self.param_usage.clear();
+        self.names.clear();
         self.ref_roots.clear();
         self.mut_roots.clear();
         self.own_roots.clear();
@@ -441,6 +447,7 @@ impl<'a> BorrowChecker<'a> {
             .and_then(|facts| facts.cfg().node_for_hir_id(stmt.id));
         match &stmt.kind {
             HirStatementKind::Local(local) => {
+                self.names.insert(local.def_id, local.name);
                 self.ensure_state(local.def_id);
                 if let Some(ty) = local.ty {
                     self.note_ref_root(local.def_id, ty);
@@ -821,6 +828,16 @@ impl<'a> BorrowChecker<'a> {
         }
     }
 
+    /// A scalar place stores a copy of the assigned value, so assigning into
+    /// it from another place retains no borrow of the source (`a ← b` on two
+    /// `mut int` parameters reads `b`; it does not borrow it).
+    fn is_scalar_place(&self, target: &HirExpression) -> bool {
+        target.ty.is_some_and(|ty| {
+            let (_, inner) = self.types.peel_access_marker(ty);
+            self.types.is_scalar_for_access_marker(inner)
+        })
+    }
+
     fn is_aliasing_type(&self, ty: TypeId) -> bool {
         let (_, inner) = self.types.peel_access_marker(ty);
         if self.types.is_aliasing_container_through_option(inner) {
@@ -978,11 +995,7 @@ impl<'a> BorrowChecker<'a> {
             return;
         }
         if state.mutable || region_mut_live {
-            self.error(
-                SemanticErrorKind::MutableBorrowConflict,
-                ISSUE_USE_WHILE_MUTABLY_BORROWED,
-                span,
-            );
+            self.conflict(ISSUE_USE_WHILE_MUTABLY_BORROWED, def_id, span);
         }
     }
 
@@ -1025,11 +1038,7 @@ impl<'a> BorrowChecker<'a> {
             return;
         }
         if state.mutable || state.shared > 0 || region_any_live {
-            self.error(
-                SemanticErrorKind::MutableBorrowConflict,
-                ISSUE_WRITE_WHILE_BORROWED,
-                span,
-            );
+            self.conflict(ISSUE_WRITE_WHILE_BORROWED, def_id, span);
         }
     }
 
@@ -1085,11 +1094,7 @@ impl<'a> BorrowChecker<'a> {
             return;
         }
         if state.mutable || region_mut_live {
-            self.error(
-                SemanticErrorKind::MutableBorrowConflict,
-                ISSUE_SHARED_BORROW_CONFLICT,
-                span,
-            );
+            self.conflict(ISSUE_SHARED_BORROW_CONFLICT, def_id, span);
             return;
         }
         if let Some(borrower) = borrower {
@@ -1137,11 +1142,7 @@ impl<'a> BorrowChecker<'a> {
             return;
         }
         if state.mutable || state.shared > 0 || region_any_live {
-            self.error(
-                SemanticErrorKind::MutableBorrowConflict,
-                ISSUE_MUTABLE_BORROW_CONFLICT,
-                span,
-            );
+            self.conflict(ISSUE_MUTABLE_BORROW_CONFLICT, def_id, span);
             return;
         }
         if let Some(borrower) = borrower {
@@ -1233,6 +1234,21 @@ impl<'a> BorrowChecker<'a> {
                 }
             }
         }
+    }
+
+    /// A borrow conflict on `def_id`: the diagnostic names the place whose
+    /// borrow is live when its source name is known.
+    fn conflict(&mut self, issue: &str, def_id: DefId, span: radix_lexer::Span) {
+        let mut error = SemanticError::structured(SemanticErrorKind::MutableBorrowConflict, span)
+            .with_arg("issue", issue);
+        if let Some(spelling) = self
+            .names
+            .get(&def_id)
+            .and_then(|name| self.interner.strings().get(name.0 as usize))
+        {
+            error = error.with_arg("name", spelling.to_string());
+        }
+        self.errors.push(error);
     }
 
     fn error(&mut self, kind: SemanticErrorKind, issue: &str, span: radix_lexer::Span) {
@@ -1336,6 +1352,7 @@ impl HirVisitor for BorrowChecker<'_> {
                 {
                     self.bind_own_from(value);
                 } else if self.language_conflicts
+                    && !self.is_scalar_place(target)
                     && (target.ty.is_some_and(|ty| self.types.is_mut_view(ty))
                         || Self::root_def_id(target).is_some_and(|id| self.mut_roots.contains(&id)))
                 {
