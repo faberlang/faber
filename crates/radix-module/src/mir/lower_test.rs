@@ -4510,6 +4510,32 @@ fn lowers_lista_reducta_with_synthetic_reducer() {
 }
 
 #[test]
+fn reducta_does_not_overwrite_its_initial_value() {
+    // The fold rewrites its accumulator every step; the initial value is a
+    // caller binding and must read the same after the call (need:
+    // gradus `kv.extend` reduced onto `c.history` and corrupted the cache).
+    let source = r"functio main2() → vacuum {
+  fixum lista<numerus> base ← [1]
+  fixum lista<numerus> folded ← [3, 4].reducta((lista<numerus> acc, numerus x) ∴ acc.addita(x), base)
+  nota folded.longitudo()
+  nota base.longitudo()
+}
+
+incipit {
+  main2()
+}";
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "reducta-initial.fab",
+        source,
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("reducta initial run must execute: {error:?}"));
+    assert_eq!(host.stdout_lines, ["3", "1"]);
+}
+
+#[test]
 fn lowers_lista_cumulata_with_synthetic_reducer() {
     let dump = dump_source(
         r"functio prefixes(lista<numerus> xs) → lista<numerus> {

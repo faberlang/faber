@@ -745,8 +745,13 @@ impl FunctionBuilder<'_> {
 
         let collection = self.lower_expr_value(receiver)?;
         let collection = self.materialize_operand_place(collection, collection_ty, receiver.span);
+        // WHY: the fold rewrites the accumulator every step, so it must be a
+        // fresh cell. `materialize_operand_place` would return the initial's
+        // own place (a caller local or field) and the fold would overwrite it.
         let accumulator = self.lower_expr_value(initial)?;
-        let accumulator = self.materialize_operand_place(accumulator, result_ty, initial.span);
+        let accumulator_temp = self.push_temp(result_ty, initial.span);
+        self.assign(MirPlace::temp(accumulator_temp), accumulator, result_ty, initial.span);
+        let accumulator = MirPlace::temp(accumulator_temp);
 
         let index = self.next_local_id();
         self.locals
