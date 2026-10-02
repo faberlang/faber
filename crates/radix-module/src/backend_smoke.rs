@@ -18,6 +18,7 @@
 
 use crate::codegen::Target;
 use crate::test_support::test_temp_dir;
+use radix_codegen_shared::runtime_api::{self, GEN_BLOCK_ON, GEN_BLOCK_ON_TOKIO};
 use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -122,12 +123,20 @@ pub fn python3_available() -> bool {
 }
 
 fn generated_rust_needs_tokio(code: &str) -> bool {
-    code.contains("tokio::") || code.contains("__faber_block_on")
+    // The `block_on` spellings come from the runtime table, never typed here.
+    code.contains("tokio::")
+        || [GEN_BLOCK_ON, GEN_BLOCK_ON_TOKIO]
+            .iter()
+            .filter_map(|row| runtime_api::spell(Target::HirRust, row).ok())
+            .any(|spelled| code.contains(&spelled))
 }
 
 fn render_smoke_cargo_dependencies(code: &str, runtime: &Path) -> String {
-    let mut deps = format!("faber = {{ path = \"{}\" }}\n", runtime.display());
-    if generated_rust_needs_tokio(code) {
+    let needs_tokio = generated_rust_needs_tokio(code);
+    // The `tokio` feature of the runtime crate carries `block_on_tokio`.
+    let faber_features = if needs_tokio { ", features = [\"tokio\"]" } else { "" };
+    let mut deps = format!("faber = {{ path = \"{}\"{faber_features} }}\n", runtime.display());
+    if needs_tokio {
         deps.push_str("tokio = { version = \"1\", features = [\"rt\", \"net\", \"time\"] }\n");
     }
     deps

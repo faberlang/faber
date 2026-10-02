@@ -307,6 +307,64 @@ pub const INF_REM: RuntimeItem = inf_row("rem", RuntimeKind::Fn, INF_RUST);
 pub const INF_STORE: RuntimeItem = inf_row("store", RuntimeKind::StoreFn, INF_RUST);
 pub const INF_TRUE_DIV: RuntimeItem = inf_row("true_div", RuntimeKind::Fn, INF_RUST);
 
+/// `gen` rows (T1-R7): the lazy sync-generator carrier of the Rust runtime
+/// (`faber::Gen`, `faber::Yield`, crate-root types per fork F-A; the module is
+/// `faber::r#gen` because `gen` is reserved in edition 2024). A generator body
+/// is an `async` block rustc lowers to a state machine; `cede` parks the item
+/// through `Yield` and `Gen` is the iterator the consumer pulls.
+pub const GEN_GEN: RuntimeItem = RuntimeItem {
+    ns: Namespace::Gen,
+    name: "Gen",
+    kind: RuntimeKind::Type,
+    targets: &[Target::HirRust],
+};
+pub const GEN_YIELD: RuntimeItem = RuntimeItem {
+    ns: Namespace::Gen,
+    name: "Yield",
+    kind: RuntimeKind::Type,
+    targets: &[Target::HirRust],
+};
+
+/// `gen` rows (T1-R8): the async-generator cursor (`fient`) and `block_on` of the
+/// Rust runtime. The cursor types are crate-root (fork F-A) and `block_on` is a
+/// free function of the `gen` module (`faber::r#gen::block_on`, the std form).
+/// `block_on_tokio` is the Tokio form, behind the crate's optional `tokio`
+/// feature; the emitter picks it by the library-binding fact it already had.
+pub const GEN_ASYNC_CURSOR: RuntimeItem = RuntimeItem {
+    ns: Namespace::Gen,
+    name: "AsyncCursor",
+    kind: RuntimeKind::Type,
+    targets: &[Target::HirRust],
+};
+pub const GEN_ASYNC_CURSOR_SHARED: RuntimeItem = RuntimeItem {
+    ns: Namespace::Gen,
+    name: "AsyncCursorShared",
+    kind: RuntimeKind::Type,
+    targets: &[Target::HirRust],
+};
+pub const GEN_BLOCK_ON: RuntimeItem = RuntimeItem {
+    ns: Namespace::Gen,
+    name: "block_on",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirRust],
+};
+pub const GEN_BLOCK_ON_TOKIO: RuntimeItem = RuntimeItem {
+    ns: Namespace::Gen,
+    name: "block_on_tokio",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirRust],
+};
+
+/// `float` row (T1-R7, fork F-D): the half-float bit decode of the Rust runtime
+/// (`faber::float::f16_bits_to_f32`). The Rust target has no std half-float
+/// carrier, so `fractus<f16>` is a decoded-`f32` conversion intermediate.
+pub const FLOAT_F16_BITS_TO_F32: RuntimeItem = RuntimeItem {
+    ns: Namespace::Float,
+    name: "f16_bits_to_f32",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirRust],
+};
+
 /// The targets whose runtime package carries each `format` row: the Rust
 /// runtime (`faber::format`) and the Go runtime (`rt.Format*`) share the
 /// renderers whose id and meaning match.
@@ -575,6 +633,13 @@ pub const TABLE: &[RuntimeItem] = &[
     INF_REM,
     INF_STORE,
     INF_TRUE_DIV,
+    GEN_GEN,
+    GEN_YIELD,
+    GEN_ASYNC_CURSOR,
+    GEN_ASYNC_CURSOR_SHARED,
+    GEN_BLOCK_ON,
+    GEN_BLOCK_ON_TOKIO,
+    FLOAT_F16_BITS_TO_F32,
     FORMAT_FMT,
     FORMAT_SPEC,
     FORMAT_FLOAT,
@@ -781,7 +846,7 @@ fn spelling(target: Target, item: &RuntimeItem) -> Result<String, SpellError> {
     let is_type = item.kind == RuntimeKind::Type;
     match target {
         Target::HirRust if is_type => Ok(format!("faber::{}", upper_camel(item.name))),
-        Target::HirRust => Ok(format!("faber::{ns}::{}", item.name)),
+        Target::HirRust => Ok(format!("faber::{}::{}", rust_module(ns), item.name)),
         Target::HirTypeScript | Target::HirPython if is_type => {
             Ok(format!("{ns}.{}", upper_camel(item.name)))
         }
@@ -793,6 +858,15 @@ fn spelling(target: Target, item: &RuntimeItem) -> Result<String, SpellError> {
         Target::HirSwift => Ok(format!("{}.{}", upper_camel(ns), lower_camel(item.name))),
         Target::HirPython => Ok(format!("{ns}.{}", item.name)),
         _ => Err(SpellError::NoRuntime(target)),
+    }
+}
+
+/// A namespace as a Rust module path segment: `gen` is a reserved keyword of the
+/// 2024 edition, so the crate's module is `r#gen` and the path spells it raw.
+fn rust_module(ns: &str) -> String {
+    match ns {
+        "gen" => format!("r#{ns}"),
+        _ => ns.to_owned(),
     }
 }
 
