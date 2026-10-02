@@ -78,3 +78,25 @@ domain policy.
 - **`power`.** `x.power(y)` follows IEEE 754 `pow`: a negative base with an
   integral exponent returns the signed result, and a non-integral exponent
   returns NaN.
+
+## R6. One const/var rule for writes and mutating calls (2026-10-02)
+
+Once a `copy` parameter's duplicate exists, its owner may change it exactly as
+far as the binding's const/var declaration allows. A field write (`c.n ← 1`)
+and a call to a method that changes its receiver (`c.inc()`) are the same kind
+of write and follow one rule: a `var` binding allows both, an immutable binding
+(`const`, or a parameter) rejects both.
+
+- A method changes its receiver when its body assigns through `self`, calls an
+  in-place collection verb on a place rooted at `self`, or calls another
+  mutating method on such a place. Methods carry no receiver marker; the
+  property is inferred from the body (and closed over sibling calls). Only
+  methods declared in the same module are classified.
+- A parameter is an immutable binding, and `copy` is the only marker in its
+  type position, so no spelling makes a `copy` parameter `var`. To modify the
+  duplicate, bind it to a `var` local first (`var C mine ← c`). The `in`/`mut`
+  marker is the way to modify the caller's own value, and it duplicates nothing.
+- The `unnecessary_varia` lint counts a mutating method call as a modification.
+
+Pinned by `corpus/mutabilitas/copy-param.fab` (the D-6 copy-parameter
+exemplar) and the semantic tests in `method_receiver_mutation_test.rs`.
