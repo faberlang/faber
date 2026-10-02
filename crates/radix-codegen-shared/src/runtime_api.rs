@@ -62,15 +62,27 @@ pub const DISPLAY_VALOR: RuntimeItem = RuntimeItem {
     targets: &[Target::HirGo],
 };
 
-/// The targets whose runtime package carries the `exact` namespace today.
+/// The targets whose runtime package carries an `exact` row: the Rust runtime
+/// carries the rows below, the Go runtime (`rt.Exact*`) carries its own rows
+/// and shares the four whose id and meaning match (`div`, `shl`, `shr`, `pow`).
 const EXACT_TARGETS: &[Target] = &[Target::HirRust];
+const EXACT_RUST_GO: &[Target] = &[Target::HirRust, Target::HirGo];
+const EXACT_GO: &[Target] = &[Target::HirGo];
 
 const fn exact_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
+    exact_row_for(name, kind, EXACT_TARGETS)
+}
+
+const fn exact_row_for(
+    name: &'static str,
+    kind: RuntimeKind,
+    targets: &'static [Target],
+) -> RuntimeItem {
     RuntimeItem {
         ns: Namespace::Exact,
         name,
         kind,
-        targets: EXACT_TARGETS,
+        targets,
     }
 }
 
@@ -82,13 +94,13 @@ pub const EXACT_APPROX_F32: RuntimeItem = exact_row("approx_f32", RuntimeKind::F
 pub const EXACT_APPROX_F64: RuntimeItem = exact_row("approx_f64", RuntimeKind::Fn);
 pub const EXACT_CMP_INT_FLOAT: RuntimeItem = exact_row("cmp_int_float", RuntimeKind::Fn);
 pub const EXACT_CMP_SCALED_FLOAT: RuntimeItem = exact_row("cmp_scaled_float", RuntimeKind::Fn);
-pub const EXACT_DIV: RuntimeItem = exact_row("div", RuntimeKind::Fn);
+pub const EXACT_DIV: RuntimeItem = exact_row_for("div", RuntimeKind::Fn, EXACT_RUST_GO);
 pub const EXACT_FIT: RuntimeItem = exact_row("fit", RuntimeKind::Fn);
 pub const EXACT_INT: RuntimeItem = exact_row("int", RuntimeKind::Fn);
-pub const EXACT_POW: RuntimeItem = exact_row("pow", RuntimeKind::Fn);
+pub const EXACT_POW: RuntimeItem = exact_row_for("pow", RuntimeKind::Fn, EXACT_RUST_GO);
 pub const EXACT_REM: RuntimeItem = exact_row("rem", RuntimeKind::Fn);
-pub const EXACT_SHL: RuntimeItem = exact_row("shl", RuntimeKind::Fn);
-pub const EXACT_SHR: RuntimeItem = exact_row("shr", RuntimeKind::Fn);
+pub const EXACT_SHL: RuntimeItem = exact_row_for("shl", RuntimeKind::Fn, EXACT_RUST_GO);
+pub const EXACT_SHR: RuntimeItem = exact_row_for("shr", RuntimeKind::Fn, EXACT_RUST_GO);
 pub const EXACT_STORE: RuntimeItem = exact_row("store", RuntimeKind::StoreFn);
 
 /// The targets whose runtime package carries the `dec` namespace today.
@@ -128,6 +140,48 @@ pub const DEC_STORE: RuntimeItem = dec_row("store");
 pub const DEC_SUB: RuntimeItem = dec_row("sub");
 pub const DEC_TRY_PARSE: RuntimeItem = dec_row("try_parse");
 pub const DEC_TRY_STORE: RuntimeItem = dec_row("try_store");
+
+/// `exact` rows (T1-G2): the Go carrier of the exact integer intermediate
+/// (`rt.Exact*`): the sign-magnitude `ExactX{neg, m}` over `[-2^63, 2^64 - 1]`.
+/// The Go runtime carries `div`, `shl`, `shr` and `pow` through the shared rows
+/// above. The width limit applies only in the store family (`store_i`,
+/// `store_u`, `wrap`, `clamp_i`, `clamp_u`): a value leaves the carrier into a
+/// bounded slot there and nowhere else.
+pub const EXACT_X: RuntimeItem = exact_row_for("X", RuntimeKind::Type, EXACT_GO);
+pub const EXACT_MK: RuntimeItem = exact_row_for("mk", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_I: RuntimeItem = exact_row_for("i", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_U: RuntimeItem = exact_row_for("u", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_NEG: RuntimeItem = exact_row_for("neg", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_ADD_S: RuntimeItem = exact_row_for("add_s", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_ADD: RuntimeItem = exact_row_for("add", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_SUB: RuntimeItem = exact_row_for("sub", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_MUL: RuntimeItem = exact_row_for("mul", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_MOD: RuntimeItem = exact_row_for("mod", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_W: RuntimeItem = exact_row_for("w", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_FROM_W: RuntimeItem = exact_row_for("from_w", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_AND: RuntimeItem = exact_row_for("and", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_OR: RuntimeItem = exact_row_for("or", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_XOR: RuntimeItem = exact_row_for("xor", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_NOT: RuntimeItem = exact_row_for("not", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_ABS: RuntimeItem = exact_row_for("abs", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_CMP: RuntimeItem = exact_row_for("cmp", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_APPROX: RuntimeItem = exact_row_for("approx", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_CMP_F: RuntimeItem = exact_row_for("cmp_f", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_LT_F: RuntimeItem = exact_row_for("lt_f", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_LE_F: RuntimeItem = exact_row_for("le_f", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_GT_F: RuntimeItem = exact_row_for("gt_f", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_GE_F: RuntimeItem = exact_row_for("ge_f", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_EQ_F: RuntimeItem = exact_row_for("eq_f", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_STR: RuntimeItem = exact_row_for("str", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_TRAP: RuntimeItem = exact_row_for("trap", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_FLOAT: RuntimeItem = exact_row_for("float", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_FITS_I: RuntimeItem = exact_row_for("fits_i", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_FITS_U: RuntimeItem = exact_row_for("fits_u", RuntimeKind::Fn, EXACT_GO);
+pub const EXACT_STORE_I: RuntimeItem = exact_row_for("store_i", RuntimeKind::StoreFn, EXACT_GO);
+pub const EXACT_STORE_U: RuntimeItem = exact_row_for("store_u", RuntimeKind::StoreFn, EXACT_GO);
+pub const EXACT_WRAP: RuntimeItem = exact_row_for("wrap", RuntimeKind::StoreFn, EXACT_GO);
+pub const EXACT_CLAMP_I: RuntimeItem = exact_row_for("clamp_i", RuntimeKind::StoreFn, EXACT_GO);
+pub const EXACT_CLAMP_U: RuntimeItem = exact_row_for("clamp_u", RuntimeKind::StoreFn, EXACT_GO);
 
 /// The targets whose runtime package carries each `regex` row. Rows differ by
 /// target: the Rust runtime carries the match operations as free functions in
@@ -253,6 +307,41 @@ pub const TABLE: &[RuntimeItem] = &[
     EXACT_SHL,
     EXACT_SHR,
     EXACT_STORE,
+    EXACT_X,
+    EXACT_MK,
+    EXACT_I,
+    EXACT_U,
+    EXACT_NEG,
+    EXACT_ADD_S,
+    EXACT_ADD,
+    EXACT_SUB,
+    EXACT_MUL,
+    EXACT_MOD,
+    EXACT_W,
+    EXACT_FROM_W,
+    EXACT_AND,
+    EXACT_OR,
+    EXACT_XOR,
+    EXACT_NOT,
+    EXACT_ABS,
+    EXACT_CMP,
+    EXACT_APPROX,
+    EXACT_CMP_F,
+    EXACT_LT_F,
+    EXACT_LE_F,
+    EXACT_GT_F,
+    EXACT_GE_F,
+    EXACT_EQ_F,
+    EXACT_STR,
+    EXACT_TRAP,
+    EXACT_FLOAT,
+    EXACT_FITS_I,
+    EXACT_FITS_U,
+    EXACT_STORE_I,
+    EXACT_STORE_U,
+    EXACT_WRAP,
+    EXACT_CLAMP_I,
+    EXACT_CLAMP_U,
     REGEX_MATCHES,
     REGEX_FIND,
     REGEX_FIND_ALL,

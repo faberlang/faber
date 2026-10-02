@@ -294,7 +294,7 @@ fn spelling_through_the_refs_records_the_namespace_only_on_success() {
 fn the_exact_rows_spell_as_faber_exact_functions_in_rust() {
     let rows: Vec<&RuntimeItem> = TABLE
         .iter()
-        .filter(|row| row.ns == Namespace::Exact)
+        .filter(|row| row.ns == Namespace::Exact && row.targets.contains(&Target::HirRust))
         .collect();
     assert_eq!(rows.len(), 13);
     for row in rows {
@@ -326,13 +326,17 @@ fn the_regex_rows_spell_as_faber_regex_functions_in_rust() {
 }
 
 #[test]
-fn only_the_exact_store_row_is_store_family() {
-    let store_rows: Vec<&str> = TABLE
+fn the_store_family_is_the_exact_rows_that_apply_a_width_limit() {
+    let mut store_rows: Vec<&str> = TABLE
         .iter()
         .filter(|row| row.kind == RuntimeKind::StoreFn)
         .map(|row| row.name)
         .collect();
-    assert_eq!(store_rows, ["store"]);
+    store_rows.sort_unstable();
+    assert_eq!(
+        store_rows,
+        ["clamp_i", "clamp_u", "store", "store_i", "store_u", "wrap"]
+    );
     assert_eq!(
         spell(Target::HirRust, &EXACT_STORE),
         Err(SpellError::StoreOnly)
@@ -344,6 +348,42 @@ fn only_the_exact_store_row_is_store_family() {
     assert_eq!(
         spell_store(Target::HirRust, &EXACT_FIT, &site()),
         Err(SpellError::NotStore)
+    );
+}
+
+#[test]
+fn the_go_exact_rows_spell_as_the_flat_rt_names() {
+    let go_rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Exact && row.targets.contains(&Target::HirGo))
+        .collect();
+    // 38 functions and the `ExactX` carrier type.
+    assert_eq!(go_rows.len(), 39);
+    assert_eq!(
+        go_rows
+            .iter()
+            .filter(|row| row.kind == RuntimeKind::Type)
+            .count(),
+        1
+    );
+    assert_eq!(spell_any(Target::HirGo, &EXACT_X), "rt.ExactX");
+    for (row, spelled) in [
+        (&EXACT_ADD, "rt.ExactAdd"),
+        (&EXACT_MUL, "rt.ExactMul"),
+        (&EXACT_MOD, "rt.ExactMod"),
+        (&EXACT_DIV, "rt.ExactDiv"),
+        (&EXACT_POW, "rt.ExactPow"),
+        (&EXACT_LT_F, "rt.ExactLtF"),
+        (&EXACT_FROM_W, "rt.ExactFromW"),
+        (&EXACT_STORE_I, "rt.ExactStoreI"),
+        (&EXACT_CLAMP_U, "rt.ExactClampU"),
+    ] {
+        assert_eq!(spell_any(Target::HirGo, row), spelled);
+    }
+    // The four shared rows keep their Rust spelling.
+    assert_eq!(
+        spell(Target::HirRust, &EXACT_DIV),
+        Ok("faber::exact::div".to_owned())
     );
 }
 
