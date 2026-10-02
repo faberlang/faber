@@ -61,3 +61,37 @@ fn hygiene_constants_are_correct() {
     assert_eq!(RUNES, "g0");
     assert_eq!(SLICE_OUT, "out0");
 }
+
+#[test]
+fn hygiene_temp_scope_skips_user_bindings() {
+    let mut scope = TempScope::new(["t0", "t1", "value"]);
+    assert_eq!(scope.name('t', 10), "t2");
+    assert_eq!(scope.name('t', 11), "t3");
+}
+
+#[test]
+fn hygiene_temp_scope_skips_fixed_names() {
+    let mut scope = TempScope::new(Vec::<String>::new());
+    assert_eq!(scope.name('o', 1), "o1");
+    assert_eq!(scope.name('u', 1), "u1");
+    assert_eq!(scope.name('b', 1), "b1");
+}
+
+#[test]
+fn hygiene_temp_scope_one_key_one_name() {
+    let mut scope = TempScope::new(Vec::<String>::new());
+    let first = scope.name('t', 42);
+    let other = scope.name('t', 43);
+    assert_eq!(scope.name('t', 42), first);
+    assert_ne!(first, other);
+    assert_eq!(scope.name('z', 42), "z0");
+}
+
+#[test]
+fn hygiene_temp_scope_functions_each_start_at_zero() {
+    let mut first = TempScope::new(Vec::<String>::new());
+    let mut second = TempScope::new(Vec::<String>::new());
+    assert_eq!(first.name('t', 1042), "t0");
+    assert_eq!(first.name('t', 1043), "t1");
+    assert_eq!(second.name('t', 7), "t0");
+}
