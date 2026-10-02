@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "range"
 canonical = true
 summary = "Interval algebra: intersection, union, and span count."
-related = ["inter", "union", "longitudo", "nihil"]
+related = ["intersect", "union", "longitudo", "nihil"]
 locale = "en"
 +++
 # =============================================================================
@@ -14,17 +14,17 @@ locale = "en"
 #
 # What this teaches:
 #   • Interval algebra: intersection, union, and span count.
-#   • Related keywords: inter, union, longitudo, nihil
+#   • Related keywords: intersect, union, longitudo, nihil
 #
 # Common mistakes:
 #   • Confusing `‥` (exclusive end) with `…` (inclusive end) — `0‥6` is [0,6), `0…6` is [0,6]; the wrong boundary operator changes the span.
 #
-# See also: inter, union, longitudo, nihil
+# See also: intersect, union, longitudo, nihil
 # =============================================================================
 
-# intervallum — range algebra (inter, union, longitudo)
+# intervallum — range algebra (intersect, union, longitudo)
 #
-# `inter` / `union` return `intervallum<numerus> ∪ nihil` (nihil when disjoint
+# `intersect` / `union` return `intervallum<numerus> ∪ nihil` (nihil when disjoint
 # or non-adjacent). `longitudo` returns discrete bound-count for numerus v1.
 #
 # EXPECTED OUTPUT:

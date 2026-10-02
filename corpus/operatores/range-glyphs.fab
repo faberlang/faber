@@ -4,13 +4,13 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "assignment", "place", "inc_dec_stmt", "itera_stmt", "range_expr", "range_tail", "expression", "literal", "nota_stmt"]
 category = "range"
 canonical = true
-summary = "Half-open and inclusive range endpoints in itera ab and intra."
+summary = "Half-open and inclusive range endpoints in itera ab and ∈."
 syntax = "<expression> ‥ <expression> | <expression> … <expression>"
-related = ["‥", "…", "ante", "usque", "intra"]
+related = ["‥", "…", "ante", "usque", "∈"]
 locale = "en"
 +++
 # =============================================================================
-# ‥ — Half-open and inclusive range endpoints in itera ab and intra.
+# ‥ — Half-open and inclusive range endpoints in itera ab and ∈.
 # =============================================================================
 #
 # What this teaches:
@@ -20,7 +20,7 @@ locale = "en"
 # Common mistakes:
 #   • Confusing ‥ (exclusive range) with … (inclusive range) — off-by-one errors are the most common range bug.
 #
-# See also: ‥, …, ante, usque, intra
+# See also: ‥, …, ante, usque, ∈
 # =============================================================================
 
 # operatores/range-glyphs — ‥ (exclusive) and … (inclusive)
@@ -32,7 +32,7 @@ locale = "en"
 #   0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5
 #
 # BACKEND:
-#   Cross-ref itera/intervallum.fab and intra/intra.fab.
+#   Cross-ref itera/intervallum.fab and operatores/membership-range.fab.
 
 main {
     var int exclusivus ← 0

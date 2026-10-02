@@ -1,34 +1,34 @@
 +++
-term = "inter"
-kind = "keyword"
+term = "∈"
+kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "hole_type", "si_stmt", "arm", "comparison", "array_literal", "argument_list", "argument", "expression", "literal", "nota_stmt"]
 category = "collection"
 canonical = true
 summary = "Checks whether a value appears in a collection."
-syntax = "<expression> inter <collection>"
-related = ["intra"]
+syntax = "<expression> ∈ <collection>"
+related = ["‥", "…"]
 locale = "en"
 +++
 # =============================================================================
-# inter — Checks whether a value appears in a collection
+# ∈ — Checks whether a value appears in a collection
 # =============================================================================
 #
 # What this teaches:
 #   • Checks whether a value appears in a collection.
-#   • Related keywords: intra
+#   • Related operators: ‥, …
 #
 # Common mistakes:
-#   • Using `inter` with a non-collection right operand — `inter` checks membership in a lista, tabula, or copia, not a scalar comparison.
+#   • Using `∈` with a non-collection right operand — `∈` checks membership in a lista, tabula, or copia (or a range), and a scalar right operand is rejected (SEM010); for a substring test on text use `contains`.
 #
-# See also: intra
+# See also: ‥, …
 # =============================================================================
 
-# inter — collection membership (element in set)
+# ∈ — collection membership (element in set)
 #
-# <expr> inter <lista>
+# <expr> ∈ <lista>
 #
 # GRAMMAR:
-#   membershipExpr :← expr 'inter' expr
+#   membershipExpr :← expr '∈' expr
 #
 # EXPECTED OUTPUT:
 #   none — stdout not pinned for this exemplum.
@@ -37,14 +37,14 @@ main {
     const string condicio ← "agens"
     const int aetas ← 21
 
-    # Basic inter with textus lista
-    if condicio between ["pendens", "agens", "pausa"] {
+    # Basic ∈ with textus lista
+    if condicio ∈ ["pendens", "agens", "pausa"] {
         print "condicio valida"
     }
 
-    # inter with numeric lista
-    if aetas between [18, 21, 65] {
+    # ∈ with numeric lista
+    if aetas ∈ [18, 21, 65] {
         print "aetas insignis"
     }
-    print "exempla inter"
+    print "exempla ∈"
 }
