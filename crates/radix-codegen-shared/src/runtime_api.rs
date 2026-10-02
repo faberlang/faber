@@ -91,15 +91,24 @@ pub const EXACT_SHL: RuntimeItem = exact_row("shl", RuntimeKind::Fn);
 pub const EXACT_SHR: RuntimeItem = exact_row("shr", RuntimeKind::Fn);
 pub const EXACT_STORE: RuntimeItem = exact_row("store", RuntimeKind::StoreFn);
 
-/// The targets whose runtime package carries the `regex` namespace today.
-const REGEX_TARGETS: &[Target] = &[Target::HirRust];
+/// The targets whose runtime package carries each `regex` row. Rows differ by
+/// target: the Rust runtime carries the match operations as free functions in
+/// `faber::regex`, the Go runtime carries a constructor plus methods, so each
+/// row lists exactly the targets that consume it.
+const REGEX_RUST: &[Target] = &[Target::HirRust];
+const REGEX_GO: &[Target] = &[Target::HirGo];
+const REGEX_RUST_GO: &[Target] = &[Target::HirRust, Target::HirGo];
 
-const fn regex_row(name: &'static str) -> RuntimeItem {
+const fn regex_row(
+    name: &'static str,
+    kind: RuntimeKind,
+    targets: &'static [Target],
+) -> RuntimeItem {
     RuntimeItem {
         ns: Namespace::Regex,
         name,
-        kind: RuntimeKind::Fn,
-        targets: REGEX_TARGETS,
+        kind,
+        targets,
     }
 }
 
@@ -108,18 +117,27 @@ const fn regex_row(name: &'static str) -> RuntimeItem {
 /// match are the `faber::Regex` / `faber::Match` carriers; every operation is
 /// total because the conversion `↦ regex` is the one place a pattern is
 /// compiled or rejected. Offsets are code points.
-pub const REGEX_MATCHES: RuntimeItem = regex_row("matches");
-pub const REGEX_FIND: RuntimeItem = regex_row("find");
-pub const REGEX_FIND_ALL: RuntimeItem = regex_row("find_all");
-pub const REGEX_SPLIT: RuntimeItem = regex_row("split");
-pub const REGEX_REPLACE: RuntimeItem = regex_row("replace");
-pub const REGEX_REPLACE_WITH: RuntimeItem = regex_row("replace_with");
-pub const REGEX_ESCAPE: RuntimeItem = regex_row("escape");
-pub const REGEX_MATCH_TEXT: RuntimeItem = regex_row("match_text");
-pub const REGEX_MATCH_START: RuntimeItem = regex_row("match_start");
-pub const REGEX_MATCH_END: RuntimeItem = regex_row("match_end");
-pub const REGEX_MATCH_GROUP: RuntimeItem = regex_row("match_group");
-pub const REGEX_MATCH_NAMED: RuntimeItem = regex_row("match_named");
+pub const REGEX_MATCHES: RuntimeItem = regex_row("matches", RuntimeKind::Fn, REGEX_RUST);
+pub const REGEX_FIND: RuntimeItem = regex_row("find", RuntimeKind::Fn, REGEX_RUST);
+pub const REGEX_FIND_ALL: RuntimeItem = regex_row("find_all", RuntimeKind::Fn, REGEX_RUST);
+pub const REGEX_SPLIT: RuntimeItem = regex_row("split", RuntimeKind::Fn, REGEX_RUST);
+pub const REGEX_REPLACE: RuntimeItem = regex_row("replace", RuntimeKind::Fn, REGEX_RUST);
+pub const REGEX_REPLACE_WITH: RuntimeItem = regex_row("replace_with", RuntimeKind::Fn, REGEX_RUST);
+pub const REGEX_MATCH_TEXT: RuntimeItem = regex_row("match_text", RuntimeKind::Fn, REGEX_RUST);
+pub const REGEX_MATCH_START: RuntimeItem = regex_row("match_start", RuntimeKind::Fn, REGEX_RUST);
+pub const REGEX_MATCH_END: RuntimeItem = regex_row("match_end", RuntimeKind::Fn, REGEX_RUST);
+pub const REGEX_MATCH_GROUP: RuntimeItem = regex_row("match_group", RuntimeKind::Fn, REGEX_RUST);
+pub const REGEX_MATCH_NAMED: RuntimeItem = regex_row("match_named", RuntimeKind::Fn, REGEX_RUST);
+
+/// `regex` rows (RX-9): the Go carrier of the RE2-dialect regex. `Regex` is the
+/// compiled value, `Match` one successful match; the operations on them are
+/// methods of those types, so only the constructor and the two helpers with no
+/// receiver of that type are functions.
+pub const REGEX_REGEX: RuntimeItem = regex_row("Regex", RuntimeKind::Type, REGEX_GO);
+pub const REGEX_MATCH: RuntimeItem = regex_row("Match", RuntimeKind::Type, REGEX_GO);
+pub const REGEX_NEW: RuntimeItem = regex_row("new", RuntimeKind::Fn, REGEX_GO);
+pub const REGEX_ESCAPE: RuntimeItem = regex_row("escape", RuntimeKind::Fn, REGEX_RUST_GO);
+pub const REGEX_REPLACE_EACH: RuntimeItem = regex_row("replace_each", RuntimeKind::Fn, REGEX_GO);
 
 /// The canonical helper table: a row for every helper some runtime package
 /// carries. Each namespace unit adds its rows with the runtime it moves.
@@ -152,6 +170,10 @@ pub const TABLE: &[RuntimeItem] = &[
     REGEX_MATCH_END,
     REGEX_MATCH_GROUP,
     REGEX_MATCH_NAMED,
+    REGEX_REGEX,
+    REGEX_MATCH,
+    REGEX_NEW,
+    REGEX_REPLACE_EACH,
 ];
 
 /// One runtime namespace: a module in Rust, a namespace export in TypeScript,
