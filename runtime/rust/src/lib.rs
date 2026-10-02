@@ -14,6 +14,7 @@ pub mod display;
 pub mod exact;
 pub mod failable;
 pub mod frame;
+pub mod inf;
 pub mod instans;
 pub mod intervallum;
 pub mod json;
