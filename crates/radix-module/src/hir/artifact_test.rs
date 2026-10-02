@@ -1816,6 +1816,12 @@ functio copy_coordinate<magnitudo N>(
         output[i] ← i
     }
 }
+
+@ nucleum
+@ publica
+functio copy_four(tensor<f32, [4]> input, tensor<u32, [4]> output) → vacuum {
+    copy_coordinate(input, output)
+}
 ";
     let session = crate::driver::Session::new(crate::driver::Config::default());
     let unit = crate::driver::analyze_source(&session, "kernel-requirements.fab", source, AnalyzeRequest::default())
