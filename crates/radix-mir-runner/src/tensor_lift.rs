@@ -12,13 +12,13 @@
 
 use super::exact_int::{exact_neg, int_value};
 use super::value::{
-    TensorValue, Value, compare_values, ieee_maximum, ieee_minimum, numeric_binop, round_float,
-    values_equal,
+    TensorValue, Value, compare_values, effective_width, ieee_maximum, ieee_minimum, numeric_binop,
+    round_float, values_equal,
 };
 use super::{Runner, RunnerError};
 use radix_lexer::Span;
 use radix_mir::{MirBinOp, MirLiftOp, MirOperand, MirType};
-use radix_types::{NumericWidth, Type, TypeId, effective_width};
+use radix_types::{NumericWidth, Type, TypeId};
 use std::cell::RefCell;
 use std::rc::Rc;
 

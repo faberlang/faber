@@ -2509,6 +2509,7 @@ impl Validator<'_, '_> {
                 | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
                 | Type::ModularWord(_)
                 | Type::SaturatingWord(_)
+                | Type::PolicyFloat(_, _)
         )
     }
 
@@ -2525,14 +2526,18 @@ impl Validator<'_, '_> {
     pub(crate) fn is_float_type(&self, ty: MirType) -> bool {
         matches!(
             self.type_kind(ty),
-            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+            Type::Primitive(Primitive::Fractus)
+                | Type::SizedNumeric(Primitive::Fractus, _)
+                | Type::PolicyFloat(_, _)
         )
     }
 
     /// True for scalar float types and tensors whose element type is float.
     pub(crate) fn is_float_operand_type(&self, ty: MirType) -> bool {
         match self.type_kind(ty) {
-            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => true,
+            Type::Primitive(Primitive::Fractus)
+            | Type::SizedNumeric(Primitive::Fractus, _)
+            | Type::PolicyFloat(_, _) => true,
             Type::Tensor(inner, _) => self.is_float_type(MirType::semantic(*inner)),
             _ => false,
         }

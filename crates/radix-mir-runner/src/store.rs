@@ -10,10 +10,13 @@
 
 use super::{Runner, RunnerError};
 use crate::exact_int::{exact_carrier, int_value};
-use crate::value::{Value, modular_word_result, saturating_word_result};
+use crate::value::{
+    Value, modular_word_result, policy_float_cell, saturating_word_result,
+    trapping_float_store_fails,
+};
 use radix_hir::{HirStoreKind, HirStoreSite};
 use radix_lexer::Span;
-use radix_types::{NumericWidth, Primitive, Type, TypeId};
+use radix_types::{FloatPolicy, NumericWidth, Primitive, Type, TypeId};
 
 /// Stable identity of a failed implicit store: distinct from arithmetic
 /// overflow (ruling 5).
@@ -42,6 +45,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         if let Some(width) = self.decimal_slot(target) {
             return self.eval_decimal_store(site, width, value, span);
         }
+        if let Some((policy, width)) = policy_float_cell(self.types, target) {
+            return self.eval_policy_float_store(site, policy, width, value, span);
+        }
         let (policy, width) = self.integer_slot(target)?;
         // Ruling 38: an `inf` beyond the 64-bit carriers fits no bounded
         // slot. A trapping slot traps with the store identity (value, type,
@@ -68,6 +74,37 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             SlotPolicy::Wrapping => Ok(modular_word_result(exact, width)),
             SlotPolicy::Saturating => Ok(saturating_word_result(exact, width)),
         })
+    }
+
+    /// A float value lands in a `trapping<W>` or `saturating<W>` cell (D1, D2).
+    ///
+    /// Only a `trapping` cell checks, and only here: a NaN or infinite value
+    /// (for `f16` and `bf16`, one that rounds to infinity in the format) traps
+    /// with the store identity. Everything else, and every `saturating` store,
+    /// returns `None` so the ordinary conversion keeps the bare float of the
+    /// cell's width. Nothing clamps.
+    fn eval_policy_float_store(
+        &self,
+        site: &HirStoreSite,
+        policy: FloatPolicy,
+        width: NumericWidth,
+        value: &Value,
+        span: Span,
+    ) -> Option<Result<Value, RunnerError>> {
+        let Value::Float(float) = value else {
+            return None;
+        };
+        if policy != FloatPolicy::Trapping || !trapping_float_store_fails(*float, width) {
+            return None;
+        }
+        let text = crate::value::display_float_at_width(*float, Some(NumericWidth::F64));
+        Some(Err(self.store_trap(
+            site,
+            text,
+            float.is_sign_negative(),
+            width,
+            span,
+        )))
     }
 
     /// Store one exactly computed tensor element under its element type's

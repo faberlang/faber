@@ -510,6 +510,38 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         Ok(saturating_word_result(exact, width))
     }
 
+    /// `↦ trapping<W>` and `↦ saturating<W>` (D1, D2, D3). The conversion is
+    /// the one into the bare float of width `W`, with every row of it (`inf`
+    /// beyond the finite range gives ±infinity, text parses, integers widen).
+    /// A `saturating` cell keeps that result as is (bare IEEE, no clamp). A
+    /// `trapping` cell checks the result at the end of the row: a non-finite
+    /// value raises the trapping overflow error (`numerus overflow`), which an
+    /// authored `⊥` recovers.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn convert_to_policy_float(
+        &mut self,
+        value: Value,
+        source_ty: TypeId,
+        policy: FloatPolicy,
+        width: NumericWidth,
+        params: &[Symbol],
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let converted =
+            self.convert_to_fractus_from(value, source_ty, params, width, recovery, span)?;
+        if policy == FloatPolicy::Trapping
+            && let Value::Float(float) = converted
+            && trapping_float_store_fails(float, width)
+        {
+            return match recovery {
+                Some(recovery) => self.eval_recovery(recovery, span),
+                None => Err(RunnerError::internal(span, "numerus overflow")),
+            };
+        }
+        Ok(converted)
+    }
+
     pub(crate) fn convert_to_vacuum(
         &mut self,
         value: Value,
