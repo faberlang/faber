@@ -360,7 +360,7 @@ mod tests {
             "typescript",
             "wasm",
             "llvm",
-            "cobol",
+            "not-a-target",
         ] {
             assert_eq!(
                 Target::from_spelling(spelling),
