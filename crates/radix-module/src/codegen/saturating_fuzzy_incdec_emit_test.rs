@@ -88,7 +88,7 @@ fn decimal_fuzzy_operand_is_unscaled_on_every_backend() {
     let swift = emit(Target::HirSwift, FUZZY);
     assert!(swift.contains("faberDecF64(faberDecOf("), "{swift}");
     let go = emit(Target::HirGo, FUZZY);
-    assert!(go.contains("faberDecF64(faberDecOf("), "{go}");
+    assert!(go.contains("rt.DecF64(rt.DecOf("), "{go}");
 }
 
 #[test]

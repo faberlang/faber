@@ -145,6 +145,46 @@ pub const EXACT_WRAP: RuntimeItem = exact_row_for("wrap", RuntimeKind::StoreFn, 
 pub const EXACT_CLAMP_I: RuntimeItem = exact_row_for("clamp_i", RuntimeKind::StoreFn, EXACT_GO);
 pub const EXACT_CLAMP_U: RuntimeItem = exact_row_for("clamp_u", RuntimeKind::StoreFn, EXACT_GO);
 
+/// The targets whose runtime package carries a `dec` row. Only the Go runtime
+/// (`rt.Dec*`, `faber/runtime/go/dec.go`) carries them on this table today.
+const DEC_TARGETS: &[Target] = &[Target::HirGo];
+
+const fn dec_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Dec,
+        name,
+        kind,
+        targets: DEC_TARGETS,
+    }
+}
+
+/// `dec` rows (T1-G3): the exact decimal (`d64`) carrier of the Go runtime
+/// (`rt.Dec*`). An unstored decimal is a `math/big` coefficient at its own
+/// scale (`DecCarrier`); `STORE` and `TRY_STORE` round it half-even to scale 8
+/// into a stored `int64`. Both are plain rows, not `StoreFn`: they are spelled
+/// where an unstored decimal computation is consumed as a stored carrier,
+/// which has no `HirStoreSite` at the call (a negation, a list element, a
+/// binary result). `TRY_PARSE` returns the runner's failure message (empty on
+/// success); `PARSE` is the arm that panics with it.
+pub const DEC_CARRIER: RuntimeItem = dec_row("Carrier", RuntimeKind::Type);
+pub const DEC_ADD: RuntimeItem = dec_row("add", RuntimeKind::Fn);
+pub const DEC_CMP: RuntimeItem = dec_row("cmp", RuntimeKind::Fn);
+pub const DEC_DIV: RuntimeItem = dec_row("div", RuntimeKind::Fn);
+pub const DEC_F64: RuntimeItem = dec_row("f64", RuntimeKind::Fn);
+pub const DEC_FLOAT_CMP: RuntimeItem = dec_row("float_cmp", RuntimeKind::Fn);
+pub const DEC_FMT: RuntimeItem = dec_row("fmt", RuntimeKind::Fn);
+pub const DEC_INT: RuntimeItem = dec_row("int", RuntimeKind::Fn);
+pub const DEC_MUL: RuntimeItem = dec_row("mul", RuntimeKind::Fn);
+pub const DEC_NEG: RuntimeItem = dec_row("neg", RuntimeKind::Fn);
+pub const DEC_OF: RuntimeItem = dec_row("of", RuntimeKind::Fn);
+pub const DEC_PARSE: RuntimeItem = dec_row("parse", RuntimeKind::Fn);
+pub const DEC_REM: RuntimeItem = dec_row("rem", RuntimeKind::Fn);
+pub const DEC_STORE: RuntimeItem = dec_row("store", RuntimeKind::Fn);
+pub const DEC_SUB: RuntimeItem = dec_row("sub", RuntimeKind::Fn);
+pub const DEC_TO_INT: RuntimeItem = dec_row("to_int", RuntimeKind::Fn);
+pub const DEC_TRY_PARSE: RuntimeItem = dec_row("try_parse", RuntimeKind::Fn);
+pub const DEC_TRY_STORE: RuntimeItem = dec_row("try_store", RuntimeKind::Fn);
+
 /// The targets whose runtime package carries each `regex` row. Rows differ by
 /// target: the Rust runtime carries the match operations as free functions in
 /// `faber::regex`, the Go runtime carries a constructor plus methods, the Swift
@@ -234,6 +274,24 @@ pub const REGEX_COMPILE: RuntimeItem = regex_row("compile", RuntimeKind::Fn, REG
 /// The canonical helper table: a row for every helper some runtime package
 /// carries. Each namespace unit adds its rows with the runtime it moves.
 pub const TABLE: &[RuntimeItem] = &[
+    DEC_CARRIER,
+    DEC_ADD,
+    DEC_CMP,
+    DEC_DIV,
+    DEC_F64,
+    DEC_FLOAT_CMP,
+    DEC_FMT,
+    DEC_INT,
+    DEC_MUL,
+    DEC_NEG,
+    DEC_OF,
+    DEC_PARSE,
+    DEC_REM,
+    DEC_STORE,
+    DEC_SUB,
+    DEC_TO_INT,
+    DEC_TRY_PARSE,
+    DEC_TRY_STORE,
     DISPLAY_LIST,
     DISPLAY_VALOR,
     DISPLAY_VERUM,

@@ -388,6 +388,39 @@ fn the_go_exact_rows_spell_as_the_flat_rt_names() {
 }
 
 #[test]
+fn the_go_dec_rows_spell_as_the_flat_rt_names() {
+    let go_rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Dec && row.targets.contains(&Target::HirGo))
+        .collect();
+    // 17 functions and the `DecCarrier` type; none is store-family (a decimal
+    // store has no `HirStoreSite` where an unstored computation is consumed).
+    assert_eq!(go_rows.len(), 18);
+    assert_eq!(
+        go_rows
+            .iter()
+            .filter(|row| row.kind == RuntimeKind::Type)
+            .count(),
+        1
+    );
+    assert!(go_rows.iter().all(|row| row.kind != RuntimeKind::StoreFn));
+    assert_eq!(spell_any(Target::HirGo, &DEC_CARRIER), "rt.DecCarrier");
+    for (row, spelled) in [
+        (&DEC_ADD, "rt.DecAdd"),
+        (&DEC_OF, "rt.DecOf"),
+        (&DEC_STORE, "rt.DecStore"),
+        (&DEC_TRY_STORE, "rt.DecTryStore"),
+        (&DEC_TO_INT, "rt.DecToInt"),
+        (&DEC_F64, "rt.DecF64"),
+        (&DEC_FLOAT_CMP, "rt.DecFloatCmp"),
+        (&DEC_TRY_PARSE, "rt.DecTryParse"),
+        (&DEC_PARSE, "rt.DecParse"),
+    ] {
+        assert_eq!(spell_any(Target::HirGo, row), spelled);
+    }
+}
+
+#[test]
 fn the_regex_rows_spell_from_the_table_for_typescript() {
     // RX-8: the TypeScript runtime package's `regex` namespace.
     for (row, spelled) in [
