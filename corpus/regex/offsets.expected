@@ -1,0 +1,7 @@
+off-cp-find-all: (1,2) (3,4)
+off-cp-astral-match: (1,2)
+off-cp-text: (0,1) (1,2) (2,3)
+off-find-astral: (1,2)
+off-find-combining: (2,3)
+off-find-accent: (2,3)
+off-find-none: none

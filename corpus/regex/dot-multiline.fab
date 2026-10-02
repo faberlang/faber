@@ -1,0 +1,95 @@
++++
+term = "dot-multiline"
+kind = "conformance"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "conversio_expr", "fac_stmt", "cape_clause", "si_stmt", "call_expr", "call_suffix", "member_suffix", "non_null_suffix", "argument_list", "argument", "expression", "ternary", "literal", "nota_stmt", "additive_expr", "equality", "equality_tail", "assignment", "place", "itera_stmt", "dum_stmt", "comparison", "vel_expr", "vel_rhs", "sit_decl", "expr_stmt"]
+category = "regex"
+canonical = false
+summary = "`.` against a newline, the `(?s)` and `(?m)` flags, and `^` and `$` over text with line breaks."
+syntax = "<textus> ↦ regex"
+related = ["regex", "↦", "find", "find_all", "split", "replace"]
+locale = "en"
++++
+# =============================================================================
+# dot-multiline — regex conformance cell
+# =============================================================================
+#
+# Pins: PIN-DOT, PIN-ANCHOR (docs/design/regex-dialect.md). One line per probe cell;
+# the label is the cell id of the dialect's Appendix B, and the value is the reference
+# engine's answer. A target whose engine disagrees fails the line, never the dialect.
+#
+# What this teaches:
+#   • `.` matches one code point and everything except the line feed: carriage return, U+2028 and U+0085 are matched, `😀` is one `.`, and a letter with a combining mark is two
+#   • `(?s)` lets `.` match the line feed; without `(?m)` `^` and `$` anchor the whole text
+#   • `(?m)` anchors at every line start and end, where a line ends at the line feed only; `(?m)^` over `a⏎b⏎` yields the positions 0, 2 and 4
+#
+# Common mistakes:
+#   • expecting `.` to match a line feed without `(?s)`
+#   • expecting `(?m)` to treat a carriage return as a line end (see line-terminators)
+#
+# See also: regex, ↦, find, find_all, split, replace.
+# =============================================================================
+
+# dot-multiline — probes, one line each
+#
+# <textus> ↦ regex, then the operation the pin is about
+#
+# EXPECTED OUTPUT:
+#   One `<cell id>: <value>` line per probe, in the order below.
+
+# The one-letter text for a code point: characters that are invisible or look like another
+# letter are written by number, never as a literal.
+fn u(int n) → string {
+    const char c ← n ↦ char via Code ⊥ '?'
+    return c ↦ string
+}
+
+# y when the pattern matches somewhere in the text, n when it does not; `error` when the
+# conversion rejects the pattern.
+fn hits(string pat, string text) → string {
+    do {
+        const regex r ← pat ↦ regex
+        return r.matches(text) ✓ "y" ✗ "n"
+    }
+    catch err {
+        return "error"
+    }
+}
+
+# The code point span of every match, left to right, as ` (start,end)`; ` none` for no match.
+fn spans(string pat, string text) → string {
+    do {
+        const regex r ← pat ↦ regex
+        var string out ← ""
+        for from r.find_all(text) const h {
+            out ← out + " (§,§)"(h.start(), h.end())
+        }
+        if out ≡ "" {
+            return " none"
+        }
+        return out
+    }
+    catch err {
+        return "error"
+    }
+}
+
+main {
+    print "dot-newline: " + hits("^.$", "\n")
+    print "dot-newline-s: " + hits("(?s)^.$", "\n")
+    print "dot-cr: " + hits("^.$", "\r")
+    print "dot-lsep: " + hits("^.$", u(8232))
+    print "dot-nel: " + hits("^.$", u(133))
+    print "dot-astral: " + hits("^.$", "😀")
+    print "dot-astral-two: " + hits("^.{2}$", "😀")
+    print "dot-combining-one: " + hits("^.$", "e§"(u(769)))
+    print "dot-combining-two: " + hits("^..$", "e§"(u(769)))
+    print "anch-caret-nonmulti: " + hits("^b", "a\nb")
+    print "anch-caret-multi: " + hits("(?m)^b", "a\nb")
+    print "anch-dollar-multi: " + hits("(?m)a$", "a\nb")
+    print "anch-caret-multi-crlf: " + hits("(?m)^b", "a\r\nb")
+    print "anch-multi-empty-lines: " + hits("(?m)^$", "a\n")
+    print "anch-multi-empty-text: " + hits("(?m)^$", "")
+    print "anch-multi-iter:" + spans("(?m)^", "a\nb\n")
+    print "anch-dollar-iter:" + spans("(?m)$", "a\nb\n")
+    print "flag-scoped-m: " + hits("(?m:^b)", "a\nb")
+}

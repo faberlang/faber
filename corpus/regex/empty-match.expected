@@ -1,0 +1,20 @@
+empty-a-star: (0,0) (1,4) (5,5)
+empty-a-star-lazy: (0,0) (1,1) (2,2) (3,3) (4,4) (5,5)
+empty-pattern: (0,0) (1,1) (2,2)
+empty-text: (0,0)
+empty-astral: (0,0) (1,2)
+empty-nonempty-then-empty: (0,2)
+empty-alt-empty-first: (0,0) (1,1) (2,2)
+empty-alt-empty-last: (0,1) (1,2)
+empty-x-star-b: (0,3) (3,4)
+empty-b-or-end: (0,0) (1,2) (3,3)
+empty-ctx-caret: (0,1)
+empty-ctx-boundary: (0,1)
+empty-ctx-A: (0,1)
+empty-ctx-multi-caret: (0,1) (2,3)
+empty-ctx-nonword-boundary: (1,2) (2,3)
+emptypat-match: y
+emptypat-match-empty-text: y
+split-a-star: <><b><c><>
+replace-a-star: -b-c-
+replace-empty-pattern: -a-b-

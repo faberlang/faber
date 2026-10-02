@@ -1,0 +1,85 @@
++++
+term = "named-groups"
+kind = "conformance"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "conversio_expr", "fac_stmt", "cape_clause", "si_stmt", "call_expr", "call_suffix", "member_suffix", "non_null_suffix", "argument_list", "argument", "expression", "ternary", "literal", "nota_stmt", "additive_expr", "equality", "equality_tail", "assignment", "place", "itera_stmt", "dum_stmt", "comparison", "vel_expr", "vel_rhs", "sit_decl", "expr_stmt"]
+category = "regex"
+canonical = false
+summary = "Named groups: `(?P<n>..)` and `(?<n>..)`, Unicode names, group numbering, and the none result for an unknown or non-participating name."
+syntax = "<textus> ↦ regex"
+related = ["regex", "↦", "find", "find_all", "split", "replace"]
+locale = "en"
++++
+# =============================================================================
+# named-groups — regex conformance cell
+# =============================================================================
+#
+# Pins: PIN-NAME (docs/design/regex-dialect.md). One line per probe cell;
+# the label is the cell id of the dialect's Appendix B, and the value is the reference
+# engine's answer. A target whose engine disagrees fails the line, never the dialect.
+#
+# What this teaches:
+#   • `(?P<n>a)` and `(?<n>a)` both name a group; a Unicode name such as `é` is accepted
+#   • named and unnamed groups share one numbering, left to right: `(a)(?P<n>b)(c)` over `abc` has the groups abc, a, b, c
+#   • a name absent from the pattern and a named group that did not take part both read as `none`
+#
+# Common mistakes:
+#   • expecting a separate numbering for named groups
+#   • treating `none` from `named` as an error: it only says the group has no text in this match
+#
+# See also: regex, ↦, find, find_all, split, replace.
+# =============================================================================
+
+# named-groups — probes, one line each
+#
+# <textus> ↦ regex, then the operation the pin is about
+#
+# EXPECTED OUTPUT:
+#   One `<cell id>: <value>` line per probe, in the order below.
+
+# The text of a named group of the first match; `none` when the group did not take part or the
+# name is not in the pattern; `nomatch` for no match.
+fn named(string pat, string text, string name) → string {
+    do {
+        const regex r ← pat ↦ regex
+        const _ h ← r.find(text)
+        if h ≡ null {
+            return "nomatch"
+        }
+        return h!.named(name) coalesce "none"
+    }
+    catch err {
+        return "error"
+    }
+}
+
+# Groups 0..n of the first match, each as `|text`, `none` for a group that did not take part;
+# `nomatch` for no match.
+fn groups(string pat, string text, int n) → string {
+    do {
+        const regex r ← pat ↦ regex
+        const _ h ← r.find(text)
+        if h ≡ null {
+            return "nomatch"
+        }
+        var string out ← ""
+        var int i ← 0
+        while i ≤ n {
+            out ← out + "|§"(h!.group(i) coalesce "none")
+            i ← i + 1
+        }
+        return out
+    }
+    catch err {
+        return "error"
+    }
+}
+
+main {
+    print "name-P: " + named("(?P<n>a)", "xa", "n")
+    print "name-angle: " + named("(?<n>a)", "xa", "n")
+    print "name-unknown: " + named("(?P<n>a)", "a", "zzz")
+    print "name-nonparticipating: " + named("(?P<n>a)|(?P<m>b)", "b", "n")
+    print "name-participating: " + named("(?P<n>a)|(?P<m>b)", "b", "m")
+    print "name-unicode: " + named("(?P<é>a)", "a", "é")
+    print "name-numbering:" + groups("(a)(?P<n>b)(c)", "abc", 3)
+}

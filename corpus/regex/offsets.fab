@@ -1,0 +1,86 @@
++++
+term = "offsets"
+kind = "conformance"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "conversio_expr", "fac_stmt", "cape_clause", "si_stmt", "call_expr", "call_suffix", "member_suffix", "non_null_suffix", "argument_list", "argument", "expression", "ternary", "literal", "nota_stmt", "additive_expr", "equality", "equality_tail", "assignment", "place", "itera_stmt", "dum_stmt", "comparison", "vel_expr", "vel_rhs", "sit_decl", "expr_stmt"]
+category = "regex"
+canonical = false
+summary = "Offsets count code points, half-open: an astral character, a letter with an accent and a combining mark each move the offset by their own code point count."
+syntax = "<textus> ↦ regex"
+related = ["regex", "↦", "find", "find_all", "split", "replace"]
+locale = "en"
++++
+# =============================================================================
+# offsets — regex conformance cell
+# =============================================================================
+#
+# Pins: PIN-OFFSET (docs/design/regex-dialect.md). One line per probe cell;
+# the label is the cell id of the dialect's Appendix B, and the value is the reference
+# engine's answer. A target whose engine disagrees fails the line, never the dialect.
+#
+# What this teaches:
+#   • `a` over `😀a⟨combining⟩a` gives the spans (1,2) and (3,4): the emoji is one code point, the combining mark is another
+#   • `😀` over `x😀y` gives (1,2); `[éa]` over `éaé` gives (0,1) (1,2) (2,3)
+#
+# Common mistakes:
+#   • reading offsets as UTF-8 bytes or UTF-16 units
+#   • counting a letter plus its combining mark as one position
+#
+# See also: regex, ↦, find, find_all, split, replace.
+# =============================================================================
+
+# offsets — probes, one line each
+#
+# <textus> ↦ regex, then the operation the pin is about
+#
+# EXPECTED OUTPUT:
+#   One `<cell id>: <value>` line per probe, in the order below.
+
+# The one-letter text for a code point: characters that are invisible or look like another
+# letter are written by number, never as a literal.
+fn u(int n) → string {
+    const char c ← n ↦ char via Code ⊥ '?'
+    return c ↦ string
+}
+
+# The code point span of every match, left to right, as ` (start,end)`; ` none` for no match.
+fn spans(string pat, string text) → string {
+    do {
+        const regex r ← pat ↦ regex
+        var string out ← ""
+        for from r.find_all(text) const h {
+            out ← out + " (§,§)"(h.start(), h.end())
+        }
+        if out ≡ "" {
+            return " none"
+        }
+        return out
+    }
+    catch err {
+        return "error"
+    }
+}
+
+# The code point span of the leftmost match, as `(start,end)`; `none` for no match.
+fn first(string pat, string text) → string {
+    do {
+        const regex r ← pat ↦ regex
+        const _ h ← r.find(text)
+        if h ≡ null {
+            return "none"
+        }
+        return "(§,§)"(h!.start(), h!.end())
+    }
+    catch err {
+        return "error"
+    }
+}
+
+main {
+    print "off-cp-find-all:" + spans("a", "😀a§a"(u(769)))
+    print "off-cp-astral-match:" + spans("😀", "x😀y")
+    print "off-cp-text:" + spans("[éa]", "éaé")
+    print "off-find-astral: " + first("a", "😀a")
+    print "off-find-combining: " + first("b", "a§b"(u(769)))
+    print "off-find-accent: " + first("c", "éac")
+    print "off-find-none: " + first("z", "😀a")
+}

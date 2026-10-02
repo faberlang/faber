@@ -1,0 +1,117 @@
++++
+term = "empty-match"
+kind = "conformance"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "conversio_expr", "fac_stmt", "cape_clause", "si_stmt", "call_expr", "call_suffix", "member_suffix", "non_null_suffix", "argument_list", "argument", "expression", "ternary", "literal", "nota_stmt", "additive_expr", "equality", "equality_tail", "assignment", "place", "itera_stmt", "dum_stmt", "comparison", "vel_expr", "vel_rhs", "sit_decl", "expr_stmt"]
+category = "regex"
+canonical = false
+summary = "The empty-match iteration rule for find_all, split and replace: an empty match that starts where the previous match ended is skipped."
+syntax = "<textus> ↦ regex"
+related = ["regex", "↦", "find", "find_all", "split", "replace"]
+locale = "en"
++++
+# =============================================================================
+# empty-match — regex conformance cell
+# =============================================================================
+#
+# Pins: PIN-EMPTY, PIN-EMPTYPAT (docs/design/regex-dialect.md). One line per probe cell;
+# the label is the cell id of the dialect's Appendix B, and the value is the reference
+# engine's answer. A target whose engine disagrees fails the line, never the dialect.
+#
+# What this teaches:
+#   • `a*` over `baaac` gives the spans (0,0) (1,4) (5,5); the empty match at 4 is skipped because it starts where the match (1,4) ended
+#   • `a*` over `aa` gives one span (0,2); `a|` over `aa` gives (0,1) (1,2); the empty pattern over `ab` gives (0,0) (1,1) (2,2)
+#   • a context assertion such as `^a`, `\ba` or `\Aa` over `aa` gives one match, because the later position fails the assertion
+#   • `split` and `replace` use the same matches: `a*` over `baaac` splits into the pieces empty, b, c, empty and `replace` with `-` gives `-b-c-`
+#
+# Common mistakes:
+#   • expecting an empty match right after a non-empty one
+#   • expecting the empty pattern to match once: it matches before every character and at the end
+#
+# See also: regex, ↦, find, find_all, split, replace.
+# =============================================================================
+
+# empty-match — probes, one line each
+#
+# <textus> ↦ regex, then the operation the pin is about
+#
+# EXPECTED OUTPUT:
+#   One `<cell id>: <value>` line per probe, in the order below.
+
+# The code point span of every match, left to right, as ` (start,end)`; ` none` for no match.
+fn spans(string pat, string text) → string {
+    do {
+        const regex r ← pat ↦ regex
+        var string out ← ""
+        for from r.find_all(text) const h {
+            out ← out + " (§,§)"(h.start(), h.end())
+        }
+        if out ≡ "" {
+            return " none"
+        }
+        return out
+    }
+    catch err {
+        return "error"
+    }
+}
+
+# y when the pattern matches somewhere in the text, n when it does not; `error` when the
+# conversion rejects the pattern.
+fn hits(string pat, string text) → string {
+    do {
+        const regex r ← pat ↦ regex
+        return r.matches(text) ✓ "y" ✗ "n"
+    }
+    catch err {
+        return "error"
+    }
+}
+
+# The pieces of split, each as `<piece>`.
+fn pieces(string pat, string text) → string {
+    do {
+        const regex r ← pat ↦ regex
+        var string out ← ""
+        for from r.split(text) const piece {
+            out ← out + "<§>"(piece)
+        }
+        return out
+    }
+    catch err {
+        return "error"
+    }
+}
+
+# The text with every match replaced by the literal replacement.
+fn swapped(string pat, string text, string with) → string {
+    do {
+        const regex r ← pat ↦ regex
+        return r.replace(text, with)
+    }
+    catch err {
+        return "error"
+    }
+}
+
+main {
+    print "empty-a-star:" + spans("a*", "baaac")
+    print "empty-a-star-lazy:" + spans("a*?", "baaac")
+    print "empty-pattern:" + spans("", "ab")
+    print "empty-text:" + spans("x*", "")
+    print "empty-astral:" + spans("a*", "😀a")
+    print "empty-nonempty-then-empty:" + spans("a*", "aa")
+    print "empty-alt-empty-first:" + spans("|a", "aa")
+    print "empty-alt-empty-last:" + spans("a|", "aa")
+    print "empty-x-star-b:" + spans("a*b*", "abba")
+    print "empty-b-or-end:" + spans("b*", "abc")
+    print "empty-ctx-caret:" + spans("^a", "aa")
+    print "empty-ctx-boundary:" + spans("\\ba", "aa")
+    print "empty-ctx-A:" + spans("\\Aa", "aa")
+    print "empty-ctx-multi-caret:" + spans("(?m)^a", "a\na")
+    print "empty-ctx-nonword-boundary:" + spans("\\Bb", "abb")
+    print "emptypat-match: " + hits("", "abc")
+    print "emptypat-match-empty-text: " + hits("", "")
+    print "split-a-star: " + pieces("a*", "baaac")
+    print "replace-a-star: " + swapped("a*", "baaac", "-")
+    print "replace-empty-pattern: " + swapped("", "ab", "-")
+}

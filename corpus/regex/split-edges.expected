@@ -1,0 +1,11 @@
+split-basic: <a><b><c>
+split-leading-trailing: <><a><>
+split-adjacent: <a><><b>
+split-empty-pattern: <><a><b><c><>
+split-empty-text: <>
+split-capture-not-spliced: <a><b>
+split-a-star: <><b><c><>
+split-spaces: <><a><b><>
+split-no-match: <abc>
+split-astral: <😀><a>
+split-whole: <><>
