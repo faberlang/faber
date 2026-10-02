@@ -161,6 +161,32 @@ pub const INF_STORE: RuntimeItem = inf_row("store", RuntimeKind::StoreFn);
 pub const INF_TO_DEC: RuntimeItem = inf_row("to_dec", RuntimeKind::Fn);
 pub const INF_TRUE_DIV: RuntimeItem = inf_row("true_div", RuntimeKind::Fn);
 
+/// The targets whose runtime package carries the `format` namespace today.
+const FORMAT_TARGETS: &[Target] = &[Target::HirRust];
+
+const fn format_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Format,
+        name,
+        kind,
+        targets: FORMAT_TARGETS,
+    }
+}
+
+/// `format` rows (T1-R4): the `¶` format-operator renderers of the Rust runtime
+/// (`faber::format`). `FORMAT_FMT` is the decomposed spec a call site builds as
+/// a struct literal; it is a crate-root type (`faber::Fmt`), the others are
+/// free functions. `MAGNUS` and `MAGNUS_SCI` render an unbounded `inf`.
+pub const FORMAT_FMT: RuntimeItem = format_row("Fmt", RuntimeKind::Type);
+pub const FORMAT_FLOAT: RuntimeItem = format_row("float", RuntimeKind::Fn);
+pub const FORMAT_INSTANS: RuntimeItem = format_row("instans", RuntimeKind::Fn);
+pub const FORMAT_INT: RuntimeItem = format_row("int", RuntimeKind::Fn);
+pub const FORMAT_MAGNUS: RuntimeItem = format_row("magnus", RuntimeKind::Fn);
+pub const FORMAT_MAGNUS_SCI: RuntimeItem = format_row("magnus_sci", RuntimeKind::Fn);
+pub const FORMAT_PAD: RuntimeItem = format_row("pad", RuntimeKind::Fn);
+pub const FORMAT_SCI: RuntimeItem = format_row("sci", RuntimeKind::Fn);
+pub const FORMAT_TEXT: RuntimeItem = format_row("text", RuntimeKind::Fn);
+
 /// The targets whose runtime package carries each `regex` row. Rows differ by
 /// target: the Rust runtime carries the match operations as free functions in
 /// `faber::regex`, the Go runtime carries a constructor plus methods, the Swift
@@ -285,6 +311,15 @@ pub const TABLE: &[RuntimeItem] = &[
     EXACT_SHL,
     EXACT_SHR,
     EXACT_STORE,
+    FORMAT_FMT,
+    FORMAT_FLOAT,
+    FORMAT_INSTANS,
+    FORMAT_INT,
+    FORMAT_MAGNUS,
+    FORMAT_MAGNUS_SCI,
+    FORMAT_PAD,
+    FORMAT_SCI,
+    FORMAT_TEXT,
     INF_BIG,
     INF_APPROX,
     INF_CMP_DEC,

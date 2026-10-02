@@ -413,3 +413,22 @@ fn the_inf_rows_spell_as_faber_inf_functions_in_rust() {
         );
     }
 }
+
+#[test]
+fn the_format_rows_spell_as_faber_format_functions_and_the_crate_root_fmt_type() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Format)
+        .collect();
+    assert_eq!(rows.len(), 9);
+    for row in rows {
+        assert_eq!(row.targets, [Target::HirRust]);
+        let (kind, spelled) = if row.name == "Fmt" {
+            (RuntimeKind::Type, "faber::Fmt".to_owned())
+        } else {
+            (RuntimeKind::Fn, format!("faber::format::{}", row.name))
+        };
+        assert_eq!(row.kind, kind);
+        assert_eq!(spell_any(Target::HirRust, row), spelled);
+    }
+}
