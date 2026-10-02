@@ -333,6 +333,8 @@ fn the_store_family_is_the_exact_and_inf_rows_that_apply_a_width_limit() {
         .map(|row| (format!("{:?}", row.ns), row.name))
         .collect();
     store_rows.sort_unstable();
+    // `exact` (Rust `store` and `store_inferred`; Go `store_i`, `store_u`,
+    // `wrap`, `clamp_i`, `clamp_u`) and `inf` (Rust `store`; Go the same five).
     assert_eq!(
         store_rows,
         [
@@ -343,7 +345,12 @@ fn the_store_family_is_the_exact_and_inf_rows_that_apply_a_width_limit() {
             ("Exact".to_owned(), "store_inferred"),
             ("Exact".to_owned(), "store_u"),
             ("Exact".to_owned(), "wrap"),
-            ("Inf".to_owned(), "store")
+            ("Inf".to_owned(), "clamp_i"),
+            ("Inf".to_owned(), "clamp_u"),
+            ("Inf".to_owned(), "store"),
+            ("Inf".to_owned(), "store_i"),
+            ("Inf".to_owned(), "store_u"),
+            ("Inf".to_owned(), "wrap")
         ]
     );
     assert_eq!(
@@ -413,6 +420,120 @@ fn the_go_exact_rows_spell_as_the_flat_rt_names() {
 }
 
 #[test]
+fn the_go_dec_rows_spell_as_the_flat_rt_names() {
+    let go_rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Dec && row.targets.contains(&Target::HirGo))
+        .collect();
+    // 17 functions and the `DecCarrier` type; none is store-family (a decimal
+    // store has no `HirStoreSite` where an unstored computation is consumed).
+    assert_eq!(go_rows.len(), 18);
+    assert_eq!(
+        go_rows
+            .iter()
+            .filter(|row| row.kind == RuntimeKind::Type)
+            .count(),
+        1
+    );
+    assert!(go_rows.iter().all(|row| row.kind != RuntimeKind::StoreFn));
+    assert_eq!(spell_any(Target::HirGo, &DEC_CARRIER), "rt.DecCarrier");
+    for (row, spelled) in [
+        (&DEC_ADD, "rt.DecAdd"),
+        (&DEC_OF, "rt.DecOf"),
+        (&DEC_STORE, "rt.DecStore"),
+        (&DEC_TRY_STORE, "rt.DecTryStore"),
+        (&DEC_TO_INT, "rt.DecToInt"),
+        (&DEC_F64, "rt.DecF64"),
+        (&DEC_FLOAT_CMP, "rt.DecFloatCmp"),
+        (&DEC_TRY_PARSE, "rt.DecTryParse"),
+        (&DEC_PARSE, "rt.DecParse"),
+    ] {
+        assert_eq!(spell_any(Target::HirGo, row), spelled);
+    }
+}
+
+#[test]
+fn the_go_inf_rows_spell_as_the_flat_rt_names() {
+    let go_rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Inf && row.targets.contains(&Target::HirGo))
+        .collect();
+    // 50 functions and the `InfPart` composite-key type.
+    assert_eq!(go_rows.len(), 51);
+    assert_eq!(
+        go_rows
+            .iter()
+            .filter(|row| row.kind == RuntimeKind::Type)
+            .count(),
+        1
+    );
+    // The width limit applies only in the store family.
+    let mut store: Vec<&str> = go_rows
+        .iter()
+        .filter(|row| row.kind == RuntimeKind::StoreFn)
+        .map(|row| row.name)
+        .collect();
+    store.sort_unstable();
+    assert_eq!(store, ["clamp_i", "clamp_u", "store_i", "store_u", "wrap"]);
+    assert_eq!(spell_any(Target::HirGo, &INF_PART), "rt.InfPart");
+    for (row, spelled) in [
+        (&INF_Z, "rt.InfZ"),
+        (&INF_I, "rt.InfI"),
+        (&INF_ADD, "rt.InfAdd"),
+        (&INF_LIST_EQ, "rt.InfListEq"),
+        (&INF_LT_F, "rt.InfLtF"),
+        (&INF_F64, "rt.InfF64"),
+        (&INF_FROM_VALOR, "rt.InfFromValor"),
+        (&INF_TO_BYTES, "rt.InfToBytes"),
+        (&INF_FITS_U, "rt.InfFitsU"),
+        (&INF_TO_DEC, "rt.InfToDec"),
+        (&INF_FROM_KEY, "rt.InfFromKey"),
+    ] {
+        assert_eq!(spell_any(Target::HirGo, row), spelled);
+    }
+    assert_eq!(
+        spell_store(Target::HirGo, &INF_STORE_I, &site()),
+        Ok("rt.InfStoreI".to_owned())
+    );
+    assert_eq!(
+        spell(Target::HirGo, &INF_STORE_I),
+        Err(SpellError::StoreOnly)
+    );
+}
+
+#[test]
+fn the_go_format_rows_spell_as_the_flat_rt_names() {
+    let go_rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Format && row.targets.contains(&Target::HirGo))
+        .collect();
+    // 9 functions and the `FormatSpec` layout-spec type; none is a store row.
+    assert_eq!(go_rows.len(), 10);
+    assert_eq!(
+        go_rows
+            .iter()
+            .filter(|row| row.kind == RuntimeKind::Type)
+            .count(),
+        1
+    );
+    assert!(go_rows.iter().all(|row| row.kind != RuntimeKind::StoreFn));
+    for (row, spelled) in [
+        (&FORMAT_SPEC, "rt.FormatSpec"),
+        (&FORMAT_PAD, "rt.FormatPad"),
+        (&FORMAT_SCI, "rt.FormatSci"),
+        (&FORMAT_INT, "rt.FormatInt"),
+        (&FORMAT_SIGNED, "rt.FormatSigned"),
+        (&FORMAT_FLOAT, "rt.FormatFloat"),
+        (&FORMAT_TEXT, "rt.FormatText"),
+        (&FORMAT_INSTANS, "rt.FormatInstans"),
+        (&FORMAT_MAGNUS, "rt.FormatMagnus"),
+        (&FORMAT_MAGNUS_SCI, "rt.FormatMagnusSci"),
+    ] {
+        assert_eq!(spell_any(Target::HirGo, row), spelled);
+    }
+}
+
+#[test]
 fn the_regex_rows_spell_from_the_table_for_typescript() {
     // RX-8: the TypeScript runtime package's `regex` namespace.
     for (row, spelled) in [
@@ -432,12 +553,12 @@ fn the_regex_rows_spell_from_the_table_for_typescript() {
 fn the_dec_rows_spell_as_faber_dec_functions_in_rust() {
     let rows: Vec<&RuntimeItem> = TABLE
         .iter()
-        .filter(|row| row.ns == Namespace::Dec)
+        .filter(|row| row.ns == Namespace::Dec && row.targets.contains(&Target::HirRust))
         .collect();
     assert_eq!(rows.len(), 19);
     for row in rows {
         assert_eq!(row.kind, RuntimeKind::Fn);
-        assert_eq!(row.targets, [Target::HirRust]);
+        assert!(row.targets.contains(&Target::HirRust));
         assert_eq!(
             spell_any(Target::HirRust, row),
             format!("faber::dec::{}", row.name)
@@ -449,7 +570,7 @@ fn the_dec_rows_spell_as_faber_dec_functions_in_rust() {
 fn the_inf_rows_spell_as_faber_inf_functions_in_rust() {
     let rows: Vec<&RuntimeItem> = TABLE
         .iter()
-        .filter(|row| row.ns == Namespace::Inf)
+        .filter(|row| row.ns == Namespace::Inf && row.targets.contains(&Target::HirRust))
         .collect();
     assert_eq!(rows.len(), 15);
     for row in rows {
@@ -460,7 +581,7 @@ fn the_inf_rows_spell_as_faber_inf_functions_in_rust() {
             RuntimeKind::Fn
         };
         assert_eq!(row.kind, kind);
-        assert_eq!(row.targets, [Target::HirRust]);
+        assert!(row.targets.contains(&Target::HirRust));
         assert_eq!(
             spell_any(Target::HirRust, row),
             format!("faber::inf::{}", row.name)
@@ -472,11 +593,11 @@ fn the_inf_rows_spell_as_faber_inf_functions_in_rust() {
 fn the_format_rows_spell_as_faber_format_functions_and_the_crate_root_fmt_type() {
     let rows: Vec<&RuntimeItem> = TABLE
         .iter()
-        .filter(|row| row.ns == Namespace::Format)
+        .filter(|row| row.ns == Namespace::Format && row.targets.contains(&Target::HirRust))
         .collect();
     assert_eq!(rows.len(), 9);
     for row in rows {
-        assert_eq!(row.targets, [Target::HirRust]);
+        assert!(row.targets.contains(&Target::HirRust));
         let (kind, spelled) = if row.name == "Fmt" {
             (RuntimeKind::Type, "faber::Fmt".to_owned())
         } else {
