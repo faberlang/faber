@@ -14,7 +14,7 @@ const STATS_FIXTURE: &str = r#"
   "kind": "faber-run-stats",
   "format_version": 1,
   "generated_at": "2026-08-28T23:00:00Z",
-  "faber": { "version": "1.11.0", "commit": null },
+  "faber": { "version": "1.12.0", "commit": null },
   "package": { "name": "fixture", "entry": "src/main.fab" },
   "route": "scena",
   "run": { "wall_ms": 17, "exit": 0 },
@@ -152,7 +152,7 @@ fn schema_round_trip_pins_binding_fields_and_intrinsic_surface() {
     assert_eq!(artifact.kind, "faber-run-stats");
     assert_eq!(artifact.format_version, 1);
     assert_eq!(artifact.generated_at, "2026-08-28T23:00:00Z");
-    assert_eq!(artifact.faber.version, "1.11.0");
+    assert_eq!(artifact.faber.version, "1.12.0");
     assert_eq!(artifact.faber.commit, None);
     assert_eq!(artifact.package.name, "fixture");
     assert_eq!(artifact.package.entry, "src/main.fab");
