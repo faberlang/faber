@@ -36,6 +36,13 @@ locale = "en"
 # EXPECTED OUTPUT:
 #   One `<cell id>: <value>` line per probe, in the order below.
 
+# The one-letter text for a code point: characters that are invisible or look like another
+# letter are written by number, never as a literal.
+fn u(int n) → string {
+    const char c ← n ↦ char via Code ⊥ '?'
+    return c ↦ string
+}
+
 # `accepted` when the conversion takes the pattern; otherwise the leading construct id of the
 # rejection payload (the text before the first colon). The engine's prose is never printed.
 fn verdict(string pat) → string {
@@ -69,7 +76,7 @@ main {
     print "flag-neg-i: " + verdict("(?-i)a")
     print "flag-combo: " + verdict("(?ims)a")
     print "flag-combo-neg: " + verdict("(?i-s)a")
-    print "flag-x-match: " + hits("(?x)a b # comment\n c", "abc")
+    print "flag-x-match: " + hits("(?x)a b § comment\n c"(u(35)), "abc")
     print "flag-x-space-lit: " + hits("(?x)a\\ b", "a b")
     print "flag-x-class-space: " + hits("(?x)[a ]b", " b")
     print "flag-scoped-m: " + hits("(?m:^b)", "a\nb")

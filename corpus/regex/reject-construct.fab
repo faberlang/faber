@@ -37,6 +37,13 @@ locale = "en"
 # EXPECTED OUTPUT:
 #   One `<cell id>: <value>` line per probe, in the order below.
 
+# The one-letter text for a code point: characters that are invisible or look like another
+# letter are written by number, never as a literal.
+fn u(int n) → string {
+    const char c ← n ↦ char via Code ⊥ '?'
+    return c ↦ string
+}
+
 # `accepted` when the conversion takes the pattern; otherwise the leading construct id of the
 # rejection payload (the text before the first colon). The engine's prose is never printed.
 fn verdict(string pat) → string {
@@ -82,7 +89,7 @@ main {
     print "k-word-start: " + verdict("\\<")
     print "k-word-start-brace: " + verdict("\\b{start}")
     print "k-named-empty: " + verdict("(?P<>a)")
-    print "k-comment-group: " + verdict("(?#c)a")
+    print "k-comment-group: " + verdict("(?§c)a"(u(35)))
     print "name-quote: " + verdict("(?'n'a)")
     print "name-dup: " + verdict("(?P<n>a)(?P<n>b)")
     print "name-digit-start: " + verdict("(?P<1a>a)")
@@ -94,6 +101,6 @@ main {
     print "k-quant-open: " + verdict("a{2,}")
     print "k-empty-group: " + verdict("()")
     print "k-empty-alt-group: " + verdict("(|a)")
-    print "k-hash-literal: " + verdict("#")
+    print "k-hash-literal: " + verdict(u(35))
     print "k-dollar-alone: " + verdict("$")
 }
