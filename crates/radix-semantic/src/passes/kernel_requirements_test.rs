@@ -378,3 +378,42 @@ incipit {
     assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
     assert_eq!(fixture.result.shape_obligations.functions.len(), 1);
 }
+
+#[test]
+fn vector_literal_over_untyped_float_constants_requires_no_f64() {
+    // K15b: `[x, 2.0, 3.0, 4.0] ↦ vf32[4]` is f32 end to end; the list
+    // literal's untyped constants must not demand f64.
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn productum(f32 x) → f32 {
+    const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
+    const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
+    return a.dot(b)
+}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+
+    for target in [Target::MirMetal, Target::MirWgsl] {
+        let report = target_row(&fixture, "productum", target);
+        assert!(report.admitted, "{target:?}: {:?}", report.failures);
+    }
+}
+
+#[test]
+fn explicit_f64_array_literal_still_requires_f64() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn wide(f64 x) → f64 {
+    const vf64[2] a ← [x, 2.0] ↦ vf64[2]
+    return a.dot(a)
+}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    assert!(!target_row(&fixture, "wide", Target::MirMetal).admitted);
+}
