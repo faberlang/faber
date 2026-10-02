@@ -4,6 +4,15 @@ use super::value::*;
 use radix_lexer::Span;
 use radix_mir::MirBinOp;
 use radix_types::NumericWidth;
+use std::{cell::RefCell, rc::Rc};
+
+impl TensorValue {
+    /// Test constructor: fixture shapes always have representable strides.
+    pub(crate) fn contiguous(data: Vec<Value>, shape: Vec<i64>) -> Self {
+        Self::try_contiguous(data, shape)
+            .expect("fixture tensor shape must have representable strides")
+    }
+}
 
 #[test]
 fn affine_prefix_view_keeps_shared_backing_without_weakening_bounds_checks() {
@@ -1003,4 +1012,33 @@ fn ascii_carried_fields_quote_by_declared_type_not_by_width() {
         nested.display(&interner, order, Span::default()).unwrap(),
         r#"Outer { outer = Rec { c = 'q', u = "q", cs = ['x'], us = ["x", "abc"] } }"#
     );
+}
+
+#[test]
+fn empty_tensor_is_rank_zero_with_no_elements() {
+    let empty = TensorValue::empty();
+    assert!(empty.shape.is_empty());
+    assert!(empty.strides.is_empty());
+    assert_eq!(empty.logical_values(), Some(Vec::new()));
+}
+
+#[test]
+fn deep_copy_of_a_tensor_does_not_share_backing_storage() {
+    let source = Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        vec![Value::Int(1), Value::Int(2)],
+        vec![2],
+    ))));
+    let copy = source.deep_copy();
+    let (Value::Tensor(source_cell), Value::Tensor(copy_cell)) = (&source, &copy) else {
+        panic!("tensor deep copy stays a tensor");
+    };
+    assert!(!Rc::ptr_eq(source_cell, copy_cell));
+    assert_eq!(
+        copy_cell.borrow().logical_values(),
+        source_cell.borrow().logical_values()
+    );
+    assert!(!Rc::ptr_eq(
+        &source_cell.borrow().data,
+        &copy_cell.borrow().data
+    ));
 }

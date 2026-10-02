@@ -59,9 +59,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             data.push(self.lift_element(op, &picked, element, span)?);
         }
-        Ok(Value::Tensor(Rc::new(RefCell::new(
-            TensorValue::contiguous(data, shape),
-        ))))
+        TensorValue::try_contiguous(data, shape)
+            .map(|tensor| Value::Tensor(Rc::new(RefCell::new(tensor))))
+            .ok_or_else(|| RunnerError::internal(span, "tensor shape has unrepresentable strides"))
     }
 
     /// The element type of the tensor result type.

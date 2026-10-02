@@ -552,7 +552,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let storage = self.gradient_handles.get(&handle).ok_or_else(|| {
             RunnerError::internal(span, format!("gradient read unknown handle {handle}"))
         })?;
-        Ok(tensor_value(storage.data.clone(), storage.shape.clone()))
+        tensor_value(storage.data.clone(), storage.shape.clone(), span)
     }
 
     /// `gradient zero(handle)` — reset the gradient storage to zero.
@@ -649,9 +649,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         "tensor construct supports only vacua",
                     ));
                 }
-                Ok(Value::Tensor(Rc::new(RefCell::new(
-                    TensorValue::contiguous(Vec::new(), Vec::new()),
-                ))))
+                Ok(Value::Tensor(Rc::new(RefCell::new(TensorValue::empty()))))
             }
             MirAggregateKind::SparseTensor => {
                 let MirAggregateFields::Ordered(items) = &aggregate.fields else {
@@ -676,7 +674,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let shape = literal_sparse_shape(self.types, *shape, span)?;
                 let zero = sparse_zero_value(self.types, *element, span)?;
                 let count = tensor_element_count(&shape, span)?;
-                Ok(tensor_value(vec![zero; count], shape))
+                tensor_value(vec![zero; count], shape, span)
             }
             MirAggregateKind::Interval { inclusive } => {
                 let [start, end] = self
@@ -2002,7 +2000,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let len = i64::try_from(values.len()).map_err(|_| {
                     RunnerError::internal(span, "interval materialization length overflow")
                 })?;
-                Ok(tensor_value(values, vec![len]))
+                tensor_value(values, vec![len], span)
             }
             _ => Err(RunnerError::internal(
                 span,
@@ -2088,9 +2086,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     // or neither prefix nor suffix: cycle the entire block.
                     fill_data.iter().cycle().take(count).cloned().collect()
                 };
-                Ok(tensor_value(data, shape))
+                tensor_value(data, shape, span)
             }
-            _ => Ok(tensor_value(vec![value; count], shape)),
+            _ => tensor_value(vec![value; count], shape, span),
         }
     }
 
@@ -2101,7 +2099,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let shape = self.shape_arg(shape, span, ERR_CREA_INVALID_SHAPE)?;
         let fill = self.eval_operand(fill, span)?;
         let count = tensor_element_count(&shape, span)?;
-        Ok(tensor_value(vec![fill; count], shape))
+        tensor_value(vec![fill; count], shape, span)
     }
 
     fn tensor_from_flat(
@@ -2147,7 +2145,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let fill = self.eval_operand(fill, span)?;
         let mut data = flat;
         data.resize(count, fill);
-        Ok(tensor_value(data, shape))
+        tensor_value(data, shape, span)
     }
 
     fn tensor_from_flat_exact(
@@ -2170,7 +2168,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             span,
             radix_mir::lista_tensor_conversio::LISTA_TO_TENSOR_STRUCTA_COUNT_MSG,
         )?;
-        Ok(tensor_value(flat, shape))
+        tensor_value(flat, shape, span)
     }
 
     fn tensor_flatten(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -2205,7 +2203,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             ));
         }
         let data = self.tensor_logical_values(&tensor, span)?;
-        Ok(tensor_value(data, shape))
+        tensor_value(data, shape, span)
     }
 
     fn tensor_expand(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -2564,9 +2562,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     return Ok(Value::Tensor(tensor));
                 }
                 let data = self.tensor_logical_values(&tensor, span)?;
-                Ok(Value::Tensor(Rc::new(RefCell::new(
-                    TensorValue::contiguous(data, snapshot.shape),
-                ))))
+                tensor_value(data, snapshot.shape, span)
             }
             Value::Array(items) => {
                 let items = items.borrow().clone();
@@ -2887,7 +2883,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                                 format!("{label} backing-length mismatch"),
                             ));
                         }
-                        return Ok(tensor_value(Vec::new(), higher_shape.clone()));
+                        return tensor_value(Vec::new(), higher_shape.clone(), span);
                     }
                     let expected = rows.saturating_mul(lower_data.len());
                     if higher_data.len() != expected {
@@ -2906,7 +2902,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                             }
                         })
                         .collect::<Result<Vec<_>, _>>()?;
-                    return Ok(tensor_value(data, higher_shape.clone()));
+                    return tensor_value(data, higher_shape.clone(), span);
                 }
                 // Equal shapes with unequal backing lengths would silently
                 // truncate via zip — reject explicitly (PRP-077).
@@ -2921,7 +2917,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .zip(right_data.iter())
                     .map(|(a, b)| op(a, b, width, span))
                     .collect::<Result<Vec<_>, _>>()?;
-                Ok(tensor_value(data, left_shape))
+                tensor_value(data, left_shape, span)
             }
             (Value::Tensor(cell), scalar) => {
                 let shape = cell.borrow().shape.clone();
@@ -2931,7 +2927,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .iter()
                     .map(|elem| op(elem, scalar, width, span))
                     .collect::<Result<Vec<_>, _>>()?;
-                Ok(tensor_value(data, shape))
+                tensor_value(data, shape, span)
             }
             (scalar, Value::Tensor(cell)) => {
                 let shape = cell.borrow().shape.clone();
@@ -2941,7 +2937,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .iter()
                     .map(|elem| op(scalar, elem, width, span))
                     .collect::<Result<Vec<_>, _>>()?;
-                Ok(tensor_value(data, shape))
+                tensor_value(data, shape, span)
             }
             _ => op(&left_val, &right_val, width, span),
         }
@@ -3011,7 +3007,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             .iter()
             .map(&mut *op)
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(tensor_value(data, shape))
+        tensor_value(data, shape, span)
     }
 
     fn tensor_neg(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -3086,7 +3082,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 None => mapped,
             });
         }
-        Ok(tensor_value(data, shape))
+        tensor_value(data, shape, span)
     }
 
     fn tensor_gelu(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -3158,7 +3154,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             let row = row_softmax(&values, base, last_dim, RowSoftmaxAccess::Safe, span)?;
             out_data.extend(row.into_iter().map(Value::Float));
         }
-        Ok(tensor_value(out_data, shape))
+        tensor_value(out_data, shape, span)
     }
 
     /// Categorical cross-entropy loss: `-sum(targets * log(softmax(logits) + ε)) / N`.
@@ -3378,10 +3374,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 )?);
             }
         }
-        Ok(tensor_value(
+        tensor_value(
             self.store_matmul_cells(element, cells, span)?,
             output_shape,
-        ))
+            span,
+        )
     }
 
     fn store_matmul_cells(
@@ -3481,7 +3478,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 }
             }
             let result = self.store_tensor_elements(element, result, span)?;
-            Ok(tensor_value(result, vec![cols as i64]))
+            tensor_value(result, vec![cols as i64], span)
         } else {
             // axis == 1 (last axis) — sum across columns → result has shape [rows].
             let mut result = Vec::with_capacity(rows);
@@ -3500,7 +3497,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 result.push(sum);
             }
             let result = self.store_tensor_elements(element, result, span)?;
-            Ok(tensor_value(result, vec![rows as i64]))
+            tensor_value(result, vec![rows as i64], span)
         }
     }
 
@@ -3714,7 +3711,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             _ => normalized,
         };
 
-        Ok(tensor_value(output, shape))
+        tensor_value(output, shape, span)
     }
 
     fn tensor_rms_norm(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -3806,7 +3803,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 output.push(Value::Float(x * scale * g));
             }
         }
-        Ok(tensor_value(output, shape))
+        tensor_value(output, shape, span)
     }
 
     fn tensor_rope(
@@ -3903,7 +3900,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             output.extend(row_data);
         }
-        Ok(tensor_value(output, shape))
+        tensor_value(output, shape, span)
     }
 
     fn tensor_gather(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -3962,7 +3959,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             output.extend(table_values[base..base + cols].iter().cloned());
         }
         let result_shape = vec![indices.len() as i64, cols as i64];
-        Ok(tensor_value(output, result_shape))
+        tensor_value(output, result_shape, span)
     }
 
     fn tensor_transpose(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -5260,8 +5257,10 @@ fn array_value(items: Vec<Value>) -> Value {
     Value::Array(Rc::new(RefCell::new(items)))
 }
 
-fn tensor_value(data: Vec<Value>, shape: Vec<i64>) -> Value {
-    Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(data, shape))))
+fn tensor_value(data: Vec<Value>, shape: Vec<i64>, span: Span) -> Result<Value, RunnerError> {
+    let tensor = TensorValue::try_contiguous(data, shape)
+        .ok_or_else(|| RunnerError::internal(span, "tensor shape has unrepresentable strides"))?;
+    Ok(Value::Tensor(Rc::new(RefCell::new(tensor))))
 }
 
 fn interval_value(start: Value, end: Value, inclusive: bool) -> Value {

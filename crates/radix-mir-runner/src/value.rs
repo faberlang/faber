@@ -308,10 +308,19 @@ pub(crate) enum TensorInverseMap {
 }
 
 impl TensorValue {
+    /// The rank-0, zero-element tensor: it has no extents whose strides could
+    /// fail to be representable.
     #[must_use]
-    pub fn contiguous(data: Vec<Value>, shape: Vec<i64>) -> Self {
-        Self::try_contiguous(data, shape)
-            .expect("contiguous tensor shape must have representable strides")
+    pub fn empty() -> Self {
+        Self {
+            data: Rc::new(RefCell::new(Vec::new())),
+            shape: Vec::new(),
+            strides: Vec::new(),
+            offset: 0,
+            is_view: false,
+            edge_base: None,
+            edge_ops: Vec::new(),
+        }
     }
 
     /// Build a contiguous tensor only when its stride products fit the
@@ -328,11 +337,6 @@ impl TensorValue {
             edge_base: None,
             edge_ops: Vec::new(),
         })
-    }
-
-    #[must_use]
-    pub fn contiguous_strides(shape: &[i64]) -> Vec<isize> {
-        Self::try_contiguous_strides(shape).expect("contiguous tensor strides must fit isize")
     }
 
     #[must_use]
@@ -792,7 +796,7 @@ impl TensorValue {
         let strides = if shape == self.shape {
             self.strides.clone()
         } else if self.edge_base.is_some() || self.is_contiguous() {
-            Self::contiguous_strides(&shape)
+            Self::try_contiguous_strides(&shape)?
         } else {
             return None;
         };
@@ -1103,12 +1107,15 @@ impl Value {
                 memo,
                 Value::Tensor,
                 |t, m| {
-                    TensorValue::contiguous(
+                    // A source whose contiguous strides do not fit holds no
+                    // elements, so sharing its (empty) layout copies nothing.
+                    TensorValue::try_contiguous(
                         elements(&t.logical_values().unwrap_or_default(), m),
                         t.shape.clone(),
                     )
+                    .unwrap_or_else(|| t.clone())
                 },
-                || TensorValue::contiguous(Vec::new(), Vec::new()),
+                TensorValue::empty,
             ),
             Value::Matrix(rc) => {
                 let source = rc.borrow();
