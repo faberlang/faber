@@ -232,11 +232,14 @@ pub const EXACT_TRUE_DIV_F32: RuntimeItem =
 pub const EXACT_CLAMP: RuntimeItem = exact_row_for("clamp", RuntimeKind::StoreFn, EXACT_TS);
 
 /// The targets whose runtime package carries each `dec` row. The Rust runtime
-/// (`faber::dec`) and the Go runtime (`rt.Dec*`) share the rows whose id and
-/// meaning match; each also carries rows of its own.
+/// (`faber::dec`), the Go runtime (`rt.Dec*`) and the TypeScript runtime
+/// (`dec` in `@faber/runtime`, T1-T3) share the rows whose id and meaning
+/// match; each also carries rows of its own.
 const DEC_RUST: &[Target] = &[Target::HirRust];
 const DEC_GO: &[Target] = &[Target::HirGo];
-const DEC_RUST_GO: &[Target] = &[Target::HirRust, Target::HirGo];
+const DEC_RUST_GO_TS: &[Target] = &[Target::HirRust, Target::HirTypeScript, Target::HirGo];
+const DEC_RUST_TS: &[Target] = &[Target::HirRust, Target::HirTypeScript];
+const DEC_GO_TS: &[Target] = &[Target::HirTypeScript, Target::HirGo];
 
 const fn dec_row(name: &'static str, kind: RuntimeKind, targets: &'static [Target]) -> RuntimeItem {
     RuntimeItem {
@@ -255,29 +258,33 @@ const fn dec_row(name: &'static str, kind: RuntimeKind, targets: &'static [Targe
 /// spelled where an unstored decimal computation is consumed as a stored
 /// carrier, which has no `HirStoreSite` at the call (a negation, a list
 /// element, a binary result). Go's `TRY_PARSE` returns the runner's failure
-/// message (empty on success); `PARSE` is the arm that panics with it.
+/// message (empty on success); `PARSE` is the arm that panics with it. The
+/// TypeScript runtime (`dec`, T1-T3) carries the same decimal as a
+/// `[bigint, number]` pair; its `try_parse` returns `undefined` for text it
+/// rejects, `parse` throws, `float_cmp` and `to_int` are shared with Go, and
+/// `fmt_list` is shared with Rust.
 pub const DEC_CARRIER: RuntimeItem = dec_row("Carrier", RuntimeKind::Type, DEC_GO);
-pub const DEC_ADD: RuntimeItem = dec_row("add", RuntimeKind::Fn, DEC_RUST_GO);
-pub const DEC_CMP: RuntimeItem = dec_row("cmp", RuntimeKind::Fn, DEC_RUST_GO);
-pub const DEC_DIV: RuntimeItem = dec_row("div", RuntimeKind::Fn, DEC_RUST_GO);
-pub const DEC_F64: RuntimeItem = dec_row("f64", RuntimeKind::Fn, DEC_RUST_GO);
-pub const DEC_FLOAT_CMP: RuntimeItem = dec_row("float_cmp", RuntimeKind::Fn, DEC_GO);
-pub const DEC_FMT: RuntimeItem = dec_row("fmt", RuntimeKind::Fn, DEC_RUST_GO);
-pub const DEC_FMT_LIST: RuntimeItem = dec_row("fmt_list", RuntimeKind::Fn, DEC_RUST);
+pub const DEC_ADD: RuntimeItem = dec_row("add", RuntimeKind::Fn, DEC_RUST_GO_TS);
+pub const DEC_CMP: RuntimeItem = dec_row("cmp", RuntimeKind::Fn, DEC_RUST_GO_TS);
+pub const DEC_DIV: RuntimeItem = dec_row("div", RuntimeKind::Fn, DEC_RUST_GO_TS);
+pub const DEC_F64: RuntimeItem = dec_row("f64", RuntimeKind::Fn, DEC_RUST_GO_TS);
+pub const DEC_FLOAT_CMP: RuntimeItem = dec_row("float_cmp", RuntimeKind::Fn, DEC_GO_TS);
+pub const DEC_FMT: RuntimeItem = dec_row("fmt", RuntimeKind::Fn, DEC_RUST_GO_TS);
+pub const DEC_FMT_LIST: RuntimeItem = dec_row("fmt_list", RuntimeKind::Fn, DEC_RUST_TS);
 pub const DEC_FMT_OPTION: RuntimeItem = dec_row("fmt_option", RuntimeKind::Fn, DEC_RUST);
-pub const DEC_INT: RuntimeItem = dec_row("int", RuntimeKind::Fn, DEC_RUST_GO);
-pub const DEC_MUL: RuntimeItem = dec_row("mul", RuntimeKind::Fn, DEC_RUST_GO);
-pub const DEC_NEG: RuntimeItem = dec_row("neg", RuntimeKind::Fn, DEC_RUST_GO);
-pub const DEC_OF: RuntimeItem = dec_row("of", RuntimeKind::Fn, DEC_RUST_GO);
-pub const DEC_PARSE: RuntimeItem = dec_row("parse", RuntimeKind::Fn, DEC_RUST_GO);
-pub const DEC_REM: RuntimeItem = dec_row("rem", RuntimeKind::Fn, DEC_RUST_GO);
+pub const DEC_INT: RuntimeItem = dec_row("int", RuntimeKind::Fn, DEC_RUST_GO_TS);
+pub const DEC_MUL: RuntimeItem = dec_row("mul", RuntimeKind::Fn, DEC_RUST_GO_TS);
+pub const DEC_NEG: RuntimeItem = dec_row("neg", RuntimeKind::Fn, DEC_RUST_GO_TS);
+pub const DEC_OF: RuntimeItem = dec_row("of", RuntimeKind::Fn, DEC_RUST_GO_TS);
+pub const DEC_PARSE: RuntimeItem = dec_row("parse", RuntimeKind::Fn, DEC_RUST_GO_TS);
+pub const DEC_REM: RuntimeItem = dec_row("rem", RuntimeKind::Fn, DEC_RUST_GO_TS);
 pub const DEC_RHE: RuntimeItem = dec_row("rhe", RuntimeKind::Fn, DEC_RUST);
 pub const DEC_ROUND: RuntimeItem = dec_row("round", RuntimeKind::Fn, DEC_RUST);
-pub const DEC_STORE: RuntimeItem = dec_row("store", RuntimeKind::Fn, DEC_RUST_GO);
-pub const DEC_SUB: RuntimeItem = dec_row("sub", RuntimeKind::Fn, DEC_RUST_GO);
-pub const DEC_TO_INT: RuntimeItem = dec_row("to_int", RuntimeKind::Fn, DEC_GO);
-pub const DEC_TRY_PARSE: RuntimeItem = dec_row("try_parse", RuntimeKind::Fn, DEC_RUST_GO);
-pub const DEC_TRY_STORE: RuntimeItem = dec_row("try_store", RuntimeKind::Fn, DEC_RUST_GO);
+pub const DEC_STORE: RuntimeItem = dec_row("store", RuntimeKind::Fn, DEC_RUST_GO_TS);
+pub const DEC_SUB: RuntimeItem = dec_row("sub", RuntimeKind::Fn, DEC_RUST_GO_TS);
+pub const DEC_TO_INT: RuntimeItem = dec_row("to_int", RuntimeKind::Fn, DEC_GO_TS);
+pub const DEC_TRY_PARSE: RuntimeItem = dec_row("try_parse", RuntimeKind::Fn, DEC_RUST_GO_TS);
+pub const DEC_TRY_STORE: RuntimeItem = dec_row("try_store", RuntimeKind::Fn, DEC_RUST_GO_TS);
 
 /// The targets whose runtime package carries each `inf` row: the Rust runtime
 /// (`faber::inf`) and the Go runtime (`rt.Inf*`) share the rows whose id and

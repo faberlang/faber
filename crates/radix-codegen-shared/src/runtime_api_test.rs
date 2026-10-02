@@ -387,6 +387,34 @@ fn the_exact_rows_spell_as_exact_namespace_members_in_typescript() {
 }
 
 #[test]
+fn the_dec_rows_spell_as_dec_namespace_members_in_typescript() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Dec && row.targets.contains(&Target::HirTypeScript))
+        .collect();
+    // The 18 exported helpers of `dec.ts`: 15 shared with Rust and Go, `fmt_list`
+    // shared with Rust, `float_cmp` and `to_int` shared with Go. None is
+    // store-family (a decimal store is spelled where an unstored computation is
+    // consumed, which has no store site at the call).
+    assert_eq!(rows.len(), 18);
+    assert!(rows.iter().all(|row| row.kind == RuntimeKind::Fn));
+    let mut spelled: Vec<String> = rows
+        .iter()
+        .map(|row| spell_any(Target::HirTypeScript, row))
+        .collect();
+    spelled.sort_unstable();
+    let mut expected: Vec<String> = [
+        "add", "cmp", "div", "f64", "floatCmp", "fmt", "fmtList", "int", "mul", "neg", "of",
+        "parse", "rem", "store", "sub", "toInt", "tryParse", "tryStore",
+    ]
+    .iter()
+    .map(|name| format!("dec.{name}"))
+    .collect();
+    expected.sort_unstable();
+    assert_eq!(spelled, expected);
+}
+
+#[test]
 fn the_regex_rows_spell_as_faber_regex_functions_in_rust() {
     let rows: Vec<&RuntimeItem> = TABLE
         .iter()

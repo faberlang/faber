@@ -222,7 +222,7 @@ const EMITTERS: [Emitter; 3] = [
     },
     Emitter {
         name: "radix-hir-ts",
-        legacy_budget: 176,
+        legacy_budget: 102,
         // WHY: `sermo.open(` (write_ad_expr) and the `sermo.close accepts no
         // arguments` message in expr/access.rs were hand-spelled before this
         // ratchet existed. The sermo namespace unit removes both.
