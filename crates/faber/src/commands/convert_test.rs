@@ -195,7 +195,7 @@ fn convert_directory_resolves_each_source_locale_before_emitting_one_target() {
     fs::write(&latin, super::super::format_test::VALID_BLOCK_SOURCE).expect("write Latin source");
 
     let output = Command::new(faber_binary())
-        .args(["convert", "--to", "en"])
+        .args(["convert", "--to", "en", "--write"])
         .arg(root.path())
         .output()
         .expect("run mixed-locale directory conversion");
@@ -882,6 +882,7 @@ fn run_convert_in_place(binary: &std::path::Path, source_dir: &std::path::Path, 
             source_dir.to_str().expect("utf8 source dir"),
             "--to",
             to,
+            "--write",
         ])
         .output()
         .expect("run faber convert in place");
@@ -958,10 +959,12 @@ fn convert_refuses_construct_loss() {
 
     for args in [
         vec!["convert", "--to", "la", path_arg],
+        vec!["convert", "--to", "la", "--write", path_arg],
         vec!["convert", "--to", "la", "--stdout", path_arg],
     ] {
         let output = run_faber_capture(&args, None);
         let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
         assert!(
             !output.status.success(),
             "{args:?} must exit non-zero:\n{stderr}"
@@ -970,14 +973,173 @@ fn convert_refuses_construct_loss() {
             !stderr.is_empty(),
             "{args:?} must report the refusal on stderr"
         );
-        assert!(
-            output.stdout.is_empty(),
-            "{args:?} must print nothing to stdout"
-        );
+        if args.contains(&"--stdout") {
+            assert!(stdout.is_empty(), "{args:?} must print nothing to stdout");
+        } else {
+            // The summary is the only stdout line: no file was converted.
+            assert_eq!(stdout.lines().count(), 1, "{args:?}: {stdout}");
+            assert!(
+                stdout.contains("1 refused (nothing written)"),
+                "{args:?}: {stdout}"
+            );
+        }
     }
     assert_eq!(
         fs::read_to_string(&path).expect("read back"),
         HOOK_SOURCE,
         "the file must stay byte-identical"
+    );
+}
+
+/// Source whose reader locale is `la` (frontmatter), so `--to en` drifts.
+const LATIN_DRIFT: &str = super::super::format_test::VALID_BLOCK_SOURCE;
+
+fn run_convert(args: &[&str]) -> std::process::Output {
+    let mut full = vec!["convert"];
+    full.extend_from_slice(args);
+    run_faber_capture(&full, None)
+}
+
+/// A file already in the `en` surface: the converter's own output.
+fn already_converted(dir: &Path) -> (std::path::PathBuf, String) {
+    let path = dir.join("done.fab");
+    fs::write(&path, LATIN_DRIFT).expect("write fixture");
+    let output = run_convert(&["--to", "en", "--stdout", path.to_str().expect("utf8 path")]);
+    assert!(output.status.success(), "{output:?}");
+    let converted = String::from_utf8(output.stdout).expect("utf8 stdout");
+    fs::write(&path, &converted).expect("write converted fixture");
+    (path, converted)
+}
+
+#[test]
+fn cli_convert_default_mode_is_report_only() {
+    use clap::Parser;
+    let cli = crate::cli::Cli::try_parse_from(["faber", "convert", "--to", "en", "main.fab"])
+        .expect("parse convert");
+    let Some(crate::cli::Command::Convert(args)) = cli.command else {
+        panic!("expected convert command");
+    };
+    assert!(!args.write && !args.check && !args.stdout && !args.stdin);
+}
+
+#[test]
+fn cli_convert_modes_conflict() {
+    use clap::Parser;
+    for pair in [
+        ["--write", "--check"],
+        ["--write", "--stdout"],
+        ["--check", "--stdout"],
+        ["--stdin", "--write"],
+        ["--stdin", "--stdout"],
+    ] {
+        let result =
+            crate::cli::Cli::try_parse_from(["faber", "convert", "--to", "en", pair[0], pair[1]]);
+        assert!(result.is_err(), "{pair:?} must conflict");
+    }
+}
+
+#[test]
+fn convert_default_writes_nothing_and_exits_1_on_drift() {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let path = dir.path().join("drift.fab");
+    fs::write(&path, LATIN_DRIFT).expect("write fixture");
+    let (_, _) = already_converted(dir.path());
+    let root = dir.path().to_str().expect("utf8 path");
+
+    for args in [
+        vec!["--to", "en", root],
+        vec!["--to", "en", "--check", root],
+    ] {
+        let output = run_convert(&args);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert_eq!(output.status.code(), Some(1), "{args:?}: {stdout}");
+        let lines: Vec<&str> = stdout.lines().collect();
+        assert_eq!(lines.len(), 2, "{args:?}: {stdout}");
+        assert!(lines[0].starts_with("would convert "), "{stdout}");
+        assert!(lines[0].ends_with("drift.fab"), "{stdout}");
+        assert!(
+            lines[1].starts_with("1 of 2 files would be converted; rerun with --write to apply"),
+            "{stdout}"
+        );
+    }
+    assert_eq!(fs::read_to_string(&path).expect("read back"), LATIN_DRIFT);
+}
+
+#[test]
+fn convert_default_exits_0_when_nothing_would_change() {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let (path, source) = already_converted(dir.path());
+    let output = run_convert(&["--to", "en", path.to_str().expect("utf8 path")]);
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim_end(),
+        "1 files already converted"
+    );
+    assert_eq!(fs::read_to_string(&path).expect("read back"), source);
+}
+
+#[test]
+fn convert_write_changes_only_files_that_drift() {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let drift = dir.path().join("drift.fab");
+    fs::write(&drift, LATIN_DRIFT).expect("write fixture");
+    let (clean, clean_source) = already_converted(dir.path());
+    let clean_mtime = fs::metadata(&clean)
+        .and_then(|meta| meta.modified())
+        .expect("clean mtime");
+
+    let output = run_convert(&["--to", "en", "--write", dir.path().to_str().expect("utf8")]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(output.status.code(), Some(0), "{stdout}");
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert_eq!(lines.len(), 2, "{stdout}");
+    assert!(lines[0].starts_with("converted ") && lines[0].ends_with("drift.fab"));
+    assert_eq!(lines[1], "converted 1 of 2 files");
+    assert_ne!(fs::read_to_string(&drift).expect("read drift"), LATIN_DRIFT);
+    assert_eq!(
+        fs::read_to_string(&clean).expect("read clean"),
+        clean_source
+    );
+    assert_eq!(
+        fs::metadata(&clean)
+            .and_then(|meta| meta.modified())
+            .expect("clean mtime"),
+        clean_mtime,
+        "an unchanged file must not be touched"
+    );
+}
+
+#[test]
+fn convert_counts_refused_files_and_never_writes_them() {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let lossy = dir.path().join("lossy.fab");
+    fs::write(&lossy, HOOK_SOURCE).expect("write lossy fixture");
+    let drift = dir.path().join("drift.fab");
+    fs::write(&drift, LATIN_DRIFT).expect("write fixture");
+    let root = dir.path().to_str().expect("utf8 path");
+
+    let report = run_convert(&["--to", "en", root]);
+    let report_out = String::from_utf8_lossy(&report.stdout);
+    assert_eq!(report.status.code(), Some(1), "{report_out}");
+    assert!(
+        report_out
+            .lines()
+            .last()
+            .is_some_and(|line| line.ends_with(", 1 refused (nothing written)")),
+        "{report_out}"
+    );
+    assert_eq!(fs::read_to_string(&drift).expect("read drift"), LATIN_DRIFT);
+
+    let write = run_convert(&["--to", "en", "--write", root]);
+    let write_out = String::from_utf8_lossy(&write.stdout);
+    assert_eq!(write.status.code(), Some(1), "{write_out}");
+    assert_eq!(
+        write_out.lines().last(),
+        Some("converted 1 of 2 files, 1 refused (nothing written)")
+    );
+    assert_eq!(
+        fs::read_to_string(&lossy).expect("read lossy"),
+        HOOK_SOURCE,
+        "a refused file is never written"
     );
 }

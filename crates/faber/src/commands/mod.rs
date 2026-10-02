@@ -425,6 +425,7 @@ fn dispatch(command: Command) {
             from: args.from,
             check: args.check,
             stdout: args.stdout,
+            write: args.write,
             stdin: args.stdin,
         }),
         Command::Format(args) => cmd_format(&format::FormatCommand {
@@ -448,6 +449,7 @@ fn dispatch(command: Command) {
                 paths: args.paths,
                 check: args.check,
                 stdout: args.stdout,
+                write: args.write,
             });
         }
         Command::Host(args) => cmd_host(args.command),

@@ -55,7 +55,9 @@ is one command-wide target pack. Successful output replaces or inserts
 frontmatter `locale = \"<target>\"` while preserving unrelated metadata. Use a
 wrapper such as `main { const list<u32> values ← empty }` when probing a
 local declaration; fragments are not accepted. --stdout and --stdin emit one
-complete converted document, and --check writes nothing.
+complete converted document. Does not write unless `--write` is given: the
+default (spelled `--check`) reports files that would change and exits 1 if any
+would.
 ";
 
 const CHECK_LIBRARY_LONG_ABOUT: &str = "\
@@ -195,7 +197,8 @@ pub enum Command {
     Doc(DocArgs),
 
     /// Convert source between reader-locale surfaces (en, la, zh-Hans, …) —
-    /// HIR-backed round-trip; not a formatter (see `faber convert --help`)
+    /// HIR-backed round-trip; not a formatter; report-only unless `--write`
+    /// is given (see `faber convert --help`)
     #[command(long_about = CONVERT_LONG_ABOUT)]
     Convert(ConvertArgs),
 
@@ -205,7 +208,8 @@ pub enum Command {
     OutputTransferCodemod(OutputTransferCodemodArgs),
 
     /// Insert `var`/`varia` before every unmarked genus field (D16.1 migration;
-    /// span-based, every other byte unchanged)
+    /// span-based, every other byte unchanged; report-only unless `--write`
+    /// is given)
     #[command(name = "field-modifier-codemod")]
     FieldModifierCodemod(FieldModifierCodemodArgs),
 
@@ -280,19 +284,23 @@ pub struct ConvertArgs {
     #[arg(long = "from", value_name = "LOCALE")]
     pub from: Option<String>,
 
-    /// Report pending conversions without writing files; exit 1 if any
-    /// file would change
-    #[arg(long)]
+    /// Report files that would change without writing (the default; explicit
+    /// spelling); exit 1 if any file would change
+    #[arg(long, conflicts_with_all = ["write", "stdout"])]
     pub check: bool,
 
-    /// Write converted output to stdout instead of updating files (exactly
-    /// one input file)
-    #[arg(long, conflicts_with = "check")]
+    /// Write converted output to stdout instead of reporting (exactly one
+    /// input file)
+    #[arg(long, conflicts_with_all = ["check", "write"])]
     pub stdout: bool,
 
+    /// Write converted source back to the file (default is report-only)
+    #[arg(long, conflicts_with_all = ["check", "stdout"])]
+    pub write: bool,
+
     /// Read exactly one source document from stdin and print the converted
-    /// result to stdout
-    #[arg(long, conflicts_with_all = ["check", "stdout", "paths"])]
+    /// result to stdout (incompatible with path arguments and the other modes)
+    #[arg(long, conflicts_with_all = ["check", "write", "stdout", "paths"])]
     pub stdin: bool,
 }
 
@@ -303,15 +311,19 @@ pub struct FieldModifierCodemodArgs {
     #[arg(value_name = "PATH")]
     pub paths: Vec<PathBuf>,
 
-    /// Dry run: report per-file insertion counts without writing; exit 1 if
-    /// any file would change
-    #[arg(long)]
+    /// Report files that would change without writing (the default; explicit
+    /// spelling); exit 1 if any file would change
+    #[arg(long, conflicts_with_all = ["write", "stdout"])]
     pub check: bool,
 
-    /// Write the codemodded source to stdout instead of updating the file
-    /// (exactly one input file)
-    #[arg(long, conflicts_with = "check")]
+    /// Write the codemodded source to stdout instead of reporting (exactly
+    /// one input file)
+    #[arg(long, conflicts_with_all = ["check", "write"])]
     pub stdout: bool,
+
+    /// Write codemodded source back to the file (default is report-only)
+    #[arg(long, conflicts_with_all = ["check", "stdout"])]
+    pub write: bool,
 }
 
 /// Arguments for `faber output-transfer-codemod`.
