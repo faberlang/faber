@@ -362,3 +362,20 @@ fn the_regex_rows_spell_from_the_table_for_typescript() {
     assert!(reserved_names(Target::HirTypeScript, TABLE).contains(&"regex".to_owned()));
     assert!(!reserved_names(Target::HirGo, TABLE).contains(&"regex".to_owned()));
 }
+
+#[test]
+fn the_dec_rows_spell_as_faber_dec_functions_in_rust() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Dec)
+        .collect();
+    assert_eq!(rows.len(), 19);
+    for row in rows {
+        assert_eq!(row.kind, RuntimeKind::Fn);
+        assert_eq!(row.targets, [Target::HirRust]);
+        assert_eq!(
+            spell_any(Target::HirRust, row),
+            format!("faber::dec::{}", row.name)
+        );
+    }
+}

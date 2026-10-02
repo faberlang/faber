@@ -76,6 +76,25 @@ incipit {
 }
 
 #[test]
+#[cfg(feature = "hir-rust")]
+fn rust_needs_faber_runtime_for_a_decimal_program() {
+    // The decimal helpers live in `faber::dec`, so a decimal width alone makes
+    // a program depend on the runtime crate.
+    let (hir, types) = analyze_hir(
+        r"
+incipit {
+  fixum d64 a ← 1.5
+  fixum d64 b ← a + 1
+  nota b
+}
+",
+    );
+    let needs = collect_rust_needs(&hir, &types, BTreeSet::new(), None);
+    assert!(needs.needs_decimal_helper);
+    assert!(needs.needs_faber_runtime, "decimal arithmetic requires the faber runtime crate");
+}
+
+#[test]
 fn rust_prelude_policy_no_longer_scans_body_for_hashmap() {
     let prelude = include_str!("../../../radix-hir-rust/src/prelude.rs");
     assert!(!prelude.contains("code.contains(\"HashMap\""));

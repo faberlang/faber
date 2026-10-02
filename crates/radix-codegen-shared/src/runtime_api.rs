@@ -91,6 +91,44 @@ pub const EXACT_SHL: RuntimeItem = exact_row("shl", RuntimeKind::Fn);
 pub const EXACT_SHR: RuntimeItem = exact_row("shr", RuntimeKind::Fn);
 pub const EXACT_STORE: RuntimeItem = exact_row("store", RuntimeKind::StoreFn);
 
+/// The targets whose runtime package carries the `dec` namespace today.
+const DEC_TARGETS: &[Target] = &[Target::HirRust];
+
+const fn dec_row(name: &'static str) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Dec,
+        name,
+        kind: RuntimeKind::Fn,
+        targets: DEC_TARGETS,
+    }
+}
+
+/// `dec` rows (T1-R2): the exact decimal (`d64`) carrier of the Rust runtime
+/// (`faber::dec`). An unstored decimal is an `(i128, u32)` carrier/scale pair;
+/// `STORE` and `TRY_STORE` round it half-even to scale 8 into a stored `i64`.
+/// Both are plain rows, not `StoreFn`: they are spelled where an unstored
+/// decimal computation is consumed as a stored carrier, which has no
+/// `HirStoreSite` at the call (a negation, a list element, a binary result).
+pub const DEC_ADD: RuntimeItem = dec_row("add");
+pub const DEC_CMP: RuntimeItem = dec_row("cmp");
+pub const DEC_DIV: RuntimeItem = dec_row("div");
+pub const DEC_F64: RuntimeItem = dec_row("f64");
+pub const DEC_FMT: RuntimeItem = dec_row("fmt");
+pub const DEC_FMT_LIST: RuntimeItem = dec_row("fmt_list");
+pub const DEC_FMT_OPTION: RuntimeItem = dec_row("fmt_option");
+pub const DEC_INT: RuntimeItem = dec_row("int");
+pub const DEC_MUL: RuntimeItem = dec_row("mul");
+pub const DEC_NEG: RuntimeItem = dec_row("neg");
+pub const DEC_OF: RuntimeItem = dec_row("of");
+pub const DEC_PARSE: RuntimeItem = dec_row("parse");
+pub const DEC_REM: RuntimeItem = dec_row("rem");
+pub const DEC_RHE: RuntimeItem = dec_row("rhe");
+pub const DEC_ROUND: RuntimeItem = dec_row("round");
+pub const DEC_STORE: RuntimeItem = dec_row("store");
+pub const DEC_SUB: RuntimeItem = dec_row("sub");
+pub const DEC_TRY_PARSE: RuntimeItem = dec_row("try_parse");
+pub const DEC_TRY_STORE: RuntimeItem = dec_row("try_store");
+
 /// The targets whose runtime package carries each `regex` row. Rows differ by
 /// target: the Rust runtime carries the match operations as free functions in
 /// `faber::regex`, the Go runtime carries a constructor plus methods, the Swift
@@ -180,6 +218,25 @@ pub const REGEX_COMPILE: RuntimeItem = regex_row("compile", RuntimeKind::Fn, REG
 /// The canonical helper table: a row for every helper some runtime package
 /// carries. Each namespace unit adds its rows with the runtime it moves.
 pub const TABLE: &[RuntimeItem] = &[
+    DEC_ADD,
+    DEC_CMP,
+    DEC_DIV,
+    DEC_F64,
+    DEC_FMT,
+    DEC_FMT_LIST,
+    DEC_FMT_OPTION,
+    DEC_INT,
+    DEC_MUL,
+    DEC_NEG,
+    DEC_OF,
+    DEC_PARSE,
+    DEC_REM,
+    DEC_RHE,
+    DEC_ROUND,
+    DEC_STORE,
+    DEC_SUB,
+    DEC_TRY_PARSE,
+    DEC_TRY_STORE,
     DISPLAY_LIST,
     DISPLAY_VALOR,
     DISPLAY_VERUM,

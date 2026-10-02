@@ -81,7 +81,7 @@ fn go_saturating_division_by_zero_uses_the_integer_text() {
 #[test]
 fn decimal_fuzzy_operand_is_unscaled_on_every_backend() {
     let rust = emit(Target::HirRust, FUZZY);
-    assert!(rust.contains("__faber_dec_f64(__faber_dec_of("), "{rust}");
+    assert!(rust.contains("faber::dec::f64(faber::dec::of("), "{rust}");
     let swift = emit(Target::HirSwift, FUZZY);
     assert!(swift.contains("faberDecF64(faberDecOf("), "{swift}");
     let go = emit(Target::HirGo, FUZZY);
