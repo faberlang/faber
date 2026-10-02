@@ -52,6 +52,10 @@ mod saturating_word_test;
 mod trapping_word_test;
 
 #[cfg(test)]
+#[path = "policy_float_store_test.rs"]
+mod policy_float_store_test;
+
+#[cfg(test)]
 #[path = "via_hint_test.rs"]
 mod via_hint_test;
 

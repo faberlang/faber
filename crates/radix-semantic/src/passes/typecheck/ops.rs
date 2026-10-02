@@ -96,6 +96,12 @@ impl TypeChecker<'_> {
         rhs_ty: TypeId,
         expected: Option<TypeId>,
     ) -> TypeId {
+        if !self.trapping_float_operands_agree(lhs, rhs, lhs.span) {
+            return self.error_type;
+        }
+        if let Some(result) = self.trapping_float_join(lhs, rhs) {
+            return result;
+        }
         if let Some(result) =
             self.arithmetic_range_type(op, lhs, rhs, lhs_ty, rhs_ty, expected, lhs.span)
         {
@@ -505,6 +511,16 @@ impl TypeChecker<'_> {
         rhs: TypeId,
         shape: NumericShape,
     ) -> TypeId {
+        // N7e D4: arithmetic over `trapping<W>` operands is the bare float
+        // `W`, an expression's value rather than a slot's; the cell it came
+        // from is tracked by `trapping_float_origin` and checked at the store.
+        if let Some(Type::PolicyFloat(radix_types::FloatPolicy::Trapping, width)) = [lhs, rhs]
+            .into_iter()
+            .map(|ty| self.types.get(ty).clone())
+            .find(|ty| matches!(ty, Type::PolicyFloat(radix_types::FloatPolicy::Trapping, _)))
+        {
+            return self.bare_float_type(width);
+        }
         if matches!(
             self.types.get(lhs),
             Type::SizedNumeric(_, _)
@@ -1105,6 +1121,7 @@ impl TypeChecker<'_> {
                     return self.numerus_type();
                 }
                 let expected = self.unary_operand_expected(operand, expected);
+                let expected = self.unary_float_cell_expected(operand, expected);
                 let operand_ty = self.check_expr_with_expected(operand, expected);
                 if self.is_error(operand_ty) {
                     return self.error_type;
@@ -1408,6 +1425,12 @@ impl TypeChecker<'_> {
             HirBinOp::TrueDiv => {
                 let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);
                 if let Some(result) = self.check_tensor_lift_arith(op, lhs, rhs, lhs_ty, rhs_ty) {
+                    return result;
+                }
+                if !self.trapping_float_operands_agree(lhs, rhs, lhs.span) {
+                    return self.error_type;
+                }
+                if let Some(result) = self.trapping_float_join(lhs, rhs) {
                     return result;
                 }
                 self.true_division_type(lhs, rhs, lhs_ty, rhs_ty, lhs.span)
@@ -2274,7 +2297,7 @@ impl TypeChecker<'_> {
     }
 }
 
-fn is_numeric_literal(expr: &HirExpression) -> bool {
+pub(super) fn is_numeric_literal(expr: &HirExpression) -> bool {
     match &expr.kind {
         HirExpressionKind::Literal(
             HirLiteral::Int(_)
