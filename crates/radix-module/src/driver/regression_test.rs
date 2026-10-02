@@ -520,8 +520,8 @@ fn compile_supports_extended_binary_operators() {
   nota a ≡ b
   nota a ≠ b
   nota maybe est nihil
-  nota a intra 0‥3
-  nota a inter [1, 2, 3]
+  nota a ∈ 0‥3
+  nota a ∈ [1, 2, 3]
   nota maybe vel 0
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());

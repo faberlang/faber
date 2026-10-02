@@ -96,14 +96,14 @@ fn intervallum_step_remains_valid_for_textus_slice() {
 fn intervallum_stored_intra_accepts() {
     let source = r#"incipit {
   fixum intervallum<numerus> fines ← 0‥10
-  si 5 intra fines { nota "ok" }
+  si 5 ∈ fines { nota "ok" }
 }"#;
     accepts(&compile(source));
 }
 
 #[test]
 fn textus_intra_range_rejects() {
-    let source = r#"incipit { si "a" intra 0‥3 { nota "bad" } }"#;
+    let source = r#"incipit { si "a" ∈ 0‥3 { nota "bad" } }"#;
     rejects_with_issue(&compile(source), "range_operand_must_be_numeric");
 }
 
@@ -140,7 +140,7 @@ fn intervallum_sized_fractus_rejects() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn intra_half_open_codegen_honors_exclusive_end() {
-    let source = r#"incipit { si 5 intra 0‥10 { nota "ok" } }"#;
+    let source = r#"incipit { si 5 ∈ 0‥10 { nota "ok" } }"#;
     let result = compile(source);
     accepts(&result);
     let code = rust_code(result);
@@ -151,7 +151,7 @@ fn intra_half_open_codegen_honors_exclusive_end() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn intra_inclusive_codegen_honors_inclusive_end() {
-    let source = r#"incipit { si 10 intra 0…10 { nota "ok" } }"#;
+    let source = r#"incipit { si 10 ∈ 0…10 { nota "ok" } }"#;
     let result = compile(source);
     accepts(&result);
     let code = rust_code(result);

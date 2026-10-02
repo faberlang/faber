@@ -4,7 +4,7 @@
 //! Two faces of one hole, plus the already-green same-unit control that the
 //! need's done-when names:
 //!   * face 1 — a SIBLING unit's function body reads another unit's exported
-//!     module const (`k between keys.KEYS`). The namespace member rewrite
+//!     module const (`k ∈ keys.KEYS`). The namespace member rewrite
 //!     turned the read into `Path(synthetic)`, but the synthetic const item
 //!     only existed in the entry analysis, so the sibling lowered
 //!     "path that does not resolve to a local value".
@@ -185,7 +185,7 @@ import from "keyslane:keys" keys
 
 @ public
 fn admits_via_module(string k) → bool {
-    return k between keys.KEYS
+    return k ∈ keys.KEYS
 }
 "#,
         ),
