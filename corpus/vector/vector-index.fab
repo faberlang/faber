@@ -1,0 +1,52 @@
++++
+term = "vector"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "type_arguments", "type_argument", "redde_stmt", "fixum_decl", "varia_decl", "assignment", "array_literal", "conversio_expr", "call_expr", "call_suffix", "member_suffix", "non_null_suffix", "argument_list", "argument", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "register"
+canonical = false
+summary = "A constant index on a vector reads one lane: v[k] is the k-th lane, at any element type."
+syntax = "<vector>[<constant>] | <optional vector>![<constant>]"
+related = ["vector", "dot"]
+locale = "en"
++++
+# =============================================================================
+# vector — constant lane read and write with v[k]
+# =============================================================================
+#
+# What this teaches:
+#   • `v[k]` on a `vector<T, N>` is one lane of the register value, typed as
+#     the element `T` (f32 and i32 alike), with `k` a constant below `N`.
+#   • After a null assertion the same form reads a lane: `hit![0]`.
+#   • A lane read is a value, so a sum over lanes needs no loop.
+#   • A lane of a `var` vector can be written: `v[1] ← 9.0`.
+#
+# Common mistakes:
+#   • indexing with a constant outside the width — `v[3]` on a three-lane
+#     vector is rejected at check time, not at run time
+#   • indexing with a run-time value — only constant lanes are supported today
+#
+# See also: vector, dot
+#
+# EXPECTED OUTPUT:
+#   vector-index.expected
+# =============================================================================
+
+fn normal(int code) → vector<f32, 3> ∪ none {
+    if code ≡ 1 then return [-1.0, 0.0, 0.5] ↦ vector<f32, 3>
+    return null
+}
+
+main {
+    const vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    const vector<i32, 4> w ← [10, 20, 30, 40] ↦ vector<i32, 4>
+    print v[1]
+    const f32 a ← v[2]
+    print a
+    print w[3]
+    const vector<f32, 3> ∪ none hit ← normal(1)
+    print hit![2]
+    print v[0] + v[1] + v[2]
+    var vector<f32, 3> u ← v
+    u[1] ← 9.0
+    print u
+}

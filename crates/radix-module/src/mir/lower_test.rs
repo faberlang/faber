@@ -6933,3 +6933,34 @@ incipit {
         ]
     );
 }
+
+// ──────────────────────────────────────────────────────────────────────
+// VEC-5a: a constant index on a vector is a lane projection, never an Index
+// projection (a vector is a register value, not a storage buffer).
+// ──────────────────────────────────────────────────────────────────────
+
+const VECTOR_LANE_SOURCE: &str = r"
+functio lane(vector<f32, 3> v) → f32 {
+    redde v[1]
+}
+functio asserted(vector<f32, 3> ∪ nihil v) → f32 {
+    redde v![2]
+}
+functio write(vector<f32, 3> v) → vector<f32, 3> {
+    varia vector<f32, 3> u ← v
+    u[0] ← 4.0
+    redde u
+}
+";
+
+#[test]
+fn vector_constant_index_lowers_to_a_lane_projection() {
+    let dump = dump_source(VECTOR_LANE_SOURCE);
+    for lane in ["lane1", "lane2", "lane0"] {
+        assert!(dump.contains(&format!(".{lane}")), "missing .{lane} in:\n{dump}");
+    }
+    assert!(
+        !dump.contains("[1]") && !dump.contains("[2]"),
+        "vector lane lowered as Index:\n{dump}"
+    );
+}
