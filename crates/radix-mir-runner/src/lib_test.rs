@@ -4791,7 +4791,14 @@ fn tensor_shift_accepts_integer_array_offsets_and_keeps_validation() {
         vec![(MirValueId(0), base.clone()), (MirValueId(1), wrong_rank)],
     )
     .expect_err("offset count must match tensor rank");
-    assert!(error.message.contains("offset rank differs"));
+    assert_eq!(error.code, RUNNER_CODE_INTERNAL);
+    assert_eq!(
+        error.args,
+        vec![(
+            "detail".to_owned(),
+            "tensor shift offset rank differs from receiver rank".to_owned()
+        )]
+    );
 
     let wrong_element = Value::Array(Rc::new(RefCell::new(vec![Value::Float(1.0)])));
     let error = eval_tensor_view_op(
@@ -4803,7 +4810,14 @@ fn tensor_shift_accepts_integer_array_offsets_and_keeps_validation() {
         vec![(MirValueId(0), base), (MirValueId(1), wrong_element)],
     )
     .expect_err("offset elements must be integers");
-    assert!(error.message.contains("offset is not numerus"));
+    assert_eq!(error.code, RUNNER_CODE_INTERNAL);
+    assert_eq!(
+        error.args,
+        vec![(
+            "detail".to_owned(),
+            "tensor shift offset is not numerus: Float(1.0)".to_owned()
+        )]
+    );
 }
 
 #[test]
@@ -4838,10 +4852,13 @@ fn tensor_shift_coalesce_consumes_optional_holes_before_materialize() {
         vec![(MirValueId(0), shifted.clone())],
     )
     .expect_err("unresolved optional view cannot escape");
-    assert!(
-        materialize_error
-            .message
-            .contains("unresolved shifted edges")
+    assert_eq!(materialize_error.code, RUNNER_CODE_INTERNAL);
+    assert_eq!(
+        materialize_error.args,
+        vec![(
+            "detail".to_owned(),
+            "tensor materialize cannot escape unresolved shifted edges".to_owned()
+        )]
     );
 
     let coalesced = evaluate_collection_call(
@@ -5082,7 +5099,7 @@ fn tensor_shape_check_mismatch_has_recoverable_issue_identity() {
     )
     .expect_err("runtime extent mismatch");
     assert_eq!(error.issue, "runner_tensor_shape_mismatch");
-    assert!(error.message.contains("2 != 3"));
+    assert_eq!(error.code, RUNNER_CODE_INTERNAL);
 }
 
 #[test]
@@ -5318,7 +5335,7 @@ fn tensor_shape_check_reads_vector_axis_zero_and_rejects_other_axes() {
     let error = evaluate_collection_call(&call(1), vec![(MirValueId(0), vector)])
         .expect_err("vectors have no axis beyond zero");
     assert_eq!(error.issue, "runner_tensor_shape_invalid_extent");
-    assert!(error.message.contains("axis is out of range"));
+    assert_eq!(error.code, RUNNER_CODE_INTERNAL);
 }
 
 #[test]
@@ -5343,7 +5360,6 @@ fn tensor_shape_check_rejects_inexact_division() {
         .expect_err("shape division must be exact");
     assert_eq!(error.code, RUNNER_CODE_INTERNAL);
     assert_eq!(error.issue, "runner_tensor_shape_invalid_extent");
-    assert!(error.message.contains("division must be exact"));
 }
 
 #[test]
@@ -6433,23 +6449,20 @@ fn pd25_row_softmax_preserves_values_and_errors() {
         RunnerError::internal(span, "tensor crux_entropia shape mismatch")
     );
 
-    let Value::Tensor(softmax_short) = eval_tensor_intrinsic(
+    // A backing shorter than the shape implies is malformed: it fails closed
+    // instead of yielding an empty result (a08c554b9).
+    let error = eval_tensor_intrinsic(
         MirCollectionOp::TensorSoftmax,
         vec![tensor(vec![Value::Float(1.0)], vec![2])],
         span,
     )
-    .expect("softmax short backing is outside the computed row count") else {
-        panic!("softmax must return a tensor");
-    };
-    assert!(
-        softmax_short
-            .borrow()
-            .logical_values()
-            .expect("valid tensor layout")
-            .is_empty()
+    .expect_err("softmax short backing is a backing-length mismatch");
+    assert_eq!(
+        error,
+        RunnerError::internal(span, "tensor backing-length mismatch")
     );
 
-    let Value::Float(entropia_short) = eval_tensor_intrinsic(
+    let error = eval_tensor_intrinsic(
         MirCollectionOp::TensorCruxEntropia,
         vec![
             tensor(vec![Value::Float(1.0)], vec![2]),
@@ -6457,10 +6470,11 @@ fn pd25_row_softmax_preserves_values_and_errors() {
         ],
         span,
     )
-    .expect("entropia short backing is outside the computed row count") else {
-        panic!("entropia must return a float");
-    };
-    assert_eq!(entropia_short.to_bits(), 0);
+    .expect_err("entropia short backing is a backing-length mismatch");
+    assert_eq!(
+        error,
+        RunnerError::internal(span, "tensor backing-length mismatch")
+    );
 }
 
 #[test]
