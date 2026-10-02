@@ -475,6 +475,7 @@ impl TypeChecker<'_> {
             radix_target::Target::HirHaskell => matches!(target, "haskell"),
             radix_target::Target::HirPascal => matches!(target, "pascal" | "pas"),
             radix_target::Target::HirCobol => matches!(target, "cobol" | "cob"),
+            radix_target::Target::HirFortran => matches!(target, "fortran" | "f90"),
             radix_target::Target::MirWasm => matches!(target, "wasm" | "wasm-text" | "wat"),
             radix_target::Target::MirLlvm | radix_target::Target::MirLlvmHost => {
                 matches!(target, "llvm" | "llvm-host" | "llvm-text")

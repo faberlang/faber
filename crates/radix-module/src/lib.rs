@@ -162,6 +162,10 @@ pub enum Output {
     #[cfg(feature = "hir-cobol")]
     Cobol(CobolOutput),
 
+    /// Novelty Fortran backend output (default-off `hir-fortran` feature).
+    #[cfg(feature = "hir-fortran")]
+    Fortran(FortranOutput),
+
     /// Canonical Faber source output.
     Faber(FaberOutput),
 
@@ -219,6 +223,13 @@ pub struct SwiftOutput {
 /// Python backend output.
 pub struct PythonOutput {
     /// Complete generated Python source.
+    pub code: String,
+}
+
+/// Novelty Fortran backend output.
+#[cfg(feature = "hir-fortran")]
+pub struct FortranOutput {
+    /// Complete generated Fortran 2008 program.
     pub code: String,
 }
 

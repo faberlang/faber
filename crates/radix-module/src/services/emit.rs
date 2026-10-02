@@ -37,6 +37,8 @@ pub fn output_code(output: crate::Output) -> String {
         crate::Output::Pascal(out) => out.code,
         #[cfg(feature = "hir-cobol")]
         crate::Output::Cobol(out) => out.code,
+        #[cfg(feature = "hir-fortran")]
+        crate::Output::Fortran(out) => out.code,
         crate::Output::Faber(out) => out.code,
         #[cfg(feature = "mir-wasm")]
         crate::Output::WasmText(out) => out.code,

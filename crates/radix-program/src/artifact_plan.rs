@@ -468,6 +468,7 @@ pub(crate) fn target_name(target: Target) -> &'static str {
         Target::HirHaskell => "haskell",
         Target::HirPascal => "pascal",
         Target::HirCobol => "cobol",
+        Target::HirFortran => "fortran",
         Target::HirFhir => "fhir",
     }
 }

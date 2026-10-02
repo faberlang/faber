@@ -82,6 +82,9 @@ pub enum FaberCliTarget {
     /// Novelty GnuCOBOL 3.2 free-format source (default-off `hir-cobol` feature).
     #[value(name = "cobol", alias = "cob")]
     HirCobol,
+    /// Novelty Fortran 2008 program (default-off `hir-fortran` feature).
+    #[value(name = "fortran", alias = "f90")]
+    HirFortran,
 
     /// Experimental MIR-backed WebAssembly text target. Emits `.wat` text
     /// only; `wasm` is an alias kept for compatibility (binary conversion is
@@ -155,6 +158,7 @@ impl FaberCliTarget {
             FaberCliTarget::HirHaskell => radix::module::codegen::Target::HirHaskell,
             FaberCliTarget::HirPascal => radix::module::codegen::Target::HirPascal,
             FaberCliTarget::HirCobol => radix::module::codegen::Target::HirCobol,
+            FaberCliTarget::HirFortran => radix::module::codegen::Target::HirFortran,
             FaberCliTarget::MirWasm => radix::module::codegen::Target::MirWasm,
             FaberCliTarget::MirLlvm => radix::module::codegen::Target::MirLlvm,
             FaberCliTarget::MirMetal => radix::module::codegen::Target::MirMetal,

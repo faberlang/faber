@@ -30,6 +30,8 @@ pub mod faber;
 pub mod cobol;
 #[cfg(feature = "hir-go")]
 pub mod go;
+#[cfg(feature = "hir-fortran")]
+pub mod fortran;
 #[cfg(feature = "hir-haskell")]
 pub mod haskell;
 #[cfg(feature = "hir-pascal")]
@@ -417,6 +419,7 @@ pub fn generate_from_analyzed_with_options(
         Target::HirHaskell => generate_haskell_from_analyzed(analysis),
         Target::HirPascal => generate_pascal_from_analyzed(analysis),
         Target::HirCobol => generate_cobol_from_analyzed(analysis),
+        Target::HirFortran => generate_fortran_from_analyzed(analysis),
         #[cfg(feature = "hir-faber")]
         Target::HirFaber => {
             let imported_spellings = analysis.resolver.imported_spellings(&analysis.interner);
@@ -593,6 +596,18 @@ fn generate_pascal_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> Re
 #[cfg(not(feature = "hir-pascal"))]
 fn generate_pascal_from_analyzed(_analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
     Err(unavailable_target_error(Target::HirPascal))
+}
+
+#[cfg(feature = "hir-fortran")]
+fn generate_fortran_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
+    let r#gen = fortran::FortranCodegen::new(&analysis.hir, &analysis.interner);
+    let output = r#gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
+    Ok(crate::Output::Fortran(crate::FortranOutput { code: output.code }))
+}
+
+#[cfg(not(feature = "hir-fortran"))]
+fn generate_fortran_from_analyzed(_analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
+    Err(unavailable_target_error(Target::HirFortran))
 }
 
 /// Emit each distinct file-namespace provider binding as a module, mapping
