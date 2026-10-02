@@ -30,6 +30,8 @@ pub mod queue_stack;
 pub mod regex;
 pub mod sparsa;
 pub mod tensor;
+mod tensor_edge;
+mod tensor_edge_policy;
 pub mod textus;
 pub mod textus_bounded;
 pub mod valor;
@@ -61,7 +63,10 @@ pub use queue_stack::{Queue, QueueN, QueueStackError, QueueStackOverflow, Stack,
 #[cfg(feature = "regex")]
 pub use regex::{Match, Regex, RegexError};
 pub use sparsa::Sparsa;
-pub use tensor::Tensor;
+pub use tensor::{Tensor, TensorEdgePolicy};
+pub use tensor_edge_policy::{
+    ClampEdgePolicy, ReflectEdgePolicy, TensorEdgePolicyProvider, WrapEdgePolicy,
+};
 pub use textus::unicode_scalar_value;
 pub use textus_bounded::{TextusN, TextusNOverflow};
 pub use valor::{FromValor, Valor};
@@ -85,6 +90,10 @@ mod regex_test;
 #[cfg(test)]
 #[path = "intervallum_test.rs"]
 mod intervallum_test;
+
+#[cfg(test)]
+#[path = "tensor_edge_policy_test.rs"]
+mod tensor_edge_policy_test;
 
 #[cfg(test)]
 #[path = "valor_from_valor_test.rs"]

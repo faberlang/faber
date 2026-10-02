@@ -123,13 +123,13 @@ fn densata_produces_correct_dense_output() {
     let dense = s.densata().expect("densata");
     assert_eq!(dense.magnitudines(), vec![2, 3]);
     // Row-major: [[10, 0, 0], [0, 0, 20]]
-    assert_eq!(dense.planata(), vec![10, 0, 0, 0, 0, 20]);
+    assert_eq!(dense.planata().unwrap(), vec![10, 0, 0, 0, 0, 20]);
 }
 
 #[test]
 fn from_tensor_drops_default_values() {
     let dense = super::Tensor::structa(vec![0, 7, 0, 9], &[2, 2]).expect("dense");
-    let sparse = Sparsa::from_tensor(&dense);
+    let sparse = Sparsa::from_tensor(&dense).expect("plain dense tensor reads");
     assert_eq!(sparse.magnitudines(), vec![2, 2]);
     assert_eq!(sparse.nonnihil(), Ok(2));
     assert_eq!(sparse.accipe(&[0, 0]), Ok(0));
@@ -140,10 +140,28 @@ fn from_tensor_drops_default_values() {
 #[test]
 fn from_tensor_preserves_rank_zero_non_default() {
     let dense = super::Tensor::structa(vec![5], &[]).expect("rank-zero dense");
-    let sparse = Sparsa::from_tensor(&dense);
+    let sparse = Sparsa::from_tensor(&dense).expect("plain rank-zero tensor reads");
     assert_eq!(sparse.longitudo(), 0);
     assert_eq!(sparse.nonnihil(), Ok(1));
     assert_eq!(sparse.accipe(&[]), Ok(5));
+}
+
+#[test]
+fn from_tensor_propagates_invalid_custom_edge_mapping() {
+    let dense = super::Tensor::structa(vec![1_i32, 2, 3], &[3])
+        .unwrap()
+        .shift(&[1])
+        .unwrap()
+        .limes(crate::tensor::TensorEdgePolicy::Custom {
+            remap: |_| vec![99],
+            transform: None,
+        })
+        .unwrap();
+
+    assert_eq!(
+        Sparsa::from_tensor(&dense).unwrap_err(),
+        crate::tensor::ERR_TENSOR_EDGE_POLICY_INVALID
+    );
 }
 
 #[test]
@@ -151,7 +169,7 @@ fn densata_empty_sparsa_produces_all_default() {
     let s: Sparsa<f32> = Sparsa::vacua(&[2, 2]).expect("valid shape");
     let dense = s.densata().expect("densata");
     assert_eq!(dense.magnitudines(), vec![2, 2]);
-    assert_eq!(dense.planata(), vec![0.0, 0.0, 0.0, 0.0]);
+    assert_eq!(dense.planata().unwrap(), vec![0.0, 0.0, 0.0, 0.0]);
 }
 
 #[test]
@@ -197,5 +215,5 @@ fn accipe_rank_zero_after_densata() {
     let s: Sparsa<i64> = Sparsa::vacua(&[]).expect("empty shape");
     let dense = s.densata().expect("densata rank-zero");
     assert_eq!(dense.element_count(), 1);
-    assert_eq!(dense.planata(), vec![0]);
+    assert_eq!(dense.planata().unwrap(), vec![0]);
 }

@@ -2,16 +2,21 @@ use super::{
     ERR_BROADCAST_SHAPE, ERR_CRUX_ENTROPIA_EMPTY_TENSOR, ERR_CRUX_ENTROPIA_NON_FINITE_INPUT,
     ERR_CRUX_ENTROPIA_SHAPE_MISMATCH, ERR_CRUX_ENTROPIA_TARGET_NON_FINITE,
     ERR_CRUX_ENTROPIA_TARGET_RANGE, ERR_DIVIDE_NON_FINITE_INPUT, ERR_DIVIDE_NON_FINITE_RESULT,
-    ERR_DIVIDE_ZERO_DENOMINATOR, ERR_ELEMENT_COUNT_OVERFLOW, ERR_LAYERNORM_AXIS_OUT_OF_RANGE,
-    ERR_LAYERNORM_BETA_NON_FINITE, ERR_LAYERNORM_BETA_SHAPE_MISMATCH, ERR_LAYERNORM_EMPTY_TENSOR,
-    ERR_LAYERNORM_EPSILON_INVALID, ERR_LAYERNORM_GAMMA_NON_FINITE,
-    ERR_LAYERNORM_GAMMA_SHAPE_MISMATCH, ERR_LAYERNORM_NON_FINITE_INPUT,
-    ERR_LAYERNORM_RANK_TOO_HIGH, ERR_MATMUL_ARGUMENT_RANK, ERR_MATMUL_INNER_DIMENSION,
-    ERR_MATMUL_RECEIVER_RANK, ERR_MEDIA_EMPTY, ERR_PERMUTE_AXIS_OUT_OF_RANGE,
-    ERR_PERMUTE_DUPLICATE_AXIS, ERR_PERMUTE_NEGATIVE_AXIS, ERR_PERMUTE_RANK,
-    ERR_SOFTMAX_EMPTY_TENSOR, ERR_SOFTMAX_NON_FINITE_INPUT, ERR_TRANSPOSE_RANK, Tensor,
+    ERR_DIVIDE_ZERO_DENOMINATOR, ERR_ELEMENT_COUNT_OVERFLOW, ERR_FORMA_LAYOUT_NOT_VIEWABLE,
+    ERR_LAYERNORM_AXIS_OUT_OF_RANGE, ERR_LAYERNORM_BETA_NON_FINITE,
+    ERR_LAYERNORM_BETA_SHAPE_MISMATCH, ERR_LAYERNORM_EMPTY_TENSOR, ERR_LAYERNORM_EPSILON_INVALID,
+    ERR_LAYERNORM_GAMMA_NON_FINITE, ERR_LAYERNORM_GAMMA_SHAPE_MISMATCH,
+    ERR_LAYERNORM_NON_FINITE_INPUT, ERR_LAYERNORM_RANK_TOO_HIGH, ERR_MATMUL_ARGUMENT_RANK,
+    ERR_MATMUL_BATCH_DIMENSION, ERR_MATMUL_INNER_DIMENSION, ERR_MATMUL_RECEIVER_RANK,
+    ERR_MEDIA_EMPTY, ERR_PERMUTE_AXIS_OUT_OF_RANGE, ERR_PERMUTE_DUPLICATE_AXIS,
+    ERR_PERMUTE_NEGATIVE_AXIS, ERR_PERMUTE_RANK, ERR_SECTIO_INVALID_SLICE_BOUNDS,
+    ERR_SOFTMAX_EMPTY_TENSOR, ERR_SOFTMAX_NON_FINITE_INPUT, ERR_TENSOR_COALESCE_REQUIRES_OPTIONAL,
+    ERR_TENSOR_EDGE_NOT_SHIFTED, ERR_TENSOR_EDGE_POLICY_INVALID, ERR_TENSOR_EDGE_RANK_MISMATCH,
+    ERR_TENSOR_EDGE_READ_ONLY, ERR_TENSOR_EDGE_UNRESOLVED_READ, ERR_TENSOR_MATERIALIZE_UNRESOLVED,
+    ERR_TENSOR_SHAPE_HOLE_UNDERDETERMINED, ERR_TRANSPOSE_RANK, Tensor, TensorEdgePolicy,
     tensor_flat_offset, tensor_shape_element_count, tensor_shape_has_element_count,
 };
+use std::sync::Arc;
 
 #[test]
 fn vacua_has_rank_zero() {
@@ -105,7 +110,7 @@ fn accipe_rejects_negative_index() {
 fn structa_and_planata_round_trip() {
     let tensor = Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0], &[2, 2]).expect("shape matches data");
     assert_eq!(tensor.magnitudines(), vec![2, 2]);
-    assert_eq!(tensor.planata(), vec![1.0, 2.0, 3.0, 4.0]);
+    assert_eq!(tensor.planata().unwrap(), vec![1.0, 2.0, 3.0, 4.0]);
 }
 
 #[test]
@@ -115,26 +120,70 @@ fn structa_rejects_negative_shape_dimension() {
 }
 
 #[test]
+fn structa_and_forma_infer_one_exact_shape_hole() {
+    let tensor = Tensor::structa_with_holes(vec![0, 1, 2, 3, 4, 5], &[Some(2), None])
+        .expect("element count determines the missing extent");
+    assert_eq!(tensor.magnitudines(), vec![2, 3]);
+    assert_eq!(tensor.planata().unwrap(), vec![0, 1, 2, 3, 4, 5]);
+
+    let reshaped = tensor
+        .forma_with_holes(&[None, Some(2)])
+        .expect("reshape count determines the missing extent");
+    assert_eq!(reshaped.magnitudines(), vec![3, 2]);
+    assert_eq!(reshaped.planata().unwrap(), vec![0, 1, 2, 3, 4, 5]);
+    assert!(Arc::ptr_eq(&tensor.data, &reshaped.data));
+}
+
+#[test]
+fn shape_holes_reject_ambiguous_inexact_and_authored_negative_dimensions() {
+    assert_eq!(
+        Tensor::<i32>::structa_with_holes(vec![1, 2, 3, 4], &[None, None]).unwrap_err(),
+        ERR_TENSOR_SHAPE_HOLE_UNDERDETERMINED
+    );
+    assert_eq!(
+        Tensor::<i32>::structa_with_holes(Vec::new(), &[Some(0), None]).unwrap_err(),
+        ERR_TENSOR_SHAPE_HOLE_UNDERDETERMINED
+    );
+    assert_eq!(
+        Tensor::<i32>::structa_with_holes(vec![1, 2, 3, 4, 5, 6], &[Some(4), None]).unwrap_err(),
+        "tensor element count does not match shape"
+    );
+    assert_eq!(
+        Tensor::<i32>::structa_with_holes(vec![1, 2], &[Some(-1), None]).unwrap_err(),
+        "tensor shape dimension must be non-negative"
+    );
+    let tensor = Tensor::structa(vec![1, 2, 3, 4], &[2, 2]).unwrap();
+    assert_eq!(
+        tensor.forma_with_holes(&[Some(-1), None]).unwrap_err(),
+        "tensor shape dimension must be non-negative"
+    );
+}
+
+#[test]
 fn convert_elements_preserves_shape_and_maps_values() {
     let tensor = Tensor::structa(vec![1i64, 2, 3, 4], &[2, 2]).expect("shape matches data");
-    let converted = tensor.convert_elements(|value| {
-        // SAFETY: test values are small integers.
-        #[allow(clippy::cast_precision_loss)]
-        let value = value as f64;
-        value
-    });
+    let converted = tensor
+        .convert_elements(|value| {
+            // SAFETY: test values are small integers.
+            #[allow(clippy::cast_precision_loss)]
+            let value = value as f64;
+            value
+        })
+        .expect("valid source values");
     assert_eq!(converted.magnitudines(), vec![2, 2]);
-    assert_eq!(converted.planata(), vec![1.0, 2.0, 3.0, 4.0]);
+    assert_eq!(converted.planata().unwrap(), vec![1.0, 2.0, 3.0, 4.0]);
 }
 
 #[test]
 fn convert_elements_empty_tensor() {
     let tensor: Tensor<i64> = Tensor::structa(Vec::new(), &[0, 5]).expect("zero-extent shape");
-    let converted: Tensor<f64> = tensor.convert_elements(|_| -> f64 {
-        unreachable!("conversion closure is not called for an empty tensor")
-    });
+    let converted: Tensor<f64> = tensor
+        .convert_elements(|_| -> f64 {
+            unreachable!("conversion closure is not called for an empty tensor")
+        })
+        .expect("empty source converts");
     assert_eq!(converted.magnitudines(), vec![0, 5]);
-    assert_eq!(converted.planata(), Vec::<f64>::new());
+    assert_eq!(converted.planata().unwrap(), Vec::<f64>::new());
 }
 
 #[test]
@@ -165,10 +214,290 @@ fn sectio_returns_axis_zero_view() {
 }
 
 #[test]
+fn sectio_strided_returns_axis_zero_view() {
+    let mut tensor = Tensor::structa(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10], &[5, 2]).unwrap();
+    let mut slice = tensor.sectio_strided(1, 5, 2).unwrap();
+
+    assert_eq!(slice.magnitudines(), vec![2, 2]);
+    assert_eq!(slice.planata().unwrap(), vec![3, 4, 7, 8]);
+    assert!(Arc::ptr_eq(&tensor.data, &slice.data));
+
+    tensor.ponde(&[3, 1], 80).unwrap();
+    assert_eq!(slice.accipe(&[1, 1]).unwrap(), Some(80));
+    slice.ponde(&[0, 0], 30).unwrap();
+    assert_eq!(tensor.accipe(&[1, 0]).unwrap(), Some(30));
+}
+
+#[test]
+fn sectio_strided_rejects_nonpositive_steps_and_invalid_bounds() {
+    let tensor = Tensor::structa(vec![1, 2, 3], &[3]).unwrap();
+
+    assert_eq!(
+        tensor.sectio_strided(0, 3, 0).unwrap_err(),
+        ERR_SECTIO_INVALID_SLICE_BOUNDS
+    );
+    assert_eq!(
+        tensor.sectio_strided(0, 3, -1).unwrap_err(),
+        ERR_SECTIO_INVALID_SLICE_BOUNDS
+    );
+    assert_eq!(
+        tensor.sectio_strided(0, 4, 1).unwrap_err(),
+        "tensor index out of bounds"
+    );
+}
+
+#[test]
+fn expanded_inserts_an_axis_and_uses_a_zero_stride_view() {
+    let mut tensor = Tensor::structa(vec![7, 9], &[2]).unwrap();
+    let expanded = tensor.expanded(&[2, 2]).unwrap();
+
+    assert_eq!(expanded.magnitudines(), vec![2, 2]);
+    assert_eq!(expanded.planata().unwrap(), vec![7, 9, 7, 9]);
+    assert!(Arc::ptr_eq(&tensor.data, &expanded.data));
+    tensor.ponde(&[1], 90).unwrap();
+    assert_eq!(expanded.accipe(&[1, 1]).unwrap(), Some(90));
+
+    let copy = expanded
+        .materialize()
+        .expect("ordinary expanded view copies");
+    assert!(!Arc::ptr_eq(&expanded.data, &copy.data));
+    tensor.ponde(&[0], 70).unwrap();
+    assert_eq!(copy.accipe(&[0, 0]).unwrap(), Some(7));
+}
+
+#[test]
+fn expanded_stretches_a_singleton_axis_without_copying() {
+    let tensor = Tensor::structa(vec![10, 20, 30], &[3, 1]).unwrap();
+
+    let expanded = tensor.expanded(&[3, 4]).unwrap();
+
+    assert_eq!(
+        expanded.planata().unwrap(),
+        vec![10, 10, 10, 10, 20, 20, 20, 20, 30, 30, 30, 30]
+    );
+    assert!(Arc::ptr_eq(&tensor.data, &expanded.data));
+}
+
+#[test]
+fn expanded_maps_a_one_dimensional_row_to_the_rightmost_axis() {
+    let tensor = Tensor::structa(vec![2, 4, 6], &[3]).unwrap();
+
+    let expanded = tensor.expanded(&[2, 3]).unwrap();
+
+    assert_eq!(expanded.planata().unwrap(), vec![2, 4, 6, 2, 4, 6]);
+    assert!(Arc::ptr_eq(&tensor.data, &expanded.data));
+}
+
+#[test]
+fn expanded_rejects_incompatible_or_negative_target_shapes() {
+    let tensor = Tensor::structa(vec![1, 2, 3], &[3]).unwrap();
+
+    assert_eq!(tensor.expanded(&[2, 2]).unwrap_err(), ERR_BROADCAST_SHAPE);
+    assert_eq!(
+        tensor.expanded(&[-1, 3]).unwrap_err(),
+        "tensor shape dimension must be non-negative"
+    );
+}
+
+#[test]
+fn expanded_fills_holes_only_from_the_exact_shape_witness() {
+    let tensor = Tensor::structa((0..64).collect::<Vec<i32>>(), &[64]).unwrap();
+    let expanded = tensor
+        .expanded_with_witness(&[None, Some(64)], &[3, 64])
+        .expect("compiler-resolved batch extent fills the hole");
+
+    assert_eq!(expanded.magnitudines(), vec![3, 64]);
+    assert!(Arc::ptr_eq(&tensor.data, &expanded.data));
+    let values = expanded.planata().unwrap();
+    assert_eq!(&values[..64], &(0..64).collect::<Vec<i32>>());
+    assert_eq!(&values[64..128], &(0..64).collect::<Vec<i32>>());
+    assert_eq!(&values[128..], &(0..64).collect::<Vec<i32>>());
+
+    let singleton_row = Tensor::structa((0..64).collect::<Vec<i32>>(), &[1, 64]).unwrap();
+    let stretched = singleton_row
+        .expanded_with_witness(&[None, Some(64)], &[3, 64])
+        .expect("singleton source batch axis can stretch");
+    assert!(Arc::ptr_eq(&singleton_row.data, &stretched.data));
+    assert_eq!(stretched.planata().unwrap(), values);
+    assert_eq!(
+        singleton_row
+            .expanded_with_witness(&[None, Some(64)], &[3, 63])
+            .unwrap_err(),
+        ERR_BROADCAST_SHAPE
+    );
+    assert_eq!(
+        singleton_row
+            .expanded_with_witness(&[Some(-1), Some(64)], &[3, 64])
+            .unwrap_err(),
+        "tensor shape dimension must be non-negative"
+    );
+}
+
+#[test]
+fn shift_is_a_shared_optional_view_and_unresolved_reads_stay_fallible() {
+    let tensor = Tensor::structa(vec![10, 20, 30], &[3]).unwrap();
+    let shifted = tensor.shift(&[1]).unwrap();
+
+    assert!(Arc::ptr_eq(&tensor.data, &shifted.data));
+    assert_eq!(shifted.accipe(&[0]).unwrap(), Some(20));
+    assert_eq!(shifted.accipe(&[2]).unwrap(), None);
+    assert_eq!(shifted.planata(), Err(ERR_TENSOR_EDGE_UNRESOLVED_READ));
+    assert_eq!(
+        shifted.materialize().unwrap_err(),
+        ERR_TENSOR_MATERIALIZE_UNRESOLVED
+    );
+    let coalesced = shifted.coalesce(-1).unwrap();
+    assert!(!Arc::ptr_eq(&tensor.data, &coalesced.data));
+    assert_eq!(coalesced.planata().unwrap(), vec![20, 30, -1]);
+    assert_eq!(
+        tensor.coalesce(-1).unwrap_err(),
+        ERR_TENSOR_COALESCE_REQUIRES_OPTIONAL
+    );
+    assert_eq!(
+        tensor.shift(&[]).unwrap_err(),
+        ERR_TENSOR_EDGE_RANK_MISMATCH
+    );
+    assert_eq!(
+        tensor.limes(TensorEdgePolicy::Wrap).unwrap_err(),
+        ERR_TENSOR_EDGE_NOT_SHIFTED
+    );
+}
+
+#[test]
+fn limes_builtin_policies_keep_views_and_resolve_boundaries() {
+    let tensor = Tensor::structa(vec![10, 20, 30], &[3]).unwrap();
+    let wrapped = tensor
+        .shift(&[1])
+        .unwrap()
+        .limes(TensorEdgePolicy::Wrap)
+        .unwrap();
+    let clamped = tensor
+        .shift(&[1])
+        .unwrap()
+        .limes(TensorEdgePolicy::Clamp)
+        .unwrap();
+    let reflected = tensor
+        .shift(&[1])
+        .unwrap()
+        .limes(TensorEdgePolicy::Reflect)
+        .unwrap();
+
+    assert!(Arc::ptr_eq(&tensor.data, &wrapped.data));
+    assert!(Arc::ptr_eq(&tensor.data, &clamped.data));
+    assert!(Arc::ptr_eq(&tensor.data, &reflected.data));
+    assert_eq!(wrapped.planata().unwrap(), vec![20, 30, 10]);
+    assert_eq!(clamped.planata().unwrap(), vec![20, 30, 30]);
+    assert_eq!(reflected.planata().unwrap(), vec![20, 30, 20]);
+
+    let copy = wrapped.materialize().unwrap();
+    assert!(!Arc::ptr_eq(&wrapped.data, &copy.data));
+    assert_eq!(copy.planata().unwrap(), vec![20, 30, 10]);
+}
+
+#[test]
+fn custom_limes_maps_and_transforms_only_displaced_boundary_values() {
+    let tensor = Tensor::structa(vec![10, 20, 30], &[3]).unwrap();
+    let custom = tensor
+        .shift(&[1])
+        .unwrap()
+        .limes(TensorEdgePolicy::Custom {
+            remap: |_| vec![0],
+            transform: Some(|coordinate, value| {
+                value + i32::try_from(coordinate[0]).expect("small shifted coordinate")
+            }),
+        })
+        .unwrap();
+
+    assert_eq!(custom.planata().unwrap(), vec![20, 30, 13]);
+    assert!(Arc::ptr_eq(&tensor.data, &custom.data));
+
+    let invalid = tensor
+        .shift(&[1])
+        .unwrap()
+        .limes(TensorEdgePolicy::Custom {
+            remap: |_| vec![99],
+            transform: None,
+        })
+        .unwrap();
+    assert_eq!(invalid.accipe(&[2]), Err(ERR_TENSOR_EDGE_POLICY_INVALID));
+    assert_eq!(invalid.planata(), Err(ERR_TENSOR_EDGE_POLICY_INVALID));
+    assert_eq!(
+        invalid.materialize().unwrap_err(),
+        ERR_TENSOR_EDGE_POLICY_INVALID
+    );
+    assert_eq!(invalid.summa(), Err(ERR_TENSOR_EDGE_POLICY_INVALID));
+    assert_eq!(
+        invalid.convert_elements(|value| value).unwrap_err(),
+        ERR_TENSOR_EDGE_POLICY_INVALID
+    );
+    assert_eq!(
+        invalid
+            .addita(&Tensor::structa(vec![0, 0, 0], &[3]).unwrap())
+            .unwrap_err(),
+        ERR_TENSOR_EDGE_POLICY_INVALID
+    );
+    let mut invalid_write = invalid.clone();
+    assert_eq!(invalid_write.ponde(&[0], 5), Err(ERR_TENSOR_EDGE_READ_ONLY));
+    assert_eq!(invalid_write.reple(5), Err(ERR_TENSOR_EDGE_READ_ONLY));
+}
+
+#[test]
+fn shifted_edge_metadata_composes_through_reshape_transpose_slice_and_expand() {
+    let tensor = Tensor::structa(vec![1, 2, 3, 4], &[2, 2]).unwrap();
+    let wrapped = tensor
+        .shift(&[1, 0])
+        .unwrap()
+        .limes(TensorEdgePolicy::Wrap)
+        .unwrap();
+    let reshaped = wrapped.forma(&[4]).unwrap();
+    let expanded = reshaped.expanded(&[2, 4]).unwrap();
+
+    assert!(Arc::ptr_eq(&tensor.data, &expanded.data));
+    assert_eq!(expanded.planata().unwrap(), vec![3, 4, 1, 2, 3, 4, 1, 2]);
+
+    let matrix = Tensor::structa(vec![1, 2, 3, 4, 5, 6], &[2, 3]).unwrap();
+    let sliced = matrix
+        .shift(&[1, 0])
+        .unwrap()
+        .limes(TensorEdgePolicy::Wrap)
+        .unwrap()
+        .transpose_rank2()
+        .unwrap()
+        .sectio(1, 3)
+        .unwrap();
+    assert!(Arc::ptr_eq(&matrix.data, &sliced.data));
+    assert_eq!(sliced.planata().unwrap(), vec![5, 2, 6, 3]);
+}
+
+#[test]
+fn forma_reshapes_as_a_shared_view_and_rejects_unrepresentable_order() {
+    let mut tensor = Tensor::structa(vec![1, 2, 3, 4, 5, 6], &[2, 3]).unwrap();
+    let mut reshaped = tensor.forma(&[3, 2]).unwrap();
+
+    assert_eq!(reshaped.planata().unwrap(), vec![1, 2, 3, 4, 5, 6]);
+    assert!(Arc::ptr_eq(&tensor.data, &reshaped.data));
+    tensor.ponde(&[1, 0], 40).unwrap();
+    assert_eq!(reshaped.accipe(&[1, 1]).unwrap(), Some(40));
+    reshaped.ponde(&[2, 1], 60).unwrap();
+    assert_eq!(tensor.accipe(&[1, 2]).unwrap(), Some(60));
+
+    let transposed = tensor.transpose_rank2().unwrap();
+    assert_eq!(
+        transposed.forma(&[6]).unwrap_err(),
+        ERR_FORMA_LAYOUT_NOT_VIEWABLE
+    );
+}
+
+#[test]
 fn materialize_breaks_sectio_alias() {
     let mut tensor =
         Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0], &[2, 2]).expect("shape matches data");
-    let mut materialized = tensor.sectio(0, 1).expect("valid slice").materialize();
+    let mut materialized = tensor
+        .sectio(0, 1)
+        .expect("valid slice")
+        .materialize()
+        .expect("ordinary slice copies");
+    assert!(!Arc::ptr_eq(&tensor.data, &materialized.data));
 
     tensor.ponde(&[0, 0], 10.0).expect("parent write succeeds");
     assert_eq!(
@@ -225,7 +554,7 @@ fn addita_sums_elementwise() {
     let b = Tensor::structa(vec![10.0f32, 20.0, 30.0], &[3]).unwrap();
     let c = a.addita(&b).expect("broadcast-compatible shape");
     assert_eq!(c.magnitudines(), vec![3]);
-    assert_eq!(c.planata(), vec![11.0, 22.0, 33.0]);
+    assert_eq!(c.planata().unwrap(), vec![11.0, 22.0, 33.0]);
 }
 
 #[test]
@@ -235,7 +564,7 @@ fn addita_broadcasts_size_one_dimension() {
     let c = a.addita(&b).expect("broadcast-compatible shape");
     assert_eq!(c.magnitudines(), vec![2, 2]);
     // a = [[1,2],[3,4]]; b = [[10],[20]] broadcasts to [[10,10],[20,20]].
-    assert_eq!(c.planata(), vec![11.0, 12.0, 23.0, 24.0]);
+    assert_eq!(c.planata().unwrap(), vec![11.0, 12.0, 23.0, 24.0]);
 }
 
 #[test]
@@ -255,7 +584,7 @@ fn addita_broadcasts_zero_extent_with_size_one_axis_to_empty_result() {
         .expect("zero/one broadcast is compatible");
 
     assert_eq!(result.magnitudines(), vec![0, 3]);
-    assert_eq!(result.planata(), Vec::<f32>::new());
+    assert_eq!(result.planata().unwrap(), Vec::<f32>::new());
 }
 
 #[test]
@@ -268,7 +597,7 @@ fn subtrahe_broadcasts_zero_extent_with_size_one_axis_to_empty_result() {
         .expect("one/zero broadcast is compatible");
 
     assert_eq!(result.magnitudines(), vec![0, 3]);
-    assert_eq!(result.planata(), Vec::<f32>::new());
+    assert_eq!(result.planata().unwrap(), Vec::<f32>::new());
 }
 
 #[test]
@@ -281,7 +610,7 @@ fn multiplica_broadcasts_zero_extent_with_size_one_axis_to_empty_result() {
         .expect("zero/one broadcast is compatible");
 
     assert_eq!(result.magnitudines(), vec![2, 0, 3]);
-    assert_eq!(result.planata(), Vec::<f32>::new());
+    assert_eq!(result.planata().unwrap(), Vec::<f32>::new());
 }
 
 #[test]
@@ -315,7 +644,8 @@ fn subtrahe_is_elementwise() {
     assert_eq!(
         a.subtrahe(&b)
             .expect("broadcast-compatible shape")
-            .planata(),
+            .planata()
+            .unwrap(),
         vec![9.0, 18.0, 27.0]
     );
 }
@@ -327,7 +657,8 @@ fn multiplica_is_elementwise() {
     assert_eq!(
         a.multiplica(&b)
             .expect("broadcast-compatible shape")
-            .planata(),
+            .planata()
+            .unwrap(),
         vec![10.0, 40.0, 90.0]
     );
 }
@@ -337,7 +668,10 @@ fn addita_integer_tensors_sum_without_widening() {
     let a = Tensor::structa(vec![1i64, 2, 3], &[3]).unwrap();
     let b = Tensor::structa(vec![4i64, 5, 6], &[3]).unwrap();
     assert_eq!(
-        a.addita(&b).expect("broadcast-compatible shape").planata(),
+        a.addita(&b)
+            .expect("broadcast-compatible shape")
+            .planata()
+            .unwrap(),
         vec![5, 7, 9]
     );
 }
@@ -346,59 +680,59 @@ fn addita_integer_tensors_sum_without_widening() {
 #[allow(clippy::float_cmp)]
 fn summa_folds_all_elements_to_element_type() {
     let grid = Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0], &[2, 2]).unwrap();
-    assert_eq!(grid.summa(), 10.0);
+    assert_eq!(grid.summa().unwrap(), 10.0);
     let ints = Tensor::structa(vec![1i64, 2, 3, 4], &[4]).unwrap();
-    assert_eq!(ints.summa(), 10);
+    assert_eq!(ints.summa().unwrap(), 10);
 }
 
 #[test]
 #[allow(clippy::float_cmp)]
 fn summa_empty_tensor_returns_default() {
     let empty_f32 = Tensor::<f32>::structa(Vec::new(), &[0]).unwrap();
-    assert_eq!(empty_f32.summa(), 0.0);
+    assert_eq!(empty_f32.summa().unwrap(), 0.0);
 
     let empty_ints = Tensor::<i64>::structa(Vec::new(), &[0, 0]).unwrap();
-    assert_eq!(empty_ints.summa(), 0);
+    assert_eq!(empty_ints.summa().unwrap(), 0);
 }
 
 #[test]
 fn neg_negates_f32_elements_and_preserves_shape() {
     let tensor = Tensor::structa(vec![1.0f32, -2.0, 0.0, 4.5], &[2, 2]).unwrap();
 
-    let negated = tensor.neg();
+    let negated = tensor.neg().unwrap();
 
     assert_eq!(negated.magnitudines(), vec![2, 2]);
-    assert_eq!(negated.planata(), vec![-1.0, 2.0, -0.0, -4.5]);
+    assert_eq!(negated.planata().unwrap(), vec![-1.0, 2.0, -0.0, -4.5]);
 }
 
 #[test]
 fn neg_empty_tensor_preserves_shape() {
     let tensor = Tensor::<f32>::structa(Vec::new(), &[0, 3]).unwrap();
 
-    let negated = tensor.neg();
+    let negated = tensor.neg().unwrap();
 
     assert_eq!(negated.magnitudines(), vec![0, 3]);
-    assert_eq!(negated.planata(), Vec::<f32>::new());
+    assert_eq!(negated.planata().unwrap(), Vec::<f32>::new());
 }
 
 #[test]
 fn scala_scales_f32_elements_and_preserves_shape() {
     let tensor = Tensor::structa(vec![1.0f32, -2.0, 3.5, 4.0], &[2, 2]).unwrap();
 
-    let scaled = tensor.scala(0.5);
+    let scaled = tensor.scala(0.5).unwrap();
 
     assert_eq!(scaled.magnitudines(), vec![2, 2]);
-    assert_eq!(scaled.planata(), vec![0.5, -1.0, 1.75, 2.0]);
+    assert_eq!(scaled.planata().unwrap(), vec![0.5, -1.0, 1.75, 2.0]);
 }
 
 #[test]
 fn scala_empty_tensor_preserves_shape() {
     let tensor = Tensor::<f32>::structa(Vec::new(), &[0, 2]).unwrap();
 
-    let scaled = tensor.scala(2.0);
+    let scaled = tensor.scala(2.0).unwrap();
 
     assert_eq!(scaled.magnitudines(), vec![0, 2]);
-    assert_eq!(scaled.planata(), Vec::<f32>::new());
+    assert_eq!(scaled.planata().unwrap(), Vec::<f32>::new());
 }
 
 #[test]
@@ -409,7 +743,7 @@ fn divide_broadcasts_finite_f32_tensors() {
     let divided = lhs.divide(&rhs).expect("finite broadcast division");
 
     assert_eq!(divided.magnitudines(), vec![2, 2]);
-    assert_eq!(divided.planata(), vec![4.0, 9.0, 6.0, -10.0]);
+    assert_eq!(divided.planata().unwrap(), vec![4.0, 9.0, 6.0, -10.0]);
 }
 
 #[test]
@@ -419,7 +753,7 @@ fn reciproca_preserves_shape_and_values() {
     let reciprocal = tensor.reciproca().expect("finite reciprocal");
 
     assert_eq!(reciprocal.magnitudines(), vec![2, 2]);
-    assert_eq!(reciprocal.planata(), vec![0.5, -0.25, 4.0, 0.125]);
+    assert_eq!(reciprocal.planata().unwrap(), vec![0.5, -0.25, 4.0, 0.125]);
 }
 
 #[test]
@@ -485,23 +819,55 @@ fn transpose_rank2_materializes_rows_as_columns() {
     let transposed = tensor.transpose_rank2().expect("rank-2 transpose");
 
     assert_eq!(transposed.magnitudines(), vec![3, 2]);
-    assert_eq!(transposed.planata(), vec![1.0, 4.0, 2.0, 5.0, 3.0, 6.0]);
+    assert_eq!(
+        transposed.planata().unwrap(),
+        vec![1.0, 4.0, 2.0, 5.0, 3.0, 6.0]
+    );
 }
 
 #[test]
-fn transpose_rank2_materializes_views_without_aliasing() {
+fn transpose_rank2_returns_a_shared_view() {
     let mut tensor = Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0], &[3, 2]).unwrap();
     let view = tensor.sectio(1, 3).expect("axis-0 view");
     let transposed = view.transpose_rank2().expect("rank-2 view transpose");
 
+    assert!(Arc::ptr_eq(&tensor.data, &transposed.data));
     tensor.ponde(&[1, 0], 99.0).unwrap();
 
     assert_eq!(transposed.magnitudines(), vec![2, 2]);
-    assert_eq!(transposed.planata(), vec![3.0, 5.0, 4.0, 6.0]);
+    assert_eq!(transposed.planata().unwrap(), vec![99.0, 5.0, 4.0, 6.0]);
 }
 
 #[test]
-fn transpose_rank2_rejects_non_rank2_tensor() {
+fn transpose_rank2_swaps_only_the_trailing_axes_of_batched_tensors() {
+    let tensor = Tensor::structa((0..12).collect::<Vec<i32>>(), &[2, 2, 3]).unwrap();
+
+    let transposed = tensor.transpose_rank2().unwrap();
+
+    assert_eq!(transposed.magnitudines(), vec![2, 3, 2]);
+    assert_eq!(
+        transposed.planata().unwrap(),
+        vec![0, 3, 1, 4, 2, 5, 6, 9, 7, 10, 8, 11]
+    );
+    assert!(Arc::ptr_eq(&tensor.data, &transposed.data));
+}
+
+#[test]
+fn transpose_rank2_preserves_the_rank_at_least_two_static_contract() {
+    let tensor = Tensor::structa((0..12).collect::<Vec<i32>>(), &[1, 1, 2, 2, 3]).unwrap();
+
+    let transposed = tensor.transpose_rank2().unwrap();
+
+    assert_eq!(transposed.magnitudines(), vec![1, 1, 2, 3, 2]);
+    assert_eq!(
+        transposed.planata().unwrap(),
+        vec![0, 3, 1, 4, 2, 5, 6, 9, 7, 10, 8, 11]
+    );
+    assert!(Arc::ptr_eq(&tensor.data, &transposed.data));
+}
+
+#[test]
+fn transpose_rank2_rejects_rank_below_two() {
     let tensor = Tensor::structa(vec![1.0f32, 2.0, 3.0], &[3]).unwrap();
 
     assert_eq!(tensor.transpose_rank2().unwrap_err(), ERR_TRANSPOSE_RANK);
@@ -515,7 +881,7 @@ fn permute_materializes_general_axis_order() {
 
     assert_eq!(permuted.magnitudines(), vec![4, 2, 3]);
     assert_eq!(
-        permuted.planata(),
+        permuted.planata().unwrap(),
         vec![
             0, 4, 8, 12, 16, 20, 1, 5, 9, 13, 17, 21, 2, 6, 10, 14, 18, 22, 3, 7, 11, 15, 19, 23
         ]
@@ -531,7 +897,7 @@ fn permute_materializes_views_without_aliasing() {
     tensor.ponde(&[1, 0], 99.0).unwrap();
 
     assert_eq!(permuted.magnitudines(), vec![2, 2]);
-    assert_eq!(permuted.planata(), vec![3.0, 5.0, 4.0, 6.0]);
+    assert_eq!(permuted.planata().unwrap(), vec![3.0, 5.0, 4.0, 6.0]);
 }
 
 #[test]
@@ -541,7 +907,7 @@ fn permute_accepts_rank_zero_empty_axis_list() {
     let permuted = tensor.permute(&[]).expect("rank-0 identity permute");
 
     assert_eq!(permuted.magnitudines(), Vec::<i64>::new());
-    assert_eq!(permuted.planata(), vec![42]);
+    assert_eq!(permuted.planata().unwrap(), vec![42]);
 }
 
 #[test]
@@ -596,7 +962,7 @@ fn matmul_square_identity() {
     let result = eye.matmul(&a).expect("valid matmul");
     assert_eq!(result.magnitudines(), vec![3, 3]);
     assert_eq!(
-        result.planata(),
+        result.planata().unwrap(),
         vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
     );
 }
@@ -619,9 +985,64 @@ fn matmul_rectangular() {
     // Row 1: [4*1+5*5+6*9, 4*2+5*6+6*10, 4*3+5*7+6*11, 4*4+5*8+6*12]
     //       = [83, 98, 113, 128]
     assert_eq!(
-        result.planata(),
+        result.planata().unwrap(),
         vec![38.0, 44.0, 50.0, 56.0, 83.0, 98.0, 113.0, 128.0]
     );
+}
+
+#[test]
+fn matmul_rank_two_accepts_a_vector_argument() {
+    let matrix = Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0], &[2, 3]).unwrap();
+    let vector = Tensor::structa(vec![2.0f32, 3.0, 4.0], &[3]).unwrap();
+
+    let result = matrix.matmul(&vector).unwrap();
+
+    assert_eq!(result.magnitudines(), vec![2]);
+    assert_eq!(result.planata().unwrap(), vec![20.0, 47.0]);
+}
+
+#[test]
+fn matmul_rank_three_batches_a_rank_two_rhs_across_all_batches() {
+    let lhs = Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], &[2, 2, 2]).unwrap();
+    let rhs = Tensor::structa(vec![10.0f32, 20.0], &[2, 1]).unwrap();
+
+    let result = lhs.matmul(&rhs).unwrap();
+
+    assert_eq!(result.magnitudines(), vec![2, 2, 1]);
+    assert_eq!(result.planata().unwrap(), vec![50.0, 110.0, 170.0, 230.0]);
+}
+
+#[test]
+fn matmul_rank_three_accepts_matching_rank_three_rhs_batches() {
+    let lhs = Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], &[2, 2, 2]).unwrap();
+    let rhs = Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0], &[2, 2, 1]).unwrap();
+
+    let result = lhs.matmul(&rhs).unwrap();
+
+    assert_eq!(result.magnitudines(), vec![2, 2, 1]);
+    assert_eq!(result.planata().unwrap(), vec![5.0, 11.0, 39.0, 53.0]);
+}
+
+#[test]
+fn matmul_rank_four_accepts_rhs_batch_prefix() {
+    let lhs = Tensor::structa(vec![1.0f32; 12], &[2, 3, 1, 2]).unwrap();
+    let rhs = Tensor::structa(vec![1.0f32, 2.0, 10.0, 20.0], &[2, 2, 1]).unwrap();
+
+    let result = lhs.matmul(&rhs).unwrap();
+
+    assert_eq!(result.magnitudines(), vec![2, 3, 1, 1]);
+    assert_eq!(
+        result.planata().unwrap(),
+        vec![3.0, 3.0, 3.0, 30.0, 30.0, 30.0]
+    );
+}
+
+#[test]
+fn matmul_rejects_nonmatching_batch_prefix() {
+    let lhs = Tensor::structa(vec![1.0f32; 8], &[2, 2, 2]).unwrap();
+    let rhs = Tensor::structa(vec![1.0f32; 6], &[3, 2, 1]).unwrap();
+
+    assert_eq!(lhs.matmul(&rhs).unwrap_err(), ERR_MATMUL_BATCH_DIMENSION);
 }
 
 #[test]
@@ -634,7 +1055,7 @@ fn matmul_receiver_rank_rejects_with_error() {
 #[test]
 fn matmul_argument_rank_rejects_with_error() {
     let a = Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0], &[2, 3]).unwrap();
-    let b = Tensor::structa(vec![1.0, 2.0, 3.0], &[3]).unwrap();
+    let b = Tensor::<f32>::vacua();
     assert_eq!(a.matmul(&b).unwrap_err(), ERR_MATMUL_ARGUMENT_RANK);
 }
 
@@ -665,7 +1086,7 @@ fn layernorm_matches_reference_rank2_axis1_no_affine() {
     // Expected row 0: [-1.2247, 0.0, 1.2247]
     // Row 1: mean=5.0, var=0.6667, same inv_std
     // Expected row 1: [-1.2247, 0.0, 1.2247]
-    let result_data = result.planata();
+    let result_data = result.planata().unwrap();
     let expected: Vec<f32> = vec![
         -1.224_744_9,
         0.0,
@@ -691,7 +1112,7 @@ fn layernorm_matches_reference_rank2_axis1_with_affine() {
     let result = input.layernorm(1, 1e-5, Some(&gamma), Some(&beta)).unwrap();
     assert_eq!(result.magnitudines(), vec![2, 3]);
 
-    let result_data = result.planata();
+    let result_data = result.planata().unwrap();
     let row0: Vec<f32> = vec![
         (-1.224_744_9 * 1.0) + 0.0,
         0.0 * 2.0 + 0.1,
@@ -719,7 +1140,7 @@ fn layernorm_rank1_no_affine() {
     assert_eq!(result.magnitudines(), vec![3]);
     // mean=2.0, var=(1+0+1)/3=0.6667, inv_std≈1.2247
     let expected = [-1.224_744_9_f32, 0.0, 1.224_744_9];
-    for (a, e) in result.planata().iter().zip(expected.iter()) {
+    for (a, e) in result.planata().unwrap().iter().zip(expected.iter()) {
         assert!(
             (a - e).abs() < 1e-4,
             "rank-1 layernorm output {a} differs from expected {e}"
@@ -733,7 +1154,7 @@ fn layernorm_equal_max_finite_values_remain_finite() {
 
     let result = input.layernorm(0, 1e-5, None, None).unwrap();
 
-    assert_eq!(result.planata(), vec![0.0, 0.0]);
+    assert_eq!(result.planata().unwrap(), vec![0.0, 0.0]);
 }
 
 #[test]
@@ -743,7 +1164,7 @@ fn layernorm_rank2_axis0_no_affine() {
     let result = input.layernorm(0, 1e-5, None, None).unwrap();
 
     assert_eq!(result.magnitudines(), vec![2, 3]);
-    let result_data = result.planata();
+    let result_data = result.planata().unwrap();
 
     // Col 0: [1, 4], mean=2.5, centered=[-1.5, 1.5], var=(2.25+2.25)/2=2.25, inv_std≈0.66667
     // Expected col 0: [-1.0/√(0.444...), 1.0/√(0.444...)] = [-1.0, 1.0]
@@ -770,7 +1191,7 @@ fn layernorm_rank2_axis0_with_affine() {
     let result = input.layernorm(0, 1e-5, Some(&gamma), Some(&beta)).unwrap();
 
     assert_eq!(result.magnitudines(), vec![2, 3]);
-    let result_data = result.planata();
+    let result_data = result.planata().unwrap();
 
     // axis=0 normalizes each column independently.
     // Pre-affine normalized y = [-1,-1,-1, 1,1,1] (same as no-affine test).
@@ -912,7 +1333,7 @@ fn softmax_rejects_non_finite_input() {
 fn softmax_rank1_sums_to_one() {
     let input = Tensor::structa(vec![1.0f32, 2.0, 3.0], &[3]).unwrap();
     let output = input.softmax().unwrap();
-    let data = output.planata();
+    let data = output.planata().unwrap();
     let sum: f32 = data.iter().sum();
     assert!((sum - 1.0).abs() < 1e-6, "sum must be 1.0, got {sum}");
 }
@@ -921,7 +1342,7 @@ fn softmax_rank1_sums_to_one() {
 fn softmax_rank2_sums_to_one_per_row() {
     let input = Tensor::structa(vec![1.0f32, 2.0, 3.0, 1.0, 2.0, 3.0], &[2, 3]).unwrap();
     let output = input.softmax().unwrap();
-    let data = output.planata();
+    let data = output.planata().unwrap();
     let row0_sum: f32 = data[0..3].iter().sum();
     let row1_sum: f32 = data[3..6].iter().sum();
     assert!(
@@ -938,7 +1359,7 @@ fn softmax_rank2_sums_to_one_per_row() {
 fn softmax_rank1_correct_values() {
     let input = Tensor::structa(vec![1.0f32, 2.0, 3.0], &[3]).unwrap();
     let output = input.softmax().unwrap();
-    let data = output.planata();
+    let data = output.planata().unwrap();
     // softmax([1, 2, 3]) ≈ [0.09003057, 0.24472847, 0.66524096]
     let expected = [0.090_030_57, 0.244_728_47, 0.665_240_96];
     for i in 0..3 {
@@ -955,7 +1376,7 @@ fn softmax_rank1_correct_values() {
 fn softmax_rank2_identical_rows() {
     let input = Tensor::structa(vec![1.0f32, 2.0, 3.0, 1.0, 2.0, 3.0], &[2, 3]).unwrap();
     let output = input.softmax().unwrap();
-    let data = output.planata();
+    let data = output.planata().unwrap();
     // Both rows are identical since inputs are identical.
     for i in 0..3 {
         assert!(
@@ -970,7 +1391,7 @@ fn softmax_rank2_correct_values() {
     // Different inputs per row: [1,2,3] and [7,8,9] as 2×3
     let input = Tensor::structa(vec![1.0f32, 2.0, 3.0, 7.0, 8.0, 9.0], &[2, 3]).unwrap();
     let output = input.softmax().unwrap();
-    let data = output.planata();
+    let data = output.planata().unwrap();
     // softmax([1,2,3]) ≈ [0.09003057, 0.24472847, 0.66524096]
     // softmax([7,8,9]) ≈ [0.09003057, 0.24472847, 0.66524096] (same because shift-invariant)
     let expected_row = [0.090_030_57, 0.244_728_47, 0.665_240_96];

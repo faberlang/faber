@@ -22,11 +22,36 @@ pub const ERR_INVALID_SLICE_RANGE: &str = "tensor slice end must be at least sta
 pub const ERR_INDEX_OUT_OF_BOUNDS: &str = "tensor index out of bounds";
 /// Element count exceeds representable range.
 pub const ERR_ELEMENT_COUNT_OVERFLOW: &str = "tensor element count overflow";
+/// An expression-shape hole has no unique extent witness.
+pub const ERR_TENSOR_SHAPE_HOLE_UNDERDETERMINED: &str =
+    "tensor shape hole cannot be inferred uniquely from the available element count";
+/// `limes` was applied to a tensor without an unresolved shifted view.
+pub const ERR_TENSOR_EDGE_NOT_SHIFTED: &str = "tensor limes requires an unresolved shifted view";
+/// A read would turn an unresolved optional shifted element into an ordinary value.
+pub const ERR_TENSOR_EDGE_UNRESOLVED_READ: &str =
+    "tensor flatten cannot read an unresolved shifted optional element";
+/// `materialize` cannot erase an unresolved optional shifted element.
+pub const ERR_TENSOR_MATERIALIZE_UNRESOLVED: &str =
+    "tensor materialize cannot copy unresolved shifted optional elements";
+/// A custom edge policy produced an invalid mapped coordinate.
+pub const ERR_TENSOR_EDGE_POLICY_INVALID: &str =
+    "tensor edge policy produced an invalid coordinate";
+/// Edge coordinate rank does not match the tensor rank.
+pub const ERR_TENSOR_EDGE_RANK_MISMATCH: &str =
+    "tensor edge coordinate rank does not match tensor rank";
+/// Writes through an edge view are not admitted.
+pub const ERR_TENSOR_EDGE_READ_ONLY: &str = "tensor edge views do not support writes";
+/// Tensor coalescing requires an unresolved shifted optional view.
+pub const ERR_TENSOR_COALESCE_REQUIRES_OPTIONAL: &str =
+    "tensor coalesce requires an unresolved shifted optional view";
 
 /// `forma` (reshape) element count mismatch.
 pub const ERR_FORMA_RESHAPE_COUNT: &str = "tensor forma (reshape) element count mismatch";
 /// `forma` element count mismatch.
 pub const ERR_FORMA_ELEMENT_COUNT: &str = "tensor forma element count mismatch";
+/// `forma` cannot express this logical order as a stride-only view.
+pub const ERR_FORMA_LAYOUT_NOT_VIEWABLE: &str =
+    "tensor forma layout cannot be represented as a view";
 /// `accipe` (get) invalid index.
 pub const ERR_ACCIPE_INVALID_INDEX: &str = "tensor accipe invalid index";
 /// `ponde` (set) invalid index.
@@ -37,14 +62,19 @@ pub const ERR_CREA_INVALID_SHAPE: &str = "tensor crea invalid shape";
 pub const ERR_SECTIO_INVALID_SLICE_BOUNDS: &str = "tensor sectio invalid slice bounds";
 /// Broadcast shape mismatch.
 pub const ERR_BROADCAST_SHAPE: &str = "tensor broadcast shape mismatch";
-/// `matmul` receiver must be rank-2.
-pub const ERR_MATMUL_RECEIVER_RANK: &str = "tensor matmul requires rank-2 tensor receiver";
-/// `matmul` argument must be rank-2.
-pub const ERR_MATMUL_ARGUMENT_RANK: &str = "tensor matmul requires rank-2 tensor argument";
+/// `matmul` receiver has two contraction axes and up to two batch axes.
+pub const ERR_MATMUL_RECEIVER_RANK: &str =
+    "tensor matmul requires rank-2, rank-3 or rank-4 tensor receiver";
+/// The right operand rank is compatible with the receiver's batch axes.
+pub const ERR_MATMUL_ARGUMENT_RANK: &str =
+    "tensor matmul argument rank is incompatible with receiver rank";
 /// `matmul` inner dimension mismatch.
 pub const ERR_MATMUL_INNER_DIMENSION: &str = "tensor matmul inner dimension mismatch";
-/// `transpose` requires rank-2.
-pub const ERR_TRANSPOSE_RANK: &str = "tensor transpose requires rank-2 tensor";
+/// `matmul` right-operand batch axes must equal a receiver batch prefix.
+pub const ERR_MATMUL_BATCH_DIMENSION: &str =
+    "tensor matmul batch dimensions do not match receiver prefix";
+/// `transpose` requires at least two axes.
+pub const ERR_TRANSPOSE_RANK: &str = "tensor transpose requires rank at least 2";
 /// `permute` axis count must equal rank.
 pub const ERR_PERMUTE_RANK: &str = "tensor permute axis count must equal tensor rank";
 /// `permute` axis must be non-negative.

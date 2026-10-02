@@ -73,11 +73,13 @@ impl<T: Clone + Default + PartialEq> Sparsa<T> {
     }
 
     /// Build sparse storage from a dense tensor, dropping exact default values.
-    #[must_use]
-    pub fn from_tensor(dense: &Tensor<T>) -> Self {
+    /// # Errors
+    ///
+    /// Returns an error when the dense view cannot be read as ordinary values.
+    pub fn from_tensor(dense: &Tensor<T>) -> Result<Self, &'static str> {
         let shape = dense.magnitudines();
-        let entries = entries_from_dense_values(&shape, dense.planata());
-        Self { shape, entries }
+        let entries = entries_from_dense_values(&shape, dense.planata()?);
+        Ok(Self { shape, entries })
     }
 
     /// Rank (number of dimensions).
