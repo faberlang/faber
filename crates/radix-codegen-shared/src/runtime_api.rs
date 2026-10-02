@@ -168,8 +168,7 @@ pub const EXACT_POW: RuntimeItem = exact_row_for("pow", RuntimeKind::Fn, EXACT_R
 pub const EXACT_REM: RuntimeItem = exact_row("rem", RuntimeKind::Fn);
 pub const EXACT_SHL: RuntimeItem = exact_row_for("shl", RuntimeKind::Fn, EXACT_RUST_GO_TS);
 pub const EXACT_SHR: RuntimeItem = exact_row_for("shr", RuntimeKind::Fn, EXACT_RUST_GO_TS);
-pub const EXACT_STORE: RuntimeItem =
-    exact_row_for("store", RuntimeKind::StoreFn, EXACT_RUST_GO_TS);
+pub const EXACT_STORE: RuntimeItem = exact_row_for("store", RuntimeKind::StoreFn, EXACT_RUST_GO_TS);
 pub const EXACT_STORE_INFERRED: RuntimeItem = exact_row("store_inferred", RuntimeKind::StoreFn);
 pub const EXACT_SUB: RuntimeItem = exact_row_for("sub", RuntimeKind::Fn, EXACT_RUST_GO_TS);
 
