@@ -7,7 +7,7 @@ canonical = true
 summary = "Generic set collection type."
 syntax = "copia<T>"
 aliases = ["set"]
-related = ["lista", "tabula", "inter"]
+related = ["lista", "tabula", "∈"]
 locale = "en"
 +++
 # =============================================================================
@@ -16,12 +16,12 @@ locale = "en"
 #
 # What this teaches:
 #   • Generic set collection type.
-#   • Related keywords: lista, tabula, inter
+#   • Related keywords: lista, tabula, ∈
 #
 # Common mistakes:
 #   • Using `copia<T>` without an explicit type — `vacua` requires an explicit type annotation like `copia<numerus>` (SEM014).
 #
-# See also: lista, tabula, inter
+# See also: lista, tabula, ∈
 # =============================================================================
 
 # copia<T> basic intrinsics

@@ -1,0 +1,57 @@
++++
+term = "∈"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "field_decl", "hole_type", "si_stmt", "arm", "comparison", "range_expr", "range_tail", "incipit_stmt", "expression", "literal", "nota_stmt"]
+category = "range"
+canonical = true
+summary = "Checks whether a value lies within a range."
+syntax = "<expression> ∈ <range>"
+related = ["‥", "…"]
+locale = "en"
++++
+# =============================================================================
+# ∈ — Checks whether a value lies within a range
+# =============================================================================
+#
+# What this teaches:
+#   • Checks whether a value lies within a range.
+#   • Related operators: ‥, …
+#
+# Common mistakes:
+#   • Confusing `∈` over a range (numeric interval) with `∈` over a collection (set membership) — the right operand decides: a range such as `0‥100` tests the interval, a lista, tabula, or copia tests membership.
+#
+# See also: ‥, …
+# =============================================================================
+
+# ∈ — range containment (membership in a numeric interval)
+#
+# <expr> ∈ <initium>‥<finis>    — half-open [initium, finis)
+# <expr> ∈ <initium>…<finis>     — inclusive [initium, finis]
+# <expr> ∈ <initium> before <finis> — explicit exclusive end
+#
+# GRAMMAR:
+#   rangeMembership :← expr '∈' rangeExpr
+#
+# EXPECTED OUTPUT:
+#   none — stdout not pinned for this exemplum.
+
+const int aetas = 25
+
+main {
+    print "exempla ∈"
+
+    # Basic ∈ with ‥ operator (exclusive end)
+    if aetas ∈ 0‥100 {
+        print "aetas intra fines est"
+    }
+
+    # ∈ with … (inclusive end)
+    if aetas ∈ 18…65 {
+        print "aetas laboris"
+    }
+
+    # ∈ with before (explicit exclusive)
+    if aetas ∈ 0 before 18 {
+        print "minor"
+    }
+}
