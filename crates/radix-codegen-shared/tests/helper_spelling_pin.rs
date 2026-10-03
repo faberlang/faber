@@ -226,17 +226,13 @@ const EMITTERS: [Emitter; 3] = [
     },
     Emitter {
         name: "radix-hir-ts",
-        // 46 -> 40 (modulus/shaped carriers) -> 32 when T1-T13 moved
-        // `order.compare`, `order.textCompare` and `dup.duplicate` into
-        // `@faber/runtime`. The remaining lines belong to the TS namespaces
-        // still pending (intervallum, instans, regex, json, valor, variant,
-        // tuple, atomic, result, sermo, route); the last TS unit lowers this
-        // to 0.
-        legacy_budget: 32,
-        // WHY: `sermo.open(` (write_ad_expr) and the `sermo.close accepts no
-        // arguments` message in expr/access.rs were hand-spelled before this
-        // ratchet existed. The sermo namespace unit removes both.
-        new_shape_budget: 2,
+        // Four helper-shaped lines remain: three failure-carrier spellings
+        // and the inline optional variable. Keep the exact count as the
+        // remaining TS runtime work removes these legacy forms.
+        legacy_budget: 4,
+        // One new-shape line remains: the `sermo.close` diagnostic text in
+        // expr/access.rs. Lower this exact-count ratchet with the sermo work.
+        new_shape_budget: 1,
         new_shape: ts_new_shape,
     },
     Emitter {
