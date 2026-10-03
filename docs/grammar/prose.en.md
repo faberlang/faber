@@ -181,24 +181,9 @@ anywhere else (`x ← insere "p"`, a call argument, a `redde` value) it is `SEM0
 - Generic parameter lists put type parameters first and `magnitudo` (en `size`) parameters after them (`<T, U, magnitudo N>`); a type parameter after a size parameter is `type_param_after_magnitudo`. Once one parameter has a default (`= numerus`, `magnitudo N = 3`), every later parameter needs one (`generic_default_not_trailing`).
 - The `exitus` function modifier takes an identifier or a non-negative integer literal; the entry-point `exitus` (below) takes an expression.
 
-### Capture-free closures
+### Closures
 
-
-`libera` is the canonical Latin spelling of the `closure_modifier`; the English reader spelling is `free`. The modifier follows the parameter list in both compact and legacy `clausura` forms, before any `→` return or `⇥` alternate-exit clause. It declares a checked capture-free contract: the closure may use its own parameters, body locals, and module-level items, but it must not reference a local or parameter from an enclosing function. Such a capture is rejected by the compiler.
-
-```fab
-sit summa ← (numerus a, numerus b) libera ∴ a + b
-clausura numerus x libera: x * 2
-```
-
-`nucleum` is the second spelling of the `closure_modifier`; the English reader spelling is `kernel`. The alternative is locale-sealed and singular: at most one modifier may occupy the slot, each reader pack admits only its declared spelling, and stacked spellings such as `free kernel` are rejected as a duplicate modifier. A `kernel` closure requires everything `free` requires — no reference to an enclosing function's local or parameter, while its own parameters, body locals, and module-level items stay legal — plus the device-safe subset used by kernel functions: typed tensors and scalars, glyphs, structured control, and calls to other device functions. Host allocation, I/O, bags, dynamic calls, `⇥` clauses, `iace` throws, and `cape` recovery are rejected in the kernel contract; `redde` returns only the closure's own `→` result. Declaration annotations `@ nucleum` (`@ kernel` in the English reader) are unchanged: they remain the role marker for named functions, and the closure modifier is their expression-form twin.
-
-The body joint keeps the existing closure law: `∴` followed by one expression, or `∴ fac { ... }` (`do` in the English reader); bare `{ ... }` is not a closure body. A kernel closure is usable only as a local immutable binding in its enclosing function and only called there, or invoked immediately in the same expression; it is not a first-class value and cannot escape into a field, list element, return value, or ordinary-function argument. The compiler lowers it to a private synthetic kernel with a stable identity: one launch when its host caller invokes it, direct composition with no surviving device-to-device runtime call when a kernel caller invokes it, and never a public launch entry or ABI row. The modifier does not request fusion; two local kernel closures remain two launches unless a later cross-launch pass fuses them.
-
-```fab
-fixum _ duplica ← (tensor<f32, [8]> x) nucleum ∴ x + x
-fixum _ dup ← duplica(xs)
-```
+The body joint keeps the existing closure law: `∴` followed by one expression, or `∴ fac { ... }` (`do` in the English reader); bare `{ ... }` is not a closure body.
 
 - Return syntax: `→` declares the normal success type. A bodyful function with no `→` is effect-only (`vacuum`) and must not contain `redde`. A statement-bodied closure (`fac { ... }` or legacy block body) must also spell `→ T` before it can use `redde`; expression-bodied closures may infer their result from the expression.
 - Recoverable alternate-exit syntax: `⇥` declares the error-channel type. It can appear after `→ T` or alone on an effect-only failable function or closure. A closure body that uses an escaping `iace` must declare its own `⇥ E`; it cannot inherit the enclosing function's error channel. A local `fac { ... } cape err { ... }` may catch `iace` without an enclosing `⇥`. A failable function call (`→ T ⇥ E`) inside a `⇥`-declaring function propagates to the function's alternate exit without a `fac`/`cape` wrapper, mirroring how bare `↦` conversio and `iace` throws already behave; the call lowers to Rust `?`. A closure must still declare its own `⇥` to propagate a failable call — the enclosing function's error channel does not cross the closure boundary.

@@ -747,7 +747,6 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Expression | `maxima` | maximum reduction (en `max from`) |
 # | Expression | `minima` | minimum reduction (en `min from`) |
 # | Objects | `clausura` | legacy closure |
-# | Objects | `libera` | capture-free closure modifier |
 # | Objects | `ego` | self |
 # | Objects | `finge` | construct variant |
 # | Objects | `iuncta` | tuple type/constructor |
@@ -789,7 +788,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Builtin | `lineam` | line |
 # | Builtin | `scriptum` | write |
 # | Annotation | `fragment` | nucleum fragment |
-# | Annotation | `nucleum` | kernel annotation; kernel closure modifier |
+# | Annotation | `nucleum` | kernel annotation |
 # | Annotation | `radix` | compiler-reserved annotation family |
 # | Annotation | `lane` | `@ radix` compiler-lane directive |
 # | Annotation | `contract` | `@ radix` contract-role mark |
@@ -1018,10 +1017,9 @@ ergo_joint  := 'ergo'
 clausura_joint  := '∴'
 clausura_expr   := compact_clausura_expr | clausura_legacy_expr
 compact_clausura_expr := clausura_signature clausura_joint (expression | fac_block)
-clausura_signature := (clausura_param | '(' clausura_params? ')') closure_modifier? return_clause? alternate_exit_clause?
-closure_modifier := 'libera' | 'nucleum'
+clausura_signature := (clausura_param | '(' clausura_params? ')') return_clause? alternate_exit_clause?
 fac_block := 'fac' block_stmt cape_clause?
-clausura_legacy_expr := 'clausura' clausura_params? closure_modifier? ('→' type_annotation)? (':' expression | block_stmt)
+clausura_legacy_expr := 'clausura' clausura_params? ('→' type_annotation)? (':' expression | block_stmt)
 clausura_params := clausura_param (',' clausura_param)*
 clausura_param  := type_annotation IDENTIFIER
 
