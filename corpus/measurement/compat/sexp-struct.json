@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 300,
-    "analyzable": 376
+    "capable": 302,
+    "analyzable": 378
   },
   "terms": [
     {
@@ -336,8 +336,8 @@
     {
       "term": "fac",
       "rule": "keyword",
-      "capable": 2,
-      "analyzable": 2
+      "capable": 3,
+      "analyzable": 3
     },
     {
       "term": "falsum",
@@ -528,8 +528,8 @@
     {
       "term": "itera",
       "rule": "keyword",
-      "capable": 19,
-      "analyzable": 20
+      "capable": 20,
+      "analyzable": 21
     },
     {
       "term": "iuncta",
