@@ -528,6 +528,7 @@ fn proven_result() -> HirAspectCheckResult {
     HirAspectCheckResult {
         status: HirAspectCheckStatus::Proven,
         evidence: HirAspectEvidence("Build completed successfully.\n".into()),
+        counterexample: Vec::new(),
         backend: HirAspectBackendKind::Lean,
     }
 }
@@ -536,6 +537,7 @@ fn failed_result() -> HirAspectCheckResult {
     HirAspectCheckResult {
         status: HirAspectCheckStatus::Failed,
         evidence: HirAspectEvidence("error: syntax error\n".into()),
+        counterexample: Vec::new(),
         backend: HirAspectBackendKind::Lean,
     }
 }
@@ -1028,6 +1030,7 @@ fn lean_checker_mask_neutrality_seeded_sorry_is_rejected() {
         HirAspectCheckResult {
             status: HirAspectCheckStatus::Proven,
             evidence: HirAspectEvidence("lake build succeeded".into()),
+            counterexample: Vec::new(),
             backend: HirAspectBackendKind::Lean,
         },
         &AxiomVerdict::Allowed,

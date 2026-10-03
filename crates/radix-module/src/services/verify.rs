@@ -1,8 +1,9 @@
 //! Typed verify service. Printing and process exit live in `radix-cli`.
 
 use crate::aspect::{
-    HirAspectBackendKind, HirAspectCoverageReport, HirAspectCoverageStatus, HirAspectTlaModule, HirAspectVerifier,
-    TlaAspectCheckerConfig, TlaAspectVerifier, emit_tla_modules, report_hir_aspects, summarize_hir_aspect_coverage,
+    HirAspectBackendKind, HirAspectCheckResult, HirAspectCheckStatus, HirAspectCoverageReport, HirAspectCoverageStatus,
+    HirAspectEvidence, HirAspectTlaModule, HirAspectVerifier, TlaAspectCheckerConfig, TlaAspectVerifier,
+    emit_tla_modules, report_hir_aspects, summarize_hir_aspect_coverage,
 };
 use crate::diagnostics::Diagnostic;
 use crate::driver::{AnalyzedModule, Config, Session};
@@ -37,41 +38,10 @@ fn coverage_for_analysis(
     let aspect_report = report_hir_aspects(&analysis.hir, &analysis.types);
     let modules = emit_tla_modules(&aspect_report);
     let check_results = match checker_config {
-        Some(config) => {
-            let verifier = TlaAspectVerifier::new(config);
-            let verifier_results = verifier.verify(&aspect_report);
-            modules
-                .iter()
-                .zip(verifier_results)
-                .map(|(module, vr)| {
-                    let (summary, counterexample) =
-                        crate::aspect::tla_checker::split_evidence_with_counterexample(&vr.evidence.0);
-                    crate::aspect::tla_checker::HirAspectCheckResult {
-                        module_name: module.name.clone(),
-                        status: map_verifier_status(vr.status),
-                        summary,
-                        counterexample,
-                    }
-                })
-                .collect()
-        }
+        Some(config) => TlaAspectVerifier::new(config).verify(&aspect_report),
         None => checker_unavailable_results(&modules),
     };
     summarize_hir_aspect_coverage(&aspect_report, &check_results, HirAspectBackendKind::Tla)
-}
-
-fn map_verifier_status(
-    status: crate::aspect::HirAspectCheckStatus,
-) -> crate::aspect::tla_checker::HirAspectCheckStatus {
-    use crate::aspect::HirAspectCheckStatus as New;
-    use crate::aspect::tla_checker::HirAspectCheckStatus as Legacy;
-    match status {
-        New::Proven => Legacy::Passed,
-        New::Failed => Legacy::Failed,
-        New::Error => Legacy::CheckerError,
-        New::Timeout => Legacy::CheckerError,
-        New::ToolchainMissing => Legacy::CheckerUnavailable,
-    }
 }
 
 #[must_use]
@@ -83,13 +53,15 @@ fn coverage_proves_success(coverage: &HirAspectCoverageReport) -> bool {
             .all(|entry| entry.status == HirAspectCoverageStatus::Proven)
 }
 
-fn checker_unavailable_results(
-    modules: &[HirAspectTlaModule],
-) -> Vec<crate::aspect::tla_checker::HirAspectCheckResult> {
+#[must_use]
+fn checker_unavailable_results(modules: &[HirAspectTlaModule]) -> Vec<HirAspectCheckResult> {
     modules
         .iter()
-        .map(|module| {
-            crate::aspect::tla_checker::HirAspectCheckResult::checker_unavailable(&module.name, TLC_JAR_UNSET_SUMMARY)
+        .map(|_| HirAspectCheckResult {
+            status: HirAspectCheckStatus::ToolchainMissing,
+            evidence: HirAspectEvidence(TLC_JAR_UNSET_SUMMARY.to_owned()),
+            counterexample: Vec::new(),
+            backend: HirAspectBackendKind::Tla,
         })
         .collect()
 }

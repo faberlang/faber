@@ -3,7 +3,8 @@
 //! stdout normalization (pass, fail, error, timeout); env-path
 //! canonicalization.
 
-use super::{HirAspectCheckStatus, HirAspectTlaModule, TlaAspectChecker, TlaAspectCheckerConfig, check_tla_modules};
+use super::{HirAspectTlaModule, TlaAspectChecker, TlaAspectCheckerConfig, check_tla_modules};
+use crate::aspect::verifier::HirAspectCheckStatus;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
@@ -30,7 +31,7 @@ fn hir_aspect_checker_reports_missing_tlc_jar_without_claiming_success() {
     let results = check_tla_modules(config, &[module]);
 
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0].status, HirAspectCheckStatus::CheckerUnavailable);
+    assert_eq!(results[0].status, HirAspectCheckStatus::ToolchainMissing);
     assert!(work_dir.join("FaberAspectDiscerneOmnia_Hir7.tla").is_file());
     assert!(work_dir.join("FaberAspectDiscerneOmnia_Hir7.cfg").is_file());
 }
@@ -50,22 +51,21 @@ fn hir_aspect_checker_reports_missing_java_without_claiming_success() {
     let results = check_tla_modules(config, &[module]);
 
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0].status, HirAspectCheckStatus::CheckerUnavailable);
-    assert_eq!(results[0].summary, "java executable is unavailable");
+    assert_eq!(results[0].status, HirAspectCheckStatus::ToolchainMissing);
+    assert_eq!(results[0].evidence.0, "java executable is unavailable");
 }
 
 #[test]
 fn hir_aspect_checker_normalizes_tlc_success() {
-    let result = super::normalize_tlc_output("Spec", true, "TLC2 Version 2.19\nNo error has been found.\n", "");
+    let result = super::normalize_tlc_output(true, "TLC2 Version 2.19\nNo error has been found.\n", "");
 
-    assert_eq!(result.status, HirAspectCheckStatus::Passed);
+    assert_eq!(result.status, HirAspectCheckStatus::Proven);
     assert!(result.counterexample.is_empty());
 }
 
 #[test]
 fn hir_aspect_checker_normalizes_tlc_failure_trace() {
     let result = super::normalize_tlc_output(
-        "Spec",
         false,
         "Error: Invariant Totality is violated.\n\
 The following behavior constitutes a counter-example:\n\
@@ -74,7 +74,7 @@ State 1: <Initial predicate>\n",
     );
 
     assert_eq!(result.status, HirAspectCheckStatus::Failed);
-    assert_eq!(result.summary, "Error: Invariant Totality is violated.");
+    assert_eq!(result.evidence.0, "Error: Invariant Totality is violated.");
     assert_eq!(
         result.counterexample,
         vec![
@@ -86,31 +86,27 @@ State 1: <Initial predicate>\n",
 
 #[test]
 fn hir_aspect_checker_does_not_pass_nonzero_tlc_success_marker() {
-    let result = super::normalize_tlc_output("Spec", false, "No error has been found.\n", "");
+    let result = super::normalize_tlc_output(false, "No error has been found.\n", "");
 
-    assert_eq!(result.status, HirAspectCheckStatus::CheckerError);
-    assert_eq!(result.summary, "No error has been found.");
+    assert_eq!(result.status, HirAspectCheckStatus::Error);
+    assert_eq!(result.evidence.0, "No error has been found.");
 }
 
 #[test]
 fn hir_aspect_checker_prefers_failure_markers_on_nonzero_tlc_exit() {
-    let result = super::normalize_tlc_output(
-        "Spec",
-        false,
-        "No error has been found.\nError: Invariant Totality is violated.\n",
-        "",
-    );
+    let result =
+        super::normalize_tlc_output(false, "No error has been found.\nError: Invariant Totality is violated.\n", "");
 
     assert_eq!(result.status, HirAspectCheckStatus::Failed);
-    assert_eq!(result.summary, "Error: Invariant Totality is violated.");
+    assert_eq!(result.evidence.0, "Error: Invariant Totality is violated.");
 }
 
 #[test]
 fn hir_aspect_checker_normalizes_unknown_tlc_output_as_error() {
-    let result = super::normalize_tlc_output("Spec", false, "Unexpected TLC output", "");
+    let result = super::normalize_tlc_output(false, "Unexpected TLC output", "");
 
-    assert_eq!(result.status, HirAspectCheckStatus::CheckerError);
-    assert_eq!(result.summary, "Unexpected TLC output");
+    assert_eq!(result.status, HirAspectCheckStatus::Error);
+    assert_eq!(result.evidence.0, "Unexpected TLC output");
 }
 
 #[test]
@@ -221,8 +217,8 @@ fn hir_aspect_checker_rejects_invalid_module_names() {
 
     let results = checker.check_modules(&[module]);
 
-    assert_eq!(results[0].status, HirAspectCheckStatus::CheckerError);
-    assert_eq!(results[0].summary, "invalid TLA module name");
+    assert_eq!(results[0].status, HirAspectCheckStatus::Error);
+    assert_eq!(results[0].evidence.0, "invalid TLA module name");
     assert!(
         std::fs::read_dir(&work_dir).is_ok_and(|mut entries| entries.next().is_none()),
         "checker must not create files for invalid module names"
@@ -251,84 +247,44 @@ Totality == Variants \\subseteq Covered\n\
 
     let results = check_tla_modules(config, &[module]);
 
-    assert_eq!(results[0].status, HirAspectCheckStatus::Passed);
-}
-
-#[test]
-fn hir_aspect_checker_verifier_bridge_preserves_counterexample() {
-    let legacy = super::HirAspectCheckResult::failed(
-        "Spec",
-        "Error: Invariant Totality is violated.",
-        vec![
-            "The following behavior constitutes a counter-example:".to_owned(),
-            "State 1: <Initial predicate>".to_owned(),
-        ],
-    );
-
-    let verifier_result = super::map_legacy_result(legacy);
-
-    assert_eq!(verifier_result.status, crate::aspect::HirAspectCheckStatus::Failed);
-    let (summary, counterexample) = super::split_evidence_with_counterexample(&verifier_result.evidence.0);
-    assert_eq!(summary, "Error: Invariant Totality is violated.");
-    assert_eq!(
-        counterexample,
-        vec![
-            "The following behavior constitutes a counter-example:".to_owned(),
-            "State 1: <Initial predicate>".to_owned(),
-        ]
-    );
-}
-
-#[test]
-fn hir_aspect_checker_verifier_bridge_preserves_plain_summary_without_counterexample() {
-    let legacy = super::HirAspectCheckResult::passed("Spec", "TLC completed with no error");
-
-    let verifier_result = super::map_legacy_result(legacy);
-
-    assert_eq!(verifier_result.status, crate::aspect::HirAspectCheckStatus::Proven);
-    let (summary, counterexample) = super::split_evidence_with_counterexample(&verifier_result.evidence.0);
-    assert_eq!(summary, "TLC completed with no error");
-    assert!(counterexample.is_empty());
+    assert_eq!(results[0].status, HirAspectCheckStatus::Proven);
 }
 
 #[test]
 fn hir_aspect_checker_does_not_flip_success_on_loose_invariant_substring() {
     let result = super::normalize_tlc_output(
-        "Spec",
         true,
         "TLC2 Version 2.19\nInvariant Totality is being checked\nNo error has been found.\n",
         "",
     );
 
-    assert_eq!(result.status, HirAspectCheckStatus::Passed);
+    assert_eq!(result.status, HirAspectCheckStatus::Proven);
     assert!(result.counterexample.is_empty());
 }
 
 #[test]
 fn hir_aspect_checker_reports_toolchain_error_without_violation_markers_as_error() {
-    let result = super::normalize_tlc_output("Spec", false, "Error: Could not find or load main class tlc2.TLC\n", "");
+    let result = super::normalize_tlc_output(false, "Error: Could not find or load main class tlc2.TLC\n", "");
 
-    assert_eq!(result.status, HirAspectCheckStatus::CheckerError);
-    assert_eq!(result.summary, "Error: Could not find or load main class tlc2.TLC");
+    assert_eq!(result.status, HirAspectCheckStatus::Error);
+    assert_eq!(result.evidence.0, "Error: Could not find or load main class tlc2.TLC");
 }
 
 #[test]
 fn hir_aspect_checker_reports_stack_trace_quoting_invariant_as_error() {
     let result = super::normalize_tlc_output(
-        "Spec",
         false,
         "java.lang.Error: Invariant Totality could not be evaluated\n\tat tlc2.TLC.main(TLC.java)\n",
         "",
     );
 
-    assert_eq!(result.status, HirAspectCheckStatus::CheckerError);
-    assert_eq!(result.summary, "java.lang.Error: Invariant Totality could not be evaluated");
+    assert_eq!(result.status, HirAspectCheckStatus::Error);
+    assert_eq!(result.evidence.0, "java.lang.Error: Invariant Totality could not be evaluated");
 }
 
 #[test]
 fn hir_aspect_checker_failure_trace_without_error_line_still_failed() {
     let result = super::normalize_tlc_output(
-        "Spec",
         true,
         "The following behavior constitutes a counter-example:\nState 1: <Initial predicate>\n",
         "",
