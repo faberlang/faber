@@ -30,6 +30,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RADIX = Path(os.environ.get("RADIX_ROOT", ROOT.parent / "radix"))
 COMPAT = RADIX / "corpus" / "measurement" / "compat"
 CONVERSIO = RADIX / "corpus" / "measurement" / "conversio"
+CONVERSIO_DECIMAL = RADIX / "corpus" / "measurement" / "conversio-decimal"
 DEFAULT_OUT = Path(os.environ.get("MATRICES_OUT", ROOT / "docs"))
 
 EBNF_OVERRIDES = ROOT / "scripta" / "ebnf-matrix-overrides.toml"
@@ -49,6 +50,7 @@ MIR_TARGETS = [
 
 CONV_HIR_TARGETS = ["rust", "ts", "go", "faber"]
 CONV_MIR_TARGETS = ["llvm-text", "wasm-text", "wasm", "wgsl-text", "sexp-struct", "sexp"]
+CONV_DECIMAL_TARGETS = CONV_HIR_TARGETS + CONV_MIR_TARGETS
 
 # Family universe in stable matrix order (matches ConversioTypeFamily::ALL).
 FAMILIES = [
@@ -263,6 +265,16 @@ def load_conversio(targets: list[str]) -> dict[str, dict]:
     return data
 
 
+def load_conversio_decimal() -> dict[str, dict]:
+    data: dict[str, dict] = {}
+    for target in CONV_DECIMAL_TARGETS:
+        path = CONVERSIO_DECIMAL / f"{target}.json"
+        if not path.exists():
+            raise SystemExit(f"error: missing measurement JSON {path}")
+        data[target] = json.loads(path.read_text(encoding="utf-8"))
+    return data
+
+
 def load_disagreements() -> list[dict]:
     path = CONVERSIO / "disagreements.json"
     if not path.exists():
@@ -294,6 +306,7 @@ def render_conversio_matrix() -> list[str]:
     hir = load_conversio(CONV_HIR_TARGETS)
     mir = load_conversio(CONV_MIR_TARGETS)
     disagreements = load_disagreements()
+    decimal = load_conversio_decimal()
 
     total = len(FAMILIES) * len(FAMILIES)
     backed = sum(1 for c in hir[CONV_HIR_TARGETS[0]]["cells"] if c["measured"])
@@ -467,6 +480,42 @@ def render_conversio_matrix() -> list[str]:
         "- `tensor ↦ tensor` reports dedicated when element widths unify; shape "
         "or element mismatch is a conditional rejection, not a cell verdict."
     )
+    lines.append("")
+    lines.append("## Decimal-width conversions")
+    lines.append("")
+    lines.append(
+        "These measured decimal-specific conversions are emitted separately "
+        "from the general type-family matrix. Data comes from "
+        "`radix/corpus/measurement/conversio-decimal/*.json`."
+    )
+    lines.append("")
+    decimal_cells = {
+        target: {
+            (cell["src"], cell["tgt"]): cell
+            for cell in decimal[target]["cells"]
+        }
+        for target in CONV_DECIMAL_TARGETS
+    }
+    decimal_pairs = sorted(
+        {
+            pair
+            for target_cells in decimal_cells.values()
+            for pair in target_cells
+        }
+    )
+    lines.append(
+        "| conversion | " + " | ".join(f"`{target}`" for target in CONV_DECIMAL_TARGETS) + " |"
+    )
+    lines.append("|---|" + "---|" * len(CONV_DECIMAL_TARGETS))
+    for src, tgt in decimal_pairs:
+        row = []
+        for target in CONV_DECIMAL_TARGETS:
+            cell = decimal_cells[target].get((src, tgt), {})
+            glyph_ = TIER_GLYPH.get(cell.get("tier", "not-emitted"), "?")
+            if cell.get("measured"):
+                glyph_ = f"**{glyph_}**"
+            row.append(glyph_)
+        lines.append(f"| `{src} ↦ {tgt}` | " + " | ".join(row) + " |")
     lines.append("")
     return lines
 

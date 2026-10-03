@@ -1511,3 +1511,18 @@ Rerun whenever the conversio codegen, semantic `↦` policy, or MIR lowering cha
 - Each aggregate family (`tensor`, `vector`, `matrix`, `sparsa`, `intervallum`) collapses shape/element variance into one cell.
 - `valor ↦ fractus<f32>` (sized) is semantically rejected; `valor ↦ fractus` (unsized) is dedicated. The `fractus` family cell reports the unconditional (unsized) verdict.
 - `tensor ↦ tensor` reports dedicated when element widths unify; shape or element mismatch is a conditional rejection, not a cell verdict.
+
+## Decimal-width conversions
+
+These measured decimal-specific conversions are emitted separately from the general type-family matrix. Data comes from `radix/corpus/measurement/conversio-decimal/*.json`.
+
+| conversion | `rust` | `ts` | `go` | `faber` | `llvm-text` | `wasm-text` | `wasm` | `wgsl-text` | `sexp-struct` | `sexp` |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `d64 ↦ fractus` | **✓** | **✓** | **✓** | **✓** | **—** | **—** | **—** | **—** | **✓** | **✓** |
+| `d64 ↦ i64` | **✓** | **✓** | **✓** | **✓** | **—** | **—** | **—** | **—** | **✓** | **✓** |
+| `d64 ↦ textus` | **✓** | **✓** | **✓** | **✓** | **—** | **—** | **—** | **—** | **✓** | **✓** |
+| `d64 ↦ u32` | **✕** | **✕** | **✕** | **✕** | **✕** | **✕** | **✕** | **✕** | **✕** | **✕** |
+| `fractus ↦ d64` | **✓** | **✓** | **✓** | **✓** | **—** | **—** | **—** | **—** | **✓** | **✓** |
+| `i64 ↦ d64` | **✓** | **✓** | **✓** | **✓** | **—** | **—** | **—** | **—** | **✓** | **✓** |
+| `textus ↦ d64` | **✕** | **✕** | **✕** | **✕** | **✕** | **✕** | **✕** | **✕** | **✕** | **✕** |
+| `u32 ↦ d64` | **✓** | **✓** | **✓** | **✓** | **—** | **—** | **—** | **—** | **✓** | **✓** |
