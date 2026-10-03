@@ -1,7 +1,5 @@
-//! Numeric tensor / vector / matrix `+` is the live `addita` / `.added()` op.
-//!
-//! Glyph/method identity: same-shape and tensor-broadcast `+` typecheck as
-//! `addita`; mixed `tensor + textus` stays `string_operands_required`.
+//! Numeric tensor `+` requires exact shapes; unretired tensor methods
+//! retain their separate broadcast contract. Vector and matrix rules are unchanged.
 
 use radix_diagnostics::DiagnosticArg;
 
@@ -58,15 +56,15 @@ fn matrix_plus_same_shape_typechecks() {
 }
 
 #[test]
-fn tensor_plus_broadcast_unifies_result_shape() {
-    // Same case as `tensor_arithmetic_broadcast_unifies_result_shape`.
-    accepts(
+fn tensor_plus_implicit_broadcast_rejects() {
+    rejects_with_issue(
         r"incipit {
   fixum tf32[2] a ← vacua
   fixum tf32[2, 1] b ← vacua
   fixum tf32[2, 2] c ← a + b
   nota c.longitudo()
 }",
+        "incompatible_tensor_index",
     );
 }
 

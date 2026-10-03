@@ -1833,13 +1833,10 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// Numeric `+`/`-` on tensor / vector / matrix: live `addita` / `subtrahe`.
+    /// Numeric `+`/`-` on tensor / vector / matrix require equal shapes.
     ///
-    /// One arm covers the three families for both glyphs. Tensor broadcast is
-    /// `addita`'s `Figura'` (`constrain_elementwise_result_shape`); minus
-    /// shares that exact contract. Vector/matrix follow the live same-shape
-    /// contracts. `None` means this is not an addita-family pair — scalar
-    /// arithmetic continues.
+    /// Tensor glyphs do not inherit the unretired methods' broadcast contract.
+    /// `None` leaves scalar arithmetic and scalar lifting to their own paths.
     fn check_addita_plus(
         &mut self,
         lhs: TypeId,
@@ -1857,9 +1854,9 @@ impl TypeChecker<'_> {
             self.types.get(lhs_resolved).clone(),
             self.types.get(rhs_resolved).clone(),
         ) {
-            (Type::Tensor(lhs_elem, _), Type::Tensor(rhs_elem, _)) => Some(
-                self.check_tensor_addita_plus(lhs_resolved, rhs_resolved, lhs_elem, rhs_elem, span),
-            ),
+            (Type::Tensor(lhs_elem, lhs_shape), Type::Tensor(rhs_elem, rhs_shape)) => {
+                Some(self.check_tensor_addita_plus(lhs_shape, rhs_shape, lhs_elem, rhs_elem, span))
+            }
             (Type::Vector(lhs_elem, _), Type::Vector(rhs_elem, _)) => {
                 Some(self.check_same_shape_addita_plus(
                     lhs_resolved,
@@ -1886,8 +1883,8 @@ impl TypeChecker<'_> {
 
     fn check_tensor_addita_plus(
         &mut self,
-        lhs_ty: TypeId,
-        rhs_ty: TypeId,
+        lhs_shape: IndexId,
+        rhs_shape: IndexId,
         lhs_elem: TypeId,
         rhs_elem: TypeId,
         span: radix_lexer::Span,
@@ -1904,19 +1901,13 @@ impl TypeChecker<'_> {
         if self.is_error(elem) {
             return self.error_type;
         }
-        let result = super::tensor_index::tensor_with_fresh_shape(self, elem);
-        let result_shape = match self.types.get(result) {
-            Type::Tensor(_, shape) => *shape,
-            _ => fresh_tensor_result_missing_shape(),
-        };
-        super::tensor_index::constrain_elementwise_result_shape(
-            self,
-            lhs_ty,
-            rhs_ty,
-            result_shape,
-            span,
-        );
-        result
+        let before = self.errors.len();
+        self.constrain_index_equal(lhs_shape, rhs_shape, span);
+        if self.errors.len() != before {
+            return self.error_type;
+        }
+        let shape = self.resolve_index(lhs_shape);
+        self.types.intern(Type::Tensor(elem, shape))
     }
 
     fn check_same_shape_addita_plus(
@@ -1991,11 +1982,8 @@ impl TypeChecker<'_> {
                 let Some(elem) = self.glyph_tensor_element(op, lhs_elem, rhs_elem, lhs.span) else {
                     return self.error_type;
                 };
-                // WHY: shape-generics Phase 2 — the tensor arm consumes the
-                // same-shape/broadcast contract instead of requiring literal
-                // shapes. Symbolic tuple shapes and whole-shape params merge
-                // through `unify_broadcast`; shapes that cannot merge reject
-                // with the glyph mismatch diagnostic.
+                // Symbolic tuple shapes and whole-shape params unify exactly;
+                // only an explicit expanded view may repair a shape mismatch.
                 let result = super::tensor_index::tensor_with_fresh_shape(self, elem);
                 let result_shape = match self.types.get(result) {
                     Type::Tensor(_, shape) => *shape,
@@ -2004,7 +1992,7 @@ impl TypeChecker<'_> {
                 let lhs_shape = self.resolve_index(lhs_shape);
                 let rhs_shape = self.resolve_index(rhs_shape);
                 let mut unifier = self.index_infer.unifier(self.types);
-                match unifier.unify_broadcast(lhs_shape, rhs_shape) {
+                match unifier.unify(lhs_shape, rhs_shape) {
                     Ok(merged) => {
                         self.constrain_index_equal(result_shape, merged, lhs.span);
                         result

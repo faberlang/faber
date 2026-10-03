@@ -1,8 +1,5 @@
-//! Numeric tensor / vector / matrix `-` is the live `subtrahe` / `.subtract()` op.
-//!
-//! Glyph/method identity: same-shape and tensor-broadcast `-` typecheck as
-//! `subtrahe`, mirroring `+` / `addita`. Mixed `tensor - textus` stays
-//! `numeric_operands_required` (minus has no string path).
+//! Numeric tensor `-` requires exact shapes; unretired tensor methods
+//! retain their separate broadcast contract. Vector and matrix rules are unchanged.
 
 use radix_diagnostics::DiagnosticArg;
 
@@ -68,14 +65,15 @@ fn matrix_minus_same_shape_typechecks() {
 }
 
 #[test]
-fn tensor_minus_broadcast_unifies_result_shape() {
-    accepts(
+fn tensor_minus_implicit_broadcast_rejects() {
+    rejects_with_issue(
         r"incipit {
   fixum tf32[2] a ← vacua
   fixum tf32[2, 1] b ← vacua
   fixum tf32[2, 2] c ← a - b
   nota c.longitudo()
 }",
+        "incompatible_tensor_index",
     );
 }
 
