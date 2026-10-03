@@ -8,6 +8,25 @@ fn all_rows() -> impl Iterator<Item = &'static (&'static str, &'static str)> {
 }
 
 #[test]
+fn genus_field_policy_family_is_a_closed_two_row_contract() {
+    // The genus field-layout contract consumed by `valor_get_genus` callers:
+    // two codes, derived from one declaration list. The LLVM emitter and the
+    // host descriptor-table callers read these codes by name.
+    use super::{
+        GENUS_FIELD_POLICY_DEFAULTABLE, GENUS_FIELD_POLICY_MANDATORY, GENUS_FIELD_POLICY_ROWS,
+    };
+    assert_eq!(
+        GENUS_FIELD_POLICY_ROWS,
+        &[
+            ("GENUS_FIELD_POLICY_MANDATORY", 0u32),
+            ("GENUS_FIELD_POLICY_DEFAULTABLE", 1u32)
+        ]
+    );
+    assert_eq!(u32::from(GENUS_FIELD_POLICY_MANDATORY), 0);
+    assert_eq!(u32::from(GENUS_FIELD_POLICY_DEFAULTABLE), 1);
+}
+
+#[test]
 fn symbol_names_and_values_are_unique() {
     let mut by_name: HashMap<&str, &str> = HashMap::new();
     let mut by_value: HashMap<&str, &str> = HashMap::new();
