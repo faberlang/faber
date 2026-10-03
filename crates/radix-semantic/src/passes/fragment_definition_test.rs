@@ -90,7 +90,7 @@ fn accepts_tensor_ops_supported_in_device_mir() {
         r"
 @ nucleum fragment
 functio combine(tf32[2, 2] x, tf32[2, 2] y) → tf32[2, 2] {
-    redde x.addita(y).multiplica(y)
+    redde (x + y) ⊙ y
 }
 ",
     );
@@ -103,13 +103,24 @@ functio combine(tf32[2, 2] x, tf32[2, 2] y) → tf32[2, 2] {
         .summaries
         .get(first_fragment_def(&report))
         .expect("summary");
+    // Glyphs are binary expressions, not receiver intrinsic calls. Their
+    // three operand reads must retain source spans without invented effects.
+    assert_eq!(
+        summary
+            .effects
+            .iter()
+            .map(|effect| effect.kind)
+            .collect::<Vec<_>>(),
+        vec![DeviceEffectKind::ArgumentRead; 3],
+        "expected only glyph operand reads, got {:?}",
+        summary.effects
+    );
     assert!(
         summary
             .effects
             .iter()
-            .any(|effect| effect.kind == DeviceEffectKind::DeviceIntrinsic),
-        "expected device-intrinsic spans, got {:?}",
-        summary.effects
+            .all(|effect| effect.span != radix_lexer::Span::default()),
+        "glyph operand reads must retain source spans"
     );
 }
 

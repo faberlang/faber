@@ -81,11 +81,11 @@ fn size_param_in_arithmetic_still_rejects() {
 
 #[test]
 fn size_param_at_non_index_intrinsic_slot_still_rejects() {
-    // `addita` takes a TensorPeer operand, not an index: the size parameter
+    // Live `divisio` takes a TensorPeer operand, not an index: the size parameter
     // keeps the not-a-value rejection.
     rejects_with_issue(
         r"functio bad<T, magnitudo d>(tensor<T, [8, d]> input) → tensor<T, [8, d]> {
-    redde input.addita(d)
+    redde input.divisio(d)
 }",
         "name_not_value",
     );

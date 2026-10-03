@@ -42,7 +42,7 @@ fn tensor_textus_construction_and_accipe_typecheck() {
 }
 
 #[test]
-fn tensor_textus_addita_rejects() {
+fn tensor_textus_plus_rejects() {
     rejects_with_issue(
         &compile(
             r#"incipit {
@@ -50,7 +50,7 @@ fn tensor_textus_addita_rejects() {
   fixum tensor<textus, _> seed ← vacua
   fixum tensor<textus, [3]> left ← seed.strue(flat, [3])
   fixum tensor<textus, [3]> right ← seed.strue(flat, [3])
-  fixum _ sum ← left.addita(right)
+  fixum _ sum ← left + right
 }"#,
         ),
         "tensor_arithmetic_numeric_element_required",

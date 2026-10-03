@@ -228,54 +228,54 @@ fn tensor_expande_rejects_incompatible_non_singleton_axis() {
     );
 }
 
-// --- tensor arithmetic family (Commit A: elementwise broadcast) ---
+// --- tensor arithmetic glyphs (exact shape, explicit expansion) ---
 
 #[test]
-fn tensor_arithmetic_addita_same_shape_typechecks() {
+fn tensor_arithmetic_plus_same_shape_typechecks() {
     accepts(
         r"incipit {
   fixum tf32[2] a ← vacua
   fixum tf32[2] b ← vacua
-  fixum tf32[2] c ← a.addita(b)
+  fixum tf32[2] c ← a + b
   nota c.longitudo()
 }",
     );
 }
 
 #[test]
-fn tensor_arithmetic_subtrahe_multiplica_typecheck() {
+fn tensor_arithmetic_minus_hadamard_typecheck() {
     accepts(
         r"incipit {
   fixum tf32[2] a ← vacua
   fixum tf32[2] b ← vacua
-  fixum tf32[2] c ← a.subtrahe(b)
-  fixum tf32[2] d ← c.multiplica(b)
+  fixum tf32[2] c ← a - b
+  fixum tf32[2] d ← c ⊙ b
   nota d.longitudo()
 }",
     );
 }
 
 #[test]
-fn tensor_arithmetic_broadcast_unifies_result_shape() {
-    // [2] + [2, 1] must resolve to a [2, 2] result shape via broadcast unification.
+fn tensor_arithmetic_expanded_operands_preserve_result_shape() {
+    // Expand both [2] and [2, 1] explicitly before exact-shape addition.
     accepts(
         r"incipit {
   fixum tf32[2] a ← vacua
   fixum tf32[2, 1] b ← vacua
-  fixum tf32[2, 2] c ← a.addita(b)
+  fixum tf32[2, 2] c ← a.expande([2, 2]) + b.expande([2, 2])
   nota c.longitudo()
 }",
     );
 }
 
 #[test]
-fn tensor_arithmetic_broadcast_incompatible_shape_rejects() {
-    // [3] + [2] has no broadcast merge; result shape must be rejected.
+fn tensor_arithmetic_incompatible_expansion_rejects() {
+    // [2] cannot expand to [3]; the attempted shape repair must reject.
     rejects_with_issue(
         r"incipit {
   fixum tf32[3] a ← vacua
   fixum tf32[2] b ← vacua
-  fixum tf32[3] c ← a.addita(b)
+  fixum tf32[3] c ← a + b.expande([3])
   nota c.longitudo()
 }",
         "incompatible_tensor_index",
@@ -288,7 +288,7 @@ fn tensor_arithmetic_textus_element_rejects() {
         r"incipit {
   fixum tensor<textus, [2]> a ← vacua
   fixum tensor<textus, [2]> b ← vacua
-  fixum tensor<textus, [2]> c ← a.addita(b)
+  fixum tensor<textus, [2]> c ← a + b
   nota c.longitudo()
 }",
         "tensor_arithmetic_numeric_element_required",
@@ -296,16 +296,17 @@ fn tensor_arithmetic_textus_element_rejects() {
 }
 
 #[test]
-fn tensor_arithmetic_mixed_width_element_rejects() {
-    // numerus<i32> + numerus<i64> is a ↦ problem, not silent promotion.
+fn tensor_arithmetic_mixed_width_result_cannot_narrow() {
+    // Glyph addition joins i32 and i64 elements; storing the result in i32
+    // still requires an explicit conversion rather than silent narrowing.
     rejects_with_issue(
         r"incipit {
   fixum tensor<i32, [2]> a ← vacua
   fixum tensor<i64, [2]> b ← vacua
-  fixum tensor<i32, [2]> c ← a.addita(b)
+  fixum tensor<i32, [2]> c ← a + b
   nota c.longitudo()
 }",
-        "argument_type_mismatch",
+        "initializer_annotation_mismatch",
     );
 }
 
@@ -567,10 +568,11 @@ nota "bad batched transpose body"
 
 #[test]
 fn tensor_broadcast_symbolic_stretches_size_one_dim() {
-    // [B,1] + [B,D] → [B,D] via broadcast merge with Param dims.
+    // Expand [B,1] to the grid's [B,D] explicitly before exact-shape addition.
+    // Size params are type witnesses, not runtime values: query the grid shape.
     accepts(
         r#"functio bias_add_sym<magnitudo B, magnitudo D>(tensor<f32, [B, D]> grid, tensor<f32, [B, 1]> bias) → tensor<f32, [B, D]> {
-    redde grid.addita(bias)
+    redde grid + bias.expande(grid.magnitudines())
 }
 
 nota "symbolic broadcast body ok"
@@ -580,10 +582,10 @@ nota "symbolic broadcast body ok"
 
 #[test]
 fn tensor_elementwise_symbolic_same_param_shapes() {
-    // Same-param elementwise: [B,D] multiplica [B,D] → [B,D].
+    // Same-param elementwise: [B,D] ⊙ [B,D] → [B,D].
     accepts(
         r#"functio scale_sym<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32, [B, D]> b) → tensor<f32, [B, D]> {
-    redde a.multiplica(b)
+    redde a ⊙ b
 }
 
 nota "same-param elementwise body ok"
@@ -900,13 +902,13 @@ fn vector_bracket_index_requires_integer() {
 #[test]
 fn batched_masked_softmax_decode_shape_typechecks() {
     // Decode: rectangular scores [5,3,1,76] + declared-length additive
-    // mask [1,76] (broadcast over heads), softmax over the last axis —
+    // mask [1,76] (explicitly expanded over heads), softmax over the last axis —
     // the last two axes are query_seq × key_seq, never required square.
     accepts(
         r"incipit {
     fixum tensor<f32, [5, 3, 1, 76]> scores ← vacua
     fixum tensor<f32, [1, 76]> length_mask ← vacua
-    fixum tensor<f32, [5, 3, 1, 76]> probabilities ← (scores + length_mask).activatio_softmax()
+    fixum tensor<f32, [5, 3, 1, 76]> probabilities ← (scores + length_mask.expande([5, 3, 1, 76])).activatio_softmax()
     nota probabilities.longitudo()
 }",
     );
@@ -914,12 +916,12 @@ fn batched_masked_softmax_decode_shape_typechecks() {
 
 #[test]
 fn batched_masked_softmax_prefill_shape_typechecks() {
-    // Prefill: [5,3,36,36] scores + causal additive mask [36,36].
+    // Prefill: explicitly expand causal mask [36,36] to scores [5,3,36,36].
     accepts(
         r"incipit {
     fixum tensor<f32, [5, 3, 36, 36]> scores ← vacua
     fixum tensor<f32, [36, 36]> causal_mask ← vacua
-    fixum tensor<f32, [5, 3, 36, 36]> probabilities ← (scores + causal_mask).activatio_softmax()
+    fixum tensor<f32, [5, 3, 36, 36]> probabilities ← (scores + causal_mask.expande([5, 3, 36, 36])).activatio_softmax()
     nota probabilities.longitudo()
 }",
     );
@@ -928,12 +930,12 @@ fn batched_masked_softmax_prefill_shape_typechecks() {
 #[test]
 fn batched_masked_softmax_non_broadcast_mask_rejects() {
     // A mask dim that contradicts its aligned score dim (38 against 76)
-    // is not a broadcast — the merged shape constraint fails typed.
+    // cannot expand to the score shape — the expansion fails typed.
     rejects_with_issue(
         r"incipit {
     fixum tensor<f32, [5, 3, 1, 76]> scores ← vacua
     fixum tensor<f32, [2, 38]> bad_mask ← vacua
-    fixum tensor<f32, [5, 3, 1, 76]> probabilities ← (scores + bad_mask).activatio_softmax()
+    fixum tensor<f32, [5, 3, 1, 76]> probabilities ← (scores + bad_mask.expande([5, 3, 1, 76])).activatio_softmax()
     nota probabilities.longitudo()
 }",
         "incompatible_tensor_index",

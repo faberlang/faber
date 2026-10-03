@@ -156,8 +156,8 @@ fn shape_param_binds_from_argument_shape_at_call_site() {
     accepts(
         r"functio sgd_step<magnitudo Figura>(tensor<f32, Figura> param, tensor<f32, Figura> grad, f32 lr) → tensor<f32, Figura> {
     fixum tensor<f32, Figura> lr_fill ← param.reple(lr)
-    fixum tensor<f32, Figura> scaled ← grad.multiplica(lr_fill)
-    redde param.subtrahe(scaled)
+    fixum tensor<f32, Figura> scaled ← grad ⊙ lr_fill
+    redde param - scaled
 }
 
 incipit {
@@ -194,8 +194,8 @@ fn shape_param_binds_rank_agnostic_across_concrete_ranks() {
     accepts(
         r"functio sgd_step<magnitudo Figura>(tensor<f32, Figura> param, tensor<f32, Figura> grad, f32 lr) → tensor<f32, Figura> {
     fixum tensor<f32, Figura> lr_fill ← param.reple(lr)
-    fixum tensor<f32, Figura> scaled ← grad.multiplica(lr_fill)
-    redde param.subtrahe(scaled)
+    fixum tensor<f32, Figura> scaled ← grad ⊙ lr_fill
+    redde param - scaled
 }
 
 incipit {
@@ -318,7 +318,7 @@ fn generic_scaled_dot_product_method_body_typechecks() {
 ) → tensor<f32, [B, D]> {
     fixum tensor<f32, [D, B]> kt ← kb.transpone()
     fixum tensor<f32, [B, B]> scores ← qb.matmul(kt)
-    fixum tensor<f32, [B, B]> scaled ← scores.multiplica(scale)
+    fixum tensor<f32, [B, B]> scaled ← scores ⊙ scale
     fixum tensor<f32, [B, B]> attn ← scaled.activatio_softmax()
     fixum tensor<f32, [B, D]> context ← attn.matmul(vb)
     redde context
