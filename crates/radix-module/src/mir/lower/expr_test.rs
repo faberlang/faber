@@ -74,7 +74,16 @@ fn static_field_read_through_an_imported_genus_inlines_the_interface_initializer
                 ty: InterfaceTypeSnapshot::Primitive(Primitive::Numerus),
                 optional: false,
                 required: false,
-                default: Some(init),
+                default: Some(
+                    crate::file_interface::InterfaceFieldDefault::snapshot(
+                        &init,
+                        &crate::semantic::TypeTable::new(),
+                        &crate::lexer::Interner::new(),
+                        &crate::semantic::Resolver::new(),
+                        None,
+                    )
+                    .expect("portable scalar default"),
+                ),
                 modifier: Some(FieldModifier::Generis),
                 visibility: MemberVisibility::Publica,
             }],

@@ -582,3 +582,60 @@ fn identity_bearing_enum_variant_library_payload_miss_fails_closed() {
         "expected an unknown-identity fail-closed diagnostic, got: {errors:?}"
     );
 }
+
+#[test]
+fn package_mir_imported_nested_field_defaults_keep_type_and_text_identity() {
+    let dir = crate::test_support::test_temp_dir("nested-import-default");
+    let entry = write_nominal_package(
+        dir.as_ref(),
+        r#"import from "./headers" headers
+@ public
+class Request {
+    var headers.Headers headers = headers.Headers { }
+    var string body = "producer body"
+}
+"#,
+        r#"import from "./util" httpreq
+import from "./headers" headers
+class Incoming {
+    var string id = ""
+    var int connection = 0
+    var httpreq.Request req = httpreq.Request { }
+}
+main {
+    const Incoming incoming ← Incoming { id = "http-1", connection = 3 }
+    print incoming.id
+    print incoming.connection
+    print incoming.req.body
+    print incoming.req.headers.name
+    print incoming.req.headers.entries.length()
+}
+"#,
+    );
+    fs::write(
+        dir.join("src/headers.fab"),
+        r#"@ public
+class Header {
+    var string name = "header name"
+}
+@ public
+class Headers {
+    var string name = "nested producer text"
+    var list<Header> entries = []
+}
+"#,
+    )
+    .expect("write nested producer");
+    let mut host = BufferHost::default();
+    run_package_mir(
+        &Config::default(),
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        &mut host,
+    )
+    .expect("nested imported defaults lower and run");
+    assert_eq!(
+        host.stdout_lines,
+        ["http-1", "3", "producer body", "nested producer text", "0"]
+    );
+}

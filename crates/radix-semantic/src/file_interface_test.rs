@@ -405,3 +405,94 @@ fn policy_float_file_interface_round_trip() {
         );
     }
 }
+
+#[test]
+fn file_interface_default_remaps_embedded_targets_and_text_slots() {
+    use crate::file_interface::InterfaceFieldDefault;
+    use radix_hir::{DefId, HirArrayElement, HirExpression, HirExpressionKind, HirId, HirLiteral};
+    use radix_lexer::Span;
+    let mut source_types = TypeTable::new();
+    let mut source_interner = Interner::new();
+    let text = source_interner.intern("producer text");
+    let string = source_types.primitive(Primitive::Textus);
+    let array = source_types.array(string);
+    let literal = HirExpression {
+        id: HirId(0),
+        kind: HirExpressionKind::Literal(HirLiteral::String(text)),
+        ty: Some(string),
+        span: Span::default(),
+    };
+    let expression = HirExpression {
+        id: HirId(1),
+        ty: Some(array),
+        span: Span::default(),
+        kind: HirExpressionKind::Verte {
+            source: Box::new(HirExpression {
+                id: HirId(2),
+                ty: Some(array),
+                span: Span::default(),
+                kind: HirExpressionKind::Array(vec![HirArrayElement::Expr(literal)]),
+            }),
+            target: array,
+            entries: None,
+        },
+    };
+    let snapshot = InterfaceFieldDefault::snapshot(
+        &expression,
+        &source_types,
+        &source_interner,
+        &Resolver::new(),
+        None,
+    )
+    .expect("snapshot default");
+    let mut target_types = TypeTable::new();
+    let collision = target_types.intern(Type::Enum(DefId(20)));
+    assert_eq!(
+        array, collision,
+        "the producer array slot is a consumer enum slot"
+    );
+    let mut target_interner = Interner::new();
+    target_interner.intern("unrelated consumer text");
+    let imported = snapshot
+        .import(&mut target_types, &mut target_interner, &Resolver::new())
+        .expect("import default");
+    let HirExpressionKind::Verte { source, target, .. } = imported.kind else {
+        panic!("expected aggregate ascription");
+    };
+    assert_ne!(target, collision);
+    assert_eq!(imported.ty, Some(target));
+    assert_eq!(target_types.get(target), &Type::Array(string));
+    assert_eq!(source.ty, Some(target));
+    let HirExpressionKind::Array(items) = source.kind else {
+        panic!("expected array");
+    };
+    let HirArrayElement::Expr(element) = &items[0] else {
+        panic!("expected element");
+    };
+    let HirExpressionKind::Literal(HirLiteral::String(value)) = element.kind else {
+        panic!("expected text literal");
+    };
+    assert_eq!(target_interner.resolve(value), "producer text");
+}
+
+#[test]
+fn file_interface_default_rejects_unmapped_definition_references() {
+    use crate::file_interface::InterfaceFieldDefault;
+    use radix_hir::{DefId, HirExpression, HirExpressionKind, HirId};
+    let expression = HirExpression {
+        id: HirId(0),
+        kind: HirExpressionKind::Path(DefId(42)),
+        ty: None,
+        span: radix_lexer::Span::default(),
+    };
+    assert_eq!(
+        InterfaceFieldDefault::snapshot(
+            &expression,
+            &TypeTable::new(),
+            &Interner::new(),
+            &Resolver::new(),
+            None
+        ),
+        Err(FileInterfaceError::FieldDefaultUnsupported),
+    );
+}
