@@ -86,8 +86,9 @@ pub struct FaberCodegen<'a> {
     /// Ids of transpose `MethodCall`s authored with the `ᵀ` glyph; only these
     /// re-emit as `receiverᵀ` rather than `.transpose()`.
     pub(crate) glyph_transpose_ids: FxHashSet<radix_hir::HirId>,
-    /// Ids of `Assign` expressions desugared from in-place numeric twin
-    /// method calls; only these re-emit as `place.method(arg)`.
+    /// Ids of expressions desugared from numeric twin method calls (operator,
+    /// assignment, or effect-hoisted block); only these re-emit as
+    /// `place.method(arg)`.
     pub(crate) numeric_twin_ids: FxHashSet<radix_hir::HirId>,
     /// Initializer-expression ids of authored discard bindings (`fixum T _ ← e`)
     /// with their declaration facts, for re-emitting the binding.

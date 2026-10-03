@@ -25,8 +25,16 @@ impl super::FaberCodegen<'_> {
     /// parent expression.
     pub(super) fn expr_precedence(&self, expr: &HirExpression) -> u8 {
         match &expr.kind {
-            // An in-place numeric twin re-emits as a postfix method call.
-            HirExpressionKind::Assign(..) if self.numeric_twin_call(expr).is_some() => 14,
+            // A numeric twin re-emits as a postfix method call, whatever the
+            // desugared node (assignment, operator, or hoisted block).
+            HirExpressionKind::Assign(..)
+            | HirExpressionKind::Binary(..)
+            | HirExpressionKind::Unary(..)
+                if self.numeric_twin_call(expr).is_some() =>
+            {
+                14
+            }
+            HirExpressionKind::Block(..) if self.hoisted_numeric_twin(expr).is_some() => 14,
             HirExpressionKind::Assign(_, _) | HirExpressionKind::ConversioAssign { .. } => 1,
             // `⇇` sits between assignment and the ternary level: the target
             // and value are complete ternaries (parser locks it just above

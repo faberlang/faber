@@ -67,6 +67,30 @@ enum Twin {
     InPlaceUnary(HirUnOp),
 }
 
+/// Canonical binary twins (`x.added(y)` is `x + y`).
+const BINARY_TWINS: [(&str, HirBinOp); 14] = [
+    ("addita", HirBinOp::Add),
+    ("subtracta", HirBinOp::Sub),
+    ("multiplicata", HirBinOp::Mul),
+    ("divisa", HirBinOp::Div),
+    ("modulata", HirBinOp::Mod),
+    ("coniuncta", HirBinOp::BitAnd),
+    ("disiuncta", HirBinOp::BitOr),
+    ("alternata", HirBinOp::BitXor),
+    ("sinistrata", HirBinOp::Shl),
+    ("dextrata", HirBinOp::Shr),
+    ("minor", HirBinOp::Lt),
+    ("maior", HirBinOp::Gt),
+    ("minime", HirBinOp::LtEq),
+    ("maxime", HirBinOp::GtEq),
+];
+
+/// Canonical unary twins (`x.negated()` is `-x`).
+const UNARY_TWINS: [(&str, HirUnOp); 2] = [
+    ("negativa", HirUnOp::Neg),
+    ("complementata", HirUnOp::BitNot),
+];
+
 /// Canonical in-place binary twins (`x.add(y)` is `x ← x + y`).
 const IN_PLACE_BINARY_TWINS: [(&str, HirBinOp); 10] = [
     ("adde", HirBinOp::Add),
@@ -84,6 +108,24 @@ const IN_PLACE_BINARY_TWINS: [(&str, HirBinOp); 10] = [
 /// Canonical in-place unary twins (`x.negate()` is `x ← -x`).
 const IN_PLACE_UNARY_TWINS: [(&str, HirUnOp); 2] =
     [("nega", HirUnOp::Neg), ("complementa", HirUnOp::BitNot)];
+
+/// The canonical binary twin method whose desugaring is `x op y`; the inverse
+/// of the rewrite in [`desugar_numeric_twin`], used by Faber re-emission to
+/// restore the authored method spelling.
+#[must_use]
+pub fn binary_twin_name(op: HirBinOp) -> Option<&'static str> {
+    BINARY_TWINS
+        .iter()
+        .find_map(|(name, twin_op)| (*twin_op == op).then_some(*name))
+}
+
+/// The canonical unary twin method whose desugaring is `op x`.
+#[must_use]
+pub fn unary_twin_name(op: HirUnOp) -> Option<&'static str> {
+    UNARY_TWINS
+        .iter()
+        .find_map(|(name, twin_op)| (*twin_op == op).then_some(*name))
+}
 
 /// The canonical in-place twin method whose desugaring is `x ← x op y`; the
 /// inverse of the rewrite in [`desugar_numeric_twin`], used by Faber
@@ -107,34 +149,22 @@ pub fn in_place_unary_twin_name(op: HirUnOp) -> Option<&'static str> {
 fn twin_of(canonical: &str, arity: usize) -> Option<Twin> {
     let binary = |op| (arity == 1).then_some(op);
     let unary = |op| (arity == 0).then_some(op);
-    match canonical {
-        "addita" => binary(HirBinOp::Add).map(Twin::Binary),
-        "subtracta" => binary(HirBinOp::Sub).map(Twin::Binary),
-        "multiplicata" => binary(HirBinOp::Mul).map(Twin::Binary),
-        "divisa" => binary(HirBinOp::Div).map(Twin::Binary),
-        "modulata" => binary(HirBinOp::Mod).map(Twin::Binary),
-        "coniuncta" => binary(HirBinOp::BitAnd).map(Twin::Binary),
-        "disiuncta" => binary(HirBinOp::BitOr).map(Twin::Binary),
-        "alternata" => binary(HirBinOp::BitXor).map(Twin::Binary),
-        "sinistrata" => binary(HirBinOp::Shl).map(Twin::Binary),
-        "dextrata" => binary(HirBinOp::Shr).map(Twin::Binary),
-        "minor" => binary(HirBinOp::Lt).map(Twin::Binary),
-        "maior" => binary(HirBinOp::Gt).map(Twin::Binary),
-        "minime" => binary(HirBinOp::LtEq).map(Twin::Binary),
-        "maxime" => binary(HirBinOp::GtEq).map(Twin::Binary),
-        "negativa" => unary(HirUnOp::Neg).map(Twin::Unary),
-        "complementata" => unary(HirUnOp::BitNot).map(Twin::Unary),
-        _ => IN_PLACE_BINARY_TWINS
-            .iter()
-            .find(|(name, _)| *name == canonical)
-            .and_then(|(_, op)| binary(*op).map(Twin::InPlaceBinary))
-            .or_else(|| {
-                IN_PLACE_UNARY_TWINS
-                    .iter()
-                    .find(|(name, _)| *name == canonical)
-                    .and_then(|(_, op)| unary(*op).map(Twin::InPlaceUnary))
-            }),
+    if let Some((_, op)) = BINARY_TWINS.iter().find(|(name, _)| *name == canonical) {
+        return binary(*op).map(Twin::Binary);
     }
+    if let Some((_, op)) = UNARY_TWINS.iter().find(|(name, _)| *name == canonical) {
+        return unary(*op).map(Twin::Unary);
+    }
+    IN_PLACE_BINARY_TWINS
+        .iter()
+        .find(|(name, _)| *name == canonical)
+        .and_then(|(_, op)| binary(*op).map(Twin::InPlaceBinary))
+        .or_else(|| {
+            IN_PLACE_UNARY_TWINS
+                .iter()
+                .find(|(name, _)| *name == canonical)
+                .and_then(|(_, op)| unary(*op).map(Twin::InPlaceUnary))
+        })
 }
 
 fn is_bitwise(op: HirBinOp) -> bool {
@@ -235,10 +265,16 @@ impl TypeChecker<'_> {
             }
         };
         let in_place = matches!(twin, Twin::InPlaceBinary(_) | Twin::InPlaceUnary(_));
-        // The rewrite keeps the call's node id; a bare assignment (no hoisted
-        // place temporaries) is the surface `place.method(arg)` and is
-        // recorded so Faber re-emission restores the authored spelling.
-        if in_place && matches!(expr.kind, HirExpressionKind::Assign(..)) {
+        // The rewrite keeps the call's node id in every spelling: a value
+        // twin is the operator node itself, a bare in-place twin is the
+        // `Assign`, and an effect-hoisted one is the wrapping `Block`. All
+        // are recorded so Faber re-emission restores the authored spelling.
+        if !in_place
+            || matches!(
+                expr.kind,
+                HirExpressionKind::Assign(..) | HirExpressionKind::Block(..)
+            )
+        {
             self.numeric_twin_ids.push(expr.id);
         }
         in_place

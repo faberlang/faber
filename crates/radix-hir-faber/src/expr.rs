@@ -34,7 +34,7 @@ use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     DefId, HirArrayElement, HirBlock, HirCallArg, HirCape, HirConversioTarget, HirExpression,
     HirExpressionKind, HirNonNullKind, HirObjectField, HirObjectKey, HirOptionalChainKind,
-    HirOwnerRef, HirTypeSite, HirTypeSlot,
+    HirOwnerRef, HirStatementKind, HirTypeSite, HirTypeSlot,
 };
 use radix_lexer::{Interner, Symbol, TokenKind};
 use radix_types::{Primitive, Type, TypeId};
@@ -198,6 +198,19 @@ impl super::FaberCodegen<'_> {
             }
             HirExpressionKind::Literal(lit) => self.write_literal(lit, surface, writer),
             HirExpressionKind::ReadLine(_) => writer.write(surface.contextual_keyword("lege")),
+            HirExpressionKind::Assign(..)
+            | HirExpressionKind::Binary(..)
+            | HirExpressionKind::Unary(..)
+                if self.numeric_twin_call(expr).is_some() =>
+            {
+                // Authored numeric twin (`a.add(2)`, `x.added(y)`,
+                // `x.negated()`): typecheck desugared the call to the
+                // assignment or operator and kept the node id; restore the
+                // method spelling in the reader locale.
+                if let Some((receiver, canonical, argument)) = self.numeric_twin_call(expr) {
+                    self.write_twin_call(receiver, canonical, argument, names, surface, writer);
+                }
+            }
             HirExpressionKind::Binary(op, lhs, rhs) => {
                 let op_prec = self.binop_precedence(*op);
                 // Left operands of associative operators re-parse identically
@@ -233,25 +246,6 @@ impl super::FaberCodegen<'_> {
                     self.write_call_type_args(type_args, names, surface, writer);
                     writer.write("(");
                     self.write_call_args(args, names, surface, writer);
-                    writer.write(")");
-                }
-            }
-            HirExpressionKind::Assign(..) if self.numeric_twin_call(expr).is_some() => {
-                // Authored in-place numeric twin (`a.add(2)`): typecheck
-                // desugared it to `a ← a + 2` and kept the node id; restore
-                // the method spelling in the reader locale.
-                if let Some((receiver, canonical, argument)) = self.numeric_twin_call(expr) {
-                    self.write_expr_prec(receiver, 13, names, surface, writer);
-                    writer.write(".");
-                    writer.write(
-                        &surface
-                            .intrinsic_surface(canonical)
-                            .unwrap_or_else(|| canonical.to_owned()),
-                    );
-                    writer.write("(");
-                    if let Some(argument) = argument {
-                        self.write_expr(argument, names, surface, writer);
-                    }
                     writer.write(")");
                 }
             }
@@ -361,6 +355,21 @@ impl super::FaberCodegen<'_> {
                         NON_NULL_CHAIN,
                         tail,
                         self.receiver_projects_intrinsic(object),
+                        names,
+                        surface,
+                        writer,
+                    );
+                }
+            }
+            HirExpressionKind::Block(..) if self.hoisted_numeric_twin(expr).is_some() => {
+                // Authored effect-hoisted in-place twin (`xs[f()].add(2)`):
+                // typecheck pinned the place's effects to temporaries inside
+                // a block; inline them back and restore the method spelling.
+                if let Some((receiver, canonical, argument)) = self.hoisted_numeric_twin(expr) {
+                    self.write_twin_call(
+                        &receiver,
+                        canonical,
+                        argument.as_ref(),
                         names,
                         surface,
                         writer,
@@ -1711,10 +1720,13 @@ impl super::FaberCodegen<'_> {
         }
     }
 
-    /// The `(receiver, canonical method, argument)` of an assignment that
-    /// typecheck desugared from an in-place numeric twin call, or `None` when
-    /// `expr` is not a recorded twin or no longer has the desugared shape
-    /// (`place ← place op arg`, `place ← op place`).
+    /// The `(receiver, canonical method, argument)` of an authored numeric
+    /// twin call whose desugar left the call's node id on the node itself: an
+    /// in-place `Assign` (`place ← place op arg`, `place ← op place`) or a
+    /// value twin `Binary` / `Unary` (`x.added(y)`, `x.negated()`). `None`
+    /// when `expr` is not a recorded twin or no longer has the desugared
+    /// shape. The effect-hoisted `Block` spelling is
+    /// [`Self::hoisted_numeric_twin`].
     pub(super) fn numeric_twin_call<'e>(
         &self,
         expr: &'e HirExpression,
@@ -1722,34 +1734,115 @@ impl super::FaberCodegen<'_> {
         if !self.numeric_twin_ids.contains(&expr.id) {
             return None;
         }
-        let HirExpressionKind::Assign(place, value) = &expr.kind else {
-            return None;
-        };
-        let mut value = &**value;
-        // The store's implicit conversion and widening nodes are the
-        // checker's, not part of the authored call.
-        loop {
-            match &value.kind {
-                HirExpressionKind::Conversio {
-                    implicit: Some(_),
-                    source,
-                    ..
-                } => value = source,
-                HirExpressionKind::Widen { operand, .. } => value = operand,
-                _ => break,
+        match &expr.kind {
+            // The store's implicit conversion and widening nodes are the
+            // checker's, not part of the authored call; the stored place is
+            // the authored receiver.
+            HirExpressionKind::Assign(place, value) => {
+                let value = strip_store_wrappers(value);
+                match &value.kind {
+                    HirExpressionKind::Binary(op, _, argument) => Some((
+                        place,
+                        radix_semantic::passes::in_place_binary_twin_name(*op)?,
+                        Some(argument),
+                    )),
+                    HirExpressionKind::Unary(op, _) => Some((
+                        place,
+                        radix_semantic::passes::in_place_unary_twin_name(*op)?,
+                        None,
+                    )),
+                    _ => None,
+                }
             }
-        }
-        match &value.kind {
-            HirExpressionKind::Binary(op, _, argument) => {
-                let name = radix_semantic::passes::in_place_binary_twin_name(*op)?;
-                Some((place, name, Some(argument)))
-            }
-            HirExpressionKind::Unary(op, _) => {
-                let name = radix_semantic::passes::in_place_unary_twin_name(*op)?;
-                Some((place, name, None))
-            }
+            // A value twin is the operator node the rewrite left at the
+            // call's id; the operator's operand is the authored receiver.
+            HirExpressionKind::Binary(op, receiver, argument) => Some((
+                receiver,
+                radix_semantic::passes::binary_twin_name(*op)?,
+                Some(argument),
+            )),
+            HirExpressionKind::Unary(op, receiver) => Some((
+                receiver,
+                radix_semantic::passes::unary_twin_name(*op)?,
+                None,
+            )),
             _ => None,
         }
+    }
+
+    /// The authored in-place twin call an effect-hoisted desugar wrapped in a
+    /// block (`xs[f()].add(2)` desugars to a `__place` temporary plus the
+    /// store): each temporary is inlined back into the store so re-emission
+    /// prints `place.method(arg)`, not the checker's temporaries. `None` when
+    /// `expr` is not a recorded twin or no longer has that shape.
+    pub(super) fn hoisted_numeric_twin(
+        &self,
+        expr: &HirExpression,
+    ) -> Option<(HirExpression, &'static str, Option<HirExpression>)> {
+        if !self.numeric_twin_ids.contains(&expr.id) {
+            return None;
+        }
+        let HirExpressionKind::Block(block) = &expr.kind else {
+            return None;
+        };
+        if block.expr.is_some() || block.statements.len() < 2 {
+            return None;
+        }
+        let (assign_stmt, local_stmts) = block.statements.split_last()?;
+        let HirStatementKind::Expr(assign) = &assign_stmt.kind else {
+            return None;
+        };
+        let HirExpressionKind::Assign(place, value) = &assign.kind else {
+            return None;
+        };
+        let mut temps = FxHashMap::default();
+        for stmt in local_stmts {
+            let HirStatementKind::Local(local) = &stmt.kind else {
+                return None;
+            };
+            let Some(init) = &local.init else {
+                return None;
+            };
+            temps.insert(local.def_id, init.clone());
+        }
+        let inlined_value = inline_place_temps(value, &temps);
+        let value = strip_store_wrappers(&inlined_value);
+        let (name, argument) = match &value.kind {
+            HirExpressionKind::Binary(op, _, argument) => (
+                radix_semantic::passes::in_place_binary_twin_name(*op)?,
+                Some((**argument).clone()),
+            ),
+            HirExpressionKind::Unary(op, _) => {
+                (radix_semantic::passes::in_place_unary_twin_name(*op)?, None)
+            }
+            _ => return None,
+        };
+        Some((inline_place_temps(place, &temps), name, argument))
+    }
+
+    /// `receiver.method(argument)` for an authored numeric twin call, in the
+    /// reader locale's surface spelling.
+    fn write_twin_call(
+        &self,
+        receiver: &HirExpression,
+        canonical: &'static str,
+        argument: Option<&HirExpression>,
+        names: &FxHashMap<DefId, Symbol>,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        self.write_expr_prec(receiver, 13, names, surface, writer);
+        writer.write(".");
+        writer.write(
+            &surface
+                .intrinsic_surface(canonical)
+                .unwrap_or_else(|| canonical.to_owned()),
+        );
+        writer.write("(");
+        if let Some(argument) = argument {
+            self.write_expr(argument, names, surface, writer);
+        }
+        writer.write(")");
     }
 
     /// Localize a canonical intrinsic method name through the target surface.
@@ -1896,4 +1989,61 @@ fn sorted_record_entries<'a>(
         _ => std::cmp::Ordering::Equal,
     });
     ordered
+}
+
+/// The stored value with the checker's implicit conversion and widening
+/// nodes stripped: those wrap the desugared twin, not the authored call.
+fn strip_store_wrappers(mut value: &HirExpression) -> &HirExpression {
+    loop {
+        match &value.kind {
+            HirExpressionKind::Conversio {
+                implicit: Some(_),
+                source,
+                ..
+            } => value = source,
+            HirExpressionKind::Widen { operand, .. } => value = operand,
+            _ => return value,
+        }
+    }
+}
+
+/// A copy of `expr` with each hoisted place temporary (`__placeN`) replaced
+/// by the effectful expression it pins, restoring the authored place. Only
+/// the shapes a place chain or a twin value can take carry temporaries.
+fn inline_place_temps(
+    expr: &HirExpression,
+    temps: &FxHashMap<DefId, HirExpression>,
+) -> HirExpression {
+    if let HirExpressionKind::Path(def_id) = &expr.kind
+        && let Some(init) = temps.get(def_id)
+    {
+        return init.clone();
+    }
+    let kind = match &expr.kind {
+        HirExpressionKind::Field(base, name) => {
+            HirExpressionKind::Field(Box::new(inline_place_temps(base, temps)), *name)
+        }
+        HirExpressionKind::Deref(base) => {
+            HirExpressionKind::Deref(Box::new(inline_place_temps(base, temps)))
+        }
+        HirExpressionKind::Index(base, index) => HirExpressionKind::Index(
+            Box::new(inline_place_temps(base, temps)),
+            Box::new(inline_place_temps(index, temps)),
+        ),
+        HirExpressionKind::Binary(op, lhs, rhs) => HirExpressionKind::Binary(
+            *op,
+            Box::new(inline_place_temps(lhs, temps)),
+            Box::new(inline_place_temps(rhs, temps)),
+        ),
+        HirExpressionKind::Unary(op, operand) => {
+            HirExpressionKind::Unary(*op, Box::new(inline_place_temps(operand, temps)))
+        }
+        other => other.clone(),
+    };
+    HirExpression {
+        id: expr.id,
+        kind,
+        ty: expr.ty.clone(),
+        span: expr.span,
+    }
 }

@@ -145,7 +145,9 @@ pub mod lookup;
 mod member_privacy;
 mod numeric_twin;
 pub(crate) use numeric_twin::intern_place_temporaries;
-pub use numeric_twin::{in_place_binary_twin_name, in_place_unary_twin_name};
+pub use numeric_twin::{
+    binary_twin_name, in_place_binary_twin_name, in_place_unary_twin_name, unary_twin_name,
+};
 pub mod ops;
 mod ordering;
 mod store;
@@ -414,8 +416,9 @@ pub(crate) struct TypeChecker<'a> {
     /// Locals declared `fixum T x = e` (D5.10): their initializer is an `=`
     /// position, a compile-time store.
     compile_time_locals: FxHashSet<DefId>,
-    /// Node ids of assignments desugared from in-place numeric twin methods,
-    /// handed to the presentation sidecar when the check finishes.
+    /// Node ids of expressions desugared from numeric twin methods (operator,
+    /// assignment, or effect-hoisted block), handed to the presentation
+    /// sidecar when the check finishes.
     numeric_twin_ids: Vec<HirId>,
 
     /// Type-alias declaration parameter names keyed by alias def-id, in
