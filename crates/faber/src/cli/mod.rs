@@ -379,7 +379,7 @@ pub struct CorpusArgs {
     /// Faber source, package directory, or suite directory containing corpus.toml
     pub input: PathBuf,
 
-    /// Target to verify (only runner is implemented)
+    /// Target to verify (runner or rust)
     #[arg(long, default_value = "runner")]
     pub target: String,
 

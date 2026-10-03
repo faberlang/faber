@@ -1,4 +1,4 @@
-//! The corpus command must judge the same file and package routes as `faber run`.
+//! The corpus command judges file and package routes on the selected target.
 
 use std::fs;
 use std::path::PathBuf;
@@ -6,6 +6,13 @@ use std::process::Command;
 
 fn smoke_case() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus/incipit/salve-munde.fab")
+}
+
+fn rust_runtime() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../faber/runtime/rust")
+        .canonicalize()
+        .expect("packet Rust runtime")
 }
 
 fn records(output: &[u8]) -> Vec<serde_json::Value> {
@@ -105,6 +112,118 @@ fn corpus_runs_pilot_suite_across_source_package_and_rejection_cases() {
         rows.iter()
             .take(6)
             .all(|row| row["timing_ms"]["run"].is_number())
+    );
+}
+
+#[test]
+fn corpus_rust_pilot_builds_once_and_checks_generated_binaries() {
+    let suite = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus-suites/pilot");
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "rust"])
+        .arg(suite)
+        .output()
+        .expect("run Rust corpus suite");
+    assert!(
+        output.status.success(),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let rows = records(&output.stdout);
+    assert_eq!(rows.len(), 7);
+    assert_eq!(rows[6]["passed"], 6);
+    assert_eq!(rows[6]["build"]["cargo_invocations"], 1);
+    assert!(rows[6]["timing_ms"]["build"].is_number());
+    let rejection = rows
+        .iter()
+        .find(|row| row["case"] == "diagnostics/unknown-type")
+        .expect("intentional Rust emit rejection");
+    assert_eq!(rejection["status"], "pass");
+    assert_eq!(rejection["phase"], "emit");
+    assert_eq!(rejection["exit"], 1);
+    assert!(rows[0]["emit_command"]["argv"].is_array());
+    assert_eq!(
+        rows.iter()
+            .filter(|row| row["type"] == "case" && row["phase"] == "run")
+            .count(),
+        5
+    );
+}
+
+#[test]
+fn corpus_rust_rejects_a_wrong_golden_after_building() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let case = temp.path().join("cases/probe");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        format!(
+            "version = 1\ncases_dir = \"cases\"\n\n[targets.rust]\nruntime = {}\n",
+            toml::Value::String(rust_runtime().display().to_string())
+        ),
+    )
+    .expect("write suite");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\ninput = \"main.fab\"\n\n[expect]\nstdout = \"wrong.expected\"\n\n[targets.rust]\noutcome = \"pass\"\n",
+    )
+    .expect("write case");
+    fs::copy(smoke_case(), case.join("main.fab")).expect("copy source");
+    fs::write(case.join("wrong.expected"), "wrong output\n").expect("write golden");
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "rust"])
+        .arg(temp.path())
+        .output()
+        .expect("run Rust corpus suite");
+    assert!(!output.status.success());
+    let rows = records(&output.stdout);
+    assert_eq!(rows[0]["phase"], "run");
+    assert_eq!(rows[0]["reason"], "stdout mismatch");
+    assert_eq!(rows[1]["build"]["cargo_invocations"], 1);
+}
+
+#[test]
+fn corpus_rust_known_failure_becoming_green_requires_reclassification() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let case = temp.path().join("cases/probe");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        format!(
+            "version = 1\ncases_dir = \"cases\"\n\n[targets.rust]\nruntime = {}\n",
+            toml::Value::String(rust_runtime().display().to_string())
+        ),
+    )
+    .expect("write suite");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\ninput = \"main.fab\"\n\n[targets.rust]\noutcome = \"known-fail\"\nphase = \"emit\"\ndiagnostic_contains = \"SEM002:unknown_type\"\n",
+    )
+    .expect("write case");
+    fs::copy(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus/typi/inf-prefix-error.fab"),
+        case.join("main.fab"),
+    )
+    .expect("copy rejected source");
+    let red = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "rust"])
+        .arg(temp.path())
+        .output()
+        .expect("run known failure");
+    assert!(red.status.success());
+    assert_eq!(records(&red.stdout)[0]["status"], "expected-fail");
+    assert_eq!(records(&red.stdout)[1]["build"]["cargo_invocations"], 0);
+
+    fs::copy(smoke_case(), case.join("main.fab")).expect("replace with valid source");
+    let green = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "rust"])
+        .arg(temp.path())
+        .output()
+        .expect("run unexpected pass");
+    assert!(!green.status.success());
+    assert_eq!(
+        records(&green.stdout)[0]["reason"],
+        "unexpected pass; update target expectation"
     );
 }
 

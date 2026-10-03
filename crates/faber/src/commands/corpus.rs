@@ -1,4 +1,6 @@
-//! Verify explicit corpus cases with the MIR runner.
+//! Verify explicit corpus cases against a selected execution target.
+
+mod rust;
 
 use crate::cli::CorpusArgs;
 use faber_cli::package;
@@ -15,6 +17,19 @@ use std::time::Instant;
 struct SuiteManifest {
     version: u32,
     cases_dir: PathBuf,
+    #[serde(default)]
+    targets: BTreeMap<String, SuiteTarget>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SuiteTarget {
+    runtime: Option<PathBuf>,
+}
+
+struct LoadedSuite {
+    cases: Vec<Case>,
+    rust_runtime: Option<PathBuf>,
 }
 
 #[derive(Deserialize)]
@@ -67,28 +82,49 @@ struct Case {
 
 pub(super) fn cmd_corpus(args: &CorpusArgs) {
     let started = Instant::now();
-    if args.target != "runner" {
+    if !matches!(args.target.as_str(), "runner" | "rust") {
         fail(&format!("target {} is not implemented", args.target));
     }
     let input = package::absolutize_path(&args.input);
     let discovering = Instant::now();
-    let cases = if input.is_dir() && input.join("corpus.toml").is_file() {
+    let suite = if input.is_dir() && input.join("corpus.toml").is_file() {
         if args.expected.is_some() {
             fail("--expected applies only to a single input");
         }
         load_suite(&input, &args.target).unwrap_or_else(|message| fail(&message))
     } else {
-        vec![single_case(&input, args.expected.as_deref()).unwrap_or_else(|message| fail(&message))]
+        if args.target == "rust" {
+            fail("the rust target requires a suite with [targets.rust] runtime");
+        }
+        LoadedSuite {
+            cases: vec![
+                single_case(&input, args.expected.as_deref())
+                    .unwrap_or_else(|message| fail(&message)),
+            ],
+            rust_runtime: None,
+        }
     };
     let discover_ms = ms(discovering);
     let faber = std::env::current_exe()
         .unwrap_or_else(|error| fail(&format!("cannot locate faber executable: {error}")));
 
+    if args.target == "rust" {
+        rust::execute(
+            &suite.cases,
+            &input,
+            suite.rust_runtime.as_deref().expect("validated Rust suite"),
+            &faber,
+            discover_ms,
+            started,
+        );
+        return;
+    }
+
     let mut passed = 0;
     let mut expected_failures = 0;
     let mut not_applicable = 0;
     let mut failed = 0;
-    for case in &cases {
+    for case in &suite.cases {
         let result = run_case(case, &faber);
         match result["status"].as_str() {
             Some("pass") => passed += 1,
@@ -104,7 +140,7 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
             "schema": 1,
             "type": "summary",
             "target": args.target,
-            "cases": cases.len(),
+            "cases": suite.cases.len(),
             "passed": passed,
             "expected_failures": expected_failures,
             "not_applicable": not_applicable,
@@ -156,7 +192,7 @@ fn single_case(input: &Path, explicit: Option<&Path>) -> Result<Case, String> {
     })
 }
 
-fn load_suite(root: &Path, target: &str) -> Result<Vec<Case>, String> {
+fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, String> {
     let manifest_path = root.join("corpus.toml");
     let text = fs::read_to_string(&manifest_path)
         .map_err(|error| format!("cannot read {}: {error}", manifest_path.display()))?;
@@ -178,10 +214,35 @@ fn load_suite(root: &Path, target: &str) -> Result<Vec<Case>, String> {
     if manifests.is_empty() {
         return Err(format!("no case.toml files under {}", cases_root.display()));
     }
-    manifests
+    let cases = manifests
         .iter()
         .map(|path| load_case(path, &cases_root, target))
-        .collect()
+        .collect::<Result<Vec<_>, _>>()?;
+    let rust_runtime =
+        if target == "rust" {
+            let configured = suite
+                .targets
+                .get("rust")
+                .and_then(|item| item.runtime.as_deref())
+                .ok_or("rust target requires [targets.rust] runtime in corpus.toml")?;
+            let path = if configured.is_absolute() {
+                configured.to_path_buf()
+            } else {
+                root.join(configured)
+            };
+            if !path.join("Cargo.toml").is_file() {
+                return Err(format!("Rust runtime crate is missing: {}", path.display()));
+            }
+            Some(path.canonicalize().map_err(|error| {
+                format!("cannot resolve Rust runtime {}: {error}", path.display())
+            })?)
+        } else {
+            None
+        };
+    Ok(LoadedSuite {
+        cases,
+        rust_runtime,
+    })
 }
 
 fn find_cases(dir: &Path, manifests: &mut Vec<PathBuf>) -> Result<(), String> {
@@ -246,15 +307,34 @@ fn load_case(manifest_path: &Path, cases_root: &Path, target: &str) -> Result<Ca
             return Err(format!("{id}: a passing case requires expect.stdout"));
         }
         Outcome::KnownFail
-            if expectation.phase.as_deref() != Some("run")
+            if !matches!(
+                (target, expectation.phase.as_deref()),
+                ("runner", Some("run")) | ("rust", Some("emit" | "build" | "run"))
+            ) || expectation
+                .diagnostic_contains
+                .as_ref()
+                .is_none_or(String::is_empty) =>
+        {
+            return Err(format!(
+                "{id}: known-fail requires a supported phase and diagnostic_contains"
+            ));
+        }
+        Outcome::Pass if target == "rust" && expectation.phase.as_deref() == Some("emit") => {
+            if manifest.expect.as_ref().is_none_or(|item| item.exit == 0)
                 || expectation
                     .diagnostic_contains
                     .as_ref()
-                    .is_none_or(String::is_empty) =>
+                    .is_none_or(String::is_empty)
+            {
+                return Err(format!(
+                    "{id}: an expected emit rejection requires nonzero expect.exit and diagnostic_contains"
+                ));
+            }
+        }
+        Outcome::Pass
+            if expectation.phase.is_some() && expectation.phase.as_deref() != Some("run") =>
         {
-            return Err(format!(
-                "{id}: known-fail requires phase = \"run\" and diagnostic_contains"
-            ));
+            return Err(format!("{id}: passing case has unsupported phase"));
         }
         Outcome::NotApplicable if expectation.reason.as_ref().is_none_or(String::is_empty) => {
             return Err(format!("{id}: not-applicable requires a reason"));
