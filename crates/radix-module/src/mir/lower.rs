@@ -4528,3 +4528,7 @@ mod optional_field_unwrap_tests;
 #[cfg(test)]
 #[path = "own_textus_test.rs"]
 mod own_textus_tests;
+
+#[cfg(test)]
+#[path = "lower/octeti_itera_test.rs"]
+mod octeti_itera_tests;
