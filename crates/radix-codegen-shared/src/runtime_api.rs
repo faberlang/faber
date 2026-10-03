@@ -687,9 +687,10 @@ pub const TUPLE_PARTS: RuntimeItem = carrier_row(Namespace::Tuple, "parts", Runt
 pub const INSTANS_PARSE: RuntimeItem = carrier_row(Namespace::Instans, "parse", RuntimeKind::Fn);
 pub const VALOR_STRUCT: RuntimeItem = carrier_row(Namespace::Valor, "struct", RuntimeKind::Fn);
 
-/// The targets whose runtime package carries a `sermo` row. Only the Go runtime
-/// (`rt.Sermo*`, `faber/runtime/go/{frame,sermo}.go`) carries them on this
-/// table today.
+/// The shared conversation type carriers live in Go and TypeScript. Go's
+/// variant types and free functions remain Go-only rows.
+const SERMO_GO_TS: &[Target] = &[Target::HirGo, Target::HirTypeScript];
+
 const SERMO_GO: &[Target] = &[Target::HirGo];
 
 const fn sermo_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
@@ -710,11 +711,36 @@ const fn sermo_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
 /// sermo into a text, numeric or vacuum value. The frame family has no
 /// namespace of its own: it rides the `sermo` namespace. No row applies a width
 /// limit.
-pub const SERMO_SERMO: RuntimeItem = sermo_row("Sermo", RuntimeKind::Type);
-pub const SERMO_MEUS: RuntimeItem = sermo_row("Meus", RuntimeKind::Type);
-pub const SERMO_TUUS: RuntimeItem = sermo_row("Tuus", RuntimeKind::Type);
-pub const SERMO_SCRINIUM: RuntimeItem = sermo_row("Scrinium", RuntimeKind::Type);
-pub const SERMO_STATUS: RuntimeItem = sermo_row("Status", RuntimeKind::Type);
+pub const SERMO_SERMO: RuntimeItem = RuntimeItem {
+    ns: Namespace::Sermo,
+    name: "Sermo",
+    kind: RuntimeKind::Type,
+    targets: SERMO_GO_TS,
+};
+pub const SERMO_MEUS: RuntimeItem = RuntimeItem {
+    ns: Namespace::Sermo,
+    name: "Meus",
+    kind: RuntimeKind::Type,
+    targets: SERMO_GO_TS,
+};
+pub const SERMO_TUUS: RuntimeItem = RuntimeItem {
+    ns: Namespace::Sermo,
+    name: "Tuus",
+    kind: RuntimeKind::Type,
+    targets: SERMO_GO_TS,
+};
+pub const SERMO_SCRINIUM: RuntimeItem = RuntimeItem {
+    ns: Namespace::Sermo,
+    name: "Scrinium",
+    kind: RuntimeKind::Type,
+    targets: SERMO_GO_TS,
+};
+pub const SERMO_STATUS: RuntimeItem = RuntimeItem {
+    ns: Namespace::Sermo,
+    name: "Status",
+    kind: RuntimeKind::Type,
+    targets: SERMO_GO_TS,
+};
 pub const SERMO_REQUEST: RuntimeItem = sermo_row("Request", RuntimeKind::Type);
 pub const SERMO_ITEM: RuntimeItem = sermo_row("Item", RuntimeKind::Type);
 pub const SERMO_BYTE: RuntimeItem = sermo_row("Byte", RuntimeKind::Type);
@@ -820,9 +846,32 @@ pub const REGEX_ERROR: RuntimeItem = regex_row("RegexError", RuntimeKind::Type, 
 /// `replace_each` and `escape`; `compile` is its constructor.
 pub const REGEX_COMPILE: RuntimeItem = regex_row("compile", RuntimeKind::Fn, REGEX_SWIFT_PY);
 
+/// Shared TypeScript route registry accessor and typed entries.
+pub const ROUTES_TABLE: RuntimeItem = RuntimeItem {
+    ns: Namespace::Routes,
+    name: "table",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirTypeScript],
+};
+pub const ROUTES_HANDLER: RuntimeItem = RuntimeItem {
+    ns: Namespace::Routes,
+    name: "Handler",
+    kind: RuntimeKind::Type,
+    targets: &[Target::HirTypeScript],
+};
+pub const ROUTES_REGISTRY: RuntimeItem = RuntimeItem {
+    ns: Namespace::Routes,
+    name: "Registry",
+    kind: RuntimeKind::Type,
+    targets: &[Target::HirTypeScript],
+};
+
 /// The canonical helper table: a row for every helper some runtime package
 /// carries. Each namespace unit adds its rows with the runtime it moves.
 pub const TABLE: &[RuntimeItem] = &[
+    ROUTES_TABLE,
+    ROUTES_HANDLER,
+    ROUTES_REGISTRY,
     modulus_ts_row("add_u8"),
     modulus_ts_row("sub_u8"),
     modulus_ts_row("mul_u8"),
@@ -1205,13 +1254,14 @@ pub enum Namespace {
     Result,
     Variant,
     Sermo,
+    Routes,
     Gen,
     Float,
 }
 
 impl Namespace {
     /// Every namespace, in declaration order.
-    pub const ALL: [Namespace; 24] = [
+    pub const ALL: [Namespace; 25] = [
         Namespace::Exact,
         Namespace::Dec,
         Namespace::Inf,
@@ -1234,6 +1284,7 @@ impl Namespace {
         Namespace::Result,
         Namespace::Variant,
         Namespace::Sermo,
+        Namespace::Routes,
         Namespace::Gen,
         Namespace::Float,
     ];
@@ -1264,6 +1315,7 @@ impl Namespace {
             Namespace::Result => "result",
             Namespace::Variant => "variant",
             Namespace::Sermo => "sermo",
+            Namespace::Routes => "routes",
             Namespace::Gen => "gen",
             Namespace::Float => "float",
         }
