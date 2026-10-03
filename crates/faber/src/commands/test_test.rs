@@ -453,3 +453,33 @@ fn cmd_test_json_report_emits_blocked_census() {
         "JSON blocked cases must name the blocking MIR gap"
     );
 }
+
+#[test]
+fn empty_selection_json_is_not_success_without_changing_exit_policy() {
+    let report = run_proba_source(
+        &Session::new(Config::default()),
+        "empty_selection.fab",
+        r#"proba "one equals one" { adfirma 1 ≡ 1 }"#,
+        &TestSelection {
+            name: Some("not selected".to_owned()),
+            ..TestSelection::default()
+        },
+        None,
+        false,
+        false,
+        None,
+        false,
+    )
+    .expect("analyze and run fixture");
+    let json = super::json_report_value(&report, &super::RunMetadata::default(), false);
+    println!("empty selection JSON: {json}");
+    println!(
+        "empty exit policy: default={} allow_no_tests={}",
+        super::empty_run_exit_code(false),
+        super::empty_run_exit_code(true)
+    );
+    assert!(report.results.is_empty());
+    assert_eq!(json["success"], false);
+    assert_eq!(super::empty_run_exit_code(false), 1);
+    assert_eq!(super::empty_run_exit_code(true), 0);
+}

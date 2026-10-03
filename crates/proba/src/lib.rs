@@ -19,6 +19,7 @@ use radix::mir::{
 };
 use radix::module::{AnalyzedModule, Session};
 use radix::program::analyze_prepared_program_name;
+use radix_mir_runner::{RUNNER_ISSUE_STEP_BUDGET_EXHAUSTED, RUNNER_ISSUE_WALL_CLOCK_TIMEOUT};
 use std::collections::HashMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
@@ -196,11 +197,12 @@ impl ProbaReport {
             .count()
     }
 
-    /// True when every selected runnable case passed (skips allowed).
+    /// True when at least one case was selected and all runnable cases passed
+    /// (source skips allowed). An empty selection is not a successful run.
     /// Blocked cases are fail-closed: the runner never executed them.
     #[must_use]
     pub fn success(&self) -> bool {
-        self.failed() == 0 && self.blocked() == 0
+        !self.results.is_empty() && self.failed() == 0 && self.blocked() == 0
     }
 }
 
@@ -863,34 +865,31 @@ fn is_error_channel_escape(errors: &[RunnerError]) -> bool {
 }
 
 fn case_outcome_from_runner_errors(errors: &[RunnerError]) -> CaseOutcome {
+    // Verdicts consume runner identity; prose is only report detail. Preserve
+    // timeout/budget precedence when an execution reports several errors.
     let message = format_runner_errors(errors);
-    if is_wall_clock_timeout(&message) {
+    if errors
+        .iter()
+        .any(|error| error.issue == RUNNER_ISSUE_WALL_CLOCK_TIMEOUT)
+    {
         CaseOutcome::Failed {
             message: "faber: test exceeded its wall-clock timeout".to_owned(),
         }
-    } else if is_step_budget_exhausted(&message) {
+    } else if errors
+        .iter()
+        .any(|error| error.issue == RUNNER_ISSUE_STEP_BUDGET_EXHAUSTED)
+    {
         CaseOutcome::Failed {
             message: format!("temporis: {message}"),
         }
-    } else if is_capability_gap_message(&message) {
+    } else if errors
+        .iter()
+        .any(|error| error.code == "runner_unsupported")
+    {
         CaseOutcome::Blocked { reason: message }
     } else {
         CaseOutcome::Failed { message }
     }
-}
-
-fn is_step_budget_exhausted(message: &str) -> bool {
-    message.contains("interpreter step budget exhausted")
-}
-
-fn is_wall_clock_timeout(message: &str) -> bool {
-    message.contains("wall-clock timeout exceeded")
-}
-
-fn is_capability_gap_message(message: &str) -> bool {
-    message.contains("unsupported MIR lowering")
-        || message.contains("faberscript unsupported:")
-        || message.contains("missing type information for MIR lowering")
 }
 
 fn format_runner_errors(errors: &[RunnerError]) -> String {
