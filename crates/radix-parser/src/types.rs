@@ -884,7 +884,10 @@ impl Parser {
             let mut dims = Vec::new();
             if !self.check(&TokenKind::RBracket) {
                 loop {
-                    dims.push(self.parse_figura()?);
+                    let span = self.current_span();
+                    dims.push(self.nested(ParseErrorKind::TypeInvalid, span, |parser| {
+                        parser.parse_figura()
+                    })?);
                     if !self.consume_item_separator(&TokenKind::RBracket, "figura_dimensions")? {
                         break;
                     }

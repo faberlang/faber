@@ -776,6 +776,43 @@ impl Lowerer<'_> {
         member: &radix_syntax::MemberExpr,
         id: radix_hir::HirId,
     ) -> HirExpressionKind {
+        // WHY: postfix member chains are parsed iteratively and may be much
+        // deeper than the native stack can safely lower recursively. Flatten
+        // only this left spine, then rebuild HIR from the base outward.
+        let mut chain = Vec::new();
+        let mut cursor = member;
+        loop {
+            chain.push(cursor);
+            let radix_syntax::ExprKind::Member(previous) = &cursor.object.kind else {
+                break;
+            };
+            cursor = previous;
+        }
+        let mut object = lower_expr(self, &cursor.object);
+        for (index, item) in chain.iter().rev().enumerate() {
+            let item_id = if index + 1 == chain.len() {
+                id
+            } else {
+                self.next_hir_id()
+            };
+            let span = object.span.merge(item.member.span);
+            let kind = self.lower_member_from_object(item, item_id, object);
+            object = radix_hir::HirExpression {
+                id: item_id,
+                kind,
+                ty: None,
+                span,
+            };
+        }
+        object.kind
+    }
+
+    fn lower_member_from_object(
+        &mut self,
+        member: &radix_syntax::MemberExpr,
+        id: radix_hir::HirId,
+        object: radix_hir::HirExpression,
+    ) -> HirExpressionKind {
         if let radix_syntax::ExprKind::Ident(base) = &member.object.kind
             && let Some(base_def) = self.lookup_name(base.name)
             && let Some(base_symbol) = self.resolver.get_symbol(base_def)
@@ -853,7 +890,6 @@ impl Lowerer<'_> {
             return HirExpressionKind::Field(Box::new(object), member.member.name);
         }
 
-        let object = lower_expr(self, &member.object);
         let field = self.canonicalize_namespace_member(&object, member.member.name);
         if let Some(kind) = self.lower_tuple_label_member(&object, field, member.member.span, id) {
             return kind;

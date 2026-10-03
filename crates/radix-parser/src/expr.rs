@@ -386,6 +386,7 @@ impl Parser {
             // not a second meaning for `est`.
             let positive = matches!(op, BinOp::Is);
             if matches!(op, BinOp::Is | BinOp::IsNot) {
+                self.charge_fold(start)?;
                 let ty = self.parse_est_type_rhs()?;
                 let span = start.merge(self.previous_span());
                 let id = self.next_id();
@@ -1010,6 +1011,26 @@ impl Parser {
         let mut expr = self.parse_primary()?;
 
         loop {
+            if self.budget_exhausted {
+                return Err(self.spent_budget_error(ParseErrorKind::ExpressionInvalid, start));
+            }
+            let has_postfix = self.check(&TokenKind::LtAscii)
+                || self.check(&TokenKind::LParen)
+                || self.check(&TokenKind::Dot)
+                || self.check(&TokenKind::LBracket)
+                || self.check(&TokenKind::Transpose)
+                || self.check(&TokenKind::Nabla)
+                || self.check(&TokenKind::QuestionDot)
+                || self.check(&TokenKind::QuestionBracket)
+                || self.check(&TokenKind::QuestionParen)
+                || self.check(&TokenKind::BangDot)
+                || self.check(&TokenKind::BangBracket)
+                || self.check(&TokenKind::BangParen)
+                || self.check_keyword(TokenKind::Verte)
+                || (allow_conversio && self.check_keyword(TokenKind::Conversio));
+            if has_postfix {
+                self.charge_fold(start)?;
+            }
             if self.check(&TokenKind::LtAscii) {
                 let checkpoint = self.checkpoint();
                 if let Ok(type_args) = self.parse_call_type_args()

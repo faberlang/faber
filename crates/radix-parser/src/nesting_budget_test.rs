@@ -82,6 +82,22 @@ fn flat_fold_chain(operators: usize) -> String {
     format!("fixum _ value ← 1{}", " + 1".repeat(operators))
 }
 
+fn postfix_member_chain(members: usize) -> String {
+    format!("fixum _ value ← root{}", ".b".repeat(members))
+}
+
+fn type_test_chain(tests: usize) -> String {
+    format!("fixum _ value ← root{}", " est T".repeat(tests))
+}
+
+fn nested_figura(depth: usize) -> String {
+    format!(
+        "functio f(tensor<f32, {}1{}> value) → vacuum {{}}",
+        "[".repeat(depth),
+        "]".repeat(depth)
+    )
+}
+
 /// Two folded chains under one root expression.
 fn split_fold_chain(operators_per_side: usize) -> String {
     let side = format!("1{}", " + 1".repeat(operators_per_side));
@@ -235,6 +251,30 @@ fn array_binding_pattern_nesting_past_the_budget_reports_a_nesting_diagnostic() 
 /// The count budget, not the depth counter, must reject an iteratively folded
 /// chain: `1 + 1 + …` costs no parser recursion, so a flat source can build a
 /// tree far deeper than the grammar nests.
+#[test]
+fn postfix_member_chain_past_the_budget_reports_a_count_diagnostic() {
+    assert_parse_error_matches(
+        &postfix_member_chain(MAX_PARSE_OPERATORS + 64),
+        ParseExpectation::Issue("expression_too_long"),
+    );
+}
+
+#[test]
+fn repeated_type_tests_past_the_budget_report_a_count_diagnostic() {
+    assert_parse_error_matches(
+        &type_test_chain(MAX_PARSE_OPERATORS + 64),
+        ParseExpectation::Issue("expression_too_long"),
+    );
+}
+
+#[test]
+fn nested_figura_past_the_budget_reports_a_nesting_diagnostic() {
+    assert_parse_error_matches(
+        &nested_figura(OVER_BUDGET_DEPTH),
+        ParseExpectation::Issue("nesting_too_deep"),
+    );
+}
+
 #[test]
 fn flat_fold_chain_past_the_operator_budget_reports_a_count_diagnostic() {
     let source = flat_fold_chain(OVER_BUDGET_OPERATORS);
