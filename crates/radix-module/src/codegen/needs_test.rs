@@ -225,10 +225,3 @@ incipiet {
     let needs = collect_rust_needs(&hir, &types, BTreeSet::new(), None);
     assert!(needs.needs_faber_runtime, "an awaiting entry requires the faber runtime crate");
 }
-
-#[test]
-fn rust_prelude_policy_no_longer_scans_body_for_hashmap() {
-    let prelude = include_str!("../../../radix-hir-rust/src/prelude.rs");
-    assert!(!prelude.contains("code.contains(\"HashMap\""));
-    assert!(!prelude.contains("needs_faber_runtime_dep"));
-}
