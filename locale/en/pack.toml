@@ -3143,6 +3143,10 @@ help = "add an explicit type annotation"
 message = "cannot infer constant type"
 help = "add an explicit type annotation"
 
+[diagnostics.SEM014.issues.cannot_infer_empty_list_element_type]
+message = "cannot infer the element type of an empty list"
+help = "declare a list<T> local initialized with empty, or ascribe [] to list<T> before converting it"
+
 [diagnostics.SEM014.issues.cannot_infer_expression_type]
 message = "cannot infer expression type"
 help = "add an explicit type annotation"
