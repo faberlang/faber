@@ -878,6 +878,9 @@ pub struct HirImportItem {
 pub enum HirBreakableKind {
     /// `fac { }` try body (not the `cape` handler).
     Fac,
+    /// `fac omnia { }` try body: same breakable semantics as [`Fac`]; the
+    /// marker is surface-only and rides HIR so the re-emitter round-trips it.
+    FacOmnia,
 }
 
 /// Ordered statement block with an optional trailing expression.

@@ -22,6 +22,8 @@ pub mod types;
 
 #[cfg(test)]
 mod cape_attach_emit_test;
+#[cfg(test)]
+mod fac_omnia_emit_test;
 
 #[cfg(test)]
 mod comma_law_test;

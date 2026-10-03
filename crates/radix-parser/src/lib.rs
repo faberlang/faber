@@ -1499,6 +1499,10 @@ pub mod test_support;
 mod comment_preservation_test;
 
 #[cfg(test)]
+#[path = "fac_omnia_test.rs"]
+mod fac_omnia_test;
+
+#[cfg(test)]
 #[path = "line_start_comment_test.rs"]
 mod line_start_comment_test;
 

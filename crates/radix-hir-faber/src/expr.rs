@@ -371,8 +371,17 @@ impl super::FaberCodegen<'_> {
                 // A plain `fac { }` body is a breakable scope: `rumpe` exits
                 // the block, not the enclosing loop. Dropping the keyword
                 // would change what `rumpe`/`perge` target (D8.9).
-                if block.breakable == Some(radix_hir::HirBreakableKind::Fac) {
+                if let Some(kind) = block.breakable
+                    && matches!(
+                        kind,
+                        radix_hir::HirBreakableKind::Fac | radix_hir::HirBreakableKind::FacOmnia
+                    )
+                {
                     writer.write(surface.contextual_keyword("fac"));
+                    if matches!(kind, radix_hir::HirBreakableKind::FacOmnia) {
+                        writer.write(" ");
+                        writer.write(surface.contextual_keyword("omnia"));
+                    }
                     writer.write(" ");
                 }
                 writer.writeln("{");
@@ -954,7 +963,7 @@ impl super::FaberCodegen<'_> {
                 writer.write(" ∴ ");
                 // A `fac`-breakable body block writes its own keyword.
                 if matches!(&body.kind, HirExpressionKind::Block(block)
-                    if block.breakable != Some(radix_hir::HirBreakableKind::Fac))
+                    if !matches!(block.breakable, Some(radix_hir::HirBreakableKind::Fac | radix_hir::HirBreakableKind::FacOmnia)))
                 {
                     writer.write(surface.contextual_keyword("fac"));
                     writer.write(" ");
@@ -1505,7 +1514,22 @@ impl super::FaberCodegen<'_> {
             return;
         }
 
+        // `fac omnia` rides the synthetic `Block` tail the same way
+        // `write_fac_body` unwraps it; the handler keyword follows the body.
+        let omnia = body.statements.is_empty()
+            && matches!(
+                body.expr.as_deref().map(|expr| &expr.kind),
+                Some(HirExpressionKind::Block(inner))
+                    if matches!(
+                        inner.breakable,
+                        Some(radix_hir::HirBreakableKind::FacOmnia)
+                    )
+            );
         writer.write(surface.contextual_keyword("fac"));
+        if omnia {
+            writer.write(" ");
+            writer.write(surface.contextual_keyword("omnia"));
+        }
         writer.writeln(" {");
         writer.indented(|writer| {
             self.write_fac_body(body, names, surface, writer);
