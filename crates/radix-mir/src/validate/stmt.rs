@@ -6,8 +6,8 @@ use super::{
 use crate::generic::MirShapeBindings;
 use crate::visit::terminator_successors;
 use crate::{
-    MirBlock, MirBlockId, MirCallee, MirFunction, MirFunctionId, MirStatement, MirStatementKind,
-    MirTerminator, MirTerminatorKind,
+    MirBlock, MirBlockId, MirCallee, MirFunction, MirFunctionId, MirIntrinsic, MirOperand,
+    MirPlaceBase, MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind,
 };
 use radix_types::Primitive;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -374,15 +374,79 @@ impl Validator<'_, '_> {
             }
         }
 
+        // A conversion recovery may be represented by an intentionally
+        // detached CFG region. Its recovery operand names the temp assigned at
+        // the region tail; that tail jumps back to the reachable success flow.
+        // Permit only detached predecessors that flow into such an anchored
+        // tail, not arbitrary orphan CFG components.
+        let mut recovery_temps = FxHashSet::default();
+        for block in &function.blocks {
+            for statement in &block.statements {
+                let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+                    continue;
+                };
+                let MirIntrinsic::Convert(conversion) = &call.intrinsic else {
+                    continue;
+                };
+                match conversion.recovery.as_ref() {
+                    Some(MirOperand::Temp(temp)) => {
+                        recovery_temps.insert(*temp);
+                    }
+                    Some(MirOperand::Place(place)) => {
+                        if let MirPlaceBase::Temp(temp) = place.base {
+                            recovery_temps.insert(temp);
+                        }
+                    }
+                    Some(MirOperand::Value(_) | MirOperand::Constant(_)) | None => {}
+                }
+            }
+        }
+
+        let mut predecessors: FxHashMap<MirBlockId, Vec<MirBlockId>> = FxHashMap::default();
+        for block in &function.blocks {
+            for succ in terminator_successors(&block.terminator.kind) {
+                predecessors.entry(succ).or_default().push(block.id);
+            }
+        }
+
+        let mut recovery_region = FxHashSet::default();
+        let mut recovery_stack = Vec::new();
+        for block in &function.blocks {
+            let stores_recovery = block.statements.iter().any(|statement| {
+                matches!(
+                    &statement.kind,
+                    MirStatementKind::Assign {
+                        place: crate::MirPlace { base: MirPlaceBase::Temp(temp), .. },
+                        ..
+                    } if recovery_temps.contains(temp)
+                )
+            });
+            let joins_reachable = terminator_successors(&block.terminator.kind)
+                .into_iter()
+                .any(|successor| reachable.contains(&successor));
+            if stores_recovery && !reachable.contains(&block.id) && joins_reachable {
+                recovery_region.insert(block.id);
+                recovery_stack.push(block.id);
+            }
+        }
+        while let Some(current) = recovery_stack.pop() {
+            if let Some(preds) = predecessors.get(&current) {
+                for pred in preds {
+                    if !reachable.contains(pred) && recovery_region.insert(*pred) {
+                        recovery_stack.push(*pred);
+                    }
+                }
+            }
+        }
+
         for block in &function.blocks {
             // Only flag blocks that are referenced as successor targets but are
-            // not reachable from entry. These are genuine orphans: some
-            // terminator tries to reach them but no path from entry exists.
-            //
-            // Blocks that no terminator references are dead code (unused join
-            // points, eliminated paths) — the lowerer creates them and later
-            // passes clean them up. They are not reachability bugs.
-            if successor_targets.contains(&block.id) && !reachable.contains(&block.id) {
+            // not reachable from entry, except the detached predecessors of an
+            // explicit conversion-recovery tail.
+            if successor_targets.contains(&block.id)
+                && !reachable.contains(&block.id)
+                && !recovery_region.contains(&block.id)
+            {
                 self.error(
                     block.span,
                     format!("block bb{} is not reachable from entry", block.id.0),
@@ -397,14 +461,6 @@ impl Validator<'_, '_> {
         //    reach a seed by following predecessor edges backward. This
         //    accepts loops (the exit reaches Return) while rejecting pure
         //    Goto cycles (no path to any seed).
-
-        // Build predecessor map: for each block, which blocks target it.
-        let mut predecessors: FxHashMap<MirBlockId, Vec<MirBlockId>> = FxHashMap::default();
-        for block in &function.blocks {
-            for succ in terminator_successors(&block.terminator.kind) {
-                predecessors.entry(succ).or_default().push(block.id);
-            }
-        }
 
         // Identify seeds: blocks whose terminator is Return/ReturnError/Unreachable.
         let mut reaches_terminator = FxHashSet::default();
