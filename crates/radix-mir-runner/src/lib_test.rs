@@ -6637,3 +6637,35 @@ fn pd25_map_tensor_unary_preserves_values_and_errors
         );
     }
 }
+
+#[test]
+fn tensor_expand_static_tensor_witness_matches_list_shape_and_shares_storage() {
+    let source = tensor_value(
+        vec![Value::Int(10), Value::Int(20), Value::Int(30)],
+        vec![1, 3],
+    );
+    let witness = tensor_value(vec![Value::Int(0); 24], vec![2, 4, 3]);
+    let expanded = eval_tensor_view_op(
+        MirCollectionOp::TensorExpand,
+        vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        vec![(MirValueId(0), source.clone()), (MirValueId(1), witness)],
+    )
+    .expect("static tensor witness expansion");
+    let (Value::Tensor(source), Value::Tensor(expanded)) = (&source, &expanded) else {
+        unreachable!();
+    };
+    assert!(Rc::ptr_eq(&source.borrow().data, &expanded.borrow().data));
+    assert_eq!(expanded.borrow().shape, [2, 4, 3]);
+    let values = expanded.borrow().logical_values().unwrap();
+    assert_eq!(
+        values,
+        [Value::Int(10), Value::Int(20), Value::Int(30)]
+            .into_iter()
+            .cycle()
+            .take(24)
+            .collect::<Vec<_>>()
+    );
+}

@@ -6,6 +6,9 @@
 //!
 //! - [`MirCollectionOp::TensorShape`] (`magnitudines()`) on a static tensor
 //!   folds to a constant `lista<numerus>` construct of the literal dims;
+//! - [`MirCollectionOp::TensorExpand`] on a static `TensorShape` witness
+//!   uses the source tensor as a checked shape carrier; its consumed shape
+//!   list is erased and the explicit expansion's index map remains live;
 //! - [`MirCollectionOp::TensorCreate`] (`crea(lr, shape)`) on a static
 //!   destination folds to a scalar-broadcast [`MirCollectionOp::TensorFill`]
 //!   whose receiver is the **shape-source tensor** (the tensor whose
@@ -183,6 +186,8 @@ pub fn fold_static_shapes(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
 ) -> Result<ShapeFoldOutcome, ShapeFoldError> {
+    let expansion_folded = crate::tensor_expansion::fold_expansion_witnesses(function, validation)?;
+    let function = &expansion_folded;
     // The lowered body's call-result copies: a runtime call lands in a temp
     // and the next statement copies it into a local (`Local(l) ← Temp(t)`).
     // Shape construction is no exception (`shape_w ← weight.magnitudines()`,

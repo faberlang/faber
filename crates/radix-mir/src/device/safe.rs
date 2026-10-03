@@ -906,6 +906,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                                 | MirCollectionOp::TensorDiv
                                 | MirCollectionOp::TensorNeg
                                 | MirCollectionOp::TensorFill
+                                | MirCollectionOp::TensorExpand
                                 | MirCollectionOp::TensorRelu
                                 | MirCollectionOp::TensorGelu,
                             ),
