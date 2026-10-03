@@ -58,6 +58,35 @@ incipit {
 
 #[test]
 #[cfg(feature = "hir-rust")]
+fn rust_needs_regex_follows_the_regex_type_in_use() {
+    let (hir, types) = analyze_hir(
+        r#"
+incipit {
+  fixum textus s ← "a+"
+  fixum regex r ← s ↦ regex
+  nota r
+}
+"#,
+    );
+    let needs = collect_rust_needs(&hir, &types, BTreeSet::new(), None);
+    assert!(needs.needs_regex, "a regex literal requires the regex feature");
+    assert!(needs.needs_faber_runtime);
+
+    let (hir, types) = analyze_hir(
+        r"
+incipit {
+  fixum valor v ← 1
+  nota v
+}
+",
+    );
+    let needs = collect_rust_needs(&hir, &types, BTreeSet::new(), None);
+    assert!(!needs.needs_regex, "a program without a regex stays off the feature");
+    assert!(needs.needs_faber_runtime);
+}
+
+#[test]
+#[cfg(feature = "hir-rust")]
 fn rust_needs_faber_runtime_for_an_integer_only_program() {
     // The exact-integer helpers live in `faber::exact`, so integer arithmetic
     // alone makes a program depend on the runtime crate.

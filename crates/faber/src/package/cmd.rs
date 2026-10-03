@@ -633,6 +633,7 @@ fn single_file_rust_runtime_plan(
     Ok(super::RustRuntimePlan {
         needs_faber: needs.needs_faber_runtime || needs_f16_decode,
         needs_tokio,
+        needs_regex: needs.needs_regex,
         host: None,
         non_runtime_routes: std::collections::BTreeSet::new(),
         selected_providers: std::collections::BTreeSet::new(),
