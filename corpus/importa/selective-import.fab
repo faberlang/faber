@@ -15,8 +15,8 @@ locale = "la"
 # =============================================================================
 #
 # What this teaches:
-#   • Value bindings — `importa ex "norma:console" fixum dic ut output,
-#     funde ut output_bytes` imports one exported value member per `fixum`
+#   • Value bindings — `importa ex "norma:console" fixum write_partial ut output,
+#     write_bytes ut output_bytes` imports one exported value member per `fixum`
 #     local; the pre-`ut` identifier names an exported value in the imported
 #     file, the post-`ut` identifier is the caller-owned local binding
 #   • Values and types — functions and constants bind as values; a type
@@ -41,7 +41,7 @@ locale = "la"
 # See also: importa, ex
 # =============================================================================
 
-importa ex "norma:console" fixum dic ut output, funde ut output_bytes
+importa ex "norma:console" fixum write_partial ut output, write_bytes ut output_bytes
 
 functio scribe((textus) → vacuum sink, textus nomen) → vacuum {
     sink(nomen)

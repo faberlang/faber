@@ -29,10 +29,7 @@ locale = "en"
 #   entryModifier :← 'exitus' integer
 #
 # EXPECTED OUTPUT:
-#   No incipit — declaration or test-runner surface only.
-#
-# BACKEND:
-#   declaration-only entry modifier (whitelist: exitus/exitus.fab).
+#   The entry terminates with exit code 1, as selected by `exit 1` below.
 #
 
 @ cli { name = "exitus-smoke" }
