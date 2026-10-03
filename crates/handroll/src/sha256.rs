@@ -202,7 +202,11 @@ pub fn sha256_hex(data: impl AsRef<[u8]>) -> String {
 
 /// Lowercase hex encoding with zero-padded bytes — matches the `{:x}`
 /// formatting the replaced sha2 call sites used.
-fn hex(bytes: &[u8]) -> String {
+///
+/// Public so callers that hold an already-computed digest (rather than the
+/// hashed input) can render it, instead of carrying a private hex helper.
+#[must_use]
+pub fn hex(bytes: &[u8]) -> String {
     const HEX_DIGITS: &[u8; 16] = b"0123456789abcdef";
     let mut out = String::with_capacity(bytes.len() * 2);
     for &byte in bytes {
