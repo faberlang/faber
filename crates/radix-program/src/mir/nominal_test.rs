@@ -604,11 +604,11 @@ class Incoming {
 }
 main {
     const Incoming incoming ← Incoming { id = "http-1", connection = 3 }
-    print incoming.id
-    print incoming.connection
-    print incoming.req.body
-    print incoming.req.headers.name
-    print incoming.req.headers.entries.length()
+    assert incoming.id ≡ "http-1"
+    assert incoming.connection ≡ 3
+    assert incoming.req.body ≡ "producer body"
+    assert incoming.req.headers.name ≡ "nested producer text"
+    assert incoming.req.headers.entries.length() ≡ 0
 }
 "#,
     );
@@ -633,9 +633,5 @@ class Headers {
         &crate::test_support::test_mir_seams(),
         &mut host,
     )
-    .expect("nested imported defaults lower and run");
-    assert_eq!(
-        host.stdout_lines,
-        ["http-1", "3", "producer body", "nested producer text", "0"]
-    );
+    .expect("nested imported defaults and all five value assertions run");
 }
