@@ -116,12 +116,11 @@ pub(super) fn cmd_test(args: &TestArgs) {
         deny_codes: args.deny.clone(),
     };
 
-    // ONE-EFFECTIVE-TARGET SEAM (TARGETLANE001 executed-lane routing;
-    // authoritative decision record `radix/docs/factory/
-    // executed-lane-target-decision.md`): the runner analysis target resolves
-    // to a MIR-backed target — the manifest `[build] target` when present,
-    // else the executed-lane default `fmir` — so air-lane packages (e.g.
-    // gradus) pass the lane policy at analysis instead of tripping
+    // ONE-EFFECTIVE-TARGET SEAM (TARGETLANE001 executed-lane routing):
+    // BUG-F585D081 keeps the manifest authoritative. The analysis target resolves
+    // to the manifest target (including its implicit `fhir` default), or
+    // the executed-lane default `fmir` only without a manifest. Air-lane
+    // packages declaring a MIR target pass analysis instead of tripping
     // `lane_requires_mir_backed_target` under the old HIR-direct placeholder.
     // The runner never emits product targets; the target only selects the
     // analysis lane-policy posture.

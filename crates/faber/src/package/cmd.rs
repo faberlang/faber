@@ -18,7 +18,8 @@ use super::cargo::{
 };
 #[cfg(feature = "hir-go")]
 use super::go_build::{GoBuildLayout, emit_go_module_with_postprocess, invoke_go_build};
-use super::manifest::{FaberManifest, manifest_package_build_target};
+use super::manifest::FaberManifest;
+use super::manifest_build_target_for_input;
 #[cfg(feature = "mir-llvm")]
 use super::{LlvmHostProfile, build_host_program};
 use super::{
@@ -662,15 +663,20 @@ fn single_file_rust_runtime_plan(
 
 /// Resolve the build target: an explicit CLI target wins, otherwise the
 /// package manifest's `build.target`. A manifest read failure or unsupported
-/// target is fatal.
+/// target is fatal, including when the CLI explicitly overrides a valid target.
 fn resolve_build_target(command: &radix::services::BuildCommand, input_path: &Path) -> Target {
+    let manifest_target = match manifest_build_target_for_input(input_path) {
+        Ok(target) => target,
+        Err(diag) => fail_with_diagnostic(&diag),
+    };
     if command.target_explicit {
         return command.target;
     }
 
-    manifest_package_build_target(input_path)
-        .unwrap_or_else(|diag| fail_with_diagnostic(&diag))
-        .unwrap_or(command.target)
+    match manifest_target {
+        Some(target) => target,
+        None => command.target,
+    }
 }
 
 /// Decide whether an input path should enter package-mode command handling.
@@ -773,9 +779,11 @@ pub fn cmd_check_package(
     // A manifest that cannot be read or names an unsupported target is fatal,
     // exactly as in `faber build`; a package with no manifest checks as
     // `Target::HirRust`.
-    let check_target = manifest_package_build_target(&input_path)
-        .unwrap_or_else(|diag| fail_with_diagnostic(&diag))
-        .unwrap_or(Target::HirRust);
+    let check_target = match manifest_build_target_for_input(&input_path) {
+        Ok(Some(target)) => target,
+        Ok(None) => Target::HirRust,
+        Err(diag) => fail_with_diagnostic(&diag),
+    };
 
     let (config, locale_pack) = match config_with_locale(
         check_target,

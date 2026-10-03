@@ -207,12 +207,10 @@ fn diagnostic_has_arg(diag: &Diagnostic, name: &'static str, value: impl Into<St
 
 #[test]
 fn executed_lane_analysis_target_seam_is_single_valued() {
-    // TARGETLANE001 executed-lane routing (authoritative decision record
-    // `radix/docs/factory/executed-lane-target-decision.md`): the executed-
-    // package analysis target resolves to a MIR-backed target with single-
-    // valued precedence — explicit MIR-backed config target > manifest
-    // `[build] target` > executed-lane default `fmir`. The seam is never
-    // ambient and never divergent between analysis and execution.
+    // TARGETLANE001 / BUG-F585D081: single-valued precedence is explicit
+    // MIR-backed config target > manifest target (including its implicit
+    // default) > executed-lane `fmir` only without a manifest. Analysis and
+    // execution must consume the same fact.
     let dir = test_temp_dir("lane-seam");
     fs::create_dir_all(dir.join("src")).expect("src");
     fs::write(dir.join("src/main.fab"), "main {}\n").expect("source");
@@ -254,7 +252,8 @@ kind = "bin"
         "explicit MIR-backed target must stay authoritative over the manifest"
     );
 
-    // No manifest target → executed-lane default `fmir`.
+    // A manifest with no explicit target still owns its implicit `fhir` default.
+    // The old `fmir` substitution disagreed with build/check for this manifest.
     let bare = test_temp_dir("lane-seam-bare");
     fs::create_dir_all(bare.join("src")).expect("src");
     fs::write(bare.join("src/main.fab"), "main {}\n").expect("source");
@@ -274,9 +273,186 @@ entry = "main.fab"
     .expect("manifest");
     assert_eq!(
         super::executed_lane_analysis_target(&Config::default(), bare.path()).unwrap(),
-        Target::MirFmirBinary,
-        "the executed-lane default for an un-targeted package must be `fmir`"
+        Target::HirFhir,
+        "an existing un-targeted manifest must keep its implicit portable target"
     );
+}
+
+#[test]
+fn executed_lane_uses_the_manifest_implicit_target() {
+    let dir = test_temp_dir("implicit-target-agreement");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(dir.join("src/main.fab"), "main {}\n").expect("source");
+    fs::write(
+        dir.join("faber.toml"),
+        "[package]\nname = \"implicit-target\"\n[paths]\nentry = \"main.fab\"\n",
+    )
+    .expect("manifest");
+    let manifest_target = super::manifest_build_target_for_input(dir.path())
+        .expect("valid manifest")
+        .expect("manifest exists");
+    assert_eq!(manifest_target, Target::HirFhir);
+    assert_eq!(
+        super::executed_lane_analysis_target(&Config::default(), dir.path()).unwrap(),
+        manifest_target,
+        "an existing manifest must not be replaced with the executed-lane default"
+    );
+}
+
+#[test]
+fn manifest_declared_targets_keep_their_analysis_identity() {
+    let dir = test_temp_dir("declared-target-agreement");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(dir.join("src/main.fab"), "main {}\n").expect("source");
+    let manifest_path = dir.join("faber.toml");
+    let spellings = Target::ALL.iter().map(ToString::to_string).chain([
+        "typescript".to_owned(),
+        "wasm".to_owned(),
+        "fmir-bin".to_owned(),
+    ]);
+    for spelling in spellings {
+        let expected =
+            radix::program::manifest::manifest_build_target(Some(&spelling), &manifest_path);
+        fs::write(
+            &manifest_path,
+            format!(
+                "[package]\nname = \"declared-target\"\n[paths]\nentry = \"main.fab\"\n[build]\ntarget = \"{spelling}\"\n"
+            ),
+        )
+        .expect("manifest");
+        for input in [
+            dir.path(),
+            manifest_path.as_path(),
+            dir.join("src/main.fab").as_path(),
+        ] {
+            match &expected {
+                Ok(target) => {
+                    assert_eq!(
+                        super::manifest_build_target_for_input(input).unwrap(),
+                        Some(*target),
+                        "manifest target {spelling}, input {}",
+                        input.display()
+                    );
+                    assert_eq!(
+                        super::executed_lane_analysis_target(&Config::default(), input).unwrap(),
+                        *target,
+                        "executed target {spelling}, input {}",
+                        input.display()
+                    );
+                }
+                Err(_) => {
+                    assert!(super::manifest_build_target_for_input(input).is_err());
+                    assert!(
+                        super::executed_lane_analysis_target(&Config::default(), input).is_err()
+                    );
+                }
+            }
+        }
+    }
+}
+
+// Exercise the real process-exiting package command drivers from a child test
+// process, without relying on a possibly stale standalone `faber` executable.
+#[test]
+fn manifest_target_command_probe() {
+    let Some(operation) = std::env::var_os("FABER_MANIFEST_TARGET_PROBE") else {
+        return;
+    };
+    let input = std::env::var("FABER_MANIFEST_TARGET_PROBE_INPUT").expect("probe input");
+    match operation.to_str().expect("probe operation") {
+        "check" => super::cmd_check_package(
+            radix::services::CheckCommand {
+                input: vec![input],
+                package: true,
+                permissive: false,
+                deny_warnings: false,
+                deny_codes: Vec::new(),
+                diagnostic_mode: radix::services::DiagnosticMode::Normal,
+                diagnostics_locale_pack: None,
+                locale: None,
+                diagnostics_locale: None,
+            },
+            None,
+            None,
+        ),
+        "build" | "build-explicit" => super::cmd_build(
+            radix::services::BuildCommand {
+                input,
+                out_dir: PathBuf::new(),
+                package: true,
+                release: false,
+                target: Target::HirFhir,
+                target_explicit: operation.to_str() == Some("build-explicit"),
+                deny_warnings: false,
+                deny_codes: Vec::new(),
+                locale: None,
+                diagnostics_locale: None,
+            },
+            false,
+            false,
+        ),
+        other => panic!("unknown probe operation {other}"),
+    }
+}
+
+#[test]
+fn package_check_refuses_the_manifest_target_build_refuses() {
+    let dir = test_temp_dir("check-build-target-refusal");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(dir.join("src/main.fab"), "main {}\n").expect("source");
+    fs::write(
+        dir.join("faber.toml"),
+        "[package]\nname = \"bad-target\"\n[paths]\nentry = \"main.fab\"\n[build]\nkind = \"lib\"\ntarget = \"ada\"\ntargets = [\"rust\"]\n[library]\nprovider = \"bad-target\"\n",
+    )
+    .expect("manifest");
+    let mut errors = Vec::new();
+    for operation in ["check", "build", "build-explicit"] {
+        let output = Command::new(std::env::current_exe().expect("test executable"))
+            .args([
+                "--exact",
+                "package::tests::manifest_target_command_probe",
+                "--nocapture",
+            ])
+            .env("FABER_MANIFEST_TARGET_PROBE", operation)
+            .env("FABER_MANIFEST_TARGET_PROBE_INPUT", dir.path())
+            .output()
+            .expect("run package command probe");
+        assert_eq!(output.status.code(), Some(1), "{operation}: {output:?}");
+        let stderr = String::from_utf8(output.stderr).expect("diagnostic UTF-8");
+        assert!(
+            stderr.contains("build.target 'ada' is not a build target"),
+            "{stderr}"
+        );
+        errors.push(stderr);
+    }
+    assert_eq!(
+        errors[0], errors[1],
+        "check/build must refuse the same manifest fact"
+    );
+    assert_eq!(
+        errors[0], errors[2],
+        "an explicit build must also fail closed"
+    );
+
+    // A valid explicit override still wins; manifest validation must not turn
+    // the manifest into an override of an intentional CLI target.
+    fs::write(
+        dir.join("faber.toml"),
+        "[package]\nname = \"valid-target\"\n[paths]\nentry = \"main.fab\"\n[build]\ntarget = \"fmir\"\n",
+    )
+    .expect("valid manifest");
+    let output = Command::new(std::env::current_exe().expect("test executable"))
+        .args([
+            "--exact",
+            "package::tests::manifest_target_command_probe",
+            "--nocapture",
+        ])
+        .env("FABER_MANIFEST_TARGET_PROBE", "build-explicit")
+        .env("FABER_MANIFEST_TARGET_PROBE_INPUT", dir.path())
+        .output()
+        .expect("run explicit build probe");
+    assert!(output.status.success(), "valid explicit build: {output:?}");
+    assert!(dir.join("target/faber-fhir/package.fhirpkg").is_file());
 }
 
 #[derive(Debug)]
@@ -8103,7 +8279,7 @@ provider = "lib-target"
     )
     .expect("write manifest");
 
-    let package_err = super::manifest_package_build_target(dir.path())
+    let package_err = super::manifest_build_target_for_input(dir.path())
         .expect_err("package target resolver must fail closed");
     assert!(diagnostic_has_issue(
         &package_err,
@@ -8116,11 +8292,21 @@ provider = "lib-target"
         "package_build_target_unsupported"
     ));
 
+    let explicit_lane_err = super::executed_lane_analysis_target(
+        &Config::default().with_target(Target::MirFmir),
+        dir.path(),
+    )
+    .expect_err("an explicit executed target must not hide a manifest error");
+    assert!(diagnostic_has_issue(
+        &explicit_lane_err,
+        "package_build_target_unsupported"
+    ));
+
     // No manifest: every resolver reports "no manifest" and the caller picks
     // its own named default.
     let bare = test_temp_dir("lib-target-resolvers-bare");
     assert_eq!(
-        super::manifest_package_build_target(bare.path()).expect("no manifest"),
+        super::manifest_build_target_for_input(bare.path()).expect("no manifest"),
         None
     );
     assert_eq!(

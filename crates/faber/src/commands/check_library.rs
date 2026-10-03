@@ -186,10 +186,10 @@ fn check_target(
     if root_rule != LibraryRootRule::FaberToml {
         return Ok(Target::HirRust);
     }
-    Ok(
-        faber_cli::package::manifest_package_build_target(provider_repo)?
-            .unwrap_or(Target::HirRust),
-    )
+    match faber_cli::package::manifest_build_target_for_input(provider_repo)? {
+        Some(target) => Ok(target),
+        None => Ok(Target::HirRust),
+    }
 }
 
 /// Analyze the library interface graph. Does not include `.proba`.
