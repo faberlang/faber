@@ -8,5 +8,23 @@
     "rewriteRelativeImportExtensions": true,
     "outDir": "dist"
   },
-  "include": ["index.ts", "dec.ts", "display.ts", "exact.ts", "format.ts", "inf.ts", "modulus.ts", "regex.ts", "instans.ts", "intervallum.ts", "dup.ts", "order.ts"]
+  "include": [
+    "index.ts",
+    "dec.ts",
+    "display.ts",
+    "exact.ts",
+    "format.ts",
+    "inf.ts",
+    "modulus.ts",
+    "regex.ts",
+    "instans.ts",
+    "intervallum.ts",
+    "dup.ts",
+    "order.ts",
+    "json.ts",
+    "valor.ts",
+    "variant.ts",
+    "tuple.ts",
+    "atomic.ts"
+  ]
 }
