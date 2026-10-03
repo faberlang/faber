@@ -1,0 +1,70 @@
++++
+term = "inf-nul"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "concrete_type", "type_arguments", "conversio_expr", "inline_default", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "`valor ∪ none ↦ inf` reads its payload by the `valor ↦ inf` law: an integer converts exactly, a float or an absent value fails and `⊥` supplies the fallback."
+syntax = "<valor ∪ none> ↦ inf [⊥ <default>]"
+related = ["inf", "valor", "none", "↦", "⊥"]
+locale = "en"
++++
+# =============================================================================
+# inf-nul — taking an `inf` out of a nullable `valor`
+# =============================================================================
+#
+# What this teaches:
+#   • A `valor ∪ none` that holds an integer converts to `inf` exactly, the
+#     same as a non-nullable `valor`: a small `int`, a `u64`, or an `inf` far
+#     beyond 64 bits.
+#   • Anything else fails and `⊥` supplies the fallback. A float fails even
+#     when it is a whole number, so `1.5` never reads as `1`; an absent
+#     (`none`) value fails too.
+#
+# Common mistakes:
+#   • Expecting the nullable path to truncate a float — it follows the
+#     non-nullable `valor ↦ inf` row and fails.
+#   • Expecting an absent value to read as `0` — a `none` is not an integer.
+#
+# See also: inf, valor, none, ↦, ⊥, inf-valor
+# =============================================================================
+
+# operatores/inf-nul — `valor ∪ none ↦ inf` on integer and non-integer payloads
+#
+# WHY: the nullable source is a union/option carrier, not a bare `valor`, so
+# it is a separate conversion row from operatores/inf-valor. Before the fix the
+# runner read the payload by its own shape and truncated a float (1.5 → 1);
+# this pins the same law as the non-nullable path.
+#
+# EXPECTED OUTPUT:
+#   inf-nul.expected — one result per print.
+
+# The inf in a nullable valor, or -1 when the payload is not an integer.
+fn take(value ∪ none boxed) → inf {
+    return boxed ↦ inf ⊥ -1
+}
+
+main {
+    # 1. Integer payloads convert exactly, whatever the size.
+    const value ∪ none small ← 7 ↦ value
+    print take(small)
+    const value ∪ none big ← 18446744073709551616 ↦ value
+    print take(big)
+    const value ∪ none negative ← -18446744073709551617 ↦ value
+    print take(negative)
+
+    # 2. A float payload fails like the non-nullable `valor ↦ inf`: it never
+    #    truncates, so even `3.0` fails.
+    const value ∪ none half ← 1.5 ↦ value
+    print take(half)
+    const value ∪ none whole ← 3.0 ↦ value
+    print take(whole)
+
+    # 3. An absent (none) value is not an integer and fails too.
+    const value ∪ none absent ← null
+    print take(absent)
+
+    # 4. `⊥` names its own fallback.
+    const value ∪ none word ← "text" ↦ value
+    print word ↦ inf ⊥ 8
+}

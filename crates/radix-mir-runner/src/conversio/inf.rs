@@ -15,14 +15,15 @@ use handroll::{Magnus, Radix};
 use radix_codegen_shared::hints::EndianHint;
 use radix_lexer::{Span, Symbol};
 use radix_mir::MirOperand;
-use radix_types::{NumericWidth, TypeId, effective_width};
+use radix_types::{NumericWidth, Primitive, Type, TypeId, effective_width};
 
 impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     /// Any source `↦ inf` (ruling 40). Bounded integers and policy words widen
     /// unchanged; a float truncates toward zero and fails on NaN and `±∞`; a
     /// `d64` reduces as it does to `int`; text parses any length of digits
     /// (`via Hex/Bin/Oct`); `octeti via Be/Le` decodes minimal two's
-    /// complement.
+    /// complement. A nullable `valor ∪ none` source reads its payload by the
+    /// `valor ↦ inf` law, not by the payload's own shape.
     pub(super) fn convert_to_inf(
         &mut self,
         value: Value,
@@ -31,6 +32,23 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         recovery: Option<&MirOperand>,
         span: Span,
     ) -> Result<Value, RunnerError> {
+        // A nullable `valor ∪ none` carries a dynamic payload, exactly as the
+        // non-nullable `valor` does; the union/option source type is not the
+        // `Primitive::Valor` that routes `convert_to_target` through the
+        // dynamic extraction. Read only the integer carriers here, so a float
+        // fails with the non-nullable path's text instead of truncating on the
+        // payload's own shape (LANES.md inf-U8b residual (e), inf-nul).
+        if let Some(inner) = self.types.nullable_inner(source_ty)
+            && matches!(
+                self.types.get(inner),
+                Type::Primitive(Primitive::Valor | Primitive::Ignotum)
+            )
+        {
+            return match to_magnus(&value) {
+                Some(_) => Ok(value),
+                None => self.recover_or_fail(recovery, span, "valor to numerus conversion failed"),
+            };
+        }
         if let Some(source_width) =
             effective_width(self.types, source_ty).filter(|width| width.is_decimal())
         {
