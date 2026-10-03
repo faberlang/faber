@@ -120,7 +120,7 @@ fn corpus_rust_pilot_builds_once_and_checks_generated_binaries() {
     let suite = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus-suites/pilot");
     let output = Command::new(env!("CARGO_BIN_EXE_faber"))
         .args(["corpus", "--target", "rust"])
-        .arg(suite)
+        .arg(&suite)
         .output()
         .expect("run Rust corpus suite");
     assert!(
@@ -148,6 +148,181 @@ fn corpus_rust_pilot_builds_once_and_checks_generated_binaries() {
             .count(),
         5
     );
+
+    let generated = suite.join("target/corpus/rust/corpus_case_0000/src/main.rs");
+    let stable = PathBuf::from(
+        rows[0]["command"]["argv"][0]
+            .as_str()
+            .expect("stable binary path"),
+    );
+    let source_modified = fs::metadata(&generated)
+        .expect("generated Rust source")
+        .modified()
+        .expect("source mtime");
+    let binary_modified = fs::metadata(&stable)
+        .expect("stable Rust binary")
+        .modified()
+        .expect("binary mtime");
+    let warm = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "rust"])
+        .arg(&suite)
+        .output()
+        .expect("run warm Rust corpus suite");
+    assert!(
+        warm.status.success(),
+        "{}",
+        String::from_utf8_lossy(&warm.stdout)
+    );
+    let warm_rows = records(&warm.stdout);
+    assert_eq!(warm_rows[6]["executables"]["reused"], 5);
+    assert_eq!(warm_rows[6]["executables"]["installed_or_updated"], 0);
+    assert_eq!(warm_rows[0]["artifact"]["cargo_fresh"], true);
+    assert_eq!(
+        fs::metadata(&generated)
+            .expect("unchanged source")
+            .modified()
+            .expect("source mtime"),
+        source_modified
+    );
+    assert_eq!(
+        fs::metadata(&stable)
+            .expect("unchanged binary")
+            .modified()
+            .expect("binary mtime"),
+        binary_modified
+    );
+}
+
+#[test]
+fn corpus_rust_never_runs_a_stale_executable_after_build_failure() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let case = temp.path().join("cases/probe");
+    fs::create_dir_all(&case).expect("create case directory");
+    let suite_manifest = temp.path().join("corpus.toml");
+    fs::write(
+        &suite_manifest,
+        format!(
+            "version = 1\ncases_dir = \"cases\"\n\n[targets.rust]\nruntime = {}\n",
+            toml::Value::String(rust_runtime().display().to_string())
+        ),
+    )
+    .expect("write suite");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\ninput = \"lista.fab\"\n\n[expect]\nstdout = \"lista.expected\"\n\n[targets.rust]\noutcome = \"pass\"\n",
+    )
+    .expect("write case");
+    let original = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus/lista");
+    fs::copy(original.join("lista.fab"), case.join("lista.fab")).expect("copy source");
+    fs::copy(original.join("lista.expected"), case.join("lista.expected")).expect("copy golden");
+    let first = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "rust"])
+        .arg(temp.path())
+        .output()
+        .expect("build first binary");
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stdout)
+    );
+    let stable = PathBuf::from(
+        records(&first.stdout)[0]["command"]["argv"][0]
+            .as_str()
+            .expect("stable binary path"),
+    );
+    assert!(stable.is_file());
+
+    let broken_runtime = temp.path().join("broken-runtime");
+    fs::create_dir(&broken_runtime).expect("create broken runtime");
+    fs::write(broken_runtime.join("Cargo.toml"), "[package]\nname = \"faber\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[lib]\npath = \"lib.rs\"\n")
+        .expect("write broken runtime manifest");
+    fs::write(broken_runtime.join("lib.rs"), "").expect("write broken runtime");
+    fs::write(
+        &suite_manifest,
+        format!(
+            "version = 1\ncases_dir = \"cases\"\n\n[targets.rust]\nruntime = {}\n",
+            toml::Value::String(broken_runtime.display().to_string())
+        ),
+    )
+    .expect("switch runtime");
+    let broken = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "rust"])
+        .arg(temp.path())
+        .output()
+        .expect("run failing build");
+    assert!(!broken.status.success());
+    let rows = records(&broken.stdout);
+    assert_eq!(rows[0]["phase"], "build");
+    assert_eq!(rows[0]["status"], "fail");
+    assert!(
+        rows[0]["reason"]
+            .as_str()
+            .is_some_and(|reason| reason.contains("no current artifact"))
+    );
+    assert!(
+        stable.is_file(),
+        "the old executable remains cached but must not run"
+    );
+}
+
+#[test]
+fn corpus_rust_replaces_stable_executable_when_emitted_program_changes() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let case = temp.path().join("cases/probe");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        format!(
+            "version = 1\ncases_dir = \"cases\"\n\n[targets.rust]\nruntime = {}\n",
+            toml::Value::String(rust_runtime().display().to_string())
+        ),
+    )
+    .expect("write suite");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\ninput = \"main.fab\"\n\n[expect]\nstdout = \"stdout.expected\"\n\n[targets.rust]\noutcome = \"pass\"\n",
+    )
+    .expect("write case");
+    fs::copy(smoke_case(), case.join("main.fab")).expect("copy source");
+    fs::copy(
+        smoke_case().with_extension("expected"),
+        case.join("stdout.expected"),
+    )
+    .expect("copy golden");
+    let first = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "rust"])
+        .arg(temp.path())
+        .output()
+        .expect("build first binary");
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stdout)
+    );
+    assert_eq!(records(&first.stdout)[0]["artifact"]["state"], "installed");
+
+    let source = fs::read_to_string(case.join("main.fab")).expect("read source");
+    assert!(source.contains("Salve, Munde!"));
+    fs::write(
+        case.join("main.fab"),
+        source.replace("Salve, Munde!", "Changed output!"),
+    )
+    .expect("change source");
+    fs::write(case.join("stdout.expected"), "Changed output!\n").expect("change golden");
+    let changed = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "rust"])
+        .arg(temp.path())
+        .output()
+        .expect("build changed binary");
+    assert!(
+        changed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&changed.stdout)
+    );
+    let rows = records(&changed.stdout);
+    assert_eq!(rows[0]["status"], "pass");
+    assert_eq!(rows[0]["artifact"]["cargo_fresh"], false);
+    assert_eq!(rows[0]["artifact"]["state"], "updated");
 }
 
 #[test]
