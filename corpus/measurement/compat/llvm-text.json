@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 335,
-    "analyzable": 374
+    "capable": 349,
+    "analyzable": 376
   },
   "terms": [
     {
@@ -138,13 +138,13 @@
     {
       "term": "![",
       "rule": "operator-group",
-      "capable": 0,
+      "capable": 1,
       "analyzable": 1
     },
     {
       "term": "!.",
       "rule": "operator-group",
-      "capable": 1,
+      "capable": 3,
       "analyzable": 3
     },
     {
@@ -156,7 +156,7 @@
     {
       "term": "!(",
       "rule": "operator-group",
-      "capable": 0,
+      "capable": 1,
       "analyzable": 1
     },
     {
@@ -324,7 +324,7 @@
     {
       "term": "ex",
       "rule": "keyword",
-      "capable": 3,
+      "capable": 6,
       "analyzable": 6
     },
     {
@@ -528,7 +528,7 @@
     {
       "term": "itera",
       "rule": "keyword",
-      "capable": 16,
+      "capable": 18,
       "analyzable": 20
     },
     {
@@ -558,7 +558,7 @@
     {
       "term": "lista",
       "rule": "keyword",
-      "capable": 6,
+      "capable": 7,
       "analyzable": 8
     },
     {
@@ -834,19 +834,19 @@
     {
       "term": "?[",
       "rule": "operator-group",
-      "capable": 0,
+      "capable": 1,
       "analyzable": 1
     },
     {
       "term": "?.",
       "rule": "operator-group",
-      "capable": 0,
+      "capable": 2,
       "analyzable": 2
     },
     {
       "term": "?(",
       "rule": "operator-group",
-      "capable": 0,
+      "capable": 1,
       "analyzable": 1
     },
     {
@@ -912,8 +912,8 @@
     {
       "term": "block-string",
       "rule": "existing-home",
-      "capable": 0,
-      "analyzable": 0
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "§",
@@ -1026,8 +1026,8 @@
     {
       "term": "⇇",
       "rule": "operator",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 0,
+      "analyzable": 2
     },
     {
       "term": "summa",

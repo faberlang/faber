@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 299,
-    "analyzable": 374
+    "analyzable": 376
   },
   "terms": [
     {
@@ -912,8 +912,8 @@
     {
       "term": "block-string",
       "rule": "existing-home",
-      "capable": 0,
-      "analyzable": 0
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "§",
@@ -1026,8 +1026,8 @@
     {
       "term": "⇇",
       "rule": "operator",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 0,
+      "analyzable": 2
     },
     {
       "term": "summa",
