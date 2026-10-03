@@ -126,7 +126,7 @@ pub enum Command {
     #[command(override_usage = "faber build [OPTIONS] <INPUT>")]
     Build(BuildArgs),
 
-    /// Run a Faber corpus case on the MIR runner and compare its output with a golden file
+    /// Verify a corpus case or suite against its expected output
     Corpus(CorpusArgs),
 
     /// Show supported targets and current capability notes
@@ -376,10 +376,14 @@ pub struct BuildArgs {
 /// Arguments for `faber corpus`.
 #[derive(clap::Args, Debug)]
 pub struct CorpusArgs {
-    /// Faber source file or package directory
+    /// Faber source, package directory, or suite directory containing corpus.toml
     pub input: PathBuf,
 
-    /// Golden stdout file (defaults to the entry source's .expected sidecar)
+    /// Target to verify (only runner is implemented)
+    #[arg(long, default_value = "runner")]
+    pub target: String,
+
+    /// Golden stdout file for a single input (defaults to its .expected sidecar)
     #[arg(long, value_name = "PATH")]
     pub expected: Option<PathBuf>,
 }

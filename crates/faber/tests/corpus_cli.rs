@@ -8,6 +8,13 @@ fn smoke_case() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus/incipit/salve-munde.fab")
 }
 
+fn records(output: &[u8]) -> Vec<serde_json::Value> {
+    String::from_utf8_lossy(output)
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("porcelain JSON line"))
+        .collect()
+}
+
 #[test]
 fn corpus_accepts_existing_file_golden_and_rejects_mismatch() {
     let input = smoke_case();
@@ -19,8 +26,9 @@ fn corpus_accepts_existing_file_golden_and_rejects_mismatch() {
     assert!(
         pass.status.success(),
         "{}",
-        String::from_utf8_lossy(&pass.stderr)
+        String::from_utf8_lossy(&pass.stdout)
     );
+    assert_eq!(records(&pass.stdout)[0]["status"], "pass");
 
     let temp = tempfile::tempdir().expect("temporary golden directory");
     let wrong = temp.path().join("wrong.expected");
@@ -33,11 +41,7 @@ fn corpus_accepts_existing_file_golden_and_rejects_mismatch() {
         .output()
         .expect("run corpus mismatch");
     assert!(!fail.status.success(), "a wrong golden must fail");
-    assert!(
-        String::from_utf8_lossy(&fail.stderr).contains("differs from"),
-        "{}",
-        String::from_utf8_lossy(&fail.stderr)
-    );
+    assert_eq!(records(&fail.stdout)[0]["reason"], "stdout mismatch");
 }
 
 #[test]
@@ -65,6 +69,111 @@ fn corpus_accepts_package_directory_with_entry_golden() {
     assert!(
         output.status.success(),
         "{}",
-        String::from_utf8_lossy(&output.stderr)
+        String::from_utf8_lossy(&output.stdout)
+    );
+}
+
+#[test]
+fn corpus_runs_pilot_suite_across_source_package_and_rejection_cases() {
+    let suite = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus-suites/pilot");
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "runner"])
+        .arg(suite)
+        .output()
+        .expect("run corpus suite");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let rows = records(&output.stdout);
+    assert_eq!(rows.len(), 7);
+    assert_eq!(rows[6]["cases"], 6);
+    assert_eq!(rows[6]["passed"], 6);
+    assert_eq!(rows[6]["failed"], 0);
+    let rejection = rows
+        .iter()
+        .find(|row| row["case"] == "diagnostics/unknown-type")
+        .expect("intentional rejection case");
+    assert_eq!(rejection["status"], "pass");
+    assert_eq!(rejection["exit"], 1);
+    assert!(
+        rows.iter()
+            .any(|row| row["case"] == "packages/public-proba" && row["status"] == "pass")
+    );
+    assert!(
+        rows.iter()
+            .take(6)
+            .all(|row| row["timing_ms"]["run"].is_number())
+    );
+}
+
+#[test]
+fn corpus_known_failure_becoming_green_requires_reclassification() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let case = temp.path().join("cases").join("probe");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\n",
+    )
+    .expect("write suite");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\ninput = \"main.fab\"\n\n[targets.runner]\noutcome = \"known-fail\"\nphase = \"run\"\ndiagnostic_contains = \"SEM002.unknown_type\"\n",
+    )
+    .expect("write case");
+    fs::copy(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus/typi/inf-prefix-error.fab"),
+        case.join("main.fab"),
+    )
+    .expect("copy rejected source");
+    let red = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "runner"])
+        .arg(temp.path())
+        .output()
+        .expect("run known failure");
+    assert!(red.status.success());
+    assert_eq!(records(&red.stdout)[0]["status"], "expected-fail");
+
+    fs::copy(smoke_case(), case.join("main.fab")).expect("replace with valid source");
+    let green = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "runner"])
+        .arg(temp.path())
+        .output()
+        .expect("run unexpected pass");
+    assert!(!green.status.success());
+    assert_eq!(
+        records(&green.stdout)[0]["reason"],
+        "unexpected pass; update target expectation"
+    );
+}
+
+#[test]
+fn corpus_requires_each_case_to_classify_the_selected_target() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let case = temp.path().join("cases").join("probe");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\n",
+    )
+    .expect("write suite");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\ninput = \"main.fab\"\n\n[targets.go]\noutcome = \"pass\"\n",
+    )
+    .expect("write case");
+    fs::copy(smoke_case(), case.join("main.fab")).expect("copy source");
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .arg("corpus")
+        .arg(temp.path())
+        .output()
+        .expect("run suite");
+    assert!(!output.status.success());
+    assert!(
+        records(&output.stdout)[0]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("target runner has no expectation"))
     );
 }
