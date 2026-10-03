@@ -25,6 +25,9 @@
     "valor.ts",
     "variant.ts",
     "tuple.ts",
-    "atomic.ts"
+    "atomic.ts",
+    "result.ts",
+    "sermo.ts",
+    "routes.ts"
   ]
 }

@@ -48,10 +48,12 @@
     "valor.ts",
     "variant.ts",
     "tuple.ts",
-    "atomic.ts"
+    "atomic.ts",
+    "sermo.ts",
+    "routes.ts"
   ],
   "private": true,
   "scripts": {
-    "test": "node --test dec.test.ts display.test.ts exact.test.ts format.test.ts inf.test.ts modulus.test.ts regex.test.ts tensor.test.ts sparsa.test.ts matrix.test.ts vector.test.ts instans.test.ts intervallum.test.ts dup.test.ts order.test.ts prototype-free.test.ts json.test.ts valor.test.ts variant.test.ts tuple.test.ts"
+    "test": "node --test dec.test.ts display.test.ts exact.test.ts format.test.ts inf.test.ts modulus.test.ts regex.test.ts tensor.test.ts sparsa.test.ts matrix.test.ts vector.test.ts instans.test.ts intervallum.test.ts dup.test.ts order.test.ts prototype-free.test.ts json.test.ts valor.test.ts variant.test.ts tuple.test.ts sermo.test.ts routes.test.ts"
   }
 }

@@ -54,3 +54,7 @@ export * as tuple from "./tuple.ts";
 export * as atomic from "./atomic.ts";
 // @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
 export * as result from "./result.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as sermo from "./sermo.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as routes from "./routes.ts";
