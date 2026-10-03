@@ -3710,3 +3710,55 @@ fn prepare_program_module_fails_closed_on_unparsable_library() {
         diagnostic.args
     );
 }
+
+/// ST3-2 residual: the sibling interface a single-file consumer installs must
+/// carry the imported genus's static-field initializer, or the consumer's
+/// `module.Tab.Z` read fails closed at MIR lowering.
+#[test]
+fn import_contract_carries_static_field_default_from_sibling() {
+    let (_td, dir) = temp_dir("static-field-default");
+    let lectio = dir.join("lectio.fab");
+    fs::write(
+        &lectio,
+        r#"
+@ publica
+genus Tab {
+    generis numerus LIMES = 7
+    varia numerus w = 1
+}
+"#,
+    )
+    .expect("lectio");
+    let app = dir.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "./lectio" lectio
+incipit {
+    print lectio.Tab.LIMES
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let contract = import_contract_for_file(&app, &source, None, None);
+    let interface = contract
+        .file_interfaces
+        .get("lectio")
+        .expect("lectio interface installed");
+    let tab = interface.exports.get("Tab").expect("Tab export");
+    let FileExportKind::Struct(tab_export) = &tab.kind else {
+        panic!("Tab must export as a struct snapshot, got {:?}", tab.kind);
+    };
+    let limes = tab_export
+        .fields
+        .iter()
+        .find(|field| field.name == "LIMES")
+        .expect("LIMES field crosses the interface");
+    assert!(
+        limes.default.is_some(),
+        "static field default must ride the sibling interface, got {:?}",
+        limes.default
+    );
+}
