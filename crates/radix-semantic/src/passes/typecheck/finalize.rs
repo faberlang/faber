@@ -303,6 +303,29 @@ impl TypeChecker<'_> {
         }
     }
 
+    /// An empty list may acquire its element type from later uses. Diagnose
+    /// only after those constraints have converged; conversion to `valor`
+    /// erases the list shape and supplies no element type of its own.
+    fn finalize_empty_list_type(&mut self, expr: &HirExpression) {
+        let HirExpressionKind::Array(elements) = &expr.kind else {
+            return;
+        };
+        if !elements.is_empty() {
+            return;
+        }
+        let Some(ty) = expr.ty else {
+            return;
+        };
+        let ty = self.canonicalize_type(ty);
+        let element = match self.types.get(ty) {
+            Type::Array(element) | Type::BoundedArray { element, .. } => *element,
+            _ => return,
+        };
+        if self.is_infer(element) {
+            self.missing_type_annotation("cannot_infer_empty_list_element_type", expr.span);
+        }
+    }
+
     /// Report missing type or index inference; returns `true` when a diagnostic was emitted.
     fn report_unresolved_type_inference(
         &mut self,
@@ -709,6 +732,7 @@ impl HirVisitorMut for TypeChecker<'_> {
     /// Finalize expression type annotations after inference has converged.
     fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
         self.finalize_expr_type(&mut expr.ty, expr.span);
+        self.finalize_empty_list_type(expr);
         // WHY: a closure parameter written with a hole type (`_ m`) is solved
         // from the expected signature (the regex `muta` closure, whose `match`
         // type has no source name, RD-3); write the solved type back so MIR

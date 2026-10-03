@@ -3080,7 +3080,17 @@ impl TypeChecker<'_> {
             return result;
         }
 
-        let source_expected = constructor_source.then_some(effective_target);
+        // WHY: an empty list has no element evidence to check in the array
+        // target loop below. Its authored list ascription supplies that fact;
+        // an erased target such as `valor` does not.
+        let empty_list_source =
+            matches!(&source.kind, HirExpressionKind::Array(elements) if elements.is_empty());
+        let list_target = matches!(
+            self.types.get(effective_target),
+            Type::Array(_) | Type::BoundedArray { .. }
+        );
+        let source_expected =
+            (constructor_source || (empty_list_source && list_target)).then_some(effective_target);
         let source_ty = if matches!(
             self.types.get(effective_target),
             Type::ModularWord(_) | Type::SaturatingWord(_) | Type::PolicyFloat(_, _)

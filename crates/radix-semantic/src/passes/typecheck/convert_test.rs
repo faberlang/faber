@@ -2286,3 +2286,69 @@ functio konst() → u8 ⇥ numerus {
 ",
     );
 }
+
+#[test]
+fn empty_list_conversio_to_valor_requires_element_annotation() {
+    let source = r#"incipit {
+    varia tabula<textus, valor> raw ← {}
+    raw.pone("headers", [] ↦ valor)
+}"#;
+    let analyzed = test_support::analyze_source(source);
+    let errors: Vec<_> = analyzed
+        .diagnostics
+        .iter()
+        .filter(|error| error.issue() == Some("cannot_infer_empty_list_element_type"))
+        .collect();
+    assert_eq!(errors.len(), 1, "{:?}", analyzed.diagnostics);
+    assert_eq!(
+        errors[0].kind,
+        crate::SemanticErrorKind::TypeAnnotationAbsent
+    );
+    assert_eq!(
+        &source[errors[0].span.start as usize..errors[0].span.end as usize],
+        "[]"
+    );
+}
+
+#[test]
+fn empty_list_conversio_typed_source_accepts() {
+    test_support::assert_accepts(
+        r"incipit {
+    fixum lista<valor> headers ← vacua
+    fixum valor packed ← headers ↦ valor
+    nota packed
+}",
+    );
+}
+
+#[test]
+fn empty_list_conversio_element_ascription_accepts() {
+    test_support::assert_accepts(
+        r"incipit {
+    fixum valor packed ← ([] ∷ lista<textus>) ↦ valor
+    nota packed
+}",
+    );
+}
+
+#[test]
+fn empty_list_conversio_later_element_constraint_accepts() {
+    test_support::assert_accepts(
+        r"incipit {
+    varia _ headers ← []
+    headers.appende(1)
+    fixum valor packed ← headers ↦ valor
+    nota packed
+}",
+    );
+}
+
+#[test]
+fn empty_list_conversio_nonempty_source_accepts() {
+    test_support::assert_accepts(
+        r#"incipit {
+    fixum valor packed ← ["content-type"] ↦ valor
+    nota packed
+}"#,
+    );
+}
