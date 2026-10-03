@@ -166,14 +166,27 @@ impl super::FaberCodegen<'_> {
     }
 }
 
-/// Whether a same-precedence left operand regroups under a left-associative
-/// re-parse without changing meaning. Associative operators are safe; the rest
-/// keep the equal-precedence parenthesis policy.
+/// Whether the parser folds this operator's tier left to right, so a
+/// same-precedence left operand re-parses to the same tree without parens
+/// (`a + b - c` is `(a + b) - c`, `a * b / c` is `(a * b) / c`). Only the
+/// right operand needs the equal-precedence parenthesis, so the tree shape is
+/// kept. The comparison tiers do not chain and keep their parens.
 pub(super) fn binop_left_associative(op: HirBinOp) -> bool {
     matches!(
         op,
         HirBinOp::Add
+            | HirBinOp::Sub
             | HirBinOp::Mul
+            | HirBinOp::Div
+            | HirBinOp::TrueDiv
+            | HirBinOp::Mod
+            | HirBinOp::Dot
+            | HirBinOp::Cross
+            | HirBinOp::TensorProduct
+            | HirBinOp::Hadamard
+            | HirBinOp::HadamardDiv
+            | HirBinOp::Shl
+            | HirBinOp::Shr
             | HirBinOp::And
             | HirBinOp::Or
             | HirBinOp::BitAnd

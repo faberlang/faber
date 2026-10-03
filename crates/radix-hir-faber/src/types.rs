@@ -826,6 +826,17 @@ impl super::FaberCodegen<'_> {
                     rendered.join(", ")
                 ))
             }
+            // A builtin frame carrier (`sermo`) keeps no type arguments in its
+            // erased witness, but the author's `sermo<O, R>` rides the form:
+            // print the head over the authored arguments, or the re-emit
+            // would drop them.
+            Type::Struct(def_id)
+                if !form.args.is_empty() && self.builtin_frame_family(*def_id, names).is_some() =>
+            {
+                let head = self.type_to_faber(form.ty, names, surface);
+                let args = self.type_form_args_to_faber(&form.args, names, surface)?;
+                Ok(format!("{head}<{}>", args.join(", ")))
+            }
             Type::Func(_)
             | Type::Union(_)
             | Type::Intersection(_)
