@@ -511,7 +511,7 @@ impl Parser {
     /// Parse `fac`, the canonical block form for do/try-style execution.
     ///
     /// GRAMMAR:
-    ///   fac-stmt := `fac` block [`cape` ident block] [`dum` expr]
+    ///   fac-stmt := `fac` [`omnia`] block [`cape` ident block] [`dum` expr]
     ///
     /// At statement level, a trailing `dum` turns `fac` into a do-while form.
     /// Closure bodies call the shared construct with `allow_while = false` so
@@ -523,10 +523,21 @@ impl Parser {
     pub(super) fn parse_fac_construct(&mut self, allow_while: bool) -> Result<FacStmt, ParseError> {
         self.expect_keyword_ident(TokenKind::Fac, "expected 'fac'")?;
 
+        let omnia = self.eat_keyword_ident(TokenKind::Omnia);
         let body = self.parse_block()?;
         let catch = self.try_parse_cape_stmt()?;
 
         let while_ = if self.eat_keyword_ident(TokenKind::Dum) {
+            if omnia {
+                // `omnia` rides the breakable try-body block in HIR; the
+                // do-while form lowers to a plain loop with no marker slot,
+                // so re-emission would silently drop it.
+                return Err(ParseError::structured(
+                    ParseErrorKind::StatementInvalid,
+                    self.previous_span(),
+                )
+                .with_arg("issue", "fac_omnia_dum"));
+            }
             if !allow_while {
                 return Err(self.invalid_expression_error("closure_fac_body_dum"));
             }
@@ -548,6 +559,7 @@ impl Parser {
         };
 
         Ok(FacStmt {
+            omnia,
             body,
             catch,
             while_,

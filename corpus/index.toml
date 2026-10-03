@@ -440,7 +440,7 @@ phase = 2
 action = "review"
 rule = "keyword"
 primary = "fac/fac-cape.fab"
-paths = ["fac/fac-cape.fab", "fac/fac-dum.fab"]
+paths = ["cape/fac-omnia.fab", "fac/fac-cape.fab", "fac/fac-dum.fab"]
 
 [[terms]]
 term = "falsum"
@@ -1935,6 +1935,12 @@ path = "cape/cape.fab"
 term = "cape"
 kind = "keyword"
 category = "errors"
+
+[[files]]
+path = "cape/fac-omnia.fab"
+term = "fac"
+kind = "keyword"
+category = "control-flow"
 
 [[files]]
 path = "cape/receptio-air.fab"

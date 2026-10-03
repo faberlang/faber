@@ -1637,7 +1637,11 @@ impl Lowerer<'_> {
 
     pub(super) fn lower_fac_expr(&mut self, stmt: &radix_syntax::FacStmt) -> HirExpression {
         let mut block = self.lower_block(&stmt.body);
-        block.breakable = Some(radix_hir::HirBreakableKind::Fac);
+        block.breakable = Some(if stmt.omnia {
+            radix_hir::HirBreakableKind::FacOmnia
+        } else {
+            radix_hir::HirBreakableKind::Fac
+        });
         let expr = if let Some(cond) = &stmt.while_ {
             let negate_cond = HirExpression {
                 id: self.next_hir_id(),

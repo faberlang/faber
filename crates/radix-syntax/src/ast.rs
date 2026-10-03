@@ -942,6 +942,9 @@ pub struct CustodiClause {
 
 #[derive(Debug)]
 pub struct FacStmt {
+    /// `fac omnia` marker (en `do all`): surface-only intent flag; the
+    /// construct keeps plain `fac` host semantics.
+    pub omnia: bool,
     pub body: BlockStmt,
     pub catch: Option<CapeClause>,
     pub while_: Option<Box<Expr>>,
