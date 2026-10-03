@@ -4222,3 +4222,30 @@ help = "fac ut unaquaeque alternativa aut eadem nomina eisdem generibus liget"
 [diagnostics.SEM010.issues.filum_independence_unproven]
 message = "independentia iterationis filum probari non potest: {reason}"
 help = "utere iteratione ordinaria, aut scribe et lege repositorium scriptum tantum apud coordinatam propriam; ne muta locales exteriores nec voca effectus non probatos"
+
+[diagnostics.PARSE001.issues.type_arguments_end]
+message = "expected '>' after type arguments"
+
+[diagnostics.PARSE001.issues.function_type_start]
+message = "expected '(' before function type parameters"
+
+[diagnostics.PARSE001.issues.function_type_parameters_end]
+message = "expected ')' after function type parameters"
+
+[diagnostics.PARSE001.issues.function_type_return_arrow]
+message = "expected '→' before the function return type"
+
+[diagnostics.PARSE001.issues.numeric_wrapper_start]
+message = "expected '<' after the numeric wrapper name"
+
+[diagnostics.PARSE001.issues.tuple_type_label_separator]
+message = "expected ':' after the tuple element label"
+
+[diagnostics.PARSE001.issues.ratio_type_label_separator]
+message = "expected ':' after the ratio element label"
+
+[diagnostics.PARSE001.issues.shape_dimensions_end]
+message = "expected ']' after shape dimensions"
+
+[diagnostics.PARSE001.issues.shape_parenthesis_end]
+message = "expected ')' after the parenthesized shape"

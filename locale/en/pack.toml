@@ -4439,3 +4439,30 @@ help = "make every `aut` alternative bind the same names with the same types"
 [diagnostics.SEM010.issues.filum_independence_unproven]
 message = "cannot prove thread iteration independence: {reason}"
 help = "use an ordinary loop, or write only the iteration’s own coordinate and read written storage only at that coordinate; do not mutate outer locals or call unproved effects"
+
+[diagnostics.PARSE001.issues.type_arguments_end]
+message = "expected '>' after type arguments"
+
+[diagnostics.PARSE001.issues.function_type_start]
+message = "expected '(' before function type parameters"
+
+[diagnostics.PARSE001.issues.function_type_parameters_end]
+message = "expected ')' after function type parameters"
+
+[diagnostics.PARSE001.issues.function_type_return_arrow]
+message = "expected '→' before the function return type"
+
+[diagnostics.PARSE001.issues.numeric_wrapper_start]
+message = "expected '<' after the numeric wrapper name"
+
+[diagnostics.PARSE001.issues.tuple_type_label_separator]
+message = "expected ':' after the tuple element label"
+
+[diagnostics.PARSE001.issues.ratio_type_label_separator]
+message = "expected ':' after the ratio element label"
+
+[diagnostics.PARSE001.issues.shape_dimensions_end]
+message = "expected ']' after shape dimensions"
+
+[diagnostics.PARSE001.issues.shape_parenthesis_end]
+message = "expected ')' after the parenthesized shape"

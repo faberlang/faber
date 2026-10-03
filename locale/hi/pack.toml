@@ -3178,3 +3178,30 @@ help = "हर aut विकल्प में समान नामों क
 [diagnostics.SEM010.issues.filum_independence_unproven]
 message = "थ्रेड पुनरावृत्तियों की स्वतंत्रता सिद्ध नहीं हो सकी: {reason}"
 help = "सामान्य लूप का उपयोग करें, या केवल पुनरावृत्ति के अपने निर्देशांक पर लिखें और लिखे गए भंडारण को उसी निर्देशांक पर पढ़ें; बाहरी चर न बदलें और अप्रमाणित प्रभाव न बुलाएँ"
+
+[diagnostics.PARSE001.issues.type_arguments_end]
+message = "प्रकार तर्कों के बाद '>' अपेक्षित है"
+
+[diagnostics.PARSE001.issues.function_type_start]
+message = "फ़ंक्शन प्रकार के मापदंडों से पहले '(' अपेक्षित है"
+
+[diagnostics.PARSE001.issues.function_type_parameters_end]
+message = "फ़ंक्शन प्रकार के मापदंडों के बाद ')' अपेक्षित है"
+
+[diagnostics.PARSE001.issues.function_type_return_arrow]
+message = "फ़ंक्शन के वापसी प्रकार से पहले '→' अपेक्षित है"
+
+[diagnostics.PARSE001.issues.numeric_wrapper_start]
+message = "संख्यात्मक आवरण के नाम के बाद '<' अपेक्षित है"
+
+[diagnostics.PARSE001.issues.tuple_type_label_separator]
+message = "टपल तत्व के लेबल के बाद ':' अपेक्षित है"
+
+[diagnostics.PARSE001.issues.ratio_type_label_separator]
+message = "ratio तत्व के लेबल के बाद ':' अपेक्षित है"
+
+[diagnostics.PARSE001.issues.shape_dimensions_end]
+message = "आकार के आयामों के बाद ']' अपेक्षित है"
+
+[diagnostics.PARSE001.issues.shape_parenthesis_end]
+message = "कोष्ठक में आकार के बाद ')' अपेक्षित है"
