@@ -165,6 +165,17 @@ pub fn kernel_plan_for_function_with_limit(
     validation: &MirValidationContext<'_>,
     limit: StorageBufferLimitRecord,
 ) -> Result<Option<CollectionKernelPlan>, PlanMappingError> {
+    for statement in function.blocks.iter().flat_map(|block| &block.statements) {
+        if let MirStatementKind::RuntimeCall { call, .. } = &statement.kind
+            && call.intrinsic == MirIntrinsic::Collection(MirCollectionOp::TensorExpand)
+            && crate::tensor_expansion::TensorExpansion::for_call(function, call, validation)
+                .is_none()
+        {
+            return Err(PlanMappingError::mapping(
+                "tensor expansion has no exact compatible static tensor witness",
+            ));
+        }
+    }
     // A kernel whose storage-buffer binding count exceeds the per-lane
     // `StorageBufferLimitRecord` capacity cannot be emitted as ONE kernel
     // (the shared default is the minimum across admitted lanes). The whole-function plan is refused
@@ -2450,6 +2461,9 @@ pub(crate) fn is_elementwise_collection_op(op: MirCollectionOp) -> bool {
             | MirCollectionOp::TensorDiv
             | MirCollectionOp::TensorNeg
             | MirCollectionOp::TensorFill
+            // Explicit static expansion is a reindexed tensor expression.
+            // Fusion remains a typed barrier until its planner represents reindexing.
+            | MirCollectionOp::TensorExpand
             | MirCollectionOp::TensorRelu
             | MirCollectionOp::TensorGelu
     )

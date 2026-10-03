@@ -39,6 +39,7 @@ pub mod rank2_reduction_readiness;
 pub mod shader_contract;
 pub mod static_shape_fold;
 pub mod store_trap;
+pub mod tensor_expansion;
 pub mod tensor_operation_floor;
 pub mod tensor_operation_parity;
 pub mod tensor_placement;

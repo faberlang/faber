@@ -2211,7 +2211,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let [receiver, target_shape] = args else {
             return Err(RunnerError::internal(span, "tensor expand arity"));
         };
-        let target_shape = self.shape_arg(target_shape, span, ERR_CREA_INVALID_SHAPE)?;
+        let target_shape = match self.eval_operand(target_shape, span)? {
+            // Device specialization replaces the shape list with a tensor
+            // whose exact static shape is validated as the target witness.
+            Value::Tensor(witness) => witness.borrow().shape.clone(),
+            _ => self.shape_arg(target_shape, span, ERR_CREA_INVALID_SHAPE)?,
+        };
         let tensor = self.tensor_arg(receiver, span)?;
         let borrow = tensor.borrow();
         let view = borrow.expanded_view(target_shape).ok_or_else(|| {

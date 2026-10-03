@@ -46,6 +46,55 @@ struct TensorNormSpec {
 }
 
 impl Validator<'_, '_> {
+    fn validate_tensor_expand(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        call: &MirRuntimeCall,
+        span: Span,
+    ) {
+        let Some(receiver) = call.args.first() else {
+            return;
+        };
+        let Some(receiver_ty) = self.validate_operand(scope, receiver, span) else {
+            return;
+        };
+        self.require_tensor_type(receiver_ty, span, "tensor expand receiver is not tensor");
+        self.require_tensor_type(call.return_ty, span, "tensor expand result is not tensor");
+        let Some(shape_ty) = call
+            .args
+            .get(1)
+            .and_then(|shape| self.validate_operand(scope, shape, span))
+        else {
+            return;
+        };
+        if matches!(
+            self.context.types.get(shape_ty.semantic_id()),
+            Type::Tensor(_, _)
+        ) {
+            if crate::tensor_expansion::TensorExpansion::for_types(
+                receiver_ty,
+                shape_ty,
+                call.return_ty,
+                &self.context,
+            )
+            .is_none()
+            {
+                self.error(
+                    span,
+                    "tensor expand tensor witness has no exact compatible static shape",
+                );
+            }
+        } else if !radix_types::is_integer_index_vector(
+            self.context.types.as_table(),
+            shape_ty.semantic_id(),
+        ) {
+            self.error(
+                span,
+                "tensor expand target shape is not an integer lista or static tensor witness",
+            );
+        }
+    }
+
     pub(crate) fn validate_runtime_call(
         &mut self,
         scope: &FunctionScope<'_, '_>,
@@ -1673,26 +1722,7 @@ impl Validator<'_, '_> {
                     "tensor materialize result is not tensor",
                 );
             }
-            MirCollectionOp::TensorExpand => {
-                let Some(receiver_ty) = first_arg_ty else {
-                    return;
-                };
-                self.require_tensor_type(receiver_ty, span, "tensor expand receiver is not tensor");
-                self.require_tensor_type(
-                    call.return_ty,
-                    span,
-                    "tensor expand result is not tensor",
-                );
-                if let Some(shape) = call.args.get(1)
-                    && let Some(shape_ty) = self.validate_operand(scope, shape, span)
-                    && !radix_types::is_integer_index_vector(
-                        self.context.types.as_table(),
-                        shape_ty.semantic_id(),
-                    )
-                {
-                    self.error(span, "tensor expand target shape is not an integer lista");
-                }
-            }
+            MirCollectionOp::TensorExpand => self.validate_tensor_expand(scope, call, span),
             MirCollectionOp::TensorCopyInto => {
                 self.validate_tensor_copy_into(scope, call, span);
             }
