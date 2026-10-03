@@ -166,7 +166,7 @@ fn incipit_tacet_expected_brace() {
                 && err
                     .args
                     .iter()
-                    .any(|arg| arg.name == "expected" && arg.value == "'{'")
+                    .any(|arg| arg.name == "issue" && arg.value == "block_start")
         })
         .expect("structured parser-core expected diagnostic");
 
@@ -181,10 +181,9 @@ fn functio_missing_close_paren_expected() {
         .iter()
         .find(|err| {
             err.kind == ParseErrorKind::Expected
-                && err
-                    .args
-                    .iter()
-                    .any(|arg| arg.name == "expected" && arg.value == "')' after parameters")
+                && err.args.iter().any(|arg| {
+                    arg.name == "issue" && arg.value == "function_declaration_parameters_end"
+                })
         })
         .expect("structured parser-core expected diagnostic");
 
@@ -1878,8 +1877,8 @@ fn object_destructuring_rejects_colon_rename() {
     assert_parse_error_matches(
         r"fixum { nomen: n } ← persona",
         ParseExpectation::Arg {
-            name: "expected",
-            value: "'}' after pattern",
+            name: "issue",
+            value: "object_binding_pattern_end",
         },
     );
 }
@@ -3641,8 +3640,8 @@ fn incipit_tacet_expected_block() {
     assert_parse_error_matches(
         "incipit tacet",
         ParseExpectation::Arg {
-            name: "expected",
-            value: "'{'",
+            name: "issue",
+            value: "block_start",
         },
     );
 }

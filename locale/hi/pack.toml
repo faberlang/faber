@@ -3205,3 +3205,108 @@ message = "आकार के आयामों के बाद ']' अपे
 
 [diagnostics.PARSE001.issues.shape_parenthesis_end]
 message = "कोष्ठक में आकार के बाद ')' अपेक्षित है"
+
+[diagnostics.PARSE001.issues.awaited_binding_assignment]
+message = "expected '←' after the awaited binding"
+
+[diagnostics.PARSE001.issues.array_binding_pattern_start]
+message = "expected '[' to start the array binding pattern"
+
+[diagnostics.PARSE001.issues.array_binding_pattern_end]
+message = "expected ']' to end the array binding pattern"
+
+[diagnostics.PARSE001.issues.object_binding_pattern_start]
+message = "expected an opening brace for the object binding pattern"
+
+[diagnostics.PARSE001.issues.object_binding_pattern_end]
+message = "expected a closing brace for the object binding pattern"
+
+[diagnostics.PARSE001.issues.function_declaration_parameters_start]
+message = "expected '(' before function declaration parameters"
+
+[diagnostics.PARSE001.issues.function_declaration_parameters_end]
+message = "expected ')' after function declaration parameters"
+
+[diagnostics.PARSE001.issues.class_body_end]
+message = "expected a closing brace after the class body"
+
+[diagnostics.PARSE001.issues.interface_body_start]
+message = "expected an opening brace for the interface body"
+
+[diagnostics.PARSE001.issues.interface_method_parameters_start]
+message = "expected '(' before interface method parameters"
+
+[diagnostics.PARSE001.issues.interface_method_parameters_end]
+message = "expected ')' after interface method parameters"
+
+[diagnostics.PARSE001.issues.interface_body_end]
+message = "expected a closing brace after the interface body"
+
+[diagnostics.PARSE001.issues.type_alias_value_separator]
+message = "expected '=' before the type alias value"
+
+[diagnostics.PARSE001.issues.schema_body_start]
+message = "expected an opening brace for the schema body"
+
+[diagnostics.PARSE001.issues.schema_body_end]
+message = "expected a closing brace after the schema body"
+
+[diagnostics.PARSE001.issues.enum_body_start]
+message = "expected an opening brace for the enum body"
+
+[diagnostics.PARSE001.issues.enum_body_end]
+message = "expected a closing brace after the enum body"
+
+[diagnostics.PARSE001.issues.union_body_start]
+message = "expected an opening brace for the union body"
+
+[diagnostics.PARSE001.issues.union_variant_fields_end]
+message = "expected a closing brace after the union variant fields"
+
+[diagnostics.PARSE001.issues.union_body_end]
+message = "expected a closing brace after the union body"
+
+[diagnostics.PARSE001.issues.import_record_start]
+message = "expected an opening brace for the import record"
+
+[diagnostics.PARSE001.issues.import_field_value_separator]
+message = "expected '=' after the import field name"
+
+[diagnostics.PARSE001.issues.import_record_end]
+message = "expected a closing brace after the import record fields"
+
+[diagnostics.PARSE001.issues.probandum_body_start]
+message = "expected an opening brace for the probandum body"
+
+[diagnostics.PARSE001.issues.probandum_body_end]
+message = "expected a closing brace after the probandum body"
+
+[diagnostics.PARSE001.issues.annotation_fields_start]
+message = "expected an opening brace for the annotation fields"
+
+[diagnostics.PARSE001.issues.annotation_field_value_separator]
+message = "expected '=' after the annotation field name"
+
+[diagnostics.PARSE001.issues.annotation_fields_end]
+message = "expected a closing brace after the annotation fields"
+
+[diagnostics.PARSE001.issues.nucleum_annotation_fields_start]
+message = "expected an opening brace for the nucleum annotation fields"
+
+[diagnostics.PARSE001.issues.nucleum_annotation_field_value_separator]
+message = "expected '=' after the nucleum annotation field name"
+
+[diagnostics.PARSE001.issues.nucleum_annotation_fields_end]
+message = "expected a closing brace after the nucleum annotation fields"
+
+[diagnostics.PARSE001.issues.block_start]
+message = "expected an opening brace for the block"
+
+[diagnostics.PARSE001.issues.block_end]
+message = "expected a closing brace to end the block"
+
+[diagnostics.PARSE001.issues.generic_parameters_end]
+message = "expected '>' after generic parameters"
+
+[diagnostics.PARSE001.issues.contract_type_arguments_end]
+message = "expected '>' after contract type arguments"
