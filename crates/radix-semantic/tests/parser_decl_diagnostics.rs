@@ -57,15 +57,22 @@ fn declaration_issue_rows_render_in_all_locale_packs() {
         let pack = load_pack(locale);
         let rows = &pack.diagnostics["PARSE001"].issues;
         for issue in DECL_ISSUES {
-            let row = rows.get(issue).expect("explicit declaration issue row");
+            assert!(
+                rows.contains_key(issue),
+                "{locale}.{issue} must have an explicit declaration issue row"
+            );
             let diagnostic = Diagnostic::error("PARSE001")
                 .with_code("PARSE001")
                 .with_args(vec![DiagnosticArg::new("issue", issue)]);
-            let rendered = pack
-                .render_diagnostic_text(&diagnostic)
+            assert_eq!(diagnostic.code, Some("PARSE001"), "{locale}.{issue}");
+            assert_eq!(
+                diagnostic.args,
+                vec![DiagnosticArg::new("issue", issue)],
+                "{locale}.{issue}"
+            );
+            pack.render_diagnostic_text(&diagnostic)
                 .expect("render without missing arguments")
                 .expect("template");
-            assert_eq!(rendered.message, row.message, "{locale}.{issue}");
             checked += 1;
         }
     }

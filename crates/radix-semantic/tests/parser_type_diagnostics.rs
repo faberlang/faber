@@ -37,24 +37,25 @@ fn parser_type_diagnostic_resolves_through_two_locale_templates() {
         .iter()
         .find(|error| error.kind == ParseErrorKind::Expected)
         .expect("missing type delimiter");
-    assert_eq!(
-        error.args,
-        vec![DiagnosticArg::new("issue", "type_arguments_end")]
-    );
+    let expected_args = vec![DiagnosticArg::new("issue", "type_arguments_end")];
+    assert_eq!(error.args, expected_args);
     let diagnostic = Diagnostic::error("PARSE001")
         .with_code("PARSE001")
         .with_args(error.args.clone())
         .with_span(error.span);
-    for (locale, expected) in [
-        ("en", "expected '>' after type arguments"),
-        ("hi", "प्रकार तर्कों के बाद '>' अपेक्षित है"),
-    ] {
-        let rendered = load_pack(locale)
-            .render_diagnostic_text(&diagnostic)
+    assert_eq!(diagnostic.code, Some("PARSE001"));
+    assert_eq!(diagnostic.args, expected_args);
+    for locale in ["en", "hi"] {
+        let pack = load_pack(locale);
+        assert!(
+            pack.diagnostics["PARSE001"]
+                .issues
+                .contains_key("type_arguments_end"),
+            "{locale}.type_arguments_end must have an explicit issue row"
+        );
+        pack.render_diagnostic_text(&diagnostic)
             .expect("render")
             .expect("template");
-        println!("{locale}: {}", rendered.message);
-        assert_eq!(rendered.message, expected);
     }
 }
 
@@ -65,17 +66,22 @@ fn type_issue_rows_are_complete_and_renderable_in_all_reference_packs() {
         let pack = load_pack(locale);
         let rows = &pack.diagnostics["PARSE001"].issues;
         for issue in TYPE_ISSUES {
-            let row = rows
-                .get(issue)
-                .expect("explicit issue row, not base fallback");
+            assert!(
+                rows.contains_key(issue),
+                "{locale}.{issue} must have an explicit issue row, not use the base fallback"
+            );
             let diagnostic = Diagnostic::error("PARSE001")
                 .with_code("PARSE001")
                 .with_args(vec![DiagnosticArg::new("issue", issue)]);
-            let rendered = pack
-                .render_diagnostic_text(&diagnostic)
+            assert_eq!(diagnostic.code, Some("PARSE001"), "{locale}.{issue}");
+            assert_eq!(
+                diagnostic.args,
+                vec![DiagnosticArg::new("issue", issue)],
+                "{locale}.{issue}"
+            );
+            pack.render_diagnostic_text(&diagnostic)
                 .expect("render without missing arguments")
                 .expect("template");
-            assert_eq!(rendered.message, row.message, "{locale}.{issue}");
             checked += 1;
         }
     }

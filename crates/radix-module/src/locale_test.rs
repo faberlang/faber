@@ -780,6 +780,115 @@ exemplars = ["./exemplars/salve-munde.fab"]
 }
 
 #[test]
+fn type_arguments_end_message_renders_in_english_and_hindi() {
+    let diagnostic = diagnostic_with_code("PARSE001", vec![diagnostic_arg("issue", "type_arguments_end")]);
+    for (locale, expected) in [
+        ("en", "expected '>' after type arguments"),
+        ("hi", "प्रकार तर्कों के बाद '>' अपेक्षित है"),
+    ] {
+        let rendered = installed_pack(locale)
+            .render_diagnostic_text(&diagnostic)
+            .expect("template should render")
+            .expect("template row should exist");
+        assert_eq!(rendered.message, expected, "{locale}.type_arguments_end");
+    }
+}
+
+#[test]
+fn type_issue_templates_render_their_exact_rows_in_all_installed_packs() {
+    const ISSUES: [&str; 9] = [
+        "type_arguments_end",
+        "function_type_start",
+        "function_type_parameters_end",
+        "function_type_return_arrow",
+        "numeric_wrapper_start",
+        "tuple_type_label_separator",
+        "ratio_type_label_separator",
+        "shape_dimensions_end",
+        "shape_parenthesis_end",
+    ];
+
+    let mut checked = 0;
+    for locale in ["en", "la", "ar", "hi", "vi", "th-TH", "zh-Hans", "zh-Hant"] {
+        let pack = installed_pack(locale);
+        for issue in ISSUES {
+            let row = pack.diagnostics["PARSE001"]
+                .issues
+                .get(issue)
+                .expect("explicit type issue row, not base fallback");
+            let diagnostic = diagnostic_with_code("PARSE001", vec![diagnostic_arg("issue", issue)]);
+            let rendered = pack
+                .render_diagnostic_text(&diagnostic)
+                .expect("type issue template should render")
+                .expect("type issue row should exist");
+            assert_eq!(rendered.message, row.message, "{locale}.{issue}");
+            checked += 1;
+        }
+    }
+    assert_eq!(checked, 72);
+}
+
+#[test]
+fn declaration_issue_templates_render_their_exact_rows_in_all_installed_packs() {
+    const ISSUES: [&str; 35] = [
+        "awaited_binding_assignment",
+        "array_binding_pattern_start",
+        "array_binding_pattern_end",
+        "object_binding_pattern_start",
+        "object_binding_pattern_end",
+        "function_declaration_parameters_start",
+        "function_declaration_parameters_end",
+        "class_body_end",
+        "interface_body_start",
+        "interface_method_parameters_start",
+        "interface_method_parameters_end",
+        "interface_body_end",
+        "type_alias_value_separator",
+        "schema_body_start",
+        "schema_body_end",
+        "enum_body_start",
+        "enum_body_end",
+        "union_body_start",
+        "union_variant_fields_end",
+        "union_body_end",
+        "import_record_start",
+        "import_field_value_separator",
+        "import_record_end",
+        "probandum_body_start",
+        "probandum_body_end",
+        "annotation_fields_start",
+        "annotation_field_value_separator",
+        "annotation_fields_end",
+        "nucleum_annotation_fields_start",
+        "nucleum_annotation_field_value_separator",
+        "nucleum_annotation_fields_end",
+        "block_start",
+        "block_end",
+        "generic_parameters_end",
+        "contract_type_arguments_end",
+    ];
+
+    let mut checked = 0;
+    for locale in ["en", "la", "ar", "hi", "vi", "th-TH", "zh-Hans", "zh-Hant"] {
+        let pack = installed_pack(locale);
+        for issue in ISSUES {
+            let row = pack.diagnostics["PARSE001"]
+                .issues
+                .get(issue)
+                .expect("explicit declaration issue row");
+            let diagnostic = diagnostic_with_code("PARSE001", vec![diagnostic_arg("issue", issue)]);
+            let rendered = pack
+                .render_diagnostic_text(&diagnostic)
+                .expect("declaration issue template should render")
+                .expect("declaration issue row should exist");
+            assert_eq!(rendered.message, row.message, "{locale}.{issue}");
+            checked += 1;
+        }
+    }
+    assert_eq!(checked, 280);
+}
+
+#[test]
 fn pack_render_returns_none_when_code_has_no_template_row() {
     let pack = latin_locale_pack();
     let diagnostic = Diagnostic::error("uncoded").with_code("NOPE999");
