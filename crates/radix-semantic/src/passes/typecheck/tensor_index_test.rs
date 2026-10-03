@@ -899,14 +899,15 @@ fn vector_bracket_index_requires_integer() {
 
 #[test]
 fn batched_masked_softmax_decode_shape_typechecks() {
-    // Decode: rectangular scores [5,3,1,76] + declared-length additive
-    // mask [1,76] (broadcast over heads), softmax over the last axis —
-    // the last two axes are query_seq × key_seq, never required square.
+    // Decode: explicitly expand the [1,76] length mask over batch/head axes
+    // before exact-shape addition and last-axis softmax. The [1,76] query/key
+    // axes remain rectangular, never required square.
     accepts(
         r"incipit {
     fixum tensor<f32, [5, 3, 1, 76]> scores ← vacua
     fixum tensor<f32, [1, 76]> length_mask ← vacua
-    fixum tensor<f32, [5, 3, 1, 76]> probabilities ← (scores + length_mask).activatio_softmax()
+    fixum tensor<f32, [5, 3, 1, 76]> expanded_mask ← length_mask.expande([5, 3, 1, 76])
+    fixum tensor<f32, [5, 3, 1, 76]> probabilities ← (scores + expanded_mask).activatio_softmax()
     nota probabilities.longitudo()
 }",
     );
@@ -914,12 +915,14 @@ fn batched_masked_softmax_decode_shape_typechecks() {
 
 #[test]
 fn batched_masked_softmax_prefill_shape_typechecks() {
-    // Prefill: [5,3,36,36] scores + causal additive mask [36,36].
+    // Prefill: explicitly expand the [36,36] causal mask over batch/head
+    // axes; exact-shape addition and last-axis softmax preserve [5,3,36,36].
     accepts(
         r"incipit {
     fixum tensor<f32, [5, 3, 36, 36]> scores ← vacua
     fixum tensor<f32, [36, 36]> causal_mask ← vacua
-    fixum tensor<f32, [5, 3, 36, 36]> probabilities ← (scores + causal_mask).activatio_softmax()
+    fixum tensor<f32, [5, 3, 36, 36]> expanded_mask ← causal_mask.expande([5, 3, 36, 36])
+    fixum tensor<f32, [5, 3, 36, 36]> probabilities ← (scores + expanded_mask).activatio_softmax()
     nota probabilities.longitudo()
 }",
     );
