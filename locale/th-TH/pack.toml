@@ -3173,3 +3173,8 @@ munita = "เอสเคป"
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "ทางเลือกของรูปแบบ or ต้องผูกชื่อและชนิดเดียวกัน"
 help = "ให้ทุกทางเลือก aut ผูกชื่อเดียวกันด้วยชนิดเดียวกัน"
+
+# K8-I: translated diagnostic proposal.
+[diagnostics.SEM010.issues.filum_independence_unproven]
+message = "ไม่สามารถพิสูจน์ความเป็นอิสระของรอบเธรดได้: {reason}"
+help = "ใช้ลูปธรรมดา หรือเขียนและอ่านพื้นที่ที่เขียนเฉพาะพิกัดของรอบนั้น อย่าแก้ตัวแปรภายนอกหรือเรียกผลกระทบที่ยังพิสูจน์ไม่ได้"

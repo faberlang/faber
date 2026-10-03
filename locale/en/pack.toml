@@ -4431,3 +4431,7 @@ help = "bind the iteration coordinate with `{apud}` on a `{filum}` loop: `{itera
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "or-pattern alternatives must bind the same names and types"
 help = "make every `aut` alternative bind the same names with the same types"
+
+[diagnostics.SEM010.issues.filum_independence_unproven]
+message = "cannot prove thread iteration independence: {reason}"
+help = "use an ordinary loop, or write only the iteration’s own coordinate and read written storage only at that coordinate; do not mutate outer locals or call unproved effects"
