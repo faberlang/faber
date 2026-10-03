@@ -82,12 +82,12 @@ functio loss(i32 x) → numerus {
 }
 
 #[test]
-fn accepts_v1_tensor_intrinsic_method_names_on_tensor_receivers() {
+fn accepts_tensor_arithmetic_glyphs_on_tensor_receivers() {
     let errors = air_errors(
         r#"
 @ radix lane "air"
 functio combine(tf32[2, 2] x, tf32[2, 2] y) → tf32[2, 2] {
-    redde x.addita(y).multiplica(y)
+    redde (x + y) ⊙ y
 }
 "#,
     );
@@ -621,7 +621,7 @@ fn accepts_backward_annotated_kernel_in_air_lane() {
 @ radix lane "air"
 @ radix backward "loss_backward"
 functio simple_loss(tf32[2, 2] x, tf32[2, 2] w) → tf32[2, 2] {
-    redde x.multiplica(w)
+    redde x ⊙ w
 }
 "#,
     );
@@ -649,7 +649,7 @@ fn rejects_plain_kernel_in_air_lane() {
 @ nucleum
 @ radix lane "air"
 functio forward(tf32[2, 2] x) → tf32[2, 2] {
-    redde x.multiplica(x)
+    redde x ⊙ x
 }
 "#,
     );
@@ -667,7 +667,7 @@ fn rejects_plain_nucleum_fragment_in_air_lane() {
 @ nucleum fragment
 @ radix lane "air"
 functio forward(tf32[2, 2] x) → tf32[2, 2] {
-    redde x.multiplica(x)
+    redde x ⊙ x
 }
 "#,
     );
@@ -1439,7 +1439,7 @@ functio pick(tensor<f32, [4, 4]> x) → tensor<f32, [4, 4]> ⇥ textus {
     itera ex x apud [i, j] fixum cell {
         fixum numerus idx ← i * 2 + j
         si idx > 20 { iace "upper" }
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     redde acc
 }
@@ -1463,7 +1463,7 @@ functio pick(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
     varia tensor<f32, [2, 2]> acc ← x
     itera ab 0‥16 fixum i {
         fixum numerus k ← i * 2 + 1
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     redde acc
 }
@@ -1520,7 +1520,7 @@ functio pick(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
     itera ab 0‥16 fixum i {
         fixum _ k ← i * 2 + 1
         fixum _ m ← k * 2 + i
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     redde acc
 }
@@ -1541,7 +1541,7 @@ functio pick(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
     itera ab 0‥16 fixum i {
         fixum numerus k ← i * 2 + 1
         fixum numerus m ← k * k
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     redde acc
 }

@@ -244,7 +244,7 @@ fn radix_backward_attaches_with_air_lane() {
 @ radix lane "air"
 @ radix backward "multiplica_backward"
 functio loss(tf32[2] a, tf32[2] b) → tf32[2] {
-    redde a.multiplica(b)
+    redde a ⊙ b
 }
 "#,
     );
@@ -290,7 +290,7 @@ fn radix_backward_missing_backward_name_rejects() {
 @ radix lane "air"
 @ radix backward
 functio loss(tf32[2] a, tf32[2] b) → tf32[2] {
-    redde a.multiplica(b)
+    redde a ⊙ b
 }
 "#,
     );
@@ -312,7 +312,7 @@ fn radix_backward_non_string_value_rejects() {
         "@ radix lane \"air\"\n",
         "@ radix backward 42\n",
         "functio loss(tf32[2] a, tf32[2] b) → tf32[2] {\n",
-        "    redde a.multiplica(b)\n",
+        "    redde a ⊙ b\n",
         "}\n",
     ));
 
@@ -333,7 +333,7 @@ fn radix_backward_extra_args_rejects() {
 @ radix lane "air"
 @ radix backward "name" "extra"
 functio loss(tf32[2] a, tf32[2] b) → tf32[2] {
-    redde a.multiplica(b)
+    redde a ⊙ b
 }
 "#,
     );
@@ -356,7 +356,7 @@ fn radix_backward_conflicting_annotations_rejects() {
 @ radix backward "first_name"
 @ radix backward "second_name"
 functio loss(tf32[2] a, tf32[2] b) → tf32[2] {
-    redde a.multiplica(b)
+    redde a ⊙ b
 }
 "#,
     );
@@ -399,7 +399,7 @@ fn radix_backward_no_backward_when_not_annotated() {
         r#"
 @ radix lane "air"
 functio loss(tf32[2] a, tf32[2] b) → tf32[2] {
-    redde a.multiplica(b)
+    redde a ⊙ b
 }
 "#,
     );
@@ -419,7 +419,7 @@ fn radix_backward_air_lane_collects_both_metadata() {
 @ radix lane "air"
 @ radix backward "loss_backward"
 functio loss(tf32[2] a, tf32[2] b) → tf32[2] {
-    redde a.addita(b)
+    redde a + b
 }
 
 @ radix lane "mir"

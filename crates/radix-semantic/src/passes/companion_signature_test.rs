@@ -36,7 +36,7 @@ const TWO_TENSOR_PRIMAL: &str = r#"
 @ radix lane "air"
 @ radix backward "mul_backward"
 functio mul_pair(tf32[2,2] a, tf32[2,2] b) → tf32[2,2] {
-    redde a.multiplica(b)
+    redde a ⊙ b
 }
 "#;
 
@@ -155,7 +155,7 @@ fn companion_call_with_correct_arity_typechecks() {
 @ radix lane "air"
 @ radix backward "mean_backward"
 functio mean(tf32[5] x, tf32[5] y) → fractus {
-    redde x.addita(y).media()
+    redde (x + y).media()
 }
 
 incipit {
@@ -207,7 +207,7 @@ fn companion_call_with_correctly_typed_args_typechecks_fully() {
 @ radix lane "air"
 @ radix backward "mean_backward"
 functio mean(tf32[5] x, tf32[5] y) → fractus {
-    redde x.addita(y).media()
+    redde (x + y).media()
 }
 
 functio nil() → vacuum {
@@ -237,7 +237,7 @@ const GENERIC_TWO_TENSOR_PRIMAL: &str = r#"
 functio simple_loss<magnitudo R, magnitudo C>(
     tensor<f32, [R, C]> x, tensor<f32, [R, C]> w
 ) → f32 {
-    fixum tensor<f32, [R, C]> product ← x.multiplica(w)
+    fixum tensor<f32, [R, C]> product ← x ⊙ w
     redde product.media()
 }
 "#;
@@ -390,7 +390,7 @@ fn concrete_primal_companion_frozen_form_regression() {
 @ radix lane "air"
 @ radix backward "loss2_backward"
 functio concrete_loss(tensor<f32, [2, 2]> x, tensor<f32, [2, 2]> w) → f32 {
-    fixum tensor<f32, [2, 2]> product ← x.multiplica(w)
+    fixum tensor<f32, [2, 2]> product ← x ⊙ w
     redde product.media()
 }
 

@@ -150,7 +150,7 @@ const FULL_PREFIX_TENSOR_LOOP: &str = r#"
 functio lane_sum(tensor<f32, [4]> x) → f32 {
     varia tensor<f32, [4]> acc ← x
     itera ab 0‥4 fixum i {
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     redde acc.media()
 }
@@ -197,7 +197,7 @@ const APUD_RANK2_GRID: &str = r#"
 functio grid_sum(tensor<f32, [2, 3]> x) → f32 {
     varia tensor<f32, [2, 3]> acc ← x
     itera ex x apud [i, j] fixum cell {
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     redde acc.media()
 }
@@ -243,7 +243,7 @@ fn apud_rank1_driver_reaches_reverse_ad_with_lane_count() {
 functio line_sum(tensor<f32, [8]> x) → f32 {
     varia tensor<f32, [8]> acc ← x
     itera ex x apud [i] fixum cell {
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     redde acc.media()
 }
@@ -276,7 +276,7 @@ fn apud_rank3_driver_reaches_reverse_ad_with_lane_count() {
 functio cube_sum(tensor<f32, [2, 2, 2]> x) → f32 {
     varia tensor<f32, [2, 2, 2]> acc ← x
     itera ex x apud [i, j, k] fixum cell {
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     redde acc.media()
 }
@@ -555,7 +555,7 @@ functio boom(tensor<f32, [4]> x) → tensor<f32, [4]> ⇥ textus {
         si i > 1 {
             iace "boom"
         }
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     redde acc
 }
@@ -599,7 +599,7 @@ fn budget_exceeding_n_declines_with_causa() {
 functio too_wide(tensor<f32, [4]> x) → f32 {
     varia tensor<f32, [4]> acc ← x
     itera ab 0‥65 fixum i {
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     redde acc.media()
 }
@@ -650,7 +650,7 @@ fn generic_or_runtime_bound_declines_not_concrete() {
 functio runtime_n(numerus n, tensor<f32, [4]> x) → f32 {
     varia tensor<f32, [4]> acc ← x
     itera ab 0‥n fixum i {
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     redde acc.media()
 }
@@ -690,9 +690,9 @@ const MASKED_LANE_MEAN: &str = r#"
 functio masked_lane_mean(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
     varia tensor<f32, [4]> acc ← x
     itera ab 0‥4 fixum i {
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
-    redde acc.multiplica(mask).media()
+    redde (acc ⊙ mask).media()
 }
 "#;
 
@@ -724,7 +724,7 @@ fn two_data_tensors_stay_full_prefix() {
 functio pair_sum(tensor<f32, [4]> a, tensor<f32, [4]> b) → f32 {
     varia tensor<f32, [4]> acc ← a
     itera ab 0‥4 fixum i {
-        acc ← acc.addita(b)
+        acc ← acc + b
     }
     redde acc.media()
 }
@@ -750,9 +750,9 @@ functio fill_mask(tensor<f32, [4]> x) → f32 {
     fixum tensor<f32, [4]> mask ← x.reple(1.0)
     varia tensor<f32, [4]> acc ← x
     itera ab 0‥4 fixum i {
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
-    redde acc.multiplica(mask).media()
+    redde (acc ⊙ mask).media()
 }
 "#,
     );
@@ -771,7 +771,7 @@ functio cmp_mask(tensor<f32, [4]> x, numerus len) → f32 ⇥ textus {
         si i < len {
             iace "pad"
         }
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     redde acc.media()
 }
@@ -789,9 +789,9 @@ fn nan_unsafe_unclamped_div_declines_with_causa() {
 functio unsafe_div(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
     varia tensor<f32, [4]> acc ← x.divisio(mask)
     itera ab 0‥4 fixum i {
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
-    redde acc.multiplica(mask).media()
+    redde (acc ⊙ mask).media()
 }
 "#,
     );
@@ -807,7 +807,7 @@ fn unmasked_reduction_exit_declines_with_causa() {
 functio unmasked_exit(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
     varia tensor<f32, [4]> acc ← x
     itera ab 0‥4 fixum i {
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     redde acc.media()
 }
@@ -1189,7 +1189,7 @@ functio causal(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> ⇥ textus {
     varia tensor<f32, [2, 2]> acc ← x
     itera ex x apud [i, j] fixum cell {
         si i > j { iace "upper" }
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     redde acc
 }
@@ -1234,7 +1234,7 @@ functio triangular(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> ⇥ textus {
     itera ex x apud [i, j] fixum cell {
         fixum numerus idx ← i * 2 + j
         si idx > 2 { iace "upper" }
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     redde acc
 }
@@ -1302,10 +1302,10 @@ fn apud_mixed_admit_and_decline_reports_only_the_declined_loop() {
 functio mixed(tensor<f32, [40]> x) → f32 {
     varia tensor<f32, [40]> acc ← x
     itera ex x apud [i] fixum cell {
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     itera ex x apud [i] fixum cell {
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     redde acc.media()
 }
