@@ -18,8 +18,8 @@ locale = "la"
 #     params `B` and `D` bind implicitly from the concrete `[2, 8]` / `[2, 2]`
 #     argument shapes (D1). No explicit shape args (that syntax is PARSE030).
 #   • One generic function replaces the concrete `scaled_dot_product_2x8`
-#     overload pattern. The body is method-spelled Depth-2 static
-#     (`transpone` / `matmul` / `multiplica` / `activatio_softmax`).
+#     overload pattern. The body is a Depth-2 static composition of
+#     tensor operators and methods (`transpone` / `matmul` / `activatio_softmax`).
 #   • Construction of the concrete arguments uses the conversion-route
 #     `lista ↦ tensor<f32, [literal]>` edge; the static world never reads
 #     `figura()` / `magnitudines()`.
@@ -37,7 +37,7 @@ locale = "la"
 functio scaled_dot_product<magnitudo B, magnitudo D>(tensor<f32, [B, D]> qb, tensor<f32, [B, D]> kb, tensor<f32, [B, D]> vb, tensor<f32, [B, B]> scale) → tensor<f32, [B, D]> {
     fixum tensor<f32, [D, B]> kt ← kb.transpone()
     fixum tensor<f32, [B, B]> scores ← qb.matmul(kt)
-    fixum tensor<f32, [B, B]> scaled ← scores.multiplica(scale)
+    fixum tensor<f32, [B, B]> scaled ← scores ⊙ scale
     fixum tensor<f32, [B, B]> attn ← scaled.activatio_softmax()
     fixum tensor<f32, [B, D]> context ← attn.matmul(vb)
     redde context
