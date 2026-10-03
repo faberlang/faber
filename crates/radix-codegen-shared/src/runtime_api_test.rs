@@ -644,7 +644,6 @@ fn the_go_tensor_vector_and_sparsa_rows_spell_as_the_flat_rt_names() {
 fn the_go_carrier_rows_spell_as_the_flat_rt_names() {
     for (row, spelled) in [
         (&ORDER_ORDER, "rt.OrderOrder"),
-        (&ORDER_COMPARE, "rt.OrderCompare"),
         (&INTERVALLUM_INTERVALLUM, "rt.IntervallumIntervallum"),
         (&INTERVALLUM_VALUE, "rt.IntervallumValue"),
         (&TUPLE_KEY, "rt.TupleKey"),
@@ -657,8 +656,42 @@ fn the_go_carrier_rows_spell_as_the_flat_rt_names() {
         assert_eq!(row.targets, &[Target::HirGo]);
         assert_ne!(row.kind, RuntimeKind::StoreFn);
     }
+    // `order.compare` is the shared row: Go spells `rt.OrderCompare` and the
+    // TypeScript runtime spells `order.compare` (T1-T13).
+    assert_eq!(spell_any(Target::HirGo, &ORDER_COMPARE), "rt.OrderCompare");
+    assert_eq!(
+        ORDER_COMPARE.targets,
+        &[Target::HirGo, Target::HirTypeScript]
+    );
     // The interval carrier is the one type among them.
     assert_eq!(INTERVALLUM_INTERVALLUM.kind, RuntimeKind::Type);
+}
+
+#[test]
+fn the_ts_order_and_dup_rows_spell_as_namespace_members() {
+    assert_eq!(
+        spell(Target::HirTypeScript, &ORDER_COMPARE).as_deref(),
+        Ok("order.compare")
+    );
+    assert_eq!(
+        spell(Target::HirTypeScript, &ORDER_TEXT_COMPARE).as_deref(),
+        Ok("order.textCompare")
+    );
+    assert_eq!(
+        spell(Target::HirTypeScript, &DUP_DUPLICATE).as_deref(),
+        Ok("dup.duplicate")
+    );
+    for row in [ORDER_COMPARE, ORDER_TEXT_COMPARE, DUP_DUPLICATE] {
+        assert!(TABLE.contains(&row), "{row:?} is a table row");
+        assert!(row.targets.contains(&Target::HirTypeScript));
+        assert_ne!(row.kind, RuntimeKind::StoreFn);
+    }
+    let reserved = reserved_names(Target::HirTypeScript, TABLE);
+    assert!(reserved.contains(&"order".to_owned()));
+    assert!(reserved.contains(&"dup".to_owned()));
+    // The text compare is TypeScript-only (Go compares UTF-8 bytes).
+    assert_eq!(ORDER_TEXT_COMPARE.targets, &[Target::HirTypeScript]);
+    assert_eq!(DUP_DUPLICATE.targets, &[Target::HirTypeScript]);
 }
 
 #[test]
