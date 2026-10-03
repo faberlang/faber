@@ -55,7 +55,6 @@ fn invalid_provider_segments_rejected() {
 fn parse_paths_config_empty_toml() {
     let config = parse_paths_config("");
     assert!(config.source.is_none());
-    assert!(config.templates.is_empty());
 }
 
 #[test]
@@ -66,7 +65,6 @@ name = "test"
 "#;
     let config = parse_paths_config(toml);
     assert!(config.source.is_none());
-    assert!(config.templates.is_empty());
 }
 
 #[test]
@@ -77,9 +75,6 @@ source = "src"
 "#;
     let config = parse_paths_config(toml);
     assert_eq!(config.source, Some("src".to_owned()));
-    // Implicit §src default should be present.
-    assert_eq!(config.templates.get("src"), Some(&"src".to_owned()));
-    assert_eq!(config.templates.len(), 1);
 }
 
 #[test]
@@ -90,25 +85,10 @@ output = "dist"
 "#;
     let config = parse_paths_config(toml);
     assert!(config.source.is_none());
-    assert!(config.templates.is_empty());
 }
 
 #[test]
-fn parse_paths_config_template_only() {
-    let toml = r#"
-[paths.templates]
-src = "src"
-assets = "assets/textures"
-"#;
-    let config = parse_paths_config(toml);
-    assert!(config.source.is_none());
-    assert_eq!(config.templates.get("src"), Some(&"src".to_owned()));
-    assert_eq!(config.templates.get("assets"), Some(&"assets/textures".to_owned()));
-    assert_eq!(config.templates.len(), 2);
-}
-
-#[test]
-fn parse_paths_config_mixed_source_and_templates() {
+fn parse_paths_config_source_with_templates_section() {
     let toml = r#"
 [paths]
 source = "lib"
@@ -118,68 +98,6 @@ assets = "assets"
 "#;
     let config = parse_paths_config(toml);
     assert_eq!(config.source, Some("lib".to_owned()));
-    // Explicit template entry.
-    assert_eq!(config.templates.get("assets"), Some(&"assets".to_owned()));
-    // Implicit §src default from [paths].source.
-    assert_eq!(config.templates.get("src"), Some(&"lib".to_owned()));
-    assert_eq!(config.templates.len(), 2);
-}
-
-#[test]
-fn parse_paths_config_explicit_src_overrides_default() {
-    let toml = r#"
-[paths]
-source = "lib"
-
-[paths.templates]
-src = "custom_src"
-"#;
-    let config = parse_paths_config(toml);
-    assert_eq!(config.source, Some("lib".to_owned()));
-    // Explicit `src` should win over the default.
-    assert_eq!(config.templates.get("src"), Some(&"custom_src".to_owned()));
-    assert_eq!(config.templates.len(), 1);
-}
-
-#[test]
-fn parse_paths_config_absolute_template_value_rejected() {
-    let toml = r#"
-[paths]
-source = "src"
-
-[paths.templates]
-good = "relative/path"
-bad = "/absolute/path"
-"#;
-    let config = parse_paths_config(toml);
-    assert_eq!(config.source, Some("src".to_owned()));
-    // 'good' should be present.
-    assert_eq!(config.templates.get("good"), Some(&"relative/path".to_owned()));
-    // 'bad' (absolute) should be rejected.
-    assert!(!config.templates.contains_key("bad"));
-    // §src default should still be present.
-    assert_eq!(config.templates.get("src"), Some(&"src".to_owned()));
-    assert_eq!(config.templates.len(), 2);
-}
-
-#[test]
-fn parse_paths_config_dotdot_template_value_rejected() {
-    let toml = r#"
-[paths.templates]
-good = "relative/path"
-bad = "../escape"
-bad2 = "a/../b"
-"#;
-    let config = parse_paths_config(toml);
-    // 'good' should be present.
-    assert_eq!(config.templates.get("good"), Some(&"relative/path".to_owned()));
-    // 'bad' and 'bad2' (containing `..`) should be rejected.
-    assert!(
-        !config.templates.contains_key("bad"),
-        "..-prefix template value must be rejected"
-    );
-    assert!(!config.templates.contains_key("bad2"), "embedded .. segment must be rejected");
-    assert_eq!(config.templates.len(), 1);
 }
 
 #[test]
@@ -190,20 +108,16 @@ source = ""
 "#;
     let config = parse_paths_config(toml);
     assert!(config.source.is_none());
-    assert!(config.templates.is_empty());
 }
 
 #[test]
-fn parse_paths_config_source_with_templates_absent() {
+fn parse_paths_config_source_with_nested_path() {
     let toml = r#"
 [paths]
 source = "src/faber"
 "#;
     let config = parse_paths_config(toml);
     assert_eq!(config.source, Some("src/faber".to_owned()));
-    // Implicit §src default from source.
-    assert_eq!(config.templates.get("src"), Some(&"src/faber".to_owned()));
-    assert_eq!(config.templates.len(), 1);
 }
 
 #[test]
@@ -221,9 +135,6 @@ extra = "extra_dir"
 "#;
     let config = parse_paths_config(toml);
     assert_eq!(config.source, Some("src".to_owned()));
-    assert_eq!(config.templates.get("extra"), Some(&"extra_dir".to_owned()));
-    assert_eq!(config.templates.get("src"), Some(&"src".to_owned()));
-    assert_eq!(config.templates.len(), 2);
 }
 
 // ── resolve_fab_file ────────────────────────────────────────────────────────
@@ -430,7 +341,6 @@ fn parse_paths_config_empty_paths_section() {
 ";
     let config = parse_paths_config(toml);
     assert!(config.source.is_none());
-    assert!(config.templates.is_empty());
 }
 
 // ── PRP-066 BO-D-1 package root memo ────────────────────────────────────────
