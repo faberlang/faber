@@ -5901,6 +5901,22 @@
     },
     {
       "src": "lista",
+      "tgt": "tensor",
+      "target": "wasm-text",
+      "predicted": "not-emitted",
+      "measured": "dedicated",
+      "detail": "mir-capable"
+    },
+    {
+      "src": "lista",
+      "tgt": "tensor",
+      "target": "wasm",
+      "predicted": "not-emitted",
+      "measured": "dedicated",
+      "detail": "mir-capable"
+    },
+    {
+      "src": "lista",
       "tgt": "vector",
       "target": "rust",
       "predicted": "dedicated",
@@ -7397,6 +7413,22 @@
     },
     {
       "src": "tensor",
+      "tgt": "valor",
+      "target": "wasm-text",
+      "predicted": "not-emitted",
+      "measured": "dedicated",
+      "detail": "mir-capable"
+    },
+    {
+      "src": "tensor",
+      "tgt": "valor",
+      "target": "wasm",
+      "predicted": "not-emitted",
+      "measured": "dedicated",
+      "detail": "mir-capable"
+    },
+    {
+      "src": "tensor",
       "tgt": "instans",
       "target": "ts",
       "predicted": "fallback",
@@ -7418,6 +7450,22 @@
       "predicted": "fallback",
       "measured": "dedicated",
       "detail": "arm:dedicated"
+    },
+    {
+      "src": "tensor",
+      "tgt": "lista",
+      "target": "wasm-text",
+      "predicted": "not-emitted",
+      "measured": "dedicated",
+      "detail": "mir-capable"
+    },
+    {
+      "src": "tensor",
+      "tgt": "lista",
+      "target": "wasm",
+      "predicted": "not-emitted",
+      "measured": "dedicated",
+      "detail": "mir-capable"
     },
     {
       "src": "tensor",
@@ -7506,6 +7554,22 @@
       "predicted": "fallback",
       "measured": "dedicated",
       "detail": "arm:dedicated"
+    },
+    {
+      "src": "tensor",
+      "tgt": "tensor",
+      "target": "wasm-text",
+      "predicted": "not-emitted",
+      "measured": "dedicated",
+      "detail": "mir-capable"
+    },
+    {
+      "src": "tensor",
+      "tgt": "tensor",
+      "target": "wasm",
+      "predicted": "not-emitted",
+      "measured": "dedicated",
+      "detail": "mir-capable"
     },
     {
       "src": "tensor",

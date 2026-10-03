@@ -5,10 +5,10 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "dedicated": 54,
+    "dedicated": 58,
     "fallback": 0,
     "rejected": 208,
-    "not-emitted": 179
+    "not-emitted": 175
   },
   "cells": [
     {
@@ -1490,7 +1490,7 @@
     {
       "src": "lista",
       "tgt": "tensor",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
@@ -1952,7 +1952,7 @@
     {
       "src": "tensor",
       "tgt": "valor",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
@@ -1970,7 +1970,7 @@
     {
       "src": "tensor",
       "tgt": "lista",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
@@ -1994,7 +1994,7 @@
     {
       "src": "tensor",
       "tgt": "tensor",
-      "tier": "not-emitted",
+      "tier": "dedicated",
       "measured": true
     },
     {
