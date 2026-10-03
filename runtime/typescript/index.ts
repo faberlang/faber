@@ -24,3 +24,11 @@ export * as dec from "./dec.ts";
 export * as inf from "./inf.ts";
 // @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
 export * as format from "./format.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as tensor from "./tensor.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as sparsa from "./sparsa.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as matrix from "./matrix.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as vector from "./vector.ts";

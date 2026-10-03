@@ -24,11 +24,15 @@
     "format.ts",
     "inf.ts",
     "regex.ts",
+    "tensor.ts",
+    "sparsa.ts",
+    "matrix.ts",
+    "vector.ts",
     "tsconfig.json",
     "package.json"
   ],
   "private": true,
   "scripts": {
-    "test": "node --test dec.test.ts display.test.ts exact.test.ts format.test.ts inf.test.ts regex.test.ts"
+    "test": "node --test dec.test.ts display.test.ts exact.test.ts format.test.ts inf.test.ts regex.test.ts tensor.test.ts sparsa.test.ts matrix.test.ts vector.test.ts"
   }
 }
