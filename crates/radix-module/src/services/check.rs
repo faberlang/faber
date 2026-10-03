@@ -1,8 +1,8 @@
 //! Typed check service: normalized diagnostics, no print/exit.
 
 use crate::diagnostics::DiagnosticConvert;
+use crate::driver::MISSING_PARSE_PROGRAM_MESSAGE;
 
-const MISSING_PARSE_PROGRAM_MESSAGE: &str = "successful parse result missing program";
 const PERMISSIVE_DOWNGRADE_MESSAGE: &str = "permissive mode downgraded unresolved/import-driven semantic errors";
 
 struct CheckErrorTally {

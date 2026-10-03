@@ -466,30 +466,5 @@ pub fn qualify_for_target(
 }
 
 fn target_label(target: radix_target::Target) -> &'static str {
-    match target {
-        radix_target::Target::MirStepper => "stepper",
-        radix_target::Target::HirRust => "rust",
-        radix_target::Target::HirTypeScript => "ts",
-        radix_target::Target::HirGo => "go",
-        radix_target::Target::HirSwift => "swift",
-        radix_target::Target::HirPython => "python",
-        radix_target::Target::HirHaskell => "haskell",
-        radix_target::Target::HirPascal => "pascal",
-        radix_target::Target::HirCobol => "cobol",
-        radix_target::Target::HirFortran => "fortran",
-        radix_target::Target::HirFaber => "faber",
-        radix_target::Target::MirWasm => "wasm-text",
-        radix_target::Target::MirLlvm => "llvm-text",
-        radix_target::Target::MirLlvmHost => "llvm-host",
-        radix_target::Target::MirAmd => "amd",
-        radix_target::Target::MirMetal => "metal-text",
-        radix_target::Target::MirWgsl => "wgsl-text",
-        radix_target::Target::MirSexp => "sexp",
-        radix_target::Target::MirBasic => "basic",
-        radix_target::Target::MirScena => "scena",
-        radix_target::Target::MirFmir => "fmir-text",
-        radix_target::Target::MirFmirBinary => "fmir",
-        radix_target::Target::MirFmirBundle => "fmir-bin",
-        radix_target::Target::HirFhir => "fhir",
-    }
+    target.as_str()
 }
