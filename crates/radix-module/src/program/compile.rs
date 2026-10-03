@@ -1920,9 +1920,9 @@ fn file_export_from_stmt(
             let name = interner.resolve(decl.name.name).to_owned();
             // `ordo` members are unit variants: project their names so
             // consumers can reference `module.MEMBER` values and match them.
-            // Only identity-bearing snapshots project (module-boundary rows
-            // 1/9 pin the identity-less relative-import surface to the
-            // legacy empty-variant fail-closed behavior).
+            // Only identity-bearing snapshots project; the identity-less
+            // relative-import surface keeps the legacy empty-variant
+            // fail-closed behavior.
             let variants = if ctx.module_identity.is_some() {
                 decl.members
                     .iter()
@@ -1954,7 +1954,7 @@ fn file_export_from_stmt(
             // union patterns (`module.VARIANT` in `discerne` arms) resolve
             // instead of failing SEM001. Identity-bearing snapshots only —
             // identity-less relative-import targets keep the legacy
-            // empty-variant surface the module-boundary + error-masking
+            // empty-variant surface the error-masking
             // diagnostics pin (SEM001.unknown_variant / SEM008 on imported
             // union refs).
             let (variants, shared_fields) = if ctx.module_identity.is_some() {

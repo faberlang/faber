@@ -795,10 +795,9 @@ incipit {
 fn wildcard_relative_import_resolves_publica_type_alias() {
     // MB-U1 / tela U5 repro shape: a consumer importing `./lib_alias` as `la`
     // resolves `la.Nomen` (an `@ publica` type alias) in return AND parameter
-    // positions. This is the module-boundary fixture's parity control.
+    // positions.
     let (_td, home) = temp_dir("wildcard-alias");
-    let fixture =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../radix-module-boundary/tests/fixtures/lib_alias.fab");
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/fixtures/lib_alias.fab");
     fs::write(home.join("lib_alias.fab"), fs::read_to_string(&fixture).expect("fixture")).expect("copy lib_alias");
     let app = home.join("consumer.fab");
     fs::write(
@@ -3112,7 +3111,7 @@ fn interface_snapshot_projects_union_and_enum_variants() {
     // must project the variant list (name + payload fields) like the package path —
     // for identity-bearing targets (library/package imports). Identity-less
     // relative-import targets keep the legacy empty-variant surface the
-    // module-boundary rows 1/9 and the error-masking diagnostics pin
+    // error-masking diagnostics pin
     // (SEM001.unknown_variant / SEM008 on imported union refs).
     let (program, interner) = super::parse_program_for_namespace_exports(
         "producer.fab",

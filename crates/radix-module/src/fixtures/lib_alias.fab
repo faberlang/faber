@@ -1,0 +1,30 @@
++++
+locale = "en"
++++
+
+# MB-U1 seed fixture — bug 5 family control (tela U5: qualified TYPE refs
+# under an import alias fail while value calls work).
+#
+# `lib_alias.fab` exposes a TYPE ALIAS (`Nomen`), a genus (`Persona`), and a
+# value function (`faci`). The tela U5 repro shape is a consumer referencing
+# the module's TYPE ALIAS under the import alias (`la.Nomen` in a return or
+# parameter type) while `la.Persona` genus-type refs and `la.faci()` value
+# calls work. The tela U5 evidence recorded the failure as PARSE001, tracked
+# in-tree as SEM002.unknown_qualified_type at the qualified type-alias
+# reference. Cheap-profile re-measure 2026-08-17 (RTR1b, no prepared
+# contract): standalone is clean; the imported consumer fails
+# SEM002.unknown_qualified_type. That is an empty-contract capability gap,
+# not a proof that tela U5 reproduces under a prepared contract.
+
+@ public
+class Persona {
+    var string nomen
+}
+
+@ public
+type Nomen = string
+
+@ public
+fn faci() → Persona {
+    return Persona { nomen = "salve" }
+}

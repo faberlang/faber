@@ -1503,7 +1503,7 @@ fn rejects_lista_to_tensor_runtime_convert() {
 }
 
 #[test]
-#[ignore = "parity-ledger.toml standalone stepper capability-gap (octeti/unify.fab); owner hand-9; runner_unsupported_mir_lowering_method_call_before_runtime_provider_mir_lowering"]
+#[ignore = "standalone stepper capability-gap (octeti/unify.fab); runner_unsupported_mir_lowering_method_call_before_runtime_provider_mir_lowering"]
 fn octeti_unify_exemplum_mir_validates() {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/octeti/unify.fab");
     let source = std::fs::read_to_string(path).expect("read octeti unify exemplum");

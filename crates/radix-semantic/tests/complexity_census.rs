@@ -15,9 +15,7 @@
 //! silently skipped — the failure list is part of the census artifact.
 //!
 //! Postures (delivery.md CC-U4 read_scope):
-//! - `radix/corpus/`: driver single-unit analysis per file (the
-//!   module-boundary harness precedent — `radix-module-boundary`
-//!   `measure_standalone`).
+//! - `radix/corpus/`: driver single-unit analysis per file.
 //! - `norma/src/`, `gradus/src/`: package-analysis posture — each module is
 //!   resolved through the production `LibraryResolver` rooted at the
 //!   faberlang container root and analyzed in-process through the
@@ -218,8 +216,7 @@ fn corpus_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus")
 }
 
-/// Corpus tree: driver single-unit analysis per file (module-boundary
-/// precedent). Reject/negative exempla that fail analysis are honest failure
+/// Corpus tree: driver single-unit analysis per file. Reject/negative exempla that fail analysis are honest failure
 /// rows, not skips.
 fn census_corpus() -> TreeCensus {
     let mut census = TreeCensus::new("radix/corpus");
