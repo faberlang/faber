@@ -1056,7 +1056,21 @@ fn resolve_variant_path_without_enum_parent(
                     .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
             );
         }
-        QualifiedVariantPathLookup::NotQualified => resolve_variant_ident(resolver, last, errors),
+        QualifiedVariantPathLookup::NotQualified => {
+            // A two-segment path naming an imported type (`geo.Circle`) is a
+            // type pattern, not a variant reference (BUG-82852379): skip the
+            // bare-variant resolution exactly as an authored type pattern
+            // resolves. A namespace member that is not a type keeps the
+            // bare-variant resolution, so unknown members still fail closed.
+            if segments.len() == 2
+                && resolver
+                    .namespace_file_type(segments[0].name, last.name)
+                    .is_some()
+            {
+                return;
+            }
+            resolve_variant_ident(resolver, last, errors);
+        }
     }
 }
 
