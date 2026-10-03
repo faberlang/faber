@@ -7,11 +7,12 @@
 //! toolchain dependency leaking back onto the emit path or an accidental
 //! regression.
 //!
-//! Scanned set — every non-test `src` file under:
-//!   - `crates/radix-mir-*` — all MIR backends + runner
-//!   - `crates/radix-hir-*` — all HIR backends
-//!   - `crates/radix-lower-ts`
-//!   - `crates/radix-module/src/codegen`
+//! Scanned set — every non-test `src` file under workspace members named:
+//!   - `radix-mir` / `radix-mir-*` — all MIR backends + runner
+//!   - `radix-hir` / `radix-hir-*` — all HIR backends
+//!   - `radix-lower-*`
+//!   - `radix-codegen-shared`
+//! plus `crates/radix-module/src/codegen`.
 //!
 //! Allowlisted by policy (spawns are deliberate; entries only shrink):
 //!   - `radix-mir-runner/src/kernel/processus.rs` — the `processus` provider
@@ -37,6 +38,7 @@
 use hygiene_ratchet::{ScanConfig, collect_production_files, scan_command_new};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 fn workspace() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -46,41 +48,53 @@ fn workspace() -> PathBuf {
         .to_path_buf()
 }
 
-/// Emit/lowering crate families pinned by this ratchet, mirroring the D5
-/// scope (`radix-mir-*`, `radix-hir-*`, `radix-lower-*`, `radix-module`
-/// codegen). New emit/lowering backends must be added here deliberately.
-fn scanned_roots(workspace: &Path) -> Vec<PathBuf> {
-    const CRATES: &[&str] = &[
-        "radix-mir",
-        "radix-mir-basic",
-        "radix-mir-coverage",
-        "radix-mir-fmir",
-        "radix-mir-llvm",
-        "radix-mir-metal",
-        "radix-mir-parity",
-        "radix-mir-python",
-        "radix-mir-runner",
-        "radix-mir-sexp",
-        "radix-mir-wasm",
-        "radix-mir-wgsl",
-        "radix-hir",
-        "radix-hir-faber",
-        "radix-hir-fhir",
-        "radix-hir-cobol",
-        "radix-hir-fortran",
-        "radix-hir-go",
-        "radix-hir-haskell",
-        "radix-hir-lean",
-        "radix-hir-pascal",
-        "radix-hir-python",
-        "radix-hir-rust",
-        "radix-hir-swift",
-        "radix-hir-ts",
-        "radix-lower-ts",
-    ];
-    let mut roots: Vec<PathBuf> = CRATES
+/// Discover emit/lowering package roots from Cargo's workspace membership,
+/// not a second hand-maintained crate list.
+fn scanned_roots(workspace: &Path) -> (Vec<PathBuf>, usize) {
+    let output = Command::new("cargo")
+        .args(["metadata", "--no-deps", "--format-version", "1"])
+        .current_dir(workspace)
+        .output()
+        .expect("run cargo metadata to discover workspace members");
+    assert!(
+        output.status.success(),
+        "cargo metadata failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let metadata: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("parse cargo metadata JSON");
+    let members = metadata["workspace_members"]
+        .as_array()
+        .expect("cargo metadata workspace_members array");
+    let packages = metadata["packages"]
+        .as_array()
+        .expect("cargo metadata packages array");
+    let member_ids: std::collections::HashSet<&str> = members
         .iter()
-        .map(|name| workspace.join("crates").join(name).join("src"))
+        .map(|id| id.as_str().expect("workspace member package ID"))
+        .collect();
+
+    let mut roots: Vec<PathBuf> = packages
+        .iter()
+        .filter(|package| {
+            let id = package["id"].as_str().expect("package ID");
+            if !member_ids.contains(id) {
+                return false;
+            }
+            let name = package["name"].as_str().expect("package name");
+            name == "radix-mir"
+                || name.starts_with("radix-mir-")
+                || name == "radix-hir"
+                || name.starts_with("radix-hir-")
+                || name.starts_with("radix-lower-")
+                || name == "radix-codegen-shared"
+        })
+        .map(|package| {
+            Path::new(package["manifest_path"].as_str().expect("manifest path"))
+                .parent()
+                .expect("package manifest directory")
+                .join("src")
+        })
         .collect();
     roots.push(
         workspace
@@ -89,14 +103,19 @@ fn scanned_roots(workspace: &Path) -> Vec<PathBuf> {
             .join("src")
             .join("codegen"),
     );
-    roots
+    (roots, members.len())
 }
 
 #[test]
 fn emit_crates_do_not_spawn_toolchains() {
     let workspace = workspace();
+    let (source_roots, workspace_member_count) = scanned_roots(&workspace);
+    eprintln!(
+        "workspace members: {workspace_member_count}; emit/lowering roots: {}",
+        source_roots.len() - 1
+    );
     let config = ScanConfig {
-        source_roots: scanned_roots(&workspace),
+        source_roots,
         exclude_path_suffixes: vec![
             // Allowlisted: processus provider — Faber language capability
             // kernel (`exec`/`captura`/shell), not a toolchain dependency.
