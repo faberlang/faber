@@ -249,6 +249,9 @@ mod conversio_function_tests;
 #[cfg(test)]
 #[path = "copy_duplicate_test.rs"]
 mod copy_duplicate_tests;
+#[cfg(all(test, target_os = "macos"))]
+#[path = "copy_into_device_test.rs"]
+mod copy_into_device_tests;
 #[cfg(test)]
 #[path = "copy_into_run_test.rs"]
 mod copy_into_run_tests;

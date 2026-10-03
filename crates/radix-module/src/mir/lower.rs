@@ -725,6 +725,16 @@ pub fn lower_analyzed_unit(
         // entry row. Entry gating happens on the driver's emit/dispatch path
         // via `device_entry_roles_from_hir`.
         let roles = crate::mir::device_roles_from_hir(&unit.hir);
+        // `⇇` on a device function lowers as the output-buffer store the
+        // recipes already write; the host keeps the storage-preserving copy.
+        for function in &mut program.functions {
+            if function
+                .source
+                .is_some_and(|source| roles.contains_key(&source))
+            {
+                radix_mir::device_copy_into::lower_device_copy_into(function);
+            }
+        }
         // DFV2-4: launch entries are the public `@ nucleum` sources — the
         // only device functions that stay program symbols when device code
         // also calls them; composed private helpers are pruned.

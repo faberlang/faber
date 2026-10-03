@@ -7209,3 +7209,32 @@ fn vector_runtime_index_lowers_to_an_index_projection_on_the_vector() {
     }
     assert!(!dump.contains(".lane"), "run-time index became a constant lane:\n{dump}");
 }
+
+/// A device function lowers `⇇` to the output-buffer store the recipes already
+/// write (one forwarding assign, no copy-into call); a host function keeps the
+/// storage-preserving `TensorCopyInto`.
+#[test]
+fn a_device_function_lowers_copy_into_to_a_forwarding_store() {
+    let dump = dump_source(
+        "+++\nlocale = \"en\"\n+++\n@ kernel\n@ public\nfn k(tf32[16, 8] a, tf32[8, 16] b, mut tf32[16, 16] out, u32 id) → void {\n    out ⇇ a · b\n}\n",
+    );
+
+    assert_eq!(dump.matches("tensor_matmul").count(), 1, "{dump}");
+    assert_eq!(
+        dump.matches("tensor_copy_into").count(),
+        0,
+        "a device function has no copy-into call:\n{dump}"
+    );
+    assert!(dump.contains("_2 = %0"), "the result is stored into the output param:\n{dump}");
+}
+
+#[test]
+fn a_host_function_keeps_the_storage_preserving_copy_into() {
+    let dump = dump_source(
+        r"functio copy(tf32[3, 3] a, in tf32[3, 3] out) → vacuum {
+    out ⇇ a
+}",
+    );
+
+    assert_eq!(dump.matches("tensor_copy_into").count(), 1, "{dump}");
+}
