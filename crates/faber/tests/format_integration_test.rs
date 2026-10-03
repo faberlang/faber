@@ -174,3 +174,62 @@ fn format_cmd_comment_fixture_cli_reparses() {
     )
     .expect("reparse");
 }
+
+/// Numeric twin methods re-emit with their authored spelling in every form:
+/// binary (`x.added(y)`), unary (`x.negated()`), in-place (`acc.add(y)`),
+/// and effect-hoisted in-place (`xs[f()].add(y)`) — never respelled to an
+/// operator, an assignment, or a block with temporaries.
+#[test]
+fn format_cmd_keeps_numeric_twin_spellings() {
+    let temp_root = TempDir::new("faber-format", "numeric-twins");
+    let fixture = temp_root.join("twins.fab");
+    fs::write(
+        &fixture,
+        concat!(
+            "+++\nlocale = \"en\"\n+++\n",
+            "fn bump(int i) → int {\n    return i + 1\n}\n\n",
+            "main {\n",
+            "    const float x ← 2.0\n",
+            "    const float chained ← x.added(1.0).multiplied(3.0)\n",
+            "    const float neg ← x.negated()\n",
+            "    var float acc ← 10.0\n",
+            "    acc.add(5.0)\n",
+            "    var list<float> xs ← [1.0, 2.0]\n",
+            "    xs[bump(0)].add(5.0)\n",
+            "    print chained\n    print neg\n    print acc\n    print xs[0]\n",
+            "}\n",
+        ),
+    )
+    .expect("write numeric twin fixture");
+
+    let formatted = run_faber_format_stdout(&fixture);
+    let body = body_for_parse(&formatted);
+    for authored in [
+        "x.added(1.0).multiplied(3.0)",
+        "x.negated()",
+        "acc.add(5.0)",
+        "xs[bump(0)].add(5.0)",
+    ] {
+        assert!(
+            body.contains(authored),
+            "format must keep the authored twin spelling `{authored}`:\n{formatted}"
+        );
+    }
+    assert!(
+        !body.contains("__place"),
+        "format must not emit the checker's place temporaries:\n{formatted}"
+    );
+    assert_canonical_reparses_with(body, "numeric twins CLI --stdout", Some(&english_pack()))
+        .expect("reparse");
+
+    // The authored spellings must also stabilize: formatting the formatted
+    // source changes nothing.
+    let tmp = temp_root.join("pass1.fab");
+    fs::write(&tmp, &formatted).expect("write formatted pass");
+    let second = run_faber_format_stdout(&tmp);
+    let _ = fs::remove_file(&tmp);
+    assert_eq!(
+        formatted, second,
+        "authored twin spellings must survive a second format pass"
+    );
+}
