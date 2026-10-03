@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 298,
-    "analyzable": 378
+    "analyzable": 380
   },
   "terms": [
     {
@@ -415,13 +415,13 @@
       "term": "implendum",
       "rule": "keyword",
       "capable": 1,
-      "analyzable": 1
+      "analyzable": 2
     },
     {
       "term": "implet",
       "rule": "keyword",
       "capable": 2,
-      "analyzable": 3
+      "analyzable": 4
     },
     {
       "term": "importa",

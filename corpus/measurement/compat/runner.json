@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 322,
-    "analyzable": 378
+    "capable": 324,
+    "analyzable": 380
   },
   "terms": [
     {
@@ -414,14 +414,14 @@
     {
       "term": "implendum",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "implet",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "importa",
