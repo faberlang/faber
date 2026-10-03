@@ -53,10 +53,21 @@ fn pro_is_a_tokenless_contextual_row_that_lexes_as_an_identifier() {
 }
 
 #[test]
-fn identifiers_and_comments_are_not_keywords() {
-    assert!(!TokenKind::Ident(Symbol(0)).is_keyword());
-    assert!(!TokenKind::Underscore(Symbol(1)).is_keyword());
-    assert!(!TokenKind::LineComment(Symbol(2)).is_keyword());
+fn identifiers_and_comments_have_no_keyword_registry_spelling() {
+    use crate::keyword_spelling_for_token;
+
+    assert_eq!(
+        keyword_spelling_for_token(&TokenKind::Ident(Symbol(0))),
+        None
+    );
+    assert_eq!(
+        keyword_spelling_for_token(&TokenKind::Underscore(Symbol(1))),
+        None
+    );
+    assert_eq!(
+        keyword_spelling_for_token(&TokenKind::LineComment(Symbol(2))),
+        None
+    );
     assert!(TokenKind::LineComment(Symbol(2)).is_comment());
     assert!(TokenKind::LineComment(Symbol(2)).is_trivia());
     assert!(TokenKind::Newline.is_trivia());
@@ -84,7 +95,9 @@ fn conversio_assign_glyph_lexes_without_error() {
 }
 
 #[test]
-fn glyph_product_tokens_are_operators_not_keywords() {
+fn glyph_product_tokens_are_operators_not_registered_keywords() {
+    use crate::keyword_spelling_for_token;
+
     for kind in [
         TokenKind::MiddleDot,
         TokenKind::Cross,
@@ -96,10 +109,7 @@ fn glyph_product_tokens_are_operators_not_keywords() {
         TokenKind::Transpose,
         TokenKind::Nabla,
     ] {
-        assert!(
-            !kind.is_keyword(),
-            "{kind:?} is an operator token, not a keyword identity"
-        );
+        assert_eq!(keyword_spelling_for_token(&kind), None, "{kind:?}");
         assert!(!kind.is_comment(), "{kind:?} must not classify as trivia");
         assert!(!kind.is_trivia(), "{kind:?} must not classify as trivia");
     }
@@ -119,7 +129,6 @@ fn transpose_lexes_as_dedicated_postfix_operator() {
             .iter()
             .any(|token| token.kind == TokenKind::Transpose)
     );
-    assert!(!TokenKind::Transpose.is_keyword());
 }
 
 #[test]
@@ -138,8 +147,6 @@ fn nabla_lexes_as_dedicated_gradient_operator() {
         "∇ must produce TokenKind::Nabla, got {:?}",
         result.tokens
     );
-    // Nabla is never a keyword identity.
-    assert!(!TokenKind::Nabla.is_keyword());
 }
 
 // EOT-3L: U+21C7 is one exact operator token, never a keyword identity, and
@@ -163,8 +170,6 @@ fn eot_transfer_glyph_is_a_dedicated_non_keyword_token() {
             .any(|token| token.kind == TokenKind::Error),
         "U+21C7 must not produce the Error recovery token"
     );
-    // The transfer token is an operator identity, never a keyword.
-    assert!(!TokenKind::Transfer.is_keyword());
     // Distinct from every live arrow-family token.
     assert_ne!(TokenKind::Transfer, TokenKind::Assign); // ←
     assert_ne!(TokenKind::Transfer, TokenKind::Conversio); // ↦

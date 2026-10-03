@@ -1,8 +1,7 @@
 //! Keyword registry coverage: uniqueness, token correspondence, and owner-based
 //! identifier-like policy.
 //!
-//! Tests lock the contract between `keyword_specs()`, `TokenKind::is_keyword()`,
-//! and `keyword_allowed_as_ident()` against registry drift (see ca50d39c).
+//! Tests lock registry lookup and owner-based identifier-like policy against drift.
 
 use super::{
     KeywordKind, KeywordOwner, KeywordScope, keyword_allowed_as_ident, keyword_group_specs,
@@ -53,13 +52,23 @@ fn filum_lexes_as_plain_identifier_in_every_position() {
             "'{source}' must lex cleanly with filum as a plain identifier, got {:?}",
             result.errors
         );
-        for token in &result.tokens {
-            assert!(
-                !token.kind.is_keyword(),
-                "'{source}': token {:?} must not claim keyword status for filum",
-                token.kind
-            );
-        }
+        let filum_tokens: Vec<_> = result
+            .tokens
+            .iter()
+            .filter(|token| &source[token.span.start as usize..token.span.end as usize] == "filum")
+            .collect();
+        assert!(
+            !filum_tokens.is_empty(),
+            "'{source}' must emit a filum token"
+        );
+        assert!(
+            filum_tokens
+                .iter()
+                .all(|token| matches!(token.kind, crate::TokenKind::Ident(_))),
+            "'{source}': filum must lex as an identifier, got {filum_tokens:?}"
+        );
+        let spec = lookup_keyword_spec("filum").expect("filum registry row");
+        assert!(spec.token_kind.is_none(), "filum stays tokenless");
     }
 }
 
@@ -169,19 +178,14 @@ fn registry_texts_are_unique() {
 }
 
 #[test]
-fn every_registered_keyword_token_reports_is_keyword() {
-    // WHY: keyword_or_ident (scan.rs) and the is_keyword() match (token.rs) are
-    // two parallel registries. breakable-blocks shipped Meus/Tuus in scan.rs but
-    // forgot is_keyword() until ca50d39c; this guards that class of drift.
+fn every_registered_keyword_token_round_trips_through_registry() {
     for spec in keyword_specs() {
-        let Some(ref kind) = spec.token_kind else {
+        let Some(kind) = &spec.token_kind else {
             continue;
         };
-        assert!(
-            kind.is_keyword(),
-            "{kind:?} (KeywordSpec text {:?}) is registered but not returned by is_keyword()",
-            spec.text,
-        );
+        assert_eq!(keyword_token_kind(spec.text).as_ref(), Some(kind));
+        let spelling = keyword_spelling_for_token(kind).expect("registered token spelling");
+        assert_eq!(keyword_token_kind(spelling).as_ref(), Some(kind));
     }
 }
 
@@ -344,7 +348,6 @@ fn interna_is_visibility_annotation_keyword() {
     assert_eq!(spec.token_kind, Some(TokenKind::Interna));
     assert_eq!(spec.category, KeywordKind::Modifier);
     assert_eq!(keyword_token_kind("interna"), Some(TokenKind::Interna));
-    assert!(TokenKind::Interna.is_keyword());
     assert_eq!(
         keyword_spelling_for_token(&TokenKind::Interna),
         Some("interna")
@@ -393,7 +396,6 @@ fn nucleum_is_an_annotation_identity() {
     assert_eq!(spec.token_kind, Some(TokenKind::Nucleum));
     assert_eq!(spec.category, KeywordKind::Annotation);
     assert_eq!(keyword_token_kind("nucleum"), Some(TokenKind::Nucleum));
-    assert!(TokenKind::Nucleum.is_keyword());
 }
 
 #[test]
@@ -402,7 +404,6 @@ fn apud_is_a_control_flow_keyword_identity() {
     assert_eq!(spec.token_kind, Some(TokenKind::Apud));
     assert_eq!(spec.category, KeywordKind::ControlFlow);
     assert_eq!(keyword_token_kind("apud"), Some(TokenKind::Apud));
-    assert!(TokenKind::Apud.is_keyword());
     assert_eq!(keyword_spelling_for_token(&TokenKind::Apud), Some("apud"));
     let KeywordScope::Contextual(owners) = spec.scope else {
         panic!("apud must be contextual");
@@ -423,10 +424,7 @@ fn census_schema_and_columna_are_declaration_keywords() {
         assert_eq!(spec.token_kind, Some(identity.clone()));
         assert_eq!(spec.category, KeywordKind::Declaration);
         assert_eq!(keyword_token_kind(spelling), Some(identity.clone()));
-        assert!(
-            identity.is_keyword(),
-            "{spelling} identity must report is_keyword"
-        );
+        assert_eq!(keyword_spelling_for_token(&identity), Some(spelling));
     }
 
     let schema = lookup_keyword_spec("schema").expect("schema spec");
