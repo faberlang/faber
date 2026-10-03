@@ -95,7 +95,7 @@ fn finalize_rewrites_instance_shape_size_from_shape_args() {
     let mut unit = analyzed_unit(
         r"
 functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32, [B, D]> b) → tensor<f32, [B, D]> {
-    redde a.addita(b)
+    redde a + b
 }
 ",
     );
@@ -140,7 +140,7 @@ fn finalize_fails_closed_on_out_of_range_shape_size_axis() {
     let mut unit = analyzed_unit(
         r"
 functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32, [B, D]> b) → tensor<f32, [B, D]> {
-    redde a.addita(b)
+    redde a + b
 }
 ",
     );
@@ -183,7 +183,7 @@ fn finalize_fails_closed_on_missing_and_infer_shape_args() {
     let mut unit = analyzed_unit(
         r"
 functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32, [B, D]> b) → tensor<f32, [B, D]> {
-    redde a.addita(b)
+    redde a + b
 }
 ",
     );

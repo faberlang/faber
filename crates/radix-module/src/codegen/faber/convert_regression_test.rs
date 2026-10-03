@@ -183,7 +183,7 @@ functio nil() → vacuum {
 @ radix lane "air"
 @ radix backward "loss_backward"
 functio simple_loss(tensor<f32, [2, 2]> x, tensor<f32, [2, 2]> w) → f32 {
-    redde x.multiplica(w).media()
+    redde (x ⊙ w).media()
 }
 
 functio gradientes(tensor<f32, [2, 2]> x, tensor<f32, [2, 2]> w) → f32 {

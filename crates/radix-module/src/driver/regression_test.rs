@@ -1959,7 +1959,7 @@ functio forward(
     tensor<f32, [2,2]> bias
 ) → tensor<f32, [2,2]> {
     fixum tensor<f32, [2,2]> prediction ← input.matmul(weight)
-    redde prediction.addita(bias)
+    redde prediction + bias
 }
 
 incipit {

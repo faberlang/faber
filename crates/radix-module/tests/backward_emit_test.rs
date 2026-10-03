@@ -69,7 +69,7 @@ fn tensor_air_emits_backward() {
 @ radix lane "air"
 @ radix backward "multiplica_backward"
 functio multiplica(tf32[2] a, tf32[2] b) → tf32[2] {
-    redde a.multiplica(b)
+    redde a ⊙ b
 }
 "#;
 
