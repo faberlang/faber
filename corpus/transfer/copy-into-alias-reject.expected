@@ -1,0 +1,2 @@
+# R3: the right side may be a view but must not alias the left; a view of the target (or a `←` alias of it) is rejected.
+SEM057:copy_into_alias

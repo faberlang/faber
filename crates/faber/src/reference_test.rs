@@ -275,8 +275,8 @@ fn audit_finding_topics_resolve_with_current_behavior() {
     let pack = ReferencePack::load_from(repo_exempla_root()).expect("load pack");
     let registry = pack.build_registry().expect("build registry");
 
-    // ⇇ transfer: alias and term both reach the same canonical entry, and the
-    // body carries the EBNF [126]/[127] precedence rows.
+    // ⇇ copy-into: alias and term both reach the same canonical entry, and the
+    // body carries the EBNF [158]/[159] precedence rows.
     assert!(matches!(registry.lookup("⇇"), Some(Lookup::Exact(_))));
     assert!(matches!(
         registry.lookup("transfer"),
@@ -284,16 +284,16 @@ fn audit_finding_topics_resolve_with_current_behavior() {
     ));
     let transfer = render_plain(&registry.lookup("⇇").expect("transfer resolves"));
     assert!(
-        transfer.contains("[126]"),
-        "transfer entry cites EBNF row 126"
+        transfer.contains("[158]"),
+        "transfer entry cites EBNF row 158"
     );
     assert!(
-        transfer.contains("[127]"),
-        "transfer entry cites EBNF row 127"
+        transfer.contains("[159]"),
+        "transfer entry cites EBNF row 159"
     );
     assert!(
         transfer.contains("vacuum"),
-        "transfer chain result is vacuum"
+        "copy-into statement result is vacuum"
     );
 
     // Selective imports cite the [067]/[071] rows and the fixum member rule.

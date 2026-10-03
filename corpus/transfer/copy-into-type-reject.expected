@@ -1,0 +1,2 @@
+# R1: both sides have the same element type; an `f32` source cannot be copied into an `f64` target without an explicit conversion first.
+SEM010:copy_into_type_mismatch

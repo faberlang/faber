@@ -4913,10 +4913,9 @@ const EOT_SELECTIVE_IMPORT_ISSUES: &[&str] = &[
 ];
 
 const EOT_TRANSFER_ISSUES: &[&str] = &[
-    "transfer_sink_not_callable",
-    "transfer_sink_must_be_unary",
-    "transfer_sink_must_return_vacuum",
-    "transfer_payload_type_mismatch",
+    "transfer_sink_retired",
+    "copy_into_target_not_tensor",
+    "copy_into_type_mismatch",
 ];
 
 #[test]

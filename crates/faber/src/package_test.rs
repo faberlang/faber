@@ -5357,11 +5357,12 @@ fn consolum_eot4_native_output_sinks_canonical() {
 import from "norma:console" const write_partial as partial_sink, write_bytes as bytes_sink, write_line as line_sink, warn_line as warning_sink, debug_line as debug_sink
 
 main {
-  partial_sink ⇇ "partial" ⇇ "chain"
-  bytes_sink ⇇ |41 42|
-  line_sink ⇇ "line"
-  warning_sink ⇇ "warning"
-  debug_sink ⇇ "debug"
+  partial_sink("partial")
+  partial_sink("chain")
+  bytes_sink(|41 42|)
+  line_sink("line")
+  warning_sink("warning")
+  debug_sink("debug")
 }
 "#,
     )
@@ -5404,22 +5405,6 @@ main {
         );
     }
 
-    let sink_line = output
-        .code
-        .lines()
-        .find(|line| line.contains("let z") && line.contains(" = partial_sink;"))
-        .expect("chained partial sink binding");
-    let sink = sink_line
-        .split_once("let ")
-        .and_then(|(_, line)| line.split_once(" = partial_sink;"))
-        .map(|(name, _)| name)
-        .expect("hygienic partial sink binding");
-    assert_eq!(
-        sink_line.matches(&format!("{sink}(")).count(),
-        2,
-        "chained transfer must invoke the partial sink once per payload:\n{}",
-        output.code
-    );
     assert!(!output.code.contains("println!"));
     assert_format_macro_only_in_print_literals(&output.code);
 }
@@ -5438,11 +5423,12 @@ importa ex "norma:console" fixum mone ut warning_sink
 importa ex "norma:console" fixum vide ut debug_sink
 
 incipit {
-  partial_sink ⇇ "partial" ⇇ "chain"
-  bytes_sink ⇇ |43 44|
-  line_sink ⇇ "line"
-  warning_sink ⇇ "warning"
-  debug_sink ⇇ "debug"
+  partial_sink("partial")
+  partial_sink("chain")
+  bytes_sink(|43 44|)
+  line_sink("line")
+  warning_sink("warning")
+  debug_sink("debug")
 }
 "#,
     )
@@ -5483,22 +5469,6 @@ incipit {
         );
     }
 
-    let sink_line = output
-        .code
-        .lines()
-        .find(|line| line.contains("let z") && line.contains(" = partial_sink;"))
-        .expect("chained la partial sink binding");
-    let sink = sink_line
-        .split_once("let ")
-        .and_then(|(_, line)| line.split_once(" = partial_sink;"))
-        .map(|(name, _)| name)
-        .expect("hygienic la partial sink binding");
-    assert_eq!(
-        sink_line.matches(&format!("{sink}(")).count(),
-        2,
-        "la chained transfer must invoke the partial sink once per payload:\n{}",
-        output.code
-    );
     assert!(!output.code.contains("println!"));
     assert_format_macro_only_in_print_literals(&output.code);
 }
@@ -5567,9 +5537,9 @@ importa ex "norma:console" fixum funde ut bytes_sink
 importa ex "norma:fs" fixum lege ut terra_lege
 
 incipit {
-  line_sink ⇇ line_reader()
-  bytes_sink ⇇ bytes_reader(4)
-  line_sink ⇇ terra_lege("data.txt")
+  line_sink(line_reader())
+  bytes_sink(bytes_reader(4))
+  line_sink(terra_lege("data.txt"))
 }
 "#,
     )
@@ -5639,9 +5609,9 @@ import from "norma:console" const read_line, read_bytes, write_line, write_bytes
 main {
   const _ line_out ← (string msg) → void ∴ write_line(msg)
   const _ bytes_out ← (bytes data) → void ∴ write_bytes(data)
-  line_out ⇇ read_line()
-  bytes_out ⇇ read_bytes(4)
-  line_out ⇇ ""
+  line_out(read_line())
+  bytes_out(read_bytes(4))
+  line_out("")
 }
 "#,
     )

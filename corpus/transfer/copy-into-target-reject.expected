@@ -1,0 +1,2 @@
+# R2: the target must be writable tensor storage (a `mut` parameter, a `var`, or a writable field); a plain parameter is not.
+SEM020:copy_into_target_immutable

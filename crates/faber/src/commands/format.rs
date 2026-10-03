@@ -160,8 +160,8 @@ impl RewriteVerb {
     };
 }
 
-/// Per-run counters and summary lines shared by the four in-place rewriters
-/// (`format`, `convert`, `output-transfer-codemod`, `field-modifier-codemod`):
+/// Per-run counters and summary lines shared by the three in-place rewriters
+/// (`format`, `convert`, `field-modifier-codemod`):
 /// report by default, `--write` applies.
 #[derive(Debug)]
 pub(super) struct RewriteTally {

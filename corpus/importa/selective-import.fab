@@ -1,12 +1,12 @@
 +++
 term = "selective_import"
 kind = "keyword"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "selective_import", "import_value_binding", "incipit_stmt", "fixum_decl", "assignment", "transfer", "expression", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "selective_import", "import_value_binding", "incipit_stmt", "fixum_decl", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
 category = "package"
 summary = "Selective imports bind exported members by name: one exported value or type per fixum local, with the imported file interface supplying the complete type."
 syntax = "importa ex <source> [publica] fixum <member> [ut <local>]{, <member> [ut <local>]}"
 aliases = ["selective imports", "importa fixum"]
-related = ["importa", "ex", "⇇"]
+related = ["importa", "ex"]
 locale = "la"
 +++
 # =============================================================================
@@ -30,21 +30,21 @@ locale = "la"
 #     list; `publica` before `fixum` re-exports each binding
 #   • Trailing comma — the current parser tolerates one trailing comma after
 #     the final member; the canonical spine keeps every comma required
-#   • Pairs with ⇇ — import a sink value this way and replace compiler-owned
-#     output statements with ordinary typed values
+#   • Callable values — an imported function binds as an ordinary callable
+#     local, so it can be passed or called like any other function value
 #
 # Common mistakes:
 #   • expecting a type binding to be a value — `nota Type` or `x est Type`
 #     on an imported type is an error
 #   • expecting the bindings to re-export — only `publica` bindings do
 #
-# See also: importa, ex, ⇇
+# See also: importa, ex
 # =============================================================================
 
 importa ex "norma:console" fixum dic ut output, funde ut output_bytes
 
 functio scribe((textus) → vacuum sink, textus nomen) → vacuum {
-    sink ⇇ nomen
+    sink(nomen)
 }
 
 incipit {

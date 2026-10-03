@@ -1,0 +1,2 @@
+# R4: the statement result is `vacuum`; a copy-into cannot be bound, returned, or used as an operand.
+SEM010:copy_into_value_used
