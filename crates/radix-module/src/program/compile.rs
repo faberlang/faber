@@ -778,6 +778,10 @@ fn cached_import_target(
     }
     let const_values = provider_const_values(&provider_unit);
     apply_const_values(&mut interface, &const_values);
+    // ST3-2: the AST-built class fields carry no initializer; the analyzed
+    // provider unit supplies the genus static-field defaults a consumer's
+    // `module.Tab.Z` read inlines.
+    apply_static_field_defaults(&mut interface, &provider_unit);
     {
         let mut cache = session.memos.import_targets.borrow_mut();
         for key in std::iter::once(raw_key).chain(canonical_key) {
@@ -822,6 +826,37 @@ fn apply_const_values(interface: &mut FileInterface, values: &[(String, Interfac
     for (name, value) in values {
         if let Some(FileExport { kind: FileExportKind::Const(_, slot), .. }) = interface.exports.get_mut(name) {
             *slot = Some(value.clone());
+        }
+    }
+}
+
+/// Patch the analyzed provider unit's genus static-field initializers into the
+/// sibling interface's class fields. A failed provider carries none, so its
+/// fields stay `default: None` and the consumer's `module.Tab.Z` read keeps
+/// failing closed.
+fn apply_static_field_defaults(interface: &mut FileInterface, provider: &crate::driver::CarriedProviderUnit) {
+    let Some(unit) = provider.lock_unit() else {
+        return;
+    };
+    for item in &unit.hir.items {
+        let HirItemKind::Struct(strukt) = &item.kind else {
+            continue;
+        };
+        let name = unit.interner.resolve(strukt.name).to_owned();
+        let Some(FileExport { kind: FileExportKind::Struct(export), .. }) = interface.exports.get_mut(&name) else {
+            continue;
+        };
+        for field in &strukt.fields {
+            if !field.is_static() {
+                continue;
+            }
+            let Some(init) = &field.init else {
+                continue;
+            };
+            let field_name = unit.interner.resolve(field.name).to_owned();
+            if let Some(interface_field) = export.fields.iter_mut().find(|f| f.name == field_name) {
+                interface_field.default = Some(init.clone());
+            }
         }
     }
 }
