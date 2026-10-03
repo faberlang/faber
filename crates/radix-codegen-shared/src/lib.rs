@@ -7,6 +7,15 @@
 //! `validation.rs` walk HIR with `HirVisitor`. The crate must never construct,
 //! lower, or re-derive HIR.
 //!
+//! # Contents
+//!
+//! The crate owns the frame/loop-branch builders and ident helpers the device
+//! emitters share. Device-specific emission belongs in the device emitters, so
+//! no Metal-only helper and no `dyn Emitter` / stringly target façade enters
+//! this crate. This is the standing accretion law from the CTO b4b goal-close
+//! record `eda0566c` (disposition B4B-7/8: `record_risk`); `frame`'s module
+//! docs are the admission test for the next helper.
+//!
 //! # `CodeWriter`
 //!
 //! Backends emit target source incrementally while walking IR. [`CodeWriter`]
