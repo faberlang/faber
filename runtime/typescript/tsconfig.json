@@ -8,5 +8,5 @@
     "rewriteRelativeImportExtensions": true,
     "outDir": "dist"
   },
-  "include": ["index.ts", "dec.ts", "display.ts", "exact.ts", "format.ts", "inf.ts", "modulus.ts", "regex.ts"]
+  "include": ["index.ts", "dec.ts", "display.ts", "exact.ts", "format.ts", "inf.ts", "modulus.ts", "regex.ts", "instans.ts", "intervallum.ts"]
 }

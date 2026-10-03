@@ -34,3 +34,7 @@ export * as sparsa from "./sparsa.ts";
 export * as matrix from "./matrix.ts";
 // @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
 export * as vector from "./vector.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as intervallum from "./intervallum.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as instans from "./instans.ts";
