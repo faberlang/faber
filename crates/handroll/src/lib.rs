@@ -9,7 +9,7 @@
 pub mod entropy;
 pub use entropy::uuid_v4;
 pub mod sha256;
-pub use sha256::{Sha256, sha256, sha256_hex};
+pub use sha256::{Sha256, hex, sha256, sha256_hex};
 pub mod magnus;
 pub use magnus::{Magnus, MagnusError, Radix};
 
