@@ -130,6 +130,85 @@ fn comments_in_closure_comptime_and_trap_blocks_are_claimed() {
     }
 }
 
+fn assert_expression_block_comment_claimed(source: &str) {
+    let result = parse_source(source);
+    assert_eq!(invalid_placement_count(&result), 0, "{:?}", result.errors);
+    assert!(result.success(), "{:?}", result.errors);
+
+    let claimed = crate::claim::claimed_comment_spans(result.program.as_ref().unwrap());
+    let lexed = lex(source);
+    let comments: Vec<_> = lexed
+        .tokens
+        .iter()
+        .filter(|token| matches!(token.kind, TokenKind::LineComment(_)))
+        .collect();
+    assert_eq!(comments.len(), 1, "fixture must contain one body comment");
+    assert!(claimed.contains(&comments[0].span.start));
+}
+
+#[test]
+fn expression_block_comment_lambda_initializer() {
+    assert_expression_block_comment_claimed(
+        "functio f() → vacuum { fixum _ x ← clausura → vacuum {\n# lambda body\ntacet\n} }\n",
+    );
+}
+
+#[test]
+fn expression_block_comment_lambda_call_argument() {
+    assert_expression_block_comment_claimed(
+        "functio f() → vacuum { consume(clausura → vacuum {\n# lambda body\ntacet\n}) }\n",
+    );
+}
+
+#[test]
+fn expression_block_comment_lambda_expression_statement() {
+    assert_expression_block_comment_claimed(
+        "functio f() → vacuum { clausura → vacuum {\n# lambda body\ntacet\n} }\n",
+    );
+}
+
+#[test]
+fn expression_block_comment_comptime_initializer() {
+    assert_expression_block_comment_claimed(
+        "functio f() → vacuum { fixum numerus x ← praefixum {\n# comptime body\n1\n} }\n",
+    );
+}
+
+#[test]
+fn expression_block_comment_comptime_call_argument() {
+    assert_expression_block_comment_claimed(
+        "functio f() → vacuum { consume(praefixum {\n# comptime body\n1\n}) }\n",
+    );
+}
+
+#[test]
+fn expression_block_comment_comptime_expression_statement() {
+    assert_expression_block_comment_claimed(
+        "functio f() → vacuum { praefixum {\n# comptime body\n1\n} }\n",
+    );
+}
+
+#[test]
+fn expression_block_comment_trap_initializer() {
+    assert_expression_block_comment_claimed(
+        "functio f() → vacuum { fixum ∪ x ← capta {\n# trap body\n1\n} }\n",
+    );
+}
+
+#[test]
+fn expression_block_comment_trap_call_argument() {
+    assert_expression_block_comment_claimed(
+        "functio f() → vacuum { consume(capta {\n# trap body\n1\n}) }\n",
+    );
+}
+
+#[test]
+fn expression_block_comment_trap_expression_statement() {
+    assert_expression_block_comment_claimed(
+        "functio f() → vacuum { capta {\n# trap body\n1\n} }\n",
+    );
+}
+
 // ── Legal position: after last declaration / program end ──
 
 #[test]
