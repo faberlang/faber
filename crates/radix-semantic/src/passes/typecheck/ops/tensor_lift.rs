@@ -267,7 +267,15 @@ impl TypeChecker<'_> {
     ) -> Option<TypeId> {
         let span = lhs.span;
         let pair = match self.lift_pairing(lhs_ty, rhs_ty, span, op == HirBinOp::TrueDiv) {
-            LiftPairing::NotLifted => return None,
+            LiftPairing::NotLifted => {
+                let tensor_pair = matches!(self.lift_side(lhs_ty), LiftSide::Tensor { .. })
+                    && matches!(self.lift_side(rhs_ty), LiftSide::Tensor { .. });
+                if op == HirBinOp::Mul && tensor_pair {
+                    self.invalid_operand_types(TENSOR_MULTIPLY_REQUIRES_GLYPH, span);
+                    return Some(self.error_type);
+                }
+                return None;
+            }
             LiftPairing::Failed => return Some(self.error_type),
             LiftPairing::Lifted(pair) => pair,
         };

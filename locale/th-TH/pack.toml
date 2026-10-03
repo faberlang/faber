@@ -1889,6 +1889,10 @@ help = "ใช้ขอบเขต intervallum แบบ numerus สำหร�
 message = "ต้องมีตัวถูกดำเนินการตัวเลข"
 help = "ใช้ตัวถูกดำเนินการตัวเลขสำหรับตัวดำเนินการนี้"
 
+[diagnostics.SEM011.issues.tensor_multiply_requires_glyph]
+message = "ไม่รองรับ tensor `*` tensor; ใช้ ⊙ สำหรับการคูณรายองค์ประกอบ หรือ · สำหรับ contraction"
+help = "ใช้ ⊙ สำหรับการคูณรายองค์ประกอบ หรือ · สำหรับ contraction"
+
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "ตัวถูกดำเนินการเลขคณิตเชิงตัวเลขต้องมีชนิดเหมือนกัน ใช้ ↦ เพื่อแปลงอย่างชัดเจน"
 help = "แปลงตัวถูกดำเนินการอย่างชัดเจนก่อนใช้ตัวดำเนินการตัวเลขนี้"
