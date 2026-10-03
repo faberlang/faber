@@ -4,6 +4,8 @@
 //! The check enforces device-safety of the body, not purity: explicit writes
 //! to caller-provided device arguments are allowed and recorded.
 
+use std::sync::LazyLock;
+
 use crate::{Resolver, SemanticError, SemanticErrorKind, SymbolKind, Type, TypeId, TypeTable};
 use radix_hir::{
     DefId, HirBlock, HirCallArg, HirCape, HirExpression, HirExpressionKind, HirFunction,
@@ -753,40 +755,38 @@ pub(crate) fn is_device_value_type(ty: TypeId, types: &TypeTable) -> bool {
     }
 }
 
-const ALLOWED_DEVICE_METHODS: &[&str] = &[
-    "addita",
-    "addita_bias",
-    "subtrahe",
-    "multiplica",
-    "divisio",
-    "nega",
-    "summa",
-    "media",
-    "matmul",
-    "transpone",
-    "forma",
-    "exponentia",
-    "logarithmus",
-    "activatio_relu",
-    "radix",
-    "gelu",
-    "silu",
-    "activatio_tanh",
-    "activatio_softmax",
-    "laminatio",
-    "summa_axis",
-    "crux_entropia",
-    "rms_norm",
-    "rope_norm",
-    "gather",
+/// Tensor methods the device-fragment subset withholds from the AIR-lane
+/// vocabulary: the reduction/arg-reduction family and the higher-order combine
+/// family. This is the only hand-typed list here; the device set is derived
+/// from it.
+pub(crate) const DEVICE_EXCLUDED: &[&str] = &[
+    "maxima",
+    "minima",
+    "argmaxima",
+    "argminima",
+    "reducta",
+    "cumulata",
+    "mappata",
+    "filtrata",
 ];
+
+/// Derived device-fragment admission set: every AIR-lane tensor intrinsic
+/// except [`DEVICE_EXCLUDED`]. Computed once from the shared tensor row set, so
+/// there is no second literal list to drift.
+static ALLOWED_DEVICE_METHODS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
+    super::air_tensor_intrinsics::allowed_tensor_intrinsics()
+        .iter()
+        .copied()
+        .filter(|method| !DEVICE_EXCLUDED.contains(method))
+        .collect()
+});
 
 /// The device-fragment method admission set. Test-support surface: the
 /// radix-module bijection ratchet derives its direction-3 candidates from it.
 #[doc(hidden)]
 #[must_use]
 pub fn allowed_device_methods() -> &'static [&'static str] {
-    ALLOWED_DEVICE_METHODS
+    ALLOWED_DEVICE_METHODS.as_slice()
 }
 
 pub(crate) fn is_allowed_device_method(method: &str) -> bool {

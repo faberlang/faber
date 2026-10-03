@@ -363,3 +363,35 @@ functio helper() → vacuum {
     );
     expect_issue(&report.errors, ISSUE_EFFECT, "dynamic_function");
 }
+
+#[test]
+fn device_methods_are_a_derived_subset_of_tensor_intrinsics() {
+    use super::air_tensor_intrinsics::allowed_tensor_intrinsics;
+    use super::fragment_definition::{DEVICE_EXCLUDED, allowed_device_methods};
+    use std::collections::BTreeSet;
+
+    let tensor: BTreeSet<&str> = allowed_tensor_intrinsics().iter().copied().collect();
+    let device: BTreeSet<&str> = allowed_device_methods().iter().copied().collect();
+
+    // The device vocabulary is derived, never an independent literal list:
+    // every device method must be an admitted AIR tensor intrinsic.
+    assert!(
+        device.is_subset(&tensor),
+        "device methods must be a subset of the tensor intrinsics; extra: {:?}",
+        device.difference(&tensor).collect::<Vec<_>>()
+    );
+
+    // The tensor/device delta is exactly the explicit exclusion set — no name
+    // may be silently dropped from the device surface.
+    let delta: BTreeSet<&str> = tensor.difference(&device).copied().collect();
+    let excluded: BTreeSet<&str> = DEVICE_EXCLUDED.iter().copied().collect();
+    assert_eq!(
+        delta.len(),
+        8,
+        "device/tensor delta must be the 8-name DEVICE_EXCLUDED set, got {delta:?}"
+    );
+    assert_eq!(
+        delta, excluded,
+        "device/tensor delta must equal DEVICE_EXCLUDED"
+    );
+}
