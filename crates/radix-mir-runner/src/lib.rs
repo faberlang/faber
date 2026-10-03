@@ -2974,6 +2974,10 @@ fn regex_pattern(pattern: &str, flags: Option<&str>) -> String {
 mod lib_test;
 
 #[cfg(test)]
+#[path = "copy_into_test.rs"]
+mod copy_into_test;
+
+#[cfg(test)]
 #[path = "tensor_math_test.rs"]
 mod tensor_math_test;
 

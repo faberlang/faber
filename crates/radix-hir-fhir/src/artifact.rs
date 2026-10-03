@@ -571,7 +571,10 @@ pub struct FunctionProvenanceTableWire {
 /// Rust code generation just like the root unit's guards. Version 35 carries
 /// imported struct method identities and signatures; schema-v34 artifacts fail
 /// closed because policy callbacks need their imported owner/name route.
-pub const SCHEMA_VERSION: u32 = 35;
+/// Version 36 reshapes `HirExpressionKind::Transfer { sink, payloads }` into
+/// `CopyInto { target, value }` (the `⇇` copy-into statement); schema-v35
+/// artifacts fail closed because the serialized variant payload changed.
+pub const SCHEMA_VERSION: u32 = 36;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

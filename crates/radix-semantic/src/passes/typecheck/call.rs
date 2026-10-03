@@ -40,8 +40,6 @@ const ISSUE_CALLEE_NOT_CALLABLE: &str = "callee_not_callable";
 pub(crate) const ISSUE_COPY_INTO_TYPE_MISMATCH: &str = "copy_into_type_mismatch";
 /// R2: the left side of `⇇` is not tensor storage (scalar, list, matrix, ...).
 pub(crate) const ISSUE_COPY_INTO_TARGET_NOT_TENSOR: &str = "copy_into_target_not_tensor";
-/// `⇇` carries exactly one value; HIR built with another count is rejected.
-pub(crate) const ISSUE_COPY_INTO_ARITY: &str = "copy_into_arity";
 /// R4/R5: a `⇇` statement has no result, so it is not a value to store.
 pub(crate) const ISSUE_COPY_INTO_VALUE_USED: &str = "copy_into_value_used";
 /// R7: the callable-sink form `sink ⇇ payload` is retired.
@@ -1887,35 +1885,21 @@ impl TypeChecker<'_> {
     ///   rejected (a value type is already written by `←`).
     /// - R7: a callable target is the retired sink form.
     ///
-    /// The node keeps the `{ sink, payloads }` shape until the HIR reshape: a
-    /// one-payload node is a copy-into, any other count is rejected. The
-    /// statement result is `vacuum`.
-    pub fn check_transfer(
+    /// The statement result is `vacuum`.
+    pub fn check_copy_into(
         &mut self,
-        sink: &mut HirExpression,
-        payloads: &mut [HirExpression],
+        target: &mut HirExpression,
+        value: &mut HirExpression,
         span: radix_lexer::Span,
     ) -> TypeId {
         let vacuum = self.vacuum_type();
-        let [value] = payloads else {
-            self.check_expr(sink);
-            for payload in payloads.iter_mut() {
-                self.check_expr(payload);
-            }
-            self.error_issue(
-                SemanticErrorKind::ArityMismatch,
-                ISSUE_COPY_INTO_ARITY,
-                span,
-            );
-            return self.error_type;
-        };
 
         // A field target goes through the lvalue rules (privacy and `fixum`
         // field modifiers); every other target is typed as a plain read.
-        let target_ty = if matches!(sink.kind, HirExpressionKind::Field(..)) {
-            self.check_lvalue(sink)
+        let target_ty = if matches!(target.kind, HirExpressionKind::Field(..)) {
+            self.check_lvalue(target)
         } else {
-            self.check_expr(sink)
+            self.check_expr(target)
         };
         let resolved = self.resolve_inferred_type(target_ty);
 
@@ -1950,15 +1934,15 @@ impl TypeChecker<'_> {
 
         if !crate::tensor_bracket::is_tensor_type(self.types, resolved) {
             self.check_expr(value);
-            self.invalid_operand_types(ISSUE_COPY_INTO_TARGET_NOT_TENSOR, sink.span);
+            self.invalid_operand_types(ISSUE_COPY_INTO_TARGET_NOT_TENSOR, target.span);
             return self.error_type;
         }
 
-        if let HirExpressionKind::Path(def_id) = &sink.kind
+        if let HirExpressionKind::Path(def_id) = &target.kind
             && self.lookup_binding(*def_id).is_none()
             && self.consts.contains_key(def_id)
         {
-            self.immutable_assignment("assignment_to_constant", sink.span);
+            self.immutable_assignment("assignment_to_constant", target.span);
         }
 
         let value_ty =
@@ -2014,7 +1998,7 @@ impl TypeChecker<'_> {
     /// R4/R5: report a `⇇` statement used as a value (`x ← a ⇇ b`,
     /// `fixum t ← a ⇇ b`). The statement has no result to store or chain.
     pub fn reject_copy_into_value(&mut self, value: &HirExpression) -> bool {
-        if !matches!(value.kind, HirExpressionKind::Transfer { .. }) {
+        if !matches!(value.kind, HirExpressionKind::CopyInto { .. }) {
             return false;
         }
         self.error_issue(

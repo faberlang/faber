@@ -128,7 +128,7 @@ impl Parser {
     fn parse_assignment_open(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         let expr = self.parse_ternary()?;
-        let expr = self.parse_transfer_chain(expr, start)?;
+        let expr = self.parse_copy_into(expr, start)?;
         self.parse_assignment_tail(expr, start)
     }
 
@@ -145,25 +145,21 @@ impl Parser {
     /// complete ternary so binary operators group into the value, not around
     /// the statement. The form is a statement, not a pipeline of results, so a
     /// second `⇇` is rejected here rather than parsed as a chain.
-    ///
-    /// The node keeps the `{ sink, payloads }` shape; the parser guarantees
-    /// exactly one payload, which the semantic layer reads as the copy-into
-    /// value.
-    fn parse_transfer_chain(&mut self, sink: Expr, start: Span) -> Result<Expr, ParseError> {
+    fn parse_copy_into(&mut self, target: Expr, start: Span) -> Result<Expr, ParseError> {
         if !self.check(&TokenKind::Transfer) {
-            return Ok(sink);
+            return Ok(target);
         }
 
-        let sink = Box::new(sink);
+        let target = Box::new(target);
         self.advance();
         if !Self::can_start_expression(&self.peek().kind) {
             return Err(
                 ParseError::structured(ParseErrorKind::Expected, self.current_span())
-                    .with_arg("issue", "transfer_payload_expected")
+                    .with_arg("issue", "copy_into_value_expected")
                     .with_arg("operator", "⇇"),
             );
         }
-        let payloads = vec![self.parse_ternary()?];
+        let value = Box::new(self.parse_ternary()?);
         if self.check(&TokenKind::Transfer) {
             return Err(self.invalid_expression_error("copy_into_chain"));
         }
@@ -172,7 +168,7 @@ impl Parser {
         let id = self.next_id();
         Ok(Expr {
             id,
-            kind: ExprKind::Transfer(TransferExpr { sink, payloads }),
+            kind: ExprKind::CopyInto(CopyIntoExpr { target, value }),
             span,
         })
     }

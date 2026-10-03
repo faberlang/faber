@@ -413,6 +413,12 @@ pub enum MirCollectionOp {
     /// Lazily shifted tensor edge view. `args` are `[source, offsets]`; an
     /// unresolvable read remains optional until `TensorLimes` or fused coalesce.
     TensorShift,
+    /// `target ⇇ value` copy-into: `args` are `[dest, src]`, returns `vacuum`.
+    /// Copies the logical values of `src` through the destination's strides
+    /// into the destination's existing storage; the destination's storage
+    /// identity is preserved. Receiver-mutating: neither `TensorSet` (one
+    /// element) nor `TensorFill` (tiles, returns a new tensor) fits.
+    TensorCopyInto,
 }
 
 /// The built-in unary math functions lifted elementwise over a tensor

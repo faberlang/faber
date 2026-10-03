@@ -122,10 +122,9 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Summa(summa) => lower_summa(lowerer, summa),
         ExprKind::Maxima(extremum) => lower_extremum(lowerer, extremum, HirExtremumOp::Max),
         ExprKind::Minima(extremum) => lower_extremum(lowerer, extremum, HirExtremumOp::Min),
-        // EOT-3M: `⇇` transfer lowers to the typed HIR node. The sink and
-        // payloads are ordinary expressions; typecheck owns the unary
-        // vacuum-returning callable rules and payload compatibility.
-        ExprKind::Transfer(transfer) => lowerer.lower_transfer(transfer),
+        // `⇇` copy-into lowers to the typed HIR node; typecheck owns the
+        // tensor-storage, exact-type and alias rules.
+        ExprKind::CopyInto(copy) => lowerer.lower_copy_into(copy),
         ExprKind::FirstMatch(first_match) => lower_first_match(lowerer, first_match),
         ExprKind::Trap(trap) => lower_trap(lowerer, trap),
         ExprKind::CallDefault(call_default) => lower_call_default(lowerer, call_default),
@@ -977,22 +976,13 @@ impl Lowerer<'_> {
         }
     }
 
-    /// Lower the `⇇` transfer chain (EOT-3M).
-    ///
-    /// The node is not normalized to nested calls: the single sink plus the
-    /// ordered payload list is the contract that typecheck and MIR lowering
-    /// prove sink-once / left-to-right evaluation against. The sink expression
-    /// lowers exactly once here, before any payload.
-    fn lower_transfer(&mut self, transfer: &radix_syntax::TransferExpr) -> HirExpressionKind {
-        let sink = lower_expr(self, &transfer.sink);
-        let payloads = transfer
-            .payloads
-            .iter()
-            .map(|payload| lower_expr(self, payload))
-            .collect();
-        HirExpressionKind::Transfer {
-            sink: Box::new(sink),
-            payloads,
+    /// Lower the `⇇` copy-into: `target ⇇ value`.
+    fn lower_copy_into(&mut self, copy: &radix_syntax::CopyIntoExpr) -> HirExpressionKind {
+        let target = lower_expr(self, &copy.target);
+        let value = lower_expr(self, &copy.value);
+        HirExpressionKind::CopyInto {
+            target: Box::new(target),
+            value: Box::new(value),
         }
     }
 

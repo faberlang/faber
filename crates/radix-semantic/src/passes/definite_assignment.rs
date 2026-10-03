@@ -508,19 +508,16 @@ impl HirVisitor for DefiniteAssignmentChecker<'_> {
             // the target's root must be a writable binding. Unlike `←` it never
             // rebinds, so it is legal only on `varia` bindings and `mut`
             // parameters, however often it runs.
-            HirExpressionKind::Transfer { sink, payloads } => {
-                for payload in payloads {
-                    self.check_expr(payload);
-                }
-                self.check_expr(sink);
-                if payloads.len() == 1
-                    && let Some(def_id) = Self::root_def_id(sink)
+            HirExpressionKind::CopyInto { target, value } => {
+                self.check_expr(value);
+                self.check_expr(target);
+                if let Some(def_id) = Self::root_def_id(target)
                     && self.write_once.contains(&def_id)
                 {
                     self.error(
                         SemanticErrorKind::ImmutableAssignment,
                         ISSUE_COPY_INTO_TARGET_IMMUTABLE,
-                        sink.span,
+                        target.span,
                     );
                 }
             }

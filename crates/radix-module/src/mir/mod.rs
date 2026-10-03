@@ -250,6 +250,9 @@ mod conversio_function_tests;
 #[path = "copy_duplicate_test.rs"]
 mod copy_duplicate_tests;
 #[cfg(test)]
+#[path = "copy_into_run_test.rs"]
+mod copy_into_run_tests;
+#[cfg(test)]
 #[path = "decimal_constant_join_test.rs"]
 mod decimal_constant_join_tests;
 #[cfg(test)]
@@ -312,6 +315,7 @@ mod rank2_reduction_readiness_tests;
 #[cfg(test)]
 #[path = "saturating_word_test.rs"]
 mod saturating_word_tests;
+
 #[cfg(test)]
 #[path = "tensor_lift_test.rs"]
 mod tensor_lift_tests;

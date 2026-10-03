@@ -4328,3 +4328,177 @@ fn policy_float_cell_arithmetic_validates() {
         assert!(errors.is_empty(), "{policy:?}: {errors:?}");
     }
 }
+
+// -----------------------------------------------------------------------
+// `⇇` copy-into: TensorCopyInto(dest, src) -> vacuum
+// -----------------------------------------------------------------------
+
+/// One function with a destination local (0) and a source local (1) and a
+/// single `TensorCopyInto(dest, src)` call returning `return_ty`.
+fn copy_into_program(
+    dest_ty: MirType,
+    src_ty: MirType,
+    dest: MirOperand,
+    return_ty: MirType,
+    function_return: MirType,
+) -> MirProgram {
+    let local = |id: u32, ty: MirType| MirLocal {
+        id: MirLocalId(id),
+        ty,
+        name: None,
+        mutable: true,
+        span: Span::default(),
+    };
+    MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![local(0, dest_ty), local(1, src_ty)],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: None,
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorCopyInto),
+                            args: vec![dest, MirOperand::Place(MirPlace::local(MirLocalId(1)))],
+                            return_ty,
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: function_return,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    }
+}
+
+fn dest_place() -> MirOperand {
+    MirOperand::Place(MirPlace::local(MirLocalId(0)))
+}
+
+#[test]
+fn copy_into_accepts_a_tensor_place_and_an_equal_shape_tensor() {
+    let mut types = TypeTable::new();
+    let dest = tensor_mty(&mut types, &[2, 3]);
+    let src = tensor_mty(&mut types, &[2, 3]);
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let errors = validate(
+        &copy_into_program(dest, src, dest_place(), vacuum, vacuum),
+        &types,
+    );
+    assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+}
+
+#[test]
+fn copy_into_rejects_a_shape_mismatch() {
+    let mut types = TypeTable::new();
+    let dest = tensor_mty(&mut types, &[2, 3]);
+    let src = tensor_mty(&mut types, &[3, 2]);
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let errors = validate(
+        &copy_into_program(dest, src, dest_place(), vacuum, vacuum),
+        &types,
+    );
+    assert!(
+        errors.iter().any(|e| e.contains("copy-into shapes differ")),
+        "expected a shape error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn copy_into_rejects_an_element_type_mismatch() {
+    let mut types = TypeTable::new();
+    let dest = tensor_mty(&mut types, &[2, 3]);
+    let src = MirType::semantic(tensor_type(&mut types, Primitive::Numerus, &[2, 3]));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let errors = validate(
+        &copy_into_program(dest, src, dest_place(), vacuum, vacuum),
+        &types,
+    );
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("copy-into element types differ")),
+        "expected an element-type error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn copy_into_rejects_a_non_tensor_destination_or_source() {
+    let mut types = TypeTable::new();
+    let tensor = tensor_mty(&mut types, &[2, 3]);
+    let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let errors = validate(
+        &copy_into_program(numerus, tensor, dest_place(), vacuum, vacuum),
+        &types,
+    );
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("copy-into destination is not tensor")),
+        "expected a destination error, got: {errors:?}"
+    );
+    let errors = validate(
+        &copy_into_program(tensor, numerus, dest_place(), vacuum, vacuum),
+        &types,
+    );
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("copy-into source is not tensor")),
+        "expected a source error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn copy_into_rejects_a_destination_that_is_not_a_place() {
+    let mut types = TypeTable::new();
+    let tensor = tensor_mty(&mut types, &[2, 3]);
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let program = copy_into_program(
+        tensor,
+        tensor,
+        MirOperand::Constant(MirConstant::Int(0)),
+        vacuum,
+        vacuum,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("copy-into destination is not a place")),
+        "expected a place error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn copy_into_rejects_a_non_vacuum_result() {
+    let mut types = TypeTable::new();
+    let tensor = tensor_mty(&mut types, &[2, 3]);
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let errors = validate(
+        &copy_into_program(tensor, tensor, dest_place(), tensor, vacuum),
+        &types,
+    );
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("copy-into result is not vacuum")),
+        "expected a result error, got: {errors:?}"
+    );
+}

@@ -75,6 +75,10 @@ mod saturating_fuzzy_incdec_emit_test;
 mod statica_emit_test;
 
 #[cfg(test)]
+#[path = "copy_into_emit_test.rs"]
+mod copy_into_emit_test;
+
+#[cfg(test)]
 #[path = "tensor_lift_gate_test.rs"]
 mod tensor_lift_gate_test;
 

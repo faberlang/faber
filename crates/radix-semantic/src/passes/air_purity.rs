@@ -234,12 +234,10 @@ impl AirPurityChecker<'_> {
             HirExpressionKind::Call(callee, _, args, _) => self.check_call(callee, args, expr.span),
             // `target ⇇ value` copies into storage the target already names:
             // a mutation of the target place, rejected exactly like `←`.
-            HirExpressionKind::Transfer { sink, payloads } => {
+            HirExpressionKind::CopyInto { target, value } => {
                 self.reject(expr.span, "assignment_mutation");
-                self.check_expr(sink);
-                for payload in payloads {
-                    self.check_expr(payload);
-                }
+                self.check_expr(target);
+                self.check_expr(value);
             }
             HirExpressionKind::Gradient {
                 call,

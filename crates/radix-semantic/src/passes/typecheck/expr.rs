@@ -314,8 +314,8 @@ impl TypeChecker<'_> {
                 );
                 self.error_type
             }
-            HirExpressionKind::Transfer { sink, payloads } => {
-                self.check_transfer(sink, payloads, expr.span)
+            HirExpressionKind::CopyInto { target, value } => {
+                self.check_copy_into(target, value, expr.span)
             }
             HirExpressionKind::Format { value, spec } => {
                 super::format::check_format_expr(self, value, *spec, expr.span)

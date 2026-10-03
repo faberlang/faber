@@ -1176,10 +1176,9 @@ pub enum ExprKind {
     FirstMatch(Box<FirstMatchExpr>),
     /// Copy-into statement: `target ⇇ value` (U+21C7).
     ///
-    /// One sink evaluated once plus an ordered payload list. Each payload is
-    /// transferred on that single sink left-to-right; the chain is never a
-    /// pipeline of return values and the whole expression is `vacuum`-shaped.
-    Transfer(TransferExpr),
+    /// Copies every value of `value` into the existing storage of `target`;
+    /// the whole expression is `vacuum`-shaped.
+    CopyInto(CopyIntoExpr),
     /// Capture boundary: `capta { body }`.
     ///
     /// Reifies the error channel into a value union (`success ∪ errata`). The
@@ -1240,15 +1239,12 @@ pub struct FormatExpr {
 
 /// Source shape for the `⇇` copy-into statement: `target ⇇ value` copies
 /// every value of `value` into the existing storage of `target`.
-///
-/// The field names are the retired sink-chain spelling, kept until the HIR
-/// reshape; the parser guarantees `payloads` holds exactly one value.
 #[derive(Debug)]
-pub struct TransferExpr {
-    /// The copy-into target: the existing storage that receives the values.
-    pub sink: Box<Expr>,
-    /// The single value expression copied into the target.
-    pub payloads: Vec<Expr>,
+pub struct CopyIntoExpr {
+    /// The existing storage that receives the values.
+    pub target: Box<Expr>,
+    /// The value expression copied into the target.
+    pub value: Box<Expr>,
 }
 
 /// Source shape for the contextual `summa ex` term-fold expression.

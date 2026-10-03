@@ -952,14 +952,7 @@ impl<'a> BorrowChecker<'a> {
     /// under one), never a view. R3: the value does not read the storage the
     /// target names. The target is written, so the ordinary write rules (a
     /// `de` parameter, a `ref` root, an outstanding borrow) apply to it.
-    fn check_copy_into(&mut self, target: &HirExpression, payloads: &[HirExpression]) {
-        let [value] = payloads else {
-            self.visit_expr(target);
-            for payload in payloads {
-                self.visit_expr(payload);
-            }
-            return;
-        };
+    fn check_copy_into(&mut self, target: &HirExpression, value: &HirExpression) {
         let key = Self::place_key(target);
         if !self.tensor_view_origins(target).is_empty() || self.is_tensor_view(target) {
             self.error(
@@ -1871,8 +1864,8 @@ impl HirVisitor for BorrowChecker<'_> {
                     self.visit_expr(value);
                 }
             }
-            HirExpressionKind::Transfer { sink, payloads } => {
-                self.check_copy_into(sink, payloads);
+            HirExpressionKind::CopyInto { target, value } => {
+                self.check_copy_into(target, value);
             }
             // `↤` writes the target place (declared ownership/access rules
             // apply) before visiting the conversion source and its `⇥`

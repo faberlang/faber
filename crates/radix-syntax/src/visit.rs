@@ -632,11 +632,9 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
             visitor.visit_expr(&type_check.expr);
             visitor.visit_type_expr(&type_check.ty);
         }
-        ExprKind::Transfer(transfer) => {
-            visitor.visit_expr(&transfer.sink);
-            for payload in &transfer.payloads {
-                visitor.visit_expr(payload);
-            }
+        ExprKind::CopyInto(copy) => {
+            visitor.visit_expr(&copy.target);
+            visitor.visit_expr(&copy.value);
         }
         ExprKind::Trap(trap) => {
             visitor.visit_block(&trap.body);

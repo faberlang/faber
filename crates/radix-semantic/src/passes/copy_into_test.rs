@@ -520,58 +520,6 @@ main {}",
     );
 }
 
-#[test]
-fn a_copy_into_with_any_other_value_count_is_rejected() {
-    use radix_syntax::{ExprKind, StmtKind};
-
-    let source = r"fn t(tf32[3, 3] a, mut tf32[3, 3] b) → void {
-    b ⇇ a
-    b ⇇ a
-}
-main {}";
-    let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
-    let pack =
-        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
-            .expect("load English locale pack");
-    config.locale_pack = Some(pack.clone());
-    let mut parsed = radix_parser::parse(radix_lexer::lex_with_locale_pack(
-        source,
-        &pack as &dyn radix_lexer::KeywordPack,
-    ));
-    assert!(parsed.errors.is_empty(), "{:?}", parsed.errors);
-    let program = parsed.program.as_mut().expect("program");
-    let StmtKind::Func(function) = &mut program.statements[0].kind else {
-        panic!("expected a function");
-    };
-    let body = function.body.as_mut().expect("body");
-    let second = body.statements.pop().expect("second copy");
-    let StmtKind::Expr(second) = second.kind else {
-        panic!("expected an expression statement");
-    };
-    let ExprKind::Transfer(second) = second.expr.kind else {
-        panic!("expected a transfer");
-    };
-    let StmtKind::Expr(first) = &mut body.statements[0].kind else {
-        panic!("expected an expression statement");
-    };
-    let ExprKind::Transfer(first) = &mut first.expr.kind else {
-        panic!("expected a transfer");
-    };
-    first.payloads.extend(second.payloads);
-    assert_eq!(first.payloads.len(), 2);
-
-    let result = crate::analyze(program, &config, &mut parsed.interner);
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|d| d.kind == SemanticErrorKind::ArityMismatch
-                && issue(d) == Some("copy_into_arity")),
-        "expected copy_into_arity, got: {:?}",
-        result.diagnostics
-    );
-}
-
 // =============================================================================
 // R6 `←` never writes a mut tensor parameter
 // =============================================================================

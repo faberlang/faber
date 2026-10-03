@@ -5187,24 +5187,20 @@ fn eot_transfer_expr(result: &ParseResult) -> &radix_syntax::Expr {
 }
 
 #[test]
-fn eot_transfer_one_sink_one_payload() {
+fn copy_into_one_target_one_value() {
     let result = parse_ok(r#"output ⇇ "salve\n""#);
     let expr = eot_transfer_expr(&result);
-    let ExprKind::Transfer(transfer) = &expr.kind else {
-        panic!("expected transfer expression, got {:?}", expr.kind);
+    let ExprKind::CopyInto(copy) = &expr.kind else {
+        panic!("expected copy-into expression, got {:?}", expr.kind);
     };
-    let ExprKind::Ident(sink) = &transfer.sink.kind else {
-        panic!("expected ident sink, got {:?}", transfer.sink.kind);
+    let ExprKind::Ident(target) = &copy.target.kind else {
+        panic!("expected ident target, got {:?}", copy.target.kind);
     };
-    assert_eq!(symbol_name(&result, sink.name), "output");
-    assert_eq!(transfer.payloads.len(), 1, "exactly one payload");
+    assert_eq!(symbol_name(&result, target.name), "output");
     assert!(
-        matches!(
-            transfer.payloads[0].kind,
-            ExprKind::Literal(Literal::String(_))
-        ),
-        "payload is the string literal, got {:?}",
-        transfer.payloads[0].kind
+        matches!(copy.value.kind, ExprKind::Literal(Literal::String(_))),
+        "value is the string literal, got {:?}",
+        copy.value.kind
     );
 }
 
@@ -5228,30 +5224,29 @@ fn eot_transfer_groups_around_calls_conversions_and_templates() {
     // conversion. The ⇇ sits outside both.
     let result = parse_ok(r#"scribe("x") ⇇ payload ↦ textus"#);
     let expr = eot_transfer_expr(&result);
-    let ExprKind::Transfer(transfer) = &expr.kind else {
-        panic!("expected transfer expression, got {:?}", expr.kind);
+    let ExprKind::CopyInto(copy) = &expr.kind else {
+        panic!("expected copy-into expression, got {:?}", expr.kind);
     };
     assert!(
-        matches!(transfer.sink.kind, ExprKind::Call(_)),
+        matches!(copy.target.kind, ExprKind::Call(_)),
         "target keeps the complete call, got {:?}",
-        transfer.sink.kind
+        copy.target.kind
     );
-    assert_eq!(transfer.payloads.len(), 1);
     assert!(
-        matches!(transfer.payloads[0].kind, ExprKind::Conversio(_)),
+        matches!(copy.value.kind, ExprKind::Conversio(_)),
         "value is the complete conversion, got {:?}",
-        transfer.payloads[0].kind
+        copy.value.kind
     );
 
     let result = parse_ok(r#"output ⇇ "§ §\n"(a, b)"#);
     let expr = eot_transfer_expr(&result);
-    let ExprKind::Transfer(transfer) = &expr.kind else {
-        panic!("expected transfer expression, got {:?}", expr.kind);
+    let ExprKind::CopyInto(copy) = &expr.kind else {
+        panic!("expected copy-into expression, got {:?}", expr.kind);
     };
-    let ExprKind::Call(template) = &transfer.payloads[0].kind else {
+    let ExprKind::Call(template) = &copy.value.kind else {
         panic!(
             "value is the string-constructor application, got {:?}",
-            transfer.payloads[0].kind
+            copy.value.kind
         );
     };
     assert!(
@@ -5267,14 +5262,13 @@ fn eot_transfer_binary_operators_group_into_the_value() {
     // value, never around the statement.
     let result = parse_ok(r#"output ⇇ (q · kt) ⊙ s"#);
     let expr = eot_transfer_expr(&result);
-    let ExprKind::Transfer(transfer) = &expr.kind else {
-        panic!("expected transfer expression, got {:?}", expr.kind);
+    let ExprKind::CopyInto(copy) = &expr.kind else {
+        panic!("expected copy-into expression, got {:?}", expr.kind);
     };
-    assert_eq!(transfer.payloads.len(), 1);
     assert!(
-        matches!(transfer.payloads[0].kind, ExprKind::Binary(_)),
+        matches!(copy.value.kind, ExprKind::Binary(_)),
         "value keeps `(q · kt) ⊙ s`, got {:?}",
-        transfer.payloads[0].kind
+        copy.value.kind
     );
 }
 
@@ -5290,7 +5284,7 @@ fn eot_transfer_inside_assignment_value() {
     };
     let init = var.init.as_deref().expect("initializer");
     assert!(
-        matches!(init.kind, ExprKind::Transfer(_)),
+        matches!(init.kind, ExprKind::CopyInto(_)),
         "declaration initializer is the copy-into, got {:?}",
         init.kind
     );
@@ -5300,7 +5294,7 @@ fn eot_transfer_inside_assignment_value() {
 fn eot_transfer_missing_payload_rejected() {
     assert_parse_error_matches(
         r"output ⇇",
-        ParseExpectation::Issue("transfer_payload_expected"),
+        ParseExpectation::Issue("copy_into_value_expected"),
     );
     assert_parse_error_matches(
         r#"output ⇇ "a" ⇇"#,

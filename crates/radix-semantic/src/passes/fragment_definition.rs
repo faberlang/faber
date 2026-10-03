@@ -221,12 +221,10 @@ impl FragmentDefinitionChecker<'_> {
             // `target ⇇ value` writes existing tensor storage; fragments admit
             // no such effect yet, so classify it as one instead of admitting it
             // silently.
-            HirExpressionKind::Transfer { sink, payloads } => {
+            HirExpressionKind::CopyInto { target, value } => {
                 self.effect(expr.span, "dynamic_function");
-                self.check_expr(sink);
-                for payload in payloads {
-                    self.check_expr(payload);
-                }
+                self.check_expr(target);
+                self.check_expr(value);
             }
             HirExpressionKind::Gradient {
                 call,

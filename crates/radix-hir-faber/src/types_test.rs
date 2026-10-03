@@ -2355,37 +2355,27 @@ fn cape_handler_keeps_leading_author_local() {
     );
 }
 
-// ── EOT-3W: ⇇ transfer re-emission ─────────────────────────────────────────
+// ── ⇇ copy-into re-emission ─────────────────────────────────────────
 
-fn transfer_program(interner: &mut Interner) -> HirModule {
+fn copy_into_program(interner: &mut Interner) -> HirModule {
     let funde = interner.intern("funde");
     let alpha = interner.intern("alpha");
-    let beta = interner.intern("beta");
-
     let transfer = HirExpression {
         id: HirId(3),
         ty: None,
-        kind: HirExpressionKind::Transfer {
-            sink: Box::new(HirExpression {
+        kind: HirExpressionKind::CopyInto {
+            target: Box::new(HirExpression {
                 id: HirId(1),
                 ty: None,
                 kind: HirExpressionKind::Path(DefId(radix_types::USER_DEF_ID_BASE)),
                 span: span(),
             }),
-            payloads: vec![
-                HirExpression {
-                    id: HirId(2),
-                    ty: None,
-                    kind: HirExpressionKind::Literal(HirLiteral::String(alpha)),
-                    span: span(),
-                },
-                HirExpression {
-                    id: HirId(4),
-                    ty: None,
-                    kind: HirExpressionKind::Literal(HirLiteral::String(beta)),
-                    span: span(),
-                },
-            ],
+            value: Box::new(HirExpression {
+                id: HirId(2),
+                ty: None,
+                kind: HirExpressionKind::Literal(HirLiteral::String(alpha)),
+                span: span(),
+            }),
         },
         span: span(),
     };
@@ -2433,27 +2423,26 @@ fn transfer_program(interner: &mut Interner) -> HirModule {
 }
 
 #[test]
-fn transfer_emits_glyph_chain_canonical() {
-    // EOT-3W: canonical re-emission keeps the U+21C7 glyph between the sink
-    // and every payload, in source order, with no console or formatting
-    // vocabulary.
+fn copy_into_emits_glyph_canonical() {
+    // Canonical re-emission keeps the U+21C7 glyph between the target and the
+    // value, with no console or formatting vocabulary.
     let mut interner = Interner::new();
-    let program = transfer_program(&mut interner);
+    let program = copy_into_program(&mut interner);
     let types = TypeTable::new();
 
     let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     assert!(
-        code.contains(r#"funde ⇇ "alpha" ⇇ "beta""#),
-        "transfer must re-emit the flat glyph chain, got:\n{code}"
+        code.contains(r#"funde ⇇ "alpha""#) && !code.contains(r#""alpha" ⇇"#),
+        "copy-into must re-emit one `target ⇇ value`, got:\n{code}"
     );
 }
 
 #[test]
-fn transfer_glyph_is_locale_invariant() {
+fn copy_into_glyph_is_locale_invariant() {
     // `⇇` is an operator token, never a keyword: localized re-emission keeps
     // the glyph exactly while keywords project through the reader surface.
     let mut interner = Interner::new();
-    let program = transfer_program(&mut interner);
+    let program = copy_into_program(&mut interner);
     let types = TypeTable::new();
 
     let code = FaberCodegen::new(&types, &interner)
@@ -2462,7 +2451,7 @@ fn transfer_glyph_is_locale_invariant() {
         .code;
     assert!(
         code.contains("⇇"),
-        "localized transfer output must keep the U+21C7 glyph, got:\n{code}"
+        "localized copy-into output must keep the U+21C7 glyph, got:\n{code}"
     );
 }
 

@@ -28,13 +28,13 @@ impl super::FaberCodegen<'_> {
             // An in-place numeric twin re-emits as a postfix method call.
             HirExpressionKind::Assign(..) if self.numeric_twin_call(expr).is_some() => 14,
             HirExpressionKind::Assign(_, _) | HirExpressionKind::ConversioAssign { .. } => 1,
-            // `⇇` sits between assignment and the ternary level: the sink and
-            // payloads are complete ternaries (parser locks it just above
-            // assignment), so the chain shares the Si/Conversio level.
+            // `⇇` sits between assignment and the ternary level: the target
+            // and value are complete ternaries (parser locks it just above
+            // assignment), so it shares the Si/Conversio level.
             HirExpressionKind::Si { .. }
             | HirExpressionKind::Conversio { .. }
             | HirExpressionKind::CallDefault { .. }
-            | HirExpressionKind::Transfer { .. } => 2,
+            | HirExpressionKind::CopyInto { .. } => 2,
             HirExpressionKind::Binary(op, _, _) => self.binop_precedence(*op),
             // TypeCheck (`expr est <type>`) behaves like Is (precedence 4):
             // both are relational-style checks spelled with `est`.

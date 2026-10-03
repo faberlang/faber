@@ -1600,6 +1600,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::TensorSlice => self.tensor_slice(args, span),
             MirCollectionOp::TensorExpand => self.tensor_expand(args, span),
             MirCollectionOp::TensorShift => self.tensor_shift(args, span),
+            MirCollectionOp::TensorCopyInto => self.tensor_copy_into(args, span),
             MirCollectionOp::TensorAdd => {
                 self.tensor_elementwise_or_scalar(args, span, "tensor add", numeric_add, return_ty)
             }
@@ -2217,6 +2218,44 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             RunnerError::internal(span, "tensor expanded shape is incompatible with receiver")
         })?;
         Ok(Value::Tensor(Rc::new(RefCell::new(view))))
+    }
+
+    /// `TensorCopyInto(dest, src)`: write every logical value of `src` through
+    /// the destination's strides into the destination's existing storage.
+    ///
+    /// The source is read in full before the first write, so a source that
+    /// shares storage with the destination (a view of it) still copies the
+    /// values it had when the statement began. The destination keeps its
+    /// allocation identity: every alias of it sees the new values. A shape
+    /// mismatch (possible only for runtime extents) is a runner error value
+    /// naming the issue, not a panic.
+    fn tensor_copy_into(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [dest, src] = args else {
+            return Err(RunnerError::internal(span, "tensor copy into arity"));
+        };
+        let dest = self.tensor_arg(dest, span)?;
+        let src = self.tensor_arg(src, span)?;
+        let values = self.tensor_logical_values(&src, span)?;
+        let src_shape = src.borrow().shape.clone();
+        let dest_snapshot = dest.borrow().clone();
+        if dest_snapshot.shape != src_shape {
+            return Err(RunnerError::internal(
+                span,
+                "tensor copy into shape mismatch",
+            ));
+        }
+        if !dest_snapshot.edge_ops.is_empty() {
+            return Err(RunnerError::internal(
+                span,
+                "tensor copy into destination is a lazy view",
+            ));
+        }
+        for (index, value) in values.into_iter().enumerate() {
+            dest_snapshot.set_value_at(index, value).ok_or_else(|| {
+                RunnerError::internal(span, "tensor copy into destination layout")
+            })?;
+        }
+        Ok(Value::Unit)
     }
 
     fn tensor_shift(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {

@@ -1064,23 +1064,9 @@ fn walk_expr_callees(expr: &HirExpression, index: &NucleumIndex, names: &mut Vec
                 walk_expr_callees(&arg.expr, index, names);
             }
         }
-        // A transfer invokes its sink once per payload (EOT-3M/MIR contract),
-        // so a device sink is a called device callee per payload — never
-        // silently dropped by the catch-all.
-        HirExpressionKind::Transfer { sink, payloads } => {
-            let sink_device_def = match &sink.kind {
-                HirExpressionKind::Path(def_id) if index.roles.contains_key(def_id) => Some(*def_id),
-                _ => None,
-            };
-            for payload in payloads {
-                if let Some(def_id) = sink_device_def
-                    && let Some(name) = index.names.get(&def_id)
-                {
-                    names.push(name.clone());
-                }
-                walk_expr_callees(payload, index, names);
-            }
-            walk_expr_callees(sink, index, names);
+        HirExpressionKind::CopyInto { target, value } => {
+            walk_expr_callees(value, index, names);
+            walk_expr_callees(target, index, names);
         }
         HirExpressionKind::Binary(_, lhs, rhs)
         | HirExpressionKind::Assign(lhs, rhs)

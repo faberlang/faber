@@ -1323,11 +1323,9 @@ fn collect_expr_defs(
         HirExpressionKind::Praefixum(inner) | HirExpressionKind::Format { value: inner, .. } => {
             collect_expr_defs(inner, registry);
         }
-        HirExpressionKind::Transfer { sink, payloads } => {
-            collect_expr_defs(sink, registry);
-            for payload in payloads {
-                collect_expr_defs(payload, registry);
-            }
+        HirExpressionKind::CopyInto { target, value } => {
+            collect_expr_defs(target, registry);
+            collect_expr_defs(value, registry);
         }
         HirExpressionKind::Binary(_, lhs, rhs) => {
             collect_expr_defs(lhs, registry);
@@ -1710,11 +1708,9 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                     collect_expr(&arg.expr, registry);
                 }
             }
-            HirExpressionKind::Transfer { sink, payloads } => {
-                collect_expr(sink, registry);
-                for payload in payloads {
-                    collect_expr(payload, registry);
-                }
+            HirExpressionKind::CopyInto { target, value } => {
+                collect_expr(target, registry);
+                collect_expr(value, registry);
             }
             HirExpressionKind::Gradient {
                 call,
@@ -2726,11 +2722,9 @@ pub(crate) fn validate_referential_integrity(
                     validate_expr(&arg.expr, checks)?;
                 }
             }
-            HirExpressionKind::Transfer { sink, payloads } => {
-                validate_expr(sink, checks)?;
-                for payload in payloads {
-                    validate_expr(payload, checks)?;
-                }
+            HirExpressionKind::CopyInto { target, value } => {
+                validate_expr(target, checks)?;
+                validate_expr(value, checks)?;
             }
             HirExpressionKind::Gradient {
                 call,

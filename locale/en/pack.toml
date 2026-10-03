@@ -3148,10 +3148,6 @@ help = "adjust the number of type arguments"
 message = "iuncta construction has {actual} elements but type has {expected}"
 help = "match the element count to the iuncta type arity"
 
-[diagnostics.SEM013.issues.copy_into_arity]
-message = "'⇇' copies exactly one value into its target"
-help = "write one 'target ⇇ value' per statement"
-
 [diagnostics.SEM014]
 message = "missing type annotation"
 help = "add a type annotation"

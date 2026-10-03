@@ -808,6 +808,9 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         // green by the direction-1 sweep (reachable, not permanent).
         MirCollectionOp::TensorExpand,
         MirCollectionOp::TensorShift,
+        // `target ⇇ value`: a statement surface lowered from HIR `CopyInto`,
+        // not a method row (permanent allowlist below).
+        MirCollectionOp::TensorCopyInto,
         MirCollectionOp::TensorAdd,
         MirCollectionOp::TensorSub,
         MirCollectionOp::TensorMul,
@@ -871,6 +874,8 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         MirCollectionOp::ArrayDiv,
         // Conversion surface (intervallum → tensor materialization).
         MirCollectionOp::IntervalMaterialize,
+        // Statement surface: `target ⇇ value` lowers from HIR `CopyInto`.
+        MirCollectionOp::TensorCopyInto,
         // Lowering composite: the closure form of regex `muta` maps its closure
         // over the matches in a lowered loop, then joins the results (RX-5);
         // the registry row of `muta` names the literal op, not this one.

@@ -44,7 +44,7 @@ pub(super) trait HirExpressionLoweringVisitor {
             HirExpressionKind::Call(callee, type_args, args, conversion) => {
                 self.visit_call_expr(callee, type_args, args, *conversion, expr)
             }
-            HirExpressionKind::Transfer { sink, payloads } => self.visit_transfer_expr(sink, payloads, expr),
+            HirExpressionKind::CopyInto { target, value } => self.visit_copy_into_expr(target, value, expr),
             HirExpressionKind::MethodCall(receiver, method, generic_args, args, conversion) => {
                 self.visit_method_call_expr(receiver, *method, generic_args, args, *conversion, expr)
             }
@@ -163,10 +163,10 @@ pub(super) trait HirExpressionLoweringVisitor {
         conversion: Option<DefId>,
         expr: &HirExpression,
     ) -> Option<MirOperand>;
-    fn visit_transfer_expr(
+    fn visit_copy_into_expr(
         &mut self,
-        sink: &HirExpression,
-        payloads: &[HirExpression],
+        target: &HirExpression,
+        value: &HirExpression,
         expr: &HirExpression,
     ) -> Option<MirOperand>;
     fn visit_method_call_expr(
@@ -425,32 +425,24 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         self.lower_call(callee, type_args, args, conversion, expr)
     }
 
-    fn visit_transfer_expr(
+    fn visit_copy_into_expr(
         &mut self,
-        sink: &HirExpression,
-        payloads: &[HirExpression],
+        target: &HirExpression,
+        value: &HirExpression,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
-        // EOT-3M single-evaluation contract: `lower_expr_value(sink)` fully
-        // evaluates the sink exactly once into an operand; reusing that operand
-        // as the callee of each per-payload call never re-executes the sink
-        // expression. Payloads are evaluated and invoked in source order, one
-        // invocation each, and the transfer itself produces no value operand.
-        let sink_operand = self.lower_expr_value(sink)?;
+        // `target ⇇ value`: the value is evaluated exactly once, then written
+        // through the target's existing storage by one `TensorCopyInto`. The
+        // statement itself produces no value operand.
+        let target_operand = self.lower_expr_value(target)?;
+        let value_operand = self.lower_expr_value(value)?;
         let vacuum = self.expr_ty(expr)?;
-        let error_ty = self.callable_error_ty(sink);
-        for payload in payloads {
-            let arg = self.lower_expr_value(payload)?;
-            if let Some(err_ty) = error_ty {
-                let callee = self
-                    .closure_callee_for_operand(&sink_operand)
-                    .map_or_else(|| MirCallee::Value(sink_operand.clone()), MirCallee::Closure);
-                self.lower_failable_call(callee, vec![arg], vacuum, err_ty, None, payload.span);
-            } else {
-                self.call_value_operand(sink_operand.clone(), vec![arg], vacuum, payload.span);
-            }
-        }
-        Some(MirOperand::Constant(MirConstant::Unit))
+        Some(self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorCopyInto),
+            vec![target_operand, value_operand],
+            vacuum,
+            expr.span,
+        ))
     }
 
     fn visit_method_call_expr(
