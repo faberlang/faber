@@ -864,7 +864,7 @@ incipit {
 fn empty_array_and_spread_literals_no_longer_report_annotation_or_type_errors() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum _ empty_list ← []
+  fixum lista<numerus> empty_list ← []
   fixum _ first ← [1, 2, 3]
   fixum _ extended ← [0, sparge first, 99]
   nota empty_list, extended
@@ -878,6 +878,24 @@ fn empty_array_and_spread_literals_no_longer_report_annotation_or_type_errors() 
             .iter()
             .all(|d| d.issue() != Some("common_type_mismatch"))
     );
+
+    let context_free_session = test_session(Target::HirRust);
+    let context_free_source = r"incipit {
+  fixum _ empty_list ← []
+}";
+    let context_free = compile(
+        &context_free_session,
+        "context-free-empty.fab",
+        context_free_source,
+        ModuleCompileRequest::default(),
+    );
+
+    assert!(!context_free.success(), "{:?}", context_free.diagnostics);
+    assert!(context_free.diagnostics.iter().any(|diagnostic| {
+        diagnostic.is_error()
+            && diagnostic.code == Some("SEM014")
+            && diagnostic.issue() == Some("cannot_infer_empty_list_element_type")
+    }));
 }
 
 // ── typed vacua / context-free vacua ──
