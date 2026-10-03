@@ -146,6 +146,15 @@ pub struct Parser {
     /// still routes to `TypeCheck`. Cross-file imported types are not visible
     /// here; those keep today's `Binary(Is)` value-equality classification.
     declared_type_names: HashSet<String>,
+    /// Local names this file's selective imports bind (BUG-92EE4566).
+    ///
+    /// Selective members are the only import form whose binding resolves as a
+    /// bare type (`bind_selective_type_import`); named and wildcard imports
+    /// bind module namespaces whose members are used qualified. Populated by
+    /// one pre-parse token scan alongside `declared_type_names`, so a `casu`
+    /// arm classifies the same before or after the import line. Names here
+    /// are candidates only: the scrutinee's closed-set rule decides.
+    imported_type_names: HashSet<String>,
     /// Grammar nesting levels currently open, bounded by [`MAX_PARSE_DEPTH`].
     ///
     /// Raised and lowered around each recursive entry point, so a rejected
@@ -328,6 +337,7 @@ impl Parser {
             reader_type_surfaces,
             has_latin_fallback,
             declared_type_names: HashSet::new(),
+            imported_type_names: HashSet::new(),
             nesting_depth: 0,
             folded_operators: 0,
             expression_contexts: 0,
@@ -336,6 +346,7 @@ impl Parser {
             conditionals: Vec::new(),
         };
         parser.declared_type_names = parser.scan_declared_type_names();
+        parser.imported_type_names = parser.scan_imported_type_names();
         parser
     }
 
@@ -389,6 +400,169 @@ impl Parser {
             }
         }
         names
+    }
+
+    /// Collect the local names this file's selective imports bind (BUG-92EE4566).
+    ///
+    /// One linear token walk mirroring the sugar form's selective list
+    /// (`importa ex "path" fixum A, B ut C` — no braces), including its
+    /// selective-vs-following-statement lookahead, so the scan and the parser
+    /// never disagree about which names an import binds. Record imports
+    /// (`importa { … }`) carry no selective shape and are skipped.
+    fn scan_imported_type_names(&self) -> HashSet<String> {
+        let tokens: Vec<&radix_lexer::Token> = self
+            .tokens
+            .iter()
+            .filter(|token| !token.kind.is_trivia())
+            .collect();
+        let keyword_at = |index: usize, identity: TokenKind| -> bool {
+            tokens
+                .get(index)
+                .is_some_and(|token| self.token_keyword_identity(&token.kind) == Some(identity))
+        };
+        let mut names = HashSet::new();
+        let mut index = 0;
+        while index < tokens.len() {
+            if !keyword_at(index, TokenKind::Importa) {
+                index += 1;
+                continue;
+            }
+            index += 1;
+            if keyword_at(index, TokenKind::LBrace) || !keyword_at(index, TokenKind::Ex) {
+                continue;
+            }
+            index += 1;
+            if !matches!(
+                tokens.get(index).map(|token| &token.kind),
+                Some(TokenKind::String(_))
+            ) {
+                continue;
+            }
+            index += 1;
+            if keyword_at(index, TokenKind::Publica) {
+                index += 1;
+            }
+            if !keyword_at(index, TokenKind::Fixum)
+                || !self.fixum_opens_selective_list(&tokens, index + 1)
+            {
+                continue;
+            }
+            index += 1;
+            // Members: `name [ut alias]` separated by commas; a name that
+            // cannot start a member after a comma is a trailing comma.
+            while let Some((name, next)) = self.import_member_name(&tokens, index) {
+                let mut cursor = next;
+                if keyword_at(cursor, TokenKind::Ut) {
+                    let Some((alias, alias_next)) = self.import_member_name(&tokens, cursor + 1)
+                    else {
+                        break;
+                    };
+                    names.insert(alias);
+                    cursor = alias_next;
+                } else {
+                    names.insert(name);
+                }
+                if !keyword_at(cursor, TokenKind::Comma) {
+                    break;
+                }
+                index = cursor + 1;
+                if !self.import_member_starts_here(&tokens, index) {
+                    break;
+                }
+            }
+        }
+        names
+    }
+
+    /// Keyword identity of a token, whether the lexer emitted the dedicated
+    /// kind or a contextual identifier claiming it.
+    fn token_keyword_identity(&self, kind: &TokenKind) -> Option<TokenKind> {
+        match kind {
+            kind if matches!(
+                kind,
+                TokenKind::Importa
+                    | TokenKind::Ex
+                    | TokenKind::Publica
+                    | TokenKind::Fixum
+                    | TokenKind::Ut
+                    | TokenKind::LBrace
+                    | TokenKind::Comma
+            ) =>
+            {
+                Some(kind.clone())
+            }
+            TokenKind::Ident(sym) => self
+                .keyword_claim_key(*sym)
+                .and_then(lookup_keyword_spec)
+                .and_then(|spec| spec.token_kind.clone()),
+            _ => None,
+        }
+    }
+
+    /// Token-index twin of [`Parser::import_fixum_starts_selective_list`]:
+    /// whether the `fixum` word at `index` opens the import's selective list
+    /// instead of starting a following `fixum` statement.
+    fn fixum_opens_selective_list(&self, tokens: &[&radix_lexer::Token], index: usize) -> bool {
+        let Some(kind) = tokens.get(index).map(|token| &token.kind) else {
+            return true;
+        };
+        match kind {
+            TokenKind::Eof | TokenKind::Comma | TokenKind::Star => true,
+            kind if self.token_keyword_identity(kind) == Some(TokenKind::Ut) => true,
+            kind if self.is_import_binding_name_kind(kind) => {
+                match tokens.get(index + 1).map(|token| &token.kind) {
+                    None => true,
+                    Some(TokenKind::Eof | TokenKind::Comma | TokenKind::Star) => true,
+                    Some(kind) if self.token_keyword_identity(kind) == Some(TokenKind::Ut) => true,
+                    Some(TokenKind::Ident(_)) => tokens
+                        .get(index + 1)
+                        .is_some_and(|token| self.token_keyword_identity(&token.kind).is_some()),
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
+    }
+
+    /// Token-index twin of [`Parser::is_import_binding_name`].
+    fn is_import_binding_name_kind(&self, kind: &TokenKind) -> bool {
+        match kind {
+            TokenKind::Ident(_) | TokenKind::Underscore(_) | TokenKind::Tag => true,
+            kind => keyword_allowed_as_ident(KeywordOwner::DeclarationName, kind).is_some(),
+        }
+    }
+
+    /// The plain-identifier member (or alias) at `index`, with the index just
+    /// past it. Keyword-spelled member names are skipped: a type-pattern
+    /// target is an identifier the peek can classify.
+    fn import_member_name(
+        &self,
+        tokens: &[&radix_lexer::Token],
+        index: usize,
+    ) -> Option<(String, usize)> {
+        match tokens.get(index).map(|token| &token.kind) {
+            Some(TokenKind::Ident(sym))
+                if self
+                    .keyword_claim_key(*sym)
+                    .and_then(lookup_keyword_spec)
+                    .is_none() =>
+            {
+                Some((self.interner.resolve(*sym).to_owned(), index + 1))
+            }
+            _ => None,
+        }
+    }
+
+    /// Token-index twin of [`Parser::import_value_member_starts_here`].
+    fn import_member_starts_here(&self, tokens: &[&radix_lexer::Token], index: usize) -> bool {
+        match tokens.get(index).map(|token| &token.kind) {
+            Some(TokenKind::Ident(sym)) => self
+                .keyword_claim_key(*sym)
+                .and_then(lookup_keyword_spec)
+                .is_none(),
+            Some(TokenKind::Underscore(_) | TokenKind::Star) => true,
+            _ => false,
+        }
     }
 
     /// Parse a complete Faber source file body.
@@ -992,10 +1166,13 @@ impl Parser {
     /// `case numerus` to a type pattern without consuming the token.
     ///
     /// U1R extends the same classification to identifiers this file declares
-    /// as nominal types (`case Errata`). A name that declares no type stays a
-    /// value pattern — an imported type is the documented miss, not a parse
-    /// guess. `est` no longer consults this: D23.5 made the right-hand side of
-    /// `est`/`non est` always a type.
+    /// as nominal types (`casu Errata`), and selective-import member bindings
+    /// join them (BUG-92EE4566): resolution types those bindings from the
+    /// imported file's interface, so the parser routes them as type-pattern
+    /// candidates and the scrutinee's closed-set rule owns type-vs-value. A
+    /// name that is neither declared nor selectively imported stays a value
+    /// pattern. `est` no longer consults this: D23.5 made the right-hand side
+    /// of `est`/`non est` always a type.
     fn peek_starts_type_name(&self) -> bool {
         let TokenKind::Ident(sym) = self.peek().kind else {
             return false;
@@ -1005,6 +1182,9 @@ impl Parser {
             return true;
         }
         if self.declared_type_names.contains(source) {
+            return true;
+        }
+        if self.imported_type_names.contains(source) {
             return true;
         }
         // Bare width markers (`u8`, `f32`, `lu8`, ...) are type names in every
@@ -1688,3 +1868,7 @@ mod via_hint_test;
 #[cfg(test)]
 #[path = "big_integer_literal_test.rs"]
 mod big_integer_literal_test;
+
+#[cfg(test)]
+#[path = "selective_import_type_pattern_test.rs"]
+mod selective_import_type_pattern_test;
