@@ -126,6 +126,9 @@ pub enum Command {
     #[command(override_usage = "faber build [OPTIONS] <INPUT>")]
     Build(BuildArgs),
 
+    /// Run a Faber corpus case on the MIR runner and compare its output with a golden file
+    Corpus(CorpusArgs),
+
     /// Show supported targets and current capability notes
     Targets,
 
@@ -368,6 +371,17 @@ pub struct BuildArgs {
     /// Input file or package path
     #[arg(value_name = "INPUT")]
     pub input: String,
+}
+
+/// Arguments for `faber corpus`.
+#[derive(clap::Args, Debug)]
+pub struct CorpusArgs {
+    /// Faber source file or package directory
+    pub input: PathBuf,
+
+    /// Golden stdout file (defaults to the entry source's .expected sidecar)
+    #[arg(long, value_name = "PATH")]
+    pub expected: Option<PathBuf>,
 }
 
 /// Shared source-input grammar for phase inspection commands.

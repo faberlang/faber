@@ -16,6 +16,7 @@ mod check_library_test;
 #[path = "check_test.rs"]
 mod check_test;
 mod convert;
+mod corpus;
 mod cost;
 #[cfg(test)]
 #[path = "cost_test.rs"]
@@ -66,6 +67,7 @@ use radix::services::{BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, V
 
 use check_library::cmd_check_library;
 use convert::cmd_convert;
+use corpus::cmd_corpus;
 use cost::cmd_cost;
 use doc::cmd_doc;
 use doctor::cmd_doctor;
@@ -254,6 +256,7 @@ fn dispatch(command: Command) {
                 args.linter,
             );
         }
+        Command::Corpus(args) => cmd_corpus(&args),
         Command::Targets => cmd_targets(),
         Command::CheckLibrary(args) => cmd_check_library(args),
         Command::Doctor => cmd_doctor(),
