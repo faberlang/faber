@@ -842,23 +842,15 @@ fn reject_saturating_word_target(analysis: &AnalyzedModule, target_name: &str) -
     Ok(())
 }
 
-#[cfg_attr(not(feature = "mir-wasm"), allow(unused_variables))]
 #[cfg(feature = "mir-wasm")]
 fn generate_wasm_text_output(
     analysis: &mut AnalyzedModule,
     no_fuse: bool,
 ) -> Result<crate::Output, SpannedCodegenError> {
-    #[cfg(not(feature = "mir-wasm"))]
-    {
-        return Err(unavailable_target_spanned(Target::MirWasm));
-    }
-    #[cfg(feature = "mir-wasm")]
-    {
-        prepare_mir_lowering_interner(analysis);
-        let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
-        let code = crate::mir::emit_wasm_text_probe(&mir.validated, &mir.interner).map_err(wasm_text_codegen_error)?;
-        Ok(crate::Output::WasmText(crate::WasmTextOutput { code }))
-    }
+    prepare_mir_lowering_interner(analysis);
+    let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
+    let code = crate::mir::emit_wasm_text_probe(&mir.validated, &mir.interner).map_err(wasm_text_codegen_error)?;
+    Ok(crate::Output::WasmText(crate::WasmTextOutput { code }))
 }
 
 /// KPC-EMIT: translate one package-lowering registration row into its
