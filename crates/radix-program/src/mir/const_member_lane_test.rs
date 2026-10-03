@@ -115,9 +115,6 @@ fn run_const_member_package_tests(src: &Path) -> Vec<String> {
         panic!(
             "const-member package must lower on the test-link lane: {:?}",
             diagnostics
-                .iter()
-                .map(|diag| (diag.code, diag.issue()))
-                .collect::<Vec<_>>()
         )
     })
 }
@@ -282,5 +279,75 @@ test "module const set conversion membership" {
             .iter()
             .map(|d| (d.code, d.issue()))
             .collect::<Vec<_>>()
+    );
+}
+
+/// A library reader is outside the application's local-node closure. Its
+/// namespace const reads need bindings in the cached library analysis, not
+/// just in the application entry or sibling analyses.
+#[test]
+fn package_test_library_fn_reads_module_consts() {
+    let dir = crate::test_support::test_temp_dir("library-reads-module-const");
+    write_const_member_package(
+        dir.as_ref(),
+        "constlib",
+        r#"+++
+locale = "en"
++++
+@ public
+const string schema_version = "2.0.0"
+@ private
+const int BASE = 20
+@ public
+const int ANSWER = BASE * 2 + 2
+@ public
+const list<string> KEYS = ["a", "b"]
+"#,
+        Some(
+            r#"+++
+locale = "en"
++++
+import from "constlib:keys" keys
+
+@ public
+fn version() → string {
+    return keys.schema_version
+}
+@ public
+fn answer() → int {
+    return keys.ANSWER
+}
+@ public
+fn admits(string k) → bool {
+    return k ∈ keys.KEYS
+}
+"#,
+        ),
+    );
+    let src = write_const_member_package(dir.as_ref(), "consumer", "", None);
+    fs::write(
+        src.join("main.proba"),
+        r#"+++
+locale = "en"
++++
+import from "constlib:reader" reader
+
+test "library fn reads module consts" {
+    assert reader.version() ≡ "2.0.0"
+    assert reader.answer() ≡ 42
+    assert reader.admits("a") ≡ true
+    assert reader.admits("z") ≡ false
+    print reader.version()
+    print reader.answer()
+    print reader.admits("a")
+    print reader.admits("z")
+}
+"#,
+    )
+    .expect("write main.proba");
+    assert_eq!(
+        run_const_member_package_tests(&src),
+        vec!["2.0.0", "42", "verum", "falsum"],
+        "library function bodies must receive linked const value bindings"
     );
 }
