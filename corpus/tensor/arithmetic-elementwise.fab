@@ -4,19 +4,19 @@ kind = "method"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "collection"
 canonical = false
-summary = "Tensor elementwise arithmetic with canonical + / - operators, plus addita, subtrahe, and multiplica method twins."
-syntax = "tensor + other | tensor - other | tensor.added(other) (non-preferred) | tensor.subtract(other) (non-preferred) | tensor.multiply(other)"
+summary = "Tensor elementwise arithmetic with canonical + / - operators and Hadamard multiplication."
+syntax = "tensor + other | tensor - other | tensor ⊙ other"
 related = ["tensor", "fractus", "lista"]
 locale = "en"
 +++
 
 # =============================================================================
-# tensor — Tensor elementwise arithmetic with addita, subtrahe, and multiplica.
+# tensor — Tensor elementwise arithmetic with +, -, and ⊙.
 # =============================================================================
 #
 # What this teaches:
-#   • Canonical elementwise operators — `a + b` and `a - b`; `.added()`/`.subtract()` are non-preferred method twins where operators are legal
-#   • Elementwise multiplication — `multiplica` applies per-element
+#   • Elementwise addition and subtraction — `a + b` and `a - b`
+#   • Elementwise multiplication — `⊙` applies per-element
 #
 # Common mistakes:
 #   • mixing tensors of different shapes without explicit forma (reshape) or broadcast, or using elementwise ops on non-numeric tensors
@@ -26,7 +26,7 @@ locale = "en"
 
 
 
-# tensor elementwise arithmetic — canonical + / -, plus multiplica
+# tensor elementwise arithmetic — canonical + / - / ⊙
 #
 # WHY: tensor operators lower by radix into faber::Tensor<T> kernels. Same-shape
 # add and subtract here; broadcast coverage lives in the radix typecheck tests
@@ -45,7 +45,7 @@ main {
 
     const tf32[2, 2] sum ← a + b
     const tf32[2, 2] diff ← sum - b
-    const tf32[2, 2] prod ← diff.multiply(a)
+    const tf32[2, 2] prod ← diff ⊙ a
 
     const list<f32> out ← prod.flatten()
     print out

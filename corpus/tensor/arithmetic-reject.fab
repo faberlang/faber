@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "collection"
 canonical = false
 summary = "Tensor arithmetic rejects non-numeric elements and mixed numeric widths."
-syntax = "tensor.added(other)"
+syntax = "tensor + other"
 related = ["tensor", "typus", "conversio"]
 locale = "en"
 +++
@@ -40,11 +40,11 @@ locale = "en"
 main {
     const tensor<string, [2]> words_a ← empty
     const tensor<string, [2]> words_b ← empty
-    const tensor<string, [2]> words_sum ← words_a.added(words_b)
+    const tensor<string, [2]> words_sum ← words_a + words_b
     print words_sum.length()
 
     const tensor<i32, [2]> i32_a ← empty
     const tensor<i64, [2]> i64_b ← empty
-    const tensor<i32, [2]> mixed ← i32_a.added(i64_b)
+    const tensor<i32, [2]> mixed ← i32_a + i64_b
     print mixed.length()
 }
