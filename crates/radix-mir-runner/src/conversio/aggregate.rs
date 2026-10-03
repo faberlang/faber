@@ -633,6 +633,15 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     "valor to textus conversion failed",
                 )),
             },
+            // Authored octeti box as a numeric lista; native hosts may supply
+            // opaque octeti. Both carriers must extract without text coercion.
+            Type::Primitive(Primitive::Octeti) => match value {
+                Value::Octeti(_) | Value::Array(_) => self.convert_to_octeti(value, span),
+                _ => Err(RunnerError::conversion(
+                    span,
+                    "valor to octeti conversion failed",
+                )),
+            },
             Type::Primitive(Primitive::Ascii) => match value {
                 Value::Ascii(b) => Ok(Value::Ascii(b)),
                 Value::Str(value) if value.is_ascii() => Ok(Value::Str(value)),

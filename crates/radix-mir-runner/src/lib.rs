@@ -3069,6 +3069,9 @@ mod ascii_format_pack_test;
 mod octeti_lista_test;
 
 #[cfg(test)]
+mod octeti_valor_test;
+
+#[cfg(test)]
 #[path = "vector_lista_test.rs"]
 mod vector_lista_test;
 
