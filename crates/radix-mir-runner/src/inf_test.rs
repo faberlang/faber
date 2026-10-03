@@ -571,9 +571,25 @@ fn convert(
     params: &[&str],
     recovery: Option<MirOperand>,
 ) -> Result<Value, RunnerError> {
+    convert_ty(
+        |types| (types.intern(source), types.intern(target)),
+        value,
+        params,
+        recovery,
+    )
+}
+
+/// Run one runtime `↦` conversion. `build` interns the source and target in the
+/// fresh table, so a nullable carrier (which needs its member `TypeId`s) can be
+/// constructed before the runner borrows the table.
+fn convert_ty(
+    build: impl FnOnce(&mut TypeTable) -> (radix_types::TypeId, radix_types::TypeId),
+    value: Value,
+    params: &[&str],
+    recovery: Option<MirOperand>,
+) -> Result<Value, RunnerError> {
     let mut types = TypeTable::new();
-    let source_ty = types.intern(source);
-    let target_ty = types.intern(target);
+    let (source_ty, target_ty) = build(&mut types);
     let mut interner = Interner::new();
     let params = params.iter().map(|p| interner.intern(p)).collect();
     let context = MirValidationContext::new(&types);
@@ -1071,6 +1087,76 @@ fn valor_to_inf_extracts_every_integer_carrier_and_nothing_else() {
         .expect("recovered"),
         Value::Int(9)
     );
+}
+
+fn inf_ty(types: &mut TypeTable) -> radix_types::TypeId {
+    types.intern(Type::SizedNumeric(Primitive::Numerus, INF))
+}
+
+/// The two nullable carriers the table uses for `valor ∪ none`: a union with
+/// `nihil`, and an `Option<valor>` (`types.rs` collapses between them at
+/// lowering). Both must read a payload by the `valor` law.
+fn nullable_valor(types: &mut TypeTable, option: bool) -> radix_types::TypeId {
+    let valor = types.intern(Type::Primitive(Primitive::Valor));
+    if option {
+        types.option(valor)
+    } else {
+        let nihil = types.primitive(Primitive::Nihil);
+        types.intern(Type::Union(vec![valor, nihil]))
+    }
+}
+
+/// inf-nul: `valor ∪ none ↦ inf` reads its payload by the `valor ↦ inf` law. A
+/// nullable source is a union/option carrier, not the bare `Primitive::Valor`
+/// that routes `convert_to_target` through the dynamic extraction, so before
+/// the fix a float payload truncated on its own shape (1.5 → 1) instead of
+/// failing like the non-nullable path.
+#[test]
+fn nullable_valor_to_inf_reads_its_payload_by_the_valor_law() {
+    let beyond = big("18446744073709551616");
+    for option in [false, true] {
+        let build = move |types: &mut TypeTable| (nullable_valor(types, option), inf_ty(types));
+        // Integer payloads cross exactly, as the non-nullable path does.
+        assert_eq!(
+            convert_ty(build, Value::Int(7), &[], None).expect("integer payload"),
+            Value::Int(7)
+        );
+        assert_eq!(
+            convert_ty(build, beyond.clone(), &[], None).expect("beyond-64-bit payload"),
+            beyond
+        );
+        // A float payload fails with the non-nullable path's text; it never
+        // truncates (1.5 must not become 1).
+        for value in [Value::Float(1.5), Value::Float(3.0)] {
+            let error = convert_ty(build, value, &[], None).expect_err("float payload");
+            assert_valor_to_numerus_failure(&error);
+        }
+        // `⊥` supplies the fallback on the nullable path, as on the
+        // non-nullable one.
+        assert_eq!(
+            convert_ty(
+                build,
+                Value::Float(1.0),
+                &[],
+                Some(MirOperand::Constant(MirConstant::Int(9))),
+            )
+            .expect("recovered"),
+            Value::Int(9)
+        );
+    }
+    // Side by side: nullable and non-nullable report the identical fault.
+    let nullable = convert_ty(
+        |types: &mut TypeTable| (nullable_valor(types, false), inf_ty(types)),
+        Value::Float(1.5),
+        &[],
+        None,
+    )
+    .expect_err("nullable float");
+    let non_nullable = convert(valor_type(), inf_type(), Value::Float(1.5), &[], None)
+        .expect_err("non-nullable float");
+    assert_eq!(nullable.issue, non_nullable.issue);
+    assert_eq!(nullable.message, non_nullable.message);
+    assert_eq!(nullable.code, non_nullable.code);
 }
 
 #[test]
