@@ -386,7 +386,7 @@ impl Parser {
                     .with_arg("issue", "conversio_assign_await_unsupported"),
             );
         }
-        self.expect(&TokenKind::Assign, "expected '←' after awaited binding")?;
+        self.expect_issue(&TokenKind::Assign, "awaited_binding_assignment")?;
         let init = Some(Box::new(self.parse_expression()?));
 
         Ok(StmtKind::Var(VarDecl {
@@ -515,7 +515,7 @@ impl Parser {
 
     fn parse_array_binding_pattern(&mut self) -> Result<BindingPattern, ParseError> {
         let start = self.current_span();
-        self.expect(&TokenKind::LBracket, "expected '['")?;
+        self.expect_issue(&TokenKind::LBracket, "array_binding_pattern_start")?;
 
         let mut elements = Vec::new();
         let mut rest = None;
@@ -574,7 +574,7 @@ impl Parser {
             }
         }
 
-        self.expect(&TokenKind::RBracket, "expected ']' after pattern")?;
+        self.expect_issue(&TokenKind::RBracket, "array_binding_pattern_end")?;
         let span = start.merge(self.previous_span());
         Ok(BindingPattern::Array {
             elements,
@@ -585,7 +585,7 @@ impl Parser {
 
     fn parse_object_binding_pattern(&mut self) -> Result<BindingPattern, ParseError> {
         let start = self.current_span();
-        self.expect(&TokenKind::LBrace, "expected '{'")?;
+        self.expect_issue(&TokenKind::LBrace, "object_binding_pattern_start")?;
 
         let mut fields = Vec::new();
         let mut rest = None;
@@ -633,7 +633,7 @@ impl Parser {
             }
         }
 
-        self.expect(&TokenKind::RBrace, "expected '}' after pattern")?;
+        self.expect_issue(&TokenKind::RBrace, "object_binding_pattern_end")?;
         let span = start.merge(self.previous_span());
         Ok(BindingPattern::Object {
             fields,
@@ -656,9 +656,9 @@ impl Parser {
         let name = self.parse_function_name()?;
         let type_params = self.parse_generic_params()?;
 
-        self.expect(&TokenKind::LParen, "expected '(' after function name")?;
+        self.expect_issue(&TokenKind::LParen, "function_declaration_parameters_start")?;
         let params = self.parse_param_list()?;
-        self.expect(&TokenKind::RParen, "expected ')' after parameters")?;
+        self.expect_issue(&TokenKind::RParen, "function_declaration_parameters_end")?;
 
         let modifiers = self.parse_func_modifiers()?;
 
@@ -887,7 +887,7 @@ impl Parser {
         // completeness check can claim it (mirrors `parse_block`).
         let end_trivia = self.parse_block_end_trivia();
 
-        self.expect(&TokenKind::RBrace, "expected '}' after class body")?;
+        self.expect_issue(&TokenKind::RBrace, "class_body_end")?;
 
         Ok(StmtKind::Class(ClassDecl {
             name,
@@ -1074,7 +1074,7 @@ impl Parser {
         let name = self.parse_decl_name()?;
         let type_params = self.parse_generic_params()?;
 
-        self.expect(&TokenKind::LBrace, "expected '{'")?;
+        self.expect_issue(&TokenKind::LBrace, "interface_body_start")?;
 
         let mut methods = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
@@ -1085,9 +1085,9 @@ impl Parser {
             self.expect_keyword_ident(TokenKind::Functio, "expected 'functio'")?;
             let method_name = self.parse_member_ident()?;
 
-            self.expect(&TokenKind::LParen, "expected '('")?;
+            self.expect_issue(&TokenKind::LParen, "interface_method_parameters_start")?;
             let params = self.parse_param_list()?;
-            self.expect(&TokenKind::RParen, "expected ')'")?;
+            self.expect_issue(&TokenKind::RParen, "interface_method_parameters_end")?;
 
             let modifiers = self.parse_func_modifiers()?;
             let posture = self.parse_callable_posture();
@@ -1117,7 +1117,7 @@ impl Parser {
             });
         }
 
-        self.expect(&TokenKind::RBrace, "expected '}'")?;
+        self.expect_issue(&TokenKind::RBrace, "interface_body_end")?;
 
         Ok(StmtKind::Interface(InterfaceDecl {
             name,
@@ -1131,7 +1131,7 @@ impl Parser {
         self.expect_keyword_ident(TokenKind::Typus, "expected 'typus'")?;
         let name = self.parse_decl_name()?;
         let type_params = self.parse_generic_params()?;
-        self.expect(&TokenKind::Eq, "expected '='")?;
+        self.expect_issue(&TokenKind::Eq, "type_alias_value_separator")?;
         let ty = self.parse_type()?;
 
         Ok(StmtKind::TypeAlias(TypeAliasDecl {
@@ -1176,7 +1176,7 @@ impl Parser {
             .with_arg("issue", "schema_inheritance"));
         }
 
-        self.expect(&TokenKind::LBrace, "expected '{'")?;
+        self.expect_issue(&TokenKind::LBrace, "schema_body_start")?;
 
         let mut columns = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
@@ -1254,7 +1254,7 @@ impl Parser {
         // completeness check can claim it (mirrors `parse_class_decl`).
         let end_trivia = self.parse_block_end_trivia();
 
-        self.expect(&TokenKind::RBrace, "expected '}' after schema body")?;
+        self.expect_issue(&TokenKind::RBrace, "schema_body_end")?;
 
         Ok(StmtKind::Schema(SchemaDecl {
             name,
@@ -1275,7 +1275,7 @@ impl Parser {
         let name = self.parse_decl_name()?;
         self.reject_sum_type_implet()?;
 
-        self.expect(&TokenKind::LBrace, "expected '{'")?;
+        self.expect_issue(&TokenKind::LBrace, "enum_body_start")?;
 
         let mut members = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
@@ -1365,7 +1365,7 @@ impl Parser {
             }
         }
 
-        self.expect(&TokenKind::RBrace, "expected '}'")?;
+        self.expect_issue(&TokenKind::RBrace, "enum_body_end")?;
 
         Ok(StmtKind::Enum(EnumDecl { name, members }))
     }
@@ -1383,7 +1383,7 @@ impl Parser {
         let type_params = self.parse_generic_params()?;
         self.reject_sum_type_implet()?;
 
-        self.expect(&TokenKind::LBrace, "expected '{'")?;
+        self.expect_issue(&TokenKind::LBrace, "union_body_start")?;
 
         let mut shared_fields = Vec::new();
         let mut variants = Vec::new();
@@ -1453,7 +1453,7 @@ impl Parser {
                     });
                     self.reject_declaration_block_comma("discretio_payload")?;
                 }
-                self.expect(&TokenKind::RBrace, "expected '}'")?;
+                self.expect_issue(&TokenKind::RBrace, "union_variant_fields_end")?;
                 fields
             } else {
                 Vec::new()
@@ -1476,7 +1476,7 @@ impl Parser {
             }
         }
 
-        self.expect(&TokenKind::RBrace, "expected '}'")?;
+        self.expect_issue(&TokenKind::RBrace, "union_body_end")?;
 
         Ok(StmtKind::Union(UnionDecl {
             name,
@@ -1641,7 +1641,7 @@ impl Parser {
     fn parse_import_record(
         &mut self,
     ) -> Result<(radix_lexer::Symbol, Visibility, ImportKind), ParseError> {
-        self.expect(&TokenKind::LBrace, "expected '{' after importa")?;
+        self.expect_issue(&TokenKind::LBrace, "import_record_start")?;
 
         let mut path = None;
         let mut path_span = None;
@@ -1653,7 +1653,7 @@ impl Parser {
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
             let field = self.parse_import_field_name()?;
             let field_name = self.interner.resolve(field.name).to_owned();
-            self.expect(&TokenKind::Eq, "expected '=' in import field")?;
+            self.expect_issue(&TokenKind::Eq, "import_field_value_separator")?;
 
             match field_name.as_str() {
                 "ex" => {
@@ -1682,7 +1682,7 @@ impl Parser {
             }
         }
 
-        self.expect(&TokenKind::RBrace, "expected '}' after import fields")?;
+        self.expect_issue(&TokenKind::RBrace, "import_record_end")?;
 
         let Some(path) = path else {
             return Err(self.invalid_import_error("missing_import_source"));
@@ -1960,11 +1960,11 @@ impl Parser {
         let name = self.parse_string()?;
         let modifiers = self.parse_test_modifiers()?;
 
-        self.expect(&TokenKind::LBrace, "expected '{'")?;
+        self.expect_issue(&TokenKind::LBrace, "probandum_body_start")?;
 
         let body = self.parse_probandum_body()?;
 
-        self.expect(&TokenKind::RBrace, "expected '}'")?;
+        self.expect_issue(&TokenKind::RBrace, "probandum_body_end")?;
 
         let span = start.merge(self.previous_span());
         Ok(StmtKind::Probandum(ProbandumDecl {
@@ -2373,14 +2373,14 @@ impl Parser {
 
     fn parse_braced_annotation(&mut self, name: Ident) -> Result<AnnotationKind, ParseError> {
         let family = self.interner.resolve(name.name).to_owned();
-        self.expect(&TokenKind::LBrace, "expected '{' after annotation name")?;
+        self.expect_issue(&TokenKind::LBrace, "annotation_fields_start")?;
 
         let mut fields = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
             let field_start = self.current_span();
             let field_name = self.parse_annotation_field_name()?;
             let field_name_str = self.interner.resolve(field_name.name).to_owned();
-            self.expect(&TokenKind::Eq, "expected '=' in annotation field")?;
+            self.expect_issue(&TokenKind::Eq, "annotation_field_value_separator")?;
 
             let value = if family == "annotatio" && field_name_str == "target" {
                 self.parse_annotatio_target_value()?
@@ -2402,7 +2402,7 @@ impl Parser {
             }
         }
 
-        self.expect(&TokenKind::RBrace, "expected '}' after annotation fields")?;
+        self.expect_issue(&TokenKind::RBrace, "annotation_fields_end")?;
         Ok(AnnotationKind::Braced(BracedAnnotation { name, fields }))
     }
 
@@ -2586,14 +2586,14 @@ impl Parser {
     }
 
     fn parse_braced_nucleum_annotation(&mut self) -> Result<AnnotationKind, ParseError> {
-        self.expect(&TokenKind::LBrace, "expected '{' after annotation name")?;
+        self.expect_issue(&TokenKind::LBrace, "nucleum_annotation_fields_start")?;
 
         let mut fragment = false;
         let mut saw_fragment_field = false;
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
             let field_name = self.parse_annotation_field_name()?;
             let field_name_str = self.interner.resolve(field_name.name).to_owned();
-            self.expect(&TokenKind::Eq, "expected '=' in annotation field")?;
+            self.expect_issue(&TokenKind::Eq, "nucleum_annotation_field_value_separator")?;
 
             match field_name_str.as_str() {
                 "fragment" => {
@@ -2616,7 +2616,7 @@ impl Parser {
             }
         }
 
-        self.expect(&TokenKind::RBrace, "expected '}' after annotation fields")?;
+        self.expect_issue(&TokenKind::RBrace, "nucleum_annotation_fields_end")?;
         Ok(AnnotationKind::Nucleum(NucleumAnnotation {
             is_fragment: fragment,
             braced: true,
@@ -2992,7 +2992,7 @@ impl Parser {
 
     /// Block body beneath the depth budget; see [`Parser::parse_block`].
     fn parse_block_body(&mut self, start: Span) -> Result<BlockStmt, ParseError> {
-        self.expect(&TokenKind::LBrace, "expected '{'")?;
+        self.expect_issue(&TokenKind::LBrace, "block_start")?;
 
         let mut stmts = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() && !self.budget_exhausted {
@@ -3031,7 +3031,7 @@ impl Parser {
         // completeness check can claim it.
         let end_trivia = self.parse_block_end_trivia();
 
-        self.expect(&TokenKind::RBrace, "expected '}'")?;
+        self.expect_issue(&TokenKind::RBrace, "block_end")?;
 
         let span = start.merge(self.previous_span());
         Ok(BlockStmt {
@@ -3120,7 +3120,7 @@ impl Parser {
             }
         }
 
-        self.expect(&TokenKind::GtAscii, "expected '>' after generic parameters")?;
+        self.expect_issue(&TokenKind::GtAscii, "generic_parameters_end")?;
         Ok(params)
     }
 
@@ -3141,7 +3141,7 @@ impl Parser {
                     break;
                 }
             }
-            self.expect(&TokenKind::GtAscii, "expected '>'")?;
+            self.expect_issue(&TokenKind::GtAscii, "contract_type_arguments_end")?;
         }
         let span = name.span.merge(self.previous_span());
         Ok(ContractRefExpr { name, args, span })
