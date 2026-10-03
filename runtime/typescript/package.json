@@ -29,6 +29,6 @@
   ],
   "private": true,
   "scripts": {
-    "test": "node --test dec.test.ts display.test.ts exact.test.ts format.test.ts inf.test.ts regex.test.ts"
+    "test": "node --test dec.test.ts display.test.ts exact.test.ts format.test.ts inf.test.ts regex.test.ts prototype-free.test.ts"
   }
 }
