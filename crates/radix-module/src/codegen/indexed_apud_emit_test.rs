@@ -70,7 +70,7 @@ fn ts_builds_value_keyed_tuple_map() {
     assert!(lista.contains("for (const [i, x] of (xs).entries())"), "{lista}");
     let composite = emit(Target::HirTypeScript, COMPOSITE);
     assert!(
-        composite.contains("new FaberTupleMap<[string, number], number>()"),
+        composite.contains("new tuple.TupleMap<[string, number], number>()"),
         "{composite}"
     );
     assert!(composite.contains("for (const [[regio, annus], v] of (sales))"), "{composite}");
