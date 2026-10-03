@@ -61,6 +61,8 @@ impl Parser {
         if self.expression_contexts == 0 {
             self.folded_operators = 0;
         }
+        let previous_conversio_postfix_enabled = self.conversio_postfix_enabled;
+        self.conversio_postfix_enabled = true;
         self.expression_contexts = self.expression_contexts.saturating_add(1);
         let result = self.nested(
             ParseErrorKind::ExpressionInvalid,
@@ -68,6 +70,7 @@ impl Parser {
             Self::parse_assignment,
         );
         self.expression_contexts = self.expression_contexts.saturating_sub(1);
+        self.conversio_postfix_enabled = previous_conversio_postfix_enabled;
         result
     }
 
@@ -631,7 +634,11 @@ impl Parser {
 
     /// EBNF `additive` for range bounds — excludes postfix `↦` so `0‥10 ↦ T` parses as conversio.
     fn parse_range_bound(&mut self) -> Result<Expr, ParseError> {
-        self.parse_additive_inner(false)
+        let previous = self.conversio_postfix_enabled;
+        self.conversio_postfix_enabled = false;
+        let result = self.parse_additive_inner();
+        self.conversio_postfix_enabled = previous;
+        result
     }
 
     /// Parse additive arithmetic and infix extrema at one left-associative tier.
@@ -642,9 +649,9 @@ impl Parser {
     /// WHY: `⤒` and `⤓` are pure arithmetic extrema, not multiplicative
     /// operators. Keeping them in this loop makes `a ⤒ b ⤓ c` left-nested and
     /// leaves the operator identity available for D3's semantic lowering.
-    fn parse_additive_inner(&mut self, allow_conversio: bool) -> Result<Expr, ParseError> {
+    fn parse_additive_inner(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        let mut left = self.parse_multiplicative_inner(allow_conversio)?;
+        let mut left = self.parse_multiplicative_inner()?;
 
         loop {
             let op = match self.peek().kind {
@@ -655,7 +662,7 @@ impl Parser {
                 _ => break,
             };
             self.advance();
-            let right = self.parse_multiplicative_inner(allow_conversio)?;
+            let right = self.parse_multiplicative_inner()?;
             left = self.binary_expr(start, left, op, right)?;
         }
 
@@ -673,9 +680,9 @@ impl Parser {
     /// `prefix + item vel ""` and `scale * factor vel 1` both default only the
     /// adjacent term. The `vel` `RHS` may complete an interval constructor
     /// (`0‥0`) so fallback ranges are not split as `(x vel 0)‥0`.
-    fn parse_multiplicative_inner(&mut self, allow_conversio: bool) -> Result<Expr, ParseError> {
+    fn parse_multiplicative_inner(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        let mut left = self.parse_coalesce_inner(allow_conversio)?;
+        let mut left = self.parse_coalesce_inner()?;
 
         loop {
             let op = match self.peek().kind {
@@ -691,7 +698,7 @@ impl Parser {
                 _ => break,
             };
             self.advance();
-            let right = self.parse_coalesce_inner(allow_conversio)?;
+            let right = self.parse_coalesce_inner()?;
             let binary = self.binary_expr(start, left, op, right)?;
             left = self.reassociate_gradient_selection(binary);
         }
@@ -741,13 +748,13 @@ impl Parser {
     }
 
     /// Local nullable elimination (`vel`). Left-associative: `a vel b vel c`.
-    fn parse_coalesce_inner(&mut self, allow_conversio: bool) -> Result<Expr, ParseError> {
+    fn parse_coalesce_inner(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        let mut left = self.parse_unary_inner(allow_conversio)?;
+        let mut left = self.parse_unary_inner()?;
 
         while self.check_keyword_ident(TokenKind::Vel) {
             self.advance();
-            let right = self.parse_vel_rhs(allow_conversio)?;
+            let right = self.parse_vel_rhs()?;
             left = self.binary_expr(start, left, BinOp::Coalesce, right)?;
         }
 
@@ -758,9 +765,9 @@ impl Parser {
     ///
     /// Interval bounds stay unary-tight so broad bound expressions require
     /// parentheses: `maybeRange vel (lo + 1‥hi - 1)`.
-    fn parse_vel_rhs(&mut self, allow_conversio: bool) -> Result<Expr, ParseError> {
+    fn parse_vel_rhs(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        let left = self.parse_unary_inner(allow_conversio)?;
+        let left = self.parse_unary_inner()?;
 
         let kind = if self.check(&TokenKind::DotDot) {
             self.advance();
@@ -779,9 +786,9 @@ impl Parser {
         };
 
         if let Some(kind) = kind {
-            let end = Box::new(self.parse_unary_inner(allow_conversio)?);
+            let end = Box::new(self.parse_unary_inner()?);
             let step = if self.eat_keyword_ident(TokenKind::Per) {
-                Some(Box::new(self.parse_unary_inner(allow_conversio)?))
+                Some(Box::new(self.parse_unary_inner()?))
             } else {
                 None
             };
@@ -810,10 +817,10 @@ impl Parser {
     ///
     /// EDGE: `finge` is a unary-position variant constructor, not a prefix operator.
     fn parse_unary(&mut self) -> Result<Expr, ParseError> {
-        self.parse_unary_inner(true)
+        self.parse_unary_inner()
     }
 
-    fn parse_unary_inner(&mut self, allow_conversio: bool) -> Result<Expr, ParseError> {
+    fn parse_unary_inner(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
 
         self.reject_retired_literal_prefix_predicate()?;
@@ -834,7 +841,7 @@ impl Parser {
             let operand = Box::new(self.nested(
                 ParseErrorKind::ExpressionInvalid,
                 start,
-                |parser| parser.parse_unary_inner(allow_conversio),
+                |parser| parser.parse_unary_inner(),
             )?);
             let span = start.merge(self.previous_span());
             let id = self.next_id();
@@ -849,7 +856,7 @@ impl Parser {
             return self.parse_variant_expr();
         }
 
-        self.parse_postfix_inner(allow_conversio)
+        self.parse_postfix_inner()
     }
 
     fn can_start_expression(kind: &TokenKind) -> bool {
@@ -1006,7 +1013,7 @@ impl Parser {
     /// consumes its optional selector bracket here, before the loop resumes, so
     /// later postfix operations apply to the gradient result — never to the
     /// selector list.
-    fn parse_postfix_inner(&mut self, allow_conversio: bool) -> Result<Expr, ParseError> {
+    fn parse_postfix_inner(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         let mut expr = self.parse_primary()?;
 
@@ -1014,6 +1021,8 @@ impl Parser {
             if self.budget_exhausted {
                 return Err(self.spent_budget_error(ParseErrorKind::ExpressionInvalid, start));
             }
+            let has_conversio_postfix =
+                self.conversio_postfix_enabled && self.check_keyword(TokenKind::Conversio);
             let has_postfix = self.check(&TokenKind::LtAscii)
                 || self.check(&TokenKind::LParen)
                 || self.check(&TokenKind::Dot)
@@ -1027,7 +1036,7 @@ impl Parser {
                 || self.check(&TokenKind::BangBracket)
                 || self.check(&TokenKind::BangParen)
                 || self.check_keyword(TokenKind::Verte)
-                || (allow_conversio && self.check_keyword(TokenKind::Conversio));
+                || has_conversio_postfix;
             if has_postfix {
                 self.charge_fold(start)?;
             }
@@ -1095,7 +1104,7 @@ impl Parser {
                 )?;
             } else if self.check_keyword(TokenKind::Verte) {
                 expr = self.parse_verte_postfix(start, expr)?;
-            } else if allow_conversio && self.check_keyword(TokenKind::Conversio) {
+            } else if has_conversio_postfix {
                 expr = self.parse_conversio_postfix(expr, start)?;
             } else {
                 break;
@@ -2690,7 +2699,11 @@ impl Parser {
         }
         let start = self.current_span();
         self.advance();
-        let source = self.parse_postfix_inner(false)?;
+        let previous = self.conversio_postfix_enabled;
+        self.conversio_postfix_enabled = false;
+        let parsed_source = self.parse_postfix_inner();
+        self.conversio_postfix_enabled = previous;
+        let source = parsed_source?;
         if self.check_keyword_ident(TokenKind::Ex) && !self.raw_newline_before_next_word() {
             return Err(
                 ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
