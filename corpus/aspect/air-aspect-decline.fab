@@ -26,6 +26,9 @@ locale = "en"
 # See also: radix-lane, itera, ab, air-aspect-admit
 # =============================================================================
 
+# Declaration-only proof fixture: the aspect report inspects these functions;
+# this source intentionally has no executable entry point.
+#
 # Declined Line 1 shape: the range bounds are runtime values, so no concrete
 # lanes exist and no unroll obligation is recorded.
 fn deambulatio(int n) → int {

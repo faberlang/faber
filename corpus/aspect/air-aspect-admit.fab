@@ -31,6 +31,9 @@ locale = "en"
 # See also: itera, ab, air-aspect-decline
 # =============================================================================
 
+# Declaration-only proof fixture: the aspect report inspects these functions;
+# this source intentionally has no executable entry point.
+#
 # Admitted Line 1 shape: literal range gives concrete lanes (route ab, 4 lanes).
 fn unroll_admit() → void {
     for range 0‥4 const i {
