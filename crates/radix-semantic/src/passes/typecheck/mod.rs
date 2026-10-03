@@ -398,6 +398,8 @@ pub(crate) struct TypeChecker<'a> {
     pub(crate) current_shape_fields: Vec<Symbol>,
     /// Runtime carrier axes that witness generic size symbols in this function.
     pub(crate) current_shape_param_sources: FxHashMap<Symbol, IndexId>,
+    /// Caller-owned binding witnesses used inside a nested call's index space.
+    pub(crate) current_shape_param_call_sources: FxHashMap<Symbol, IndexId>,
     /// Runtime shape relations discovered by typechecking.
     pub(crate) shape_obligations: ShapeObligationTable,
     /// Resolved edge-policy callbacks selected by tensor `limes` calls.
@@ -740,6 +742,7 @@ impl<'a> TypeChecker<'a> {
             current_shape_argument: None,
             current_shape_fields: Vec::new(),
             current_shape_param_sources: FxHashMap::default(),
+            current_shape_param_call_sources: FxHashMap::default(),
             shape_obligations: ShapeObligationTable::default(),
             tensor_edge_policies: crate::TensorEdgePolicyTable::default(),
             tensor_edge_generic_calls: Vec::new(),

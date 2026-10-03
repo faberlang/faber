@@ -84,6 +84,9 @@ mod monomorphize;
 mod package_instantiate;
 mod place;
 mod runtime;
+#[cfg(test)]
+#[path = "lower/runtime_shape_test.rs"]
+mod runtime_shape_tests;
 mod stmt;
 mod tensor_lift;
 mod union_dispatch;

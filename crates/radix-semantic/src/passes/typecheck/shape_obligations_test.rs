@@ -474,6 +474,20 @@ fn affine_record_field_size_binding_uses_formal_axes_and_checks_repeats() {
             axis: 0
         }) if fields.as_slice() == &[grid]
     ));
+
+    checker.current_shape_call = Some(HirId(44));
+    let call_witness = checker.runtime_substitute_shape_params(param_n);
+    let IndexExpr::Affine { base, offset: 1 } = checker.types.get_index(call_witness) else {
+        panic!("caller record witness should retain the inverse affine offset");
+    };
+    assert!(
+        matches!(
+            checker.types.get_index(*base),
+            IndexExpr::Runtime(RuntimeExtentId::TensorFieldAxis { binding: DefId(11), fields, axis: 0 })
+                if fields.as_slice() == &[grid]
+        ),
+        "a nested call reads the caller record binding, not callee parameter 0"
+    );
 }
 
 fn tensor_param(

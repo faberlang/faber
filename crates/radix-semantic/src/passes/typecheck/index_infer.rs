@@ -292,11 +292,17 @@ impl TypeChecker<'_> {
 
     pub(super) fn runtime_substitute_shape_params(&mut self, index: IndexId) -> IndexId {
         match self.types.get_index(index).clone() {
-            IndexExpr::Param(symbol) => self
-                .current_shape_param_sources
-                .get(&symbol)
-                .copied()
-                .unwrap_or(index),
+            IndexExpr::Param(symbol) => {
+                // A formal ordinal at a call boundary denotes the callee's
+                // argument, not this function's parameter. Caller size symbols
+                // must retain their carrier's binding identity instead.
+                let sources = if self.current_shape_call.is_some() {
+                    &self.current_shape_param_call_sources
+                } else {
+                    &self.current_shape_param_sources
+                };
+                sources.get(&symbol).copied().unwrap_or(index)
+            }
             IndexExpr::Affine { base, offset } => {
                 let base = self.runtime_substitute_shape_params(base);
                 radix_types::add_index_constant(self.types, base, offset).unwrap_or(index)
@@ -360,22 +366,38 @@ impl TypeChecker<'_> {
                 if self.current_shape_param_sources.contains_key(&symbol) {
                     continue;
                 }
+                let Some(inverse) = offset.checked_neg() else {
+                    continue;
+                };
                 let axis_source = runtime_formal_axis(*parameter, fields, axis as u32);
                 let axis_witness = self.types.intern_index(IndexExpr::Runtime(axis_source));
-                let witness = if offset == 0 {
-                    axis_witness
+                let Ok(witness) =
+                    radix_types::add_index_constant(self.types, axis_witness, inverse)
+                else {
+                    continue;
+                };
+                let binding = params[*parameter as usize].def_id;
+                let call_source = if fields.is_empty() {
+                    RuntimeExtentId::TensorBindingAxis {
+                        binding,
+                        axis: axis as u32,
+                    }
                 } else {
-                    let Some(inverse) = offset.checked_neg() else {
-                        continue;
-                    };
-                    let Ok(witness) =
-                        radix_types::add_index_constant(self.types, axis_witness, inverse)
-                    else {
-                        continue;
-                    };
-                    witness
+                    RuntimeExtentId::TensorFieldAxis {
+                        binding,
+                        fields: fields.clone(),
+                        axis: axis as u32,
+                    }
+                };
+                let call_axis = self.types.intern_index(IndexExpr::Runtime(call_source));
+                let Ok(call_witness) =
+                    radix_types::add_index_constant(self.types, call_axis, inverse)
+                else {
+                    continue;
                 };
                 self.current_shape_param_sources.insert(symbol, witness);
+                self.current_shape_param_call_sources
+                    .insert(symbol, call_witness);
                 self.record_function_size_binding(
                     u32::try_from(ordinal).unwrap_or(u32::MAX),
                     witness,
