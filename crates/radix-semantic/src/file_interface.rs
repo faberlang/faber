@@ -4,12 +4,13 @@
 //! public exports without carrying producer-local `TypeId` or `DefId` values.
 //! Importers remap structural snapshots into their own semantic `TypeTable`.
 
+pub use crate::file_interface_default::InterfaceFieldDefault;
 use crate::{
     FuncSig, GenericParamDescriptor, GenericParamSort, IndexExpr, IndexId, InstansPrecision,
     NumericWidth, ParamType, Primitive, Resolver, SemanticGenericParamDefault, SemanticMutability,
     SemanticParamMode, SymbolKind, Type, TypeId, TypeParamConstraint, TypeTable,
 };
-use radix_hir::{DefId, HirExpression};
+use radix_hir::DefId;
 use radix_lexer::Interner;
 use radix_syntax::GenericParamKind;
 use radix_types::{BuiltinTensorEdgePolicy, FloatPolicy};
@@ -235,7 +236,7 @@ pub struct InterfaceStructField {
     pub optional: bool,
     pub required: bool,
     /// Producer-side compile-time initializer for imported class construction.
-    pub default: Option<HirExpression>,
+    pub default: Option<InterfaceFieldDefault>,
     /// Authored genus field modifier (D16.1); `None` for unmarked and
     /// variant/union payload fields.
     pub modifier: Option<radix_syntax::FieldModifier>,
@@ -581,6 +582,7 @@ pub enum FileInterfaceError {
     },
     InferenceTypeUnsupported,
     ErrorTypeUnsupported,
+    FieldDefaultUnsupported,
     IndexInferenceUnsupported,
     TensorEdgePolicyRequirementUnsupported,
     InvalidIndexArithmetic(radix_types::IndexArithmeticError),

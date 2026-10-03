@@ -11,10 +11,10 @@ use radix_module::file_interface::{
     FileExport, FileExportKind, FileInterface, FileInterfaceError, InterfaceAliasExport,
     InterfaceAnnotationContract, InterfaceAnnotationContractField, InterfaceBodyChannel,
     InterfaceDeviceContract, InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceEnumVariant,
-    InterfaceGenericParam, InterfaceLibraryIdentity, InterfaceMethodExport, InterfaceNominalExport,
-    InterfaceQualifiedIdentity, InterfaceStructExport, InterfaceStructField,
-    InterfaceTensorEdgePolicyRequirement, snapshot_interface_callable_with_identity,
-    snapshot_interface_type_with_identity,
+    InterfaceFieldDefault, InterfaceGenericParam, InterfaceLibraryIdentity, InterfaceMethodExport,
+    InterfaceNominalExport, InterfaceQualifiedIdentity, InterfaceStructExport,
+    InterfaceStructField, InterfaceTensorEdgePolicyRequirement,
+    snapshot_interface_callable_with_identity, snapshot_interface_type_with_identity,
 };
 use radix_module::hir::{
     DefId, HirConst, HirEnum, HirFunction, HirInterface, HirInterfaceMethod, HirItemKind,
@@ -456,7 +456,20 @@ fn snapshot_struct(
                 .map_err(|err| interface_error(file_label, name, err))?,
                 optional: field.sponte,
                 required: !field.sponte && field.init.is_none(),
-                default: field.init.clone(),
+                default: field
+                    .init
+                    .as_ref()
+                    .map(|init| {
+                        InterfaceFieldDefault::snapshot(
+                            init,
+                            &analysis.types,
+                            &analysis.interner,
+                            &analysis.resolver,
+                            export_identity.map(identity_for).as_ref(),
+                        )
+                        .map_err(|err| interface_error(file_label, name, err))
+                    })
+                    .transpose()?,
                 modifier: field.modifier,
                 visibility: hir_member_visibility(&field.annotations, &analysis.interner),
             })
