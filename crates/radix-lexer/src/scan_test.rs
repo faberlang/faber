@@ -2472,13 +2472,13 @@ fn decimal_literal_with_exponent_carries_text() {
 }
 
 // ---------------------------------------------------------------------------
-// KCM-02: closure-modifier identities are locale-sealed at the reader-key
-// recording step. Pack spellings resolve to their Latin identity; spellings
-// the surface does not declare record nothing and cannot claim a slot later.
+// Keyword identities are locale-sealed at the reader-key recording step.
+// Pack spellings resolve to their Latin identity; spellings the surface
+// does not declare record nothing and cannot claim a slot later.
 // ---------------------------------------------------------------------------
 
-/// English-style surface: declares only `kernel`/`free` spellings for the
-/// `nucleum`/`libera` closure-modifier identities.
+/// English-style surface: declares only the `kernel` spelling for the
+/// `nucleum` annotation identity.
 struct EnModifierSurfacePack;
 
 impl KeywordPack for EnModifierSurfacePack {
@@ -2493,7 +2493,6 @@ impl KeywordPack for EnModifierSurfacePack {
     fn keyword_latin_key(&self, text: &str) -> Option<&str> {
         match text {
             "kernel" => Some("nucleum"),
-            "free" => Some("libera"),
             _ => None,
         }
     }
@@ -2504,13 +2503,13 @@ impl KeywordPack for EnModifierSurfacePack {
 }
 
 #[test]
-fn en_surface_records_only_pack_declared_modifier_spellings() {
-    let result = lex_with_locale_pack("kernel free nucleum libera", &EnModifierSurfacePack);
+fn en_surface_records_only_pack_declared_keyword_spellings() {
+    let result = lex_with_locale_pack("kernel nucleum", &EnModifierSurfacePack);
     assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
-    for token in result.tokens.iter().take(4) {
+    for token in result.tokens.iter().take(2) {
         assert!(
             matches!(token.kind, TokenKind::Ident(_)),
-            "modifier spellings must lex as identifiers"
+            "keyword spellings must lex as identifiers"
         );
     }
     assert_eq!(
@@ -2518,28 +2517,18 @@ fn en_surface_records_only_pack_declared_modifier_spellings() {
         Some(&"nucleum".to_owned()),
         "en `kernel` must resolve to the nucleum identity"
     );
-    assert_eq!(
-        result.reader_keyword_latin_keys.get("free"),
-        Some(&"libera".to_owned()),
-        "en `free` must resolve to the libera identity"
-    );
     assert!(
         !result.reader_keyword_latin_keys.contains_key("nucleum"),
         "undeclared Latin `nucleum` must not claim the identity on the en surface"
     );
-    assert!(
-        !result.reader_keyword_latin_keys.contains_key("libera"),
-        "undeclared Latin `libera` must not claim the identity on the en surface"
-    );
 }
 
 #[test]
-fn latin_surface_records_only_latin_modifier_identities() {
+fn latin_surface_records_only_latin_keyword_identities() {
     // Registry-direct (`la`/no-pack) surface: `nucleum` is token-backed and
-    // records its Latin key; `libera` is tokenless contextual (claimed by the
-    // parser through the registry, never through a recorded key); the English
-    // spellings are ordinary identifiers with no identity.
-    let result = lex("kernel free nucleum libera");
+    // records its Latin key; the English spelling is an ordinary identifier
+    // with no identity.
+    let result = lex("kernel nucleum");
     assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
     assert_eq!(
         result.reader_keyword_latin_keys.get("nucleum"),
@@ -2549,14 +2538,6 @@ fn latin_surface_records_only_latin_modifier_identities() {
     assert!(
         !result.reader_keyword_latin_keys.contains_key("kernel"),
         "`kernel` must not claim the nucleum identity on the la surface"
-    );
-    assert!(
-        !result.reader_keyword_latin_keys.contains_key("free"),
-        "`free` must not claim the libera identity on the la surface"
-    );
-    assert!(
-        !result.reader_keyword_latin_keys.contains_key("libera"),
-        "tokenless `libera` is parser-claimed, never key-recorded"
     );
 }
 

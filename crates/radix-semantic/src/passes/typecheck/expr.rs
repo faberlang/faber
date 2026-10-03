@@ -636,14 +636,9 @@ impl TypeChecker<'_> {
                 default,
                 err_ty,
             } => self.check_call_default(body, default, err_ty, expected, expr.span),
-            HirExpressionKind::Clausura(params, ret, err, body, modifier) => self.check_closure(
-                params,
-                ret.as_mut(),
-                err.as_mut(),
-                body,
-                expected,
-                *modifier,
-            ),
+            HirExpressionKind::Clausura(params, ret, err, body) => {
+                self.check_closure(params, ret.as_mut(), err.as_mut(), body, expected)
+            }
             HirExpressionKind::Cede(inner) => {
                 self.check_expr(inner);
                 self.error_issue(

@@ -432,7 +432,7 @@ impl HirVisitor for BodyVisitor<'_> {
                     self.visit_block(else_block);
                 }
             }
-            HirExpressionKind::Clausura(params, _, _, body, _) => {
+            HirExpressionKind::Clausura(params, _, _, body) => {
                 let mut nested_bound = self.bound_locals.clone();
                 for param in params {
                     nested_bound.insert(param.def_id);
@@ -471,7 +471,7 @@ impl HirVisitor for ClosureCaptureCollector {
                 }
                 walk_expr(self, expr);
             }
-            HirExpressionKind::Clausura(params, _, _, body, _) => {
+            HirExpressionKind::Clausura(params, _, _, body) => {
                 let mut nested = self.bound.clone();
                 for param in params {
                     nested.insert(param.def_id);

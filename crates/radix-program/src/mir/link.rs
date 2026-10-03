@@ -2113,7 +2113,7 @@ pub(super) fn rewrite_expr(
                 diagnostics,
             );
         }
-        HirExpressionKind::Clausura(_, _, _, body, _) => rewrite_expr(
+        HirExpressionKind::Clausura(_, _, _, body) => rewrite_expr(
             unit_path,
             body,
             interner,

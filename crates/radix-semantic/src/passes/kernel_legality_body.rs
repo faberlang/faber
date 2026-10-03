@@ -23,7 +23,6 @@ use radix_hir::{
     NucleumRole,
 };
 use radix_lexer::{Span, Symbol};
-use radix_syntax::ClosureModifier;
 use radix_types::MirKernelBuiltin;
 
 /// Check one `@ nucleum` definition. Returns the kernels it calls, for the
@@ -484,9 +483,6 @@ impl HostWalk<'_, '_> {
 impl HirVisitor for HostWalk<'_, '_> {
     fn visit_expr(&mut self, expr: &HirExpression) {
         match &expr.kind {
-            // A kernel closure is a device region inside host code: its
-            // calls are device-to-device, and its body has its own contract.
-            HirExpressionKind::Clausura(.., ClosureModifier::Nucleum) => return,
             HirExpressionKind::Call(callee, ..) => {
                 if let HirExpressionKind::Path(def_id) = &callee.kind {
                     self.check_target(expr.span, *def_id);

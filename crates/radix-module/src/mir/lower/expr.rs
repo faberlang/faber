@@ -119,14 +119,9 @@ pub(super) trait HirExpressionLoweringVisitor {
             HirExpressionKind::Ref(_, inner) => self.visit_ref_expr(inner, expr),
             HirExpressionKind::Deref(inner) => self.visit_deref_expr(inner, expr),
             HirExpressionKind::ReadLine(_) => self.visit_read_line_expr(expr),
-            HirExpressionKind::Clausura(params, ret_ty, err_ty, body, modifier) => match modifier {
-                crate::syntax::ClosureModifier::Nucleum => {
-                    self.visit_nucleum_closure_expr(params, ret_ty.as_ref(), err_ty.as_ref(), body, expr)
-                }
-                crate::syntax::ClosureModifier::None | crate::syntax::ClosureModifier::Libera => {
-                    self.visit_clausura_expr(params, ret_ty.as_ref(), err_ty.as_ref(), body, expr)
-                }
-            },
+            HirExpressionKind::Clausura(params, ret_ty, err_ty, body) => {
+                self.visit_clausura_expr(params, ret_ty.as_ref(), err_ty.as_ref(), body, expr)
+            }
             HirExpressionKind::Yield(inner) => self.visit_cede_expr(inner, expr),
             HirExpressionKind::Tacebit(inner) => self.visit_tacebit_expr(inner, expr),
             HirExpressionKind::Reddet(inner) => self.visit_reddet_expr(inner, expr),
@@ -349,14 +344,6 @@ pub(super) trait HirExpressionLoweringVisitor {
     fn visit_ref_expr(&mut self, inner: &HirExpression, expr: &HirExpression) -> Option<MirOperand>;
     fn visit_deref_expr(&mut self, inner: &HirExpression, expr: &HirExpression) -> Option<MirOperand>;
     fn visit_read_line_expr(&mut self, expr: &HirExpression) -> Option<MirOperand>;
-    fn visit_nucleum_closure_expr(
-        &mut self,
-        params: &[crate::hir::HirParam],
-        ret_ty: Option<&crate::semantic::TypeId>,
-        err_ty: Option<&crate::semantic::TypeId>,
-        body: &HirExpression,
-        expr: &HirExpression,
-    ) -> Option<MirOperand>;
     fn visit_clausura_expr(
         &mut self,
         params: &[crate::hir::HirParam],
@@ -722,17 +709,6 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
 
     fn visit_read_line_expr(&mut self, expr: &HirExpression) -> Option<MirOperand> {
         self.lower_read_line(expr)
-    }
-
-    fn visit_nucleum_closure_expr(
-        &mut self,
-        params: &[crate::hir::HirParam],
-        ret_ty: Option<&crate::semantic::TypeId>,
-        err_ty: Option<&crate::semantic::TypeId>,
-        body: &HirExpression,
-        expr: &HirExpression,
-    ) -> Option<MirOperand> {
-        self.lower_nucleum_closure_expr(params, ret_ty, err_ty, body, expr)
     }
 
     fn visit_clausura_expr(

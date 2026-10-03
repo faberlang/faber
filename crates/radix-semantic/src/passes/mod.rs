@@ -72,7 +72,6 @@ mod kernel_legality_types;
 pub mod kernel_namespace;
 pub mod kernel_requirements;
 pub mod leading_underscore;
-pub mod libera;
 pub mod lint;
 pub mod live_tuus_cursor_escape;
 pub mod local_constants;
@@ -217,10 +216,6 @@ mod kernel_requirements_test;
 #[cfg(test)]
 #[path = "kernel_namespace_test.rs"]
 mod kernel_namespace_test;
-
-#[cfg(test)]
-#[path = "libera_test.rs"]
-mod libera_test;
 
 #[cfg(test)]
 #[path = "lint_test.rs"]

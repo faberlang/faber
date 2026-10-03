@@ -844,10 +844,6 @@ pub fn analyze_with_cli(
         diagnostics.extend(e);
     }
 
-    if let Err(e) = passes::libera::analyze(&hir, &resolver, interner) {
-        diagnostics.extend(e);
-    }
-
     // `@ ad` handler legality and in-file route uniqueness (A3). AST-only,
     // so it runs whatever earlier passes reported.
     if let Err(e) = passes::ad_routes::check(program, interner) {

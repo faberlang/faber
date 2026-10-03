@@ -4310,64 +4310,6 @@ fn lowers_nested_collection_higher_order_synthetic_closures() {
 }
 
 #[test]
-fn lowers_kernel_closure_to_private_direct_kernel() {
-    let source = r"
-incipit {
-    fixum _ kernel ← (numerus value) nucleum → numerus ∴ value * 2
-    fixum numerus result ← kernel(21)
-}
-";
-    let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit(&mut unit, MirLoweringOptions::default()).expect("MIR lowering succeeds");
-    let synthetic = lowered
-        .validated
-        .program()
-        .functions
-        .iter()
-        .find(|function| function.source.is_none() && function.shader_stage == Some(MirKernelShaderStage::Compute))
-        .expect("kernel closure synthetic function");
-
-    assert!(
-        lowered.closure_environments.is_empty(),
-        "kernel closure must not create an environment"
-    );
-    let calls = lowered
-        .validated
-        .program()
-        .functions
-        .iter()
-        .flat_map(|function| &function.blocks)
-        .flat_map(|block| &block.statements)
-        .filter_map(|statement| match &statement.kind {
-            MirStatementKind::Call { callee, .. } => Some(callee),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    assert!(
-        calls
-            .iter()
-            .any(|callee| matches!(callee, MirCallee::Function(id) if *id == synthetic.id)),
-        "kernel closure call must be direct: {calls:?}"
-    );
-    assert!(
-        calls
-            .iter()
-            .all(|callee| !matches!(callee, MirCallee::Closure(_) | MirCallee::Value(_)))
-    );
-
-    let metadata = lowered
-        .device_function_metadata
-        .get(&synthetic.id)
-        .expect("synthetic kernel metadata");
-    assert_eq!(metadata.identity.parent, MirFunctionId(0));
-    assert_eq!(metadata.identity.ordinal, 0);
-    assert_eq!(metadata.role, MirDeviceRole::Kernel);
-    assert_eq!(metadata.shader_stage, MirKernelShaderStage::Compute);
-    assert_eq!(metadata.visibility, MirFunctionVisibility::Private);
-    assert_eq!(metadata.origin, MirFunctionOrigin::SyntheticKernelClosure);
-}
-
-#[test]
 fn production_named_public_kernel_metadata_reaches_device_program_selection() {
     let mut unit = analyze(
         r"
@@ -4401,60 +4343,6 @@ functio privata_helper(f32 value) → f32 {
         admitted.entry, "publica_entry",
         "the public named kernel must be the selected entry"
     );
-}
-
-#[test]
-fn production_kernel_closure_composes_named_device_leaf() {
-    let mut unit = analyze(
-        r"
-@ nucleum
-functio device_leaf(numerus value) → numerus {
-    redde value + 1
-}
-
-@ nucleum
-functio caller(numerus input) → numerus {
-    fixum _ region ← (numerus value) nucleum → numerus ∴ device_leaf(value)
-    redde region(input)
-}
-",
-    );
-    let roles = crate::mir::device_roles_from_hir(&unit.hir);
-    let lowered = lower_analyzed_unit(&mut unit, MirLoweringOptions::default())
-        .expect("a kernel closure may call a named device leaf");
-    let survivors = super::super::fragment_composition::surviving_fragment_calls_with_metadata(
-        &lowered.validated.program().functions,
-        &lowered.monomorphizations,
-        &roles,
-        &lowered.device_function_metadata,
-    );
-    assert!(
-        survivors.is_empty(),
-        "device calls must compose through the production metadata path: {survivors:?}"
-    );
-}
-
-#[test]
-fn lowers_kernel_closure_iife_to_private_direct_kernel() {
-    let mut unit = analyze(
-        r"
-incipit {
-    fixum numerus result ← ((numerus value) nucleum → numerus ∴ value * 2)(21)
-}
-",
-    );
-    let lowered = lower_analyzed_unit(&mut unit, MirLoweringOptions::default()).expect("MIR lowering succeeds");
-    let synthetic = lowered
-        .validated
-        .program()
-        .functions
-        .iter()
-        .find(|function| function.source.is_none() && function.shader_stage == Some(MirKernelShaderStage::Compute))
-        .expect("IIFE kernel closure synthetic function");
-    assert!(lowered.closure_environments.is_empty());
-    assert!(lowered.validated.program().functions.iter().flat_map(|function| &function.blocks).flat_map(|block| &block.statements).any(
-        |statement| matches!(&statement.kind, MirStatementKind::Call { callee: MirCallee::Function(id), .. } if *id == synthetic.id)
-    ));
 }
 
 #[test]
@@ -4597,7 +4485,6 @@ fn collection_callback_errors_do_not_publish_synthetic_functions() {
             Some(numerus),
             None,
             Box::new(callback_body),
-            crate::syntax::ClosureModifier::None,
         ),
         ty: None,
         span,

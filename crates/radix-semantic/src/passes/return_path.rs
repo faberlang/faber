@@ -134,7 +134,7 @@ struct ClosureReturnPathVisitor<'a> {
 
 impl HirVisitor for ClosureReturnPathVisitor<'_> {
     fn visit_expr(&mut self, expr: &HirExpression) {
-        if let HirExpressionKind::Clausura(_, ret, _, body, _) = &expr.kind {
+        if let HirExpressionKind::Clausura(_, ret, _, body) = &expr.kind {
             let Some(ret_ty) = ret else {
                 walk_expr(self, expr);
                 return;
@@ -353,7 +353,7 @@ fn contains_rumpe_expr(expr: &HirExpression) -> bool {
         }
         HirExpressionKind::Block(inner) => contains_rumpe_block(inner),
         // F-078: closures can host statements (including `rumpe`) in their body.
-        HirExpressionKind::Clausura(_, _, _, body, _) => contains_rumpe_expr(body),
+        HirExpressionKind::Clausura(_, _, _, body) => contains_rumpe_expr(body),
         _ => false,
     }
 }

@@ -412,7 +412,7 @@ impl FragmentDefinitionChecker<'_> {
                 self.check_block(body);
                 self.check_expr(default);
             }
-            HirExpressionKind::Clausura(params, _, _, body, _) => {
+            HirExpressionKind::Clausura(params, _, _, body) => {
                 self.effect(expr.span, "dynamic_function");
                 for param in params {
                     if let Some(default) = &param.default {

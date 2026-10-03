@@ -558,7 +558,7 @@ impl HirVisitor for DefiniteAssignmentChecker<'_> {
                 self.mark_assigned(*binding);
                 self.visit_block(block);
             }
-            HirExpressionKind::Clausura(params, _, _, body, _) => {
+            HirExpressionKind::Clausura(params, _, _, body) => {
                 // PRP-057: `take` avoids O(N) clone of the full state map when
                 // entering a new closure scope. The outer state is swapped out
                 // (O(1)) and restored after the body is analysed.

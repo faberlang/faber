@@ -458,7 +458,7 @@ impl AirPurityChecker<'_> {
                 self.handler_regions.pop();
                 self.check_expr(default);
             }
-            HirExpressionKind::Clausura(params, _, _, body, _) => {
+            HirExpressionKind::Clausura(params, _, _, body) => {
                 // ARC-4 rewrites higher-order capture-free combines before this
                 // walker. A closure that remains here is outside that callback
                 // surface (or was rejected with a capture-specific diagnostic).

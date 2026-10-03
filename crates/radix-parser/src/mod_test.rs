@@ -11,9 +11,9 @@ use crate::{ParseErrorKind, ParseResult, parse};
 use radix_lexer::{KeywordPack, lex_with_locale_pack};
 use radix_syntax::{
     AnnotationKind, AstMutability, AstParamMode, AwaitBindingForm, BindingPattern, CallablePosture,
-    ClassMemberKind, ClausuraBody, ClosureModifier, ExprKind, IfBody, ImportKind, IteraMode,
-    JsonValue, Literal, Pattern, PatternBind, PraeparaKind, ProbaModifier, ScribeKind, SecusClause,
-    StmtKind, TypeExprKind,
+    ClassMemberKind, ClausuraBody, ExprKind, IfBody, ImportKind, IteraMode, JsonValue, Literal,
+    Pattern, PatternBind, PraeparaKind, ProbaModifier, ScribeKind, SecusClause, StmtKind,
+    TypeExprKind,
 };
 
 fn generic_arg_type(arg: &radix_syntax::GenericArgExpr) -> &radix_syntax::TypeExpr {
@@ -4761,144 +4761,6 @@ fn conversio_assign_awaited_binding_initializer_rejects_with_await_issue() {
         "incipit {\n  variandum numerus n ↤ \"42\"\n}",
     ] {
         assert_parse_error_issue(source, "conversio_assign_await_unsupported");
-    }
-}
-
-// =============================================================================
-// CL-1 — `libera` grammar drivers (green since CL-3)
-// =============================================================================
-// Pinned red in CL-1 (422bc28bd, side branch; restored here) and turned green
-// by the CL-3 marker plumbing. The two semantic drivers in
-// radix-semantic/src/passes/typecheck_test.rs remain ignored until the CL-4
-// capture contract lands.
-
-#[test]
-fn parses_compact_libera_closure() {
-    let result = parse_ok("fixum _ summa ← (numerus a, numerus b) libera ∴ a + b");
-    let program = result.program.as_ref().expect("program");
-    let StmtKind::Var(var) = &program.statements[0].kind else {
-        panic!("expected variable declaration");
-    };
-    let ExprKind::Clausura(closure) = &var.init.as_ref().expect("initializer").kind else {
-        panic!("expected compact closure");
-    };
-    assert_eq!(closure.params.len(), 2);
-    assert_eq!(closure.modifier, ClosureModifier::Libera);
-    assert!(matches!(closure.body, ClausuraBody::Expr(_)));
-}
-
-#[test]
-fn parses_legacy_clausura_libera_closure() {
-    let result = parse_ok("fixum _ identity ← clausura numerus value libera: value");
-    let program = result.program.as_ref().expect("program");
-    let StmtKind::Var(var) = &program.statements[0].kind else {
-        panic!("expected variable declaration");
-    };
-    let ExprKind::Clausura(closure) = &var.init.as_ref().expect("initializer").kind else {
-        panic!("expected legacy clausura expression");
-    };
-    assert_eq!(closure.params.len(), 1);
-    assert_eq!(closure.modifier, ClosureModifier::Libera);
-    assert!(matches!(closure.body, ClausuraBody::Expr(_)));
-}
-
-#[test]
-fn parses_libera_before_return_clause_in_compact_and_legacy_forms() {
-    for source in [
-        "fixum _ compact ← (numerus value) libera → numerus ∴ value",
-        "fixum _ legacy ← clausura numerus value libera → numerus: value",
-    ] {
-        let result = parse_ok(source);
-        let program = result.program.as_ref().expect("program");
-        let StmtKind::Var(var) = &program.statements[0].kind else {
-            panic!("expected variable declaration");
-        };
-        let ExprKind::Clausura(closure) = &var.init.as_ref().expect("initializer").kind else {
-            panic!("expected closure expression");
-        };
-        assert_eq!(closure.modifier, ClosureModifier::Libera);
-        assert!(
-            closure.ret.is_some(),
-            "libera must precede the return clause"
-        );
-    }
-}
-
-#[test]
-fn unmarked_closures_carry_absent_marker() {
-    for source in [
-        "fixum _ compact ← (numerus value) ∴ value",
-        "fixum _ legacy ← clausura numerus value: value",
-    ] {
-        let result = parse_ok(source);
-        let program = result.program.as_ref().expect("program");
-        let StmtKind::Var(var) = &program.statements[0].kind else {
-            panic!("expected variable declaration");
-        };
-        let ExprKind::Clausura(closure) = &var.init.as_ref().expect("initializer").kind else {
-            panic!("expected closure expression");
-        };
-        assert_eq!(closure.modifier, ClosureModifier::None);
-    }
-}
-
-#[test]
-fn parses_nucleum_in_compact_and_legacy_closure_slots() {
-    for source in [
-        "fixum _ compact ← (numerus value) nucleum ∴ value",
-        "fixum _ legacy ← clausura numerus value nucleum: value",
-    ] {
-        let result = parse_ok(source);
-        let program = result.program.as_ref().expect("program");
-        let StmtKind::Var(var) = &program.statements[0].kind else {
-            panic!("expected variable declaration");
-        };
-        let ExprKind::Clausura(closure) = &var.init.as_ref().expect("initializer").kind else {
-            panic!("expected closure expression");
-        };
-        assert_eq!(closure.modifier, ClosureModifier::Nucleum);
-    }
-}
-
-#[test]
-fn parses_nucleum_same_expression_iife_call() {
-    let result = parse_ok("fixum _ result ← ((numerus value) nucleum ∴ value)(1)");
-    let program = result.program.as_ref().expect("program");
-    let StmtKind::Var(var) = &program.statements[0].kind else {
-        panic!("expected variable declaration");
-    };
-    let ExprKind::Call(call) = &var.init.as_ref().expect("initializer").kind else {
-        panic!("expected IIFE call");
-    };
-    let ExprKind::Paren(callee) = &call.callee.kind else {
-        panic!("expected parenthesized closure callee");
-    };
-    let ExprKind::Clausura(closure) = &callee.kind else {
-        panic!("expected nucleum closure callee");
-    };
-    assert_eq!(closure.modifier, ClosureModifier::Nucleum);
-}
-
-#[test]
-fn stacked_closure_modifiers_are_structured_duplicates() {
-    for source in [
-        "fixum _ compact ← (numerus value) libera nucleum ∴ value",
-        "fixum _ legacy ← clausura numerus value nucleum libera: value",
-    ] {
-        let result = parse_program(source);
-        assert!(
-            result.errors.iter().any(|error| {
-                error.kind == ParseErrorKind::ModifierDuplicate
-                    && has_arg(error, "modifier", "closure")
-                    && has_arg(error, "duplicate", "libera")
-            }) || result.errors.iter().any(|error| {
-                error.kind == ParseErrorKind::ModifierDuplicate
-                    && has_arg(error, "modifier", "closure")
-                    && has_arg(error, "duplicate", "nucleum")
-            }),
-            "stacked modifiers must report PARSE019/ModifierDuplicate: {:?}",
-            result.errors
-        );
     }
 }
 

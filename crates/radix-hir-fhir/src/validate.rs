@@ -269,7 +269,7 @@ impl radix_hir::visit::HirVisitor for TypeSiteCollector {
                     );
                 }
             }
-            radix_hir::HirExpressionKind::Clausura(params, ret, err, _, _) => {
+            radix_hir::HirExpressionKind::Clausura(params, ret, err, _) => {
                 for (ordinal, param) in params.iter().enumerate() {
                     register_type_site(
                         &mut self.sites,
@@ -1547,7 +1547,7 @@ fn collect_expr_defs(
             collect_block_defs(body, registry);
             collect_expr_defs(default, registry);
         }
-        HirExpressionKind::Clausura(params, _, _, body, _) => {
+        HirExpressionKind::Clausura(params, _, _, body) => {
             for param in params {
                 collect_param_defs(param, registry);
             }
@@ -1877,7 +1877,7 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                 collect_block(body, registry);
                 collect_expr(default, registry);
             }
-            HirExpressionKind::Clausura(params, _, _, body, _) => {
+            HirExpressionKind::Clausura(params, _, _, body) => {
                 for param in params {
                     if let Some(ref init) = param.default {
                         collect_expr(init, registry);
@@ -2984,7 +2984,7 @@ pub(crate) fn validate_referential_integrity(
                     checks.check_type(*ty)?;
                 }
             }
-            HirExpressionKind::Clausura(params, ret_ty, err_ty, body, _) => {
+            HirExpressionKind::Clausura(params, ret_ty, err_ty, body) => {
                 for param in params {
                     checks.check_def(param.def_id)?;
                     checks.check_symbol(param.name)?;
