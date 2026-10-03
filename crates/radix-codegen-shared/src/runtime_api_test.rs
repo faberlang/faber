@@ -943,3 +943,46 @@ fn the_rust_gen_and_float_rows_spell_as_the_crate_root_types_and_a_float_functio
         ]
     );
 }
+
+#[test]
+fn modulus_rows_cover_every_ring_operation_and_width_for_typescript() {
+    let rows: Vec<_> = TABLE
+        .iter()
+        .filter(|item| item.ns == Namespace::Modulus)
+        .collect();
+    assert_eq!(rows.len(), 96);
+    let refs = RuntimeRefs::default();
+    for width in ["u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64"] {
+        for operation in [
+            "add", "sub", "mul", "and", "or", "xor", "neg", "bit_not", "div", "mod", "shl", "shr",
+        ] {
+            let name = format!("{operation}_{width}");
+            let row = rows
+                .iter()
+                .find(|row| row.name == name)
+                .expect("ring row exists");
+            assert_eq!(row.kind, RuntimeKind::Fn);
+            assert_eq!(row.targets, &[Target::HirTypeScript]);
+            let op = if operation == "bit_not" {
+                "bitNot"
+            } else {
+                operation
+            };
+            let suffix = width.to_ascii_uppercase();
+            assert_eq!(
+                refs.spell(Target::HirTypeScript, row),
+                Ok(format!("modulus.{op}{suffix}"))
+            );
+        }
+    }
+    assert_eq!(refs.used(), vec![Namespace::Modulus]);
+    assert_eq!(
+        ts_imports(&refs),
+        Some("import { modulus } from \"@faber/runtime\";".to_owned())
+    );
+    assert!(
+        reserved_names(Target::HirTypeScript, TABLE)
+            .iter()
+            .any(|name| name == "modulus")
+    );
+}
