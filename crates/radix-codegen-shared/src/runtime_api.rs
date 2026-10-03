@@ -545,11 +545,16 @@ pub const VECTOR_NORMALIZE: RuntimeItem = RuntimeItem {
 pub const SPARSA_NEW: RuntimeItem = shaped_row(Namespace::Sparsa, "new", RuntimeKind::Fn);
 
 /// The targets whose runtime package carries an `order`, `intervallum`, `tuple`,
-/// `instans` or `valor` row. Only the Go runtime (`rt.Order*`, `rt.Intervallum*`,
+/// `instans` or `valor` row. The Go runtime (`rt.Order*`, `rt.Intervallum*`,
 /// `rt.Tuple*`, `rt.Instans*`, `rt.Valor*`,
-/// `faber/runtime/go/{order,intervallum,tuple,instans,valor}.go`) carries them
-/// on this table today.
+/// `faber/runtime/go/{order,intervallum,tuple,instans,valor}.go`) carries them;
+/// the TypeScript runtime shares `order.compare` (T1-T13).
 const CARRIER_GO: &[Target] = &[Target::HirGo];
+
+/// The `order` and `dup` rows shared with Go (`order.compare`) or carried by
+/// the TypeScript runtime alone (`order.textCompare`, `dup.duplicate`).
+const CARRIER_GO_TS: &[Target] = &[Target::HirGo, Target::HirTypeScript];
+const CARRIER_TS: &[Target] = &[Target::HirTypeScript];
 
 const fn carrier_row(ns: Namespace, name: &'static str, kind: RuntimeKind) -> RuntimeItem {
     RuntimeItem {
@@ -572,7 +577,33 @@ const fn carrier_row(ns: Namespace, name: &'static str, kind: RuntimeKind) -> Ru
 /// whose field extraction is supplied at the call site. No row applies a width
 /// limit: none of them stores into a bounded cell.
 pub const ORDER_ORDER: RuntimeItem = carrier_row(Namespace::Order, "order", RuntimeKind::Fn);
-pub const ORDER_COMPARE: RuntimeItem = carrier_row(Namespace::Order, "compare", RuntimeKind::Fn);
+/// `order.compare` (T1-G8, T1-T13): the built-in and tuple three-way compare.
+/// The TypeScript runtime shares the row: its `order.compare` helper orders
+/// built-ins, tuples and a genus's own `compare`, so it carries the same id.
+pub const ORDER_COMPARE: RuntimeItem = RuntimeItem {
+    ns: Namespace::Order,
+    name: "compare",
+    kind: RuntimeKind::Fn,
+    targets: CARRIER_GO_TS,
+};
+/// `order.text_compare` (T1-T13): code-point text compare of the TypeScript
+/// runtime (`order.textCompare`). Go compares strings by UTF-8 byte order,
+/// which equals code-point order, so it needs no such helper.
+pub const ORDER_TEXT_COMPARE: RuntimeItem = RuntimeItem {
+    ns: Namespace::Order,
+    name: "text_compare",
+    kind: RuntimeKind::Fn,
+    targets: CARRIER_TS,
+};
+/// `dup.duplicate` (T1-T13): the deep duplicate of the TypeScript runtime
+/// (`dup.duplicate`), called at a `copy` bind, a copy parameter and the sermo
+/// boundary. Only the TypeScript runtime carries it.
+pub const DUP_DUPLICATE: RuntimeItem = RuntimeItem {
+    ns: Namespace::Dup,
+    name: "duplicate",
+    kind: RuntimeKind::Fn,
+    targets: CARRIER_TS,
+};
 pub const INTERVALLUM_INTERVALLUM: RuntimeItem =
     carrier_row(Namespace::Intervallum, "Intervallum", RuntimeKind::Type);
 pub const INTERVALLUM_VALUE: RuntimeItem =
@@ -996,6 +1027,8 @@ pub const TABLE: &[RuntimeItem] = &[
     SPARSA_NEW,
     ORDER_ORDER,
     ORDER_COMPARE,
+    ORDER_TEXT_COMPARE,
+    DUP_DUPLICATE,
     INTERVALLUM_INTERVALLUM,
     INTERVALLUM_VALUE,
     TUPLE_KEY,
