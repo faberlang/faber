@@ -1125,11 +1125,21 @@ fn nullable_valor_to_inf_reads_its_payload_by_the_valor_law() {
             convert_ty(build, beyond.clone(), &[], None).expect("beyond-64-bit payload"),
             beyond
         );
-        // A float payload fails with the non-nullable path's text; it never
-        // truncates (1.5 must not become 1).
+        // Both fractional and integral floats fail by the same valor law;
+        // neither nullable carrier may truncate or change the fault's facts.
         for value in [Value::Float(1.5), Value::Float(3.0)] {
-            let error = convert_ty(build, value, &[], None).expect_err("float payload");
-            assert_valor_to_numerus_failure(&error);
+            let nullable = convert_ty(build, value.clone(), &[], None).expect_err("float payload");
+            let non_nullable = convert(valor_type(), inf_type(), value, &[], None)
+                .expect_err("non-nullable float");
+            assert_valor_to_numerus_failure(&nullable);
+            assert_valor_to_numerus_failure(&non_nullable);
+            // Re-express message equality as full structured fault equality:
+            // matching code/issue alone would miss changed diagnostic facts.
+            assert_eq!(nullable.args, non_nullable.args);
+            assert_eq!(
+                nullable.arg("detail"),
+                Some("valor to numerus conversion failed")
+            );
         }
         // `⊥` supplies the fallback on the nullable path, as on the
         // non-nullable one.
@@ -1144,20 +1154,6 @@ fn nullable_valor_to_inf_reads_its_payload_by_the_valor_law() {
             Value::Int(9)
         );
     }
-    // Side by side: nullable and non-nullable report the identical fault.
-    let nullable = convert_ty(
-        |types: &mut TypeTable| (nullable_valor(types, false), inf_ty(types)),
-        Value::Float(1.5),
-        &[],
-        None,
-    )
-    .expect_err("nullable float");
-    let non_nullable = convert(valor_type(), inf_type(), Value::Float(1.5), &[], None)
-        .expect_err("non-nullable float");
-    // The identical fault is a code/issue identity; message text is renderer
-    // prose (hygiene: `non_renderer_tests_do_not_assert_diagnostic_text`).
-    assert_eq!(nullable.issue, non_nullable.issue);
-    assert_eq!(nullable.code, non_nullable.code);
 }
 
 #[test]

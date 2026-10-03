@@ -474,16 +474,20 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
         || rel == "crates/radix-mir/src/kernel_decomposition_test.rs"
         || rel == "crates/radix-mir/src/static_shape_fold_test.rs"
         || rel == "crates/radix-mir-llvm/tests/device_mode.rs"
-        // Host-error prose (gpu-reset C1 device crates): `HostError` is the
-        // ported machine-readable host error whose stable identity is `code`
-        // (asserted alongside each prose check); the rendered message is the
-        // ported host contract's own surface (backend/class naming, budget
-        // numbers, named identity and reason, launch attribution), not a
-        // compiler diagnostic that carries issue/args. Remove these when the
-        // host-error vocabulary grows structured args.
+        // HostError constructor/Display contract: error.rs owns backend
+        // naming, requested/limit budget facts, recoverable-OOM wording, and
+        // `{code}: {message}` rendering. HostError has code/retryable/launch_ids
+        // but no issue/args for these facts; error_test.rs pins their rendering
+        // alongside code/retryable. Remove when those facts become structured.
         || rel == "crates/radix-device-core/src/error_test.rs"
+        // Admission refusal contract: registry.rs::open composes the CPU class,
+        // backend probe notes, degraded device identity/reason, and budget
+        // facts into HostError.message. registry_test.rs pins each alongside
+        // its stable code and proves no fallback/retry loss. There is no
+        // structured refusal payload yet; remove when one replaces this text.
+        // Metal launch attribution is NOT exempt: HostError.launch_ids already
+        // carries that fact, so runtime_test.rs must assert it directly.
         || rel == "crates/radix-device-core/src/registry_test.rs"
-        || rel == "crates/radix-device-metal/src/runtime_test.rs"
 }
 
 fn display_relative(root: &Path, path: &Path) -> String {
