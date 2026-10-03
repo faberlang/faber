@@ -1,0 +1,90 @@
+//! Byte-value iteration preserves the opaque octeti carrier and its u8 index row.
+
+use crate::codegen::Target;
+use crate::driver::{AnalyzeRequest, Config, Session};
+use crate::mir::{BufferHost, MirLoweringOptions, lower_analyzed_unit, run_source};
+
+fn session() -> Session {
+    Session::new(Config::default().with_target(Target::HirTypeScript))
+}
+
+#[test]
+fn octeti_itera_ex_validates_byte_binding_and_runtime_bound() {
+    let source = r"functio byte_list(octeti input) → lista<u8> {
+    varia lista<u8> out ← vacua
+    itera ex input fixum byte {
+        out.appende(byte)
+    }
+    redde out
+}";
+    let mut unit = crate::driver::analyze_source(&session(), "byte-list.fab", source, AnalyzeRequest::default())
+        .expect("D10.4/D19.4 admit bytes iteration with a u8 binding");
+    let lowered = lower_analyzed_unit(&mut unit, MirLoweringOptions::default())
+        .expect("byte iteration must lower through the existing byte index row");
+    crate::mir::validate_program(&lowered.validated.program(), lowered.validated.validation())
+        .expect("the byte carrier and binding types must pass MIR validation");
+}
+
+#[test]
+fn octeti_itera_ex_runs_decoder_byte_list_in_order_and_handles_empty() {
+    let source = r"functio byte_list(octeti input) → lista<u8> {
+    varia lista<u8> out ← vacua
+    itera ex input fixum byte {
+        out.appende(byte ↦ u8)
+    }
+    redde out
+}
+
+incipit {
+    fixum octeti input ← |00 7f 80 ff 00|
+    fixum lista<u8> copied ← byte_list(input)
+    nota copied.longitudo()
+    itera ex copied fixum byte {
+        nota byte
+    }
+    nota input[3]
+    nota byte_list(||).longitudo()
+}";
+    let mut host = BufferHost::default();
+    run_source(&session(), "byte-list-run.fab", source, &mut host)
+        .unwrap_or_else(|error| panic!("decoder byte iteration must execute: {error:?}"));
+    assert_eq!(host.stdout_lines, ["5", "0", "127", "128", "255", "0", "255", "0"]);
+}
+
+#[test]
+fn octeti_itera_ex_preserves_continue_and_break() {
+    let source = r"incipit {
+    fixum octeti input ← |00 7f 80 ff|
+    itera ex input fixum byte {
+        si byte ≡ 0 {
+            perge
+        }
+        si byte ≡ 255 {
+            rumpe
+        }
+        nota byte
+    }
+}";
+    let mut host = BufferHost::default();
+    run_source(&session(), "byte-loop-flow.fab", source, &mut host)
+        .unwrap_or_else(|error| panic!("byte iteration control flow must execute: {error:?}"));
+    assert_eq!(host.stdout_lines, ["127", "128"]);
+}
+
+#[test]
+fn octeti_itera_de_keeps_existing_fail_closed_admission() {
+    let source = r"functio indices(octeti input) → vacuum {
+    itera de input fixum index {
+        nota index
+    }
+}";
+    let mut unit = crate::driver::analyze_source(&session(), "byte-indices.fab", source, AnalyzeRequest::default())
+        .expect("the checker admits the index surface while MIR owns its decline");
+    let errors = lower_analyzed_unit(&mut unit, MirLoweringOptions::default())
+        .expect_err("this repair only implements byte value iteration");
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.issue == "unsupported_mir_lowering_itera_collection_before_iterator_mir_lowering")
+    );
+}

@@ -107,6 +107,8 @@ struct RangeProductAxis {
 #[derive(Clone)]
 enum CollectionIteraKind {
     Array(TypeId),
+    /// Byte value iteration uses the opaque carrier's length and u8 index row.
+    Bytes(TypeId),
     /// Queue value iteration preserves insertion order (FIFO).
     Queue(TypeId),
     /// Stack value iteration walks removal order (top-first LIFO).
@@ -2490,6 +2492,14 @@ impl FunctionBuilder<'_> {
                     }
                 }
                 Type::Array(item) => CollectionIteraKind::Array(*item),
+                // D10.4/D19.4: byte iteration binds the same u8 as octeti[i].
+                // Retain the byte carrier rather than fabricating a list type.
+                Type::Primitive(Primitive::Octeti) if matches!(iter.mode, HirIteraMode::Ex) => {
+                    match self.scalar_buffer_element(normalized) {
+                        Some(element) => CollectionIteraKind::Bytes(element),
+                        None => CollectionIteraKind::Unsupported,
+                    }
+                }
                 // Text value iteration: only `ex` admits it,
                 // mirroring the queue/stack value-surface rule. The binding
                 // is `littera` (D10.1), one Unicode scalar, with no trap.
@@ -2634,6 +2644,7 @@ impl FunctionBuilder<'_> {
                 (collection, MirType::semantic(*elem), false)
             }
             CollectionIteraKind::BoundedArray(elem, _) => (collection, MirType::semantic(*elem), false),
+            CollectionIteraKind::Bytes(element) => (collection, MirType::semantic(*element), false),
             CollectionIteraKind::Text(element) => (collection, MirType::semantic(*element), false),
             CollectionIteraKind::Shaped { .. } => {
                 unreachable!("shaped collection itera returns through nested lowering above")
@@ -3262,13 +3273,13 @@ impl FunctionBuilder<'_> {
     /// ever read. The branch is base-lane MIR; the AIR lane never admits the
     /// loop (`air_unroll` declines runtime-len values `not_concrete`), so
     /// reverse AD never sees a non-literal scrutinee.
-    /// AEU-7: the scalar buffer lane element — `octeti<N>` binds
+    /// The scalar buffer lane element — bare and bounded `octeti` bind
     /// `octetus` (`numerus<u8>`), `ascii<N>` / `textus<N>` bind `littera`
     /// (D10.1). The typecheck `itera` arm interns the byte row for the loop
     /// being lowered; a miss fails closed into Unsupported.
     fn scalar_buffer_element(&self, ty: &Type) -> Option<TypeId> {
         match ty {
-            Type::BoundedOcteti { .. } => self
+            Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. } => self
                 .types
                 .find_sized_numeric(Primitive::Numerus, NumericWidth::U8),
             Type::BoundedAscii { .. } | Type::BoundedTextus { .. } => Some(self.types.primitive(Primitive::Littera)),
