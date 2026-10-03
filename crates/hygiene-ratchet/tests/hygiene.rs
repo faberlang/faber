@@ -474,6 +474,16 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
         || rel == "crates/radix-mir/src/kernel_decomposition_test.rs"
         || rel == "crates/radix-mir/src/static_shape_fold_test.rs"
         || rel == "crates/radix-mir-llvm/tests/device_mode.rs"
+        // Host-error prose (gpu-reset C1 device crates): `HostError` is the
+        // ported machine-readable host error whose stable identity is `code`
+        // (asserted alongside each prose check); the rendered message is the
+        // ported host contract's own surface (backend/class naming, budget
+        // numbers, named identity and reason, launch attribution), not a
+        // compiler diagnostic that carries issue/args. Remove these when the
+        // host-error vocabulary grows structured args.
+        || rel == "crates/radix-device-core/src/error_test.rs"
+        || rel == "crates/radix-device-core/src/registry_test.rs"
+        || rel == "crates/radix-device-metal/src/runtime_test.rs"
 }
 
 fn display_relative(root: &Path, path: &Path) -> String {

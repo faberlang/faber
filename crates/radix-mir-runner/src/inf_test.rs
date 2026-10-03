@@ -1154,8 +1154,9 @@ fn nullable_valor_to_inf_reads_its_payload_by_the_valor_law() {
     .expect_err("nullable float");
     let non_nullable = convert(valor_type(), inf_type(), Value::Float(1.5), &[], None)
         .expect_err("non-nullable float");
+    // The identical fault is a code/issue identity; message text is renderer
+    // prose (hygiene: `non_renderer_tests_do_not_assert_diagnostic_text`).
     assert_eq!(nullable.issue, non_nullable.issue);
-    assert_eq!(nullable.message, non_nullable.message);
     assert_eq!(nullable.code, non_nullable.code);
 }
 
