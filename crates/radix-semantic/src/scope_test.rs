@@ -327,6 +327,127 @@ fn indexed_variant_lookups_match_linear_reference() {
     assert_eq!(resolver.variant_child(union_c, y_name), Some(c_y));
 }
 
+/// Producer-shaped interface whose exported enum carries one well-formed
+/// variant and one whose payload field names a nominal the consumer cannot
+/// resolve. The second variant's row stays in the enum's table but is flagged
+/// `payload_unresolved` by the phase-2 remap.
+fn imported_enum_with_unresolved_payload() -> crate::file_interface::FileInterface {
+    use crate::file_interface::{
+        FileExport, FileExportKind, FileInterface, InterfaceEnumVariant, InterfaceNominalExport,
+        InterfaceNominalKind, InterfaceNominalType, InterfaceStructField, InterfaceTypeSnapshot,
+    };
+
+    let mut interface = FileInterface::new();
+    interface.insert(FileExport {
+        name: "Kind".to_owned(),
+        kind: FileExportKind::Enum(InterfaceNominalExport {
+            name: "Kind".to_owned(),
+            params: Vec::new(),
+            methods: Vec::new(),
+            shared_fields: Vec::new(),
+            radix_contract: None,
+            variants: vec![
+                InterfaceEnumVariant {
+                    name: "Fine".to_owned(),
+                    fields: Vec::new(),
+                },
+                InterfaceEnumVariant {
+                    name: "Broken".to_owned(),
+                    fields: vec![InterfaceStructField {
+                        name: "payload".to_owned(),
+                        ty: InterfaceTypeSnapshot::Nominal(InterfaceNominalType {
+                            kind: InterfaceNominalKind::Struct,
+                            name: "Missing".to_owned(),
+                            identity: None,
+                            kind_guessed: false,
+                        }),
+                        optional: false,
+                        required: true,
+                        default: None,
+                        modifier: None,
+                        visibility: radix_syntax::MemberVisibility::Publica,
+                    }],
+                },
+            ],
+        }),
+    });
+    interface
+}
+
+#[test]
+fn namespace_variant_value_position_flagged_row_is_pinned() {
+    use crate::TypeTable;
+    use std::collections::BTreeMap;
+
+    let mut resolver = Resolver::new();
+    let mut interner = radix_lexer::Interner::new();
+    let mut types = TypeTable::new();
+    resolver
+        .set_file_interfaces_from_snapshots(
+            &BTreeMap::from([("mod".to_owned(), imported_enum_with_unresolved_payload())]),
+            &mut interner,
+            &mut types,
+        )
+        .expect("enum interface installs");
+
+    let namespace = interner.intern("mod");
+    let type_name = interner.intern("Kind");
+    let fine = interner.intern("Fine");
+    let broken = interner.intern("Broken");
+
+    // The flagged row stays in the variant parent table (so the commune
+    // projection can still arm it) but its payload identity is unknown.
+    let enum_def = resolver
+        .variant_parents_all()
+        .into_iter()
+        .find_map(|(variant_def, parent_def)| {
+            let symbol = resolver.get_symbol(variant_def)?;
+            (symbol.name == fine).then_some(parent_def)
+        })
+        .expect("the enum's parent link survives install");
+    let broken_def = resolver
+        .variant_parents_all()
+        .into_iter()
+        .find_map(|(variant_def, parent_def)| {
+            let symbol = resolver.get_symbol(variant_def)?;
+            (parent_def == enum_def && symbol.name == broken).then_some(variant_def)
+        })
+        .expect("the flagged row is not dropped from the variant table");
+    let fine_def = resolver
+        .variant_child(enum_def, fine)
+        .expect("the well-formed variant resolves");
+
+    // Fail-closed pin: the flagged row must not resolve in value position on
+    // any namespace path, matching `variant_child`.
+    assert_eq!(resolver.variant_child(enum_def, broken), None);
+    assert_eq!(resolver.namespace_file_variant(namespace, broken), None);
+    assert_eq!(
+        resolver.namespace_file_type_variant(namespace, type_name, broken),
+        None
+    );
+
+    // ...while the well-formed sibling still resolves on every path.
+    assert_eq!(
+        resolver
+            .namespace_file_variant(namespace, fine)
+            .map(|(def_id, _)| def_id),
+        Some(fine_def)
+    );
+    assert_eq!(
+        resolver
+            .namespace_file_type_variant(namespace, type_name, fine)
+            .map(|(def_id, _)| def_id),
+        Some(fine_def)
+    );
+    let nameable = resolver.non_local_enum_variants();
+    let kind = nameable
+        .iter()
+        .find(|(def_id, _)| *def_id == enum_def)
+        .expect("the enum is a non-local enum with variant lists");
+    assert!(kind.1.contains(&fine_def));
+    assert!(!kind.1.contains(&broken_def));
+}
+
 #[cfg(feature = "hir-fhir")]
 #[test]
 fn resolver_snapshot_round_trips_conversion_rows() {
