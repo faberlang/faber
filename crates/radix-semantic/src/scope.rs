@@ -2882,6 +2882,11 @@ impl Resolver {
     /// returns the consumer variant `DefId` and the variant's value type
     /// (`Type::Enum(consumer enum def)`). Only variants of enums exported by
     /// the namespace resolve; consts/type exports keep their existing paths.
+    ///
+    /// A variant flagged `payload_unresolved` is excluded, matching
+    /// [`Resolver::variant_child`]: its payload identity is unknown to this
+    /// consumer, so a value-position reference must fail closed rather than
+    /// name a variant the consumer cannot build.
     #[must_use]
     pub fn namespace_file_variant(
         &self,
@@ -2895,7 +2900,10 @@ impl Resolver {
             };
             let enum_def = ty.def_id?;
             let variants = self.imported_enum_variants.get(&enum_def)?;
-            if let Some(variant) = variants.iter().find(|variant| variant.name == member) {
+            if let Some(variant) = variants
+                .iter()
+                .find(|variant| variant.name == member && !variant.payload_unresolved)
+            {
                 return Some((variant.def_id, ty.ty));
             }
         }
@@ -2910,6 +2918,8 @@ impl Resolver {
     /// def)`), mirroring [`Resolver::namespace_file_variant`] for the
     /// single-segment form. Enums and unions both install as `Type` exports
     /// carrying variant metadata, so the two declarations share this path.
+    /// As in [`Resolver::namespace_file_variant`], a variant flagged
+    /// `payload_unresolved` is excluded.
     #[must_use]
     pub fn namespace_file_type_variant(
         &self,
@@ -2926,7 +2936,7 @@ impl Resolver {
         let variants = self.imported_enum_variants.get(&type_def)?;
         let variant = variants
             .iter()
-            .find(|variant| variant.name == variant_name)?;
+            .find(|variant| variant.name == variant_name && !variant.payload_unresolved)?;
         Some((variant.def_id, ty.ty))
     }
 
