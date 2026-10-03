@@ -14043,7 +14043,7 @@ fn simple_loss(
     tensor<f32, [2,2]> x,
     tensor<f32, [2,2]> w
 ) → f32 {
-    const tensor<f32, [2,2]> product ← x.multiply(w)
+    const tensor<f32, [2,2]> product ← x ⊙ w
     return product.mean()
 }
 "#,
@@ -14157,7 +14157,7 @@ functio simple_loss(
     tensor<f32, [2,2]> x,
     tensor<f32, [2,2]> w
 ) → f32 {
-    fixum tensor<f32, [2,2]> product ← x.multiplica(w)
+    fixum tensor<f32, [2,2]> product ← x ⊙ w
     redde product.media()
 }
 "#,
@@ -14404,7 +14404,7 @@ targets = ["fmir"]
         lib_root.join("testgrad/src/gradient.fab"),
         r#"@ radix lane "air"
 functio inner(tensor<f32, [2,2]> a, tensor<f32, [2,2]> b) → tensor<f32, [2,2]> {
-    redde a.addita(b)
+    redde a + b
 }
 
 @ publica
@@ -14419,7 +14419,7 @@ functio simple_loss(
     tensor<f32, [2,2]> x,
     tensor<f32, [2,2]> w
 ) → f32 {
-    fixum tensor<f32, [2,2]> product ← x.multiplica(inner(x, w))
+    fixum tensor<f32, [2,2]> product ← x ⊙ inner(x, w)
     redde product.media()
 }
 "#,
@@ -14513,7 +14513,7 @@ functio simple_loss(
     tensor<f32, [2,2]> x,
     tensor<f32, [2,2]> w
 ) → f32 {
-    fixum tensor<f32, [2,2]> product ← x.multiplica(w)
+    fixum tensor<f32, [2,2]> product ← x ⊙ w
     redde product.media()
 }
 "#,
