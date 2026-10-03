@@ -3153,14 +3153,22 @@ pub(super) fn rewrite_statement_type_id(
         }
         MirStatementKind::RuntimeCall { call, .. } => {
             rewrite_type_id(&mut call.return_ty, rewrites);
-            if let MirIntrinsic::Convert(conversion) = &mut call.intrinsic {
-                // A conversion carries both source and target types outside
-                // the ordinary call return type. Imported units get their
-                // semantic type ids rewritten into the merged entry table;
-                // leaving either side behind makes the validator compare a
-                // remapped operand against a source-local conversion type.
-                rewrite_type_id(&mut conversion.source_ty, rewrites);
-                rewrite_type_id(&mut conversion.target_ty, rewrites);
+            match &mut call.intrinsic {
+                MirIntrinsic::Convert(conversion) => {
+                    // A conversion carries both source and target types outside
+                    // the ordinary call return type. Imported units get their
+                    // semantic type ids rewritten into the merged entry table;
+                    // leaving either side behind makes the validator compare a
+                    // remapped operand against a source-local conversion type.
+                    rewrite_type_id(&mut conversion.source_ty, rewrites);
+                    rewrite_type_id(&mut conversion.target_ty, rewrites);
+                }
+                MirIntrinsic::TypeCheck(check) => {
+                    // The checked type is separate from the bool return type.
+                    // A source-local id can name a different carrier after linking.
+                    rewrite_type_id(&mut check.ty, rewrites);
+                }
+                _ => {}
             }
         }
         MirStatementKind::Construct { aggregate, .. } => {

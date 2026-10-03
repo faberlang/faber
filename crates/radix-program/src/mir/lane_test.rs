@@ -77,6 +77,79 @@ fn package_mir_rewrites_runtime_conversion_types_with_imported_types() {
     assert_eq!(call.return_ty.semantic_id(), TypeId(11));
 }
 
+#[test]
+fn package_mir_rewrites_imported_type_check_targets() {
+    for positive in [true, false] {
+        let mut statement = MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination: None,
+                call: MirRuntimeCall {
+                    intrinsic: MirIntrinsic::TypeCheck(radix_module::mir::MirTypeCheckOp {
+                        positive,
+                        ty: MirType::semantic(TypeId(2)),
+                    }),
+                    args: vec![MirOperand::Constant(MirConstant::Int(1))],
+                    return_ty: MirType::semantic(TypeId(3)),
+                },
+            },
+            span: Span::default(),
+        };
+        super::lower::rewrite_statement_type_id(
+            &mut statement,
+            &[(TypeId(2), TypeId(11)), (TypeId(3), TypeId(12))],
+        );
+        let MirStatementKind::RuntimeCall { call, .. } = statement.kind else {
+            panic!("expected a runtime call");
+        };
+        let MirIntrinsic::TypeCheck(check) = call.intrinsic else {
+            panic!("expected a type-check intrinsic");
+        };
+        assert_eq!(check.ty.semantic_id(), TypeId(11));
+        assert_eq!(check.positive, positive);
+        assert_eq!(call.return_ty.semantic_id(), TypeId(12));
+    }
+}
+
+#[test]
+fn package_mir_imported_type_checks_match_list_and_map_carriers() {
+    let dir = crate::test_support::test_temp_dir("imported-type-check");
+    let library = r#"+++
+locale = "en"
++++
+@ public
+fn accepts(value raw) → bool {
+    if raw not is list<value> then return false
+    const list<value> items ← raw ↦ list<value> ⊥ empty
+    for from items const item {
+        if item is map<string, value> then return true
+    }
+    return false
+}
+"#;
+    let main = r#"import from "checklib:lib" lib
+class Pad { var list<string> names = [] }
+main {
+    var map<string, value> row ← {}
+    row.put("name", "Accept" ↦ value)
+    const list<value> rows ← [row ↦ value]
+    assert lib.accepts(rows ↦ value)
+    assert not lib.accepts(row ↦ value)
+    print "accepted"
+}
+"#;
+    let entry = write_library_package(dir.as_ref(), "checklib", library, main);
+    let config = Config::default().with_library_home(dir.join("libhome"));
+    let mut host = BufferHost::default();
+    run_package_mir(
+        &config,
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        &mut host,
+    )
+    .expect("imported type-check targets must use the merged type table");
+    assert_eq!(host.stdout_lines, ["accepted"]);
+}
+
 /// The `forma`-shadowing guard (fd0c939) excludes the `h1b.gelu()` false
 /// positive: an ordinary method call on a local is NOT rewritten into a
 /// synthetic-path namespace call when the method name happens to match an
