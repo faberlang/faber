@@ -389,17 +389,17 @@ impl Lowerer<'_> {
     ) -> ShaderLocal {
         let def_id = self.next_def_id();
         let name = self.interner.intern(name);
-        // Register so typechecker's `check_path` fallback can `get_symbol(def_id)`.
-        self.resolver
-            .define(crate::Symbol {
-                def_id,
-                name,
-                kind: crate::SymbolKind::Local,
-                ty: Some(ty),
-                mutable,
-                span,
-            })
-            .expect("shader locals must define unique names");
+        // Function-local names bind in the lowerer's scope, not the resolver's
+        // global frame (which already contains builtin stage names). Keep the
+        // fresh symbol's type available to `check_path` by DefId only.
+        self.resolver.register_unbound_symbol(crate::Symbol {
+            def_id,
+            name,
+            kind: crate::SymbolKind::Local,
+            ty: Some(ty),
+            mutable,
+            span,
+        });
         (def_id, name, span, ty, mutable)
     }
 
