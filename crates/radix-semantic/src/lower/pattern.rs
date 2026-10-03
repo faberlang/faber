@@ -29,6 +29,7 @@ use radix_hir::{HirLiteral, HirPattern};
 use radix_lexer::Span;
 use radix_syntax::{
     AstMutability, Literal, PathPattern, Pattern, PatternBind, TypeExpr, TypeExprKind,
+    TypeFormLevel,
 };
 
 /// Lower a parser pattern into HIR while establishing any new bindings.
@@ -273,6 +274,28 @@ fn lower_ident_pattern(
         };
     }
 
+    // Not a variant: a name that resolves as a type (declared here or
+    // selectively imported, D22.5) lowers as a type pattern — the same
+    // classification the parser's file-local prescan applies to local names,
+    // so an imported class is matchable exactly like a local one
+    // (BUG-82852379). Genuinely unknown names keep the binding fallthrough.
+    if lowerer.resolver.lookup_type(ident.name).is_some()
+        || lowerer
+            .resolver
+            .lookup_selective_import_type(ident.name)
+            .is_some()
+    {
+        let ty_expr = TypeExpr {
+            nullable: false,
+            mode: None,
+            kind: TypeExprKind::Named(ident.clone(), Vec::new()),
+            span: ident.span,
+            form: TypeFormLevel::LONG,
+            iuncta_label: None,
+        };
+        return lower_type_pattern(lowerer, &ty_expr, bind);
+    }
+
     let def_id = lowerer.next_def_id();
     lowerer.bind_local(ident.name, def_id);
 
@@ -305,7 +328,9 @@ fn lower_ident_pattern(
 /// qualified imported parent resolves through the imported union's parent link
 /// (CTO UVN-1). Otherwise the terminal segment resolves through the bare table
 /// and the per-union namespace, so single-union bare variants keep resolving
-/// exactly as before.
+/// exactly as before. A two-segment path whose namespace pair names an
+/// imported type (`geo.Circle`) lowers as a type pattern instead of a variant
+/// reference (BUG-82852379).
 fn lower_path_pattern(lowerer: &mut Lowerer, path: &PathPattern) -> HirPattern {
     lowerer.current_span = path.span;
     let Some(last) = path.segments.last() else {
@@ -360,15 +385,38 @@ fn lower_path_pattern(lowerer: &mut Lowerer, path: &PathPattern) -> HirPattern {
                     lowerer.error("unknown_variant");
                     return HirPattern::Wildcard;
                 }
-                crate::QualifiedVariantPathLookup::NotQualified => lowerer
-                    .resolver
-                    .lookup(last.name)
-                    .or_else(|| match lowerer.resolver.lookup_variant_bare(last.name) {
-                        crate::BareVariantLookup::Single(def_id) => Some(def_id),
-                        crate::BareVariantLookup::Ambiguous { .. }
-                        | crate::BareVariantLookup::None => None,
-                    })
-                    .unwrap_or_else(|| lowerer.next_def_id()),
+                crate::QualifiedVariantPathLookup::NotQualified => {
+                    // A two-segment path naming an imported type (`geo.Circle`)
+                    // lowers as a type pattern — the qualified twin of the bare
+                    // imported-name classification (BUG-82852379). A namespace
+                    // member that is not a type keeps the bare-terminal
+                    // fallback below, so unknown members still fail closed at
+                    // typecheck.
+                    if lowerer
+                        .resolver
+                        .namespace_file_type(parent.name, last.name)
+                        .is_some()
+                    {
+                        let ty_expr = TypeExpr {
+                            nullable: false,
+                            mode: None,
+                            kind: TypeExprKind::Qualified(path.segments.clone(), Vec::new()),
+                            span: path.span,
+                            form: TypeFormLevel::LONG,
+                            iuncta_label: None,
+                        };
+                        return lower_type_pattern(lowerer, &ty_expr, path.bind.as_ref());
+                    }
+                    lowerer
+                        .resolver
+                        .lookup(last.name)
+                        .or_else(|| match lowerer.resolver.lookup_variant_bare(last.name) {
+                            crate::BareVariantLookup::Single(def_id) => Some(def_id),
+                            crate::BareVariantLookup::Ambiguous { .. }
+                            | crate::BareVariantLookup::None => None,
+                        })
+                        .unwrap_or_else(|| lowerer.next_def_id())
+                }
             }
         }
     } else {

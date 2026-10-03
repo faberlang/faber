@@ -1312,3 +1312,7 @@ mod type_algebra_test;
 #[cfg(test)]
 #[path = "signed_pattern_test.rs"]
 mod signed_pattern_test;
+
+#[cfg(test)]
+#[path = "pattern_import_test.rs"]
+mod pattern_import_test;
