@@ -288,21 +288,21 @@ functio config_ssl_verify(bivalens enabled) {
 
     // Verify sanitized helper function names in the emitted code.
     assert!(
-        output.code.contains("run_remote(") || output.code.contains("run_remote_cmd"),
+        output.code.contains("fn run_remote(host: String)"),
         "command name must be sanitized: run-remote -> run_remote"
     );
     assert!(
-        output.code.contains("run_local(") || output.code.contains("run_local_cmd"),
+        output.code.contains("fn run_local(path: String)"),
         "command name must be sanitized: run:local -> run_local"
     );
     assert!(
-        output.code.contains("config_ssl_verify(") || output.code.contains("config_ssl_verify_cmd"),
+        output.code.contains("fn config_ssl_verify(enabled: bool)"),
         "command name must be sanitized: config.ssl-verify -> config_ssl_verify"
     );
 
     // But the struct field names and CLI dispatch use the original path.
     assert!(
-        output.code.contains("run-remote") || output.code.contains("run_remote"),
+        output.code.contains("\"run-remote\""),
         "CLI path should be derivable from sanitized name"
     );
 
