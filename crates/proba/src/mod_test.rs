@@ -875,3 +875,132 @@ fn erratur_flips_before_repete_short_circuit() {
     assert_eq!(executions, 3);
     assert!(matches!(execution.outcome, CaseOutcome::Passed));
 }
+
+#[test]
+fn runner_verdict_is_invariant_under_rewording() {
+    let original = RunnerError::unsupported(radix::lexer::Span::default(), "fixture operation");
+    let mut reworded = original.clone();
+    reworded.message = "this operation is unavailable in the interpreter".to_owned();
+    assert_eq!(original.code, reworded.code);
+    assert_eq!(original.issue, reworded.issue);
+    assert_eq!(original.args, reworded.args);
+    assert_eq!(original.span, reworded.span);
+    let before = outcome_from_run_result(Err(vec![original]), false);
+    let after = outcome_from_run_result(Err(vec![reworded]), false);
+    println!("same runner code/issue/args/span, prose only changed: {before:?} -> {after:?}");
+    assert!(matches!(before, CaseOutcome::Blocked { .. }));
+    assert!(matches!(after, CaseOutcome::Blocked { .. }));
+}
+
+#[test]
+fn empty_selection_is_not_success() {
+    let report = run(
+        r#"proba "one equals one" { adfirma 1 ≡ 1 }"#,
+        TestSelection {
+            name: Some("not selected".to_owned()),
+            ..TestSelection::default()
+        },
+    );
+    println!(
+        "empty selection: selected={} passed={} failed={} blocked={} skipped={} success={}",
+        report.results.len(),
+        report.passed(),
+        report.failed(),
+        report.blocked(),
+        report.skipped(),
+        report.success()
+    );
+    assert!(report.results.is_empty());
+    assert!(!report.success());
+}
+
+#[test]
+fn runner_failure_prose_cannot_manufacture_a_capability_gap() {
+    let original = RunnerError::internal_with_issue(
+        radix::lexer::Span::default(),
+        "host failed",
+        "runner_fixture_host_failed",
+    );
+    let mut reworded = original.clone();
+    reworded.message = "faberscript unsupported: host failed".to_owned();
+    let before = outcome_from_run_result(Err(vec![original]), false);
+    let after = outcome_from_run_result(Err(vec![reworded]), false);
+    println!("same internal failure, prose only changed: {before:?} -> {after:?}");
+    assert!(matches!(before, CaseOutcome::Failed { .. }));
+    assert!(matches!(after, CaseOutcome::Failed { .. }));
+}
+
+#[test]
+fn runner_limits_keep_their_verdict_under_rewording_and_erratur() {
+    for (issue, message) in [
+        (
+            RUNNER_ISSUE_STEP_BUDGET_EXHAUSTED,
+            "interpreter step budget exhausted after 1 steps",
+        ),
+        (
+            RUNNER_ISSUE_WALL_CLOCK_TIMEOUT,
+            "wall-clock timeout exceeded",
+        ),
+    ] {
+        let original =
+            RunnerError::internal_with_issue(radix::lexer::Span::default(), message, issue);
+        let mut reworded = original.clone();
+        reworded.message = "faberscript unsupported: execution limit reached".to_owned();
+        for erratur in [false, true] {
+            let before = outcome_from_run_result(Err(vec![original.clone()]), erratur);
+            let after = outcome_from_run_result(Err(vec![reworded.clone()]), erratur);
+            println!(
+                "limit {issue} erratur={erratur}, prose only changed: {before:?} -> {after:?}"
+            );
+            assert!(matches!(before, CaseOutcome::Failed { .. }));
+            assert!(matches!(after, CaseOutcome::Failed { .. }));
+            if issue == RUNNER_ISSUE_WALL_CLOCK_TIMEOUT {
+                assert_eq!(before, after);
+            }
+        }
+    }
+}
+
+#[test]
+fn runner_limits_take_precedence_over_capability_gaps() {
+    let span = radix::lexer::Span::default();
+    let unsupported = RunnerError::unsupported(span, "fixture operation");
+    let budget =
+        RunnerError::internal_with_issue(span, "fuel depleted", RUNNER_ISSUE_STEP_BUDGET_EXHAUSTED);
+    let timeout =
+        RunnerError::internal_with_issue(span, "deadline reached", RUNNER_ISSUE_WALL_CLOCK_TIMEOUT);
+    for errors in [
+        vec![unsupported.clone(), budget.clone()],
+        vec![budget.clone(), unsupported.clone()],
+    ] {
+        assert!(matches!(
+            case_outcome_from_runner_errors(&errors),
+            CaseOutcome::Failed { .. }
+        ));
+    }
+    for errors in [
+        vec![unsupported.clone(), budget.clone(), timeout.clone()],
+        vec![timeout.clone(), budget, unsupported],
+    ] {
+        assert_eq!(
+            case_outcome_from_runner_errors(&errors),
+            case_outcome_from_runner_errors(&[timeout.clone()])
+        );
+    }
+}
+
+#[test]
+fn empty_inventory_is_not_success_but_source_skips_still_are() {
+    assert!(!ProbaReport::default().success());
+    let skipped = ProbaReport {
+        results: vec![CaseResult::reported(
+            PathBuf::new(),
+            "parked".to_owned(),
+            String::new(),
+            CaseOutcome::Skipped {
+                reason: "later".to_owned(),
+            },
+        )],
+    };
+    assert!(skipped.success());
+}

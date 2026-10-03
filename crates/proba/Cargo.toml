@@ -10,10 +10,12 @@ license = "MIT"
 # another compiler pipeline. Keep the dependency downward and core builds
 # runner-free.
 radix = { path = "../radix", default-features = false }
+# Stable runner issue identities used by the verdict classifier.
+radix-mir-runner = { path = "../radix-mir-runner", optional = true }
 
 [features]
 default = []
-runner = ["radix/runner"]
+runner = ["radix/runner", "dep:radix-mir-runner"]
 
 [lints]
 workspace = true

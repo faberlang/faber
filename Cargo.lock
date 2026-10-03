@@ -666,6 +666,7 @@ name = "proba"
 version = "0.1.0"
 dependencies = [
  "radix",
+ "radix-mir-runner",
 ]
 
 [[package]]
