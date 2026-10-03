@@ -129,7 +129,7 @@ impl ModuleGraph {
 ///
 /// `library_resolver` is the resolver analysis already built — not a second
 /// stored constructor. Downstream linking threads this value instead of
-/// calling `library_resolver_for_config` after `analyze_package*`.
+/// reconstructing a resolver from config after `analyze_package*`.
 pub struct AnalyzedProgram {
     pub spec: PackageSpec,
     pub entry: Option<ModuleId>,

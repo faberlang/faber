@@ -51,7 +51,6 @@ pub fn faber_mir_seams() -> radix::program::mir::MirSeams {
     radix::program::mir::MirSeams {
         analysis: super::faber_analysis_seams(),
         executed_lane_target: super::executed_lane_analysis_target,
-        library_resolver_for_config: super::library_resolver_from_config,
         library_cache_for_config: super::library_cache_with_config,
         device_config_for_input: manifest::manifest_device_config,
         device_section_builder,
