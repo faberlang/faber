@@ -943,3 +943,28 @@ fn the_rust_gen_and_float_rows_spell_as_the_crate_root_types_and_a_float_functio
         ]
     );
 }
+
+#[test]
+fn typescript_json_valor_variant_tuple_atomic_rows_are_registered_and_reserved() {
+    for (row, expected) in [
+        (&JSON_VALUE, "json.Value"),
+        (&JSON_PARSE, "json.parse"),
+        (&JSON_STRINGIFY, "json.stringify"),
+        (&JSON_PARSE_BIG_INT, "json.parseBigInt"),
+        (&JSON_STRINGIFY_BIG_INT, "json.stringifyBigInt"),
+        (&VALOR_BOX, "valor.box"),
+        (&VALOR_PAYLOAD, "valor.payload"),
+        (&VALOR_IS, "valor.is"),
+        (&VALOR_IS_INTEGER, "valor.isInteger"),
+        (&VARIANT_VALUE, "variant.value"),
+        (&TUPLE_MAP, "tuple.TupleMap"),
+        (&ATOMIC_ATOMIC, "atomic.Atomic"),
+    ] {
+        assert!(
+            TABLE.contains(row),
+            "{expected} is missing from namespace hygiene"
+        );
+        assert_eq!(spell(Target::HirTypeScript, row), Ok(expected.to_owned()));
+        assert!(reserved_names(Target::HirTypeScript, TABLE).contains(&row.ns.as_str().to_owned()));
+    }
+}

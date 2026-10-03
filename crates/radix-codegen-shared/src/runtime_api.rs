@@ -445,6 +445,80 @@ pub const FLOAT_F16_BITS_TO_F32: RuntimeItem = RuntimeItem {
     targets: &[Target::HirRust],
 };
 
+/// TypeScript JSON, dynamic-value, variant, tuple-map and atomic carriers (T1-T11).
+pub const JSON_VALUE: RuntimeItem = RuntimeItem {
+    ns: Namespace::Json,
+    name: "Value",
+    kind: RuntimeKind::Type,
+    targets: &[Target::HirTypeScript],
+};
+pub const JSON_PARSE: RuntimeItem = RuntimeItem {
+    ns: Namespace::Json,
+    name: "parse",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirTypeScript],
+};
+pub const JSON_STRINGIFY: RuntimeItem = RuntimeItem {
+    ns: Namespace::Json,
+    name: "stringify",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirTypeScript],
+};
+pub const JSON_PARSE_BIG_INT: RuntimeItem = RuntimeItem {
+    ns: Namespace::Json,
+    name: "parse_big_int",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirTypeScript],
+};
+pub const JSON_STRINGIFY_BIG_INT: RuntimeItem = RuntimeItem {
+    ns: Namespace::Json,
+    name: "stringify_big_int",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirTypeScript],
+};
+pub const VALOR_BOX: RuntimeItem = RuntimeItem {
+    ns: Namespace::Valor,
+    name: "box",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirTypeScript],
+};
+pub const VALOR_PAYLOAD: RuntimeItem = RuntimeItem {
+    ns: Namespace::Valor,
+    name: "payload",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirTypeScript],
+};
+pub const VALOR_IS: RuntimeItem = RuntimeItem {
+    ns: Namespace::Valor,
+    name: "is",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirTypeScript],
+};
+pub const VALOR_IS_INTEGER: RuntimeItem = RuntimeItem {
+    ns: Namespace::Valor,
+    name: "is_integer",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirTypeScript],
+};
+pub const VARIANT_VALUE: RuntimeItem = RuntimeItem {
+    ns: Namespace::Variant,
+    name: "value",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirTypeScript],
+};
+pub const TUPLE_MAP: RuntimeItem = RuntimeItem {
+    ns: Namespace::Tuple,
+    name: "TupleMap",
+    kind: RuntimeKind::Type,
+    targets: &[Target::HirTypeScript],
+};
+pub const ATOMIC_ATOMIC: RuntimeItem = RuntimeItem {
+    ns: Namespace::Atomic,
+    name: "Atomic",
+    kind: RuntimeKind::Type,
+    targets: &[Target::HirTypeScript],
+};
+
 /// The targets whose runtime package carries each `format` row: the Rust
 /// runtime (`faber::format`), the Go runtime (`rt.Format*`) and the TypeScript
 /// runtime (`format` in `@faber/runtime`, T1-T5) share the renderers whose id
@@ -870,6 +944,18 @@ pub const TABLE: &[RuntimeItem] = &[
     FORMAT_SCI,
     FORMAT_SIGNED,
     FORMAT_TEXT,
+    JSON_VALUE,
+    JSON_PARSE,
+    JSON_STRINGIFY,
+    JSON_PARSE_BIG_INT,
+    JSON_STRINGIFY_BIG_INT,
+    VALOR_BOX,
+    VALOR_PAYLOAD,
+    VALOR_IS,
+    VALOR_IS_INTEGER,
+    VARIANT_VALUE,
+    TUPLE_MAP,
+    ATOMIC_ATOMIC,
     TENSOR_TENSOR,
     TENSOR_ELEMENT_COUNT,
     TENSOR_TO_SPARSA,
