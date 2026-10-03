@@ -722,8 +722,12 @@ fn the_go_sermo_rows_spell_as_the_flat_rt_names() {
         (&SERMO_DRAIN, "rt.SermoDrain"),
     ] {
         assert_eq!(spell_any(Target::HirGo, row), spelled);
-        // Go carries these rows only; none is a store row.
-        assert_eq!(row.targets, &[Target::HirGo]);
+        match row.name {
+            "Sermo" | "Meus" | "Tuus" | "Scrinium" | "Status" => {
+                assert_eq!(row.targets, &[Target::HirGo, Target::HirTypeScript]);
+            }
+            _ => assert_eq!(row.targets, &[Target::HirGo]),
+        }
         assert_ne!(row.kind, RuntimeKind::StoreFn);
     }
     // The types: the handle, its two views, the frame, the status enum with its
@@ -1042,5 +1046,22 @@ fn typescript_json_valor_variant_tuple_atomic_rows_are_registered_and_reserved()
         );
         assert_eq!(spell(Target::HirTypeScript, row), Ok(expected.to_owned()));
         assert!(reserved_names(Target::HirTypeScript, TABLE).contains(&row.ns.as_str().to_owned()));
+    }
+}
+
+#[test]
+fn typescript_conversation_and_registry_carriers_have_runtime_rows() {
+    for (row, expected) in [
+        (&SERMO_SERMO, "sermo.Sermo"),
+        (&SERMO_SCRINIUM, "sermo.Scrinium"),
+        (&SERMO_MEUS, "sermo.Meus"),
+        (&SERMO_TUUS, "sermo.Tuus"),
+        (&SERMO_STATUS, "sermo.Status"),
+        (&ROUTES_TABLE, "routes.table"),
+        (&ROUTES_HANDLER, "routes.Handler"),
+        (&ROUTES_REGISTRY, "routes.Registry"),
+    ] {
+        assert_eq!(spell_any(Target::HirTypeScript, row), expected);
+        assert!(TABLE.contains(row));
     }
 }
