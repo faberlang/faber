@@ -1584,8 +1584,8 @@ pub(crate) fn encode_weight_map(
     })
 }
 
-/// Decode the hosts CLI `--inputs` JSON. Mirrors
-/// `faber_host_macos_arm64::device_execute::inputs_from_json`.
+/// Decode the child `faber-host-macos-arm64` device-execute CLI's
+/// `--inputs` JSON (the live child route's input contract — C2's to retire).
 pub fn decode_device_inputs(bytes: &[u8]) -> Result<BTreeMap<u32, Vec<f32>>, HostSpawnError> {
     let wire: BTreeMap<String, Vec<serde_json::Value>> =
         serde_json::from_slice(bytes).map_err(|error| HostSpawnError {
