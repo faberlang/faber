@@ -974,23 +974,13 @@ fn batched_softmax_mask_facts(
     score_dims: &[u64],
     operand: &MirOperand,
 ) -> Option<RowSoftmaxMask> {
-    if !crate::abi::softmax_operand_is_additive_mask_temp(function, operand) {
-        // A non-additive elementwise temp at rank 3/4 has no batched body
-        // in v1 — never a silent reshape of the composition.
-        return None;
-    }
-    // The additive idiom's `TensorAdd(scores, mask)` statement: the
-    // receiver (args[0]) carries the full score shape; the argument
-    // (args[1]) is the broadcast mask.
+    let (scores_local, mask_local, count) =
+        softmax_additive_mask_locals(function, operand, validation)?;
     let addends = additive_mask_add_args(function, operand)?;
-    let scores_local = operand_local_id(&addends[0])?;
-    let mask_local = operand_local_id(&addends[1])?;
     let receiver_dims = transformer_operand_dims(function, &addends[0], validation)?;
     if receiver_dims.as_slice() != score_dims {
         return None;
     }
-    let mask_dims = transformer_operand_dims(function, &addends[1], validation)?;
-    let count = mask_broadcast_count(score_dims, &mask_dims)?;
     let total = dims_product(score_dims)?;
     // A3 cross-check: both addend locals resolve to read-only kernel
     // resources holding exactly their own element counts.
@@ -1007,18 +997,62 @@ fn batched_softmax_mask_facts(
     Some(RowSoftmaxMask { count })
 }
 
-/// The `(scores, mask)` local ids of the additive-idiom `TensorAdd`
-/// statement feeding a softmax operand (U2 head-axis emitter surface):
-/// `args[0]` is the scores receiver, `args[1]` the broadcast mask. `None`
-/// when the operand is not the additive idiom or an addend is not a plain
-/// local.
+/// Resolve the additive softmax's raw scores and mask buffers. Explicit
+/// expansion is admitted only when its proven flat index is `flat % count`.
 #[must_use]
 pub fn softmax_additive_mask_locals(
     function: &MirFunction,
     operand: &MirOperand,
-) -> Option<(MirLocalId, MirLocalId)> {
+    validation: &MirValidationContext<'_>,
+) -> Option<(MirLocalId, MirLocalId, u64)> {
     let args = additive_mask_add_args(function, operand)?;
-    Some((operand_local_id(&args[0])?, operand_local_id(&args[1])?))
+    let scores = operand_local_id(&args[0])?;
+    let score_dims = transformer_operand_dims(function, &args[0], validation)?;
+    if let Some(mask) = operand_local_id(&args[1]) {
+        let mask_dims = transformer_operand_dims(function, &args[1], validation)?;
+        return Some((scores, mask, mask_broadcast_count(&score_dims, &mask_dims)?));
+    }
+    // Expansion producers in other blocks need an explicit dominance proof.
+    if function.blocks.len() != 1 {
+        return None;
+    }
+    let mask_base = match &args[1] {
+        MirOperand::Temp(temp) => MirPlaceBase::Temp(*temp),
+        MirOperand::Place(place) if place.projections.is_empty() => place.base.clone(),
+        _ => return None,
+    };
+    let mut producer = None;
+    for statement in function.blocks.iter().flat_map(|block| &block.statements) {
+        if let Some(destination) = crate::read_analysis::statement_destination_place(statement)
+            && destination.base == mask_base
+        {
+            // Multiple definitions or projected writes need a dominance proof.
+            if producer.is_some() || !destination.projections.is_empty() {
+                return None;
+            }
+            let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+                return None;
+            };
+            producer = Some(call);
+        }
+    }
+    let call = producer?;
+    let expansion = crate::tensor_expansion::TensorExpansion::for_call(function, call, validation)?;
+    if expansion.result_shape != score_dims {
+        return None;
+    }
+    let count = mask_broadcast_count(&score_dims, &expansion.source_shape)?;
+    // Every non-singleton digit must occupy the same row-major stride as
+    // the source. Together with the trailing-full-block shape law, this
+    // proves the expansion's exact flat mapping is modulo source count.
+    if expansion
+        .index_terms()
+        .iter()
+        .any(|(_, target_stride, _, source_stride)| target_stride != source_stride)
+    {
+        return None;
+    }
+    Some((scores, operand_local_id(call.args.first()?)?, count))
 }
 
 /// The `(scores, mask)` local operands of the `TensorAdd` statement whose

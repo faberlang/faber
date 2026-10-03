@@ -3012,3 +3012,68 @@ fn batched_softmax_batch_law_validation_fails_closed() {
         }
     );
 }
+
+#[test]
+fn batched_softmax_expanded_mask_requires_trailing_mapping() {
+    for (score_dims, mask_dims, resource_count, admitted) in [
+        (vec![5, 3, 1, 76], vec![1, 76], 76, true),
+        (vec![5, 3, 36, 36], vec![36, 36], 1296, true),
+        (vec![5, 3, 2, 76], vec![3, 76], 228, false),
+        (vec![5, 3, 1, 76], vec![1, 76], 152, false),
+    ] {
+        let mut types = TypeTable::new();
+        let mut function = batched_masked_softmax_function(&mut types, &score_dims, &mask_dims);
+        let scores_ty = function.params[0].ty;
+        function.temps.push(crate::MirTemp {
+            id: crate::MirTempId(1),
+            ty: scores_ty,
+            span: test_span(),
+        });
+        let MirStatementKind::RuntimeCall { call, .. } = &mut function.blocks[0].statements[0].kind
+        else {
+            unreachable!()
+        };
+        call.args[1] = MirOperand::Temp(crate::MirTempId(1));
+        function.blocks[0].statements.insert(
+            0,
+            MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::temp(crate::MirTempId(1))),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorExpand),
+                        args: vec![
+                            MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                            MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                        ],
+                        return_ty: scores_ty,
+                    },
+                },
+                span: test_span(),
+            },
+        );
+        let signature = batched_masked_softmax_signature(
+            &mut types,
+            score_dims.iter().product(),
+            resource_count,
+        );
+        let validation = MirValidationContext::new(&types);
+        let plan = CollectionKernelPlan::from_transformer_op(
+            &signature,
+            &function,
+            &validation,
+            MirCollectionOp::TensorSoftmax,
+        );
+        assert_eq!(plan.is_some(), admitted, "{score_dims:?} <- {mask_dims:?}");
+        if admitted {
+            assert_eq!(
+                softmax_additive_mask_locals(
+                    &function,
+                    &MirOperand::Temp(crate::MirTempId(0)),
+                    &validation,
+                ),
+                Some((MirLocalId(0), MirLocalId(1), resource_count))
+            );
+            plan.unwrap().validate().unwrap();
+        }
+    }
+}
