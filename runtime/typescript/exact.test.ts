@@ -99,6 +99,22 @@ test("pow is exact and traps on a negative exponent or overflow", () => {
   assert.equal(trapText(() => exact.pow(2, 53)), "numerus overflow");
 });
 
+test("pow preserves the expression value until a bounded store", () => {
+  assert.equal(exact.pow(20, 2), 400);
+  assert.equal(exact.pow(20, 2) / 2, 200);
+  assert.equal(exact.wrap(exact.pow(20, 2) / 2, 8, false), 200);
+  assert.equal(exact.wrap(exact.pow(20, 2), 8, false), 144);
+  assert.equal(exact.clamp(exact.pow(20, 2), 0, 255), 255);
+});
+
+test("pow preserves zero-exponent and signed-base behavior", () => {
+  assert.equal(exact.pow(0, 0), 1);
+  assert.equal(exact.pow(0, 5), 0);
+  assert.equal(exact.pow(-3, 2), 9);
+  assert.equal(exact.pow(-1, 63), -1);
+  assert.equal(exact.pow(2, 52), 4503599627370496);
+});
+
 test("hi, lo and join split and rejoin a value", () => {
   for (const v of [0, 1, -1, 4294967295, 4294967296, -4294967297, MAX, -MAX]) {
     assert.equal(exact.join(exact.hi(v), exact.lo(v)), v);
