@@ -4526,6 +4526,31 @@ incipit {
 }
 
 #[test]
+fn cumulata_does_not_overwrite_its_initial_value() {
+    // The scan rewrites its accumulator at each step; its initial value is a
+    // caller binding and must read the same after the call.
+    let source = r"functio main2() → vacuum {
+  fixum lista<numerus> base ← [1]
+  fixum lista<lista<numerus>> scanned ← [3, 4].cumulata((lista<numerus> acc, numerus x) ∴ acc.addita(x), base)
+  nota scanned.longitudo()
+  nota base.longitudo()
+}
+
+incipit {
+  main2()
+}";
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "cumulata-initial.fab",
+        source,
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("cumulata initial run must execute: {error:?}"));
+    assert_eq!(host.stdout_lines, ["2", "1"]);
+}
+
+#[test]
 fn lowers_lista_cumulata_with_synthetic_reducer() {
     let dump = dump_source(
         r"functio prefixes(lista<numerus> xs) → lista<numerus> {

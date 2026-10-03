@@ -841,8 +841,13 @@ impl FunctionBuilder<'_> {
 
         let collection = self.lower_expr_value(receiver)?;
         let collection = self.materialize_operand_place(collection, collection_ty, receiver.span);
+        // WHY: each scan step rewrites the accumulator, so it must be a
+        // fresh cell. Materializing the initial value could return a caller
+        // local or field and let the scan overwrite it.
         let accumulator = self.lower_expr_value(initial)?;
-        let accumulator = self.materialize_operand_place(accumulator, accumulator_ty, initial.span);
+        let accumulator_temp = self.push_temp(accumulator_ty, initial.span);
+        self.assign(MirPlace::temp(accumulator_temp), accumulator, accumulator_ty, initial.span);
+        let accumulator = MirPlace::temp(accumulator_temp);
         let result = self.construct_temp(
             MirAggregateKind::Array,
             MirAggregateFields::Ordered(Vec::new()),
