@@ -4230,7 +4230,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 cell.borrow()
                     .get(&key)
                     .cloned()
-                    .ok_or_else(|| RunnerError::internal(span, "map key not found"))
+                    .ok_or_else(|| RunnerError::internal(span, "tabula missing key"))
             }
             // Scalar flat-lane index over a tensor (itera ex element gather);
             // tensors define every lane by construction, so bounds are the
