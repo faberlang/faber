@@ -9,13 +9,14 @@ pub struct HirAspectEvidence(pub String);
 
 /// Outcome of checking a single verification obligation.
 ///
-/// Carries the status, human-readable evidence, and the backend tag so that
-/// callers can aggregate or display results without coupling to any specific
-/// verifier.
+/// Carries the status, human-readable evidence, the counter-example trace
+/// when one was produced, and the backend tag so that callers can aggregate
+/// or display results without coupling to any specific verifier.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HirAspectCheckResult {
     pub status: HirAspectCheckStatus,
     pub evidence: HirAspectEvidence,
+    pub counterexample: Vec<String>,
     pub backend: HirAspectBackendKind,
 }
 

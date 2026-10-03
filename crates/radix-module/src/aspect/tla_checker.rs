@@ -9,7 +9,7 @@ use super::HirAspectBackendKind;
 use super::HirAspectReport;
 use super::HirAspectTlaModule;
 use super::tla::emit_tla_modules;
-use super::verifier::{HirAspectEvidence, HirAspectVerifier};
+use super::verifier::{HirAspectCheckResult, HirAspectCheckStatus, HirAspectEvidence, HirAspectVerifier};
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -89,21 +89,18 @@ impl TlaAspectChecker {
 
     fn check_module(&self, module: &HirAspectTlaModule) -> HirAspectCheckResult {
         if !is_tla_identifier(&module.name) {
-            return HirAspectCheckResult::checker_error(&module.name, "invalid TLA module name");
+            return HirAspectCheckResult::checker_error("invalid TLA module name");
         }
 
         if let Err(error) = write_module_files(&self.config.work_dir, module) {
-            return HirAspectCheckResult::checker_error(&module.name, &format!("failed to write TLA module: {error}"));
+            return HirAspectCheckResult::checker_error(&format!("failed to write TLA module: {error}"));
         }
 
         if !self.config.java_bin_exists() {
-            return HirAspectCheckResult::checker_unavailable(&module.name, "java executable is unavailable");
+            return HirAspectCheckResult::checker_unavailable("java executable is unavailable");
         }
         if !self.config.tla_tools_jar.is_file() {
-            return HirAspectCheckResult::checker_unavailable(
-                &module.name,
-                "FABER_TLA_TLC_JAR does not point to a file",
-            );
+            return HirAspectCheckResult::checker_unavailable("FABER_TLA_TLC_JAR does not point to a file");
         }
 
         let output = Command::new(&self.config.java_bin)
@@ -118,15 +115,13 @@ impl TlaAspectChecker {
 
         match output {
             Ok(output) => normalize_tlc_output(
-                &module.name,
                 output.status.success(),
                 &String::from_utf8_lossy(&output.stdout),
                 &String::from_utf8_lossy(&output.stderr),
             ),
-            Err(error) => HirAspectCheckResult::checker_unavailable(
-                &module.name,
-                &format!("failed to launch TLC through java: {error}"),
-            ),
+            Err(error) => {
+                HirAspectCheckResult::checker_unavailable(&format!("failed to launch TLC through java: {error}"))
+            }
         }
     }
 }
@@ -144,9 +139,6 @@ pub fn check_tla_modules(config: TlaAspectCheckerConfig, modules: &[HirAspectTla
 
 /// TLA+ model-checker verifier — implements [`HirAspectVerifier`] over
 /// [`TlaAspectChecker`].
-///
-/// Bridges the old checker result types (with flat status/summary) into the
-/// verifier trait's result type (with evidence + backend tag).
 #[derive(Debug, Clone)]
 pub struct TlaAspectVerifier {
     config: TlaAspectCheckerConfig,
@@ -160,105 +152,46 @@ impl TlaAspectVerifier {
 }
 
 impl HirAspectVerifier for TlaAspectVerifier {
-    fn verify(&self, report: &HirAspectReport) -> Vec<super::verifier::HirAspectCheckResult> {
+    fn verify(&self, report: &HirAspectReport) -> Vec<HirAspectCheckResult> {
         let modules = emit_tla_modules(report);
-        let checker_results = check_tla_modules(self.config.clone(), &modules);
-        checker_results.into_iter().map(map_legacy_result).collect()
+        check_tla_modules(self.config.clone(), &modules)
     }
-}
-
-fn map_legacy_result(old: HirAspectCheckResult) -> super::verifier::HirAspectCheckResult {
-    use super::verifier::HirAspectCheckStatus as VerifierStatus;
-    let status = match old.status {
-        HirAspectCheckStatus::Passed => VerifierStatus::Proven,
-        HirAspectCheckStatus::Failed => VerifierStatus::Failed,
-        HirAspectCheckStatus::CheckerUnavailable => VerifierStatus::ToolchainMissing,
-        HirAspectCheckStatus::CheckerError => VerifierStatus::Error,
-    };
-    // The verifier result carries a single evidence string, so the
-    // counter-example must ride inside it to survive the bridge;
-    // `split_evidence_with_counterexample` recovers both halves.
-    let evidence = HirAspectEvidence(evidence_with_counterexample(old.summary, &old.counterexample));
-    super::verifier::HirAspectCheckResult { status, evidence, backend: HirAspectBackendKind::Tla }
-}
-
-/// Separator embedded in verifier evidence between the summary and the
-/// counter-example trace. NUL cannot appear in TLC output, so the split is
-/// unambiguous.
-const COUNTEREXAMPLE_EVIDENCE_SEPARATOR: &str = "\n\x00counter-example\x00\n";
-
-/// Join a legacy result's summary and counter-example into a single verifier
-/// evidence string.
-fn evidence_with_counterexample(mut summary: String, counterexample: &[String]) -> String {
-    if counterexample.is_empty() {
-        return summary;
-    }
-    summary.push_str(COUNTEREXAMPLE_EVIDENCE_SEPARATOR);
-    summary.push_str(&counterexample.join("\n"));
-    summary
-}
-
-/// Recover the summary and counter-example from verifier evidence produced by
-/// [`evidence_with_counterexample`]. The tool side (verify.rs) feeds the
-/// recovered halves back into the legacy result so the coverage renderer can
-/// display the trace.
-pub(crate) fn split_evidence_with_counterexample(evidence: &str) -> (String, Vec<String>) {
-    match evidence.split_once(COUNTEREXAMPLE_EVIDENCE_SEPARATOR) {
-        Some((summary, trace)) => (summary.to_owned(), trace.lines().map(str::to_owned).collect()),
-        None => (evidence.to_owned(), Vec::new()),
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HirAspectCheckStatus {
-    Passed,
-    Failed,
-    CheckerUnavailable,
-    CheckerError,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HirAspectCheckResult {
-    pub module_name: String,
-    pub status: HirAspectCheckStatus,
-    pub summary: String,
-    pub counterexample: Vec<String>,
 }
 
 impl HirAspectCheckResult {
-    pub(crate) fn checker_unavailable(module_name: &str, summary: &str) -> Self {
+    fn passed(summary: &str) -> Self {
         Self {
-            module_name: module_name.to_owned(),
-            status: HirAspectCheckStatus::CheckerUnavailable,
-            summary: summary.to_owned(),
+            status: HirAspectCheckStatus::Proven,
+            evidence: HirAspectEvidence(summary.to_owned()),
             counterexample: Vec::new(),
+            backend: HirAspectBackendKind::Tla,
         }
     }
 
-    fn passed(module_name: &str, summary: &str) -> Self {
+    fn failed(summary: &str, counterexample: Vec<String>) -> Self {
         Self {
-            module_name: module_name.to_owned(),
-            status: HirAspectCheckStatus::Passed,
-            summary: summary.to_owned(),
-            counterexample: Vec::new(),
-        }
-    }
-
-    fn failed(module_name: &str, summary: &str, counterexample: Vec<String>) -> Self {
-        Self {
-            module_name: module_name.to_owned(),
             status: HirAspectCheckStatus::Failed,
-            summary: summary.to_owned(),
+            evidence: HirAspectEvidence(summary.to_owned()),
             counterexample,
+            backend: HirAspectBackendKind::Tla,
         }
     }
 
-    fn checker_error(module_name: &str, summary: &str) -> Self {
+    fn checker_error(summary: &str) -> Self {
         Self {
-            module_name: module_name.to_owned(),
-            status: HirAspectCheckStatus::CheckerError,
-            summary: summary.to_owned(),
+            status: HirAspectCheckStatus::Error,
+            evidence: HirAspectEvidence(summary.to_owned()),
             counterexample: Vec::new(),
+            backend: HirAspectBackendKind::Tla,
+        }
+    }
+
+    fn checker_unavailable(summary: &str) -> Self {
+        Self {
+            status: HirAspectCheckStatus::ToolchainMissing,
+            evidence: HirAspectEvidence(summary.to_owned()),
+            counterexample: Vec::new(),
+            backend: HirAspectBackendKind::Tla,
         }
     }
 }
@@ -270,7 +203,7 @@ fn write_module_files(work_dir: &Path, module: &HirAspectTlaModule) -> std::io::
     Ok(())
 }
 
-fn normalize_tlc_output(module_name: &str, exit_success: bool, stdout: &str, stderr: &str) -> HirAspectCheckResult {
+fn normalize_tlc_output(exit_success: bool, stdout: &str, stderr: &str) -> HirAspectCheckResult {
     let combined = format!("{stdout}\n{stderr}");
 
     if !exit_success {
@@ -279,30 +212,22 @@ fn normalize_tlc_output(module_name: &str, exit_success: bool, stdout: &str, std
         // counter-example trace or the invariant status line) disproves the
         // aspect; anything else on a failed exit is a checker error.
         if contains_failure_markers(&combined) {
-            return HirAspectCheckResult::failed(
-                module_name,
-                first_relevant_line(&combined),
-                counterexample_lines(&combined),
-            );
+            return HirAspectCheckResult::failed(first_relevant_line(&combined), counterexample_lines(&combined));
         }
-        return HirAspectCheckResult::checker_error(module_name, first_nonempty_line(&combined));
+        return HirAspectCheckResult::checker_error(first_nonempty_line(&combined));
     }
 
     if combined.contains(TLC_SUCCESS_MARKER) {
-        return HirAspectCheckResult::passed(module_name, "TLC completed with no error");
+        return HirAspectCheckResult::passed("TLC completed with no error");
     }
 
     // Defensive: a zero-exit run that still printed a violation status line
     // must not surface as success.
     if contains_failure_markers(&combined) {
-        return HirAspectCheckResult::failed(
-            module_name,
-            first_relevant_line(&combined),
-            counterexample_lines(&combined),
-        );
+        return HirAspectCheckResult::failed(first_relevant_line(&combined), counterexample_lines(&combined));
     }
 
-    HirAspectCheckResult::checker_error(module_name, TLC_UNRECOGNIZED_OUTPUT_SUMMARY)
+    HirAspectCheckResult::checker_error(TLC_UNRECOGNIZED_OUTPUT_SUMMARY)
 }
 
 /// Whether the output reports a genuine model-checking violation: the

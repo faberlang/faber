@@ -372,6 +372,7 @@ impl HirAspectVerifier for LeanAspectChecker {
                     "aspect kind `{}` is registered without proof content; refusing placeholder proof",
                     aspect_label(r)
                 )),
+                counterexample: Vec::new(),
                 backend: HirAspectBackendKind::Lean,
             })
             .collect();
@@ -389,6 +390,7 @@ impl HirAspectVerifier for LeanAspectChecker {
                     evidence: HirAspectEvidence(format!(
                         "gate hole (never downgraded): {label} — the AIR purity gate admitted a form whose Line-3 model translation carries an IO/monadic effect"
                     )),
+                    counterexample: Vec::new(),
                     backend: HirAspectBackendKind::Lean,
                 }
             })
@@ -415,6 +417,7 @@ impl HirAspectVerifier for LeanAspectChecker {
                 let err_result = HirAspectCheckResult {
                     status: HirAspectCheckStatus::Error,
                     evidence: HirAspectEvidence(error),
+                    counterexample: Vec::new(),
                     backend: HirAspectBackendKind::Lean,
                 };
                 return merge_results(
@@ -432,6 +435,7 @@ impl HirAspectVerifier for LeanAspectChecker {
             let err_result = HirAspectCheckResult {
                 status: HirAspectCheckStatus::Error,
                 evidence: HirAspectEvidence(format!("failed to write Lean source: {error}")),
+                counterexample: Vec::new(),
                 backend: HirAspectBackendKind::Lean,
             };
             ignore_result(std::fs::remove_dir_all(&temp_dir));
@@ -446,6 +450,7 @@ impl HirAspectVerifier for LeanAspectChecker {
             let err_result = HirAspectCheckResult {
                 status: HirAspectCheckStatus::Error,
                 evidence: HirAspectEvidence(format!("failed to write lakefile.toml: {error}")),
+                counterexample: Vec::new(),
                 backend: HirAspectBackendKind::Lean,
             };
             ignore_result(std::fs::remove_dir_all(&temp_dir));
@@ -701,6 +706,7 @@ pub fn normalize_result(lake_output: LakeResult) -> HirAspectCheckResult {
         return HirAspectCheckResult {
             status: HirAspectCheckStatus::Timeout,
             evidence: HirAspectEvidence(lake_output.stderr),
+            counterexample: Vec::new(),
             backend: HirAspectBackendKind::Lean,
         };
     }
@@ -712,12 +718,14 @@ pub fn normalize_result(lake_output: LakeResult) -> HirAspectCheckResult {
             return HirAspectCheckResult {
                 status: HirAspectCheckStatus::ToolchainMissing,
                 evidence: HirAspectEvidence(combined),
+                counterexample: Vec::new(),
                 backend: HirAspectBackendKind::Lean,
             };
         }
         return HirAspectCheckResult {
             status: HirAspectCheckStatus::Error,
             evidence: HirAspectEvidence(combined),
+            counterexample: Vec::new(),
             backend: HirAspectBackendKind::Lean,
         };
     };
@@ -726,6 +734,7 @@ pub fn normalize_result(lake_output: LakeResult) -> HirAspectCheckResult {
         0 => HirAspectCheckResult {
             status: HirAspectCheckStatus::Proven,
             evidence: HirAspectEvidence(lake_output.stdout),
+            counterexample: Vec::new(),
             backend: HirAspectBackendKind::Lean,
         },
         _ => {
@@ -734,6 +743,7 @@ pub fn normalize_result(lake_output: LakeResult) -> HirAspectCheckResult {
             HirAspectCheckResult {
                 status: HirAspectCheckStatus::Failed,
                 evidence: HirAspectEvidence(lake_output.stderr),
+                counterexample: Vec::new(),
                 backend: HirAspectBackendKind::Lean,
             }
         }
@@ -768,6 +778,7 @@ pub fn combined_verdict(
         return HirAspectCheckResult {
             status: HirAspectCheckStatus::Failed,
             evidence: HirAspectEvidence(format!("sorry detected at lines: {line_numbers:?}")),
+            counterexample: Vec::new(),
             backend: HirAspectBackendKind::Lean,
         };
     }
@@ -779,6 +790,7 @@ pub fn combined_verdict(
                 "axiom audit unresolved: the #print-axioms wrapper import did not resolve; axioms are unverified"
                     .into(),
             ),
+            counterexample: Vec::new(),
             backend: HirAspectBackendKind::Lean,
         };
     }
@@ -788,6 +800,7 @@ pub fn combined_verdict(
         return HirAspectCheckResult {
             status: HirAspectCheckStatus::Failed,
             evidence: HirAspectEvidence(format!("disallowed axioms: {names:?}")),
+            counterexample: Vec::new(),
             backend: HirAspectBackendKind::Lean,
         };
     }

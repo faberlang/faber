@@ -6,7 +6,7 @@
 //! recognition and checking live in [`report`] and [`tla_checker`]
 //! respectively.
 
-use super::tla_checker::{HirAspectCheckResult, HirAspectCheckStatus};
+use super::verifier::{HirAspectCheckResult, HirAspectCheckStatus};
 use super::{
     HirAspectBackendKind, HirAspectKind, HirAspectObligationId, HirAspectReason, HirAspectRecord, HirAspectRecordKind,
     HirAspectReport, HirAspectSpan,
@@ -142,6 +142,7 @@ pub enum HirAspectCoverageReason {
     },
     CheckerUnavailable(String),
     CheckerError(String),
+    CheckerTimeout(String),
     MissingCheckerResult {
         id: HirAspectObligationId,
     },
@@ -235,21 +236,25 @@ fn obligation_id(record: &HirAspectRecord, index: usize) -> HirAspectObligationI
 
 fn coverage_from_check_result(result: &HirAspectCheckResult) -> (HirAspectCoverageStatus, HirAspectCoverageReason) {
     match result.status {
-        HirAspectCheckStatus::Passed => (HirAspectCoverageStatus::Proven, HirAspectCoverageReason::CheckerPassed),
+        HirAspectCheckStatus::Proven => (HirAspectCoverageStatus::Proven, HirAspectCoverageReason::CheckerPassed),
         HirAspectCheckStatus::Failed => (
             HirAspectCoverageStatus::Failed,
             HirAspectCoverageReason::CheckerFailed {
-                summary: result.summary.clone(),
+                summary: result.evidence.0.clone(),
                 counterexample: result.counterexample.clone(),
             },
         ),
-        HirAspectCheckStatus::CheckerUnavailable => (
+        HirAspectCheckStatus::ToolchainMissing => (
             HirAspectCoverageStatus::Abstracted,
-            HirAspectCoverageReason::CheckerUnavailable(result.summary.clone()),
+            HirAspectCoverageReason::CheckerUnavailable(result.evidence.0.clone()),
         ),
-        HirAspectCheckStatus::CheckerError => (
+        HirAspectCheckStatus::Error => (
             HirAspectCoverageStatus::Abstracted,
-            HirAspectCoverageReason::CheckerError(result.summary.clone()),
+            HirAspectCoverageReason::CheckerError(result.evidence.0.clone()),
+        ),
+        HirAspectCheckStatus::Timeout => (
+            HirAspectCoverageStatus::Abstracted,
+            HirAspectCoverageReason::CheckerTimeout(result.evidence.0.clone()),
         ),
     }
 }
@@ -330,6 +335,7 @@ fn reason_label(reason: &HirAspectCoverageReason) -> String {
         }
         HirAspectCoverageReason::CheckerUnavailable(summary) => format!("checker unavailable: {summary}"),
         HirAspectCoverageReason::CheckerError(summary) => format!("checker error: {summary}"),
+        HirAspectCoverageReason::CheckerTimeout(summary) => format!("checker timed out: {summary}"),
         HirAspectCoverageReason::MissingCheckerResult { id } => {
             format!("missing checker result for obligation {id:?}")
         }

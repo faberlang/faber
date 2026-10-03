@@ -7,7 +7,7 @@ use super::{
     HirAspectAssumption, HirAspectCoverageEntry, HirAspectCoverageReason, HirAspectCoverageReport,
     HirAspectCoverageStatus, render_hir_aspect_coverage, summarize_hir_aspect_coverage,
 };
-use crate::aspect::tla_checker::{HirAspectCheckResult, HirAspectCheckStatus};
+use crate::aspect::verifier::{HirAspectCheckResult, HirAspectCheckStatus, HirAspectEvidence};
 use crate::aspect::{
     HirAspectBackendKind, HirAspectKind, HirAspectObligationId, HirAspectPrecondition, HirAspectReason,
     HirAspectRecord, HirAspectReport, HirAspectSpan,
@@ -28,7 +28,12 @@ fn obligation_id(aspect: HirAspectKind, hir_id: u32, ordinal: usize) -> HirAspec
 }
 
 fn check(status: HirAspectCheckStatus, summary: &str) -> HirAspectCheckResult {
-    HirAspectCheckResult { module_name: String::new(), status, summary: summary.to_owned(), counterexample: Vec::new() }
+    HirAspectCheckResult {
+        status,
+        evidence: HirAspectEvidence(summary.to_owned()),
+        counterexample: Vec::new(),
+        backend: HirAspectBackendKind::Tla,
+    }
 }
 
 #[test]
@@ -56,18 +61,18 @@ fn hir_aspect_coverage_maps_checker_results_without_hiding_absence() {
         ],
     );
     let checks_list = vec![
-        check(HirAspectCheckStatus::Passed, "ok"),
+        check(HirAspectCheckStatus::Proven, "ok"),
         HirAspectCheckResult {
-            module_name: String::new(),
             status: HirAspectCheckStatus::Failed,
-            summary: "Error: Invariant Totality is violated.".to_owned(),
+            evidence: HirAspectEvidence("Error: Invariant Totality is violated.".to_owned()),
             counterexample: vec!["State 1".to_owned()],
+            backend: HirAspectBackendKind::Tla,
         },
         check(
-            HirAspectCheckStatus::CheckerUnavailable,
+            HirAspectCheckStatus::ToolchainMissing,
             "FABER_TLA_TLC_JAR does not point to a file",
         ),
-        check(HirAspectCheckStatus::CheckerError, "unexpected TLC output"),
+        check(HirAspectCheckStatus::Error, "unexpected TLC output"),
     ];
 
     let coverage = summarize_hir_aspect_coverage(&report, &checks_list, HirAspectBackendKind::Tla);
@@ -237,4 +242,27 @@ fn hir_aspect_coverage_empty_checks_list_maps_all_to_abstracted() {
 
     assert_eq!(coverage.entries().len(), 1);
     assert_eq!(coverage.entries()[0].status, HirAspectCoverageStatus::Abstracted);
+}
+
+#[test]
+fn hir_aspect_coverage_reports_timeout_distinctly_from_checker_error() {
+    let report =
+        HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, vec![recognized(1, 10), recognized(2, 20)]);
+    let checks_list = vec![
+        check(HirAspectCheckStatus::Timeout, "lake build timed out after 30s"),
+        check(HirAspectCheckStatus::Error, "unexpected output"),
+    ];
+
+    let coverage = summarize_hir_aspect_coverage(&report, &checks_list, HirAspectBackendKind::Tla);
+
+    assert_eq!(coverage.entries()[0].status, HirAspectCoverageStatus::Abstracted);
+    assert!(matches!(
+        coverage.entries()[0].reason,
+        HirAspectCoverageReason::CheckerTimeout(_)
+    ));
+    assert_eq!(coverage.entries()[1].status, HirAspectCoverageStatus::Abstracted);
+    assert!(matches!(coverage.entries()[1].reason, HirAspectCoverageReason::CheckerError(_)));
+    let rendered = coverage.render_text();
+    assert!(rendered.contains("checker timed out: lake build timed out after 30s"));
+    assert!(rendered.contains("checker error: unexpected output"));
 }
