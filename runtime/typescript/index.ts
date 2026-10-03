@@ -24,3 +24,7 @@ export * as dec from "./dec.ts";
 export * as inf from "./inf.ts";
 // @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
 export * as format from "./format.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as intervallum from "./intervallum.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as instans from "./instans.ts";
