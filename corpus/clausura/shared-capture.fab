@@ -7,7 +7,7 @@ canonical = false
 summary = "An unmarked closure shares the enclosing scope: captured names are the enclosing bindings, by reference."
 syntax = "(<params>) → <type> ∴ <expression>"
 aliases = ["shared capture", "capture by reference"]
-related = ["clausura", "libera", "∴"]
+related = ["clausura", "∴"]
 locale = "en"
 +++
 # =============================================================================
@@ -23,13 +23,12 @@ locale = "en"
 #     binding alive
 #   • Fresh loop bindings — `for … const i` binds a new `i` each iteration,
 #     so closures made in a loop each see their own value
-#   • Capture-free — mark a closure `free` (la `libera`) to forbid capture
 #
 # Common mistakes:
 #   • expecting a snapshot — capture is not a copy; read the value into a
 #     `const` first if a snapshot is wanted
 #
-# See also: clausura, libera, ∴
+# See also: clausura, ∴
 # =============================================================================
 
 # clausura — shared capture
