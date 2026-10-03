@@ -1269,6 +1269,9 @@ pub enum HirExpressionKind {
         mode: HirIteraMode,
         /// Coordinate bindings from the optional `apud` clause.
         coordinates: Vec<(DefId, Symbol)>,
+        /// Optional lane binder from the `filum` clause. Declared metadata
+        /// only: the runner lowers the plain loop and ignores the binder.
+        filum: Option<(DefId, Symbol)>,
         /// Element binding definition.
         binding: DefId,
         /// Element binding name.

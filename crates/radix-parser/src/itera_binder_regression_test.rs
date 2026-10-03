@@ -156,3 +156,52 @@ fn de_source_series_still_rejected() {
         ]),
     );
 }
+
+#[test]
+fn parses_filum_clause_after_apud() {
+    // BUG-4D4D0AE9 (K2): the lane-binder clause rides the shared itera
+    // head in the same position as `summa`'s (`filum` IDENTIFIER after
+    // the apud clause, before the mutability marker).
+    let result = parse_ok("itera ex t apud [i, j] filum f fixum v { tacet }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
+        panic!("expected itera statement");
+    };
+    assert_eq!(iter_stmt.apud.len(), 2);
+    let filum = iter_stmt.filum.as_ref().expect("filum clause preserved");
+    assert_eq!(result.interner.resolve(filum.name), "f");
+    let BindingPattern::Ident(binding) = &iter_stmt.bindings[0] else {
+        panic!("expected name binder");
+    };
+    assert_eq!(result.interner.resolve(binding.name), "v");
+}
+
+#[test]
+fn parses_filum_clause_without_apud() {
+    let result = parse_ok("itera ex t filum f fixum v { tacet }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
+        panic!("expected itera statement");
+    };
+    assert!(iter_stmt.apud.is_empty());
+    let filum = iter_stmt.filum.as_ref().expect("filum clause preserved");
+    assert_eq!(result.interner.resolve(filum.name), "f");
+}
+
+#[test]
+fn filum_stays_usable_as_an_ordinary_name_outside_the_clause_slot() {
+    // `filum` is claimed by registry identity only in the clause position:
+    // a binder named `filum` after the mutability marker still parses, and
+    // a loop-less `filum` identifier stays an ordinary name.
+    let result = parse_ok("itera ex t fixum filum { tacet }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
+        panic!("expected itera statement");
+    };
+    assert!(iter_stmt.filum.is_none());
+    assert!(matches!(
+        &iter_stmt.bindings[0],
+        BindingPattern::Ident(ident) if result.interner.resolve(ident.name) == "filum"
+    ));
+    let _ = parse_ok("functio t() → vacuum { filum(1) }");
+}

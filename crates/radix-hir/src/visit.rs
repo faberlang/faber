@@ -393,12 +393,16 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
             coordinates,
             binding: def_id,
             binding_name: name,
+            filum,
             iter,
             body: block,
             ..
         } => {
             for (coordinate_def_id, coordinate_name) in coordinates {
                 visitor.visit_def(*coordinate_def_id, *coordinate_name);
+            }
+            if let Some((filum_def_id, filum_name)) = filum {
+                visitor.visit_def(*filum_def_id, *filum_name);
             }
             visitor.visit_def(*def_id, *name);
             visitor.visit_expr(iter);
@@ -997,12 +1001,16 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
             coordinates,
             binding: def_id,
             binding_name: name,
+            filum,
             iter,
             body: block,
             ..
         } => {
             for (coordinate_def_id, coordinate_name) in coordinates {
                 visitor.visit_def(*coordinate_def_id, *coordinate_name);
+            }
+            if let Some((filum_def_id, filum_name)) = filum {
+                visitor.visit_def(*filum_def_id, *filum_name);
             }
             visitor.visit_def(*def_id, *name);
             visitor.visit_expr_mut(iter);

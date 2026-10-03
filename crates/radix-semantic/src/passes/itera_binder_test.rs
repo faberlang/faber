@@ -600,3 +600,46 @@ impl HirVisitor for ProductWalkTrace<'_> {
         radix_hir::visit::walk_block(self, block);
     }
 }
+
+#[test]
+fn accepts_filum_lane_binder_on_single_source_itera() {
+    // BUG-4D4D0AE9 (K2): the lane binder lowers as declared metadata on the
+    // single-source `Itera` node; the runner keeps plain-loop semantics.
+    let _ = test_support::analyze_ok(
+        r"
+functio walk(lista<numerus> ys) → vacuum {
+    itera ex ys apud [i] filum f fixum y {
+        nota i, y
+    }
+}
+",
+    );
+}
+
+#[test]
+fn declines_filum_clause_on_lockstep_series() {
+    test_support::assert_rejects_with_issue(
+        r"
+functio zip_walk(lista<numerus> ks, lista<numerus> vs) → vacuum {
+    itera ex ks, vs apud [i] filum f fixum k, v {
+        nota k, v
+    }
+}
+",
+        "itera_filum_requires_single_source",
+    );
+}
+
+#[test]
+fn declines_filum_clause_on_range_product() {
+    test_support::assert_rejects_with_issue(
+        r"
+functio grid_walk(numerus m, numerus n) → vacuum {
+    itera ab 0‥m, 0‥n filum f fixum r, c {
+        nota r, c
+    }
+}
+",
+        "itera_filum_requires_single_source",
+    );
+}

@@ -545,6 +545,7 @@ impl super::FaberCodegen<'_> {
             HirExpressionKind::Itera {
                 mode,
                 coordinates,
+                filum,
                 binding_name,
                 iter,
                 body: block,
@@ -577,6 +578,14 @@ impl super::FaberCodegen<'_> {
                         writer.write(&self.symbol_to_string(*name));
                     }
                     writer.write("]");
+                }
+                // Lane-binder clause from the shared `filum` production;
+                // dropping it rewrites the declared source head.
+                if let Some((_, lane)) = filum {
+                    writer.write(" ");
+                    writer.write(surface.contextual_keyword("filum"));
+                    writer.write(" ");
+                    writer.write(&self.symbol_to_string(*lane));
                 }
                 writer.write(" ");
                 // A destructuring binder lowers to a synthetic element local

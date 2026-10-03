@@ -1,0 +1,54 @@
++++
+term = "itera"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "vel_expr", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "itera_stmt", "apud_clause", "filum_clause", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "The optional lane-binder clause after `at` declares loop metadata and runs as the plain loop."
+syntax = "for from t at [i] thread f const cell { }"
+related = ["apud", "itera", "ex", "filum", "thread"]
+locale = "en"
++++
+
+# =============================================================================
+# apud filum — the `thread f` lane-binder clause after the coordinate clause.
+# =============================================================================
+#
+# What this teaches:
+#   • `thread f` (Latin `filum f`) rides the shared loop head in the same
+#     position as the `sum` reduction's lane binder: after the `at`
+#     coordinates, before the element binder
+#   • declared metadata, not a runtime value — the binder names a loop lane
+#     for later parallel lowering and is ignored on the way to MIR, so the
+#     loop below runs exactly like the plain `for from` loop
+#   • the clause is optional and composes with or without `at`
+#
+# Common mistakes:
+#   • using the lane name inside the body — it is not a runtime binding; the
+#     coordinates from `at` are the loop-visible values
+#   • combining `thread` with the lockstep series (`from a, b`) or the
+#     range-product series — the clause admits on the single-source loop
+#     only and declines on both series forms
+#
+# See also: apud, itera, ex, filum, thread
+# =============================================================================
+
+# Single-source `at [i] thread f` over a list
+#
+# for from t at [i] thread f const cell { <body> }
+#
+# GRAMMAR:
+#   iteraStmt :← 'for' 'from' expr ('at' '[' ident (',' ident)* ']')?
+#               ('thread' ident)? ('const' | 'var') binder …
+#
+# EXPECTED OUTPUT:
+#   lane index and element, one line per lane (0‥3) — identical to the
+#   plain loop's output.
+
+main {
+    const list<f32> xs ← [1.0, 2.0, 3.0]
+
+    for from xs at [i] thread f const v {
+        print i, v
+    }
+}
