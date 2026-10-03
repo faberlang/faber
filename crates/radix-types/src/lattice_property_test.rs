@@ -208,9 +208,7 @@ fn transitivity_holds_for_random_triples() {
         // Octeti and exactly lista<numerus<u8>> are mutually assignable as a
         // compatibility bridge, not as a proper subtype edge. Keep the
         // randomized transitivity property over the actual lattice.
-        if is_octeti_u8_lista_bridge(&table, a, b)
-            || is_octeti_u8_lista_bridge(&table, b, c)
-        {
+        if is_octeti_u8_lista_bridge(&table, a, b) || is_octeti_u8_lista_bridge(&table, b, c) {
             continue;
         }
 
