@@ -44,9 +44,10 @@ fn make<size D, size Q>(tensor<f32, [D]> ln1, tensor<f32, [D, Q]> wq) → Box<D,
 
 # `layer.ln1` projects an applied nominal inside the instantiated body and
 # `↦ list<f32>` is a Convert carrying pre-substitution payload types.
+# Expand the projected row to x's shape before exact-shape addition.
 @ public
 fn axis0_cells<size T, size D, size Q>(tensor<f32, [T, D]> x, Box<D, Q> layer) → int {
-    const tensor<f32, [T, D]> y ← x + layer.ln1
+    const tensor<f32, [T, D]> y ← x + layer.ln1.expanded(x.shape())
     const list<f32> data ← y ↦ list<f32>
     return data.length()
 }
