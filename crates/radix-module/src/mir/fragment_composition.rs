@@ -29,6 +29,7 @@ use crate::mir::{
 };
 use radix_mir::device::MirDeviceFunctionMetadataMap;
 use rustc_hash::{FxHashMap, FxHashSet};
+#[cfg(test)]
 use std::cell::Cell;
 
 pub const ISSUE_CYCLE: &str = "nucleum_fragment_cycle";
@@ -52,16 +53,32 @@ impl ExpansionBudget {
     };
 }
 
+#[cfg(test)]
 thread_local! {
     static BUDGET_OVERRIDE: Cell<Option<ExpansionBudget>> = const { Cell::new(None) };
+}
+
+#[cfg(test)]
+fn with_budget_override<R>(budget: ExpansionBudget, f: impl FnOnce() -> R) -> R {
+    struct Reset(Option<ExpansionBudget>);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            BUDGET_OVERRIDE.with(|slot| slot.set(self.0));
+        }
+    }
+    let previous = BUDGET_OVERRIDE.with(|slot| slot.replace(Some(budget)));
+    let _reset = Reset(previous);
+    f()
 }
 
 /// Active budget: test override or the documented defaults.
 #[must_use]
 pub fn active_budget() -> ExpansionBudget {
-    BUDGET_OVERRIDE
-        .with(Cell::get)
-        .unwrap_or(ExpansionBudget::DOCUMENTED_DEFAULTS)
+    #[cfg(test)]
+    if let Some(budget) = BUDGET_OVERRIDE.with(Cell::get) {
+        return budget;
+    }
+    ExpansionBudget::DOCUMENTED_DEFAULTS
 }
 
 /// One composition diagnostic.

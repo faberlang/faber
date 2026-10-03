@@ -2,7 +2,7 @@
 
 use super::{
     ExpansionBudget, FragmentCompositionError, ISSUE_CYCLE, ISSUE_EXPANSION, compose_with_metadata,
-    reject_surviving_fragment_calls_with_metadata, surviving_fragment_calls_with_metadata,
+    reject_surviving_fragment_calls_with_metadata, surviving_fragment_calls_with_metadata, with_budget_override,
 };
 use crate::diagnostics::DiagnosticArg;
 use crate::driver::{self, AnalyzeRequest, Config, Session};
@@ -47,18 +47,6 @@ const FRAGMENT_B: DefId = DefId(7);
 const KERNEL_HELPER: DefId = DefId(8);
 const KERNEL_INNER: DefId = DefId(9);
 const HOST: DefId = DefId(10);
-
-fn with_budget_override<R>(budget: ExpansionBudget, f: impl FnOnce() -> R) -> R {
-    struct Reset(Option<ExpansionBudget>);
-    impl Drop for Reset {
-        fn drop(&mut self) {
-            super::BUDGET_OVERRIDE.with(|slot| slot.set(self.0));
-        }
-    }
-    let prev = super::BUDGET_OVERRIDE.with(|slot| slot.replace(Some(budget)));
-    let _reset = Reset(prev);
-    f()
-}
 
 const CALL_SPAN: fn() -> Span = || test_span_between(40, 52);
 const DEF_SPAN: fn() -> Span = || test_span_between(8, 20);

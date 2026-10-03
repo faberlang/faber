@@ -4,7 +4,9 @@
 //! Fragments have no standalone runtime identity, so no fixture here emits a
 //! fragment alone.
 
-use super::{ExpansionBudget, ISSUE_CYCLE, ISSUE_EXPANSION, surviving_fragment_calls_with_metadata};
+use super::{
+    ExpansionBudget, ISSUE_CYCLE, ISSUE_EXPANSION, surviving_fragment_calls_with_metadata, with_budget_override,
+};
 use crate::diagnostics::Diagnostic;
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::lexer::Span;
@@ -19,18 +21,6 @@ use crate::test_support::test_span;
 const ISSUE_CONTEXT: &str = "nucleum_fragment_context";
 const ISSUE_TYPE: &str = "nucleum_fragment_type";
 const ISSUE_EFFECT: &str = "nucleum_fragment_effect";
-
-fn with_budget_override<R>(budget: ExpansionBudget, f: impl FnOnce() -> R) -> R {
-    struct Reset(Option<ExpansionBudget>);
-    impl Drop for Reset {
-        fn drop(&mut self) {
-            super::BUDGET_OVERRIDE.with(|slot| slot.set(self.0));
-        }
-    }
-    let prev = super::BUDGET_OVERRIDE.with(|slot| slot.replace(Some(budget)));
-    let _reset = Reset(prev);
-    f()
-}
 
 fn assert_wrapper_route(source: &str) {
     assert!(
