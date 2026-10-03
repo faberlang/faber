@@ -1249,6 +1249,23 @@ impl Parser {
         })
     }
 
+    /// Require a token while preserving the grammar contract as a locale issue.
+    fn expect_issue(
+        &mut self,
+        kind: &TokenKind,
+        issue: &'static str,
+    ) -> Result<&Token, ParseError> {
+        if self.check(kind) {
+            Ok(self.advance())
+        } else {
+            Err(
+                ParseError::structured(ParseErrorKind::Expected, self.current_span())
+                    .with_arg("issue", issue),
+            )
+        }
+    }
+
+    // Unmigrated declaration, statement, and expression contracts still use prose.
     fn expect(&mut self, kind: &TokenKind, msg: &str) -> Result<&Token, ParseError> {
         if self.check(kind) {
             Ok(self.advance())

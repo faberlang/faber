@@ -281,14 +281,14 @@ impl Parser {
                         )
                         .with_arg("issue", "atomic_single_element"));
                     }
-                    self.expect(&TokenKind::GtAscii, "expected '>'")?;
+                    self.expect_issue(&TokenKind::GtAscii, "type_arguments_end")?;
                     TypeExprKind::Atomic(elem)
                 } else if name_str == "promissum" {
                     let success = Box::new(self.parse_type()?);
 
                     if self.eat(&TokenKind::ExitArrow) {
                         let alternate = Box::new(self.parse_type()?);
-                        self.expect(&TokenKind::GtAscii, "expected '>'")?;
+                        self.expect_issue(&TokenKind::GtAscii, "type_arguments_end")?;
                         TypeExprKind::PromissumFailable(success, alternate)
                     } else {
                         if self.eat(&TokenKind::Comma) {
@@ -298,7 +298,7 @@ impl Parser {
                             )
                             .with_arg("issue", "promissum_alternate_uses_exit_arrow"));
                         }
-                        self.expect(&TokenKind::GtAscii, "expected '>'")?;
+                        self.expect_issue(&TokenKind::GtAscii, "type_arguments_end")?;
                         TypeExprKind::Named(name, vec![GenericArgExpr::Type(*success)])
                     }
                 } else if name_str == "tensor"
@@ -324,7 +324,7 @@ impl Parser {
                         .with_arg("issue", issue));
                     }
                     let shape = self.parse_figura()?;
-                    self.expect(&TokenKind::GtAscii, "expected '>'")?;
+                    self.expect_issue(&TokenKind::GtAscii, "type_arguments_end")?;
                     if name_str == "tensor" {
                         TypeExprKind::Tensor(elem, shape)
                     } else if name_str == "sparsa" {
@@ -356,7 +356,7 @@ impl Parser {
                             break;
                         }
                     }
-                    self.expect(&TokenKind::GtAscii, "expected '>'")?;
+                    self.expect_issue(&TokenKind::GtAscii, "type_arguments_end")?;
                     if name_str == "iuncta" && params.len() > 16 {
                         return Err(
                             ParseError::structured(ParseErrorKind::TypeInvalid, name.span)
@@ -513,7 +513,7 @@ impl Parser {
     /// Function type syntax is only recognized after an opening parenthesis in a
     /// known type position, avoiding ambiguity with parenthesized expressions.
     fn parse_func_type(&mut self) -> Result<FuncTypeExpr, ParseError> {
-        self.expect(&TokenKind::LParen, "expected '('")?;
+        self.expect_issue(&TokenKind::LParen, "function_type_start")?;
 
         let mut params = Vec::new();
         while !self.check(&TokenKind::RParen) && !self.is_at_end() {
@@ -523,8 +523,8 @@ impl Parser {
             }
         }
 
-        self.expect(&TokenKind::RParen, "expected ')'")?;
-        self.expect(&TokenKind::Arrow, "expected '→'")?;
+        self.expect_issue(&TokenKind::RParen, "function_type_parameters_end")?;
+        self.expect_issue(&TokenKind::Arrow, "function_type_return_arrow")?;
 
         let ret = Box::new(self.parse_type()?);
         let err = if self.eat(&TokenKind::ExitArrow) {
@@ -626,7 +626,7 @@ impl Parser {
         name: Ident,
         authored_word: &str,
     ) -> Result<(TypeExprKind, TypeFormLevel), ParseError> {
-        self.expect(&TokenKind::LtAscii, "expected '<'")?;
+        self.expect_issue(&TokenKind::LtAscii, "numeric_wrapper_start")?;
         let mut args = Vec::new();
         loop {
             args.push(self.parse_type_argument()?);
@@ -634,7 +634,7 @@ impl Parser {
                 break;
             }
         }
-        self.expect(&TokenKind::GtAscii, "expected '>'")?;
+        self.expect_issue(&TokenKind::GtAscii, "type_arguments_end")?;
         let span = name.span.merge(self.previous_span());
 
         let rendered: Vec<String> = args
@@ -737,7 +737,7 @@ impl Parser {
                 break;
             }
         }
-        self.expect(&TokenKind::GtAscii, "expected '>'")?;
+        self.expect_issue(&TokenKind::GtAscii, "type_arguments_end")?;
         Ok(args)
     }
 
@@ -760,7 +760,7 @@ impl Parser {
                     .with_arg("issue", "duplicate_tuple_element_label")
                     .with_arg("label", self.interner.resolve(label.name).to_owned()));
             }
-            self.expect(&TokenKind::Colon, "expected ':' after tuple element label")?;
+            self.expect_issue(&TokenKind::Colon, "tuple_type_label_separator")?;
             Some(label)
         } else {
             None
@@ -793,7 +793,7 @@ impl Parser {
                 .with_arg("issue", "duplicate_tuple_element_label")
                 .with_arg("label", self.interner.resolve(label.name).to_owned()));
         }
-        self.expect(&TokenKind::Colon, "expected ':' after ratio element label")?;
+        self.expect_issue(&TokenKind::Colon, "ratio_type_label_separator")?;
 
         let mut ty = self.parse_type()?;
         ty.iuncta_label = Some(label);
@@ -893,7 +893,7 @@ impl Parser {
                     }
                 }
             }
-            self.expect(&TokenKind::RBracket, "expected ']'")?;
+            self.expect_issue(&TokenKind::RBracket, "shape_dimensions_end")?;
             return Ok(FiguraExpr::Tuple(dims));
         }
 
@@ -935,7 +935,7 @@ impl Parser {
     fn parse_figura_atom(&mut self) -> Result<FiguraExpr, ParseError> {
         if self.eat(&TokenKind::LParen) {
             let value = self.parse_figura()?;
-            self.expect(&TokenKind::RParen, "expected ')'")?;
+            self.expect_issue(&TokenKind::RParen, "shape_parenthesis_end")?;
             return Ok(value);
         }
 
@@ -1021,3 +1021,7 @@ fn flatten_intersection_member(member: TypeExpr, members: &mut Vec<TypeExpr>) {
 #[cfg(test)]
 #[path = "types_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "types_diagnostic_test.rs"]
+mod diagnostic_tests;

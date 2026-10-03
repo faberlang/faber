@@ -3166,3 +3166,30 @@ help = "讓每個 aut 分支以相同型別繫結相同名稱"
 [diagnostics.SEM010.issues.filum_independence_unproven]
 message = "無法證明執行緒迭代的獨立性：{reason}"
 help = "使用普通迴圈，或僅寫入本次迭代的座標，並僅在同一座標讀取已寫入的儲存；不要修改外部區域變數或呼叫未經證明的副作用"
+
+[diagnostics.PARSE001.issues.type_arguments_end]
+message = "型別實參後需要 '>'"
+
+[diagnostics.PARSE001.issues.function_type_start]
+message = "函式型別的形參前需要 '('"
+
+[diagnostics.PARSE001.issues.function_type_parameters_end]
+message = "函式型別的形參後需要 ')'"
+
+[diagnostics.PARSE001.issues.function_type_return_arrow]
+message = "函式回傳型別前需要 '→'"
+
+[diagnostics.PARSE001.issues.numeric_wrapper_start]
+message = "數值包裝型別名稱後需要 '<'"
+
+[diagnostics.PARSE001.issues.tuple_type_label_separator]
+message = "元組元素標籤後需要 ':'"
+
+[diagnostics.PARSE001.issues.ratio_type_label_separator]
+message = "ratio 元素標籤後需要 ':'"
+
+[diagnostics.PARSE001.issues.shape_dimensions_end]
+message = "形狀維度後需要 ']'"
+
+[diagnostics.PARSE001.issues.shape_parenthesis_end]
+message = "括號內的形狀後需要 ')'"

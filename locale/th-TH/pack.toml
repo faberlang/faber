@@ -3178,3 +3178,30 @@ help = "ให้ทุกทางเลือก aut ผูกชื่อเ�
 [diagnostics.SEM010.issues.filum_independence_unproven]
 message = "ไม่สามารถพิสูจน์ความเป็นอิสระของรอบเธรดได้: {reason}"
 help = "ใช้ลูปธรรมดา หรือเขียนและอ่านพื้นที่ที่เขียนเฉพาะพิกัดของรอบนั้น อย่าแก้ตัวแปรภายนอกหรือเรียกผลกระทบที่ยังพิสูจน์ไม่ได้"
+
+[diagnostics.PARSE001.issues.type_arguments_end]
+message = "ต้องมี '>' หลังอาร์กิวเมนต์ชนิด"
+
+[diagnostics.PARSE001.issues.function_type_start]
+message = "ต้องมี '(' ก่อนพารามิเตอร์ของชนิดฟังก์ชัน"
+
+[diagnostics.PARSE001.issues.function_type_parameters_end]
+message = "ต้องมี ')' หลังพารามิเตอร์ของชนิดฟังก์ชัน"
+
+[diagnostics.PARSE001.issues.function_type_return_arrow]
+message = "ต้องมี '→' ก่อนชนิดคืนค่าของฟังก์ชัน"
+
+[diagnostics.PARSE001.issues.numeric_wrapper_start]
+message = "ต้องมี '<' หลังชื่อตัวครอบชนิดตัวเลข"
+
+[diagnostics.PARSE001.issues.tuple_type_label_separator]
+message = "ต้องมี ':' หลังป้ายกำกับสมาชิกทูเพิล"
+
+[diagnostics.PARSE001.issues.ratio_type_label_separator]
+message = "ต้องมี ':' หลังป้ายกำกับสมาชิก ratio"
+
+[diagnostics.PARSE001.issues.shape_dimensions_end]
+message = "ต้องมี ']' หลังมิติรูปร่าง"
+
+[diagnostics.PARSE001.issues.shape_parenthesis_end]
+message = "ต้องมี ')' หลังรูปร่างในวงเล็บ"

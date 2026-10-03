@@ -3166,3 +3166,30 @@ help = "hãy để mỗi lựa chọn aut liên kết cùng tên với cùng ki�
 [diagnostics.SEM010.issues.filum_independence_unproven]
 message = "không thể chứng minh tính độc lập của vòng lặp luồng: {reason}"
 help = "dùng vòng lặp thường, hoặc chỉ ghi tại tọa độ của lượt và đọc vùng đã ghi tại cùng tọa độ; không sửa biến ngoài hay gọi hiệu ứng chưa được chứng minh"
+
+[diagnostics.PARSE001.issues.type_arguments_end]
+message = "cần '>' sau các đối số kiểu"
+
+[diagnostics.PARSE001.issues.function_type_start]
+message = "cần '(' trước các tham số của kiểu hàm"
+
+[diagnostics.PARSE001.issues.function_type_parameters_end]
+message = "cần ')' sau các tham số của kiểu hàm"
+
+[diagnostics.PARSE001.issues.function_type_return_arrow]
+message = "cần '→' trước kiểu trả về của hàm"
+
+[diagnostics.PARSE001.issues.numeric_wrapper_start]
+message = "cần '<' sau tên kiểu bao số"
+
+[diagnostics.PARSE001.issues.tuple_type_label_separator]
+message = "cần ':' sau nhãn phần tử bộ"
+
+[diagnostics.PARSE001.issues.ratio_type_label_separator]
+message = "cần ':' sau nhãn phần tử ratio"
+
+[diagnostics.PARSE001.issues.shape_dimensions_end]
+message = "cần ']' sau các chiều hình dạng"
+
+[diagnostics.PARSE001.issues.shape_parenthesis_end]
+message = "cần ')' sau hình dạng trong ngoặc"
