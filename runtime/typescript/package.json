@@ -1,7 +1,7 @@
 {
   "name": "@faber/runtime",
   "version": "0.1.0",
-  "description": "Faber language runtime package for generated TypeScript: the display namespace (display.value and its renderers), the exact namespace (exact-integer arithmetic and stores), the dec namespace (exact decimal arithmetic and the d64 store), the inf namespace (unbounded-integer arithmetic, comparisons, stores and conversions), the format namespace (the \u00b6 format-operator renderers), the modulus namespace (signed and unsigned word-ring operations), the interval and instant namespaces, and the regex namespace (@faber/runtime/regex).",
+  "description": "Faber language runtime package for generated TypeScript: the display namespace (display.value and its renderers), the exact namespace (exact-integer arithmetic and stores), the dec namespace (exact decimal arithmetic and the d64 store), the inf namespace (unbounded-integer arithmetic, comparisons, stores and conversions), the format namespace (the \u00b6 format-operator renderers), the modulus namespace (signed and unsigned word-ring operations), the interval and instant namespaces, the order and dup namespaces, and the regex namespace (@faber/runtime/regex).",
   "license": "MIT",
   "type": "module",
   "main": "index.ts",
@@ -40,10 +40,12 @@
     "tsconfig.json",
     "package.json",
     "intervallum.ts",
-    "instans.ts"
+    "instans.ts",
+    "dup.ts",
+    "order.ts"
   ],
   "private": true,
   "scripts": {
-    "test": "node --test dec.test.ts display.test.ts exact.test.ts format.test.ts inf.test.ts modulus.test.ts regex.test.ts tensor.test.ts sparsa.test.ts matrix.test.ts vector.test.ts instans.test.ts intervallum.test.ts"
+    "test": "node --test dec.test.ts display.test.ts exact.test.ts format.test.ts inf.test.ts modulus.test.ts regex.test.ts tensor.test.ts sparsa.test.ts matrix.test.ts vector.test.ts instans.test.ts intervallum.test.ts dup.test.ts order.test.ts"
   }
 }

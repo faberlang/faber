@@ -38,3 +38,7 @@ export * as vector from "./vector.ts";
 export * as intervallum from "./intervallum.ts";
 // @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
 export * as instans from "./instans.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as order from "./order.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as dup from "./dup.ts";
