@@ -1270,9 +1270,10 @@ requirit_stmt      := 'requirit' expression 'iace' expression
 reice_stmt         := 'reice' expression 'iace' expression
 
 expression := assignment
-# Exact-output transfer (EOT-3): sink ⇇ payload chains bind above assignment
-# and below ternary; operands are complete before transfer.
-transfer   := ternary ('⇇' ternary)*
+# Copy-into: `target ⇇ value` copies the values of `value` into the existing
+# storage of `target`. Binds above assignment and below ternary; operands are
+# complete before the copy. One ⇇ per statement: a chain is `copy_into_chain`.
+transfer   := ternary ('⇇' ternary)?
 assignment := transfer ('←' assignment | '↤' assignment inline_default?)?
 inc_dec_stmt := place ('↑' | '↓')
 place      := call_expr  (* semantic analysis requires an assignable target *)
