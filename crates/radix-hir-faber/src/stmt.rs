@@ -1,10 +1,10 @@
 //! Statement and block emission for the canonical Faber backend.
 //!
-//! This module reconstructs grammar-valid Faber statements from HIR. The goal
-//! is normalized source output that can be parsed again, not recovery of the
-//! user's exact source layout, comments, or spelling choices. Helpers here
-//! recognize HIR shapes that came from compact Faber syntax and rebuild the
-//! canonical form only when the shape is unambiguous.
+//! This module reconstructs grammar-valid Faber statements from HIR, placing
+//! authored comments from the presentation sidecar at their render slots.
+//! Layout is normalized rather than reproduced verbatim. Helpers here recognize
+//! HIR shapes that came from compact Faber syntax and rebuild the canonical
+//! form only when the shape is unambiguous and no comment slot is lost.
 //!
 //! INVARIANTS
 //! ==========
@@ -14,7 +14,7 @@
 //! - `si`/`sin`/`secus` chains are reconstructed from nested conditional HIR
 //!   without changing branch semantics.
 //! - Expression-level constructs such as `fac`/`dum` loops and `discerne` arms
-//!   can reuse these block helpers without reintroducing source-layout trivia.
+//!   reuse the same block helpers and presentation-trivia slots.
 //! - Catch blocks, `ad` bodies, and control statements are emitted as canonical
 //!   Faber syntax accepted by the parser.
 
@@ -466,6 +466,9 @@ impl super::FaberCodegen<'_> {
     ) {
         self.write_stmts(&block.statements[start..], names, surface, writer);
         if let Some(expr) = &block.expr {
+            if let Some(trivia) = self.trivia.for_hir(expr.id) {
+                crate::trivia::write_leading_trivia(trivia, self.interner, writer);
+            }
             self.write_expr(expr, names, surface, writer);
             writer.newline();
         }

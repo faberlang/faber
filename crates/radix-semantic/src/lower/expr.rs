@@ -234,7 +234,7 @@ fn lower_first_match(
     let binding_def_id = lowerer.next_def_id();
     lowerer.bind_local(first_match.binding.name, binding_def_id);
     let mut body = lowerer.lower_block(&first_match.body);
-    lift_trailing_expression_stmt(&mut body);
+    lift_trailing_expression_stmt(lowerer, &mut body);
     lowerer.pop_scope();
 
     HirExpressionKind::FirstMatch {
@@ -253,7 +253,7 @@ fn lower_first_match(
 fn lower_trap(lowerer: &mut Lowerer, trap: &radix_syntax::TrapExpr) -> HirExpressionKind {
     lowerer.current_span = trap.span;
     let mut body = lowerer.lower_block(&trap.body);
-    lift_trailing_expression_stmt(&mut body);
+    lift_trailing_expression_stmt(lowerer, &mut body);
     HirExpressionKind::Trap(Box::new(body))
 }
 
@@ -296,8 +296,10 @@ fn lower_literal(lowerer: &mut Lowerer, lit: &Literal) -> HirExpressionKind {
 /// the `ubi` predicate (`ubi x { x < 0.0 }`, AFM-3) and the `capta` trap body
 /// (its final expression is the success value, UT). The last expression
 /// statement of the block becomes the block value; everything before it is
-/// ordinary sequential preamble.
-fn lift_trailing_expression_stmt(body: &mut radix_hir::HirBlock) {
+/// ordinary sequential preamble. The source statement's presentation owner
+/// follows the expression into that slot; leaving it on the removed statement
+/// would orphan its comments even though the value itself survives.
+fn lift_trailing_expression_stmt(lowerer: &mut Lowerer, body: &mut radix_hir::HirBlock) {
     if body.expr.is_some() {
         return;
     }
@@ -315,6 +317,16 @@ fn lift_trailing_expression_stmt(body: &mut radix_hir::HirBlock) {
             return;
         }
     };
+    let statement_owner = radix_hir::HirOwnerRef::Hir(trailing.id);
+    if let Some(owner) = lowerer
+        .presentation
+        .owners
+        .iter_mut()
+        .rev()
+        .find(|owner| owner.semantic.as_ref() == Some(&statement_owner))
+    {
+        owner.semantic = Some(radix_hir::HirOwnerRef::Hir(expr.id));
+    }
     body.expr = Some(Box::new(expr));
 }
 

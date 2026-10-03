@@ -307,6 +307,41 @@ fn emits_statement_trivia_before_each_statement() {
 }
 
 #[test]
+fn emits_lifted_statement_trivia_before_block_tail() {
+    let mut interner = Interner::new();
+    let body = HirBlock::simple(Vec::new(), Some(Box::new(literal_int(10, 1))), span());
+    let mut presentation = crate::empty_presentation();
+    presentation.owners.push(owner(
+        1,
+        HirTriviaOwnerKind::Statement,
+        Some(HirOwnerRef::Hir(HirId(10))),
+    ));
+    presentation
+        .attachments
+        .push(attachment(1, comment_run(&mut interner, " tail comment")));
+    assert!(
+        crate::trivia::TriviaIndex::from_presentation(&presentation).block_has_trivia(&body),
+        "a lifted statement's tail comment must prevent comment-free compaction"
+    );
+    let hir = program(
+        vec![function_item(
+            &mut interner,
+            100,
+            USER_DEF_ID_BASE,
+            "noop",
+            Some(body),
+            vec![],
+        )],
+        None,
+    );
+    let code = render(&hir, &presentation, &interner);
+    assert!(
+        code.contains("    # tail comment\n    1\n"),
+        "tail trivia must precede its value:\n{code}"
+    );
+}
+
+#[test]
 fn emits_block_end_trivia_before_closing_brace() {
     let mut interner = Interner::new();
     let body = authored_block(vec![redde_stmt(1, 10, 1)], 20);

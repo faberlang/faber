@@ -41,6 +41,22 @@ fn assert_idempotent(source: &str) -> String {
 }
 
 #[test]
+fn trap_body_comments_survive_round_trip() {
+    for source in [
+        "functio f() { fixum ∪ r ← capta {\n# trap body\n1\n} }\n",
+        "functio f() { fixum ∪ r ← capta {\n# preamble\nfixum numerus x ← 1\n# trap body\n# second tail comment\nx\n# block end\n} }\n",
+    ] {
+        let first = emit_once(source);
+        let second = emit_once(&first);
+        for comment in source.lines().filter(|line| line.starts_with('#')) {
+            assert!(first.contains(comment), "first format lost `{comment}`:\n{first}");
+            assert!(second.contains(comment), "second format lost `{comment}`:\n{second}");
+        }
+        assert_eq!(first, second, "trap formatting must be idempotent");
+    }
+}
+
+#[test]
 fn access_marked_parameter_forms_keep_their_inner_type() {
     let source = "genus Box { varia numerus value }\nfunctio update(in Box box, de lista<numerus> items, in numerus count, de li32 compact) { tacet }\n";
     let emitted = assert_idempotent(source);

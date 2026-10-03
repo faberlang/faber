@@ -115,7 +115,7 @@ impl TriviaIndex {
     }
 
     /// Whether a candidate compact block carries any attached trivia on its
-    /// statements or on its structural end.
+    /// statements, lifted tail expression, or structural end.
     ///
     /// Compact `ergo redde` / `sic … secus …` output has no slot for attached
     /// trivia, so comment-bearing blocks must stay braced (locked invariant).
@@ -130,6 +130,10 @@ impl TriviaIndex {
             .statements
             .iter()
             .any(|stmt| self.for_hir(stmt.id).is_some())
+            || block
+                .expr
+                .as_ref()
+                .is_some_and(|expr| self.for_hir(expr.id).is_some())
     }
 }
 
