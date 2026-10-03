@@ -1889,6 +1889,10 @@ help = "अभी longitudo के लिए numerus intervallum सीमाओ
 message = "संख्यात्मक ऑपरेंड आवश्यक हैं"
 help = "इस ऑपरेटर के लिए संख्यात्मक ऑपरेंड का उपयोग करें"
 
+[diagnostics.SEM011.issues.tensor_multiply_requires_glyph]
+message = "tensor `*` tensor समर्थित नहीं है; तत्ववार गुणन के लिए ⊙ या contraction के लिए · का उपयोग करें"
+help = "तत्ववार गुणन के लिए ⊙ या contraction के लिए · का उपयोग करें"
+
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "संख्यात्मक अंकगणितीय ऑपरेंड के प्रकार समान होने चाहिए; स्पष्ट रूप से परिवर्तित करने के लिए ↦ का उपयोग करें"
 help = "इस संख्यात्मक ऑपरेटर को लागू करने से पहले ऑपरेंड को स्पष्ट रूप से परिवर्तित करें"

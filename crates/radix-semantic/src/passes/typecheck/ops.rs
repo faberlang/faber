@@ -2457,6 +2457,7 @@ pub(super) fn is_numeric_literal(expr: &HirExpression) -> bool {
 }
 
 const NUMERIC_OPERANDS_REQUIRED: &str = "numeric_operands_required";
+const TENSOR_MULTIPLY_REQUIRES_GLYPH: &str = "tensor_multiply_requires_glyph";
 pub(super) const NUMERIC_ARITHMETIC_OPERANDS_IDENTICAL: &str =
     "numeric_arithmetic_operands_identical";
 pub(super) const MODULAR_WORD_FAMILY_MISMATCH: &str = "modular_word_family_mismatch";

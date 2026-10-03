@@ -88,11 +88,15 @@ functio k(tensor<numerus, [4]> a) → tensor<numerus, [4]> { redde a % 3 }",
     );
 }
 
-/// `tensor * tensor` is K10's (conflicted, routed): today's behaviour is pinned
-/// exactly, with no `⊙` hint, so K4 does not preempt that decision.
+/// Tensor multiplication points to the rule's alternatives; division and
+/// remainder keep their general numeric-operand diagnostic.
 #[test]
-fn tensor_times_tensor_keeps_todays_rejection() {
-    for op in ["*", "/", "%"] {
+fn tensor_times_tensor_rejects_with_the_rule_alternatives() {
+    operands_invalid(
+        "functio f(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]> { redde a * b }",
+        "tensor_multiply_requires_glyph",
+    );
+    for op in ["/", "%"] {
         operands_invalid(
             &format!(
                 "functio f(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]> {{ redde a {op} b }}"

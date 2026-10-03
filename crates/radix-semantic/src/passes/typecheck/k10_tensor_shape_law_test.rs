@@ -45,7 +45,7 @@ fn rejects_tensor_multiply(left: &str, right: &str) {
     rejects(
         &tensor_pair(left, right, "*"),
         SemanticErrorKind::OperandTypesInvalid,
-        "numeric_operands_required",
+        "tensor_multiply_requires_glyph",
     );
 }
 

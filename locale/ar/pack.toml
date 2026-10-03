@@ -1877,6 +1877,10 @@ help = "استخدم {numerus} intervallum bounds لـ longitudo حاليا"
 message = "numeric operands مطلوبة"
 help = "استخدم numeric operands لهذا العامل"
 
+[diagnostics.SEM011.issues.tensor_multiply_requires_glyph]
+message = "tensor `*` tensor غير مدعوم؛ استخدم ⊙ (ضرب عنصرًا بعنصر) أو · (الانكماش)"
+help = "استخدم ⊙ للضرب عنصرًا بعنصر أو · للانكماش"
+
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "numeric arithmetic operands يجب أن تكون أنواعها متطابقة؛ استخدم ↦ للتحويل الصريح"
 help = "حول operands صراحة قبل تطبيق هذا العامل العددي"

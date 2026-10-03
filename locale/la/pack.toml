@@ -2391,6 +2391,10 @@ help = "applica +, -, *, vel / per elementa in queue vel stack; utere generibus 
 message = "numeric operands required"
 help = "use numeric operands for this operator"
 
+[diagnostics.SEM011.issues.tensor_multiply_requires_glyph]
+message = "tensor `*` tensor non licet; utere ⊙ (elementwise) aut · (contractio)"
+help = "utere ⊙ ad multiplicationem elementwise aut · ad contractionem"
+
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "numeric arithmetic operands must have identical types; use ↦ to convert explicitly"
 help = "convert operands explicitly before applying this numeric operator"
