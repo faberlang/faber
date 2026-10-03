@@ -346,9 +346,6 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     textus_literals: RefCell<FxHashMap<Symbol, String>>,
     /// Owned ASCII literals, keyed by interned source symbol.
     ascii_literals: RefCell<FxHashMap<Symbol, String>>,
-    /// Side-effecting `⊥` default calls parked in unreachable orphan blocks.
-    /// Looked up by `(function, dest temp)` so conversion failure is O(1).
-    recovery_calls: FxHashMap<(MirFunctionId, MirTempId), (MirCallee, Vec<MirOperand>)>,
     /// Value-id static types per function (`MirStatementKind::Assign`), for
     /// display-width resolution at diagnostics.
     value_types: FxHashMap<(MirFunctionId, MirValueId), MirType>,
@@ -411,7 +408,6 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             next_gradient_handle: 0,
             textus_literals: RefCell::new(FxHashMap::default()),
             ascii_literals: RefCell::new(FxHashMap::default()),
-            recovery_calls: index_orphan_recovery_calls(program),
             value_types: index_value_types(program),
             next_conversation_id: 0,
             conversation_slots: Rc::default(),
@@ -1948,29 +1944,60 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     }
 
     /// CTO-3 — the fallback runs ONLY on conversion failure. A side-effecting
-    /// `⊥` default CALL is lowered by the materializer into an ORPHAN block
-    /// (dead code to the main flow); at the conversion-failure recovery point
-    /// this invokes it LAZILY, so its side effects run only here — never on a
-    /// successful conversion (fallback-not-run-on-success). Pure recovery
-    /// operands evaluate normally.
+    /// `⊥` default is lowered into the conversion's recovery region: real CFG
+    /// blocks the success path skips, whose tail stores the fallback into the
+    /// conversion's destination temp. At the failure point this executes the
+    /// region through the normal statement executor — following its internal
+    /// control flow, stopping at the main-reachable join — and reads the
+    /// destination. Pure recovery operands evaluate normally.
     fn eval_recovery(&mut self, recovery: &MirOperand, span: Span) -> Result<Value, RunnerError> {
-        let MirOperand::Temp(temp_id) = recovery else {
+        let MirOperand::Temp(destination) = recovery else {
             return self.eval_operand(recovery, span);
         };
-        let function_id = self
-            .frames
-            .last()
-            .map(|frame| frame.function)
-            .ok_or_else(|| RunnerError::internal(span, "recovery evaluation outside a frame"))?;
-        let deferred = self.recovery_calls.get(&(function_id, *temp_id)).cloned();
-        if let Some((callee, args)) = deferred {
-            return match self.invoke_call(&callee, &args, span)? {
-                CallOutcome::Ok(value) => Ok(value),
-                CallOutcome::Err(_) => Err(RunnerError::internal(
-                    span,
-                    "deferred recovery call returned an error",
-                )),
+        let Some(frame) = self.frames.last() else {
+            return Err(RunnerError::internal(
+                span,
+                "recovery evaluation outside a frame",
+            ));
+        };
+        let function_id = frame.function;
+        if frame.temps.contains_key(destination) {
+            // A temp the main flow already computed is a pure recovery operand.
+            return self.eval_operand(recovery, span);
+        }
+        let function = self.function_by_id(function_id, span)?;
+        let main_reachable = reachable_block_ids(function);
+        let Some(entry) = recovery_region_entry(function, *destination, &main_reachable) else {
+            return Err(RunnerError::internal(
+                span,
+                "conversion recovery region missing",
+            ));
+        };
+        let mut current = entry;
+        loop {
+            let block = self.block_snapshot(function_id, current)?;
+            for statement in &block.statements {
+                self.execute_statement_inner(statement, false)?;
+            }
+            let next = match &block.terminator.kind {
+                MirTerminatorKind::Goto(target) => {
+                    (!main_reachable.contains(target)).then_some(*target)
+                }
+                MirTerminatorKind::Branch {
+                    condition,
+                    then_block,
+                    else_block,
+                } => {
+                    let condition = self.eval_operand(condition, span)?;
+                    let taken = condition.as_bool(span)?;
+                    Some(if taken { *then_block } else { *else_block })
+                }
+                _ => None,
             };
+            let Some(next) = next else {
+                break;
+            };
+            current = next;
         }
         self.eval_operand(recovery, span)
     }
@@ -2882,34 +2909,70 @@ fn index_value_types(program: &MirProgram) -> FxHashMap<(MirFunctionId, MirValue
     map
 }
 
-fn index_orphan_recovery_calls(
-    program: &MirProgram,
-) -> FxHashMap<(MirFunctionId, MirTempId), (MirCallee, Vec<MirOperand>)> {
-    let mut map = FxHashMap::default();
-    for function in &program.functions {
-        let reachable = reachable_block_ids(function);
-        for block in &function.blocks {
-            if reachable.contains(&block.id) {
-                continue;
-            }
-            for statement in &block.statements {
-                let MirStatementKind::Call {
-                    destination: Some(place),
-                    callee,
-                    args,
-                } = &statement.kind
-                else {
-                    continue;
-                };
-                let MirPlaceBase::Temp(temp_id) = place.base else {
-                    continue;
-                };
-                map.entry((function.id, temp_id))
-                    .or_insert_with(|| (callee.clone(), args.clone()));
+/// Whether a statement writes `temp` through a plain temp place.
+fn writes_temp(statement: &radix_mir::MirStatement, temp: MirTempId) -> bool {
+    let place = match &statement.kind {
+        MirStatementKind::Assign { place, .. }
+        | MirStatementKind::RuntimeCall {
+            destination: Some(place),
+            ..
+        }
+        | MirStatementKind::Call {
+            destination: Some(place),
+            ..
+        }
+        | MirStatementKind::Construct {
+            destination: place, ..
+        } => place,
+        _ => return false,
+    };
+    matches!(&place.base, MirPlaceBase::Temp(id) if *id == temp) && place.projections.is_empty()
+}
+
+/// The entry block of a conversion's recovery region. The region tail is the
+/// block outside the main-reachable set that writes the conversion's
+/// destination temp; the entry is that region's root — the member of the
+/// non-main-reachable set with no predecessor inside it.
+fn recovery_region_entry(
+    function: &MirFunction,
+    destination: MirTempId,
+    main_reachable: &FxHashSet<MirBlockId>,
+) -> Option<MirBlockId> {
+    let region_blocks: Vec<&MirBlock> = function
+        .blocks
+        .iter()
+        .filter(|block| !main_reachable.contains(&block.id))
+        .collect();
+    let tail = region_blocks.iter().copied().find(|block| {
+        block
+            .statements
+            .iter()
+            .any(|statement| writes_temp(statement, destination))
+    })?;
+    let has_region_predecessor = |id: MirBlockId| {
+        region_blocks
+            .iter()
+            .any(|block| terminator_successors(&block.terminator.kind).contains(&id))
+    };
+    // Backward walk over region-internal predecessors to the root.
+    let mut frontier = vec![tail.id];
+    let mut seen = FxHashSet::default();
+    let mut entry = tail.id;
+    while let Some(id) = frontier.pop() {
+        if !seen.insert(id) {
+            continue;
+        }
+        if !has_region_predecessor(id) {
+            entry = id;
+            break;
+        }
+        for block in &region_blocks {
+            if terminator_successors(&block.terminator.kind).contains(&id) {
+                frontier.push(block.id);
             }
         }
     }
-    map
+    Some(entry)
 }
 
 fn reachable_block_ids(function: &MirFunction) -> FxHashSet<MirBlockId> {
@@ -2984,6 +3047,10 @@ mod tensor_math_test;
 #[cfg(test)]
 #[path = "conversion_parity_test.rs"]
 mod conversion_parity_test;
+
+#[cfg(test)]
+#[path = "recovery_block_test.rs"]
+mod recovery_block_test;
 
 #[cfg(test)]
 #[path = "octeti_index_test.rs"]

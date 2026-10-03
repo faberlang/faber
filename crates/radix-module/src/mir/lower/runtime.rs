@@ -21,6 +21,7 @@
 // parent module provides shared imports for lowering
 use super::*;
 use crate::hir::HirCallArg;
+use crate::hir::visit::{HirVisitor, walk_expr};
 use crate::semantic::IndexExpr;
 use crate::semantic::lista_tensor_conversio::{
     ListaToTensorShape, analyze_rectangular_lista_literal, lista_numerus_type, resolve_bounded_lista_padded_shape,
@@ -66,11 +67,24 @@ pub(super) fn shape_relation_applies_to_return(types: &TypeTable, relation: &Sha
 }
 
 /// Whether a `⊥` default expression is side-effecting: a call or method call
-/// whose execution has observable effects. Pure recovery expressions (literals,
-/// paths, compound values) need no deferral — evaluating them eagerly is
+/// anywhere inside it. Pure recovery expressions (literals, paths, call-free
+/// compound values) need no deferral — evaluating them eagerly is
 /// side-effect-free (CTO-3 recovery-eval fix).
-fn is_side_effecting_recovery(recovery: &HirExpression) -> bool {
-    matches!(&recovery.kind, HirExpressionKind::Call(..) | HirExpressionKind::MethodCall(..))
+fn recovery_contains_call(recovery: &HirExpression) -> bool {
+    struct CallScan {
+        found: bool,
+    }
+    impl HirVisitor for CallScan {
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            if matches!(&expr.kind, HirExpressionKind::Call(..) | HirExpressionKind::MethodCall(..)) {
+                self.found = true;
+            }
+            walk_expr(self, expr);
+        }
+    }
+    let mut scan = CallScan { found: false };
+    scan.visit_expr(recovery);
+    scan.found
 }
 
 struct HandledConversio<'a> {
@@ -3502,13 +3516,14 @@ impl FunctionBuilder<'_> {
         let conversion_source_ty = self.lowered_conversio_source_ty(source, source_type_id, target);
         let source = self.lower_conversio_source(source, target)?;
         let struct_defaults = self.valor_genus_struct_defaults(source_type_id, target, expr.span)?;
-        let recovery = match recovery {
+        let conversion_block = self.current;
+        let lowered_recovery = match recovery {
             Some(recovery) => Some(self.lower_conversio_recovery(recovery, expr.span)?),
             None => None,
         };
         // An implicit store (d11-6 ruling 5) traps: it is never routed into an
         // enclosing `fac … cape` or `⇥` channel, only an authored `↦` is.
-        if recovery.is_none()
+        if lowered_recovery.is_none()
             && implicit.is_none()
             && let Some(handler) = self.handlers.last().cloned()
         {
@@ -3522,20 +3537,41 @@ impl FunctionBuilder<'_> {
                 span: expr.span,
             }));
         }
-        Some(self.runtime_call_value(
+        let result = self.runtime_call_value(
             MirIntrinsic::Convert(MirConversion {
                 store: implicit,
                 flavor: MirConversionFlavor::Runtime,
                 source_ty: conversion_source_ty,
                 target_ty: MirType::semantic(target),
                 params: params.to_vec(),
-                recovery,
+                recovery: lowered_recovery
+                    .as_ref()
+                    .map(|(operand, _)| operand.clone()),
                 struct_defaults,
             }),
             vec![source],
             ty,
             expr.span,
-        ))
+        );
+        // A deferred recovery region stores the fallback into the conversion's
+        // destination and both arms flow into one join, so every consumer
+        // after the conversion reads a single joined temp.
+        if let Some((recovery_value, Some(tail_block))) = &lowered_recovery {
+            let Some(conversion_block) = conversion_block else {
+                self.errors
+                    .push(MirError::unsupported(expr.span, "conversio recovery after a sealed MIR block"));
+                return Some(result);
+            };
+            self.wire_conversio_recovery_block(
+                conversion_block,
+                *tail_block,
+                recovery_value.clone(),
+                result.clone(),
+                ty,
+                expr.span,
+            );
+        }
+        Some(result)
     }
 
     /// An await-binding whose awaited value narrows into the declared slot
@@ -3636,19 +3672,26 @@ impl FunctionBuilder<'_> {
         self.lower_expr_value(source)
     }
 
-    /// CTO-3 — defer a SIDE-EFFECTING `⊥` default call. A `⊥ fb()` fallback's
-    /// CALL must run ONLY when the conversion fails (fallback-not-run-on-
-    /// success): the eager `%0 = call fb()` statement previously executed even
-    /// when the conversion succeeded (an eval/dup-work hazard, AC4 deviation).
-    /// A call/method-call recovery is lowered into an ORPHAN block (never
-    /// reached by the main flow), so its side effects are not in the success
-    /// path; the runner invokes it lazily at the conversion-failure recovery
-    /// point. Pure recovery expressions (literals, paths, compound values) stay
-    /// eagerly lowered — evaluating them is side-effect-free, so the success
-    /// path stays byte-identical for them.
-    fn lower_conversio_recovery(&mut self, recovery: &HirExpression, span: Span) -> Option<MirOperand> {
-        if !is_side_effecting_recovery(recovery) {
-            return self.lower_expr_value(recovery);
+    /// CTO-3 — defer a SIDE-EFFECTING `⊥` default. A fallback containing a
+    /// call must run ONLY when the conversion fails (fallback-not-run-on-
+    /// success), so it lowers into a RECOVERY BLOCK: a real CFG block the
+    /// conversion failure enters, carrying the whole expression (nested calls
+    /// and conditionals included). Pure recovery expressions (literals, paths,
+    /// call-free compound values) stay eagerly lowered — evaluating them is
+    /// side-effect-free, so the success path stays byte-identical for them.
+    ///
+    /// Returns the recovery expression's value and, for the deferred shape,
+    /// the region's tail block (where the fallback value is complete). The
+    /// region is left open: the caller emits the conversion statement, then
+    /// `wire_conversio_recovery_block` stores the value into the conversion's
+    /// destination from the tail and joins both arms.
+    fn lower_conversio_recovery(
+        &mut self,
+        recovery: &HirExpression,
+        span: Span,
+    ) -> Option<(MirOperand, Option<MirBlockId>)> {
+        if !recovery_contains_call(recovery) {
+            return Some((self.lower_expr_value(recovery)?, None));
         }
         let Some(main_block) = self.current else {
             self.errors
@@ -3658,12 +3701,45 @@ impl FunctionBuilder<'_> {
         let recovery_block = self.fresh_block(span);
         self.switch_to(recovery_block);
         let operand = self.lower_expr_value(recovery)?;
-        // The orphan block is never entered by the main flow; the runner
-        // evaluates the recovery call lazily at the failure point. Sealing it
-        // with `unreachable` keeps it dead code to every pass.
-        self.terminate_current(MirTerminatorKind::Unreachable, span);
+        let Some(tail_block) = self.current else {
+            self.errors
+                .push(MirError::unsupported(span, "conversio recovery after a sealed MIR block"));
+            return None;
+        };
         self.switch_to(main_block);
-        Some(operand)
+        Some((operand, Some(tail_block)))
+    }
+
+    /// Wire a deferred recovery region into the CFG after the conversion
+    /// statement: the region tail stores the fallback value into the
+    /// conversion's destination temp and jumps to a fresh join, and the
+    /// conversion block jumps to the same join, so both arms rejoin in one
+    /// block. The failure edge itself is carried by the statement's
+    /// `recovery` operand (the runner, LLVM and Wasm read it); the MIR shows
+    /// the recovery region as ordinary Goto-closed blocks instead of an
+    /// `unreachable` orphan.
+    fn wire_conversio_recovery_block(
+        &mut self,
+        conversion_block: MirBlockId,
+        tail_block: MirBlockId,
+        recovery_value: MirOperand,
+        destination: MirOperand,
+        ty: MirType,
+        span: Span,
+    ) {
+        let join_block = self.fresh_block(span);
+        self.switch_to(tail_block);
+        if let MirOperand::Temp(temp) = destination {
+            let value = self.new_value(MirValueKind::Operand(recovery_value), ty, span);
+            self.append_stmt(MirStatement {
+                kind: MirStatementKind::Assign { place: MirPlace::temp(temp), value },
+                span,
+            });
+        }
+        self.terminate_current(MirTerminatorKind::Goto(join_block), span);
+        self.switch_to(conversion_block);
+        self.terminate_current(MirTerminatorKind::Goto(join_block), span);
+        self.switch_to(join_block);
     }
 
     fn lowered_conversio_source_ty(&self, source: &HirExpression, source_type_id: TypeId, target: TypeId) -> MirType {
