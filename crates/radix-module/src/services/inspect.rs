@@ -415,7 +415,10 @@ fn parse_inspect_program(
     }
     let crate::parser::ParseResult { program, interner, .. } = parse_result;
     let Some(program) = program else {
-        return Err(vec!["internal error: successful parse result missing program".to_owned()]);
+        return Err(vec![format!(
+            "internal error: {}",
+            crate::driver::MISSING_PARSE_PROGRAM_MESSAGE
+        )]);
     };
     Ok((program, interner))
 }

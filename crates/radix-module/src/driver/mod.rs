@@ -65,7 +65,7 @@ use crate::semantic::{self, PassConfig, Primitive, RadixLane, RadixLaneMetadata,
 use crate::syntax::*;
 use std::collections::BTreeMap;
 
-const MISSING_PARSE_PROGRAM_MESSAGE: &str = "successful parse result missing program";
+pub(crate) const MISSING_PARSE_PROGRAM_MESSAGE: &str = "successful parse result missing program";
 const MISSING_SEMANTIC_HIR_MESSAGE: &str = "successful semantic result missing lowered HIR";
 
 /// Promote warning diagnostics to errors according to a [`WarnPolicy`].
@@ -3398,16 +3398,15 @@ pub fn analyze_source_with_kernel_template_admissions(
     request: AnalyzeRequest,
     admissions: &PackageKernelTemplateAdmissions,
 ) -> Result<AnalyzedModule, Vec<Diagnostic>> {
-    let body_byte_offset = split_frontmatter(source)
-        .ok()
-        .map_or(0, |split| split.body_byte_offset);
+    let peeled = peel_raw_source(name, source).map_err(|error| vec![source_load_diagnostic(name, &error)])?;
+    let body_byte_offset = peeled.body_byte_offset;
     // Reader-locale suggestions wait here until the analysis result is known:
     // an edit-distance guess is shown only where an error sits at its span.
     let mut locale_candidates = Vec::new();
     let result = analyze_source_with_kernel_template_admissions_unadjusted(
         session,
         name,
-        source,
+        &peeled,
         request,
         admissions,
         &mut locale_candidates,
@@ -3452,7 +3451,7 @@ pub fn adjust_diagnostic_lines_for_body(diagnostics: &mut [Diagnostic], raw_sour
 fn analyze_source_with_kernel_template_admissions_unadjusted(
     session: &Session,
     name: &str,
-    source: &str,
+    peeled: &PeeledSource,
     request: AnalyzeRequest,
     admissions: &PackageKernelTemplateAdmissions,
     locale_candidates: &mut Vec<Diagnostic>,
@@ -3461,7 +3460,7 @@ fn analyze_source_with_kernel_template_admissions_unadjusted(
     let mut diagnostics = Vec::new();
 
     let Ok(ParsedSourceBody { body, mut program, mut interner, lex_pack }) =
-        parse_frontend_source_deferring_locale(session, name, source, &mut diagnostics, locale_candidates)
+        parse_frontend_source_deferring_locale(session, name, peeled, &mut diagnostics, locale_candidates)
     else {
         return Err(diagnostics);
     };
@@ -3697,8 +3696,15 @@ fn parse_frontend_source<'a>(
     source: &'a str,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Result<ParsedSourceBody<'a>, ()> {
+    let peeled = match peel_raw_source(name, source) {
+        Ok(peeled) => peeled,
+        Err(error) => {
+            diagnostics.push(source_load_diagnostic(name, &error));
+            return Err(());
+        }
+    };
     let mut locale_candidates = Vec::new();
-    let parsed = parse_frontend_source_deferring_locale(session, name, source, diagnostics, &mut locale_candidates);
+    let parsed = parse_frontend_source_deferring_locale(session, name, &peeled, diagnostics, &mut locale_candidates);
     push_filtered_locale_suggestions(diagnostics, locale_candidates);
     parsed
 }
@@ -3708,21 +3714,14 @@ fn parse_frontend_source<'a>(
 fn parse_frontend_source_deferring_locale<'a>(
     session: &Session,
     name: &str,
-    source: &'a str,
+    peeled: &PeeledSource<'a>,
     diagnostics: &mut Vec<Diagnostic>,
     locale_candidates: &mut Vec<Diagnostic>,
 ) -> Result<ParsedSourceBody<'a>, ()> {
-    let peeled = match peel_raw_source(name, source) {
-        Ok(peeled) => peeled,
-        Err(error) => {
-            diagnostics.push(source_load_diagnostic(name, &error));
-            return Err(());
-        }
-    };
     let body = peeled.body;
 
     // Resolve reader pack: frontmatter locale > session config > Latin default.
-    let Ok(lex_pack) = resolve_peeled_lex_pack(session, &peeled, diagnostics) else {
+    let Ok(lex_pack) = resolve_peeled_lex_pack(session, peeled, diagnostics) else {
         return Err(());
     };
 
