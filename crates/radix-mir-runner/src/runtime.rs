@@ -4227,7 +4227,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             Value::Map(cell) => {
                 let key = index.to_key(span)?;
-                Ok(cell.borrow().get(&key).cloned().unwrap_or(Value::Nil))
+                cell.borrow()
+                    .get(&key)
+                    .cloned()
+                    .ok_or_else(|| RunnerError::internal(span, "map key not found"))
             }
             // Scalar flat-lane index over a tensor (itera ex element gather);
             // tensors define every lane by construction, so bounds are the
@@ -4249,6 +4252,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         index: Value,
         span: Span,
     ) -> Result<Value, RunnerError> {
+        if let Value::Map(cell) = receiver {
+            return Ok(cell
+                .borrow()
+                .get(&index.to_key(span)?)
+                .cloned()
+                .unwrap_or(Value::Nil));
+        }
         let optional_index = match &index {
             Value::Int(value) if *value >= 0 => Some(*value as usize),
             Value::Int(_) => None,
@@ -4267,11 +4277,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             Value::Octeti(bytes) => Ok(optional_index
                 .and_then(|idx| bytes.get(idx).copied())
                 .map(|byte| Value::Int(i64::from(byte)))
-                .unwrap_or(Value::Nil)),
-            Value::Map(cell) => Ok(cell
-                .borrow()
-                .get(&index.to_key(span)?)
-                .cloned()
                 .unwrap_or(Value::Nil)),
             other => self.collection_index(other, index, span),
         }
@@ -6192,3 +6197,7 @@ fn apply_tensor_math(function: MirTensorMath, value: f64) -> f64 {
         MirTensorMath::Tan => value.tan(),
     }
 }
+
+#[cfg(test)]
+#[path = "runtime_index_test.rs"]
+mod runtime_index_test;
