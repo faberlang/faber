@@ -111,6 +111,25 @@ fn comment_inside_check_ballot_conditional_is_invalid() {
     assert_invalid_comment_placement(&result, " mid");
 }
 
+// ── Expression-owned block bodies ──
+
+#[test]
+fn comments_in_closure_comptime_and_trap_blocks_are_claimed() {
+    for source in [
+        "functio f() → vacuum { clausura → vacuum {\n# closure body\ntacet\n} }\n",
+        "fixum numerus x = praefixum {\n# comptime body\n1\n}\n",
+        "functio f() → vacuum { fixum ∪ r ← capta {\n# trap body\n1\n} }\n",
+    ] {
+        let result = parse_source(source);
+        assert!(
+            result.success(),
+            "source should parse cleanly: {:?}",
+            result.errors
+        );
+        assert_eq!(invalid_placement_count(&result), 0, "{source}");
+    }
+}
+
 // ── Legal position: after last declaration / program end ──
 
 #[test]
