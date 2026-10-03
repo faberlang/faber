@@ -178,6 +178,10 @@ def parse_mir(text: str) -> dict[str, dict[str, str]]:
         slot = verdicts.setdefault(rel, {})
         for target, cell in zip(MIR_TARGETS, cells):
             cell = cell.strip()
+            if cell.startswith("runner panic:"):
+                raise ValueError(
+                    f"MIR target matrix contains a runner panic for {rel} [{target}]: {cell}"
+                )
             if cell == "ok":
                 slot[target] = "capable"
             elif cell == "n/a" or cell == "missing":
