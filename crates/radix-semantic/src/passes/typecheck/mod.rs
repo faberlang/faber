@@ -1250,6 +1250,10 @@ mod index_param_value_test;
 mod tensor_lattice_matrix_test;
 
 #[cfg(test)]
+#[path = "k10_tensor_shape_law_test.rs"]
+mod k10_tensor_shape_law_test;
+
+#[cfg(test)]
 #[path = "tensor_lift_test.rs"]
 mod tensor_lift_test;
 
