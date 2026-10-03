@@ -1426,6 +1426,107 @@ fn rejects_orphan_block_not_reachable_from_entry() {
 }
 
 #[test]
+fn accepts_detached_conversion_recovery_region() {
+    let types = TypeTable::new();
+    let int_ty = MirType::semantic(types.primitive(Primitive::Numerus));
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![],
+            temps: vec![
+                crate::MirTemp {
+                    id: crate::MirTempId(0),
+                    ty: int_ty,
+                    span: Span::default(),
+                },
+                crate::MirTemp {
+                    id: crate::MirTempId(1),
+                    ty: int_ty,
+                    span: Span::default(),
+                },
+            ],
+            blocks: vec![
+                MirBlock {
+                    id: MirBlockId(0),
+                    statements: vec![MirStatement {
+                        kind: MirStatementKind::RuntimeCall {
+                            destination: Some(MirPlace::temp(crate::MirTempId(0))),
+                            call: MirRuntimeCall {
+                                intrinsic: MirIntrinsic::Convert(crate::MirConversion {
+                                    store: None,
+                                    flavor: crate::MirConversionFlavor::Runtime,
+                                    source_ty: int_ty,
+                                    target_ty: int_ty,
+                                    params: vec![],
+                                    recovery: Some(MirOperand::Temp(crate::MirTempId(1))),
+                                    struct_defaults: vec![],
+                                }),
+                                args: vec![MirOperand::Constant(MirConstant::Int(42))],
+                                return_ty: int_ty,
+                            },
+                        },
+                        span: Span::default(),
+                    }],
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Goto(MirBlockId(2)),
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
+                },
+                MirBlock {
+                    id: MirBlockId(1),
+                    statements: vec![MirStatement {
+                        kind: MirStatementKind::Assign {
+                            place: MirPlace::temp(crate::MirTempId(1)),
+                            value: MirValue {
+                                id: MirValueId(0),
+                                kind: MirValueKind::Operand(MirOperand::Constant(
+                                    MirConstant::Int(7),
+                                )),
+                                ty: int_ty,
+                                span: Span::default(),
+                            },
+                        },
+                        span: Span::default(),
+                    }],
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Goto(MirBlockId(2)),
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
+                },
+                MirBlock {
+                    id: MirBlockId(2),
+                    statements: vec![],
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Return(Some(MirOperand::Temp(crate::MirTempId(
+                            0,
+                        )))),
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
+                },
+            ],
+            return_ty: int_ty,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+
+    let errors = validate(&program, &types);
+    assert!(
+        errors.is_empty(),
+        "expected valid recovery region, got: {errors:?}"
+    );
+}
+
+#[test]
 fn rejects_function_with_only_goto_cycle() {
     let types = TypeTable::new();
     let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
