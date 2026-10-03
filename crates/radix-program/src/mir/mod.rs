@@ -70,11 +70,6 @@ use crate::library::{
 pub type ExecutedLaneTarget =
     fn(&Config, &Path) -> Result<radix_module::codegen::Target, Box<radix_module::Diagnostic>>;
 
-/// Library-resolver construction from a driver config. `FABER_LIBRARY_HOME`
-/// and workspace probing stay faber-side; analysis/lowering receives the
-/// resolved resolver.
-pub type LibraryResolverForConfig = fn(&Config) -> LibraryResolver;
-
 /// Library-interface-cache construction from a driver config. Faber wires its
 /// locale-pack loader; the compiler subset receives the wired cache.
 pub type LibraryCacheForConfig = fn(&Config) -> LibraryInterfaceCache;
@@ -130,7 +125,6 @@ pub type BinRunnerWriter = fn(
 pub struct MirSeams {
     pub analysis: AnalysisSeams,
     pub executed_lane_target: ExecutedLaneTarget,
-    pub library_resolver_for_config: LibraryResolverForConfig,
     pub library_cache_for_config: LibraryCacheForConfig,
     pub device_config_for_input: DeviceConfigForInput,
     pub device_section_builder: DeviceSectionBuilder,

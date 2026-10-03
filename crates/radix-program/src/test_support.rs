@@ -64,7 +64,7 @@ fn test_resolver_for_package(
     config: &Config,
     package_root: &Path,
 ) -> Result<LibraryResolver, Vec<Diagnostic>> {
-    let resolver = test_library_resolver_for_config(config);
+    let resolver = test_library_resolver(config);
     let manifest_path = package_root.join(crate::MANIFEST_FILE);
     if !manifest_path.is_file() {
         return Ok(resolver);
@@ -143,7 +143,7 @@ fn test_executed_lane_target(
 /// A config-rooted library resolver: an explicit `library_home` becomes the
 /// home (the moved tests use `Config::with_library_home` fixtures); without
 /// one the resolver has no home (no `FABER_LIBRARY_HOME` in tests).
-fn test_library_resolver_for_config(config: &Config) -> LibraryResolver {
+fn test_library_resolver(config: &Config) -> LibraryResolver {
     if let Some(path) = config.library_home.as_ref() {
         return LibraryResolver::new(path.clone());
     }
@@ -196,7 +196,6 @@ pub fn test_mir_seams() -> MirSeams {
     MirSeams {
         analysis: test_analysis_seams(),
         executed_lane_target: test_executed_lane_target,
-        library_resolver_for_config: test_library_resolver_for_config,
         library_cache_for_config: test_library_cache_for_config,
         device_config_for_input: test_device_config_for_input,
         device_section_builder: test_device_section_builder,
