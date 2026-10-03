@@ -52,3 +52,5 @@ export * as variant from "./variant.ts";
 export * as tuple from "./tuple.ts";
 // @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
 export * as atomic from "./atomic.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as result from "./result.ts";

@@ -28,6 +28,7 @@
     "index.ts",
     "dec.ts",
     "display.ts",
+    "result.ts",
     "exact.ts",
     "format.ts",
     "inf.ts",
