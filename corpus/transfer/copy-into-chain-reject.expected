@@ -1,0 +1,2 @@
+# R5: the grammar is `transfer ::= ternary ('⇇' ternary)?`; `a ⇇ b ⇇ c` is a parse error with a named diagnostic.
+PARSE030:copy_into_chain

@@ -160,17 +160,16 @@ fn transfer_round_trips_through_msgpack() {
     let radix_hir::HirStatementKind::Expr(expr) = &body.statements[0].kind else {
         panic!("expected expr statement");
     };
-    let radix_hir::HirExpressionKind::Transfer { sink, payloads } = &expr.kind else {
-        panic!("expected transfer expression");
+    let radix_hir::HirExpressionKind::CopyInto { target, value } = &expr.kind else {
+        panic!("expected copy-into expression");
     };
     assert!(
-        matches!(sink.kind, radix_hir::HirExpressionKind::Path(DefId(0))),
-        "sink must survive the wire"
+        matches!(target.kind, radix_hir::HirExpressionKind::Path(DefId(0))),
+        "target must survive the wire"
     );
-    assert_eq!(
-        payloads.len(),
-        2,
-        "ordered payload list must survive the wire"
+    assert!(
+        matches!(value.kind, radix_hir::HirExpressionKind::Literal(_)),
+        "value must survive the wire"
     );
 }
 
@@ -187,7 +186,7 @@ fn transfer_msgpack_decode_passes_referential_integrity() {
         matches!(
             &body.statements[0].kind,
             radix_hir::HirStatementKind::Expr(radix_hir::HirExpression {
-                kind: radix_hir::HirExpressionKind::Transfer { .. },
+                kind: radix_hir::HirExpressionKind::CopyInto { .. },
                 ..
             })
         ),
@@ -205,7 +204,7 @@ fn unit_wire_uses_the_named_keys_in_order() {
     assert_eq!(top_keys(&value), UNIT_KEYS);
 
     // §2 row 1: version is a uint fact.
-    assert_eq!(get(&value, &["schema_version"]), Some(&Value::Uint(35)));
+    assert_eq!(get(&value, &["schema_version"]), Some(&Value::Uint(36)));
 
     // §2 row 2: source identity map with its named keys.
     assert!(matches!(
@@ -318,7 +317,7 @@ fn enums_encode_as_tag_maps() {
         Some(&Value::Str("Function".into()))
     );
 
-    // Struct variant (Transfer): payload fields inlined next to "tag".
+    // Struct variant (CopyInto): payload fields inlined next to "tag".
     let transfer = crate::test_support::transfer_artifact();
     let value = parse(&encode_msgpack(&transfer).expect("encode"));
     let expr = get(&value, &["hir", "items"])
@@ -334,8 +333,8 @@ fn enums_encode_as_tag_maps() {
         .and_then(|st| get(st, &["kind", "value", "kind"]))
         .expect("transfer expression kind");
     let keys = top_keys(expr);
-    assert_eq!(keys, vec!["tag", "sink", "payloads"]);
-    assert_eq!(get(expr, &["tag"]), Some(&Value::Str("Transfer".into())));
+    assert_eq!(keys, vec!["tag", "target", "value"]);
+    assert_eq!(get(expr, &["tag"]), Some(&Value::Str("CopyInto".into())));
 }
 
 #[test]
@@ -720,7 +719,7 @@ fn package_msgpack_wire_uses_named_keys_and_nested_unit_values() {
     // modules[0] is src/aux.fab; its record carries the named module keys.
     let aux = at(&value, &[Step::Key("modules"), Step::Idx(0)]).expect("modules[0]");
     assert_eq!(top_keys(aux), MODULE_KEYS);
-    assert_eq!(get(aux, &["unit_schema_version"]), Some(&Value::Uint(35)));
+    assert_eq!(get(aux, &["unit_schema_version"]), Some(&Value::Uint(36)));
 
     // The unit is a nested named map with the unit keys — not bin.
     let unit = get(aux, &["unit"]).expect("nested unit");

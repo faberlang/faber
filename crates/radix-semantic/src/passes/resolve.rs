@@ -1433,15 +1433,12 @@ fn resolve_expr(
                 resolve_expr(resolver, interner, element, errors);
             }
         }
-        // EOT-3S repair (fail-closed): `⇇` transfer typing is owned by EOT-3M.
-        // Name resolution still walks sink and payloads so ordinary
-        // binding-wins lookup applies to every subexpression.
+        // `⇇` copy-into: name resolution walks target and value so ordinary
+        // binding-wins lookup applies to both.
         ExprKind::Format(format) => resolve_expr(resolver, interner, &format.value, errors),
-        ExprKind::Transfer(expr) => {
-            resolve_expr(resolver, interner, &expr.sink, errors);
-            for payload in &expr.payloads {
-                resolve_expr(resolver, interner, payload, errors);
-            }
+        ExprKind::CopyInto(expr) => {
+            resolve_expr(resolver, interner, &expr.target, errors);
+            resolve_expr(resolver, interner, &expr.value, errors);
         }
         // UT: the capture boundary's body is an ordinary block — binding-wins
         // lookup applies to every subexpression inside it.

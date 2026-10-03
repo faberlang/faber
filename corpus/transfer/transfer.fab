@@ -1,53 +1,80 @@
 +++
 term = "⇇"
 kind = "operator"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "assignment", "transfer", "expression", "ternary", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "fixum_decl", "literal", "nota_stmt"]
-category = "output"
-summary = "Exact-output transfer: sink ⇇ payload invokes a callable sink value once per payload — no formatting, no separators, no channel selection, no conversions."
-syntax = "<sink> ⇇ <payload> (⇇ <payload>)*"
-aliases = ["transfer"]
-related = ["selective_import", "importa"]
-locale = "la"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "assignment", "transfer", "expression", "ternary", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "fixum_decl", "literal", "nota_stmt"]
+category = "collection"
+summary = "Copy-into: target ⇇ value writes every value of a tensor into the existing storage of another tensor; storage identity is preserved and ← only ever rebinds a name."
+syntax = "<tensor storage> ⇇ <tensor>"
+aliases = ["transfer", "copy-into"]
+related = ["tensor"]
+locale = "en"
 +++
 # =============================================================================
-# ⇇ — exact-output transfer (EBNF rows [126] transfer / [127] assignment).
+# ⇇ — copy-into (EBNF row [158] transfer, consumed by row [159] assignment).
 # =============================================================================
 #
 # What this teaches:
-#   • Callable sink — `sink ⇇ payload` invokes a callable sink value (one
-#     argument, `vacuum` result) once per payload; the bound value owns
-#     destination and behavior, and the compiler holds no console knowledge
-#   • No formatting — the operator adds no separator or terminator, selects
-#     no channel, and runs no conversions; formatting is explicit on the
-#     right, e.g. `output ⇇ "§ §\n"(a, b)`
-#   • Chain — `sink ⇇ a ⇇ b` evaluates the sink expression once, each payload
-#     once left-to-right, and invokes the sink once per payload left-to-right;
-#     the chain result is `vacuum`
-#   • Precedence — `⇇` binds below assignment and above ternary: postfix
-#     calls, conversions, and string-constructor applications finish before
-#     transfer (EBNF [126] `transfer ::= ternary ('⇇' ternary)*`, consumed by
-#     [127] `assignment ::= transfer ('←' assignment | '↤' assignment …)?`)
-#   • Sinks arrive as values — the sink may be an imported callable (see
-#     selective_import) or any callable local, parameter, or member value
+#   • Writing in place — `target ⇇ value` copies every value of `value` INTO
+#     the existing storage of `target`. `←` only ever rebinds a name; `⇇` is
+#     the one way to write into a tensor that already exists
+#   • Writable targets — the left side is tensor storage you may write: a
+#     `var` local, a `mut` parameter, or a field of a writable root. The write
+#     is visible to the caller of a `mut` parameter and through every `←`
+#     alias of the target (see copy-into-alias)
+#   • Views on the right — the value may be any tensor expression, including a
+#     view such as `source.transpose()`; the logical values are copied through
+#     the destination's own layout
+#   • Exact match — both sides have the same element type and the same shape
+#   • Statement — a copy-into is a statement and its result is `vacuum`; it
+#     does not chain and is never a value
+#   • Precedence — `⇇` binds below every binary operator and above assignment
+#     (EBNF [158] `transfer ::= ternary ('⇇' ternary)?`, consumed by [159]
+#     `assignment`), so `target ⇇ a + b` copies the whole sum
 #
 # Common mistakes:
-#   • expecting `⇇` to print — the compiler formats nothing; import a sink
-#     value (e.g. `importa ex "norma:console" fixum dic ut output`) and
-#     format explicitly on the right
-#   • using the chain result — a transfer chain is `vacuum`, never a payload
+#   • writing `target ← value` into a `mut` tensor parameter — `←` rebinds, so
+#     a whole-tensor `←` into a `mut` tensor parameter is rejected
+#     (`mut_tensor_param_rebind`); write `⇇`
+#   • a `const` or non-`mut` target, a scalar/list/matrix/vector target (a
+#     value type is written by `←`), or a view target such as
+#     `out.slice(0, 1) ⇇ x` — all rejected
+#   • a right side that aliases the left, or a chain `a ⇇ b ⇇ c`
+#   • using the retired callable-sink form `sink ⇇ payload` — it is retired
+#     (`transfer_sink_retired`); output is `print`
 #
-# See also: selective_import, importa
+# See also: tensor
 # =============================================================================
 
-functio mittite((textus) → vacuum sink, textus nomen) → vacuum {
-    sink ⇇ nomen
+# transfer — copy-into on tensors
+#
+# GRAMMAR:
+#   transfer :← ternary ( '⇇' ternary )?
+#
+# EXPECTED stdout:
+#   [1.0, 2.0, 3.0, 4.0]
+#   [1.0, 3.0, 2.0, 4.0]
+#   [2.0, 4.0, 6.0, 8.0]
+
+fn fill_transposed(mut tf32[2, 2] target, tf32[2, 2] source) → void {
+    target ⇇ source.transpose()
 }
 
-functio mittite_duplex((textus) → vacuum sink, textus prior, textus posterior) → vacuum {
-    sink ⇇ prior ⇇ posterior
-}
+main {
+    const list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
+    const list<f32> flat_b ← [10.0, 20.0, 30.0, 40.0]
+    const tf32[] seed ← empty
+    const tf32[2, 2] source ← seed.from_flat(flat_a, [2, 2])
+    var tf32[2, 2] target ← seed.from_flat(flat_b, [2, 2])
 
-incipit {
-    fixum textus nomen ← "salve"
-    nota nomen
+    # Into a var tensor.
+    target ⇇ source
+    print target.flatten()
+
+    # Into a mut parameter, from a view: the caller sees the write.
+    fill_transposed(target, source)
+    print target.flatten()
+
+    # The right side is any tensor expression; the whole sum is copied.
+    target ⇇ source + source
+    print target.flatten()
 }

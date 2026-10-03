@@ -1,0 +1,2 @@
+# R6 (provisional): `←` rebinds a name, so a whole-tensor `←` into a `mut` tensor parameter is rejected everywhere; write `target ⇇ source`.
+SEM057:mut_tensor_param_rebind

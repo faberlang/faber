@@ -2473,9 +2473,9 @@ fn run_faber_with_stdin(args: &[&str], stdin: &[u8]) -> (String, String, bool) {
 }
 
 #[test]
-fn run_norma_console_selective_transfer_is_byte_exact() {
+fn run_norma_console_selective_imports_are_byte_exact() {
     // EOT-4R: interpreted lane executes the consolum contract through
-    // selective imports + ⇇. Captured stdout is byte-identical to the
+    // selective imports. Captured stdout is byte-identical to the
     // concatenated payloads (write_partial, write_bytes, read_line).
     let package = temp_dir("norma-consolum-eot4r");
     let src = package.join("src");
@@ -2499,9 +2499,9 @@ entry = "main.fab"
 main {
   const _ partial ← (string msg) → void ∴ write_partial(msg)
   const _ out_bytes ← (bytes data) → void ∴ write_bytes(data)
-  partial ⇇ "P"
-  out_bytes ⇇ |41|
-  partial ⇇ read_line()
+  partial("P")
+  out_bytes(|41|)
+  partial(read_line())
 }
 "#,
     )
@@ -2512,7 +2512,10 @@ main {
         b"LINE\n",
     );
 
-    assert!(ok, "norma:console interpreted transfer failed:\n{stderr}");
+    assert!(
+        ok,
+        "norma:console interpreted selective import failed:\n{stderr}"
+    );
     assert_eq!(stdout, "PALINE");
     assert!(
         !stderr.contains("Compiling") && !stderr.contains("cargo"),

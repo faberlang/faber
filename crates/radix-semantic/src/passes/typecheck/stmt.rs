@@ -124,6 +124,9 @@ impl TypeChecker<'_> {
             self.check_await_local(local);
             return;
         }
+        if let Some(init) = &local.init {
+            self.reject_copy_into_value(init);
+        }
 
         let inferred = match (&local.ty, &mut local.init) {
             (Some(ty), Some(init)) => {

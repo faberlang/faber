@@ -38,7 +38,6 @@ pub(crate) mod format_test;
 pub mod host;
 pub(crate) mod init;
 mod model;
-mod output_transfer_codemod;
 #[cfg(feature = "runner")]
 mod run;
 #[cfg(feature = "runner")]
@@ -76,7 +75,6 @@ use format::cmd_format;
 use host::cmd_host;
 use init::cmd_init;
 use model::cmd_model;
-use output_transfer_codemod::cmd_output_transfer_codemod;
 #[cfg(feature = "runner")]
 use run::{cmd_eval, cmd_fmir_run_image, cmd_repl, cmd_run};
 use self_update::cmd_self;
@@ -435,15 +433,6 @@ fn dispatch(command: Command) {
             write: args.write,
             stdin: args.stdin,
         }),
-        Command::OutputTransferCodemod(args) => {
-            cmd_output_transfer_codemod(&output_transfer_codemod::OutputTransferCodemodCommand {
-                paths: args.paths,
-                check: args.check,
-                stdout: args.stdout,
-                write: args.write,
-                stdin: args.stdin,
-            });
-        }
         Command::FieldModifierCodemod(args) => {
             cmd_field_modifier_codemod(&field_modifier_codemod::FieldModifierCodemodCommand {
                 paths: args.paths,

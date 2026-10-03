@@ -726,6 +726,13 @@ impl HirVisitor for LintContext<'_> {
                 self.visit_expr(target);
                 self.visit_expr(value);
             }
+            // `⇇` writes the existing storage its target names: for the
+            // `var` lint that is a mutation of the target place.
+            HirExpressionKind::CopyInto { target, value } => {
+                self.mark_place_mutated(target);
+                self.visit_expr(target);
+                self.visit_expr(value);
+            }
             // String-typed `+` chains: the outermost node of a left-spine run
             // evaluates the whole chain once; nested nodes defer to it.
             HirExpressionKind::Binary(HirBinOp::Add, lhs, rhs) => {

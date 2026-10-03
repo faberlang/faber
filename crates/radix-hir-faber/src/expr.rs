@@ -1214,18 +1214,15 @@ impl super::FaberCodegen<'_> {
                 // until AFM-3 provides a valid Faber surface.
                 writer.write(surface.contextual_keyword("nulla"));
             }
-            HirExpressionKind::Transfer { sink, payloads } => {
-                // `sink ⇇ p1 ⇇ p2` — the glyph is an operator token, never a
-                // keyword, so it is locale-invariant. The chain binds between
-                // assignment and the ternary level: the sink and every payload
-                // are complete ternaries (emitted at chain precedence 2 / 3),
-                // so looser operands parenthesize and re-parse to the same
-                // flat chain.
-                self.write_expr_prec(sink, 2, names, surface, writer);
-                for payload in payloads {
-                    writer.write(" ⇇ ");
-                    self.write_expr_prec(payload, 3, names, surface, writer);
-                }
+            HirExpressionKind::CopyInto { target, value } => {
+                // `target ⇇ value` — the glyph is an operator token, never a
+                // keyword, so it is locale-invariant. It binds between
+                // assignment and the ternary level: the target and the value
+                // are complete ternaries (emitted at precedence 2 / 3), so
+                // looser operands parenthesize and re-parse to the same form.
+                self.write_expr_prec(target, 2, names, surface, writer);
+                writer.write(" ⇇ ");
+                self.write_expr_prec(value, 3, names, surface, writer);
             }
             HirExpressionKind::Format { value, spec } => {
                 // `value ¶ "spec"` (D2.1): the glyph is the same in every

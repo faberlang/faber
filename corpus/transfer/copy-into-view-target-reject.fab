@@ -1,0 +1,19 @@
++++
+term = "⇇"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "assignment", "transfer", "expression", "ternary", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "literal"]
+category = "collection"
+canonical = false
+summary = "Copy-into rejects a view as the target."
+syntax = "view target"
+related = ["tensor", "⇇"]
+locale = "en"
++++
+
+# R2: a view on the left, such as `base.slice(0, 1) ⇇ source`, is rejected for now; a sub-block write is a recorded future question.
+
+fn fill(mut tf32[2, 2] base, tf32[1, 2] source) → void {
+    base.slice(0, 1) ⇇ source
+}
+
+main {}

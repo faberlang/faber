@@ -2209,20 +2209,11 @@ pub(super) fn rewrite_expr(
                 diagnostics,
             );
         }
-        HirExpressionKind::Transfer { sink, payloads } => {
-            rewrite_expr(
-                unit_path,
-                sink,
-                interner,
-                targets,
-                data_member_targets,
-                namespaces,
-                diagnostics,
-            );
-            for payload in payloads {
+        HirExpressionKind::CopyInto { target, value } => {
+            for part in [target, value] {
                 rewrite_expr(
                     unit_path,
-                    payload,
+                    part,
                     interner,
                     targets,
                     data_member_targets,

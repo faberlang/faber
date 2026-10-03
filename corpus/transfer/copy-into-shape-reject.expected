@@ -1,0 +1,2 @@
+# R1: both sides have the same shape; a static shape mismatch is a compile error. Extents known only at run time are a recoverable runtime error value instead.
+SEM010:incompatible_tensor_index

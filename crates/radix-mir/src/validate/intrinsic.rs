@@ -805,6 +805,7 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorReshape
             | MirCollectionOp::TensorExpand
             | MirCollectionOp::TensorShift
+            | MirCollectionOp::TensorCopyInto
             | MirCollectionOp::TensorGet
             | MirCollectionOp::TensorFill
             | MirCollectionOp::TensorAdd
@@ -1692,6 +1693,9 @@ impl Validator<'_, '_> {
                     self.error(span, "tensor expand target shape is not an integer lista");
                 }
             }
+            MirCollectionOp::TensorCopyInto => {
+                self.validate_tensor_copy_into(scope, call, span);
+            }
             MirCollectionOp::TensorShift => {
                 self.require_arg_count(call.args.len(), 2, span, "tensor shift runtime call");
                 let Some(receiver_ty) = first_arg_ty else {
@@ -2176,6 +2180,55 @@ impl Validator<'_, '_> {
                     self.error(span, "cord cursor result is not a cursor");
                 }
             }
+        }
+    }
+
+    /// `TensorCopyInto(dest, src)`: the destination is a tensor place (the
+    /// storage that receives the values), the source is a tensor of the same
+    /// element type and shape, and the call is `vacuum`.
+    fn validate_tensor_copy_into(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        call: &MirRuntimeCall,
+        span: Span,
+    ) {
+        self.require_arg_count(call.args.len(), 2, span, "tensor copy-into runtime call");
+        self.require_exact(
+            call.return_ty,
+            self.primitive(Primitive::Vacuum),
+            span,
+            "tensor copy-into result is not vacuum",
+        );
+        let [dest, src] = call.args.as_slice() else {
+            return;
+        };
+        if !matches!(dest, MirOperand::Place(_)) {
+            self.error(span, "tensor copy-into destination is not a place");
+        }
+        let dest_ty = self.validate_operand(scope, dest, span);
+        let src_ty = self.validate_operand(scope, src, span);
+        let (Some(dest_ty), Some(src_ty)) = (dest_ty, src_ty) else {
+            return;
+        };
+        let (dest_element, dest_shape) = match self.type_kind(dest_ty) {
+            Type::Tensor(element, shape) => (*element, *shape),
+            _ => {
+                self.error(span, "tensor copy-into destination is not tensor");
+                return;
+            }
+        };
+        let (src_element, src_shape) = match self.type_kind(src_ty) {
+            Type::Tensor(element, shape) => (*element, *shape),
+            _ => {
+                self.error(span, "tensor copy-into source is not tensor");
+                return;
+            }
+        };
+        if !self.context.types.equals(dest_element, src_element) {
+            self.error(span, "tensor copy-into element types differ");
+        }
+        if !self.context.types.index_equals(dest_shape, src_shape) {
+            self.error(span, "tensor copy-into shapes differ");
         }
     }
 

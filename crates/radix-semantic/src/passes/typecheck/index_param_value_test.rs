@@ -31,7 +31,7 @@ fn rejects_with_issue(source: &str, issue: &str) {
 }
 
 const ROPE_Q_PROBE: &str = r"functio rope_q<T, magnitudo D, magnitudo d, magnitudo P>(tensor<T, [D, d]> input, tensor<T, [P, d, 3]> rota, in tensor<T, [D, d]> output) → vacuum {
-    output ← input.rope_norm<d>(0, rota)
+    output ⇇ input.rope_norm<d>(0, rota)
 }";
 
 #[test]

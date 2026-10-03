@@ -1,0 +1,19 @@
++++
+term = "⇇"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "assignment", "transfer", "expression", "ternary", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "literal"]
+category = "collection"
+canonical = false
+summary = "Copy-into rejects a source whose element type differs from the target."
+syntax = "tensor<f32> into tensor<f64>"
+related = ["tensor", "⇇"]
+locale = "en"
++++
+
+# R1: both sides have the same element type; an `f32` source cannot be copied into an `f64` target without an explicit conversion first.
+
+fn fill(mut tf64[2, 2] target, tf32[2, 2] source) → void {
+    target ⇇ source
+}
+
+main {}

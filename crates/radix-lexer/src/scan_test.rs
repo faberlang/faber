@@ -1306,8 +1306,7 @@ fn bare_cr_in_ascii_literal_rejected() {
 // The positive assertions FAIL today with the expected missing-feature reason:
 // the glyph is unknown and lexes as `unexpected_character`. The confusion
 // tests pin scalar distinctness against the neighbor glyphs ← ↦ ⇥ ⇇ and must
-// stay green (U+21C7 remains unowned by the planned exact-output-transfer goal
-// per OQ3).
+// stay green (U+21C7 is the copy-into operator).
 
 #[test]
 fn lexes_conversio_assign_glyph_as_dedicated_token() {
@@ -1377,7 +1376,7 @@ fn exit_arrow_never_scans_as_conversio_assign() {
 #[test]
 fn leftwards_pair_arrow_never_scans_as_conversio_assign() {
     // Confusion (EOT-3L pin): `⇇` (U+21C7) is the dedicated
-    // exact-output-transfer token. It must never be aliased into the ↤ token
+    // copy-into token. It must never be aliased into the ↤ token
     // (or any other arrow); it lexes as its own `Transfer` token.
     let result = lex("\u{21C7}");
     assert!(result.errors.is_empty(), "errors: {:?}", result.errors);

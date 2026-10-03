@@ -296,14 +296,12 @@ impl SummaBodyState {
             HirExpressionKind::Call(callee, _, args, _) => {
                 self.walk_call(checker, callee, args, expr.span)
             }
-            // EOT-3M (exhaustive-match completion): a transfer invokes its
-            // sink; keep the same unapproved-effect rejection as `∇`.
-            HirExpressionKind::Transfer { sink, payloads } => {
+            // `target ⇇ value` writes existing tensor storage, an effect a term
+            // body does not admit; keep the same rejection as `∇`.
+            HirExpressionKind::CopyInto { target, value } => {
                 effect(checker, expr.span, "unapproved_effect");
-                self.walk_expr(checker, sink);
-                for payload in payloads {
-                    self.walk_expr(checker, payload);
-                }
+                self.walk_expr(checker, target);
+                self.walk_expr(checker, value);
             }
             HirExpressionKind::Gradient {
                 call,

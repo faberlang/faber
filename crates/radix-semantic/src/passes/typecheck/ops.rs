@@ -929,6 +929,10 @@ impl TypeChecker<'_> {
             self.check_expr(value);
             return self.error_type;
         }
+        if self.reject_copy_into_value(value) {
+            self.check_expr(value);
+            return target_ty;
+        }
         if self.is_shader_vec3_to_vec4_output_target(target, target_ty) {
             let value_ty = self.check_expr(value);
             if self.is_f32_vector_width(value_ty, 3) {
@@ -1016,6 +1020,10 @@ impl TypeChecker<'_> {
         if target_ty == self.error_type {
             self.check_expr(source);
             return self.error_type;
+        }
+        if self.reject_copy_into_value(source) {
+            self.check_expr(source);
+            return target_ty;
         }
         // The destination type must resolve before conversion checking: an
         // inference-hole destination (e.g. `fixum _ xs ← []`) cannot name a

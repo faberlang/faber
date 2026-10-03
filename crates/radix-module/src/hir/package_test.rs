@@ -863,21 +863,20 @@ fn nucleum_sidecar_is_deterministic_and_rejects_foreign_bytes() {
 }
 
 #[test]
-fn device_transfer_sink_is_recorded_as_device_callee() {
-    // EOT-3W: `walk_expr_callees` covers `HirExpressionKind::Transfer` — a
-    // device function invoked as a `⇇` sink is a called device callee (once
-    // per payload), so the post-import call graph records the edge instead
-    // of silently dropping it through the catch-all.
+fn device_callee_in_a_copy_into_value_is_recorded() {
+    // `walk_expr_callees` covers `HirExpressionKind::CopyInto`: a device
+    // function called in the value of `target ⇇ value` is a called device
+    // callee, so the post-import call graph records the edge instead of
+    // silently dropping it through the catch-all.
     let unit = analyze(
         "device.fab",
         r"
 @ nucleum fragment
-functio emit(f32 x) → vacuum { tacet }
+functio emit(tf32[4] x) → tf32[4] { redde x }
 
 @ nucleum
-functio k(f32 x) → f32 {
-    emit ⇇ x
-    redde x
+functio k(tf32[4] x, in tf32[4] out) → vacuum {
+    out ⇇ emit(x)
 }
 ",
     );

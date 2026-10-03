@@ -1,0 +1,2 @@
+# R2: a view on the left, such as `base.slice(0, 1) ⇇ source`, is rejected for now; a sub-block write is a recorded future question.
+SEM057:copy_into_target_view

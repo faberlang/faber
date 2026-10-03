@@ -202,11 +202,6 @@ pub enum Command {
     #[command(long_about = CONVERT_LONG_ABOUT)]
     Convert(ConvertArgs),
 
-    /// Rewrite admitted print/nota statements to imported `⇇` transfers
-    /// (report-only unless `--write` is given)
-    #[command(name = "output-transfer-codemod")]
-    OutputTransferCodemod(OutputTransferCodemodArgs),
-
     /// Insert `var`/`varia` before every unmarked genus field (D16.1 migration;
     /// span-based, every other byte unchanged; report-only unless `--write`
     /// is given)
@@ -324,33 +319,6 @@ pub struct FieldModifierCodemodArgs {
     /// Write codemodded source back to the file (default is report-only)
     #[arg(long, conflicts_with_all = ["check", "stdout"])]
     pub write: bool,
-}
-
-/// Arguments for `faber output-transfer-codemod`.
-#[derive(clap::Args, Debug)]
-pub struct OutputTransferCodemodArgs {
-    /// Files or directories to codemod (default: current directory)
-    #[arg(value_name = "PATH")]
-    pub paths: Vec<PathBuf>,
-
-    /// Report files that would change without writing (the default; explicit
-    /// spelling); exit 1 if any file would change
-    #[arg(long, conflicts_with_all = ["write", "stdout"])]
-    pub check: bool,
-
-    /// Write codemodded output to stdout instead of reporting (exactly one
-    /// input file)
-    #[arg(long, conflicts_with_all = ["check", "write"])]
-    pub stdout: bool,
-
-    /// Write codemodded source back to the file (default is report-only)
-    #[arg(long, conflicts_with_all = ["check", "stdout"])]
-    pub write: bool,
-
-    /// Read exactly one source document from stdin and print the codemodded
-    /// result to stdout (incompatible with path arguments and the other modes)
-    #[arg(long, conflicts_with_all = ["check", "write", "stdout", "paths"])]
-    pub stdin: bool,
 }
 
 /// Arguments for `faber build`.

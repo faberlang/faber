@@ -1097,67 +1097,47 @@ functio check(valor v) → bivalens {
     );
 }
 
-#[test]
 // ===========================================================================
 // Section G: Direct calls, intrinsics, methods
 // ===========================================================================
 
-/// EOT-3M: one sink evaluation, one invocation per payload, left-to-right.
-///
-/// The sink is an effect-bearing expression (a closure literal constructed at
-/// the transfer site), so a second `const function` or a re-evaluated callee
-/// would be visible in the dump. Payloads `"a"` then `"b"` must each produce
-/// exactly one call on the single sink temp.
+/// `target ⇇ value`: the value is evaluated once and one `TensorCopyInto`
+/// writes the target's existing storage. The statement is `vacuum`.
 #[test]
-fn lowers_transfer_with_single_sink_evaluation_and_ordered_payloads() {
+fn lowers_copy_into_to_one_tensor_copy_into_with_the_value_evaluated_once() {
     let dump = dump_source(
-        r#"functio output(textus value) → vacuum { tacet }
-incipit {
-  ((textus value) → vacuum ∴ output(value)) ⇇ "a" ⇇ "b"
-}"#,
+        r"functio copy(tf32[3, 3] a, tf32[3, 3] b, in tf32[3, 3] out) → vacuum {
+    out ⇇ a + b
+}",
     );
 
     assert_eq!(
-        dump.matches("%0 = const function").count(),
+        dump.matches("tensor_copy_into").count(),
         1,
-        "sink expression must be evaluated exactly once:\n{dump}"
+        "exactly one copy-into call:\n{dump}"
     );
-    let first = dump
-        .find("call %0(const string sym#7)")
-        .unwrap_or_else(|| panic!("first payload call missing:\n{dump}"));
-    let second = dump
-        .find("call %0(const string sym#8)")
-        .unwrap_or_else(|| panic!("second payload call missing:\n{dump}"));
-    assert!(first < second, "payloads must be invoked left-to-right:\n{dump}");
     assert_eq!(
-        dump.matches("call %0(").count(),
-        2,
-        "exactly one invocation per payload:\n{dump}"
+        dump.matches("tensor_add").count(),
+        1,
+        "the value is evaluated exactly once:\n{dump}"
     );
+    let add = dump.find("tensor_add").expect("add call");
+    let copy = dump.find("tensor_copy_into").expect("copy-into call");
+    assert!(add < copy, "the value is computed before the copy:\n{dump}");
 }
 
-/// EOT-3M: a path sink binds once and every payload transfers on that single
-/// callable value.
+/// A view source copies through the view: the transpose is evaluated once and
+/// is the source operand of the single `TensorCopyInto`.
 #[test]
-fn lowers_transfer_path_sink_invokes_once_per_payload() {
+fn lowers_copy_into_of_a_view_source_with_one_call() {
     let dump = dump_source(
-        r#"functio output(textus value) → vacuum { tacet }
-incipit {
-  fixum _ sink ← (textus value) → vacuum ∴ output(value)
-  sink ⇇ "a" ⇇ "b"
-}"#,
+        r"functio copy(tf32[2, 3] a, in tf32[3, 2] out) → vacuum {
+    out ⇇ a.transpone()
+}",
     );
 
-    assert_eq!(
-        dump.matches("%0 = const function").count(),
-        1,
-        "closure sink constructed once:\n{dump}"
-    );
-    assert_eq!(
-        dump.matches("call _0(").count(),
-        2,
-        "one invocation per payload on the single sink:\n{dump}"
-    );
+    assert_eq!(dump.matches("tensor_copy_into").count(), 1, "{dump}");
+    assert_eq!(dump.matches("tensor_transpose").count(), 1, "{dump}");
 }
 
 fn lowers_direct_calls_to_definition_callees() {
@@ -5134,7 +5114,7 @@ functio describe(Resultatus<numerus> r) → textus {
 fn generic_rope_dim_lowers_to_symbolic_shape_size_operand() {
     let source = r"
 functio rope_q<T, magnitudo D, magnitudo d, magnitudo P>(tensor<T, [D, d]> input, tensor<T, [P, d, 3]> rota, in tensor<T, [D, d]> output) → vacuum {
-    output ← input.rope_norm<d>(0, rota)
+    output ⇇ input.rope_norm<d>(0, rota)
 }
 ";
     let mut unit = analyze(source);
@@ -7228,4 +7208,33 @@ fn vector_runtime_index_lowers_to_an_index_projection_on_the_vector() {
         );
     }
     assert!(!dump.contains(".lane"), "run-time index became a constant lane:\n{dump}");
+}
+
+/// A device function lowers `⇇` to the output-buffer store the recipes already
+/// write (one forwarding assign, no copy-into call); a host function keeps the
+/// storage-preserving `TensorCopyInto`.
+#[test]
+fn a_device_function_lowers_copy_into_to_a_forwarding_store() {
+    let dump = dump_source(
+        "+++\nlocale = \"en\"\n+++\n@ kernel\n@ public\nfn k(tf32[16, 8] a, tf32[8, 16] b, mut tf32[16, 16] out, u32 id) → void {\n    out ⇇ a · b\n}\n",
+    );
+
+    assert_eq!(dump.matches("tensor_matmul").count(), 1, "{dump}");
+    assert_eq!(
+        dump.matches("tensor_copy_into").count(),
+        0,
+        "a device function has no copy-into call:\n{dump}"
+    );
+    assert!(dump.contains("_2 = %0"), "the result is stored into the output param:\n{dump}");
+}
+
+#[test]
+fn a_host_function_keeps_the_storage_preserving_copy_into() {
+    let dump = dump_source(
+        r"functio copy(tf32[3, 3] a, in tf32[3, 3] out) → vacuum {
+    out ⇇ a
+}",
+    );
+
+    assert_eq!(dump.matches("tensor_copy_into").count(), 1, "{dump}");
 }

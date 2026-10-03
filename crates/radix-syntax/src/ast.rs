@@ -1174,12 +1174,11 @@ pub enum ExprKind {
     /// `primus_quem` is immediately followed by `(`; the `ubi` predicate tail
     /// is owned by this head and is never shared with the reduce/scan tails.
     FirstMatch(Box<FirstMatchExpr>),
-    /// Exact-output transfer: `sink ⇇ p1 ⇇ p2` (U+21C7).
+    /// Copy-into statement: `target ⇇ value` (U+21C7).
     ///
-    /// One sink evaluated once plus an ordered payload list. Each payload is
-    /// transferred on that single sink left-to-right; the chain is never a
-    /// pipeline of return values and the whole expression is `vacuum`-shaped.
-    Transfer(TransferExpr),
+    /// Copies every value of `value` into the existing storage of `target`;
+    /// the whole expression is `vacuum`-shaped.
+    CopyInto(CopyIntoExpr),
     /// Capture boundary: `capta { body }`.
     ///
     /// Reifies the error channel into a value union (`success ∪ errata`). The
@@ -1238,13 +1237,14 @@ pub struct FormatExpr {
     pub spec_span: Span,
 }
 
-/// Source shape for the `⇇` exact-output transfer chain.
+/// Source shape for the `⇇` copy-into statement: `target ⇇ value` copies
+/// every value of `value` into the existing storage of `target`.
 #[derive(Debug)]
-pub struct TransferExpr {
-    /// Unary callable receiving every payload; evaluated once.
-    pub sink: Box<Expr>,
-    /// Payloads in source order, one transfer each, left-to-right.
-    pub payloads: Vec<Expr>,
+pub struct CopyIntoExpr {
+    /// The existing storage that receives the values.
+    pub target: Box<Expr>,
+    /// The value expression copied into the target.
+    pub value: Box<Expr>,
 }
 
 /// Source shape for the contextual `summa ex` term-fold expression.

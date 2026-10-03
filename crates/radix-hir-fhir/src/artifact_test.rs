@@ -127,8 +127,9 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // adds the loop-binder `mutable` flag to the four loop nodes. Schema 31
     // carries runtime shape-boundary obligations; schema 32 carries inferred
     // per-target kernel requirements; schema 33 carries tensor edge policies;
-    // schema 34 carries runtime shape guards in provider units.
-    assert_eq!(SCHEMA_VERSION, 35);
+    // schema 34 carries runtime shape guards in provider units; schema 36
+    // reshapes `HirExpressionKind::Transfer` into `CopyInto`.
+    assert_eq!(SCHEMA_VERSION, 36);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────
@@ -149,17 +150,16 @@ fn transfer_round_trips_through_postcard() {
     let radix_hir::HirStatementKind::Expr(expr) = &body.statements[0].kind else {
         panic!("expected expr statement");
     };
-    let radix_hir::HirExpressionKind::Transfer { sink, payloads } = &expr.kind else {
-        panic!("expected transfer expression");
+    let radix_hir::HirExpressionKind::CopyInto { target, value } = &expr.kind else {
+        panic!("expected copy-into expression");
     };
     assert!(
-        matches!(sink.kind, radix_hir::HirExpressionKind::Path(DefId(0))),
-        "sink must survive the wire"
+        matches!(target.kind, radix_hir::HirExpressionKind::Path(DefId(0))),
+        "target must survive the wire"
     );
-    assert_eq!(
-        payloads.len(),
-        2,
-        "ordered payload list must survive the wire"
+    assert!(
+        matches!(value.kind, radix_hir::HirExpressionKind::Literal(_)),
+        "value must survive the wire"
     );
 }
 
@@ -179,7 +179,7 @@ fn transfer_decode_passes_referential_integrity() {
         matches!(
             &body.statements[0].kind,
             radix_hir::HirStatementKind::Expr(radix_hir::HirExpression {
-                kind: radix_hir::HirExpressionKind::Transfer { .. },
+                kind: radix_hir::HirExpressionKind::CopyInto { .. },
                 ..
             })
         ),

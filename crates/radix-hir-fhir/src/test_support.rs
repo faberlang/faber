@@ -159,7 +159,7 @@ pub(crate) fn selective_import_artifact() -> HirArtifact {
     artifact
 }
 
-/// Artifact whose HIR carries one `⇇` transfer statement in the function body.
+/// Artifact whose HIR carries one `⇇` copy-into statement in the function body.
 pub(crate) fn transfer_artifact() -> HirArtifact {
     use radix_hir::{HirBlock, HirStatement, HirStatementKind};
 
@@ -168,31 +168,21 @@ pub(crate) fn transfer_artifact() -> HirArtifact {
     let transfer = radix_hir::HirExpression {
         id: HirId(7),
         ty: None,
-        kind: radix_hir::HirExpressionKind::Transfer {
-            sink: Box::new(radix_hir::HirExpression {
+        kind: radix_hir::HirExpressionKind::CopyInto {
+            target: Box::new(radix_hir::HirExpression {
                 id: HirId(8),
                 ty: None,
                 kind: radix_hir::HirExpressionKind::Path(DefId(0)),
                 span: Span::default(),
             }),
-            payloads: vec![
-                radix_hir::HirExpression {
-                    id: HirId(9),
-                    ty: None,
-                    kind: radix_hir::HirExpressionKind::Literal(radix_hir::HirLiteral::String(
-                        Symbol(2),
-                    )),
-                    span: Span::default(),
-                },
-                radix_hir::HirExpression {
-                    id: HirId(10),
-                    ty: None,
-                    kind: radix_hir::HirExpressionKind::Literal(radix_hir::HirLiteral::String(
-                        Symbol(2),
-                    )),
-                    span: Span::default(),
-                },
-            ],
+            value: Box::new(radix_hir::HirExpression {
+                id: HirId(9),
+                ty: None,
+                kind: radix_hir::HirExpressionKind::Literal(radix_hir::HirLiteral::String(Symbol(
+                    2,
+                ))),
+                span: Span::default(),
+            }),
         },
         span: Span::default(),
     };

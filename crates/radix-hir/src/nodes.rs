@@ -1566,16 +1566,15 @@ pub enum HirExpressionKind {
         ty: TypeId,
     },
 
-    /// Exact-output transfer chain: `sink ⇇ p1 ⇇ p2` (U+21C7).
+    /// Copy-into: `target ⇇ value` (U+21C7).
     ///
-    /// One sink plus an ordered payload list. The sink is a unary callable
-    /// whose return type is `vacuum`; every payload is transferred on that
-    /// single sink left-to-right, one invocation per payload, and the whole
-    /// expression is `vacuum`-shaped. Typecheck owns the callable/vacuum/payload
-    /// rules; lowering owns the single-evaluation contract.
-    Transfer {
-        sink: Box<HirExpression>,
-        payloads: Vec<HirExpression>,
+    /// Copies every value of `value` into the existing storage of `target`;
+    /// the storage identity of `target` is preserved (`←` only rebinds names).
+    /// The expression is `vacuum`-shaped. Typecheck owns the tensor-storage,
+    /// exact-type and aliasing rules; lowering evaluates `value` once.
+    CopyInto {
+        target: Box<HirExpression>,
+        value: Box<HirExpression>,
     },
 
     /// Format operator `value ¶ "spec"` (D2.1) → `textus`.

@@ -218,15 +218,13 @@ impl FragmentDefinitionChecker<'_> {
             }
             HirExpressionKind::Unary(_, operand) => self.check_expr(operand),
             HirExpressionKind::Call(callee, _, args, _) => self.check_call(callee, args, expr.span),
-            // EOT-3M (exhaustive-match completion): a transfer invokes a
-            // dynamic sink callable; classify it as an effect rather than
-            // admitting it silently.
-            HirExpressionKind::Transfer { sink, payloads } => {
+            // `target ⇇ value` writes existing tensor storage; fragments admit
+            // no such effect yet, so classify it as one instead of admitting it
+            // silently.
+            HirExpressionKind::CopyInto { target, value } => {
                 self.effect(expr.span, "dynamic_function");
-                self.check_expr(sink);
-                for payload in payloads {
-                    self.check_expr(payload);
-                }
+                self.check_expr(target);
+                self.check_expr(value);
             }
             HirExpressionKind::Gradient {
                 call,

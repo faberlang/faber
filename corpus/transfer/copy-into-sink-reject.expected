@@ -1,0 +1,2 @@
+# R7: the old `sink ⇇ payload` form (a callable on the left) is retired (FABER-2-SUNSET); output is `print`, and a tensor write is `target ⇇ value`.
+SEM012:transfer_sink_retired

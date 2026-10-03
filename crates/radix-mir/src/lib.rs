@@ -13,6 +13,7 @@ mod collection_ops;
 pub mod control;
 pub mod cost_analysis;
 pub mod device;
+pub mod device_copy_into;
 pub mod device_plan_compiler;
 pub mod device_plan_ingress;
 pub mod device_program;
@@ -49,6 +50,8 @@ pub mod validate;
 pub mod vector_expand;
 pub mod visit;
 
+#[cfg(test)]
+mod device_copy_into_test;
 mod figura;
 #[cfg(test)]
 mod function_index_test;
