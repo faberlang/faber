@@ -107,7 +107,8 @@ pub(crate) use manifest::manifest_device_inputs;
 pub(crate) use manifest::validate_manifest;
 pub use manifest::{
     FaberManifest, ManifestProduct, ManifestProductEmit, ManifestProductKind,
-    ManifestProductShaders, manifest_package_build_target, read_manifest,
+    ManifestProductShaders, manifest_package_build_target as manifest_build_target_for_input,
+    read_manifest,
 };
 #[cfg(feature = "runner")]
 pub use mir::run_fmir_image_bytes_with_stdio;
@@ -124,9 +125,9 @@ use radix::program::library::{LibraryInterfaceCache, LibraryResolver, LockedLibr
 use std::path::{Path, PathBuf};
 pub use test_route::{analyze_package_for_tests, test_source_filter_for_input};
 
-/// ONE-EFFECTIVE-TARGET SEAM — executed lane (TARGETLANE001 executed-lane
-/// routing; authoritative decision record
-/// `radix/docs/factory/executed-lane-target-decision.md`).
+/// ONE-EFFECTIVE-TARGET SEAM — executed lane (TARGETLANE001 routing).
+/// BUG-F585D081: all manifest-backed routes share the manifest's target,
+/// including its implicit default; caller defaults apply only without a manifest.
 ///
 /// Resolve the effective analysis target for an executed package:
 ///   1. **Explicit MIR-backed config target** — authoritative and never
@@ -139,9 +140,9 @@ pub use test_route::{analyze_package_for_tests, test_source_filter_for_input};
 ///      target is the ABI source of truth for analysis and execution alike;
 ///      this propagation is the routing fix that stops `TARGETLANE001`
 ///      firing at analysis on the executed path.
-///   3. **Executed-lane default `fmir`** (`Target::MirFmirBinary`) when no
-///      target is named — the source-independent package-MIR binary image the
-///      in-process runner consumes.
+///   3. **Executed-lane default `fmir`** (`Target::MirFmirBinary`) only when no
+///      manifest exists. An existing manifest owns its implicit portable
+///      default (`fhir`) as well as any explicitly declared target.
 ///
 /// The seam is single-valued and never ambient: analysis and execution resolve
 /// from the same source, so the two targets cannot diverge (ABI source-of-
@@ -155,10 +156,14 @@ pub fn executed_lane_analysis_target(
     config: &Config,
     input: &Path,
 ) -> Result<Target, Box<Diagnostic>> {
+    let manifest_target = manifest_build_target_for_input(input)?;
     if is_mir_backed_target(config.target) {
         return Ok(config.target);
     }
-    Ok(manifest::manifest_build_target_for_input(input)?.unwrap_or(Target::MirFmirBinary))
+    match manifest_target {
+        Some(target) => Ok(target),
+        None => Ok(Target::MirFmirBinary),
+    }
 }
 
 /// Whether a compiler target is MIR-backed (the executed-lane positive set;
