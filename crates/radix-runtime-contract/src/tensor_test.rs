@@ -104,6 +104,10 @@ fn err_tensor_edge_constants_match_codegen_copy() {
         radix_hir_rust::runtime_contract_tensor::ERR_TENSOR_MATERIALIZE_UNRESOLVED
     );
     assert_eq!(
+        ERR_TENSOR_COPY_INTO_SHAPE_MISMATCH,
+        radix_hir_rust::runtime_contract_tensor::ERR_TENSOR_COPY_INTO_SHAPE_MISMATCH
+    );
+    assert_eq!(
         ERR_TENSOR_EDGE_POLICY_INVALID,
         radix_hir_rust::runtime_contract_tensor::ERR_TENSOR_EDGE_POLICY_INVALID
     );

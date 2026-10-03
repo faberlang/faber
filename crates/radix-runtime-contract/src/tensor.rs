@@ -32,6 +32,7 @@ pub const ERR_TENSOR_EDGE_UNRESOLVED_READ: &str =
     "tensor flatten cannot read an unresolved shifted optional element";
 pub const ERR_TENSOR_MATERIALIZE_UNRESOLVED: &str =
     "tensor materialize cannot copy unresolved shifted optional elements";
+pub const ERR_TENSOR_COPY_INTO_SHAPE_MISMATCH: &str = "tensor copy into shape mismatch";
 pub const ERR_TENSOR_EDGE_POLICY_INVALID: &str =
     "tensor edge policy produced an invalid coordinate";
 pub const ERR_TENSOR_EDGE_RANK_MISMATCH: &str =
