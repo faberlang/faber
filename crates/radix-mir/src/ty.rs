@@ -218,9 +218,10 @@ pub fn index_projection_result_ty(
     match types.get(base_ty.semantic_id()) {
         // A run-time lane select on a vector register value (the constant lane
         // is the `VectorLane` projection).
-        Type::Array(inner) | Type::Tensor(inner, _) | Type::Vector(inner, _) => {
-            Ok(MirType::semantic(*inner))
-        }
+        Type::Array(inner)
+        | Type::BoundedArray { element: inner, .. }
+        | Type::Tensor(inner, _)
+        | Type::Vector(inner, _) => Ok(MirType::semantic(*inner)),
         Type::Map(_, value) => Ok(MirType::semantic(*value)),
         Type::Primitive(Primitive::Textus) => {
             Ok(MirType::semantic(types.primitive(Primitive::Textus)))
