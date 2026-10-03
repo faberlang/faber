@@ -91,18 +91,11 @@ fn faber_row_feature(target: Target) -> &'static str {
 /// build without the feature reports no row for it (capability truth — the
 /// surface is not part of this build). No build/run/package claim: these are
 /// compiled support surfaces, not `faber build`/`run` targets.
-const FABER_CAPABILITY_ROWS: &[(&str, &str, &str)] = &[
-    (
-        "device-runtime",
-        "device-runtime",
-        "device runtime support surface (faber runtime + package/device modules); compiled only under the device-runtime feature",
-    ),
-    (
-        "host-macos-arm64",
-        "host-macos-arm64",
-        "native host leaf (Metal/CUDA host session support); compiled only under the host-macos-arm64 feature",
-    ),
-];
+const FABER_CAPABILITY_ROWS: &[(&str, &str, &str)] = &[(
+    "device-runtime",
+    "device-runtime",
+    "device runtime support surface (faber runtime + package/device modules); compiled only under the device-runtime feature",
+)];
 
 /// One rendered capability row.
 struct TargetRow {
@@ -276,9 +269,6 @@ fn compiled_features() -> BTreeSet<&'static str> {
     }
     if cfg!(feature = "device-runtime") {
         compiled.insert("device-runtime");
-    }
-    if cfg!(feature = "host-macos-arm64") {
-        compiled.insert("host-macos-arm64");
     }
     compiled
 }

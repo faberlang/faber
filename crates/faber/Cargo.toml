@@ -33,6 +33,10 @@ radix-mir-fmir = { path = "../radix-mir-fmir" }
 # DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by `mir-metal`.
 # DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by `mir-llvm`.
 radix-mir-runner = { path = "../radix-mir-runner", optional = true }
+# gpu-reset C1-e: the in-process device seam (`package::host_factory`) opens
+# radix-device-core's DeviceRegistry fail-closed. No hosts path dependency —
+# the parked `host-macos-arm64` feature is retired (bucket (d)); driver
+# runtimes register as they land (C1-c metal, C2 cpu).
 proba = { path = "../proba", default-features = false, optional = true }
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0.228", features = ["derive"] }
@@ -59,7 +63,6 @@ hir-faber = ["radix/hir-faber"]
 hir-fhir = ["radix/hir-fhir"]
 mir-fmir = ["radix/mir-fmir"]
 runner = ["radix/runner", "dep:radix-mir-runner", "dep:proba", "proba/runner"]
-host-macos-arm64 = []
 
 [lints]
 workspace = true

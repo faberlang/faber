@@ -151,7 +151,7 @@ fn small_build_reports_only_compiled_capabilities() {
     }
 
     // No device/host-leaf/device-runtime capability rows at all.
-    for name in ["device-runtime", "host-macos-arm64"] {
+    for name in ["device-runtime"] {
         assert!(
             !rows.iter().any(|r| r.name == name),
             "{name} row must be absent in a small build (capability not compiled)"
@@ -167,8 +167,8 @@ fn default_build_reports_full_surface() {
     let rows = target_rows(&compiled_features());
     let specs = faber_target_row_specs();
     // All derived emit rows; no capability rows compile under the default
-    // build (device-runtime / host-macos-arm64 since the S3-U2 cut) — both
-    // are opt-in and report no row.
+    // build (device-runtime since the S3-U2 cut) — it is opt-in and
+    // reports no row.
     assert_eq!(rows.len(), specs.len());
 
     for spec in &specs {
@@ -184,7 +184,7 @@ fn default_build_reports_full_surface() {
             assert!(available, "{} must be available", spec.name);
         }
     }
-    for name in ["device-runtime", "host-macos-arm64"] {
+    for name in ["device-runtime"] {
         assert!(
             !rows.iter().any(|r| r.name == name),
             "{name} row must be absent in the default build (feature left full-targets)"
@@ -219,10 +219,9 @@ fn default_build_reports_full_surface() {
 fn rendered_table_contains_capability_rows_under_full_build() {
     let table = rendered_targets_table();
     assert!(table.contains("rust available=yes"), "{table}");
-    // Capability truth under the default build: device-runtime and
-    // host-macos-arm64 (opt-in since S3-U2) report no row for an unbuilt
-    // surface.
-    for name in ["device-runtime", "host-macos-arm64"] {
+    // Capability truth under the default build: device-runtime (opt-in
+    // since S3-U2) reports no row for an unbuilt surface.
+    for name in ["device-runtime"] {
         assert!(
             !table
                 .lines()

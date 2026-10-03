@@ -44,7 +44,7 @@ mod embedded_locale;
 mod fhir;
 #[cfg(feature = "hir-go")]
 mod go_build;
-#[cfg(all(feature = "device-runtime", feature = "host-macos-arm64"))]
+#[cfg(feature = "device-runtime")]
 mod host_factory;
 pub(crate) mod host_spawn;
 #[cfg_attr(not(feature = "hir-rust"), path = "library_link_unavailable.rs")]

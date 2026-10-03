@@ -67,15 +67,15 @@ fn cli_parses_targets_subcommand() {
 fn targets_table_reports_capability_truth_for_the_default_build() {
     // The cli_test binary builds under default features (full-targets): the
     // rust host lane must be present, and the opt-in capability rows absent —
-    // `device-runtime` / `host-macos-arm64` left full-targets at the S3-U2
-    // ordinary-tool cut (f683d94d0), so capability truth reports no row for
-    // an unbuilt surface.
+    // `device-runtime` left full-targets at the S3-U2 ordinary-tool cut
+    // (f683d94d0), so capability truth reports no row for an unbuilt
+    // surface.
     let table = crate::commands::targets::rendered_targets_table();
     assert!(
         table.contains("rust available=yes"),
         "rust host lane must be reported as available:\n{table}"
     );
-    for row_name in ["device-runtime", "host-macos-arm64"] {
+    for row_name in ["device-runtime"] {
         assert!(
             !table
                 .lines()
