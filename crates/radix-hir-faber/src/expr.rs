@@ -921,7 +921,17 @@ impl super::FaberCodegen<'_> {
                 self.write_expr(value, names, surface, writer);
             }
             HirExpressionKind::Clausura(params, ret, err, body) => {
-                let parenthesized = params.len() != 1;
+                // Compact block bodies require `fac`, which adds a break
+                // target. Preserve a plain lexical body via the live keyword
+                // grammar instead of changing its HIR meaning (D8.9).
+                let lexical_body = matches!(&body.kind, HirExpressionKind::Block(block) if block.breakable.is_none());
+                if lexical_body {
+                    writer.write(surface.keyword(TokenKind::Clausura));
+                    if !params.is_empty() {
+                        writer.write(" ");
+                    }
+                }
+                let parenthesized = !lexical_body && params.len() != 1;
                 if parenthesized {
                     writer.write("(");
                 }
@@ -974,14 +984,7 @@ impl super::FaberCodegen<'_> {
                         .unwrap_or_else(|error| self.record_type_emission_error(error));
                     writer.write(&rendered);
                 }
-                writer.write(" ∴ ");
-                // A `fac`-breakable body block writes its own keyword.
-                if matches!(&body.kind, HirExpressionKind::Block(block)
-                    if !matches!(block.breakable, Some(radix_hir::HirBreakableKind::Fac | radix_hir::HirBreakableKind::FacOmnia)))
-                {
-                    writer.write(surface.contextual_keyword("fac"));
-                    writer.write(" ");
-                }
+                writer.write(if lexical_body { " " } else { " ∴ " });
                 self.write_expr(body, names, surface, writer);
             }
             HirExpressionKind::Cede(_) => {

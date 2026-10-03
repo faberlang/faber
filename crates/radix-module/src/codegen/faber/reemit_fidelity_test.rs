@@ -891,6 +891,77 @@ fn canonical_revalidation_accepts_layout_only_changes() {
         .expect("layout, trivia, and redundant parentheses do not change meaning");
 }
 
+/// Both passes include the unmodified D8.9 HIR meaning proof.
+fn emit_closure_body_twice(source: &str, locale: &str) -> String {
+    let pack = crate::locale::LocalePack::from_toml_path(&crate::locale::workspace_locale_pack_path(locale))
+        .expect("reader pack loads");
+    let session = Session::new(Config::default().with_resolved_locale_pack(pack.clone()));
+    let emit = |source: &str| {
+        let result = reemit_faber(&session, &pack, "closure.fab", source);
+        assert!(result.success(), "{source}\n{:?}", result.diagnostics);
+        result.output.expect("closure output").code
+    };
+    let first = emit(source);
+    assert_eq!(emit(&first), first, "closure emission must be idempotent");
+    first
+}
+
+#[test]
+fn closure_body_breakability_legacy_blocks_round_trip_with_and_without_comments() {
+    for (locale, function, keyword, ty, return_word) in [
+        ("en", "fn", "lambda", "int", "return"),
+        ("la", "functio", "clausura", "numerus", "redde"),
+    ] {
+        for params in [String::new(), format!("{ty} x"), format!("{ty} x, {ty} y")] {
+            for comment in ["", "# lambda body\n"] {
+                let source =
+                    format!("{function} f() {{ {keyword} {params} → {ty} {{\n{comment}{return_word} 1\n}} }}\n");
+                let emitted = emit_closure_body_twice(&source, locale);
+                assert!(emitted.contains(&format!("{keyword} ")), "{emitted}");
+                assert!(!emitted.contains('∴'), "{emitted}");
+                assert_eq!(
+                    emitted.matches("# lambda body").count(),
+                    usize::from(!comment.is_empty()),
+                    "{emitted}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn closure_body_breakability_explicit_fac_blocks_remain_compact() {
+    for (locale, function, ty, return_word, fac) in [
+        ("en", "fn", "int", "return", "do"),
+        ("la", "functio", "numerus", "redde", "fac"),
+    ] {
+        let source = format!("{function} f() {{ () → {ty} ∴ {fac} {{\n# lambda body\n{return_word} 1\n}} }}\n");
+        let emitted = emit_closure_body_twice(&source, locale);
+        assert!(emitted.contains(&format!("∴ {fac} {{")), "{emitted}");
+        assert_eq!(emitted.matches("# lambda body").count(), 1, "{emitted}");
+    }
+}
+
+#[test]
+fn closure_body_breakability_revalidation_rejects_added_fac_scope() {
+    let source = "functio f() { clausura → numerus { redde 1 } }\n";
+    let latin = crate::locale::latin_locale_pack();
+    let session = Session::new(Config::default().with_locale_pack(latin.clone()));
+    let prepared = prepare_program_module_for_name("closure.fab", source, &session).expect("prepare closure");
+    let analysis = analyze_source(
+        &prepared.session,
+        "closure.fab",
+        source,
+        AnalyzeRequest { cli_program: None, contract: prepared.contract },
+    )
+    .expect("analyze closure");
+    let changed = "functio f() { () → numerus ∴ fac { redde 1 } }\n";
+    let diagnostic = super::compile::revalidate_emitted_output(&session, "closure.fab", changed, &analysis, &latin)
+        .expect_err("adding a breakable closure scope changes HIR meaning");
+    assert_eq!(diagnostic.code, Some("CODEGEN006"));
+    assert_eq!(diagnostic.issue(), Some("hir_meaning_diverged"));
+}
+
 #[test]
 fn plain_fac_block_keeps_its_breakable_scope() {
     let source = "incipit {\n    varia numerus m ← 0\n    fac {\n        fac {\n            m ↑\n            si m ≥ 2 {\n                rumpe\n            }\n        }\n    } dum m < 6\n    nota m\n}\n";
