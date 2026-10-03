@@ -1695,7 +1695,7 @@ impl BodyDecline<'_> {
             HirExpressionKind::Scribe(_, _)
             | HirExpressionKind::ReadLine(_)
             | HirExpressionKind::Adfirma(_, _)
-            | HirExpressionKind::Clausura(_, _, _, _, _)
+            | HirExpressionKind::Clausura(..)
             | HirExpressionKind::Conversio { .. }
             | HirExpressionKind::ConversioAssign { .. }
             | HirExpressionKind::Ref(_, _)

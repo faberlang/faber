@@ -1888,7 +1888,7 @@ impl HirVisitor for BorrowChecker<'_> {
                     self.visit_expr(recovery);
                 }
             }
-            HirExpressionKind::Clausura(params, _, _, body, _) => {
+            HirExpressionKind::Clausura(params, _, _, body) => {
                 if closure_captures_tensor_view(body, &self.tensor_view_roots) {
                     self.error(
                         SemanticErrorKind::ModeMismatch,

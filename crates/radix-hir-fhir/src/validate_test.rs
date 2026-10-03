@@ -5,7 +5,7 @@ use radix_hir::{
     HirParamMode, HirRangeKind, HirStatement, HirStatementKind,
 };
 use radix_lexer::{Span, Symbol};
-use radix_syntax::{ClosureModifier, TypeFormLevel};
+use radix_syntax::TypeFormLevel;
 use radix_types::{
     DefId, IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable, USER_DEF_ID_BASE,
 };
@@ -73,7 +73,6 @@ fn decode_accepts_def_sites_inside_parameter_default() {
             None,
             None,
             Box::new(lit(2, 0)),
-            ClosureModifier::None,
         ),
         ty: None,
         span: Span::default(),

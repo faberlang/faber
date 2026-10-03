@@ -730,7 +730,7 @@ impl HirVisitor for TypeSiteRegistry {
                     );
                 }
             }
-            radix_hir::HirExpressionKind::Clausura(params, ret, err, _, _) => {
+            radix_hir::HirExpressionKind::Clausura(params, ret, err, _) => {
                 for (ordinal, param) in params.iter().enumerate() {
                     register_site(
                         &mut self.sites,

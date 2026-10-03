@@ -57,7 +57,6 @@ mori = "mori"
 requirit = "requirit"
 reice = "reice"
 clausura = "clausura"
-libera = "libera"
 falsum = "falsum"
 # Null value literal (D23.2): `nulla`. The null *type* is `nihil` ([types]
 # below).
@@ -1456,14 +1455,6 @@ help = "fix the AST construct for lowering"
 message = "nested object destructuring is not lowered yet"
 help = "fix the AST construct for lowering"
 
-[diagnostics.SEM008.issues.nucleum_closure_effect]
-message = "kernel closure rejects operation '{operation}' (reason: {reason}); a kernel closure is a private device region"
-help = "fix the AST construct for lowering"
-
-[diagnostics.SEM008.issues.nucleum_closure_escape]
-message = "kernel closure escapes as a {context} value; it may only initialize an immutable local or be called in the same expression"
-help = "fix the AST construct for lowering"
-
 [diagnostics.SEM008.issues.nucleum_async]
 message = "nucleum {construct} adhibere non potest: formae asynchronae et generatoriae hospitem requirunt"
 help = "nucleum functionem synchronam simplicem facias"
@@ -2111,14 +2102,6 @@ help = "make the expression type match the expected type"
 [diagnostics.SEM010.issues.live_tuus_cursor_value]
 message = "live {tuus} cursor values cannot be used as expressions yet"
 help = "make the expression type match the expected type"
-
-[diagnostics.SEM010.issues.nucleum_closure_capture]
-message = "kernel closure captures '{capture}' from an enclosing scope; a kernel closure must not capture enclosing locals or parameters"
-help = "make the expression type match the expected type"
-
-[diagnostics.SEM010.issues.nucleum_closure_type]
-message = "kernel closure {position} type '{type}' is outside the device-safe subset"
-help = "kernel closures admit scalars and tensor-family types only"
 
 [diagnostics.SEM010.issues.map_index_type_mismatch]
 message = "map index type mismatch"

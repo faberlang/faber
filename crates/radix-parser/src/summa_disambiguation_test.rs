@@ -111,7 +111,7 @@ fn summa_receiver_stays_ordinary_recollige_exemplar() {
 #[test]
 fn non_head_summa_identifiers_stay_ordinary() {
     let _ = parse_ok("functio f() → numerus { fixum numerus summa ← 2 redde summa }");
-    // Known-good lambda spelling named `summa` (see mod_test's libera suite).
-    let _ = parse_ok("fixum _ summa ← (numerus a, numerus b) libera ∴ a + b");
+    // Known-good lambda spelling named `summa` (closure parameter position).
+    let _ = parse_ok("fixum _ summa ← (numerus a, numerus b) ∴ a + b");
     let _ = parse_ok("functio g(numerus summa) → numerus { redde summa }");
 }

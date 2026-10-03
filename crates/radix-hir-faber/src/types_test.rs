@@ -1227,7 +1227,6 @@ fn closure_params_preserve_sponte_and_defaults() {
                 ty: Some(textus),
                 span: span(),
             }),
-            radix_syntax::ClosureModifier::None,
         ),
         ty: Some(textus),
         span: span(),

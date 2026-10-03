@@ -1464,15 +1464,13 @@ pub enum HirExpressionKind {
         err_ty: Option<TypeId>,
     },
 
-    /// Closure with parameters, optional return/error types, expression body,
-    /// and one signature modifier (marker-carry only; semantic analysis owns
-    /// each modifier's contract).
+    /// Closure with parameters, optional return/error types, and expression
+    /// body.
     Clausura(
         Vec<HirParam>,
         Option<TypeId>,
         Option<TypeId>,
         Box<HirExpression>,
-        radix_syntax::ClosureModifier,
     ),
 
     /// Legacy serialized/imported context-dependent `cede` carrier. New source

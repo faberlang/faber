@@ -2283,11 +2283,8 @@ struct FunctionBuilder<'a> {
     synthetic_functions: Vec<MirFunction>,
     closure_environments: Vec<MirClosureEnvironment>,
     device_function_metadata: MirDeviceFunctionMetadataMap,
-    next_kernel_closure_ordinal: u32,
     closure_temp_callees: FxHashMap<MirTempId, MirClosureCallee>,
     closure_local_callees: FxHashMap<MirLocalId, MirClosureCallee>,
-    kernel_temp_callees: FxHashMap<MirTempId, MirFunctionId>,
-    kernel_local_callees: FxHashMap<MirLocalId, MirFunctionId>,
     captured_bindings: FxHashMap<DefId, MirPlace>,
     captured_binding_metadata: FxHashMap<DefId, (Symbol, MirType)>,
     /// `var` locals of this body that closures capture and that are rebound
@@ -2356,11 +2353,8 @@ impl<'a> FunctionBuilder<'a> {
             synthetic_functions: Vec::new(),
             closure_environments: Vec::new(),
             device_function_metadata: MirDeviceFunctionMetadataMap::default(),
-            next_kernel_closure_ordinal: 0,
             closure_temp_callees: FxHashMap::default(),
             closure_local_callees: FxHashMap::default(),
-            kernel_temp_callees: FxHashMap::default(),
-            kernel_local_callees: FxHashMap::default(),
             captured_bindings: FxHashMap::default(),
             captured_binding_metadata: FxHashMap::default(),
             shared_bindings: FxHashSet::default(),
@@ -3937,14 +3931,9 @@ impl<'a> FunctionBuilder<'a> {
         let MirPlaceBase::Local(local) = destination.base else {
             return;
         };
-        if let Some(function) = self.kernel_callee_for_operand(value) {
-            self.kernel_local_callees.insert(local, function);
-            self.closure_local_callees.remove(&local);
-        } else if let Some(closure) = self.closure_callee_for_operand(value) {
-            self.kernel_local_callees.remove(&local);
+        if let Some(closure) = self.closure_callee_for_operand(value) {
             self.closure_local_callees.insert(local, closure);
         } else {
-            self.kernel_local_callees.remove(&local);
             self.closure_local_callees.remove(&local);
         }
     }
@@ -4482,7 +4471,7 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::Panic(_) => "mori fatal flow",
         HirExpressionKind::Throw(_) => "iace error-flow",
         HirExpressionKind::Handled { .. } => "structured cape before local-handler MIR lowering",
-        HirExpressionKind::Clausura(_, _, _, _, _) => "closure expression",
+        HirExpressionKind::Clausura(..) => "closure expression",
         HirExpressionKind::Cede(_) => "legacy context-dependent cede carrier",
         HirExpressionKind::Verte { .. } => "verte before conversion MIR lowering",
         HirExpressionKind::Conversio { .. } => "conversio before runtime conversion MIR lowering",

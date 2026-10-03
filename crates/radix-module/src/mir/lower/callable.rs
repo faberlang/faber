@@ -85,49 +85,6 @@ impl FunctionBuilder<'_> {
         Some(operand)
     }
 
-    /// Lower a capture-free `nucleum` closure as a direct private kernel.
-    ///
-    /// Unlike ordinary closures, the result is only a temporary marker used to
-    /// associate a legal local/IIFE call with the synthetic function. The
-    /// emitted call is rewritten to `MirCallee::Function`; no environment or
-    /// closure callee is constructed.
-    pub(super) fn lower_nucleum_closure_expr(
-        &mut self,
-        params: &[crate::hir::HirParam],
-        ret_ty: Option<&TypeId>,
-        err_ty: Option<&TypeId>,
-        body: &HirExpression,
-        expr: &HirExpression,
-    ) -> Option<MirOperand> {
-        if err_ty.is_some() {
-            self.errors.push(MirError::unsupported(
-                expr.span,
-                "kernel closure error channel reached MIR lowering",
-            ));
-            return None;
-        }
-        let captures = self.collect_closure_captures(params, body);
-        if !captures.is_empty() {
-            self.errors
-                .push(MirError::unsupported(expr.span, "kernel closure captures a local binding"));
-            return None;
-        }
-        let return_ty = ret_ty
-            .map(|ty| MirType::semantic(*ty))
-            .or_else(|| self.infer_closure_return_ty(body))?;
-        let function_id = self.lower_private_kernel_from_parts(params, ret_ty.copied(), body, return_ty, expr.span)?;
-        let value_ty = self.expr_ty(expr)?;
-        let operand = self.assign_temp(
-            MirValueKind::Operand(MirOperand::Constant(MirConstant::Function(function_id))),
-            value_ty,
-            expr.span,
-        );
-        if let MirOperand::Temp(temp) = operand {
-            self.kernel_temp_callees.insert(temp, function_id);
-        }
-        Some(operand)
-    }
-
     pub(super) fn lower_closure_function(
         &mut self,
         closure: &HirExpression,
@@ -150,20 +107,13 @@ impl FunctionBuilder<'_> {
         expected_return: MirType,
         expected_params: usize,
     ) -> Option<MirCallee> {
-        let HirExpressionKind::Clausura(params, ret_ty, err_ty, body, modifier) = &closure.kind else {
+        let HirExpressionKind::Clausura(params, ret_ty, err_ty, body) = &closure.kind else {
             self.errors.push(MirError::unsupported(
                 closure.span,
                 "collection callback must be a closure expression",
             ));
             return None;
         };
-        if *modifier == crate::syntax::ClosureModifier::Nucleum {
-            self.errors.push(MirError::unsupported(
-                closure.span,
-                "kernel closure cannot be lowered as a collection callback",
-            ));
-            return None;
-        }
         if err_ty.is_some() {
             self.errors
                 .push(MirError::unsupported(closure.span, FAILABLE_CALLBACK_MESSAGE));
@@ -322,87 +272,6 @@ impl FunctionBuilder<'_> {
         Some(id)
     }
 
-    fn lower_private_kernel_from_parts(
-        &mut self,
-        params: &[crate::hir::HirParam],
-        ret_ty: Option<TypeId>,
-        body: &HirExpression,
-        return_ty: MirType,
-        span: Span,
-    ) -> Option<MirFunctionId> {
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "MirFunctionId is u32 by design; synthetic function count is bounded by u32::MAX"
-        )]
-        let id = MirFunctionId(self.parent_function_id.0 + 1 + self.synthetic_functions.len() as u32);
-        let ordinal = self.next_kernel_closure_ordinal;
-        self.next_kernel_closure_ordinal = self.next_kernel_closure_ordinal.saturating_add(1);
-        let mut nested = FunctionBuilder::for_function(
-            self.types,
-            None,
-            Self::clone_context(&self.context),
-            id,
-            Some(MirDeviceRole::Kernel),
-            Some(MirKernelShaderStage::Compute),
-        );
-        for param in params {
-            nested.add_param(param.def_id, param.name, param.ty, param.mode, param.span);
-        }
-        let blocks = if let HirExpressionKind::Block(block) = &body.kind {
-            nested.lower_body(block)
-        } else {
-            let entry = nested.fresh_block(body.span);
-            nested.switch_to(entry);
-            if let Some(value) = nested.lower_expr_value(body) {
-                nested.terminate_current(MirTerminatorKind::Return(Some(value)), body.span);
-            }
-            nested.finish_blocks()
-        };
-        let nested_synthetics = nested.take_synthetic_functions();
-        let nested_environments = nested.take_closure_environments();
-        let nested_metadata = nested.take_device_function_metadata();
-        let nested_error_count = nested.errors.len();
-        self.errors.extend(nested.errors);
-        if nested_error_count > 0 {
-            return None;
-        }
-        if blocks.is_empty() {
-            self.errors
-                .push(MirError::unsupported(span, "kernel closure produced no MIR blocks"));
-            return None;
-        }
-
-        self.synthetic_functions.push(MirFunction {
-            id,
-            source: None,
-            name: None,
-            params: nested.params,
-            locals: nested.locals,
-            temps: nested.temps,
-            blocks,
-            return_ty: ret_ty.map_or(return_ty, MirType::semantic),
-            error_ty: None,
-            is_async: false,
-            is_generator: false,
-            shader_stage: Some(MirKernelShaderStage::Compute),
-            span,
-        });
-        self.device_function_metadata.insert(
-            id,
-            MirDeviceFunctionMetadata {
-                identity: MirSyntheticFunctionIdentity { parent: self.parent_function_id, ordinal },
-                role: MirDeviceRole::Kernel,
-                shader_stage: MirKernelShaderStage::Compute,
-                visibility: MirFunctionVisibility::Private,
-                origin: MirFunctionOrigin::SyntheticKernelClosure,
-            },
-        );
-        self.synthetic_functions.extend(nested_synthetics);
-        self.closure_environments.extend(nested_environments);
-        self.device_function_metadata.extend(nested_metadata);
-        Some(id)
-    }
-
     pub(super) fn call_value_operand(
         &mut self,
         callee: MirOperand,
@@ -410,9 +279,6 @@ impl FunctionBuilder<'_> {
         return_ty: MirType,
         span: Span,
     ) -> MirOperand {
-        if let Some(function) = self.kernel_callee_for_operand(&callee) {
-            return self.emit_call(MirCallee::Function(function), args, return_ty, span);
-        }
         if let Some(closure) = self.closure_callee_for_operand(&callee) {
             return self.emit_call(MirCallee::Closure(closure), args, return_ty, span);
         }
@@ -530,17 +396,6 @@ impl FunctionBuilder<'_> {
                 MirPlaceBase::Temp(temp) => self.closure_temp_callees.get(&temp).cloned(),
             },
             MirOperand::Temp(temp) => self.closure_temp_callees.get(temp).cloned(),
-            _ => None,
-        }
-    }
-
-    pub(super) fn kernel_callee_for_operand(&self, operand: &MirOperand) -> Option<MirFunctionId> {
-        match operand {
-            MirOperand::Place(place) if place.projections.is_empty() => match place.base {
-                MirPlaceBase::Local(local) => self.kernel_local_callees.get(&local).copied(),
-                MirPlaceBase::Temp(temp) => self.kernel_temp_callees.get(&temp).copied(),
-            },
-            MirOperand::Temp(temp) => self.kernel_temp_callees.get(temp).copied(),
             _ => None,
         }
     }

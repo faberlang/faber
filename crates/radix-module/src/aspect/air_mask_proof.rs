@@ -52,7 +52,7 @@ pub fn reduction_family(method: &str) -> Option<MaskNeutralityFamily> {
 #[must_use]
 pub fn is_additive_combine(expr: &HirExpression) -> bool {
     match &expr.kind {
-        HirExpressionKind::Clausura(_, _, _, body, _) => is_additive_body(body),
+        HirExpressionKind::Clausura(_, _, _, body) => is_additive_body(body),
         HirExpressionKind::Path(_) => false,
         _ => false,
     }

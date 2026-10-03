@@ -117,42 +117,14 @@ fn en_annotation_visibility_spelling_is_sealed() {
 }
 
 #[test]
-fn en_closure_slot_sealing_leaves_annotation_identity_intact() {
-    // KCM-02: the same `kernel` spelling owns both surfaces on the en pack —
-    // the annotation position (already pinned above) and the closure-modifier
-    // slot — while the Latin `nucleum` spelling stays sealed out of both.
+fn en_kernel_annotation_identity_is_sealed() {
+    // The `kernel` spelling owns the annotation position on the en pack,
+    // while the Latin `nucleum` spelling stays sealed out of it.
     let result = parse_en("@ kernel\nfn probe() { }\n");
     assert!(
         result.success(),
         "en `@ kernel` annotation must keep parsing: {:?}",
         result.errors
-    );
-
-    let closure = parse_en("const _ probe ← (int value) kernel ∴ value\n");
-    assert!(
-        closure.success(),
-        "en `kernel` closure modifier must parse: {:?}",
-        closure.errors
-    );
-    let program = closure.program.as_ref().expect("program");
-    let radix_syntax::StmtKind::Var(var) = &program.statements[0].kind else {
-        panic!("expected variable declaration");
-    };
-    let radix_syntax::ExprKind::Clausura(node) = &var.init.as_ref().expect("initializer").kind
-    else {
-        panic!("expected closure expression");
-    };
-    assert_eq!(
-        node.modifier,
-        radix_syntax::ClosureModifier::Nucleum,
-        "en `kernel` must carry the nucleum identity in the closure slot"
-    );
-
-    let sealed = parse_en("const _ probe ← (int value) nucleum ∴ value\n");
-    assert!(
-        !sealed.success(),
-        "Latin `nucleum` must stay sealed out of the en closure slot: {:?}",
-        sealed.errors
     );
     assert_wrong_locale_annotation("@ nucleum\nfn probe() { }\n", "kernel");
 }

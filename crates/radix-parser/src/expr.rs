@@ -2290,16 +2290,12 @@ impl Parser {
             if self.check(&TokenKind::Arrow)
                 || self.check(&TokenKind::Colon)
                 || self.check(&TokenKind::LBrace)
-                || self.check_closure_modifier() != ClosureModifier::None
             {
                 break;
             }
 
             params.push(self.parse_clausura_param()?);
 
-            if self.check_closure_modifier() != ClosureModifier::None {
-                break;
-            }
             if !self.consume_item_separator_before(
                 &[TokenKind::Arrow, TokenKind::Colon, TokenKind::LBrace],
                 "closure_parameters",
@@ -2308,8 +2304,6 @@ impl Parser {
             }
         }
 
-        let modifier = self.eat_closure_modifier();
-        self.reject_duplicate_closure_modifier()?;
         let (ret, err) = self.parse_optional_clausura_signature()?;
 
         let body = if self.eat(&TokenKind::Colon) {
@@ -2326,7 +2320,6 @@ impl Parser {
             id,
             kind: ExprKind::Clausura(Box::new(ClausuraExpr {
                 params,
-                modifier,
                 ret,
                 err,
                 body,
@@ -2437,8 +2430,6 @@ impl Parser {
             vec![self.parse_clausura_param()?]
         };
 
-        let modifier = self.eat_closure_modifier();
-        self.reject_duplicate_closure_modifier()?;
         let (ret, err) = self.parse_optional_clausura_signature()?;
         if self.check_keyword_ident(TokenKind::Ergo) {
             return Err(ParseError::structured(
@@ -2458,7 +2449,6 @@ impl Parser {
             id,
             kind: ExprKind::Clausura(Box::new(ClausuraExpr {
                 params,
-                modifier,
                 ret,
                 err,
                 body,

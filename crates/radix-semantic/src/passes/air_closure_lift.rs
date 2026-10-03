@@ -8,9 +8,7 @@
 //! call edge it already handles for named functions.
 //!
 //! Capture detection is deliberately structural.  A module item is not a
-//! capture, while a path to a local or an enclosing callable parameter is.  The
-//! `libera` marker is an explicit Tier-B assertion and skips this detection;
-//! its sibling legality contract owns any stronger validation of that marker.
+//! capture, while a path to a local or an enclosing callable parameter is.
 
 use crate::function_facts::{CaptureFact, CaptureMode};
 use crate::{RadixLane, RadixLaneMetadata, SemanticError, SemanticErrorKind, Type, TypeTable};
@@ -20,7 +18,7 @@ use radix_hir::{
     HirModule, HirParam,
 };
 use radix_lexer::{Interner, Span, Symbol};
-use radix_syntax::{CallablePosture, ClosureModifier};
+use radix_syntax::CallablePosture;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Higher-order tensor methods whose first argument is a combine/callback.
@@ -163,8 +161,7 @@ impl<'a> LiftVisitor<'a> {
     fn lift_callback(&mut self, closure: HirExpression) -> Result<HirExpression, ()> {
         let HirExpression {
             id,
-            kind:
-                HirExpressionKind::Clausura(params, explicit_ret, explicit_err, mut body, modifier),
+            kind: HirExpressionKind::Clausura(params, explicit_ret, explicit_err, mut body),
             ty: closure_ty,
             span,
         } = closure
@@ -172,16 +169,7 @@ impl<'a> LiftVisitor<'a> {
             return Err(());
         };
 
-        if modifier == ClosureModifier::Nucleum {
-            self.errors.push(self.nucleum_escape_error(span));
-            return Err(());
-        }
-
-        let captures = if modifier == ClosureModifier::Libera {
-            Vec::new()
-        } else {
-            collect_captures(&body, &params, &self.module_defs)
-        };
+        let captures = collect_captures(&body, &params, &self.module_defs);
         if !captures.is_empty() {
             self.errors.push(self.capture_error(span, &captures));
             return Err(());
@@ -237,12 +225,6 @@ impl<'a> LiftVisitor<'a> {
             ty: closure_ty,
             span,
         })
-    }
-
-    fn nucleum_escape_error(&self, closure_span: Span) -> SemanticError {
-        SemanticError::structured(SemanticErrorKind::AirPurityViolation, closure_span)
-            .with_arg("issue", "nucleum_closure_escape")
-            .with_arg("context", "higher_order_argument")
     }
 
     fn capture_error(&self, closure_span: Span, captures: &[CaptureUse]) -> SemanticError {
@@ -354,7 +336,7 @@ impl HirVisitor for CaptureCollector<'_> {
                 });
                 walk_expr(self, expr);
             }
-            HirExpressionKind::Clausura(params, _, _, body, _) => {
+            HirExpressionKind::Clausura(params, _, _, body) => {
                 let mut nested_bound = self.bound.clone();
                 nested_bound.extend(params.iter().map(|param| param.def_id));
                 let previous = std::mem::replace(&mut self.bound, nested_bound);

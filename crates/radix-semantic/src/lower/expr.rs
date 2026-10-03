@@ -1413,7 +1413,7 @@ impl Lowerer<'_> {
                 true,
             )
         });
-        HirExpressionKind::Clausura(params, ret, err, Box::new(body), closure.modifier)
+        HirExpressionKind::Clausura(params, ret, err, Box::new(body))
     }
 
     fn lower_intervallum(&mut self, range: &radix_syntax::IntervallumExpr) -> HirExpressionKind {

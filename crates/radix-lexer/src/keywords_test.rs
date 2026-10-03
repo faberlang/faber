@@ -384,11 +384,11 @@ fn keyword_groups_are_static_and_complete_for_latin_surface() {
         .iter()
         .find(|group| group.id == "closure")
         .expect("closure group");
-    assert_eq!(closure.members, &["clausura", "libera", "nucleum"]);
+    assert_eq!(closure.members, &["clausura", "nucleum"]);
 }
 
 #[test]
-fn nucleum_is_a_closure_modifier_and_annotation_identity() {
+fn nucleum_is_an_annotation_identity() {
     let spec = lookup_keyword_spec("nucleum").expect("nucleum must be registered");
     assert_eq!(spec.token_kind, Some(TokenKind::Nucleum));
     assert_eq!(spec.category, KeywordKind::Annotation);
@@ -408,17 +408,6 @@ fn apud_is_a_control_flow_keyword_identity() {
         panic!("apud must be contextual");
     };
     assert!(owners.contains(&KeywordOwner::ControlFlow));
-}
-
-#[test]
-fn libera_is_a_tokenless_closure_modifier_identity() {
-    let spec = lookup_keyword_spec("libera").expect("libera must be registered");
-    assert_eq!(spec.token_kind, None);
-    assert_eq!(spec.category, KeywordKind::Modifier);
-    let KeywordScope::Contextual(owners) = spec.scope else {
-        panic!("libera must be contextual");
-    };
-    assert!(owners.contains(&KeywordOwner::CallablePosture));
 }
 
 #[test]
