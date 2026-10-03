@@ -1,183 +1,149 @@
-//! Companion tests for `cli_descriptor` (round-trip wire format).
+//! Companion tests for `cli_descriptor` (encoder-side golden byte fixtures).
+//!
+//! Radix owns only the encoder; the LLVM host (`hosts/llvm/src/cli.rs`) owns
+//! the decoder and is the decode authority. These fixtures pin the v1 wire
+//! format byte-for-byte, hand-derived from the byte layout documented in
+//! `cli_descriptor.rs`, so a change to the encoder that would break the host
+//! fails here first.
 
 use super::*;
-use crate::lexer::{Interner, Symbol};
+use crate::lexer::{Span, Symbol};
 
-fn program_sample(interner: &mut Interner) -> CliProgram {
-    let textus = Symbol(1);
+fn program_minimal() -> CliProgram {
     CliProgram {
-        name: "exemplum".to_owned(),
-        entry_args: "args".to_owned(),
-        mode: CliMode::Subcommand,
-        version: Some("0.1.0".to_owned()),
-        description: Some("Faber CLI framework smoke exemplum".to_owned()),
-        global_options: vec![CliOption {
-            binding: "verbose".to_owned(),
-            binding_symbol: textus,
-            ty: CliType::Bivalens,
-            short: Some("v".to_owned()),
-            long: Some("verbose".to_owned()),
-            description: Some("Enable verbose output".to_owned()),
-            global: true,
-            default: Some(CliDefault::Bool(false)),
-            flag: true,
-            span: crate::lexer::Span::default(),
-        }],
-        global_operands: Vec::new(),
-        options: Vec::new(),
-        operands: Vec::new(),
-        commands: vec![
-            CliCommand {
-                path: vec!["greet".to_owned()],
-                module_path: None,
-                function: "greet".to_owned(),
-                function_symbol: interner.intern("greet"),
-                args_binding: Some("args".to_owned()),
-                aliases: vec!["g".to_owned()],
-                description: Some("Greet by name".to_owned()),
-                options: Vec::new(),
-                operands: vec![CliOperand {
-                    binding: "nomen".to_owned(),
-                    binding_symbol: interner.intern("nomen"),
-                    ty: CliType::Textus,
-                    rest: false,
-                    description: Some("Name to greet".to_owned()),
-                    global: false,
-                    default: None,
-                    span: crate::lexer::Span::default(),
-                }],
-                span: crate::lexer::Span::default(),
-            },
-            CliCommand {
-                path: vec!["version".to_owned()],
-                module_path: None,
-                function: "version".to_owned(),
-                function_symbol: interner.intern("version"),
-                args_binding: None,
-                aliases: vec!["v".to_owned()],
-                description: None,
-                options: Vec::new(),
-                operands: Vec::new(),
-                span: crate::lexer::Span::default(),
-            },
-        ],
-        exit: Some(CliExit::Binding("code".to_owned())),
-    }
-}
-
-#[test]
-fn roundtrips_full_program() {
-    let mut interner = Interner::new();
-    let program = program_sample(&mut interner);
-    let bytes = serialize_cli_descriptor(&program);
-    let decoded = parse_cli_descriptor(&bytes).expect("decode");
-    assert_eq!(decoded.name, "exemplum");
-    assert_eq!(decoded.mode, 1);
-    assert_eq!(decoded.version.as_deref(), Some("0.1.0"));
-    assert_eq!(decoded.description.as_deref(), Some("Faber CLI framework smoke exemplum"));
-    assert_eq!(decoded.exit, DescriptorExit::Binding("code".to_owned()));
-    assert_eq!(decoded.global_options.len(), 1);
-    let verbose = &decoded.global_options[0];
-    assert_eq!(verbose.binding, "verbose");
-    assert_eq!(verbose.ty, tags::BIVALENS);
-    assert!(verbose.flag);
-    assert_eq!(verbose.short.as_deref(), Some("v"));
-    assert_eq!(verbose.long.as_deref(), Some("verbose"));
-    assert_eq!(verbose.default.as_ref().map(|d| d.tag), Some(default_tags::BOOL));
-    assert_eq!(verbose.default.as_ref().and_then(|d| d.boolean), Some(false));
-    assert_eq!(decoded.commands.len(), 2);
-    let greet = &decoded.commands[0];
-    assert_eq!(greet.path, vec!["greet".to_owned()]);
-    assert_eq!(greet.aliases, vec!["g".to_owned()]);
-    assert_eq!(greet.function, "greet");
-    assert_eq!(greet.args_binding.as_deref(), Some("args"));
-    assert_eq!(greet.operands.len(), 1);
-    assert_eq!(greet.operands[0].binding, "nomen");
-    assert_eq!(greet.operands[0].ty, tags::TEXTUS);
-    assert!(!greet.operands[0].rest);
-}
-
-#[test]
-fn serialization_is_deterministic() {
-    let mut interner = Interner::new();
-    let program = program_sample(&mut interner);
-    let first = serialize_cli_descriptor(&program);
-    let second = serialize_cli_descriptor(&program);
-    assert_eq!(first, second);
-}
-
-#[test]
-fn decode_rejects_corruption() {
-    let mut interner = Interner::new();
-    let program = program_sample(&mut interner);
-    let bytes = serialize_cli_descriptor(&program);
-    assert!(parse_cli_descriptor(&bytes).is_ok());
-    assert!(parse_cli_descriptor(&bytes[..bytes.len() - 1]).is_err(), "truncated");
-    let mut bad_version = bytes.clone();
-    bad_version[4] = 99;
-    assert!(parse_cli_descriptor(&bad_version).is_err(), "bad version");
-    let mut bad_magic = bytes.clone();
-    bad_magic[0] = b'X';
-    assert!(parse_cli_descriptor(&bad_magic).is_err(), "bad magic");
-}
-
-#[test]
-fn single_command_roundtrip_with_defaults() {
-    let mut interner = Interner::new();
-    let program = CliProgram {
-        name: "operandus-smoke".to_owned(),
+        name: "tool".to_owned(),
         entry_args: "args".to_owned(),
         mode: CliMode::SingleCommand,
         version: None,
         description: None,
         global_options: Vec::new(),
         global_operands: Vec::new(),
+        options: Vec::new(),
+        operands: Vec::new(),
+        commands: Vec::new(),
+        exit: None,
+    }
+}
+
+fn program_records() -> CliProgram {
+    CliProgram {
+        name: "tool".to_owned(),
+        entry_args: "args".to_owned(),
+        mode: CliMode::Subcommand,
+        version: Some("1.2".to_owned()),
+        description: None,
+        global_options: Vec::new(),
+        global_operands: Vec::new(),
         options: vec![CliOption {
             binding: "count".to_owned(),
-            binding_symbol: interner.intern("count"),
+            binding_symbol: Symbol(1),
             ty: CliType::Numerus,
             short: None,
             long: Some("count".to_owned()),
-            description: Some("Repeat count".to_owned()),
+            description: None,
             global: false,
             default: Some(CliDefault::Integer(3)),
             flag: false,
-            span: crate::lexer::Span::default(),
+            span: Span::default(),
         }],
-        operands: vec![
-            CliOperand {
-                binding: "input".to_owned(),
-                binding_symbol: interner.intern("input"),
-                ty: CliType::Textus,
-                rest: false,
-                description: Some("Input path".to_owned()),
-                global: false,
-                default: None,
-                span: crate::lexer::Span::default(),
-            },
-            CliOperand {
-                binding: "files".to_owned(),
-                binding_symbol: interner.intern("files"),
-                ty: CliType::ListaTextus,
-                rest: true,
-                description: Some("Extra files".to_owned()),
-                global: false,
-                default: None,
-                span: crate::lexer::Span::default(),
-            },
-        ],
-        commands: Vec::new(),
-        exit: Some(CliExit::Fixed(7)),
-    };
-    let bytes = serialize_cli_descriptor(&program);
-    let decoded = parse_cli_descriptor(&bytes).expect("decode");
-    assert_eq!(decoded.mode, 0);
-    assert_eq!(decoded.options.len(), 1);
-    let count = &decoded.options[0];
-    assert_eq!(count.ty, tags::NUMERUS);
-    assert_eq!(count.default.as_ref().and_then(|d| d.integer), Some(3));
-    assert_eq!(decoded.operands.len(), 2);
-    assert!(decoded.operands[1].rest);
-    assert_eq!(decoded.operands[1].ty, tags::LISTA_TEXTUS);
-    assert_eq!(decoded.exit, DescriptorExit::Fixed(7));
+        operands: vec![CliOperand {
+            binding: "input".to_owned(),
+            binding_symbol: Symbol(2),
+            ty: CliType::Textus,
+            rest: false,
+            description: None,
+            global: false,
+            default: None,
+            span: Span::default(),
+        }],
+        commands: vec![CliCommand {
+            path: vec!["greet".to_owned()],
+            module_path: None,
+            function: "greet".to_owned(),
+            function_symbol: Symbol(3),
+            args_binding: Some("args".to_owned()),
+            aliases: vec!["g".to_owned()],
+            description: None,
+            options: Vec::new(),
+            operands: Vec::new(),
+            span: Span::default(),
+        }],
+        exit: Some(CliExit::Fixed(3)),
+    }
+}
+
+/// Golden v1 encoding of [`program_minimal`].
+#[rustfmt::skip]
+const GOLDEN_MINIMAL: &[u8] = &[
+    b'F', b'C', b'L', b'I',                               // magic
+    CLI_DESCRIPTOR_VERSION,                               // version
+    0,                                                    // mode SingleCommand
+    0,                                                    // has_version
+    0,                                                    // has_description
+    4, 0, b't', b'o', b'o', b'l',                         // name "tool"
+    0,                                                    // exit tag none
+    0, 0,                                                 // global_options count 0
+    0, 0,                                                 // global_operands count 0
+    0, 0,                                                 // options count 0
+    0, 0,                                                 // operands count 0
+    0, 0,                                                 // commands count 0
+];
+
+/// Golden v1 encoding of [`program_records`].
+#[rustfmt::skip]
+const GOLDEN_RECORDS: &[u8] = &[
+    b'F', b'C', b'L', b'I',                               // magic
+    CLI_DESCRIPTOR_VERSION,                               // version
+    1,                                                    // mode Subcommand
+    1,                                                    // has_version
+    0,                                                    // has_description
+    4, 0, b't', b'o', b'o', b'l',                         // name "tool"
+    3, 0, b'1', b'.', b'2',                               // version "1.2"
+    1,                                                    // exit tag fixed
+    3, 0, 0, 0, 0, 0, 0, 0,                               //   i64 3
+    0, 0,                                                 // global_options count 0
+    0, 0,                                                 // global_operands count 0
+    1, 0,                                                 // options count 1
+    1,                                                    //   ty numerus
+    0,                                                    //   flag false
+    0,                                                    //   short none
+    1,                                                    //   long some
+    5, 0, b'c', b'o', b'u', b'n', b't',                   //     "count"
+    0,                                                    //   description none
+    1,                                                    //   default some
+    1,                                                    //     tag integer
+    3, 0, 0, 0, 0, 0, 0, 0,                               //     i64 3
+    5, 0, b'c', b'o', b'u', b'n', b't',                   //   binding "count"
+    1, 0,                                                 // operands count 1
+    0,                                                    //   ty textus
+    0,                                                    //   rest false
+    0,                                                    //   description none
+    0,                                                    //   default none
+    5, 0, b'i', b'n', b'p', b'u', b't',                   //   binding "input"
+    1, 0,                                                 // commands count 1
+    1,                                                    //   path len 1
+    5, 0, b'g', b'r', b'e', b'e', b't',                   //     "greet"
+    1,                                                    //   aliases len 1
+    1, 0, b'g',                                           //     "g"
+    0,                                                    //   description none
+    5, 0, b'g', b'r', b'e', b'e', b't',                   //   function "greet"
+    1, 4, 0, b'a', b'r', b'g', b's',                      //   args_binding some "args"
+    0, 0,                                                 //   options count 0
+    0, 0,                                                 //   operands count 0
+];
+
+#[test]
+fn encodes_minimal_program_to_golden_bytes() {
+    assert_eq!(serialize_cli_descriptor(&program_minimal()), GOLDEN_MINIMAL);
+}
+
+#[test]
+fn encodes_records_to_golden_bytes() {
+    assert_eq!(serialize_cli_descriptor(&program_records()), GOLDEN_RECORDS);
+}
+
+#[test]
+fn serialization_is_deterministic() {
+    let program = program_records();
+    assert_eq!(serialize_cli_descriptor(&program), serialize_cli_descriptor(&program));
 }
