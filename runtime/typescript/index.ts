@@ -24,3 +24,13 @@ export * as dec from "./dec.ts";
 export * as inf from "./inf.ts";
 // @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
 export * as format from "./format.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as json from "./json.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as valor from "./valor.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as variant from "./variant.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as tuple from "./tuple.ts";
+// @ts-ignore TS5097: the `.ts` extension is required by Node, not by tsc.
+export * as atomic from "./atomic.ts";
