@@ -11,8 +11,9 @@ use super::{
     ERR_MEDIA_EMPTY, ERR_PERMUTE_AXIS_OUT_OF_RANGE, ERR_PERMUTE_DUPLICATE_AXIS,
     ERR_PERMUTE_NEGATIVE_AXIS, ERR_PERMUTE_RANK, ERR_SECTIO_INVALID_SLICE_BOUNDS,
     ERR_SOFTMAX_EMPTY_TENSOR, ERR_SOFTMAX_NON_FINITE_INPUT, ERR_TENSOR_COALESCE_REQUIRES_OPTIONAL,
-    ERR_TENSOR_EDGE_NOT_SHIFTED, ERR_TENSOR_EDGE_POLICY_INVALID, ERR_TENSOR_EDGE_RANK_MISMATCH,
-    ERR_TENSOR_EDGE_READ_ONLY, ERR_TENSOR_EDGE_UNRESOLVED_READ, ERR_TENSOR_MATERIALIZE_UNRESOLVED,
+    ERR_TENSOR_COPY_INTO_SHAPE_MISMATCH, ERR_TENSOR_EDGE_NOT_SHIFTED,
+    ERR_TENSOR_EDGE_POLICY_INVALID, ERR_TENSOR_EDGE_RANK_MISMATCH, ERR_TENSOR_EDGE_READ_ONLY,
+    ERR_TENSOR_EDGE_UNRESOLVED_READ, ERR_TENSOR_MATERIALIZE_UNRESOLVED,
     ERR_TENSOR_SHAPE_HOLE_UNDERDETERMINED, ERR_TRANSPOSE_RANK, Tensor, TensorEdgePolicy,
     tensor_flat_offset, tensor_shape_element_count, tensor_shape_has_element_count,
 };
@@ -1488,4 +1489,122 @@ fn crux_entropia_rejects_shape_mismatch() {
         logits.crux_entropia(&targets).unwrap_err(),
         ERR_CRUX_ENTROPIA_SHAPE_MISMATCH
     );
+}
+
+// ── write_values (`target ⇇ source`) ───────────────────────────────────────
+
+#[test]
+fn write_values_copies_every_value_into_the_destination() {
+    let mut dest = Tensor::structa(vec![0.0_f32; 4], &[2, 2]).unwrap();
+    let source = Tensor::structa(vec![1.0_f32, 2.0, 3.0, 4.0], &[2, 2]).unwrap();
+    dest.write_values(&source).unwrap();
+    assert_eq!(dest.planata().unwrap(), vec![1.0, 2.0, 3.0, 4.0]);
+    assert_eq!(source.planata().unwrap(), vec![1.0, 2.0, 3.0, 4.0]);
+}
+
+#[test]
+fn write_values_preserves_storage_identity_for_every_handle() {
+    let mut dest = Tensor::structa(vec![0.0_f32; 3], &[3]).unwrap();
+    let other_handle = dest.clone();
+    let source = Tensor::structa(vec![7.0_f32, 8.0, 9.0], &[3]).unwrap();
+    dest.write_values(&source).unwrap();
+    assert_eq!(other_handle.planata().unwrap(), vec![7.0, 8.0, 9.0]);
+}
+
+#[test]
+fn write_values_through_a_mut_borrow_is_visible_to_the_caller() {
+    // The shape the Rust emitter produces for a `mut` tensor parameter.
+    fn store(source: &Tensor<f32>, out: &mut Tensor<f32>) {
+        (*out).write_values(source).unwrap();
+    }
+    let mut out = Tensor::structa(vec![0.0_f32; 2], &[2]).unwrap();
+    let source = Tensor::structa(vec![5.0_f32, 6.0], &[2]).unwrap();
+    store(&source, &mut out);
+    assert_eq!(out.planata().unwrap(), vec![5.0, 6.0]);
+}
+
+#[test]
+fn write_values_writes_through_the_destination_strides() {
+    let backing = Tensor::structa(vec![0.0_f32; 6], &[3, 2]).unwrap();
+    let mut transposed = backing.transpose_rank2().unwrap();
+    let source = Tensor::structa(vec![1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0], &[2, 3]).unwrap();
+    transposed.write_values(&source).unwrap();
+    // The view reads back what was written; the backing storage holds the
+    // transposed layout.
+    assert_eq!(
+        transposed.planata().unwrap(),
+        vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    );
+    assert_eq!(
+        backing.planata().unwrap(),
+        vec![1.0, 4.0, 2.0, 5.0, 3.0, 6.0]
+    );
+
+    let flat = Tensor::structa(vec![0.0_f32; 6], &[6]).unwrap();
+    let mut every_other = flat.sectio_strided(0, 6, 2).unwrap();
+    let three = Tensor::structa(vec![1.0_f32, 2.0, 3.0], &[3]).unwrap();
+    every_other.write_values(&three).unwrap();
+    assert_eq!(flat.planata().unwrap(), vec![1.0, 0.0, 2.0, 0.0, 3.0, 0.0]);
+}
+
+#[test]
+fn write_values_reads_an_overlapping_source_in_full_first() {
+    let mut dest = Tensor::structa(vec![1.0_f32, 2.0, 3.0, 4.0], &[2, 2]).unwrap();
+    let transposed_self = dest.transpose_rank2().unwrap();
+    dest.write_values(&transposed_self).unwrap();
+    // A write-as-you-read copy would give [1, 3, 3, 4].
+    assert_eq!(dest.planata().unwrap(), vec![1.0, 3.0, 2.0, 4.0]);
+}
+
+#[test]
+fn write_values_rejects_a_shape_mismatch_without_writing() {
+    let mut dest = Tensor::structa(vec![0.0_f32; 4], &[2, 2]).unwrap();
+    let wrong = Tensor::structa(vec![1.0_f32; 4], &[4]).unwrap();
+    assert_eq!(
+        dest.write_values(&wrong).unwrap_err(),
+        ERR_TENSOR_COPY_INTO_SHAPE_MISMATCH
+    );
+    assert_eq!(dest.planata().unwrap(), vec![0.0; 4]);
+    let wrong_extent = Tensor::structa(vec![1.0_f32; 6], &[2, 3]).unwrap();
+    assert_eq!(
+        dest.write_values(&wrong_extent).unwrap_err(),
+        ERR_TENSOR_COPY_INTO_SHAPE_MISMATCH
+    );
+}
+
+#[test]
+fn write_values_rejects_an_edge_view_destination() {
+    let base = Tensor::structa(vec![1.0_f32, 2.0, 3.0], &[3]).unwrap();
+    let mut shifted = base.shift(&[1]).unwrap();
+    let source = Tensor::structa(vec![0.0_f32; 3], &[3]).unwrap();
+    assert_eq!(
+        shifted.write_values(&source).unwrap_err(),
+        ERR_TENSOR_EDGE_READ_ONLY
+    );
+    assert_eq!(base.planata().unwrap(), vec![1.0, 2.0, 3.0]);
+}
+
+#[test]
+fn write_values_rejects_an_unresolved_optional_source() {
+    let base = Tensor::structa(vec![1.0_f32, 2.0, 3.0], &[3]).unwrap();
+    let shifted = base.shift(&[1]).unwrap();
+    let mut dest = Tensor::structa(vec![0.0_f32; 3], &[3]).unwrap();
+    assert_eq!(
+        dest.write_values(&shifted).unwrap_err(),
+        ERR_TENSOR_EDGE_UNRESOLVED_READ
+    );
+    assert_eq!(dest.planata().unwrap(), vec![0.0; 3]);
+}
+
+#[test]
+fn write_values_accepts_a_resolved_edge_view_source() {
+    let base = Tensor::structa(vec![1.0_f32, 2.0, 3.0], &[3]).unwrap();
+    let wrapped = base
+        .shift(&[1])
+        .unwrap()
+        .limes(TensorEdgePolicy::Wrap)
+        .unwrap();
+    let mut dest = Tensor::structa(vec![0.0_f32; 3], &[3]).unwrap();
+    dest.write_values(&wrapped).unwrap();
+    assert_eq!(dest.planata().unwrap(), wrapped.planata().unwrap());
 }
