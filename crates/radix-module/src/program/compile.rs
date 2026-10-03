@@ -1391,38 +1391,23 @@ pub(crate) fn package_reader_locale_pack(
     let package_root = crate::import_resolve::find_package_root_with_session(session, path)?;
     let manifest_path = package_root.join("faber.toml");
     let manifest = std::fs::read_to_string(manifest_path).ok()?;
-    let locale_id = parse_reader_locale_from_toml(&manifest)?;
+    let locale_id = reader_locale_from_manifest(&manifest)?;
     let config = crate::driver::Config::default();
     crate::driver::resolve_frontmatter_locale_pack(&config, &locale_id).ok()
 }
 
 /// Parse the `locale = "…"` value from a `faber.toml` manifest source.
 ///
-/// Accepts the canonical `[locale]` table and the legacy `[reader]` alias (the
-/// faber manifest deserializes `reader` as an alias of `locale`). Returns
-/// `None` when the manifest has neither table or no `locale` key. Bare-spelling
-/// scan (no TOML crate dependency) mirroring
-/// [`crate::import_resolve::parse_paths_config`].
+/// Accepts the canonical `[locale]` table and the legacy `[reader]` alias. Returns
+/// `None` when the manifest has neither table or no `locale` key.
 #[must_use]
-fn parse_reader_locale_from_toml(toml_source: &str) -> Option<String> {
-    let mut in_locale_table = false;
-    for line in toml_source.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with('[') {
-            in_locale_table = trimmed == "[locale]" || trimmed == "[reader]";
-            continue;
-        }
-        if in_locale_table && let Some(rest) = trimmed.strip_prefix("locale") {
-            let rest = rest.trim_start();
-            if let Some(value) = rest.strip_prefix('=') {
-                let value = value.trim().trim_matches('"').trim_matches('\'');
-                if !value.is_empty() {
-                    return Some(value.to_owned());
-                }
-            }
-        }
-    }
-    None
+fn reader_locale_from_manifest(toml_source: &str) -> Option<String> {
+    let manifest = toml::from_str::<toml::Value>(toml_source).ok()?;
+    ["locale", "reader"]
+        .iter()
+        .find_map(|table| manifest.get(table)?.get("locale")?.as_str())
+        .filter(|locale| !locale.is_empty())
+        .map(str::to_owned)
 }
 
 /// Package identity facts for a source file path, regardless of local imports.

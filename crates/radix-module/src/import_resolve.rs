@@ -51,45 +51,16 @@ pub(crate) fn clear_provider_name_memo() {
 /// Environment variable for installed provider roots (`<home>/<provider>/…`).
 pub const FABER_LIBRARY_HOME_ENV: &str = "FABER_LIBRARY_HOME";
 
-/// Structured config parsed from a `faber.toml` manifest's `[paths]` section.
-///
-/// Holds the optional `source` root.
-#[derive(Debug, Clone)]
-pub struct PathsConfig {
-    /// Value of `[paths].source`, if present.
-    pub source: Option<String>,
-}
-
-/// Parse a TOML manifest source string into a [`PathsConfig`].
+/// Read the optional `[paths].source` root from a TOML manifest.
 #[must_use]
-pub fn parse_paths_config(toml_source: &str) -> PathsConfig {
-    let mut source: Option<String> = None;
-    let mut in_paths = false;
-
-    for line in toml_source.lines() {
-        let trimmed = line.trim();
-
-        // Detect section headers.
-        if trimmed.starts_with('[') {
-            in_paths = trimmed == "[paths]";
-            continue;
-        }
-
-        if in_paths {
-            // Parse [paths] for `source = "value"`.
-            if let Some(rest) = trimmed.strip_prefix("source") {
-                let rest = rest.trim_start();
-                if let Some(value) = rest.strip_prefix('=') {
-                    let value = value.trim().trim_matches('"').trim_matches('\'');
-                    if !value.is_empty() {
-                        source = Some(value.to_owned());
-                    }
-                }
-            }
-        }
-    }
-
-    PathsConfig { source }
+fn paths_source_from_manifest(toml_source: &str) -> Option<String> {
+    toml::from_str::<toml::Value>(toml_source)
+        .ok()?
+        .get("paths")?
+        .get("source")?
+        .as_str()
+        .filter(|source| !source.is_empty())
+        .map(str::to_owned)
 }
 
 #[cfg(test)]
@@ -296,7 +267,7 @@ pub(crate) fn resolve_source_root_import(
     }
     let package_root = find_package_root_with_session(session, from_file)?;
     let manifest = std::fs::read_to_string(package_root.join("faber.toml")).ok()?;
-    let base = match parse_paths_config(&manifest).source.as_deref() {
+    let base = match paths_source_from_manifest(&manifest).as_deref() {
         None | Some("src") => package_root.join("src"),
         Some(".") => package_root.clone(),
         Some(_) => return None,
@@ -448,7 +419,7 @@ fn scan_home_for_provider(home: &Path, provider: &str) -> Option<PathBuf> {
         let Ok(manifest) = std::fs::read_to_string(&manifest_path) else {
             continue;
         };
-        if parse_manifest_provider_name(&manifest).as_deref() == Some(provider) {
+        if provider_name_from_manifest(&manifest).as_deref() == Some(provider) {
             return Some(dir);
         }
     }
@@ -462,25 +433,14 @@ fn scan_home_for_provider(home: &Path, provider: &str) -> Option<PathBuf> {
 /// checkout directory is `faber-web`). Returns `None` when the manifest has
 /// no `[library]` table or no `provider` key.
 #[must_use]
-fn parse_manifest_provider_name(toml_source: &str) -> Option<String> {
-    let mut in_library = false;
-    for line in toml_source.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with('[') {
-            in_library = trimmed == "[library]";
-            continue;
-        }
-        if in_library && let Some(rest) = trimmed.strip_prefix("provider") {
-            let rest = rest.trim_start();
-            if let Some(value) = rest.strip_prefix('=') {
-                let value = value.trim().trim_matches('"').trim_matches('\'');
-                if !value.is_empty() {
-                    return Some(value.to_owned());
-                }
-            }
-        }
-    }
-    None
+fn provider_name_from_manifest(toml_source: &str) -> Option<String> {
+    toml::from_str::<toml::Value>(toml_source)
+        .ok()?
+        .get("library")?
+        .get("provider")?
+        .as_str()
+        .filter(|provider| !provider.is_empty())
+        .map(str::to_owned)
 }
 
 pub fn library_home() -> Option<PathBuf> {
@@ -534,8 +494,8 @@ fn installed_provider_source_root(provider_repo: &Path) -> Option<PathBuf> {
     if manifest_path.is_file()
         && let Ok(toml_str) = std::fs::read_to_string(&manifest_path)
     {
-        let config = parse_paths_config(&toml_str);
-        if let Some(source_rel) = &config.source {
+        let config = paths_source_from_manifest(&toml_str);
+        if let Some(source_rel) = &config {
             let root = provider_repo.join(source_rel);
             return root.is_dir().then_some(root);
         }

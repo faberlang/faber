@@ -2,6 +2,7 @@
 
 use super::import_contract_for_file;
 use super::package_identity_facts_for_path;
+use super::reader_locale_from_manifest;
 use crate::driver::AnalyzeRequest;
 use crate::file_interface::{
     FileExportKind, InterfaceBodyChannel, InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceIndexSnapshot,
@@ -12,6 +13,18 @@ use crate::import_resolve::resolve_namespace_import;
 use crate::semantic::{NumericWidth, Primitive, SemanticParamMode};
 use std::fs;
 use std::path::{Path, PathBuf};
+
+#[test]
+fn parse_reader_locale_accepts_toml_whitespace_and_inline_comment() {
+    assert_eq!(
+        reader_locale_from_manifest("[locale]\nlocale = \"en\" # package locale\n").as_deref(),
+        Some("en")
+    );
+    assert_eq!(
+        reader_locale_from_manifest("[ reader ]\nlocale = \"la\"\n").as_deref(),
+        Some("la")
+    );
+}
 
 fn english_config() -> crate::driver::Config {
     let path = crate::locale::workspace_locale_pack_path("en");

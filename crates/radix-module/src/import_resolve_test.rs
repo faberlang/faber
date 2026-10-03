@@ -49,46 +49,60 @@ fn invalid_provider_segments_rejected() {
     assert!(!is_valid_provider_segment("spaced name"));
 }
 
-// ── parse_paths_config (structured PathsConfig) ─────────────────────────────
+// ── paths_source_from_manifest ──────────────────────────────────────────────
 
 #[test]
-fn parse_paths_config_empty_toml() {
-    let config = parse_paths_config("");
-    assert!(config.source.is_none());
+fn paths_source_from_manifest_empty_toml() {
+    let config = paths_source_from_manifest("");
+    assert!(config.is_none());
 }
 
 #[test]
-fn parse_paths_config_missing_paths_section() {
+fn paths_source_from_manifest_missing_paths_section() {
     let toml = r#"
 [package]
 name = "test"
 "#;
-    let config = parse_paths_config(toml);
-    assert!(config.source.is_none());
+    let config = paths_source_from_manifest(toml);
+    assert!(config.is_none());
 }
 
 #[test]
-fn parse_paths_config_only_source() {
+fn paths_source_from_manifest_only_source() {
     let toml = r#"
 [paths]
 source = "src"
 "#;
-    let config = parse_paths_config(toml);
-    assert_eq!(config.source, Some("src".to_owned()));
+    let config = paths_source_from_manifest(toml);
+    assert_eq!(config, Some("src".to_owned()));
 }
 
 #[test]
-fn parse_paths_config_missing_source_key() {
+fn paths_source_from_manifest_accepts_toml_whitespace_and_inline_comment() {
+    let config = paths_source_from_manifest("[ paths ]\nsource = \"src\" # source root\n");
+    assert_eq!(config.as_deref(), Some("src"));
+}
+
+#[test]
+fn provider_name_from_manifest_uses_toml_table() {
+    assert_eq!(
+        provider_name_from_manifest("[library]\nprovider = \"web\" # segment\n").as_deref(),
+        Some("web")
+    );
+}
+
+#[test]
+fn paths_source_from_manifest_missing_source_key() {
     let toml = r#"
 [paths]
 output = "dist"
 "#;
-    let config = parse_paths_config(toml);
-    assert!(config.source.is_none());
+    let config = paths_source_from_manifest(toml);
+    assert!(config.is_none());
 }
 
 #[test]
-fn parse_paths_config_source_with_templates_section() {
+fn paths_source_from_manifest_source_with_templates_section() {
     let toml = r#"
 [paths]
 source = "lib"
@@ -96,36 +110,35 @@ source = "lib"
 [paths.templates]
 assets = "assets"
 "#;
-    let config = parse_paths_config(toml);
-    assert_eq!(config.source, Some("lib".to_owned()));
+    let config = paths_source_from_manifest(toml);
+    assert_eq!(config, Some("lib".to_owned()));
 }
 
 #[test]
-fn parse_paths_config_empty_source_value_skipped() {
+fn paths_source_from_manifest_empty_source_value_skipped() {
     let toml = r#"
 [paths]
 source = ""
 "#;
-    let config = parse_paths_config(toml);
-    assert!(config.source.is_none());
+    let config = paths_source_from_manifest(toml);
+    assert!(config.is_none());
 }
 
 #[test]
-fn parse_paths_config_source_with_nested_path() {
+fn paths_source_from_manifest_source_with_nested_path() {
     let toml = r#"
 [paths]
 source = "src/faber"
 "#;
-    let config = parse_paths_config(toml);
-    assert_eq!(config.source, Some("src/faber".to_owned()));
+    let config = paths_source_from_manifest(toml);
+    assert_eq!(config, Some("src/faber".to_owned()));
 }
 
 #[test]
-fn parse_paths_config_other_sections_ignored() {
+fn paths_source_from_manifest_other_sections_ignored() {
     let toml = r#"
 [build]
 source = "elsewhere"
-source = "also-wrong"
 
 [paths]
 source = "src"
@@ -133,8 +146,8 @@ source = "src"
 [paths.templates]
 extra = "extra_dir"
 "#;
-    let config = parse_paths_config(toml);
-    assert_eq!(config.source, Some("src".to_owned()));
+    let config = paths_source_from_manifest(toml);
+    assert_eq!(config, Some("src".to_owned()));
 }
 
 // ── resolve_fab_file ────────────────────────────────────────────────────────
@@ -335,12 +348,12 @@ fn rejects_backslash_in_provider_segment() {
 }
 
 #[test]
-fn parse_paths_config_empty_paths_section() {
+fn paths_source_from_manifest_empty_paths_section() {
     let toml = r"
 [paths]
 ";
-    let config = parse_paths_config(toml);
-    assert!(config.source.is_none());
+    let config = paths_source_from_manifest(toml);
+    assert!(config.is_none());
 }
 
 // ── PRP-066 BO-D-1 package root memo ────────────────────────────────────────
