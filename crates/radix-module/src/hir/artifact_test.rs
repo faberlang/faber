@@ -1,3 +1,5 @@
+//! FHIR artifact validation and round-trip preservation at the analyzed-module boundary.
+
 use super::*;
 use crate::driver::AnalyzeRequest;
 use radix_hir_fhir::HirArtifact;
@@ -1232,6 +1234,81 @@ fn build_artifact_from_unit(unit: &AnalyzedModule) -> HirArtifact {
 }
 
 // ── U2.4: Full round-trip acceptance (5 HIR-backed targets) ────────
+
+#[test]
+fn struct_field_type_sites_remap_to_struct_owner_once() {
+    use crate::hir::serialize::{from_analyzed, normalize_presentation_witnesses};
+    use radix_hir::{HirItemKind, HirOwnerRef, HirTypeSite, HirTypeSlot};
+
+    let source = "class Point {\n    var int x\n    var int y\n}\n\
+                  class Label {\n    var string text\n    var bool visible\n}\n\
+                  fn identity(int value) → int { return value }\n";
+    let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+        .expect("load English locale pack");
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_locale_pack(pack));
+    let unit = crate::driver::analyze_source(&session, "field-sites.fab", source, AnalyzeRequest::default())
+        .expect("analyze struct field type sites");
+    let artifact = from_analyzed(&unit, "field-sites", "field-sites.fab");
+    let mut expected = artifact.clone();
+    expected.presentation = unit.presentation.clone();
+
+    // Keep the former first-match scan as an independent byte-level oracle.
+    let mut remapped = 0;
+    for item in &unit.hir.items {
+        let HirItemKind::Struct(strukt) = &item.kind else {
+            continue;
+        };
+        for (ordinal, field) in strukt.fields.iter().enumerate() {
+            let old_site =
+                HirTypeSite { owner: HirOwnerRef::Def(field.def_id), slot: HirTypeSlot::Field(ordinal as u32) };
+            let authored = expected
+                .presentation
+                .authored_types
+                .iter_mut()
+                .find(|entry| entry.site == old_site)
+                .expect("lowering records a field-owned type site");
+            authored.site.owner = HirOwnerRef::Def(item.def_id);
+            remapped += 1;
+            assert_eq!(
+                artifact
+                    .presentation
+                    .authored_types
+                    .iter()
+                    .filter(|entry| entry.site == authored.site)
+                    .count(),
+                1,
+                "each field has exactly one struct-owned type site"
+            );
+            assert!(
+                !artifact
+                    .presentation
+                    .authored_types
+                    .iter()
+                    .any(|entry| entry.site == old_site)
+            );
+        }
+    }
+    assert_eq!(remapped, 4);
+    assert!(
+        expected.presentation.authored_types.len() > remapped,
+        "fixture also covers non-field sites"
+    );
+    let bytes = serialize_artifact(&artifact);
+    assert_eq!(
+        bytes,
+        serialize_artifact(&expected),
+        "indexed remapping preserves artifact bytes and site order"
+    );
+    load_fhir(&bytes).expect("remapped field owners validate");
+
+    let mut repeated = artifact;
+    normalize_presentation_witnesses(&repeated.hir, &mut repeated.presentation, &unit.types);
+    assert_eq!(
+        bytes,
+        serialize_artifact(&repeated),
+        "already remapped sites are unchanged on a second pass"
+    );
+}
 
 #[test]
 fn hir_artifact_round_trip_acceptance() {
