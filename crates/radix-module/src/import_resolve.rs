@@ -53,36 +53,18 @@ pub const FABER_LIBRARY_HOME_ENV: &str = "FABER_LIBRARY_HOME";
 
 /// Structured config parsed from a `faber.toml` manifest's `[paths]` section.
 ///
-/// Holds the optional `source` root and a map of template names (without the
-/// `§` glyph) to their resolved relative paths.
+/// Holds the optional `source` root.
 #[derive(Debug, Clone)]
 pub struct PathsConfig {
     /// Value of `[paths].source`, if present.
     pub source: Option<String>,
-    /// Map of template name → relative path from `[paths.templates]`, plus the
-    /// implicit `§src` default when `[paths].source` is set.
-    #[allow(dead_code)]
-    pub templates: BTreeMap<String, String>,
 }
 
 /// Parse a TOML manifest source string into a [`PathsConfig`].
-///
-/// # Defaults
-///
-/// When `[paths].source` is present, an implicit template entry `"src" →
-/// <source>` is added to the templates map unless `"src"` is already explicitly
-/// defined in `[paths.templates]`.
-///
-/// # Template validation
-///
-/// Template values that start with `/` (absolute) or contain `..` segments
-/// are silently rejected — they are not added to the returned templates map.
 #[must_use]
 pub fn parse_paths_config(toml_source: &str) -> PathsConfig {
     let mut source: Option<String> = None;
-    let mut templates: BTreeMap<String, String> = BTreeMap::new();
     let mut in_paths = false;
-    let mut in_templates = false;
 
     for line in toml_source.lines() {
         let trimmed = line.trim();
@@ -90,11 +72,10 @@ pub fn parse_paths_config(toml_source: &str) -> PathsConfig {
         // Detect section headers.
         if trimmed.starts_with('[') {
             in_paths = trimmed == "[paths]";
-            in_templates = trimmed == "[paths.templates]";
             continue;
         }
 
-        if in_paths && !in_templates {
+        if in_paths {
             // Parse [paths] for `source = "value"`.
             if let Some(rest) = trimmed.strip_prefix("source") {
                 let rest = rest.trim_start();
@@ -106,33 +87,9 @@ pub fn parse_paths_config(toml_source: &str) -> PathsConfig {
                 }
             }
         }
-
-        if in_templates {
-            // Parse [paths.templates] for `name = "value"`.
-            if let Some(eq_pos) = trimmed.find('=') {
-                let key = trimmed[..eq_pos].trim().to_owned();
-                let value_raw = trimmed[eq_pos + 1..].trim();
-                let value = value_raw.trim_matches('"').trim_matches('\'');
-                if !key.is_empty() && !value.is_empty() {
-                    // Reject absolute template values or those with `..` segments.
-                    if contains_path_traversal(value) {
-                        continue;
-                    }
-                    templates.insert(key, value.to_owned());
-                }
-            }
-        }
     }
 
-    // Default: when [paths].source is present, implicitly add §src → source
-    // to the templates map, unless `src` was already explicitly defined.
-    if let Some(ref src) = source {
-        templates
-            .entry("src".to_owned())
-            .or_insert_with(|| src.clone());
-    }
-
-    PathsConfig { source, templates }
+    PathsConfig { source }
 }
 
 #[cfg(test)]
@@ -314,9 +271,8 @@ fn resolve_template_import(
 /// Returns `true` if `path` contains any `..` segment that would escape
 /// an intended directory scope.
 ///
-/// Shared by the template-value sanitization in [`parse_paths_config`] and
-/// the `rest` portion of both `§name/rest` template resolvers (CLI and
-/// package loader; F-046 / S10-1).
+/// Used by the `rest` portion of both `§name/rest` template resolvers (CLI
+/// and package loader; F-046 / S10-1).
 pub fn contains_path_traversal(path: &str) -> bool {
     path.starts_with('/') || path == ".." || path.starts_with("../") || path.contains("/../") || path.ends_with("/..")
 }
