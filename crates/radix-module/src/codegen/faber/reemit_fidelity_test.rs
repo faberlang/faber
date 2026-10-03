@@ -1007,3 +1007,35 @@ fn template_application_keeps_guillemets_when_the_text_holds_quotes() {
     let emitted = assert_idempotent(source);
     assert!(emitted.contains("«{\"n\":§}»(\"7\")"), "{emitted}");
 }
+
+/// A left operand of the same precedence regroups under the parser's left fold,
+/// so `a + b - c` re-emits without parens. A leading `(` would otherwise read
+/// as call syntax after a statement-head `nota`.
+#[test]
+fn same_precedence_left_chain_re_emits_without_parens() {
+    let source = "incipit {\n    fixum numerus m ← 9\n    nota m + 1 - 1\n    nota m - 1 - 1\n    nota m / 2 * 3\n    nota m - (1 - 1)\n}\n";
+    let emitted = assert_idempotent(source);
+    for expected in ["nota m + 1 - 1", "nota m - 1 - 1", "nota m / 2 * 3", "nota m - (1 - 1)"] {
+        assert!(emitted.contains(expected), "missing `{expected}` in:\n{emitted}");
+    }
+}
+
+/// The Latin spelling of `reshape` is the method name `forma`; it is not a use
+/// of the builtin `forma` genus, so the re-analysis must not inject that item
+/// (the meaning gate would refuse the file as `hir_meaning_diverged`).
+#[test]
+fn latin_forma_method_name_is_not_a_forma_genus_use() {
+    let source = "incipit {\n    fixum tf32[] seed ← vacua\n    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]\n    fixum tf32[2, 2] grid ← seed.strue(flat, [2, 2])\n    fixum tensor<f32, [2, 2]> reshaped ← grid.forma([_, 2])\n    nota reshaped.magnitudines()\n}\n";
+    let emitted = assert_idempotent(source);
+    assert!(emitted.contains("grid.forma([_, 2])"), "{emitted}");
+}
+
+/// A typed conversation `sermo<O, R>` keeps its authored type arguments: the
+/// witness is the erased bare carrier, so only the authored form has them.
+#[test]
+fn typed_sermo_annotation_keeps_its_arguments() {
+    let source = "@ ad 'numeri:twice'\nfunctio twice(numerus n) → numerus {\n    redde n * 2\n}\n\nincipit {\n    fixum sermo<numerus, numerus> t ← ad 'numeri:twice' (5)\n    fixum sermo loose ← t\n    nota loose ↦ numerus\n}\n";
+    let emitted = assert_idempotent(source);
+    assert!(emitted.contains("sermo<numerus, numerus> t"), "{emitted}");
+    assert!(emitted.contains("sermo loose"), "{emitted}");
+}

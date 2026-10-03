@@ -83,6 +83,8 @@ pub fn program_uses_forma(program: &radix_syntax::Program, resolver: &Resolver) 
     struct FormaUsageVisitor {
         forma_name: Symbol,
         found: bool,
+        /// Addresses of member-name identifiers, which never name the genus.
+        member_names: std::collections::HashSet<usize>,
         /// Depth the walker refused to enter, if it stopped short.
         depth_exceeded: Option<DepthExceeded>,
     }
@@ -122,15 +124,41 @@ pub fn program_uses_forma(program: &radix_syntax::Program, resolver: &Resolver) 
             if self.found {
                 return;
             }
-            if matches!(&expr.kind, ExprKind::Literal(Literal::Forma(_))) {
-                self.found = true;
-                return;
+            match &expr.kind {
+                ExprKind::Literal(Literal::Forma(_)) => {
+                    self.found = true;
+                    return;
+                }
+                // A member name is a property or method name, never a reference
+                // to the builtin genus: the Latin spelling of `reshape` is
+                // `.forma(...)`, and it must not inject the struct. Record the
+                // name's address so `visit_ident` skips exactly that site while
+                // `walk_expr` keeps its depth guard.
+                ExprKind::Member(member) => {
+                    self.member_names
+                        .insert(std::ptr::from_ref(&member.member) as usize);
+                }
+                ExprKind::OptionalChain(opt) => {
+                    if let radix_syntax::OptionalChainKind::Member(ident) = &opt.chain {
+                        self.member_names.insert(std::ptr::from_ref(ident) as usize);
+                    }
+                }
+                ExprKind::NonNull(non_null) => {
+                    if let radix_syntax::NonNullKind::Member(ident) = &non_null.chain {
+                        self.member_names.insert(std::ptr::from_ref(ident) as usize);
+                    }
+                }
+                _ => {}
             }
             walk_expr(self, expr);
         }
 
         fn visit_ident(&mut self, ident: &radix_syntax::Ident) {
-            if ident.name == self.forma_name {
+            if ident.name == self.forma_name
+                && !self
+                    .member_names
+                    .contains(&(std::ptr::from_ref(ident) as usize))
+            {
                 self.found = true;
             }
         }
@@ -139,6 +167,7 @@ pub fn program_uses_forma(program: &radix_syntax::Program, resolver: &Resolver) 
     let mut visitor = FormaUsageVisitor {
         forma_name: symbol.name,
         found: false,
+        member_names: std::collections::HashSet::new(),
         depth_exceeded: None,
     };
     visitor.scan(program);
