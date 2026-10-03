@@ -220,7 +220,7 @@ fn run_main(
     main_id: u32,
     types: &TypeTable,
     interner: &Interner,
-) -> (Option<Value>, Vec<String>, Vec<String>) {
+) -> (Option<Value>, Vec<String>, Vec<(&'static str, String)>) {
     let context = MirValidationContext::new(types);
     let mut host = BufferHost::default();
     let program = MirProgram { functions };
@@ -228,10 +228,10 @@ fn run_main(
     runner.push_frame(MirFunctionId(main_id), MirBlockId(0));
     runner.run_until_depth(0);
     let value = runner.return_value.clone();
-    let errors: Vec<String> = runner
+    let errors = runner
         .errors
         .iter()
-        .map(|error| error.message.clone())
+        .map(|error| (error.code, error.issue.clone()))
         .collect();
     let stdout = host.stdout_lines.clone();
     (value, stdout, errors)
