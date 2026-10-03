@@ -1651,17 +1651,7 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"  - locale: {error}")
         return code
 
-    if args.render_locales:
-        try:
-            written = run_render_locales(args)
-            for path in written:
-                print(f"rendered {display_path(path)}")
-            return 0
-        except (OSError, ValueError, tomllib.TOMLDecodeError, SubstitutionError) as exc:
-            print(f"grammar pipeline: {exc}", file=sys.stderr)
-            return 1
-
-    if args.render or args.emit:
+    if args.render or args.emit or args.render_locales:
         try:
             if args.render:
                 _, output = run_render(args)
@@ -1669,8 +1659,17 @@ def main(argv: list[str] | None = None) -> int:
             if args.emit:
                 _, output = run_emit(args)
                 print(f"emitted {display_path(output)}")
+            if args.render_locales:
+                written = run_render_locales(args)
+                for path in written:
+                    print(f"rendered {display_path(path)}")
             return 0
-        except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
+        except (
+            OSError,
+            ValueError,
+            tomllib.TOMLDecodeError,
+            SubstitutionError,
+        ) as exc:
             print(f"grammar pipeline: {exc}", file=sys.stderr)
             return 1
 
