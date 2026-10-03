@@ -325,7 +325,7 @@ reice_stmt ::= '拒绝' expression '抛错' expression
 # [157] expression
 expression ::= assignment
 # [158] transfer
-transfer ::= ternary ('⇇' ternary)*
+transfer ::= ternary ('⇇' ternary)?
 # [159] assignment
 assignment ::= transfer ('←' assignment | '↤' assignment inline_default?)?
 # [160] inc_dec_stmt
@@ -2194,8 +2194,7 @@ is true division and yields a float (`f32` for 8- and 16-bit integer operands,
 two values. They are pure arithmetic operators at the additive tier with `+`
 and `-`, left-associative: `a ⤒ b ⤓ c` is `(a ⤒ b) ⤓ c`.
 
-**Exact-output transfer (`⇇`):** `sink ⇇ payload` invokes a callable sink value — one argument, `vacuum` result — once per payload. The operator performs no formatting, adds no separators or terminator, selects no channel, and runs no conversions: the bound value owns destination and behavior, and the compiler holds no console knowledge. A chain `sink ⇇ a ⇇ b` evaluates the sink expression once, each payload once left-to-right, and invokes the sink once per payload left-to-right; the chain result is `vacuum`. `⇇` binds above assignment and below ternary, so postfix calls, conversions, and string-constructor applications finish before transfer; formatting is explicit on the right (`output ⇇ "§ §
-"(a, b)`). Combined with selective value imports it replaces compiler-owned output statements with ordinary typed values.
+**Copy-into (`⇇`):** `target ⇇ value` copies every value of `value` into the existing storage of `target`. The storage of `target` keeps its identity: `←` only ever rebinds a name, and `⇇` is the one way to write into a tensor that already exists (a `mut` parameter, a `var` local, a field of a writable root). `⇇` binds above assignment and below ternary, so every binary operator, postfix call, and conversion on the right finishes first: `output ⇇ (q · kt) ⊙ s` copies the whole product. It is a statement and its result is `vacuum`, so it cannot be chained or used as a value (`a ⇇ b ⇇ c` is `copy_into_chain`; `x ← a ⇇ b` is `copy_into_value_used`). The left side must be writable tensor storage: a `const` or a non-`mut` parameter is `copy_into_target_immutable`; a scalar, list, matrix, or vector is `copy_into_target_not_tensor` (a value type is written by `←`); a view, including `out.sectio(…)`, is `copy_into_target_view` (a view target is a future question, not an admitted form). Both sides have the same element type and shape. A static mismatch is a compile error (`copy_into_type_mismatch` for the element type, `incompatible_tensor_index` for the shape); extents known only at run time are a recoverable runtime error value, never a kernel-level trap, and a generic shape compares in declared-symbol space. The right side may be any tensor expression, including a view, but it must not alias the left: a view of the target, the target itself, or a `←` alias of either is `copy_into_alias`. A plain `←` of a whole tensor into a `mut` tensor parameter is rejected everywhere, host function and kernel alike (`mut_tensor_param_rebind`), so a `mut` tensor has one write meaning. The earlier callable-sink form `sink ⇇ payload` is retired: a callable on the left is `transfer_sink_retired`.
 
 **Conversion-directed assignment (`↤` / conversio-assign):** `place ↤ value`
 evaluates the right side, converts it to the statically known type of the left

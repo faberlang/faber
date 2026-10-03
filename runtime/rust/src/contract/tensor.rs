@@ -33,6 +33,8 @@ pub const ERR_TENSOR_EDGE_UNRESOLVED_READ: &str =
 /// `materialize` cannot erase an unresolved optional shifted element.
 pub const ERR_TENSOR_MATERIALIZE_UNRESOLVED: &str =
     "tensor materialize cannot copy unresolved shifted optional elements";
+/// `⇇` copy-into source and destination shapes differ.
+pub const ERR_TENSOR_COPY_INTO_SHAPE_MISMATCH: &str = "tensor copy into shape mismatch";
 /// A custom edge policy produced an invalid mapped coordinate.
 pub const ERR_TENSOR_EDGE_POLICY_INVALID: &str =
     "tensor edge policy produced an invalid coordinate";

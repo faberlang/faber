@@ -87,8 +87,9 @@ pub use crate::contract::tensor::{
     ERR_NEGATIVE_SLICE, ERR_PERMUTE_AXIS_OUT_OF_RANGE, ERR_PERMUTE_DUPLICATE_AXIS,
     ERR_PERMUTE_NEGATIVE_AXIS, ERR_PERMUTE_RANK, ERR_PONDE_INVALID_INDEX,
     ERR_SECTIO_INVALID_SLICE_BOUNDS, ERR_TENSOR_COALESCE_REQUIRES_OPTIONAL,
-    ERR_TENSOR_EDGE_NOT_SHIFTED, ERR_TENSOR_EDGE_POLICY_INVALID, ERR_TENSOR_EDGE_RANK_MISMATCH,
-    ERR_TENSOR_EDGE_READ_ONLY, ERR_TENSOR_EDGE_UNRESOLVED_READ, ERR_TENSOR_MATERIALIZE_UNRESOLVED,
+    ERR_TENSOR_COPY_INTO_SHAPE_MISMATCH, ERR_TENSOR_EDGE_NOT_SHIFTED,
+    ERR_TENSOR_EDGE_POLICY_INVALID, ERR_TENSOR_EDGE_RANK_MISMATCH, ERR_TENSOR_EDGE_READ_ONLY,
+    ERR_TENSOR_EDGE_UNRESOLVED_READ, ERR_TENSOR_MATERIALIZE_UNRESOLVED,
     ERR_TENSOR_SHAPE_HOLE_UNDERDETERMINED, ERR_TRANSPOSE_RANK, tensor_dim_non_negative,
     tensor_flat_offset, tensor_shape_element_count,
 };
@@ -438,6 +439,36 @@ impl<T: Clone + Default> Tensor<T> {
             data[offset] = value.clone();
         }
         data[last_offset] = value;
+        Ok(())
+    }
+
+    /// Copy every logical value of `source` through this tensor's strides into
+    /// its existing storage (`target ⇇ source`).
+    ///
+    /// The destination keeps its allocation: every handle that shares its
+    /// storage observes the new values. The source is read in full before the
+    /// first write, so a source that shares storage with the destination (a
+    /// view of it) copies the values it held when the call began.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` when the shapes differ, when this tensor is a shifted or
+    /// resolved edge view (read-only), or when `source` holds an unresolved
+    /// optional element or an invalid edge-policy coordinate. No element is
+    /// written on error.
+    pub fn write_values(&mut self, source: &Tensor<T>) -> Result<(), &'static str> {
+        if self.logical_view.is_some() {
+            return Err(ERR_TENSOR_EDGE_READ_ONLY);
+        }
+        if self.shape != source.shape {
+            return Err(ERR_TENSOR_COPY_INTO_SHAPE_MISMATCH);
+        }
+        let values = source.planata()?;
+        let offsets = self.logical_offsets()?;
+        let mut data = tensor_data(&self.data);
+        for (offset, value) in offsets.into_iter().zip(values) {
+            data[offset] = value;
+        }
         Ok(())
     }
 
