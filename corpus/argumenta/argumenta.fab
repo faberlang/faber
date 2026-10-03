@@ -1,5 +1,6 @@
 +++
 term = "argumenta"
+explains = ["argumenta"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "entry_header", "annotation", "annotation_sugar", "annotation_name"]
 category = "entry"

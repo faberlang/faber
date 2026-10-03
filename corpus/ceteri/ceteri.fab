@@ -1,5 +1,6 @@
 +++
 term = "ceteri"
+explains = ["ceteri"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "return_clause", "fixum_decl", "redde_stmt", "expression", "literal", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "nota_stmt"]
 category = "function"

@@ -1,5 +1,6 @@
 +++
 term = "vel"
+explains = ["vel"]
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "sit_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "si_stmt", "call_expr", "call_suffix", "argument_list", "argument", "vel_expr", "vel_rhs", "proba_stmt", "adfirma_stmt", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
 category = "logic"

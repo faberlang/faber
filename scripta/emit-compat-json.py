@@ -191,28 +191,35 @@ def parse_mir(text: str) -> dict[str, dict[str, str]]:
     return verdicts
 
 
-TERM_RE = re.compile(r'term\s*=\s*"([^"]+)"')
-RULE_RE = re.compile(r'rule\s*=\s*"([^"]+)"')
-PATHS_RE = re.compile(r'paths\s*=\s*\[(.*?)\]', re.S)
-PATH_ELEM_RE = re.compile(r'"([^"]+)"')
-
-
 def load_terms() -> list[tuple[str, str, list[str]]]:
-    """[(term, rule, [corpus-rel-path, ...])] in corpus/index.toml order."""
-    index = ROOT / "corpus" / "index.toml"
-    text = index.read_text(encoding="utf-8")
-    terms: list[tuple[str, str, list[str]]] = []
-    for block in text.split("[[terms]]")[1:]:
-        term_m = TERM_RE.search(block)
-        rule_m = RULE_RE.search(block)
-        paths_m = PATHS_RE.search(block)
-        if not term_m:
+    """[(term, kind, [corpus-rel-path, ...])] sorted by term, from exempla frontmatter.
+
+    A term is declared by the one exemplum that lists it under `explains`. Its
+    paths are that exemplum plus every exemplum whose own `term` is the same.
+    """
+    corpus = ROOT / "corpus"
+    by_term: dict[str, set[str]] = {}
+    declared: dict[str, tuple[str, str]] = {}
+    for path in sorted(corpus.rglob("*.fab")):
+        text = path.read_text(encoding="utf-8")
+        if not text.startswith("+++\n"):
             continue
-        term = term_m.group(1)
-        rule = rule_m.group(1) if rule_m else "unspecified"
-        paths = PATH_ELEM_RE.findall(paths_m.group(1)) if paths_m else []
-        terms.append((term, rule, paths))
-    return terms
+        rel = path.relative_to(corpus).as_posix()
+        kind = "unspecified"
+        explains: list[str] = []
+        for line in text[4 : text.find("\n+++", 4)].splitlines():
+            if line.startswith("term = "):
+                by_term.setdefault(json.loads(line[len("term = ") :]), set()).add(rel)
+            elif line.startswith("kind = "):
+                kind = json.loads(line[len("kind = ") :])
+            elif line.startswith("explains = "):
+                explains = json.loads(line[len("explains = ") :])
+        for term in explains:
+            declared[term] = (kind, rel)
+    return [
+        (term, kind, sorted(by_term.get(term, set()) | {primary}))
+        for term, (kind, primary) in sorted(declared.items())
+    ]
 
 
 def target_rows(

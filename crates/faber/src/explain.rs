@@ -1,8 +1,7 @@
-//! Disk-backed reference registry for `faber explain`.
+//! Reference registry for `faber explain`.
 //!
-//! This module indexes exempla reference-pack entries loaded from disk
-//! (`radix/corpus/` in development, `share/faber/reference/` when installed)
-//! and exposes rendering-friendly lookup/search results. `.fab` parsing lives in
+//! This module indexes the exempla entries embedded in the binary
+//! (see [`crate::reference`]) and exposes rendering-friendly lookup/search results. `.fab` parsing lives in
 //! [`crate::reference_parse`]; this module owns registry indexing and validation.
 //!
 //! INVARIANTS
@@ -16,7 +15,6 @@
 //! - Non-canonical entries must point at a canonical replacement before they can
 //!   be rendered or returned from search.
 
-use crate::io_buf::writeln_buf;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -162,9 +160,6 @@ pub struct Registry {
     terms: BTreeMap<String, usize>,
     aliases: BTreeMap<String, usize>,
     legacy: BTreeMap<String, usize>,
-    pub(crate) reference_root: Option<std::path::PathBuf>,
-    pub(crate) reference_version: Option<String>,
-    pub(crate) version_warning: Option<String>,
 }
 
 /// Error type for corpus parsing, validation, and rendering failures.
@@ -191,53 +186,22 @@ impl std::fmt::Display for ExplainError {
 impl std::error::Error for ExplainError {}
 
 impl Registry {
-    /// Load the exempla reference pack from disk and build the explain registry.
+    /// Build the explain registry from the reference embedded in this binary.
     pub fn load() -> Result<Self, ExplainError> {
-        Self::load_from_disk()
+        crate::reference::ReferencePack::embedded()?.build_registry()
     }
 
-    /// Load the disk-backed exempla reference pack and build the explain registry.
-    pub fn load_from_disk() -> Result<Self, ExplainError> {
-        let pack = crate::reference::ReferencePack::load()?;
-        let version_warning = pack.version_warning().map(str::to_owned);
-        let mut registry = pack.build_registry()?;
-        registry.version_warning = version_warning;
-        Ok(registry)
-    }
-
-    /// Non-fatal pack/binary version skew detected at load time.
-    pub fn version_warning(&self) -> Option<&str> {
-        self.version_warning.as_deref()
-    }
-
-    /// Build a registry from parsed entries and optional pack provenance.
-    pub(crate) fn from_entries(
-        entries: Vec<Entry>,
-        reference_root: Option<std::path::PathBuf>,
-        reference_version: Option<String>,
-    ) -> Result<Self, ExplainError> {
+    /// Build a registry from parsed entries.
+    pub(crate) fn from_entries(entries: Vec<Entry>) -> Result<Self, ExplainError> {
         let mut registry = Self {
             entries,
             terms: BTreeMap::new(),
             aliases: BTreeMap::new(),
             legacy: BTreeMap::new(),
-            reference_root,
-            reference_version,
-            version_warning: None,
         };
         registry.index()?;
         registry.validate_references()?;
         Ok(registry)
-    }
-
-    /// Return the loaded reference pack root when this registry came from disk.
-    pub fn reference_root(&self) -> Option<&std::path::Path> {
-        self.reference_root.as_deref()
-    }
-
-    /// Return the pack version recorded in `PACK.toml` when available.
-    pub fn reference_version(&self) -> Option<&str> {
-        self.reference_version.as_deref()
     }
 
     /// Return parsed entries in registry order.
@@ -495,13 +459,6 @@ pub fn render_json(lookup: &Lookup<'_>) -> Result<String, ExplainError> {
 /// presents the current language surface first.
 pub fn render_list(registry: &Registry) -> String {
     let mut out = String::new();
-    if let Some(root) = registry.reference_root() {
-        writeln_buf(&mut out, format_args!("reference: {}", root.display()));
-        if let Some(version) = registry.reference_version() {
-            writeln_buf(&mut out, format_args!("pack version: {version}"));
-        }
-        out.push('\n');
-    }
     let entries = registry
         .entries()
         .iter()

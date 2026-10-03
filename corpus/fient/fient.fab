@@ -1,5 +1,6 @@
 +++
 term = "fient"
+explains = ["fient"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "callable_posture", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "cede_stmt", "incipiet_stmt", "itera_stmt", "itera_binding", "nota_stmt", "call_expr", "call_suffix", "argument_list", "expression", "literal"]
 category = "async"

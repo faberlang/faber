@@ -123,17 +123,11 @@ pub(super) fn cmd_explain(args: ExplainArgs) {
 }
 
 fn load_registry() -> Registry {
-    let registry = match Registry::load_from_disk() {
+    match Registry::load() {
         Ok(registry) => registry,
         Err(err) => {
-            eprintln!("error: failed to load reference pack: {err}");
+            eprintln!("error: failed to load the embedded reference: {err}");
             std::process::exit(1);
         }
-    };
-
-    if let Some(warning) = registry.version_warning() {
-        eprintln!("warning: {warning}");
     }
-
-    registry
 }

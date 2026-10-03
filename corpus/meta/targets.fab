@@ -1,5 +1,6 @@
 +++
 term = "targets"
+explains = ["targets"]
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "return_clause", "redde_stmt", "type_annotation", "owned_type", "base_type", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "expression", "literal", "nota_stmt"]
 category = "package"

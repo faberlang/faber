@@ -10,6 +10,60 @@
   },
   "terms": [
     {
+      "term": "!(",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "!.",
+      "rule": "operator-group",
+      "capable": 3,
+      "analyzable": 3
+    },
+    {
+      "term": "![",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "=",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "?(",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "?.",
+      "rule": "operator-group",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "?[",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "@",
+      "rule": "annotation",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "Bits",
+      "rule": "conversio",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
       "term": "ab",
       "rule": "keyword",
       "capable": 1,
@@ -29,54 +83,12 @@
     },
     {
       "term": "alias",
-      "rule": "existing-home",
+      "rule": "annotation",
       "capable": 1,
       "analyzable": 1
-    },
-    {
-      "term": "⊜",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "∧",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "·",
-      "rule": "operator-group",
-      "capable": 2,
-      "analyzable": 4
-    },
-    {
-      "term": "×",
-      "rule": "operator-group",
-      "capable": 0,
-      "analyzable": 1
-    },
-    {
-      "term": "⊗",
-      "rule": "operator-group",
-      "capable": 0,
-      "analyzable": 1
-    },
-    {
-      "term": "⊙",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 2
     },
     {
       "term": "ante",
-      "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "atomic",
       "rule": "keyword",
       "capable": 1,
       "analyzable": 1
@@ -88,38 +100,8 @@
       "analyzable": 1
     },
     {
-      "term": "→",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "⇥",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "←",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "↤",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "⊥",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "@",
-      "rule": "existing-home",
+      "term": "atomic",
+      "rule": "type",
       "capable": 1,
       "analyzable": 1
     },
@@ -136,26 +118,8 @@
       "analyzable": 1
     },
     {
-      "term": "![",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "!.",
-      "rule": "operator-group",
-      "capable": 3,
-      "analyzable": 3
-    },
-    {
-      "term": "≠",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "!(",
-      "rule": "operator-group",
+      "term": "block-string",
+      "rule": "existing-home",
       "capable": 1,
       "analyzable": 1
     },
@@ -164,12 +128,6 @@
       "rule": "keyword",
       "capable": 3,
       "analyzable": 3
-    },
-    {
-      "term": "⊻",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
     },
     {
       "term": "casu",
@@ -203,15 +161,9 @@
     },
     {
       "term": "cli",
-      "rule": "keyword",
+      "rule": "annotation",
       "capable": 2,
       "analyzable": 2
-    },
-    {
-      "term": "↦",
-      "rule": "operator-group",
-      "capable": 25,
-      "analyzable": 25
     },
     {
       "term": "copia",
@@ -244,12 +196,6 @@
       "analyzable": 1
     },
     {
-      "term": "⇒",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
       "term": "discerne",
       "rule": "keyword",
       "capable": 2,
@@ -258,12 +204,6 @@
     {
       "term": "discretio",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "‥",
-      "rule": "operator-group",
       "capable": 1,
       "analyzable": 1
     },
@@ -286,22 +226,10 @@
       "analyzable": 4
     },
     {
-      "term": "…",
+      "term": "ergo",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "≡",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "=",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "errata",
@@ -334,6 +262,12 @@
       "analyzable": 1
     },
     {
+      "term": "f16",
+      "rule": "type",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
       "term": "fac",
       "rule": "keyword",
       "capable": 3,
@@ -342,12 +276,6 @@
     {
       "term": "falsum",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "f16",
-      "rule": "existing-home",
       "capable": 1,
       "analyzable": 1
     },
@@ -370,8 +298,20 @@
       "analyzable": 1
     },
     {
+      "term": "filum",
+      "rule": "concept",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
       "term": "finge",
       "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "finite",
+      "rule": "conversio",
       "capable": 1,
       "analyzable": 1
     },
@@ -389,13 +329,7 @@
     },
     {
       "term": "forma",
-      "rule": "existing-home",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "fragilis",
-      "rule": "keyword",
+      "rule": "literal",
       "capable": 1,
       "analyzable": 1
     },
@@ -406,6 +340,12 @@
       "analyzable": 2
     },
     {
+      "term": "fragilis",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
       "term": "functio",
       "rule": "keyword",
       "capable": 11,
@@ -413,7 +353,7 @@
     },
     {
       "term": "futura",
-      "rule": "keyword",
+      "rule": "annotation",
       "capable": 2,
       "analyzable": 2
     },
@@ -436,12 +376,6 @@
       "analyzable": 8
     },
     {
-      "term": "≥",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
       "term": "iace",
       "rule": "keyword",
       "capable": 2,
@@ -449,7 +383,7 @@
     },
     {
       "term": "iacit",
-      "rule": "keyword",
+      "rule": "modifier",
       "capable": 1,
       "analyzable": 1
     },
@@ -467,13 +401,19 @@
     },
     {
       "term": "imperia",
-      "rule": "existing-home",
+      "rule": "annotation",
       "capable": 1,
       "analyzable": 1
     },
     {
       "term": "imperium",
-      "rule": "existing-home",
+      "rule": "annotation",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "implendum",
+      "rule": "keyword",
       "capable": 1,
       "analyzable": 1
     },
@@ -496,12 +436,6 @@
       "analyzable": 0
     },
     {
-      "term": "insere",
-      "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
       "term": "incipiet",
       "rule": "keyword",
       "capable": 1,
@@ -514,10 +448,10 @@
       "analyzable": 3
     },
     {
-      "term": "∈",
-      "rule": "operator-group",
-      "capable": 4,
-      "analyzable": 4
+      "term": "insere",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "instans",
@@ -533,7 +467,7 @@
     },
     {
       "term": "iuncta",
-      "rule": "existing-home",
+      "rule": "keyword",
       "capable": 2,
       "analyzable": 2
     },
@@ -550,12 +484,6 @@
       "analyzable": 1
     },
     {
-      "term": "≤",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
       "term": "lista",
       "rule": "keyword",
       "capable": 8,
@@ -563,13 +491,13 @@
     },
     {
       "term": "manifest",
-      "rule": "existing-home",
+      "rule": "concept",
       "capable": 1,
       "analyzable": 1
     },
     {
       "term": "matrix",
-      "rule": "keyword",
+      "rule": "type",
       "capable": 0,
       "analyzable": 1
     },
@@ -578,24 +506,6 @@
       "rule": "existing-home",
       "capable": 1,
       "analyzable": 1
-    },
-    {
-      "term": "↓",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "mone",
-      "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "mori",
-      "rule": "keyword",
-      "capable": 2,
-      "analyzable": 2
     },
     {
       "term": "modulus<u16>",
@@ -622,6 +532,18 @@
       "analyzable": 1
     },
     {
+      "term": "mone",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "mori",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
       "term": "named-holes",
       "rule": "existing-home",
       "capable": 1,
@@ -634,22 +556,10 @@
       "analyzable": 2
     },
     {
-      "term": "nondum",
-      "rule": "existing-home",
-      "capable": 2,
-      "analyzable": 2
-    },
-    {
-      "term": "numquam",
+      "term": "non",
       "rule": "keyword",
       "capable": 1,
       "analyzable": 1
-    },
-    {
-      "term": "numerus",
-      "rule": "keyword",
-      "capable": 5,
-      "analyzable": 6
     },
     {
       "term": "non est",
@@ -658,10 +568,34 @@
       "analyzable": 1
     },
     {
-      "term": "non",
+      "term": "nondum",
+      "rule": "annotation",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "numerus",
+      "rule": "keyword",
+      "capable": 5,
+      "analyzable": 6
+    },
+    {
+      "term": "numquam",
       "rule": "keyword",
       "capable": 1,
       "analyzable": 1
+    },
+    {
+      "term": "objectum",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "octeti",
+      "rule": "keyword",
+      "capable": 3,
+      "analyzable": 3
     },
     {
       "term": "omitte",
@@ -700,24 +634,6 @@
       "analyzable": 1
     },
     {
-      "term": "objectum",
-      "rule": "existing-home",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "octeti",
-      "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
-    },
-    {
-      "term": "implendum",
-      "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
       "term": "per",
       "rule": "keyword",
       "capable": 1,
@@ -728,30 +644,6 @@
       "rule": "keyword",
       "capable": 3,
       "analyzable": 3
-    },
-    {
-      "term": "⊚",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "∨",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "∪",
-      "rule": "operator-group",
-      "capable": 3,
-      "analyzable": 3
-    },
-    {
-      "term": "↑",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
     },
     {
       "term": "postpara",
@@ -767,7 +659,7 @@
     },
     {
       "term": "prae",
-      "rule": "keyword",
+      "rule": "concept",
       "capable": 1,
       "analyzable": 1
     },
@@ -796,10 +688,10 @@
       "analyzable": 1
     },
     {
-      "term": "promissum",
-      "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "term": "primus_quem",
+      "rule": "concept",
+      "capable": 0,
+      "analyzable": 0
     },
     {
       "term": "privata",
@@ -820,6 +712,12 @@
       "analyzable": 1
     },
     {
+      "term": "promissum",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
       "term": "protecta",
       "rule": "keyword",
       "capable": 0,
@@ -828,24 +726,6 @@
     {
       "term": "publica",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "?[",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "?.",
-      "rule": "operator-group",
-      "capable": 2,
-      "analyzable": 2
-    },
-    {
-      "term": "?(",
-      "rule": "operator-group",
       "capable": 1,
       "analyzable": 1
     },
@@ -868,6 +748,12 @@
       "analyzable": 1
     },
     {
+      "term": "reice",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
       "term": "repete",
       "rule": "keyword",
       "capable": 1,
@@ -875,12 +761,6 @@
     },
     {
       "term": "requirit",
-      "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "reice",
       "rule": "keyword",
       "capable": 1,
       "analyzable": 1
@@ -904,40 +784,22 @@
       "analyzable": 1
     },
     {
-      "term": "string",
-      "rule": "existing-home",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "block-string",
-      "rule": "existing-home",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "§",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
       "term": "secus",
       "rule": "keyword",
       "capable": 2,
       "analyzable": 2
     },
     {
+      "term": "selective_import",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
       "term": "si",
       "rule": "keyword",
       "capable": 2,
       "analyzable": 2
-    },
-    {
-      "term": "✓",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
     },
     {
       "term": "sin",
@@ -952,25 +814,13 @@
       "analyzable": 1
     },
     {
-      "term": "⇐",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "⊘",
-      "rule": "operator-group",
-      "capable": 2,
-      "analyzable": 2
-    },
-    {
-      "term": "solum_in",
+      "term": "solum",
       "rule": "keyword",
       "capable": 1,
       "analyzable": 1
     },
     {
-      "term": "solum",
+      "term": "solum_in",
       "rule": "keyword",
       "capable": 1,
       "analyzable": 1
@@ -988,46 +838,10 @@
       "analyzable": 1
     },
     {
-      "term": "⊛",
-      "rule": "operator-group",
+      "term": "string",
+      "rule": "existing-home",
       "capable": 1,
       "analyzable": 1
-    },
-    {
-      "term": "selective_import",
-      "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "primus_quem",
-      "rule": "concept",
-      "capable": 0,
-      "analyzable": 0
-    },
-    {
-      "term": "filum",
-      "rule": "concept",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "finite",
-      "rule": "conversio",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "Bits",
-      "rule": "conversio",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "⇇",
-      "rule": "operator",
-      "capable": 2,
-      "analyzable": 2
     },
     {
       "term": "summa",
@@ -1036,10 +850,10 @@
       "analyzable": 11
     },
     {
-      "term": "tacet",
+      "term": "tabula",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 3,
+      "analyzable": 3
     },
     {
       "term": "tacebit",
@@ -1048,14 +862,20 @@
       "analyzable": 1
     },
     {
-      "term": "tabula",
+      "term": "tacet",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "tag",
       "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "targets",
+      "rule": "concept",
       "capable": 1,
       "analyzable": 1
     },
@@ -1067,27 +887,15 @@
     },
     {
       "term": "tensor",
-      "rule": "keyword",
+      "rule": "type",
       "capable": 14,
       "analyzable": 14
-    },
-    {
-      "term": "targets",
-      "rule": "existing-home",
-      "capable": 1,
-      "analyzable": 1
     },
     {
       "term": "textus",
       "rule": "keyword",
       "capable": 3,
       "analyzable": 3
-    },
-    {
-      "term": "¬",
-      "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
     },
     {
       "term": "typus",
@@ -1120,6 +928,12 @@
       "analyzable": 1
     },
     {
+      "term": "vacuum",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
       "term": "varia",
       "rule": "keyword",
       "capable": 2,
@@ -1132,6 +946,12 @@
       "analyzable": 1
     },
     {
+      "term": "vector",
+      "rule": "type",
+      "capable": 1,
+      "analyzable": 12
+    },
+    {
       "term": "vel",
       "rule": "operator-group",
       "capable": 1,
@@ -1139,25 +959,7 @@
     },
     {
       "term": "versio",
-      "rule": "existing-home",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
-      "term": "vector",
-      "rule": "keyword",
-      "capable": 1,
-      "analyzable": 12
-    },
-    {
-      "term": "∷",
-      "rule": "operator-group",
-      "capable": 2,
-      "analyzable": 2
-    },
-    {
-      "term": "vacuum",
-      "rule": "keyword",
+      "rule": "annotation",
       "capable": 1,
       "analyzable": 1
     },
@@ -1174,16 +976,214 @@
       "analyzable": 1
     },
     {
+      "term": "§",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "¬",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "·",
+      "rule": "operator-group",
+      "capable": 2,
+      "analyzable": 4
+    },
+    {
+      "term": "×",
+      "rule": "operator-group",
+      "capable": 0,
+      "analyzable": 1
+    },
+    {
+      "term": "‥",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "…",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "←",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "↑",
+      "rule": "operator",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "→",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "↓",
+      "rule": "operator",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "↤",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "↦",
+      "rule": "operator-group",
+      "capable": 25,
+      "analyzable": 25
+    },
+    {
+      "term": "⇇",
+      "rule": "operator",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "⇐",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⇒",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⇥",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "∈",
+      "rule": "operator-group",
+      "capable": 4,
+      "analyzable": 4
+    },
+    {
+      "term": "∧",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "∨",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "∪",
+      "rule": "keyword",
+      "capable": 3,
+      "analyzable": 3
+    },
+    {
       "term": "∴",
       "rule": "operator-group",
       "capable": 1,
       "analyzable": 1
     },
     {
-      "term": "ergo",
+      "term": "∷",
       "rule": "operator-group",
       "capable": 2,
       "analyzable": 2
+    },
+    {
+      "term": "≠",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "≡",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "≤",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "≥",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⊗",
+      "rule": "operator-group",
+      "capable": 0,
+      "analyzable": 1
+    },
+    {
+      "term": "⊘",
+      "rule": "operator-group",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "⊙",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 2
+    },
+    {
+      "term": "⊚",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⊛",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⊜",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⊥",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⊻",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "✓",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
     }
   ]
 }

@@ -1,5 +1,6 @@
 +++
 term = "lineam"
+explains = ["lineam"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "lege_expr", "expression", "literal", "nota_stmt"]
 category = "io"

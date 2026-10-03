@@ -2,15 +2,10 @@ use crate::explain::{
     Lookup, Registry, render_json, render_list, render_list_json, render_plain, render_search,
 };
 use crate::reference::ReferencePack;
-use crate::reference_pack_test_support::{env_lock, repo_exempla_root};
 use serde::Deserialize;
 
 fn disk_registry() -> Registry {
-    let root = repo_exempla_root();
-    ReferencePack::load_from(&root)
-        .expect("load exempla pack")
-        .build_registry()
-        .expect("build registry")
+    Registry::load().expect("embedded registry")
 }
 
 #[test]
@@ -19,7 +14,6 @@ fn disk_registry_resolves_core_terms() {
     assert!(registry.lookup("≡").is_some());
     assert!(registry.lookup("→").is_some());
     assert!(registry.lookup("proba").is_some());
-    assert!(registry.reference_root().is_some());
 }
 
 #[test]
@@ -41,13 +35,13 @@ fn lookup_resolves_terms_aliases_and_legacy() {
 }
 
 #[test]
-fn index_manifest_matches_registry() {
+fn every_declared_term_resolves() {
     let manifest = load_index_manifest();
     let registry = disk_registry();
 
     assert_eq!(
         registry.entries().len(),
-        manifest.registry_terms as usize + manifest.legacy_terms.len()
+        manifest.canonical_terms.len() + manifest.legacy_terms.len()
     );
 
     for term in &manifest.canonical_terms {
@@ -179,41 +173,7 @@ fn render_list_json_matches_plain_list_rows() {
         assert!(plain.contains(summary), "plain list lacks {summary}");
     }
     // Plain list ignores --json: still the sectioned fixed-width text.
-    assert!(plain.contains("\nKEYWORDS\n"));
-}
-
-#[test]
-fn load_aliases_disk_registry_entry_point() {
-    let _guard = env_lock();
-    let previous = std::env::var(crate::reference::REFERENCE_ROOT_ENV).ok();
-    // SAFETY: serialized by env_lock(); edition 2024 marks env mutation unsafe.
-    unsafe {
-        std::env::remove_var(crate::reference::REFERENCE_ROOT_ENV);
-    }
-
-    let registry = Registry::load().expect("load via disk entry point");
-    // 216 → 210 → 211 → 210: the registry follows the canonical term count
-    // (197) plus the legacy redirects (13). The `nulla` redirect retired with
-    // D23.4 (8c5cc3de4), so 196 + 13 = 209 (mg5a folds inter+intra into one term); see reference_test for history.
-    assert_eq!(registry.entries().len(), 209);
-
-    if let Some(value) = previous {
-        // SAFETY: serialized by env_lock(); edition 2024 marks env mutation unsafe.
-        unsafe {
-            std::env::set_var(crate::reference::REFERENCE_ROOT_ENV, value);
-        }
-    }
-}
-
-#[derive(Debug, Deserialize)]
-struct IndexManifest {
-    registry_terms: u32,
-    terms: Vec<IndexTerm>,
-}
-
-#[derive(Debug, Deserialize)]
-struct IndexTerm {
-    term: String,
+    assert!(plain.starts_with("KEYWORDS\n"));
 }
 
 #[derive(Debug, Deserialize)]
@@ -233,8 +193,7 @@ struct ExcludedTermsFile {
 }
 
 fn load_index_manifest() -> IndexManifestView {
-    let index: IndexManifest =
-        toml::from_str(include_str!("../../../corpus/index.toml")).expect("index");
+    let pack = ReferencePack::embedded().expect("embedded reference");
     let legacy: LegacyRedirectsFile =
         toml::from_str(include_str!("../../../corpus/legacy-redirects.toml"))
             .expect("legacy redirects");
@@ -251,8 +210,11 @@ fn load_index_manifest() -> IndexManifestView {
         .map(|(term, _)| term.clone())
         .collect();
     IndexManifestView {
-        registry_terms: index.registry_terms,
-        canonical_terms: index.terms.into_iter().map(|row| row.term).collect(),
+        canonical_terms: pack
+            .terms()
+            .iter()
+            .map(|record| record.term.clone())
+            .collect(),
         legacy_terms,
         legacy_canonical,
         excluded_terms: excluded.terms,
@@ -260,7 +222,6 @@ fn load_index_manifest() -> IndexManifestView {
 }
 
 struct IndexManifestView {
-    registry_terms: u32,
     canonical_terms: Vec<String>,
     legacy_terms: Vec<String>,
     legacy_canonical: Vec<(String, String)>,

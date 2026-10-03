@@ -1,5 +1,6 @@
 +++
 term = "Bits"
+explains = ["Bits"]
 kind = "conversio"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "cast_expr", "assignment", "transfer", "expression", "literal", "redde_stmt"]
 category = "conversion"

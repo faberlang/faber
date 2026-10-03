@@ -1,5 +1,6 @@
 +++
 term = "fac"
+explains = ["fac"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "fac_stmt", "cape_clause", "si_stmt", "arm", "iace_stmt", "iace_expr", "assignment", "place", "comparison", "equality", "equality_tail", "additive_expr", "call_expr", "call_suffix", "member_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
 category = "control-flow"

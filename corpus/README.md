@@ -18,7 +18,6 @@ corpus/
     …
   operatores/          # glyph / operator groups
   lista/ tabula/ …     # language types and compiler-owned method surfaces
-  index.toml           # generated explain manifest
   legacy-redirects.toml
   excluded-terms.toml
 ```
@@ -39,12 +38,13 @@ cargo run -p radix-cli --bin radix -- check corpus/incipit/incipit.fab
 cargo run -p radix-cli --bin radix -- test corpus/incipit/incipit.fab
 ```
 
-## Regenerate index
+## Explain terms
 
-From this repo root:
+A file owns the `faber explain` terms it lists in frontmatter:
 
-```bash
-./scripta/generate-exempla-index.py
-# or via gate:
-./scripta/check-exempla-pack
+```toml
+explains = ["←", "="]
 ```
+
+Each term has exactly one owner. The `faber` build embeds every file that
+declares `explains`, so there is no index to regenerate.

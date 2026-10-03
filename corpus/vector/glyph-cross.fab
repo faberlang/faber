@@ -1,5 +1,6 @@
 +++
 term = "×"
+explains = ["×"]
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
 category = "arithmetic"

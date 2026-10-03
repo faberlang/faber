@@ -1,6 +1,6 @@
 //! Diagnostic-code lookup for `faber explain`.
 //!
-//! Language reference lookup is backed by the exempla reference pack. Diagnostic
+//! Language reference lookup is backed by the embedded exempla reference. Diagnostic
 //! lookup is backed by reader packs because human diagnostic prose is locale
 //! data, not compiler transport data.
 

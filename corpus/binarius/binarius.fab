@@ -1,5 +1,6 @@
 +++
 term = "aut"
+explains = ["aut"]
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "sit_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "functio_decl", "return_clause", "redde_stmt", "expr_stmt", "assignment", "inc_dec_stmt", "place", "additive_expr", "multiplicative_expr", "equality", "equality_tail", "comparison", "et_expr", "aut_expr", "vel_expr", "vel_rhs", "ternary", "bitwise_and_expr", "bitwise_or_expr", "bitwise_xor_expr", "shift_expr", "expression", "literal", "call_expr", "call_suffix", "argument_list", "nota_stmt"]
 category = "logic"

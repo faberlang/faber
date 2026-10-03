@@ -1,5 +1,6 @@
 +++
 term = "verum"
+explains = ["verum"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "hole_type", "proba_stmt", "adfirma_stmt", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
 category = "boolean"

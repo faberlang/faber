@@ -1,5 +1,6 @@
 +++
 term = "cli"
+explains = ["alias", "cli", "imperia", "imperium"]
 kind = "annotation"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "annotation", "annotation_sugar", "annotation_name", "entry_header", "functio_decl", "param_list", "func_modifier", "return_clause", "si_stmt", "expression", "member_suffix", "literal", "call_expr", "call_suffix", "argument_list", "argument", "nota_stmt"]
 category = "cli"

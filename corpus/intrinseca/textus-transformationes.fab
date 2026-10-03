@@ -1,5 +1,6 @@
 +++
 term = "textus"
+explains = ["textus"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "sit_decl", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "type"

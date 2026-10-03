@@ -42,8 +42,6 @@ mod explain_test;
 #[cfg(test)]
 mod input_shape_test;
 #[cfg(test)]
-mod reference_pack_test_support;
-#[cfg(test)]
 mod reference_parse_test;
 #[cfg(test)]
 mod reference_test;

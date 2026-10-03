@@ -1,5 +1,6 @@
 +++
 term = "exitus"
+explains = ["exitus"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "annotation_sugar", "entry_header", "incipit_stmt", "expression", "literal"]
 category = "entry"

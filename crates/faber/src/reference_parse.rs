@@ -3,7 +3,6 @@
 use crate::explain::{Entry, ExplainError, Kind};
 use radix::module::driver::split_frontmatter;
 use serde::Deserialize;
-use std::path::Path;
 
 #[derive(Debug, Default, Deserialize)]
 struct ExemplaFrontmatter {
@@ -27,7 +26,6 @@ pub fn entry_from_exempla(
     path_label: &str,
     source: &str,
     term_override: &str,
-    rule_fallback: &str,
 ) -> Result<Entry, ExplainError> {
     let split = split_frontmatter(source)
         .map_err(|error| ExplainError::new(format!("{path_label}: {error}")))?;
@@ -41,7 +39,10 @@ pub fn entry_from_exempla(
     let fm: ExemplaFrontmatter = toml::from_str(frontmatter_text)
         .map_err(|error| ExplainError::new(format!("{path_label}: {error}")))?;
 
-    let kind_value = fm.kind.as_deref().unwrap_or(rule_fallback);
+    let kind_value = fm
+        .kind
+        .as_deref()
+        .ok_or_else(|| ExplainError::new(format!("{path_label}: frontmatter missing kind")))?;
     let category = fm
         .category
         .ok_or_else(|| ExplainError::new(format!("{path_label}: frontmatter missing category")))?;
@@ -110,11 +111,6 @@ pub fn legacy_entry_from_redirect(
 
     validate_exempla_entry(&path_label, &entry)?;
     Ok(entry)
-}
-
-pub fn read_exempla_file(path: &Path) -> Result<String, ExplainError> {
-    std::fs::read_to_string(path)
-        .map_err(|error| ExplainError::new(format!("failed to read {}: {error}", path.display())))
 }
 
 fn build_entry_body(comment_header: &str, fab_source: &str) -> String {

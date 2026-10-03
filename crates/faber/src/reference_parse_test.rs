@@ -6,7 +6,7 @@ fn missing_frontmatter_fails() {
     redde "pong"
 }
 "#;
-    let err = entry_from_exempla("bad.fab", source, "ping", "keyword").expect_err("missing fm");
+    let err = entry_from_exempla("bad.fab", source, "ping").expect_err("missing fm");
     assert!(err.message.contains("missing +++ frontmatter"));
 }
 
@@ -23,7 +23,7 @@ functio ping() → textus {
     redde "pong"
 }
 "#;
-    let err = entry_from_exempla("bad.fab", source, "x", "keyword").expect_err("unterminated");
+    let err = entry_from_exempla("bad.fab", source, "x").expect_err("unterminated");
     assert!(err.message.contains("unterminated frontmatter"));
 }
 
@@ -39,7 +39,7 @@ syntax = "x"
 
 incipit {}
 "#;
-    let err = entry_from_exempla("bad.fab", source, "x", "keyword").expect_err("invalid toml");
+    let err = entry_from_exempla("bad.fab", source, "x").expect_err("invalid toml");
     assert!(err.message.contains("bad.fab"));
 }
 
@@ -56,6 +56,6 @@ surprise = "extra"
 
 incipit {}
 "#;
-    let entry = entry_from_exempla("ok.fab", source, "x", "keyword").expect("extra keys ok");
+    let entry = entry_from_exempla("ok.fab", source, "x").expect("extra keys ok");
     assert_eq!(entry.term, "x");
 }

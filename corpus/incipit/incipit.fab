@@ -1,5 +1,6 @@
 +++
 term = "incipit"
+explains = ["incipit"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "proba_stmt", "tacet_stmt", "expression", "literal", "nota_stmt"]
 category = "function"

@@ -1,5 +1,6 @@
 +++
 term = "praefixum"
+explains = ["praefixum"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "const_init", "praefixum_expr", "block_stmt", "genus_decl", "genus_member", "field_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "functio_decl", "redde_stmt", "fixum_decl", "itera_stmt", "range_expr", "si_stmt", "assignment", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "nota_stmt"]
 category = "comptime"

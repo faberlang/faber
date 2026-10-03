@@ -1,5 +1,6 @@
 +++
 term = "insere"
+explains = ["insere"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "fixum_decl", "const_init", "insere_expr", "genus_decl", "genus_member", "field_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "expression", "literal", "nota_stmt", "call_expr", "call_suffix", "member_suffix"]
 category = "comptime"

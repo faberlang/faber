@@ -1,5 +1,6 @@
 +++
 term = "sparge"
+explains = ["sparge"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "hole_type", "array_literal", "argument_list", "argument", "itera_stmt", "expression", "literal", "nota_stmt"]
 category = "collection"

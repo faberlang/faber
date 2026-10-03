@@ -1,5 +1,6 @@
 +++
 term = "ceterum"
+explains = ["ceterum"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "elige_stmt", "casu_elige_clause", "ceterum_clause", "expression", "literal", "nota_stmt"]
 category = "control-flow"

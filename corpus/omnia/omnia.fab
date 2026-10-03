@@ -1,5 +1,6 @@
 +++
 term = "omnia"
+explains = ["omnia"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "discretio_decl", "variant", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "finge_expr", "qualified_ident", "call_expr", "call_suffix", "argument_list", "argument", "nota_stmt", "expression", "literal"]
 category = "testing"

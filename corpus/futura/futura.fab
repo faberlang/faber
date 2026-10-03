@@ -1,5 +1,6 @@
 +++
 term = "futura"
+explains = ["futura"]
 kind = "annotation"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_sugar", "annotation_name", "functio_decl", "param_list", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipiet_stmt", "figendum_decl", "hole_type", "call_expr", "call_suffix", "argument_list", "expression", "literal", "nota_stmt"]
 category = "async"

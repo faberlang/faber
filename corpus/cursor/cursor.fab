@@ -1,5 +1,6 @@
 +++
 term = "cursor"
+explains = ["cursor"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "annotation_sugar", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "cede_stmt", "incipit_stmt", "nota_stmt", "expression", "literal", "call_expr", "call_suffix"]
 category = "async"

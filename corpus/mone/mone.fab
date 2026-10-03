@@ -1,5 +1,6 @@
 +++
 term = "mone"
+explains = ["mone"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "expression", "literal", "nota_stmt"]
 category = "output"

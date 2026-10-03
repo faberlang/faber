@@ -1,5 +1,5 @@
-# Legacy spellings without runnable exempla. Copied into the reference pack by
-# scripta/assemble-reference-pack.py.
+# Legacy spellings without runnable exempla. Embedded in the `faber` binary
+# for `faber explain`.
 
 [[redirects]]
 term = "ab pipeline"

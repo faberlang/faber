@@ -1,5 +1,6 @@
 +++
 term = "praeparabit"
+explains = ["praeparabit"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "probandum_decl", "probandum_body", "praepara_block", "proba_stmt", "adfirma_stmt", "nota_stmt", "expression", "literal"]
 category = "testing"

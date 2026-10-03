@@ -1,5 +1,6 @@
 +++
 term = "versio"
+explains = ["versio"]
 kind = "annotation"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_sugar", "annotation_name", "incipit_stmt", "entry_header"]
 category = "cli"
