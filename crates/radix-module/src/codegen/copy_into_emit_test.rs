@@ -1,6 +1,7 @@
 //! `target ⇇ value` through the HIR-backed source emitters: the Faber source
 //! emitter prints it back (the `faber format` round trip); every other source
-//! target fails closed by name instead of emitting a wrong program.
+//! target other than Rust fails closed by name instead of emitting a
+//! wrong program; Rust emits the runtime's `write_values` call.
 
 use crate::codegen::Target;
 use crate::driver::{Config, ModuleCompileRequest, Session};
@@ -85,15 +86,15 @@ fn go_fails_closed_by_name() {
 
 #[cfg(feature = "hir-rust")]
 #[test]
-fn rust_fails_closed_until_write_values_lands() {
+fn rust_emits_the_write_values_carrier() {
     let result = compile(Target::HirRust, SOURCE);
-    assert!(result.output.is_none(), "Rust must not emit a copy-into yet");
+    let Some(crate::Output::Rust(output)) = result.output else {
+        panic!("Rust must emit a copy-into: {:?}", result.diagnostics);
+    };
     assert!(
-        issues(&result)
-            .iter()
-            .any(|issue| issue == "copy_into_rust_pending"),
-        "{:?}",
-        issues(&result)
+        output.code.contains("(*out).write_values(&("),
+        "the copy-into is the runtime's write_values call:\n{}",
+        output.code
     );
 }
 
