@@ -16,13 +16,13 @@ fn air_lane_backward_handles_two_backward_functions() {
 @ radix lane "air"
 @ radix backward "loss_a_backward"
 functio loss_a(tf32[5] x, tf32[5] y) → fractus {
-    redde x.addita(y).media()
+    redde (x + y).media()
 }
 
 @ radix lane "air"
 @ radix backward "loss_b_backward"
 functio loss_b(tf32[5] a, tf32[5] b) → fractus {
-    redde a.multiplica(b).media()
+    redde (a ⊙ b).media()
 }
 "#;
 
@@ -80,7 +80,7 @@ fn air_lane_program_without_backward_is_noop() {
     let source = r#"
 @ radix lane "air"
 functio forward(tf32[5] x, tf32[5] y) → tf32[5] {
-    redde x.addita(y)
+    redde x + y
 }
 "#;
 
@@ -131,7 +131,7 @@ fn air_lane_mixed_backward_and_non_backward() {
 @ radix lane "air"
 @ radix backward "diff_backward"
 functio diff(tf32[5] x, tf32[5] y) → fractus {
-    redde x.addita(y).media()
+    redde (x + y).media()
 }
 
 @ radix lane "air"
@@ -199,7 +199,7 @@ fn air_lane_backward_companion_has_unique_function_id() {
 @ radix lane "air"
 @ radix backward "mean_backward"
 functio mean(tf32[5] x, tf32[5] y) → fractus {
-    redde x.addita(y).media()
+    redde (x + y).media()
 }
 "#;
 
@@ -263,13 +263,13 @@ fn air_lane_backward_companion_preserves_bindings_in_mir() {
 @ radix lane "air"
 @ radix backward "single_backward"
 functio single(tf32[5] x, tf32[5] y) → tf32[5] {
-    redde x.addita(y)
+    redde x + y
 }
 
 @ radix lane "air"
 @ radix backward "multi_backward"
 functio multi(tf32[5] x, tf32[5] y) → fractus {
-    redde ((x.addita(y)).multiplica(x)).media()
+    redde ((x + y) ⊙ x).media()
 }
 "#;
 
@@ -350,7 +350,7 @@ fn companion_name_call_completes_through_driver() {
 @ radix lane "air"
 @ radix backward "mean_backward"
 functio mean(tf32[5] x, tf32[5] y) → fractus {
-    redde x.addita(y).media()
+    redde (x + y).media()
 }
 
 functio nil() → vacuum {
@@ -424,12 +424,12 @@ fn interprocedural_call_emits_both_companions_through_driver() {
 @ radix lane "air"
 @ radix backward "caller_backward"
 functio caller(tf32[5] x, tf32[5] w) → tf32[5] {
-    redde x.addita(callee(x, w))
+    redde x + callee(x, w)
 }
 
 @ radix lane "air"
 functio callee(tf32[5] a, tf32[5] b) → tf32[5] {
-    redde a.addita(b)
+    redde a + b
 }
 "#;
 

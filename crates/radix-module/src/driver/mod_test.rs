@@ -602,7 +602,7 @@ fn air_lane_backward_generation_merges_companion_into_mir_program() {
 @ radix lane "air"
 @ radix backward "combine_backward"
 functio combine(tf32[2, 2] x, tf32[2, 2] y) → tf32[2, 2] {
-    redde x.multiplica(y)
+    redde x ⊙ y
 }
 "#;
 

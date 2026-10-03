@@ -21,12 +21,12 @@ locale = "en"
 @ kernel
 @ public
 fn addita(tf32[256] a, tf32[256] b) → tf32[256] {
-    return a.added(b)
+    return a + b
 }
 
 @ kernel
 fn hidden_helper(tf32[256] a, tf32[256] b) → tf32[256] {
-    return a.added(b)
+    return a + b
 }
 "#;
 

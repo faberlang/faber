@@ -48,7 +48,7 @@ const GENERIC_SIMPLE_LOSS_SOURCE: &str = r#"
 functio simple_loss<magnitudo R, magnitudo C>(
     tensor<f32, [R, C]> x, tensor<f32, [R, C]> w
 ) → f32 {
-    fixum tensor<f32, [R, C]> product ← x.multiplica(w)
+    fixum tensor<f32, [R, C]> product ← x ⊙ w
     redde product.media()
 }
 "#;
@@ -203,7 +203,7 @@ fn generic_wrapper_call_to_generic_companion_typechecks_at_call_site() {
 functio simple_loss<magnitudo R, magnitudo C>(
     tensor<f32, [R, C]> x, tensor<f32, [R, C]> w
 ) → f32 {
-    fixum tensor<f32, [R, C]> product ← x.multiplica(w)
+    fixum tensor<f32, [R, C]> product ← x ⊙ w
     redde product.media()
 }
 
@@ -312,7 +312,7 @@ fn unrolled_full_prefix_range_loop_generates_companion_through_driver() {
 functio lane_sum(tensor<f32, [4]> x) → f32 {
     varia tensor<f32, [4]> acc ← x
     itera ab 0‥4 fixum i {
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     redde acc.media()
 }
@@ -370,7 +370,7 @@ fn generic_full_prefix_range_reaches_concrete_backward_companion() {
 functio generic_lane_sum<magnitudo N>(tensor<f32, [N]> x) → f32 {
     varia tensor<f32, [N]> acc ← x
     itera ex x fixum value {
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
     redde acc.media()
 }
@@ -457,9 +457,9 @@ functio generic_masked_mean<magnitudo N>(
 ) → f32 {
     varia tensor<f32, [N]> acc ← x
     itera ex x fixum value {
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
-    redde acc.multiplica(mask).media()
+    redde (acc ⊙ mask).media()
 }
 
 incipit {
@@ -527,9 +527,9 @@ fn unrolled_masked_route_generates_companion_through_driver() {
 functio masked_lane_mean(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
     varia tensor<f32, [4]> acc ← x
     itera ab 0‥4 fixum i {
-        acc ← acc.addita(x)
+        acc ← acc + x
     }
-    redde acc.multiplica(mask).media()
+    redde (acc ⊙ mask).media()
 }
 "#;
 

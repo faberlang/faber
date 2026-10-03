@@ -3969,9 +3969,9 @@ incipit {
     filler.reple(4.0)
     fixum tf32[1, 2] slice ← grid.sectio(0, 1)
     fixum lista<f32> out ← slice.planata()
-    fixum tf32[2, 2] sum ← grid.addita(filler)
-    fixum tf32[2, 2] diff ← sum.subtrahe(filler)
-    fixum tf32[2, 2] prod ← diff.multiplica(grid)
+    fixum tf32[2, 2] sum ← grid + filler
+    fixum tf32[2, 2] diff ← sum - filler
+    fixum tf32[2, 2] prod ← diff ⊙ grid
     nota prod.summa()
     nota prod.media()
     nota reshaped.longitudo()
@@ -5456,7 +5456,7 @@ fn assert_tensor_dims_literal(types: &TypeTable, ty: MirType) {
 fn mir_generic_shape_params_monomorphize_to_literal_dims() {
     let source = r"
 functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32, [B, D]> b) → tensor<f32, [B, D]> {
-    redde a.addita(b)
+    redde a + b
 }
 
 incipit {
@@ -5565,7 +5565,7 @@ incipit {
 fn mir_generic_shape_params_distinct_shapes_produce_distinct_instances() {
     let source = r"
 functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32, [B, D]> b) → tensor<f32, [B, D]> {
-    redde a.addita(b)
+    redde a + b
 }
 
 incipit {
@@ -5604,7 +5604,7 @@ incipit {
 fn mir_generic_shape_params_same_shape_deduplicates_instances() {
     let source = r"
 functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32, [B, D]> b) → tensor<f32, [B, D]> {
-    redde a.addita(b)
+    redde a + b
 }
 
 incipit {
