@@ -74,6 +74,9 @@ mod collection_higher_order;
 mod context;
 mod control;
 mod conversio_route;
+#[cfg(test)]
+#[path = "lower/entry_args_test.rs"]
+mod entry_args_tests;
 mod expr;
 #[cfg(test)]
 #[path = "lower/first_match_test.rs"]
@@ -859,7 +862,7 @@ fn align_function_signatures_with_mir_params(validation: &mut MirValidationConte
 /// Pre-intern symbols synthesized by MIR lowering before a target clones the
 /// analyzed-unit interner for emission.
 pub fn prepare_mir_lowering_interner(interner: &mut Interner) {
-    for template in ["", "§", "§ §", "§ § §", " ", "nihil"] {
+    for template in ["", "§", "§ §", "§ § §", " ", "nihil", "processus", "argv"] {
         interner.intern(template);
     }
 }
@@ -1721,6 +1724,7 @@ impl<'a> MirLowerer<'a> {
                 }
             }
             if consts_lowered {
+                builder.lower_raw_entry_args(entry, self.unit.hir.entry_args_name);
                 builder.visit_block(entry);
                 builder.terminate_open_current(MirTerminatorKind::Return(None), entry.span);
             }
@@ -2608,6 +2612,51 @@ impl<'a> FunctionBuilder<'a> {
         };
         let value = self.construct_temp(MirAggregateKind::Record, MirAggregateFields::Named(fields), mir_ty, span);
         self.assign(MirPlace::local(id), value, mir_ty, span);
+    }
+
+    /// Raw entry args are host-provided, unlike descriptor-backed CLI records.
+    /// Bind only the synthesized entry local here; shader runtime locals remain
+    /// the device runtime's responsibility.
+    fn lower_raw_entry_args(&mut self, entry: &HirBlock, args_name: Option<Symbol>) {
+        let Some(statement) = entry.statements.first() else {
+            return;
+        };
+        let HirStatementKind::Local(local) = &statement.kind else {
+            return;
+        };
+        if !local.runtime_provided || Some(local.name) != args_name {
+            return;
+        }
+        let Some(ty) = local.ty else {
+            return;
+        };
+        if !matches!(self.types.get(ty), Type::Array(element) if *element == self.types.primitive(Primitive::Textus)) {
+            return;
+        }
+        if self.lower_local(local, statement.span).is_none() {
+            return;
+        }
+        let binding = self.bindings[&local.def_id];
+        let Some((module, name)) = self
+            .context
+            .interner
+            .and_then(|interner| Some((interner.lookup("processus")?, interner.lookup("argv")?)))
+        else {
+            self.errors
+                .push(MirError::unsupported(statement.span, "raw entry args provider identity"));
+            return;
+        };
+        self.runtime_call_to_place(
+            Some(MirPlace::local(binding.local)),
+            MirIntrinsic::Provider(MirProvider {
+                kind: MirProviderKind::Kernel(radix_mir::KernelModule::Processus),
+                module: vec![module],
+                name,
+            }),
+            Vec::new(),
+            binding.ty,
+            statement.span,
+        );
     }
 
     fn lower_local(&mut self, local: &HirLocal, span: Span) -> Option<()> {
