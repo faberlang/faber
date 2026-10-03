@@ -106,3 +106,18 @@ fn same_element_tensor_plus_keeps_its_emitter() {
         "{found:?}"
     );
 }
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn rust_admits_scalar_coalesce_over_a_shifted_view() {
+    // The runtime carries `vel` over a nullable-element tensor as `coalesce`.
+    let found = issues(Target::HirRust, "fixum tensor<f32, [2]> r ← a.disloco([1]) vel 0.0");
+    // Only the unused-binding warnings remain: the form type-checks and emits.
+    assert!(found.iter().all(|issue| issue == "unused_variable"), "{found:?}");
+}
+
+#[cfg(feature = "hir-ts")]
+#[test]
+fn typescript_still_rejects_coalesce_over_a_shifted_view() {
+    assert_rejected(Target::HirTypeScript, "fixum tensor<f32, [2]> r ← a.disloco([1]) vel 0.0");
+}

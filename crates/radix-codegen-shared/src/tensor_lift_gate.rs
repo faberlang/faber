@@ -32,6 +32,7 @@ pub fn reject_tensor_lift(
     struct Gate<'a> {
         types: &'a TypeTable,
         interner: &'a Interner,
+        target: Target,
         found: Option<String>,
     }
     impl HirVisitor for Gate<'_> {
@@ -39,7 +40,7 @@ pub fn reject_tensor_lift(
             if self.found.is_some() {
                 return;
             }
-            self.found = lifted_form(self.types, self.interner, expr);
+            self.found = lifted_form(self.types, self.interner, self.target, expr);
             if self.found.is_none() {
                 walk_expr(self, expr);
             }
@@ -51,6 +52,7 @@ pub fn reject_tensor_lift(
     let mut gate = Gate {
         types,
         interner,
+        target,
         found: None,
     };
     walk_program(&mut gate, hir);
@@ -82,9 +84,34 @@ fn tensor_element(types: &TypeTable, ty: Option<TypeId>) -> Option<TypeId> {
     }
 }
 
+/// Whether a type is a tensor whose element type is nullable.
+fn is_nullable_tensor(types: &TypeTable, ty: Option<TypeId>) -> bool {
+    tensor_element(types, ty).is_some_and(|element| {
+        let mut element = element;
+        while let Type::Alias(_, inner) = types.get(element) {
+            element = *inner;
+        }
+        matches!(types.get(element), Type::Option(_))
+    })
+}
+
 /// The label of a lifted form, when `expr` is one.
-fn lifted_form(types: &TypeTable, interner: &Interner, expr: &HirExpression) -> Option<String> {
+fn lifted_form(
+    types: &TypeTable,
+    interner: &Interner,
+    target: Target,
+    expr: &HirExpression,
+) -> Option<String> {
     match &expr.kind {
+        // The Rust runtime carries `vel` over a nullable-element tensor (a
+        // shifted edge view) with a scalar fallback as `Tensor::coalesce`.
+        HirExpressionKind::Binary(HirBinOp::Coalesce, lhs, rhs)
+            if matches!(target, Target::HirRust)
+                && is_nullable_tensor(types, lhs.ty)
+                && tensor_element(types, rhs.ty).is_none() =>
+        {
+            None
+        }
         HirExpressionKind::Binary(op, lhs, rhs) => binary_label(
             types,
             *op,
