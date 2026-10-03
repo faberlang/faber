@@ -52,7 +52,9 @@ pub fn register(resolver: &mut Resolver, types: &mut TypeTable, interner: &mut I
             mutable: false,
             span: Span::default(),
         };
-        let _ = resolver.define(symbol);
+        resolver
+            .define(symbol)
+            .expect("GPU builtin names must be unique");
         resolver.register_gpu_builtin(def_id, builtin);
     }
 }

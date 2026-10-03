@@ -66,14 +66,16 @@ fn register_vertex_shader_locals(
             continue;
         }
         let def_id = resolver.fresh_builtin_def_id();
-        let _ = resolver.define(crate::Symbol {
-            def_id,
-            name,
-            kind: SymbolKind::Local,
-            ty: Some(ty),
-            mutable,
-            span,
-        });
+        resolver
+            .define(crate::Symbol {
+                def_id,
+                name,
+                kind: SymbolKind::Local,
+                ty: Some(ty),
+                mutable,
+                span,
+            })
+            .expect("vertex shader locals must have unique names");
     }
 }
 

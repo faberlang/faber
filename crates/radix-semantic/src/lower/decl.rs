@@ -390,14 +390,16 @@ impl Lowerer<'_> {
         let def_id = self.next_def_id();
         let name = self.interner.intern(name);
         // Register so typechecker's `check_path` fallback can `get_symbol(def_id)`.
-        let _ = self.resolver.define(crate::Symbol {
-            def_id,
-            name,
-            kind: crate::SymbolKind::Local,
-            ty: Some(ty),
-            mutable,
-            span,
-        });
+        self.resolver
+            .define(crate::Symbol {
+                def_id,
+                name,
+                kind: crate::SymbolKind::Local,
+                ty: Some(ty),
+                mutable,
+                span,
+            })
+            .expect("shader locals must define unique names");
         (def_id, name, span, ty, mutable)
     }
 
