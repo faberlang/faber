@@ -716,22 +716,16 @@ impl<'a> LoweringContextMaps<'a> {
     }
 
     fn record_enum_item(&mut self, enum_item: &HirEnum, enum_def_id: DefId) {
-        self.enum_type_params.insert(
-            enum_def_id,
-            enum_item
-                .type_params
-                .iter()
-                .map(|param| param.name)
-                .collect(),
-        );
-        self.validation.enum_type_params.insert(
-            enum_def_id,
-            enum_item
-                .type_params
-                .iter()
-                .map(|param| param.name)
-                .collect(),
-        );
+        let enum_type_params = enum_item
+            .type_params
+            .iter()
+            .map(|param| param.name)
+            .collect::<Vec<_>>();
+        self.enum_type_params
+            .insert(enum_def_id, enum_type_params.clone());
+        self.validation
+            .enum_type_params
+            .insert(enum_def_id, enum_type_params);
         let variants = enum_item
             .variants
             .iter()
