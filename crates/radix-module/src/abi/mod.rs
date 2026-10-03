@@ -128,6 +128,12 @@ impl AbiPayload {
                     "u32",
                     host_abi::ARRAY_OPTION_MODE_ROWS,
                 ),
+                enum_family(
+                    "genus_field_policy",
+                    "FaberRtGenusFieldPolicyV1",
+                    "u8",
+                    host_abi::GENUS_FIELD_POLICY_ROWS,
+                ),
             ],
             llvm_types: named_str_rows(host_abi::LLVM_TYPE_ROWS),
             statuses: host_abi::STATUS_CODES

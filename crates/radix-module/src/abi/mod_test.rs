@@ -75,6 +75,37 @@ fn payload_enum_rows_match_const_declarations() {
 }
 
 #[test]
+fn payload_reports_genus_field_policy_family() {
+    // The genus field-layout contract is part of the reported surface: the
+    // LLVM emitter writes its codes and `render_rust` emits its type alias
+    // and constants, so `radix abi` must enumerate it.
+    let payload = AbiPayload::current();
+    let family = payload
+        .enums
+        .iter()
+        .find(|family| family.family == "genus_field_policy")
+        .expect("genus_field_policy family is reported by the ABI surface");
+    assert_eq!(family.type_alias, "FaberRtGenusFieldPolicyV1");
+    assert_eq!(family.repr, "u8");
+    assert_eq!(family.rows.len(), host_abi::GENUS_FIELD_POLICY_ROWS.len());
+
+    let row_for = |name: &str| {
+        host_abi::GENUS_FIELD_POLICY_ROWS
+            .iter()
+            .find(|(candidate, _)| *candidate == name)
+            .map(|(_, value)| *value)
+    };
+    assert_eq!(
+        row_for("GENUS_FIELD_POLICY_MANDATORY"),
+        Some(u32::from(host_abi::GENUS_FIELD_POLICY_MANDATORY))
+    );
+    assert_eq!(
+        row_for("GENUS_FIELD_POLICY_DEFAULTABLE"),
+        Some(u32::from(host_abi::GENUS_FIELD_POLICY_DEFAULTABLE))
+    );
+}
+
+#[test]
 fn fingerprint_is_deterministic_and_stable() {
     let one = AbiPayload::current()
         .fingerprint()
