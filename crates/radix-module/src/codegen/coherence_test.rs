@@ -361,16 +361,25 @@ fn go_and_typescript_frame_protocols_follow_runtime_status_semantics() {
         .iter()
         .filter_map(|(tag, status)| status.is_terminal().then_some(*tag))
         .collect::<Vec<_>>();
+    let content = statuses
+        .iter()
+        .filter_map(|(tag, status)| status.is_content().then_some(*tag))
+        .collect::<Vec<_>>();
+
+    assert_eq!(terminal, vec!["done", "error", "cancel"]);
+    assert_eq!(content, vec!["item", "byte", "bulk"]);
+    // TypeScript frame transport now lives behind the runtime import; this
+    // compiler-side proof checks that generated modules use that runtime seam.
+    assert!(
+        typescript.contains("from \"@faber/runtime\"") && typescript.contains("sermo.Sermo.open(\"runtime:echo\""),
+        "TypeScript delegates frame handling through the runtime sermo API"
+    );
 
     for (tag, _) in statuses {
         assert!(
             go_frame.contains(&format!("code{}", pascal(tag)))
                 && go_frame.contains(&format!("Sermo{} struct{{}}", pascal(tag))),
             "Go omits {tag} frame status"
-        );
-        assert!(
-            typescript.contains(&format!("tag: \"{tag}\"")),
-            "TypeScript omits {tag} frame status"
         );
     }
 
@@ -384,33 +393,12 @@ fn go_and_typescript_frame_protocols_follow_runtime_status_semantics() {
         .nth(1)
         .and_then(|body| body.split("func sermoAccipe").next())
         .expect("Go cursor helper");
-    // Since A4/U8 (a412c062d) `nextInbound` and `nextInboundAsync` share one
-    // frame-admission switch, `admit<T>`; terminal statuses finish the inbound
-    // half there, so the terminal cases are checked in that helper and
-    // `nextInbound` must delegate to it.
-    let ts_next_inbound = typescript
-        .split("nextInbound<T>(): ")
-        .nth(1)
-        .and_then(|body| body.split("nextInboundAsync<T>()").next())
-        .expect("TypeScript nextInbound helper");
-    assert!(
-        ts_next_inbound.contains("this.admit<T>(frame)"),
-        "TypeScript nextInbound does not route frames through admit"
-    );
-    let ts_admit = typescript
-        .split("private admit<T>(frame: scrinium<any>)")
-        .nth(1)
-        .and_then(|body| body.split("private finish(").next())
-        .expect("TypeScript admit helper");
-
+    // Terminal statuses finish Go's inbound cursor; non-terminal statuses
+    // must not trigger its drained path.
     for tag in &terminal {
         assert!(
             go_cursor.contains(&format!("code{}", pascal(tag))),
             "Go cursor omits terminal {tag}"
-        );
-        assert!(
-            ts_admit.contains(&format!("case \"{tag}\":")),
-            "TypeScript nextInbound omits terminal {tag}"
         );
     }
     for (tag, status) in frame_statuses() {
