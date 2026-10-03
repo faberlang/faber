@@ -36,10 +36,17 @@ const ISSUE_MUT_ARGUMENT_TYPE_MISMATCH: &str = "mut_argument_type_mismatch";
 /// K5 (gpu-reset rule 15): a function over one number called on a tensor.
 pub(crate) const ISSUE_TENSOR_FUNCTION_NOT_LIFTED: &str = "tensor_function_not_lifted";
 const ISSUE_CALLEE_NOT_CALLABLE: &str = "callee_not_callable";
-const ISSUE_TRANSFER_PAYLOAD_TYPE_MISMATCH: &str = "transfer_payload_type_mismatch";
-const ISSUE_TRANSFER_SINK_MUST_BE_UNARY: &str = "transfer_sink_must_be_unary";
-const ISSUE_TRANSFER_SINK_MUST_RETURN_VACUUM: &str = "transfer_sink_must_return_vacuum";
-const ISSUE_TRANSFER_SINK_NOT_CALLABLE: &str = "transfer_sink_not_callable";
+/// R1: the two sides of `⇇` differ in element type or shape.
+pub(crate) const ISSUE_COPY_INTO_TYPE_MISMATCH: &str = "copy_into_type_mismatch";
+/// R2: the left side of `⇇` is not tensor storage (scalar, list, matrix, ...).
+pub(crate) const ISSUE_COPY_INTO_TARGET_NOT_TENSOR: &str = "copy_into_target_not_tensor";
+/// `⇇` carries exactly one value; HIR built with another count is rejected.
+pub(crate) const ISSUE_COPY_INTO_ARITY: &str = "copy_into_arity";
+/// R4/R5: a `⇇` statement has no result, so it is not a value to store.
+pub(crate) const ISSUE_COPY_INTO_VALUE_USED: &str = "copy_into_value_used";
+/// R7: the callable-sink form `sink ⇇ payload` is retired.
+// FABER-2-SUNSET: delete with the retired-word diagnostics.
+pub(crate) const ISSUE_TRANSFER_SINK_RETIRED: &str = "transfer_sink_retired";
 pub(super) const ISSUE_DIRECTIONAL_VIEW_METHOD_TYPE_ARGS: &str =
     "directional_view_method_type_args";
 const ISSUE_DYNAMIC_CALLEE_TYPE_ARGS: &str = "dynamic_callee_type_args";
@@ -1866,14 +1873,23 @@ impl TypeChecker<'_> {
         true
     }
 
-    /// Checks the `⇇` transfer chain (EOT-3M).
+    /// Checks the `⇇` copy-into statement: `target ⇇ value` copies every value
+    /// of `value` into the existing storage of `target`.
     ///
-    /// Ordinary call semantics with two sink constraints: the sink must be a
-    /// unary callable returning `vacuum`. Each payload is one ordinary call
-    /// argument against the single parameter (per-payload generic
-    /// instantiation, exactly like a direct call per payload), and the whole
-    /// expression is `vacuum`. Diagnostics are target-neutral: no console,
-    /// formatting, or channel wording.
+    /// The type rules live here; the access rules (writable storage, no
+    /// alias, view target) live in definite assignment and borrow analysis.
+    ///
+    /// - R1: element type and shape match exactly. Shapes compare in the
+    ///   declared-symbol space (`index_equals`), so a generic
+    ///   `tensor<f32, [d, T]>` meets the transpose of `[T, d]` without any
+    ///   runtime witness.
+    /// - R2: the target is a tensor; scalars, lists, matrices and vectors are
+    ///   rejected (a value type is already written by `←`).
+    /// - R7: a callable target is the retired sink form.
+    ///
+    /// The node keeps the `{ sink, payloads }` shape until the HIR reshape: a
+    /// one-payload node is a copy-into, any other count is rejected. The
+    /// statement result is `vacuum`.
     pub fn check_transfer(
         &mut self,
         sink: &mut HirExpression,
@@ -1881,109 +1897,132 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
     ) -> TypeId {
         let vacuum = self.vacuum_type();
-        let sink_ty = self.check_expr(sink);
-        let resolved = self.resolve_inferred_type(sink_ty);
-
-        if self.is_infer(resolved) {
-            // Provisional shape, mirroring inferred ordinary callees: a unary
-            // callable from the first payload's type to `vacuum`.
-            let mut param_ty = self.fresh_infer();
-            for (index, payload) in payloads.iter_mut().enumerate() {
-                let payload_ty = self.check_expr(payload);
-                if index == 0 {
-                    param_ty = payload_ty;
-                }
-            }
-            let sig = FuncSig {
-                type_params: Vec::new(),
-                params: vec![ParamType {
-                    ty: param_ty,
-                    mode: SemanticParamMode::Owned,
-                    optional: false,
-                }],
-                ret: vacuum,
-                err: None,
-                is_async: false,
-                is_generator: false,
-            };
-            let func_ty = self.types.function(sig);
-            self.unify_assign_issue(sink_ty, func_ty, span, ISSUE_TRANSFER_SINK_NOT_CALLABLE);
-            return vacuum;
-        }
-
-        if matches!(
-            self.types.get(resolved),
-            Type::Primitive(Primitive::Ignotum)
-        ) {
-            for payload in payloads {
+        let [value] = payloads else {
+            self.check_expr(sink);
+            for payload in payloads.iter_mut() {
                 self.check_expr(payload);
             }
-            return vacuum;
-        }
-
-        let Some(sig) = self.signature_from_type(resolved) else {
-            for payload in payloads {
-                self.check_expr(payload);
-            }
-            self.not_callable(ISSUE_TRANSFER_SINK_NOT_CALLABLE, span);
+            self.error_issue(
+                SemanticErrorKind::ArityMismatch,
+                ISSUE_COPY_INTO_ARITY,
+                span,
+            );
             return self.error_type;
         };
 
-        let unary = sig.params.len() == 1 && !sig.params[0].optional;
-        if !unary {
-            self.invalid_operand_types(ISSUE_TRANSFER_SINK_MUST_BE_UNARY, span);
+        // A field target goes through the lvalue rules (privacy and `fixum`
+        // field modifiers); every other target is typed as a plain read.
+        let target_ty = if matches!(sink.kind, HirExpressionKind::Field(..)) {
+            self.check_lvalue(sink)
+        } else {
+            self.check_expr(sink)
+        };
+        let resolved = self.resolve_inferred_type(target_ty);
+
+        if resolved == self.error_type
+            || matches!(
+                self.types.get(resolved),
+                Type::Primitive(Primitive::Ignotum)
+            )
+        {
+            self.check_expr(value);
+            return self.error_type;
         }
-        let ret_vacuum = matches!(
-            self.types.get(self.resolve_inferred_type(sig.ret)),
-            Type::Primitive(Primitive::Vacuum)
+
+        if self.signature_from_type(resolved).is_some() {
+            // FABER-2-SUNSET: delete with the retired-word diagnostics.
+            self.check_expr(value);
+            self.not_callable(ISSUE_TRANSFER_SINK_RETIRED, span);
+            return self.error_type;
+        }
+
+        if self.is_infer(resolved) {
+            // The target is still open: the value decides its type.
+            let value_ty = self.check_expr(value);
+            self.unify_carrier_assign(
+                value_ty,
+                target_ty,
+                value.span,
+                ISSUE_COPY_INTO_TYPE_MISMATCH,
+            );
+            return vacuum;
+        }
+
+        if !crate::tensor_bracket::is_tensor_type(self.types, resolved) {
+            self.check_expr(value);
+            self.invalid_operand_types(ISSUE_COPY_INTO_TARGET_NOT_TENSOR, sink.span);
+            return self.error_type;
+        }
+
+        if let HirExpressionKind::Path(def_id) = &sink.kind
+            && self.lookup_binding(*def_id).is_none()
+            && self.consts.contains_key(def_id)
+        {
+            self.immutable_assignment("assignment_to_constant", sink.span);
+        }
+
+        let value_ty =
+            self.check_store_expr(value, target_ty, StoreSite::new(HirStoreKind::Assignment));
+        if self.resolve_inferred_type(value_ty) == self.error_type {
+            return self.error_type;
+        }
+        let unified = self.unify_carrier_assign(
+            value_ty,
+            target_ty,
+            value.span,
+            ISSUE_COPY_INTO_TYPE_MISMATCH,
         );
-        if !ret_vacuum {
+        if unified == self.error_type {
+            return self.error_type;
+        }
+        self.require_exact_tensor_element(value_ty, target_ty, value.span);
+        vacuum
+    }
+
+    /// R1 asks for the same element type, not a widening one: the tensor
+    /// assignment relation is element-covariant, so an exact check follows it.
+    fn require_exact_tensor_element(
+        &mut self,
+        value_ty: TypeId,
+        target_ty: TypeId,
+        span: radix_lexer::Span,
+    ) {
+        let value_ty = self.resolve_inferred_type(value_ty);
+        let target_ty = self.resolve_inferred_type(target_ty);
+        let value_inner = self.types.peel_access_marker(value_ty).1;
+        let target_inner = self.types.peel_access_marker(target_ty).1;
+        let (Type::Tensor(value_elem, _), Type::Tensor(target_elem, _)) = (
+            self.types.get(value_inner).clone(),
+            self.types.get(target_inner).clone(),
+        ) else {
+            return;
+        };
+        let value_elem = self.resolve_inferred_type(value_elem);
+        let target_elem = self.resolve_inferred_type(target_elem);
+        // Exact up to aliases: each element assigns to the other.
+        let exact = self.types.is_assignable(value_elem, target_elem)
+            && self.types.is_assignable(target_elem, value_elem);
+        if !exact {
             self.error_issue(
                 SemanticErrorKind::TypeMismatch,
-                ISSUE_TRANSFER_SINK_MUST_RETURN_VACUUM,
+                ISSUE_COPY_INTO_TYPE_MISMATCH,
                 span,
             );
         }
-        if !unary {
-            for payload in payloads {
-                self.check_expr(payload);
-            }
-            return self.error_type;
-        }
+    }
 
-        for payload in payloads {
-            // One ordinary call per payload: fresh generic instantiation so
-            // each payload drives its own inference, like separate calls.
-            let mut vars = FxHashMap::default();
-            let instantiated = self.substitute_func_sig(&sig, &mut vars, None);
-            let param = &instantiated.params[0];
-            let payload_ty =
-                self.check_store_expr(payload, param.ty, StoreSite::new(HirStoreKind::Argument));
-            if self.types.is_ref_view(payload_ty)
-                && (matches!(
-                    param.mode,
-                    SemanticParamMode::MutRef | SemanticParamMode::Move
-                ) || self.types.is_mut_or_own_view(param.ty))
-            {
-                self.error_issue(
-                    SemanticErrorKind::ModeMismatch,
-                    crate::ISSUE_REF_TO_MUT_OR_OWN_POSITION,
-                    payload.span,
-                );
-            }
-            self.unify_carrier_assign(
-                payload_ty,
-                param.ty,
-                payload.span,
-                ISSUE_TRANSFER_PAYLOAD_TYPE_MISMATCH,
-            );
+    /// R4/R5: report a `⇇` statement used as a value (`x ← a ⇇ b`,
+    /// `fixum t ← a ⇇ b`). The statement has no result to store or chain.
+    pub fn reject_copy_into_value(&mut self, value: &HirExpression) -> bool {
+        if !matches!(value.kind, HirExpressionKind::Transfer { .. }) {
+            return false;
         }
-
-        // Failable sinks propagate exactly like ordinary failable calls.
-        if self.reject_failable_call(&sig, span) {
-            return self.error_type;
-        }
-        vacuum
+        self.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_COPY_INTO_VALUE_USED,
+            value.span,
+        );
+        true
     }
 
     /// Whether a nominal def declares generic type parameters.

@@ -560,6 +560,7 @@ pub(super) fn constrain_elementwise_result_shape(
 
 fn tensor_parts(checker: &mut TypeChecker<'_>, ty: TypeId) -> Option<(TypeId, IndexId)> {
     let resolved = checker.resolve_inferred_type(ty);
+    let resolved = checker.types.peel_access_marker(resolved).1;
     match checker.types.get(resolved) {
         Type::Tensor(elem, shape) => Some((*elem, *shape)),
         _ => None,

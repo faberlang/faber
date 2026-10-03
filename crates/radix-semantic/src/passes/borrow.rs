@@ -87,6 +87,17 @@ const ISSUE_USE_WHILE_MUTABLY_BORROWED: &str = "use_while_mutably_borrowed";
 const ISSUE_WRITE_WHILE_BORROWED: &str = "write_while_borrowed";
 const ISSUE_TENSOR_VIEW_ESCAPE: &str = "tensor_view_escape";
 const ISSUE_TENSOR_VIEW_READ_ONLY: &str = "tensor_view_read_only";
+/// R2: the left side of `⇇` is a view, which is never writable storage.
+const ISSUE_COPY_INTO_TARGET_VIEW: &str = "copy_into_target_view";
+/// R2: the left side of `⇇` is not a named storage place.
+const ISSUE_COPY_INTO_TARGET_NOT_STORAGE: &str = "copy_into_target_not_storage";
+/// R3: the right side of `⇇` reads the storage the left side writes.
+const ISSUE_COPY_INTO_ALIAS: &str = "copy_into_alias";
+/// R6: a whole tensor is rebound into a `mut` tensor parameter by `←`.
+const ISSUE_MUT_TENSOR_PARAM_REBIND: &str = "mut_tensor_param_rebind";
+
+/// A named storage place: a binding plus the field path under it.
+type PlaceKey = (DefId, Vec<radix_lexer::Symbol>);
 
 /// Target-neutral Faber access-fact analysis.
 ///
@@ -275,6 +286,12 @@ struct BorrowChecker<'a> {
     /// Read-only tensor views and their backing place. Chained views and
     /// immutable aliases retain the original root until materialize().
     tensor_view_roots: FxHashMap<DefId, FxHashSet<DefId>>,
+    /// Tensor bindings bound by `←` to another tensor place: the binding shares
+    /// that place's storage (reference model), so a write through either name
+    /// reaches both. Closed transitively when the alias is recorded.
+    tensor_alias_roots: FxHashMap<DefId, FxHashSet<DefId>>,
+    /// Parameters declared `mut` (`in` mode or a `mut` access marker).
+    mut_params: FxHashSet<DefId>,
     /// Function param contracts keyed by callee `DefId` (named calls leave
     /// `callee.ty` unset; this index supplies own-param dest facts).
     func_params: FxHashMap<DefId, Vec<ParamType>>,
@@ -327,6 +344,8 @@ impl<'a> BorrowChecker<'a> {
             unmarked_own_binds: FxHashMap::default(),
             de_aliases: FxHashSet::default(),
             tensor_view_roots: FxHashMap::default(),
+            tensor_alias_roots: FxHashMap::default(),
+            mut_params: FxHashSet::default(),
             func_params: FxHashMap::default(),
             regions,
             stmt_node: None,
@@ -403,6 +422,9 @@ impl<'a> BorrowChecker<'a> {
             self.note_mut_root(param.def_id, param.ty);
             self.note_copy_root(param.def_id, param.ty);
             self.note_own_root(param.def_id, param.ty);
+            if matches!(param.mode, HirParamMode::In) || self.types.is_mut_view(param.ty) {
+                self.mut_params.insert(param.def_id);
+            }
             self.param_usage.insert(
                 param.def_id,
                 ParamUsage {
@@ -435,6 +457,8 @@ impl<'a> BorrowChecker<'a> {
         self.unmarked_own_binds.clear();
         self.de_aliases.clear();
         self.tensor_view_roots.clear();
+        self.tensor_alias_roots.clear();
+        self.mut_params.clear();
         self.stmt_node = None;
     }
 
@@ -540,6 +564,7 @@ impl<'a> BorrowChecker<'a> {
                         self.check_expr(init);
                     }
                     self.note_de_alias(local.def_id, local.ty, init);
+                    self.note_tensor_alias(local.def_id, local.ty, init);
                 }
             }
             HirStatementKind::Expr(expr) => self.check_expr(expr),
@@ -791,6 +816,11 @@ impl<'a> BorrowChecker<'a> {
                 target.span,
             );
         }
+        self.check_lvalue_access(target);
+    }
+
+    /// Access rules for writing `target`, shared by assignment and `⇇`.
+    fn check_lvalue_access(&mut self, target: &HirExpression) {
         if Self::is_projection(target)
             && let Some(def_id) = Self::root_def_id(target)
             && self.ref_roots.contains(&def_id)
@@ -816,6 +846,179 @@ impl<'a> BorrowChecker<'a> {
             self.write_use(def_id, target.span);
         } else {
             self.check_expr(target);
+        }
+    }
+
+    /// The binding and field path of a named storage place (`out`, `self.buf`).
+    fn place_key(expr: &HirExpression) -> Option<PlaceKey> {
+        match &expr.kind {
+            HirExpressionKind::Path(def_id) => Some((*def_id, Vec::new())),
+            HirExpressionKind::Field(object, name) => {
+                let (root, mut path) = Self::place_key(object)?;
+                path.push(*name);
+                Some((root, path))
+            }
+            _ => None,
+        }
+    }
+
+    fn is_tensor_typed(&self, expr: &HirExpression) -> bool {
+        expr.ty.is_some_and(|ty| {
+            let (_, inner) = self.types.peel_access_marker(ty);
+            matches!(self.types.get(inner), Type::Tensor(_, _))
+        })
+    }
+
+    /// Record that a binding initialized from a tensor place shares that
+    /// place's storage. `c ← a` makes `c` another name for `a`'s tensor, so
+    /// `c` and `a` overlap for the `⇇` alias rule. Exclusive (`own`/`copy`)
+    /// bindings duplicate and do not alias.
+    fn note_tensor_alias(&mut self, local: DefId, ty: Option<TypeId>, init: &HirExpression) {
+        self.tensor_alias_roots.remove(&local);
+        if ty.is_some_and(|ty| self.types.is_exclusive_value(ty)) || !self.is_tensor_typed(init) {
+            return;
+        }
+        let Some((source, _)) = Self::place_key(init) else {
+            return;
+        };
+        let mut roots = self
+            .tensor_alias_roots
+            .get(&source)
+            .cloned()
+            .unwrap_or_default();
+        roots.insert(source);
+        self.tensor_alias_roots.insert(local, roots);
+    }
+
+    /// The bindings whose storage a binding names: itself plus its aliases.
+    fn storage_names(&self, def_id: DefId) -> FxHashSet<DefId> {
+        let mut names = self
+            .tensor_alias_roots
+            .get(&def_id)
+            .cloned()
+            .unwrap_or_default();
+        names.insert(def_id);
+        names
+    }
+
+    /// The places a `⇇` value reads through: the value itself when it is a
+    /// named place, the receiver place of a view chain, or the view origins.
+    fn copy_into_value_places(&self, value: &HirExpression, out: &mut Vec<PlaceKey>) {
+        if let HirExpressionKind::Path(def_id) = &value.kind
+            && let Some(roots) = self.tensor_view_roots.get(def_id)
+        {
+            out.extend(roots.iter().map(|root| (*root, Vec::new())));
+            return;
+        }
+        if let Some(key) = Self::place_key(value) {
+            out.push(key);
+            return;
+        }
+        if let HirExpressionKind::MethodCall(receiver, method, _, args, _) = &value.kind
+            && self
+                .tensor_view_method(receiver, *method, args.len())
+                .is_some_and(Self::is_view_method)
+        {
+            self.copy_into_value_places(receiver, out);
+            return;
+        }
+        out.extend(
+            self.tensor_view_origins(value)
+                .into_iter()
+                .map(|root| (root, Vec::new())),
+        );
+    }
+
+    /// Whether writing `target` can change what `value` reads. Two places on
+    /// one binding overlap when one field path prefixes the other; places on
+    /// different bindings overlap when `←` aliases join their storage.
+    fn copy_into_overlaps(&self, target: &PlaceKey, value: &HirExpression) -> bool {
+        let mut places = Vec::new();
+        self.copy_into_value_places(value, &mut places);
+        let target_names = self.storage_names(target.0);
+        places.iter().any(|(root, path)| {
+            if *root == target.0 {
+                let shared = path.len().min(target.1.len());
+                return path[..shared] == target.1[..shared];
+            }
+            !self.storage_names(*root).is_disjoint(&target_names)
+        })
+    }
+
+    /// `target ⇇ value`: copy the values of `value` into the existing storage
+    /// of `target`.
+    ///
+    /// R2: the target is a named storage place (a binding or a field path
+    /// under one), never a view. R3: the value does not read the storage the
+    /// target names. The target is written, so the ordinary write rules (a
+    /// `de` parameter, a `ref` root, an outstanding borrow) apply to it.
+    fn check_copy_into(&mut self, target: &HirExpression, payloads: &[HirExpression]) {
+        let [value] = payloads else {
+            self.visit_expr(target);
+            for payload in payloads {
+                self.visit_expr(payload);
+            }
+            return;
+        };
+        let key = Self::place_key(target);
+        if !self.tensor_view_origins(target).is_empty() || self.is_tensor_view(target) {
+            self.error(
+                SemanticErrorKind::ModeMismatch,
+                ISSUE_COPY_INTO_TARGET_VIEW,
+                target.span,
+            );
+        } else if key.is_none() {
+            self.error(
+                SemanticErrorKind::ModeMismatch,
+                ISSUE_COPY_INTO_TARGET_NOT_STORAGE,
+                target.span,
+            );
+        }
+        if let Some(key) = &key
+            && self.copy_into_overlaps(key, value)
+        {
+            self.error(
+                SemanticErrorKind::ModeMismatch,
+                ISSUE_COPY_INTO_ALIAS,
+                value.span,
+            );
+        }
+        self.visit_expr(value);
+        let Some((root, _)) = key else {
+            self.visit_expr(target);
+            return;
+        };
+        if self.de_aliases.contains(&root) {
+            self.error(
+                SemanticErrorKind::AssignToImmutableBorrow,
+                ISSUE_ASSIGN_TO_DE_PARAMETER,
+                target.span,
+            );
+        }
+        if self.ref_roots.contains(&root) && !self.param_usage.contains_key(&root) {
+            self.error(
+                SemanticErrorKind::AssignToImmutableBorrow,
+                ISSUE_ASSIGN_THROUGH_REF,
+                target.span,
+            );
+        }
+        self.check_projection_inputs(target);
+        self.write_use(root, target.span);
+    }
+
+    /// R6: a plain `←` of a whole tensor into a `mut` tensor parameter. `⇇`
+    /// is the one way to write the caller's storage, so a rebind of the
+    /// parameter name is rejected on the host and in a kernel alike.
+    fn check_mut_tensor_param_rebind(&mut self, target: &HirExpression) {
+        if let HirExpressionKind::Path(def_id) = &target.kind
+            && self.mut_params.contains(def_id)
+            && self.is_tensor_typed(target)
+        {
+            self.error(
+                SemanticErrorKind::ModeMismatch,
+                ISSUE_MUT_TENSOR_PARAM_REBIND,
+                target.span,
+            );
         }
     }
 
@@ -1644,6 +1847,11 @@ impl HirVisitor for BorrowChecker<'_> {
                         ISSUE_TENSOR_VIEW_ESCAPE,
                         value.span,
                     );
+                } else {
+                    self.check_mut_tensor_param_rebind(target);
+                }
+                if let HirExpressionKind::Path(def_id) = &target.kind {
+                    self.note_tensor_alias(*def_id, target.ty, value);
                 }
                 if target.ty.is_some_and(|ty| self.types.is_copy_view(ty))
                     || Self::root_def_id(target).is_some_and(|id| self.copy_roots.contains(&id))
@@ -1662,6 +1870,9 @@ impl HirVisitor for BorrowChecker<'_> {
                 } else {
                     self.visit_expr(value);
                 }
+            }
+            HirExpressionKind::Transfer { sink, payloads } => {
+                self.check_copy_into(sink, payloads);
             }
             // `↤` writes the target place (declared ownership/access rules
             // apply) before visiting the conversion source and its `⇥`

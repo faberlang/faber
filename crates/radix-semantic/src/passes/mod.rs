@@ -169,6 +169,10 @@ mod companion_signature_test;
 mod complexity_test;
 
 #[cfg(test)]
+#[path = "copy_into_test.rs"]
+mod copy_into_test;
+
+#[cfg(test)]
 #[path = "definite_assignment_test.rs"]
 mod definite_assignment_test;
 #[cfg(test)]

@@ -1174,7 +1174,7 @@ pub enum ExprKind {
     /// `primus_quem` is immediately followed by `(`; the `ubi` predicate tail
     /// is owned by this head and is never shared with the reduce/scan tails.
     FirstMatch(Box<FirstMatchExpr>),
-    /// Exact-output transfer: `sink ⇇ p1 ⇇ p2` (U+21C7).
+    /// Copy-into statement: `target ⇇ value` (U+21C7).
     ///
     /// One sink evaluated once plus an ordered payload list. Each payload is
     /// transferred on that single sink left-to-right; the chain is never a
@@ -1238,12 +1238,16 @@ pub struct FormatExpr {
     pub spec_span: Span,
 }
 
-/// Source shape for the `⇇` exact-output transfer chain.
+/// Source shape for the `⇇` copy-into statement: `target ⇇ value` copies
+/// every value of `value` into the existing storage of `target`.
+///
+/// The field names are the retired sink-chain spelling, kept until the HIR
+/// reshape; the parser guarantees `payloads` holds exactly one value.
 #[derive(Debug)]
 pub struct TransferExpr {
-    /// Unary callable receiving every payload; evaluated once.
+    /// The copy-into target: the existing storage that receives the values.
     pub sink: Box<Expr>,
-    /// Payloads in source order, one transfer each, left-to-right.
+    /// The single value expression copied into the target.
     pub payloads: Vec<Expr>,
 }
 

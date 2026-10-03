@@ -45,6 +45,8 @@ use radix_lexer::{Interner, Symbol};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 const ISSUE_IMMUTABLE_SECOND_ASSIGNMENT: &str = "immutable_second_assignment";
+/// R2: the left side of `⇇` is a `fixum` binding or a non-`mut` parameter.
+const ISSUE_COPY_INTO_TARGET_IMMUTABLE: &str = "copy_into_target_immutable";
 const ISSUE_MUTATING_METHOD_ON_IMMUTABLE: &str =
     "imperativus_operator_method_requires_varia_receiver";
 const ISSUE_POSSIBLY_UNINITIALIZED: &str = "possibly_uninitialized";
@@ -500,6 +502,27 @@ impl HirVisitor for DefiniteAssignmentChecker<'_> {
             HirExpressionKind::Assign(target, value) => {
                 self.check_expr(value);
                 self.assign_binding(target);
+            }
+            // `target ⇇ value` writes the storage `target` already names: the
+            // value is read, the target is read (it must be initialized), and
+            // the target's root must be a writable binding. Unlike `←` it never
+            // rebinds, so it is legal only on `varia` bindings and `mut`
+            // parameters, however often it runs.
+            HirExpressionKind::Transfer { sink, payloads } => {
+                for payload in payloads {
+                    self.check_expr(payload);
+                }
+                self.check_expr(sink);
+                if payloads.len() == 1
+                    && let Some(def_id) = Self::root_def_id(sink)
+                    && self.write_once.contains(&def_id)
+                {
+                    self.error(
+                        SemanticErrorKind::ImmutableAssignment,
+                        ISSUE_COPY_INTO_TARGET_IMMUTABLE,
+                        sink.span,
+                    );
+                }
             }
             // `↤` stores exactly like ordinary `←`: the source (and its `⊥`
             // recovery) are reads, then the target binding is assigned.

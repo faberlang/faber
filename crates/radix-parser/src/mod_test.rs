@@ -5209,60 +5209,49 @@ fn eot_transfer_one_sink_one_payload() {
 }
 
 #[test]
-fn eot_transfer_chain_is_one_sink_with_ordered_payloads() {
-    let result = parse_ok(r#"output ⇇ "a" ⇇ "b" ⇇ "c""#);
-    let expr = eot_transfer_expr(&result);
-    let ExprKind::Transfer(transfer) = &expr.kind else {
-        panic!("expected transfer expression, got {:?}", expr.kind);
-    };
-    let ExprKind::Ident(sink) = &transfer.sink.kind else {
-        panic!("expected ident sink, got {:?}", transfer.sink.kind);
-    };
-    assert_eq!(symbol_name(&result, sink.name), "output");
-    assert_eq!(transfer.payloads.len(), 3, "one sink, three payloads");
-
-    // Left-to-right order: a, b, c (string symbols carry the raw inner text).
-    // The chain is flat — no payload is itself a Transfer node, so the form is
-    // never a pipeline of return values.
-    for (index, expected) in ["a", "b", "c"].iter().enumerate() {
-        let ExprKind::Literal(Literal::String(text)) = &transfer.payloads[index].kind else {
-            panic!(
-                "payload {index} must be a string literal, got {:?}",
-                transfer.payloads[index].kind
-            );
-        };
-        assert_eq!(symbol_name(&result, *text), *expected);
-        assert!(
-            !matches!(transfer.payloads[index].kind, ExprKind::Transfer(_)),
-            "payload {index} must not nest a transfer"
-        );
-    }
+fn eot_transfer_chain_is_rejected_with_a_named_issue() {
+    // `⇇` is a single copy-into statement: a chain is a parse error, not a
+    // flat list of payloads.
+    assert_parse_error_matches(
+        r#"output ⇇ "a" ⇇ "b""#,
+        ParseExpectation::Issue("copy_into_chain"),
+    );
+    assert_parse_error_matches(
+        r#"output ⇇ "a" ⇇ "b" ⇇ "c""#,
+        ParseExpectation::Issue("copy_into_chain"),
+    );
 }
 
 #[test]
 fn eot_transfer_groups_around_calls_conversions_and_templates() {
-    // Sink is a complete postfix call; payloads are a conversion and a
-    // string-constructor application. The ⇇ sits outside all of them.
-    let result = parse_ok(r#"scribe("x") ⇇ payload ↦ textus ⇇ "§ §\n"(a, b)"#);
+    // The target is a complete postfix call; the value is a complete
+    // conversion. The ⇇ sits outside both.
+    let result = parse_ok(r#"scribe("x") ⇇ payload ↦ textus"#);
     let expr = eot_transfer_expr(&result);
     let ExprKind::Transfer(transfer) = &expr.kind else {
         panic!("expected transfer expression, got {:?}", expr.kind);
     };
     assert!(
         matches!(transfer.sink.kind, ExprKind::Call(_)),
-        "sink keeps the complete call, got {:?}",
+        "target keeps the complete call, got {:?}",
         transfer.sink.kind
     );
-    assert_eq!(transfer.payloads.len(), 2);
+    assert_eq!(transfer.payloads.len(), 1);
     assert!(
         matches!(transfer.payloads[0].kind, ExprKind::Conversio(_)),
-        "first payload is the complete conversion, got {:?}",
+        "value is the complete conversion, got {:?}",
         transfer.payloads[0].kind
     );
-    let ExprKind::Call(template) = &transfer.payloads[1].kind else {
+
+    let result = parse_ok(r#"output ⇇ "§ §\n"(a, b)"#);
+    let expr = eot_transfer_expr(&result);
+    let ExprKind::Transfer(transfer) = &expr.kind else {
+        panic!("expected transfer expression, got {:?}", expr.kind);
+    };
+    let ExprKind::Call(template) = &transfer.payloads[0].kind else {
         panic!(
-            "second payload is the string-constructor application, got {:?}",
-            transfer.payloads[1].kind
+            "value is the string-constructor application, got {:?}",
+            transfer.payloads[0].kind
         );
     };
     assert!(
@@ -5273,25 +5262,27 @@ fn eot_transfer_groups_around_calls_conversions_and_templates() {
 }
 
 #[test]
-fn eot_transfer_binary_operators_group_into_the_payload() {
-    // ⇇ is locked at low precedence: `+` binds into the payload, never around
-    // the chain.
-    let result = parse_ok(r#"output ⇇ 1 + 2 ⇇ "c""#);
+fn eot_transfer_binary_operators_group_into_the_value() {
+    // ⇇ is locked at low precedence: every binary operator binds into the
+    // value, never around the statement.
+    let result = parse_ok(r#"output ⇇ (q · kt) ⊙ s"#);
     let expr = eot_transfer_expr(&result);
     let ExprKind::Transfer(transfer) = &expr.kind else {
         panic!("expected transfer expression, got {:?}", expr.kind);
     };
-    assert_eq!(transfer.payloads.len(), 2);
+    assert_eq!(transfer.payloads.len(), 1);
     assert!(
         matches!(transfer.payloads[0].kind, ExprKind::Binary(_)),
-        "payload keeps `1 + 2`, got {:?}",
+        "value keeps `(q · kt) ⊙ s`, got {:?}",
         transfer.payloads[0].kind
     );
 }
 
 #[test]
 fn eot_transfer_inside_assignment_value() {
-    // `⇇` binds tighter than `←`: the transfer is the assigned value.
+    // `⇇` binds tighter than `←`: the copy-into is the assigned value. The
+    // parser admits the shape; the semantic layer rejects it as a result used
+    // as a value (`copy_into_value_used`).
     let result = parse_ok(r#"fixum _ sink ← output ⇇ "a""#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
@@ -5300,7 +5291,7 @@ fn eot_transfer_inside_assignment_value() {
     let init = var.init.as_deref().expect("initializer");
     assert!(
         matches!(init.kind, ExprKind::Transfer(_)),
-        "declaration initializer is the transfer chain, got {:?}",
+        "declaration initializer is the copy-into, got {:?}",
         init.kind
     );
 }
@@ -5313,6 +5304,6 @@ fn eot_transfer_missing_payload_rejected() {
     );
     assert_parse_error_matches(
         r#"output ⇇ "a" ⇇"#,
-        ParseExpectation::Issue("transfer_payload_expected"),
+        ParseExpectation::Issue("copy_into_chain"),
     );
 }

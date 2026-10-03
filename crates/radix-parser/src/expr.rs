@@ -132,35 +132,40 @@ impl Parser {
         self.parse_assignment_tail(expr, start)
     }
 
-    /// Parse the `⇇` (U+21C7) exact-output transfer suffix at the locked low
-    /// precedence — below assignment, above ternary.
+    /// Parse the `⇇` (U+21C7) copy-into suffix at the locked low precedence —
+    /// below assignment, above ternary.
     ///
     /// GRAMMAR:
-    ///   transfer := sink ('⇇' ternary)+
+    ///   transfer := ternary ('⇇' ternary)?
     ///
-    /// WHY: one sink plus repeated unary payload transfers, never a pipeline
-    /// of return values. The sink is the complete expression already parsed
-    /// (calls, conversions, and string-constructor applications finished
-    /// inside `parse_ternary`'s postfix level); each payload is a complete
-    /// ternary so binary operators group into the payload, not around the
-    /// chain. The chain shape is flat on purpose: lowering transfers payloads
-    /// on the single sink left-to-right.
+    /// WHY: `target ⇇ value` copies every value of `value` into the existing
+    /// storage of `target`. The target is the complete expression already
+    /// parsed (calls, conversions, and string-constructor applications
+    /// finished inside `parse_ternary`'s postfix level); the value is a
+    /// complete ternary so binary operators group into the value, not around
+    /// the statement. The form is a statement, not a pipeline of results, so a
+    /// second `⇇` is rejected here rather than parsed as a chain.
+    ///
+    /// The node keeps the `{ sink, payloads }` shape; the parser guarantees
+    /// exactly one payload, which the semantic layer reads as the copy-into
+    /// value.
     fn parse_transfer_chain(&mut self, sink: Expr, start: Span) -> Result<Expr, ParseError> {
         if !self.check(&TokenKind::Transfer) {
             return Ok(sink);
         }
 
         let sink = Box::new(sink);
-        let mut payloads = Vec::new();
-        while self.eat(&TokenKind::Transfer) {
-            if !Self::can_start_expression(&self.peek().kind) {
-                return Err(
-                    ParseError::structured(ParseErrorKind::Expected, self.current_span())
-                        .with_arg("issue", "transfer_payload_expected")
-                        .with_arg("operator", "⇇"),
-                );
-            }
-            payloads.push(self.parse_ternary()?);
+        self.advance();
+        if !Self::can_start_expression(&self.peek().kind) {
+            return Err(
+                ParseError::structured(ParseErrorKind::Expected, self.current_span())
+                    .with_arg("issue", "transfer_payload_expected")
+                    .with_arg("operator", "⇇"),
+            );
+        }
+        let payloads = vec![self.parse_ternary()?];
+        if self.check(&TokenKind::Transfer) {
+            return Err(self.invalid_expression_error("copy_into_chain"));
         }
 
         let span = start.merge(self.previous_span());

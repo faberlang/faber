@@ -1021,9 +1021,7 @@ impl TypeChecker<'_> {
 
     fn expression_diverges(&self, expr: &HirExpression) -> bool {
         match &expr.kind {
-            HirExpressionKind::Throw(_)
-            | HirExpressionKind::Panic(_)
-            | HirExpressionKind::Transfer { .. } => true,
+            HirExpressionKind::Throw(_) | HirExpressionKind::Panic(_) => true,
             HirExpressionKind::Block(block) | HirExpressionKind::Loop(block) => {
                 self.block_diverges(block)
             }

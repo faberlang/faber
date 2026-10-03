@@ -992,6 +992,10 @@ help = "use '{si}'/'{sin}', '{discerne}', or a function that '{redde}'s each cas
 message = "the '¶' format spec must be a string literal"
 help = "write the spec in quotes, like 'x ¶ \".2\"'; a computed spec is not allowed"
 
+[diagnostics.PARSE030.issues.copy_into_chain]
+message = "'⇇' does not chain"
+help = "write one 'target ⇇ value' per statement; '⇇' has no result to chain"
+
 [diagnostics.PARSE030.issues.format_chained]
 message = "'¶' does not chain"
 help = "format once; parenthesize to format a formatted text"
@@ -2576,6 +2580,14 @@ help = "gradient selection (`∇`) is parse-only in Phase 2A; the eligibility/se
 message = "decimal literal is outside the d64 range"
 help = "a d64 literal has at most 8 fraction digits and lies within ±92233720368.54775807; a written literal is never rounded"
 
+[diagnostics.SEM010.issues.copy_into_type_mismatch]
+message = "'⇇' needs the same element type and shape on both sides"
+help = "make the right side the same tensor type as the target, or convert it first"
+
+[diagnostics.SEM010.issues.copy_into_value_used]
+message = "a '⇇' statement has no value"
+help = "write the copy as its own statement; to rebind a name to a tensor, use '←' on a local binding"
+
 [diagnostics.SEM011]
 message = "invalid operand types"
 help = "use compatible operand types"
@@ -3084,6 +3096,10 @@ help = "use a literal integer index such as pair[0] or pair[1]"
 message = "index {index} is out of bounds for a bound of {bound}"
 help = "use an index from 0 up to one below the bound"
 
+[diagnostics.SEM011.issues.copy_into_target_not_tensor]
+message = "the left side of '⇇' must be tensor storage"
+help = "'⇇' copies into an existing tensor; a scalar, list, matrix, or vector is written with '←'"
+
 [diagnostics.SEM012]
 message = "not callable"
 help = "call a function or closure"
@@ -3091,6 +3107,10 @@ help = "call a function or closure"
 [diagnostics.SEM012.issues.callee_not_callable]
 message = "callee is not callable"
 help = "call a function, closure, or callable value"
+
+[diagnostics.SEM012.issues.transfer_sink_retired]
+message = "'sink ⇇ value' (a callable on the left) was retired"
+help = "'⇇' now copies the values of its right side into the existing tensor storage on its left; call the function directly instead"
 
 [diagnostics.SEM013]
 message = "wrong arity"
@@ -3127,6 +3147,10 @@ help = "adjust the number of type arguments"
 [diagnostics.SEM013.issues.iuncta_construction_arity_mismatch]
 message = "iuncta construction has {actual} elements but type has {expected}"
 help = "match the element count to the iuncta type arity"
+
+[diagnostics.SEM013.issues.copy_into_arity]
+message = "'⇇' copies exactly one value into its target"
+help = "write one 'target ⇇ value' per statement"
 
 [diagnostics.SEM014]
 message = "missing type annotation"
@@ -3652,6 +3676,10 @@ help = "use a `var` binding to allow reassignment, or remove the extra assignmen
 message = "`{method}` changes `{binding}` in place, but `{binding}` is an immutable binding"
 help = "declare `{binding}` with `var` so it can be changed in place, or call a method that returns a new value instead"
 
+[diagnostics.SEM020.issues.copy_into_target_immutable]
+message = "'⇇' needs writable tensor storage on its left"
+help = "write into a mutable local or a mut parameter; a constant, a fixum binding, or a non-mut parameter cannot be written"
+
 [diagnostics.SEM021]
 message = "invalid assignment target"
 help = "assign to a valid lvalue"
@@ -3834,7 +3862,7 @@ help = "align parameter modes between caller and callee"
 
 [diagnostics.SEM057.issues.tensor_view_escape]
 message = "a borrowed tensor view cannot escape or initialize mutable storage"
-help = "call materialize() to create an owned tensor before storing, returning, or capturing it"
+help = "call materialize() to create an owned tensor before storing, returning, or capturing it, or write the view into existing mutable storage with 'target ⇇ view'"
 
 [diagnostics.SEM057.issues.tensor_view_read_only]
 message = "a borrowed tensor view is read-only and aliases its base"
@@ -3875,6 +3903,22 @@ help = "bind through `copy` to duplicate the source"
 [diagnostics.SEM057.issues.shared_into_own]
 message = "cannot bind a shared value into `own`"
 help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.copy_into_target_view]
+message = "a view cannot be the target of '⇇'"
+help = "write into the tensor that owns the storage, not into a view of it"
+
+[diagnostics.SEM057.issues.copy_into_target_not_storage]
+message = "the left side of '⇇' must name tensor storage"
+help = "write the target as a local, a mut parameter, or a field of one"
+
+[diagnostics.SEM057.issues.copy_into_alias]
+message = "the right side of '⇇' reads the storage the left side writes"
+help = "copy from a different tensor, or call materialize() on the right side first"
+
+[diagnostics.SEM057.issues.mut_tensor_param_rebind]
+message = "'←' cannot rebind a mut tensor parameter"
+help = "write into the caller's tensor with 'target ⇇ value'; '←' only binds names"
 
 [diagnostics.SEM058]
 message = "use before initialization"

@@ -232,12 +232,10 @@ impl AirPurityChecker<'_> {
             }
             HirExpressionKind::Unary(_, operand) => self.check_expr(operand),
             HirExpressionKind::Call(callee, _, args, _) => self.check_call(callee, args, expr.span),
-            // EOT-3M (exhaustive-match completion): a transfer invokes an
-            // arbitrary sink callable once per payload. A value sink cannot be
-            // proven AIR-pure, so reject with the ordinary non-AIR-call issue
-            // instead of silently admitting it.
+            // `target ⇇ value` copies into storage the target already names:
+            // a mutation of the target place, rejected exactly like `←`.
             HirExpressionKind::Transfer { sink, payloads } => {
-                self.reject(expr.span, "non_air_call");
+                self.reject(expr.span, "assignment_mutation");
                 self.check_expr(sink);
                 for payload in payloads {
                     self.check_expr(payload);
