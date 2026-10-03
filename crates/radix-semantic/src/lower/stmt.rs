@@ -898,6 +898,14 @@ impl Lowerer<'_> {
                 (def_id, ident.name)
             })
             .collect();
+        // The lane binder is declared alongside the loop bindings (same
+        // shape as `summa`'s filum binder); the runner lowers the plain
+        // loop, so the binder never becomes a runtime local.
+        let filum_binding = iter_stmt.filum.as_ref().map(|ident| {
+            let def_id = self.next_def_id();
+            self.bind_local(ident.name, def_id);
+            (def_id, ident.name)
+        });
         self.bind_local(binding_name, binding);
         if matches!(first_binding, radix_syntax::BindingPattern::Object { .. }) {
             self.record_itera_element_labels(&iter_stmt.sources[0], binding);
@@ -928,6 +936,7 @@ impl Lowerer<'_> {
             kind: HirExpressionKind::Itera {
                 mode,
                 coordinates: coordinate_bindings,
+                filum: filum_binding,
                 binding,
                 binding_name,
                 iter: Box::new(iter),
@@ -956,6 +965,18 @@ impl Lowerer<'_> {
     /// are typecheck laws over the node — same family as the single-source
     /// `apud` arity rule.
     fn lower_lockstep_itera(&mut self, iter_stmt: &radix_syntax::IteraStmt) -> HirStatementKind {
+        // The series node carries no lane-binder metadata; a declared `filum`
+        // clause declines whole instead of silently dropping the binder.
+        if let Some(lane) = iter_stmt.filum.as_ref() {
+            self.error_with_args_at(
+                vec![radix_diagnostics::DiagnosticArg::new(
+                    "issue",
+                    "itera_filum_requires_single_source",
+                )],
+                lane.span,
+            );
+            return HirStatementKind::Expr(error_expr(self, self.current_span));
+        }
         let mut bindings = Vec::new();
         for binding in &iter_stmt.bindings {
             let radix_syntax::BindingPattern::Ident(ident) = binding else {
@@ -1036,6 +1057,18 @@ impl Lowerer<'_> {
                     "itera_apud_requires_ex",
                 )],
                 coordinate.span,
+            );
+            return HirStatementKind::Expr(error_expr(self, self.current_span));
+        }
+        // The range-product node carries no lane-binder metadata; a declared
+        // `filum` clause declines whole instead of silently dropping it.
+        if let Some(lane) = iter_stmt.filum.as_ref() {
+            self.error_with_args_at(
+                vec![radix_diagnostics::DiagnosticArg::new(
+                    "issue",
+                    "itera_filum_requires_single_source",
+                )],
+                lane.span,
             );
             return HirStatementKind::Expr(error_expr(self, self.current_span));
         }

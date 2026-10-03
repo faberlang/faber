@@ -161,8 +161,9 @@ impl Parser {
     /// Parse an `itera` loop and its ownership mode.
     ///
     /// GRAMMAR:
-    ///   itera-stmt := `itera` ((`ex`|`ab`) expr (`,` expr)* | `de` expr) [apud-clause] (`fixum`|`varia`) itera-binding if-body [`cape` ident block]
+    ///   itera-stmt := `itera` ((`ex`|`ab`) expr (`,` expr)* | `de` expr) [apud-clause] [filum-clause] (`fixum`|`varia`) itera-binding if-body [`cape` ident block]
     ///   apud-clause := `apud` `[` IDENTIFIER (`,` IDENTIFIER)* `]`
+    ///   filum-clause := `filum` IDENTIFIER
     ///   itera-binding := array-pattern | object-pattern | IDENTIFIER (`,` IDENTIFIER)*
     ///
     /// The parser records the source preposition mode; later phases validate
@@ -195,6 +196,19 @@ impl Parser {
             self.parse_apud_clause()?
         } else {
             Vec::new()
+        };
+        // The lane-binder clause rides the shared itera head, in the same
+        // position as `summa`'s (`filum` is claimed by registry identity
+        // only here). The binder is declared metadata; lowering owns what
+        // it binds and the runner lowers the plain loop.
+        let filum = if matches!(
+            self.peek().kind,
+            TokenKind::Ident(sym) if self.keyword_claim_key(sym) == Some("filum")
+        ) {
+            self.advance();
+            Some(self.parse_ident()?)
+        } else {
+            None
         };
 
         let mutability_span = self.current_span();
@@ -233,6 +247,7 @@ impl Parser {
             mode,
             sources,
             apud,
+            filum,
             mutability,
             bindings,
             body,

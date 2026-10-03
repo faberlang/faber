@@ -660,6 +660,7 @@ fn itera_expr(
         kind: HirExpressionKind::Itera {
             mode,
             coordinates,
+            filum: None,
             binding: DefId(50),
             binding_name: crate::lexer::Symbol(1),
             iter: Box::new(source),

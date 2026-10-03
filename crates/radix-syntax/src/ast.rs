@@ -831,6 +831,9 @@ pub struct IteraStmt {
     /// Coordinate names from the optional `apud`/`at` clause, in source order.
     /// Semantic binding is intentionally deferred to the iteration lowering unit.
     pub apud: Vec<Ident>,
+    /// Optional lane binder from the `filum` clause (declared metadata only;
+    /// the runner lowers the plain loop).
+    pub filum: Option<Ident>,
     pub mutability: AstMutability,
     /// Binder patterns in source order, one per source (enforced in semantic:
     /// patterns bind only the single-source form; the series binds names).

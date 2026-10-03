@@ -239,7 +239,8 @@ fn row_loops_count_one_each() {
             binding_name: Symbol(1),
             iter: boxed(HirExpressionKind::Literal(HirLiteral::Nil)),
             body: body_block.clone(),
-            mutable: false
+            mutable: false,
+            filum: None,
         })]),
         2,
         "Itera"

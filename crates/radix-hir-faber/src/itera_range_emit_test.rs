@@ -7,7 +7,9 @@
 
 use crate::surface::{KeywordSurface, TypeBindingKind};
 use radix_codegen_shared::CodeWriter;
-use radix_hir::{HirBlock, HirExpression, HirExpressionKind, HirId, HirLiteral, HirRangeKind};
+use radix_hir::{
+    HirBlock, HirExpression, HirExpressionKind, HirId, HirIteraMode, HirLiteral, HirRangeKind,
+};
 use radix_lexer::{Interner, KeywordPack, Span, Symbol, TokenKind};
 use radix_syntax::{BindingPattern, IteraMode, StmtKind};
 use radix_types::{DefId, TypeTable, USER_DEF_ID_BASE};
@@ -54,6 +56,9 @@ impl KeywordSurface for EnSurface {
             "ab" => "range",
             "fixum" => "const",
             "varia" => "var",
+            // The `en` pack's filum row (`filum = "thread"`), as emitted by
+            // the locale-backed surface bridge.
+            "filum" => "thread",
             key => key,
         }
     }
@@ -80,9 +85,11 @@ impl KeywordPack for EnPack {
         match text {
             "for" => Some("itera"),
             "from" => Some("ex"),
+            "at" => Some("apud"),
             "range" => Some("ab"),
             "const" => Some("fixum"),
             "var" => Some("varia"),
+            "thread" => Some("filum"),
             _ => None,
         }
     }
@@ -278,4 +285,68 @@ fn english_mutable_binder_emits_var() {
         "mutable English head must keep var, got:\n{code}"
     );
     assert_round_trips(&code, 2, 2, true);
+}
+
+#[test]
+fn filum_lane_binder_round_trips_on_single_source_itera() {
+    // BUG-4D4D0AE9 (K2): the declared lane binder re-emits in the shared
+    // clause position (after `apud`, before the mutability marker) in both
+    // surfaces, and the emitted head re-parses with the binder preserved.
+    let build = |ctx: &mut Ctx| {
+        let (binding, binding_name) = ctx.binder("v");
+        let (filum_def, filum_name) = ctx.binder("f");
+        let coordinates = vec![ctx.binder("i")];
+        expr(HirExpressionKind::Itera {
+            mode: HirIteraMode::Ex,
+            coordinates,
+            filum: Some((filum_def, filum_name)),
+            binding,
+            binding_name,
+            iter: Box::new(int_range(0, 3)),
+            body: HirBlock::simple(Vec::new(), None, Span::new(0, 0)),
+            mutable: false,
+        })
+    };
+
+    let mut ctx = Ctx::new();
+    let lane_itera = build(&mut ctx);
+    let code = ctx.render(&lane_itera, &LatinSurface);
+    assert!(
+        code.starts_with("itera ex 0‥3 apud [i] filum f fixum v {"),
+        "Latin head must keep the lane-binder clause, got:\n{code}"
+    );
+    let lexed = radix_lexer::lex(&code);
+    let parsed = radix_parser::parse(lexed);
+    assert!(
+        parsed.success(),
+        "emitted Latin head must re-parse, got:\n{code}\nerrors: {:?}",
+        parsed.errors
+    );
+    let program = parsed.program.as_ref().expect("program");
+    let StmtKind::Itera(iter) = &program.statements[0].kind else {
+        panic!("expected itera statement, got:\n{code}");
+    };
+    let filum = iter.filum.as_ref().expect("filum clause survives re-parse");
+    assert_eq!(parsed.interner.resolve(filum.name), "f");
+
+    let mut ctx = Ctx::new();
+    let lane_itera = build(&mut ctx);
+    let code = ctx.render(&lane_itera, &EnSurface);
+    assert!(
+        code.starts_with("for from 0‥3 at [i] thread f const v {"),
+        "English head must project the pack's filum row, got:\n{code}"
+    );
+    let lexed = radix_lexer::lex_with_locale_pack(&code, &EnPack);
+    let parsed = radix_parser::parse(lexed);
+    assert!(
+        parsed.success(),
+        "emitted English head must re-parse, got:\n{code}\nerrors: {:?}",
+        parsed.errors
+    );
+    let program = parsed.program.as_ref().expect("program");
+    let StmtKind::Itera(iter) = &program.statements[0].kind else {
+        panic!("expected itera statement, got:\n{code}");
+    };
+    let filum = iter.filum.as_ref().expect("filum clause survives re-parse");
+    assert_eq!(parsed.interner.resolve(filum.name), "f");
 }

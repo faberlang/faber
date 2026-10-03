@@ -794,10 +794,10 @@ fn ar2_facts(source: &str) -> Ar2Facts {
 #[test]
 fn ar2_dum_and_itera_variants_carry_no_catch_field() {
     // Compile-time carrier-shape pin (AR-2): `Dum` is (cond, block) and
-    // `Itera` is the 6-field mode+bindings+source+body form — neither has a
-    // catch slot, so a per-iteration handler cannot be represented on the
-    // loop node itself. This match fails to compile if either variant gains
-    // (or drops) a field.
+    // `Itera` is the mode+bindings+source+body form (its `filum` slot is
+    // declared metadata, never a catch) — neither has a catch slot, so a
+    // per-iteration handler cannot be represented on the loop node itself.
+    // This match fails to compile if either variant gains (or drops) a field.
     let _ = |kind: &radix_hir::HirExpressionKind| match kind {
         radix_hir::HirExpressionKind::Dum(cond, block) => {
             // Carrier-shape pin: the field really is Box<HirExpression>.
@@ -808,6 +808,7 @@ fn ar2_dum_and_itera_variants_carry_no_catch_field() {
         radix_hir::HirExpressionKind::Itera {
             mode,
             coordinates: bindings,
+            filum: None,
             binding: index_def,
             binding_name: index_name,
             iter: source,
