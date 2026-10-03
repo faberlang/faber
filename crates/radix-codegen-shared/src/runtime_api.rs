@@ -491,9 +491,8 @@ pub const FORMAT_SIGNED: RuntimeItem = format_row("signed", RuntimeKind::Fn, FOR
 pub const FORMAT_TEXT: RuntimeItem = format_row("text", RuntimeKind::Fn, FORMAT_RUST_GO_TS);
 
 /// The targets whose runtime package carries a `tensor`, `vector` or `sparsa`
-/// row. Only the Go runtime (`rt.Tensor*`, `rt.Vector*`, `rt.Sparsa*`,
-/// `faber/runtime/go/{tensor,vector,sparsa}.go`) carries them on this table
-/// today.
+/// row. Go carries its flat carrier and free-function rows; TypeScript shares
+/// the tensor and sparse types and carries matrix and normalization rows.
 const SHAPED_GO: &[Target] = &[Target::HirGo];
 
 const fn shaped_row(ns: Namespace, name: &'static str, kind: RuntimeKind) -> RuntimeItem {
@@ -514,7 +513,10 @@ const fn shaped_row(ns: Namespace, name: &'static str, kind: RuntimeKind) -> Run
 /// tensor), the dense-to-sparse conversion, the width-checked vector
 /// constructor and the sparse vacua constructor. No row applies a width limit:
 /// a carrier computes in its element type and never stores into a bounded cell.
-pub const TENSOR_TENSOR: RuntimeItem = shaped_row(Namespace::Tensor, "Tensor", RuntimeKind::Type);
+pub const TENSOR_TENSOR: RuntimeItem = RuntimeItem {
+    targets: &[Target::HirGo, Target::HirTypeScript],
+    ..shaped_row(Namespace::Tensor, "Tensor", RuntimeKind::Type)
+};
 pub const TENSOR_ELEMENT_COUNT: RuntimeItem =
     shaped_row(Namespace::Tensor, "element_count", RuntimeKind::Fn);
 pub const TENSOR_TO_SPARSA: RuntimeItem =
@@ -522,7 +524,24 @@ pub const TENSOR_TO_SPARSA: RuntimeItem =
 pub const VECTOR_VECTOR: RuntimeItem = shaped_row(Namespace::Vector, "Vector", RuntimeKind::Type);
 pub const VECTOR_FROM_LIST: RuntimeItem =
     shaped_row(Namespace::Vector, "from_list", RuntimeKind::Fn);
-pub const SPARSA_SPARSA: RuntimeItem = shaped_row(Namespace::Sparsa, "Sparsa", RuntimeKind::Type);
+pub const SPARSA_SPARSA: RuntimeItem = RuntimeItem {
+    targets: &[Target::HirGo, Target::HirTypeScript],
+    ..shaped_row(Namespace::Sparsa, "Sparsa", RuntimeKind::Type)
+};
+/// TypeScript shaped-carrier rows. Operations remain methods of the carriers;
+/// normalization is a free function rather than an Array prototype extension.
+pub const MATRIX_MATRIX: RuntimeItem = RuntimeItem {
+    ns: Namespace::Matrix,
+    name: "Matrix",
+    kind: RuntimeKind::Type,
+    targets: &[Target::HirTypeScript],
+};
+pub const VECTOR_NORMALIZE: RuntimeItem = RuntimeItem {
+    ns: Namespace::Vector,
+    name: "normalize",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirTypeScript],
+};
 pub const SPARSA_NEW: RuntimeItem = shaped_row(Namespace::Sparsa, "new", RuntimeKind::Fn);
 
 /// The targets whose runtime package carries an `order`, `intervallum`, `tuple`,
@@ -967,6 +986,8 @@ pub const TABLE: &[RuntimeItem] = &[
     FORMAT_SIGNED,
     FORMAT_TEXT,
     TENSOR_TENSOR,
+    MATRIX_MATRIX,
+    VECTOR_NORMALIZE,
     TENSOR_ELEMENT_COUNT,
     TENSOR_TO_SPARSA,
     VECTOR_VECTOR,
