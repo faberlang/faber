@@ -146,15 +146,14 @@ impl TensorExpansion {
         self.source_axes
             .iter()
             .enumerate()
-            .filter_map(|(source_axis, &target_axis)| {
-                (self.source_shape[source_axis] != 1).then(|| {
-                    (
-                        target_axis,
-                        self.result_shape[target_axis + 1..].iter().product(),
-                        self.result_shape[target_axis],
-                        self.source_shape[source_axis + 1..].iter().product(),
-                    )
-                })
+            .filter(|(source_axis, _)| self.source_shape[*source_axis] != 1)
+            .map(|(source_axis, &target_axis)| {
+                (
+                    target_axis,
+                    self.result_shape[target_axis + 1..].iter().product(),
+                    self.result_shape[target_axis],
+                    self.source_shape[source_axis + 1..].iter().product(),
+                )
             })
             .collect()
     }

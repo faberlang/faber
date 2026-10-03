@@ -2046,7 +2046,7 @@ fn inline_place_temps(
     HirExpression {
         id: expr.id,
         kind,
-        ty: expr.ty.clone(),
+        ty: expr.ty,
         span: expr.span,
     }
 }

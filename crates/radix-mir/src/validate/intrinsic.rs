@@ -75,7 +75,7 @@ impl Validator<'_, '_> {
                 receiver_ty,
                 shape_ty,
                 call.return_ty,
-                &self.context,
+                self.context,
             )
             .is_none()
             {
