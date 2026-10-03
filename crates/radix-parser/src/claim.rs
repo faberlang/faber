@@ -18,6 +18,7 @@ use radix_syntax::{
     BlockStmt, CapeClause, ClassMemberKind, FuncDecl, IfBody, ProbandumDecl, Program, SecusClause,
     Stmt, StmtKind, Trivia,
 };
+use radix_syntax::{Visitor, walk_stmt};
 use std::collections::HashSet;
 
 /// Stable `issue` sub-variant for the invalid-placement diagnostic identity.
@@ -68,6 +69,33 @@ fn claim_program(program: &Program, claimed: &mut HashSet<u32>) {
     }
     for stmt in &program.statements {
         claim_stmt(stmt, claimed);
+    }
+
+    // The hand-written carrier walk above covers statement/declaration trivia.
+    // Reuse the syntax tree walker for blocks nested inside expressions too:
+    // closure, comptime, and trap bodies are expression-owned, not statement
+    // children of the surrounding block.
+    let mut expression_blocks = ExpressionBlockTrivia { claimed };
+    for stmt in &program.statements {
+        expression_blocks.visit_stmt(stmt);
+    }
+}
+
+struct ExpressionBlockTrivia<'a> {
+    claimed: &'a mut HashSet<u32>,
+}
+
+impl Visitor for ExpressionBlockTrivia<'_> {
+    fn visit_stmt(&mut self, stmt: &Stmt) {
+        claim_trivia(&stmt.leading_trivia, self.claimed);
+        walk_stmt(self, stmt);
+    }
+
+    fn visit_block(&mut self, block: &BlockStmt) {
+        claim_trivia(&block.end_trivia, self.claimed);
+        for stmt in &block.statements {
+            self.visit_stmt(stmt);
+        }
     }
 }
 
