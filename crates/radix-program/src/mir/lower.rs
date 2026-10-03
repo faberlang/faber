@@ -1,5 +1,7 @@
 //! Lower package units (and libraries) into the merged package MIR program.
 
+use radix_module::driver::AnalyzedModule;
+
 use super::{
     AnalyzedProgram, AnalyzedProgramNode, BTreeMap, CliEntryRecords, CliPackagePlan,
     CliRecordTypeRewrite, DataMemberLink, DefId, Diagnostic, HashMap, HashSet, HirConst,
@@ -908,7 +910,8 @@ pub(super) fn lower_package_units<'a>(
     // `Path(synthetic_def)` member references then materialize through the
     // entry's existing top-level-const seam.
     inject_package_data_members(
-        entry,
+        &entry.path,
+        &mut entry.analysis,
         others.values(),
         links,
         library_resolver,
@@ -923,7 +926,7 @@ pub(super) fn lower_package_units<'a>(
     // the linked members into every sibling reader before it lowers, so the
     // rewritten path materializes through that unit's own top-level-const
     // seam (same data-member ABI as the entry).
-    let sibling_reader_paths: HashSet<&PathBuf> = links
+    let data_member_reader_paths: HashSet<&PathBuf> = links
         .data_member_targets
         .keys()
         .map(|(caller_path, _, _)| caller_path)
@@ -931,13 +934,14 @@ pub(super) fn lower_package_units<'a>(
         .collect();
     let sibling_reader_ids: Vec<ModuleId> = others
         .iter()
-        .filter(|(_, unit)| sibling_reader_paths.contains(&unit.path))
+        .filter(|(_, unit)| data_member_reader_paths.contains(&unit.path))
         .map(|(id, _)| id.clone())
         .collect();
     for id in sibling_reader_ids {
         let (_, mut reader) = others.remove_entry(&id).expect("reader id from map");
         let injection = inject_package_data_members(
-            &mut reader,
+            &reader.path,
+            &mut reader.analysis,
             others.values(),
             links,
             library_resolver,
@@ -945,6 +949,37 @@ pub(super) fn lower_package_units<'a>(
         );
         others.insert(id, reader);
         injection?;
+    }
+    // Cached library analyses sit outside `others`, but their namespace
+    // const reads use the same synthetic paths. Inject while package source
+    // analyses are still borrowable; pending sibling MIR retains their borrows.
+    for library in &links.libraries {
+        if !data_member_reader_paths.contains(&library.path) {
+            continue;
+        }
+        let mut diagnostics = Vec::new();
+        with_library_cached_analysis_mut(
+            &library.import,
+            library_resolver,
+            library_cache,
+            |analysis, cache| {
+                if let Err(errors) = inject_package_data_members(
+                    &library.path,
+                    analysis,
+                    std::iter::once(&*entry).chain(others.values()),
+                    links,
+                    library_resolver,
+                    cache,
+                ) {
+                    diagnostics.extend(errors);
+                }
+                Ok(())
+            },
+        )
+        .map_err(|diagnostic| vec![diagnostic])?;
+        if !diagnostics.is_empty() {
+            return Err(diagnostics);
+        }
     }
     let mut pending = Vec::new();
     let mut extra_validation = RemappedValidation::default();
@@ -1656,9 +1691,8 @@ pub(super) fn lower_package_units<'a>(
 }
 
 /// Transplant linked const data members into a target unit's analysis before
-/// that unit lowers (S1 data-member ABI). The target is the entry unit or a
-/// sibling unit whose function bodies read another unit's const through the
-/// namespace member rewrite.
+/// that unit lowers (S1 data-member ABI). Entry, sibling, and library readers
+/// use the same bindings for const reads rewritten to synthetic paths.
 ///
 /// Each linked const is re-interned into the target interner and its type is
 /// imported into the target type table, then injected as a synthetic
@@ -1667,7 +1701,8 @@ pub(super) fn lower_package_units<'a>(
 /// `Path(synthetic_def)` member references materialize through the existing
 /// top-level-const seam.
 fn inject_package_data_members<'a>(
-    target: &mut AnalyzedProgramNode,
+    target_path: &Path,
+    target: &mut AnalyzedModule,
     others: impl IntoIterator<Item = &'a AnalyzedProgramNode>,
     links: &PackageMirLinks,
     library_resolver: &LibraryResolver,
@@ -1675,7 +1710,6 @@ fn inject_package_data_members<'a>(
 ) -> Result<(), Vec<Diagnostic>> {
     let others = others.into_iter().collect::<Vec<_>>();
     let mut diagnostics = Vec::new();
-    let target_path = target.path.clone();
     // Const-to-const references inside linked initializers (`ELEMENTS ← N *
     // K`) rewrite through the linked-const entries of `links.sources`. The
     // map keeps only synthetic ids that belong to a transplanted const data
@@ -1698,8 +1732,8 @@ fn inject_package_data_members<'a>(
     let no_rewrites = HashMap::new();
     for member in &links.data_members {
         if member.source_path == target_path {
-            // Same-unit consts already lower through the target's own
-            // top-level-const seam; the linker never registers those.
+            // Same-unit reads already use the target's original const
+            // definitions rather than rewritten namespace member paths.
             continue;
         }
         // The source analysis is borrowed from the sibling nodes (disjoint
@@ -1738,7 +1772,7 @@ fn inject_package_data_members<'a>(
         let Some((source_interner, source_types, source_resolver, source_interface)) = source
         else {
             diagnostics.push(mir_issue_diag(
-                &target_path,
+                target_path,
                 "package_mir_data_member_unsupported",
                 format!(
                     "package MIR could not find const data member source unit `{}`",
@@ -1761,14 +1795,14 @@ fn inject_package_data_members<'a>(
             Ok(item) => item,
             Err(message) => {
                 diagnostics.push(mir_issue_diag(
-                    &target_path,
+                    target_path,
                     "package_mir_data_member_unsupported",
                     message,
                 ));
                 continue;
             }
         };
-        target.analysis.hir.items.push(item);
+        target.hir.items.push(item);
     }
     if diagnostics.is_empty() {
         Ok(())
@@ -1787,7 +1821,7 @@ fn transplant_data_member(
     source_resolver: &Resolver,
     source_interface: &FileInterface,
     const_path_rewrites: &HashMap<DefId, DefId>,
-    target: &mut AnalyzedProgramNode,
+    target: &mut AnalyzedModule,
 ) -> Result<HirItem, String> {
     let mut imported = HashMap::new();
     let source_exports = exported_nominal_names(source_interface);
@@ -1800,19 +1834,16 @@ fn transplant_data_member(
         source_resolver,
         source_interface.identity.as_ref(),
         &source_exports,
-        &target.analysis,
+        target,
         &HashMap::new(),
     )?;
     let empty_def_remap = HashMap::new();
     let empty_source_names = HashMap::new();
     let empty_shared_nominals = HashMap::new();
     let param_symbols =
-        super::intern_param_symbols(source_types, source_interner, &mut target.analysis.interner);
-    let record_field_symbols = super::intern_record_field_symbols(
-        source_types,
-        source_interner,
-        &mut target.analysis.interner,
-    );
+        super::intern_param_symbols(source_types, source_interner, &mut target.interner);
+    let record_field_symbols =
+        super::intern_record_field_symbols(source_types, source_interner, &mut target.interner);
     let nominal = NominalImportContext {
         nominal_map: &nominal_map,
         def_remap: &empty_def_remap,
@@ -1822,15 +1853,11 @@ fn transplant_data_member(
         record_field_symbols: &record_field_symbols,
     };
     let konst = HirConst {
-        name: remap_symbol(
-            member.konst.name,
-            source_interner,
-            &mut target.analysis.interner,
-        ),
+        name: remap_symbol(member.konst.name, source_interner, &mut target.interner),
         ty: member.konst.ty.map(|ty| {
             import_semantic_type_with_nominal(
                 source_types,
-                &mut target.analysis.types,
+                &mut target.types,
                 ty,
                 &mut imported,
                 Some(&nominal),
@@ -1840,8 +1867,8 @@ fn transplant_data_member(
             &member.konst.value,
             source_interner,
             source_types,
-            &mut target.analysis.interner,
-            &mut target.analysis.types,
+            &mut target.interner,
+            &mut target.types,
             &mut imported,
             Some(&nominal),
             const_path_rewrites,

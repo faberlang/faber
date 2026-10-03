@@ -74,6 +74,7 @@ pub mod builtins;
 pub mod cli;
 pub mod coverage;
 pub mod file_interface;
+mod file_interface_default;
 pub mod kernel;
 pub mod live_tuus_cursor;
 pub mod locale;

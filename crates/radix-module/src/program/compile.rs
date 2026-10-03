@@ -855,7 +855,14 @@ fn apply_static_field_defaults(interface: &mut FileInterface, provider: &crate::
             };
             let field_name = unit.interner.resolve(field.name).to_owned();
             if let Some(interface_field) = export.fields.iter_mut().find(|f| f.name == field_name) {
-                interface_field.default = Some(init.clone());
+                interface_field.default = crate::file_interface::InterfaceFieldDefault::snapshot(
+                    init,
+                    &unit.types,
+                    &unit.interner,
+                    &unit.resolver,
+                    interface.identity.as_ref(),
+                )
+                .ok();
             }
         }
     }

@@ -1646,15 +1646,22 @@ impl Resolver {
                     .iter()
                     .filter_map(|field| {
                         match import_interface_type_with_resolver(&field.ty, types, interner, self)
-                        {
-                            Ok(ty) => Some(ImportedFileStructField {
+                            .and_then(|ty| {
+                                let init = field
+                                    .default
+                                    .as_ref()
+                                    .map(|default| default.import(types, interner, self))
+                                    .transpose()?;
+                                Ok((ty, init))
+                            }) {
+                            Ok((ty, init)) => Some(ImportedFileStructField {
                                 name: interner.intern(&field.name),
                                 ty,
                                 optional: field.optional,
                                 required: field.required,
                                 modifier: field.modifier,
                                 visibility: field.visibility,
-                                init: field.default.clone(),
+                                init,
                             }),
                             Err(_) => {
                                 payload_unresolved = true;
@@ -1877,6 +1884,26 @@ impl Resolver {
                     continue;
                 }
             };
+            let init = match field
+                .default
+                .as_ref()
+                .map(|default| default.import(types, interner, self))
+                .transpose()
+            {
+                Ok(init) => init,
+                Err(err) => {
+                    skipped.push(FileInterfaceSkippedExport::from_error(
+                        namespace,
+                        identity,
+                        Some(&strukt.name),
+                        kind,
+                        &field.name,
+                        projected_surfaces,
+                        &err,
+                    ));
+                    continue;
+                }
+            };
             imported.push(ImportedFileStructField {
                 name: interner.intern(&field.name),
                 ty,
@@ -1884,7 +1911,7 @@ impl Resolver {
                 required: field.required,
                 modifier: field.modifier,
                 visibility: field.visibility,
-                init: field.default.clone(),
+                init,
             });
         }
         (imported, skipped)
