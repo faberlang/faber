@@ -482,6 +482,13 @@ pub(crate) fn normalize_presentation_witnesses(
 /// owner. Move only that producer-side spelling mismatch; enum and schema
 /// field sites already use the validator's accepted owner shape.
 fn remap_struct_field_sites(hir: &radix_hir::HirModule, presentation: &mut radix_hir::HirPresentation) {
+    let mut authored_by_site = FxHashMap::default();
+    for authored in &mut presentation.authored_types {
+        // Preserve the first-match rule without changing serialized site order.
+        authored_by_site
+            .entry(authored.site.clone())
+            .or_insert(authored);
+    }
     for item in &hir.items {
         let radix_hir::HirItemKind::Struct(strukt) = &item.kind else {
             continue;
@@ -491,11 +498,7 @@ fn remap_struct_field_sites(hir: &radix_hir::HirModule, presentation: &mut radix
                 owner: radix_hir::HirOwnerRef::Def(field.def_id),
                 slot: radix_hir::HirTypeSlot::Field(ordinal as u32),
             };
-            if let Some(authored) = presentation
-                .authored_types
-                .iter_mut()
-                .find(|entry| entry.site == old_site)
-            {
+            if let Some(authored) = authored_by_site.get_mut(&old_site) {
                 authored.site.owner = radix_hir::HirOwnerRef::Def(item.def_id);
             }
         }
