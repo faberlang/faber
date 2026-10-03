@@ -4,9 +4,9 @@
 //! binary embeds the compressed bytes and decompresses only the selected
 //! locale at runtime.
 //!
-//! It also stamps `FABER_HOSTS_PINNED_REV` from the release manifest's hosts
-//! source pin (`release-manifest.yaml`), so the rev the generated manifests
-//! emit equals the manifest pin by construction.
+//! It also stamps the faber runtime and hosts source pins from the release
+//! manifest (`release-manifest.yaml`), so generated manifests emit the exact
+//! commits selected by release inputs.
 
 use flate2::Compression;
 use flate2::write::GzEncoder;
@@ -30,39 +30,46 @@ fn main() {
         compress_pack(&locale_root, &artifact_dir, locale);
     }
 
-    stamp_hosts_pinned_rev(&manifest_dir.join("../../release-manifest.yaml"));
+    stamp_source_revisions(&manifest_dir.join("../../release-manifest.yaml"));
 }
 
-/// Export the hosts source pin (`pinnedInputs.source[name = hosts].commit`) as
-/// the `FABER_HOSTS_PINNED_REV` compile-time env. `commit:` rows exist only in
-/// that list, so a name-to-commit scan cannot cross into other sections.
-fn stamp_hosts_pinned_rev(manifest: &Path) {
+/// Export the faber runtime and hosts source pins from `pinnedInputs.source`.
+/// Source commit rows are scoped by their `- name:` row, so unrelated
+/// `commit:` fields elsewhere in the release manifest cannot become pins.
+fn stamp_source_revisions(manifest: &Path) {
     println!("cargo:rerun-if-changed={}", manifest.display());
     let text = fs::read_to_string(manifest).unwrap_or_else(|err| {
         panic!("read release manifest {}: {err}", manifest.display());
     });
-    let mut source_name: Option<&str> = None;
-    let mut hosts_commit: Option<&str> = None;
-    for line in text.lines() {
-        let trimmed = line.trim_start();
-        if let Some(name) = trimmed.strip_prefix("- name:") {
-            source_name = Some(name.trim().trim_matches('"'));
-        } else if let Some(commit) = trimmed.strip_prefix("commit:") {
-            if source_name == Some("hosts") {
-                hosts_commit = Some(commit.trim().trim_matches('"'));
-                break;
+    for source in ["faber", "hosts"] {
+        let mut source_name: Option<&str> = None;
+        let mut source_commit: Option<&str> = None;
+        for line in text.lines() {
+            let trimmed = line.trim_start();
+            if let Some(name) = trimmed.strip_prefix("- name:") {
+                source_name = Some(name.trim().trim_matches('"'));
+            } else if let Some(commit) = trimmed.strip_prefix("commit:") {
+                if source_name == Some(source) {
+                    source_commit = Some(commit.trim().trim_matches('"'));
+                    break;
+                }
             }
         }
+        let commit = source_commit.unwrap_or_else(|| {
+            panic!("{} has no source row named {source}", manifest.display());
+        });
+        assert!(
+            commit.len() == 40 && commit.bytes().all(|b| b.is_ascii_hexdigit()),
+            "{}: {source} source pin {commit:?} is not a 40-hex commit",
+            manifest.display()
+        );
+        let variable = match source {
+            "faber" => "FABER_RUNTIME_PINNED_REV",
+            "hosts" => "FABER_HOSTS_PINNED_REV",
+            _ => unreachable!(),
+        };
+        println!("cargo:rustc-env={variable}={commit}");
     }
-    let commit = hosts_commit.unwrap_or_else(|| {
-        panic!("{} has no source row named hosts", manifest.display());
-    });
-    assert!(
-        commit.len() == 40 && commit.bytes().all(|b| b.is_ascii_hexdigit()),
-        "{}: hosts source pin {commit:?} is not a 40-hex commit",
-        manifest.display()
-    );
-    println!("cargo:rustc-env=FABER_HOSTS_PINNED_REV={commit}");
 }
 
 fn compress_pack(locale_root: &Path, artifact_dir: &Path, locale: &str) {
