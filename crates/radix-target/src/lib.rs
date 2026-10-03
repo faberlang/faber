@@ -109,36 +109,42 @@ pub enum Target {
 
 impl fmt::Display for Target {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Target::MirStepper => write!(f, "stepper"),
-            Target::HirRust => write!(f, "rust"),
-            Target::HirTypeScript => write!(f, "ts"),
-            Target::HirGo => write!(f, "go"),
-            Target::HirSwift => write!(f, "swift"),
-            Target::HirPython => write!(f, "python"),
-            Target::HirHaskell => write!(f, "haskell"),
-            Target::HirPascal => write!(f, "pascal"),
-            Target::HirCobol => write!(f, "cobol"),
-            Target::HirFortran => write!(f, "fortran"),
-            Target::HirFaber => write!(f, "faber"),
-            Target::HirFhir => write!(f, "fhir"),
-            Target::MirWasm => write!(f, "wasm-text"),
-            Target::MirLlvm => write!(f, "llvm-text"),
-            Target::MirLlvmHost => write!(f, "llvm-host"),
-            Target::MirAmd => write!(f, "amd"),
-            Target::MirMetal => write!(f, "metal-text"),
-            Target::MirWgsl => write!(f, "wgsl-text"),
-            Target::MirSexp => write!(f, "sexp"),
-            Target::MirBasic => write!(f, "basic"),
-            Target::MirScena => write!(f, "scena"),
-            Target::MirFmir => write!(f, "fmir-text"),
-            Target::MirFmirBinary => write!(f, "fmir"),
-            Target::MirFmirBundle => write!(f, "fmir-bin"),
-        }
+        f.write_str(self.as_str())
     }
 }
 
 impl Target {
+    /// Canonical target spelling, shared by display and compiler services.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Target::MirStepper => "stepper",
+            Target::HirRust => "rust",
+            Target::HirTypeScript => "ts",
+            Target::HirGo => "go",
+            Target::HirSwift => "swift",
+            Target::HirPython => "python",
+            Target::HirHaskell => "haskell",
+            Target::HirPascal => "pascal",
+            Target::HirCobol => "cobol",
+            Target::HirFortran => "fortran",
+            Target::HirFaber => "faber",
+            Target::HirFhir => "fhir",
+            Target::MirWasm => "wasm-text",
+            Target::MirLlvm => "llvm-text",
+            Target::MirLlvmHost => "llvm-host",
+            Target::MirAmd => "amd",
+            Target::MirMetal => "metal-text",
+            Target::MirWgsl => "wgsl-text",
+            Target::MirSexp => "sexp",
+            Target::MirBasic => "basic",
+            Target::MirScena => "scena",
+            Target::MirFmir => "fmir-text",
+            Target::MirFmirBinary => "fmir",
+            Target::MirFmirBundle => "fmir-bin",
+        }
+    }
+
     /// Parse a canonical target spelling into a [`Target`].
     ///
     /// Exact inverse of [`fmt::Display`]: every canonical spelling

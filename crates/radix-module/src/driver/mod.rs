@@ -4498,32 +4498,7 @@ fn radix_lane_target_error(lane: RadixLane, target: Target, file: &str) -> Optio
 }
 
 fn target_display_name(target: Target) -> &'static str {
-    match target {
-        Target::MirStepper => "stepper",
-        Target::HirRust => "rust",
-        Target::HirFaber => "faber",
-        Target::HirTypeScript => "ts",
-        Target::HirGo => "go",
-        Target::HirSwift => "swift",
-        Target::HirPython => "python",
-        Target::HirHaskell => "haskell",
-        Target::HirPascal => "pascal",
-        Target::HirCobol => "cobol",
-        Target::HirFortran => "fortran",
-        Target::MirWasm => "wasm-text",
-        Target::MirLlvm => "llvm-text",
-        Target::MirLlvmHost => "llvm-host",
-        Target::MirAmd => "amd",
-        Target::MirMetal => "metal-text",
-        Target::MirWgsl => "wgsl-text",
-        Target::MirSexp => "sexp",
-        Target::MirBasic => "basic",
-        Target::MirScena => "scena",
-        Target::MirFmir => "fmir-text",
-        Target::MirFmirBinary => "fmir",
-        Target::MirFmirBundle => "fmir-bin",
-        Target::HirFhir => "fhir",
-    }
+    target.as_str()
 }
 
 fn retarget_cli_program_symbols(

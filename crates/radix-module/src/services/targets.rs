@@ -106,46 +106,12 @@ pub fn target_extension(target: crate::codegen::Target) -> &'static str {
     }
 }
 
-/// The canonical CLI spelling table (defect-audit P6-3: one copy, owned
-/// here and re-exported through the `radix` façade; the `radix-cli`
-/// private duplicate is gone). Spellings equal `Target`'s `Display`;
-/// `target_name_table_matches_display` pins that agreement.
+/// Return the canonical CLI spelling owned by [`crate::codegen::Target`].
 ///
-/// The `MirAmd`, `MirScena`, and `MirStepper` spellings have no
-/// CLI-selectable row (they are the hidden delta of
-/// [`DISCOVERABLE_TARGET_ROWS`]), but the arms stay exhaustive and are
-/// **reachable by construction** (defect-audit S10-12):
-/// `target_name_table_matches_display` walks all of `Target::ALL` and
-/// executes every arm, and the table is a public API callable with any
-/// variant.
+/// This includes hidden targets without a [`DISCOVERABLE_TARGET_ROWS`] entry.
 #[must_use]
 pub fn target_name(target: crate::codegen::Target) -> &'static str {
-    match target {
-        crate::codegen::Target::MirStepper => "stepper",
-        crate::codegen::Target::HirRust => "rust",
-        crate::codegen::Target::HirFaber => "faber",
-        crate::codegen::Target::HirTypeScript => "ts",
-        crate::codegen::Target::HirGo => "go",
-        crate::codegen::Target::HirSwift => "swift",
-        crate::codegen::Target::HirPython => "python",
-        crate::codegen::Target::HirHaskell => "haskell",
-        crate::codegen::Target::HirPascal => "pascal",
-        crate::codegen::Target::HirCobol => "cobol",
-        crate::codegen::Target::HirFortran => "fortran",
-        crate::codegen::Target::MirWasm => "wasm-text",
-        crate::codegen::Target::MirLlvm => "llvm-text",
-        crate::codegen::Target::MirLlvmHost => "llvm-host",
-        crate::codegen::Target::MirAmd => "amd",
-        crate::codegen::Target::MirMetal => "metal-text",
-        crate::codegen::Target::MirWgsl => "wgsl-text",
-        crate::codegen::Target::MirSexp => "sexp",
-        crate::codegen::Target::MirBasic => "basic",
-        crate::codegen::Target::MirScena => "scena",
-        crate::codegen::Target::MirFmir => "fmir-text",
-        crate::codegen::Target::MirFmirBinary => "fmir",
-        crate::codegen::Target::MirFmirBundle => "fmir-bin",
-        crate::codegen::Target::HirFhir => "fhir",
-    }
+    target.as_str()
 }
 
 /// Return current command-surface support for a backend target.

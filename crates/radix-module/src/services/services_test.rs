@@ -391,10 +391,8 @@ fn discoverable_targets_equal_universe_minus_hidden() {
 
 #[test]
 fn target_name_table_matches_display() {
-    // P6-3: the name table is the single canonical copy, and it must agree
-    // with `Target`'s `Display` — `faber targets` derives row names from
-    // `Display` while `radix targets` prints this table, so drift would
-    // split the two reports' spellings of the same backend.
+    // Service names and Display must share the target-owned canonical spelling,
+    // including hidden targets without a discovery row.
     for target in crate::codegen::Target::ALL {
         assert_eq!(
             target_name(*target),

@@ -445,32 +445,7 @@ fn module_key(module: &ModuleId) -> String {
 }
 
 pub(crate) fn target_name(target: Target) -> &'static str {
-    match target {
-        Target::MirStepper => "stepper",
-        Target::HirRust => "rust",
-        Target::HirTypeScript => "ts",
-        Target::HirGo => "go",
-        Target::HirFaber => "faber",
-        Target::MirWasm => "wasm-text",
-        Target::MirLlvm => "llvm-text",
-        Target::MirLlvmHost => "llvm-host",
-        Target::MirAmd => "amd",
-        Target::MirMetal => "metal-text",
-        Target::MirWgsl => "wgsl-text",
-        Target::MirSexp => "sexp",
-        Target::MirBasic => "basic",
-        Target::MirScena => "scena",
-        Target::MirFmir => "fmir-text",
-        Target::MirFmirBinary => "fmir",
-        Target::MirFmirBundle => "fmir-bin",
-        Target::HirSwift => "swift",
-        Target::HirPython => "python",
-        Target::HirHaskell => "haskell",
-        Target::HirPascal => "pascal",
-        Target::HirCobol => "cobol",
-        Target::HirFortran => "fortran",
-        Target::HirFhir => "fhir",
-    }
+    target.as_str()
 }
 
 fn push_unique_node(
