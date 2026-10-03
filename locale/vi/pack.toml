@@ -3161,3 +3161,8 @@ munita = "thoát_ký_tự"
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "các lựa chọn mẫu or phải liên kết cùng tên và kiểu"
 help = "hãy để mỗi lựa chọn aut liên kết cùng tên với cùng kiểu"
+
+# K8-I: translated diagnostic proposal.
+[diagnostics.SEM010.issues.filum_independence_unproven]
+message = "không thể chứng minh tính độc lập của vòng lặp luồng: {reason}"
+help = "dùng vòng lặp thường, hoặc chỉ ghi tại tọa độ của lượt và đọc vùng đã ghi tại cùng tọa độ; không sửa biến ngoài hay gọi hiệu ứng chưa được chứng minh"

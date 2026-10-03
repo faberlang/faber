@@ -3173,3 +3173,8 @@ munita = "एस्केप"
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "or-pattern विकल्पों को समान नाम और प्रकार बाँधने चाहिए"
 help = "हर aut विकल्प में समान नामों को समान प्रकारों से बाँधें"
+
+# K8-I: translated diagnostic proposal.
+[diagnostics.SEM010.issues.filum_independence_unproven]
+message = "थ्रेड पुनरावृत्तियों की स्वतंत्रता सिद्ध नहीं हो सकी: {reason}"
+help = "सामान्य लूप का उपयोग करें, या केवल पुनरावृत्ति के अपने निर्देशांक पर लिखें और लिखे गए भंडारण को उसी निर्देशांक पर पढ़ें; बाहरी चर न बदलें और अप्रमाणित प्रभाव न बुलाएँ"

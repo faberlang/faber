@@ -4214,3 +4214,7 @@ exemplars = ["./exemplars/salve-munde.la.fab"]
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "alternativa aut eadem nomina et genera ligare debent"
 help = "fac ut unaquaeque alternativa aut eadem nomina eisdem generibus liget"
+
+[diagnostics.SEM010.issues.filum_independence_unproven]
+message = "independentia iterationis filum probari non potest: {reason}"
+help = "utere iteratione ordinaria, aut scribe et lege repositorium scriptum tantum apud coordinatam propriam; ne muta locales exteriores nec voca effectus non probatos"

@@ -3161,3 +3161,8 @@ munita = "转义"
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "或模式的各分支必须绑定相同的名称和类型"
 help = "让每个 aut 分支以相同类型绑定相同名称"
+
+# K8-I: translated diagnostic proposal.
+[diagnostics.SEM010.issues.filum_independence_unproven]
+message = "无法证明线程迭代的独立性：{reason}"
+help = "使用普通循环，或仅写入本次迭代的坐标，并仅在同一坐标读取已写入的存储；不要修改外部局部变量或调用未经证明的副作用"

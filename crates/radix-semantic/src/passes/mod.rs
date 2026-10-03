@@ -17,6 +17,7 @@
 //! 3. HIR lowering happens outside this module, after collect/resolve errors
 //!    have been reported.
 //! 4. [`typecheck`] assigns and verifies expression/statement types on HIR.
+//!    [`filum_independence`] then admits independent iteration on every target.
 //! 5. [`air_unroll`] rewrites eligible AIR-lane concrete-`N` `itera ab` range
 //!    loops into straight-line bindings before purity admission.
 //! 6. [`air_purity`] is the fail-closed AIR-lane subset gate.
@@ -61,6 +62,7 @@ pub(crate) mod coverage;
 pub mod decimal_integer_literal;
 pub mod definite_assignment;
 pub mod exhaustive;
+pub(crate) mod filum_independence;
 pub mod float_literal_fold;
 pub mod fragment_definition;
 pub mod import_path;
@@ -307,3 +309,7 @@ mod visibility_annotation_test;
 #[cfg(test)]
 #[path = "first_match_contract_test.rs"]
 mod first_match_contract_test;
+
+#[cfg(test)]
+#[path = "k8_filum_independence_test.rs"]
+mod k8_filum_independence_test;

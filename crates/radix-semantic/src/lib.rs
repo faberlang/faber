@@ -685,6 +685,9 @@ pub fn analyze_with_cli(
         }
         Err(e) => diagnostics.extend(e),
     }
+    if !diagnostics.iter().any(SemanticError::is_error) {
+        diagnostics.extend(passes::filum_independence::check(&hir, &types, interner));
+    }
     // Module constants: top-level `fixum`/`varia` stores are an error (D5.7),
     // then compile-time evaluation. Folding rewrites constant initializers before any
     // later pass or backend reads them; it needs the finished types.

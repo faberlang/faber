@@ -3161,3 +3161,8 @@ munita = "تهريب"
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "يجب أن تربط بدائل نمط أو الأسماء والأنواع نفسها"
 help = "اجعل كل بديل aut يربط الأسماء نفسها بالأنواع نفسها"
+
+# K8-I: translated diagnostic proposal.
+[diagnostics.SEM010.issues.filum_independence_unproven]
+message = "تعذر إثبات استقلال تكرارات الخيط: {reason}"
+help = "استخدم حلقة عادية، أو اكتب واقرأ التخزين المكتوب عند إحداثي التكرار نفسه فقط؛ لا تعدّل المتغيرات الخارجية ولا تستدعِ تأثيرات غير مثبتة"
