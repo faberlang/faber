@@ -413,7 +413,7 @@ ad_opener ::= '(' expression ')'
 # [201] array_literal
 array_literal ::= '[' array_element_list? ']'
 # [202] array_element_list
-array_element_list ::= array_element (',' array_element)* ','?
+array_element_list ::= array_element (',' array_element)*
 # [203] array_element
 array_element ::= argument | '_'
 # [204] iuncta_expr
@@ -973,7 +973,7 @@ positions; every comma-bearing production is either required or absent.
 
 | Production | Source row |
 |---|---|
-| `array_element_list` | `array_element_list := array_element (',' array_element)* ','?` |
+| — | no optional comma positions |
 
 ## Normative Language Notes {#normative-language-notes}
 

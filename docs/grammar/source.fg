@@ -1400,7 +1400,7 @@ primary := IDENTIFIER | literal | 'ego'
 ad_expr    := 'ad' ASCII_STRING ad_opener?
 ad_opener  := '(' expression ')'
 array_literal := '[' array_element_list? ']'
-array_element_list := array_element (',' array_element)* ','?
+array_element_list := array_element (',' array_element)*
 array_element := argument | '_'
 iuncta_expr := 'iuncta' type_arguments '[' argument_list? ']'
 # Bare `{ ... }` is a JSON document literal. Keys are quoted JSON strings separated
