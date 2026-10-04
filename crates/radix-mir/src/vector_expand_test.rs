@@ -551,3 +551,248 @@ fn direct_destination_is_written_by_the_final_lane_statement() {
         MirStatementKind::Construct { destination, .. } if *destination == place(2)
     ));
 }
+
+/// Operands `[a, marker]`: the vector param and the scalar local `l3`.
+fn vector_and_scalar() -> Vec<MirOperand> {
+    vec![MirOperand::Place(place(0)), MirOperand::Place(place(3))]
+}
+
+fn scalar_function(fixture: &Fixture, op: MirVectorOp) -> MirFunction {
+    function_with(fixture, op, vector_and_scalar(), fixture.vector)
+}
+
+fn unary_negations(function: &MirFunction) -> usize {
+    all_statements(function)
+        .filter(|statement| {
+            matches!(
+                &statement.kind,
+                MirStatementKind::Assign { value, .. }
+                    if matches!(&value.kind, MirValueKind::Unary { op: crate::MirUnOp::Neg, .. })
+            )
+        })
+        .count()
+}
+
+/// The `(lhs, rhs)` operands of every `wanted` lane binary, in order.
+fn binary_operands(function: &MirFunction, wanted: MirBinOp) -> Vec<(MirOperand, MirOperand)> {
+    all_statements(function)
+        .filter_map(|statement| match &statement.kind {
+            MirStatementKind::Assign { value, .. } => match &value.kind {
+                MirValueKind::Binary { op, lhs, rhs } if *op == wanted => {
+                    Some((lhs.clone(), rhs.clone()))
+                }
+                _ => None,
+            },
+            _ => None,
+        })
+        .collect()
+}
+
+fn is_lane_read(operand: &MirOperand) -> bool {
+    matches!(
+        operand,
+        MirOperand::Place(place)
+            if matches!(place.projections.as_slice(), [MirProjection::VectorLane(_)])
+    )
+}
+
+#[test]
+fn a_scalar_peer_unrolls_one_binary_per_lane_in_written_order() {
+    for width in 2..=4u64 {
+        let fixture = fixture(width);
+        for op in BIN_OPS {
+            for scalar_first in [false, true] {
+                let mut function = scalar_function(
+                    &fixture,
+                    MirVectorOp::ElementwiseScalar {
+                        op,
+                        scalar_first,
+                        checked: false,
+                    },
+                );
+                let errors = expand(&fixture, &mut function);
+                assert!(
+                    errors.is_empty(),
+                    "w{width} {op:?} {scalar_first}: {errors:?}"
+                );
+                assert!(!has_vector_op(&function));
+                assert_eq!(constructs(&function), vec![width as usize]);
+                let operands = binary_operands(&function, op);
+                assert_eq!(operands.len(), width as usize, "w{width} {op:?}");
+                for (lhs, rhs) in operands {
+                    let (scalar, lane) = if scalar_first { (lhs, rhs) } else { (rhs, lhs) };
+                    assert!(is_lane_read(&lane), "w{width} {op:?} {scalar_first}");
+                    assert_eq!(
+                        scalar,
+                        MirOperand::Place(place(3)),
+                        "the scalar is read as is"
+                    );
+                }
+                assert!(
+                    ValidatedMir::new(program(function), MirValidationContext::new(&fixture.types))
+                        .is_ok(),
+                    "w{width} {op:?} {scalar_first}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn negate_unrolls_one_negation_per_lane() {
+    for width in 2..=4u64 {
+        let fixture = fixture(width);
+        let mut function = function_with(
+            &fixture,
+            MirVectorOp::Negate { checked: false },
+            a(),
+            fixture.vector,
+        );
+        assert!(expand(&fixture, &mut function).is_empty());
+        assert_eq!(unary_negations(&function), width as usize);
+        assert_eq!(store_checks(&function), 0);
+        assert_eq!(constructs(&function), vec![width as usize]);
+        assert!(
+            ValidatedMir::new(program(function), MirValidationContext::new(&fixture.types)).is_ok()
+        );
+    }
+}
+
+#[test]
+fn the_scalar_forms_check_their_arity() {
+    let fixture = fixture(3);
+    let mut one = function_with(
+        &fixture,
+        MirVectorOp::ElementwiseScalar {
+            op: MirBinOp::Mul,
+            scalar_first: false,
+            checked: false,
+        },
+        a(),
+        fixture.vector,
+    );
+    assert_eq!(expand(&fixture, &mut one), vec![VECTOR_OP_ARITY.to_owned()]);
+    let mut two = function_with(
+        &fixture,
+        MirVectorOp::Negate { checked: false },
+        ab(),
+        fixture.vector,
+    );
+    assert_eq!(expand(&fixture, &mut two), vec![VECTOR_OP_ARITY.to_owned()]);
+}
+
+#[test]
+fn a_destination_aliasing_the_vector_is_written_after_every_lane_read_of_a_scalar_op() {
+    let fixture = fixture(3);
+    let args = vec![MirOperand::Place(place(2)), MirOperand::Place(place(3))];
+    let mut function = function_with(
+        &fixture,
+        MirVectorOp::ElementwiseScalar {
+            op: MirBinOp::Mul,
+            scalar_first: false,
+            checked: false,
+        },
+        args,
+        fixture.vector,
+    );
+    assert!(expand(&fixture, &mut function).is_empty());
+    let statements: Vec<_> = all_statements(&function).collect();
+    let write = statements
+        .iter()
+        .rposition(|statement| match &statement.kind {
+            MirStatementKind::Assign { place: target, .. } => *target == place(2),
+            _ => false,
+        })
+        .expect("the destination is written");
+    let last_lane_read = statements
+        .iter()
+        .rposition(|statement| match &statement.kind {
+            MirStatementKind::Assign { value, .. } => matches!(
+                &value.kind,
+                MirValueKind::Binary { lhs, .. } if is_lane_read(lhs)
+            ),
+            _ => false,
+        })
+        .expect("lanes are read");
+    assert!(
+        write > last_lane_read,
+        "the result lands after every lane read"
+    );
+}
+
+/// How many store-checked `Convert` calls the function holds.
+fn store_checks(function: &MirFunction) -> usize {
+    all_statements(function)
+        .filter(|statement| {
+            matches!(
+                &statement.kind,
+                MirStatementKind::RuntimeCall { call, .. }
+                    if matches!(
+                        &call.intrinsic,
+                        MirIntrinsic::Convert(conversion) if conversion.store.is_some()
+                    )
+            )
+        })
+        .count()
+}
+
+#[test]
+fn a_checked_scalar_op_stores_every_lane_under_the_element_type() {
+    for width in 2..=4u64 {
+        let fixture = fixture(width);
+        for scalar_first in [false, true] {
+            let mut function = scalar_function(
+                &fixture,
+                MirVectorOp::ElementwiseScalar {
+                    op: MirBinOp::Mul,
+                    scalar_first,
+                    checked: true,
+                },
+            );
+            assert!(expand(&fixture, &mut function).is_empty());
+            assert_eq!(store_checks(&function), width as usize, "w{width}");
+            assert_eq!(binaries(&function, MirBinOp::Mul), width as usize);
+            assert_eq!(constructs(&function), vec![width as usize]);
+            assert!(
+                ValidatedMir::new(program(function), MirValidationContext::new(&fixture.types))
+                    .is_ok(),
+                "w{width}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_checked_negation_stores_every_lane_under_the_element_type() {
+    for width in 2..=4u64 {
+        let fixture = fixture(width);
+        let mut function = function_with(
+            &fixture,
+            MirVectorOp::Negate { checked: true },
+            a(),
+            fixture.vector,
+        );
+        assert!(expand(&fixture, &mut function).is_empty());
+        assert_eq!(store_checks(&function), width as usize, "w{width}");
+        assert_eq!(unary_negations(&function), width as usize);
+        assert!(
+            ValidatedMir::new(program(function), MirValidationContext::new(&fixture.types)).is_ok(),
+            "w{width}"
+        );
+    }
+}
+
+#[test]
+fn an_unchecked_scalar_op_carries_no_store_node() {
+    let fixture = fixture(3);
+    let mut function = scalar_function(
+        &fixture,
+        MirVectorOp::ElementwiseScalar {
+            op: MirBinOp::Add,
+            scalar_first: false,
+            checked: false,
+        },
+    );
+    assert!(expand(&fixture, &mut function).is_empty());
+    assert_eq!(store_checks(&function), 0);
+}

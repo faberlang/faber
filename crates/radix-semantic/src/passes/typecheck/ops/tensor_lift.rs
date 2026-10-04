@@ -18,6 +18,12 @@
 //!
 //! The runner is the oracle for these forms (`MirLiftOp`); every other target
 //! fails closed.
+//!
+//! A register `vector` takes the same arithmetic rule against a scalar: `+ - *
+//! / %` with the scalar on either side and unary `-` (the K4 note "the same
+//! lifting rule applies to vector and matrix", rule 15.1). `vector * vector`
+//! is an error that points at `⊙` and `·`. Vectors lift no comparison, logic
+//! or select, and `÷` and the matrix register are not lifted here.
 
 use super::*;
 use crate::IndexId;
@@ -34,6 +40,9 @@ pub(in crate::passes::typecheck) const ISSUE_TENSOR_COALESCE_ELEMENT_NULLABLE_RE
 pub(in crate::passes::typecheck) const ISSUE_TENSOR_LIFT_DECIMAL_ELEMENT: &str =
     "tensor_lift_decimal_element_unsupported";
 const ISSUE_CONDITION_MUST_BE_BIVALENS: &str = "condition_must_be_bivalens";
+/// `vector * vector` is not elementwise; the glyphs say which product is meant.
+pub(in crate::passes::typecheck) const ISSUE_VECTOR_MULTIPLY_REQUIRES_GLYPH: &str =
+    "vector_multiply_requires_glyph";
 
 /// Spelling of the approximate-equality glyph in a deferral diagnostic.
 fn approx_glyph(op: HirBinOp) -> &'static str {
@@ -84,17 +93,101 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// The type a literal beside a tensor takes as its peer: the tensor's
+    /// The element and width of a register vector operand.
+    fn vector_operand(&mut self, ty: TypeId) -> Option<(TypeId, IndexId)> {
+        let resolved = self.value_carrier_type(ty);
+        let (_, payload) = self.types.peel_access_marker(resolved);
+        match self.types.get(payload).clone() {
+            Type::Vector(elem, width) => Some((self.resolve_inferred_type(elem), width)),
+            _ => None,
+        }
+    }
+
+    /// The type a literal beside a tensor or vector takes as its peer: the
     /// numeric element, so `x * 0.5` on an `f32` tensor stays `f32`.
     pub(in crate::passes::typecheck) fn scalar_peer_type(&mut self, ty: TypeId) -> TypeId {
-        match self.lift_side(ty) {
-            LiftSide::Tensor { elem, .. }
-                if crate::numeric_width::is_tensor_numeric_element(self.types, elem) =>
-            {
-                elem
-            }
+        let elem = match self.lift_side(ty) {
+            LiftSide::Tensor { elem, .. } => Some(elem),
+            _ => self.vector_operand(ty).map(|(elem, _)| elem),
+        };
+        match elem {
+            Some(elem) if crate::numeric_width::is_tensor_numeric_element(self.types, elem) => elem,
             _ => ty,
         }
+    }
+
+    /// `+ - * / %` between a vector and a scalar (either side). The element
+    /// is the F9 join of the vector element and the scalar, as for a tensor,
+    /// and the result is a new vector of the same width. `vector * vector` is
+    /// the glyph diagnostic; every other vector pair keeps its own rule.
+    fn check_vector_lift_arith(
+        &mut self,
+        op: HirBinOp,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+        lhs_ty: TypeId,
+        rhs_ty: TypeId,
+    ) -> Option<TypeId> {
+        if !matches!(
+            op,
+            HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div | HirBinOp::Mod
+        ) {
+            return None;
+        }
+        let span = lhs.span;
+        let (left, right) = (self.vector_operand(lhs_ty), self.vector_operand(rhs_ty));
+        let ((v_elem, width), scalar_ty, vector_first) = match (left, right) {
+            (Some(_), Some(_)) => {
+                if op == HirBinOp::Mul {
+                    self.invalid_operand_types(ISSUE_VECTOR_MULTIPLY_REQUIRES_GLYPH, span);
+                    return Some(self.error_type);
+                }
+                return None;
+            }
+            (Some(vector), None) => (vector, rhs_ty, true),
+            (None, Some(vector)) => (vector, lhs_ty, false),
+            (None, None) => return None,
+        };
+        // A tensor, matrix or other register beside a vector keeps its own rule.
+        if !matches!(self.lift_side(scalar_ty), LiftSide::Scalar(_)) {
+            return None;
+        }
+        if self.is_error(scalar_ty) || !self.lift_element_admitted(v_elem, span) {
+            return Some(self.error_type);
+        }
+        let resolved = self.resolve_inferred_type(scalar_ty);
+        if !self.is_infer(resolved) && self.numeric_shape(resolved).is_none() {
+            self.invalid_operand_types(NUMERIC_OPERANDS_REQUIRED, span);
+            return Some(self.error_type);
+        }
+        let (l_elem, r_elem) = if vector_first {
+            (v_elem, scalar_ty)
+        } else {
+            (scalar_ty, v_elem)
+        };
+        // The element is the F9 join of the operands, as for a tensor. Each
+        // lane is stored under it at the operation (ruling 19(g)): an integer
+        // lane is exact and traps where it leaves the element's range.
+        let elem = self.lift_arith_element(op, lhs, rhs, l_elem, r_elem, span);
+        if self.is_error(elem) {
+            return Some(self.error_type);
+        }
+        Some(self.types.vector_with_width(elem, width))
+    }
+
+    /// Unary `-` over a vector keeps the element type and width. Each lane
+    /// is stored under that element at the operation, so an integer lane
+    /// traps where the negation leaves the range (`-i8::MIN`).
+    fn check_vector_lift_neg(
+        &mut self,
+        operand: &HirExpression,
+        operand_ty: TypeId,
+    ) -> Option<TypeId> {
+        let (elem, _) = self.vector_operand(operand_ty)?;
+        if !self.lift_element_admitted(elem, operand.span) {
+            return Some(self.error_type);
+        }
+        Some(self.value_carrier_type(operand_ty))
     }
 
     fn lift_result(&mut self, elem: TypeId, shape: IndexId) -> TypeId {
@@ -266,6 +359,9 @@ impl TypeChecker<'_> {
         rhs_ty: TypeId,
     ) -> Option<TypeId> {
         let span = lhs.span;
+        if let Some(result) = self.check_vector_lift_arith(op, lhs, rhs, lhs_ty, rhs_ty) {
+            return Some(result);
+        }
         let pair = match self.lift_pairing(lhs_ty, rhs_ty, span, op == HirBinOp::TrueDiv) {
             LiftPairing::NotLifted => {
                 let tensor_pair = matches!(self.lift_side(lhs_ty), LiftSide::Tensor { .. })
@@ -299,7 +395,7 @@ impl TypeChecker<'_> {
         operand_ty: TypeId,
     ) -> Option<TypeId> {
         let LiftSide::Tensor { elem, shape } = self.lift_side(operand_ty) else {
-            return None;
+            return self.check_vector_lift_neg(operand, operand_ty);
         };
         if !self.lift_element_admitted(elem, operand.span) {
             return Some(self.error_type);

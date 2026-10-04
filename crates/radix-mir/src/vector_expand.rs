@@ -30,10 +30,12 @@ use crate::validate::MirValidationError;
 use crate::vector_width::literal_vector_width;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock,
-    MirBlockId, MirConstant, MirFunction, MirIntrinsic, MirOperand, MirPlace, MirPlaceBase,
-    MirProjection, MirStatement, MirStatementKind, MirTemp, MirTempId, MirTerminator,
-    MirTerminatorKind, MirType, MirUnOp, MirValue, MirValueId, MirValueKind, MirVectorOp,
+    MirBlockId, MirConstant, MirConversion, MirConversionFlavor, MirFunction, MirIntrinsic,
+    MirOperand, MirPlace, MirPlaceBase, MirProjection, MirRuntimeCall, MirStatement,
+    MirStatementKind, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType, MirUnOp,
+    MirValue, MirValueId, MirValueKind, MirVectorOp,
 };
+use radix_hir::{HirStoreKind, HirStoreSite};
 use radix_lexer::Span;
 use radix_types::{Primitive, Type, TypeId, TypeTable};
 
@@ -205,6 +207,27 @@ fn expand_site(
             rhs,
             shape.width,
             *op,
+            shape.element,
+            site.return_ty,
+        ),
+        MirVectorOp::ElementwiseScalar {
+            op,
+            scalar_first,
+            checked,
+        } => elementwise_scalar(
+            &mut head,
+            lhs,
+            MirOperand::Place(rhs.clone()),
+            shape.width,
+            (*op, *scalar_first, *checked),
+            shape.element,
+            site.return_ty,
+        ),
+        MirVectorOp::Negate { checked } => negate(
+            &mut head,
+            lhs,
+            shape.width,
+            *checked,
             shape.element,
             site.return_ty,
         ),
@@ -432,6 +455,41 @@ impl<'a> Lanes<'a> {
         true
     }
 
+    /// `value` stored under its own integer slot type: a checked `Convert`
+    /// that traps when the exact lane leaves `ty`'s range (the same store node
+    /// the lowerer emits for an integer slot). `value` itself when unchecked.
+    fn stored(&mut self, value: MirOperand, ty: MirType, checked: bool) -> MirOperand {
+        if !checked {
+            return value;
+        }
+        let temp = self.temp(ty);
+        self.statements.push(MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination: Some(MirPlace::temp(temp)),
+                call: MirRuntimeCall {
+                    intrinsic: MirIntrinsic::Convert(MirConversion {
+                        store: Some(HirStoreSite {
+                            kind: HirStoreKind::Element,
+                            slot: None,
+                            inferred_from: None,
+                            inferred_text: None,
+                        }),
+                        flavor: MirConversionFlavor::Runtime,
+                        source_ty: ty,
+                        target_ty: ty,
+                        params: Vec::new(),
+                        recovery: None,
+                        struct_defaults: Vec::new(),
+                    }),
+                    args: vec![value],
+                    return_ty: ty,
+                },
+            },
+            span: self.span,
+        });
+        MirOperand::Temp(temp)
+    }
+
     fn construct_vector(&mut self, lanes: Vec<MirOperand>, ty: MirType) -> MirOperand {
         let temp = self.temp(ty);
         self.statements.push(MirStatement {
@@ -476,6 +534,56 @@ fn elementwise(
         .map(|i| b.binary(op, lane(lhs, i), lane(rhs, i), element))
         .collect();
     b.construct_vector(fields, vector)
+}
+
+/// Each lane against one scalar: `lane op scalar`, or `scalar op lane` when
+/// the scalar was written first. A new vector; the operands are not touched.
+/// `checked` stores each lane under `element` with the integer store trap.
+fn elementwise_scalar(
+    b: &mut Lanes<'_>,
+    vector: &MirPlace,
+    scalar: MirOperand,
+    width: u8,
+    (op, scalar_first, checked): (MirBinOp, bool, bool),
+    element: MirType,
+    result: MirType,
+) -> MirOperand {
+    let fields = (0..width)
+        .map(|i| {
+            let (lhs, rhs) = if scalar_first {
+                (scalar.clone(), lane(vector, i))
+            } else {
+                (lane(vector, i), scalar.clone())
+            };
+            let value = b.binary(op, lhs, rhs, element);
+            b.stored(value, element, checked)
+        })
+        .collect();
+    b.construct_vector(fields, result)
+}
+
+/// Each lane negated, as a new vector; `checked` as for [`elementwise_scalar`].
+fn negate(
+    b: &mut Lanes<'_>,
+    vector: &MirPlace,
+    width: u8,
+    checked: bool,
+    element: MirType,
+    result: MirType,
+) -> MirOperand {
+    let fields = (0..width)
+        .map(|i| {
+            let value = b.assign_temp(
+                MirValueKind::Unary {
+                    op: MirUnOp::Neg,
+                    operand: lane(vector, i),
+                },
+                element,
+            );
+            b.stored(value, element, checked)
+        })
+        .collect();
+    b.construct_vector(fields, result)
 }
 
 /// `(lhs_a, rhs_a, lhs_b, rhs_b)` per result lane: `l[a]*r[a'] - l[b]*r[b']`.

@@ -863,7 +863,10 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         MirCollectionOp::CordCursor,
     ];
     // K5: one payload variant per lifted math function, all registry rows.
-    all.extend(radix_types::MirTensorMath::ALL.map(MirCollectionOp::TensorMath));
+    all.extend(radix_types::MirMathFunction::ALL.map(MirCollectionOp::TensorMath));
+    // A2-LIFT G01: the same functions as scalar float methods (not `Abs`,
+    // whose scalar form is the numeric `Absolute` row).
+    all.extend(radix_types::MirMathFunction::SCALAR.map(MirCollectionOp::ScalarMath));
 
     // Permanent internal allowlist — a design fact, not a worklist.
     let permanent: &[MirCollectionOp] = &[

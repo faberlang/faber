@@ -1265,8 +1265,16 @@ mod tensor_lift_test;
 mod tensor_minus_test;
 
 #[cfg(test)]
+#[path = "scalar_math_test.rs"]
+mod scalar_math_test;
+
+#[cfg(test)]
 #[path = "tensor_math_test.rs"]
 mod tensor_math_test;
+
+#[cfg(test)]
+#[path = "vector_lift_test.rs"]
+mod vector_lift_test;
 
 #[cfg(test)]
 #[path = "tensor_plus_test.rs"]

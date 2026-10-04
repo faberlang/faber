@@ -1,13 +1,13 @@
 //! K5 (gpu-reset rule 15): the built-in scalar math functions lift over a
 //! tensor; a user function does not.
 //!
-//! Registry-driven: the lifted set is `MirTensorMath::ALL` by canonical Latin
+//! Registry-driven: the lifted set is `MirMathFunction::ALL` by canonical Latin
 //! name. Element typing follows the scalar function: `absolutum` takes any
 //! numeric element and range-types an integer element to the smallest holder
 //! of `|x|`; every other member takes float elements only.
 
 use radix_diagnostics::DiagnosticArg;
-use radix_types::MirTensorMath;
+use radix_types::MirMathFunction;
 
 const ISSUE_FLOAT_ELEMENT: &str = "tensor_math_float_element_required";
 const ISSUE_NOT_LIFTED: &str = "tensor_function_not_lifted";
@@ -41,7 +41,7 @@ fn rejects_with_issue(source: &str, issue: &str) {
 
 #[test]
 fn every_lifted_function_preserves_a_float_tensor_type() {
-    for function in MirTensorMath::ALL {
+    for function in MirMathFunction::ALL {
         let name = function.latin_name();
         accepts(&format!(
             "functio lifted(tensor<f32, [2, 3]> x) → tensor<f32, [2, 3]> {{\n    redde x.{name}()\n}}"
@@ -54,7 +54,7 @@ fn every_lifted_function_preserves_a_float_tensor_type() {
 
 #[test]
 fn float_only_functions_reject_integer_elements() {
-    for function in MirTensorMath::ALL.into_iter().filter(|f| f.float_only()) {
+    for function in MirMathFunction::ALL.into_iter().filter(|f| f.float_only()) {
         let name = function.latin_name();
         rejects_with_issue(
             &format!(

@@ -809,6 +809,7 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorMin
             | MirCollectionOp::TensorNeg
             | MirCollectionOp::TensorMath(_)
+            | MirCollectionOp::ScalarMath(_)
             | MirCollectionOp::TensorGelu
             | MirCollectionOp::TensorRelu
             | MirCollectionOp::TensorSoftmax
@@ -1516,6 +1517,24 @@ impl Validator<'_, '_> {
                         );
                     }
                 }
+            }
+            MirCollectionOp::ScalarMath(_) => {
+                let Some(receiver_ty) = first_arg_ty else {
+                    return;
+                };
+                if !matches!(
+                    self.type_kind(receiver_ty),
+                    Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+                ) {
+                    self.error(span, "scalar math receiver is not fractus");
+                    return;
+                }
+                self.require_exact(
+                    call.return_ty,
+                    receiver_ty,
+                    span,
+                    "scalar math result type mismatch",
+                );
             }
             MirCollectionOp::Absolute | MirCollectionOp::Signum => {
                 let Some(receiver_ty) = first_arg_ty else {

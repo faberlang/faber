@@ -1,0 +1,85 @@
++++
+term = "vector"
+kind = "method"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "redde_stmt", "fixum_decl", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "unary_expr", "multiplicative_expr", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "A scalar operator against a vector: + - * / % with the scalar on either side, and unary minus."
+syntax = "v * s | s * v | v / s | s - v | v + 1.0 | -v"
+related = ["vector", "tensor", "fractus"]
+locale = "en"
++++
+# =============================================================================
+# vector — A scalar operator against a vector
+# =============================================================================
+#
+# What this teaches:
+#   • Lifted arithmetic — `+ - * / %` with a scalar on either side apply to each lane
+#   • Unary minus — `-v` negates each lane
+#   • New values — the result is a new vector; the operand is not changed
+#   • Same rule as a tensor — an untyped literal adopts the vector's element type
+#
+# Common mistakes:
+#   • writing `a * b` for two vectors — it is not elementwise; use `⊙` or the dot `·`
+#   • mixing an integer scalar with a float vector — convert one operand with `↦`
+#
+# See also: vector, tensor, fractus
+# =============================================================================
+
+# vector — scalar lifting
+#
+# WHY: rule 15 lifts the scalar operators over a vector exactly as over a
+# tensor. `s - v` keeps its operand order: each lane is `s - v[i]`.
+#
+# EXPECTED stdout: see lift-scalar.expected
+
+fn scaled(vector<f32, 3> a, f32 s) → vector<f32, 3> {
+    return a * s
+}
+
+fn scaled_left(vector<f32, 3> a, f32 s) → vector<f32, 3> {
+    return s * a
+}
+
+fn shrunk(vector<f32, 3> a, f32 s) → vector<f32, 3> {
+    return a / s
+}
+
+fn inverted(vector<f32, 3> a, f32 s) → vector<f32, 3> {
+    return s / a
+}
+
+fn shifted(vector<f32, 3> a, f32 s) → vector<f32, 3> {
+    return s - a
+}
+
+fn remainder(vector<f32, 3> a, f32 s) → vector<f32, 3> {
+    return a % s
+}
+
+fn lifted(vector<f32, 3> a) → vector<f32, 3> {
+    return a + 1.0
+}
+
+fn flipped(vector<f32, 3> a) → vector<f32, 3> {
+    return -a
+}
+
+fn halved(vector<f32, 4> a) → vector<f32, 4> {
+    return a * 0.5
+}
+
+main {
+    const vector<f32, 3> a ← [1.0, 2.0, 4.0] ↦ vector<f32, 3>
+    print scaled(a, 2.5)
+    print scaled_left(a, 2.5)
+    print shrunk(a, 4.0)
+    print inverted(a, 8.0)
+    print shifted(a, 10.0)
+    print remainder(a, 3.0)
+    print lifted(a)
+    print flipped(a)
+    print a
+    const vector<f32, 4> w ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
+    print halved(w)
+}

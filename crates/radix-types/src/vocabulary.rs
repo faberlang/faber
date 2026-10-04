@@ -324,7 +324,14 @@ pub enum MirCollectionOp {
     /// element: a domain miss is NaN, an overflow is infinity, and the result
     /// is stored under the result element type. This is NOT the trapping
     /// device-domain policy of the MIR unary `Exp`/`Sqrt`/`Log` ops.
-    TensorMath(MirTensorMath),
+    TensorMath(MirMathFunction),
+    /// Built-in math function on a scalar float (`x.sqrt()`, `x.sin()`):
+    /// `[x]` → a float of the receiver's type. The function is the same
+    /// [`MirMathFunction`] the tensor lift applies per element, with the same
+    /// IEEE semantics (a domain miss is NaN, an overflow is infinity); the
+    /// result is rounded to the result width only where it is stored. Scalar
+    /// `abs` is the existing `Absolute` op, so `Abs` is never carried here.
+    ScalarMath(MirMathFunction),
     /// Gaussian Error Linear Unit using the tanh approximation:
     /// 0.5*x*(1+tanh(√(2/π)*(x+0.044715*x³))). Error < 1e-6 vs exact Gelu.
     /// Elementwise unary activation on tensor values. All finite f32 inputs valid.
@@ -421,11 +428,11 @@ pub enum MirCollectionOp {
     TensorCopyInto,
 }
 
-/// The built-in unary math functions lifted elementwise over a tensor
-/// (gpu-reset rule 15). One member per scalar built-in math function; the
+/// The built-in unary math functions: methods on a scalar float and, lifted
+/// elementwise, on a tensor (gpu-reset rule 15). One member per function; the
 /// scalar meaning of each is the per-element meaning.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum MirTensorMath {
+pub enum MirMathFunction {
     /// `absolutum` (en `abs`): magnitude. Integer elements are exact.
     Abs,
     /// `radix` (en `sqrt`): square root. `sqrt(x < 0)` is NaN.
@@ -445,7 +452,7 @@ pub enum MirTensorMath {
     Tan,
 }
 
-impl MirTensorMath {
+impl MirMathFunction {
     /// Every lifted function, in catalog order.
     pub const ALL: [Self; 8] = [
         Self::Abs,
@@ -495,6 +502,19 @@ impl MirTensorMath {
             .into_iter()
             .find(|function| function.latin_name() == name)
     }
+
+    /// The functions that are scalar float methods through
+    /// [`MirCollectionOp::ScalarMath`]: everything except `Abs`, whose scalar
+    /// form is the shared numeric `Absolute` op.
+    pub const SCALAR: [Self; 7] = [
+        Self::Sqrt,
+        Self::Exp,
+        Self::Ln,
+        Self::Log10,
+        Self::Sin,
+        Self::Cos,
+        Self::Tan,
+    ];
 
     /// Whether the function is defined only on floating-point elements
     /// (everything except `abs`, which also accepts integers).

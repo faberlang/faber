@@ -82,6 +82,14 @@ mod copy_into_emit_test;
 #[path = "tensor_lift_gate_test.rs"]
 mod tensor_lift_gate_test;
 
+#[cfg(test)]
+#[path = "vector_lift_gate_test.rs"]
+mod vector_lift_gate_test;
+
+#[cfg(test)]
+#[path = "scalar_math_emit_test.rs"]
+mod scalar_math_emit_test;
+
 // The failable-facts conversion under test is gated to the non-rust backends
 // that call it, so its tests carry the same feature gate.
 #[cfg(all(

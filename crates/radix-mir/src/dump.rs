@@ -595,17 +595,31 @@ fn conversion_flavor(flavor: MirConversionFlavor) -> &'static str {
     }
 }
 
-fn tensor_math_dump_name(function: radix_types::MirTensorMath) -> &'static str {
-    use radix_types::MirTensorMath;
+fn tensor_math_dump_name(function: radix_types::MirMathFunction) -> &'static str {
+    use radix_types::MirMathFunction;
     match function {
-        MirTensorMath::Abs => "tensor_math_abs",
-        MirTensorMath::Sqrt => "tensor_math_sqrt",
-        MirTensorMath::Exp => "tensor_math_exp",
-        MirTensorMath::Ln => "tensor_math_ln",
-        MirTensorMath::Log10 => "tensor_math_log10",
-        MirTensorMath::Sin => "tensor_math_sin",
-        MirTensorMath::Cos => "tensor_math_cos",
-        MirTensorMath::Tan => "tensor_math_tan",
+        MirMathFunction::Abs => "tensor_math_abs",
+        MirMathFunction::Sqrt => "tensor_math_sqrt",
+        MirMathFunction::Exp => "tensor_math_exp",
+        MirMathFunction::Ln => "tensor_math_ln",
+        MirMathFunction::Log10 => "tensor_math_log10",
+        MirMathFunction::Sin => "tensor_math_sin",
+        MirMathFunction::Cos => "tensor_math_cos",
+        MirMathFunction::Tan => "tensor_math_tan",
+    }
+}
+
+fn scalar_math_dump_name(function: radix_types::MirMathFunction) -> &'static str {
+    use radix_types::MirMathFunction;
+    match function {
+        MirMathFunction::Abs => "scalar_math_abs",
+        MirMathFunction::Sqrt => "scalar_math_sqrt",
+        MirMathFunction::Exp => "scalar_math_exp",
+        MirMathFunction::Ln => "scalar_math_ln",
+        MirMathFunction::Log10 => "scalar_math_log10",
+        MirMathFunction::Sin => "scalar_math_sin",
+        MirMathFunction::Cos => "scalar_math_cos",
+        MirMathFunction::Tan => "scalar_math_tan",
     }
 }
 
@@ -696,6 +710,7 @@ fn collection_op(op: MirCollectionOp) -> &'static str {
         MirCollectionOp::TensorDiv => "tensor_div",
         MirCollectionOp::TensorNeg => "tensor_neg",
         MirCollectionOp::TensorMath(function) => tensor_math_dump_name(function),
+        MirCollectionOp::ScalarMath(function) => scalar_math_dump_name(function),
         MirCollectionOp::TensorGelu => "tensor_gelu",
         MirCollectionOp::TensorRelu => "tensor_relu",
         MirCollectionOp::TensorSoftmax => "softmax",

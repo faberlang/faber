@@ -47,7 +47,7 @@ pub use filtrum::{
 };
 pub use vocabulary::{
     CapabilityGap, KernelModule, Lowerability, MirAtomicOp, MirCollectionOp, MirKernelAxis,
-    MirKernelBuiltin, MirTensorMath,
+    MirKernelBuiltin, MirMathFunction,
 };
 
 /// [`DefId`] partition threshold: [`DefId`]s below this value are compiler-injected

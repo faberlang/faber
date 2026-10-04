@@ -6,7 +6,7 @@
 use super::*;
 
 use radix_mir::{MirCollectionOp, MirIntrinsic, MirRuntimeCall, MirType};
-use radix_types::{MirTensorMath, NumericWidth, Primitive, Type, TypeId};
+use radix_types::{MirMathFunction, NumericWidth, Primitive, Type, TypeId};
 
 fn function() -> MirFunction {
     MirFunction {
@@ -42,7 +42,7 @@ fn int_element(width: NumericWidth) -> Type {
 /// Run `function` over `input` (given shape) with `element` as the result
 /// element type.
 fn run(
-    function_under_test: MirTensorMath,
+    function_under_test: MirMathFunction,
     element: Type,
     shape: &[i64],
     input: Vec<Value>,
@@ -100,7 +100,7 @@ fn elements(result: Value) -> (Vec<Value>, Vec<i64>) {
 }
 
 fn float_result(
-    function: MirTensorMath,
+    function: MirMathFunction,
     width: NumericWidth,
     shape: &[i64],
     input: &[f64],
@@ -132,14 +132,14 @@ fn assert_floats(actual: &[f64], expected: &[f64]) {
 #[test]
 fn sqrt_domain_miss_is_nan_and_zero_keeps_its_sign() {
     let out = float_result(
-        MirTensorMath::Sqrt,
+        MirMathFunction::Sqrt,
         NumericWidth::F64,
         &[6],
         &[4.0, -1.0, 0.0, -0.0, f64::INFINITY, f64::NAN],
     );
     assert_floats(&out, &[2.0, f64::NAN, 0.0, -0.0, f64::INFINITY, f64::NAN]);
     let negative_infinity = float_result(
-        MirTensorMath::Sqrt,
+        MirMathFunction::Sqrt,
         NumericWidth::F64,
         &[1],
         &[f64::NEG_INFINITY],
@@ -150,7 +150,7 @@ fn sqrt_domain_miss_is_nan_and_zero_keeps_its_sign() {
 #[test]
 fn exp_overflows_to_infinity_and_underflows_to_zero() {
     let out = float_result(
-        MirTensorMath::Exp,
+        MirMathFunction::Exp,
         NumericWidth::F64,
         &[6],
         &[0.0, 1.0, 710.0, -746.0, f64::INFINITY, f64::NEG_INFINITY],
@@ -166,12 +166,12 @@ fn exp_overflows_to_infinity_and_underflows_to_zero() {
             0.0,
         ],
     );
-    assert!(float_result(MirTensorMath::Exp, NumericWidth::F64, &[1], &[f64::NAN])[0].is_nan());
+    assert!(float_result(MirMathFunction::Exp, NumericWidth::F64, &[1], &[f64::NAN])[0].is_nan());
 }
 
 #[test]
 fn ln_and_log10_domain_edges() {
-    for function in [MirTensorMath::Ln, MirTensorMath::Log10] {
+    for function in [MirMathFunction::Ln, MirMathFunction::Log10] {
         let out = float_result(
             function,
             NumericWidth::F64,
@@ -190,7 +190,7 @@ fn ln_and_log10_domain_edges() {
         );
     }
     let out = float_result(
-        MirTensorMath::Log10,
+        MirMathFunction::Log10,
         NumericWidth::F64,
         &[3],
         &[10.0, 100.0, 1000.0],
@@ -201,21 +201,21 @@ fn ln_and_log10_domain_edges() {
 #[test]
 fn trig_special_values() {
     let sin = float_result(
-        MirTensorMath::Sin,
+        MirMathFunction::Sin,
         NumericWidth::F64,
         &[4],
         &[0.0, -0.0, f64::INFINITY, f64::NAN],
     );
     assert_floats(&sin, &[0.0, -0.0, f64::NAN, f64::NAN]);
     let cos = float_result(
-        MirTensorMath::Cos,
+        MirMathFunction::Cos,
         NumericWidth::F64,
         &[3],
         &[0.0, f64::INFINITY, f64::NAN],
     );
     assert_floats(&cos, &[1.0, f64::NAN, f64::NAN]);
     let tan = float_result(
-        MirTensorMath::Tan,
+        MirMathFunction::Tan,
         NumericWidth::F64,
         &[3],
         &[0.0, -0.0, f64::INFINITY],
@@ -226,7 +226,7 @@ fn trig_special_values() {
 #[test]
 fn abs_clears_the_sign_bit_of_floats() {
     let out = float_result(
-        MirTensorMath::Abs,
+        MirMathFunction::Abs,
         NumericWidth::F64,
         &[6],
         &[-2.5, 3.0, -0.0, 0.0, f64::NEG_INFINITY, f64::NAN],
@@ -237,19 +237,19 @@ fn abs_clears_the_sign_bit_of_floats() {
 #[test]
 fn f32_elements_round_through_f32() {
     // sqrt(2) in f64 is not an f32; the stored element is the nearest f32.
-    let out = float_result(MirTensorMath::Sqrt, NumericWidth::F32, &[1], &[2.0]);
+    let out = float_result(MirMathFunction::Sqrt, NumericWidth::F32, &[1], &[2.0]);
     assert_eq!(out[0], f64::from(2.0f32.sqrt()));
     assert_ne!(out[0], 2.0f64.sqrt());
     // f32 overflow: exp(100) fits f64 but not f32.
-    let overflow = float_result(MirTensorMath::Exp, NumericWidth::F32, &[1], &[100.0]);
+    let overflow = float_result(MirMathFunction::Exp, NumericWidth::F32, &[1], &[100.0]);
     assert_eq!(overflow[0], f64::INFINITY);
-    let wide = float_result(MirTensorMath::Exp, NumericWidth::F64, &[1], &[100.0]);
+    let wide = float_result(MirMathFunction::Exp, NumericWidth::F64, &[1], &[100.0]);
     assert!(wide[0].is_finite());
 }
 
 #[test]
 fn empty_tensor_stays_empty_with_its_shape() {
-    for function in MirTensorMath::ALL {
+    for function in MirMathFunction::ALL {
         let (data, shape) = elements(
             run(function, float_element(NumericWidth::F32), &[0], vec![]).expect("empty runs"),
         );
@@ -263,7 +263,7 @@ fn shape_is_preserved_for_ranks_one_to_three() {
     for shape in [vec![3], vec![2, 3], vec![2, 1, 2]] {
         let count: i64 = shape.iter().product();
         let input: Vec<f64> = (0..count).map(|value| value as f64 + 1.0).collect();
-        for function in MirTensorMath::ALL {
+        for function in MirMathFunction::ALL {
             let out = float_result(function, NumericWidth::F64, &shape, &input);
             assert_eq!(out.len() as i64, count, "{}", function.name());
         }
@@ -275,7 +275,7 @@ fn integer_abs_is_exact_and_typed_by_the_result_element() {
     // The range rule types `absolutum` of an `i8` as `u8`, so `|-128|` fits.
     let (data, _) = elements(
         run(
-            MirTensorMath::Abs,
+            MirMathFunction::Abs,
             int_element(NumericWidth::U8),
             &[3],
             ints(&[-128, 5, 0]),
@@ -285,7 +285,7 @@ fn integer_abs_is_exact_and_typed_by_the_result_element() {
     assert_eq!(data, ints(&[128, 5, 0]));
     // A device function keeps the element type: `|-128|` does not fit `i8`.
     let err = run(
-        MirTensorMath::Abs,
+        MirMathFunction::Abs,
         int_element(NumericWidth::I8),
         &[1],
         ints(&[-128]),
@@ -296,7 +296,7 @@ fn integer_abs_is_exact_and_typed_by_the_result_element() {
 
 #[test]
 fn integer_elements_are_rejected_by_float_only_functions() {
-    for function in MirTensorMath::ALL.into_iter().filter(|f| f.float_only()) {
+    for function in MirMathFunction::ALL.into_iter().filter(|f| f.float_only()) {
         let err = run(function, int_element(NumericWidth::I32), &[1], ints(&[4]))
             .expect_err("float-only function on integers");
         assert_eq!(

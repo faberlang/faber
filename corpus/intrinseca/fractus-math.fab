@@ -1,0 +1,87 @@
++++
+term = "fractus-math"
+kind = "method"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "width_type_sugar", "redde_stmt", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "intrinseca"
+canonical = false
+summary = "Built-in math functions as methods on a scalar float: sqrt, exp, ln, log10, sin, cos, tan."
+syntax = "x.sqrt() | x.exp() | x.ln() | x.log10() | x.sin() | x.cos() | x.tan()"
+related = ["tensor", "fractus", "intrinseca"]
+locale = "en"
++++
+# =============================================================================
+# fractus-math — Built-in math functions as methods on a scalar float
+# =============================================================================
+#
+# What this teaches:
+#   • Scalar math methods — `sqrt`, `exp`, `ln`, `log10`, `sin`, `cos`, `tan` on an `f32` or `f64` receiver
+#   • Same names as the tensor lift — a tensor applies the same function to each element
+#   • IEEE results — a domain miss is NaN, an overflow is infinity, nothing traps
+#   • Width at the result — the math runs unbounded and an `f32` result is rounded where it lands
+#
+# Common mistakes:
+#   • calling `sqrt` on an integer — convert to a float first; only `abs` takes integers
+#   • expecting `sqrt` of a negative number to fail — it is NaN, as in IEEE
+#
+# See also: tensor, fractus, intrinseca
+# =============================================================================
+
+# intrinseca/fractus-math — scalar math methods
+#
+# WHY: the kernel spelling for scalar math is a method, like `abs` and `power`
+# (`x.sqrt()`, not a free function), so one name works on a scalar and, lifted,
+# on a tensor.
+#
+# EXPECTED stdout: see fractus-math.expected
+
+fn root32(f32 x) → f32 {
+    return x.sqrt()
+}
+
+fn root64(f64 x) → f64 {
+    return x.sqrt()
+}
+
+fn logged(f64 x) → f64 {
+    return x.ln()
+}
+
+fn decade(f64 x) → f64 {
+    return x.log10()
+}
+
+fn grown64(f64 x) → f64 {
+    return x.exp()
+}
+
+fn grown32(f32 x) → f32 {
+    return x.exp()
+}
+
+fn sine32(f32 x) → f32 {
+    return x.sin()
+}
+
+fn cosine64(f64 x) → f64 {
+    return x.cos()
+}
+
+fn tangent64(f64 x) → f64 {
+    return x.tan()
+}
+
+main {
+    print root32(2.0)
+    print root64(2.0)
+    print root64(-1.0)
+    print logged(0.0)
+    print logged(-1.0)
+    print decade(1000.0)
+    print grown64(1000.0)
+    print grown64(1000.0) - grown64(1000.0)
+    print grown32(89.0)
+    print grown32(1.0)
+    print sine32(1.0)
+    print cosine64(0.0)
+    print tangent64(0.5)
+}

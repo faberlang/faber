@@ -2627,6 +2627,10 @@ help = "use numeric operands for this operator"
 message = "tensor `*` tensor is unsupported; use ⊙ (elementwise) or · (contraction)"
 help = "use ⊙ for elementwise multiplication or · for contraction"
 
+[diagnostics.SEM011.issues.vector_multiply_requires_glyph]
+message = "vector `*` vector is unsupported; use ⊙ (elementwise) or · (dot product)"
+help = "use ⊙ for elementwise multiplication or · for the dot product"
+
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "numeric arithmetic operands must have identical types; use ↦ to convert explicitly"
 help = "convert operands explicitly before applying this numeric operator"

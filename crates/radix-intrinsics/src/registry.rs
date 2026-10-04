@@ -5,7 +5,7 @@
 //! lowering adapters; they must not grow parallel string tables for promoted
 //! intrinsics.
 
-use radix_types::{GenericParamSort, MirAtomicOp, MirCollectionOp, MirTensorMath};
+use radix_types::{GenericParamSort, MirAtomicOp, MirCollectionOp, MirMathFunction};
 
 /// Compiler-owned intrinsic receiver families.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -249,6 +249,22 @@ macro_rules! intrinsic {
             value_arity_issue: None,
         }
     };
+    ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, scalar_math $function:ident) => {
+        MethodIntrinsic {
+            receiver: IntrinsicReceiver::$receiver,
+            faber_name: $name,
+            generic: &[],
+            arg_count: $args,
+            params: $params,
+            return_kind: IntrinsicReturnKind::$ret,
+            mir_kind: IntrinsicMirKind::Collection(MirCollectionOp::ScalarMath(
+                MirMathFunction::$function,
+            )),
+            missing_generic_issue: None,
+            excess_generic_issue: None,
+            value_arity_issue: None,
+        }
+    };
     ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, math $function:ident) => {
         MethodIntrinsic {
             receiver: IntrinsicReceiver::$receiver,
@@ -258,7 +274,7 @@ macro_rules! intrinsic {
             params: $params,
             return_kind: IntrinsicReturnKind::$ret,
             mir_kind: IntrinsicMirKind::Collection(MirCollectionOp::TensorMath(
-                MirTensorMath::$function,
+                MirMathFunction::$function,
             )),
             missing_generic_issue: None,
             excess_generic_issue: None,
@@ -713,6 +729,17 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Fractus, "rotunda", 0, &[], NumerusFromFractus, collection Round),
     intrinsic!(Fractus, "tectum", 0, &[], NumerusFromFractus, collection Ceiling),
     intrinsic!(Fractus, "trunca", 0, &[], NumerusFromFractus, collection Truncate),
+    // Scalar built-in math functions on a float (the kernel spelling
+    // `x.sqrt()`, `x.sin()`): the same functions, Latin names and IEEE
+    // semantics as the tensor lift below. Scalar `absolutum` is the numeric
+    // row above.
+    intrinsic!(Fractus, "radix", 0, &[], SameAsReceiver, scalar_math Sqrt),
+    intrinsic!(Fractus, "exponentia", 0, &[], SameAsReceiver, scalar_math Exp),
+    intrinsic!(Fractus, "logarithmus", 0, &[], SameAsReceiver, scalar_math Ln),
+    intrinsic!(Fractus, "logarithmus_decimalis", 0, &[], SameAsReceiver, scalar_math Log10),
+    intrinsic!(Fractus, "sinus", 0, &[], SameAsReceiver, scalar_math Sin),
+    intrinsic!(Fractus, "cosinus", 0, &[], SameAsReceiver, scalar_math Cos),
+    intrinsic!(Fractus, "tangens", 0, &[], SameAsReceiver, scalar_math Tan),
     intrinsic!(Sparsa, "accipe", 1, &[IntrinsicParamKind::NumerusArray], Inner, collection SparseGet),
     intrinsic!(Sparsa, "densata", 0, &[], DenseFromSparsa, collection SparseDensify),
     intrinsic!(Sparsa, "longitudo", 0, &[], Numerus, collection Length),

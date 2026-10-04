@@ -1881,6 +1881,10 @@ help = "为此运算符使用 numeric operands"
 message = "不支持 tensor `*` tensor；逐元素乘法请用 ⊙，缩并请用 ·"
 help = "逐元素乘法请用 ⊙，缩并请用 ·"
 
+[diagnostics.SEM011.issues.vector_multiply_requires_glyph]
+message = "不支持 vector `*` vector；逐元素乘法请用 ⊙，点积请用 ·"
+help = "逐元素乘法请用 ⊙，点积请用 ·"
+
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "numeric arithmetic operands 必须类型完全一致；请用 ↦ 显式转换"
 help = "在应用此 numeric 运算符之前显式转换 operands"

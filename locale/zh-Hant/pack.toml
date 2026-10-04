@@ -1881,6 +1881,10 @@ help = "對此運算子使用數值運算元"
 message = "不支援 tensor `*` tensor；逐元素乘法請用 ⊙，縮併請用 ·"
 help = "逐元素乘法請用 ⊙，縮併請用 ·"
 
+[diagnostics.SEM011.issues.vector_multiply_requires_glyph]
+message = "不支援 vector `*` vector；逐元素乘法請用 ⊙，點積請用 ·"
+help = "逐元素乘法請用 ⊙，點積請用 ·"
+
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "數值算術運算元必須具有相同型別；使用 ↦ 進行明確轉換"
 help = "套用此數值運算子前，先明確轉換運算元"

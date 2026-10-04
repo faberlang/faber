@@ -2399,6 +2399,10 @@ help = "use numeric operands for this operator"
 message = "tensor `*` tensor non licet; utere ⊙ (elementwise) aut · (contractio)"
 help = "utere ⊙ ad multiplicationem elementwise aut · ad contractionem"
 
+[diagnostics.SEM011.issues.vector_multiply_requires_glyph]
+message = "vector `*` vector non licet; utere ⊙ (elementwise) aut · (productum)"
+help = "utere ⊙ ad multiplicationem elementwise aut · ad productum"
+
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "numeric arithmetic operands must have identical types; use ↦ to convert explicitly"
 help = "convert operands explicitly before applying this numeric operator"

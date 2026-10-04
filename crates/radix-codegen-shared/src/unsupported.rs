@@ -52,8 +52,8 @@ pub fn lifted_tensor_math(
     types: &radix_types::TypeTable,
     receiver_ty: Option<radix_types::TypeId>,
     method_name: &str,
-) -> Option<radix_types::MirTensorMath> {
-    let function = radix_types::MirTensorMath::from_latin_name(method_name)?;
+) -> Option<radix_types::MirMathFunction> {
+    let function = radix_types::MirMathFunction::from_latin_name(method_name)?;
     let mut id = receiver_ty?;
     loop {
         match types.get(id) {
@@ -67,7 +67,10 @@ pub fn lifted_tensor_math(
 /// Fail-closed diagnostic for a lifted tensor math function on a target with
 /// no tensor math lowering (only the MIR runner and Rust lower them).
 #[must_use]
-pub fn tensor_math_function(function: radix_types::MirTensorMath, target: Target) -> CodegenError {
+pub fn tensor_math_function(
+    function: radix_types::MirMathFunction,
+    target: Target,
+) -> CodegenError {
     CodegenError {
         message: format!(
             "tensor math function `{}` is not supported on the {} target",
@@ -76,6 +79,54 @@ pub fn tensor_math_function(function: radix_types::MirTensorMath, target: Target
         ),
         args: vec![
             DiagnosticArg::new("issue", "tensor_math_function_unsupported"),
+            DiagnosticArg::new("function", function.name()),
+            DiagnosticArg::new("target", target_name(target)),
+        ],
+    }
+}
+
+/// The built-in scalar math function a method call spells, when its receiver
+/// is a scalar float (`x.sqrt()`, `x.sin()`). Scalar `absolutum` is a numeric
+/// method every target already lowers, so it is never reported here. The
+/// method name is the canonical Latin registry spelling, which typecheck has
+/// already written into the HIR.
+#[must_use]
+pub fn scalar_math(
+    types: &radix_types::TypeTable,
+    receiver_ty: Option<radix_types::TypeId>,
+    method_name: &str,
+) -> Option<radix_types::MirMathFunction> {
+    let function = radix_types::MirMathFunction::SCALAR
+        .into_iter()
+        .find(|function| function.latin_name() == method_name)?;
+    let mut id = receiver_ty?;
+    loop {
+        match types.get(id) {
+            radix_types::Type::Alias(_, inner) | radix_types::Type::Ref(_, inner) => id = *inner,
+            radix_types::Type::Primitive(radix_types::Primitive::Fractus)
+            | radix_types::Type::SizedNumeric(radix_types::Primitive::Fractus, _) => {
+                return Some(function);
+            }
+            _ => return None,
+        }
+    }
+}
+
+/// Fail-closed diagnostic for a scalar math function on a target with no
+/// scalar math lowering (only the MIR runner and Rust lower them).
+#[must_use]
+pub fn scalar_math_function(
+    function: radix_types::MirMathFunction,
+    target: Target,
+) -> CodegenError {
+    CodegenError {
+        message: format!(
+            "scalar math function `{}` is not supported on the {} target",
+            function.name(),
+            target_name(target)
+        ),
+        args: vec![
+            DiagnosticArg::new("issue", "scalar_math_function_unsupported"),
             DiagnosticArg::new("function", function.name()),
             DiagnosticArg::new("target", target_name(target)),
         ],

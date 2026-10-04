@@ -542,6 +542,29 @@ fn nested_filum_metadata_survives_reemission() {
 }
 
 #[test]
+fn scalar_math_and_vector_lift_survive_reemission() {
+    // A2-LIFT: the scalar math method keeps its spelling, and the vector
+    // operators keep their operand order and parentheses (`s - v` is not
+    // `v - s`; `-(v * s)` is not `(-v) * s`).
+    let code = assert_idempotent(
+        "functio f(f32 x, vector<f32, 3> v) → vector<f32, 3> {\n    redde x.radix() - (v * x.sinus()) / x\n}\nfunctio g(f32 x, vector<f32, 3> v) → vector<f32, 3> {\n    redde -(v + x)\n}\n",
+    );
+    assert!(
+        code.contains("x.radix()") && code.contains("x.sinus()"),
+        "scalar math methods must survive:\n{code}"
+    );
+    assert!(
+        code.contains("x.radix() - (v * x.sinus()) / x")
+            || code.contains("x.radix() - v * x.sinus() / x"),
+        "vector lift operand order must survive:\n{code}"
+    );
+    assert!(
+        code.contains("-(v + x)"),
+        "negated sum keeps its parentheses:\n{code}"
+    );
+}
+
+#[test]
 fn reduction_sum_reemits_source_shape() {
     let code = assert_idempotent(
         "functio total(tensor<f32, [8]> a) → f32 {\n    redde reducta via summa ex a apud [i] fixum s { redde s }\n}\n",

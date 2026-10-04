@@ -9,6 +9,12 @@
 //! runs, naming the operator and the target, so no backend can miscompile
 //! them silently. Tensor `+ -` against a tensor of the same element type and
 //! the `⊙ ⊘` products keep their emitters.
+//!
+//! The register-vector forms are gated the same way under their own issue,
+//! `vector_lift_unsupported_on_target`: `+ - * / %` between a vector and a
+//! scalar and unary `-` on a vector. Their per-lane unrolling happens in MIR,
+//! so only the MIR-backed targets execute them; vector with vector `+ -`
+//! keeps its own emitters.
 
 use crate::CodegenError;
 use radix_diagnostics::DiagnosticArg;
@@ -19,6 +25,14 @@ use radix_target::Target;
 use radix_types::{Type, TypeId, TypeTable};
 
 const ISSUE: &str = "tensor_lift_unsupported_on_target";
+const VECTOR_ISSUE: &str = "vector_lift_unsupported_on_target";
+
+/// Which container a lifted form operates on.
+#[derive(Clone, Copy)]
+enum Family {
+    Tensor,
+    Vector,
+}
 
 /// # Errors
 ///
@@ -33,14 +47,16 @@ pub fn reject_tensor_lift(
         types: &'a TypeTable,
         interner: &'a Interner,
         target: Target,
-        found: Option<String>,
+        found: Option<(Family, String)>,
     }
     impl HirVisitor for Gate<'_> {
         fn visit_expr(&mut self, expr: &HirExpression) {
             if self.found.is_some() {
                 return;
             }
-            self.found = lifted_form(self.types, self.interner, self.target, expr);
+            self.found = lifted_form(self.types, self.interner, self.target, expr)
+                .map(|label| (Family::Tensor, label))
+                .or_else(|| vector_form(self.types, expr).map(|label| (Family::Vector, label)));
             if self.found.is_none() {
                 walk_expr(self, expr);
             }
@@ -58,13 +74,24 @@ pub fn reject_tensor_lift(
     walk_program(&mut gate, hir);
     match gate.found {
         None => Ok(()),
-        Some(label) => Err(CodegenError {
+        Some((Family::Tensor, label)) => Err(CodegenError {
             message: format!(
                 "tensor elementwise {label} is not supported on the {target:?} target: \
                  the lifted operator has only the MIR runner as its executor"
             ),
             args: vec![
                 DiagnosticArg::new("issue", ISSUE),
+                DiagnosticArg::new("op", label),
+                DiagnosticArg::new("target", format!("{target:?}")),
+            ],
+        }),
+        Some((Family::Vector, label)) => Err(CodegenError {
+            message: format!(
+                "vector {label} against a scalar is not supported on the {target:?} target: \
+                 the lanes are unrolled only on MIR-backed targets"
+            ),
+            args: vec![
+                DiagnosticArg::new("issue", VECTOR_ISSUE),
                 DiagnosticArg::new("op", label),
                 DiagnosticArg::new("target", format!("{target:?}")),
             ],
@@ -80,6 +107,44 @@ fn tensor_element(types: &TypeTable, ty: Option<TypeId>) -> Option<TypeId> {
     }
     match types.get(ty) {
         Type::Tensor(element, _) => Some(*element),
+        _ => None,
+    }
+}
+
+/// Whether a type is a register vector, aliases and access markers peeled.
+fn is_vector(types: &TypeTable, ty: Option<TypeId>) -> bool {
+    let Some(ty) = ty else { return false };
+    let mut ty = types.peel_access_marker(ty).1;
+    while let Type::Alias(_, inner) = types.get(ty) {
+        ty = *inner;
+    }
+    matches!(types.get(ty), Type::Vector(..))
+}
+
+/// The label of a vector form lifted against a scalar, when `expr` is one.
+fn vector_form(types: &TypeTable, expr: &HirExpression) -> Option<String> {
+    match &expr.kind {
+        HirExpressionKind::Binary(op, lhs, rhs) => {
+            let spelling = match op {
+                HirBinOp::Add => "+",
+                HirBinOp::Sub => "-",
+                HirBinOp::Mul => "*",
+                HirBinOp::Div => "/",
+                HirBinOp::Mod => "%",
+                _ => return None,
+            };
+            // Vector with vector `+ -` keeps its emitters; a pair that is not
+            // vector-with-scalar is not this form.
+            let scalar = |operand: &HirExpression| {
+                tensor_element(types, operand.ty).is_none() && !is_vector(types, operand.ty)
+            };
+            let against_scalar = (is_vector(types, lhs.ty) && scalar(rhs))
+                || (is_vector(types, rhs.ty) && scalar(lhs));
+            against_scalar.then(|| spelling.to_owned())
+        }
+        HirExpressionKind::Unary(HirUnOp::Neg, operand) => {
+            is_vector(types, operand.ty).then(|| "-".to_owned())
+        }
         _ => None,
     }
 }

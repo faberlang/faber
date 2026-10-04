@@ -3491,6 +3491,56 @@ fn absolute_of_sized_numerus_takes_a_range_typed_integer_result() {
     );
 }
 
+// ── ScalarMath (A2-LIFT G01): float-only scalar math functions ─────────
+
+#[test]
+fn scalar_math_float_receivers_are_valid_for_every_function() {
+    for function in radix_types::MirMathFunction::SCALAR {
+        let op = MirCollectionOp::ScalarMath(function);
+        let mut types = TypeTable::new();
+        for receiver_ty in [f32_receiver_mty(&mut types), fractus_mty(&mut types)] {
+            let program = unary_scalar_collection_program(&mut types, op, receiver_ty, receiver_ty);
+            let errors = validate(&program, &types);
+            assert!(errors.is_empty(), "{op:?}: {errors:?}");
+        }
+    }
+}
+
+#[test]
+fn scalar_math_rejects_an_integer_receiver() {
+    for function in radix_types::MirMathFunction::SCALAR {
+        let op = MirCollectionOp::ScalarMath(function);
+        let mut types = TypeTable::new();
+        for receiver_ty in [numerus_mty(&mut types), i32_receiver_mty(&mut types)] {
+            let program = unary_scalar_collection_program(&mut types, op, receiver_ty, receiver_ty);
+            assert!(
+                validate(&program, &types)
+                    .iter()
+                    .any(|e| e.contains("scalar math receiver is not fractus")),
+                "{op:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn scalar_math_result_must_be_the_receiver_type() {
+    let mut types = TypeTable::new();
+    let receiver_ty = f32_receiver_mty(&mut types);
+    let wider = fractus_mty(&mut types);
+    let program = unary_scalar_collection_program(
+        &mut types,
+        MirCollectionOp::ScalarMath(radix_types::MirMathFunction::Sqrt),
+        receiver_ty,
+        wider,
+    );
+    assert!(
+        validate(&program, &types)
+            .iter()
+            .any(|e| e.contains("scalar math result type mismatch"))
+    );
+}
+
 // -----------------------------------------------------------------------
 // GI3-1: TensorCausalMaskedSoftmax MIR validation (the causal masked-row
 // softmax op the CausalMaskedSoftmax recipe resolves from).

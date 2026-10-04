@@ -93,6 +93,7 @@ mod runtime_shape_tests;
 mod stmt;
 mod tensor_lift;
 mod union_dispatch;
+mod vector_lift;
 
 use context::{LoweringContextMaps, function_param_map, struct_field_map};
 use expr::HirExpressionLoweringVisitor;
@@ -2992,7 +2993,7 @@ impl<'a> FunctionBuilder<'a> {
 
     /// Whether `ty` is an integer slot whose policy a store applies: a
     /// trapping `numerus`, a `wrapping` or a `saturating` word.
-    fn is_integer_store_slot(&self, ty: MirType) -> bool {
+    pub(super) fn is_integer_store_slot(&self, ty: MirType) -> bool {
         match self.normalized_type(self.types.peel_access_marker(ty.semantic_id()).1) {
             // Every integer slot takes the node: at the cap the exact successor
             // (`i64::MAX + 1`) is a value the carrier holds, so only the store
@@ -3320,6 +3321,11 @@ impl<'a> FunctionBuilder<'a> {
         if let Some(lift) = self.tensor_lift_unary_op(op, operand) {
             return self.lower_tensor_lift(lift, &[operand], expr);
         }
+        if op == HirUnOp::Neg
+            && let Some(lowered) = self.lower_vector_negate(operand, expr)
+        {
+            return lowered;
+        }
         let Some(mir_op) = mir_un_op(op) else {
             self.errors
                 .push(MirError::unsupported(expr.span, "unary operator without a MIR primitive"));
@@ -3388,6 +3394,10 @@ impl<'a> FunctionBuilder<'a> {
         // operands are always evaluated, so it precedes the short-circuit.
         if let Some(lift) = self.tensor_lift_binary_op(op, lhs, rhs) {
             return self.lower_tensor_lift(lift, &[lhs, rhs], expr);
+        }
+        // A scalar operator against a register vector unrolls per lane.
+        if let Some(lowered) = self.lower_vector_scalar_binary(op, lhs, rhs, expr) {
+            return lowered;
         }
         if matches!(op, HirBinOp::And | HirBinOp::Or) {
             return self.lower_logical_short_circuit(op, lhs, rhs, expr);

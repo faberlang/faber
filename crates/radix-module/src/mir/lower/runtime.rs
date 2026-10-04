@@ -1442,7 +1442,12 @@ impl FunctionBuilder<'_> {
     /// A vector operand the expander can read lanes from: a temp or an
     /// unprojected place. Anything else (a projected place, a value, a
     /// constant) is copied into a temp first.
-    fn vector_operand_place(&mut self, operand: MirOperand, ty: MirType, span: Span) -> MirOperand {
+    pub(super) fn vector_operand_place(
+        &mut self,
+        operand: MirOperand,
+        ty: MirType,
+        span: Span,
+    ) -> MirOperand {
         match operand {
             MirOperand::Temp(_) => operand,
             MirOperand::Place(ref place) if place.projections.is_empty() => operand,

@@ -1090,14 +1090,29 @@ pub enum MirIntrinsic {
 
 /// The vector method a [`MirIntrinsic::VectorOp`] defers.
 ///
-/// Arity: `Length`, `Normalized`, `Crea` and `Swizzle` take one operand (the
-/// receiver; `Crea` uses only its declared shape), everything else takes two
+/// Arity: `Length`, `Normalized`, `Negate`, `Crea` and `Swizzle` take one
+/// operand (the receiver; `Crea` uses only its declared shape), everything else takes two
 /// (receiver, peer). `Swizzle` carries resolved lane indices, never a symbol,
 /// so symbol remapping needs no rewrite.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirVectorOp {
     /// Lane-wise binary operator (`+`, `-`, `*`, `/`, ...).
     Elementwise(MirBinOp),
+    /// Lane-wise binary operator against one scalar operand (the peer is a
+    /// scalar, not a vector): lane `i` is `lane[i] op scalar`, or
+    /// `scalar op lane[i]` when `scalar_first` (`s - v`, `s / v`). Operands
+    /// are always `[vector, scalar]`, whichever side the scalar was written.
+    /// With `checked`, each lane is stored under the result element type with
+    /// the integer store trap (an exact lane that leaves its range traps).
+    ElementwiseScalar {
+        op: MirBinOp,
+        scalar_first: bool,
+        checked: bool,
+    },
+    /// Lane-wise negation (`-v`); `checked` as for [`Self::ElementwiseScalar`].
+    Negate {
+        checked: bool,
+    },
     Dot,
     Cross,
     Length,
@@ -1112,8 +1127,12 @@ impl MirVectorOp {
     #[must_use]
     pub fn arity(&self) -> usize {
         match self {
-            Self::Length | Self::Normalized | Self::Crea | Self::Swizzle(_) => 1,
-            Self::Elementwise(_) | Self::Dot | Self::Cross => 2,
+            Self::Length
+            | Self::Normalized
+            | Self::Negate { .. }
+            | Self::Crea
+            | Self::Swizzle(_) => 1,
+            Self::Elementwise(_) | Self::ElementwiseScalar { .. } | Self::Dot | Self::Cross => 2,
         }
     }
 
@@ -1122,6 +1141,8 @@ impl MirVectorOp {
     pub fn name(&self) -> &'static str {
         match self {
             Self::Elementwise(_) => "elementwise",
+            Self::ElementwiseScalar { .. } => "elementwise_scalar",
+            Self::Negate { .. } => "negate",
             Self::Dot => "dot",
             Self::Cross => "cross",
             Self::Length => "length",

@@ -2,11 +2,11 @@
 //! whose Latin name is the function's own and whose MIR op is that function.
 
 use super::*;
-use radix_types::MirTensorMath;
+use radix_types::MirMathFunction;
 
 #[test]
 fn every_lifted_function_has_one_tensor_row_under_its_latin_name() {
-    for function in MirTensorMath::ALL {
+    for function in MirMathFunction::ALL {
         let entry = lookup_method(IntrinsicReceiver::Tensor, function.latin_name(), 0)
             .unwrap_or_else(|| panic!("no tensor row for {}", function.latin_name()));
         assert_eq!(entry.return_kind, IntrinsicReturnKind::SameAsReceiver);
@@ -18,7 +18,7 @@ fn every_lifted_function_has_one_tensor_row_under_its_latin_name() {
             function.latin_name()
         );
         assert_eq!(
-            MirTensorMath::from_latin_name(function.latin_name()),
+            MirMathFunction::from_latin_name(function.latin_name()),
             Some(function)
         );
     }
@@ -35,7 +35,7 @@ fn no_tensor_row_lowers_to_an_unlisted_math_function() {
             )
         })
         .count();
-    assert_eq!(rows, MirTensorMath::ALL.len());
+    assert_eq!(rows, MirMathFunction::ALL.len());
     assert!(
         INTRINSICS
             .iter()
@@ -49,34 +49,49 @@ fn no_tensor_row_lowers_to_an_unlisted_math_function() {
 
 #[test]
 fn only_absolutum_takes_integer_elements() {
-    let float_only: Vec<_> = MirTensorMath::ALL
+    let float_only: Vec<_> = MirMathFunction::ALL
         .into_iter()
         .filter(|function| function.float_only())
-        .map(MirTensorMath::latin_name)
+        .map(MirMathFunction::latin_name)
         .collect();
     assert!(!float_only.contains(&"absolutum"));
-    assert_eq!(float_only.len(), MirTensorMath::ALL.len() - 1);
+    assert_eq!(float_only.len(), MirMathFunction::ALL.len() - 1);
 }
 
 #[test]
-fn scalars_do_not_gain_the_tensor_only_math_names() {
-    // Scalar math stays `absolutum` (numeric) plus the `norma:math` module;
-    // the lifted names are tensor rows, not numeric methods.
-    for name in [
-        "radix",
-        "exponentia",
-        "logarithmus",
-        "sinus",
-        "cosinus",
-        "tangens",
-    ] {
-        assert!(
-            lookup_method(IntrinsicReceiver::Numeric, name, 0).is_none(),
-            "{name}"
+fn every_scalar_function_has_one_fractus_row_and_no_integer_row() {
+    // Scalar `absolutum` is the numeric `Absolute` row; the other seven are
+    // float-only rows, so an integer receiver has no such method.
+    for function in MirMathFunction::SCALAR {
+        let entry = lookup_method(IntrinsicReceiver::Fractus, function.latin_name(), 0)
+            .unwrap_or_else(|| panic!("no fractus row for {}", function.latin_name()));
+        assert_eq!(entry.return_kind, IntrinsicReturnKind::SameAsReceiver);
+        assert!(entry.params.is_empty() && entry.generic.is_empty());
+        assert_eq!(
+            mir_collection_op(entry),
+            Some(MirCollectionOp::ScalarMath(function)),
+            "{} row lowers to the wrong function",
+            function.latin_name()
         );
         assert!(
-            lookup_method(IntrinsicReceiver::Fractus, name, 0).is_none(),
-            "{name}"
+            lookup_method(IntrinsicReceiver::Numeric, function.latin_name(), 0).is_none(),
+            "{} must not be a numeric (integer) method",
+            function.latin_name()
         );
     }
+    let scalar_rows = INTRINSICS
+        .iter()
+        .filter(|entry| {
+            matches!(
+                mir_collection_op(entry),
+                Some(MirCollectionOp::ScalarMath(_))
+            )
+        })
+        .count();
+    assert_eq!(scalar_rows, MirMathFunction::SCALAR.len());
+    assert!(!MirMathFunction::SCALAR.contains(&MirMathFunction::Abs));
+    assert_eq!(
+        MirMathFunction::SCALAR.len(),
+        MirMathFunction::ALL.len() - 1
+    );
 }

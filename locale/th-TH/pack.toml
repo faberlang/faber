@@ -1893,6 +1893,10 @@ help = "ใช้ตัวถูกดำเนินการตัวเลข
 message = "ไม่รองรับ tensor `*` tensor; ใช้ ⊙ สำหรับการคูณรายองค์ประกอบ หรือ · สำหรับ contraction"
 help = "ใช้ ⊙ สำหรับการคูณรายองค์ประกอบ หรือ · สำหรับ contraction"
 
+[diagnostics.SEM011.issues.vector_multiply_requires_glyph]
+message = "ไม่รองรับ vector `*` vector; ใช้ ⊙ สำหรับการคูณรายองค์ประกอบ หรือ · สำหรับผลคูณจุด"
+help = "ใช้ ⊙ สำหรับการคูณรายองค์ประกอบ หรือ · สำหรับผลคูณจุด"
+
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "ตัวถูกดำเนินการเลขคณิตเชิงตัวเลขต้องมีชนิดเหมือนกัน ใช้ ↦ เพื่อแปลงอย่างชัดเจน"
 help = "แปลงตัวถูกดำเนินการอย่างชัดเจนก่อนใช้ตัวดำเนินการตัวเลขนี้"

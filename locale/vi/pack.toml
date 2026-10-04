@@ -1881,6 +1881,10 @@ help = "dùng các toán hạng số cho toán tử này"
 message = "không hỗ trợ tensor `*` tensor; dùng ⊙ (nhân theo phần tử) hoặc · (tích co)"
 help = "dùng ⊙ để nhân theo phần tử hoặc · để lấy tích co"
 
+[diagnostics.SEM011.issues.vector_multiply_requires_glyph]
+message = "không hỗ trợ vector `*` vector; dùng ⊙ (nhân theo phần tử) hoặc · (tích vô hướng)"
+help = "dùng ⊙ để nhân theo phần tử hoặc · để lấy tích vô hướng"
+
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "các toán hạng số học phải có kiểu giống hệt nhau; dùng ↦ để chuyển đổi rõ ràng"
 help = "chuyển đổi rõ ràng các toán hạng trước khi áp dụng toán tử số học này"

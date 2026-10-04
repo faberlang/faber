@@ -58,7 +58,7 @@ use radix_runtime_contract::tensor::{
     tensor_dim_non_negative, tensor_flat_offset, tensor_shape_element_count,
 };
 use radix_types::{
-    IndexExpr, IndexId, MirTensorMath, NumericWidth, Primitive, Type, TypeId, TypeTable,
+    IndexExpr, IndexId, MirMathFunction, NumericWidth, Primitive, Type, TypeId, TypeTable,
     effective_width,
 };
 use rustc_hash::FxHashMap;
@@ -1648,6 +1648,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::TensorMath(function) => {
                 self.tensor_math(function, args, span, return_ty)
             }
+            MirCollectionOp::ScalarMath(function) => {
+                self.scalar_math(function, args, span, return_ty)
+            }
             MirCollectionOp::TensorGelu => self.tensor_gelu(args, span),
             MirCollectionOp::TensorRelu => self.tensor_relu(args, span),
             MirCollectionOp::TensorSoftmax => self.tensor_softmax(args, span),
@@ -3083,7 +3086,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     /// types a scalar `abs` of a non-device integer as the smallest holder).
     fn tensor_math(
         &mut self,
-        function: MirTensorMath,
+        function: MirMathFunction,
         args: &[MirOperand],
         span: Span,
         return_ty: MirType,
@@ -3104,10 +3107,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         for value in &values {
             let mapped = match value {
                 Value::Float(number) => Value::Float(round_float(
-                    apply_tensor_math(function, *number),
+                    apply_math_function(function, *number),
                     float_width,
                 )),
-                Value::Int(_) | Value::UInt(_) if function == MirTensorMath::Abs => {
+                Value::Int(_) | Value::UInt(_) if function == MirMathFunction::Abs => {
                     let exact = super::exact_int::int_value(value)
                         .ok_or_else(|| RunnerError::internal(span, "tensor abs element"))?
                         .abs();
@@ -3127,6 +3130,43 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             });
         }
         tensor_value(data, shape, span)
+    }
+
+    /// Built-in math function on a scalar float (`x.sqrt()`, `x.sin()`).
+    ///
+    /// The same IEEE function the tensor lift applies per element: a domain
+    /// miss is NaN, an overflow is infinity, nothing traps. The function runs
+    /// unbounded in `f64`; the result is rounded to the result width only
+    /// here, where the call's value lands in a typed cell (`f32` rounds
+    /// through `f32`).
+    fn scalar_math(
+        &mut self,
+        function: MirMathFunction,
+        args: &[MirOperand],
+        span: Span,
+        return_ty: MirType,
+    ) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(span, "scalar math arity"));
+        };
+        let number = match self.eval_operand(receiver, span)? {
+            Value::Float(number) => number,
+            Value::Int(number) => number as f64,
+            Value::UInt(number) => number as f64,
+            _ => {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("scalar {} receiver type mismatch", function.name()),
+                ));
+            }
+        };
+        let width = effective_width(self.types, return_ty.semantic_id())
+            .filter(|width| width.is_float())
+            .unwrap_or(NumericWidth::F64);
+        Ok(Value::Float(round_float(
+            apply_math_function(function, number),
+            width,
+        )))
     }
 
     fn tensor_gelu(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -6187,19 +6227,19 @@ pub(crate) fn format_value(
     }
 }
 
-/// The scalar IEEE function behind one lifted math function. Float `abs` is
+/// The scalar IEEE function behind one math function (scalar or lifted). Float `abs` is
 /// the sign-bit clear; the rest are the libm functions, so `sqrt(-x)` is NaN,
 /// `ln(0)` is `-inf`, and `exp` overflows to `+inf`.
-fn apply_tensor_math(function: MirTensorMath, value: f64) -> f64 {
+fn apply_math_function(function: MirMathFunction, value: f64) -> f64 {
     match function {
-        MirTensorMath::Abs => value.abs(),
-        MirTensorMath::Sqrt => value.sqrt(),
-        MirTensorMath::Exp => value.exp(),
-        MirTensorMath::Ln => value.ln(),
-        MirTensorMath::Log10 => value.log10(),
-        MirTensorMath::Sin => value.sin(),
-        MirTensorMath::Cos => value.cos(),
-        MirTensorMath::Tan => value.tan(),
+        MirMathFunction::Abs => value.abs(),
+        MirMathFunction::Sqrt => value.sqrt(),
+        MirMathFunction::Exp => value.exp(),
+        MirMathFunction::Ln => value.ln(),
+        MirMathFunction::Log10 => value.log10(),
+        MirMathFunction::Sin => value.sin(),
+        MirMathFunction::Cos => value.cos(),
+        MirMathFunction::Tan => value.tan(),
     }
 }
 
