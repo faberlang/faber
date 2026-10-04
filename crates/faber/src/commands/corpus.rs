@@ -12,9 +12,18 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::{self, Read};
 use std::path::{Component, Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::time::Instant;
+use std::process::{Command, Output, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
+
+/// Bound for one child process of a case: emit, compile, run, or verify.
+const CASE_TIMEOUT_SECS: u64 = 120;
+/// Bound for one suite-level step shared by every case: a batched Cargo build or a
+/// target prepare command. Those compile many members at once and legitimately outlast
+/// a single case.
+const SUITE_STEP_TIMEOUT: Duration = Duration::from_secs(600);
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -103,6 +112,7 @@ struct TargetExpectation {
     diagnostic_contains: Option<String>,
     reason: Option<String>,
     expect: Option<RawExpected>,
+    timeout_secs: Option<u64>,
 }
 
 #[derive(Clone, Copy, Deserialize)]
@@ -121,6 +131,122 @@ struct Case {
     stdin: Option<PathBuf>,
     expect: Option<Expected>,
     target: TargetExpectation,
+    timeout: Duration,
+}
+
+impl Case {
+    /// The diagnostic fragment a diagnostic known-fail pins. Validation guarantees it;
+    /// a miss is reported as a case failure, never a panic.
+    fn known_fragment(&self) -> Result<&str, String> {
+        self.target
+            .diagnostic_contains
+            .as_deref()
+            .ok_or_else(|| format!("{}: known-fail case has no diagnostic_contains", self.id))
+    }
+
+    /// The expectation of a case that runs and compares. Validation guarantees it for
+    /// passing cases; a miss is reported as a case failure, never a panic.
+    fn expected(&self) -> Result<&Expected, String> {
+        self.expect
+            .as_ref()
+            .ok_or_else(|| format!("{}: case has no expectation to compare", self.id))
+    }
+}
+
+/// A child process that did not produce an output within its bound.
+enum ChildError {
+    Io(io::Error),
+    Timeout(Duration),
+}
+
+impl ChildError {
+    fn describe(&self, what: &str) -> String {
+        match self {
+            Self::Io(error) => format!("cannot start {what}: {error}"),
+            Self::Timeout(limit) => {
+                format!("timeout: {what} did not finish within {}s", limit.as_secs())
+            }
+        }
+    }
+}
+
+/// Run `command` to completion or kill it at `limit`. The child leads its own process
+/// group so an overrun kills its descendants too (a build tool's compiler, a shell's
+/// children), not only the direct child.
+fn run_bounded(command: &mut Command, stdin: Stdio, limit: Duration) -> Result<Output, ChildError> {
+    command
+        .stdin(stdin)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(unix)]
+    std::os::unix::process::CommandExt::process_group(command, 0);
+    let mut child = command.spawn().map_err(ChildError::Io)?;
+    let stdout = drain(child.stdout.take());
+    let stderr = drain(child.stderr.take());
+    let deadline = Instant::now() + limit;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if Instant::now() >= deadline => {
+                kill_process_group(child.id());
+                child.kill().ok();
+                child.wait().ok();
+                return Err(ChildError::Timeout(limit));
+            }
+            Ok(None) => thread::sleep(Duration::from_millis(2)),
+            Err(error) => return Err(ChildError::Io(error)),
+        }
+    };
+    Ok(Output {
+        status,
+        stdout: stdout.join().unwrap_or_default(),
+        stderr: stderr.join().unwrap_or_default(),
+    })
+}
+
+/// Read a child pipe on its own thread so a chatty child cannot fill it and stall.
+fn drain(pipe: Option<impl Read + Send + 'static>) -> thread::JoinHandle<Vec<u8>> {
+    thread::spawn(move || {
+        let mut bytes = Vec::new();
+        if let Some(mut pipe) = pipe {
+            pipe.read_to_end(&mut bytes).ok();
+        }
+        bytes
+    })
+}
+
+#[cfg(unix)]
+fn kill_process_group(leader: u32) {
+    Command::new("kill")
+        .args(["-KILL", "--"])
+        .arg(format!("-{leader}"))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .ok();
+}
+
+#[cfg(not(unix))]
+fn kill_process_group(leader: u32) {
+    Command::new("taskkill")
+        .args(["/F", "/T", "/PID"])
+        .arg(leader.to_string())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .ok();
+}
+
+/// One summary status shared by every target. A run where every case is
+/// not-applicable proved nothing and must not exit green.
+fn summary_status(passed: usize, expected_failures: usize, failed: usize) -> &'static str {
+    if failed != 0 {
+        "fail"
+    } else if passed == 0 && expected_failures == 0 {
+        "no-applicable-cases"
+    } else {
+        "pass"
+    }
 }
 
 pub(super) fn cmd_corpus(args: &CorpusArgs) {
@@ -156,7 +282,7 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
                 .recipe
                 .as_ref()
                 .and_then(|item| item.runtime.as_deref())
-                .expect("validated Rust suite"),
+                .unwrap_or_else(|| fail("rust target requires [targets.rust] runtime")),
             &faber,
             discover_ms,
             started,
@@ -171,7 +297,7 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
                 .recipe
                 .as_ref()
                 .and_then(|item| item.runtime.as_deref())
-                .expect("validated canonical suite"),
+                .unwrap_or_else(|| fail("canonical target requires [targets.canonical] runtime")),
             &faber,
             discover_ms,
             started,
@@ -190,7 +316,10 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
             &suite.cases,
             &input,
             &args.target,
-            suite.recipe.as_ref().expect("validated external suite"),
+            suite
+                .recipe
+                .as_ref()
+                .unwrap_or_else(|| fail("external target requires a suite target recipe")),
             &faber,
             discover_ms,
             started,
@@ -212,6 +341,7 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
         }
         println!("{result}");
     }
+    let status = summary_status(passed, expected_failures, failed);
     println!(
         "{}",
         json!({
@@ -223,10 +353,11 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
             "expected_failures": expected_failures,
             "not_applicable": not_applicable,
             "failed": failed,
+            "status": status,
             "timing_ms": {"discover": discover_ms, "total": ms(started)}
         })
     );
-    if failed != 0 {
+    if status != "pass" {
         std::process::exit(1);
     }
 }
@@ -273,7 +404,9 @@ fn single_case(input: &Path, explicit: Option<&Path>) -> Result<Case, String> {
             diagnostic_contains: None,
             reason: None,
             expect: None,
+            timeout_secs: None,
         },
+        timeout: Duration::from_secs(CASE_TIMEOUT_SECS),
     })
 }
 
@@ -570,6 +703,16 @@ fn load_case(
         }
         _ => {}
     }
+    check_executor_support(&id, target, &expectation)?;
+    let timeout = match expectation.timeout_secs {
+        Some(0) => {
+            return Err(format!(
+                "{id}: target {target}: timeout_secs must be positive"
+            ));
+        }
+        Some(seconds) => Duration::from_secs(seconds),
+        None => Duration::from_secs(CASE_TIMEOUT_SECS),
+    };
     let stdin = manifest
         .stdin
         .as_deref()
@@ -583,7 +726,43 @@ fn load_case(
         stdin,
         expect,
         target: expectation,
+        timeout,
     })
+}
+
+/// Reject every pin the selected target's executor cannot judge, so the executor never
+/// meets a shape it would have to guess at. Executors still report a missing field as a
+/// case failure rather than panic, but this is the one place that decides what is legal.
+fn check_executor_support(
+    id: &str,
+    target: &str,
+    expectation: &TargetExpectation,
+) -> Result<(), String> {
+    let kind = expectation.failure_kind.as_deref().unwrap_or("diagnostic");
+    let phase = expectation.phase.as_deref();
+    let unsupported = |what: &str| Err(format!("{id}: target {target} cannot judge {what}"));
+    match (target, expectation.outcome) {
+        (_, Outcome::NotApplicable) => Ok(()),
+        ("runner", Outcome::KnownFail) if kind == "nonzero-exit" => {
+            unsupported("failure_kind nonzero-exit")
+        }
+        ("runner", Outcome::Pass) if !matches!(phase, None | Some("run")) => {
+            unsupported("a passing case with a phase other than run")
+        }
+        ("rust" | "canonical" | "gpu", Outcome::KnownFail) if kind != "diagnostic" => unsupported(
+            &format!("failure_kind {kind}; only diagnostic is supported"),
+        ),
+        ("canonical", Outcome::KnownFail) if phase == Some("run") => {
+            unsupported("a known failure in the run phase; it never runs the program")
+        }
+        ("canonical", Outcome::Pass) if phase == Some("run") => {
+            unsupported("a passing case in the run phase; it never runs the program")
+        }
+        ("gpu", Outcome::KnownFail) if phase != Some("emit") => {
+            unsupported("a known failure outside the emit phase")
+        }
+        _ => Ok(()),
+    }
 }
 
 #[derive(Default)]
@@ -689,88 +868,22 @@ fn run_case(case: &Case, faber: &Path) -> Value {
     if !case.args.is_empty() {
         command.arg("--").args(&case.args);
     }
-    command.stdin(stdin.map_or_else(Stdio::null, Stdio::from));
     let running = Instant::now();
-    let output = match command.output() {
+    let output = match run_bounded(
+        &mut command,
+        stdin.map_or_else(Stdio::null, Stdio::from),
+        case.timeout,
+    ) {
         Ok(output) => output,
-        Err(error) => return case_error(case, format!("cannot start runner: {error}"), started),
+        Err(error) => return case_error(case, error.describe("runner"), started),
     };
     let run_ms = ms(running);
     let comparing = Instant::now();
-    let (status, reason) =
-        match case.target.outcome {
-            Outcome::Pass => {
-                let expected = case.expect.as_ref().expect("validated passing expectation");
-                if !exit_matches(expected, &output.status) {
-                    (
-                        "fail",
-                        Some(format!(
-                            "exit mismatch: expected {}, got {}",
-                            expected.exit, output.status
-                        )),
-                    )
-                } else if expected_stdout.as_deref().is_some_and(|expected| {
-                    normalize_stdout(expected) != normalize_stdout(&output.stdout)
-                }) {
-                    ("fail", Some("stdout mismatch".to_owned()))
-                } else if expected.stderr.is_some()
-                    && output.stderr != expected_stderr.unwrap_or_default()
-                {
-                    ("fail", Some("stderr mismatch".to_owned()))
-                } else if expected.stdout_contains.as_ref().is_some_and(|fragment| {
-                    !String::from_utf8_lossy(&output.stdout).contains(fragment)
-                }) {
-                    ("fail", Some("stdout diagnostic mismatch".to_owned()))
-                } else if expected.stderr_contains.as_ref().is_some_and(|fragment| {
-                    !String::from_utf8_lossy(&output.stderr).contains(fragment)
-                }) {
-                    ("fail", Some("stderr diagnostic mismatch".to_owned()))
-                } else {
-                    ("pass", None)
-                }
-            }
-            Outcome::KnownFail => {
-                if case.target.failure_kind.as_deref() == Some("stdout-mismatch") {
-                    let expected = case.expect.as_ref().expect("validated stdout expectation");
-                    let differs = expected_stdout.as_deref().is_some_and(|expected| {
-                        normalize_stdout(expected) != normalize_stdout(&output.stdout)
-                    });
-                    if !exit_matches(expected, &output.status) {
-                        (
-                            "fail",
-                            Some(format!(
-                                "exit mismatch: expected {}, got {}",
-                                expected.exit, output.status
-                            )),
-                        )
-                    } else if differs {
-                        ("expected-fail", None)
-                    } else {
-                        (
-                            "fail",
-                            Some("unexpected output match; update target expectation".to_owned()),
-                        )
-                    }
-                } else {
-                    let fragment = case
-                        .target
-                        .diagnostic_contains
-                        .as_deref()
-                        .expect("validated known failure diagnostic");
-                    if output.status.success() {
-                        (
-                            "fail",
-                            Some("unexpected pass; update target expectation".to_owned()),
-                        )
-                    } else if !String::from_utf8_lossy(&output.stderr).contains(fragment) {
-                        ("fail", Some("known failure diagnostic changed".to_owned()))
-                    } else {
-                        ("expected-fail", None)
-                    }
-                }
-            }
-            Outcome::NotApplicable => unreachable!(),
-        };
+    let (status, reason) = match case.target.outcome {
+        Outcome::Pass => judge_pass(case, expected_stdout, expected_stderr, &output),
+        Outcome::KnownFail => judge_known_fail(case, expected_stdout, &output),
+        Outcome::NotApplicable => unreachable!(),
+    };
     let compare_ms = ms(comparing);
     json!({
         "schema": 1,
@@ -783,6 +896,95 @@ fn run_case(case: &Case, faber: &Path) -> Value {
         "exit": output.status.code(),
         "timing_ms": {"read": read_ms, "run": run_ms, "compare": compare_ms, "total": ms(started)}
     })
+}
+
+fn judge_pass(
+    case: &Case,
+    expected_stdout: Option<Vec<u8>>,
+    expected_stderr: Option<Vec<u8>>,
+    output: &Output,
+) -> (&'static str, Option<String>) {
+    let expected = match case.expected() {
+        Ok(expected) => expected,
+        Err(reason) => return ("fail", Some(reason)),
+    };
+    if !exit_matches(expected, &output.status) {
+        (
+            "fail",
+            Some(format!(
+                "exit mismatch: expected {}, got {}",
+                expected.exit, output.status
+            )),
+        )
+    } else if expected_stdout
+        .as_deref()
+        .is_some_and(|expected| normalize_stdout(expected) != normalize_stdout(&output.stdout))
+    {
+        ("fail", Some("stdout mismatch".to_owned()))
+    } else if expected.stderr.is_some() && output.stderr != expected_stderr.unwrap_or_default() {
+        ("fail", Some("stderr mismatch".to_owned()))
+    } else if expected
+        .stdout_contains
+        .as_ref()
+        .is_some_and(|fragment| !String::from_utf8_lossy(&output.stdout).contains(fragment))
+    {
+        ("fail", Some("stdout diagnostic mismatch".to_owned()))
+    } else if expected
+        .stderr_contains
+        .as_ref()
+        .is_some_and(|fragment| !String::from_utf8_lossy(&output.stderr).contains(fragment))
+    {
+        ("fail", Some("stderr diagnostic mismatch".to_owned()))
+    } else {
+        ("pass", None)
+    }
+}
+
+fn judge_known_fail(
+    case: &Case,
+    expected_stdout: Option<Vec<u8>>,
+    output: &Output,
+) -> (&'static str, Option<String>) {
+    if case.target.failure_kind.as_deref() == Some("stdout-mismatch") {
+        let expected = match case.expected() {
+            Ok(expected) => expected,
+            Err(reason) => return ("fail", Some(reason)),
+        };
+        let differs = expected_stdout
+            .as_deref()
+            .is_some_and(|expected| normalize_stdout(expected) != normalize_stdout(&output.stdout));
+        if !exit_matches(expected, &output.status) {
+            (
+                "fail",
+                Some(format!(
+                    "exit mismatch: expected {}, got {}",
+                    expected.exit, output.status
+                )),
+            )
+        } else if differs {
+            ("expected-fail", None)
+        } else {
+            (
+                "fail",
+                Some("unexpected output match; update target expectation".to_owned()),
+            )
+        }
+    } else {
+        let fragment = match case.known_fragment() {
+            Ok(fragment) => fragment,
+            Err(reason) => return ("fail", Some(reason)),
+        };
+        if output.status.success() {
+            (
+                "fail",
+                Some("unexpected pass; update target expectation".to_owned()),
+            )
+        } else if !String::from_utf8_lossy(&output.stderr).contains(fragment) {
+            ("fail", Some("known failure diagnostic changed".to_owned()))
+        } else {
+            ("expected-fail", None)
+        }
+    }
 }
 
 fn exit_matches(expected: &Expected, status: &std::process::ExitStatus) -> bool {

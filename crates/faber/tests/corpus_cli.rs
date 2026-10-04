@@ -837,3 +837,251 @@ fn corpus_does_not_report_an_all_inapplicable_target_as_green() {
         "no-applicable-cases"
     );
 }
+
+/// A one-case suite whose case lists `case_extra` and whose source is the smoke case.
+fn probe_suite(suite_extra: &str, case_extra: &str) -> tempfile::TempDir {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let case = temp.path().join("cases/probe");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        format!("version = 1\ncases_dir = \"cases\"\n{suite_extra}"),
+    )
+    .expect("write suite manifest");
+    fs::copy(smoke_case(), case.join("main.fab")).expect("copy source");
+    fs::write(
+        case.join("case.toml"),
+        format!("version = 1\ninput = \"main.fab\"\n{case_extra}"),
+    )
+    .expect("write case manifest");
+    // A stand-in runtime crate: these suites never reach a Cargo build, so only its
+    // manifest has to exist for the recipe to validate.
+    fs::create_dir(temp.path().join("runtime")).expect("create stand-in runtime");
+    fs::write(temp.path().join("runtime/Cargo.toml"), "").expect("write stand-in runtime");
+    temp
+}
+
+fn run_corpus(suite: &std::path::Path, target: &str) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", target])
+        .arg(suite)
+        .output()
+        .expect("run corpus suite")
+}
+
+fn runtime_recipe(target: &str) -> String {
+    format!("\n[targets.{target}]\nruntime = \"runtime\"\n")
+}
+
+#[test]
+fn corpus_rejects_pins_the_target_cannot_judge_instead_of_panicking() {
+    let known_fail = |target: &str, phase: &str, kind: &str| {
+        format!(
+            "\n[targets.{target}]\noutcome = \"known-fail\"\nphase = \"{phase}\"\nfailure_kind = \"{kind}\"\n\n[targets.{target}.expect]\nstdout = \"expected.stdout\"\nexit_nonzero = true\n"
+        )
+    };
+    let diagnostic_known_fail = |target: &str, phase: &str| {
+        format!(
+            "\n[targets.{target}]\noutcome = \"known-fail\"\nphase = \"{phase}\"\ndiagnostic_contains = \"anything\"\n"
+        )
+    };
+    let gpu_recipe = "\n[targets.gpu]\nmode = \"gpu\"\n".to_owned();
+    let shapes = [
+        (
+            "runner",
+            String::new(),
+            known_fail("runner", "run", "nonzero-exit"),
+            "nonzero-exit",
+        ),
+        (
+            "runner",
+            String::new(),
+            "\n[targets.runner]\noutcome = \"pass\"\nphase = \"emit\"\n".to_owned(),
+            "phase other than run",
+        ),
+        (
+            "runner",
+            String::new(),
+            "\n[expect]\ncheck_only = true\n\n[targets.runner]\noutcome = \"pass\"\ntimeout_secs = 0\n"
+                .to_owned(),
+            "timeout_secs must be positive",
+        ),
+        (
+            "rust",
+            runtime_recipe("rust"),
+            known_fail("rust", "run", "stdout-mismatch"),
+            "stdout-mismatch",
+        ),
+        (
+            "rust",
+            runtime_recipe("rust"),
+            known_fail("rust", "run", "nonzero-exit"),
+            "nonzero-exit",
+        ),
+        (
+            "canonical",
+            runtime_recipe("canonical"),
+            known_fail("canonical", "run", "stdout-mismatch"),
+            "stdout-mismatch",
+        ),
+        (
+            "canonical",
+            runtime_recipe("canonical"),
+            diagnostic_known_fail("canonical", "run"),
+            "run phase",
+        ),
+        (
+            "canonical",
+            runtime_recipe("canonical"),
+            "\n[expect]\ncheck_only = true\n\n[targets.canonical]\noutcome = \"pass\"\nphase = \"run\"\n"
+                .to_owned(),
+            "run phase",
+        ),
+        (
+            "gpu",
+            gpu_recipe.clone(),
+            known_fail("gpu", "run", "stdout-mismatch"),
+            "stdout-mismatch",
+        ),
+        (
+            "gpu",
+            gpu_recipe,
+            diagnostic_known_fail("gpu", "build"),
+            "outside the emit phase",
+        ),
+    ];
+    for (target, suite_extra, case_extra, fragment) in shapes {
+        let suite = probe_suite(&suite_extra, &case_extra);
+        let output = run_corpus(suite.path(), target);
+        assert_eq!(
+            output.status.code(),
+            Some(1),
+            "{target} {fragment}: a rejected pin must exit 1, not panic: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let message = records(&output.stdout)[0]["message"]
+            .as_str()
+            .expect("validation error message")
+            .to_owned();
+        assert!(
+            message.contains("probe") && message.contains(target) && message.contains(fragment),
+            "{target} {fragment}: unexpected message {message}"
+        );
+    }
+}
+
+#[test]
+fn corpus_rust_and_canonical_emit_known_failure_cannot_hide_an_unexpected_pass() {
+    for target in ["rust", "canonical"] {
+        // Emit succeeds and the emitted program contains the pinned fragment: the exit
+        // status decides, so this is an unexpected pass and not an expected failure.
+        let suite = probe_suite(
+            &runtime_recipe(target),
+            &format!(
+                "\n[targets.{target}]\noutcome = \"known-fail\"\nphase = \"emit\"\ndiagnostic_contains = \"Salve, Munde!\"\n"
+            ),
+        );
+        let output = run_corpus(suite.path(), target);
+        assert!(!output.status.success(), "{target} must not pass");
+        let rows = records(&output.stdout);
+        assert_eq!(rows[0]["status"], "fail", "{target}");
+        assert_eq!(
+            rows[0]["reason"], "unexpected pass; update target expectation",
+            "{target}"
+        );
+    }
+}
+
+#[test]
+fn corpus_rust_and_canonical_emit_pass_without_a_diagnostic_fragment() {
+    for target in ["rust", "canonical"] {
+        let suite = probe_suite(
+            &runtime_recipe(target),
+            &format!("\n[targets.{target}]\noutcome = \"pass\"\nphase = \"emit\"\n"),
+        );
+        let output = run_corpus(suite.path(), target);
+        assert!(
+            output.status.success(),
+            "{target}: {}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let rows = records(&output.stdout);
+        assert_eq!(rows[0]["status"], "pass", "{target}");
+        assert_eq!(rows[0]["phase"], "emit", "{target}");
+    }
+}
+
+#[test]
+fn corpus_times_out_a_hanging_case_and_kills_its_descendants() {
+    let suite_extra = "\n[targets.probe]\nemit = \"faber\"\nextension = \"fab\"\nrun = [\"sh\", \"-c\", \"sleep 40 & echo $! > {case_dir}/child.pid; wait\"]\n";
+    let suite = probe_suite(
+        suite_extra,
+        "\n[expect]\ncheck_only = true\n\n[targets.probe]\noutcome = \"pass\"\ntimeout_secs = 1\n",
+    );
+    let started = std::time::Instant::now();
+    let output = run_corpus(suite.path(), "probe");
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(30),
+        "the hanging case must be cut off by its bound"
+    );
+    assert!(!output.status.success(), "a timeout is a failure");
+    let rows = records(&output.stdout);
+    assert_eq!(rows[0]["status"], "fail");
+    assert_eq!(rows[0]["phase"], "run");
+    assert!(
+        rows[0]["reason"]
+            .as_str()
+            .is_some_and(|reason| reason.contains("timeout") && reason.contains("1s")),
+        "{}",
+        rows[0]["reason"]
+    );
+
+    let pid = fs::read_to_string(suite.path().join("target/corpus/probe/case_0000/child.pid"))
+        .expect("the hanging case recorded its child")
+        .trim()
+        .to_owned();
+    let alive = || {
+        Command::new("kill")
+            .args(["-0", &pid])
+            .output()
+            .expect("probe child")
+            .status
+            .success()
+    };
+    for _ in 0..40 {
+        if !alive() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    assert!(!alive(), "the timed-out case's descendant must be killed");
+}
+
+#[test]
+fn corpus_does_not_report_an_all_inapplicable_run_as_green() {
+    let not_applicable = |target: &str| {
+        format!("\n[targets.{target}]\noutcome = \"not-applicable\"\nreason = \"probe\"\n")
+    };
+    let shapes = [
+        ("runner", String::new()),
+        ("rust", runtime_recipe("rust")),
+        ("canonical", runtime_recipe("canonical")),
+        (
+            "roundtrip",
+            "\n[targets.roundtrip]\nmode = \"roundtrip\"\n".to_owned(),
+        ),
+    ];
+    for (target, suite_extra) in shapes {
+        let suite = probe_suite(&suite_extra, &not_applicable(target));
+        let output = run_corpus(suite.path(), target);
+        assert!(
+            !output.status.success(),
+            "{target}: all cases not-applicable must not exit green"
+        );
+        let rows = records(&output.stdout);
+        let summary = rows.last().expect("summary");
+        assert_eq!(summary["not_applicable"], 1, "{target}");
+        assert_eq!(summary["status"], "no-applicable-cases", "{target}");
+    }
+}

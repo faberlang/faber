@@ -1,11 +1,11 @@
 //! Canonical generated Rust: formatted members and one batched Clippy check.
 
-use super::{Case, Outcome, fail, ms};
+use super::{Case, Outcome, SUITE_STEP_TIMEOUT, fail, ms, run_bounded, summary_status};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Output, Stdio};
 use std::time::Instant;
 
 struct Job<'a> {
@@ -48,10 +48,11 @@ pub(super) fn execute(
             case.input.display().to_string(),
         ];
         let emitting = Instant::now();
-        let emitted = Command::new(faber)
-            .args(&argv[1..])
-            .current_dir(&case.dir)
-            .output();
+        let emitted = run_bounded(
+            Command::new(faber).args(&argv[1..]).current_dir(&case.dir),
+            Stdio::null(),
+            case.timeout,
+        );
         let emit_ms = ms(emitting);
         let emitted = match emitted {
             Ok(output) => output,
@@ -60,7 +61,7 @@ pub(super) fn execute(
                     case,
                     "fail",
                     "emit",
-                    Some(format!("cannot start Rust emit: {error}")),
+                    Some(error.describe("Rust emit")),
                     Some(&argv),
                     None,
                     emit_ms,
@@ -71,43 +72,7 @@ pub(super) fn execute(
             }
         };
         if case.target.phase.as_deref() == Some("emit") {
-            let expected = case.expect.as_ref().expect("validated expected rejection");
-            let fragment = case
-                .target
-                .diagnostic_contains
-                .as_deref()
-                .expect("validated diagnostic");
-            let diagnostics = format!(
-                "{}{}",
-                String::from_utf8_lossy(&emitted.stderr),
-                String::from_utf8_lossy(&emitted.stdout)
-            );
-            let (status, reason) = match case.target.outcome {
-                Outcome::KnownFail
-                    if !emitted.status.success() && diagnostics.contains(fragment) =>
-                {
-                    ("expected-fail", None)
-                }
-                Outcome::KnownFail if emitted.status.success() => (
-                    "fail",
-                    Some("unexpected pass; update target expectation".to_owned()),
-                ),
-                Outcome::KnownFail => (
-                    "fail",
-                    Some(format!("expected emit diagnostic changed: {diagnostics}")),
-                ),
-                Outcome::Pass
-                    if super::exit_matches(expected, &emitted.status)
-                        && diagnostics.contains(fragment) =>
-                {
-                    ("pass", None)
-                }
-                Outcome::Pass => (
-                    "fail",
-                    Some(format!("emit rejection changed: {diagnostics}")),
-                ),
-                Outcome::NotApplicable => unreachable!(),
-            };
+            let (status, reason) = judge_emit(case, &emitted);
             rows[index] = Some(row(
                 case,
                 status,
@@ -196,65 +161,35 @@ pub(super) fn execute(
             "--check".to_owned(),
             source.display().to_string(),
         ];
-        let checked = Command::new("rustfmt").args(&fmt_argv[1..]).output();
+        let checked = run_bounded(
+            Command::new("rustfmt").args(&fmt_argv[1..]),
+            Stdio::null(),
+            case.timeout,
+        );
         let format_ms = ms(formatting);
         match checked {
-            Ok(output) if output.status.success() => {}
             Ok(output) => {
-                let diagnostics = format!(
-                    "{}{}",
-                    String::from_utf8_lossy(&output.stderr),
-                    String::from_utf8_lossy(&output.stdout)
-                );
-                let expects_format_failure = matches!(case.target.outcome, Outcome::KnownFail)
-                    && case.target.phase.as_deref() == Some("format");
-                let expected_format_failure = expects_format_failure
-                    && !output.status.success()
-                    && diagnostics.contains(
-                        case.target
-                            .diagnostic_contains
-                            .as_deref()
-                            .expect("validated diagnostic"),
-                    );
-                let (status, reason) = if expected_format_failure {
-                    ("expected-fail", None)
-                } else if expects_format_failure && output.status.success() {
-                    (
-                        "fail",
-                        Some("unexpected pass; update target expectation".to_owned()),
-                    )
-                } else if expects_format_failure {
-                    (
-                        "fail",
-                        Some(format!("expected format diagnostic changed: {diagnostics}")),
-                    )
-                } else {
-                    (
-                        "fail",
-                        Some(format!(
-                            "generated Rust is not rustfmt-clean: {diagnostics}"
-                        )),
-                    )
-                };
-                rows[index] = Some(row(
-                    case,
-                    status,
-                    "format",
-                    reason,
-                    Some(&fmt_argv),
-                    output.status.code(),
-                    emit_ms,
-                    format_ms,
-                    case_started,
-                ));
-                continue;
+                if let Some((status, reason)) = judge_format(case, &output) {
+                    rows[index] = Some(row(
+                        case,
+                        status,
+                        "format",
+                        reason,
+                        Some(&fmt_argv),
+                        output.status.code(),
+                        emit_ms,
+                        format_ms,
+                        case_started,
+                    ));
+                    continue;
+                }
             }
             Err(error) => {
                 rows[index] = Some(row(
                     case,
                     "fail",
                     "format",
-                    Some(format!("cannot start rustfmt: {error}")),
+                    Some(error.describe("rustfmt")),
                     Some(&fmt_argv),
                     None,
                     emit_ms,
@@ -308,11 +243,13 @@ pub(super) fn execute(
         ];
         lint_command = Some(json!({"argv":argv,"cwd":workspace}));
         let linting = Instant::now();
-        match Command::new("cargo")
-            .args(&argv[1..])
-            .current_dir(&workspace)
-            .output()
-        {
+        match run_bounded(
+            Command::new("cargo")
+                .args(&argv[1..])
+                .current_dir(&workspace),
+            Stdio::null(),
+            SUITE_STEP_TIMEOUT,
+        ) {
             Ok(output) => {
                 lint_ms = ms(linting);
                 lint_exit = output.status.code();
@@ -352,7 +289,7 @@ pub(super) fn execute(
                         job.case,
                         "fail",
                         "lint",
-                        Some(format!("cannot start Cargo Clippy: {error}")),
+                        Some(error.describe("Cargo Clippy")),
                         None,
                         None,
                         job.emit_ms,
@@ -383,13 +320,10 @@ pub(super) fn execute(
         let expects_build_failure = matches!(job.case.target.outcome, Outcome::KnownFail)
             && job.case.target.phase.as_deref() == Some("build");
         let expected_build_failure = expects_build_failure
-            && diagnostic.contains(
-                job.case
-                    .target
-                    .diagnostic_contains
-                    .as_deref()
-                    .expect("validated diagnostic"),
-            );
+            && job
+                .case
+                .known_fragment()
+                .is_ok_and(|fragment| diagnostic.contains(fragment));
         let (status, reason) = if expected_build_failure {
             ("expected-fail", None)
         } else if expects_build_failure && artifacts.contains(&job.name) {
@@ -439,16 +373,108 @@ pub(super) fn execute(
         }
         println!("{value}");
     }
+    let status = summary_status(passed, expected_failures, failed);
     println!(
         "{}",
         json!({"schema":1,"type":"summary","target":"canonical",
         "cases":cases.len(),"passed":passed,"expected_failures":expected_failures,
-        "not_applicable":not_applicable,"failed":failed,
+        "not_applicable":not_applicable,"failed":failed,"status":status,
         "lint":{"command":lint_command,"exit":lint_exit,"cargo_invocations":usize::from(!members.is_empty())},
         "timing_ms":{"discover":discover_ms,"lint":lint_ms,"total":ms(started)}})
     );
-    if failed != 0 {
+    if status != "pass" {
         std::process::exit(1);
+    }
+}
+
+/// `None` means rustfmt accepted the member and the case does not pin a format failure,
+/// so the case proceeds to the lint step.
+fn judge_format(case: &Case, output: &Output) -> Option<(&'static str, Option<String>)> {
+    let expects_failure = matches!(case.target.outcome, Outcome::KnownFail)
+        && case.target.phase.as_deref() == Some("format");
+    if output.status.success() {
+        return expects_failure.then(|| {
+            (
+                "fail",
+                Some("unexpected pass; update target expectation".to_owned()),
+            )
+        });
+    }
+    let diagnostics = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout)
+    );
+    if !expects_failure {
+        return Some((
+            "fail",
+            Some(format!(
+                "generated Rust is not rustfmt-clean: {diagnostics}"
+            )),
+        ));
+    }
+    let fragment = match case.known_fragment() {
+        Ok(fragment) => fragment,
+        Err(reason) => return Some(("fail", Some(reason))),
+    };
+    Some(if diagnostics.contains(fragment) {
+        ("expected-fail", None)
+    } else {
+        (
+            "fail",
+            Some(format!("expected format diagnostic changed: {diagnostics}")),
+        )
+    })
+}
+
+fn judge_emit(case: &Case, emitted: &Output) -> (&'static str, Option<String>) {
+    let diagnostics = format!(
+        "{}{}",
+        String::from_utf8_lossy(&emitted.stderr),
+        String::from_utf8_lossy(&emitted.stdout)
+    );
+    match case.target.outcome {
+        Outcome::KnownFail => {
+            // The exit status decides first: stdout carries the emitted program.
+            if emitted.status.success() {
+                return (
+                    "fail",
+                    Some("unexpected pass; update target expectation".to_owned()),
+                );
+            }
+            let fragment = match case.known_fragment() {
+                Ok(fragment) => fragment,
+                Err(reason) => return ("fail", Some(reason)),
+            };
+            if diagnostics.contains(fragment) {
+                ("expected-fail", None)
+            } else {
+                (
+                    "fail",
+                    Some(format!("expected emit diagnostic changed: {diagnostics}")),
+                )
+            }
+        }
+        Outcome::Pass => {
+            let expected = match case.expected() {
+                Ok(expected) => expected,
+                Err(reason) => return ("fail", Some(reason)),
+            };
+            let fragment_found = case
+                .target
+                .diagnostic_contains
+                .as_deref()
+                .is_none_or(|fragment| diagnostics.contains(fragment));
+            if super::exit_matches(expected, &emitted.status) && fragment_found {
+                ("pass", None)
+            } else {
+                (
+                    "fail",
+                    Some(format!("emit rejection changed: {diagnostics}")),
+                )
+            }
+        }
+        Outcome::NotApplicable => unreachable!(),
     }
 }
 

@@ -1,12 +1,14 @@
 //! Suite-configured target toolchains and compiler inspection lanes.
 
-use super::{Case, Outcome, SuiteTarget, fail, ms};
+use super::{
+    Case, Outcome, SUITE_STEP_TIMEOUT, SuiteTarget, fail, ms, run_bounded, summary_status,
+};
 use serde_json::{Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 struct Paths<'a> {
     suite: &'a Path,
@@ -81,6 +83,7 @@ pub(super) fn execute(
             &prepare_paths,
             &workspace,
             None,
+            SUITE_STEP_TIMEOUT,
         ))
     };
     let prepare_ms = ms(preparation);
@@ -134,7 +137,7 @@ pub(super) fn execute(
         }
         println!("{row}");
     }
-    let no_applicable_cases = passed == 0 && expected_failures == 0;
+    let status = summary_status(passed, expected_failures, failed);
     println!(
         "{}",
         json!({
@@ -142,13 +145,13 @@ pub(super) fn execute(
             "passed":passed,"expected_failures":expected_failures,
             "not_applicable":not_applicable,"failed":failed,
             "workers":workers,
-            "status":if no_applicable_cases { "no-applicable-cases" } else if failed != 0 { "fail" } else { "pass" },
+            "status":status,
             "prepare_command":prepare.as_ref().and_then(|item| item.as_ref().ok())
                 .map(|item| json!({"argv":&item.0,"cwd":workspace})),
             "timing_ms":{"discover":discover_ms,"prepare":prepare_ms,"build":build_ms,"total":ms(started)}
         })
     );
-    if failed != 0 || no_applicable_cases {
+    if status != "pass" {
         std::process::exit(1);
     }
 }
@@ -266,6 +269,7 @@ fn execute_roundtrip(cases: &[Case], target: &str, discover_ms: f64, started: In
             })
         );
     }
+    let status = summary_status(passed, expected_failures, failed);
     println!(
         "{}",
         json!({
@@ -273,11 +277,11 @@ fn execute_roundtrip(cases: &[Case], target: &str, discover_ms: f64, started: In
             "passed":passed,"expected_failures":expected_failures,
             "not_applicable":not_applicable,"failed":failed,
             "workers":1,
-            "status":if failed == 0 { "pass" } else { "fail" },
+            "status":status,
             "timing_ms":{"discover":discover_ms,"prepare":0.0,"build":0.0,"total":ms(started)}
         })
     );
-    if failed != 0 {
+    if status != "pass" {
         std::process::exit(1);
     }
 }
@@ -457,10 +461,13 @@ fn run_case(
                 case.input.display().to_string(),
             ],
         };
-        let emitted = Command::new(faber)
-            .args(&emit_args[1..])
-            .current_dir(&case.dir)
-            .output();
+        let emitted = run_bounded(
+            Command::new(faber)
+                .args(&emit_args[1..])
+                .current_dir(&case.dir),
+            Stdio::null(),
+            case.timeout,
+        );
         let emit_ms = ms(emitting);
         let output = match emitted {
             Ok(output) => output,
@@ -470,7 +477,7 @@ fn run_case(
                     target,
                     "fail",
                     "emit",
-                    Some(format!("cannot start Faber: {error}")),
+                    Some(error.describe("Faber")),
                     Some(&emit_args),
                     started,
                 );
@@ -514,7 +521,7 @@ fn run_case(
     row["timing_ms"]["emit"] = json!(emit_ms);
     if !recipe.build.is_empty() {
         let building = Instant::now();
-        let build = run_command(&recipe.build, &paths, &case_dir, None);
+        let build = run_command(&recipe.build, &paths, &case_dir, None, case.timeout);
         let build_ms = ms(building);
         *build_total_ms += build_ms;
         row["timing_ms"]["build"] = json!(build_ms);
@@ -547,7 +554,13 @@ fn run_case(
     let running = Instant::now();
     let mut run_recipe = recipe.run.clone();
     run_recipe.extend(case.args.iter().cloned());
-    let run = run_command(&run_recipe, &paths, &case_dir, case.stdin.as_deref());
+    let run = run_command(
+        &run_recipe,
+        &paths,
+        &case_dir,
+        case.stdin.as_deref(),
+        case.timeout,
+    );
     row["timing_ms"]["run"] = json!(ms(running));
     let (argv, mut output) = match run {
         Ok(item) => item,
@@ -597,11 +610,10 @@ fn judge_api_emit_failure(case: &Case, diagnostics: &str) -> (&'static str, Opti
         );
     }
     if matches!(case.target.outcome, Outcome::KnownFail) {
-        let fragment = case
-            .target
-            .diagnostic_contains
-            .as_deref()
-            .expect("validated known failure");
+        let fragment = match case.known_fragment() {
+            Ok(fragment) => fragment,
+            Err(reason) => return ("fail", Some(reason)),
+        };
         return if diagnostics.contains(fragment) {
             ("expected-fail", None)
         } else {
@@ -651,7 +663,10 @@ fn judge_phase(case: &Case, phase: &str, output: &Output) -> (&'static str, Opti
     );
     if matches!(case.target.outcome, Outcome::KnownFail) {
         if case.target.failure_kind.as_deref() == Some("stdout-mismatch") {
-            let expected = case.expect.as_ref().expect("validated stdout expectation");
+            let expected = match case.expected() {
+                Ok(expected) => expected,
+                Err(reason) => return ("fail", Some(reason)),
+            };
             if !super::exit_matches(expected, &output.status) {
                 return (
                     "fail",
@@ -661,7 +676,12 @@ fn judge_phase(case: &Case, phase: &str, output: &Output) -> (&'static str, Opti
                     )),
                 );
             }
-            let path = expected.stdout.as_ref().expect("validated stdout golden");
+            let Some(path) = expected.stdout.as_ref() else {
+                return (
+                    "fail",
+                    Some(format!("{}: stdout-mismatch has no stdout golden", case.id)),
+                );
+            };
             let golden = match fs::read(path) {
                 Ok(bytes) => bytes,
                 Err(error) => return ("fail", Some(format!("cannot read stdout golden: {error}"))),
@@ -676,10 +696,10 @@ fn judge_phase(case: &Case, phase: &str, output: &Output) -> (&'static str, Opti
             };
         }
         if case.target.failure_kind.as_deref() == Some("nonzero-exit") {
-            let expected = case
-                .expect
-                .as_ref()
-                .expect("validated nonzero exit expectation");
+            let expected = match case.expected() {
+                Ok(expected) => expected,
+                Err(reason) => return ("fail", Some(reason)),
+            };
             return if super::exit_matches(expected, &output.status) {
                 ("expected-fail", None)
             } else {
@@ -698,11 +718,10 @@ fn judge_phase(case: &Case, phase: &str, output: &Output) -> (&'static str, Opti
                 Some("unexpected pass; update target expectation".to_owned()),
             );
         }
-        let fragment = case
-            .target
-            .diagnostic_contains
-            .as_deref()
-            .expect("validated known failure");
+        let fragment = match case.known_fragment() {
+            Ok(fragment) => fragment,
+            Err(reason) => return ("fail", Some(reason)),
+        };
         return if diagnostics.contains(fragment) {
             ("expected-fail", None)
         } else {
@@ -754,7 +773,10 @@ fn judge_phase(case: &Case, phase: &str, output: &Output) -> (&'static str, Opti
             ("fail", Some(format!("build failed: {diagnostics}")))
         };
     }
-    let expected = expected.expect("passing cases have a default expectation");
+    let expected = match case.expected() {
+        Ok(expected) => expected,
+        Err(reason) => return ("fail", Some(reason)),
+    };
     if !super::exit_matches(expected, &output.status) {
         return (
             "fail",
@@ -919,6 +941,7 @@ fn run_command(
     paths: &Paths<'_>,
     cwd: &Path,
     stdin: Option<&Path>,
+    limit: Duration,
 ) -> Result<(Vec<String>, Output), String> {
     let mut expanded = Vec::new();
     for arg in argv {
@@ -952,11 +975,11 @@ fn run_command(
         .map(fs::File::open)
         .transpose()
         .map_err(|error| format!("cannot read stdin fixture: {error}"))?;
-    let output = Command::new(program)
-        .args(&expanded[1..])
-        .current_dir(cwd)
-        .stdin(input.map_or_else(Stdio::null, Stdio::from))
-        .output()
-        .map_err(|error| format!("cannot start {program}: {error}"))?;
+    let output = run_bounded(
+        Command::new(program).args(&expanded[1..]).current_dir(cwd),
+        input.map_or_else(Stdio::null, Stdio::from),
+        limit,
+    )
+    .map_err(|error| error.describe(program))?;
     Ok((expanded, output))
 }
