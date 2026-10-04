@@ -17,6 +17,7 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
+use crate::passes::filum_independence::is_inlinable_kernel;
 
 /// Memberless view for builtin nominal receivers (sermo, directional views).
 fn empty_struct_info() -> StructInfo {
@@ -135,6 +136,9 @@ impl TypeChecker<'_> {
                 self.nucleum_roles.insert(method.def_id, role);
                 self.method_nucleum_roles
                     .insert((def_id, method.func.name), role);
+                if is_inlinable_kernel(&method.func) {
+                    self.inlinable_kernels.insert(method.def_id);
+                }
             }
         }
 
@@ -396,15 +400,8 @@ impl TypeChecker<'_> {
                     self.functions.insert(item.def_id, sig);
                     if let Some(role) = func.nucleum_role() {
                         self.nucleum_roles.insert(item.def_id, role);
-                        // Without an interner publicness is unknowable: stay strict.
-                        let private = self.interner.is_some_and(|interner| {
-                            !item
-                                .annotations
-                                .iter()
-                                .any(|annotation| interner.resolve(annotation.family) == "publica")
-                        });
-                        if role == NucleumRole::Entry && private {
-                            self.private_kernels.insert(item.def_id);
+                        if is_inlinable_kernel(func) {
+                            self.inlinable_kernels.insert(item.def_id);
                         }
                     }
                 }

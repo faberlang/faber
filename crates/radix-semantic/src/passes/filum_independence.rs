@@ -4,14 +4,17 @@
 //! coordinates are mapped before comparing accesses. Unknown provenance or
 //! effects decline admission; ordinary iteration is not checked.
 //!
-//! A call to a private device helper (`calls`) is analysed as if inlined
-//! (gpu-reset rule 12.7): the callee's parameters map to the caller's argument
+//! A call to a kernel (`calls`: any `@ nucleum` function, or instance method
+//! bound statically by its receiver's type, public or private) is analysed as
+//! if inlined (gpu-reset rule 12.7): the callee's parameters, and `ego` with
+//! its tensor fields for a method, map to the caller's argument and receiver
 //! storage and coordinates, and its reads and writes meet the same rules.
 
 mod calls;
 
 use crate::{SemanticError, SemanticErrorKind, Type, TypeId, TypeTable};
-use calls::{EffectScan, Frame, Module};
+pub(crate) use calls::is_inlinable_kernel;
+use calls::{EffectScan, Frame, Module, Receiver};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local, walk_stmt};
 use radix_hir::{
     DefId, HirArrayElement, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirLocal,
@@ -107,6 +110,10 @@ struct Aliases {
 impl Aliases {
     /// `scan` is `None` for a helper body: every effect in it runs inside the
     /// caller's `filum` body, where the proof inlines or declines it.
+    ///
+    /// `receiver` is set for an instance-method body: `ego` and each tensor
+    /// field of it get roots of their own, which a call maps to the storage of
+    /// the receiver expression.
     fn build(
         params: &[HirParam],
         body: &HirBlock,
@@ -114,6 +121,7 @@ impl Aliases {
         interner: &Interner,
         mode: ParamRoots,
         scan: Option<&Module<'_>>,
+        receiver: Option<&Receiver>,
     ) -> Self {
         let mut declarations = Declarations::default();
         declarations.visit_block(body);
@@ -132,6 +140,16 @@ impl Aliases {
             values: parameter_roots(params, types, mode),
             ..Self::default()
         };
+        if let Some(receiver) = receiver {
+            result
+                .values
+                .insert(receiver.ego, Facts::fresh(receiver.ego));
+            for (name, field) in &receiver.fields {
+                result
+                    .fields
+                    .insert((receiver.ego, *name), Facts::fresh(*field));
+            }
+        }
         // Each poison round only grows the poisoned sets, so a few rounds per
         // call and binding settle it; anything longer is declined as unknown.
         let rounds = result.bindings.len() + result.stores.len() + effects.calls.len() + 2;
@@ -844,12 +862,11 @@ impl HirVisitor for BodyProof<'_> {
                     is_access_intrinsic(receiver, *name, args.len(), self.types, self.interner);
                 let pure =
                     is_pure_value_method(receiver, *name, args.len(), self.types, self.interner);
-                let name = self.interner.resolve(*name);
                 if !intrinsic {
-                    self.decline(expr.span, "unproved_call_effect");
-                    walk_expr(self, expr);
+                    self.method_call(expr, receiver, *name, args);
                     return;
                 }
+                let name = self.interner.resolve(*name);
                 match name {
                     "accipe" if args.len() == 1 => {
                         self.access(receiver, Some(&args[0].expr), false, expr.span)
@@ -1126,6 +1143,7 @@ impl Scopes<'_> {
             self.interner,
             ParamRoots::Classes,
             Some(self.module),
+            None,
         );
         let mut loops = Loops {
             aliases: &aliases,

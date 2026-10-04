@@ -687,6 +687,7 @@ impl ReductionBodyState {
         if let Some(role) = resolve_method_role(checker, receiver, method) {
             match role {
                 NucleumRole::Fragment => {}
+                NucleumRole::Entry if is_inlinable_method(checker, receiver, method) => {}
                 NucleumRole::Entry => context(checker, span, "entry_callee"),
             }
         } else if is_allowed_device_method(checker.interner.map_or("", |i| i.resolve(method)))
@@ -703,19 +704,19 @@ impl ReductionBodyState {
     }
 
     /// Callee classification shared with the fragment definition rules:
-    /// device intrinsics, `@ nucleum fragment` calls and private kernel
-    /// helpers are admitted; public entry kernels, graphics stages, and
-    /// ordinary host callables are not.
+    /// device intrinsics, `@ nucleum fragment` calls and inlinable kernels
+    /// (public or private) are admitted; async or fallible kernels, graphics
+    /// stages, and ordinary host callables are not.
     fn classify_callee(&mut self, checker: &mut TypeChecker<'_>, def_id: DefId, span: Span) {
         if checker.resolver.gpu_builtin(def_id).is_some() {
             return;
         }
         match checker.nucleum_roles.get(&def_id).copied() {
             Some(NucleumRole::Fragment) => {}
-            // Rule 12.7 inlines a private kernel into its caller, so it is a
-            // term function here; its body is proved write-free after
-            // typecheck (`filum_independence`).
-            Some(NucleumRole::Entry) if checker.private_kernels.contains(&def_id) => {}
+            // Rule 12.7 inlines a kernel (public or private) into its caller,
+            // so it is a term function here; its body is proved write-free
+            // after typecheck (`filum_independence`).
+            Some(NucleumRole::Entry) if checker.inlinable_kernels.contains(&def_id) => {}
             Some(NucleumRole::Entry) => context(checker, span, "entry_callee"),
             None => context(checker, span, "host_callable"),
         }
@@ -754,4 +755,19 @@ fn resolve_method_role(
         .method_nucleum_roles
         .get(&(struct_def, method))
         .copied()
+}
+
+/// A method kernel the filum pass inlines into its caller (rule 12.7): the
+/// receiver type names the class statically, so the method definition is the
+/// one the type checker resolves the call to.
+fn is_inlinable_method(
+    checker: &TypeChecker<'_>,
+    receiver: &HirExpression,
+    method: Symbol,
+) -> bool {
+    receiver
+        .ty
+        .and_then(|ty| struct_def_from_type(ty, checker.types))
+        .and_then(|class| checker.method_defs.get(&(class, method)))
+        .is_some_and(|def| checker.inlinable_kernels.contains(def))
 }

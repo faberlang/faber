@@ -1,17 +1,31 @@
 //! Calls inside a `filum` body (or a reduction term), seen through.
 //!
-//! gpu-reset rule 12.7 inlines a private kernel called from a kernel, so the
-//! proof analyses such a callee as if its body stood at the call site. The
-//! callee's tensor parameters take the storage of the call's arguments, its
-//! coordinate parameters take the arguments' coordinates, and its body meets
-//! the rules of the enclosing body unchanged. A call to anything else keeps
-//! the `unproved_call_effect` decline.
+//! gpu-reset rule 12.7 inlines a kernel called from a kernel, so the proof
+//! analyses such a callee as if its body stood at the call site. The callee's
+//! tensor parameters take the storage of the call's arguments, its coordinate
+//! parameters take the arguments' coordinates, and its body meets the rules of
+//! the enclosing body unchanged. A call to anything else keeps the
+//! `unproved_call_effect` decline.
 //!
-//! The inlinable callees are the module's `@ nucleum` functions that are
-//! `fragment`s or private (non-`publica`) entry kernels, synchronous and
-//! infallible. Their host-freedom is the kernel legality pass's verdict; this
-//! pass needs no more than its own rules, because every unproved effect in a
-//! callee body declines exactly as it would in the caller.
+//! The inlinable callees are the module's `@ nucleum` functions and instance
+//! methods (`fragment`s and entry kernels, public or private), synchronous and
+//! infallible. Their host-freedom is the kernel legality pass's verdict, which
+//! runs after this pass and is not consulted: this pass needs no more than its
+//! own rules, because every unproved effect in a callee body declines exactly
+//! as it would in the caller.
+//!
+//! A method call resolves statically: the receiver's type names one class
+//! (genus have no inheritance), and the class and method name name one method.
+//! A receiver typed by a contract or a type parameter is dispatched at run
+//! time, so it declines by name (`dynamic_dispatch`). Inside a method body
+//! `ego` is the class's own definition, and a tensor-typed instance field is
+//! storage with a root of its own (the field's definition); a call maps `ego`
+//! to the receiver's storage and each such field to the storage the receiver
+//! holds in that field. Overlap is then judged on the mapped roots like any
+//! other access. The call-site borrow rule does not check the arguments of a
+//! user-method call, so a method call also declines when two
+//! roots it receives, one of them writable, name the same storage
+//! (`overlapping_call_arguments`) rather than relying on that rule.
 //!
 //! This file also owns the scan that bounds what a call outside a `filum`
 //! body can disturb in the alias facts.
@@ -20,13 +34,14 @@ use super::{
     Aliases, BodyProof, Coordinate, Facts, LoopCtx, Owned, ParamRoots, Storage, coordinate,
     is_access_intrinsic, is_aggregate, param_root,
 };
-use crate::{SemanticError, SemanticErrorKind, Type, TypeTable};
+use crate::passes::fragment_definition::struct_def_from_type;
+use crate::{SemanticError, SemanticErrorKind, Type, TypeId, TypeTable};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_stmt};
 use radix_hir::{
-    DefId, HirAnnotation, HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction,
-    HirItemKind, HirModule, HirStatement, HirStatementKind, NucleumRole,
+    DefId, HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirItemKind,
+    HirModule, HirParamMode, HirStatement, HirStatementKind,
 };
-use radix_lexer::Interner;
+use radix_lexer::{Interner, Symbol};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Deepest chain of helper calls analysed as inlined. Rule 12.7 inlines
@@ -37,9 +52,20 @@ pub(super) const MAX_INLINE_DEPTH: usize = 8;
 /// The issue a reduction term reports: the filum issue is about loops.
 const REDUCTION_EFFECT_ISSUE: &str = "reducta_body_effect";
 
+/// What an instance-method callee takes from its receiver.
+pub(super) struct Receiver {
+    /// `ego` in the body is the path to the class definition.
+    pub(super) ego: DefId,
+    /// Tensor-typed instance fields, by name; the field definition is the
+    /// root a body access through `ego.<field>` carries.
+    pub(super) fields: Vec<(Symbol, DefId)>,
+}
+
 /// One inlinable callee and the facts its analysis reuses at every call.
 pub(super) struct Helper<'a> {
     function: &'a HirFunction,
+    /// Set for an instance method.
+    receiver: Option<Receiver>,
     aliases: Aliases,
     /// Defs one call owns: body locals and by-value scalar parameters.
     owned: FxHashSet<DefId>,
@@ -52,56 +78,138 @@ pub(super) struct Helper<'a> {
 /// The inlinable callees of one module, keyed by definition.
 pub(super) struct Module<'a> {
     helpers: FxHashMap<DefId, Helper<'a>>,
+    /// Instance methods by (class, name): the static resolution of a method
+    /// call, whether or not the method is a kernel.
+    methods: FxHashMap<(DefId, Symbol), DefId>,
 }
 
 impl<'a> Module<'a> {
     pub(super) fn build(hir: &'a HirModule, types: &TypeTable, interner: &Interner) -> Self {
         let mut helpers = FxHashMap::default();
+        let mut methods = FxHashMap::default();
         for item in &hir.items {
-            let HirItemKind::Function(function) = &item.kind else {
-                continue;
-            };
-            let Some(body) = &function.body else {
-                continue;
-            };
-            if !is_inlinable(function, &item.annotations, interner) {
-                continue;
+            match &item.kind {
+                HirItemKind::Function(function) => {
+                    add_helper(&mut helpers, item.def_id, function, None, types, interner);
+                }
+                HirItemKind::Struct(strukt) => {
+                    for method in &strukt.methods {
+                        // HIR carries no receiver mode (lowering leaves it `None`
+                        // for every method): every genus method is an instance
+                        // method, reached through its receiver.
+                        methods.insert((item.def_id, method.func.name), method.def_id);
+                        let receiver = Receiver {
+                            ego: item.def_id,
+                            fields: strukt
+                                .fields
+                                .iter()
+                                .filter(|field| {
+                                    !field.is_static() && is_tensor_typed(types, field.ty)
+                                })
+                                .map(|field| (field.name, field.def_id))
+                                .collect(),
+                        };
+                        add_helper(
+                            &mut helpers,
+                            method.def_id,
+                            &method.func,
+                            Some(receiver),
+                            types,
+                            interner,
+                        );
+                    }
+                }
+                _ => {}
             }
-            let mut owned = Owned::default();
-            owned.visit_block(body);
-            owned.defs.extend(
-                function
-                    .params
-                    .iter()
-                    .filter(|param| !is_aggregate(types, param.ty))
-                    .map(|param| param.def_id),
-            );
-            helpers.insert(
-                item.def_id,
-                Helper {
-                    function,
-                    aliases: Aliases::build(
-                        &function.params,
-                        body,
-                        types,
-                        interner,
-                        ParamRoots::PerParam,
-                        None,
-                    ),
-                    owned: owned.defs,
-                    inert: false,
-                },
-            );
         }
         let calls = mark_inert(&mut helpers, types, interner);
         settle_inert(&mut helpers, &calls);
-        Self { helpers }
+        Self { helpers, methods }
+    }
+
+    /// The method a call `receiver.name(..)` is statically bound to, or why
+    /// it is not.
+    fn resolve_method(
+        &self,
+        receiver: &HirExpression,
+        name: Symbol,
+        types: &TypeTable,
+    ) -> Resolved<'_, 'a> {
+        let Some(ty) = receiver.ty else {
+            return Resolved::Opaque;
+        };
+        if is_dispatched_at_run_time(types, ty) {
+            return Resolved::Dynamic;
+        }
+        let Some(def) = struct_def_from_type(ty, types)
+            .and_then(|class| self.methods.get(&(class, name)))
+            .copied()
+        else {
+            return Resolved::Opaque;
+        };
+        self.helpers
+            .get(&def)
+            .map_or(Resolved::Opaque, |helper| Resolved::Helper(def, helper))
     }
 
     /// A call to `def` leaves the alias facts of its caller as they were.
     pub(super) fn is_inert(&self, def: DefId) -> bool {
         self.helpers.get(&def).is_some_and(|helper| helper.inert)
     }
+}
+
+/// How a method call resolves.
+enum Resolved<'m, 'a> {
+    Helper(DefId, &'m Helper<'a>),
+    /// Dispatched on a contract or a type parameter: no one body to look through.
+    Dynamic,
+    /// Not a kernel method of this module (a host method, a function-valued
+    /// field, an imported class).
+    Opaque,
+}
+
+fn add_helper<'a>(
+    helpers: &mut FxHashMap<DefId, Helper<'a>>,
+    def: DefId,
+    function: &'a HirFunction,
+    receiver: Option<Receiver>,
+    types: &TypeTable,
+    interner: &Interner,
+) {
+    let Some(body) = &function.body else {
+        return;
+    };
+    if !is_inlinable_kernel(function) {
+        return;
+    }
+    let mut owned = Owned::default();
+    owned.visit_block(body);
+    owned.defs.extend(
+        function
+            .params
+            .iter()
+            .filter(|param| !is_aggregate(types, param.ty))
+            .map(|param| param.def_id),
+    );
+    let aliases = Aliases::build(
+        &function.params,
+        body,
+        types,
+        interner,
+        ParamRoots::PerParam,
+        None,
+        receiver.as_ref(),
+    );
+    helpers.insert(
+        def,
+        Helper {
+            function,
+            receiver,
+            aliases,
+            owned: owned.defs,
+            inert: false,
+        },
+    );
 }
 
 /// Mark every helper whose own body cannot disturb its caller's alias facts
@@ -119,7 +227,13 @@ fn mark_inert(
         };
         let mut reach = Reach {
             aliases: &helper.aliases,
-            params: helper.function.params.iter().map(|p| p.def_id).collect(),
+            params: helper
+                .function
+                .params
+                .iter()
+                .map(|p| p.def_id)
+                .chain(helper.receiver.iter().map(|receiver| receiver.ego))
+                .collect(),
             helpers: &defs,
             types,
             interner,
@@ -221,25 +335,33 @@ impl HirVisitor for Reach<'_> {
     }
 }
 
-fn is_inlinable(
-    function: &HirFunction,
-    annotations: &[HirAnnotation],
-    interner: &Interner,
-) -> bool {
-    let public = annotations
-        .iter()
-        .any(|annotation| interner.resolve(annotation.family) == "publica");
-    let device_helper = match function.nucleum_role() {
-        Some(NucleumRole::Fragment) => true,
-        Some(NucleumRole::Entry) => !public,
-        None => false,
-    };
-    device_helper
+/// Whether a callable is a kernel that rule 12.7 inlines: `@ nucleum`
+/// (fragment or entry, public or private), synchronous and infallible.
+pub(crate) fn is_inlinable_kernel(function: &HirFunction) -> bool {
+    function.nucleum_role().is_some()
         && !function.is_async
         && !function.posture.is_async()
         && !function.is_generator
         && !function.posture.is_stream()
         && function.err_ty.is_none()
+}
+
+/// A bare tensor (through an access marker): the one field type with a
+/// storage root of its own.
+fn is_tensor_typed(types: &TypeTable, ty: TypeId) -> bool {
+    let (_, inner) = types.peel_access_marker(ty);
+    matches!(types.get(inner), Type::Tensor(_, _))
+}
+
+/// A receiver typed by a contract or a type parameter: which body a call
+/// reaches is decided at run time (or per instantiation), not here.
+fn is_dispatched_at_run_time(types: &TypeTable, ty: TypeId) -> bool {
+    match types.get(ty) {
+        Type::Interface(_) | Type::Param(_) => true,
+        Type::Ref(_, inner) | Type::Alias(_, inner) => is_dispatched_at_run_time(types, *inner),
+        Type::Applied(base, _) => is_dispatched_at_run_time(types, *base),
+        _ => false,
+    }
 }
 
 /// A helper being analysed as inlined at one call site.
@@ -350,6 +472,48 @@ impl<'a> BodyProof<'a> {
         let Some((def, helper)) = helper else {
             return self.decline_call(expr, "unproved_call_effect");
         };
+        // A method is called through its receiver, never by path.
+        if helper.receiver.is_some() {
+            return self.decline_call(expr, "unproved_call_effect");
+        }
+        self.inline(expr, def, helper, None, args);
+    }
+
+    /// A method call in a body under proof. The receiver's type binds it to
+    /// one method; that method is analysed as inlined with `ego` mapped to the
+    /// receiver. A call that binds to no kernel method is an unproved effect.
+    pub(super) fn method_call(
+        &mut self,
+        expr: &HirExpression,
+        receiver: &HirExpression,
+        name: Symbol,
+        args: &[HirCallArg],
+    ) {
+        let module = self.module;
+        match module.resolve_method(receiver, name, self.types) {
+            Resolved::Helper(def, helper) => self.inline(expr, def, helper, Some(receiver), args),
+            Resolved::Dynamic => self.decline_call(expr, "dynamic_dispatch"),
+            Resolved::Opaque => self.decline_call(expr, "unproved_call_effect"),
+        }
+    }
+
+    /// Whether the call `receiver.name(..)` resolves to a kernel method this
+    /// pass looks through.
+    pub(super) fn is_method_helper(&self, receiver: &HirExpression, name: Symbol) -> bool {
+        matches!(
+            self.module.resolve_method(receiver, name, self.types),
+            Resolved::Helper(..)
+        )
+    }
+
+    fn inline(
+        &mut self,
+        expr: &HirExpression,
+        def: DefId,
+        helper: &'a Helper<'a>,
+        receiver: Option<&HirExpression>,
+        args: &[HirCallArg],
+    ) {
         let function = helper.function;
         if args.len() != function.params.len()
             || args.iter().any(|arg| arg.spread || arg.name.is_some())
@@ -362,7 +526,15 @@ impl<'a> BodyProof<'a> {
         if self.frames.len() >= MAX_INLINE_DEPTH {
             return self.decline_call(expr, "inline_depth_exceeded");
         }
-        let frame = self.bind_arguments(def, helper, args);
+        let frame = self.bind_arguments(def, helper, receiver, args);
+        if receiver.is_some() && self.roots_overlap(helper, &frame) {
+            return self.decline_call(expr, "overlapping_call_arguments");
+        }
+        if let Some(receiver) = receiver
+            && !self.skip_arguments
+        {
+            self.receiver(receiver);
+        }
         self.visit_arguments(args);
         let owner = *self.stack.last().expect("inside a filum loop");
         self.loops[owner].owned.extend(helper.owned.iter().copied());
@@ -384,6 +556,7 @@ impl<'a> BodyProof<'a> {
         &self,
         callee: DefId,
         helper: &'a Helper<'a>,
+        receiver: Option<&HirExpression>,
         args: &[HirCallArg],
     ) -> Frame<'a> {
         let mut roots = FxHashMap::default();
@@ -396,12 +569,53 @@ impl<'a> BodyProof<'a> {
             let coord = coordinate(&arg.expr).and_then(|coord| self.map_coords(vec![coord])?.pop());
             coords.insert(param.def_id, coord);
         }
+        if let (Some(model), Some(receiver)) = (&helper.receiver, receiver) {
+            roots.insert(model.ego, self.facts_of(receiver));
+            for (name, field) in &model.fields {
+                let held = HirExpression {
+                    id: receiver.id,
+                    kind: HirExpressionKind::Field(Box::new(receiver.clone()), *name),
+                    ty: None,
+                    span: receiver.span,
+                };
+                roots.insert(*field, self.facts_of(&held));
+            }
+        }
         Frame {
             callee,
             aliases: &helper.aliases,
             roots,
             coords,
         }
+    }
+
+    /// Two roots a method call receives name the same storage and one of them
+    /// is writable: the receiver's tensor fields, and the tensor parameters
+    /// that are not shared (`de`, `ref`). Unknown or empty facts do not count
+    /// here; an access through them declines where it is analysed.
+    fn roots_overlap(&self, helper: &Helper<'_>, frame: &Frame<'_>) -> bool {
+        let mut roots: Vec<(&Facts, bool)> = Vec::new();
+        if let Some(model) = &helper.receiver {
+            for (_, field) in &model.fields {
+                roots.extend(frame.roots.get(field).map(|facts| (facts, true)));
+            }
+        }
+        for param in &helper.function.params {
+            let shared = matches!(param.mode, HirParamMode::De) || self.types.is_ref_view(param.ty);
+            roots.extend(frame.roots.get(&param.def_id).map(|facts| (facts, !shared)));
+        }
+        roots
+            .iter()
+            .enumerate()
+            .any(|(index, (left, left_writable))| {
+                roots[index + 1..].iter().any(|(right, right_writable)| {
+                    (*left_writable || *right_writable)
+                        && left
+                            .storage
+                            .iter()
+                            .any(|a| right.storage.iter().any(|b| a.root == b.root))
+                })
+            })
     }
 
     /// The argument expressions run in the caller before the body does. A
@@ -552,6 +766,16 @@ impl HirVisitor for TermCalls<'_> {
             && self.proof.module.helpers.contains_key(def)
         {
             self.proof.call(expr, callee, args);
+            for arg in args {
+                self.visit_expr(&arg.expr);
+            }
+            return;
+        }
+        if let HirExpressionKind::MethodCall(receiver, name, _, args, _) = &expr.kind
+            && self.proof.is_method_helper(receiver, *name)
+        {
+            self.proof.method_call(expr, receiver, *name, args);
+            self.visit_expr(receiver);
             for arg in args {
                 self.visit_expr(&arg.expr);
             }

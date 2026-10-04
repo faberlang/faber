@@ -313,16 +313,15 @@ functio host(f32 x) → f32 { redde x }
 }
 
 #[test]
-fn public_kernel_call_stays_declined() {
+fn public_kernel_call_is_looked_through() {
+    // Rule 12.7 (extended 2026-10-04): a public kernel called from a kernel is
+    // just a call; its body is analysed as inlined.
     let public = r"
 @ nucleum
 @ publica
 functio shown(f32 x) → f32 { redde x }
 ";
-    rejected(
-        &kernel(public, "out[i] ← shown(value)"),
-        "unproved_call_effect",
-    );
+    accepted(&kernel(public, "out[i] ← shown(value)"));
 }
 
 #[test]
@@ -448,8 +447,8 @@ functio k(tensor<f32, [32]> xs) → f32 {
 }
 
 #[test]
-fn reduction_term_calling_a_public_kernel_is_still_rejected() {
-    assert_rejects_with_issue(
+fn reduction_term_may_call_a_public_kernel() {
+    assert_accepts(
         r"
 @ nucleum
 @ publica
@@ -459,7 +458,6 @@ functio k(tensor<f32, [32]> xs) → f32 {
     redde reducta via summa ex xs apud [i] filum f fixum s { redde shown(s) }
 }
 ",
-        "reducta_body_context",
     );
 }
 

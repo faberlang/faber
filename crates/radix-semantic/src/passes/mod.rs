@@ -327,6 +327,10 @@ mod k8_filum_calls_test;
 mod k8_filum_independence_test;
 
 #[cfg(test)]
+#[path = "k8_filum_methods_test.rs"]
+mod k8_filum_methods_test;
+
+#[cfg(test)]
 #[path = "k8_filum_nested_test.rs"]
 mod k8_filum_nested_test;
 
